@@ -73,7 +73,37 @@
       currency: 'USD',
       source: source || 'fallback',
       updatedAt: new Date().toISOString(),
+      marketStatus: getLocalMarketStatus(),
       clientNextUpdateAt: new Date(Date.now() + CLIENT_CACHE_TTL_MS).toISOString()
+    };
+  }
+
+  function getLocalMarketStatus() {
+    var parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      weekday: 'short',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false
+    }).formatToParts(new Date()).reduce(function (values, part) {
+      values[part.type] = part.value;
+      return values;
+    }, {});
+
+    var weekday = parts.weekday;
+    var hour = Number(parts.hour);
+    var minute = Number(parts.minute);
+    var minutesAfterMidnight = hour * 60 + minute;
+    var isWeekendClose =
+      weekday === 'Sat' ||
+      (weekday === 'Fri' && minutesAfterMidnight >= 17 * 60) ||
+      (weekday === 'Sun' && minutesAfterMidnight < 18 * 60);
+
+    return {
+      market: 'gold',
+      timeZone: 'America/New_York',
+      isClosed: isWeekendClose,
+      reason: isWeekendClose ? 'weekend' : 'open'
     };
   }
 
@@ -143,6 +173,18 @@
     return countdown ? label + '\n' + countdown : label;
   }
 
+  function isMarketClosed() {
+    var status = spotData && spotData.marketStatus;
+    if (status && typeof status.isClosed === 'boolean') {
+      return status.isClosed;
+    }
+    return getLocalMarketStatus().isClosed;
+  }
+
+  function formatMarketClosedMessage() {
+    return 'Market closed - updates resume when trading reopens';
+  }
+
   function getNextUpdateTime() {
     if (!spotData) return null;
     var raw = spotData.nextUpdateAt || spotData.clientNextUpdateAt;
@@ -158,6 +200,10 @@
   }
 
   function formatNextUpdateCountdown() {
+    if (isMarketClosed()) {
+      return formatMarketClosedMessage();
+    }
+
     var ms = getMsUntilNextUpdate();
     if (ms === null) return '';
     if (ms <= 0) return 'Next update: soon';
@@ -249,9 +295,15 @@
       var sourceLabel = spotData.source === 'fallback' ? 'estimated spot' : 'live spot';
       var spotLabel = formatSpotPrice(spotData);
       var countdown = formatNextUpdateCountdown();
-      spotMeta.textContent = timeLabel
-        ? 'Gold ' + sourceLabel + ' updated ' + timeLabel + (spotLabel ? ' - spot ' + spotLabel : '') + (countdown ? ' - ' + countdown : '')
-        : 'Gold pricing updated from current spot' + (spotLabel ? ' - spot ' + spotLabel : '') + (countdown ? ' - ' + countdown : '');
+      if (isMarketClosed()) {
+        spotMeta.textContent = timeLabel
+          ? 'Gold market closed - last ' + sourceLabel + ' update ' + timeLabel + (spotLabel ? ' - spot ' + spotLabel : '')
+          : 'Gold market closed - pricing will refresh when trading reopens' + (spotLabel ? ' - spot ' + spotLabel : '');
+      } else {
+        spotMeta.textContent = timeLabel
+          ? 'Gold ' + sourceLabel + ' updated ' + timeLabel + (spotLabel ? ' - spot ' + spotLabel : '') + (countdown ? ' - ' + countdown : '')
+          : 'Gold pricing updated from current spot' + (spotLabel ? ' - spot ' + spotLabel : '') + (countdown ? ' - ' + countdown : '');
+      }
       spotMeta.hidden = false;
     }
   }
@@ -288,9 +340,15 @@
       var timeLabel = formatSpotTimestamp(spotData.updatedAt);
       var spotLabel = formatSpotPrice(spotData);
       var countdown = formatNextUpdateCountdown();
-      spotMeta.textContent = timeLabel
-        ? 'Price reflects gold spot updated ' + timeLabel + (spotLabel ? ' at ' + spotLabel : '') + (countdown ? ' - ' + countdown : '') + '.'
-        : 'Price reflects current gold spot' + (spotLabel ? ' at ' + spotLabel : '') + (countdown ? ' - ' + countdown : '') + '.';
+      if (isMarketClosed()) {
+        spotMeta.textContent = timeLabel
+          ? 'Price reflects last gold spot update ' + timeLabel + (spotLabel ? ' at ' + spotLabel : '') + '. Market closed; updates resume when trading reopens.'
+          : 'Market closed; pricing will refresh when trading reopens' + (spotLabel ? ' from spot ' + spotLabel : '') + '.';
+      } else {
+        spotMeta.textContent = timeLabel
+          ? 'Price reflects gold spot updated ' + timeLabel + (spotLabel ? ' at ' + spotLabel : '') + (countdown ? ' - ' + countdown : '') + '.'
+          : 'Price reflects current gold spot' + (spotLabel ? ' at ' + spotLabel : '') + (countdown ? ' - ' + countdown : '') + '.';
+      }
       spotMeta.hidden = false;
     }
   }

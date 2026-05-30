@@ -25,6 +25,35 @@ function normalizeSpotPrice(value) {
   return spot;
 }
 
+function getEasternMarketStatus(now) {
+  var parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'short',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false
+  }).formatToParts(now || new Date()).reduce(function (values, part) {
+    values[part.type] = part.value;
+    return values;
+  }, {});
+
+  var weekday = parts.weekday;
+  var hour = Number(parts.hour);
+  var minute = Number(parts.minute);
+  var minutesAfterMidnight = hour * 60 + minute;
+  var isWeekendClose =
+    weekday === 'Sat' ||
+    (weekday === 'Fri' && minutesAfterMidnight >= 17 * 60) ||
+    (weekday === 'Sun' && minutesAfterMidnight < 18 * 60);
+
+  return {
+    market: 'gold',
+    timeZone: 'America/New_York',
+    isClosed: isWeekendClose,
+    reason: isWeekendClose ? 'weekend' : 'open'
+  };
+}
+
 function buildPayload(spotPerTroyOz, source, fetchedAt) {
   var normalized = normalizeSpotPrice(spotPerTroyOz);
   if (!normalized) {
@@ -36,7 +65,8 @@ function buildPayload(spotPerTroyOz, source, fetchedAt) {
     goldSpotPerGram24k: normalized / GRAMS_PER_TROY_OZ,
     currency: 'USD',
     source: source,
-    updatedAt: fetchedAt || new Date().toISOString()
+    updatedAt: fetchedAt || new Date().toISOString(),
+    marketStatus: getEasternMarketStatus(new Date())
   };
 }
 
