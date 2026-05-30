@@ -40,6 +40,12 @@ function buildPayload(spotPerTroyOz, source, fetchedAt) {
   };
 }
 
+function withCacheWindow(payload, expiresAt) {
+  return Object.assign({}, payload, {
+    nextUpdateAt: new Date(expiresAt).toISOString()
+  });
+}
+
 function normalizeTimestamp(data) {
   var rawTimestamp = data && (data.updatedAt || data.updated_at || data.timestamp || data.time);
   if (!rawTimestamp) {
@@ -113,22 +119,22 @@ exports.handler = async function handler(event) {
       throw new Error('Unable to normalize gold spot price');
     }
 
-    cache.payload = payload;
     cache.expiresAt = now + CACHE_TTL_MS;
+    cache.payload = withCacheWindow(payload, cache.expiresAt);
 
     return {
       statusCode: 200,
       headers: Object.assign({}, corsHeaders(), {
         'Cache-Control': 'public, max-age=300'
       }),
-      body: JSON.stringify(payload)
+      body: JSON.stringify(cache.payload)
     };
   } catch (error) {
     var fallback = buildPayload(FALLBACK_GOLD_SPOT_PER_TROY_OZ, 'fallback', new Date().toISOString());
-    cache.payload = Object.assign({}, fallback, {
-      warning: error && error.message ? error.message : 'Live spot price unavailable'
-    });
     cache.expiresAt = Date.now() + CACHE_TTL_MS;
+    cache.payload = withCacheWindow(Object.assign({}, fallback, {
+      warning: error && error.message ? error.message : 'Live spot price unavailable'
+    }), cache.expiresAt);
 
     return {
       statusCode: 200,

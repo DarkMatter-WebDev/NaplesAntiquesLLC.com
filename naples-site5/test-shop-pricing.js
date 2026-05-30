@@ -2,25 +2,17 @@
 var GRAMS_PER_TROY_OZ = 31.1034768;
 var FALLBACK_GOLD_SPOT_PER_TROY_OZ = 5500;
 
-function roundToRetail(amount) {
+function roundToCents(amount) {
   var value = Number(amount);
   if (!Number.isFinite(value) || value <= 0) return 0;
-  var rounded;
-  if (value >= 5000) {
-    rounded = Math.round(value / 50) * 50;
-  } else if (value >= 2000) {
-    rounded = Math.round(value / 25) * 25;
-  } else {
-    rounded = Math.round(value / 5) * 5;
-  }
-  return Math.max(5, rounded);
+  return Math.round(value * 100) / 100;
 }
 
 function calculatePublicPrice(product, spotPerTroyOz) {
   var spotPerGram24k = spotPerTroyOz / GRAMS_PER_TROY_OZ;
   var meltValue = spotPerGram24k * (product.purity / 24) * product.weightGrams;
   var rawPrice = meltValue * product.pricingMultiplier;
-  return roundToRetail(rawPrice);
+  return roundToCents(rawPrice);
 }
 
 var products = [
@@ -41,23 +33,23 @@ products.forEach(function (product) {
   var price = calculatePublicPrice(product, spot);
   total += price;
   var ok = price > 0;
-  console.log(product.id + ': $' + price + ' ' + (ok ? 'OK' : 'WARN'));
+  console.log(product.id + ': $' + price.toFixed(2) + ' ' + (ok ? 'OK' : 'WARN'));
   if (!ok) failures.push(product.id);
 });
 
-console.log('\nCart subtotal: $' + total.toLocaleString('en-US'));
+console.log('\nCart subtotal: $' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
-console.log('\nRounding checks:');
+console.log('\nCent accuracy checks:');
 [
-  [2487, 2475],
-  [10780, 10800],
-  [5955, 5950],
-  [1498, 1500]
+  [2487.129, 2487.13],
+  [10780.555, 10780.56],
+  [5955.004, 5955],
+  [1498.1, 1498.1]
 ].forEach(function (pair) {
-  var result = roundToRetail(pair[0]);
+  var result = roundToCents(pair[0]);
   var ok = result === pair[1];
-  console.log('roundToRetail(' + pair[0] + ') = ' + result + ' expected ' + pair[1] + ' ' + (ok ? 'OK' : 'FAIL'));
-  if (!ok) failures.push('round-' + pair[0]);
+  console.log('roundToCents(' + pair[0] + ') = ' + result.toFixed(2) + ' expected ' + pair[1].toFixed(2) + ' ' + (ok ? 'OK' : 'FAIL'));
+  if (!ok) failures.push('cents-' + pair[0]);
 });
 
 if (failures.length) {

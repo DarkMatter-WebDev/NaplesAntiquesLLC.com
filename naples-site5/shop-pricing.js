@@ -8,6 +8,7 @@
   var spotData = null;
   var readyCallbacks = [];
   var isReady = false;
+  var refreshTimer = null;
 
   function runReadyCallbacks() {
     isReady = true;
@@ -37,7 +38,7 @@
       if (!parsed || !parsed.payload || !parsed.expiresAt || parsed.expiresAt <= Date.now()) {
         return null;
       }
-      return parsed.payload;
+      return withClientCacheWindow(parsed.payload, parsed.expiresAt);
     } catch (error) {
       return null;
     }
@@ -45,13 +46,24 @@
 
   function writeClientCache(payload) {
     try {
+      var expiresAt = Date.now() + CLIENT_CACHE_TTL_MS;
+      var normalizedPayload = withClientCacheWindow(payload, expiresAt);
       window.sessionStorage.setItem(CLIENT_CACHE_KEY, JSON.stringify({
-        payload: payload,
-        expiresAt: Date.now() + CLIENT_CACHE_TTL_MS
+        payload: normalizedPayload,
+        expiresAt: expiresAt
       }));
+      return normalizedPayload;
     } catch (error) {
       /* ignore storage failures */
     }
+
+    return payload;
+  }
+
+  function withClientCacheWindow(payload, expiresAt) {
+    return Object.assign({}, payload, {
+      clientNextUpdateAt: new Date(expiresAt).toISOString()
+    });
   }
 
   function buildFallbackSpot(source) {
@@ -60,7 +72,8 @@
       goldSpotPerGram24k: FALLBACK_GOLD_SPOT_PER_TROY_OZ / GRAMS_PER_TROY_OZ,
       currency: 'USD',
       source: source || 'fallback',
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      clientNextUpdateAt: new Date(Date.now() + CLIENT_CACHE_TTL_MS).toISOString()
     };
   }
 
@@ -82,37 +95,74 @@
         if (!payload || !payload.goldSpotPerTroyOz) {
           throw new Error('Spot price payload missing goldSpotPerTroyOz');
         }
-        spotData = payload;
-        writeClientCache(payload);
+        spotData = writeClientCache(payload);
         return payload;
       })
       .catch(function () {
-        spotData = buildFallbackSpot('fallback');
+        spotData = writeClientCache(buildFallbackSpot('fallback'));
         return spotData;
       });
   }
 
-  function roundToRetail(amount) {
-    var value = Number(amount);
-    if (!Number.isFinite(value) || value <= 0) return 0;
-
-    var rounded;
-    if (value >= 5000) {
-      rounded = Math.round(value / 50) * 50;
-    } else if (value >= 2000) {
-      rounded = Math.round(value / 25) * 25;
-    } else {
-      rounded = Math.round(value / 5) * 5;
-    }
-
-    return Math.max(5, rounded);
-  }
-
   function formatMoney(amount) {
     return '$' + Number(amount).toLocaleString('en-US', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     });
+  }
+
+  function roundToCents(amount) {
+    var value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) return 0;
+    return Math.round(value * 100) / 100;
+  }
+
+  function formatMultiplier(multiplier) {
+    var value = Number(multiplier);
+    if (!Number.isFinite(value) || value <= 0) return '';
+    return value.toFixed(2).replace(/\.?0+$/, '') + 'x';
+  }
+
+  function formatSpotPrice(spot) {
+    var value = spot && Number(spot.goldSpotPerTroyOz);
+    if (!Number.isFinite(value) || value <= 0) return '';
+    return formatMoney(value) + '/oz';
+  }
+
+  function buildPriceContext(product) {
+    if (!usesSpotPricing(product)) {
+      return 'Manual price';
+    }
+
+    var multiplier = formatMultiplier(product.pricingMultiplier);
+    var countdown = formatNextUpdateCountdown();
+    var label = multiplier
+      ? 'Live price - ' + multiplier + ' spot multiplier'
+      : 'Live price';
+
+    return countdown ? label + '\n' + countdown : label;
+  }
+
+  function getNextUpdateTime() {
+    if (!spotData) return null;
+    var raw = spotData.nextUpdateAt || spotData.clientNextUpdateAt;
+    if (!raw) return null;
+    var date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  function getMsUntilNextUpdate() {
+    var nextUpdate = getNextUpdateTime();
+    if (!nextUpdate) return null;
+    return nextUpdate.getTime() - Date.now();
+  }
+
+  function formatNextUpdateCountdown() {
+    var ms = getMsUntilNextUpdate();
+    if (ms === null) return '';
+    if (ms <= 0) return 'Next update: soon';
+    var minutes = Math.max(1, Math.ceil(ms / 60000));
+    return 'Next update: ' + minutes + ' min';
   }
 
   function priceLabelToNumber(priceLabel) {
@@ -142,7 +192,7 @@
 
     var meltValue = spotPerGram24k * (Number(product.purity) / 24) * Number(product.weightGrams);
     var rawPrice = meltValue * Number(product.pricingMultiplier);
-    var amount = roundToRetail(rawPrice);
+    var amount = roundToCents(rawPrice);
 
     return {
       amount: amount,
@@ -186,15 +236,22 @@
       if (priceEl) {
         priceEl.textContent = product.priceLabel;
       }
+
+      var contextEl = card.querySelector('[data-shop-price-context]');
+      if (contextEl) {
+        contextEl.textContent = buildPriceContext(product);
+      }
     });
 
     var spotMeta = document.getElementById('shop-spot-meta');
     if (spotMeta && spotData) {
       var timeLabel = formatSpotTimestamp(spotData.updatedAt);
       var sourceLabel = spotData.source === 'fallback' ? 'estimated spot' : 'live spot';
+      var spotLabel = formatSpotPrice(spotData);
+      var countdown = formatNextUpdateCountdown();
       spotMeta.textContent = timeLabel
-        ? 'Gold ' + sourceLabel + ' updated ' + timeLabel
-        : 'Gold pricing updated from current spot';
+        ? 'Gold ' + sourceLabel + ' updated ' + timeLabel + (spotLabel ? ' - spot ' + spotLabel : '') + (countdown ? ' - ' + countdown : '')
+        : 'Gold pricing updated from current spot' + (spotLabel ? ' - spot ' + spotLabel : '') + (countdown ? ' - ' + countdown : '');
       spotMeta.hidden = false;
     }
   }
@@ -210,6 +267,12 @@
       priceEl.textContent = product.priceLabel;
     }
 
+    var contextEl = document.getElementById('product-price-context');
+    if (contextEl) {
+      contextEl.textContent = buildPriceContext(product);
+      contextEl.hidden = false;
+    }
+
     var details = document.getElementById('product-details');
     if (details) {
       Array.prototype.forEach.call(details.querySelectorAll('li'), function (item) {
@@ -223,11 +286,37 @@
     var spotMeta = document.getElementById('product-spot-meta');
     if (spotMeta && spotData) {
       var timeLabel = formatSpotTimestamp(spotData.updatedAt);
+      var spotLabel = formatSpotPrice(spotData);
+      var countdown = formatNextUpdateCountdown();
       spotMeta.textContent = timeLabel
-        ? 'Price reflects gold spot updated ' + timeLabel + '.'
-        : 'Price reflects current gold spot.';
+        ? 'Price reflects gold spot updated ' + timeLabel + (spotLabel ? ' at ' + spotLabel : '') + (countdown ? ' - ' + countdown : '') + '.'
+        : 'Price reflects current gold spot' + (spotLabel ? ' at ' + spotLabel : '') + (countdown ? ' - ' + countdown : '') + '.';
       spotMeta.hidden = false;
     }
+  }
+
+  function refreshDisplays() {
+    applyProductPrices(window.SHOP_PRODUCTS || []);
+    applyToShopCards();
+    applyToProductPage();
+  }
+
+  function startRefreshTimer() {
+    if (refreshTimer) {
+      window.clearInterval(refreshTimer);
+    }
+
+    refreshTimer = window.setInterval(function () {
+      var ms = getMsUntilNextUpdate();
+      if (ms !== null && ms <= 0) {
+        fetchSpot().then(function () {
+          refreshDisplays();
+        });
+        return;
+      }
+
+      refreshDisplays();
+    }, 30000);
   }
 
   function init() {
@@ -245,6 +334,7 @@
       applyProductPrices(products);
       applyToShopCards();
       applyToProductPage();
+      startRefreshTimer();
       runReadyCallbacks();
       return spot;
     });
@@ -254,13 +344,14 @@
     GRAMS_PER_TROY_OZ: GRAMS_PER_TROY_OZ,
     onReady: onReady,
     fetchSpot: fetchSpot,
-    roundToRetail: roundToRetail,
+    roundToCents: roundToCents,
     formatMoney: formatMoney,
     calculatePublicPrice: calculatePublicPrice,
     getDisplayPrice: getDisplayPrice,
     applyProductPrices: applyProductPrices,
     applyToShopCards: applyToShopCards,
     applyToProductPage: applyToProductPage,
+    formatNextUpdateCountdown: formatNextUpdateCountdown,
     getSpotData: function () { return spotData; },
     init: init
   };
