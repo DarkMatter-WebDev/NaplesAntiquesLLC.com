@@ -1,0 +1,616 @@
+﻿<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Shop | Curated Estate Jewelry, Watches &amp; Antiques | Naples FL</title>
+  <meta name="description" content="Browse curated estate jewelry, luxury watches, sterling silver, and antiques from Naples Estate Jewelry &amp; Antiques. Limited one-of-one inventory — inquire or purchase by appointment. Mobile, appointment-only service in Southwest Florida." />
+  <meta name="author" content="Naples Estate Jewelry & Antiques" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://naplesantiquesllc.com/shop.html" />
+
+  <meta name="geo.region" content="US-FL" />
+  <meta name="geo.placename" content="Naples, Florida" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Naples Estate Jewelry & Antiques" />
+  <meta property="og:title" content="Shop | Curated Estate Jewelry, Watches &amp; Antiques | Naples FL" />
+  <meta property="og:description" content="Browse curated estate jewelry, luxury watches, sterling silver, and antiques. Limited inventory — inquire or purchase by appointment in Southwest Florida." />
+  <meta property="og:image" content="https://naplesantiquesllc.com/logo.png" />
+  <meta property="og:url" content="https://naplesantiquesllc.com/shop.html" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Shop | Curated Estate Jewelry, Watches &amp; Antiques | Naples FL" />
+  <meta name="twitter:description" content="Browse curated estate jewelry, luxury watches, sterling silver, and antiques. Limited inventory — inquire or purchase by appointment." />
+  <meta name="twitter:image" content="https://naplesantiquesllc.com/logo.png" />
+
+  <link rel="icon" type="image/png" href="logo2.png" />
+  <link rel="apple-touch-icon" href="logo2.png" />
+  <meta name="theme-color" content="#f9f9f9" />
+
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Hanken+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <script src="editorial-tailwind-config.js"></script>
+  <link href="editorial-base.css" rel="stylesheet" />
+  <link href="editorial-theme.css?v=charcoal-header" rel="stylesheet" />
+  <script src="site-header.js" defer></script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body { cursor: auto; overflow-x: hidden; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; }
+    .gold-button { background: linear-gradient(135deg, #f2ca50 0%, #d4af37 100%); }
+    .shop-product-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.25rem;
+    }
+    @media (min-width: 640px) {
+      .shop-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (min-width: 1024px) {
+      .shop-product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; }
+    }
+    .shop-product-card {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background: #202323;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 2px;
+      overflow: hidden;
+      cursor: pointer;
+    }
+    .shop-product-card:focus-visible {
+      outline: 2px solid rgba(242, 202, 80, 0.8);
+      outline-offset: 4px;
+    }
+    .shop-product-card .shop-product-media {
+      aspect-ratio: 1;
+      overflow: hidden;
+      position: relative;
+      background: #1a1c1c;
+      cursor: pointer;
+    }
+    .shop-product-card .shop-product-media:focus-visible {
+      outline: 2px solid rgba(242, 202, 80, 0.8);
+      outline-offset: 3px;
+    }
+    .shop-media-cart-btn {
+      position: absolute;
+      right: 0.75rem;
+      bottom: 0.75rem;
+      z-index: 2;
+      background: linear-gradient(135deg, #f2ca50 0%, #d4af37 100%);
+      color: #161616;
+      border: 0;
+      border-radius: 2px;
+      padding: 0.65rem 0.8rem;
+      font-size: 0.64rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+    }
+    .shop-media-cart-btn:hover,
+    .shop-media-cart-btn:focus-visible {
+      transform: translateY(-1px);
+      outline: none;
+    }
+    .shop-product-card .shop-product-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 1.25rem 1.25rem 1.35rem;
+    }
+    .shop-product-card .shop-product-body h3 {
+      color: #f6f1e8 !important;
+    }
+    .shop-product-card .shop-product-body p {
+      color: #d8d2c7 !important;
+    }
+    .shop-product-card .shop-product-body > span:first-child {
+      color: #f2ca50 !important;
+    }
+    .shop-product-card .shop-product-body .text-primary {
+      color: #f2ca50 !important;
+    }
+    .shop-product-card .shop-inquire-fallback {
+      align-items: center;
+    }
+    .shop-product-card .shop-inquire-fallback a {
+      display: inline-flex !important;
+      align-items: center;
+      justify-content: center;
+      min-height: 2.45rem;
+      border-radius: 0.375rem;
+      line-height: 1 !important;
+      text-decoration: none !important;
+      white-space: nowrap;
+    }
+    .shop-product-card .shop-inquire-fallback a:first-child {
+      color: #f2ca50 !important;
+      border-color: rgba(242, 202, 80, 0.65) !important;
+      background: rgba(242, 202, 80, 0.08);
+    }
+    .shop-product-card .shop-inquire-fallback a:first-child:hover {
+      color: #161616 !important;
+      background: #f2ca50 !important;
+    }
+    .shop-product-card .shop-inquire-fallback a:last-child {
+      color: #f6f1e8 !important;
+      border: 1px solid rgba(231, 223, 209, 0.32);
+      padding: 0.65rem 1.1rem;
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .shop-product-card .shop-inquire-fallback a:last-child:hover,
+    .shop-product-card .shop-inquire-fallback a:last-child:focus-visible {
+      color: #161616 !important;
+      background: #e7dfd1 !important;
+      outline: none;
+    }
+    .shop-status-badge {
+      position: absolute;
+      top: 0.75rem;
+      left: 0.75rem;
+      font-size: 0.625rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.6rem;
+      border-radius: 2px;
+      background: rgba(26, 28, 28, 0.85);
+      color: #f2ca50;
+      border: 1px solid rgba(242, 202, 80, 0.35);
+    }
+    .shop-status-badge--soon {
+      color: #c8c6c2;
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .shopify-product-embed {
+      min-height: 0;
+      margin-top: 0.75rem;
+    }
+    .shopify-product-embed:empty {
+      display: none;
+    }
+    .shopify-product-embed:not(:empty) + .shop-inquire-fallback {
+      display: none;
+    }
+    .shop-page-cart-row {
+      position: sticky;
+      top: 4.8rem;
+      z-index: 30;
+      display: flex;
+      justify-content: flex-end;
+      pointer-events: none;
+      margin-bottom: 1.5rem;
+    }
+    .shop-page-cart-btn {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      border: 1px solid rgba(115, 92, 0, 0.55);
+      background: rgba(249, 249, 247, 0.96);
+      color: #735c00;
+      box-shadow: 0 12px 30px rgba(26, 28, 28, 0.12);
+      backdrop-filter: blur(8px);
+    }
+    .shop-page-cart-btn:hover,
+    .shop-page-cart-btn:focus-visible {
+      background: #735c00;
+      color: #fff8e1;
+      outline: none;
+    }
+    .shop-product-card.is-hidden,
+    .shop-product-card[hidden] {
+      display: none !important;
+    }
+    .shop-filters-bar {
+      margin-bottom: 1.5rem;
+    }
+    .shop-search-wrap {
+      position: relative;
+      max-width: 28rem;
+      margin: 0 auto 1.25rem;
+    }
+    .shop-search-wrap .material-symbols-outlined {
+      display: none;
+    }
+    .shop-search-input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid rgba(115, 92, 0, 0.5);
+      border-radius: 2px;
+      background: #ffffff;
+      color: #1a1c1c;
+      font-size: 0.9375rem;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .shop-search-input::-webkit-search-decoration,
+    .shop-search-input::-webkit-search-cancel-button,
+    .shop-search-input::-webkit-search-results-button,
+    .shop-search-input::-webkit-search-results-decoration {
+      display: none;
+    }
+    .shop-search-input:focus {
+      outline: 2px solid rgba(115, 92, 0, 0.45);
+      outline-offset: 1px;
+    }
+    .shop-category-filters {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .shop-filter-btn {
+      font-size: 0.6875rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 0.5rem 0.85rem;
+      border: 1px solid rgba(115, 92, 0, 0.35);
+      border-radius: 2px;
+      background: #ffffff;
+      color: #1a1c1c;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s, color 0.2s;
+    }
+    .shop-filter-btn:hover {
+      border-color: rgba(115, 92, 0, 0.5);
+      color: #735c00;
+      background: #f7f2e4;
+    }
+    .shop-filter-btn--active {
+      border-color: #735c00;
+      background: #735c00;
+      color: #ffffff;
+    }
+    .shop-filter-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem 1.25rem;
+      font-size: 0.8125rem;
+      color: #4b4540;
+    }
+    .shop-clear-btn {
+      font-size: 0.6875rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      color: #735c00;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+    }
+    .shop-clear-btn:hover {
+      color: #f2ca50;
+    }
+    #shop-empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 3rem 1.5rem;
+      border: 1px dashed rgba(255, 255, 255, 0.12);
+      border-radius: 2px;
+    }
+  </style>
+
+  <!-- MailerLite Universal -->
+  <script>
+    (function(w,d,e,u,f,l,n){w[f]=w[f]||function(){(w[f].q=w[f].q||[])
+    .push(arguments);},l=d.createElement(e),l.async=1,l.src=u,
+    n=d.getElementsByTagName(e)[0],n.parentNode.insertBefore(l,n);})
+    (window,document,'script','https://assets.mailerlite.com/js/universal.js','ml');
+    ml('account', '2354340');
+  </script>
+  <!-- End MailerLite Universal -->
+
+  <!--
+    Shopify Buy Button setup (when ready):
+    1. Create products in Shopify admin (inventory qty 1 per piece).
+    2. Install the Buy Button sales channel in Shopify.
+    3. Generate embed code per product and paste inside the matching .shopify-product-embed div.
+    4. Uncomment the script block at the bottom of this page.
+    Store domain: YOUR-STORE.myshopify.com
+  -->
+</head>
+
+<body class="font-body-md text-body-md bg-background overflow-x-hidden">
+  <header class="site-header site-header--light fixed top-0 w-full z-50 bg-[#f9f9f7]/95 border-b border-[#d8d0c2]">
+  <div class="site-header-bar flex items-center justify-between gap-3 px-4 md:px-8 py-4 md:py-5 w-full max-w-[1440px] mx-auto">
+    <a href="index.html" class="site-brand-link flex items-center gap-3 min-w-0">
+      <img src="logo.png" alt="Naples Estate Jewelry & Antiques Logo" class="site-brand-logo h-10 w-auto object-contain flex-shrink-0" />
+      <span class="site-brand-text font-display-lg-mobile text-[18px] md:text-[23px] tracking-normal text-[#735c00] uppercase">
+        <span class="site-brand-short">Naples Estate Jewelry & Antiques</span>
+        <span class="site-brand-full">Naples Estate Jewelry &amp; Antiques</span>
+      </span>
+    </a>
+    <nav class="site-header-nav hidden 2xl:flex items-center gap-5">
+      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="index.html">Home</a>
+      <a class="text-[#5e5e5d] hover:text-[#735c00] border-b border-[#735c00]/40 font-label-md text-label-md transition-colors px-1 py-2" href="shop.html">Shop</a>
+      <div class="nav-buy-group"><a class="text-[#5e5e5d] hover:text-[#735c00] border-b border-[#735c00]/40 font-label-md text-label-md transition-colors px-1 py-2" href="what-we-buy.html">Sell To Us</a><div class="nav-buy-panel"><a href="estate-jewelry.html">Estate Jewelry</a><a href="gold-services.html">Gold Services</a><a href="silver-services.html">Silver Services</a><a href="bullion.html">Bullion</a></div></div>
+      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="about.html">About Us</a>
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="process.html">Process</a>
+      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="estate-services.html">Estate Services</a>
+      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="contact.html">Contact Us</a>
+      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="faq.html">FAQ</a>
+    </nav>
+    <div class="site-header-actions flex items-center gap-3"><a href="tel:2394048505" class="header-cta-call editorial-call-button hidden 2xl:inline-flex px-5 py-2 font-label-md text-label-md uppercase tracking-widest transition-colors">Call Now</a><button id="mobile-menu-toggle" type="button" aria-expanded="false" aria-label="Open menu" class="site-menu-toggle 2xl:hidden border border-[#735c00]/50 text-[#735c00] px-3 py-2 font-label-md text-label-md uppercase tracking-widest"><span class="menu-toggle-label" id="mobile-menu-icon">Menu</span></button></div>
+  </div>
+  <div id="mobile-menu" class="hidden 2xl:hidden border-t border-[#d8d0c2] bg-[#f9f9f7]/98"><div class="flex flex-col px-5 py-4"><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="index.html">Home</a><a class="text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="shop.html">Shop</a><a class="text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="what-we-buy.html">Sell To Us</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="about.html">About Us</a><a class="mobile-subitem" href="estate-jewelry.html">Estate Jewelry</a><a class="mobile-subitem" href="gold-services.html">Gold Services</a><a class="mobile-subitem" href="silver-services.html">Silver Services</a><a class="mobile-subitem" href="bullion.html">Bullion</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="process.html">Process</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="estate-services.html">Estate Services</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="contact.html">Contact Us</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="faq.html">FAQ</a><a class="text-[#735c00] font-label-md py-3" href="tel:2394048505">Call (239) 404-8505</a></div></div>
+</header>
+
+<main class="pt-16">
+    <section id="catalog" class="pt-10 pb-16 md:pt-12 md:pb-24 scroll-mt-28">
+      <div class="container mx-auto px-6 md:px-8 max-w-6xl">
+        <div class="shop-page-cart-row" aria-label="Shop cart shortcut">
+          <a href="cart.html" class="shop-page-cart-btn px-4 py-2.5 rounded-md font-label text-[0.68rem] font-bold uppercase tracking-widest transition-colors">
+            View Cart (<span data-cart-count>0</span>)
+            <span class="material-symbols-outlined text-base">shopping_cart</span>
+          </a>
+        </div>
+
+        <div class="text-center mb-6 md:mb-8">
+          <span class="text-primary font-label text-xs uppercase tracking-[0.4em]">Current Selection</span>
+          <h2 class="text-3xl md:text-4xl font-headline font-bold mt-4 mb-4 tracking-tight">Recent Arrivals</h2>
+        </div>
+
+        <div class="shop-filters-bar" role="search" aria-label="Filter shop inventory">
+          <div class="shop-search-wrap">
+            <span class="material-symbols-outlined" aria-hidden="true">search</span>
+            <input type="search" id="shop-search" class="shop-search-input" placeholder="Search gold, chain, bracelet, necklace, ring…" autocomplete="off" aria-controls="shop-product-grid shop-empty" />
+          </div>
+          <div class="shop-category-filters" role="group" aria-label="Filter by category">
+            <button type="button" class="shop-filter-btn shop-filter-btn--active" data-shop-filter="all" aria-pressed="true">All</button>
+            <button type="button" class="shop-filter-btn" data-shop-filter="gold" aria-pressed="false">Gold</button>
+          </div>
+          <div class="shop-filter-meta">
+            <span id="shop-result-count" aria-live="polite">Showing 5 of 5 pieces</span>
+            <span id="shop-spot-meta" class="text-on-surface-variant/80" hidden aria-live="polite"></span>
+            <button type="button" id="shop-clear-filters" class="shop-clear-btn">Clear filters</button>
+          </div>
+        </div>
+
+        <div id="shop-product-grid" class="shop-product-grid">
+          <div id="shop-empty" class="hidden" role="status">
+            <p class="text-on-surface-variant text-lg mb-2">No pieces match your search.</p>
+            <p class="text-on-surface-variant/80 text-sm">Try another search or clear filters to see everything.</p>
+          </div>
+
+          <article class="shop-product-card group" data-shop-item="10k-cuban-link-chain-01" data-category="gold" data-tags="10k gold miami cuban link chain necklace 119.41 grams 9mm 24 inch solid clasp estate jewelry" data-search="10k gold miami cuban link chain necklace 119.41 grams 9mm width 24 inch length solid not hollow tongue mark estate jewelry heavy gold chain box clasp $10795 price">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Available</span>
+              <img alt="10K gold Miami Cuban link chain necklace" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="shop-10k-cuban-chain-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Gold</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">10K Gold Miami Cuban Link Chain Necklace</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Substantial solid 10K gold Miami Cuban link chain with box clasp, measuring 24 inches long, approximately 9mm wide, and weighing 119.41 grams.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$10,795</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-10k-cuban-link-chain-01" aria-label="Shopify buy button embed for 10K Miami Cuban link chain listing"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Call</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="18k-heraldic-cross-band-ring-01" data-category="gold" data-tags="18k gold solid gold ring band vintage early 20th century 16 grams 8.1mm size 11 heraldic cross greek key motif estate jewelry" data-search="18k gold vintage early 20th century heraldic cross motif band ring solid gold 16 grams 8.1mm width size 11 u.s. copyright mark 18k greek key estate jewelry $2495 price">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Available</span>
+              <img alt="18K gold heraldic cross motif band ring" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="shop-18k-heraldic-cross-ring-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Gold</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">18K Gold Heraldic Cross Motif Band Ring</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Vintage early 20th century heavy solid 18K gold band ring with a raised repeating cross motif, 8.1mm width, 16 gram weight, and size 11 fit.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,495</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-18k-heraldic-cross-band-ring-01" aria-label="Shopify buy button embed for 18K gold cross motif band ring listing"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Call</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="14k-mens-curb-link-bracelet-01" data-category="gold" data-tags="14k k14 yellow gold mens men's 8mm cuban link bracelet semi hollow box clasp 22.75 grams 7.75 inch vintage estate jewelry" data-search="14k k14 yellow gold men's 8mm cuban link bracelet semi hollow box clasp 22.75 grams wearable length 7 3/4 inches 7 inch inner circumference good vintage estate condition minor dents $2425 price">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Available</span>
+              <img alt="Vintage 14K gold men's 8mm Cuban link bracelet" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="shop-14k-curb-link-bracelet-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Gold</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Vintage 14K Gold Men's 8mm Cuban Link Bracelet</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Good vintage estate 14K yellow gold semi-hollow 8mm Cuban link bracelet with box clasp marked K14, weighing 22.75 grams and fitting around a 7 inch inner circumference.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,425</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-14k-mens-curb-link-bracelet-01" aria-label="Shopify buy button embed for 14K gold Cuban link bracelet listing"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Call</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="14k-infinity-rope-chain-necklace-01" data-category="gold" data-tags="14k yellow gold rope chain infinity necklace claspless no clasp semi hollow 7.5mm 30 inch 55.9 grams bb mark vintage estate jewelry unisex" data-search="14k yellow gold vintage infinity style rope chain necklace no clasp slips over head semi hollow sturdy 7.5mm width 30 inches 55.9 grams bb circle mark 14k unisex estate jewelry $5950 price">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Available</span>
+              <img alt="Vintage 14K gold 7.5mm infinity rope chain necklace" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="shop-14k-infinity-rope-chain-03.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Gold</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Vintage 14K Gold 7.5mm Infinity Rope Chain Necklace</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Vintage 14K yellow gold claspless rope chain necklace, 30 inches long, approximately 7.5mm wide, semi-hollow and sturdy, weighing 55.9 grams.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$5,950</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-14k-infinity-rope-chain-necklace-01" aria-label="Shopify buy button embed for 14K gold infinity rope chain necklace listing"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Call</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="14k-diamond-cut-figaro-chain-necklace-01" data-category="gold" data-tags="14k 585 yellow gold diamond cut figaro link chain necklace mens men's lobster clasp rci mark 5.8mm 22 inch 23.3 grams estate jewelry" data-search="14k 585 yellow gold men's diamond cut figaro link chain necklace 5.8mm width 22 inches strong lobster clasp rci mark 14k chain ends 23.3 grams very good condition $2480 price">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Available</span>
+              <img alt="14K yellow gold diamond cut Figaro link chain necklace" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="shop-14k-diamond-cut-figaro-chain-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Gold</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">14K Gold Men's Diamond Cut Figaro Link Chain Necklace</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Men's 14K yellow gold diamond cut Figaro link chain necklace, 22 inches long, approximately 5.8mm wide, with strong lobster clasp and very good condition.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,480</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-14k-diamond-cut-figaro-chain-necklace-01" aria-label="Shopify buy button embed for 14K gold diamond cut Figaro link chain necklace listing"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Call</a>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="shop-policies" class="py-16 md:py-20 bg-surface-container-low border-t border-white/5 scroll-mt-28">
+      <div class="container mx-auto px-6 md:px-8 max-w-4xl">
+        <div class="text-center mb-10">
+          <span class="text-primary font-label text-xs uppercase tracking-[0.4em]">Before You Buy</span>
+          <h2 class="text-3xl md:text-4xl font-headline font-bold mt-4 tracking-tight">Availability &amp; Purchase Notes</h2>
+        </div>
+        <ul class="space-y-5 text-on-surface-variant leading-relaxed">
+          <li class="flex gap-3">
+            <span class="material-symbols-outlined text-primary text-base mt-0.5 flex-shrink-0">info</span>
+            <span><strong class="text-on-surface font-normal">One-of-one inventory.</strong> Items shown are often unique. Availability is confirmed at the time of inquiry; listings may be removed without notice once sold.</span>
+          </li>
+          <li class="flex gap-3">
+            <span class="material-symbols-outlined text-primary text-base mt-0.5 flex-shrink-0">home</span>
+            <span><strong class="text-on-surface font-normal">No public storefront.</strong> We are mobile and appointment-only. Local pickup in Southwest Florida can be arranged by appointment.</span>
+          </li>
+          <li class="flex gap-3">
+            <span class="material-symbols-outlined text-primary text-base mt-0.5 flex-shrink-0">local_shipping</span>
+            <span><strong class="text-on-surface font-normal">Shipping by arrangement.</strong> Insured shipping may be available for qualified purchases. Costs and carriers are quoted before payment.</span>
+          </li>
+          <li class="flex gap-3">
+            <span class="material-symbols-outlined text-primary text-base mt-0.5 flex-shrink-0">gavel</span>
+            <span><strong class="text-on-surface font-normal">Estate &amp; pre-owned condition.</strong> Pieces are sold as described. Vintage and estate items may show age-appropriate wear; ask for additional photos or an in-person viewing when possible.</span>
+          </li>
+          <li class="flex gap-3">
+            <span class="material-symbols-outlined text-primary text-base mt-0.5 flex-shrink-0">payments</span>
+            <span><strong class="text-on-surface font-normal">Payment methods.</strong> Cash, certified check, and wire transfer are available for agreed purchases. Online checkout via Shopify will appear on individual listings when enabled.</span>
+          </li>
+          <li class="flex gap-3">
+            <span class="material-symbols-outlined text-primary text-base mt-0.5 flex-shrink-0">undo</span>
+            <span><strong class="text-on-surface font-normal">Returns.</strong> Estate, antique, and one-of-a-kind sales are generally final once agreed and paid, unless otherwise stated in writing for a specific item.</span>
+          </li>
+        </ul>
+        <p class="text-sm text-on-surface-variant/80 mt-10 text-center">
+          Questions? <a class="text-primary underline underline-offset-4 decoration-primary/30 hover:decoration-primary" href="faq.html">See FAQ</a> or <a class="text-primary underline underline-offset-4 decoration-primary/30 hover:decoration-primary" href="contact.html">contact us</a>.
+        </p>
+      </div>
+    </section>
+
+    <section class="py-16 md:py-20">
+      <div class="container mx-auto px-6 md:px-8 max-w-4xl text-center">
+        <h2 class="text-3xl md:text-4xl font-headline font-bold mb-6 tracking-tight">Selling Something Instead?</h2>
+        <p class="text-on-surface-variant text-lg mb-8 max-w-2xl mx-auto">
+          We also acquire estate jewelry, gold, silver, watches, and antiques throughout Southwest Florida. That is separate from this shop &mdash; see what we buy.
+        </p>
+        <a href="what-we-buy.html" class="border border-primary/60 text-primary px-8 py-4 rounded-md font-label text-sm font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Sell To Us</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="w-full py-16 bg-[#1b1b1b]">
+    <div class="flex flex-col items-center gap-6 text-center px-4">
+      <div class="text-md font-headline text-[#d4af37] uppercase tracking-[0.2em]">
+        Naples Estate Jewelry &amp; Antiques
+      </div>
+      <div class="max-w-2xl text-gray-400 text-sm leading-relaxed">
+        Mobile, appointment-only estate services: buyer of estate jewelry, gold, sterling silver, diamonds, and antiques serving Naples, Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral, and surrounding Southwest Florida communities.
+      </div>
+      <div class="flex flex-wrap justify-center gap-x-8 gap-y-3">
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="index.html">Home</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="about.html">About Us</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="what-we-buy.html">Sell To Us</a>
+        <a class="text-primary hover:text-white transition-colors font-body text-sm tracking-wide" href="shop.html">Shop</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="gold-services.html">Gold Services</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="silver-services.html">Silver Services</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="process.html">Process</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="bullion.html">Bullion</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="estate-services.html">Estate Services</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="faq.html">FAQ</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="contact.html">Contact Us</a>
+        <a class="text-primary hover:text-white transition-colors font-body text-sm tracking-wide" href="https://share.google/yQQMAvFDiOLppBZ30" target="_blank" rel="noopener">Reviews</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="privacy.html">Privacy</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="tel:2394048505">(239) 404-8505</a>
+      </div>
+      <div class="max-w-lg text-gray-500 font-body text-sm tracking-wide leading-relaxed">
+        &copy; <span id="footer-year">2026</span> Naples Estate Jewelry &amp; Antiques. Mobile/Appointment Only. Private shop &mdash; curated pieces by appointment.
+      </div>
+    </div>
+  </footer>
+
+  <script src="shop-products.js"></script>
+  <script src="shop-pricing.js"></script>
+  <script src="cart.js"></script>
+  <script src="shop-filters.js" defer></script>
+  <script>
+    document.getElementById('footer-year').textContent = new Date().getFullYear();
+  </script>
+
+  <!--
+  Shopify Buy Button storefront script — uncomment after creating Buy Buttons in Shopify admin:
+
+  <script type="text/javascript">
+  (function () {
+    var scriptURL = 'https://sdks.shopifycdn.com/buy-button/latest/buy-button-storefront.min.js';
+    if (window.ShopifyBuy) {
+      if (window.ShopifyBuy.UI) {
+        ShopifyBuyInit();
+      } else {
+        loadScript();
+      }
+    } else {
+      loadScript();
+    }
+    function loadScript() {
+      var script = document.createElement('script');
+      script.async = true;
+      script.src = scriptURL;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(script);
+      script.onload = ShopifyBuyInit;
+    }
+    function ShopifyBuyInit() {
+      var client = ShopifyBuy.buildClient({
+        domain: 'YOUR-STORE.myshopify.com',
+        storefrontAccessToken: 'YOUR_STOREFRONT_ACCESS_TOKEN'
+      });
+      ShopifyBuy.UI.onReady(client).then(function (ui) {
+        // Paste ui.createComponent('product', { id: '...', node: document.querySelector('[data-shopify-component="product-component-10k-cuban-link-chain-01"]'), ... }) per product
+      });
+    }
+  })();
+  </script>
+  -->
+</body>
+</html>

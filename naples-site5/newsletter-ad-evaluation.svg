@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400">
+  <rect width="1200" height="400" fill="#131313"/>
+  <rect x="36" y="36" width="1128" height="328" fill="none" stroke="#d4af37" stroke-width="3" opacity="0.55"/>
+
+  <text x="600" y="118" text-anchor="middle"
+        font-family="'Noto Serif','Georgia','Times New Roman',serif"
+        font-size="86" fill="#f2ca50"
+        font-style="italic" font-weight="500">We Pay More.</text>
+
+  <text x="600" y="170" text-anchor="middle"
+        font-family="'Noto Serif','Georgia','Times New Roman',serif"
+        font-size="40" fill="#d4af37" opacity="0.9"
+        font-style="italic" font-weight="400">Top market rates &#183; paid same day</text>
+
+  <line x1="555" y1="210" x2="645" y2="210" stroke="#d4af37" stroke-width="2.5" opacity="0.7"/>
+
+  <text x="600" y="287" text-anchor="middle"
+        font-family="'Noto Serif','Georgia','Times New Roman',serif"
+        font-size="86" fill="#ffffff"
+        font-weight="500">You Pay Less.</text>
+
+  <text x="600" y="338" text-anchor="middle"
+        font-family="'Noto Serif','Georgia','Times New Roman',serif"
+        font-size="40" fill="#d0c5af" opacity="0.85"
+        font-style="italic" font-weight="400">Subscriber sales &#183; estate pieces near scrap</text>
+</svg>
