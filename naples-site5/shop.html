@@ -1,11 +1,11 @@
-ï»¿<!DOCTYPE html>
+<!DOCTYPE html>
 <html class="light" lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <title>Shop | Curated Estate Jewelry, Watches &amp; Antiques | Naples FL</title>
-  <meta name="description" content="Browse curated estate jewelry, luxury watches, sterling silver, and antiques from Naples Estate Jewelry &amp; Antiques. Limited one-of-one inventory â€” inquire or purchase by appointment. Mobile, appointment-only service in Southwest Florida." />
+  <meta name="description" content="Browse curated estate jewelry, luxury watches, sterling silver, and antiques from Naples Estate Jewelry &amp; Antiques. Limited one-of-one inventory — inquire or purchase by appointment. Mobile, appointment-only service in Southwest Florida." />
   <meta name="author" content="Naples Estate Jewelry & Antiques" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://naplesantiquesllc.com/shop.html" />
@@ -15,12 +15,12 @@
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Naples Estate Jewelry & Antiques" />
   <meta property="og:title" content="Shop | Curated Estate Jewelry, Watches &amp; Antiques | Naples FL" />
-  <meta property="og:description" content="Browse curated estate jewelry, luxury watches, sterling silver, and antiques. Limited inventory â€” inquire or purchase by appointment in Southwest Florida." />
+  <meta property="og:description" content="Browse curated estate jewelry, luxury watches, sterling silver, and antiques. Limited inventory — inquire or purchase by appointment in Southwest Florida." />
   <meta property="og:image" content="https://naplesantiquesllc.com/logo.png" />
   <meta property="og:url" content="https://naplesantiquesllc.com/shop.html" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Shop | Curated Estate Jewelry, Watches &amp; Antiques | Naples FL" />
-  <meta name="twitter:description" content="Browse curated estate jewelry, luxury watches, sterling silver, and antiques. Limited inventory â€” inquire or purchase by appointment." />
+  <meta name="twitter:description" content="Browse curated estate jewelry, luxury watches, sterling silver, and antiques. Limited inventory — inquire or purchase by appointment." />
   <meta name="twitter:image" content="https://naplesantiquesllc.com/logo.png" />
 
   <link rel="icon" type="image/png" href="logo2.png" />
@@ -369,6 +369,9 @@
             View Cart (<span data-cart-count>0</span>)
             <span class="material-symbols-outlined text-base">shopping_cart</span>
           </a>
+          <a href="account.html" class="shop-page-cart-btn px-4 py-2.5 rounded-md font-label text-[0.68rem] font-bold uppercase tracking-widest transition-colors">
+            My Account
+          </a>
         </div>
 
         <div class="text-center mb-6 md:mb-8">
@@ -379,7 +382,7 @@
         <div class="shop-filters-bar" role="search" aria-label="Filter shop inventory">
           <div class="shop-search-wrap">
             <span class="material-symbols-outlined" aria-hidden="true">search</span>
-            <input type="search" id="shop-search" class="shop-search-input" placeholder="Search gold, chain, bracelet, necklace, ringâ€¦" autocomplete="off" aria-controls="shop-product-grid shop-empty" />
+            <input type="search" id="shop-search" class="shop-search-input" placeholder="Search gold, chain, bracelet, necklace, ring…" autocomplete="off" aria-controls="shop-product-grid shop-empty" />
           </div>
           <div class="shop-category-filters" role="group" aria-label="Filter by category">
             <button type="button" class="shop-filter-btn shop-filter-btn--active" data-shop-filter="all" aria-pressed="true">All</button>
@@ -575,7 +578,11 @@
     </div>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="supabase-config.js"></script>
+  <script src="naples-auth.js"></script>
   <script src="shop-products.js"></script>
+
   <script src="shop-pricing.js"></script>
   <script src="cart.js"></script>
   <script src="shop-filters.js" defer></script>
@@ -584,7 +591,7 @@
   </script>
 
   <!--
-  Shopify Buy Button storefront script â€” uncomment after creating Buy Buttons in Shopify admin:
+  Shopify Buy Button storefront script — uncomment after creating Buy Buttons in Shopify admin:
 
   <script type="text/javascript">
   (function () {

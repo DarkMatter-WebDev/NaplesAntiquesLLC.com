@@ -180,6 +180,9 @@
               <p class="text-on-surface-variant text-sm leading-relaxed mt-3 mb-4">
                 Add this piece to your cart. Checkout will be completed by inquiry until online payment is connected.
               </p>
+              <button id="product-save-favorite" type="button" class="w-full border border-primary/50 text-primary px-6 py-3 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors mb-3">
+                Save to Favorites
+              </button>
               <button id="product-add-to-cart" type="button" class="w-full gold-button text-on-primary px-6 py-4 rounded-md font-label text-sm font-bold uppercase tracking-widest hover:scale-[1.02] transition-transform">
                 Add to Cart
               </button>
@@ -229,7 +232,11 @@
     </div>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="supabase-config.js"></script>
+  <script src="naples-auth.js"></script>
   <script src="shop-products.js"></script>
+
   <script src="shop-pricing.js"></script>
   <script src="cart.js"></script>
   <script src="product-page.js" defer></script>

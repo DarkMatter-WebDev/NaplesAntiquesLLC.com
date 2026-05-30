@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, follow" />
+  <title>My Account | Naples Estate Jewelry &amp; Antiques</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="editorial-base.css" rel="stylesheet" />
+  <link href="editorial-theme.css?v=charcoal-header" rel="stylesheet" />
+  <script src="site-header.js" defer></script>
+  <style>
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; }
+    .account-field { width: 100%; border: 1px solid rgba(255,255,255,0.14); border-radius: 2px; padding: 0.7rem 0.8rem; background: #202323; color: #f1f1f1; }
+    .account-label { display: block; font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase; color: #f2ca50; margin-bottom: 0.35rem; }
+  </style>
+</head>
+<body class="font-body-md text-body-md bg-background overflow-x-hidden">
+  <main class="pt-16 pb-16">
+    <div class="container mx-auto px-6 md:px-8 max-w-5xl">
+      <div class="flex flex-wrap items-center justify-between gap-4 mb-8">
+        <div>
+          <span class="text-primary font-label text-xs uppercase tracking-[0.35em]">VIP Access</span>
+          <h1 class="text-3xl md:text-4xl font-headline font-bold mt-3">My Account</h1>
+          <p class="text-on-surface-variant text-sm mt-3 max-w-2xl">Sign in for saved favorites, a cart that follows you across visits, and future registered-user-only pages.</p>
+        </div>
+        <a href="shop.html" class="border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Back to Shop</a>
+      </div>
+
+      <p id="account-message" class="text-on-surface-variant text-sm" aria-live="polite"></p>
+
+      <section id="account-signed-out" class="mt-6 bg-surface-container-high border border-white/5 rounded-sm p-6 max-w-lg">
+        <h2 class="text-xl font-headline font-bold mb-4">Sign In or Create Account</h2>
+        <label class="account-label" for="auth-full-name">Full name</label>
+        <input id="auth-full-name" class="account-field mb-3" type="text" autocomplete="name" />
+        <label class="account-label" for="auth-email">Email</label>
+        <input id="auth-email" class="account-field mb-3" type="email" autocomplete="email" />
+        <label class="account-label" for="auth-password">Password</label>
+        <input id="auth-password" class="account-field mb-4" type="password" autocomplete="current-password" />
+        <div class="flex flex-wrap gap-3">
+          <button id="account-sign-in" type="button" class="gold-button text-on-primary px-6 py-3 rounded-md font-label text-xs font-bold uppercase tracking-widest">Sign In</button>
+          <button id="account-sign-up" type="button" class="border border-primary/50 text-primary px-6 py-3 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Create Account</button>
+        </div>
+      </section>
+
+      <section id="account-signed-in" class="mt-6 space-y-6" hidden>
+        <div class="bg-surface-container-high border border-white/5 rounded-sm p-6">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p class="text-primary font-label text-xs uppercase tracking-widest">Signed in as</p>
+              <p id="account-email" class="text-on-surface font-headline text-xl mt-1"></p>
+            </div>
+            <span id="account-vip-badge" class="text-primary font-label text-xs uppercase tracking-widest border border-primary/40 px-3 py-1 rounded-sm" hidden>VIP Access</span>
+            <button id="account-sign-out" type="button" class="border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest">Sign Out</button>
+          </div>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-6">
+          <section class="bg-surface-container-high border border-white/5 rounded-sm p-6">
+            <h2 class="text-xl font-headline font-bold mb-4">Profile</h2>
+            <label class="account-label" for="field-full-name">Full name</label>
+            <input id="field-full-name" class="account-field mb-3" type="text" />
+            <label class="account-label" for="field-phone">Phone</label>
+            <input id="field-phone" class="account-field mb-3" type="tel" />
+            <label class="account-label" for="field-budget">Budget range</label>
+            <input id="field-budget" class="account-field mb-3" type="text" placeholder="e.g. $2,000 - $8,000" />
+            <label class="account-label" for="field-interests">Interests (comma separated)</label>
+            <input id="field-interests" class="account-field mb-4" type="text" placeholder="14K chains, rings, watches" />
+            <button id="account-save-profile" type="button" class="gold-button text-on-primary px-6 py-3 rounded-md font-label text-xs font-bold uppercase tracking-widest">Save Profile</button>
+          </section>
+
+          <section class="bg-surface-container-high border border-white/5 rounded-sm p-6">
+            <h2 class="text-xl font-headline font-bold mb-4">Saved Cart</h2>
+            <p class="text-on-surface-variant text-sm leading-relaxed mb-4">When you are signed in, items added to your cart are saved to your account and restored on return.</p>
+            <div id="account-cart" class="space-y-3"></div>
+            <a href="cart.html" class="inline-flex mt-5 border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">View Cart</a>
+          </section>
+        </div>
+
+        <section class="bg-surface-container-high border border-white/5 rounded-sm p-6">
+          <h2 class="text-xl font-headline font-bold mb-4">Saved Favorites</h2>
+          <div id="account-favorites" class="space-y-3"></div>
+        </section>
+      </section>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="supabase-config.js"></script>
+  <script src="naples-auth.js"></script>
+  <script src="shop-products.js"></script>
+  <script src="cart.js"></script>
+  <script src="account-portal.js"></script>
+</body>
+</html>

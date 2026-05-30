@@ -250,6 +250,19 @@
   }
 
   function getDisplayPrice(product) {
+    if (
+      window.NaplesAuth &&
+      window.NaplesAuth.isVip &&
+      window.NaplesAuth.isVip() &&
+      product.privatePriceLabel
+    ) {
+      return {
+        amount: priceLabelToNumber(product.privatePriceLabel),
+        label: product.privatePriceLabel,
+        source: 'private'
+      };
+    }
+
     return calculatePublicPrice(product, spotData || buildFallbackSpot('fallback'));
   }
 
