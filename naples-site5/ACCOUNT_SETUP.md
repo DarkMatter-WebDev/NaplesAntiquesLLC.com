@@ -17,6 +17,27 @@ There is no Shopify, no AI listing backend, and no admin product dashboard.
 3. Run `supabase/schema.sql`.
 4. In **Authentication -> Providers**, enable Email.
 
+### Email confirmation (recommended)
+
+If **Confirm email** is enabled in Supabase, new users will not get a session until they click the link in their inbox. The site already supports this: after sign-up they see a message to confirm email, then sign in.
+
+In **Authentication -> URL configuration**, set:
+
+- **Site URL**: your live site root, e.g. `https://naplesantiquesllc.com`
+- **Redirect URLs** (add each you use):
+  - `https://naplesantiquesllc.com/account.html`
+  - `https://naplesantiquesllc.com/**` (optional wildcard for Netlify)
+  - `http://localhost:8080/account.html` (local testing)
+  - `http://127.0.0.1:8080/account.html`
+
+Confirmation emails use `emailRedirectTo` in `naples-auth.js` (`/account.html`). After the user clicks the link, they land on the account page, Supabase establishes the session, and they are sent to the account dashboard.
+
+No code change is required beyond deploying the latest site files; you mainly need the redirect URLs in Supabase to match your domain.
+
+If you already ran the schema before the permissions/address update, run **`supabase/fix-permissions.sql`**
+once in Supabase SQL Editor. That adds the profile address field and fixes errors like
+`permission denied for table profiles` or `permission denied for table favorites`.
+
 ## 2. Add Browser Config
 
 Open `supabase-config.js` and fill in:
@@ -38,7 +59,8 @@ No Netlify environment variables are required for accounts. The only Netlify Fun
 
 ## 4. Customer Pages
 
-- `account.html` — sign in, create account, profile, saved favorites, saved cart
+- `account.html` — sign in and create account
+- `account-dashboard.html` — profile, saved favorites, saved cart
 - `member-access.html` — example registered-user-only page
 
 Any future registered-only page can use:

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <title>Shop | Curated Estate Jewelry, Watches &amp; Antiques | Naples FL</title>
-  <meta name="description" content="Browse curated estate jewelry, luxury watches, sterling silver, and antiques from Naples Estate Jewelry &amp; Antiques. Limited one-of-one inventory — inquire or purchase by appointment. Mobile, appointment-only service in Southwest Florida." />
+  <meta name="description" content="Browse curated estate jewelry, luxury watches, sterling silver, and antiques from Naples Estate Jewelry &amp; Antiques. Limited one-of-one inventory  inquire or purchase by appointment. Mobile, appointment-only service in Southwest Florida." />
   <meta name="author" content="Naples Estate Jewelry & Antiques" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://naplesantiquesllc.com/shop.html" />
@@ -15,12 +15,12 @@
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Naples Estate Jewelry & Antiques" />
   <meta property="og:title" content="Shop | Curated Estate Jewelry, Watches &amp; Antiques | Naples FL" />
-  <meta property="og:description" content="Browse curated estate jewelry, luxury watches, sterling silver, and antiques. Limited inventory — inquire or purchase by appointment in Southwest Florida." />
+  <meta property="og:description" content="Browse curated estate jewelry, luxury watches, sterling silver, and antiques. Limited inventory  inquire or purchase by appointment in Southwest Florida." />
   <meta property="og:image" content="https://naplesantiquesllc.com/logo.png" />
   <meta property="og:url" content="https://naplesantiquesllc.com/shop.html" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Shop | Curated Estate Jewelry, Watches &amp; Antiques | Naples FL" />
-  <meta name="twitter:description" content="Browse curated estate jewelry, luxury watches, sterling silver, and antiques. Limited inventory — inquire or purchase by appointment." />
+  <meta name="twitter:description" content="Browse curated estate jewelry, luxury watches, sterling silver, and antiques. Limited inventory  inquire or purchase by appointment." />
   <meta name="twitter:image" content="https://naplesantiquesllc.com/logo.png" />
 
   <link rel="icon" type="image/png" href="logo2.png" />
@@ -298,6 +298,15 @@
       border: 1px dashed rgba(255, 255, 255, 0.12);
       border-radius: 2px;
     }
+    .shop-account-notice {
+      border: 1px solid rgba(115, 92, 0, 0.28);
+      background: #fff8e1;
+      color: #4b3b00;
+      padding: 0.85rem 1rem;
+      border-radius: 2px;
+      margin-bottom: 1.25rem;
+      font-size: 0.9375rem;
+    }
   </style>
 
   <!-- MailerLite Universal -->
@@ -374,6 +383,10 @@
           </a>
         </div>
 
+        <div id="shop-account-notice" class="shop-account-notice" role="status" hidden>
+          You're signed in. Your cart and favorites are saved to your account.
+        </div>
+
         <div class="text-center mb-6 md:mb-8">
           <span class="text-primary font-label text-xs uppercase tracking-[0.4em]">Current Selection</span>
           <h2 class="text-3xl md:text-4xl font-headline font-bold mt-4 mb-4 tracking-tight">Recent Arrivals</h2>
@@ -382,7 +395,7 @@
         <div class="shop-filters-bar" role="search" aria-label="Filter shop inventory">
           <div class="shop-search-wrap">
             <span class="material-symbols-outlined" aria-hidden="true">search</span>
-            <input type="search" id="shop-search" class="shop-search-input" placeholder="Search gold, chain, bracelet, necklace, ring…" autocomplete="off" aria-controls="shop-product-grid shop-empty" />
+            <input type="search" id="shop-search" class="shop-search-input" placeholder="Search gold, chain, bracelet, necklace, ring" autocomplete="off" aria-controls="shop-product-grid shop-empty" />
           </div>
           <div class="shop-category-filters" role="group" aria-label="Filter by category">
             <button type="button" class="shop-filter-btn shop-filter-btn--active" data-shop-filter="all" aria-pressed="true">All</button>
@@ -588,10 +601,23 @@
   <script src="shop-filters.js" defer></script>
   <script>
     document.getElementById('footer-year').textContent = new Date().getFullYear();
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('account') !== 'signin') return;
+
+      var notice = document.getElementById('shop-account-notice');
+      if (notice) {
+        notice.hidden = false;
+        notice.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      params.delete('account');
+      var cleanUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+      window.history.replaceState({}, document.title, cleanUrl);
+    })();
   </script>
 
   <!--
-  Shopify Buy Button storefront script — uncomment after creating Buy Buttons in Shopify admin:
+  Shopify Buy Button storefront script  uncomment after creating Buy Buttons in Shopify admin:
 
   <script type="text/javascript">
   (function () {

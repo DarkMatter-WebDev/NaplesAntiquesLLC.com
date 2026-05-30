@@ -6,6 +6,31 @@
     el.className = isError ? 'text-red-600 text-sm mt-3' : 'text-on-surface-variant text-sm mt-3';
   }
 
+  function setCreateMessage(text, isError) {
+    var el = document.getElementById('account-create-message');
+    if (!el) return;
+    el.textContent = text || '';
+    el.className = isError
+      ? 'text-red-600 text-sm mt-6 border border-red-500/30 bg-red-500/10 rounded-sm p-3 min-h-[2.75rem]'
+      : 'text-on-surface-variant text-sm mt-6 border border-white/10 bg-white/5 rounded-sm p-3 min-h-[2.75rem]';
+    setMessage(text, isError);
+  }
+
+  function goToDashboard(isNewAccount) {
+    window.location.href = isNewAccount ? 'account-dashboard.html?welcome=1' : 'account-dashboard.html';
+  }
+
+  function goToShopAfterSignIn() {
+    window.location.href = 'shop.html?account=signin';
+  }
+
+  function goToConfirmationSent(email) {
+    var params = new URLSearchParams();
+    params.set('signup', 'success');
+    if (email) params.set('email', email);
+    window.location.href = 'account.html?' + params.toString();
+  }
+
   function showSignedOut() {
     document.getElementById('account-signed-out').hidden = false;
     document.getElementById('account-signed-in').hidden = true;
@@ -16,82 +41,72 @@
     document.getElementById('account-signed-in').hidden = false;
   }
 
-  function productsById() {
-    var map = {};
-    (window.SHOP_PRODUCTS || []).forEach(function (product) {
-      map[product.id] = product;
-    });
-    return map;
+  function showCreateMode() {
+    var signInCard = document.getElementById('account-sign-in-card');
+    var newCard = document.getElementById('account-new-card');
+    var createPanel = document.getElementById('account-create-panel');
+
+    if (signInCard) signInCard.hidden = true;
+    if (newCard) newCard.hidden = true;
+    if (createPanel) {
+      createPanel.hidden = false;
+      createPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
-  async function renderFavorites() {
-    var list = document.getElementById('account-favorites');
-    if (!list) return;
-    list.innerHTML = '';
+  function showSignInMode() {
+    var signInCard = document.getElementById('account-sign-in-card');
+    var newCard = document.getElementById('account-new-card');
+    var createPanel = document.getElementById('account-create-panel');
 
-    var favorites = await window.NaplesAuth.listFavorites();
-    if (!favorites.length) {
-      list.innerHTML = '<p class="text-on-surface-variant text-sm">No saved favorites yet.</p>';
-      return;
-    }
-
-    var byId = productsById();
-    favorites.forEach(function (favorite) {
-      var product = byId[favorite.product_id];
-      var row = document.createElement('div');
-      row.className = 'border border-white/10 rounded-sm p-4';
-      row.innerHTML = product
-        ? '<a class="text-primary font-label text-xs uppercase tracking-widest" href="product.html?id=' + encodeURIComponent(product.id) + '">' + product.category + '</a><p class="text-on-surface font-headline text-lg mt-2">' + product.title + '</p>'
-        : '<p class="text-sm text-on-surface-variant">Saved item: ' + favorite.product_id + '</p>';
-      list.appendChild(row);
-    });
+    if (signInCard) signInCard.hidden = false;
+    if (newCard) newCard.hidden = false;
+    if (createPanel) createPanel.hidden = true;
   }
 
-  function renderCart() {
-    var list = document.getElementById('account-cart');
-    if (!list) return;
-    list.innerHTML = '';
+  function showConfirmationSent() {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('signup') !== 'success') return;
 
-    var ids = window.ShopCart ? window.ShopCart.read() : [];
-    if (!ids.length) {
-      list.innerHTML = '<p class="text-on-surface-variant text-sm">Your cart is empty.</p>';
-      return;
-    }
+    var panel = document.getElementById('account-confirmation-sent');
+    var emailEl = document.getElementById('account-confirmation-email');
+    var email = params.get('email') || '';
+    if (panel) panel.hidden = false;
+    if (emailEl && email) emailEl.textContent = email;
 
-    var byId = productsById();
-    ids.forEach(function (id) {
-      var product = byId[id];
-      var row = document.createElement('div');
-      row.className = 'border border-white/10 rounded-sm p-4';
-      row.innerHTML = product
-        ? '<a class="text-primary font-label text-xs uppercase tracking-widest" href="product.html?id=' + encodeURIComponent(product.id) + '">' + product.category + '</a><p class="text-on-surface font-headline text-lg mt-2">' + product.title + '</p>'
-        : '<p class="text-sm text-on-surface-variant">Cart item: ' + id + '</p>';
-      list.appendChild(row);
-    });
+    showSignInMode();
+    setMessage('After confirming your email, sign in below.');
   }
 
-  async function refreshSignedInView() {
-    var profile = window.NaplesAuth.getProfile();
-    var session = window.NaplesAuth.getSession();
-    if (!session) {
-      showSignedOut();
-      return;
-    }
+  function getConfirmationReturnState() {
+    var params = new URLSearchParams(window.location.search);
+    var hashParams = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+    var error = params.get('error_description') || hashParams.get('error_description') || '';
 
-    showSignedIn();
-    document.getElementById('account-email').textContent = session.user.email || '';
-    document.getElementById('field-full-name').value = (profile && profile.full_name) || '';
-    document.getElementById('field-phone').value = (profile && profile.phone) || '';
-    document.getElementById('field-budget').value = (profile && profile.budget_range) || '';
-    document.getElementById('field-interests').value = (profile && profile.interests || []).join(', ');
+    return {
+      hasError: Boolean(error),
+      error: error,
+      isConfirmationReturn: Boolean(
+        params.get('confirmed') === '1' ||
+        params.get('code') ||
+        params.get('token_hash') ||
+        hashParams.get('access_token') ||
+        hashParams.get('type') === 'signup'
+      )
+    };
+  }
 
-    var vipBadge = document.getElementById('account-vip-badge');
-    if (vipBadge) {
-      vipBadge.hidden = !window.NaplesAuth.isVip();
-    }
+  function cleanConfirmationUrl() {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
 
-    await renderFavorites();
-    renderCart();
+  function showEmailConfirmed() {
+    var panel = document.getElementById('account-email-confirmed');
+    var sentPanel = document.getElementById('account-confirmation-sent');
+    if (sentPanel) sentPanel.hidden = true;
+    if (panel) panel.hidden = false;
+    showSignInMode();
+    setMessage('Email confirmed. Sign in below to continue.');
   }
 
   function bindEvents() {
@@ -101,60 +116,106 @@
       return;
     }
 
+    document.getElementById('account-show-create').addEventListener('click', function () {
+      showCreateMode();
+    });
+
+    document.getElementById('account-cancel-create').addEventListener('click', function () {
+      showSignInMode();
+      setMessage('');
+      setCreateMessage('');
+    });
+
     document.getElementById('account-sign-in').addEventListener('click', function () {
       var email = document.getElementById('auth-email').value.trim();
       var password = document.getElementById('auth-password').value;
+      if (!email || !password) {
+        setMessage('Enter your email and password to sign in.', true);
+        return;
+      }
+      setMessage('Signing in...');
       window.NaplesAuth.signIn(email, password)
         .then(function () {
           return window.ShopCart && window.ShopCart.syncFromAccount ? window.ShopCart.syncFromAccount() : Promise.resolve();
         })
-        .then(refreshSignedInView)
-        .then(function () { setMessage('Signed in'); })
-        .catch(function (error) { setMessage(error.message, true); });
+        .then(function () {
+          setMessage('Signed in. Returning to the shop...');
+          goToShopAfterSignIn();
+        })
+        .catch(function (error) {
+          var msg = error.message || 'Sign in failed.';
+          if (/email not confirmed/i.test(msg)) {
+            msg = 'Please confirm your email first. Check your inbox for the confirmation link, then sign in.';
+          }
+          setMessage(msg, true);
+        });
     });
 
     document.getElementById('account-sign-up').addEventListener('click', function () {
-      var email = document.getElementById('auth-email').value.trim();
-      var password = document.getElementById('auth-password').value;
-      var fullName = document.getElementById('auth-full-name').value.trim();
+      var email = document.getElementById('create-email').value.trim();
+      var password = document.getElementById('create-password').value;
+      var confirmPassword = document.getElementById('create-password-confirm').value;
+      var fullName = document.getElementById('create-full-name').value.trim();
+      if (!email || !password || !confirmPassword) {
+        setCreateMessage('Enter an email, password, and confirmation password to create an account.', true);
+        return;
+      }
+      if (password !== confirmPassword) {
+        setCreateMessage('Passwords do not match.', true);
+        return;
+      }
+      setCreateMessage('Creating account...');
       window.NaplesAuth.signUp(email, password, fullName)
-        .then(function () {
-          return window.ShopCart && window.ShopCart.syncFromAccount ? window.ShopCart.syncFromAccount() : Promise.resolve();
+        .then(function (data) {
+          setCreateMessage('');
+          if (data && data.session) {
+            return window.ShopCart && window.ShopCart.syncFromAccount ? window.ShopCart.syncFromAccount() : Promise.resolve();
+          }
+          return data;
         })
-        .then(refreshSignedInView)
-        .then(function () { setMessage('Account created. Check email if confirmation is required.'); })
-        .catch(function (error) { setMessage(error.message, true); });
-    });
-
-    document.getElementById('account-sign-out').addEventListener('click', function () {
-      window.NaplesAuth.signOut().then(function () {
-        showSignedOut();
-        setMessage('Signed out');
-      });
-    });
-
-    document.getElementById('account-save-profile').addEventListener('click', function () {
-      window.NaplesAuth.updateProfile({
-        full_name: document.getElementById('field-full-name').value.trim(),
-        phone: document.getElementById('field-phone').value.trim(),
-        budget_range: document.getElementById('field-budget').value.trim(),
-        interests: document.getElementById('field-interests').value.split(',').map(function (value) {
-          return value.trim();
-        }).filter(Boolean)
-      })
-        .then(function () { setMessage('Profile saved'); })
-        .catch(function (error) { setMessage(error.message, true); });
+        .then(function () {
+          showSignInMode();
+          if (window.NaplesAuth.getSession()) {
+            setMessage('Account created successfully. Opening account management...');
+            goToDashboard(true);
+            return null;
+          }
+          showSignedOut();
+          goToConfirmationSent(email);
+          return null;
+        })
+        .catch(function (error) { setCreateMessage(error.message, true); });
     });
   }
 
   async function init() {
     bindEvents();
     if (!window.NaplesAuth.isConfigured()) return;
+    var confirmationReturn = getConfirmationReturnState();
     await window.NaplesAuth.init();
-    if (window.ShopCart && window.ShopCart.syncFromAccount) {
-      await window.ShopCart.syncFromAccount();
+    if (confirmationReturn.hasError) {
+      showSignedOut();
+      showSignInMode();
+      setMessage(confirmationReturn.error, true);
+      cleanConfirmationUrl();
+      return;
     }
-    await refreshSignedInView();
+    if (confirmationReturn.isConfirmationReturn && !window.NaplesAuth.getSession()) {
+      showSignedOut();
+      showEmailConfirmed();
+      cleanConfirmationUrl();
+      return;
+    }
+    if (window.NaplesAuth.getSession()) {
+      if (confirmationReturn.isConfirmationReturn) {
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+        setMessage('Email confirmed. Opening your account...');
+      }
+      goToDashboard();
+      return;
+    }
+    showSignedOut();
+    showConfirmationSent();
   }
 
   if (document.readyState === 'loading') {

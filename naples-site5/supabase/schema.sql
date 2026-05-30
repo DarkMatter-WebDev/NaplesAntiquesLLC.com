@@ -10,6 +10,13 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   full_name text,
   phone text,
+  address_line1 text,
+  address_line2 text,
+  city text,
+  state text,
+  postal_code text,
+  country text default 'United States',
+  marketing_opt_in boolean not null default false,
   interests text[] default '{}',
   budget_range text,
   is_vip boolean not null default false,
@@ -32,6 +39,15 @@ create table if not exists public.favorites (
 );
 
 create index if not exists favorites_user_idx on public.favorites (user_id);
+
+alter table public.profiles
+  add column if not exists address_line1 text,
+  add column if not exists address_line2 text,
+  add column if not exists city text,
+  add column if not exists state text,
+  add column if not exists postal_code text,
+  add column if not exists country text default 'United States',
+  add column if not exists marketing_opt_in boolean not null default false;
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -86,6 +102,11 @@ create policy "Users read own profile"
   on public.profiles for select
   using (auth.uid() = id);
 
+drop policy if exists "Users insert own profile" on public.profiles;
+create policy "Users insert own profile"
+  on public.profiles for insert
+  with check (auth.uid() = id);
+
 drop policy if exists "Users update own profile" on public.profiles;
 create policy "Users update own profile"
   on public.profiles for update
@@ -103,3 +124,10 @@ create policy "Users manage own favorites"
   on public.favorites for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- Supabase RLS policies decide which rows a user can access, but the
+-- authenticated role still needs table privileges.
+grant usage on schema public to authenticated;
+grant select, insert, update on public.profiles to authenticated;
+grant select, insert, update, delete on public.customer_carts to authenticated;
+grant select, insert, update, delete on public.favorites to authenticated;

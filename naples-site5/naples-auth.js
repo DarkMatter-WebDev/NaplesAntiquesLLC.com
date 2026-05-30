@@ -48,12 +48,37 @@
       .maybeSingle();
 
     if (result.error) {
+      console.warn('Profile load failed:', result.error.message);
       currentProfile = null;
       return null;
     }
 
     currentProfile = result.data;
     return currentProfile;
+  }
+
+  async function ensureProfileRow(userId, fullName) {
+    var supabase = getClient();
+    if (!supabase || !userId) return;
+
+    var profilePayload = { id: userId };
+    if (fullName) {
+      profilePayload.full_name = fullName;
+    }
+
+    var profileResult = await supabase
+      .from('profiles')
+      .upsert(profilePayload, { ignoreDuplicates: true });
+    if (profileResult.error) {
+      console.warn('Profile upsert failed:', profileResult.error.message);
+    }
+
+    var cartResult = await supabase
+      .from('customer_carts')
+      .upsert({ user_id: userId, items: [] }, { ignoreDuplicates: true });
+    if (cartResult.error) {
+      console.warn('Cart upsert failed:', cartResult.error.message);
+    }
   }
 
   async function init() {
@@ -91,16 +116,21 @@
     var supabase = getClient();
     if (!supabase) throw new Error('Account system is not configured yet');
 
+    var redirectTo = window.location.origin + '/account.html';
     var result = await supabase.auth.signUp({
       email: email,
       password: password,
       options: {
-        data: { full_name: fullName || '' }
+        data: { full_name: fullName || '' },
+        emailRedirectTo: redirectTo
       }
     });
     if (result.error) throw result.error;
-    setSession(result.data.session);
-    await loadProfile();
+    if (result.data.session && result.data.user) {
+      await ensureProfileRow(result.data.user.id, fullName || '');
+      setSession(result.data.session);
+      await loadProfile();
+    }
     return result.data;
   }
 
@@ -110,6 +140,10 @@
 
     var result = await supabase.auth.signInWithPassword({ email: email, password: password });
     if (result.error) throw result.error;
+    if (result.data.user) {
+      var metaName = result.data.user.user_metadata && result.data.user.user_metadata.full_name;
+      await ensureProfileRow(result.data.user.id, metaName || '');
+    }
     setSession(result.data.session);
     await loadProfile();
     return result.data;
@@ -127,10 +161,10 @@
     var supabase = getClient();
     if (!supabase || !currentSession) throw new Error('Not signed in');
 
+    var payload = Object.assign({ id: currentSession.user.id }, fields);
     var result = await supabase
       .from('profiles')
-      .update(fields)
-      .eq('id', currentSession.user.id)
+      .upsert(payload)
       .select('*')
       .single();
 

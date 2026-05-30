@@ -100,6 +100,11 @@ header.fixed button {
   color: #f1f1f1 !important;
 }
 
+header.fixed .site-header-actions .header-cta-call,
+nav.fixed .site-header-actions .header-cta-call {
+  display: none !important;
+}
+
 nav.fixed a:hover,
 header.fixed a:hover {
   color: var(--estate-warm-gold) !important;
@@ -109,6 +114,7 @@ header.fixed .site-header-nav a,
 nav.fixed .site-header-nav a {
   color: #f1f1f1 !important;
   border-color: transparent !important;
+  border-bottom-width: 1px;
 }
 
 header.fixed .site-header-nav a[href="shop.html"],
@@ -119,8 +125,26 @@ nav.fixed .site-header-nav a[href="what-we-buy.html"] {
   border-color: rgba(233, 195, 73, 0.45) !important;
 }
 
+header.fixed .site-header-nav a:hover,
+header.fixed .site-header-nav .nav-buy-group > a:hover,
+nav.fixed .site-header-nav a:hover,
+nav.fixed .site-header-nav .nav-buy-group > a:hover {
+  color: var(--estate-warm-gold) !important;
+  border-color: rgba(233, 195, 73, 0.75) !important;
+}
+
 header.fixed .site-header-nav a.is-current-page,
-nav.fixed .site-header-nav a.is-current-page {
+header.fixed .site-header-nav .nav-buy-group > a.is-current-page,
+nav.fixed .site-header-nav a.is-current-page,
+nav.fixed .site-header-nav .nav-buy-group > a.is-current-page {
+  color: var(--estate-warm-gold) !important;
+  border-color: rgba(233, 195, 73, 0.45) !important;
+}
+
+header.fixed #mobile-menu a:hover,
+header.fixed #mobile-menu a.is-current-page,
+nav.fixed #mobile-menu a:hover,
+nav.fixed #mobile-menu a.is-current-page {
   color: var(--estate-warm-gold) !important;
   border-color: rgba(233, 195, 73, 0.45) !important;
 }
