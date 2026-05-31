@@ -269,9 +269,12 @@
   function applyProductPrices(products) {
     (products || []).forEach(function (product) {
       var priced = getDisplayPrice(product);
+      var publicPriced = calculatePublicPrice(product, spotData || buildFallbackSpot('fallback'));
       product.calculatedPrice = priced.amount;
       product.priceLabel = priced.label || product.manualPriceLabel || product.priceLabel;
       product.priceSource = priced.source;
+      product.scrapValue = publicPriced && publicPriced.meltValue ? roundToCents(publicPriced.meltValue) : 0;
+      product.scrapValueLabel = product.scrapValue ? formatMoney(product.scrapValue) : '';
     });
   }
 
@@ -332,6 +335,17 @@
       priceEl.textContent = product.priceLabel;
     }
 
+    var scrapEl = document.getElementById('product-scrap-value');
+    if (scrapEl) {
+      if (product.scrapValueLabel) {
+        scrapEl.textContent = 'Exact gold scrap value: ' + product.scrapValueLabel;
+        scrapEl.hidden = false;
+      } else {
+        scrapEl.textContent = '';
+        scrapEl.hidden = true;
+      }
+    }
+
     var contextEl = document.getElementById('product-price-context');
     if (contextEl) {
       contextEl.textContent = buildPriceContext(product);
@@ -342,8 +356,8 @@
     if (details) {
       Array.prototype.forEach.call(details.querySelectorAll('li'), function (item) {
         var text = item.textContent || '';
-        if (/^Price:/i.test(text.trim())) {
-          item.querySelector('span:last-child').textContent = 'Price: ' + product.priceLabel;
+        if (/^(Price|Your price):/i.test(text.trim())) {
+          item.querySelector('span:last-child').textContent = 'Your price: ' + product.priceLabel;
         }
       });
     }

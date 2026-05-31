@@ -160,15 +160,17 @@
 
     images: [
 
-      "shop-14k-infinity-rope-chain-03.png",
-
       "shop-14k-infinity-rope-chain-01.png",
 
       "shop-14k-infinity-rope-chain-02.png",
 
+      "shop-14k-infinity-rope-chain-03.png",
+
       "shop-14k-infinity-rope-chain-04.png",
 
-      "shop-14k-infinity-rope-chain-05.png"
+      "shop-14k-infinity-rope-chain-05.png",
+
+      "shop-14k-infinity-rope-chain-06.png"
 
     ],
 

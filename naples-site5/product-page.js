@@ -21,6 +21,7 @@
     var category = document.getElementById('product-category');
     var status = document.getElementById('product-status');
     var price = document.getElementById('product-price');
+    var scrapValue = document.getElementById('product-scrap-value');
     var description = document.getElementById('product-description');
     var mainImage = document.getElementById('product-main-image');
     var thumbs = document.getElementById('product-thumbnails');
@@ -37,15 +38,31 @@
       return product.manualPriceLabel || product.priceLabel;
     }
 
+    function getScrapValueLabel() {
+      if (!window.ShopPricing || !window.ShopPricing.calculatePublicPrice) return '';
+      var priced = window.ShopPricing.calculatePublicPrice(product, window.ShopPricing.getSpotData && window.ShopPricing.getSpotData());
+      return priced && priced.meltValue ? window.ShopPricing.formatMoney(window.ShopPricing.roundToCents(priced.meltValue)) : '';
+    }
+
     function updatePriceDisplay() {
       var label = getDisplayPriceLabel();
       if (price) price.textContent = label;
+      if (scrapValue) {
+        var scrapLabel = getScrapValueLabel();
+        if (scrapLabel) {
+          scrapValue.textContent = 'Exact gold scrap value: ' + scrapLabel;
+          scrapValue.hidden = false;
+        } else {
+          scrapValue.textContent = '';
+          scrapValue.hidden = true;
+        }
+      }
       if (details) {
         Array.prototype.forEach.call(details.querySelectorAll('li'), function (item) {
           var text = (item.textContent || '').trim();
-          if (/^Price:/i.test(text)) {
+          if (/^(Price|Your price):/i.test(text)) {
             var valueSpan = item.querySelector('span:last-child');
-            if (valueSpan) valueSpan.textContent = 'Price: ' + label;
+            if (valueSpan) valueSpan.textContent = 'Your price: ' + label;
           }
         });
       }
