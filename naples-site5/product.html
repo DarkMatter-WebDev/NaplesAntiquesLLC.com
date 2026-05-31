@@ -26,6 +26,8 @@
       background: var(--surface-container-high, #2a2c2c);
       border: 1px solid rgba(255, 255, 255, 0.08);
       overflow: hidden;
+      position: relative;
+      cursor: zoom-in;
     }
     .product-main-frame img {
       display: block;
@@ -33,6 +35,32 @@
       max-height: 760px;
       object-fit: contain;
       background: #f5f3ee;
+    }
+    .product-zoom-popover {
+      position: absolute;
+      width: min(42vw, 220px);
+      height: min(42vw, 220px);
+      border: 1px solid rgba(242, 202, 80, 0.7);
+      border-radius: 2px;
+      background-color: #f5f3ee;
+      background-repeat: no-repeat;
+      box-shadow: 0 18px 38px rgba(0, 0, 0, 0.34);
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      transition: opacity 0.12s ease;
+      z-index: 3;
+    }
+    .product-zoom-popover.is-visible {
+      opacity: 1;
+    }
+    @media (hover: none), (pointer: coarse) {
+      .product-main-frame {
+        cursor: default;
+      }
+      .product-zoom-popover {
+        display: none;
+      }
     }
     .product-thumb-grid {
       display: flex;

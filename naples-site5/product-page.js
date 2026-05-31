@@ -30,6 +30,7 @@
     var addToCart = document.getElementById('product-add-to-cart');
     var saveFavorite = document.getElementById('product-save-favorite');
     var cartMessage = document.getElementById('product-cart-message');
+    var selectedImageIndex = 0;
 
     function getDisplayPriceLabel() {
       if (window.ShopPricing) {
@@ -71,6 +72,78 @@
       }
     }
 
+    function setupImageZoom() {
+      if (!mainImage || !window.matchMedia || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+
+      var frame = mainImage.closest('.product-main-frame');
+      if (!frame) return;
+
+      var zoom = document.createElement('div');
+      zoom.className = 'product-zoom-popover';
+      frame.appendChild(zoom);
+      var zoomFactor = 3;
+      var zoomImage = new Image();
+      var zoomNaturalWidth = 0;
+      var zoomNaturalHeight = 0;
+      var currentZoomSrc = '';
+
+      function getZoomImageSrc() {
+        var zoomImages = product.zoomImages || [];
+        return zoomImages[selectedImageIndex] ||
+          product.zoomImage ||
+          mainImage.currentSrc ||
+          mainImage.src;
+      }
+
+      function updateZoomImage() {
+        var src = getZoomImageSrc();
+        if (!src || src === currentZoomSrc) return;
+
+        currentZoomSrc = src;
+        zoomNaturalWidth = 0;
+        zoomNaturalHeight = 0;
+        zoom.style.backgroundImage = 'url("' + src + '")';
+
+        zoomImage = new Image();
+        zoomImage.onload = function () {
+          if (zoomImage.src.indexOf(currentZoomSrc) === -1 && zoomImage.currentSrc !== currentZoomSrc) return;
+          zoomNaturalWidth = zoomImage.naturalWidth;
+          zoomNaturalHeight = zoomImage.naturalHeight;
+        };
+        zoomImage.src = src;
+      }
+
+      function moveZoom(event) {
+        var rect = mainImage.getBoundingClientRect();
+        var frameRect = frame.getBoundingClientRect();
+        var zoomRect = zoom.getBoundingClientRect();
+        var x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+        var y = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+        var left = event.clientX - frameRect.left;
+        var top = event.clientY - frameRect.top;
+        var bgWidth = zoomNaturalWidth || (rect.width * zoomFactor);
+        var bgHeight = zoomNaturalHeight || (rect.height * zoomFactor);
+        var bgX = (x * bgWidth) - (zoomRect.width / 2);
+        var bgY = (y * bgHeight) - (zoomRect.height / 2);
+
+        zoom.style.left = left + 'px';
+        zoom.style.top = top + 'px';
+        zoom.style.backgroundSize = bgWidth + 'px ' + bgHeight + 'px';
+        zoom.style.backgroundPosition = '-' + bgX + 'px -' + bgY + 'px';
+      }
+
+      mainImage.addEventListener('load', updateZoomImage);
+      frame.addEventListener('mouseenter', function (event) {
+        updateZoomImage();
+        moveZoom(event);
+        zoom.classList.add('is-visible');
+      });
+      frame.addEventListener('mousemove', moveZoom);
+      frame.addEventListener('mouseleave', function () {
+        zoom.classList.remove('is-visible');
+      });
+    }
+
     async function updateFavoriteButton() {
       if (!saveFavorite) return;
       if (!window.NaplesAuth || !window.NaplesAuth.isConfigured()) {
@@ -110,6 +183,7 @@
     if (mainImage) {
       mainImage.src = product.images[0];
       mainImage.alt = product.title;
+      setupImageZoom();
     }
     if (inquiry) {
       inquiry.href = 'contact.html#submit-item';
@@ -146,6 +220,7 @@
           button.setAttribute('aria-label', 'View image ' + (index + 1));
           button.innerHTML = '<img alt="" src="' + src + '" />';
           button.addEventListener('click', function () {
+            selectedImageIndex = index;
             if (mainImage) mainImage.src = src;
             Array.prototype.forEach.call(thumbs.querySelectorAll('.product-thumb'), function (thumb) {
               thumb.classList.remove('product-thumb--active');
