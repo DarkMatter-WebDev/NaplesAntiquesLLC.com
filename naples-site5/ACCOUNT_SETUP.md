@@ -1,4 +1,4 @@
-# Customer Accounts Setup
+﻿# Customer Accounts Setup
 
 This setup keeps listings in the site files and only adds customer account data:
 
@@ -30,7 +30,7 @@ In **Authentication -> URL configuration**, set:
   - `http://localhost:8080/account.html` (local testing)
   - `http://127.0.0.1:8080/account.html`
 
-Confirmation emails use `emailRedirectTo` in `naples-auth.js` (`/account.html`). After the user clicks the link, they land on the account page, Supabase establishes the session, and they are sent to the account dashboard.
+Confirmation emails use `emailRedirectTo` in `scripts/shared/naples-auth.js` (`/account.html`). After the user clicks the link, they land on the account page, Supabase establishes the session, and they are sent to the account dashboard.
 
 No code change is required beyond deploying the latest site files; you mainly need the redirect URLs in Supabase to match your domain.
 
@@ -40,7 +40,7 @@ once in Supabase SQL Editor. That adds the profile address field and fixes error
 
 ## 2. Add Browser Config
 
-Open `supabase-config.js` and fill in:
+Open `scripts/shared/supabase-config.js` and fill in:
 
 ```js
 window.NAPLES_SUPABASE = {
@@ -53,7 +53,7 @@ The anon key is intended for browser apps. Do not put a service-role key in this
 
 ## 3. Deploy
 
-Upload/deploy the site to Netlify after editing `supabase-config.js`.
+Upload/deploy the site to Netlify after editing `scripts/shared/supabase-config.js`.
 
 No Netlify environment variables are required for accounts. The only Netlify Function still used is the live gold price function.
 
@@ -76,9 +76,9 @@ Any future registered-only page can use:
 </section>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="supabase-config.js"></script>
-<script src="naples-auth.js"></script>
-<script src="registered-only.js"></script>
+<script src="scripts/shared/supabase-config.js"></script>
+<script src="scripts/shared/naples-auth.js"></script>
+<script src="scripts/shared/registered-only.js"></script>
 ```
 
 ## 5. Saved Cart Behavior

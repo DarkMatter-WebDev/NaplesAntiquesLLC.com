@@ -24,7 +24,7 @@ function Get-EditorialHeader([string]$active, [bool]$indexExtras = $false) {
 <header class="site-header site-header--light fixed top-0 w-full z-50 bg-[#f9f9f7]/95 border-b border-[#d8d0c2]">
   <div class="site-header-bar flex items-center justify-between gap-3 px-4 md:px-8 py-4 md:py-5 w-full max-w-[1440px] mx-auto">
     <a href="index.html" class="site-brand-link flex items-center gap-3 min-w-0">
-      <img src="logo.png" alt="Naples Antiques & Estate Jewelry Logo" class="site-brand-logo h-10 w-auto object-contain flex-shrink-0" />
+      <img src="assets/images/branding/logo.png" alt="Naples Antiques & Estate Jewelry Logo" class="site-brand-logo h-10 w-auto object-contain flex-shrink-0" />
       <span class="site-brand-text font-display-lg-mobile text-[18px] md:text-[23px] tracking-normal text-[#735c00] uppercase">
         <span class="site-brand-short">Naples Antiques</span>
         <span class="site-brand-full">Naples Antiques &amp; Estate Jewelry</span>
@@ -49,7 +49,7 @@ $privacyHeader = @"
   <header class="site-header site-header--light border-b border-[#d8d0c2] bg-[#f9f9f7]/95">
     <div class="site-header-bar flex items-center justify-between gap-3 px-4 md:px-8 py-4 md:py-5 w-full max-w-[1440px] mx-auto">
       <a href="index.html" class="site-brand-link flex items-center gap-3 min-w-0">
-        <img src="logo.png" alt="Naples Antiques & Estate Jewelry Logo" class="site-brand-logo h-10 w-auto object-contain flex-shrink-0" />
+        <img src="assets/images/branding/logo.png" alt="Naples Antiques & Estate Jewelry Logo" class="site-brand-logo h-10 w-auto object-contain flex-shrink-0" />
         <span class="site-brand-text font-display-lg-mobile text-[18px] md:text-[23px] tracking-normal text-[#735c00] uppercase">
           <span class="site-brand-short">Naples Antiques</span>
           <span class="site-brand-full">Naples Antiques &amp; Estate Jewelry</span>
@@ -68,7 +68,7 @@ $pageActive = @{
   'silver-services.html' = 'silver-services'; 'estate-jewelry.html' = 'estate-jewelry'
 }
 
-$dupBlock = '(?s)<link href="https://fonts\.googleapis\.com/css2\?family=Libre Caslon Text.*?</script>\s*<link href="https://fonts\.googleapis\.com/css2\?family=Material.*?</script>\s*<script src="editorial-tailwind-config\.js"></script>\s*<link href="editorial-base\.css"[^>]*>\s*<link href="editorial-theme\.css[^>]*>\s*<script src="site-header\.js" defer></script>\s*'
+$dupBlock = '(?s)<link href="https://fonts\.googleapis\.com/css2\?family=Libre Caslon Text.*?</script>\s*<link href="https://fonts\.googleapis\.com/css2\?family=Material.*?</script>\s*<script src="scripts/shared/editorial-tailwind-config\.js"></script>\s*<link href="editorial-base\.css"[^>]*>\s*<link href="editorial-theme\.css[^>]*>\s*<script src="scripts/shared/site-header\.js" defer></script>\s*'
 
 Get-ChildItem $dir -Filter '*.html' | ForEach-Object {
   $name = $_.Name
@@ -82,7 +82,7 @@ Get-ChildItem $dir -Filter '*.html' | ForEach-Object {
     $t = $t -replace '(<link href="editorial-base\.css" rel="stylesheet" />)', "`$1`n<link href=`"editorial-theme.css?v=editorial-unified`" rel=`"stylesheet`" />"
   }
   if ($t -notmatch 'site-header\.js') {
-    $t = $t -replace '(<link href="editorial-theme\.css[^>]+>)', "`$1`n<script src=`"site-header.js`" defer></script>"
+    $t = $t -replace '(<link href="editorial-theme\.css[^>]+>)', "`$1`n<script src=`"scripts/shared/site-header.js`" defer></script>"
   }
 
   if ($name -eq 'privacy.html') { $header = $privacyHeader }

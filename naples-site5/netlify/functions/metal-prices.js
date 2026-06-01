@@ -138,7 +138,7 @@ exports.handler = async function handler(event) {
       return {
         statusCode: 200,
         headers: Object.assign({}, corsHeaders(), {
-          'Cache-Control': 'public, max-age=300'
+          'Cache-Control': 'no-store, max-age=0'
         }),
         body: JSON.stringify(Object.assign({}, cache.payload, { cached: true }))
       };
@@ -155,7 +155,7 @@ exports.handler = async function handler(event) {
     return {
       statusCode: 200,
       headers: Object.assign({}, corsHeaders(), {
-        'Cache-Control': 'public, max-age=300'
+        'Cache-Control': 'no-store, max-age=0'
       }),
       body: JSON.stringify(cache.payload)
     };
@@ -169,7 +169,7 @@ exports.handler = async function handler(event) {
     return {
       statusCode: 200,
       headers: Object.assign({}, corsHeaders(), {
-        'Cache-Control': 'public, max-age=300'
+        'Cache-Control': 'no-store, max-age=0'
       }),
       body: JSON.stringify(cache.payload)
     };

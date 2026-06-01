@@ -1,4 +1,4 @@
-$dir = Split-Path -Parent $MyInvocation.MyCommand.Path
+﻿$dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 function Get-NavClass([string]$name, [string]$active) {
   if ($name -eq $active) {
@@ -36,7 +36,7 @@ function Get-EditorialHeader([string]$active, [bool]$indexExtras = $false) {
 <header class="site-header site-header--light fixed top-0 w-full z-50 bg-[#f9f9f7]/95 border-b border-[#d8d0c2]">
   <motion.div class="site-header-bar flex items-center justify-between gap-3 px-4 md:px-8 py-4 md:py-5 w-full max-w-[1440px] mx-auto">
     <a href="index.html" class="site-brand-link flex items-center gap-3 min-w-0">
-      <img src="logo.png" alt="Naples Antiques & Estate Jewelry Logo" class="site-brand-logo h-10 w-auto object-contain flex-shrink-0" />
+      <img src="assets/images/branding/logo.png" alt="Naples Antiques & Estate Jewelry Logo" class="site-brand-logo h-10 w-auto object-contain flex-shrink-0" />
       <span class="site-brand-text font-display-lg-mobile text-[18px] md:text-[23px] tracking-normal text-[#735c00] uppercase">
         <span class="site-brand-short">Naples Antiques</span>
         <span class="site-brand-full">Naples Antiques &amp; Estate Jewelry</span>
@@ -61,10 +61,10 @@ $editorialAssets = @"
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Hanken+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-<script src="editorial-tailwind-config.js"></script>
+<script src="scripts/shared/editorial-tailwind-config.js"></script>
 <link href="editorial-base.css" rel="stylesheet" />
 <link href="editorial-theme.css?v=editorial-unified" rel="stylesheet" />
-<script src="site-header.js" defer></script>
+<script src="scripts/shared/site-header.js" defer></script>
 "@
 
 $pageActive = @{
@@ -92,7 +92,7 @@ Get-ChildItem $dir -Filter "*.html" | ForEach-Object {
   <header class="site-header site-header--light border-b border-[#d8d0c2] bg-[#f9f9f7]/95">
     <div class="site-header-bar flex items-center justify-between gap-3 px-4 md:px-8 py-4 md:py-5 w-full max-w-[1440px] mx-auto">
       <a href="index.html" class="site-brand-link flex items-center gap-3 min-w-0">
-        <img src="logo.png" alt="Naples Antiques & Estate Jewelry Logo" class="site-brand-logo h-10 w-auto object-contain flex-shrink-0" />
+        <img src="assets/images/branding/logo.png" alt="Naples Antiques & Estate Jewelry Logo" class="site-brand-logo h-10 w-auto object-contain flex-shrink-0" />
         <span class="site-brand-text font-display-lg-mobile text-[18px] md:text-[23px] tracking-normal text-[#735c00] uppercase">
           <span class="site-brand-short">Naples Antiques</span>
           <span class="site-brand-full">Naples Antiques &amp; Estate Jewelry</span>
@@ -116,7 +116,7 @@ Get-ChildItem $dir -Filter "*.html" | ForEach-Object {
   $t = $t -replace 'content="#131313"', 'content="#f9f9f9"'
 
   # Remove duplicate editorial asset runs before injecting the canonical block once
-  $dupAfterHeader = '(?s)(<script src="site-header\.js" defer></script>)\s*(<link href="https://fonts\.googleapis\.com/css2\?family=Libre.*?<script src="site-header\.js" defer></script>)'
+  $dupAfterHeader = '(?s)(<script src="scripts/shared/site-header\.js" defer></script>)\s*(<link href="https://fonts\.googleapis\.com/css2\?family=Libre.*?<script src="scripts/shared/site-header\.js" defer></script>)'
   while ([regex]::IsMatch($t, $dupAfterHeader)) { $t = [regex]::Replace($t, $dupAfterHeader, '$1', 1) }
   if ($t -notmatch 'editorial-tailwind-config\.js') {
     $t = [regex]::Replace($t, '(?s)<script src="https://cdn\.tailwindcss\.com[^>]*></script>.*?(?=<style|<!-- MailerLite|</head>)', $editorialAssets + "`n", 1)
