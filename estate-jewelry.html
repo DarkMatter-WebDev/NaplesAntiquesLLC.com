@@ -10,7 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script src="scripts/shared/editorial-tailwind-config.js"></script>
 <link href="editorial-base.css" rel="stylesheet" />
-<link href="editorial-theme.css?v=charcoal-header" rel="stylesheet" />
+<link href="editorial-theme.css?v=darkmatter-credit-20260601" rel="stylesheet" />
 <script src="scripts/shared/site-header.js?v=cart-last-20260601" defer></script>
 <style>
 .luxury-divider {
@@ -18,9 +18,71 @@
             background-color: #E5E4E2;
             width: 100%;
         }
+        .estate-jewelry-page img {
+            max-width: 100%;
+        }
+        @media (max-width: 767px) {
+            .estate-jewelry-page main {
+                overflow-x: hidden;
+            }
+            .estate-hero {
+                height: auto !important;
+                min-height: 680px;
+                align-items: flex-start;
+                padding: 6rem 0 3rem;
+            }
+            .estate-mobile-container {
+                padding-left: 1.25rem !important;
+                padding-right: 1.25rem !important;
+            }
+            .estate-hero-actions {
+                align-items: stretch;
+                flex-direction: column;
+            }
+            .estate-hero-actions a {
+                width: 100%;
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
+                text-align: center;
+            }
+            .estate-text-column {
+                padding-left: 0 !important;
+                margin-top: 2rem;
+            }
+            .estate-credential-card {
+                aspect-ratio: auto !important;
+                padding: 1rem !important;
+            }
+            .estate-credential-card > div {
+                min-height: auto;
+                padding: 1.5rem !important;
+            }
+            .estate-gallery-header {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 1rem;
+            }
+            .estate-gallery-grid {
+                display: flex !important;
+                flex-direction: column;
+                height: auto !important;
+            }
+            .estate-gallery-grid > div {
+                min-height: 260px;
+                width: 100%;
+            }
+            .estate-gallery-grid h4 {
+                font-size: 1.35rem !important;
+                line-height: 1.2 !important;
+            }
+            .estate-gallery-grid p {
+                font-size: 0.68rem !important;
+                letter-spacing: 0.1em !important;
+            }
+        }
     </style>
 </head>
-<body class="font-body-md text-body-md bg-background overflow-x-hidden">
+<body class="estate-jewelry-page font-body-md text-body-md bg-background overflow-x-hidden">
 <!-- TopAppBar -->
 <header class="site-header site-header--light fixed top-0 w-full z-50 bg-[#f9f9f7]/95 border-b border-[#d8d0c2]">
   <div class="site-header-bar flex items-center justify-between gap-3 px-4 md:px-8 py-4 md:py-5 w-full max-w-[1440px] mx-auto">
@@ -62,16 +124,16 @@
   <div id="mobile-menu" class="hidden 2xl:hidden border-t border-[#d8d0c2] bg-[#f9f9f7]/98"><div class="flex flex-col px-5 py-4"><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="index.html">Home</a><a class="text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="shop.html">Shop</a><a class="text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="what-we-buy.html">Sell To Us</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="about.html">About Us</a><a class="mobile-subitem" href="estate-jewelry.html">Estate Jewelry</a><a class="mobile-subitem" href="gold-services.html">Gold Services</a><a class="mobile-subitem" href="silver-services.html">Silver Services</a><a class="mobile-subitem" href="bullion.html">Bullion</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="process.html">Process</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="estate-services.html">Estate Services</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="contact.html">Contact Us</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="faq.html">FAQ</a></div></div>
 </header><main class="pt-16">
 <!-- Hero Section -->
-<section class="relative h-[819px] flex items-center overflow-hidden bg-inverse-surface">
+<section class="estate-hero relative h-[819px] flex items-center overflow-hidden bg-inverse-surface">
 <div class="absolute inset-0 opacity-40">
 <img alt="Jeweler measuring an estate ring during a private evaluation" class="w-full h-full object-cover object-center" data-alt="A black-and-white photograph of a jeweler using digital calipers to measure a ring at the workbench during an estate jewelry evaluation." src="assets/images/pages/jeweler.jpg"/>
 </div>
-<div class="container mx-auto px-margin-desktop relative z-10">
+<div class="estate-mobile-container container mx-auto px-margin-desktop relative z-10">
 <div class="max-w-2xl">
 <span class="font-label-md text-label-md text-primary-fixed uppercase tracking-[0.2em] mb-4 block">Estate Jewelry Assessment</span>
 <h1 class="font-display-lg text-display-lg text-white mb-6 leading-tight">Evaluating the Artistry of Fine Jewelry</h1>
 <p class="font-body-lg text-body-lg text-surface-variant mb-10 leading-relaxed">Beyond the mere weight of gold and carats of stone lies a world of provenance, craftsmanship, and history. We provide careful evaluations with onsite acid testing at your appointment, and coordinate trusted offsite XRF analysis, geological review, and GIA certification when a piece calls for deeper gemological documentation.</p>
-<div class="flex gap-4">
+<div class="estate-hero-actions flex gap-4">
 <a href="index.html#appointment" class="bg-primary-container text-on-primary-container px-10 py-4 font-label-md text-label-md tracking-widest uppercase hover:opacity-90 transition-all">Schedule Consultation</a>
 <a href="process.html" class="border border-outline-variant text-white px-10 py-4 font-label-md text-label-md tracking-widest uppercase hover:bg-white/10 transition-all">The Evaluation Process</a>
 </div>
@@ -80,7 +142,7 @@
 </section>
 <!-- Evaluation Process: Asymmetric Grid -->
 <section class="py-section-gap bg-surface">
-<div class="max-w-container-max mx-auto px-margin-desktop">
+<div class="estate-mobile-container max-w-container-max mx-auto px-margin-desktop">
 <div class="mb-20 text-center max-w-3xl mx-auto">
 <h2 class="font-headline-lg text-headline-lg mb-6">A Multidimensional Approach to Value</h2>
 <p class="font-body-md text-body-md text-on-surface-variant">We look past the scrap value. Our private evaluation considers the factors that make your piece unique in the global secondary market.</p>
@@ -89,7 +151,7 @@
 <div class="col-span-12 md:col-span-7">
 <img class="w-full aspect-[4/3] object-cover" data-alt="A sophisticated close-up of a jeweler's workbench featuring high-precision tools, a loupe, and a selection of loose colored gemstones and signed jewelry pieces. The lighting is soft and natural, emphasizing the professional environment and technical expertise. The background is a clean, minimalist studio space with a focus on organized, high-end equipment in a silver and white color palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0XGJMeKPDvKKacpWJUxppJoSVQLBLw1suWtj8dAM_zHaJDIjw__2PoCMpfgUelVfpqAqkWku2L5rdVbRfqT_Ba3STl4GzphSFjGlyIkGh4JSH_Y_atfGg5r-nh99LSXqJqek5wsfAtwdqAaufm79U6uk_4hK393k40nxh_tI0OS5VlW6SMGNuk1y16abrG_Z_lyseBTzvItpdSp5iXy-IksDACfZszjXg5lE63B4AxcawI2pEub8f9kDy5tFPwGji7gmGT1lemfU"/>
 </div>
-<div class="col-span-12 md:col-span-5 flex flex-col gap-12 pl-8">
+<div class="estate-text-column col-span-12 md:col-span-5 flex flex-col gap-12 pl-8">
 <div>
 <h3 class="font-headline-md text-headline-md mb-4">Maker &amp; Provenance</h3>
 <p class="text-on-surface-variant leading-relaxed">Items from houses like Cartier, Van Cleef &amp; Arpels, or Tiffany carry a significant premium. We track auction records and private sales to ensure your piece is evaluated for its signature.</p>
@@ -111,7 +173,7 @@
 </section>
 <!-- Consultation Section -->
 <section class="py-section-gap bg-inverse-surface text-white">
-<div class="max-w-container-max mx-auto px-margin-desktop">
+<div class="estate-mobile-container max-w-container-max mx-auto px-margin-desktop">
 <div class="grid grid-cols-12 gap-gutter items-center">
 <div class="col-span-12 md:col-span-6">
 <span class="font-label-md text-label-md text-primary-fixed uppercase tracking-widest mb-6 block">Private Consultation</span>
@@ -134,7 +196,7 @@
 <a href="index.html#appointment" class="bg-primary text-on-primary px-12 py-5 font-label-md text-label-md tracking-widest uppercase hover:bg-primary-container transition-all inline-flex">Book Your Private Appointment</a>
 </div>
 <div class="col-span-12 md:col-span-6">
-<div class="aspect-square bg-surface-container-highest flex items-center justify-center p-12">
+<div class="estate-credential-card aspect-square bg-surface-container-highest flex items-center justify-center p-12">
 <div class="border border-outline p-10 w-full h-full flex flex-col justify-center text-center">
 <span class="material-symbols-outlined text-primary text-6xl mb-6">workspace_premium</span>
 <h3 class="font-headline-md text-headline-md text-on-surface mb-4">Professional Integrity</h3>
@@ -148,15 +210,15 @@
 </section>
 <!-- Items We Buy: Bento-style Gallery -->
 <section class="py-section-gap bg-white">
-<div class="max-w-container-max mx-auto px-margin-desktop">
-<div class="flex justify-between items-end mb-16">
+<div class="estate-mobile-container max-w-container-max mx-auto px-margin-desktop">
+<div class="estate-gallery-header flex justify-between items-end mb-16">
 <div class="max-w-xl">
 <h2 class="font-headline-lg text-headline-lg mb-4">Exceptional Items Sought</h2>
 <p class="text-on-surface-variant">Our boutique focuses on the acquisition of high-value signed pieces, antique heirlooms, and luxury timepieces.</p>
 </div>
 <a class="font-label-md text-label-md text-primary underline underline-offset-8 decoration-primary/30 hover:decoration-primary transition-all" href="#">VIEW FULL GUIDE</a>
 </div>
-<div class="grid grid-cols-12 grid-rows-2 gap-4 h-[800px]">
+<div class="estate-gallery-grid grid grid-cols-12 grid-rows-2 gap-4 h-[800px]">
 <div class="col-span-8 row-span-2 relative group overflow-hidden bg-surface-container">
 <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" data-alt="A Patek Philippe dress watch on dark fabric, shown as an example of the luxury watches considered in estate jewelry evaluations." src="assets/images/pages/patek.jpg" style="object-position: center 68%;"/>
 <div class="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/60 to-transparent text-white">
@@ -183,7 +245,7 @@
 </section>
 <!-- CTA / Credentials Section -->
 <section class="py-24 bg-surface-container-low">
-<div class="max-w-container-max mx-auto px-margin-desktop text-center">
+<div class="estate-mobile-container max-w-container-max mx-auto px-margin-desktop text-center">
 <h3 class="font-label-sm text-label-sm text-secondary uppercase tracking-[0.3em] mb-12">Our Standards</h3>
 <div class="flex flex-wrap justify-center gap-16 md:gap-32">
 <div class="flex flex-col items-center">
@@ -207,5 +269,16 @@
 </section>
 </main>
 <!-- Footer -->
-<footer class="bg-[#2f3131] text-[#f1f1f1] py-14 border-t border-[#d8d0c2]"><div class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop text-center"><h2 class="font-headline-md text-headline-md text-[#e9c349] uppercase mb-4">Naples Estate Jewelry & Antiques</h2><p class="max-w-2xl mx-auto text-[#d7d0c3] font-body-md text-body-md leading-relaxed mb-6">Mobile, appointment-only estate services serving Naples and Southwest Florida. Private evaluations for estate jewelry, gold, silver, bullion, watches, diamonds, antiques, and inherited collections.</p><a class="text-[#e9c349] font-label-md text-label-md uppercase tracking-widest" href="tel:2394048505">Call or Text (239) 404-8505</a><div class="mt-8 flex flex-wrap justify-center gap-x-6 gap-y-3 text-sm"><a href="privacy.html" class="text-[#d7d0c3] hover:text-white">Privacy Policy</a><a href="index.html#appointment" class="text-[#d7d0c3] hover:text-white">Contact Us</a><a href="what-we-buy.html" class="text-[#d7d0c3] hover:text-white">Sell To Us</a></div><p class="mt-8 text-[#b8b0a3] text-sm">&copy; 2026 Naples Estate Jewelry & Antiques. Mobile, Private Appointments.</p></div></footer>
+<div class="dm-powered-bar" role="contentinfo" aria-label="Website credit">
+  <a class="dm-powered-badge" href="https://darkmatterwebdev.com/" target="_blank" rel="noopener noreferrer" aria-label="Website powered by Dark Matter Web Services">
+    <svg class="dm-powered-badge__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6z" />
+    </svg>
+    <span class="dm-powered-badge__lockup">
+      <span class="dm-powered-badge__label">Website powered by</span>
+      <span class="dm-powered-badge__name">DARK MATTER</span>
+      <span class="dm-powered-badge__subtext">Web Services</span>
+    </span>
+  </a>
+</div><footer class="bg-[#2f3131] text-[#f1f1f1] py-14 border-t border-[#d8d0c2]"><div class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop text-center"><h2 class="font-headline-md text-headline-md text-[#e9c349] uppercase mb-4">Naples Estate Jewelry & Antiques</h2><p class="max-w-2xl mx-auto text-[#d7d0c3] font-body-md text-body-md leading-relaxed mb-6">Mobile, appointment-only estate services serving Naples and Southwest Florida. Private evaluations for estate jewelry, gold, silver, bullion, watches, diamonds, antiques, and inherited collections.</p><a class="text-[#e9c349] font-label-md text-label-md uppercase tracking-widest" href="tel:2394048505">Call or Text (239) 404-8505</a><div class="mt-8 flex flex-wrap justify-center gap-x-6 gap-y-3 text-sm"><a href="privacy.html" class="text-[#d7d0c3] hover:text-white">Privacy Policy</a><a href="index.html#appointment" class="text-[#d7d0c3] hover:text-white">Contact Us</a><a href="what-we-buy.html" class="text-[#d7d0c3] hover:text-white">Sell To Us</a></div><p class="mt-8 text-[#b8b0a3] text-sm">&copy; 2026 Naples Estate Jewelry & Antiques. Mobile, Private Appointments.</p></div></footer>
 </body></html>

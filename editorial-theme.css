@@ -1,4 +1,5 @@
 @import url("https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Hanken+Grotesk:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@500;600;700&display=swap");
 
 :root {
   --estate-ivory: #f9f9f7;
@@ -738,5 +739,120 @@ main > section.estate-services-hero.relative.overflow-hidden:has(> div.absolute.
   body main .estate-services-hero p {
     font-size: clamp(1rem, 4vw, 1.18rem) !important;
     line-height: 1.55 !important;
+  }
+}
+
+.dm-powered-bar {
+  background: #030406;
+  border-top: 1px solid rgba(0, 240, 255, 0.18);
+  display: flex;
+  justify-content: center;
+  padding: 1.25rem 1rem;
+  text-align: center;
+  width: 100%;
+}
+
+.dm-powered-badge {
+  align-items: center;
+  animation: dm-nebula-pulse 4s ease-in-out infinite;
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.22);
+  border-radius: 1rem;
+  box-shadow:
+    0 0 24px rgba(0, 240, 255, 0.12),
+    inset 0 0 20px rgba(112, 0, 255, 0.08);
+  color: inherit;
+  display: inline-flex;
+  flex-direction: row;
+  gap: 0.875rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 1rem 1.25rem;
+  text-decoration: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dm-powered-badge:hover,
+.dm-powered-badge:focus-visible {
+  border-color: rgba(0, 240, 255, 0.4);
+  box-shadow:
+    0 0 32px rgba(112, 0, 255, 0.2),
+    inset 0 0 24px rgba(0, 240, 255, 0.1);
+  outline: none;
+}
+
+.dm-powered-badge__icon {
+  color: #00f0ff;
+  flex-shrink: 0;
+  height: 1.5rem;
+  width: 1.5rem;
+}
+
+.dm-powered-badge__lockup {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+.dm-powered-badge__label {
+  color: #8e9192;
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+.dm-powered-badge__name {
+  animation: dm-brand-shimmer 6s ease-in-out infinite;
+  background: linear-gradient(120deg, #ffffff 0%, #00f0ff 38%, #7000ff 88%);
+  background-clip: text;
+  background-size: 200% auto;
+  filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.55)) drop-shadow(0 0 22px rgba(112, 0, 255, 0.4));
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dm-powered-badge__subtext {
+  color: #8e9192;
+  display: block;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  margin-top: 3px;
+  text-transform: uppercase;
+  transform: scaleX(1.28);
+  transform-origin: left center;
+}
+
+@keyframes dm-brand-shimmer {
+  0%, 100% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+}
+
+@keyframes dm-nebula-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.1), inset 0 0 16px rgba(112, 0, 255, 0.06);
+  }
+  50% {
+    box-shadow: 0 0 32px rgba(112, 0, 255, 0.2), inset 0 0 24px rgba(0, 240, 255, 0.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dm-powered-badge,
+  .dm-powered-badge__name {
+    animation: none;
+  }
+
+  .dm-powered-badge__name {
+    background-position: 0% center;
   }
 }
