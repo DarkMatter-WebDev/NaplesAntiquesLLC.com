@@ -6,6 +6,8 @@
   var grid = document.getElementById('shop-product-grid');
   if (!grid) return;
 
+  var ES = (document.documentElement.getAttribute('lang') || '').toLowerCase().indexOf('es') === 0;
+
   var cards = Array.prototype.slice.call(grid.querySelectorAll('.shop-product-card'));
   var searchInput = document.getElementById('shop-search');
   var clearBtn = document.getElementById('shop-clear-filters');
@@ -78,7 +80,11 @@
     });
 
     if (resultEl) {
-      resultEl.textContent = 'Showing ' + visible + ' of ' + total + ' piece' + (total === 1 ? '' : 's');
+      if (ES) {
+        resultEl.textContent = 'Mostrando ' + visible + ' de ' + total + ' pieza' + (total === 1 ? '' : 's');
+      } else {
+        resultEl.textContent = 'Showing ' + visible + ' of ' + total + ' piece' + (total === 1 ? '' : 's');
+      }
     }
     if (emptyEl) {
       emptyEl.classList.toggle('hidden', visible > 0);
@@ -99,26 +105,30 @@
     if (!media) return;
     var itemId = card.getAttribute('data-shop-item') || '';
 
+    var viewLabel = ES ? 'Ver artículo' : 'View listing';
+    var addLabel = ES ? 'Agregar al Carrito' : 'Add to Cart';
+    var addedLabel = ES ? 'Agregado' : 'Added';
+
     card.setAttribute('role', 'link');
     card.setAttribute('tabindex', '0');
-    card.setAttribute('aria-label', 'View listing');
-    card.title = 'View listing';
-    media.title = 'View listing';
+    card.setAttribute('aria-label', viewLabel);
+    card.title = viewLabel;
+    media.title = viewLabel;
 
     if (!media.querySelector('.shop-media-cart-btn')) {
       var cartBtn = document.createElement('button');
       cartBtn.type = 'button';
       cartBtn.className = 'shop-media-cart-btn';
-      cartBtn.textContent = 'Add to Cart';
-      cartBtn.setAttribute('aria-label', 'Add item to cart');
+      cartBtn.textContent = addLabel;
+      cartBtn.setAttribute('aria-label', ES ? 'Agregar artículo al carrito' : 'Add item to cart');
       cartBtn.addEventListener('click', function (event) {
         event.preventDefault();
         event.stopPropagation();
         if (window.ShopCart) {
           window.ShopCart.add(itemId);
-          cartBtn.textContent = 'Added';
+          cartBtn.textContent = addedLabel;
           setTimeout(function () {
-            cartBtn.textContent = 'Add to Cart';
+            cartBtn.textContent = addLabel;
           }, 1400);
         }
       });

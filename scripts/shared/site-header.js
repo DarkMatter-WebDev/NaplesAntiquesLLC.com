@@ -4,6 +4,7 @@
   var icon = document.getElementById("mobile-menu-icon");
   var currentPage = (window.location.pathname.split("/").pop() || "index.html").toLowerCase();
   var activePage = currentPage;
+  var ES = (document.documentElement.getAttribute("lang") || "").toLowerCase().indexOf("es") === 0;
 
   document.querySelectorAll(".site-header-actions .header-cta-call").forEach(function (link) {
     link.remove();
@@ -63,20 +64,71 @@
     var mobileInner = document.querySelector("#mobile-menu > div");
     var cartCount = ' (<span data-header-cart-count>0</span>)';
 
-    appendDesktopLink(desktopNav, "account.html", "My Account");
-    appendDesktopLink(desktopNav, "cart.html", "Cart", cartCount);
+    var accountLabel = ES ? "Mi Cuenta" : "My Account";
+    var cartLabel = ES ? "Carrito" : "Cart";
+
+    appendDesktopLink(desktopNav, "account.html", accountLabel);
+    appendDesktopLink(desktopNav, "cart.html", cartLabel, cartCount);
     if (desktopNav) {
       var desktopCart = desktopNav.querySelector('a[href="cart.html"]');
       if (desktopCart) desktopNav.appendChild(desktopCart);
     }
-    appendMobileLink(mobileInner, "cart.html", "Cart", cartCount);
-    appendMobileLink(mobileInner, "account.html", "My Account");
+    appendMobileLink(mobileInner, "cart.html", cartLabel, cartCount);
+    appendMobileLink(mobileInner, "account.html", accountLabel);
     updateHeaderCartCounts();
   }
 
+  function getLanguageTwin() {
+    var path = window.location.pathname;
+    var isEs = /^\/es(\/|$)/.test(path);
+    var twin;
+    if (isEs) {
+      twin = path.replace(/^\/es(?=\/|$)/, "");
+      if (!twin || twin === "/") twin = "/index.html";
+    } else {
+      if (!path || path === "/") twin = "/es/index.html";
+      else twin = "/es" + path;
+    }
+    return { isEs: isEs, twin: twin };
+  }
+
+  function addLanguageToggle() {
+    var info = getLanguageTwin();
+    var self = window.location.pathname || "/";
+    var enUrl = info.isEs ? info.twin : self;
+    var esUrl = info.isEs ? self : info.twin;
+
+    var actions = document.querySelector(".site-header-actions");
+    if (actions && !actions.querySelector("[data-lang-toggle]")) {
+      var wrap = document.createElement("span");
+      wrap.setAttribute("data-lang-toggle", "");
+      wrap.className = "lang-toggle inline-flex items-center gap-1 font-label-md text-label-md uppercase tracking-widest px-2 py-2";
+      wrap.setAttribute("aria-label", info.isEs ? "Cambiar idioma" : "Switch language");
+
+      var globe = '<span class="material-symbols-outlined" style="font-size:18px;line-height:1;">language</span>';
+      var en = '<a class="lang-opt' + (info.isEs ? "" : " is-current") + '" href="' + enUrl + '" title="View this page in English"' + (info.isEs ? "" : ' aria-current="true"') + ">EN</a>";
+      var sep = '<span class="lang-sep" aria-hidden="true">/</span>';
+      var es = '<a class="lang-opt' + (info.isEs ? " is-current" : "") + '" href="' + esUrl + '" title="Ver esta página en español"' + (info.isEs ? ' aria-current="true"' : "") + ">ES</a>";
+      wrap.innerHTML = globe + en + sep + es;
+      actions.insertBefore(wrap, actions.firstChild);
+    }
+
+    var mobileInner = document.querySelector("#mobile-menu > div");
+    if (mobileInner && !mobileInner.querySelector("[data-lang-toggle-mobile]")) {
+      var mlink = document.createElement("a");
+      mlink.setAttribute("data-lang-toggle-mobile", "");
+      mlink.href = info.twin;
+      mlink.className = "text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]";
+      mlink.textContent = info.isEs ? "English" : "Español";
+      mobileInner.appendChild(mlink);
+    }
+  }
+
   addAccountAndCartLinks();
+  addLanguageToggle();
 
   document.querySelectorAll(".site-header a[href]").forEach(function (link) {
+    if (link.closest("[data-lang-toggle]")) return;
     var hrefPage = (link.getAttribute("href") || "").split("#")[0].split("/").pop().toLowerCase();
     if (hrefPage === activePage) {
       link.classList.add("is-current-page");

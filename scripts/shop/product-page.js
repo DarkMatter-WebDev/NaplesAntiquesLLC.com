@@ -5,17 +5,27 @@
     var id = params.get('id');
     var product = products.find(function (item) { return item.id === id; });
 
+    var ES = (document.documentElement.getAttribute('lang') || '').toLowerCase().indexOf('es') === 0;
+    var CAT_ES = { 'gold': 'Oro', 'silver': 'Plata', 'bullion': 'Lingotes', 'diamond': 'Diamantes', 'diamonds': 'Diamantes', 'watch': 'Relojes', 'watches': 'Relojes', 'antique': 'Antigüedades', 'antiques': 'Antigüedades', 'jewelry': 'Joyería', 'coins': 'Monedas', 'coin': 'Monedas' };
+    var STATUS_ES = { 'available': 'Disponible', 'sold': 'Vendido', 'reserved': 'Reservado', 'on hold': 'En espera', 'pending': 'Pendiente' };
+    function L(en, es) { return (ES && es) ? es : en; }
+    function catLabel(cat) { if (!ES || !cat) return cat; return CAT_ES[String(cat).toLowerCase()] || cat; }
+    function statusLabel(s) { if (!ES || !s) return s; return STATUS_ES[String(s).toLowerCase()] || s; }
+    function pTitle() { return (ES && product && product.title_es) ? product.title_es : (product ? product.title : ''); }
+    function pDescription() { return (ES && product && product.description_es) ? product.description_es : (product ? product.description : ''); }
+    function pDetails() { return (ES && product && product.details_es) ? product.details_es : ((product && product.details) || []); }
+
     var found = document.getElementById('product-found');
     var missing = document.getElementById('product-missing');
 
     if (!product) {
       if (found) found.hidden = true;
       if (missing) missing.hidden = false;
-      document.title = 'Listing Not Found | Naples Estate Jewelry & Antiques';
+      document.title = L('Listing Not Found', 'Artículo No Encontrado') + ' | Naples Estate Jewelry';
       return;
     }
 
-    document.title = product.title + ' | Naples Estate Jewelry & Antiques';
+    document.title = pTitle() + ' | Naples Estate Jewelry';
 
     var title = document.getElementById('product-title');
     var category = document.getElementById('product-category');
@@ -51,7 +61,7 @@
       if (scrapValue) {
         var scrapLabel = getScrapValueLabel();
         if (scrapLabel) {
-          scrapValue.textContent = 'Exact gold scrap value: ' + scrapLabel;
+          scrapValue.textContent = L('Exact gold scrap value: ', 'Valor exacto de fundición del oro: ') + scrapLabel;
           scrapValue.hidden = false;
         } else {
           scrapValue.textContent = '';
@@ -61,9 +71,9 @@
       if (details) {
         Array.prototype.forEach.call(details.querySelectorAll('li'), function (item) {
           var text = (item.textContent || '').trim();
-          if (/^(Price|Your price):/i.test(text)) {
+          if (/^(Price|Your price|Precio|Su precio):/i.test(text)) {
             var valueSpan = item.querySelector('span:last-child');
-            if (valueSpan) valueSpan.textContent = 'Your price: ' + label;
+            if (valueSpan) valueSpan.textContent = L('Your price: ', 'Su precio: ') + label;
           }
         });
       }
@@ -147,7 +157,7 @@
     async function updateFavoriteButton() {
       if (!saveFavorite) return;
       if (!window.NaplesAuth || !window.NaplesAuth.isConfigured()) {
-        saveFavorite.textContent = 'Sign in to save favorites';
+        saveFavorite.textContent = L('Sign in to save favorites', 'Inicie sesión para guardar favoritos');
         saveFavorite.onclick = function () {
           window.location.href = 'account.html';
         };
@@ -156,7 +166,7 @@
 
       var session = window.NaplesAuth.getSession();
       if (!session) {
-        saveFavorite.textContent = 'Sign in to save favorites';
+        saveFavorite.textContent = L('Sign in to save favorites', 'Inicie sesión para guardar favoritos');
         saveFavorite.onclick = function () {
           window.location.href = 'account.html';
         };
@@ -164,25 +174,25 @@
       }
 
       var saved = await window.NaplesAuth.isFavorite(product.id);
-      saveFavorite.textContent = saved ? 'Saved to favorites' : 'Save to favorites';
+      saveFavorite.textContent = saved ? L('Saved to favorites', 'Guardado en favoritos') : L('Save to favorites', 'Guardar en favoritos');
       saveFavorite.onclick = async function () {
         try {
           var nowSaved = await window.NaplesAuth.toggleFavorite(product.id);
-          saveFavorite.textContent = nowSaved ? 'Saved to favorites' : 'Save to favorites';
+          saveFavorite.textContent = nowSaved ? L('Saved to favorites', 'Guardado en favoritos') : L('Save to favorites', 'Guardar en favoritos');
         } catch (error) {
           if (cartMessage) cartMessage.textContent = error.message;
         }
       };
     }
 
-    if (title) title.textContent = product.title;
-    if (category) category.textContent = product.category;
-    if (status) status.textContent = product.status;
+    if (title) title.textContent = pTitle();
+    if (category) category.textContent = catLabel(product.category);
+    if (status) status.textContent = statusLabel(product.status);
     updatePriceDisplay();
-    if (description) description.textContent = product.description;
+    if (description) description.textContent = pDescription();
     if (mainImage) {
       mainImage.src = product.images[0];
-      mainImage.alt = product.title;
+      mainImage.alt = pTitle();
       setupImageZoom();
     }
     if (inquiry) {
@@ -193,14 +203,14 @@
         if (!window.ShopCart) return;
         window.ShopCart.add(product.id);
         if (cartMessage) {
-          cartMessage.innerHTML = 'Added to cart. <a class="text-primary underline underline-offset-4 decoration-primary/30 hover:decoration-primary" href="cart.html">View cart</a>.';
+          cartMessage.innerHTML = L('Added to cart. <a class="text-primary underline underline-offset-4 decoration-primary/30 hover:decoration-primary" href="cart.html">View cart</a>.', 'Agregado al carrito. <a class="text-primary underline underline-offset-4 decoration-primary/30 hover:decoration-primary" href="cart.html">Ver carrito</a>.');
         }
       });
     }
 
     if (details) {
       details.innerHTML = '';
-      (product.details || []).forEach(function (line) {
+      pDetails().forEach(function (line) {
         var li = document.createElement('li');
         li.className = 'flex gap-3';
         li.innerHTML = '<span class="material-symbols-outlined text-primary text-base mt-0.5 flex-shrink-0">check</span><span></span>';
@@ -217,7 +227,7 @@
           var button = document.createElement('button');
           button.type = 'button';
           button.className = 'product-thumb' + (index === 0 ? ' product-thumb--active' : '');
-          button.setAttribute('aria-label', 'View image ' + (index + 1));
+          button.setAttribute('aria-label', L('View image ', 'Ver imagen ') + (index + 1));
           button.innerHTML = '<img alt="" src="' + src + '" />';
           button.addEventListener('click', function () {
             selectedImageIndex = index;

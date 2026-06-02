@@ -118,10 +118,10 @@ nav.fixed .site-header-nav a {
   border-bottom-width: 1px;
 }
 
-header.fixed .site-header-nav a[href="shop.html"],
-header.fixed .site-header-nav a[href="what-we-buy.html"],
-nav.fixed .site-header-nav a[href="shop.html"],
-nav.fixed .site-header-nav a[href="what-we-buy.html"] {
+header.fixed .site-header-nav a[href$="shop.html"],
+header.fixed .site-header-nav a[href$="what-we-buy.html"],
+nav.fixed .site-header-nav a[href$="shop.html"],
+nav.fixed .site-header-nav a[href$="what-we-buy.html"] {
   color: #f1f1f1 !important;
   border-color: rgba(233, 195, 73, 0.45) !important;
 }
@@ -405,6 +405,42 @@ nav.fixed .editorial-call-button:hover {
 
 .nav-buy-group {
   position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Language switcher (EN / ES) injected into .site-header-actions. Show both
+   options with the active language highlighted so it reads as a switcher. */
+.lang-toggle {
+  gap: 0.3rem;
+}
+
+.lang-toggle .material-symbols-outlined {
+  color: rgba(241, 241, 241, 0.6);
+}
+
+.lang-toggle .lang-opt,
+header.fixed .lang-toggle .lang-opt,
+nav.fixed .lang-toggle .lang-opt {
+  color: rgba(241, 241, 241, 0.6) !important;
+  transition: color 0.15s ease;
+}
+
+.lang-toggle .lang-opt.is-current,
+header.fixed .lang-toggle .lang-opt.is-current,
+nav.fixed .lang-toggle .lang-opt.is-current {
+  color: var(--estate-warm-gold) !important;
+  font-weight: 700;
+}
+
+.lang-toggle .lang-opt:hover,
+header.fixed .lang-toggle .lang-opt:hover,
+nav.fixed .lang-toggle .lang-opt:hover {
+  color: var(--estate-warm-gold) !important;
+}
+
+.lang-toggle .lang-sep {
+  color: rgba(241, 241, 241, 0.35);
 }
 
 .nav-buy-panel {
@@ -461,6 +497,26 @@ nav.fixed .editorial-call-button:hover {
 .site-header-nav a,
 header.fixed .site-header-nav a {
   white-space: nowrap;
+}
+
+/* Spanish desktop nav: labels are longer than English ("Preguntas Frecuentes",
+   "Servicios de Patrimonio", etc.), which otherwise widens the nav and crushes
+   the brand name into multiple lines (making the header very tall). Tighten the
+   nav and keep the brand on one line. Only applies where the desktop nav shows
+   (>=1536px); the mobile/hamburger view and brand wrapping stay untouched. */
+@media (min-width: 1536px) {
+  html[lang="es"] .site-header-nav {
+    gap: 0.5rem !important;
+  }
+  html[lang="es"] .site-header-nav a {
+    font-size: 0.7rem !important;
+    letter-spacing: 0.01em !important;
+    padding-left: 0.1rem !important;
+    padding-right: 0.1rem !important;
+  }
+  html[lang="es"] .site-brand-text {
+    white-space: nowrap !important;
+  }
 }
 
 #mobile-menu a.mobile-subitem {

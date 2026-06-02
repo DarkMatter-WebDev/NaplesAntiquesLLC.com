@@ -1,4 +1,7 @@
 (function () {
+  var ES = (document.documentElement.getAttribute('lang') || '').toLowerCase().indexOf('es') === 0;
+  function L(en, es) { return ES ? es : en; }
+
   function setMessage(text, isError) {
     var el = document.getElementById('account-message');
     if (!el) return;
@@ -75,7 +78,7 @@
     if (emailEl && email) emailEl.textContent = email;
 
     showSignInMode();
-    setMessage('After confirming your email, sign in below.');
+    setMessage(L('After confirming your email, sign in below.', 'Después de confirmar su correo electrónico, inicie sesión a continuación.'));
   }
 
   function getConfirmationReturnState() {
@@ -106,12 +109,12 @@
     if (sentPanel) sentPanel.hidden = true;
     if (panel) panel.hidden = false;
     showSignInMode();
-    setMessage('Email confirmed. Sign in below to continue.');
+    setMessage(L('Email confirmed. Sign in below to continue.', 'Correo electrónico confirmado. Inicie sesión a continuación para continuar.'));
   }
 
   function bindEvents() {
     if (!window.NaplesAuth.isConfigured()) {
-      setMessage('Customer accounts are not configured yet. Add your Supabase URL and anon key to scripts/shared/supabase-config.js.', true);
+      setMessage(L('Customer accounts are not configured yet. Add your Supabase URL and anon key to scripts/shared/supabase-config.js.', 'Las cuentas de cliente aún no están configuradas. Agregue su URL de Supabase y la clave anon en scripts/shared/supabase-config.js.'), true);
       showSignedOut();
       return;
     }
@@ -130,22 +133,22 @@
       var email = document.getElementById('auth-email').value.trim();
       var password = document.getElementById('auth-password').value;
       if (!email || !password) {
-        setMessage('Enter your email and password to sign in.', true);
+        setMessage(L('Enter your email and password to sign in.', 'Ingrese su correo electrónico y contraseña para iniciar sesión.'), true);
         return;
       }
-      setMessage('Signing in...');
+      setMessage(L('Signing in...', 'Iniciando sesión...'));
       window.NaplesAuth.signIn(email, password)
         .then(function () {
           return window.ShopCart && window.ShopCart.syncFromAccount ? window.ShopCart.syncFromAccount() : Promise.resolve();
         })
         .then(function () {
-          setMessage('Signed in. Returning to the shop...');
+          setMessage(L('Signed in. Returning to the shop...', 'Sesión iniciada. Regresando a la tienda...'));
           goToShopAfterSignIn();
         })
         .catch(function (error) {
-          var msg = error.message || 'Sign in failed.';
+          var msg = error.message || L('Sign in failed.', 'Error al iniciar sesión.');
           if (/email not confirmed/i.test(msg)) {
-            msg = 'Please confirm your email first. Check your inbox for the confirmation link, then sign in.';
+            msg = L('Please confirm your email first. Check your inbox for the confirmation link, then sign in.', 'Por favor confirme su correo electrónico primero. Revise su bandeja de entrada para el enlace de confirmación y luego inicie sesión.');
           }
           setMessage(msg, true);
         });
@@ -157,14 +160,14 @@
       var confirmPassword = document.getElementById('create-password-confirm').value;
       var fullName = document.getElementById('create-full-name').value.trim();
       if (!email || !password || !confirmPassword) {
-        setCreateMessage('Enter an email, password, and confirmation password to create an account.', true);
+        setCreateMessage(L('Enter an email, password, and confirmation password to create an account.', 'Ingrese un correo electrónico, una contraseña y la confirmación de la contraseña para crear una cuenta.'), true);
         return;
       }
       if (password !== confirmPassword) {
-        setCreateMessage('Passwords do not match.', true);
+        setCreateMessage(L('Passwords do not match.', 'Las contraseñas no coinciden.'), true);
         return;
       }
-      setCreateMessage('Creating account...');
+      setCreateMessage(L('Creating account...', 'Creando cuenta...'));
       window.NaplesAuth.signUp(email, password, fullName)
         .then(function (data) {
           setCreateMessage('');
@@ -176,7 +179,7 @@
         .then(function () {
           showSignInMode();
           if (window.NaplesAuth.getSession()) {
-            setMessage('Account created successfully. Opening account management...');
+            setMessage(L('Account created successfully. Opening account management...', 'Cuenta creada con éxito. Abriendo la gestión de la cuenta...'));
             goToDashboard(true);
             return null;
           }
@@ -209,7 +212,7 @@
     if (window.NaplesAuth.getSession()) {
       if (confirmationReturn.isConfirmationReturn) {
         window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
-        setMessage('Email confirmed. Opening your account...');
+        setMessage(L('Email confirmed. Opening your account...', 'Correo electrónico confirmado. Abriendo su cuenta...'));
       }
       goToDashboard();
       return;

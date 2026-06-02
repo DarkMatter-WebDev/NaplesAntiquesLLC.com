@@ -1,4 +1,7 @@
 (function () {
+  var ES = (document.documentElement.getAttribute('lang') || '').toLowerCase().indexOf('es') === 0;
+  function L(en, es) { return ES ? es : en; }
+
   function showGate(message) {
     var protectedContent = document.querySelector('[data-registered-content]');
     var gate = document.querySelector('[data-registered-gate]');
@@ -8,7 +11,7 @@
       gate.hidden = false;
       var messageEl = gate.querySelector('[data-registered-message]');
       if (messageEl) {
-        messageEl.textContent = message || 'Sign in to access this page.';
+        messageEl.textContent = message || L('Sign in to access this page.', 'Inicie sesión para acceder a esta página.');
       }
     }
   }
@@ -23,7 +26,7 @@
 
   async function init() {
     if (!window.NaplesAuth || !window.NaplesAuth.isConfigured()) {
-      showGate('Customer accounts are not configured yet.');
+      showGate(L('Customer accounts are not configured yet.', 'Las cuentas de cliente aún no están configuradas.'));
       return;
     }
 
@@ -33,7 +36,7 @@
       return;
     }
 
-    showGate('Sign in to access this registered-user page.');
+    showGate(L('Sign in to access this registered-user page.', 'Inicie sesión para acceder a esta página de usuarios registrados.'));
   }
 
   if (document.readyState === 'loading') {

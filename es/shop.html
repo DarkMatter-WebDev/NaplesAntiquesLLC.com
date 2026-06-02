@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html class="light" lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Tienda | Joyería de Patrimonio, Relojes y Antigüedades Seleccionados | Naples FL</title>
+  <meta name="description" content="Explore joyería de patrimonio, relojes de lujo, plata de ley y antigüedades seleccionadas de Naples Estate Jewelry. Inventario limitado y único — consulte o compre con cita. Servicio a domicilio y solo con cita en el Suroeste de Florida." />
+  <meta name="author" content="Naples Estate Jewelry" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://naplesantiquesllc.com/es/shop.html" />
+
+  <!-- Language alternates -->
+  <link rel="alternate" hreflang="en" href="https://naplesantiquesllc.com/shop.html" />
+  <link rel="alternate" hreflang="es" href="https://naplesantiquesllc.com/es/shop.html" />
+  <link rel="alternate" hreflang="x-default" href="https://naplesantiquesllc.com/shop.html" />
+
+  <meta name="geo.region" content="US-FL" />
+  <meta name="geo.placename" content="Naples, Florida" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Naples Estate Jewelry" />
+  <meta property="og:title" content="Tienda | Joyería de Patrimonio, Relojes y Antigüedades Seleccionados | Naples FL" />
+  <meta property="og:description" content="Explore joyería de patrimonio, relojes de lujo, plata de ley y antigüedades seleccionadas. Inventario limitado — consulte o compre con cita en el Suroeste de Florida." />
+  <meta property="og:image" content="https://naplesantiquesllc.com/assets/images/branding/logo.png" />
+  <meta property="og:url" content="https://naplesantiquesllc.com/es/shop.html" />
+  <meta property="og:locale" content="es_ES" />
+  <meta property="og:locale:alternate" content="en_US" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Tienda | Joyería de Patrimonio, Relojes y Antigüedades Seleccionados | Naples FL" />
+  <meta name="twitter:description" content="Explore joyería de patrimonio, relojes de lujo, plata de ley y antigüedades seleccionadas. Inventario limitado — consulte o compre con cita." />
+  <meta name="twitter:image" content="https://naplesantiquesllc.com/assets/images/branding/logo.png" />
+
+  <link rel="icon" type="image/png" href="/assets/images/branding/logo2.png" />
+  <link rel="apple-touch-icon" href="/assets/images/branding/logo2.png" />
+  <meta name="theme-color" content="#f9f9f9" />
+
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Hanken+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <script src="/scripts/shared/editorial-tailwind-config.js"></script>
+  <link href="/editorial-base.css" rel="stylesheet" />
+  <link href="/editorial-theme.css?v=lang-switcher-20260601" rel="stylesheet" />
+  <script src="/scripts/shared/site-header.js?v=lang-switcher-20260601" defer></script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body { cursor: auto; overflow-x: hidden; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; }
+    .gold-button { background: linear-gradient(135deg, #f2ca50 0%, #d4af37 100%); }
+    .shop-product-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.25rem;
+    }
+    @media (min-width: 640px) {
+      .shop-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (min-width: 1024px) {
+      .shop-product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; }
+    }
+    .shop-product-card {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background: #202323;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 2px;
+      overflow: hidden;
+      cursor: pointer;
+    }
+    .shop-product-card:focus-visible {
+      outline: 2px solid rgba(242, 202, 80, 0.8);
+      outline-offset: 4px;
+    }
+    .shop-product-card .shop-product-media {
+      aspect-ratio: 1;
+      overflow: hidden;
+      position: relative;
+      background: #1a1c1c;
+      cursor: pointer;
+    }
+    .shop-product-card .shop-product-media:focus-visible {
+      outline: 2px solid rgba(242, 202, 80, 0.8);
+      outline-offset: 3px;
+    }
+    .shop-media-cart-btn {
+      position: absolute;
+      right: 0.75rem;
+      bottom: 0.75rem;
+      z-index: 2;
+      background: linear-gradient(135deg, #f2ca50 0%, #d4af37 100%);
+      color: #161616;
+      border: 0;
+      border-radius: 2px;
+      padding: 0.65rem 0.8rem;
+      font-size: 0.64rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+    }
+    .shop-media-cart-btn:hover,
+    .shop-media-cart-btn:focus-visible {
+      transform: translateY(-1px);
+      outline: none;
+    }
+    .shop-product-card .shop-product-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 1.25rem 1.25rem 1.35rem;
+    }
+    .shop-product-card .shop-product-body h3 {
+      color: #f6f1e8 !important;
+    }
+    .shop-product-card .shop-product-body p {
+      color: #d8d2c7 !important;
+    }
+    .shop-product-card .shop-product-body > span:first-child {
+      color: #f2ca50 !important;
+    }
+    .shop-product-card .shop-product-body .text-primary {
+      color: #f2ca50 !important;
+    }
+    .shop-product-card .shop-inquire-fallback {
+      align-items: center;
+    }
+    .shop-product-card .shop-inquire-fallback a {
+      display: inline-flex !important;
+      align-items: center;
+      justify-content: center;
+      min-height: 2.45rem;
+      border-radius: 0.375rem;
+      line-height: 1 !important;
+      text-decoration: none !important;
+      white-space: nowrap;
+    }
+    .shop-product-card .shop-inquire-fallback a:first-child {
+      color: #f2ca50 !important;
+      border-color: rgba(242, 202, 80, 0.65) !important;
+      background: rgba(242, 202, 80, 0.08);
+    }
+    .shop-product-card .shop-inquire-fallback a:first-child:hover {
+      color: #161616 !important;
+      background: #f2ca50 !important;
+    }
+    .shop-product-card .shop-inquire-fallback a:last-child {
+      color: #f6f1e8 !important;
+      border: 1px solid rgba(231, 223, 209, 0.32);
+      padding: 0.65rem 1.1rem;
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .shop-product-card .shop-inquire-fallback a:last-child:hover,
+    .shop-product-card .shop-inquire-fallback a:last-child:focus-visible {
+      color: #161616 !important;
+      background: #e7dfd1 !important;
+      outline: none;
+    }
+    .shop-status-badge {
+      position: absolute;
+      top: 0.75rem;
+      left: 0.75rem;
+      font-size: 0.625rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.6rem;
+      border-radius: 2px;
+      background: rgba(26, 28, 28, 0.85);
+      color: #f2ca50;
+      border: 1px solid rgba(242, 202, 80, 0.35);
+    }
+    .shop-status-badge--soon {
+      color: #c8c6c2;
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .shopify-product-embed {
+      min-height: 0;
+      margin-top: 0.75rem;
+    }
+    .shopify-product-embed:empty {
+      display: none;
+    }
+    .shopify-product-embed:not(:empty) + .shop-inquire-fallback {
+      display: none;
+    }
+    .shop-page-cart-row {
+      position: sticky;
+      top: 4.8rem;
+      z-index: 30;
+      display: flex;
+      justify-content: flex-end;
+      pointer-events: none;
+      margin-bottom: 1.5rem;
+    }
+    .shop-page-cart-btn {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      border: 1px solid rgba(115, 92, 0, 0.55);
+      background: rgba(249, 249, 247, 0.96);
+      color: #735c00;
+      box-shadow: 0 12px 30px rgba(26, 28, 28, 0.12);
+      backdrop-filter: blur(8px);
+    }
+    .shop-page-cart-btn:hover,
+    .shop-page-cart-btn:focus-visible {
+      background: #735c00;
+      color: #fff8e1;
+      outline: none;
+    }
+    .shop-product-card.is-hidden,
+    .shop-product-card[hidden] {
+      display: none !important;
+    }
+    .shop-filters-bar {
+      margin-bottom: 1.5rem;
+    }
+    .shop-search-wrap {
+      position: relative;
+      max-width: 24rem;
+      margin: 0 auto 0.85rem;
+    }
+    .shop-search-wrap .material-symbols-outlined {
+      display: none;
+    }
+    .shop-search-input {
+      width: 100%;
+      padding: 0.45rem 0.8rem;
+      border: 1px solid rgba(115, 92, 0, 0.5);
+      border-radius: 2px;
+      background: #ffffff;
+      color: #1a1c1c;
+      font-size: 0.875rem;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .shop-search-input::-webkit-search-decoration,
+    .shop-search-input::-webkit-search-cancel-button,
+    .shop-search-input::-webkit-search-results-button,
+    .shop-search-input::-webkit-search-results-decoration {
+      display: none;
+    }
+    .shop-search-input:focus {
+      outline: 2px solid rgba(115, 92, 0, 0.45);
+      outline-offset: 1px;
+    }
+    .shop-dropdown-filters {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.6rem;
+      max-width: 48rem;
+      margin: 0 auto 0.85rem;
+    }
+    .shop-filter-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      text-align: left;
+    }
+    .shop-filter-field label {
+      color: #735c00;
+      font-size: 0.58rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    .shop-filter-select {
+      width: 100%;
+      border: 1px solid rgba(115, 92, 0, 0.35);
+      border-radius: 2px;
+      background: #ffffff;
+      color: #1a1c1c;
+      font-size: 0.8125rem;
+      padding: 0.4rem 0.6rem;
+    }
+    .shop-filter-select:focus {
+      outline: 2px solid rgba(115, 92, 0, 0.45);
+      outline-offset: 1px;
+    }
+    .shop-filter-btn {
+      font-size: 0.6875rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 0.5rem 0.85rem;
+      border: 1px solid rgba(115, 92, 0, 0.35);
+      border-radius: 2px;
+      background: #ffffff;
+      color: #1a1c1c;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s, color 0.2s;
+    }
+    .shop-filter-btn:hover {
+      border-color: rgba(115, 92, 0, 0.5);
+      color: #735c00;
+      background: #f7f2e4;
+    }
+    .shop-filter-btn--active {
+      border-color: #735c00;
+      background: #735c00;
+      color: #ffffff;
+    }
+    .shop-filter-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem 1.25rem;
+      font-size: 0.8125rem;
+      color: #4b4540;
+    }
+    .shop-clear-btn {
+      font-size: 0.6875rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      color: #735c00;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+    }
+    .shop-clear-btn:hover {
+      color: #f2ca50;
+    }
+    #shop-empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 3rem 1.5rem;
+      border: 1px dashed rgba(255, 255, 255, 0.12);
+      border-radius: 2px;
+    }
+    .shop-account-notice {
+      border: 1px solid rgba(115, 92, 0, 0.28);
+      background: #fff8e1;
+      color: #4b3b00;
+      padding: 0.85rem 1rem;
+      border-radius: 2px;
+      margin-bottom: 1.25rem;
+      font-size: 0.9375rem;
+    }
+    .shop-transparency-note {
+      border: 1px solid rgba(115, 92, 0, 0.24);
+      background: linear-gradient(135deg, #fffdf7 0%, #f7f2e4 100%);
+      color: #1a1c1c;
+      padding: 1.4rem;
+      margin: 0 auto 1.75rem;
+      max-width: 58rem;
+      text-align: center;
+      box-shadow: 0 16px 36px rgba(26, 28, 28, 0.08);
+    }
+    .shop-transparency-note p {
+      margin: 0;
+    }
+    .shop-transparency-eyebrow {
+      color: #735c00;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+    }
+    .shop-transparency-title {
+      color: #1a1c1c;
+      font-family: "Libre Caslon Text", Georgia, serif;
+      font-size: clamp(1.35rem, 2.35vw, 1.85rem);
+      line-height: 1.15;
+      margin: 0.45rem 0 0.65rem;
+    }
+    .shop-transparency-copy {
+      color: #5e5e5d;
+      font-size: 1rem;
+      line-height: 1.65;
+    }
+    .shop-transparency-points {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    .shop-transparency-point {
+      border-top: 1px solid rgba(115, 92, 0, 0.22);
+      color: #4b4540;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      padding-top: 0.75rem;
+      text-align: center;
+    }
+    .shop-transparency-point strong {
+      color: #735c00;
+      display: block;
+      font-size: 0.68rem;
+      letter-spacing: 0.14em;
+      margin-bottom: 0.25rem;
+      text-transform: uppercase;
+    }
+    @media (max-width: 760px) {
+      .shop-dropdown-filters {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .shop-transparency-points {
+        grid-template-columns: 1fr;
+      }
+    }
+    @media (max-width: 520px) {
+      .shop-dropdown-filters {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+
+  <!-- MailerLite Universal -->
+  <script>
+    (function(w,d,e,u,f,l,n){w[f]=w[f]||function(){(w[f].q=w[f].q||[])
+    .push(arguments);},l=d.createElement(e),l.async=1,l.src=u,
+    n=d.getElementsByTagName(e)[0],n.parentNode.insertBefore(l,n);})
+    (window,document,'script','https://assets.mailerlite.com/js/universal.js','ml');
+    ml('account', '2354340');
+  </script>
+  <!-- End MailerLite Universal -->
+
+  <!--
+    Shopify Buy Button setup (when ready):
+    1. Create products in Shopify admin (inventory qty 1 per piece).
+    2. Install the Buy Button sales channel in Shopify.
+    3. Generate embed code per product and paste inside the matching .shopify-product-embed div.
+    4. Uncomment the script block at the bottom of this page.
+    Store domain: YOUR-STORE.myshopify.com
+  -->
+</head>
+
+<body class="font-body-md text-body-md bg-background overflow-x-hidden">
+  <header class="site-header site-header--light fixed top-0 w-full z-50 bg-[#f9f9f7]/95 border-b border-[#d8d0c2]">
+  <div class="site-header-bar flex items-center justify-between gap-3 px-4 md:px-8 py-4 md:py-5 w-full max-w-[1440px] mx-auto">
+    <a href="/es/index.html" class="site-brand-link flex items-center gap-3 min-w-0">
+      <img src="/assets/images/branding/logo.png" alt="Logotipo de Naples Estate Jewelry" class="site-brand-logo h-10 w-auto object-contain flex-shrink-0" />
+      <span class="site-brand-text font-display-lg-mobile text-[18px] md:text-[23px] tracking-normal text-[#735c00] uppercase">
+        <span class="site-brand-short">Naples Estate Jewelry</span>
+        <span class="site-brand-full">Naples Estate Jewelry</span>
+      </span>
+    </a>
+    <nav class="site-header-nav hidden 2xl:flex items-center gap-5">
+      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="/es/index.html">Inicio</a>
+      <a class="text-[#5e5e5d] hover:text-[#735c00] border-b border-[#735c00]/40 font-label-md text-label-md transition-colors px-1 py-2" href="/es/shop.html">Tienda</a>
+      <div class="nav-buy-group"><a class="text-[#5e5e5d] hover:text-[#735c00] border-b border-[#735c00]/40 font-label-md text-label-md transition-colors px-1 py-2" href="/es/what-we-buy.html">Véndanos</a><div class="nav-buy-panel"><a href="/es/estate-jewelry.html">Joyería de Patrimonio</a><a href="/es/gold-services.html">Servicios de Oro</a><a href="/es/silver-services.html">Servicios de Plata</a><a href="/es/bullion.html">Lingotes</a></div></div>
+      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="/es/about.html">Sobre Nosotros</a>
+      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="/es/process.html">Proceso</a>
+      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="/es/estate-services.html">Servicios de Patrimonio</a>
+      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="/es/contact.html">Contacto</a>
+      
+    </nav>
+    <div class="site-header-actions flex items-center gap-3"><a href="tel:2394048505" class="header-cta-call editorial-call-button hidden 2xl:inline-flex px-5 py-2 font-label-md text-label-md uppercase tracking-widest transition-colors">Llámenos</a><button id="mobile-menu-toggle" type="button" aria-expanded="false" aria-label="Abrir menú" class="site-menu-toggle 2xl:hidden border border-[#735c00]/50 text-[#735c00] px-3 py-2 font-label-md text-label-md uppercase tracking-widest"><span class="menu-toggle-label" id="mobile-menu-icon">Menú</span></button></div>
+  </div>
+  <div id="mobile-menu" class="hidden 2xl:hidden border-t border-[#d8d0c2] bg-[#f9f9f7]/98"><div class="flex flex-col px-5 py-4"><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/index.html">Inicio</a><a class="text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/shop.html">Tienda</a><a class="text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/what-we-buy.html">Véndanos</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/about.html">Sobre Nosotros</a><a class="mobile-subitem" href="/es/estate-jewelry.html">Joyería de Patrimonio</a><a class="mobile-subitem" href="/es/gold-services.html">Servicios de Oro</a><a class="mobile-subitem" href="/es/silver-services.html">Servicios de Plata</a><a class="mobile-subitem" href="/es/bullion.html">Lingotes</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/process.html">Proceso</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/estate-services.html">Servicios de Patrimonio</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/contact.html">Contacto</a></div></div>
+</header>
+
+<main class="pt-16">
+    <section id="catalog" class="pt-10 pb-16 md:pt-12 md:pb-24 scroll-mt-28">
+      <div class="container mx-auto px-6 md:px-8 max-w-6xl">
+        <div class="shop-page-cart-row" aria-label="Acceso directo al carrito de la tienda">
+          <a href="/es/cart.html" class="shop-page-cart-btn px-4 py-2.5 rounded-md font-label text-[0.68rem] font-bold uppercase tracking-widest transition-colors">
+            Ver Carrito (<span data-cart-count>0</span>)
+            <span class="material-symbols-outlined text-base">shopping_cart</span>
+          </a>
+          <a href="/es/account.html" class="shop-page-cart-btn px-4 py-2.5 rounded-md font-label text-[0.68rem] font-bold uppercase tracking-widest transition-colors">
+            Mi Cuenta
+          </a>
+        </div>
+
+        <div id="shop-account-notice" class="shop-account-notice" role="status" hidden>
+          Ha iniciado sesión. Su carrito y favoritos se guardan en su cuenta.
+        </div>
+
+        <section class="shop-transparency-note" aria-labelledby="shop-transparency-heading">
+          <p class="shop-transparency-eyebrow">Una Nueva Forma de Comprar Joyería</p>
+          <h2 id="shop-transparency-heading" class="shop-transparency-title">Precios transparentes, en vivo mientras navega.</h2>
+          <p class="shop-transparency-copy">Cada artículo de oro muestra las matemáticas en vivo basadas en el precio spot detrás del precio, incluyendo el valor exacto de fundición del oro y el multiplicador usado para la pieza. Puede navegar con el mercado frente a usted, no detrás de una etiqueta de precio misteriosa.</p>
+          <div class="shop-transparency-points" aria-label="Detalles de compra transparente">
+            <p class="shop-transparency-point"><strong>Precios spot en vivo</strong>Los valores del oro se actualizan mientras compra, usando los mismos datos de mercado que impulsan cada artículo.</p>
+            <p class="shop-transparency-point"><strong>Margen claro</strong>Los artículos muestran el multiplicador spot para que pueda ver cómo se calcula el precio de venta.</p>
+            <p class="shop-transparency-point"><strong>Valor real del oro</strong>Las páginas de producto muestran el valor exacto de fundición junto al precio de venta.</p>
+          </div>
+        </section>
+
+        <div class="text-center mb-6 md:mb-8">
+          <span class="text-primary font-label text-xs uppercase tracking-[0.4em]">Selección Actual</span>
+          <h2 class="text-3xl md:text-4xl font-headline font-bold mt-4 mb-4 tracking-tight">Llegadas Recientes</h2>
+        </div>
+
+        <div class="shop-filters-bar" role="search" aria-label="Filtrar inventario de la tienda">
+          <div class="shop-search-wrap">
+            <span class="material-symbols-outlined" aria-hidden="true">search</span>
+            <input type="search" id="shop-search" class="shop-search-input" placeholder="Buscar oro, cadena, pulsera, collar, anillo" autocomplete="off" aria-controls="shop-product-grid shop-empty" />
+          </div>
+          <div class="shop-dropdown-filters" aria-label="Refinar inventario de la tienda">
+            <div class="shop-filter-field">
+              <label for="shop-metal-filter">Metal</label>
+              <select id="shop-metal-filter" class="shop-filter-select" data-shop-filter-select="metal">
+                <option value="all">Todos los Metales</option>
+                <option value="gold">Oro</option>
+              </select>
+            </div>
+            <div class="shop-filter-field">
+              <label for="shop-purity-filter">Pureza</label>
+              <select id="shop-purity-filter" class="shop-filter-select" data-shop-filter-select="purity">
+                <option value="all">Todas las Purezas</option>
+                <option value="10k">10K</option>
+                <option value="14k">14K</option>
+                <option value="18k">18K</option>
+              </select>
+            </div>
+            <div class="shop-filter-field">
+              <label for="shop-chain-type-filter">Tipo de cadena</label>
+              <select id="shop-chain-type-filter" class="shop-filter-select" data-shop-filter-select="chainType">
+                <option value="all">Todos los Tipos</option>
+                <option value="cuban-link">Eslabón cubano</option>
+                <option value="figaro-link">Eslabón Figaro</option>
+                <option value="rope-chain">Cadena de cuerda</option>
+                <option value="anchor-link">Eslabón ancla / Gucci</option>
+                <option value="oval-link">Eslabón ovalado</option>
+                <option value="byzantine-link">Eslabón bizantino</option>
+                <option value="box-link">Eslabón box</option>
+                <option value="ring">Anillo</option>
+                <option value="bracelet">Pulsera</option>
+              </select>
+            </div>
+            <div class="shop-filter-field">
+              <label for="shop-length-filter">Largo</label>
+              <select id="shop-length-filter" class="shop-filter-select" data-shop-filter-select="length">
+                <option value="all">Todos los Largos</option>
+                <option value="22">22 pulgadas</option>
+                <option value="23">23 pulgadas</option>
+                <option value="24">24 pulgadas</option>
+                <option value="25-plus">25 pulgadas o más</option>
+                <option value="30">30 pulgadas</option>
+                <option value="bracelet">Largo de pulsera</option>
+                <option value="ring">Talla de anillo</option>
+              </select>
+            </div>
+          </div>
+          <div class="shop-filter-meta">
+            <span id="shop-result-count" aria-live="polite">Mostrando 19 de 19 piezas</span>
+            <span id="shop-spot-meta" class="text-on-surface-variant/80 text-[0.58rem]" hidden aria-live="polite"></span>
+            <button type="button" id="shop-clear-filters" class="shop-clear-btn">Borrar filtros</button>
+          </div>
+        </div>
+
+        <div id="shop-product-grid" class="shop-product-grid">
+          <div id="shop-empty" class="hidden" role="status">
+            <p class="text-on-surface-variant text-lg mb-2">Ninguna pieza coincide con su búsqueda.</p>
+            <p class="text-on-surface-variant/80 text-sm">Pruebe otra búsqueda o borre los filtros para ver todo.</p>
+          </div>
+
+          <article class="shop-product-card group" data-shop-item="18k-rectangular-anchor-link-chain-necklace-01" data-filter-metal="gold" data-filter-purity="18k" data-filter-chain-type="anchor-link" data-filter-length="25-plus" data-category="gold" data-tags="18k 750 oro amarillo collar de cadena de eslabón ancla rectangular eslabón abierto broche de gancho y lazo cadena para colgante 12.7 gramos 2.2mm 27.5 pulgadas joyería de patrimonio" data-search="18k 750 oro amarillo clásico rectángulo rectangular collar de cadena de eslabón ancla 27.5 pulgadas de largo 2.2mm de ancho 12.7 gramos único broche seguro de gancho y lazo sellado 750 lazo de broche circular ideal para colgante $1729.62 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Collar de cadena de eslabón ancla rectangular de oro amarillo de 18K" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-18k-rectangular-anchor-link-chain-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Collar de Cadena de Eslabón Ancla Rectangular de Oro de 18K</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Collar de cadena de eslabón estilo ancla rectangular de oro amarillo de 18K, 27.5 pulgadas de largo, 2.2mm de ancho, con un broche seguro de gancho y lazo sellado 750.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$1,729.62</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.25x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-18k-rectangular-anchor-link-chain-necklace-01" aria-label="Botón de compra de Shopify para el artículo de collar de cadena de eslabón ancla rectangular de 18K"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="14k-heavy-diamond-cut-cuban-link-chain-necklace-01" data-filter-metal="gold" data-filter-purity="14k" data-filter-chain-type="cuban-link" data-filter-length="24" data-category="gold" data-tags="14k oro amarillo pesado sólido tallado en diamante collar de cadena de eslabón cubano construcción apretada broche de langosta 27.8 gramos 4.7mm 24 pulgadas uso diario inversión en oro joyería de patrimonio" data-search="pesado sólido 14k oro amarillo tallado en diamante collar de cadena de eslabón cubano construcción apretada 24 pulgadas de largo 4.7mm de ancho 27.8 gramos broche de langosta marcado 14k accesorios en los extremos excelente tamaño de uso diario valor de inversión en oro $2945.46 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Collar de cadena de eslabón cubano tallado en diamante de oro amarillo sólido pesado de 14K" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-14k-heavy-diamond-cut-cuban-chain-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Collar de Cadena de Eslabón Cubano Tallado en Diamante de Oro Sólido Pesado de 14K</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Collar de cadena de eslabón cubano tallado en diamante de oro amarillo sólido pesado de 14K, 24 pulgadas de largo, aproximadamente 4.7mm de ancho, con construcción apretada y peso de 27.8 gramos.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,945.46</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.25x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-14k-heavy-diamond-cut-cuban-link-chain-necklace-01" aria-label="Botón de compra de Shopify para el artículo de collar de cadena de eslabón cubano tallado en diamante de 14K pesado"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="14k-vintage-diamond-cut-figaro-chain-necklace-01" data-filter-metal="gold" data-filter-purity="14k" data-filter-chain-type="figaro-link" data-filter-length="22" data-category="gold" data-tags="14k oro amarillo vintage sólido tallado en diamante collar de cadena de eslabón figaro figueroa broche de langosta 23.33 gramos 6mm 22 pulgadas joyería de patrimonio" data-search="vintage sólido 14k oro amarillo tallado en diamante collar de cadena de eslabón figaro figueroa 22 pulgadas de largo 6mm de ancho 23.33 gramos broche de langosta marcado 14k accesorios en los extremos área del broche joyería de patrimonio $2469.89 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Collar de cadena de eslabón Figaro tallado en diamante de oro amarillo de 14K vintage" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-14k-vintage-diamond-cut-figaro-chain-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Collar de Cadena de Eslabón Figaro Tallado en Diamante de Oro de 14K Vintage</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Collar de cadena de eslabón Figaro tallado en diamante de oro amarillo sólido de 14K vintage, 22 pulgadas de largo, aproximadamente 6mm de ancho, con broche de langosta y peso de 23.33 gramos.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,469.89</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.25x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-14k-vintage-diamond-cut-figaro-chain-necklace-01" aria-label="Botón de compra de Shopify para el artículo de collar de cadena de eslabón Figaro tallado en diamante de oro de 14K"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="18k-italian-anchor-link-infinity-chain-necklace-01" data-filter-metal="gold" data-filter-purity="18k" data-filter-chain-type="anchor-link" data-filter-length="24" data-category="gold" data-tags="18k 750 oro amarillo italiano vintage eslabón ancla eslabón gucci cadena infinita continua sin broche 23.8 gramos 4mm 24 pulgadas joyería de patrimonio" data-search="vintage italiano 18k 750 oro amarillo pesado eslabón infinito eslabón ancla estilo gucci collar de cadena continua sin broche se desliza sobre la cabeza 24 pulgadas de largo 4mm de ancho 23.8 gramos artesanía sólida sellado 18k 750 $3891.15 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Collar de cadena infinita de eslabón ancla de oro amarillo de 18K italiano vintage" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-18k-italian-anchor-link-infinity-chain-06.png?v=hero-crop-20260601" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Collar de Cadena Infinita de Eslabón Ancla de Oro de 18K Italiano Vintage</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Collar de cadena infinita de eslabón ancla continuo, o estilo Gucci, de oro amarillo de 18K italiano vintage sin broche, 24 pulgadas de largo, 4mm de ancho y peso de 23.8 gramos.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$3,891.15</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.5x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-18k-italian-anchor-link-infinity-chain-necklace-01" aria-label="Botón de compra de Shopify para el artículo de collar de cadena infinita de eslabón ancla de 18K italiano"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="10k-monaco-edge-cuban-link-chain-necklace-01" data-filter-metal="gold" data-filter-purity="10k" data-filter-chain-type="cuban-link" data-filter-length="25-plus" data-category="gold" data-tags="10k oro amarillo monaco chain edge eslabón cubano collar geométrico acento de diamante diamantes pavé esmalte negro semi hueco broche de doble seguro con resorte 29.4 gramos 9mm 25.5 pulgadas joyería de patrimonio" data-search="monaco chain edge 10k oro amarillo moderno collar geométrico de eslabón cubano 25.5 pulgadas de largo 9mm de ancho 29.4 gramos semi hueco resistencia diseñada perfil bajo broche de caja de doble seguro con resorte acentos de diamante pavé logo de esmalte negro marcado monaco chain edge 10k buen estado sin abolladuras $2225.33 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Collar de eslabón cubano con acento de diamante de oro de 10K Monaco Chain Edge" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-10k-monaco-edge-cuban-chain-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Collar de Eslabón Cubano con Acento de Diamante de Oro de 10K Monaco Chain Edge</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Collar de eslabón cubano geométrico de oro amarillo de 10K Monaco Chain Edge con eslabones semihuecos de 9mm, 25.5 pulgadas de largo, peso de 29.4 gramos y un broche con logo de esmalte negro y acento de diamante pavé.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,225.33</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.25x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-10k-monaco-edge-cuban-link-chain-necklace-01" aria-label="Botón de compra de Shopify para el artículo de collar de eslabón cubano de oro de 10K Monaco Chain Edge"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="10k-hollow-cuban-link-chain-necklace-01" data-filter-metal="gold" data-filter-purity="10k" data-filter-chain-type="cuban-link" data-filter-length="25-plus" data-category="gold" data-tags="10k oro amarillo collar de cadena de eslabón cubano eslabón hueco semi sólido broche de caja doble seguro 13.27 gramos 5mm 26 pulgadas joyería de patrimonio" data-search="10k oro amarillo eslabón hueco semi sólido collar de cadena de eslabón cubano 26 pulgadas de largo 5mm de ancho 13.27 gramos broche de caja doble seguro marcado 10k un extremo broche joyería de patrimonio $1003.38 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Collar de cadena de eslabón cubano hueco de 5mm de oro amarillo de 10K" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-10k-hollow-cuban-chain-necklace-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Collar de Cadena de Eslabón Cubano Hueco de 5mm de Oro de 10K</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Collar de cadena de eslabón cubano de eslabón hueco / semisólido de oro amarillo de 10K, 26 pulgadas de largo, aproximadamente 5mm de ancho, con broche de caja, doble seguro y peso de 13.27 gramos.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$1,003.38</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.25x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-10k-hollow-cuban-link-chain-necklace-01" aria-label="Botón de compra de Shopify para el artículo de collar de cadena de eslabón cubano hueco de oro de 10K"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="14k-oval-link-chain-necklace-01" data-filter-metal="gold" data-filter-purity="14k" data-filter-chain-type="oval-link" data-filter-length="23" data-category="gold" data-tags="14k oro amarillo collar de cadena de eslabón ovalado eslabón de cadena broche de barril 22.23 gramos 4.3mm 23 pulgadas vintage joyería de patrimonio" data-search="14k oro amarillo vintage collar de eslabón ovalado eslabón de cadena 23 pulgadas de largo 4.3mm de ancho 22.23 gramos broche de barril marcado 14k en la lengüeta eslabón de cadena clásico joyería de patrimonio $2360.88 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Collar de cadena de eslabón ovalado de oro amarillo de 14K vintage" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-14k-oval-link-chain-necklace-01.png?v=2" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Collar de Cadena de Eslabón Ovalado de Oro de 14K Vintage</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Collar de eslabón de cadena ovalado de oro amarillo de 14K vintage, 23 pulgadas de largo, aproximadamente 4.3mm de ancho, con un broche de barril marcado 14K en la lengüeta y peso de 22.23 gramos.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,360.88</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.25x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-14k-oval-link-chain-necklace-01" aria-label="Botón de compra de Shopify para el artículo de collar de cadena de eslabón ovalado de oro de 14K"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="10k-cuban-link-chain-01" data-filter-metal="gold" data-filter-purity="10k" data-filter-chain-type="cuban-link" data-filter-length="24" data-category="gold" data-tags="10k oro miami collar de cadena de eslabón cubano 119.41 gramos 9mm 24 pulgadas sólido broche joyería de patrimonio" data-search="10k oro miami collar de cadena de eslabón cubano 119.41 gramos 9mm de ancho 24 pulgadas de largo sólido no hueco marca en lengüeta joyería de patrimonio cadena de oro pesada broche de caja $10795 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Collar de cadena de eslabón cubano Miami de oro de 10K" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-10k-cuban-chain-06.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Collar de Cadena de Eslabón Cubano Miami de Oro de 10K</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Cadena de eslabón cubano Miami de oro sólido de 10K considerable con broche de caja, que mide 24 pulgadas de largo, aproximadamente 9mm de ancho y pesa 119.41 gramos.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$10,795</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.25x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-10k-cuban-link-chain-01" aria-label="Botón de compra de Shopify para el artículo de cadena de eslabón cubano Miami de 10K"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="14k-infinity-rope-chain-necklace-01" data-filter-metal="gold" data-filter-purity="14k" data-filter-chain-type="rope-chain" data-filter-length="30 25-plus" data-category="gold" data-tags="14k oro amarillo cadena de cuerda collar infinito sin broche semi hueco 7.5mm 30 pulgadas 55.9 gramos marca bb vintage joyería de patrimonio unisex" data-search="14k oro amarillo vintage collar de cadena de cuerda estilo infinito sin broche se desliza sobre la cabeza semi hueco resistente 7.5mm de ancho 30 pulgadas 55.9 gramos marca de círculo bb 14k unisex joyería de patrimonio $5950 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Collar de cadena de cuerda infinita de 7.5mm de oro de 14K vintage" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-14k-infinity-rope-chain-01.png?v=rope-gallery-zoomout2-20260601" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Collar de Cadena de Cuerda Infinita de 7.5mm de Oro de 14K Vintage</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Collar de cadena de cuerda sin broche de oro amarillo de 14K vintage, 30 pulgadas de largo, aproximadamente 7.5mm de ancho, semihueco y resistente, que pesa 55.9 gramos.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$5,950</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.25x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-14k-infinity-rope-chain-necklace-01" aria-label="Botón de compra de Shopify para el artículo de collar de cadena de cuerda infinita de oro de 14K"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="10k-semi-solid-cuban-link-6mm-chain-necklace-01" data-filter-metal="gold" data-filter-purity="10k" data-filter-chain-type="cuban-link" data-filter-length="24" data-category="gold" data-tags="10k oro amarillo semisólido eslabón hueco eslabón cubano collar cadena broche de caja doble seguro marca 10k 26 gramos 6.3mm 24.5 pulgadas joyería de patrimonio" data-search="10k oro amarillo eslabón hueco semisólido collar de cadena de eslabón cubano 24.5 pulgadas de largo 6.3mm de ancho 26 gramos broche de caja doble seguro marcado 10k $2394.56 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Collar de cadena de eslabón cubano semisólido de oro amarillo de 10K" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-10k-semi-solid-cuban-link-6mm-chain-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Collar de Cadena de Eslabón Cubano Semisólido de Oro de 10K</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Collar de cadena de eslabón cubano de eslabón hueco / semisólido de oro amarillo de 10K, 24.5 pulgadas de largo, aproximadamente 6.3mm de ancho, con un broche de caja y doble seguro marcado 10K, y peso de 26 gramos.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,394.56</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.25x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-10k-semi-solid-cuban-link-6mm-chain-necklace-01" aria-label="Botón de compra de Shopify para el artículo de collar de cadena de eslabón cubano semisólido de 10K"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="14k-byzantine-link-chain-necklace-01" data-filter-metal="gold" data-filter-purity="14k" data-filter-chain-type="byzantine-link" data-filter-length="22" data-category="gold" data-tags="14k oro amarillo eslabón bizantino cadena bizantina eslabón fantasía oro sólido sólido collar broche de barril marca 14k lengüeta 31.28 gramos 4.3mm 21.5 pulgadas joyería de patrimonio" data-search="14k oro sólido eslabón bizantino eslabón fantasía collar de cadena 21.5 pulgadas de largo 4.3mm de ancho 31.28 gramos broche de barril marcado 14k en la lengüeta oro sólido $4033.18 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Collar de cadena de eslabón bizantino de oro sólido de 14K" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-14k-byzantine-link-chain-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Collar de Cadena de Eslabón Bizantino de Oro Sólido de 14K</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Collar de cadena de eslabón bizantino (fantasía) de oro sólido de 14K, 21.5 pulgadas de largo, aproximadamente 4.3mm de ancho, con un peso de 31.28 gramos, con un broche de barril marcado 14K en la lengüeta.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$4,033.18</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.25x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-14k-byzantine-link-chain-necklace-01" aria-label="Botón de compra de Shopify para el artículo de collar de cadena de eslabón bizantino de 14K"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="new-listing-01" data-filter-metal="gold" data-filter-purity="14k" data-filter-chain-type="cuban-link" data-filter-length="30" data-category="gold" data-tags="14k dos tonos oro amarillo oro blanco italia italiano collar de oro eslabón cubano estación de anillo eslabón fancy broche de langosta marca 14k italy 44.72 gramos 5.5mm 13mm 30 pulgadas joyería de patrimonio" data-search="collar italiano 14k dos tonos oro amarillo y blanco eslabón cubano estaciones de anillo 30 pulgadas de largo 5.5mm cadena 13mm conectores 44.72 gramos broche de langosta marcado 14k italy $5766.10 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Collar italiano de eslabón cubano y estaciones de anillo de oro de 14K de dos tonos" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-new-listing-01-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Collar de Eslabón Cubano y Estaciones de Anillo de Oro de 14K de Dos Tonos Italiano</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Collar italiano de oro de 14K de dos tonos que combina secciones de eslabón cubano de oro amarillo con barras estriadas de oro blanco y estaciones de anillo doble de oro trenzado — 30 pulgadas de largo (~5.5mm cadena / ~13mm conectores), 44.72 gramos, broche de langosta, marcado 14K Italy.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$5,766.10</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.25x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-new-listing-01" aria-label="Botón de compra de Shopify para el artículo Collar de Eslabón Cubano y Estaciones de Anillo de Oro de 14K de Dos Tonos Italiano"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="new-listing-02" data-filter-metal="gold" data-filter-purity="14k" data-filter-chain-type="box-link" data-filter-length="24" data-category="gold" data-tags="14k oro amarillo collar de oro eslabón box box redondo cadena rolo eslabón fancy broche de langosta marca lxg 14k 14.34 gramos 3mm 24 pulgadas joyería de patrimonio" data-search="14k oro amarillo collar de cadena de eslabón box redondo rolo 24 pulgadas de largo 3mm de ancho 14.34 gramos broche de langosta marcado lxg 14k $2218.76 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Collar de cadena de eslabón box redondo de oro amarillo de 14K" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-new-listing-02-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Collar de Cadena de Eslabón Box Redondo de Oro de 14K</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Collar de cadena de eslabón box redondo / rolo de oro amarillo de 14K, 24 pulgadas de largo, aproximadamente 3mm de ancho, 14.34 gramos, con un broche de langosta marcado LXG 14K.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,218.76</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.5x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-new-listing-02" aria-label="Botón de compra de Shopify para el artículo Collar de Cadena de Eslabón Box Redondo de Oro de 14K"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="new-listing-03" data-filter-metal="gold" data-filter-purity="10k" data-filter-chain-type="cuban-link" data-filter-length="22" data-category="gold" data-tags="10k oro amarillo collar de oro cadena monaco eslabón cubano eslabón hueco semisólido broche de diamantes pavé broche de diamantes broche de caja 12.45 gramos 5mm 20.5 pulgadas moderno joyería de patrimonio" data-search="10k oro amarillo eslabón hueco semisólido eslabón cubano monaco collar broche de caja diamantes pavé 20.5 pulgadas de largo 5mm de ancho 12.45 gramos moderno $1146.63 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Collar de eslabón cubano Monaco de oro de 10K con broche de diamantes pavé" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-new-listing-03-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Collar de Eslabón Cubano Monaco de Oro de 10K con Broche de Diamantes Pavé</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Collar de eslabón cubano Monaco de eslabón hueco / semisólido de oro amarillo de 10K con un broche de caja de bajo perfil engastado con diamantes pavé, 20.5 pulgadas de largo, aproximadamente 5mm de ancho, 12.45 gramos.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$1,146.63</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.25x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-new-listing-03" aria-label="Botón de compra de Shopify para el artículo Collar de Eslabón Cubano Monaco de Oro de 10K con Broche de Diamantes Pavé"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="new-listing-04" data-filter-metal="gold" data-filter-purity="14k" data-filter-chain-type="rope-chain" data-filter-length="25-plus" data-category="gold" data-tags="14k oro amarillo collar de oro cadena de cuerda broche de langosta marca 14k cadena para dije 12.48 gramos 2.5mm 25 pulgadas joyería de patrimonio" data-search="14k oro amarillo collar de cadena de cuerda 25 pulgadas de largo 2.5mm de ancho 12.48 gramos broche de langosta marcado 14k eslabones de los extremos $1609.14 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Collar de cadena de cuerda de oro amarillo de 14K" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-new-listing-04-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Collar de Cadena de Cuerda de Oro de 14K</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Collar de cadena de cuerda de oro amarillo de 14K, 25 pulgadas de largo, aproximadamente 2.5mm de ancho, 12.48 gramos, con un broche de langosta y eslabones de los extremos marcados 14K.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$1,609.14</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.25x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-new-listing-04" aria-label="Botón de compra de Shopify para el artículo Collar de Cadena de Cuerda de Oro de 14K"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="new-listing-05" data-filter-metal="gold" data-filter-purity="10k" data-filter-chain-type="rope-chain" data-filter-length="25-plus" data-category="gold" data-tags="10k 417 oro amarillo collar de oro cadena de cuerda broche de langosta marca ali 417 15.19 gramos 2.6mm 25 pulgadas joyería de patrimonio" data-search="10k oro amarillo collar de cadena de cuerda 25 pulgadas de largo 2.6mm de ancho 15.19 gramos broche de langosta eslabones de los extremos marcados ali 417 $1398.98 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Collar de cadena de cuerda de oro amarillo de 10K" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-new-listing-05-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Collar de Cadena de Cuerda de Oro de 10K</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Collar de cadena de cuerda de oro amarillo de 10K, 25 pulgadas de largo, aproximadamente 2.6mm de ancho, 15.19 gramos, con un broche de langosta y eslabones de los extremos marcados ALI 417.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$1,398.98</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.25x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-new-listing-05" aria-label="Botón de compra de Shopify para el artículo Collar de Cadena de Cuerda de Oro de 10K"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="new-listing-06" data-filter-metal="gold" data-filter-purity="14k" data-filter-chain-type="cuban-link" data-filter-length="24" data-category="gold" data-tags="14k oro amarillo collar de oro eslabón cubano eslabón hueco semisólido broche de langosta marca 14k uso diario 9 gramos 3.7mm 24 pulgadas joyería de patrimonio" data-search="14k oro amarillo eslabón hueco semisólido collar de cadena de eslabón cubano 24 pulgadas de largo 3.7mm de ancho 9 gramos broche de langosta marcado 14k uso diario $1299.69 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Collar de cadena de eslabón cubano semisólido de oro amarillo de 14K" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-new-listing-06-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Collar de Cadena de Eslabón Cubano Semisólido de Oro de 14K</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Collar de cadena de eslabón cubano de eslabón hueco / semisólido de oro amarillo de 14K, 24 pulgadas de largo, aproximadamente 3.7mm de ancho, 9 gramos, con un broche de langosta y eslabones de los extremos marcados 14K.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$1,299.69</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.4x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-new-listing-06" aria-label="Botón de compra de Shopify para el artículo Collar de Cadena de Eslabón Cubano Semisólido de Oro de 14K"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="18k-heraldic-cross-band-ring-01" data-filter-metal="gold" data-filter-purity="18k" data-filter-chain-type="ring" data-filter-length="ring" data-category="gold" data-tags="18k oro anillo de banda de oro sólido vintage principios del siglo 20 16 gramos 8.1mm talla 11 cruz heráldica motivo de greca griega joyería de patrimonio" data-search="18k oro vintage principios del siglo 20 anillo de banda con motivo de cruz heráldica oro sólido 16 gramos 8.1mm de ancho talla 11 marca de copyright de EE. UU. 18k greca griega joyería de patrimonio $2495 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Anillo de banda con motivo de cruz heráldica de oro de 18K" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-18k-heraldic-cross-ring-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Anillo de Banda con Motivo de Cruz Heráldica de Oro de 18K</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Anillo de banda de oro sólido pesado de 18K vintage de principios del siglo 20 con un motivo de cruz repetido en relieve, 8.1mm de ancho, peso de 16 gramos y talla 11.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,495</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.25x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-18k-heraldic-cross-band-ring-01" aria-label="Botón de compra de Shopify para el artículo de anillo de banda con motivo de cruz de oro de 18K"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="shop-product-card group" data-shop-item="14k-mens-curb-link-bracelet-01" data-filter-metal="gold" data-filter-purity="14k" data-filter-chain-type="bracelet cuban-link" data-filter-length="bracelet" data-category="gold" data-tags="14k k14 oro amarillo hombre 8mm pulsera de eslabón cubano semi hueco broche de caja 22.75 gramos 7.75 pulgadas vintage joyería de patrimonio" data-search="14k k14 oro amarillo hombre 8mm pulsera de eslabón cubano semi hueco broche de caja 22.75 gramos largo usable 7 3/4 pulgadas 7 pulgadas de circunferencia interior buen estado vintage de patrimonio abolladuras menores $2425 precio">
+            <div class="shop-product-media">
+              <span class="shop-status-badge">Disponible</span>
+              <img alt="Pulsera de eslabón cubano de 8mm para hombre de oro de 14K vintage" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="/assets/images/shop/shop-14k-curb-link-bracelet-01.png" />
+            </div>
+            <div class="shop-product-body">
+              <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Oro</span>
+              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Pulsera de Eslabón Cubano de 8mm para Hombre de Oro de 14K Vintage</h3>
+              <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Pulsera de eslabón cubano de 8mm semihueca de oro amarillo de 14K en buen estado vintage de patrimonio con broche de caja marcado K14, que pesa 22.75 gramos y se ajusta alrededor de una circunferencia interior de 7 pulgadas.</p>
+              <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,425</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Precio en vivo - multiplicador spot 1.25x</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-14k-mens-curb-link-bracelet-01" aria-label="Botón de compra de Shopify para el artículo de pulsera de eslabón cubano de oro de 14K"></div>
+              <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
+                <a href="/es/contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Consultar</a>
+                <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Llamar</a>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="shop-policies" class="py-16 md:py-20 bg-surface-container-low border-t border-white/5 scroll-mt-28">
+      <div class="container mx-auto px-6 md:px-8 max-w-4xl">
+        <div class="text-center mb-10">
+          <span class="text-primary font-label text-xs uppercase tracking-[0.4em]">Antes de Comprar</span>
+          <h2 class="text-3xl md:text-4xl font-headline font-bold mt-4 tracking-tight">Notas de Disponibilidad y Compra</h2>
+        </div>
+        <ul class="space-y-5 text-on-surface-variant leading-relaxed">
+          <li class="flex gap-3">
+            <span class="material-symbols-outlined text-primary text-base mt-0.5 flex-shrink-0">info</span>
+            <span><strong class="text-on-surface font-normal">Inventario único.</strong> Los artículos mostrados suelen ser únicos. La disponibilidad se confirma al momento de la consulta; los artículos pueden eliminarse sin previo aviso una vez vendidos.</span>
+          </li>
+          <li class="flex gap-3">
+            <span class="material-symbols-outlined text-primary text-base mt-0.5 flex-shrink-0">home</span>
+            <span><strong class="text-on-surface font-normal">Sin tienda física pública.</strong> Somos a domicilio y solo con cita. La recogida local en el Suroeste de Florida puede organizarse con cita.</span>
+          </li>
+          <li class="flex gap-3">
+            <span class="material-symbols-outlined text-primary text-base mt-0.5 flex-shrink-0">local_shipping</span>
+            <span><strong class="text-on-surface font-normal">Envío por acuerdo.</strong> El envío asegurado puede estar disponible para compras calificadas. Los costos y transportistas se cotizan antes del pago.</span>
+          </li>
+          <li class="flex gap-3">
+            <span class="material-symbols-outlined text-primary text-base mt-0.5 flex-shrink-0">gavel</span>
+            <span><strong class="text-on-surface font-normal">Estado de patrimonio y usado.</strong> Las piezas se venden tal como se describen. Los artículos vintage y de patrimonio pueden mostrar desgaste acorde a su edad; solicite fotos adicionales o una visita en persona cuando sea posible.</span>
+          </li>
+          <li class="flex gap-3">
+            <span class="material-symbols-outlined text-primary text-base mt-0.5 flex-shrink-0">payments</span>
+            <span><strong class="text-on-surface font-normal">Métodos de pago.</strong> Efectivo, cheque certificado y transferencia bancaria están disponibles para compras acordadas. El pago en línea a través de Shopify aparecerá en los artículos individuales cuando esté habilitado.</span>
+          </li>
+          <li class="flex gap-3">
+            <span class="material-symbols-outlined text-primary text-base mt-0.5 flex-shrink-0">undo</span>
+            <span><strong class="text-on-surface font-normal">Devoluciones.</strong> Las ventas de patrimonio, antigüedades y piezas únicas son generalmente definitivas una vez acordadas y pagadas, a menos que se indique lo contrario por escrito para un artículo específico.</span>
+          </li>
+        </ul>
+        <p class="text-sm text-on-surface-variant/80 mt-10 text-center">
+          ¿Preguntas? <a class="text-primary underline underline-offset-4 decoration-primary/30 hover:decoration-primary" href="/es/faq.html">Consulte las Preguntas Frecuentes</a> o <a class="text-primary underline underline-offset-4 decoration-primary/30 hover:decoration-primary" href="/es/contact.html">contáctenos</a>.
+        </p>
+      </div>
+    </section>
+
+    <section class="py-16 md:py-20">
+      <div class="container mx-auto px-6 md:px-8 max-w-4xl text-center">
+        <h2 class="text-3xl md:text-4xl font-headline font-bold mb-6 tracking-tight">¿Vende Algo en su Lugar?</h2>
+        <p class="text-on-surface-variant text-lg mb-8 max-w-2xl mx-auto">
+          También adquirimos joyería de patrimonio, oro, plata, relojes y antigüedades en todo el Suroeste de Florida. Eso es separado de esta tienda &mdash; vea qué compramos.
+        </p>
+        <a href="/es/what-we-buy.html" class="border border-primary/60 text-primary px-8 py-4 rounded-md font-label text-sm font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Véndanos</a>
+      </div>
+    </section>
+  </main>
+
+  <div class="dm-powered-bar" role="contentinfo" aria-label="Crédito del sitio web">
+  <a class="dm-powered-badge" href="https://darkmatterwebdev.com/" target="_blank" rel="noopener noreferrer" aria-label="Sitio web desarrollado por Dark Matter Web Services">
+    <svg class="dm-powered-badge__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6z" />
+    </svg>
+    <span class="dm-powered-badge__lockup">
+      <span class="dm-powered-badge__label">Sitio web desarrollado por</span>
+      <span class="dm-powered-badge__name">DARK MATTER</span>
+      <span class="dm-powered-badge__subtext">Web Services</span>
+    </span>
+  </a>
+</div><footer class="w-full py-16 bg-[#1b1b1b]">
+    <div class="flex flex-col items-center gap-6 text-center px-4">
+      <div class="text-md font-headline text-[#d4af37] uppercase tracking-[0.2em]">
+        Naples Estate Jewelry
+      </div>
+      <div class="max-w-2xl text-gray-400 text-sm leading-relaxed">
+        Servicios de patrimonio a domicilio y solo con cita: comprador de joyería de patrimonio, oro, plata de ley, diamantes y antigüedades, sirviendo a Naples, Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral y las comunidades circundantes del Suroeste de Florida.
+      </div>
+      <div class="flex flex-wrap justify-center gap-x-8 gap-y-3">
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/index.html">Inicio</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/about.html">Sobre Nosotros</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/what-we-buy.html">Véndanos</a>
+        <a class="text-primary hover:text-white transition-colors font-body text-sm tracking-wide" href="/es/shop.html">Tienda</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/gold-services.html">Servicios de Oro</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/silver-services.html">Servicios de Plata</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/process.html">Proceso</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/bullion.html">Lingotes</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/estate-services.html">Servicios de Patrimonio</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/faq.html">Preguntas Frecuentes</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/contact.html">Contáctenos</a>
+        <a class="text-primary hover:text-white transition-colors font-body text-sm tracking-wide" href="https://share.google/yQQMAvFDiOLppBZ30" target="_blank" rel="noopener">Reseñas</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/privacy.html">Privacidad</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="tel:2394048505">(239) 404-8505</a>
+      </div>
+      <div class="max-w-lg text-gray-500 font-body text-sm tracking-wide leading-relaxed">
+        &copy; <span id="footer-year">2026</span> Naples Estate Jewelry. Solo a domicilio/con cita. Tienda privada &mdash; piezas seleccionadas con cita.
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="/scripts/shared/supabase-config.js"></script>
+  <script src="/scripts/shared/naples-auth.js"></script>
+  <script src="/scripts/shop/shop-products.js?v=listing06-photos-20260602"></script>
+
+  <script src="/scripts/shop/shop-pricing.js?v=es-i18n-20260601"></script>
+  <script src="/scripts/shared/cart.js"></script>
+  <script src="/scripts/shop/shop-filters.js?v=es-i18n-20260601" defer></script>
+  <script>
+    document.getElementById('footer-year').textContent = new Date().getFullYear();
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('account') !== 'signin') return;
+
+      var notice = document.getElementById('shop-account-notice');
+      if (notice) {
+        notice.hidden = false;
+        notice.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      params.delete('account');
+      var cleanUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+      window.history.replaceState({}, document.title, cleanUrl);
+    })();
+  </script>
+
+  <!--
+  Shopify Buy Button storefront script � uncomment after creating Buy Buttons in Shopify admin:
+
+  <script type="text/javascript">
+  (function () {
+    var scriptURL = 'https://sdks.shopifycdn.com/buy-button/latest/buy-button-storefront.min.js';
+    if (window.ShopifyBuy) {
+      if (window.ShopifyBuy.UI) {
+        ShopifyBuyInit();
+      } else {
+        loadScript();
+      }
+    } else {
+      loadScript();
+    }
+    function loadScript() {
+      var script = document.createElement('script');
+      script.async = true;
+      script.src = scriptURL;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(script);
+      script.onload = ShopifyBuyInit;
+    }
+    function ShopifyBuyInit() {
+      var client = ShopifyBuy.buildClient({
+        domain: 'YOUR-STORE.myshopify.com',
+        storefrontAccessToken: 'YOUR_STOREFRONT_ACCESS_TOKEN'
+      });
+      ShopifyBuy.UI.onReady(client).then(function (ui) {
+        // Paste ui.createComponent('product', { id: '...', node: document.querySelector('[data-shopify-component="product-component-10k-cuban-link-chain-01"]'), ... }) per product
+      });
+    }
+  })();
+  </script>
+  -->
+</body>
+</html>

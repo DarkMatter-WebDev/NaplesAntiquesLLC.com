@@ -1,4 +1,5 @@
 (function () {
+  var ES = (document.documentElement.getAttribute('lang') || '').toLowerCase().indexOf('es') === 0;
   var GRAMS_PER_TROY_OZ = 31.1034768;
   var SPOT_ENDPOINT = '/.netlify/functions/metal-prices';
   var CLIENT_CACHE_KEY = 'naplesGoldSpotCacheV2';
@@ -169,14 +170,21 @@
 
   function buildPriceContext(product) {
     if (!usesSpotPricing(product)) {
-      return 'Manual price';
+      return ES ? 'Precio manual' : 'Manual price';
     }
 
     var multiplier = formatMultiplier(product.pricingMultiplier);
     var countdown = formatNextUpdateCountdown();
-    var label = multiplier
-      ? 'Live price - ' + multiplier + ' spot multiplier'
-      : 'Live price';
+    var label;
+    if (ES) {
+      label = multiplier
+        ? 'Precio en vivo - multiplicador spot ' + multiplier
+        : 'Precio en vivo';
+    } else {
+      label = multiplier
+        ? 'Live price - ' + multiplier + ' spot multiplier'
+        : 'Live price';
+    }
 
     return countdown ? label + '\n' + countdown : label;
   }
@@ -190,7 +198,9 @@
   }
 
   function formatMarketClosedMessage() {
-    return 'Market closed - updates resume when trading reopens';
+    return ES
+      ? 'Mercado cerrado - las actualizaciones se reanudan cuando reabre el mercado'
+      : 'Market closed - updates resume when trading reopens';
   }
 
   function getNextUpdateTime() {
@@ -214,9 +224,9 @@
 
     var ms = getMsUntilNextUpdate();
     if (ms === null) return '';
-    if (ms <= 60000) return 'Next update: less than 1 min';
+    if (ms <= 60000) return ES ? 'Próxima actualización: menos de 1 min' : 'Next update: less than 1 min';
     var minutes = Math.ceil(ms / 60000);
-    return 'Next update: ' + minutes + ' min';
+    return (ES ? 'Próxima actualización: ' : 'Next update: ') + minutes + ' min';
   }
 
   function priceLabelToNumber(priceLabel) {
@@ -290,7 +300,7 @@
     if (!isoString) return '';
     var date = new Date(isoString);
     if (Number.isNaN(date.getTime())) return '';
-    return date.toLocaleString('en-US', {
+    return date.toLocaleString(ES ? 'es-US' : 'en-US', {
       hour: 'numeric',
       minute: '2-digit'
     });
@@ -316,17 +326,30 @@
     var spotMeta = document.getElementById('shop-spot-meta');
     if (spotMeta && spotData) {
       var timeLabel = formatSpotTimestamp(spotData.updatedAt);
-      var sourceLabel = spotData.source === 'fallback' ? 'estimated spot' : 'live spot';
       var spotLabel = formatSpotPrice(spotData);
       var countdown = formatNextUpdateCountdown();
-      if (isMarketClosed()) {
-        spotMeta.textContent = timeLabel
-          ? 'Gold market closed - last ' + sourceLabel + ' update ' + timeLabel + (spotLabel ? ' - spot ' + spotLabel : '')
-          : 'Gold market closed - pricing will refresh when trading reopens' + (spotLabel ? ' - spot ' + spotLabel : '');
+      if (ES) {
+        var sourceLabelEs = spotData.source === 'fallback' ? 'spot estimado' : 'spot en vivo';
+        if (isMarketClosed()) {
+          spotMeta.textContent = timeLabel
+            ? 'Mercado del oro cerrado - última actualización de ' + sourceLabelEs + ' ' + timeLabel + (spotLabel ? ' - spot ' + spotLabel : '')
+            : 'Mercado del oro cerrado - los precios se actualizarán cuando reabra el mercado' + (spotLabel ? ' - spot ' + spotLabel : '');
+        } else {
+          spotMeta.textContent = timeLabel
+            ? 'Oro ' + sourceLabelEs + ' actualizado ' + timeLabel + (spotLabel ? ' - spot ' + spotLabel : '') + (countdown ? ' - ' + countdown : '')
+            : 'Precios del oro actualizados según el spot actual' + (spotLabel ? ' - spot ' + spotLabel : '') + (countdown ? ' - ' + countdown : '');
+        }
       } else {
-        spotMeta.textContent = timeLabel
-          ? 'Gold ' + sourceLabel + ' updated ' + timeLabel + (spotLabel ? ' - spot ' + spotLabel : '') + (countdown ? ' - ' + countdown : '')
-          : 'Gold pricing updated from current spot' + (spotLabel ? ' - spot ' + spotLabel : '') + (countdown ? ' - ' + countdown : '');
+        var sourceLabel = spotData.source === 'fallback' ? 'estimated spot' : 'live spot';
+        if (isMarketClosed()) {
+          spotMeta.textContent = timeLabel
+            ? 'Gold market closed - last ' + sourceLabel + ' update ' + timeLabel + (spotLabel ? ' - spot ' + spotLabel : '')
+            : 'Gold market closed - pricing will refresh when trading reopens' + (spotLabel ? ' - spot ' + spotLabel : '');
+        } else {
+          spotMeta.textContent = timeLabel
+            ? 'Gold ' + sourceLabel + ' updated ' + timeLabel + (spotLabel ? ' - spot ' + spotLabel : '') + (countdown ? ' - ' + countdown : '')
+            : 'Gold pricing updated from current spot' + (spotLabel ? ' - spot ' + spotLabel : '') + (countdown ? ' - ' + countdown : '');
+        }
       }
       spotMeta.hidden = false;
     }
@@ -346,7 +369,7 @@
     var scrapEl = document.getElementById('product-scrap-value');
     if (scrapEl) {
       if (product.scrapValueLabel) {
-        scrapEl.textContent = 'Exact gold scrap value: ' + product.scrapValueLabel;
+        scrapEl.textContent = (ES ? 'Valor exacto de fundición del oro: ' : 'Exact gold scrap value: ') + product.scrapValueLabel;
         scrapEl.hidden = false;
       } else {
         scrapEl.textContent = '';
@@ -363,9 +386,9 @@
     var details = document.getElementById('product-details');
     if (details) {
       Array.prototype.forEach.call(details.querySelectorAll('li'), function (item) {
-        var text = item.textContent || '';
-        if (/^(Price|Your price):/i.test(text.trim())) {
-          item.querySelector('span:last-child').textContent = 'Your price: ' + product.priceLabel;
+        var text = (item.textContent || '').trim();
+        if (/^(Price|Your price|Precio|Su precio):/i.test(text)) {
+          item.querySelector('span:last-child').textContent = (ES ? 'Su precio: ' : 'Your price: ') + product.priceLabel;
         }
       });
     }
@@ -375,7 +398,17 @@
       var timeLabel = formatSpotTimestamp(spotData.updatedAt);
       var spotLabel = formatSpotPrice(spotData);
       var countdown = formatNextUpdateCountdown();
-      if (isMarketClosed()) {
+      if (ES) {
+        if (isMarketClosed()) {
+          spotMeta.textContent = timeLabel
+            ? 'El precio refleja la última actualización del spot del oro ' + timeLabel + (spotLabel ? ' a ' + spotLabel : '') + '. Mercado cerrado; las actualizaciones se reanudan cuando reabre el mercado.'
+            : 'Mercado cerrado; los precios se actualizarán cuando reabra el mercado' + (spotLabel ? ' desde el spot ' + spotLabel : '') + '.';
+        } else {
+          spotMeta.textContent = timeLabel
+            ? 'El precio refleja el spot del oro actualizado ' + timeLabel + (spotLabel ? ' a ' + spotLabel : '') + (countdown ? ' - ' + countdown : '') + '.'
+            : 'El precio refleja el spot actual del oro' + (spotLabel ? ' a ' + spotLabel : '') + (countdown ? ' - ' + countdown : '') + '.';
+        }
+      } else if (isMarketClosed()) {
         spotMeta.textContent = timeLabel
           ? 'Price reflects last gold spot update ' + timeLabel + (spotLabel ? ' at ' + spotLabel : '') + '. Market closed; updates resume when trading reopens.'
           : 'Market closed; pricing will refresh when trading reopens' + (spotLabel ? ' from spot ' + spotLabel : '') + '.';

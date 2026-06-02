@@ -1,4 +1,9 @@
 (function () {
+  var ES = (document.documentElement.getAttribute('lang') || '').toLowerCase().indexOf('es') === 0;
+  function L(en, es) { return ES ? es : en; }
+  var CAT_ES = { 'gold': 'Oro', 'silver': 'Plata', 'bullion': 'Lingotes', 'diamond': 'Diamantes', 'diamonds': 'Diamantes', 'watch': 'Relojes', 'watches': 'Relojes', 'antique': 'Antigüedades', 'antiques': 'Antigüedades', 'jewelry': 'Joyería', 'coins': 'Monedas', 'coin': 'Monedas' };
+  function catLabel(cat) { if (!ES || !cat) return cat; return CAT_ES[String(cat).toLowerCase()] || cat; }
+  function titleOf(product) { return (ES && product.title_es) ? product.title_es : product.title; }
   var profileSaveTimer = null;
 
   function setMessage(text, isError) {
@@ -15,6 +20,8 @@
     el.className = isError ? 'text-red-600 text-sm mb-4' : 'text-on-surface-variant text-sm mb-4';
   }
 
+  var DEFAULT_COUNTRY = ES ? 'Estados Unidos' : 'United States';
+
   function getProfilePayload() {
     return {
       full_name: document.getElementById('field-full-name').value.trim(),
@@ -24,7 +31,7 @@
       city: document.getElementById('field-city').value.trim(),
       state: document.getElementById('field-state').value.trim(),
       postal_code: document.getElementById('field-postal-code').value.trim(),
-      country: document.getElementById('field-country').value.trim() || 'United States',
+      country: document.getElementById('field-country').value.trim() || DEFAULT_COUNTRY,
       marketing_opt_in: document.getElementById('field-marketing-opt-in').checked,
       interests: document.getElementById('field-interests').value.split(',').map(function (value) {
         return value.trim();
@@ -72,12 +79,12 @@
       favorites = await window.NaplesAuth.listFavorites();
     } catch (error) {
       console.warn('Favorites unavailable:', error.message);
-      list.innerHTML = '<p class="text-on-surface-variant text-sm">Saved favorites are temporarily unavailable.</p>';
+      list.innerHTML = '<p class="text-on-surface-variant text-sm">' + L('Saved favorites are temporarily unavailable.', 'Los favoritos guardados no están disponibles temporalmente.') + '</p>';
       return;
     }
 
     if (!favorites.length) {
-      list.innerHTML = '<p class="text-on-surface-variant text-sm">No saved favorites yet.</p>';
+      list.innerHTML = '<p class="text-on-surface-variant text-sm">' + L('No saved favorites yet.', 'Aún no hay favoritos guardados.') + '</p>';
       return;
     }
 
@@ -87,8 +94,8 @@
       var row = document.createElement('div');
       row.className = 'border border-white/10 rounded-sm p-4';
       row.innerHTML = product
-        ? '<a class="text-primary font-label text-xs uppercase tracking-widest" href="product.html?id=' + encodeURIComponent(product.id) + '">' + product.category + '</a><p class="text-on-surface font-headline text-lg mt-2">' + product.title + '</p>'
-        : '<p class="text-sm text-on-surface-variant">Saved item: ' + favorite.product_id + '</p>';
+        ? '<a class="text-primary font-label text-xs uppercase tracking-widest" href="product.html?id=' + encodeURIComponent(product.id) + '">' + catLabel(product.category) + '</a><p class="text-on-surface font-headline text-lg mt-2">' + titleOf(product) + '</p>'
+        : '<p class="text-sm text-on-surface-variant">' + L('Saved item: ', 'Artículo guardado: ') + favorite.product_id + '</p>';
       list.appendChild(row);
     });
   }
@@ -100,7 +107,7 @@
 
     var ids = window.ShopCart ? window.ShopCart.read() : [];
     if (!ids.length) {
-      list.innerHTML = '<p class="text-on-surface-variant text-sm">Your cart is empty.</p>';
+      list.innerHTML = '<p class="text-on-surface-variant text-sm">' + L('Your cart is empty.', 'Su carrito está vacío.') + '</p>';
       return;
     }
 
@@ -117,11 +124,11 @@
       row.innerHTML = product
         ? '<img src="' + image + '" alt="" class="w-12 h-12 object-cover rounded-sm bg-surface-container-low flex-shrink-0" loading="lazy" />' +
           '<span class="min-w-0 flex-1">' +
-            '<span class="text-primary font-label text-[0.55rem] uppercase tracking-widest">' + product.category + '</span>' +
-            '<span class="block text-on-surface font-headline text-xs leading-snug truncate">' + product.title + '</span>' +
+            '<span class="text-primary font-label text-[0.55rem] uppercase tracking-widest">' + catLabel(product.category) + '</span>' +
+            '<span class="block text-on-surface font-headline text-xs leading-snug truncate">' + titleOf(product) + '</span>' +
             '<span class="block text-on-surface-variant text-[0.68rem] mt-0.5">' + price + '</span>' +
           '</span>'
-        : '<p class="text-sm text-on-surface-variant">Cart item: ' + id + '</p>';
+        : '<p class="text-sm text-on-surface-variant">' + L('Cart item: ', 'Artículo del carrito: ') + id + '</p>';
       list.appendChild(row);
     });
   }
@@ -153,7 +160,7 @@
       cityEl.value = profile.city || '';
       stateEl.value = profile.state || '';
       postalCodeEl.value = profile.postal_code || '';
-      countryEl.value = profile.country || 'United States';
+      countryEl.value = profile.country || DEFAULT_COUNTRY;
       marketingOptInEl.checked = Boolean(profile.marketing_opt_in);
       interestsEl.value = (profile.interests || []).join(', ');
     } else {
@@ -165,17 +172,17 @@
       cityEl.value = '';
       stateEl.value = '';
       postalCodeEl.value = '';
-      countryEl.value = 'United States';
+      countryEl.value = DEFAULT_COUNTRY;
       marketingOptInEl.checked = false;
       interestsEl.value = '';
     }
 
     var params = new URLSearchParams(window.location.search);
     if (params.get('welcome') === '1') {
-      setMessage('Welcome. Please complete your profile below. Changes save automatically.');
+      setMessage(L('Welcome. Please complete your profile below. Changes save automatically.', 'Bienvenido. Por favor complete su perfil a continuación. Los cambios se guardan automáticamente.'));
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (profileLooksIncomplete(profile)) {
-      setMessage('Complete your profile so we can contact you about saved items and purchases.');
+      setMessage(L('Complete your profile so we can contact you about saved items and purchases.', 'Complete su perfil para que podamos contactarlo sobre artículos guardados y compras.'));
     } else {
       setMessage('');
     }
@@ -191,10 +198,10 @@
   }
 
   function saveProfile() {
-    setProfileStatus('Saving profile...');
+    setProfileStatus(L('Saving profile...', 'Guardando perfil...'));
     return window.NaplesAuth.updateProfile(getProfilePayload())
       .then(function () {
-        setProfileStatus('Profile saved automatically.');
+        setProfileStatus(L('Profile saved automatically.', 'Perfil guardado automáticamente.'));
       })
       .catch(function (error) {
         var hint = error.message && (
@@ -202,7 +209,7 @@
           error.message.indexOf('address') !== -1 ||
           error.message.indexOf('marketing_opt_in') !== -1
         )
-          ? ' Run supabase/fix-permissions.sql in Supabase SQL Editor, then try again.'
+          ? L(' Run supabase/fix-permissions.sql in Supabase SQL Editor, then try again.', ' Ejecute supabase/fix-permissions.sql en el Editor SQL de Supabase y vuelva a intentarlo.')
           : '';
         setProfileStatus(error.message + hint, true);
       });
@@ -210,7 +217,7 @@
 
   function queueProfileSave() {
     window.clearTimeout(profileSaveTimer);
-    setProfileStatus('Unsaved changes...');
+    setProfileStatus(L('Unsaved changes...', 'Cambios sin guardar...'));
     profileSaveTimer = window.setTimeout(saveProfile, 900);
   }
 
@@ -244,7 +251,7 @@
   async function init() {
     if (!window.NaplesAuth || !window.NaplesAuth.isConfigured()) {
       showSignedOut();
-      setMessage('Customer accounts are not configured yet.', true);
+      setMessage(L('Customer accounts are not configured yet.', 'Las cuentas de cliente aún no están configuradas.'), true);
       return;
     }
 
