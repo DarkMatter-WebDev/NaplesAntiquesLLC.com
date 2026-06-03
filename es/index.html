@@ -26,7 +26,7 @@
   <meta property="og:site_name" content="Naples Estate Jewelry" />
   <meta property="og:title" content="Servicios de Joyería de Patrimonio en Naples | Oro, Plata, Antigüedades | Evaluaciones Privadas" />
   <meta property="og:description" content="Los principales servicios privados de patrimonio en Naples para joyería de patrimonio, oro, plata de ley, diamantes y antigüedades. Servicio a domicilio. Pago inmediato. Llame al (239) 404-8505." />
-  <meta property="og:image" content="https://naplesantiquesllc.com/assets/images/branding/logo.png" />
+  <meta property="og:image" content="https://naplesantiquesllc.com/assets/images/branding/logo.webp" />
   <meta property="og:url" content="https://naplesantiquesllc.com/es/" />
   <meta property="og:locale" content="es_ES" />
   <meta property="og:locale:alternate" content="en_US" />
@@ -34,10 +34,10 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Servicios de Joyería de Patrimonio en Naples | Oro, Plata y Antigüedades" />
   <meta name="twitter:description" content="Evaluaciones privadas de joyería de patrimonio, oro, plata de ley, diamantes y antigüedades. Servicios de patrimonio a domicilio en todo el Suroeste de Florida." />
-  <meta name="twitter:image" content="https://naplesantiquesllc.com/assets/images/branding/logo.png" />
+  <meta name="twitter:image" content="https://naplesantiquesllc.com/assets/images/branding/logo.webp" />
 
-  <link rel="icon" type="image/png" href="/assets/images/branding/logo2.png" />
-  <link rel="apple-touch-icon" href="/assets/images/branding/logo2.png" />
+  <link rel="icon" type="image/png" href="/assets/images/branding/logo2.webp" />
+  <link rel="apple-touch-icon" href="/assets/images/branding/logo2.webp" />
   <meta name="theme-color" content="#f9f9f9" />
 
   <script type="application/ld+json">
@@ -50,8 +50,8 @@
     "url": "https://naplesantiquesllc.com/es/",
     "inLanguage": "es",
     "telephone": "+1-239-404-8505",
-    "image": "https://naplesantiquesllc.com/assets/images/branding/logo.png",
-    "logo": "https://naplesantiquesllc.com/assets/images/branding/logo.png",
+    "image": "https://naplesantiquesllc.com/assets/images/branding/logo.webp",
+    "logo": "https://naplesantiquesllc.com/assets/images/branding/logo.webp",
     "priceRange": "$$$$",
     "address": { "@type": "PostalAddress", "addressLocality": "Naples", "addressRegion": "FL", "postalCode": "34102", "addressCountry": "US" },
     "geo": { "@type": "GeoCoordinates", "latitude": 26.142036, "longitude": -81.794810 },
@@ -79,8 +79,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script src="/scripts/shared/editorial-tailwind-config.js"></script>
 <link href="/editorial-base.css" rel="stylesheet" />
-<link href="/editorial-theme.css?v=lang-switcher-20260601" rel="stylesheet" />
-<script src="/scripts/shared/site-header.js?v=lang-switcher-20260601" defer></script>
+<link href="/editorial-theme.css?v=header-sync-20260602" rel="stylesheet" />
+<link href="/assets/css/home-bullion-widget.css" rel="stylesheet" />
+<script src="/scripts/shared/site-header.js?v=header-sync-20260603" defer></script>
 <style>
     html { scroll-behavior: smooth; }
     body { cursor: auto; overflow-x: hidden; }
@@ -95,8 +96,8 @@
 
     /* Calm luxury motion: slow zoom plus a soft light sweep. */
     @keyframes hero-zoom {
-      0%, 100% { transform: translate3d(0, var(--hero-parallax, 0px), 0) scale(1.02); }
-      50% { transform: translate3d(0, var(--hero-parallax, 0px), 0) scale(1.06); }
+      0%, 100% { transform: scale(1.02); }
+      50% { transform: scale(1.06); }
     }
     @keyframes hero-sweep {
       0%, 42% { transform: translateX(-130%) skewX(-18deg); opacity: 0; }
@@ -105,6 +106,35 @@
       100% { transform: translateX(130%) skewX(-18deg); opacity: 0; }
     }
     .hero-pan { animation: hero-zoom 30s ease-in-out infinite; object-position: center center; will-change: transform; }
+    .hero-bg-parallax {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: -7%;
+      height: 114%;
+      overflow: hidden;
+      z-index: 0;
+      transform: translate3d(0, var(--hero-bg-y, 0px), 0) scale(1.06);
+      transform-origin: center center;
+      will-change: transform;
+    }
+    .hero-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center center;
+      animation: none;
+      z-index: 0;
+    }
+    .hero-fallback { z-index: 0; }
+    @media (prefers-reduced-motion: no-preference) {
+      .hero-fallback { opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .hero-video { display: none !important; }
+    }
     .hero-light-sweep {
       animation: hero-sweep 13s ease-in-out infinite;
       background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 48%, rgba(242,202,80,0.07) 52%, transparent 100%);
@@ -113,6 +143,8 @@
     #sell .homepage-hero-copy {
       max-width: 600px;
       color: #f9f4ea;
+      transform: translate3d(0, var(--hero-copy-y, 0px), 0);
+      will-change: transform;
     }
     #sell .homepage-hero-title {
       color: #f9f4ea !important;
@@ -140,6 +172,35 @@
       background: rgba(225, 226, 224, 0.28) !important;
       color: #fff8e1 !important;
       outline: none;
+    }
+    #sell .hero-trade-button,
+    #sell .homepage-hero-copy .hero-secondary-button,
+    #sell .homepage-hero-copy .gold-button.header-cta-call {
+      border-radius: 9999px !important;
+      transition:
+        transform 0.35s cubic-bezier(0.34, 1.4, 0.64, 1),
+        background 0.3s ease,
+        color 0.3s ease,
+        border-color 0.3s ease,
+        box-shadow 0.35s ease !important;
+    }
+    #sell .hero-trade-button:hover,
+    #sell .hero-trade-button:focus-visible,
+    #sell .homepage-hero-copy .hero-secondary-button:hover,
+    #sell .homepage-hero-copy .hero-secondary-button:focus-visible,
+    #sell .homepage-hero-copy .gold-button.header-cta-call:hover,
+    #sell .homepage-hero-copy .gold-button.header-cta-call:focus-visible {
+      transform: translateY(-6px) scale(1.04);
+      box-shadow: 0 18px 36px rgba(0, 0, 0, 0.32) !important;
+    }
+    #sell .homepage-hero-copy .gold-button.header-cta-call:hover,
+    #sell .homepage-hero-copy .gold-button.header-cta-call:focus-visible {
+      box-shadow: 0 18px 40px rgba(242, 202, 80, 0.35) !important;
+    }
+    #sell .homepage-hero-copy .hero-secondary-button:hover,
+    #sell .homepage-hero-copy .hero-secondary-button:focus-visible {
+      background: rgba(242, 202, 80, 0.92) !important;
+      color: #1a1c1c !important;
     }
     #sell .homepage-hero-copy .hero-phone-label {
       color: rgba(249, 244, 234, 0.9) !important;
@@ -170,6 +231,15 @@
     }
     @media (prefers-reduced-motion: reduce) {
       .hero-pan, .hero-light-sweep { animation: none; }
+      .hero-bg-parallax, #sell .homepage-hero-copy { transform: none !important; }
+      #sell .hero-trade-button:hover,
+      #sell .hero-trade-button:focus-visible,
+      #sell .homepage-hero-copy .hero-secondary-button:hover,
+      #sell .homepage-hero-copy .hero-secondary-button:focus-visible,
+      #sell .homepage-hero-copy .gold-button.header-cta-call:hover,
+      #sell .homepage-hero-copy .gold-button.header-cta-call:focus-visible {
+        transform: none !important;
+      }
     }
   </style>
 
@@ -185,34 +255,36 @@
 </head>
 
 <body class="font-body-md text-body-md bg-background overflow-x-hidden">
-  <header class="site-header site-header--light fixed top-0 w-full z-50 bg-[#f9f9f7]/95 border-b border-[#d8d0c2]">
+          <header class="site-header site-header--light fixed top-0 w-full z-50 bg-[#f9f9f7]/95 border-b border-[#d8d0c2]">
   <div class="site-header-bar flex items-center justify-between gap-3 px-4 md:px-8 py-4 md:py-5 w-full max-w-[1440px] mx-auto">
     <a href="/es/index.html" class="site-brand-link flex items-center gap-3 min-w-0">
-      <img src="/assets/images/branding/logo.png" alt="Logotipo de Naples Estate Jewelry" class="site-brand-logo h-10 w-auto object-contain flex-shrink-0" />
+      <img src="/assets/images/branding/logo.webp" alt="Logotipo de Naples Estate Jewelry" class="site-brand-logo h-10 w-auto object-contain flex-shrink-0" />
       <span class="site-brand-text font-display-lg-mobile text-[18px] md:text-[23px] tracking-normal text-[#735c00] uppercase">
         <span class="site-brand-short">Naples Estate Jewelry</span>
         <span class="site-brand-full">Naples Estate Jewelry</span>
       </span>
     </a>
     <nav class="site-header-nav hidden 2xl:flex items-center gap-5">
-      <a class="text-[#5e5e5d] hover:text-[#735c00] border-b border-[#735c00]/40 font-label-md text-label-md transition-colors px-1 py-2" href="/es/shop.html">Tienda</a>
-      <div class="nav-buy-group"><a class="text-[#5e5e5d] hover:text-[#735c00] border-b border-[#735c00]/40 font-label-md text-label-md transition-colors px-1 py-2" href="/es/what-we-buy.html">Véndanos</a><div class="nav-buy-panel"><a href="/es/estate-jewelry.html">Joyería de Patrimonio</a><a href="/es/gold-services.html">Servicios de Oro</a><a href="/es/silver-services.html">Servicios de Plata</a><a href="/es/bullion.html">Lingotes</a></div></div>
+      <a class="text-[#735c00] border-b border-[#735c00]/40 font-label-md text-label-md transition-colors px-1 py-2" href="/es/index.html">Inicio</a>
+      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="/es/shop.html">Tienda</a>
+      <div class="nav-buy-group"><a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="/es/what-we-buy.html">Véndanos</a><div class="nav-buy-panel"><a href="/es/estate-jewelry.html">Joyería de Patrimonio</a><a href="/es/gold-services.html">Servicios de Oro</a><a href="/es/silver-services.html">Servicios de Plata</a><a href="/es/bullion.html">Lingotes</a></div></div>
       <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="/es/about.html">Sobre Nosotros</a>
-      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="/es/process.html">Proceso</a>
-      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="/es/estate-services.html">Servicios de Patrimonio</a>
+      <div class="nav-buy-group"><a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="/es/free-evaluation.html">Servicios</a><div class="nav-buy-panel"><a href="/es/free-evaluation.html">Evaluación Gratuita</a><a href="/es/estate-services.html">Servicios de Patrimonio</a></div></div>
       <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="/es/contact.html">Contacto</a>
-      
+      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="/es/account.html">Mi Cuenta</a>
+      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="/es/cart.html">Carrito (<span data-header-cart-count>0</span>)</a>
     </nav>
-    <div class="site-header-actions flex items-center gap-3"><a href="tel:2394048505" class="header-cta-call editorial-call-button hidden 2xl:inline-flex px-5 py-2 font-label-md text-label-md uppercase tracking-widest transition-colors">Llámenos</a><button id="mobile-menu-toggle" type="button" aria-expanded="false" aria-label="Abrir menú" class="site-menu-toggle 2xl:hidden border border-[#735c00]/50 text-[#735c00] px-3 py-2 font-label-md text-label-md uppercase tracking-widest"><span class="menu-toggle-label" id="mobile-menu-icon">Menú</span></button></div>
+    <div class="site-header-actions flex items-center gap-3"><span data-lang-toggle="" class="lang-toggle inline-flex items-center gap-1 font-label-md text-label-md uppercase tracking-widest px-2 py-2" aria-label="Cambiar idioma"><span class="material-symbols-outlined" style="font-size:18px;line-height:1;" aria-hidden="true">language</span><a class="lang-opt" href="/index.html" title="View this page in English">EN</a><span class="lang-sep" aria-hidden="true">/</span><a class="lang-opt is-current" href="/es/index.html" title="Ver esta página en español" aria-current="true">ES</a></span><a href="tel:2394048505" class="header-cta-call editorial-call-button hidden 2xl:inline-flex px-5 py-2 font-label-md text-label-md uppercase tracking-widest transition-colors">Llámenos</a><button id="mobile-menu-toggle" type="button" aria-expanded="false" aria-label="Abrir menú" class="site-menu-toggle 2xl:hidden border border-[#735c00]/50 text-[#735c00] px-3 py-2 font-label-md text-label-md uppercase tracking-widest"><span class="menu-toggle-label" id="mobile-menu-icon">Menú</span></button></div>
   </div>
-  <div id="mobile-menu" class="hidden 2xl:hidden border-t border-[#d8d0c2] bg-[#f9f9f7]/98"><div class="flex flex-col px-5 py-4"><a class="text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/shop.html">Tienda</a><a class="text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/what-we-buy.html">Véndanos</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/about.html">Sobre Nosotros</a><a class="mobile-subitem" href="/es/estate-jewelry.html">Joyería de Patrimonio</a><a class="mobile-subitem" href="/es/gold-services.html">Servicios de Oro</a><a class="mobile-subitem" href="/es/silver-services.html">Servicios de Plata</a><a class="mobile-subitem" href="/es/bullion.html">Lingotes</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/process.html">Proceso</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/estate-services.html">Servicios de Patrimonio</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/contact.html">Contacto</a>        <a class="text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/index.html#newsletter">Suscríbase a La Lista</a>
-        
-        <a class="text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/index.html#appointment">Solicite una Llamada</a></div></div>
+  <div id="mobile-menu" class="hidden 2xl:hidden border-t border-[#d8d0c2] bg-[#f9f9f7]/98"><div class="flex flex-col px-5 py-4"><a class="text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/index.html">Inicio</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/shop.html">Tienda</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/what-we-buy.html">Véndanos</a><a class="mobile-subitem" href="/es/estate-jewelry.html">Joyería de Patrimonio</a><a class="mobile-subitem" href="/es/gold-services.html">Servicios de Oro</a><a class="mobile-subitem" href="/es/silver-services.html">Servicios de Plata</a><a class="mobile-subitem" href="/es/bullion.html">Lingotes</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/about.html">Sobre Nosotros</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/free-evaluation.html">Servicios</a><a class="mobile-subitem" href="/es/free-evaluation.html">Evaluación Gratuita</a><a class="mobile-subitem" href="/es/estate-services.html">Servicios de Patrimonio</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/contact.html">Contacto</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/index.html#newsletter">Suscríbase a La Lista</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/index.html#appointment">Solicite una Llamada</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/cart.html">Carrito (<span data-header-cart-count>0</span>)</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/account.html">Mi Cuenta</a><a data-lang-toggle-mobile="" href="/index.html" class="text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]">English</a></div></div>
 </header><main id="top" class="pt-16">
     <!-- HERO -->
     <section id="sell" class="relative min-h-[820px] sm:min-h-[760px] md:min-h-screen flex items-start overflow-hidden pt-28 md:pt-32 xl:pt-36 pb-16 bg-[#101111]">
-      <div class="absolute inset-0 z-0 overflow-hidden">
-        <img alt="Primer plano en blanco y negro de brazaletes y perlas de joyería de patrimonio" fetchpriority="high" class="hero-pan w-full h-full object-cover" src="/assets/images/pages/homepage-hero-bangles.png" width="1024" height="683" />
+      <div class="hero-bg-parallax" aria-hidden="true">
+        <img alt="" fetchpriority="high" class="hero-pan hero-fallback w-full h-full object-cover" src="/assets/images/pages/homepage-hero-bangles.webp" width="1024" height="683" />
+        <video class="hero-video" autoplay muted loop playsinline preload="metadata" poster="/assets/images/pages/homepage-hero-bangles.webp">
+          <source src="/assets/video/homepage-hero.mp4" type="video/mp4" />
+        </video>
         <div class="absolute inset-0 hero-gradient"></div>
         <div class="hero-light-sweep absolute inset-y-0 -left-1/3 w-1/2 pointer-events-none"></div>
       </div>
@@ -223,19 +295,35 @@
           <h1 class="homepage-hero-title text-4xl md:text-5xl font-headline font-bold mt-2 mb-28 md:mb-32 tracking-tight">Único. Auténtico. Atemporal.</h1>
           <div class="flex flex-col items-center gap-4 mb-20" aria-label="Opciones de comprar, vender e intercambiar">
             <div class="flex flex-wrap justify-center gap-4 md:gap-5">
-            <a href="/es/shop.html" class="hero-trade-button inline-flex justify-center min-w-[9rem] md:min-w-[10rem] border px-8 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest transition-colors">Comprar</a>
-            <a href="/es/what-we-buy.html" class="hero-trade-button inline-flex justify-center min-w-[9rem] md:min-w-[10rem] border px-8 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest transition-colors">Vender</a>
-            <a href="/es/contact.html#submit-item" class="hero-trade-button inline-flex justify-center min-w-[9rem] md:min-w-[10rem] border px-8 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest transition-colors">Intercambiar</a>
+            <a href="/es/shop.html" class="hero-trade-button inline-flex justify-center min-w-[9rem] md:min-w-[10rem] border px-8 py-2.5 rounded-full font-label text-xs font-bold uppercase tracking-widest">Comprar</a>
+            <a href="/es/what-we-buy.html" class="hero-trade-button inline-flex justify-center min-w-[9rem] md:min-w-[10rem] border px-8 py-2.5 rounded-full font-label text-xs font-bold uppercase tracking-widest">Vender</a>
+            <a href="/es/contact.html#submit-item" class="hero-trade-button inline-flex justify-center min-w-[9rem] md:min-w-[10rem] border px-8 py-2.5 rounded-full font-label text-xs font-bold uppercase tracking-widest">Intercambiar</a>
             </div>
           </div>
 
           <div class="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center justify-center flex-wrap">
-            <a href="#appointment" class="header-cta-call gold-button text-on-primary px-8 md:px-10 py-5 rounded-md font-label text-sm font-bold uppercase tracking-widest hover:scale-105 transition-transform shadow-xl">Obtenga una Oferta</a>
-            <a href="/es/contact.html#submit-item" class="hero-secondary-button border border-primary/60 text-primary px-8 md:px-10 py-5 rounded-md font-label text-sm font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Envíe Fotos</a>
+            <a href="#appointment" class="header-cta-call gold-button text-on-primary px-8 md:px-10 py-5 rounded-full font-label text-sm font-bold uppercase tracking-widest shadow-xl">Obtenga una Oferta</a>
+            <a href="/es/contact.html#submit-item" class="hero-secondary-button border border-primary/60 text-primary px-8 md:px-10 py-5 rounded-full font-label text-sm font-bold uppercase tracking-widest">Envíe Fotos</a>
             <div class="hero-phone-block flex flex-col items-center rounded-sm">
               <span class="hero-phone-label text-on-surface-variant text-xs uppercase tracking-widest font-label mb-1">Nuestro Equipo &middot; Línea Directa &middot; Llame o Envíe un Mensaje</span>
               <a class="text-primary text-2xl font-headline font-bold underline underline-offset-8 decoration-primary/30 hover:decoration-primary transition-all" href="tel:2394048505">(239) 404-8505</a>
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FREE EVALUATION CTA -->
+    <section class="py-16 md:py-20 border-y border-white/5">
+      <div class="container mx-auto px-6 md:px-8 max-w-5xl">
+        <div class="rounded-sm border border-primary/30 bg-surface-container-high p-8 md:p-12 text-center">
+          <span class="material-symbols-outlined text-primary text-4xl mb-3">price_check</span>
+          <span class="block text-primary font-label text-xs uppercase tracking-[0.4em] mb-3">Gratis y Sin Compromiso</span>
+          <h2 class="text-3xl md:text-4xl font-headline font-bold mb-4 tracking-tight">¿Se Pregunta Cuánto Valen su Joyería u Oro?</h2>
+          <p class="text-on-surface-variant text-lg max-w-2xl mx-auto mb-8">Obtenga una evaluación gratuita y honesta de su joyería, oro, plata, diamantes, relojes y monedas &mdash; con precios de mercado en vivo y sin presión para vender.</p>
+          <div class="flex flex-col sm:flex-row gap-4 justify-center items-center flex-wrap">
+            <a href="/es/free-evaluation.html" class="gold-button text-on-primary px-8 py-4 rounded-md font-label text-sm font-bold uppercase tracking-widest hover:scale-105 transition-transform">Obtenga una Evaluación Gratuita</a>
+            <a href="tel:2394048505" class="border border-primary/60 text-primary px-8 py-4 rounded-md font-label text-sm font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">(239) 404-8505</a>
           </div>
         </div>
       </div>
@@ -271,9 +359,9 @@
     <section class="homepage-transparent-buying py-18 md:py-24 border-y border-[#d8d0c2]/60">
       <div class="container mx-auto px-6 md:px-8 max-w-6xl">
         <div class="transparent-buying-card bg-white/70 rounded-sm p-8 md:p-12 text-center">
-          <span class="text-primary font-label text-xs uppercase tracking-[0.4em]">Una Nueva Forma de Comprar Joyería</span>
-          <h2 class="text-3xl md:text-4xl font-headline font-bold mt-4 mb-5 tracking-tight">Precios transparentes, en vivo mientras navega.</h2>
-          <p class="text-on-surface-variant text-lg md:text-xl max-w-3xl mx-auto leading-relaxed">Nuestra tienda muestra las matemáticas del mercado detrás de cada artículo de oro. Vea los precios spot en vivo, el valor exacto del oro y el multiplicador de precio antes de consultar, para que pueda comprar con claridad en lugar de adivinar un precio misterioso.</p>
+          <span class="text-primary font-label text-xs uppercase tracking-[0.4em]">Una Forma Más Inteligente de Tener Oro</span>
+          <h2 class="text-3xl md:text-4xl font-headline font-bold mt-4 mb-5 tracking-tight">No solo compre joyería. Invierta en ella.</h2>
+          <p class="text-on-surface-variant text-lg md:text-xl max-w-3xl mx-auto leading-relaxed">Nuestra tienda cotiza cada pieza de oro en vivo según el mercado spot y muestra el valor exacto de fundición del oro junto a su precio. No solo está comprando joyería &mdash; está invirtiendo en oro real y usable a un valor que puede comprobar usted mismo.</p>
           <div class="grid md:grid-cols-3 gap-6 mt-10 text-left">
             <div class="transparent-buying-stat pt-5">
               <span class="text-primary font-label text-xs uppercase tracking-[0.22em]">Mercado en Vivo</span>
@@ -288,7 +376,7 @@
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed">Las páginas de producto muestran el valor exacto de fundición junto a su precio para una experiencia de compra más transparente.</p>
             </div>
           </div>
-          <a href="/es/shop.html" class="gold-button inline-block text-on-primary px-8 py-4 rounded-md font-label text-sm font-bold uppercase tracking-widest hover:scale-105 transition-transform mt-10">Comprar Ahora</a>
+          <a href="/es/shop.html" class="gold-button inline-block text-on-primary px-8 py-4 rounded-md font-label text-sm font-bold uppercase tracking-widest hover:scale-105 transition-transform mt-10">Invertir en Oro</a>
         </div>
       </div>
     </section>
@@ -375,8 +463,47 @@
     </section>
   </main>
 
+  <a href="/es/bullion.html#live-prices" class="bullion-charts-widget" id="bullion-charts-widget" aria-label="Ver gráficos en vivo de oro y plata">
+    <span class="bullion-charts-widget__glow" aria-hidden="true"></span>
+    <span class="bullion-charts-widget__card">
+      <span class="bullion-charts-widget__head">
+        <span class="material-symbols-outlined bullion-charts-widget__icon" aria-hidden="true">candlestick_chart</span>
+        <span class="bullion-charts-widget__label">Ver los gráficos</span>
+      </span>
+      <span class="bullion-charts-widget__charts" aria-hidden="true">
+        <span class="bullion-charts-widget__spark-wrap">
+          <span class="bullion-charts-widget__metal bullion-charts-widget__metal--gold">Oro</span>
+          <svg class="bullion-charts-widget__spark" viewBox="0 0 24 14" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="bullion-spark-gold-fill-es" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#e9c349" stop-opacity="0.55" />
+                <stop offset="100%" stop-color="#e9c349" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+            <path class="bullion-charts-widget__spark-area--gold" fill="url(#bullion-spark-gold-fill-es)" d="M2 12 L6 10 L10 11 L14 7 L18 8 L22 4 L22 14 L2 14 Z" />
+            <path class="bullion-charts-widget__spark-line bullion-charts-widget__spark-line--gold" d="M2 12 L6 10 L10 11 L14 7 L18 8 L22 4" />
+          </svg>
+        </span>
+        <span class="bullion-charts-widget__spark-wrap">
+          <span class="bullion-charts-widget__metal bullion-charts-widget__metal--silver">Plata</span>
+          <svg class="bullion-charts-widget__spark" viewBox="0 0 24 14" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="bullion-spark-silver-fill-es" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#a8b8cc" stop-opacity="0.5" />
+                <stop offset="100%" stop-color="#a8b8cc" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+            <path class="bullion-charts-widget__spark-area--silver" fill="url(#bullion-spark-silver-fill-es)" d="M2 10 L6 11 L10 9 L14 10 L18 6 L22 5 L22 14 L2 14 Z" />
+            <path class="bullion-charts-widget__spark-line bullion-charts-widget__spark-line--silver" d="M2 10 L6 11 L10 9 L14 10 L18 6 L22 5" />
+          </svg>
+        </span>
+      </span>
+      <span class="bullion-charts-widget__hint">Mercado en vivo · Lingotes</span>
+    </span>
+  </a>
+
   <div class="dm-powered-bar" role="contentinfo" aria-label="Crédito del sitio web">
-  <a class="dm-powered-badge" href="https://darkmatterwebdev.com/" target="_blank" rel="noopener noreferrer" aria-label="Sitio web desarrollado por Dark Matter Web Services">
+  <a class="dm-powered-badge" href="https://darkmatterwebdev.com/built-by" target="_blank" rel="noopener noreferrer" aria-label="Sitio web desarrollado por Dark Matter Web Services">
     <svg class="dm-powered-badge__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6z" />
     </svg>
@@ -397,8 +524,9 @@
         <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/shop.html">Tienda</a>
         <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/gold-services.html">Servicios de Oro</a>
         <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/silver-services.html">Servicios de Plata</a>
-        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/process.html">Proceso</a>
+        
         <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/bullion.html">Lingotes</a>
+        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/free-evaluation.html">Evaluación Gratuita</a>
         <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/estate-services.html">Servicios de Patrimonio</a>
         <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="/es/faq.html">Preguntas Frecuentes</a>
         <a class="text-primary hover:text-white transition-colors font-body text-sm tracking-wide" href="/es/contact.html">Contáctenos</a>
@@ -421,13 +549,33 @@
       if (y) y.textContent = new Date().getFullYear();
 
       var hero = document.getElementById('sell');
-      var heroImage = hero ? hero.querySelector('.hero-pan') : null;
+      var heroVideo = hero ? hero.querySelector('.hero-video') : null;
       var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (hero && heroImage && !reduceMotion) {
+      if (heroVideo && reduceMotion) {
+        heroVideo.pause();
+        heroVideo.removeAttribute('autoplay');
+      }
+      if (heroVideo && !reduceMotion) {
+        document.addEventListener('visibilitychange', function () {
+          if (document.hidden) heroVideo.pause();
+          else heroVideo.play().catch(function () {});
+        });
+      }
+      var heroBg = hero ? hero.querySelector('.hero-bg-parallax') : null;
+      var heroCopy = hero ? hero.querySelector('.homepage-hero-copy') : null;
+      if (hero && heroBg && heroCopy && !reduceMotion) {
         var ticking = false;
         var updateHeroParallax = function () {
-          var progress = Math.min(1, Math.max(0, window.scrollY / Math.max(1, hero.offsetHeight)));
-          heroImage.style.setProperty('--hero-parallax', Math.round(progress * 28) + 'px');
+          var rect = hero.getBoundingClientRect();
+          if (rect.bottom <= 0 || rect.top >= window.innerHeight) {
+            heroBg.style.setProperty('--hero-bg-y', '0px');
+            heroCopy.style.setProperty('--hero-copy-y', '0px');
+            ticking = false;
+            return;
+          }
+          var scrolled = Math.max(0, -rect.top);
+          heroBg.style.setProperty('--hero-bg-y', Math.round(scrolled * 0.42) + 'px');
+          heroCopy.style.setProperty('--hero-copy-y', Math.round(scrolled * -0.32) + 'px');
           ticking = false;
         };
         var requestHeroParallax = function () {
@@ -438,6 +586,7 @@
         };
         updateHeroParallax();
         window.addEventListener('scroll', requestHeroParallax, { passive: true });
+        window.addEventListener('resize', requestHeroParallax, { passive: true });
       }
     })();
   </script>
@@ -454,5 +603,6 @@
       s0.parentNode.insertBefore(s1, s0);
     }, 6000);
   </script>
+  <script src="/scripts/shared/home-bullion-widget.js" defer></script>
 </body>
 </html>

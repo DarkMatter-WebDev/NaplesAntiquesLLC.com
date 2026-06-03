@@ -27,8 +27,9 @@
   inventory is ready.
 - Consider real checkout/payments (e.g. Stripe) vs. current contact-to-buy flow.
 - Add basic analytics (e.g. Plausible / GA4) if not already present.
-- Add automated checks for `shop-products.js` data integrity and pricing math
-  (extend `scripts/shop/test-shop-pricing.js`).
+- Extend pricing test (`scripts/shop/test-shop-pricing.js`) with explicit
+  expected-value assertions per product (catalog-schema + parity checks now live
+  in `tools/check-integrity.mjs` — see Completed).
 - Confirm whether a self-hosted metal-price API key/rate limit is needed for
   production traffic (currently using public `gold-api.com`).
 
@@ -38,6 +39,11 @@
 
 ## Completed
 
+- **Build-structure / integrity guardrails** (2026-06-02): added permanent docs
+  `STRUCTURE.md`, `INTEGRITY.md`, `features/shop-listings.md`, and a
+  dependency-free `tools/check-integrity.mjs` validator (catalog schema, unique
+  ids, image existence, EN↔ES shop + page parity, root-absolute Spanish paths).
+  Passes against the live repo. Linked from `AGENTS.md` + `README.md`.
 - **Full Spanish (EN/ES) site** (2026-06-01): created `/es/` twins for all 18 pages
   (marketing + shop/product/cart/account/dashboard/member-access), added reciprocal
   hreflang across all pages + `sitemap.xml`, and a site-wide EN/ES header toggle.

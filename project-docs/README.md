@@ -12,6 +12,8 @@ implementation, not an optional extra.
 | `PROJECT_OVERVIEW.md` | **Read first.** Purpose, business goals, audience, tech stack, deployment. |
 | `CURRENT_STATUS.md` | Present state: what works, recent work, priorities, blockers, next steps. |
 | `ARCHITECTURE.md` | System design, folder structure, DB schema, integrations, auth, hosting. |
+| `STRUCTURE.md` | Canonical repo map + structural **invariants** that keep the site consistent. |
+| `INTEGRITY.md` | Integrity rules + pre-publish checklist (enforced by `tools/check-integrity.mjs`). |
 | `DECISIONS.md` | Dated log of important technical/design/business decisions + rationale. |
 | `TASKS.md` | Backlog / In Progress / Completed task tracking. |
 | `CHANGELOG.md` | Dated log of meaningful changes. |
@@ -46,5 +48,7 @@ Before ending a work session, never leave project state undocumented:
   ones.
 - If unsure whether something matters, document it.
 - Write for both humans and AI agents.
+- After any listing/structural/script change, run the guardrail
+  `node tools/check-integrity.mjs` (no install needed) — see `INTEGRITY.md`.
 - **Never commit secrets.** In `CLIENTS.md`, record only where credentials live,
   never the credentials themselves. (`.env` / `.env.local` are gitignored.)

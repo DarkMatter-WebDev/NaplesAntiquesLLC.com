@@ -74,15 +74,6 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://naplesantiquesllc.com/silver-services.html" />
   </url>
   <url>
-    <loc>https://naplesantiquesllc.com/process.html</loc>
-    <lastmod>2026-06-01</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.9</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://naplesantiquesllc.com/process.html" />
-    <xhtml:link rel="alternate" hreflang="es" href="https://naplesantiquesllc.com/es/process.html" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://naplesantiquesllc.com/process.html" />
-  </url>
-  <url>
     <loc>https://naplesantiquesllc.com/bullion.html</loc>
     <lastmod>2026-06-01</lastmod>
     <changefreq>daily</changefreq>
@@ -99,6 +90,15 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://naplesantiquesllc.com/estate-services.html" />
     <xhtml:link rel="alternate" hreflang="es" href="https://naplesantiquesllc.com/es/estate-services.html" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://naplesantiquesllc.com/estate-services.html" />
+  </url>
+  <url>
+    <loc>https://naplesantiquesllc.com/free-evaluation.html</loc>
+    <lastmod>2026-06-02</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://naplesantiquesllc.com/free-evaluation.html" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://naplesantiquesllc.com/es/free-evaluation.html" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://naplesantiquesllc.com/free-evaluation.html" />
   </url>
   <url>
     <loc>https://naplesantiquesllc.com/faq.html</loc>
@@ -192,15 +192,6 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://naplesantiquesllc.com/silver-services.html" />
   </url>
   <url>
-    <loc>https://naplesantiquesllc.com/es/process.html</loc>
-    <lastmod>2026-06-01</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://naplesantiquesllc.com/process.html" />
-    <xhtml:link rel="alternate" hreflang="es" href="https://naplesantiquesllc.com/es/process.html" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://naplesantiquesllc.com/process.html" />
-  </url>
-  <url>
     <loc>https://naplesantiquesllc.com/es/bullion.html</loc>
     <lastmod>2026-06-01</lastmod>
     <changefreq>daily</changefreq>
@@ -217,6 +208,15 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://naplesantiquesllc.com/estate-services.html" />
     <xhtml:link rel="alternate" hreflang="es" href="https://naplesantiquesllc.com/es/estate-services.html" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://naplesantiquesllc.com/estate-services.html" />
+  </url>
+  <url>
+    <loc>https://naplesantiquesllc.com/es/free-evaluation.html</loc>
+    <lastmod>2026-06-02</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://naplesantiquesllc.com/free-evaluation.html" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://naplesantiquesllc.com/es/free-evaluation.html" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://naplesantiquesllc.com/free-evaluation.html" />
   </url>
   <url>
     <loc>https://naplesantiquesllc.com/es/faq.html</loc>

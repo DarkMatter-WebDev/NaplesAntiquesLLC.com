@@ -1,6 +1,10 @@
 [build]
   publish = "."
   functions = "netlify/functions"
+  # Build-integrity guardrail: validates the product catalog, EN<->ES shop/page
+  # parity, image existence, and root-absolute Spanish paths. Pure Node (no npm
+  # install). A non-zero exit fails the deploy. See project-docs/INTEGRITY.md.
+  command = "node tools/check-integrity.mjs"
 
 [functions]
   node_bundler = "esbuild"
@@ -30,12 +34,22 @@
 
 [[redirects]]
   from = "/logo.png"
-  to = "/assets/images/branding/logo.png"
+  to = "/assets/images/branding/logo.webp"
   status = 301
 
 [[redirects]]
   from = "/logo2.png"
-  to = "/assets/images/branding/logo2.png"
+  to = "/assets/images/branding/logo2.webp"
+  status = 301
+
+[[redirects]]
+  from = "/process.html"
+  to = "/free-evaluation.html"
+  status = 301
+
+[[redirects]]
+  from = "/es/process.html"
+  to = "/es/free-evaluation.html"
   status = 301
 
 [[redirects]]
@@ -45,52 +59,52 @@
 
 [[redirects]]
   from = "/about-if-we-had-a-store.png"
-  to = "/assets/images/pages/about-if-we-had-a-store.png"
+  to = "/assets/images/pages/about-if-we-had-a-store.webp"
   status = 301
 
 [[redirects]]
   from = "/antiques.jpeg"
-  to = "/assets/images/pages/antiques.jpeg"
+  to = "/assets/images/pages/antiques.webp"
   status = 301
 
 [[redirects]]
   from = "/bullion.jpg"
-  to = "/assets/images/pages/bullion.jpg"
+  to = "/assets/images/pages/bullion.webp"
   status = 301
 
 [[redirects]]
   from = "/chris.png"
-  to = "/assets/images/pages/chris.png"
+  to = "/assets/images/pages/chris.webp"
   status = 301
 
 [[redirects]]
   from = "/gold.jpg"
-  to = "/assets/images/pages/gold.jpg"
+  to = "/assets/images/pages/gold.webp"
   status = 301
 
 [[redirects]]
   from = "/homepage-hero-bangles.png"
-  to = "/assets/images/pages/homepage-hero-bangles.png"
+  to = "/assets/images/pages/homepage-hero-bangles.webp"
   status = 301
 
 [[redirects]]
   from = "/jeweler.jpg"
-  to = "/assets/images/pages/jeweler.jpg"
+  to = "/assets/images/pages/jeweler.webp"
   status = 301
 
 [[redirects]]
   from = "/money.jpg"
-  to = "/assets/images/pages/money.jpg"
+  to = "/assets/images/pages/money.webp"
   status = 301
 
 [[redirects]]
   from = "/patek.jpg"
-  to = "/assets/images/pages/patek.jpg"
+  to = "/assets/images/pages/patek.webp"
   status = 301
 
 [[redirects]]
   from = "/pen.png"
-  to = "/assets/images/pages/pen.png"
+  to = "/assets/images/pages/pen.webp"
   status = 301
 
 [[redirects]]
@@ -100,17 +114,17 @@
 
 [[redirects]]
   from = "/signed.jpg"
-  to = "/assets/images/pages/signed.jpg"
+  to = "/assets/images/pages/signed.webp"
+  status = 301
+
+[[redirects]]
+  from = "/trust.jpg"
+  to = "/assets/images/pages/trust.webp"
   status = 301
 
 [[redirects]]
   from = "/silver.jpg"
   to = "/assets/images/pages/silver.jpg"
-  status = 301
-
-[[redirects]]
-  from = "/trust.jpg"
-  to = "/assets/images/pages/trust.jpg"
   status = 301
 
 [[redirects]]

@@ -100,14 +100,31 @@
     });
   });
 
+  var viewLabel = ES ? 'Ver artículo' : 'View listing';
+  var addLabel = ES ? 'Agregar al Carrito' : 'Add to Cart';
+  var inCartLabel = ES ? 'En el Carrito' : 'In Cart';
+  var addAria = ES ? 'Agregar artículo al carrito' : 'Add item to cart';
+  var removeAria = ES ? 'Quitar artículo del carrito' : 'Remove item from cart';
+
+  function cartHas(id) {
+    if (!window.ShopCart) return false;
+    if (typeof window.ShopCart.has === 'function') return window.ShopCart.has(id);
+    if (typeof window.ShopCart.read === 'function') return window.ShopCart.read().indexOf(id) !== -1;
+    return false;
+  }
+
+  function syncCartBtn(btn, itemId) {
+    var inCart = cartHas(itemId);
+    btn.classList.toggle('is-in-cart', inCart);
+    btn.setAttribute('aria-pressed', inCart ? 'true' : 'false');
+    btn.setAttribute('aria-label', inCart ? removeAria : addAria);
+    btn.querySelector('.shop-media-cart-label').textContent = inCart ? inCartLabel : addLabel;
+  }
+
   cards.forEach(function (card) {
     var media = card.querySelector('.shop-product-media');
     if (!media) return;
     var itemId = card.getAttribute('data-shop-item') || '';
-
-    var viewLabel = ES ? 'Ver artículo' : 'View listing';
-    var addLabel = ES ? 'Agregar al Carrito' : 'Add to Cart';
-    var addedLabel = ES ? 'Agregado' : 'Added';
 
     card.setAttribute('role', 'link');
     card.setAttribute('tabindex', '0');
@@ -119,20 +136,27 @@
       var cartBtn = document.createElement('button');
       cartBtn.type = 'button';
       cartBtn.className = 'shop-media-cart-btn';
-      cartBtn.textContent = addLabel;
-      cartBtn.setAttribute('aria-label', ES ? 'Agregar artículo al carrito' : 'Add item to cart');
+      var icon = document.createElement('span');
+      icon.className = 'shop-media-cart-check material-symbols-outlined';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = 'check';
+      var label = document.createElement('span');
+      label.className = 'shop-media-cart-label';
+      cartBtn.appendChild(icon);
+      cartBtn.appendChild(label);
       cartBtn.addEventListener('click', function (event) {
         event.preventDefault();
         event.stopPropagation();
-        if (window.ShopCart) {
+        if (!window.ShopCart) return;
+        if (cartHas(itemId)) {
+          window.ShopCart.remove(itemId);
+        } else {
           window.ShopCart.add(itemId);
-          cartBtn.textContent = addedLabel;
-          setTimeout(function () {
-            cartBtn.textContent = addLabel;
-          }, 1400);
         }
+        syncCartBtn(cartBtn, itemId);
       });
       media.appendChild(cartBtn);
+      syncCartBtn(cartBtn, itemId);
     }
 
     card.addEventListener('click', function (event) {
@@ -145,6 +169,13 @@
         event.preventDefault();
         window.location.href = listingUrl(card);
       }
+    });
+  });
+
+  window.addEventListener('shopcart:updated', function () {
+    cards.forEach(function (card) {
+      var btn = card.querySelector('.shop-media-cart-btn');
+      if (btn) syncCartBtn(btn, card.getAttribute('data-shop-item') || '');
     });
   });
 

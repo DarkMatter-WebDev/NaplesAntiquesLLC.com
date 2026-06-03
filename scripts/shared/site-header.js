@@ -3,12 +3,13 @@
   var menu = document.getElementById("mobile-menu");
   var icon = document.getElementById("mobile-menu-icon");
   var currentPage = (window.location.pathname.split("/").pop() || "index.html").toLowerCase();
+  if (!currentPage || currentPage === "es") {
+    currentPage = "index.html";
+  }
   var activePage = currentPage;
   var ES = (document.documentElement.getAttribute("lang") || "").toLowerCase().indexOf("es") === 0;
 
-  document.querySelectorAll(".site-header-actions .header-cta-call").forEach(function (link) {
-    link.remove();
-  });
+  var navPrefix = ES ? "/es/" : "";
 
   if (currentPage === "product.html") {
     activePage = "shop.html";
@@ -67,14 +68,10 @@
     var accountLabel = ES ? "Mi Cuenta" : "My Account";
     var cartLabel = ES ? "Carrito" : "Cart";
 
-    appendDesktopLink(desktopNav, "account.html", accountLabel);
-    appendDesktopLink(desktopNav, "cart.html", cartLabel, cartCount);
-    if (desktopNav) {
-      var desktopCart = desktopNav.querySelector('a[href="cart.html"]');
-      if (desktopCart) desktopNav.appendChild(desktopCart);
-    }
-    appendMobileLink(mobileInner, "cart.html", cartLabel, cartCount);
-    appendMobileLink(mobileInner, "account.html", accountLabel);
+    appendDesktopLink(desktopNav, navPrefix + "account.html", accountLabel);
+    appendDesktopLink(desktopNav, navPrefix + "cart.html", cartLabel, cartCount);
+    appendMobileLink(mobileInner, navPrefix + "cart.html", cartLabel, cartCount);
+    appendMobileLink(mobileInner, navPrefix + "account.html", accountLabel);
     updateHeaderCartCounts();
   }
 

@@ -21,15 +21,15 @@
   <meta property="og:site_name" content="Naples Estate Jewelry" />
   <meta property="og:title" content="Shop | Curated Estate Jewelry, Watches &amp; Antiques | Naples FL" />
   <meta property="og:description" content="Browse curated estate jewelry, luxury watches, sterling silver, and antiques. Limited inventory ? inquire or purchase by appointment in Southwest Florida." />
-  <meta property="og:image" content="https://naplesantiquesllc.com/assets/images/branding/logo.png" />
+  <meta property="og:image" content="https://naplesantiquesllc.com/assets/images/branding/logo.webp" />
   <meta property="og:url" content="https://naplesantiquesllc.com/shop.html" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Shop | Curated Estate Jewelry, Watches &amp; Antiques | Naples FL" />
   <meta name="twitter:description" content="Browse curated estate jewelry, luxury watches, sterling silver, and antiques. Limited inventory ? inquire or purchase by appointment." />
-  <meta name="twitter:image" content="https://naplesantiquesllc.com/assets/images/branding/logo.png" />
+  <meta name="twitter:image" content="https://naplesantiquesllc.com/assets/images/branding/logo.webp" />
 
-  <link rel="icon" type="image/png" href="assets/images/branding/logo2.png" />
-  <link rel="apple-touch-icon" href="assets/images/branding/logo2.png" />
+  <link rel="icon" type="image/png" href="assets/images/branding/logo2.webp" />
+  <link rel="apple-touch-icon" href="assets/images/branding/logo2.webp" />
   <meta name="theme-color" content="#f9f9f9" />
 
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
@@ -37,8 +37,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
   <script src="scripts/shared/editorial-tailwind-config.js"></script>
   <link href="editorial-base.css" rel="stylesheet" />
-  <link href="editorial-theme.css?v=lang-switcher-20260601" rel="stylesheet" />
-  <script src="scripts/shared/site-header.js?v=lang-switcher-20260601" defer></script>
+  <link href="editorial-theme.css?v=header-sync-20260602" rel="stylesheet" />
+  <script src="scripts/shared/site-header.js?v=header-sync-20260603" defer></script>
   <style>
     html { scroll-behavior: smooth; }
     body { cursor: auto; overflow-x: hidden; }
@@ -46,14 +46,24 @@
     .gold-button { background: linear-gradient(135deg, #f2ca50 0%, #d4af37 100%); }
     .shop-product-grid {
       display: grid;
-      grid-template-columns: 1fr;
-      gap: 1.25rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.7rem;
     }
-    @media (min-width: 640px) {
-      .shop-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (min-width: 768px) {
+      .shop-product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
     }
-    @media (min-width: 1024px) {
-      .shop-product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; }
+    @media (min-width: 1280px) {
+      .shop-product-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.5rem; }
+    }
+    @media (max-width: 767px) {
+      .shop-product-card .shop-product-body { padding: 0.75rem 0.75rem 0.9rem; }
+      .shop-product-card .shop-product-body h3 { font-size: 0.86rem; line-height: 1.2; margin-top: 0.3rem; }
+      .shop-product-card .shop-product-body > span:first-child { font-size: 0.54rem; letter-spacing: 0.16em; }
+      .shop-product-card .shop-inquire-fallback { gap: 0.45rem !important; margin-top: 0.6rem !important; }
+      .shop-product-card .shop-inquire-fallback a { font-size: 0.62rem !important; min-height: 2.1rem; }
+      .shop-product-card .shop-inquire-fallback a:first-child { padding: 0.5rem 0.7rem !important; flex: 1 1 auto; text-align: center; }
+      .shop-media-cart-btn { right: 0.45rem; bottom: 0.45rem; padding: 0.46rem 0.56rem; font-size: 0.55rem; gap: 0.2rem; }
+      .shop-status-badge { top: 0.45rem; left: 0.45rem; font-size: 0.5rem; padding: 0.26rem 0.45rem; letter-spacing: 0.14em; }
     }
     .shop-product-card {
       display: flex;
@@ -85,9 +95,12 @@
       right: 0.75rem;
       bottom: 0.75rem;
       z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.28rem;
       background: linear-gradient(135deg, #f2ca50 0%, #d4af37 100%);
       color: #161616;
-      border: 0;
+      border: 1px solid transparent;
       border-radius: 2px;
       padding: 0.65rem 0.8rem;
       font-size: 0.64rem;
@@ -96,11 +109,26 @@
       text-transform: uppercase;
       cursor: pointer;
       box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+      transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
     }
     .shop-media-cart-btn:hover,
     .shop-media-cart-btn:focus-visible {
       transform: translateY(-1px);
       outline: none;
+    }
+    .shop-media-cart-btn .shop-media-cart-check {
+      display: none;
+      font-size: 0.95rem;
+      line-height: 1;
+      font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 20;
+    }
+    .shop-media-cart-btn.is-in-cart {
+      background: rgba(18, 19, 18, 0.92);
+      color: #f2ca50;
+      border-color: rgba(242, 202, 80, 0.75);
+    }
+    .shop-media-cart-btn.is-in-cart .shop-media-cart-check {
+      display: inline-block;
     }
     .shop-product-card .shop-product-body {
       flex: 1;
@@ -110,15 +138,67 @@
     }
     .shop-product-card .shop-product-body h3 {
       color: #f6f1e8 !important;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      overflow: hidden;
+      line-height: 1.2;
+      min-height: 2.4em;
+      flex-shrink: 0;
     }
     .shop-product-card .shop-product-body p {
       color: #d8d2c7 !important;
+    }
+    .shop-product-card .shop-product-body p.flex-1 { display: none; }
+    .shop-product-card .shop-product-body [data-shop-price] { margin-top: auto; padding-top: 0.65rem; font-size: 0.85rem !important; }
+    .shop-product-card .shop-product-body [data-shop-price-context] { font-size: 0.62rem !important; }
+    .shop-product-card .shop-product-body [data-shop-price]::before {
+      content: "Your price";
+      display: block;
+      color: #b9b3a8;
+      font-size: 0.5rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 0.2rem;
     }
     .shop-product-card .shop-product-body > span:first-child {
       color: #f2ca50 !important;
     }
     .shop-product-card .shop-product-body .text-primary {
       color: #f2ca50 !important;
+    }
+    .shop-product-card .shop-product-body .shop-trade-in-box {
+      margin-top: 0.6rem;
+      border: 1px solid rgba(242, 202, 80, 0.34);
+      background: rgba(242, 202, 80, 0.07);
+      border-radius: 3px;
+      padding: 0.42rem 0.55rem;
+      font-size: 0.66rem;
+      line-height: 1.3;
+      letter-spacing: 0.01em;
+      color: #e7c873;
+    }
+    .shop-product-card .shop-product-body .shop-trade-in-box .shop-trade-in-label {
+      display: block;
+      font-size: 0.5rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #f2ca50;
+      margin-bottom: 0.14rem;
+    }
+    .shop-product-card .shop-product-body .shop-trade-in-box strong {
+      color: #f6e2a6;
+      font-weight: 700;
+    }
+    .shop-product-card .shop-product-body .shop-trade-in-box .shop-trade-in-note {
+      color: #b9a978;
+    }
+    @media (max-width: 767px) {
+      .shop-product-card .shop-product-body .shop-trade-in-box { font-size: 0.6rem; padding: 0.36rem 0.46rem; margin-top: 0.5rem; }
+      .shop-product-card .shop-product-body .shop-trade-in-box .shop-trade-in-label { font-size: 0.46rem; letter-spacing: 0.13em; }
     }
     .shop-product-card .shop-inquire-fallback {
       align-items: center;
@@ -428,10 +508,10 @@
 </head>
 
 <body class="font-body-md text-body-md bg-background overflow-x-hidden">
-  <header class="site-header site-header--light fixed top-0 w-full z-50 bg-[#f9f9f7]/95 border-b border-[#d8d0c2]">
+          <header class="site-header site-header--light fixed top-0 w-full z-50 bg-[#f9f9f7]/95 border-b border-[#d8d0c2]">
   <div class="site-header-bar flex items-center justify-between gap-3 px-4 md:px-8 py-4 md:py-5 w-full max-w-[1440px] mx-auto">
     <a href="index.html" class="site-brand-link flex items-center gap-3 min-w-0">
-      <img src="assets/images/branding/logo.png" alt="Naples Estate Jewelry Logo" class="site-brand-logo h-10 w-auto object-contain flex-shrink-0" />
+      <img src="assets/images/branding/logo.webp" alt="Naples Estate Jewelry Logo" class="site-brand-logo h-10 w-auto object-contain flex-shrink-0" />
       <span class="site-brand-text font-display-lg-mobile text-[18px] md:text-[23px] tracking-normal text-[#735c00] uppercase">
         <span class="site-brand-short">Naples Estate Jewelry</span>
         <span class="site-brand-full">Naples Estate Jewelry</span>
@@ -439,33 +519,17 @@
     </a>
     <nav class="site-header-nav hidden 2xl:flex items-center gap-5">
       <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="index.html">Home</a>
-      <a class="text-[#5e5e5d] hover:text-[#735c00] border-b border-[#735c00]/40 font-label-md text-label-md transition-colors px-1 py-2" href="shop.html">Shop</a>
-      <div class="nav-buy-group"><a class="text-[#5e5e5d] hover:text-[#735c00] border-b border-[#735c00]/40 font-label-md text-label-md transition-colors px-1 py-2" href="what-we-buy.html">Sell To Us</a><div class="nav-buy-panel"><a href="estate-jewelry.html">Estate Jewelry</a><a href="gold-services.html">Gold Services</a><a href="silver-services.html">Silver Services</a><a href="bullion.html">Bullion</a></div></div>
+      <a class="text-[#735c00] border-b border-[#735c00]/40 font-label-md text-label-md transition-colors px-1 py-2" href="shop.html">Shop</a>
+      <div class="nav-buy-group"><a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="what-we-buy.html">Sell To Us</a><div class="nav-buy-panel"><a href="estate-jewelry.html">Estate Jewelry</a><a href="gold-services.html">Gold Services</a><a href="silver-services.html">Silver Services</a><a href="bullion.html">Bullion</a></div></div>
       <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="about.html">About Us</a>
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="process.html">Process</a>
-      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="estate-services.html">Estate Services</a>
+      <div class="nav-buy-group"><a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="free-evaluation.html">Services</a><div class="nav-buy-panel"><a href="free-evaluation.html">Free Evaluation</a><a href="estate-services.html">Estate Services</a></div></div>
       <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="contact.html">Contact</a>
-      
+      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="account.html">My Account</a>
+      <a class="text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2" href="cart.html">Cart (<span data-header-cart-count>0</span>)</a>
     </nav>
-    <div class="site-header-actions flex items-center gap-3"><a href="tel:2394048505" class="header-cta-call editorial-call-button hidden 2xl:inline-flex px-5 py-2 font-label-md text-label-md uppercase tracking-widest transition-colors">Call Now</a><button id="mobile-menu-toggle" type="button" aria-expanded="false" aria-label="Open menu" class="site-menu-toggle 2xl:hidden border border-[#735c00]/50 text-[#735c00] px-3 py-2 font-label-md text-label-md uppercase tracking-widest"><span class="menu-toggle-label" id="mobile-menu-icon">Menu</span></button></div>
+    <div class="site-header-actions flex items-center gap-3"><span data-lang-toggle="" class="lang-toggle inline-flex items-center gap-1 font-label-md text-label-md uppercase tracking-widest px-2 py-2" aria-label="Switch language"><span class="material-symbols-outlined" style="font-size:18px;line-height:1;" aria-hidden="true">language</span><a class="lang-opt is-current" href="/shop.html" title="View this page in English" aria-current="true">EN</a><span class="lang-sep" aria-hidden="true">/</span><a class="lang-opt" href="/es/shop.html" title="Ver esta página en español">ES</a></span><a href="tel:2394048505" class="header-cta-call editorial-call-button hidden 2xl:inline-flex px-5 py-2 font-label-md text-label-md uppercase tracking-widest transition-colors">Call Now</a><button id="mobile-menu-toggle" type="button" aria-expanded="false" aria-label="Open menu" class="site-menu-toggle 2xl:hidden border border-[#735c00]/50 text-[#735c00] px-3 py-2 font-label-md text-label-md uppercase tracking-widest"><span class="menu-toggle-label" id="mobile-menu-icon">Menu</span></button></div>
   </div>
-  <div id="mobile-menu" class="hidden 2xl:hidden border-t border-[#d8d0c2] bg-[#f9f9f7]/98"><div class="flex flex-col px-5 py-4"><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="index.html">Home</a><a class="text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="shop.html">Shop</a><a class="text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="what-we-buy.html">Sell To Us</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="about.html">About Us</a><a class="mobile-subitem" href="estate-jewelry.html">Estate Jewelry</a><a class="mobile-subitem" href="gold-services.html">Gold Services</a><a class="mobile-subitem" href="silver-services.html">Silver Services</a><a class="mobile-subitem" href="bullion.html">Bullion</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="process.html">Process</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="estate-services.html">Estate Services</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="contact.html">Contact</a></div></div>
+  <div id="mobile-menu" class="hidden 2xl:hidden border-t border-[#d8d0c2] bg-[#f9f9f7]/98"><div class="flex flex-col px-5 py-4"><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="index.html">Home</a><a class="text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="shop.html">Shop</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="what-we-buy.html">Sell To Us</a><a class="mobile-subitem" href="estate-jewelry.html">Estate Jewelry</a><a class="mobile-subitem" href="gold-services.html">Gold Services</a><a class="mobile-subitem" href="silver-services.html">Silver Services</a><a class="mobile-subitem" href="bullion.html">Bullion</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="about.html">About Us</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="free-evaluation.html">Services</a><a class="mobile-subitem" href="free-evaluation.html">Free Evaluation</a><a class="mobile-subitem" href="estate-services.html">Estate Services</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="contact.html">Contact</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="index.html#newsletter">Subscribe to The List</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="index.html#appointment">Request a Call</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="cart.html">Cart (<span data-header-cart-count>0</span>)</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="account.html">My Account</a><a data-lang-toggle-mobile="" href="/es/shop.html" class="text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]">Español</a></div></div>
 </header>
 
 <main class="pt-16">
@@ -486,13 +550,13 @@
         </div>
 
         <section class="shop-transparency-note" aria-labelledby="shop-transparency-heading">
-          <p class="shop-transparency-eyebrow">A new way to buy jewelry</p>
-          <h2 id="shop-transparency-heading" class="shop-transparency-title">Transparent pricing, live while you browse.</h2>
-          <p class="shop-transparency-copy">Every gold listing shows the live spot-based math behind the price, including the exact gold scrap value and the multiplier used for the piece. You can browse with the market in front of you, not behind a mystery price tag.</p>
+          <p class="shop-transparency-eyebrow">A smarter way to own gold</p>
+          <h2 id="shop-transparency-heading" class="shop-transparency-title">Don&rsquo;t just buy. Invest.</h2>
+          <p class="shop-transparency-copy">Every piece is priced live against the gold spot market, with the exact gold scrap value shown right next to your price. You&rsquo;re not just buying jewelry &mdash; you&rsquo;re putting your money into real, wearable gold at a value you can verify.</p>
           <div class="shop-transparency-points" aria-label="Transparent buying details">
             <p class="shop-transparency-point"><strong>Live spot prices</strong>Gold values update as you shop, using the same market data that powers each listing.</p>
-            <p class="shop-transparency-point"><strong>Clear markup</strong>Listings show the spot multiplier so you can see how the asking price is calculated.</p>
-            <p class="shop-transparency-point"><strong>Real gold value</strong>Product pages display the exact scrap value alongside the retail price.</p>
+            <p class="shop-transparency-point"><strong>Scrap and price</strong>Each listing shows the exact gold scrap value next to your price &mdash; nothing hidden.</p>
+            <p class="shop-transparency-point"><strong>On every product page</strong>See the spot multiplier behind the price, plus a special trade-in offer for your own gold.</p>
           </div>
         </section>
 
@@ -575,7 +639,7 @@
               <h3 class="text-on-surface font-headline text-xl font-bold mt-2">18K Gold Rectangular Anchor Link Chain Necklace</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">18K yellow gold rectangular anchor-style link chain necklace, 27.5 inches long, 2.2mm wide, with a secure hook-and-loop clasp stamped 750.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$1,729.62</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.25x spot multiplier</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
               <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-18k-rectangular-anchor-link-chain-necklace-01" aria-label="Shopify buy button embed for 18K rectangular anchor link chain necklace listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
@@ -594,7 +658,7 @@
               <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Heavy Solid 14K Gold Diamond Cut Cuban Link Chain Necklace</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Heavy solid 14K yellow gold diamond cut Cuban link chain necklace, 24 inches long, approximately 4.7mm wide, with tight construction and 27.8 gram weight.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,945.46</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.25x spot multiplier</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
               <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-14k-heavy-diamond-cut-cuban-link-chain-necklace-01" aria-label="Shopify buy button embed for heavy 14K diamond cut Cuban link chain necklace listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
@@ -613,7 +677,7 @@
               <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Vintage 14K Gold Diamond Cut Figaro Link Chain Necklace</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Vintage solid 14K yellow gold diamond cut Figaro link chain necklace, 22 inches long, approximately 6mm wide, with lobster clasp and 23.33 gram weight.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,469.89</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.25x spot multiplier</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
               <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-14k-vintage-diamond-cut-figaro-chain-necklace-01" aria-label="Shopify buy button embed for 14K gold diamond cut Figaro link chain necklace listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
@@ -632,7 +696,7 @@
               <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Vintage Italian 18K Gold Anchor Link Infinity Chain Necklace</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Vintage Italian 18K yellow gold continuous anchor link, or Gucci-style, infinity chain necklace with no clasp, 24 inch length, 4mm width, and 23.8 gram weight.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$3,891.15</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.5x spot multiplier</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
               <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-18k-italian-anchor-link-infinity-chain-necklace-01" aria-label="Shopify buy button embed for Italian 18K anchor link infinity chain necklace listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
@@ -651,7 +715,7 @@
               <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Monaco Chain Edge 10K Gold Diamond Accent Cuban Link Necklace</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Monaco Chain Edge 10K yellow gold geometric Cuban link necklace with semi-hollow 9mm links, 25.5 inch length, 29.4 gram weight, and a pav� diamond-accented black enamel logo clasp.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,225.33</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.25x spot multiplier</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
               <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-10k-monaco-edge-cuban-link-chain-necklace-01" aria-label="Shopify buy button embed for Monaco Chain Edge 10K gold Cuban link necklace listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
@@ -670,7 +734,7 @@
               <h3 class="text-on-surface font-headline text-xl font-bold mt-2">10K Gold 5mm Hollow Cuban Link Chain Necklace</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">10K yellow gold hollow-link / semi-solid Cuban link chain necklace, 26 inches long, approximately 5mm wide, with box clasp, double safety, and 13.27 gram weight.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$1,003.38</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.25x spot multiplier</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
               <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-10k-hollow-cuban-link-chain-necklace-01" aria-label="Shopify buy button embed for 10K gold hollow Cuban link chain necklace listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
@@ -689,7 +753,7 @@
               <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Vintage 14K Gold Oval Link Chain Necklace</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Vintage 14K yellow gold oval chain-link necklace, 23 inches long, approximately 4.3mm wide, with a barrel clasp marked 14K on the tongue and 22.23 gram weight.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,360.88</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.25x spot multiplier</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
               <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-14k-oval-link-chain-necklace-01" aria-label="Shopify buy button embed for 14K gold oval link chain necklace listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
@@ -708,7 +772,7 @@
               <h3 class="text-on-surface font-headline text-xl font-bold mt-2">10K Gold Miami Cuban Link Chain Necklace</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Substantial solid 10K gold Miami Cuban link chain with box clasp, measuring 24 inches long, approximately 9mm wide, and weighing 119.41 grams.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$10,795</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.25x spot multiplier</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
               <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-10k-cuban-link-chain-01" aria-label="Shopify buy button embed for 10K Miami Cuban link chain listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
@@ -727,7 +791,7 @@
               <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Vintage 14K Gold 7.5mm Infinity Rope Chain Necklace</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Vintage 14K yellow gold claspless rope chain necklace, 30 inches long, approximately 7.5mm wide, semi-hollow and sturdy, weighing 55.9 grams.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$5,950</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.25x spot multiplier</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
               <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-14k-infinity-rope-chain-necklace-01" aria-label="Shopify buy button embed for 14K gold infinity rope chain necklace listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
@@ -746,7 +810,7 @@
               <h3 class="text-on-surface font-headline text-xl font-bold mt-2">10K Gold Semi-Solid Cuban Link Chain Necklace</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">10K yellow gold hollow-link / semi-solid Cuban link chain necklace, 24.5 inches long, approximately 6.3mm wide, with a box clasp and double safety marked 10K, and 26 gram weight.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,394.56</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.25x spot multiplier</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
               <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-10k-semi-solid-cuban-link-6mm-chain-necklace-01" aria-label="Shopify buy button embed for 10K semi-solid Cuban link chain necklace listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
@@ -765,7 +829,7 @@
               <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Solid 14K Gold Byzantine Link Chain Necklace</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Solid 14K gold Byzantine (fancy) link chain necklace, 21.5 inches long, approximately 4.3mm wide, weighing 31.28 grams, with a barrel clasp marked 14K on the tongue.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$4,033.18</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.25x spot multiplier</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
               <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-14k-byzantine-link-chain-necklace-01" aria-label="Shopify buy button embed for 14K Byzantine link chain necklace listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
@@ -784,7 +848,7 @@
               <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Italian 14K Two-Tone Cuban Link & Ring Station Necklace</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Italian 14K two-tone gold necklace pairing yellow-gold Cuban link sections with white-gold ribbed bars and twisted-gold double ring stations — 30 inches long (~5.5mm chain / ~13mm connectors), 44.72 grams, lobster clasp, marked 14K Italy.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$5,766.10</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.25x spot multiplier</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
               <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-new-listing-01" aria-label="Shopify buy button embed for Italian 14K Two-Tone Cuban Link & Ring Station Necklace listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
@@ -803,7 +867,7 @@
               <h3 class="text-on-surface font-headline text-xl font-bold mt-2">14K Gold Round Box Link Chain Necklace</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">14K yellow gold round box / rolo link chain necklace, 24 inches long, approximately 3mm wide, 14.34 grams, with a lobster clasp marked LXG 14K.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,218.76</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.5x spot multiplier</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
               <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-new-listing-02" aria-label="Shopify buy button embed for 14K Gold Round Box Link Chain Necklace listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
@@ -815,15 +879,15 @@
           <article class="shop-product-card group" data-shop-item="new-listing-03" data-filter-metal="gold" data-filter-purity="10k" data-filter-chain-type="cuban-link" data-filter-length="22" data-category="gold" data-tags="10k yellow gold gold necklace monaco chain cuban link hollow link semi solid pave diamond clasp diamond clasp box clasp 12.45 grams 5mm 20.5 inch modern estate jewelry" data-search="10k yellow gold hollow link semi solid monaco cuban link chain necklace pave diamond box clasp 20.5 inches long 5mm width 12.45 grams modern $1146.63 price">
             <div class="shop-product-media">
               <span class="shop-status-badge">Available</span>
-              <img alt="10K yellow gold Monaco Cuban link necklace with pave diamond clasp" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="assets/images/shop/shop-new-listing-03-01.png" />
+              <img alt="10K yellow gold Monaco Cuban link necklace" loading="lazy" class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700" src="assets/images/shop/shop-new-listing-03-01.png" />
             </div>
             <div class="shop-product-body">
               <span class="text-primary text-[0.68rem] uppercase tracking-[0.28em] font-label">Gold</span>
-              <h3 class="text-on-surface font-headline text-xl font-bold mt-2">10K Gold Monaco Cuban Link Necklace with Pavé Diamond Clasp</h3>
+              <h3 class="shop-card-title text-on-surface font-headline text-xl font-bold mt-2">10K Gold Monaco Cuban Link Necklace</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">10K yellow gold hollow-link / semi-solid Monaco Cuban link necklace with a pavé diamond-set low-profile box clasp, 20.5 inches long, approximately 5mm wide, 12.45 grams.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$1,146.63</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.25x spot multiplier</p>
-              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-new-listing-03" aria-label="Shopify buy button embed for 10K Gold Monaco Cuban Link Necklace with Pavé Diamond Clasp listing"></div>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
+              <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-new-listing-03" aria-label="Shopify buy button embed for 10K Gold Monaco Cuban Link Necklace listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
                 <a href="tel:2394048505" class="inline-block text-on-surface-variant hover:text-primary font-label text-xs uppercase tracking-widest transition-colors">Call</a>
@@ -841,7 +905,7 @@
               <h3 class="text-on-surface font-headline text-xl font-bold mt-2">14K Gold Rope Chain Necklace</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">14K yellow gold rope chain necklace, 25 inches long, approximately 2.5mm wide, 12.48 grams, with a lobster clasp and 14K-marked end links.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$1,609.14</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.25x spot multiplier</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
               <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-new-listing-04" aria-label="Shopify buy button embed for 14K Gold Rope Chain Necklace listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
@@ -860,7 +924,7 @@
               <h3 class="text-on-surface font-headline text-xl font-bold mt-2">10K Gold Rope Chain Necklace</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">10K yellow gold rope chain necklace, 25 inches long, approximately 2.6mm wide, 15.19 grams, with a lobster clasp and end links marked ALI 417.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$1,398.98</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.25x spot multiplier</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
               <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-new-listing-05" aria-label="Shopify buy button embed for 10K Gold Rope Chain Necklace listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
@@ -879,7 +943,7 @@
               <h3 class="text-on-surface font-headline text-xl font-bold mt-2">14K Gold Semi-Solid Cuban Link Chain Necklace</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">14K yellow gold hollow-link / semi-solid Cuban link necklace, 24 inches long, approximately 3.7mm wide, 9 grams, with a lobster clasp and 14K-marked end links.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$1,299.69</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.4x spot multiplier</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
               <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-new-listing-06" aria-label="Shopify buy button embed for 14K Gold Semi-Solid Cuban Link Chain Necklace listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
@@ -898,7 +962,7 @@
               <h3 class="text-on-surface font-headline text-xl font-bold mt-2">18K Gold Heraldic Cross Motif Band Ring</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Vintage early 20th century heavy solid 18K gold band ring with a raised repeating cross motif, 8.1mm width, 16 gram weight, and size 11 fit.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,495</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.25x spot multiplier</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
               <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-18k-heraldic-cross-band-ring-01" aria-label="Shopify buy button embed for 18K gold cross motif band ring listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
@@ -917,7 +981,7 @@
               <h3 class="text-on-surface font-headline text-xl font-bold mt-2">Vintage 14K Gold Men's 8mm Cuban Link Bracelet</h3>
               <p class="text-on-surface-variant text-sm mt-2 leading-relaxed flex-1">Good vintage estate 14K yellow gold semi-hollow 8mm Cuban link bracelet with box clasp marked K14, weighing 22.75 grams and fitting around a 7 inch inner circumference.</p>
               <p class="text-primary font-label text-xs uppercase tracking-widest mt-3" data-shop-price>$2,425</p>
-              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Live price - 1.25x spot multiplier</p>
+              <p class="text-on-surface-variant/75 text-[0.52rem] leading-tight mt-1 whitespace-pre-line" data-shop-price-context>Exact gold scrap value updates live</p>
               <div class="shopify-product-embed" data-shopify-product-id="" data-shopify-component="product-component-14k-mens-curb-link-bracelet-01" aria-label="Shopify buy button embed for 14K gold Cuban link bracelet listing"></div>
               <div class="shop-inquire-fallback mt-4 flex flex-wrap gap-3">
                 <a href="contact.html#submit-item" class="inline-block border border-primary/50 text-primary px-5 py-2.5 rounded-md font-label text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Inquire</a>
@@ -979,7 +1043,7 @@
   </main>
 
   <div class="dm-powered-bar" role="contentinfo" aria-label="Website credit">
-  <a class="dm-powered-badge" href="https://darkmatterwebdev.com/" target="_blank" rel="noopener noreferrer" aria-label="Website powered by Dark Matter Web Services">
+  <a class="dm-powered-badge" href="https://darkmatterwebdev.com/built-by" target="_blank" rel="noopener noreferrer" aria-label="Website powered by Dark Matter Web Services">
     <svg class="dm-powered-badge__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6z" />
     </svg>
@@ -1004,8 +1068,9 @@
         <a class="text-primary hover:text-white transition-colors font-body text-sm tracking-wide" href="shop.html">Shop</a>
         <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="gold-services.html">Gold Services</a>
         <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="silver-services.html">Silver Services</a>
-        <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="process.html">Process</a>
+        
         <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="bullion.html">Bullion</a>
+        <a class='text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100' href="free-evaluation.html">Free Evaluation</a>
         <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="estate-services.html">Estate Services</a>
         <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="faq.html">FAQ</a>
         <a class="text-gray-500 hover:text-white transition-opacity font-body text-sm tracking-wide opacity-80 hover:opacity-100" href="contact.html">Contact Us</a>
@@ -1024,9 +1089,9 @@
   <script src="scripts/shared/naples-auth.js"></script>
   <script src="scripts/shop/shop-products.js?v=listing06-photos-20260602"></script>
 
-  <script src="scripts/shop/shop-pricing.js?v=es-i18n-20260601"></script>
-  <script src="scripts/shared/cart.js"></script>
-  <script src="scripts/shop/shop-filters.js?v=es-i18n-20260601" defer></script>
+  <script src="scripts/shop/shop-pricing.js?v=tradein-card-20260602"></script>
+  <script src="scripts/shared/cart.js?v=incart-state-20260602"></script>
+  <script src="scripts/shop/shop-filters.js?v=incart-state-20260602" defer></script>
   <script>
     document.getElementById('footer-year').textContent = new Date().getFullYear();
     (function () {

@@ -5,6 +5,10 @@
   var CLIENT_CACHE_KEY = 'naplesGoldSpotCacheV2';
   var CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
   var FALLBACK_GOLD_SPOT_PER_TROY_OZ = 5500;
+  // Special trade-in / buy offer shown on the product detail page: what we offer
+  // to pay a customer for trade-in gold, as a multiple of the exact scrap (melt)
+  // value. Change this single constant to adjust the offer site-wide.
+  var TRADE_IN_MULTIPLIER = 1.1;
 
   var spotData = null;
   var readyCallbacks = [];
@@ -293,7 +297,53 @@
       product.priceSource = priced.source;
       product.scrapValue = publicPriced && publicPriced.meltValue ? roundToCents(publicPriced.meltValue) : 0;
       product.scrapValueLabel = product.scrapValue ? formatMoney(product.scrapValue) : '';
+      product.tradeInValue = product.scrapValue ? roundToCents(product.scrapValue * TRADE_IN_MULTIPLIER) : 0;
+      product.tradeInValueLabel = product.tradeInValue ? formatMoney(product.tradeInValue) : '';
     });
+  }
+
+  // Gallery cards show the exact gold scrap (melt) value as the comparison line
+  // next to "your price" — no spot-multiplier mention (that stays on the detail
+  // page via buildPriceContext). Falls back to the manual-price label when an
+  // item has no computable scrap value.
+  function buildScrapContext(product) {
+    if (product && product.scrapValueLabel) {
+      return (ES ? 'Valor exacto de fundición del oro: ' : 'Exact gold scrap value: ') + product.scrapValueLabel;
+    }
+    return buildPriceContext(product);
+  }
+
+  // Gallery card "Trade-in price" box — mirrors the gold offer box on the
+  // product detail page. Injected/updated dynamically so we don't hand-author
+  // the markup on every card. Only shown for items with a computable trade-in
+  // (i.e. gold spot-priced) value; hidden otherwise.
+  function applyCardTradeIn(card, product, priceEl, contextEl) {
+    var body = card.querySelector('.shop-product-body') || card;
+    var tradeEl = body.querySelector('[data-shop-trade-in]');
+
+    if (!product.tradeInValueLabel) {
+      if (tradeEl) tradeEl.hidden = true;
+      return;
+    }
+
+    if (!tradeEl) {
+      tradeEl = document.createElement('div');
+      tradeEl.setAttribute('data-shop-trade-in', '');
+      tradeEl.className = 'shop-trade-in-box';
+      var anchor = contextEl || priceEl;
+      if (anchor && anchor.parentNode) {
+        anchor.parentNode.insertBefore(tradeEl, anchor.nextSibling);
+      } else {
+        body.appendChild(tradeEl);
+      }
+    }
+
+    var label = ES ? 'Precio de intercambio' : 'Trade-in price';
+    var body2 = ES
+      ? 'Llévatelo por <strong>' + product.tradeInValueLabel + '</strong> <span class="shop-trade-in-note">con crédito de tienda</span>'
+      : 'Get this for <strong>' + product.tradeInValueLabel + '</strong> <span class="shop-trade-in-note">with store credit</span>';
+    tradeEl.innerHTML = '<span class="shop-trade-in-label">' + label + '</span>' + body2;
+    tradeEl.hidden = false;
   }
 
   function formatSpotTimestamp(isoString) {
@@ -319,9 +369,19 @@
 
       var contextEl = card.querySelector('[data-shop-price-context]');
       if (contextEl) {
-        contextEl.textContent = buildPriceContext(product);
+        contextEl.textContent = buildScrapContext(product);
       }
+
+      applyCardTradeIn(card, product, priceEl, contextEl);
     });
+
+    Array.prototype.forEach.call(
+      document.querySelectorAll('.shop-product-card .shop-product-body h3'),
+      function (titleEl) {
+        var fullTitle = titleEl.textContent.trim();
+        if (fullTitle) titleEl.setAttribute('title', fullTitle);
+      }
+    );
 
     var spotMeta = document.getElementById('shop-spot-meta');
     if (spotMeta && spotData) {
@@ -381,6 +441,19 @@
     if (contextEl) {
       contextEl.textContent = buildPriceContext(product);
       contextEl.hidden = false;
+    }
+
+    var tradeEl = document.getElementById('product-trade-in-offer');
+    if (tradeEl) {
+      if (product.tradeInValueLabel) {
+        tradeEl.textContent = ES
+          ? '¿Tienes oro para vender? Oferta de intercambio: llévatelo por ' + product.tradeInValueLabel + ' con crédito de tienda.'
+          : 'Have gold to sell? Trade-in special: get this for ' + product.tradeInValueLabel + ' with store credit.';
+        tradeEl.hidden = false;
+      } else {
+        tradeEl.textContent = '';
+        tradeEl.hidden = true;
+      }
     }
 
     var details = document.getElementById('product-details');

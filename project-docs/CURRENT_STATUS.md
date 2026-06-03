@@ -1,14 +1,14 @@
 # Current Status
 
 > Reflects the present state of development. **Update this at the end of every
-> work session.** Last updated: **2026-06-01**.
+> work session.** Last updated: **2026-06-02**.
 
 ## What Is Currently Working
 
 - **Full marketing site** is live: home, about, what-we-buy (+ estate-jewelry,
   gold-services, silver-services, bullion sub-pages), process, estate-services,
   faq, contact, privacy.
-- **Online shop** (`shop.html`) lists ~12 estate gold products (all "Gold"
+- **Online shop** (`shop.html`) lists 19 estate gold products (all "Gold"
   category) defined in `scripts/shop/shop-products.js`, with filtering and a
   product detail page (`product.html?id=...`).
 - **Live gold-spot pricing**: `netlify/functions/metal-prices.js` fetches the
@@ -29,6 +29,12 @@
 
 ## What Was Recently Completed
 
+- **Build-structure / integrity guardrails (2026-06-02):** added permanent docs
+  `project-docs/STRUCTURE.md`, `INTEGRITY.md`, and `features/shop-listings.md`,
+  plus a dependency-free guardrail `tools/check-integrity.mjs` (run with plain
+  `node`, no install). It validates the catalog schema, unique ids, image
+  existence, EN↔ES shop/page parity, and root-absolute Spanish paths. Currently
+  passes (19 products, 0 errors). Run before publishing.
 - Asset reorganization into `assets/images/...` with 301 redirects from legacy
   root URLs in `netlify.toml`.
 - Scripts grouped under `scripts/{shared,shop,account,forms}/` with legacy-URL

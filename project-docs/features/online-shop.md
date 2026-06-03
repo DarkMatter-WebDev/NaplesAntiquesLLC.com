@@ -42,6 +42,26 @@ The displayed "exact gold scrap value" is the melt value; the sale price applies
 the multiplier (typically 1.25x, some at 1.5x). Manual-priced items just show
 `manualPriceLabel`. See `features/live-metal-pricing.md` for the spot source.
 
+### Where each price shows (the display contract)
+
+All price strings are built in **one place** — `shop-pricing.js` — so changing
+what/where prices show is a single-file edit (no per-card HTML changes):
+
+| Surface | Shows |
+|---------|-------|
+| **Gallery card** (`shop.html`, `es/shop.html`) | Sale price (prominent) + **gold scrap value** line (`buildScrapContext`). **No** spot-multiplier text. |
+| **Product detail** (`product.html`, `es/product.html`) | Exact gold scrap value + **Your price** + spot-multiplier context (`buildPriceContext`) + **special trade-in offer**. |
+
+- The gallery `[data-shop-price]` / `[data-shop-price-context]` elements are
+  JS-populated; the static HTML text is only a pre-JS fallback.
+- The **trade-in offer** is a store-credit price on the item =
+  `scrapValue × TRADE_IN_MULTIPLIER` ("get this for $X with store credit"). That
+  multiplier is a single constant at the top of `shop-pricing.js` (currently
+  `1.1`) — change it there to adjust the offer site-wide, EN + ES. Rendered into
+  `#product-trade-in-offer`; copy lives in `applyToProductPage`.
+- `applyProductPrices` exposes per-product `scrapValue`/`scrapValueLabel` and
+  `tradeInValue`/`tradeInValueLabel` for any surface that needs them.
+
 ## Adding / Editing Products
 
 1. Edit `scripts/shop/shop-products.js`.

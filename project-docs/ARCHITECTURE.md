@@ -76,7 +76,9 @@ EstateJewelry/
 │   │   └── account-dashboard.js        # account-dashboard.html profile/favorites/cart
 │   └── forms/
 │       └── submit-item-form.js         # LEGACY custom lead form (superseded by Jotform embed)
-└── project-docs/              # THIS memory system
+├── tools/
+│   └── check-integrity.mjs    # dependency-free build-integrity guardrail (node, no install)
+└── project-docs/              # THIS memory system (incl. STRUCTURE.md + INTEGRITY.md)
 ```
 
 ## Pages
@@ -87,7 +89,6 @@ EstateJewelry/
 | `about.html` | Owner (Chris) story and trust building |
 | `what-we-buy.html` | Overview of categories bought |
 | `estate-jewelry.html` / `gold-services.html` / `silver-services.html` / `bullion.html` | Category landing pages (grouped under "What We Buy") |
-| `process.html` | How the buying process works |
 | `estate-services.html` | Full-estate / liquidation services |
 | `faq.html` | FAQs |
 | `contact.html` | Contact + "Submit Your Item" (Jotform embed) |
@@ -158,3 +159,10 @@ every `*.html` page to inject the canonical shared header, editorial asset
 includes, theme version, body classes, and hero typography — keeping all pages
 visually consistent without a templating engine. Run after structural header/
 theme changes. Files starting with `_` are skipped by the sync.
+
+`tools/check-integrity.mjs` is a **dependency-free** Node guardrail (no npm
+install; runs with plain `node`). It validates the product catalog schema,
+unique ids, on-disk image existence, EN↔ES shop-card + page parity, and
+root-absolute Spanish paths, exiting non-zero on failure. Run it after any
+listing/structural/script change, or wire it as a Netlify build command. The
+rules it enforces are documented in `STRUCTURE.md` + `INTEGRITY.md`.

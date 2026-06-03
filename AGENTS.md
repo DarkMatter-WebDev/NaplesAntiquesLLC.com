@@ -13,6 +13,25 @@ Read these first and summarize the current state before making changes:
 
 See `project-docs/README.md` for the full index and conventions.
 
+## Build structure & integrity (keep the site consistent over time)
+
+- `project-docs/STRUCTURE.md` — canonical repo map, single-sources-of-truth, and
+  the structural **invariants** that must not be broken.
+- `project-docs/INTEGRITY.md` — concrete integrity rules + the pre-publish
+  checklist.
+- `project-docs/features/shop-listings.md` — product schema + the step-by-step
+  runbook for adding a listing.
+
+Run the dependency-free guardrail after any listing/structural/script change
+(no npm install needed):
+
+```bash
+node tools/check-integrity.mjs
+```
+
+It exits non-zero if a product is malformed, an image is missing, EN/ES shop
+cards drift apart, or a Spanish page uses a relative path.
+
 ## Before ending a session
 
 Keep the memory current — never leave project state undocumented:

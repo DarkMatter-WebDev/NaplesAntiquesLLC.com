@@ -718,9 +718,9 @@
 
     category: "Gold",
 
-    title: "10K Gold Monaco Cuban Link Necklace with Pavé Diamond Clasp",
+    title: "10K Gold Monaco Cuban Link Necklace",
 
-    title_es: "Collar de Eslabón Cubano Monaco de Oro de 10K con Broche de Diamantes Pavé",
+    title_es: "Collar de Eslabón Cubano Monaco de Oro de 10K",
 
     priceLabel: "$1,146.63",
 

@@ -71,6 +71,10 @@
     return readCart().length;
   }
 
+  function has(id) {
+    return readCart().indexOf(id) !== -1;
+  }
+
   function updateCartCounts() {
     Array.prototype.forEach.call(document.querySelectorAll('[data-cart-count]'), function (el) {
       el.textContent = String(readCart().length);
@@ -126,6 +130,7 @@
   window.ShopCart = {
     add: add,
     remove: remove,
+    has: has,
     clear: clear,
     read: readCart,
     count: count,

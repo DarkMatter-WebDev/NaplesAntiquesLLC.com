@@ -494,6 +494,16 @@ nav.fixed .lang-toggle .lang-opt:hover {
   text-transform: none;
 }
 
+/* Nav uses Tailwind text-label-md; ensure size when a page omits editorial-tailwind-config */
+.site-header-nav a.text-label-md,
+.site-header-actions .text-label-md,
+.site-header-actions .lang-toggle,
+#mobile-menu-toggle.text-label-md {
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+  font-weight: 600 !important;
+}
+
 .site-header-nav a,
 header.fixed .site-header-nav a {
   white-space: nowrap;
@@ -705,8 +715,7 @@ header.site-header.fixed + main:not([class*="pt-"]):not([class*="mt-"]) {
 }
 
 footer a[href="gold-services.html"],
-footer a[href="silver-services.html"],
-footer a[href="process.html"] {
+footer a[href="silver-services.html"] {
   font-family: "Hanken Grotesk", Inter, Arial, sans-serif !important;
   font-size: 0.875rem !important;
   letter-spacing: 0.025em !important;
