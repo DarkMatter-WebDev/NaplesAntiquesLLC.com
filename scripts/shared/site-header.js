@@ -44,37 +44,12 @@
     });
   }
 
-  function navLinkExists(container, page) {
-    if (!container) return false;
-    return Array.from(container.querySelectorAll("a[href]")).some(function (link) {
-      var href = (link.getAttribute("href") || "").split("#")[0];
-      return (
-        href === page ||
-        href === navPrefix + page ||
-        href.endsWith("/" + page)
-      );
-    });
+  function isAccountNavLink(link) {
+    var href = (link.getAttribute("href") || "").split("#")[0].toLowerCase();
+    return href === "account.html" || href.endsWith("/account.html");
   }
 
-  function appendDesktopLink(nav, href, label, extraHtml) {
-    if (!nav || navLinkExists(nav, href.split("/").pop())) return;
-    var link = document.createElement("a");
-    link.className = "text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2";
-    link.href = href;
-    link.innerHTML = label + (extraHtml || "");
-    nav.appendChild(link);
-  }
-
-  function appendMobileLink(menuInner, href, label, extraHtml) {
-    if (!menuInner || navLinkExists(menuInner, href.split("/").pop())) return;
-    var link = document.createElement("a");
-    link.className = "text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]";
-    link.href = href;
-    link.innerHTML = label + (extraHtml || "");
-    menuInner.appendChild(link);
-  }
-
-  /** Remove duplicate cart rows if HTML + legacy inject both added them. */
+  /** Remove duplicate cart rows if HTML + legacy scripts both added them. */
   function dedupeHeaderCartLinks() {
     document.querySelectorAll(".site-header-nav, #mobile-menu > div").forEach(function (container) {
       var cartLinks = Array.from(container.querySelectorAll("a[href]")).filter(function (link) {
@@ -86,28 +61,20 @@
     });
   }
 
-  function addAccountAndCartLinks() {
-    var desktopNav = document.querySelector(".site-header-nav");
-    var mobileInner = document.querySelector("#mobile-menu > div");
-    var cartCount = ' (<span data-header-cart-count>0</span>)';
-    var accountLabel = ES ? "Mi Cuenta" : "My Account";
-    var cartLabel = ES ? "Carrito" : "Cart";
-    var hasDesktopCart = desktopNav && desktopNav.querySelector("[data-header-cart-count]");
-    var hasMobileCart = mobileInner && mobileInner.querySelector("[data-header-cart-count]");
+  /** Remove duplicate My Account / Mi Cuenta rows (same root cause as cart). */
+  function dedupeHeaderAccountLinks() {
+    document.querySelectorAll(".site-header-nav, #mobile-menu > div").forEach(function (container) {
+      var accountLinks = Array.from(container.querySelectorAll("a[href]")).filter(isAccountNavLink);
+      for (var i = 1; i < accountLinks.length; i++) {
+        accountLinks[i].remove();
+      }
+    });
+  }
 
-    if (!navLinkExists(desktopNav, "account.html")) {
-      appendDesktopLink(desktopNav, navPrefix + "account.html", accountLabel);
-    }
-    if (!hasDesktopCart && !navLinkExists(desktopNav, "cart.html")) {
-      appendDesktopLink(desktopNav, navPrefix + "cart.html", cartLabel, cartCount);
-    }
-    if (!hasMobileCart && !navLinkExists(mobileInner, "cart.html")) {
-      appendMobileLink(mobileInner, navPrefix + "cart.html", cartLabel, cartCount);
-    }
-    if (!navLinkExists(mobileInner, "account.html")) {
-      appendMobileLink(mobileInner, navPrefix + "account.html", accountLabel);
-    }
+  /** Nav account/cart links are baked into HTML via sync-site-headers; only sync counts + dedupe. */
+  function ensureHeaderNavLinks() {
     dedupeHeaderCartLinks();
+    dedupeHeaderAccountLinks();
     updateHeaderCartCounts();
   }
 
@@ -157,7 +124,7 @@
     }
   }
 
-  addAccountAndCartLinks();
+  ensureHeaderNavLinks();
   addLanguageToggle();
 
   document.querySelectorAll(".site-header a[href]").forEach(function (link) {
