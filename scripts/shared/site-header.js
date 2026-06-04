@@ -7,7 +7,9 @@
     currentPage = "index.html";
   }
   var activePage = currentPage;
-  var ES = (document.documentElement.getAttribute("lang") || "").toLowerCase().indexOf("es") === 0;
+  var ES =
+    (document.documentElement.getAttribute("lang") || "").toLowerCase().indexOf("es") === 0 ||
+    /^\/es(\/|$)/.test(window.location.pathname || "");
 
   var navPrefix = ES ? "/es/" : "";
 
@@ -42,8 +44,20 @@
     });
   }
 
+  function navLinkExists(container, page) {
+    if (!container) return false;
+    return Array.from(container.querySelectorAll("a[href]")).some(function (link) {
+      var href = (link.getAttribute("href") || "").split("#")[0];
+      return (
+        href === page ||
+        href === navPrefix + page ||
+        href.endsWith("/" + page)
+      );
+    });
+  }
+
   function appendDesktopLink(nav, href, label, extraHtml) {
-    if (!nav || nav.querySelector('a[href="' + href + '"]')) return;
+    if (!nav || navLinkExists(nav, href.split("/").pop())) return;
     var link = document.createElement("a");
     link.className = "text-[#5e5e5d] hover:text-[#735c00] font-label-md text-label-md transition-colors px-1 py-2";
     link.href = href;
@@ -52,7 +66,7 @@
   }
 
   function appendMobileLink(menuInner, href, label, extraHtml) {
-    if (!menuInner || menuInner.querySelector('a[href="' + href + '"]')) return;
+    if (!menuInner || navLinkExists(menuInner, href.split("/").pop())) return;
     var link = document.createElement("a");
     link.className = "text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]";
     link.href = href;
@@ -60,18 +74,40 @@
     menuInner.appendChild(link);
   }
 
+  /** Remove duplicate cart rows if HTML + legacy inject both added them. */
+  function dedupeHeaderCartLinks() {
+    document.querySelectorAll(".site-header-nav, #mobile-menu > div").forEach(function (container) {
+      var cartLinks = Array.from(container.querySelectorAll("a[href]")).filter(function (link) {
+        return link.querySelector("[data-header-cart-count]");
+      });
+      for (var i = 1; i < cartLinks.length; i++) {
+        cartLinks[i].remove();
+      }
+    });
+  }
+
   function addAccountAndCartLinks() {
     var desktopNav = document.querySelector(".site-header-nav");
     var mobileInner = document.querySelector("#mobile-menu > div");
     var cartCount = ' (<span data-header-cart-count>0</span>)';
-
     var accountLabel = ES ? "Mi Cuenta" : "My Account";
     var cartLabel = ES ? "Carrito" : "Cart";
+    var hasDesktopCart = desktopNav && desktopNav.querySelector("[data-header-cart-count]");
+    var hasMobileCart = mobileInner && mobileInner.querySelector("[data-header-cart-count]");
 
-    appendDesktopLink(desktopNav, navPrefix + "account.html", accountLabel);
-    appendDesktopLink(desktopNav, navPrefix + "cart.html", cartLabel, cartCount);
-    appendMobileLink(mobileInner, navPrefix + "cart.html", cartLabel, cartCount);
-    appendMobileLink(mobileInner, navPrefix + "account.html", accountLabel);
+    if (!navLinkExists(desktopNav, "account.html")) {
+      appendDesktopLink(desktopNav, navPrefix + "account.html", accountLabel);
+    }
+    if (!hasDesktopCart && !navLinkExists(desktopNav, "cart.html")) {
+      appendDesktopLink(desktopNav, navPrefix + "cart.html", cartLabel, cartCount);
+    }
+    if (!hasMobileCart && !navLinkExists(mobileInner, "cart.html")) {
+      appendMobileLink(mobileInner, navPrefix + "cart.html", cartLabel, cartCount);
+    }
+    if (!navLinkExists(mobileInner, "account.html")) {
+      appendMobileLink(mobileInner, navPrefix + "account.html", accountLabel);
+    }
+    dedupeHeaderCartLinks();
     updateHeaderCartCounts();
   }
 

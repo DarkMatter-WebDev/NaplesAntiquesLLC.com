@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Replace site headers with the canonical homepage nav (EN index.html / ES es/index.html).
  * Keeps per-page active states; includes Home/Inicio on every page (highlighted on index).
  */
@@ -196,7 +196,7 @@ const EN_HEAD_ASSETS = `  <script src="https://cdn.tailwindcss.com?plugins=forms
   <script src="scripts/shared/editorial-tailwind-config.js"></script>
   <link href="editorial-base.css" rel="stylesheet" />
   <link href="editorial-theme.css?v=header-sync-20260602" rel="stylesheet" />
-  <script src="scripts/shared/site-header.js?v=header-sync-20260603" defer></script>`;
+  <script src="scripts/shared/site-header.js?v=header-sync-20260604" defer></script>`;
 
 const ES_HEAD_ASSETS = `  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Hanken+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
@@ -204,7 +204,7 @@ const ES_HEAD_ASSETS = `  <script src="https://cdn.tailwindcss.com?plugins=forms
   <script src="/scripts/shared/editorial-tailwind-config.js"></script>
   <link href="/editorial-base.css" rel="stylesheet" />
   <link href="/editorial-theme.css?v=header-sync-20260602" rel="stylesheet" />
-  <script src="/scripts/shared/site-header.js?v=header-sync-20260603" defer></script>`;
+  <script src="/scripts/shared/site-header.js?v=header-sync-20260604" defer></script>`;
 
 function injectMemberAccessHeader(filePath, isEs) {
   let html = fs.readFileSync(filePath, "utf8");

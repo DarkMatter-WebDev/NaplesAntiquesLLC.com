@@ -1,4 +1,4 @@
-/* Homepage bullion charts teaser — subtle corner float, gold + silver accents */
+/* Homepage bullion charts teaser — fixed bottom-left (desktop/tablet only) */
 
 .bullion-charts-widget {
   position: fixed;
@@ -6,12 +6,13 @@
   bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
   left: max(1rem, env(safe-area-inset-left, 0px));
   right: auto;
+  top: auto;
   width: 10.5rem;
   text-decoration: none;
   color: inherit;
   cursor: pointer;
   pointer-events: auto;
-  animation: bullion-widget-drift 14s ease-in-out infinite;
+  transform-origin: bottom left;
   filter: drop-shadow(0 10px 28px rgba(0, 0, 0, 0.28));
   transition:
     filter 0.4s ease,
@@ -20,9 +21,8 @@
 
 .bullion-charts-widget:hover,
 .bullion-charts-widget:focus-visible {
-  animation-play-state: paused;
   filter: drop-shadow(0 16px 40px rgba(115, 92, 0, 0.45));
-  transform: translate(8px, -14px) scale(1.08);
+  transform: translateY(-6px) scale(1.06);
   outline: none;
 }
 
@@ -70,7 +70,6 @@
     0 0 0 1px rgba(168, 180, 196, 0.12);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  animation: bullion-widget-bob 3.2s ease-in-out infinite;
   transition:
     transform 0.45s cubic-bezier(0.34, 1.35, 0.64, 1),
     border-color 0.35s ease,
@@ -80,8 +79,7 @@
 
 .bullion-charts-widget:hover .bullion-charts-widget__card,
 .bullion-charts-widget:focus-visible .bullion-charts-widget__card {
-  animation-play-state: paused;
-  transform: translateY(-4px) rotate(-3deg) scale(1.04);
+  transform: rotate(-2deg) scale(1.03);
   border-color: rgba(233, 195, 73, 0.72);
   background: linear-gradient(145deg, rgba(36, 38, 38, 0.96) 0%, rgba(24, 26, 26, 0.94) 100%);
   box-shadow:
@@ -236,29 +234,6 @@
   transform: translateY(-1px);
 }
 
-@keyframes bullion-widget-drift {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-  33% {
-    transform: translate(-6px, -10px);
-  }
-  66% {
-    transform: translate(4px, -16px);
-  }
-}
-
-@keyframes bullion-widget-bob {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-5px);
-  }
-}
-
 @keyframes bullion-widget-glow-spin {
   to {
     transform: rotate(360deg);
@@ -271,17 +246,11 @@
   }
 }
 
-@media (max-width: 640px) {
+/* Hidden on phones; visible from md (768px) up — matches Tailwind md */
+@media (max-width: 767px) {
   .bullion-charts-widget {
-    width: 9.25rem;
-    bottom: max(5.5rem, calc(env(safe-area-inset-bottom, 0px) + 4.5rem));
-    left: max(0.65rem, env(safe-area-inset-left, 0px));
-    right: auto;
-    opacity: 0.94;
-  }
-
-  .bullion-charts-widget__label {
-    font-size: 0.58rem;
+    display: none !important;
+    pointer-events: none;
   }
 }
 
@@ -299,7 +268,7 @@
 
   .bullion-charts-widget:hover,
   .bullion-charts-widget:focus-visible {
-    transform: scale(1.03);
+    transform: translateY(-4px) scale(1.03);
   }
 
   .bullion-charts-widget:hover .bullion-charts-widget__card,
