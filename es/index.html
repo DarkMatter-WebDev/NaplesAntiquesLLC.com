@@ -126,14 +126,12 @@
       object-fit: cover;
       object-position: center center;
       animation: none;
-      z-index: 0;
+      z-index: 1;
     }
-    .hero-fallback { z-index: 0; }
-    @media (prefers-reduced-motion: no-preference) {
-      .hero-fallback { opacity: 0; }
-    }
+    .hero-fallback { opacity: 0; z-index: 0; }
     @media (prefers-reduced-motion: reduce) {
       .hero-video { display: none !important; }
+      .hero-fallback { opacity: 1; }
     }
     .hero-light-sweep {
       animation: hero-sweep 13s ease-in-out infinite;
@@ -215,6 +213,134 @@
     .homepage-transparent-buying {
       background: linear-gradient(135deg, #fffdf7 0%, #f7f2e4 100%);
     }
+    .homepage-announcement {
+      position: fixed;
+      left: 0;
+      right: 0;
+      top: var(--site-header-height, 5.2rem);
+      z-index: 40;
+      background: rgba(20, 20, 20, 0.98);
+      border-top: 1px solid rgba(212, 175, 55, 0.42);
+      border-bottom: 1px solid rgba(212, 175, 55, 0.64);
+      color: #f8f5ed;
+      box-shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
+      transform: translateY(-120%);
+      transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+      will-change: transform;
+    }
+    .homepage-announcement[role="button"] {
+      cursor: pointer;
+    }
+    .homepage-announcement:focus-visible {
+      outline: 2px solid #f0c94d;
+      outline-offset: -3px;
+    }
+    body.announcement-open .homepage-announcement {
+      transform: translateY(0);
+    }
+    main#top {
+      transition: padding-top 520ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    body.announcement-open main#top {
+      padding-top: calc(4rem + var(--homepage-announcement-height, 0px)) !important;
+    }
+    .homepage-announcement__inner {
+      align-items: center;
+      display: flex;
+      gap: 1.05rem;
+      justify-content: flex-start;
+      margin: 0 auto;
+      max-width: 1180px;
+      padding: 0.62rem 4.75rem 0.68rem 1.25rem;
+      position: relative;
+      text-align: left;
+    }
+    .homepage-announcement__icon {
+      align-items: center;
+      color: #d4af37;
+      display: inline-flex;
+      flex: 0 0 auto;
+      justify-content: center;
+      position: relative;
+      width: 3.55rem;
+    }
+    .homepage-announcement__icon::before,
+    .homepage-announcement__icon::after {
+      background: currentColor;
+      content: "";
+      height: 1px;
+      left: 0;
+      opacity: 0.75;
+      position: absolute;
+      width: 1.25rem;
+    }
+    .homepage-announcement__icon::before {
+      top: 1.25rem;
+    }
+    .homepage-announcement__icon::after {
+      bottom: 1.25rem;
+      width: 1.65rem;
+    }
+    .homepage-announcement__icon-symbol {
+      align-items: center;
+      border: 2px solid currentColor;
+      border-radius: 999px;
+      display: inline-flex;
+      height: 2.55rem;
+      justify-content: center;
+      width: 2.55rem;
+    }
+    .homepage-announcement__eyebrow {
+      color: #f0c94d;
+      font-family: "Hanken Grotesk", Inter, Arial, sans-serif;
+      font-size: 1rem;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .homepage-announcement__headline {
+      color: #f8f5ed;
+      font-family: "Hanken Grotesk", Inter, Arial, sans-serif;
+      font-size: 1rem;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .homepage-announcement__copy {
+      color: rgba(248, 245, 237, 0.88);
+      font-size: 0.92rem;
+      line-height: 1.32;
+      margin: 0;
+    }
+    .homepage-announcement__body {
+      margin-top: 0.08rem;
+    }
+    .homepage-announcement__body span {
+      display: block;
+    }
+    .homepage-announcement__action {
+      color: #f0c94d;
+      font-weight: 800;
+    }
+    .homepage-announcement__close {
+      align-items: center;
+      border: 1px solid rgba(212, 175, 55, 0.74);
+      color: #e9c349;
+      display: inline-flex;
+      height: 3rem;
+      justify-content: center;
+      position: absolute;
+      right: 1.25rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 3rem;
+    }
+    .homepage-announcement__close:hover,
+    .homepage-announcement__close:focus-visible {
+      background: rgba(233, 195, 73, 0.14);
+      color: #fff;
+      outline: none;
+    }
     .transparent-buying-card {
       border: 1px solid rgba(115, 92, 0, 0.24);
       box-shadow: 0 18px 42px rgba(26, 28, 28, 0.08);
@@ -230,6 +356,12 @@
       }
     }
     @media (prefers-reduced-motion: reduce) {
+      .homepage-announcement {
+        transition: none;
+      }
+      main#top {
+        transition: none;
+      }
       .hero-pan, .hero-light-sweep { animation: none; }
       .hero-bg-parallax, #sell .homepage-hero-copy { transform: none !important; }
       #sell .hero-trade-button:hover,
@@ -239,6 +371,44 @@
       #sell .homepage-hero-copy .gold-button.header-cta-call:hover,
       #sell .homepage-hero-copy .gold-button.header-cta-call:focus-visible {
         transform: none !important;
+      }
+    }
+    @media (max-width: 767px) {
+      .homepage-announcement {
+        top: var(--site-header-height, 4.75rem);
+      }
+      .homepage-announcement__inner {
+        gap: 0.75rem;
+        padding: 0.55rem 3.7rem 0.6rem 0.9rem;
+        text-align: left;
+      }
+      .homepage-announcement__icon {
+        width: 2.6rem;
+      }
+      .homepage-announcement__icon::before,
+      .homepage-announcement__icon::after {
+        width: 0.75rem;
+      }
+      .homepage-announcement__icon-symbol {
+        height: 2rem;
+        width: 2rem;
+      }
+      .homepage-announcement__icon-symbol .material-symbols-outlined {
+        font-size: 1.4rem !important;
+      }
+      .homepage-announcement__copy {
+        font-size: 0.78rem;
+        line-height: 1.3;
+      }
+      .homepage-announcement__eyebrow,
+      .homepage-announcement__headline {
+        font-size: 0.78rem;
+        letter-spacing: 0;
+      }
+      .homepage-announcement__close {
+        height: 2.45rem;
+        right: 0.7rem;
+        width: 2.45rem;
       }
     }
   </style>
@@ -277,12 +447,30 @@
     <div class="site-header-actions flex items-center gap-3"><span data-lang-toggle="" class="lang-toggle inline-flex items-center gap-1 font-label-md text-label-md uppercase tracking-widest px-2 py-2" aria-label="Cambiar idioma"><span class="material-symbols-outlined" style="font-size:18px;line-height:1;" aria-hidden="true">language</span><a class="lang-opt" href="/index.html" title="View this page in English">EN</a><span class="lang-sep" aria-hidden="true">/</span><a class="lang-opt is-current" href="/es/index.html" title="Ver esta página en español" aria-current="true">ES</a></span><a href="tel:2394048505" class="header-cta-call editorial-call-button hidden 2xl:inline-flex px-5 py-2 font-label-md text-label-md uppercase tracking-widest transition-colors">Llámenos</a><button id="mobile-menu-toggle" type="button" aria-expanded="false" aria-label="Abrir menú" class="site-menu-toggle 2xl:hidden border border-[#735c00]/50 text-[#735c00] px-3 py-2 font-label-md text-label-md uppercase tracking-widest"><span class="menu-toggle-label" id="mobile-menu-icon">Menú</span></button></div>
   </div>
   <div id="mobile-menu" class="hidden 2xl:hidden border-t border-[#d8d0c2] bg-[#f9f9f7]/98"><div class="flex flex-col px-5 py-4"><a class="text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/index.html">Inicio</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/shop.html">Tienda</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/what-we-buy.html">Véndanos</a><a class="mobile-subitem" href="/es/estate-jewelry.html">Joyería de Patrimonio</a><a class="mobile-subitem" href="/es/gold-services.html">Servicios de Oro</a><a class="mobile-subitem" href="/es/silver-services.html">Servicios de Plata</a><a class="mobile-subitem" href="/es/bullion.html">Lingotes</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/about.html">Sobre Nosotros</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/free-evaluation.html">Servicios</a><a class="mobile-subitem" href="/es/free-evaluation.html">Evaluación Gratuita</a><a class="mobile-subitem" href="/es/estate-services.html">Servicios de Patrimonio</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/contact.html">Contacto</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/index.html#newsletter">Suscríbase a La Lista</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/index.html#appointment">Solicite una Llamada</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/cart.html">Carrito (<span data-header-cart-count>0</span>)</a><a class="text-[#1a1c1c] hover:text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]" href="/es/account.html">Mi Cuenta</a><a data-lang-toggle-mobile="" href="/index.html" class="text-[#735c00] font-label-md py-3 border-b border-[#d8d0c2]">English</a></div></div>
-</header><main id="top" class="pt-16">
+</header><div class="homepage-announcement" id="homepage-announcement" role="button" tabindex="0" aria-label="Programe su evaluación gratis de joyas">
+  <div class="homepage-announcement__inner">
+    <span class="homepage-announcement__icon" aria-hidden="true">
+      <span class="homepage-announcement__icon-symbol">
+        <span class="material-symbols-outlined" style="font-size:1.8rem;line-height:1;">schedule</span>
+      </span>
+    </span>
+    <div class="homepage-announcement__copy">
+      <div><span class="homepage-announcement__eyebrow">Por Tiempo Limitado:</span> <span class="homepage-announcement__headline">Evaluaciones Gratis de Joyas</span></div>
+      <div class="homepage-announcement__body">
+        <span>Reservando citas en Naples.</span>
+        <span><span class="homepage-announcement__action">Programe su cita hoy.</span></span>
+      </div>
+    </div>
+    <button class="homepage-announcement__close" type="button" aria-label="Cerrar anuncio" data-announcement-close>
+      <span class="material-symbols-outlined" aria-hidden="true" style="font-size:18px;line-height:1;">close</span>
+    </button>
+  </div>
+</div><main id="top" class="pt-16">
     <!-- HERO -->
     <section id="sell" class="relative min-h-[820px] sm:min-h-[760px] md:min-h-screen flex items-start overflow-hidden pt-28 md:pt-32 xl:pt-36 pb-16 bg-[#101111]">
       <div class="hero-bg-parallax" aria-hidden="true">
-        <img alt="" fetchpriority="high" class="hero-pan hero-fallback w-full h-full object-cover" src="/assets/images/pages/homepage-hero-bangles.webp" width="1024" height="683" />
-        <video class="hero-video" autoplay muted loop playsinline preload="metadata" poster="/assets/images/pages/homepage-hero-bangles.webp">
+        <img alt="" loading="lazy" decoding="async" fetchpriority="low" class="hero-pan hero-fallback w-full h-full object-cover" src="/assets/images/pages/homepage-hero-bangles.webp" width="1024" height="683" />
+        <video class="hero-video" autoplay muted loop playsinline preload="auto">
           <source src="/assets/video/homepage-hero.mp4" type="video/mp4" />
         </video>
         <div class="absolute inset-0 hero-gradient"></div>
@@ -547,6 +735,89 @@
     (function () {
       var y = document.getElementById('footer-year');
       if (y) y.textContent = new Date().getFullYear();
+
+      var consultationUrl = 'https://calendly.com/rcman12589?hide_landing_page_details=1&hide_gdpr_banner=1&background_color=1a1a1a&text_color=ffffff&primary_color=ffcb00';
+      var calendlyLoading = false;
+      var calendlyCallbacks = [];
+      var openConsultationScheduler = function () {
+        if (window.Calendly && typeof window.Calendly.initPopupWidget === 'function') {
+          window.Calendly.initPopupWidget({ url: consultationUrl });
+          return;
+        }
+        calendlyCallbacks.push(openConsultationScheduler);
+        if (calendlyLoading) return;
+        calendlyLoading = true;
+        var cssHref = 'https://assets.calendly.com/assets/external/widget.css';
+        if (!document.querySelector('link[href="' + cssHref + '"]')) {
+          var calendlyCss = document.createElement('link');
+          calendlyCss.href = cssHref;
+          calendlyCss.rel = 'stylesheet';
+          document.head.appendChild(calendlyCss);
+        }
+        var existingScript = document.querySelector('script[src="' + 'https://assets.calendly.com/assets/external/widget.js' + '"]');
+        if (existingScript) {
+          existingScript.addEventListener('load', function () {
+            calendlyLoading = false;
+            var callbacks = calendlyCallbacks.slice();
+            calendlyCallbacks = [];
+            callbacks.forEach(function (callback) { callback(); });
+          });
+          return;
+        }
+        var calendlyScript = document.createElement('script');
+        calendlyScript.src = 'https://assets.calendly.com/assets/external/widget.js';
+        calendlyScript.async = true;
+        calendlyScript.onload = function () {
+          calendlyLoading = false;
+          var callbacks = calendlyCallbacks.slice();
+          calendlyCallbacks = [];
+          callbacks.forEach(function (callback) { callback(); });
+        };
+        document.head.appendChild(calendlyScript);
+      };
+
+      var announcement = document.getElementById('homepage-announcement');
+      var announcementClose = announcement ? announcement.querySelector('[data-announcement-close]') : null;
+      var siteHeader = document.querySelector('.site-header');
+      var setHeaderHeight = function () {
+        if (!siteHeader) return;
+        document.documentElement.style.setProperty('--site-header-height', Math.ceil(siteHeader.getBoundingClientRect().height) + 'px');
+      };
+      var setAnnouncementHeight = function () {
+        if (!announcement) return;
+        document.documentElement.style.setProperty('--homepage-announcement-height', Math.ceil(announcement.getBoundingClientRect().height) + 'px');
+      };
+      setHeaderHeight();
+      setAnnouncementHeight();
+      window.addEventListener('resize', function () {
+        setHeaderHeight();
+        setAnnouncementHeight();
+      }, { passive: true });
+      if (announcement) {
+        window.setTimeout(function () {
+          setHeaderHeight();
+          setAnnouncementHeight();
+          document.body.classList.add('announcement-open');
+        }, 1000);
+      }
+      if (announcementClose) {
+        announcementClose.addEventListener('click', function () {
+          setAnnouncementHeight();
+          document.body.classList.remove('announcement-open');
+        });
+      }
+      if (announcement) {
+        announcement.addEventListener('click', function (event) {
+          if (event.target && event.target.closest && event.target.closest('[data-announcement-close]')) return;
+          openConsultationScheduler();
+        });
+        announcement.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openConsultationScheduler();
+          }
+        });
+      }
 
       var hero = document.getElementById('sell');
       var heroVideo = hero ? hero.querySelector('.hero-video') : null;
