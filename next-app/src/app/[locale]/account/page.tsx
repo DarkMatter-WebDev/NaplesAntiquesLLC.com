@@ -105,7 +105,7 @@ export default async function AccountPage({ params }: Props) {
               <p className="text-sm mb-4" style={{ color: 'var(--color-on-surface-variant)' }}>
                 {isEs ? 'Gestionar productos, imágenes y precios.' : 'Manage products, images, and pricing.'}
               </p>
-              <Link href="/admin/index.html" className="gold-button text-sm">
+              <Link href={isEs ? '/es/admin' : '/admin'} className="gold-button text-sm">
                 {isEs ? 'Abrir Admin' : 'Open Admin Panel'}
               </Link>
             </div>
