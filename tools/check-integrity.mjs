@@ -152,8 +152,7 @@ function htmlPagesIn(rel) {
   const dir = join(ROOT, rel);
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
-    .filter((f) => f.endsWith(".html"))
-    .filter((f) => f !== "submit-item-form.partial.html");
+    .filter((f) => f.endsWith(".html"));
 }
 
 function checkPageParity() {

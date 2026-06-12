@@ -1,62 +1,88 @@
 ﻿/**
  * Submit-your-item form (contact.html#submit-item)
  *
- * Before go-live: set FORM_ACTION to your Formspree URL, e.g.
- *   https://formspree.io/f/xxxxxxxx
- * Formspree supports file uploads on paid plans; otherwise use their
- * "link to upload" or collect photos via a follow-up text.
- *
- * Alternative: FormSubmit — https://formsubmit.co/your@email.com
+ * Netlify Forms handles delivery and photo uploads from the static HTML form.
+ * This script only improves the selected-photo label.
  */
 (function () {
-  var FORM_ACTION = ""; // e.g. "https://formspree.io/f/your-id"
-
   var forms = document.querySelectorAll(".submit-item-form");
   if (!forms.length) return;
 
   forms.forEach(function (form) {
-    if (FORM_ACTION) {
-      form.setAttribute("action", FORM_ACTION);
-      form.setAttribute("method", "POST");
-    } else {
-      form.removeAttribute("action");
-    }
-
     var fileInput = form.querySelector('input[type="file"][name="photos"]');
     var fileNamesEl = form.querySelector(".submit-item-form__file-names");
-    if (fileInput && fileNamesEl) {
+    var modal = form.querySelector("[data-submit-item-modal]");
+    var closeButton = form.querySelector("[data-submit-item-close]");
+    var modalFileNamesEl = form.querySelector(".submit-item-form__modal-file-names");
+    var firstDetailField = form.querySelector("[data-submit-item-modal] textarea, [data-submit-item-modal] input:not([type='hidden'])");
+    var phoneInput = form.querySelector('input[name="phone"]');
+
+    function openDetailsModal() {
+      if (!modal) return;
+
+      if (typeof modal.showModal === "function") {
+        if (!modal.open) modal.showModal();
+      } else {
+        modal.setAttribute("open", "open");
+      }
+
+      if (firstDetailField && typeof firstDetailField.focus === "function") {
+        firstDetailField.focus();
+      }
+    }
+
+    function closeDetailsModal() {
+      if (!modal) return;
+
+      if (typeof modal.close === "function" && modal.open) {
+        modal.close();
+      } else {
+        modal.removeAttribute("open");
+      }
+
+      if (fileInput && typeof fileInput.focus === "function") {
+        fileInput.focus();
+      }
+    }
+
+    function selectedPhotoText(files) {
+      var names = [];
+      for (var i = 0; i < files.length; i++) {
+        names.push(files[i].name);
+      }
+
+      var isSpanish = document.documentElement.lang === "es";
+      return (isSpanish ? "Seleccionado: " : "Selected: ") + names[0];
+    }
+
+    if (fileInput) {
       fileInput.addEventListener("change", function () {
         if (!fileInput.files || !fileInput.files.length) {
-          fileNamesEl.textContent = "";
+          if (fileNamesEl) fileNamesEl.textContent = "";
+          if (modalFileNamesEl) modalFileNamesEl.textContent = "";
           return;
         }
-        var names = [];
-        for (var i = 0; i < fileInput.files.length; i++) {
-          names.push(fileInput.files[i].name);
-        }
-        fileNamesEl.textContent =
-          names.length === 1
-            ? "Selected: " + names[0]
-            : names.length + " photos selected: " + names.join(", ");
+
+        var text = selectedPhotoText(fileInput.files);
+        if (fileNamesEl) fileNamesEl.textContent = text;
+        if (modalFileNamesEl) modalFileNamesEl.textContent = text;
+        openDetailsModal();
       });
     }
 
-    form.addEventListener("submit", function (e) {
-      var hp = form.querySelector('input[name="_gotcha"]');
-      if (hp && hp.value) {
-        e.preventDefault();
-        return;
-      }
+    if (closeButton) {
+      closeButton.addEventListener("click", closeDetailsModal);
+    }
 
-      if (FORM_ACTION) return;
+    form.addEventListener("submit", function (event) {
+      if (!phoneInput || phoneInput.value.trim()) return;
 
-      e.preventDefault();
-      var status = form.querySelector(".submit-item-form__status");
-      if (status) {
-        status.className =
-          "submit-item-form__status submit-item-form__status--error is-visible";
-        status.textContent =
-          "Form delivery is not configured yet. Please call or text us at (239) 404-8505, or set FORM_ACTION in scripts/forms/submit-item-form.js.";
+      event.preventDefault();
+      openDetailsModal();
+      phoneInput.focus();
+
+      if (typeof phoneInput.reportValidity === "function") {
+        phoneInput.reportValidity();
       }
     });
   });

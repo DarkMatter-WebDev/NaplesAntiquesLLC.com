@@ -36,7 +36,7 @@
 | `account-dashboard.html` | `es/account-dashboard.html` |
 | `member-access.html` | `es/member-access.html` |
 | `privacy.html` | `es/privacy.html` |
-| `submit-item-form.partial.html` | (embedded in `es/contact.html`; keep form labels in sync manually) |
+| `es/contact.html` | Netlify submit-item form labels and upload copy |
 
 ---
 
