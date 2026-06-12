@@ -1028,6 +1028,48 @@
 
     tags_es: ["14k", "k14", "oro amarillo", "pulsera de oro", "pulsera para hombre", "pulsera para hombre", "eslabón cubano", "8mm", "semihueco", "broche de caja", "22.75 gramos", "7.75 pulgadas", "circunferencia interior de 7 pulgadas", "joyería de patrimonio vintage"]
 
+  },
+
+  {
+
+    id: "david-yurman-sterling-14k-articulated-bangle-bracelet-01",
+
+    category: "Silver",
+
+    title: "David Yurman Sterling Silver & 14K Gold Articulated Bangle Bracelet",
+
+    title_es: "Pulsera Articulada David Yurman de Plata Esterlina y Oro de 14K",
+
+    priceLabel: "$0.00",
+
+    manualPriceLabel: "$0.00",
+
+    priceMode: "manual",
+
+    purity: 925,
+
+    weightGrams: 44.3,
+
+    status: "Available",
+
+    images: [
+      "/assets/shoppics/IMG_5132.webp",
+      "/assets/shoppics/IMG_5132 (Product Staging).webp",
+      "/assets/shoppics/IMG_5132 (Product Staging) 2.webp"
+    ],
+
+    description: "Unisex David Yurman sterling silver and 14K yellow gold articulated bangle bracelet featuring alternating silver and gold links. Lobster clasp marked 'D Y ©' and '925 585'. Fits approximately a 6½ inch wrist. Weighs 44.3 grams with 7mm-wide links. Good condition with normal signs of wear.",
+
+    description_es: "Pulsera articulada unisex de David Yurman en plata esterlina y oro amarillo de 14K con eslabones alternados de plata y oro. Cierre de langosta marcado 'D Y ©' y '925 585'. Se ajusta aproximadamente a una muñeca de 6½ pulgadas. Pesa 44.3 gramos con eslabones de 7mm de ancho. Buenas condiciones con signos normales de uso.",
+
+    details: ["Category: Silver", "Brand: David Yurman", "Metals: Sterling silver (925) and 14K yellow gold (585)", "Marks: D Y ©, 925, 585", "Style: Articulated bangle bracelet", "Weight: 44.3 grams", "Width: 7mm", "Fit: Wears approximately 6½ inches around the wrist", "Clasp: Lobster clasp", "Condition: Good with normal signs of wear", "Price: $0.00"],
+
+    details_es: ["Categoría: Plata", "Marca: David Yurman", "Metales: Plata esterlina (925) y oro amarillo de 14K (585)", "Marcas: D Y ©, 925, 585", "Estilo: Pulsera articulada tipo bangle", "Peso: 44.3 gramos", "Ancho: 7mm", "Ajuste: Se ajusta aproximadamente a una circunferencia de muñeca de 6½ pulgadas", "Broche: Cierre de langosta", "Condición: Buena con signos normales de uso", "Precio: $0.00"],
+
+    tags: ["sterling silver", "925", "14k", "585", "david yurman", "dy", "articulated", "bangle", "bracelet", "silver bracelet", "gold and silver", "two tone", "unisex", "44.3 grams", "7mm", "6.5 inch", "lobster clasp", "designer", "estate jewelry"],
+
+    tags_es: ["plata esterlina", "925", "14k", "585", "david yurman", "dy", "articulada", "bangle", "pulsera", "pulsera de plata", "plata y oro", "dos tonos", "unisex", "44.3 gramos", "7mm", "6.5 pulgadas", "cierre de langosta", "diseñador", "joyería de patrimonio"]
+
   }
 ];
 

@@ -25,7 +25,7 @@
     currentPage === "silver-services.html" ||
     currentPage === "bullion.html"
   ) {
-    activePage = "what-we-buy.html";
+    activePage = "estate-jewelry.html";
   }
 
   function readCartCount() {
@@ -155,6 +155,8 @@
     var mobileInner = document.querySelector('#mobile-menu > div');
     if (!mobileInner) return;
 
+    var resetFns = [];
+
     var allLinks = Array.from(mobileInner.querySelectorAll('a'));
     allLinks.forEach(function (link) {
       if (link.classList.contains('mobile-subitem')) return;
@@ -167,35 +169,55 @@
       }
       if (!group.length) return;
 
-      group.forEach(function (item) { item.style.display = 'none'; });
+      // Wrap subitems in a <div> so display:none isn't overridden by #mobile-menu a { display:block !important }
+      var groupContainer = document.createElement('div');
+      groupContainer.style.display = 'none';
+      group[0].parentNode.insertBefore(groupContainer, group[0]);
+      group.forEach(function (item) { groupContainer.appendChild(item); });
 
       var wrapper = document.createElement('div');
-      wrapper.style.cssText = 'display:flex;align-items:center;border-bottom:1px solid #d8d0c2;';
+      wrapper.style.cssText = 'display:flex;align-items:center;border-bottom:1px solid rgba(216,208,194,0.18);';
       link.style.borderBottom = 'none';
       link.style.flex = '1';
 
-      var toggle = document.createElement('button');
-      toggle.type = 'button';
-      toggle.setAttribute('aria-expanded', 'false');
-      toggle.setAttribute('aria-label', 'Expand submenu');
-      toggle.style.cssText = 'background:none;border:none;padding:0.75rem 0.5rem;cursor:pointer;color:#735c00;display:flex;align-items:center;flex-shrink:0;';
-      toggle.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;line-height:1;transition:transform 0.2s;">expand_more</span>';
+      var chevron = document.createElement('span');
+      chevron.className = 'material-symbols-outlined';
+      chevron.setAttribute('aria-hidden', 'true');
+      chevron.style.cssText = 'font-size:20px;line-height:1;transition:transform 0.2s;padding:0.75rem 0.5rem;color:#735c00;flex-shrink:0;pointer-events:none;';
+      chevron.textContent = 'expand_more';
 
       link.parentNode.insertBefore(wrapper, link);
       wrapper.appendChild(link);
-      wrapper.appendChild(toggle);
+      wrapper.appendChild(chevron);
 
       var expanded = false;
-      toggle.addEventListener('click', function (e) {
+
+      // Always prevent default; use stopImmediatePropagation so the global
+      // close-menu listener (registered later on the same element) doesn't fire.
+      link.addEventListener('click', function (e) {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         expanded = !expanded;
-        toggle.setAttribute('aria-expanded', String(expanded));
-        var chevron = toggle.querySelector('.material-symbols-outlined');
-        if (chevron) chevron.style.transform = expanded ? 'rotate(180deg)' : '';
-        group.forEach(function (item) { item.style.display = expanded ? '' : 'none'; });
+        chevron.style.transform = expanded ? 'rotate(180deg)' : '';
+        groupContainer.style.display = expanded ? '' : 'none';
+      });
+
+      // Collapse back when the menu is closed so it resets for next open
+      resetFns.push(function () {
+        expanded = false;
+        chevron.style.transform = '';
+        groupContainer.style.display = 'none';
       });
     });
+
+    // Reset all submenus to collapsed whenever the menu closes
+    if (btn) {
+      btn.addEventListener('click', function () {
+        if (menu && !menu.classList.contains('hidden')) {
+          resetFns.forEach(function (fn) { fn(); });
+        }
+      });
+    }
   }
 
   ensureHeaderNavLinks();

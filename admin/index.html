@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Admin · Naples Estate Jewelry</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600;700&family=Material+Symbols+Outlined:wght,FILL@400,0&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Hanken Grotesk',sans-serif;background:#f0ede6;color:#1a1c1c;min-height:100vh}
+    /* Fields */
+    .af{width:100%;border:1px solid #b9ad99;border-radius:2px;padding:.6rem .75rem;background:#fff;color:#1a1c1c;font-size:.875rem;font-family:inherit}
+    .af:focus{border-color:#735c00;outline:2px solid rgba(115,92,0,.2);outline-offset:1px}
+    .al{display:block;font-size:.6rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#735c00;margin-bottom:.3rem}
+    select.af{cursor:pointer}
+    textarea.af{resize:vertical}
+    /* Tabs */
+    .tab-btn{padding:.55rem 1rem;font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;border:none;border-bottom:2px solid transparent;background:none;color:#5e5e5d;cursor:pointer;white-space:nowrap;transition:all .15s}
+    .tab-btn.on{color:#735c00;border-bottom-color:#735c00}
+    .tab-pane{display:none}.tab-pane.on{display:block}
+    /* Drop zone */
+    .dropzone{border:2px dashed #b9ad99;border-radius:4px;padding:2rem;text-align:center;cursor:pointer;transition:all .2s}
+    .dropzone.over,.dropzone:hover{border-color:#735c00;background:rgba(115,92,0,.04)}
+    /* Badges */
+    .badge-avail{background:#d4edda;color:#155724;padding:2px 8px;border-radius:2px;font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+    .badge-sold{background:#f8d7da;color:#721c24;padding:2px 8px;border-radius:2px;font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+    /* Modals */
+    .modal{display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.55)}
+    .modal.open{display:flex}
+    /* Buttons */
+    .btn-gold{background:#735c00;color:#fff;border:none;padding:.6rem 1.4rem;font-size:.68rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;cursor:pointer;border-radius:2px;font-family:inherit}
+    .btn-outline{background:none;border:1px solid #b9ad99;padding:.6rem 1.2rem;font-size:.68rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;cursor:pointer;border-radius:2px;color:#5e5e5d;font-family:inherit}
+    .btn-danger{background:#c0392b;color:#fff;border:none;padding:.5rem 1.2rem;font-size:.68rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;cursor:pointer;border-radius:2px;font-family:inherit}
+    /* Table */
+    #product-table{width:100%;border-collapse:collapse}
+    #product-table th{padding:.65rem 1rem;text-align:left;font-size:.58rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#735c00;border-bottom:2px solid #d8d0c2;background:#f9f9f7;white-space:nowrap}
+    #product-table td{padding:.6rem 1rem;border-bottom:1px solid #f0ede6;font-size:.8rem;color:#1a1c1c;vertical-align:middle}
+    #product-table tr:hover td{background:#faf8f5}
+    /* Toast */
+    #toast{position:fixed;bottom:1.5rem;right:1.5rem;z-index:999;padding:.7rem 1.2rem;border-radius:2px;font-size:.8rem;font-weight:500;display:none;max-width:320px;line-height:1.4}
+  </style>
+</head>
+<body>
+
+<!-- ── AUTH STATES ── -->
+<div id="s-loading" style="min-height:100vh;display:flex;align-items:center;justify-content:center">
+  <p style="color:#735c00;font-size:.78rem;letter-spacing:.14em;text-transform:uppercase">Checking access…</p>
+</div>
+
+<div id="s-denied" style="display:none;min-height:100vh;align-items:center;justify-content:center">
+  <div style="text-align:center;max-width:320px;padding:2rem">
+    <p style="color:#735c00;font-size:.65rem;letter-spacing:.18em;text-transform:uppercase;margin-bottom:.5rem">Admin Access Required</p>
+    <h1 style="font-size:1.5rem;font-weight:700;margin-bottom:1rem">Access Denied</h1>
+    <p style="color:#5e5e5d;font-size:.875rem;margin-bottom:1.5rem">Sign in to an admin account to continue.</p>
+    <a href="../account.html" class="btn-gold" style="display:inline-block;text-decoration:none">Sign In</a>
+  </div>
+</div>
+
+<!-- ── ADMIN UI ── -->
+<div id="s-admin" style="display:none">
+
+  <!-- Top bar -->
+  <header style="background:#fff;border-bottom:1px solid #d8d0c2;padding:.9rem 1.5rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200">
+    <div style="display:flex;align-items:center;gap:.75rem">
+      <img src="../assets/images/branding/logo.webp" alt="" style="height:30px;width:auto" />
+      <div>
+        <p style="font-size:.58rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#735c00">Naples Estate Jewelry</p>
+        <p style="font-size:.95rem;font-weight:700;color:#1a1c1c;margin-top:1px">Product Admin</p>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:.85rem;flex-wrap:wrap">
+      <span id="admin-email" style="font-size:.75rem;color:#5e5e5d"></span>
+      <a href="../shop.html" target="_blank" class="btn-outline" style="text-decoration:none;font-size:.63rem;padding:.35rem .8rem">View Shop ↗</a>
+      <button id="btn-signout" class="btn-outline" style="font-size:.63rem;padding:.35rem .8rem">Sign Out</button>
+    </div>
+  </header>
+
+  <main style="max-width:1380px;margin:0 auto;padding:1.75rem 1.25rem">
+
+    <!-- Stats -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:1.75rem">
+      <div style="background:#fff;border:1px solid #d8d0c2;border-radius:2px;padding:1rem 1.25rem">
+        <p style="font-size:.58rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#735c00">Total Items</p>
+        <p id="st-total" style="font-size:1.9rem;font-weight:700;margin-top:.2rem">—</p>
+      </div>
+      <div style="background:#fff;border:1px solid #d8d0c2;border-radius:2px;padding:1rem 1.25rem">
+        <p style="font-size:.58rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#735c00">Available</p>
+        <p id="st-avail" style="font-size:1.9rem;font-weight:700;margin-top:.2rem">—</p>
+      </div>
+      <div style="background:#fff;border:1px solid #d8d0c2;border-radius:2px;padding:1rem 1.25rem">
+        <p style="font-size:.58rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#735c00">Sold</p>
+        <p id="st-sold" style="font-size:1.9rem;font-weight:700;margin-top:.2rem">—</p>
+      </div>
+      <div style="background:#fff;border:1px solid #d8d0c2;border-radius:2px;padding:1rem 1.25rem">
+        <p style="font-size:.58rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#735c00">Gold / Silver</p>
+        <p id="st-cats" style="font-size:1.9rem;font-weight:700;margin-top:.2rem">—</p>
+      </div>
+    </div>
+
+    <!-- Action bar -->
+    <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:1rem">
+      <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center">
+        <input id="f-search" type="search" placeholder="Search…" class="af" style="width:200px" />
+        <select id="f-status" class="af" style="width:140px">
+          <option value="">All Statuses</option>
+          <option value="Available">Available</option>
+          <option value="Sold">Sold</option>
+        </select>
+        <select id="f-cat" class="af" style="width:130px">
+          <option value="">All Categories</option>
+          <option value="Gold">Gold</option>
+          <option value="Silver">Silver</option>
+        </select>
+      </div>
+      <button id="btn-add" class="btn-gold">+ Add Product</button>
+    </div>
+
+    <!-- Product table -->
+    <div style="background:#fff;border:1px solid #d8d0c2;border-radius:2px;overflow:auto">
+      <div id="tbl-loading" style="padding:3rem;text-align:center;color:#5e5e5d;font-size:.85rem">Loading products…</div>
+      <div id="tbl-empty" style="display:none;padding:3rem;text-align:center;color:#5e5e5d;font-size:.85rem">No products found.</div>
+      <table id="product-table" style="display:none">
+        <thead>
+          <tr>
+            <th>Order</th>
+            <th>Photo</th>
+            <th>Title / ID</th>
+            <th>Category</th>
+            <th>Weight</th>
+            <th>Price</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── DELETE MODAL ── -->
+<div id="modal-del" class="modal" style="align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:4px;padding:2rem;max-width:400px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.18)">
+    <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:.5rem">Delete Product?</h2>
+    <p id="del-name" style="color:#5e5e5d;font-size:.875rem;margin-bottom:1.5rem"></p>
+    <div style="display:flex;gap:.75rem;justify-content:flex-end">
+      <button id="del-cancel" class="btn-outline">Cancel</button>
+      <button id="del-confirm" class="btn-danger">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── PRODUCT MODAL ── -->
+<div id="modal-prod" class="modal" style="overflow-y:auto;padding:2rem 1rem;display:none">
+  <div style="background:#fff;border-radius:4px;max-width:820px;width:100%;margin:0 auto;box-shadow:0 8px 40px rgba(0,0,0,.18)">
+
+    <!-- Modal header -->
+    <div style="padding:1.1rem 1.5rem;border-bottom:1px solid #d8d0c2;display:flex;align-items:center;justify-content:space-between">
+      <h2 id="modal-heading" style="font-size:1.05rem;font-weight:700">Add Product</h2>
+      <button id="modal-close" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#5e5e5d;line-height:1;padding:.25rem">✕</button>
+    </div>
+
+    <!-- Tabs -->
+    <div style="border-bottom:1px solid #d8d0c2;display:flex;overflow-x:auto">
+      <button class="tab-btn on" data-tab="basic">Basic Info</button>
+      <button class="tab-btn" data-tab="desc">Descriptions</button>
+      <button class="tab-btn" data-tab="meta">Details &amp; Tags</button>
+      <button class="tab-btn" data-tab="imgs">Images</button>
+    </div>
+
+    <form id="prod-form" style="padding:1.5rem">
+
+      <!-- TAB: Basic Info -->
+      <div class="tab-pane on" data-pane="basic">
+        <div style="display:grid;gap:1rem">
+          <div>
+            <label class="al" for="fi-id">Product ID / Slug</label>
+            <input id="fi-id" class="af" type="text" placeholder="e.g. 14k-rope-chain-01" />
+            <p style="font-size:.68rem;color:#9e9e9e;margin-top:.25rem">Auto-filled from title. Lowercase, hyphens only, must be unique.</p>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+            <div>
+              <label class="al" for="fi-cat">Category</label>
+              <select id="fi-cat" class="af"><option value="Gold">Gold</option><option value="Silver">Silver</option></select>
+            </div>
+            <div>
+              <label class="al" for="fi-status">Status</label>
+              <select id="fi-status" class="af"><option value="Available">Available</option><option value="Sold">Sold</option></select>
+            </div>
+          </div>
+          <div>
+            <label class="al" for="fi-title">Title (English)</label>
+            <input id="fi-title" class="af" type="text" />
+          </div>
+          <div>
+            <label class="al" for="fi-title-es">Title (Spanish)</label>
+            <input id="fi-title-es" class="af" type="text" />
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem">
+            <div>
+              <label class="al" for="fi-purity">Purity (karat / fineness)</label>
+              <input id="fi-purity" class="af" type="number" placeholder="14, 18, 925…" />
+            </div>
+            <div>
+              <label class="al" for="fi-weight">Weight (grams)</label>
+              <input id="fi-weight" class="af" type="number" step="0.01" />
+            </div>
+            <div>
+              <label class="al" for="fi-order">Sort Order</label>
+              <input id="fi-order" class="af" type="number" value="0" />
+            </div>
+          </div>
+          <div style="background:#f9f9f7;border:1px solid #d8d0c2;border-radius:2px;padding:1rem">
+            <p style="font-size:.6rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#735c00;margin-bottom:.75rem">Pricing</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+              <div>
+                <label class="al" for="fi-mode">Price Mode</label>
+                <select id="fi-mode" class="af">
+                  <option value="spot-multiplier">Live gold spot × multiplier</option>
+                  <option value="manual">Manual price label</option>
+                </select>
+              </div>
+              <div id="g-mult">
+                <label class="al" for="fi-mult">Spot Multiplier</label>
+                <input id="fi-mult" class="af" type="number" step="0.001" placeholder="1.25" />
+              </div>
+            </div>
+            <div id="g-manual" style="margin-top:.9rem;display:none">
+              <label class="al" for="fi-manual">Manual Price Label</label>
+              <input id="fi-manual" class="af" type="text" placeholder="e.g. $1,250.00" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: Descriptions -->
+      <div class="tab-pane" data-pane="desc">
+        <div style="display:grid;gap:1.25rem">
+          <div>
+            <label class="al" for="fi-desc">Description (English)</label>
+            <textarea id="fi-desc" class="af" rows="7"></textarea>
+          </div>
+          <div>
+            <label class="al" for="fi-desc-es">Description (Spanish)</label>
+            <textarea id="fi-desc-es" class="af" rows="7"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: Details & Tags -->
+      <div class="tab-pane" data-pane="meta">
+        <div style="display:grid;gap:1.25rem">
+          <div>
+            <label class="al" for="fi-det">Details (English) — one bullet per line</label>
+            <textarea id="fi-det" class="af" rows="7" style="font-family:monospace;font-size:.78rem" placeholder="Category: Gold&#10;Metal: 14K yellow gold&#10;Weight: 12.7 grams"></textarea>
+          </div>
+          <div>
+            <label class="al" for="fi-det-es">Details (Spanish) — one bullet per line</label>
+            <textarea id="fi-det-es" class="af" rows="7" style="font-family:monospace;font-size:.78rem"></textarea>
+          </div>
+          <div>
+            <label class="al" for="fi-tags">Tags (English) — comma separated</label>
+            <textarea id="fi-tags" class="af" rows="3" style="font-family:monospace;font-size:.78rem" placeholder="14k, cuban link, yellow gold, lobster clasp"></textarea>
+          </div>
+          <div>
+            <label class="al" for="fi-tags-es">Tags (Spanish) — comma separated</label>
+            <textarea id="fi-tags-es" class="af" rows="3" style="font-family:monospace;font-size:.78rem"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: Images -->
+      <div class="tab-pane" data-pane="imgs">
+        <div id="img-previews" style="display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:1rem"></div>
+        <div id="dropzone" class="dropzone">
+          <p style="font-size:1.75rem;margin-bottom:.4rem">📷</p>
+          <p style="font-size:.875rem;color:#5e5e5d;margin-bottom:.3rem">Drag photos here, or tap to choose files</p>
+          <p style="font-size:.7rem;color:#9e9e9e">JPG · PNG · HEIC · WebP — auto-compressed to WebP on upload</p>
+          <input id="img-input" type="file" accept="image/*" multiple style="display:none" />
+        </div>
+        <p id="upload-status" style="font-size:.75rem;color:#735c00;margin-top:.65rem;min-height:1.1em"></p>
+      </div>
+
+      <!-- Footer -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid #d8d0c2">
+        <p id="form-err" style="color:#c0392b;font-size:.78rem"></p>
+        <div style="display:flex;gap:.65rem">
+          <button type="button" id="form-cancel" class="btn-outline">Cancel</button>
+          <button type="submit" id="form-save" class="btn-gold">Save Product</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── TOAST ── -->
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="../scripts/shared/supabase-config.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  const sb = window.supabase.createClient(
+    window.NAPLES_SUPABASE.url,
+    window.NAPLES_SUPABASE.anonKey
+  );
+
+  let products = [];
+  let editingId = null;
+  let pendingDel = null;
+  let imgs = []; // {url, file|null, existing}
+
+  // ── SHOW / HIDE STATES ──────────────────────────────────────
+  function showState(name) {
+    const map = { loading: 's-loading', denied: 's-denied', admin: 's-admin' };
+    Object.entries(map).forEach(([k, id]) => {
+      document.getElementById(id).style.display = k === name
+        ? (k === 'denied' ? 'flex' : 'block') : 'none';
+    });
+  }
+
+  // ── AUTH CHECK ───────────────────────────────────────────────
+  sb.auth.getSession().then(async ({ data: { session } }) => {
+    if (!session) { showState('denied'); return; }
+    const { data: profile } = await sb.from('profiles')
+      .select('is_admin').eq('id', session.user.id).maybeSingle();
+    if (!profile || !profile.is_admin) { showState('denied'); return; }
+    document.getElementById('admin-email').textContent = session.user.email;
+    showState('admin');
+    loadProducts();
+  });
+
+  document.getElementById('btn-signout').addEventListener('click', async () => {
+    await sb.auth.signOut();
+    window.location.href = '../account.html';
+  });
+
+  // ── LOAD & RENDER PRODUCTS ───────────────────────────────────
+  async function loadProducts() {
+    document.getElementById('tbl-loading').style.display = 'block';
+    document.getElementById('product-table').style.display = 'none';
+    document.getElementById('tbl-empty').style.display = 'none';
+
+    const { data, error } = await sb.from('products')
+      .select('*').order('sort_order', { ascending: true });
+
+    if (error) { toast('Load error: ' + error.message, true); return; }
+    products = data || [];
+    updateStats();
+    renderTable();
+  }
+
+  function updateStats() {
+    document.getElementById('st-total').textContent = products.length;
+    document.getElementById('st-avail').textContent = products.filter(p => p.status === 'Available').length;
+    document.getElementById('st-sold').textContent = products.filter(p => p.status === 'Sold').length;
+    const gold = products.filter(p => p.category === 'Gold').length;
+    const silver = products.filter(p => p.category === 'Silver').length;
+    document.getElementById('st-cats').textContent = gold + ' / ' + silver;
+  }
+
+  function filtered() {
+    const q = (document.getElementById('f-search').value || '').toLowerCase();
+    const st = document.getElementById('f-status').value;
+    const cat = document.getElementById('f-cat').value;
+    return products.filter(p => {
+      if (q && !p.title.toLowerCase().includes(q) && !p.id.toLowerCase().includes(q)) return false;
+      if (st && p.status !== st) return false;
+      if (cat && p.category !== cat) return false;
+      return true;
+    });
+  }
+
+  function renderTable() {
+    const list = filtered();
+    document.getElementById('tbl-loading').style.display = 'none';
+    if (list.length === 0) {
+      document.getElementById('product-table').style.display = 'none';
+      document.getElementById('tbl-empty').style.display = 'block';
+      return;
+    }
+    document.getElementById('tbl-empty').style.display = 'none';
+    document.getElementById('product-table').style.display = 'table';
+    document.getElementById('tbl-body').innerHTML = list.map(p => {
+      const thumb = (p.images && p.images.length)
+        ? `<img src="${esc(p.images[0])}" alt="" style="width:62px;height:62px;object-fit:cover;border-radius:2px;border:1px solid #d8d0c2;display:block" onerror="this.style.opacity=.3">`
+        : `<div style="width:62px;height:62px;background:#f0ede6;border:1px solid #d8d0c2;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:1.1rem">📷</div>`;
+      const badge = p.status === 'Available'
+        ? `<span class="badge-avail">Available</span>`
+        : `<span class="badge-sold">Sold</span>`;
+      const price = p.price_mode === 'manual'
+        ? esc(p.manual_price_label || '—')
+        : `×${p.pricing_multiplier} spot`;
+      return `<tr>
+        <td style="color:#9e9e9e">${p.sort_order}</td>
+        <td>${thumb}</td>
+        <td>
+          <p style="font-weight:600;margin-bottom:.18rem;line-height:1.3">${esc(p.title)}</p>
+          <p style="font-size:.65rem;color:#9e9e9e;font-family:monospace">${esc(p.id)}</p>
+        </td>
+        <td>${esc(p.category)}</td>
+        <td>${p.weight_grams ? p.weight_grams + 'g' : '—'}</td>
+        <td>${price}</td>
+        <td>${badge}</td>
+        <td style="white-space:nowrap">
+          <button onclick="openEdit('${esc(p.id)}')" style="font-size:.63rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:none;border:1px solid #b9ad99;padding:.28rem .65rem;border-radius:2px;cursor:pointer;color:#735c00;margin-right:.3rem;font-family:inherit">Edit</button>
+          <button onclick="confirmDel('${esc(p.id)}','${esc(p.title)}')" style="font-size:.63rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:none;border:1px solid #f5c6cb;padding:.28rem .65rem;border-radius:2px;cursor:pointer;color:#c0392b;font-family:inherit">Delete</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  ['f-search','f-status','f-cat'].forEach(id => {
+    document.getElementById(id).addEventListener('input', renderTable);
+  });
+
+  // ── TOAST ────────────────────────────────────────────────────
+  function toast(msg, isErr) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.style.display = 'block';
+    el.style.background = isErr ? '#c0392b' : '#1a1c1c';
+    el.style.color = '#fff';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.display = 'none'; }, 4500);
+  }
+
+  function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── DELETE ───────────────────────────────────────────────────
+  window.confirmDel = function(id, title) {
+    pendingDel = id;
+    document.getElementById('del-name').textContent = `"${title}" will be permanently deleted.`;
+    document.getElementById('modal-del').classList.add('open');
+  };
+  document.getElementById('del-cancel').addEventListener('click', () => {
+    document.getElementById('modal-del').classList.remove('open');
+    pendingDel = null;
+  });
+  document.getElementById('del-confirm').addEventListener('click', async () => {
+    if (!pendingDel) return;
+    const { error } = await sb.from('products').delete().eq('id', pendingDel);
+    document.getElementById('modal-del').classList.remove('open');
+    if (error) { toast('Delete failed: ' + error.message, true); }
+    else { toast('Product deleted.'); loadProducts(); }
+    pendingDel = null;
+  });
+
+  // ── ADD / EDIT MODAL ─────────────────────────────────────────
+  function slugify(t) {
+    return t.toLowerCase().replace(/[^a-z0-9\s-]/g,'').trim().replace(/\s+/g,'-').replace(/-+/g,'-') + '-01';
+  }
+
+  document.getElementById('btn-add').addEventListener('click', openAdd);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('form-cancel').addEventListener('click', closeModal);
+
+  function openAdd() {
+    editingId = null;
+    imgs = [];
+    document.getElementById('modal-heading').textContent = 'Add Product';
+    resetForm();
+    showModal();
+  }
+
+  window.openEdit = function(id) {
+    const p = products.find(x => x.id === id);
+    if (!p) return;
+    editingId = id;
+    imgs = [];
+    document.getElementById('modal-heading').textContent = 'Edit Product';
+    fillForm(p);
+    showModal();
+  };
+
+  function showModal() {
+    switchTab('basic');
+    document.getElementById('form-err').textContent = '';
+    const m = document.getElementById('modal-prod');
+    m.classList.add('open');
+    m.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    const m = document.getElementById('modal-prod');
+    m.classList.remove('open');
+    m.style.display = 'none';
+    document.body.style.overflow = '';
+    imgs = [];
+    renderPreviews();
+  }
+
+  function resetForm() {
+    document.getElementById('fi-id').value = '';
+    document.getElementById('fi-title').value = '';
+    document.getElementById('fi-title-es').value = '';
+    document.getElementById('fi-cat').value = 'Gold';
+    document.getElementById('fi-status').value = 'Available';
+    document.getElementById('fi-purity').value = '';
+    document.getElementById('fi-weight').value = '';
+    document.getElementById('fi-order').value = products.length + 1;
+    document.getElementById('fi-mode').value = 'spot-multiplier';
+    document.getElementById('fi-mult').value = '1.25';
+    document.getElementById('fi-manual').value = '';
+    document.getElementById('fi-desc').value = '';
+    document.getElementById('fi-desc-es').value = '';
+    document.getElementById('fi-det').value = '';
+    document.getElementById('fi-det-es').value = '';
+    document.getElementById('fi-tags').value = '';
+    document.getElementById('fi-tags-es').value = '';
+    togglePrice();
+    renderPreviews();
+  }
+
+  function fillForm(p) {
+    document.getElementById('fi-id').value = p.id || '';
+    document.getElementById('fi-title').value = p.title || '';
+    document.getElementById('fi-title-es').value = p.title_es || '';
+    document.getElementById('fi-cat').value = p.category || 'Gold';
+    document.getElementById('fi-status').value = p.status || 'Available';
+    document.getElementById('fi-purity').value = p.purity || '';
+    document.getElementById('fi-weight').value = p.weight_grams || '';
+    document.getElementById('fi-order').value = p.sort_order || 0;
+    document.getElementById('fi-mode').value = p.price_mode || 'spot-multiplier';
+    document.getElementById('fi-mult').value = p.pricing_multiplier || '1.25';
+    document.getElementById('fi-manual').value = p.manual_price_label || '';
+    document.getElementById('fi-desc').value = p.description || '';
+    document.getElementById('fi-desc-es').value = p.description_es || '';
+    document.getElementById('fi-det').value = (p.details || []).join('\n');
+    document.getElementById('fi-det-es').value = (p.details_es || []).join('\n');
+    document.getElementById('fi-tags').value = (p.tags || []).join(', ');
+    document.getElementById('fi-tags-es').value = (p.tags_es || []).join(', ');
+    togglePrice();
+    imgs = (p.images || []).map(url => ({ url, file: null, existing: true }));
+    renderPreviews();
+  }
+
+  // Auto-slug from title
+  document.getElementById('fi-title').addEventListener('blur', () => {
+    const idEl = document.getElementById('fi-id');
+    if (!editingId && !idEl.value.trim()) {
+      const t = document.getElementById('fi-title').value.trim();
+      if (t) idEl.value = slugify(t);
+    }
+  });
+
+  // Price mode toggle
+  document.getElementById('fi-mode').addEventListener('change', togglePrice);
+  function togglePrice() {
+    const m = document.getElementById('fi-mode').value;
+    document.getElementById('g-mult').style.display = m === 'spot-multiplier' ? '' : 'none';
+    document.getElementById('g-manual').style.display = m === 'manual' ? '' : 'none';
+  }
+
+  // Tabs
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+  function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('on', p.dataset.pane === name));
+  }
+
+  // ── IMAGE UPLOADER ───────────────────────────────────────────
+  const dropzone = document.getElementById('dropzone');
+  const imgInput = document.getElementById('img-input');
+
+  dropzone.addEventListener('click', () => imgInput.click());
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('over'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('over'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('over');
+    addFiles(Array.from(e.dataTransfer.files));
+  });
+  imgInput.addEventListener('change', () => {
+    addFiles(Array.from(imgInput.files));
+    imgInput.value = '';
+  });
+
+  function addFiles(files) {
+    files.filter(f => f.type.startsWith('image/') || /\.(heic|heif)$/i.test(f.name)).forEach(f => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        imgs.push({ url: e.target.result, file: f, existing: false });
+        renderPreviews();
+      };
+      reader.readAsDataURL(f);
+    });
+  }
+
+  function renderPreviews() {
+    const c = document.getElementById('img-previews');
+    if (!imgs.length) { c.innerHTML = ''; return; }
+    c.innerHTML = imgs.map((img, i) => `
+      <div style="position:relative;display:inline-block">
+        <img src="${img.url}" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:2px;border:1px solid #d8d0c2;display:block" />
+        ${img.existing ? '' : '<span style="position:absolute;top:2px;left:2px;background:#735c00;color:#fff;font-size:.52rem;padding:1px 4px;border-radius:1px;font-weight:700;line-height:1.4">NEW</span>'}
+        <button type="button" onclick="removeImg(${i})" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:17px;height:17px;font-size:.65rem;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit">✕</button>
+      </div>
+    `).join('');
+  }
+
+  window.removeImg = function(i) {
+    imgs.splice(i, 1);
+    renderPreviews();
+  };
+
+  async function compressToWebp(file) {
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 1600;
+          const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob(blob => resolve(blob || file), 'image/webp', 0.85);
+        };
+        img.onerror = () => resolve(file);
+        img.src = e.target.result;
+      };
+      reader.onerror = () => resolve(file);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function uploadNewImages(productId) {
+    const statusEl = document.getElementById('upload-status');
+    const newImgs = imgs.filter(i => !i.existing && i.file);
+    if (!newImgs.length) return;
+
+    for (let n = 0; n < newImgs.length; n++) {
+      statusEl.textContent = `Uploading image ${n + 1} of ${newImgs.length}…`;
+      const blob = await compressToWebp(newImgs[n].file);
+      const ts = new Date().getTime() + n;
+      const path = `${productId}/${ts}.webp`;
+      const { error } = await sb.storage.from('product-images').upload(path, blob, {
+        contentType: 'image/webp', upsert: false
+      });
+      if (error) {
+        toast(`Image ${n + 1} failed: ${error.message}`, true);
+        continue;
+      }
+      const { data: { publicUrl } } = sb.storage.from('product-images').getPublicUrl(path);
+      newImgs[n].url = publicUrl;
+      newImgs[n].existing = true;
+    }
+    statusEl.textContent = '';
+  }
+
+  // ── SAVE PRODUCT ─────────────────────────────────────────────
+  document.getElementById('prod-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const errEl = document.getElementById('form-err');
+    const btn = document.getElementById('form-save');
+    errEl.textContent = '';
+
+    const id = document.getElementById('fi-id').value.trim();
+    const title = document.getElementById('fi-title').value.trim();
+    if (!id) { errEl.textContent = 'Product ID is required.'; switchTab('basic'); return; }
+    if (!title) { errEl.textContent = 'Title is required.'; switchTab('basic'); return; }
+
+    btn.textContent = 'Saving…';
+    btn.disabled = true;
+
+    // Upload any new images first
+    if (imgs.some(i => !i.existing)) {
+      switchTab('imgs');
+      await uploadNewImages(id);
+      switchTab('basic');
+    }
+
+    const mode = document.getElementById('fi-mode').value;
+    const payload = {
+      id,
+      category: document.getElementById('fi-cat').value,
+      title,
+      title_es: document.getElementById('fi-title-es').value.trim() || null,
+      price_mode: mode,
+      pricing_multiplier: mode === 'spot-multiplier' ? (parseFloat(document.getElementById('fi-mult').value) || null) : null,
+      manual_price_label: mode === 'manual' ? (document.getElementById('fi-manual').value.trim() || null) : null,
+      price_label: mode === 'manual' ? (document.getElementById('fi-manual').value.trim() || null) : null,
+      purity: parseInt(document.getElementById('fi-purity').value) || null,
+      weight_grams: parseFloat(document.getElementById('fi-weight').value) || null,
+      status: document.getElementById('fi-status').value,
+      sort_order: parseInt(document.getElementById('fi-order').value) || 0,
+      description: document.getElementById('fi-desc').value.trim() || null,
+      description_es: document.getElementById('fi-desc-es').value.trim() || null,
+      details: document.getElementById('fi-det').value.split('\n').map(s => s.trim()).filter(Boolean),
+      details_es: document.getElementById('fi-det-es').value.split('\n').map(s => s.trim()).filter(Boolean),
+      tags: document.getElementById('fi-tags').value.split(',').map(s => s.trim()).filter(Boolean),
+      tags_es: document.getElementById('fi-tags-es').value.split(',').map(s => s.trim()).filter(Boolean),
+      images: imgs.map(i => i.url),
+    };
+
+    let error;
+    if (editingId) {
+      ({ error } = await sb.from('products').update(payload).eq('id', editingId));
+    } else {
+      ({ error } = await sb.from('products').insert(payload));
+    }
+
+    btn.textContent = 'Save Product';
+    btn.disabled = false;
+
+    if (error) {
+      errEl.textContent = error.message;
+      return;
+    }
+
+    toast(editingId ? 'Product updated.' : 'Product added.');
+    closeModal();
+    loadProducts();
+  });
+
+})();
+</script>
+</body>
+</html>
