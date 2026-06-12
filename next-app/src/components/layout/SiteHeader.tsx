@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
+import { useWishlist } from '@/context/WishlistContext';
 
 const GOLD = '#735c00';
 const SECONDARY = '#5e5e5d';
@@ -20,6 +21,7 @@ export default function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [sellOpen, setSellOpen] = useState(false);
   const [servicesOpen, setServicesOpen] = useState(false);
+  const { count: wishlistCount, openDrawer } = useWishlist();
 
   function href(path: string) {
     return `${locale === 'es' ? '/es' : ''}${path}`;
@@ -61,7 +63,7 @@ export default function SiteHeader() {
             alt="Naples Estate Jewelry Logo"
             width={40}
             height={40}
-            className="h-8 w-auto md:h-10 object-contain flex-shrink-0"
+            className="hidden md:block h-8 w-auto md:h-10 object-contain flex-shrink-0"
             priority
             unoptimized
           />
@@ -76,7 +78,7 @@ export default function SiteHeader() {
             className="block sm:hidden text-[11px] tracking-normal uppercase whitespace-nowrap"
             style={{ fontFamily: 'var(--font-headline)', color: GOLD }}
           >
-            Naples Estate Jewelry
+            Naples Estate Jewelry Co
           </span>
         </Link>
 
@@ -117,20 +119,39 @@ export default function SiteHeader() {
             {locale === 'en' ? 'ES' : 'EN'}
           </Link>
 
+          {/* Wishlist / cart button — all breakpoints */}
+          <button
+            type="button"
+            onClick={openDrawer}
+            className="relative flex items-center justify-center w-8 h-8 transition-colors"
+            style={{ color: wishlistCount > 0 ? GOLD : '#5e5e5d' }}
+            aria-label="Saved items"
+          >
+            <span
+              className="material-symbols-outlined"
+              style={{
+                fontSize: '20px',
+                lineHeight: 1,
+                fontVariationSettings: wishlistCount > 0 ? "'FILL' 1" : "'FILL' 0",
+              }}
+            >
+              shopping_bag
+            </span>
+            {wishlistCount > 0 && (
+              <span
+                className="absolute -top-1 -right-1 w-4 h-4 flex items-center justify-center text-[0.5rem] font-bold rounded-full"
+                style={{ background: GOLD, color: '#fff', fontFamily: 'var(--font-label)' }}
+              >
+                {wishlistCount > 9 ? '9+' : wishlistCount}
+              </span>
+            )}
+          </button>
+
           {/* Call Now — hidden on mobile; inline-flex at 2xl. Wrapped in span to prevent gold-button display override */}
           <span className="hidden 2xl:inline-flex">
             <a href="tel:2394048505" className="gold-button">{t('callNow')}</a>
           </span>
 
-          {/* Phone icon link — mobile only, compact */}
-          <a
-            href="tel:2394048505"
-            className="2xl:hidden flex items-center justify-center w-8 h-8 rounded-full border transition-colors"
-            style={{ borderColor: `${GOLD}60`, color: GOLD }}
-            aria-label="Call us"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '17px', lineHeight: 1 }}>call</span>
-          </a>
 
           <button
             type="button"
@@ -184,6 +205,24 @@ export default function SiteHeader() {
 
             <MobileLink href={href('/contact')} onClick={closeAll}>{t('contact')}</MobileLink>
             <MobileLink href={href('/account')} onClick={closeAll}>{t('myAccount')}</MobileLink>
+
+            {/* Wishlist — opens drawer */}
+            <button
+              type="button"
+              onClick={() => { closeAll(); openDrawer(); }}
+              className="py-3 border-b text-xs font-bold uppercase tracking-[0.08em] flex items-center justify-between w-full transition-colors hover:text-[#735c00]"
+              style={{ borderColor: BORDER, color: '#1a1c1c', fontFamily: 'var(--font-label)' }}
+            >
+              <span>{locale === 'en' ? 'Saved Items' : 'Lista de deseos'}</span>
+              {wishlistCount > 0 && (
+                <span
+                  className="text-[0.5rem] font-bold px-1.5 py-0.5 rounded-full"
+                  style={{ background: GOLD, color: '#fff' }}
+                >
+                  {wishlistCount}
+                </span>
+              )}
+            </button>
 
             <MobileLink href={altHref} onClick={closeAll} style={{ color: GOLD }}>
               {locale === 'en' ? 'Español' : 'English'}

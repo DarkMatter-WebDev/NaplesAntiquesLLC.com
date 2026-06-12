@@ -53,6 +53,7 @@ export default function AdminShell({ initialProducts, userEmail }: Props) {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   const flash = (text: string, ok = true) => {
@@ -495,7 +496,19 @@ export default function AdminShell({ initialProducts, userEmail }: Props) {
                 <label className="form-label">Images</label>
                 <label
                   className="flex flex-col items-center justify-center border-2 border-dashed p-6 cursor-pointer text-sm transition-colors mb-3"
-                  style={{ borderColor: 'var(--color-outline-variant)', color: 'var(--color-on-surface-variant)' }}
+                  style={{
+                    borderColor: dragOver ? 'var(--color-primary)' : 'var(--color-outline-variant)',
+                    color: dragOver ? 'var(--color-primary)' : 'var(--color-on-surface-variant)',
+                    background: dragOver ? 'color-mix(in srgb, var(--color-primary) 6%, transparent)' : undefined,
+                  }}
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragEnter={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOver(false);
+                    if (e.dataTransfer.files.length) handleImageUpload(e.dataTransfer.files);
+                  }}
                 >
                   <input type="file" accept="image/*" multiple className="sr-only"
                     onChange={(e) => e.target.files && handleImageUpload(e.target.files)} />

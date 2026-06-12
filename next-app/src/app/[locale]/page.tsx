@@ -72,13 +72,13 @@ export default async function HomePage({ params }: Props) {
           <div className="container mx-auto px-6 md:px-8 relative flex justify-center" style={{ zIndex: 10 }}>
             <div className="flex flex-col items-center justify-start text-center">
               <span
-                className="text-[0.65rem] font-bold uppercase tracking-[0.3em] block mb-8"
-                style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+                className="text-[0.75rem] font-bold uppercase tracking-[0.3em] block mt-8 mb-6"
+                style={{ color: '#e9c349', fontFamily: 'var(--font-label)' }}
               >
                 {isEs ? 'Joyería de Patrimonio y Relojes' : 'Curated Estate Jewelry & Watches'}
               </span>
               <h1
-                className="text-4xl md:text-5xl font-bold mt-2 mb-28 md:mb-32 tracking-tight"
+                className="text-4xl md:text-6xl font-normal mt-2 mb-14 md:mb-20 tracking-normal"
                 style={{ fontFamily: 'var(--font-headline)', color: '#f9f9f7' }}
               >
                 {isEs ? 'Rara. Auténtica. Atemporal.' : 'Rare. Authentic. Timeless.'}

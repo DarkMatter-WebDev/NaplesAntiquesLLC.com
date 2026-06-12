@@ -9,6 +9,8 @@ import { getDisplayPrice, getPriceContext, purityToFraction } from '@/lib/pricin
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import ProductImageGallery from '@/components/shop/ProductImageGallery';
+import WishlistButton from '@/components/shop/WishlistButton';
+import type { WishlistItem } from '@/context/WishlistContext';
 
 interface Props {
   params: Promise<{ locale: string; id: string }>;
@@ -67,6 +69,19 @@ export default async function ProductDetailPage({ params }: Props) {
   const priceCtx = getPriceContext(p, spotData, locale);
   const isSold = p.status === 'Sold';
 
+  const wishlistItem: WishlistItem = {
+    id: p.id,
+    title: p.title,
+    title_es: p.title_es,
+    image: p.images?.[0] ?? null,
+    status: p.status,
+    price_mode: p.price_mode,
+    purity: p.purity,
+    weight_grams: p.weight_grams,
+    pricing_multiplier: p.pricing_multiplier,
+    manual_price_label: p.manual_price_label,
+  };
+
   // Gold weight context
   let goldWeightLine: string | null = null;
   if (p.weight_grams && p.purity && p.category === 'Gold') {
@@ -82,15 +97,15 @@ export default async function ProductDetailPage({ params }: Props) {
       <SiteHeader />
       <main className="pt-24 md:pt-28 pb-20">
 
-        {/* Breadcrumb */}
+        {/* Back to shop */}
         <div className="max-w-7xl mx-auto px-4 md:px-8 mb-6">
-          <nav className="flex items-center gap-2 text-xs" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-            <Link href={shopHref} className="hover:underline underline-offset-2">
-              {isEs ? 'Tienda' : 'Shop'}
-            </Link>
-            <span>/</span>
-            <span className="truncate">{title}</span>
-          </nav>
+          <Link
+            href={shopHref}
+            className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest hover:underline underline-offset-2"
+            style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+          >
+            ← {isEs ? 'Volver a la tienda' : 'Back to Shop'}
+          </Link>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 md:px-8">
@@ -126,7 +141,7 @@ export default async function ProductDetailPage({ params }: Props) {
 
               {/* Title */}
               <h1
-                className="text-3xl md:text-4xl font-bold leading-tight"
+                className="text-xl md:text-4xl font-bold leading-tight"
                 style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
               >
                 {title}
@@ -178,6 +193,7 @@ export default async function ProductDetailPage({ params }: Props) {
                   <a href="tel:2394048505" className="outline-button">
                     {isEs ? 'Llamar: (239) 404-8505' : 'Call: (239) 404-8505'}
                   </a>
+                  <WishlistButton item={wishlistItem} variant="button" locale={locale} />
                 </div>
               )}
 
@@ -203,16 +219,6 @@ export default async function ProductDetailPage({ params }: Props) {
                 </p>
               )}
 
-              {/* Back link */}
-              <div className="pt-4 border-t" style={{ borderColor: 'var(--color-outline-variant)' }}>
-                <Link
-                  href={shopHref}
-                  className="text-xs font-bold uppercase tracking-widest hover:underline underline-offset-2"
-                  style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
-                >
-                  {isEs ? '← Volver a la tienda' : '← Back to Shop'}
-                </Link>
-              </div>
 
             </div>
           </div>

@@ -2,6 +2,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { Product, SpotData } from '@/types/product';
 import { getDisplayPrice, getPriceContext } from '@/lib/pricing';
+import WishlistButton from '@/components/shop/WishlistButton';
+import type { WishlistItem } from '@/context/WishlistContext';
 
 interface Props {
   product: Product;
@@ -17,6 +19,19 @@ export default function ProductCard({ product, spotData, locale }: Props) {
   const thumb = product.images?.[0];
   const href = locale === 'es' ? `/es/shop/${product.id}` : `/shop/${product.id}`;
   const isSold = product.status === 'Sold';
+
+  const wishlistItem: WishlistItem = {
+    id: product.id,
+    title: product.title,
+    title_es: product.title_es,
+    image: thumb ?? null,
+    status: product.status,
+    price_mode: product.price_mode,
+    purity: product.purity,
+    weight_grams: product.weight_grams,
+    pricing_multiplier: product.pricing_multiplier,
+    manual_price_label: product.manual_price_label,
+  };
 
   return (
     <article className="group relative flex flex-col bg-[color:var(--color-surface-container-lowest)] border border-[color:var(--color-outline-variant)] overflow-hidden">
@@ -39,6 +54,11 @@ export default function ProductCard({ product, spotData, locale }: Props) {
             {isEs ? 'Disponible' : 'Available'}
           </div>
         )}
+        {/* Wishlist button — top-right of image */}
+        <div className="absolute top-2 right-2 z-10">
+          <WishlistButton item={wishlistItem} variant="icon" locale={locale} />
+        </div>
+
         {thumb ? (
           <Link href={href}>
             <Image
