@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html class="light" lang="en">
 <head>
   <meta charset="utf-8" />
@@ -29,8 +29,8 @@
   <script src="scripts/shared/editorial-tailwind-config.js"></script>
   <link href="editorial-base.css" rel="stylesheet" />
   <link href="editorial-theme.css?v=header-sync-20260602" rel="stylesheet" />
-  <script src="scripts/shared/site-header.js?v=header-sync-20260605" defer></script>
-  <script src="scripts/forms/submit-item-form.js?v=netlify-modal-20260612" defer></script>
+  <script src="scripts/shared/site-header.js?v=header-sync-20260612b" defer></script>
+  <script src="scripts/forms/submit-item-form.js?v=netlify-multi-photo-20260612" defer></script>
   <style>
     html { scroll-behavior: smooth; }
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; }
@@ -69,6 +69,13 @@
     .submit-item-form__modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; border-bottom: 1px solid #d8d0c2; padding-bottom: 1rem; }
     .submit-item-form__modal-title { color: #1a1c1c; font-family: "Libre Caslon Text", Georgia, serif; font-size: clamp(1.45rem, 4vw, 2rem); font-weight: 700; line-height: 1.15; }
     .submit-item-form__modal-close { flex: 0 0 auto; border: 1px solid #d8d0c2; border-radius: 999px; color: #735c00; width: 2.25rem; height: 2.25rem; display: inline-grid; place-items: center; }
+    .submit-item-form__additional-photos { display: grid; gap: 0.75rem; border: 1px solid #d8d0c2; border-radius: 0.25rem; padding: 1rem; background: #fbfaf6; }
+    .submit-item-form__photo-slots { display: grid; gap: 0.6rem; }
+    @media (min-width: 640px) { .submit-item-form__photo-slots { grid-template-columns: 1fr 1fr; } }
+    .submit-item-form__photo-slot { display: flex; align-items: center; justify-content: center; min-height: 3.25rem; border: 1px dashed #b9a982; border-radius: 0.25rem; color: #735c00; cursor: pointer; padding: 0.8rem; text-align: center; font-family: "Hanken Grotesk", Inter, Arial, sans-serif; font-size: 0.76rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+    .submit-item-form__photo-slot:hover,
+    .submit-item-form__photo-slot:focus-within { border-color: #735c00; background: #f8f3e5; }
+    .submit-item-form__photo-slot input { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
     .submit-item-form__modal-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; padding-top: 0.25rem; }
     .submit-item-form__change-photos { border: 1px solid #735c00; color: #735c00; cursor: pointer; padding: 0.9rem 1.25rem; border-radius: 0.25rem; font-family: "Hanken Grotesk", Inter, Arial, sans-serif; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
     .submit-item-form__modal-file-names { color: #5e5e5d; font-size: 0.9rem; line-height: 1.5; }
@@ -89,8 +96,8 @@
     <a href="index.html" class="site-brand-link flex items-center gap-3 min-w-0">
       <img src="assets/images/branding/logo.webp" alt="Naples Estate Jewelry Logo" class="site-brand-logo h-10 w-auto object-contain flex-shrink-0" />
       <span class="site-brand-text font-display-lg-mobile text-[18px] md:text-[23px] tracking-normal text-[#735c00] uppercase">
-        <span class="site-brand-short">Naples Estate Jewelry</span>
-        <span class="site-brand-full">Naples Estate Jewelry</span>
+        <span class="site-brand-short">Naples Estate Jewelry Co</span>
+        <span class="site-brand-full">Naples Estate Jewelry Co</span>
       </span>
     </a>
     <nav class="site-header-nav hidden 2xl:flex items-center gap-5">
@@ -138,11 +145,11 @@
               </p>
 
               <label class="submit-item-form__photo-drop">
-                <input id="item-photos" type="file" name="photos" accept="image/*" required />
+                <input id="item-photo-1" type="file" name="photo_1" accept="image/*" required />
                 <span>
                   <span class="material-symbols-outlined block mb-3" style="font-size:48px;line-height:1;" aria-hidden="true">add_photo_alternate</span>
-                  <span class="submit-item-form__photo-title">Upload a photo from your computer or camera roll</span>
-                  <span class="submit-item-form__hint block mt-3">Start with a clear photo of the full item, hallmark, stamp, or condition. After you choose an image, a short details window will open.</span>
+                  <span class="submit-item-form__photo-title">Upload photos from your computer or camera roll</span>
+                  <span class="submit-item-form__hint block mt-3">Start with a clear photo of the full item, then add closeups of hallmarks, stamps, or condition in the details window.</span>
                   <span class="submit-item-form__file-names block mt-3" aria-live="polite"></span>
                 </span>
               </label>
@@ -160,6 +167,31 @@
                   </div>
 
                   <p class="submit-item-form__modal-file-names" aria-live="polite"></p>
+
+                  <div class="submit-item-form__additional-photos">
+                    <div>
+                      <span class="submit-item-form__label">Additional photos</span>
+                      <p class="submit-item-form__hint mt-2">Optional: add up to four more images before sending.</p>
+                    </div>
+                    <div class="submit-item-form__photo-slots">
+                      <label class="submit-item-form__photo-slot" for="item-photo-2">
+                        <input id="item-photo-2" type="file" name="photo_2" accept="image/*" />
+                        Add photo 2
+                      </label>
+                      <label class="submit-item-form__photo-slot" for="item-photo-3">
+                        <input id="item-photo-3" type="file" name="photo_3" accept="image/*" />
+                        Add photo 3
+                      </label>
+                      <label class="submit-item-form__photo-slot" for="item-photo-4">
+                        <input id="item-photo-4" type="file" name="photo_4" accept="image/*" />
+                        Add photo 4
+                      </label>
+                      <label class="submit-item-form__photo-slot" for="item-photo-5">
+                        <input id="item-photo-5" type="file" name="photo_5" accept="image/*" />
+                        Add photo 5
+                      </label>
+                    </div>
+                  </div>
 
                   <div class="submit-item-form__field">
                     <label class="submit-item-form__label" for="item-description">What would you like to submit?</label>
@@ -190,7 +222,7 @@
 
                   <div class="submit-item-form__modal-actions">
                     <button type="submit" class="gold-button text-on-primary px-8 py-4 rounded-md font-label text-sm font-bold uppercase tracking-widest hover:scale-[1.02] transition-transform">Send item</button>
-                    <label for="item-photos" class="submit-item-form__change-photos">Change photo</label>
+                    <label for="item-photo-1" class="submit-item-form__change-photos">Change first photo</label>
                   </div>
                 </div>
               </dialog>

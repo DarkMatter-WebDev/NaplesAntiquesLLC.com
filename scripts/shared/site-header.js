@@ -124,8 +124,84 @@
     }
   }
 
+  function rewireBrandLogo() {
+    var brandLink = document.querySelector('a.site-brand-link');
+    if (!brandLink) return;
+    var logo = brandLink.querySelector('img.site-brand-logo');
+    var brandText = brandLink.querySelector('.site-brand-text');
+    if (!logo || !brandText) return;
+
+    var wrapper = document.createElement('div');
+    wrapper.className = brandLink.className;
+
+    var logoAnchor = document.createElement('a');
+    logoAnchor.href = 'https://naplesjewelrybuyers.com';
+    logoAnchor.target = '_blank';
+    logoAnchor.rel = 'noopener noreferrer';
+    logoAnchor.setAttribute('aria-label', 'Visit Naples Jewelry Buyers');
+    logoAnchor.appendChild(logo);
+
+    var textAnchor = document.createElement('a');
+    textAnchor.href = brandLink.getAttribute('href') || '/';
+    textAnchor.className = 'flex items-center min-w-0';
+    textAnchor.appendChild(brandText);
+
+    wrapper.appendChild(logoAnchor);
+    wrapper.appendChild(textAnchor);
+    brandLink.parentNode.replaceChild(wrapper, brandLink);
+  }
+
+  function initMobileSubmenus() {
+    var mobileInner = document.querySelector('#mobile-menu > div');
+    if (!mobileInner) return;
+
+    var allLinks = Array.from(mobileInner.querySelectorAll('a'));
+    allLinks.forEach(function (link) {
+      if (link.classList.contains('mobile-subitem')) return;
+
+      var group = [];
+      var next = link.nextElementSibling;
+      while (next && next.classList.contains('mobile-subitem')) {
+        group.push(next);
+        next = next.nextElementSibling;
+      }
+      if (!group.length) return;
+
+      group.forEach(function (item) { item.style.display = 'none'; });
+
+      var wrapper = document.createElement('div');
+      wrapper.style.cssText = 'display:flex;align-items:center;border-bottom:1px solid #d8d0c2;';
+      link.style.borderBottom = 'none';
+      link.style.flex = '1';
+
+      var toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.setAttribute('aria-label', 'Expand submenu');
+      toggle.style.cssText = 'background:none;border:none;padding:0.75rem 0.5rem;cursor:pointer;color:#735c00;display:flex;align-items:center;flex-shrink:0;';
+      toggle.innerHTML = '<span class="material-symbols-outlined" style="font-size:20px;line-height:1;transition:transform 0.2s;">expand_more</span>';
+
+      link.parentNode.insertBefore(wrapper, link);
+      wrapper.appendChild(link);
+      wrapper.appendChild(toggle);
+
+      var expanded = false;
+      toggle.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        expanded = !expanded;
+        toggle.setAttribute('aria-expanded', String(expanded));
+        var chevron = toggle.querySelector('.material-symbols-outlined');
+        if (chevron) chevron.style.transform = expanded ? 'rotate(180deg)' : '';
+        group.forEach(function (item) { item.style.display = expanded ? '' : 'none'; });
+      });
+    });
+  }
+
   ensureHeaderNavLinks();
   addLanguageToggle();
+  rewireBrandLogo();
+  initMobileSubmenus();
 
   document.querySelectorAll(".site-header a[href]").forEach(function (link) {
     if (link.closest("[data-lang-toggle]")) return;

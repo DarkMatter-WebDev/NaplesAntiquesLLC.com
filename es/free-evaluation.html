@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html class="light" lang="es">
 <head>
   <meta charset="utf-8" />
@@ -33,7 +33,7 @@
 <script src="/scripts/shared/editorial-tailwind-config.js"></script>
 <link href="/editorial-base.css" rel="stylesheet" />
 <link href="/editorial-theme.css?v=header-sync-20260602" rel="stylesheet" />
-<script src="/scripts/shared/site-header.js?v=header-sync-20260605" defer></script>
+<script src="/scripts/shared/site-header.js?v=header-sync-20260612b" defer></script>
 <style>
     html { scroll-behavior: smooth; }
     body { cursor: auto; overflow-x: hidden; }
@@ -100,6 +100,54 @@
     }
 
     .fe-owner-photo { box-shadow: 0 24px 60px rgba(0,0,0,0.4); }
+
+    /* Inline evaluation form card */
+    .fe-eval-form {
+      background: rgba(255,255,255,0.97);
+      border-radius: 0.375rem;
+      padding: 1.5rem;
+      display: grid;
+      gap: 1rem;
+      max-width: 540px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    }
+    .fe-eval-field { display: grid; gap: 0.35rem; }
+    .fe-eval-label {
+      color: #5e5e5d;
+      font-family: "Hanken Grotesk", Inter, Arial, sans-serif;
+      font-size: 0.7rem; font-weight: 700;
+      letter-spacing: 0.14em; text-transform: uppercase;
+    }
+    .fe-eval-row { display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
+    @media (max-width: 480px) { .fe-eval-row { grid-template-columns: 1fr; } }
+    .fe-eval-form input[type="text"],
+    .fe-eval-form input[type="tel"],
+    .fe-eval-form input[type="email"],
+    .fe-eval-form textarea {
+      width: 100%; border: 1px solid #d8d0c2; border-radius: 0.25rem;
+      background: #fff; color: #1a1c1c;
+      padding: 0.65rem 0.85rem; font-size: 0.95rem; line-height: 1.4;
+    }
+    .fe-eval-form textarea { min-height: 4.5rem; resize: vertical; }
+    .fe-eval-form input:focus,
+    .fe-eval-form textarea:focus {
+      outline: none; border-color: #735c00;
+      box-shadow: 0 0 0 3px rgba(115,92,0,0.12);
+    }
+    .fe-eval-photo-drop {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; min-height: 10rem; border: 1.5px dashed #b9a982; border-radius: 0.25rem;
+      background: #fbfaf6; color: #735c00; cursor: pointer; padding: 1.5rem;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .fe-eval-photo-drop:hover,
+    .fe-eval-photo-drop:focus-within { border-color: #735c00; background: #f8f3e5; }
+    .fe-eval-photo-drop input {
+      position: absolute; width: 1px; height: 1px; overflow: hidden;
+      clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+    }
+    .fe-eval-photo-names { color: #735c00; font-size: 0.78rem; font-weight: 600; min-height: 1em; }
+    .fe-eval-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
   </style>
 
   <script type="application/ld+json">
@@ -140,8 +188,8 @@
     <a href="/es/index.html" class="site-brand-link flex items-center gap-3 min-w-0">
       <img src="/assets/images/branding/logo.webp" alt="Logotipo de Naples Estate Jewelry" class="site-brand-logo h-10 w-auto object-contain flex-shrink-0" />
       <span class="site-brand-text font-display-lg-mobile text-[18px] md:text-[23px] tracking-normal text-[#735c00] uppercase">
-        <span class="site-brand-short">Naples Estate Jewelry</span>
-        <span class="site-brand-full">Naples Estate Jewelry</span>
+        <span class="site-brand-short">Naples Estate Jewelry Co</span>
+        <span class="site-brand-full">Naples Estate Jewelry Co</span>
       </span>
     </a>
     <nav class="site-header-nav hidden 2xl:flex items-center gap-5">
@@ -170,13 +218,49 @@
           Obtenga una evaluación experta y sin presión de su joyería, oro, plata, diamantes, relojes y monedas &mdash; cotizada en vivo según el mercado de hoy. Sepa exactamente lo que tiene.
         </p>
 
-        <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center flex-wrap mb-9">
-          <a href="/es/contact.html" class="gold-button text-on-primary px-8 py-4 rounded-md font-label text-sm font-bold uppercase tracking-widest hover:scale-105 transition-transform shadow-xl">Obtenga su Evaluación Gratuita</a>
-          <a href="/es/contact.html#submit-item" class="border border-primary/60 text-primary px-8 py-4 rounded-md font-label text-sm font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors">Envíe una Foto</a>
-          <a href="tel:2394048505" class="flex flex-col">
-            <span class="text-on-surface-variant text-[0.7rem] uppercase tracking-widest font-label mb-0.5">Llame o Envíe un Texto</span>
-            <span class="text-primary text-2xl md:text-3xl font-headline font-bold underline underline-offset-8 decoration-primary/30 hover:decoration-primary transition-all">(239) 404-8505</span>
-          </a>
+        <div class="mb-9">
+          <form class="fe-eval-form" id="fe-eval-form" name="free-evaluation-request-es" method="POST"
+                action="/es/free-evaluation.html?submitted=true" data-netlify="true"
+                data-netlify-honeypot="bot-field" enctype="multipart/form-data">
+            <input type="hidden" name="form-name" value="free-evaluation-request-es" />
+            <p class="fe-eval-hp"><label>No rellene esto si es humano: <input name="bot-field" /></label></p>
+
+            <div class="fe-eval-field">
+              <span class="fe-eval-label">Fotos &mdash; seleccione una o más</span>
+              <label class="fe-eval-photo-drop" for="fe-photos">
+                <input id="fe-photos" type="file" name="photos" accept="image/*" multiple required />
+                <span class="material-symbols-outlined" style="font-size:2.5rem;display:block;margin-bottom:0.5rem;" aria-hidden="true">add_photo_alternate</span>
+                <span style="font-size:1rem;font-weight:700;display:block;">Toque para agregar fotos</span>
+                <span style="font-size:0.8rem;color:#7a7060;display:block;margin-top:0.3rem;">Seleccione varias a la vez desde su cámara o archivos</span>
+                <span class="fe-eval-photo-names" aria-live="polite" style="font-size:0.8rem;font-weight:600;display:block;margin-top:0.4rem;"></span>
+              </label>
+            </div>
+
+            <div class="fe-eval-field">
+              <label class="fe-eval-label" for="fe-description">¿Qué desea enviar?</label>
+              <textarea id="fe-description" name="description" rows="2" placeholder="Cadena de oro, anillo de diamantes, colección de monedas &mdash; cualquier detalle ayuda."></textarea>
+            </div>
+
+            <div class="fe-eval-row">
+              <div class="fe-eval-field">
+                <label class="fe-eval-label" for="fe-name">Su nombre *</label>
+                <input id="fe-name" name="name" type="text" autocomplete="name" required />
+              </div>
+              <div class="fe-eval-field">
+                <label class="fe-eval-label" for="fe-phone">Teléfono *</label>
+                <input id="fe-phone" name="phone" type="tel" autocomplete="tel" required />
+              </div>
+            </div>
+
+            <div class="fe-eval-field">
+              <label class="fe-eval-label" for="fe-email">Correo electrónico</label>
+              <input id="fe-email" name="email" type="email" autocomplete="email" />
+            </div>
+
+            <button type="submit" class="gold-button text-on-primary w-full px-8 py-4 rounded-md font-label text-sm font-bold uppercase tracking-widest hover:scale-[1.02] transition-transform">
+              Enviar para Evaluación Gratuita
+            </button>
+          </form>
         </div>
 
         <ul class="flex flex-wrap gap-2.5 md:gap-3" aria-label="Por qué usar nuestra evaluación gratuita">
@@ -332,6 +416,33 @@
       var y = document.getElementById('footer-year');
       if (y) y.textContent = new Date().getFullYear();
     })();
+  </script>
+
+  <script>
+  (function () {
+    var form = document.getElementById('fe-eval-form');
+    if (!form) return;
+
+    if (new URLSearchParams(window.location.search).get('submitted') === 'true') {
+      form.innerHTML = '<div style="text-align:center;padding:2rem 1rem;">'
+        + '<span class="material-symbols-outlined" style="font-size:3rem;color:#735c00;display:block;">check_circle</span>'
+        + '<p style="color:#1a1c1c;font-family:\'Libre Caslon Text\',serif;font-size:1.2rem;font-weight:700;margin:0.75rem 0 0.4rem;">¡Enviado con éxito!</p>'
+        + '<p style="color:#5e5e5d;font-size:0.9rem;">Revisaremos sus fotos y nos pondremos en contacto pronto.</p>'
+        + '</div>';
+      return;
+    }
+
+    var photoInput = form.querySelector('input[type="file"]');
+    var namesEl = form.querySelector('.fe-eval-photo-names');
+
+    if (photoInput) {
+      photoInput.addEventListener('change', function () {
+        if (!namesEl) return;
+        var count = photoInput.files ? photoInput.files.length : 0;
+        namesEl.textContent = count ? count + ' foto' + (count !== 1 ? 's' : '') + ' seleccionada' + (count !== 1 ? 's' : '') : '';
+      });
+    }
+  })();
   </script>
 
   <!-- Tawk.to live chat -->

@@ -2,14 +2,15 @@
  * Submit-your-item form (contact.html#submit-item)
  *
  * Netlify Forms handles delivery and photo uploads from the static HTML form.
- * This script only improves the selected-photo label.
+ * This script only improves the selected-photo labels and details modal.
  */
 (function () {
   var forms = document.querySelectorAll(".submit-item-form");
   if (!forms.length) return;
 
   forms.forEach(function (form) {
-    var fileInput = form.querySelector('input[type="file"][name="photos"]');
+    var fileInputs = form.querySelectorAll('input[type="file"]');
+    var primaryFileInput = form.querySelector('input[type="file"][required]');
     var fileNamesEl = form.querySelector(".submit-item-form__file-names");
     var modal = form.querySelector("[data-submit-item-modal]");
     var closeButton = form.querySelector("[data-submit-item-close]");
@@ -40,35 +41,51 @@
         modal.removeAttribute("open");
       }
 
-      if (fileInput && typeof fileInput.focus === "function") {
-        fileInput.focus();
+      if (primaryFileInput && typeof primaryFileInput.focus === "function") {
+        primaryFileInput.focus();
       }
     }
 
-    function selectedPhotoText(files) {
+    function selectedPhotoNames() {
       var names = [];
-      for (var i = 0; i < files.length; i++) {
-        names.push(files[i].name);
+
+      fileInputs.forEach(function (input) {
+        if (input.files && input.files.length) {
+          names.push(input.files[0].name);
+        }
+      });
+
+      return names;
+    }
+
+    function selectedPhotoText() {
+      var names = selectedPhotoNames();
+      if (!names.length) {
+        return "";
       }
 
       var isSpanish = document.documentElement.lang === "es";
-      return (isSpanish ? "Seleccionado: " : "Selected: ") + names[0];
+      var label = isSpanish
+        ? (names.length === 1 ? "1 foto seleccionada: " : names.length + " fotos seleccionadas: ")
+        : (names.length === 1 ? "1 photo selected: " : names.length + " photos selected: ");
+
+      return label + names.join(", ");
     }
 
-    if (fileInput) {
+    function updateSelectedPhotoText() {
+      var text = selectedPhotoText();
+      if (fileNamesEl) fileNamesEl.textContent = text;
+      if (modalFileNamesEl) modalFileNamesEl.textContent = text;
+    }
+
+    fileInputs.forEach(function (fileInput) {
       fileInput.addEventListener("change", function () {
-        if (!fileInput.files || !fileInput.files.length) {
-          if (fileNamesEl) fileNamesEl.textContent = "";
-          if (modalFileNamesEl) modalFileNamesEl.textContent = "";
-          return;
+        updateSelectedPhotoText();
+        if (fileInput === primaryFileInput && fileInput.files && fileInput.files.length) {
+          openDetailsModal();
         }
-
-        var text = selectedPhotoText(fileInput.files);
-        if (fileNamesEl) fileNamesEl.textContent = text;
-        if (modalFileNamesEl) modalFileNamesEl.textContent = text;
-        openDetailsModal();
       });
-    }
+    });
 
     if (closeButton) {
       closeButton.addEventListener("click", closeDetailsModal);
