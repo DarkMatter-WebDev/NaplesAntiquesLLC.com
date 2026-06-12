@@ -27,11 +27,55 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://naplesestatejewelry.co'),
 };
 
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'JewelryStore',
+  name: 'Naples Estate Jewelry',
+  url: 'https://naplesestatejewelry.co',
+  telephone: '+12394048505',
+  image: 'https://naplesestatejewelry.co/assets/images/pages/trust.webp',
+  description:
+    'Naples, FL estate jeweler buying and selling fine gold chains, estate pieces, designer jewelry, and bullion. Free in-store and on-site evaluations.',
+  address: {
+    '@type': 'PostalAddress',
+    addressLocality: 'Naples',
+    addressRegion: 'FL',
+    addressCountry: 'US',
+  },
+  geo: {
+    '@type': 'GeoCoordinates',
+    latitude: 26.142,
+    longitude: -81.795,
+  },
+  openingHoursSpecification: [
+    {
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+      opens: '10:00',
+      closes: '17:00',
+    },
+  ],
+  priceRange: '$$',
+  currenciesAccepted: 'USD',
+  paymentAccepted: 'Cash, Check, Wire Transfer',
+  areaServed: ['Naples', 'Marco Island', 'Bonita Springs', 'Fort Myers'],
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html className={`${caslon.variable} ${hanken.variable}`}>
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body className="min-h-screen flex flex-col">{children}</body>
     </html>
   );

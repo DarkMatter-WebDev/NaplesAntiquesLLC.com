@@ -125,6 +125,79 @@ body {
   outline-offset: 1px;
 }
 
+/* Dark tile used on free-evaluation category grid */
+.fe-icon-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
+  background: #202323;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 4px;
+  padding: 1.5rem 1rem 1.35rem;
+  min-height: 9rem;
+  color: #f6f1e8;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+}
+.fe-icon-tile:hover {
+  border-color: rgba(242,202,80,0.45);
+  background: #262928;
+  transform: translateY(-2px);
+}
+
+/* Pan animations for bullion and estate-services hero backgrounds */
+@keyframes bullion-pan {
+  0%   { transform: scale(1.05) translate3d(-1%, -1%, 0); }
+  50%  { transform: scale(1.11) translate3d(1%, 1%, 0); }
+  100% { transform: scale(1.05) translate3d(-1%, -1%, 0); }
+}
+.bullion-pan {
+  animation: bullion-pan 32s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes estate-pen-pan {
+  0%, 100% { transform: scale(1.04) translate3d(0, 0, 0); }
+  50%       { transform: scale(1.11) translate3d(-1.5%, 1%, 0); }
+}
+.estate-pen-pan {
+  animation: estate-pen-pan 36s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Homepage hero — fallback image slow zoom */
+@keyframes hero-zoom {
+  0%, 100% { transform: scale(1.02); }
+  50%       { transform: scale(1.06); }
+}
+.hero-pan {
+  animation: hero-zoom 30s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Homepage hero — light sweep shimmer */
+@keyframes hero-sweep {
+  0%, 42%  { transform: translateX(-130%) skewX(-18deg); opacity: 0; }
+  50%      { opacity: 0.07; }
+  62%      { transform: translateX(130%) skewX(-18deg); opacity: 0; }
+  100%     { transform: translateX(130%) skewX(-18deg); opacity: 0; }
+}
+.hero-sweep {
+  animation: hero-sweep 13s ease-in-out infinite;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 48%, rgba(242,202,80,0.07) 52%, transparent 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bullion-pan,
+  .estate-pen-pan,
+  .hero-pan,
+  .hero-sweep { animation: none; }
+  .hero-video { display: none !important; }
+  .hero-fallback { opacity: 1 !important; }
+}
+
 .form-label {
   display: block;
   font-family: var(--font-label);

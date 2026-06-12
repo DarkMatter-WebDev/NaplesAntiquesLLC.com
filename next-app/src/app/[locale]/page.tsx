@@ -26,54 +26,106 @@ export default async function HomePage({ params }: Props) {
       <main className="flex flex-col">
 
         {/* Hero */}
-        <section
-          className="relative flex flex-col items-center justify-center text-center min-h-[92vh] px-6"
-          style={{ background: 'var(--color-background)' }}
-        >
-          <div className="max-w-3xl mx-auto">
-            <p
-              className="text-[0.65rem] font-bold uppercase tracking-[0.42em] mb-6"
-              style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
-            >
-              {isEs ? 'Naples, Florida' : 'Naples, Florida'}
-            </p>
+        <section className="relative min-h-[820px] sm:min-h-[760px] md:min-h-screen flex items-start overflow-hidden pt-28 md:pt-32 xl:pt-36 pb-16 bg-[#101111]">
 
-            <h1
-              className="text-5xl md:text-7xl font-bold leading-tight mb-8"
-              style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
+          {/* Background: video + fallback image + overlays */}
+          <div className="absolute inset-x-0 overflow-hidden" style={{ top: '-7%', height: '114%', zIndex: 0 }} aria-hidden="true">
+            {/* Fallback image — shown when video is unavailable or reduced-motion */}
+            <Image
+              src="/assets/images/pages/homepage-hero-bangles.webp"
+              alt=""
+              fill
+              className="hero-pan hero-fallback object-cover object-center"
+              style={{ opacity: 0, zIndex: 0 }}
+              priority
+            />
+            {/* Video */}
+            <video
+              className="hero-video absolute inset-0 w-full h-full object-cover object-center"
+              style={{ zIndex: 1 }}
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="auto"
             >
-              {isEs ? (
-                <>Joyería de<br />Patrimonio Fino</>
-              ) : (
-                <>Fine Estate<br />Jewelry</>
-              )}
-            </h1>
+              <source src="/assets/video/homepage-hero.mp4" type="video/mp4" />
+            </video>
+            {/* Dark gradient overlay */}
+            <div
+              className="absolute inset-0"
+              style={{
+                zIndex: 2,
+                background:
+                  'radial-gradient(circle at 19% 22%, rgba(26,28,28,0.74) 0%, rgba(26,28,28,0.5) 32%, rgba(26,28,28,0.14) 60%, rgba(26,28,28,0.36) 100%),' +
+                  'linear-gradient(90deg, rgba(26,28,28,0.78) 0%, rgba(26,28,28,0.42) 38%, rgba(26,28,28,0.08) 76%)',
+              }}
+            />
+            {/* Light sweep shimmer */}
+            <div
+              className="hero-sweep absolute inset-y-0 -left-1/3 w-1/2 pointer-events-none"
+              style={{ zIndex: 3 }}
+            />
+          </div>
 
-            <p
-              className="text-base md:text-lg max-w-xl mx-auto mb-10 leading-relaxed"
-              style={{ color: 'var(--color-on-surface-variant)' }}
-            >
-              {isEs
-                ? 'Compramos y vendemos joyería de patrimonio, cadenas de oro, piezas de diseñador y lingotes — con precios del spot de oro en vivo.'
-                : 'We buy and sell estate jewelry, fine gold chains, designer pieces, and bullion — with live gold spot pricing on every item.'}
-            </p>
-
-            <div className="flex flex-wrap gap-4 justify-center">
-              <Link href={shopHref} className="gold-button text-sm">
-                {isEs ? 'Ver Tienda' : 'Shop Now'}
-              </Link>
-              <Link href={evalHref} className="outline-button text-sm">
-                {isEs ? 'Evaluación Gratuita' : 'Free Evaluation'}
-              </Link>
+          {/* Content */}
+          <div className="container mx-auto px-6 md:px-8 relative flex justify-center" style={{ zIndex: 10 }}>
+            <div className="flex flex-col items-center justify-start text-center">
+              <span
+                className="text-[0.65rem] font-bold uppercase tracking-[0.3em] block mb-8"
+                style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+              >
+                {isEs ? 'Joyería de Patrimonio y Relojes' : 'Curated Estate Jewelry & Watches'}
+              </span>
+              <h1
+                className="text-4xl md:text-5xl font-bold mt-2 mb-28 md:mb-32 tracking-tight"
+                style={{ fontFamily: 'var(--font-headline)', color: '#f9f9f7' }}
+              >
+                {isEs ? 'Rara. Auténtica. Atemporal.' : 'Rare. Authentic. Timeless.'}
+              </h1>
+              <div className="flex flex-col items-center gap-4 mb-20">
+                <div className="flex flex-wrap justify-center gap-4 md:gap-5">
+                  <Link
+                    href={shopHref}
+                    className="inline-flex justify-center min-w-[9rem] md:min-w-[10rem] border px-8 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest transition-colors"
+                    style={{
+                      borderColor: 'rgba(212,175,55,0.6)',
+                      color: '#e9c349',
+                      fontFamily: 'var(--font-label)',
+                    }}
+                  >
+                    {isEs ? 'Comprar' : 'Buy'}
+                  </Link>
+                  <Link
+                    href={isEs ? '/es/estate-jewelry' : '/estate-jewelry'}
+                    className="inline-flex justify-center min-w-[9rem] md:min-w-[10rem] border px-8 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest transition-colors"
+                    style={{
+                      borderColor: 'rgba(212,175,55,0.6)',
+                      color: '#e9c349',
+                      fontFamily: 'var(--font-label)',
+                    }}
+                  >
+                    {isEs ? 'Vender' : 'Sell'}
+                  </Link>
+                  <Link
+                    href={isEs ? '/es/contact' : '/contact'}
+                    className="inline-flex justify-center min-w-[9rem] md:min-w-[10rem] border px-8 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest transition-colors"
+                    style={{
+                      borderColor: 'rgba(212,175,55,0.6)',
+                      color: '#e9c349',
+                      fontFamily: 'var(--font-label)',
+                    }}
+                  >
+                    {isEs ? 'Intercambiar' : 'Trade'}
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Scroll indicator */}
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 opacity-40">
-            <div
-              className="w-px h-10 animate-pulse"
-              style={{ background: 'var(--color-primary)' }}
-            />
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 opacity-40" style={{ zIndex: 10 }}>
+            <div className="w-px h-10 animate-pulse" style={{ background: 'var(--color-primary)' }} />
           </div>
         </section>
 

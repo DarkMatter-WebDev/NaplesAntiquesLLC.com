@@ -103,7 +103,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
             {isEs ? 'Ningún artículo coincide con sus filtros.' : 'No items match your filters.'}
           </p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 mt-8">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 mt-8">
             {filtered.map((product) => (
               <ProductCard
                 key={product.id}

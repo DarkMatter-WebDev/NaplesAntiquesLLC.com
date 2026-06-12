@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>Netlify Form Definitions</title></head>
+<body>
+  <!-- Netlify detects these at deploy time. The real forms live in the Next.js app. -->
+
+  <form name="submit-item" data-netlify="true" data-netlify-honeypot="bot-field" enctype="multipart/form-data" hidden>
+    <input type="hidden" name="form-name" value="submit-item" />
+    <input name="bot-field" />
+    <input type="file" name="photo_1" />
+    <input type="file" name="photo_2" />
+    <input type="file" name="photo_3" />
+    <input type="file" name="photo_4" />
+    <input type="file" name="photo_5" />
+    <textarea name="item_description"></textarea>
+    <input name="name" type="text" />
+    <input name="phone" type="tel" />
+    <input name="email" type="email" />
+    <input name="location" type="text" />
+  </form>
+
+  <form name="free-evaluation-request" data-netlify="true" data-netlify-honeypot="bot-field" enctype="multipart/form-data" hidden>
+    <input type="hidden" name="form-name" value="free-evaluation-request" />
+    <input name="bot-field" />
+    <input type="file" name="photos" multiple />
+    <textarea name="description"></textarea>
+    <input name="name" type="text" />
+    <input name="phone" type="tel" />
+    <input name="email" type="email" />
+  </form>
+</body>
+</html>
