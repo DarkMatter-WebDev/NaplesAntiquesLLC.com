@@ -1,10 +1,10 @@
 import Link from 'next/link';
 
 interface Props {
-  locale: string;
+  locale?: string;
 }
 
-export default function SiteFooter({ locale }: Props) {
+export default function SiteFooter({ locale = 'en' }: Props) {
   const isEs = locale === 'es';
   const p = (path: string) => (isEs ? `/es${path}` : path);
 
