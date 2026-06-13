@@ -1,0 +1,128 @@
+[build]
+  base    = "next-app"
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SITE_URL,NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Legacy image URLs (assets moved to assets/images/)
+[[redirects]]
+  from = "/assets/branding/:splat"
+  to = "/assets/images/branding/:splat"
+  status = 301
+
+[[redirects]]
+  from = "/assets/pages/:splat"
+  to = "/assets/images/pages/:splat"
+  status = 301
+
+[[redirects]]
+  from = "/assets/shop/:splat"
+  to = "/assets/images/shop/:splat"
+  status = 301
+
+[[redirects]]
+  from = "/logo.png"
+  to = "/assets/images/branding/logo.webp"
+  status = 301
+
+[[redirects]]
+  from = "/logo2.png"
+  to = "/assets/images/branding/logo2.webp"
+  status = 301
+
+[[redirects]]
+  from = "/process.html"
+  to = "/free-evaluation"
+  status = 301
+
+[[redirects]]
+  from = "/es/process.html"
+  to = "/es/free-evaluation"
+  status = 301
+
+[[redirects]]
+  from = "/shop-:splat"
+  to = "/assets/images/shop/shop-:splat"
+  status = 301
+
+[[redirects]]
+  from = "/about-if-we-had-a-store.png"
+  to = "/assets/images/pages/about-if-we-had-a-store.webp"
+  status = 301
+
+[[redirects]]
+  from = "/antiques.jpeg"
+  to = "/assets/images/pages/antiques.webp"
+  status = 301
+
+[[redirects]]
+  from = "/bullion.jpg"
+  to = "/assets/images/pages/bullion.webp"
+  status = 301
+
+[[redirects]]
+  from = "/chris.png"
+  to = "/assets/images/pages/chris.webp"
+  status = 301
+
+[[redirects]]
+  from = "/gold.jpg"
+  to = "/assets/images/pages/gold.webp"
+  status = 301
+
+[[redirects]]
+  from = "/homepage-hero-bangles.png"
+  to = "/assets/images/pages/homepage-hero-bangles.webp"
+  status = 301
+
+[[redirects]]
+  from = "/jeweler.jpg"
+  to = "/assets/images/pages/jeweler.webp"
+  status = 301
+
+[[redirects]]
+  from = "/money.jpg"
+  to = "/assets/images/pages/money.webp"
+  status = 301
+
+[[redirects]]
+  from = "/patek.jpg"
+  to = "/assets/images/pages/patek.webp"
+  status = 301
+
+[[redirects]]
+  from = "/pen.png"
+  to = "/assets/images/pages/pen.webp"
+  status = 301
+
+[[redirects]]
+  from = "/ring.jpg"
+  to = "/assets/images/pages/ring.jpg"
+  status = 301
+
+[[redirects]]
+  from = "/signed.jpg"
+  to = "/assets/images/pages/signed.webp"
+  status = 301
+
+[[redirects]]
+  from = "/trust.jpg"
+  to = "/assets/images/pages/trust.webp"
+  status = 301
+
+[[redirects]]
+  from = "/silver.jpg"
+  to = "/assets/images/pages/silver.jpg"
+  status = 301
+
+[[redirects]]
+  from = "/watch.jpg"
+  to = "/assets/images/pages/watch.jpg"
+  status = 301
+

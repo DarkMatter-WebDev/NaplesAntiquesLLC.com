@@ -18,6 +18,7 @@ interface Props {
     metal?: string;
     purity?: string;
     status?: string;
+    itemType?: string;
     chainType?: string;
     length?: string;
     gender?: string;
@@ -34,6 +35,15 @@ const CHAIN_KEYWORDS: Record<string, string[]> = {
   'byzantine-link':['byzantine'],
   'bracelet':      ['bracelet'],
   'ring':          ['ring'],
+};
+
+const ITEM_TYPE_KEYWORDS: Record<string, string[]> = {
+  necklace: ['necklace', 'chain'],
+  bracelet: ['bracelet', 'bangle'],
+  earrings: ['earring', 'earrings'],
+  ring: ['ring'],
+  pendant: ['pendant', 'charm'],
+  watch: ['watch'],
 };
 
 const LENGTH_PATTERNS: Record<string, string[]> = {
@@ -67,6 +77,13 @@ export default async function ShopPage({ params, searchParams }: Props) {
       if (p.purity !== parseInt(filters.purity)) return false;
     }
     if (filters.status && p.status !== filters.status) return false;
+    if (filters.itemType) {
+      const kws = ITEM_TYPE_KEYWORDS[filters.itemType];
+      if (kws) {
+        const txt = [p.title, p.title_es, ...(p.tags ?? []), ...(p.tags_es ?? [])].join(' ').toLowerCase();
+        if (!kws.some(k => txt.includes(k))) return false;
+      }
+    }
     if (filters.q) {
       const q = filters.q.toLowerCase();
       const txt = [p.title, p.title_es, ...(p.tags ?? []), ...(p.tags_es ?? [])].join(' ').toLowerCase();
@@ -119,7 +136,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
     <>
       <SiteHeader />
       <main className="pt-20 md:pt-32 pb-20">
-        <div className="max-w-6xl mx-auto px-4 md:px-8">
+        <div className="max-w-[1760px] mx-auto px-4 md:px-8 2xl:px-10">
 
           {/* Investment transparency note */}
           <section
@@ -199,6 +216,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
             currentFilters={filters}
             filteredCount={sorted.length}
             allCount={allProducts.length}
+            spotData={spotData}
           />
 
           {/* ── Grid ───────────────────────────────────────────── */}
@@ -210,7 +228,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
               {isEs ? 'Ningún artículo coincide con sus filtros.' : 'No items match your filters.'}
             </p>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 mt-8">
+            <div className="shop-product-grid grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-5 mt-8">
               {sorted.map((product) => (
                 <ProductCard
                   key={product.id}
@@ -221,6 +239,13 @@ export default async function ShopPage({ params, searchParams }: Props) {
               ))}
             </div>
           )}
+          <style>{`
+            @media (min-width: 1720px) {
+              .shop-product-grid {
+                grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+              }
+            }
+          `}</style>
         </div>
       </main>
       <SiteFooter locale={locale} />

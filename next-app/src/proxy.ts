@@ -4,12 +4,10 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { routing } from './i18n/routing';
 
 const intl = createIntlMiddleware(routing);
+const INTERNAL_LOCALE_HEADER = 'x-naples-internal-locale';
+const NEXT_INTL_LOCALE_HEADER = 'X-NEXT-INTL-LOCALE';
 
-export async function proxy(request: NextRequest) {
-  // i18n routing (locale detection, redirects, path rewrites)
-  const response = intl(request);
-
-  // Refresh Supabase session token on every request
+async function refreshSupabaseSession(request: NextRequest, response: NextResponse) {
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -32,6 +30,38 @@ export async function proxy(request: NextRequest) {
 
   await supabase.auth.getUser();
   return response;
+}
+
+export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  // Next 16 currently re-runs proxy for next-intl's internal default-locale
+  // rewrite (/ -> /en), which can make /en canonicalize back to / forever.
+  // Mark our own English rewrite and let the internal /en request render.
+  if (request.headers.get(INTERNAL_LOCALE_HEADER) === 'en') {
+    const headers = new Headers(request.headers);
+    headers.set(NEXT_INTL_LOCALE_HEADER, 'en');
+    const response = NextResponse.next({ request: { headers } });
+    response.cookies.set('NEXT_LOCALE', 'en', { path: '/', sameSite: 'lax' });
+    return refreshSupabaseSession(request, response);
+  }
+
+  if (!pathname.startsWith('/en') && !pathname.startsWith('/es')) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/en${pathname === '/' ? '' : pathname}`;
+
+    const headers = new Headers(request.headers);
+    headers.set(INTERNAL_LOCALE_HEADER, 'en');
+    headers.set(NEXT_INTL_LOCALE_HEADER, 'en');
+
+    const response = NextResponse.rewrite(url, { request: { headers } });
+    response.cookies.set('NEXT_LOCALE', 'en', { path: '/', sameSite: 'lax' });
+    return refreshSupabaseSession(request, response);
+  }
+
+  // i18n routing for Spanish and direct prefixed default-locale URLs.
+  const response = intl(request);
+  return refreshSupabaseSession(request, response);
 }
 
 export const config = {

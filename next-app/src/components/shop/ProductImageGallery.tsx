@@ -6,6 +6,7 @@ import Image from 'next/image';
 const LENS = 100;  // lens square side px
 const ZOOM = 3;    // magnification
 const PANEL = 220; // floating zoom box size px
+const MOBILE_PANEL = 190;
 
 interface Props {
   images: string[];
@@ -17,6 +18,7 @@ interface ZoomState {
   lensY: number;
   panelLeft: number;  // viewport x for the floating box
   panelTop: number;   // viewport y for the floating box
+  panelSize: number;
   bgX: number;
   bgY: number;
   bw: number;
@@ -27,35 +29,89 @@ export default function ProductImageGallery({ images, title }: Props) {
   const [active, setActive] = useState(0);
   const [zoom, setZoom] = useState<ZoomState | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const touchZoomingRef = useRef(false);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  const updateZoom = useCallback((clientX: number, clientY: number, mode: 'mouse' | 'touch') => {
     const el = containerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const img = imageRef.current;
+    let imageLeft = rect.left;
+    let imageTop = rect.top;
+    let imageWidth = rect.width;
+    let imageHeight = rect.height;
 
-    const lensX = x - LENS / 2;
-    const lensY = y - LENS / 2;
+    if (img?.naturalWidth && img.naturalHeight) {
+      const frameRatio = rect.width / rect.height;
+      const imageRatio = img.naturalWidth / img.naturalHeight;
 
-    // Zoom box centered on cursor, clamped to viewport
-    let panelLeft = e.clientX - PANEL / 2;
-    let panelTop  = e.clientY - PANEL / 2;
+      if (imageRatio > frameRatio) {
+        imageWidth = rect.width;
+        imageHeight = rect.width / imageRatio;
+        imageTop = rect.top + (rect.height - imageHeight) / 2;
+      } else {
+        imageHeight = rect.height;
+        imageWidth = rect.height * imageRatio;
+        imageLeft = rect.left + (rect.width - imageWidth) / 2;
+      }
+    }
+
+    const x = Math.max(0, Math.min(clientX - imageLeft, imageWidth));
+    const y = Math.max(0, Math.min(clientY - imageTop, imageHeight));
+
+    const lensX = imageLeft - rect.left + x - LENS / 2;
+    const lensY = imageTop - rect.top + y - LENS / 2;
+    const panelSize = mode === 'touch'
+      ? Math.min(MOBILE_PANEL, Math.max(150, window.innerWidth - 32))
+      : PANEL;
+
+    // Desktop centers on cursor. Touch keeps the panel offset from the finger.
+    let panelLeft = clientX - panelSize / 2;
+    let panelTop = mode === 'touch' ? clientY - panelSize - 18 : clientY - panelSize / 2;
+    if (mode === 'touch' && panelTop < 0) panelTop = clientY + 18;
     if (panelLeft < 0) panelLeft = 0;
-    if (panelTop  < 0) panelTop  = 0;
-    if (panelLeft + PANEL > window.innerWidth)  panelLeft = window.innerWidth  - PANEL;
-    if (panelTop  + PANEL > window.innerHeight) panelTop  = window.innerHeight - PANEL;
+    if (panelTop < 0) panelTop = 0;
+    if (panelLeft + panelSize > window.innerWidth) panelLeft = window.innerWidth - panelSize;
+    if (panelTop + panelSize > window.innerHeight) panelTop = window.innerHeight - panelSize;
 
     // Center the hovered point in the zoom box
-    const bw = rect.width  * ZOOM;
-    const bh = rect.height * ZOOM;
-    const bgX = -(x * ZOOM - PANEL / 2);
-    const bgY = -(y * ZOOM - PANEL / 2);
+    const bw = imageWidth * ZOOM;
+    const bh = imageHeight * ZOOM;
+    const bgX = -(x * ZOOM - panelSize / 2);
+    const bgY = -(y * ZOOM - panelSize / 2);
 
-    setZoom({ lensX, lensY, panelLeft, panelTop, bgX, bgY, bw, bh });
+    setZoom({ lensX, lensY, panelLeft, panelTop, panelSize, bgX, bgY, bw, bh });
   }, []);
 
-  const handleMouseLeave = useCallback(() => setZoom(null), []);
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse') {
+      updateZoom(e.clientX, e.clientY, 'mouse');
+      return;
+    }
+
+    if (touchZoomingRef.current) {
+      e.preventDefault();
+      updateZoom(e.clientX, e.clientY, 'touch');
+    }
+  }, [updateZoom]);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse') return;
+    e.preventDefault();
+    touchZoomingRef.current = true;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    updateZoom(e.clientX, e.clientY, 'touch');
+  }, [updateZoom]);
+
+  const closeZoom = useCallback(() => {
+    touchZoomingRef.current = false;
+    setZoom(null);
+  }, []);
+
+  const handlePointerLeave = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse') closeZoom();
+  }, [closeZoom]);
 
   if (!images.length) {
     return (
@@ -76,16 +132,20 @@ export default function ProductImageGallery({ images, title }: Props) {
       <div
         ref={containerRef}
         className="relative aspect-square overflow-hidden"
-        style={{ background: 'var(--color-surface-container)', cursor: 'crosshair' }}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
+        style={{ background: 'var(--color-surface-container)', cursor: 'crosshair', touchAction: 'none' }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerLeave={handlePointerLeave}
+        onPointerUp={closeZoom}
+        onPointerCancel={closeZoom}
       >
         <Image
+          ref={imageRef}
           src={current}
           alt={title}
           fill
           sizes="(max-width: 768px) 100vw, 50vw"
-          className="object-cover object-center"
+          className="object-contain object-center"
           priority
           unoptimized={current.startsWith('/assets/')}
         />
@@ -127,7 +187,7 @@ export default function ProductImageGallery({ images, title }: Props) {
                 alt={`${title} ${i + 1}`}
                 fill
                 sizes="64px"
-                className="object-cover object-center"
+                className="object-contain object-center"
                 unoptimized={img.startsWith('/assets/')}
               />
             </button>
@@ -142,8 +202,8 @@ export default function ProductImageGallery({ images, title }: Props) {
             position: 'fixed',
             left: zoom.panelLeft,
             top: zoom.panelTop,
-            width: PANEL,
-            height: PANEL,
+            width: zoom.panelSize,
+            height: zoom.panelSize,
             backgroundImage: `url(${current})`,
             backgroundSize: `${zoom.bw}px ${zoom.bh}px`,
             backgroundPosition: `${zoom.bgX}px ${zoom.bgY}px`,

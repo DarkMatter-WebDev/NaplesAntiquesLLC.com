@@ -151,7 +151,7 @@ function DrawerItem({
             alt={title}
             fill
             sizes="56px"
-            className="object-cover"
+            className="object-contain"
             unoptimized={item.image.startsWith('/assets/')}
           />
         ) : (

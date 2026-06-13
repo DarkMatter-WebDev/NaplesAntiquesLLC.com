@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -72,6 +72,38 @@ const PRICE_MODES = [
   { value: 'manual', label: 'Manual / Fixed' },
 ] as const;
 
+type SortKey =
+  | 'inventoryNumber'
+  | 'image'
+  | 'title'
+  | 'category'
+  | 'gender'
+  | 'chainType'
+  | 'length'
+  | 'purity'
+  | 'weight'
+  | 'mode'
+  | 'currentPrice'
+  | 'status';
+
+type SortDirection = 'asc' | 'desc';
+
+const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null }[] = [
+  { label: 'Inv #', sortKey: 'inventoryNumber' },
+  { label: 'Image', sortKey: 'image' },
+  { label: 'Title', sortKey: 'title' },
+  { label: 'Category', sortKey: 'category' },
+  { label: 'Gender', sortKey: 'gender' },
+  { label: 'Chain Type', sortKey: 'chainType' },
+  { label: 'Length', sortKey: 'length' },
+  { label: 'Purity', sortKey: 'purity' },
+  { label: 'Weight', sortKey: 'weight' },
+  { label: 'Mode', sortKey: 'mode' },
+  { label: 'Current Price', sortKey: 'currentPrice' },
+  { label: 'Status', sortKey: 'status' },
+  { label: '', sortKey: null },
+];
+
 function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
   return {
     id: '',
@@ -98,6 +130,52 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
   };
 }
 
+function parseDisplayPrice(value: string): number | null {
+  const numeric = Number(value.replace(/[^0-9.-]+/g, ''));
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function getSortValue(
+  product: Product,
+  key: SortKey,
+  spotData: SpotData | null,
+  inventoryNumbers: Map<string, number>,
+): string | number | null {
+  switch (key) {
+    case 'inventoryNumber':
+      return inventoryNumbers.get(product.id) ?? null;
+    case 'image':
+      return product.images?.[0] ? 1 : 0;
+    case 'title':
+      return product.title;
+    case 'category':
+      return product.category;
+    case 'gender':
+      return product.gender ?? 'Unisex';
+    case 'chainType':
+      return getChainTypeFromTags(product.tags);
+    case 'length':
+      return getLengthFromTags(product.tags);
+    case 'purity':
+      return product.purity;
+    case 'weight':
+      return product.weight_grams;
+    case 'mode':
+      return product.price_mode === 'manual' ? 'Manual' : `Spot ${product.pricing_multiplier ?? ''}`;
+    case 'currentPrice':
+      return parseDisplayPrice(getDisplayPrice(product, spotData));
+    case 'status':
+      return product.status;
+  }
+}
+
+function compareSortValues(a: string | number | null, b: string | number | null): number {
+  if (a == null || a === '') return b == null || b === '' ? 0 : 1;
+  if (b == null || b === '') return -1;
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+}
+
 export default function AdminShell({ initialProducts, userEmail, spotData }: Props) {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>(initialProducts);
@@ -118,6 +196,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
   const [previewImg, setPreviewImg] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [sortOrderManual, setSortOrderManual] = useState(false);
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
   const [chainTypeInput, setChainTypeInput] = useState('');
   const [lengthInput, setLengthInput] = useState('');
   const [quickEntry, setQuickEntry] = useState('');
@@ -393,6 +472,36 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
     return true;
   });
 
+  const inventoryNumbers = useMemo(() => {
+    const ordered = [...products].sort((a, b) => {
+      if (a.status !== b.status) return a.status === 'Available' ? -1 : 1;
+      return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+    });
+    return new Map(ordered.map((product, index) => [product.id, index + 1]));
+  }, [products]);
+
+  const sortedProducts = useMemo(() => {
+    if (!sortConfig) return filtered;
+    return filtered
+      .map((product, index) => ({ product, index }))
+      .sort((a, b) => {
+        const compared = compareSortValues(
+          getSortValue(a.product, sortConfig.key, spotData, inventoryNumbers),
+          getSortValue(b.product, sortConfig.key, spotData, inventoryNumbers),
+        );
+        const stableCompared = compared || a.index - b.index;
+        return sortConfig.direction === 'asc' ? stableCompared : -stableCompared;
+      })
+      .map(({ product }) => product);
+  }, [filtered, inventoryNumbers, sortConfig, spotData]);
+
+  function toggleSort(key: SortKey) {
+    setSortConfig((current) => {
+      if (!current || current.key !== key) return { key, direction: 'asc' };
+      return { key, direction: current.direction === 'asc' ? 'desc' : 'asc' };
+    });
+  }
+
   const total = products.length;
   const available = products.filter((p) => p.status === 'Available').length;
   const sold = products.filter((p) => p.status === 'Sold').length;
@@ -587,19 +696,45 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}>
-                  {['Image', 'Title', 'Category', 'Gender', 'Chain Type', 'Length', 'Purity', 'Weight', 'Mode', 'Current Price', 'Status', ''].map((h) => (
-                    <th key={h} className="px-4 py-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap"
-                      style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-                      {h}
-                    </th>
-                  ))}
+                  {PRODUCT_TABLE_COLUMNS.map(({ label, sortKey }) => {
+                    const active = sortConfig?.key === sortKey;
+                    return (
+                      <th
+                        key={label || 'actions'}
+                        aria-sort={active ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+                        className="px-4 py-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap"
+                        style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                      >
+                        {sortKey ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleSort(sortKey)}
+                            className="flex items-center gap-1 uppercase tracking-wide hover:opacity-75"
+                            style={{ fontFamily: 'var(--font-label)' }}
+                          >
+                            <span>{label}</span>
+                            <span
+                              aria-hidden="true"
+                              className="text-[0.65rem]"
+                              style={{ color: active ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}
+                            >
+                              {active ? (sortConfig.direction === 'asc' ? '▲' : '▼') : '↕'}
+                            </span>
+                          </button>
+                        ) : label}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((p) => (
+                {sortedProducts.map((p) => (
                   <tr key={p.id}
                     className="border-b hover:bg-[color:var(--color-surface-container-low)] transition-colors"
                     style={{ borderColor: 'var(--color-outline-variant)' }}>
+                    <td className="px-4 py-3 whitespace-nowrap font-bold text-xs" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
+                      #{inventoryNumbers.get(p.id) ?? '—'}
+                    </td>
                     <td className="p-0">
                       {p.images?.[0] ? (
                         <div className="relative w-16 h-16">
@@ -608,7 +743,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
                             alt={p.title}
                             fill
                             sizes="64px"
-                            className="object-cover"
+                            className="object-contain"
                             unoptimized={p.images[0].startsWith('/assets/')}
                           />
                         </div>
@@ -674,9 +809,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
                     </td>
                   </tr>
                 ))}
-                {filtered.length === 0 && (
+                {sortedProducts.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center text-sm"
+                    <td colSpan={PRODUCT_TABLE_COLUMNS.length} className="px-4 py-12 text-center text-sm"
                       style={{ color: 'var(--color-on-surface-variant)' }}>
                       No products found.
                     </td>
@@ -1025,7 +1160,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
                               Cover
                             </div>
                           )}
-                          <Image src={img} alt="" fill sizes="64px" className="object-cover"
+                          <Image src={img} alt="" fill sizes="64px" className="object-contain"
                             unoptimized={img.startsWith('/assets/')} />
                           {/* Hover overlay: preview + remove */}
                           <div

@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Product, SpotData } from '@/types/product';
-import { getDisplayPrice, getPriceContext } from '@/lib/pricing';
+import { getDisplayPrice } from '@/lib/pricing';
 import WishlistButton from '@/components/shop/WishlistButton';
 import type { WishlistItem } from '@/context/WishlistContext';
 import CartButton from '@/components/shop/CartButton';
@@ -17,7 +17,8 @@ export default function ProductCard({ product, spotData, locale }: Props) {
   const isEs = locale === 'es';
   const title = isEs && product.title_es ? product.title_es : product.title;
   const price = getDisplayPrice(product, spotData);
-  const priceCtx = getPriceContext(product, spotData, locale);
+  const purityLabel = formatPurity(product, isEs);
+  const weightLabel = formatWeight(product.weight_grams);
   const thumb = product.images?.[0];
   const href = locale === 'es' ? `/es/shop/${product.id}` : `/shop/${product.id}`;
   const isSold = product.status === 'Sold';
@@ -77,7 +78,7 @@ export default function ProductCard({ product, spotData, locale }: Props) {
               alt={title}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              className="object-cover object-center transition-transform duration-700 group-hover:scale-105"
+              className="object-contain object-center"
               loading="lazy"
               // Local assets in the static folder aren't in remotePatterns; unoptimized for those
               unoptimized={thumb.startsWith('/assets/')}
@@ -89,7 +90,7 @@ export default function ProductCard({ product, spotData, locale }: Props) {
       </div>
 
       {/* Body */}
-      <div className="flex flex-col flex-1 p-4 gap-2">
+      <div className="flex flex-col flex-1 p-4 gap-1.5">
         <span
           className="text-[0.62rem] font-bold uppercase tracking-[0.28em]"
           style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
@@ -99,7 +100,7 @@ export default function ProductCard({ product, spotData, locale }: Props) {
 
         <Link href={href} className="group/title">
           <h3
-            className="font-bold text-lg leading-snug mt-1 group-hover/title:underline underline-offset-2"
+            className="font-bold text-[0.98rem] leading-snug mt-0.5 group-hover/title:underline underline-offset-2"
             style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
           >
             {title}
@@ -107,29 +108,52 @@ export default function ProductCard({ product, spotData, locale }: Props) {
         </Link>
 
         <p
-          className="text-xs font-bold uppercase tracking-widest mt-auto pt-2"
-          style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+          className="pt-0.5 flex items-baseline gap-1.5 flex-wrap"
+          style={{ fontFamily: 'var(--font-label)' }}
         >
-          {price}
+          <span
+            className="text-xs font-bold uppercase tracking-widest"
+            style={{ color: 'var(--color-on-surface-variant)' }}
+          >
+            {isEs ? 'Tu precio' : 'Your price'}
+          </span>
+          <span
+            className="text-xs font-extrabold uppercase tracking-widest"
+            style={{ color: 'var(--color-primary)' }}
+          >
+            {price}
+          </span>
         </p>
         <p
-          className="text-[0.52rem] leading-tight opacity-75"
+          className="text-[0.76rem] leading-snug font-semibold opacity-85 flex flex-wrap gap-x-2 gap-y-0.5"
           style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
         >
-          {priceCtx}
+          <span>{isEs ? 'Pureza' : 'Purity'}: {purityLabel}</span>
+          <span>{isEs ? 'Gramos' : 'Grams'}: {weightLabel}</span>
         </p>
 
         {/* Actions */}
         <div className="flex flex-wrap gap-2 mt-3">
           <CartButton item={cartItem} variant="card" locale={locale} />
-          <Link
-            href={`${locale === 'es' ? '/es' : ''}/contact`}
-            className="outline-button text-xs"
-          >
-            {isEs ? 'Consultar' : 'Inquire'}
-          </Link>
         </div>
       </div>
     </article>
   );
+}
+
+function formatPurity(product: Product, isEs: boolean): string {
+  if (!product.purity) return isEs ? 'No indicado' : 'Not listed';
+  if (product.category === 'Silver' && product.purity >= 100) {
+    return product.purity === 925
+      ? `925 ${isEs ? 'esterlina' : 'sterling'}`
+      : `${product.purity}`;
+  }
+  return `${product.purity}K`;
+}
+
+function formatWeight(weight: number | null): string {
+  if (!weight) return '—';
+  return `${new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: weight % 1 === 0 ? 0 : 2,
+  }).format(weight)}g`;
 }

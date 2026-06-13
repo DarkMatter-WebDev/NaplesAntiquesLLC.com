@@ -20,8 +20,9 @@ export default function SiteHeader() {
   const locale = useLocale();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [shopOpen, setShopOpen] = useState(false);
   const [sellOpen, setSellOpen] = useState(false);
-  const [servicesOpen, setServicesOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const { count: wishlistCount, openDrawer: openWishlist } = useWishlist();
   const { count: cartCount, openDrawer: openCart, recentlyAdded, dismissAdded } = useCart();
 
@@ -33,6 +34,11 @@ export default function SiteHeader() {
   const altPath = pathname.replace(/^\/(es)(\/|$)/, '/').replace(/^(?!\/)/, '/');
   const altHref = altLocale === 'es' ? `/es${altPath === '/' ? '' : altPath}` : altPath;
 
+  const SHOP_ITEMS = [
+    { key: 'store' as const, path: '/shop' },
+    { key: 'auctions' as const, path: '/auctions' },
+  ];
+
   const SELL_ITEMS = [
     { key: 'estateJewelry' as const, path: '/estate-jewelry' },
     { key: 'goldServices' as const, path: '/gold-services' },
@@ -40,15 +46,16 @@ export default function SiteHeader() {
     { key: 'bullion' as const, path: '/bullion' },
   ];
 
-  const SERVICE_ITEMS = [
-    { key: 'freeEvaluation' as const, path: '/free-evaluation' },
-    { key: 'estateServices' as const, path: '/estate-services' },
+  const ABOUT_ITEMS = [
+    { key: 'aboutUs' as const, path: '/about' },
+    { key: 'otherServices' as const, path: '/services' },
   ];
 
   function closeAll() {
     setMenuOpen(false);
+    setShopOpen(false);
     setSellOpen(false);
-    setServicesOpen(false);
+    setAboutOpen(false);
   }
 
   return (
@@ -87,7 +94,12 @@ export default function SiteHeader() {
         {/* Desktop nav — 2xl and up */}
         <nav className="hidden 2xl:flex items-center gap-5" style={{ fontFamily: 'var(--font-label)' }}>
           <Link href={href('/')} className={navLinkBase} style={{ color: SECONDARY }}>{t('home')}</Link>
-          <Link href={href('/shop')} className={navLinkBase} style={{ color: SECONDARY }}>{t('shop')}</Link>
+          <div className="group relative flex items-center">
+            <Link href={href('/shop')} className={navLinkBase} style={{ color: SECONDARY }}>
+              {t('shop')}
+            </Link>
+            <DesktopDropdown items={SHOP_ITEMS} t={t} href={href} />
+          </div>
 
           {/* Sell To Us dropdown */}
           <div className="group relative flex items-center">
@@ -97,14 +109,12 @@ export default function SiteHeader() {
             <DesktopDropdown items={SELL_ITEMS} t={t} href={href} />
           </div>
 
-          <Link href={href('/about')} className={navLinkBase} style={{ color: SECONDARY }}>{t('about')}</Link>
-
-          {/* Services dropdown */}
+          {/* About dropdown */}
           <div className="group relative flex items-center">
-            <Link href={href('/free-evaluation')} className={navLinkBase} style={{ color: SECONDARY }}>
-              {t('services')}
+            <Link href={href('/about')} className={navLinkBase} style={{ color: SECONDARY }}>
+              {t('about')}
             </Link>
-            <DesktopDropdown items={SERVICE_ITEMS} t={t} href={href} />
+            <DesktopDropdown items={ABOUT_ITEMS} t={t} href={href} />
           </div>
 
           <Link href={href('/contact')} className={navLinkBase} style={{ color: SECONDARY }}>{t('contact')}</Link>
@@ -264,7 +274,15 @@ export default function SiteHeader() {
           <div className="flex flex-col px-4 py-3" style={{ fontFamily: 'var(--font-label)' }}>
 
             <MobileLink href={href('/')} onClick={closeAll} style={{ color: GOLD }}>{t('home')}</MobileLink>
-            <MobileLink href={href('/shop')} onClick={closeAll}>{t('shop')}</MobileLink>
+            <MobileAccordion
+              label={t('shop')}
+              open={shopOpen}
+              onToggle={() => setShopOpen(o => !o)}
+            >
+              {SHOP_ITEMS.map(({ key, path }) => (
+                <MobileLink key={key} href={href(path)} onClick={closeAll} sub>{t(key)}</MobileLink>
+              ))}
+            </MobileAccordion>
 
             {/* Sell To Us — collapsible */}
             <MobileAccordion
@@ -277,15 +295,13 @@ export default function SiteHeader() {
               ))}
             </MobileAccordion>
 
-            <MobileLink href={href('/about')} onClick={closeAll}>{t('about')}</MobileLink>
-
             {/* Services — collapsible */}
             <MobileAccordion
-              label={t('services')}
-              open={servicesOpen}
-              onToggle={() => setServicesOpen(o => !o)}
+              label={t('about')}
+              open={aboutOpen}
+              onToggle={() => setAboutOpen(o => !o)}
             >
-              {SERVICE_ITEMS.map(({ key, path }) => (
+              {ABOUT_ITEMS.map(({ key, path }) => (
                 <MobileLink key={key} href={href(path)} onClick={closeAll} sub>{t(key)}</MobileLink>
               ))}
             </MobileAccordion>
