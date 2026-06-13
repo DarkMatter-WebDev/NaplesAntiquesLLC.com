@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Naples Estate Jewelry Co — Logo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+  canvas { max-width: 100%; height: auto; display: block; }
+</style>
+</head>
+<body>
+<canvas id="logo"></canvas>
+<script>
+const canvas = document.getElementById('logo');
+canvas.width  = 960;
+canvas.height = 460;
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+/* ── gradient factory ─────────────────────────────────────────── */
+function mkGrad(oc, x1, y1, x2, y2) {
+  const g = oc.createLinearGradient(x1, y1, x2, y2);
+  g.addColorStop(0.00, '#1a44ff');
+  g.addColorStop(0.20, '#8822ff');
+  g.addColorStop(0.45, '#ff22aa');
+  g.addColorStop(0.65, '#ff2244');
+  g.addColorStop(0.83, '#ff6611');
+  g.addColorStop(1.00, '#ffaa00');
+  return g;
+}
+
+/* ── deep black background ────────────────────────────────────── */
+const bgr = ctx.createRadialGradient(W/2, H*0.45, 20, W/2, H*0.5, W*0.78);
+bgr.addColorStop(0, '#06061a');
+bgr.addColorStop(1, '#000000');
+ctx.fillStyle = bgr;
+ctx.fillRect(0, 0, W, H);
+
+/* ── faint ribbon strokes behind text ────────────────────────── */
+function drawRibbons() {
+  const pairs = [
+    { pts: [[0, H*0.12], [W*0.28, H*0.03], [W*0.72, H*0.22], [W, H*0.08]], w: 28, a: 0.11 },
+    { pts: [[0, H*0.88], [W*0.32, H*0.97], [W*0.68, H*0.78], [W, H*0.92]], w: 22, a: 0.09 },
+  ];
+  pairs.forEach(({ pts, w, a }) => {
+    ctx.save();
+    const rg = ctx.createLinearGradient(0, H*0.1, W, H*0.9);
+    rg.addColorStop(0,   '#2255ff');
+    rg.addColorStop(0.5, '#ff33bb');
+    rg.addColorStop(1,   '#ff8822');
+    ctx.strokeStyle = rg;
+    ctx.lineWidth  = w;
+    ctx.lineCap    = 'round';
+    ctx.globalAlpha = a;
+    ctx.shadowColor = '#ff33bb';
+    ctx.shadowBlur  = 18;
+    ctx.beginPath();
+    ctx.moveTo(...pts[0]);
+    ctx.bezierCurveTo(...pts[1], ...pts[2], ...pts[3]);
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+/* ── ambient glow pass (drawn on main ctx before balloon) ─────── */
+function drawGlow(text, cx, cy, size) {
+  ctx.save();
+  ctx.font = `900 ${size}px 'Arial Black', Arial, sans-serif`;
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  [50, 30, 18].forEach(blur => {
+    ctx.shadowColor = '#cc22bb';
+    ctx.shadowBlur  = blur;
+    ctx.fillStyle   = 'rgba(200,20,180,0.06)';
+    ctx.fillText(text, cx, cy);
+  });
+  ctx.restore();
+}
+
+/* ── balloon / bubble text (offscreen composite) ──────────────── */
+function drawBalloon(text, cx, cy, size) {
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const oc = off.getContext('2d');
+
+  oc.font          = `900 ${size}px 'Arial Black', Arial, sans-serif`;
+  oc.textAlign     = 'center';
+  oc.textBaseline  = 'middle';
+
+  /* step 1 – thick rounded stroke builds the balloon volume */
+  oc.strokeStyle = mkGrad(oc, 0, cy - size, W, cy + size * 0.5);
+  oc.lineWidth   = size * 0.5;
+  oc.lineJoin    = 'round';
+  oc.lineCap     = 'round';
+  oc.shadowColor = 'rgba(180,30,220,0.75)';
+  oc.shadowBlur  = 28;
+  oc.strokeText(text, cx, cy);
+  oc.shadowBlur  = 0;
+
+  /* step 2 – fill on top with same gradient */
+  oc.fillStyle = mkGrad(oc, 0, cy - size, W, cy + size * 0.5);
+  oc.fillText(text, cx, cy);
+
+  /* step 3 – composite shading/highlight INSIDE the shape only */
+  oc.globalCompositeOperation = 'source-atop';
+
+  // bottom depth shadow
+  const btm = oc.createLinearGradient(0, cy - size*0.35, 0, cy + size*0.65);
+  btm.addColorStop(0.00, 'rgba(0,0,0,0)');
+  btm.addColorStop(0.48, 'rgba(0,0,0,0)');
+  btm.addColorStop(1.00, 'rgba(0,0,0,0.58)');
+  oc.fillStyle = btm;
+  oc.fillRect(0, 0, W, H);
+
+  // top gloss band
+  const top = oc.createLinearGradient(0, cy - size*0.68, 0, cy - size*0.02);
+  top.addColorStop(0.00, 'rgba(255,255,255,0.58)');
+  top.addColorStop(0.45, 'rgba(255,255,255,0.22)');
+  top.addColorStop(1.00, 'rgba(255,255,255,0)');
+  oc.fillStyle = top;
+  oc.fillRect(0, 0, W, H);
+
+  // specular hot-spot (upper-left)
+  const spec = oc.createRadialGradient(
+    cx - size*0.52, cy - size*0.32, 0,
+    cx - size*0.05, cy + size*0.08, size * 1.45
+  );
+  spec.addColorStop(0.00, 'rgba(255,255,255,0.65)');
+  spec.addColorStop(0.14, 'rgba(255,255,255,0.28)');
+  spec.addColorStop(0.32, 'rgba(255,255,255,0.06)');
+  spec.addColorStop(1.00, 'rgba(255,255,255,0)');
+  oc.fillStyle = spec;
+  oc.fillRect(0, 0, W, H);
+
+  oc.globalCompositeOperation = 'source-over';
+  ctx.drawImage(off, 0, 0);
+}
+
+/* ── thin gradient rule lines ────────────────────────────────── */
+function rule(y, x1, x2) {
+  ctx.save();
+  ctx.strokeStyle  = mkGrad(ctx, x1, y, x2, y);
+  ctx.lineWidth    = 1.5;
+  ctx.globalAlpha  = 0.55;
+  ctx.shadowColor  = '#ff44cc';
+  ctx.shadowBlur   = 8;
+  ctx.beginPath();
+  ctx.moveTo(x1, y); ctx.lineTo(x2, y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* ── small diamond accent ────────────────────────────────────── */
+function diamond(cx, cy, r) {
+  ctx.save();
+  ctx.fillStyle   = mkGrad(ctx, cx - r, cy, cx + r, cy);
+  ctx.shadowColor = '#ff44bb';
+  ctx.shadowBlur  = 10;
+  ctx.beginPath();
+  ctx.moveTo(cx,     cy - r);
+  ctx.lineTo(cx + r, cy    );
+  ctx.lineTo(cx,     cy + r);
+  ctx.lineTo(cx - r, cy    );
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/* ══ RENDER ══════════════════════════════════════════════════════ */
+
+drawRibbons();
+
+const rows = [
+  { text: 'NAPLES',         cy: H * 0.255, size: 138 },
+  { text: 'ESTATE JEWELRY', cy: H * 0.570, size:  64 },
+  { text: 'CO.',            cy: H * 0.838, size:  50 },
+];
+
+// glow first
+rows.forEach(r => drawGlow(r.text, W/2, r.cy, r.size));
+
+// divider lines
+rule(H * 0.415, 60, W - 60);
+rule(H * 0.700, 110, W - 110);
+
+// diamond accents on dividers
+diamond(W/2, H * 0.415, 5);
+diamond(W/2, H * 0.700, 4);
+
+// balloon text
+rows.forEach(r => drawBalloon(r.text, W/2, r.cy, r.size));
+</script>
+</body>
+</html>
