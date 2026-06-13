@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import type { Product } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
@@ -85,7 +85,8 @@ export default async function ShopPage({ params, searchParams }: Props) {
     }
     if (filters.gender) {
       const g = p.gender ?? 'Unisex';
-      if (g !== filters.gender) return false;
+      // Unisex items appear in all gender categories
+      if (g !== 'Unisex' && g !== filters.gender) return false;
     }
     return true;
   });
@@ -97,6 +98,11 @@ export default async function ShopPage({ params, searchParams }: Props) {
   });
 
   const isEs = locale === 'es';
+
+  const investStyle = {
+    border: '1px solid rgba(115, 92, 0, 0.24)',
+    background: 'linear-gradient(135deg, #fffdf7 0%, #f7f2e4 100%)',
+  };
 
   if (error) {
     return (
@@ -112,30 +118,27 @@ export default async function ShopPage({ params, searchParams }: Props) {
   return (
     <>
       <SiteHeader />
-      <main className="pt-28 md:pt-32 pb-20">
+      <main className="pt-20 md:pt-32 pb-20">
         <div className="max-w-6xl mx-auto px-4 md:px-8">
 
-          {/* ── Investment transparency note ───────────────────── */}
+          {/* Investment transparency note */}
           <section
-            className="mb-8 md:mb-10 text-center px-5 py-6 md:py-8"
-            style={{
-              border: '1px solid rgba(115, 92, 0, 0.24)',
-              background: 'linear-gradient(135deg, #fffdf7 0%, #f7f2e4 100%)',
-            }}
+            className="mb-2 md:mb-10 text-center px-3 md:px-5 py-2 md:py-8"
+            style={investStyle}
             aria-labelledby="shop-invest-heading"
           >
             <p
-              className="text-[0.68rem] font-bold uppercase tracking-[0.22em] mb-2"
+              className="text-[0.55rem] md:text-[0.68rem] font-bold uppercase tracking-[0.22em] mb-0.5 md:mb-2"
               style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
             >
               {isEs ? 'Una forma más inteligente de poseer oro' : 'A smarter way to own gold'}
             </p>
             <h2
               id="shop-invest-heading"
-              className="text-3xl md:text-4xl font-bold mt-1 mb-3 tracking-tight"
+              className="text-base md:text-4xl font-bold mt-0 mb-0 md:mb-3 tracking-tight"
               style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
             >
-              {isEs ? 'No solo compres. Invierte.' : "Don’t just buy. Invest."}
+              {isEs ? 'No solo compres. Invierte.' : "Don't just buy. Invest."}
             </h2>
             <p
               className="hidden md:block text-sm leading-relaxed max-w-2xl mx-auto mb-5"
@@ -143,12 +146,12 @@ export default async function ShopPage({ params, searchParams }: Props) {
             >
               {isEs
                 ? 'Cada pieza tiene precio en vivo contra el mercado spot del oro, con el valor exacto de chatarra de oro mostrado junto a tu precio. No solo compras joyería — estás poniendo tu dinero en oro real y usable a un valor que puedes verificar.'
-                : "Every piece is priced live against the gold spot market, with the exact gold scrap value shown right next to your price. You’re not just buying jewelry — you’re putting your money into real, wearable gold at a value you can verify."}
+                : "Every piece is priced live against the gold spot market, with the exact gold scrap value shown right next to your price. You're not just buying jewelry — you're putting your money into real, wearable gold at a value you can verify."}
             </p>
 
-            {/* 3-column points */}
+            {/* 3-column points — hidden on mobile */}
             <div
-              className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4 text-left md:text-center"
+              className="hidden md:grid md:grid-cols-3 gap-3 mt-4 text-center"
               style={{ borderTop: '1px solid rgba(115, 92, 0, 0.16)', paddingTop: '1rem' }}
             >
               {[

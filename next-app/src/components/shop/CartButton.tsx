@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default function CartButton({ item, variant = 'card', locale = 'en' }: Props) {
-  const { isIn, add, remove, openDrawer } = useCart();
+  const { isIn, add, remove, openDrawer, notifyAdded } = useCart();
   const inCart = isIn(item.id);
   const isEs = locale === 'es';
 
@@ -20,7 +20,11 @@ export default function CartButton({ item, variant = 'card', locale = 'en' }: Pr
       remove(item.id);
     } else {
       add(item);
-      openDrawer();
+      if (variant === 'card') {
+        notifyAdded(item.title);
+      } else {
+        openDrawer();
+      }
     }
   }
 

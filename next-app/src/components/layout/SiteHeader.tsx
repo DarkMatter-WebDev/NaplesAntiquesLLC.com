@@ -23,7 +23,7 @@ export default function SiteHeader() {
   const [sellOpen, setSellOpen] = useState(false);
   const [servicesOpen, setServicesOpen] = useState(false);
   const { count: wishlistCount, openDrawer: openWishlist } = useWishlist();
-  const { count: cartCount, openDrawer: openCart } = useCart();
+  const { count: cartCount, openDrawer: openCart, recentlyAdded, dismissAdded } = useCart();
 
   function href(path: string) {
     return `${locale === 'es' ? '/es' : ''}${path}`;
@@ -121,33 +121,118 @@ export default function SiteHeader() {
             {locale === 'en' ? 'ES' : 'EN'}
           </Link>
 
-          {/* Cart button */}
+          {/* Wishlist heart — desktop only */}
           <button
             type="button"
-            onClick={openCart}
-            className="relative flex items-center justify-center w-8 h-8 transition-colors"
-            style={{ color: cartCount > 0 ? GOLD : '#5e5e5d' }}
-            aria-label="Cart"
+            onClick={openWishlist}
+            className="relative hidden 2xl:flex items-center justify-center w-8 h-8 transition-colors"
+            style={{ color: wishlistCount > 0 ? GOLD : '#5e5e5d' }}
+            aria-label="Saved items"
           >
             <span
               className="material-symbols-outlined"
               style={{
                 fontSize: '20px',
                 lineHeight: 1,
-                fontVariationSettings: cartCount > 0 ? "'FILL' 1" : "'FILL' 0",
+                fontVariationSettings: wishlistCount > 0 ? "'FILL' 1" : "'FILL' 0",
               }}
             >
-              shopping_bag
+              favorite
             </span>
-            {cartCount > 0 && (
+            {wishlistCount > 0 && (
               <span
                 className="absolute -top-1 -right-1 w-4 h-4 flex items-center justify-center text-[0.5rem] font-bold rounded-full"
                 style={{ background: GOLD, color: '#fff', fontFamily: 'var(--font-label)' }}
               >
-                {cartCount > 9 ? '9+' : cartCount}
+                {wishlistCount > 9 ? '9+' : wishlistCount}
               </span>
             )}
           </button>
+
+          {/* Cart button + added popup */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={openCart}
+              className="relative flex items-center justify-center w-8 h-8 transition-colors"
+              style={{ color: cartCount > 0 ? GOLD : '#5e5e5d' }}
+              aria-label="Cart"
+            >
+              <span
+                className="material-symbols-outlined"
+                style={{
+                  fontSize: '20px',
+                  lineHeight: 1,
+                  fontVariationSettings: cartCount > 0 ? "'FILL' 1" : "'FILL' 0",
+                }}
+              >
+                shopping_bag
+              </span>
+              {cartCount > 0 && (
+                <span
+                  className="absolute -top-1 -right-1 w-4 h-4 flex items-center justify-center text-[0.5rem] font-bold rounded-full"
+                  style={{ background: GOLD, color: '#fff', fontFamily: 'var(--font-label)' }}
+                >
+                  {cartCount > 9 ? '9+' : cartCount}
+                </span>
+              )}
+            </button>
+
+            {/* "Item added" mini popup */}
+            {recentlyAdded && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 10px)',
+                  right: 0,
+                  width: '220px',
+                  background: 'white',
+                  border: `1px solid rgba(115,92,0,0.25)`,
+                  borderRadius: '4px',
+                  boxShadow: '0 6px 24px rgba(0,0,0,0.12)',
+                  padding: '0.75rem',
+                  zIndex: 60,
+                }}
+              >
+                {/* Arrow */}
+                <div style={{
+                  position: 'absolute',
+                  top: '-6px',
+                  right: '10px',
+                  width: '10px',
+                  height: '10px',
+                  background: 'white',
+                  border: `1px solid rgba(115,92,0,0.25)`,
+                  borderBottom: 'none',
+                  borderRight: 'none',
+                  transform: 'rotate(45deg)',
+                }} />
+                <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: GOLD, fontFamily: 'var(--font-label)', marginBottom: '0.2rem' }}>
+                  {locale === 'es' ? 'Agregado al carrito' : 'Item added'}
+                </p>
+                <p style={{ fontSize: '0.75rem', color: '#555', marginBottom: '0.6rem', lineHeight: 1.3 }} className="line-clamp-2">
+                  {recentlyAdded}
+                </p>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => { dismissAdded(); openCart(); }}
+                    style={{ flex: 1, fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0.35rem 0.5rem', background: GOLD, color: 'white', border: 'none', borderRadius: '2px', cursor: 'pointer', fontFamily: 'var(--font-label)' }}
+                  >
+                    {locale === 'es' ? 'Ver carrito' : 'Go to cart'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={dismissAdded}
+                    style={{ fontSize: '0.7rem', padding: '0.35rem 0.5rem', background: 'none', border: '1px solid rgba(115,92,0,0.3)', color: GOLD, borderRadius: '2px', cursor: 'pointer' }}
+                    aria-label="Dismiss"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Call Now — hidden on mobile; inline-flex at 2xl. Wrapped in span to prevent gold-button display override */}
           <span className="hidden 2xl:inline-flex">

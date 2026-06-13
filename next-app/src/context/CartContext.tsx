@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import CartDrawer from '@/components/cart/CartDrawer';
 
 export interface CartItem {
@@ -22,6 +22,9 @@ interface CartContextValue {
   drawerOpen: boolean;
   openDrawer: () => void;
   closeDrawer: () => void;
+  recentlyAdded: string | null;
+  notifyAdded: (title: string) => void;
+  dismissAdded: () => void;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -47,6 +50,8 @@ export function CartProvider({
   const [items, setItems] = useState<CartItem[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [recentlyAdded, setRecentlyAdded] = useState<string | null>(null);
+  const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setItems(loadFromStorage());
@@ -72,8 +77,19 @@ export function CartProvider({
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
+  const dismissAdded = useCallback(() => {
+    if (addedTimer.current) clearTimeout(addedTimer.current);
+    setRecentlyAdded(null);
+  }, []);
+
+  const notifyAdded = useCallback((title: string) => {
+    if (addedTimer.current) clearTimeout(addedTimer.current);
+    setRecentlyAdded(title);
+    addedTimer.current = setTimeout(() => setRecentlyAdded(null), 3500);
+  }, []);
+
   return (
-    <CartContext.Provider value={{ items, count: items.length, isIn, add, remove, clear, drawerOpen, openDrawer, closeDrawer }}>
+    <CartContext.Provider value={{ items, count: items.length, isIn, add, remove, clear, drawerOpen, openDrawer, closeDrawer, recentlyAdded, notifyAdded, dismissAdded }}>
       {children}
       <CartDrawer locale={locale} />
     </CartContext.Provider>

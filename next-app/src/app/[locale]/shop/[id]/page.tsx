@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import type { Product } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
-import { getDisplayPrice, getPriceContext, purityToFraction } from '@/lib/pricing';
+import { getDisplayPrice, purityToFraction } from '@/lib/pricing';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import ProductImageGallery from '@/components/shop/ProductImageGallery';
@@ -72,8 +72,24 @@ export default async function ProductDetailPage({ params }: Props) {
   const title = isEs && p.title_es ? p.title_es : p.title;
   const description = isEs && p.description_es ? p.description_es : p.description;
   const price = getDisplayPrice(p, spotData);
-  const priceCtx = getPriceContext(p, spotData, locale);
   const isSold = p.status === 'Sold';
+
+  // Store-credit price = raw melt value at spot (multiplier = 1.0)
+  let storeCreditPrice: string | null = null;
+  if (
+    p.price_mode === 'spot-multiplier' &&
+    p.weight_grams && p.purity &&
+    p.pricing_multiplier && p.pricing_multiplier !== 1 &&
+    spotData
+  ) {
+    const spotPerOz = p.category === 'Silver'
+      ? (spotData.silverPerTroyOz ?? 33)
+      : spotData.goldPerTroyOz;
+    const melt = p.weight_grams * purityToFraction(p.purity) * (spotPerOz / GRAMS_PER_TROY_OZ);
+    storeCreditPrice = new Intl.NumberFormat('en-US', {
+      style: 'currency', currency: 'USD', maximumFractionDigits: 0,
+    }).format(melt);
+  }
 
   // Auto-compile specs from structured fields
   const chainType = (p.tags ?? []).find(t => t.startsWith('ct:'))?.slice(3) ?? null;
@@ -219,10 +235,38 @@ export default async function ProductDetailPage({ params }: Props) {
                 >
                   {price}
                 </p>
-                <p className="text-xs mt-1" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-                  {priceCtx}
+                <p
+                  className="flex items-center gap-1 mt-1.5"
+                  style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                >
+                  <span style={{ color: 'var(--color-primary)' }}>✓</span>
+                  {isEs ? 'Este es su precio' : 'This is your price'}
                 </p>
               </div>
+
+              {/* Store credit line */}
+              {storeCreditPrice && !isSold && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                    padding: '0.65rem 0.9rem',
+                    background: 'color-mix(in srgb, var(--color-primary) 7%, transparent)',
+                    border: '1px solid color-mix(in srgb, var(--color-primary) 22%, transparent)',
+                    borderRadius: '2px',
+                  }}
+                >
+                  <span style={{ fontSize: '1rem', lineHeight: 1, flexShrink: 0 }}>⬡</span>
+                  <p style={{ fontSize: '0.8125rem', color: 'var(--color-on-surface)', margin: 0, lineHeight: 1.4 }}>
+                    {isEs ? (
+                      <>Llévalo por <strong style={{ color: 'var(--color-primary)' }}>{storeCreditPrice}</strong> cuando aplicas tu valor de intercambio</>
+                    ) : (
+                      <>Get this item for <strong style={{ color: 'var(--color-primary)' }}>{storeCreditPrice}</strong> when you apply your trade-in value</>
+                    )}
+                  </p>
+                </div>
+              )}
 
               {/* Description */}
               {description && (
@@ -291,19 +335,6 @@ export default async function ProductDetailPage({ params }: Props) {
                 </div>
               )}
 
-              {/* Spot info note */}
-              {p.price_mode === 'spot-multiplier' && spotData && (
-                <p className="text-[0.6rem] leading-relaxed" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-                  {(() => {
-                    const isSilver = p.category === 'Silver';
-                    const spotPrice = isSilver ? spotData.silverPerTroyOz : spotData.goldPerTroyOz;
-                    const src = spotData.source === 'fallback';
-                    return isEs
-                      ? `Precio calculado sobre spot de ${isSilver ? 'plata' : 'oro'} a $${spotPrice?.toLocaleString() ?? '—'}/oz troy${src ? ' (precio de referencia)' : ' (en vivo)'}. El precio puede cambiar con el mercado.`
-                      : `Price calculated on ${isSilver ? 'silver' : 'gold'} spot at $${spotPrice?.toLocaleString() ?? '—'}/troy oz${src ? ' (reference price)' : ' (live)'}. Price may change with the market.`;
-                  })()}
-                </p>
-              )}
 
 
             </div>

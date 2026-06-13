@@ -142,6 +142,17 @@ export default function CartDrawer({ locale }: { locale: string }) {
 
 /* ── Cart view ──────────────────────────────────────────────────────────────── */
 
+const FL_TAX = 0.07; // Florida 6% state + Collier County 1% local
+
+function parsePrice(label: string): number | null {
+  const m = label.replace(/,/g, '').match(/\$([\d.]+)/);
+  return m ? parseFloat(m[1]) : null;
+}
+
+function fmt(n: number) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+}
+
 function CartView({ items, isEs, prefix, onRemove, onCheckout, onClose }: {
   items: CartItem[];
   isEs: boolean;
@@ -164,6 +175,13 @@ function CartView({ items, isEs, prefix, onRemove, onCheckout, onClose }: {
     );
   }
 
+  const prices = items.map((i) => parsePrice(i.priceLabel));
+  const knownPrices = prices.filter((p): p is number => p !== null);
+  const hasUnknown = knownPrices.length < prices.length;
+  const subtotal = knownPrices.reduce((a, b) => a + b, 0);
+  const tax = subtotal * FL_TAX;
+  const total = subtotal + tax;
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
@@ -171,7 +189,40 @@ function CartView({ items, isEs, prefix, onRemove, onCheckout, onClose }: {
           <CartItemRow key={item.id} item={item} isEs={isEs} prefix={prefix} onRemove={() => onRemove(item.id)} />
         ))}
       </div>
-      <div className="px-4 py-4 border-t flex flex-col gap-2 flex-shrink-0" style={{ borderColor: BORDER }}>
+
+      {/* Totals */}
+      <div className="px-4 pt-3 pb-1 border-t" style={{ borderColor: BORDER }}>
+        <div className="flex flex-col gap-1 text-xs" style={{ fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}>
+          <div className="flex justify-between">
+            <span>{isEs ? 'Subtotal' : 'Subtotal'}</span>
+            <span>{subtotal > 0 ? fmt(subtotal) : '—'}{hasUnknown ? '*' : ''}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>{isEs ? 'Impuesto FL (7%)' : 'FL Sales Tax (7%)'}</span>
+            <span>{subtotal > 0 ? fmt(tax) : '—'}</span>
+          </div>
+          <div
+            className="flex justify-between pt-1 mt-1 font-bold text-sm"
+            style={{ borderTop: `1px solid ${BORDER}`, color: 'var(--color-on-surface)' }}
+          >
+            <span>{isEs ? 'Total estimado' : 'Est. Total'}</span>
+            <span style={{ color: GOLD }}>{subtotal > 0 ? fmt(total) : '—'}</span>
+          </div>
+          {hasUnknown && (
+            <p className="text-[0.6rem] mt-1" style={{ color: 'var(--color-on-surface-variant)' }}>
+              * {isEs ? 'Algunos artículos requieren confirmación de precio.' : 'Some items require price confirmation.'}
+            </p>
+          )}
+          <p className="text-[0.6rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
+            {isEs
+              ? 'Los precios spot pueden variar. El impuesto es estimado.'
+              : 'Spot prices may vary. Tax is an estimate.'}
+          </p>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="px-4 py-3 flex flex-col gap-2 flex-shrink-0">
         <button type="button" onClick={onCheckout} className="gold-button justify-center" style={{ width: '100%' }}>
           {isEs ? 'Proceder al pago →' : 'Proceed to Checkout →'}
         </button>
