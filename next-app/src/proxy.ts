@@ -38,7 +38,10 @@ export async function proxy(request: NextRequest) {
   // Next 16 currently re-runs proxy for next-intl's internal default-locale
   // rewrite (/ -> /en), which can make /en canonicalize back to / forever.
   // Mark our own English rewrite and let the internal /en request render.
-  if (request.headers.get(INTERNAL_LOCALE_HEADER) === 'en') {
+  if (
+    request.headers.get(INTERNAL_LOCALE_HEADER) === 'en' ||
+    (pathname.startsWith('/en') && request.headers.get(NEXT_INTL_LOCALE_HEADER) === 'en')
+  ) {
     const headers = new Headers(request.headers);
     headers.set(NEXT_INTL_LOCALE_HEADER, 'en');
     const response = NextResponse.next({ request: { headers } });

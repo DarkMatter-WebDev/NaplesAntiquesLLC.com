@@ -100,8 +100,12 @@ export default function ProductCard({ product, spotData, locale }: Props) {
 
         <Link href={href} className="group/title">
           <h3
-            className="font-bold text-[0.98rem] leading-snug mt-0.5 group-hover/title:underline underline-offset-2"
-            style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
+            className="font-bold text-[0.98rem] leading-snug mt-0.5 line-clamp-3 group-hover/title:underline underline-offset-2"
+            style={{
+              fontFamily: 'var(--font-headline)',
+              color: 'var(--color-on-surface)',
+              minHeight: 'calc(1.375em * 3)',
+            }}
           >
             {title}
           </h3>
@@ -133,7 +137,7 @@ export default function ProductCard({ product, spotData, locale }: Props) {
         </p>
 
         {/* Actions */}
-        <div className="flex flex-wrap gap-2 mt-3">
+        <div className="flex flex-wrap gap-2 mt-auto pt-3">
           <CartButton item={cartItem} variant="card" locale={locale} />
         </div>
       </div>

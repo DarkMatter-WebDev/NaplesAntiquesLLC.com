@@ -12,6 +12,17 @@ export function purityToFraction(purity: number): number {
 }
 
 export function calcSpotPrice(product: Product, spotData: SpotData | null): string | null {
+  const price = calcSpotPriceValue(product, spotData);
+  if (price == null) return null;
+
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(price);
+}
+
+export function calcSpotPriceValue(product: Product, spotData: SpotData | null): number | null {
   if (product.price_mode !== 'spot-multiplier') return null;
   const { weight_grams, purity, pricing_multiplier } = product;
   if (!weight_grams || !purity || !pricing_multiplier) return null;
@@ -21,13 +32,7 @@ export function calcSpotPrice(product: Product, spotData: SpotData | null): stri
     : (spotData?.goldPerTroyOz ?? FALLBACK_GOLD_SPOT);
   const spotPerGram = spotPerOz / GRAMS_PER_TROY_OZ;
   const meltValue = weight_grams * purityToFraction(purity) * spotPerGram;
-  const price = meltValue * pricing_multiplier;
-
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(price);
+  return meltValue * pricing_multiplier;
 }
 
 export function getDisplayPrice(product: Product, spotData: SpotData | null): string {

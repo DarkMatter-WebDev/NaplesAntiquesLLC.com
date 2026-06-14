@@ -2,52 +2,60 @@
 
 ## Summary
 
-Optional customer accounts for sign-in, profile, saved favorites, and a saved
-cart that follows the user across devices. Backed by Supabase (Postgres + Auth).
-Setup instructions live in the repo root at `ACCOUNT_SETUP.md`.
+Customer accounts support sign-in, editable customer profile/contact/address
+details, saved favorites, and cart-related state. Accounts are backed by
+Supabase Auth and Postgres. Setup instructions live in `ACCOUNT_SETUP.md`.
 
 ## Key Files
 
-- `scripts/shared/supabase-config.js` — `window.NAPLES_SUPABASE` (project URL +
-  **anon** key). Template: `supabase-config.example.js`.
-- `scripts/shared/naples-auth.js` — `window.NaplesAuth` API.
-- `scripts/shared/registered-only.js` — gates `[data-registered-*]` content.
-- `account.html` + `scripts/account/account-portal.js` — sign in / sign up.
-- `account-dashboard.html` + `scripts/account/account-dashboard.js` — profile,
-  favorites, saved cart.
-- `member-access.html` — example registered-only gated page.
-- `supabase/schema.sql` — tables, triggers, RLS. `supabase/fix-permissions.sql` —
-  idempotent fixup for grants/columns.
+- `next-app/src/app/[locale]/account/page.tsx` - account dashboard route.
+- `next-app/src/components/account/AccountProfileForm.tsx` - editable profile,
+  contact, phone, and complete address form.
+- `next-app/src/app/[locale]/account/sign-in/page.tsx` and
+  `next-app/src/app/[locale]/account/sign-up/page.tsx` - auth entry points.
+- `next-app/src/components/checkout/CheckoutClient.tsx` - checkout prefill from
+  saved profile data.
+- `next-app/src/lib/supabase/client.ts` and
+  `next-app/src/lib/supabase/server.ts` - browser/server Supabase clients.
+- `supabase/schema.sql` - tables, triggers, RLS.
+- `supabase/profile-contact-fields.sql` - idempotent upgrade for full profile
+  contact/address columns.
+- `supabase/fix-permissions.sql` - idempotent fixup for grants/columns.
 
 ## Data Model
 
-See `ARCHITECTURE.md` → Database Schema. Tables: `profiles`, `customer_carts`,
+See `ARCHITECTURE.md` -> Data Model. Tables: `profiles`, `customer_carts`, and
 `favorites`, all RLS-protected so users only access their own rows. A new user
 triggers auto-creation of a profile + empty cart.
 
-## `window.NaplesAuth` API
+`profiles` stores:
 
-`init`, `isConfigured`, `getClient`, `getSession`, `getProfile`,
-`isVip`, `signUp(email, password, fullName)`, `signIn`, `signOut`,
-`updateProfile(fields)`, `listFavorites`, `isFavorite(id)`,
-`toggleFavorite(id)`, `loadCart`, `saveCart(items)`.
+- name fields: `first_name`, `last_name`, `full_name`
+- contact fields: `email`, `phone`, `alternate_phone`
+- address fields: `address_line1`, `address_line2`, `city`, `state`,
+  `postal_code`, `country`
+- customer flags/preferences: `marketing_opt_in`, `is_vip`, `is_admin`
 
 ## Auth Flow
 
-1. Config sets URL + anon key → `naples-auth.js` creates the client lazily.
-2. Sign up sends a confirmation email (`emailRedirectTo` → `/account.html`).
-3. After confirmation, session is established; user routed to the dashboard.
-4. Cart merges local → account on sign-in (`ShopCart.syncFromAccount`).
+1. Next/Supabase client config reads `NEXT_PUBLIC_SUPABASE_URL` and
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+2. Sign up sends a confirmation email and stores `full_name` in auth metadata.
+3. Supabase trigger creates `profiles` + `customer_carts` rows.
+4. `/account` reads the profile server-side and renders the editable profile
+   form.
+5. Checkout prefill reads signed-in profile contact data when available.
 
 ## VIP / Private Pricing
 
-`profiles.is_vip` (set manually in Supabase Table Editor) lets `ShopPricing`
-display a product's `privatePriceLabel` instead of the public price.
+`profiles.is_vip` can be set manually in Supabase for future private pricing
+flows. `profiles.is_admin` grants access to the admin routes.
 
-## Setup Reminders (from `ACCOUNT_SETUP.md`)
+## Setup Reminders
 
 - Run `supabase/schema.sql` in the SQL Editor; enable Email auth.
-- Set **Auth → URL configuration** Site URL + Redirect URLs to match the live
-  domain (and localhost for testing).
-- If upgrading an older schema, run `supabase/fix-permissions.sql` once.
-- Only the anon key belongs in browser config — never a service-role key.
+- For existing projects, run `supabase/profile-contact-fields.sql` once.
+- Set **Auth -> URL configuration** Site URL + Redirect URLs to match the live
+  domain and localhost dev URLs.
+- Only the anon key belongs in browser config. Never use a service-role key in
+  client code.

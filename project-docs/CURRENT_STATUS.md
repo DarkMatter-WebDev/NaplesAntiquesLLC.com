@@ -30,6 +30,84 @@
 
 ## What Was Recently Completed
 
+- **Mobile shop card cart button overflow fixed (2026-06-13):** shop gallery
+  cart buttons now use tighter card-specific spacing and compact Add/Remove
+  labels on slim mobile screens, preventing "Remove from Cart" overflow.
+  Verified 320px and 375px mobile widths in-browser; `npm run build` passes.
+- **Shop sort dropdown added (2026-06-13):** the shop filter pop-out now
+  includes a Sort dropdown for inventory order, price low/high, price high/low,
+  weight low/high, and weight high/low. Sorting is URL-backed via `sort` and
+  preserves Available items before Sold items. Verified `/shop?sort=price-asc`
+  and `/shop?sort=weight-desc` in-browser; `npm run build` passes.
+- **Estate route redirect loop fixed (2026-06-13):** updated the Next proxy so
+  internal English-locale rewrites keep the locale header on the second pass.
+  `/estate-jewelry`, `/estate-services`, and Spanish equivalents now render
+  without looping. Verified `/estate-jewelry` in-browser; `npm run build`
+  passes.
+- **Admin drag-to-reorder inventory added (2026-06-13):** product admin now
+  shows an Order grip column in the clean master list. Dragging a row onto
+  another row saves the reordered `sort_order` values to Supabase for the
+  matching Available/Sold group, updating gallery inventory order. Sorting,
+  search, and filters disable drag mode until the view is reset. Verified
+  `/admin` render in-browser; `npm run build` passes.
+- **Account profile full-name field hidden (2026-06-13):** removed the visible
+  Full Name input from the complete account profile form while continuing to
+  maintain `full_name` internally from first/last name. Verified `/account`
+  in-browser; `npm run build` passes.
+- **Complete customer profiles added (2026-06-13):** expanded account profiles
+  with editable first/last/full name, contact email, phone, alternate phone,
+  complete address, country, and marketing opt-in fields. Added
+  `supabase/profile-contact-fields.sql` for existing Supabase projects and
+  updated checkout prefill to use saved profile contact data. Verified
+  `/account` render in-browser; `npm run build` passes.
+- **Checkout account prefill added (2026-06-13):** checkout now looks up the
+  signed-in Supabase user/profile and fills blank customer fields from known
+  account data, including profile name, auth email, and phone metadata when
+  present. Fields remain editable. Verified build and in-browser email prefill;
+  `npm run build` passes.
+- **Checkout-to-payment step added (2026-06-13):** removed the checkout
+  secure-payment placeholder, changed the checkout submit button to "Continue
+  to Payment," and added a new `/payment` route with payment fields plus a
+  second shared order summary that carries the selected shipping option.
+  Verified in-browser; `npm run build` passes.
+- **Checkout shipping rates added (2026-06-13):** checkout shipping now prices
+  Local Pickup at $0, Express Overnight Insured at $75, and Priority Insured at
+  $45, with the selected shipping cost included in the estimated total.
+  Verified in-browser; `npm run build` passes.
+- **Checkout shipping option selector added (2026-06-13):** added a shipping
+  dropdown under Florida sales tax in the checkout order summary with Local
+  Pickup, Express Overnight, and Priority Insured options. Verified in-browser;
+  `npm run build` passes.
+- **Checkout summary remove control added (2026-06-13):** the right-hand
+  checkout order summary now has a per-item remove button wired to the shared
+  cart state, so removing an item updates the summary totals immediately.
+  Verified in-browser; `npm run build` passes.
+- **Shop length filter scoped by item type (2026-06-13):** length buttons now
+  appear only after choosing Necklace or Bracelet in Item Type. Necklace shows
+  chain lengths only, Bracelet shows bracelet lengths only, and server-side
+  filtering ignores incompatible hidden length values. Verified in-browser;
+  `npm run build` passes.
+- **Shop length buttons made checkable (2026-06-13):** updated the horizontal
+  length multi-select controls to read as checkable buttons with an embedded
+  checked-state indicator while preserving URL-backed multi-select behavior.
+  Verified in-browser; `npm run build` passes.
+- **Shop card cart button alignment fixed (2026-06-13):** standardized gallery
+  card title height and pushed action rows to the card bottom so cart buttons
+  align consistently across cards with different title lengths. Card buttons
+  now keep a fixed-height/no-wrap layout. Verified desktop/mobile in-browser;
+  `npm run build` passes.
+- **Shop length selector layout refined (2026-06-13):** moved the shop length
+  multi-select out of the dropdown grid and into a horizontal row of selectable
+  buttons underneath the main filter dropdowns. Verified in-browser;
+  `npm run build` passes.
+- **Shop length multi-select added (2026-06-13):** changed the shop gallery
+  length filter from a single dropdown to a checkbox group so shoppers can
+  select multiple lengths at once. The filter stays URL-backed with a stable
+  comma-separated `length` value. Verified in-browser; `npm run build` passes.
+- **Product detail scrap value added (2026-06-13):** individual shop product
+  pages now show the current scrap gold/silver value directly under "This is
+  your price," using the same live spot melt calculation as the trade-in callout.
+  Verified in-browser; `npm run build` passes.
 - **Shop card cart toggle updated (2026-06-13):** gallery card "Add to Cart"
   buttons now show a brief local "Added to cart" confirmation, switch to
   "Remove from Cart" after adding, and remove the item when clicked again.

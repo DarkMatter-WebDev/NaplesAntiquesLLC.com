@@ -15,6 +15,8 @@ Project ref: `evzluixourmsefwdsieu`.
 In the Supabase SQL Editor, run the relevant scripts in `supabase/`:
 
 - `schema.sql` - account/profile/favorites/cart foundation
+- `profile-contact-fields.sql` - upgrade existing projects with complete
+  customer contact/address profile fields
 - `products.sql` - product table and product policies
 - `inquiries.sql` - inquiry table and policies
 - `fix-permissions.sql` - idempotent permission/column repair
@@ -33,7 +35,7 @@ The Next app account routes are:
 
 - `/account/sign-in`
 - `/account/sign-up`
-- `/account`
+- `/account` - editable customer profile/contact/address details
 
 ## 3. Environment Variables
 

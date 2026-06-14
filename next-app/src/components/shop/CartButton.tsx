@@ -63,7 +63,7 @@ export default function CartButton({ item, variant = 'card', locale = 'en' }: Pr
 
   // card variant — compact button in the actions row
   return (
-    <div className="relative inline-flex">
+    <div className="relative inline-flex w-full">
       {showCardConfirmation && (
         <span
           className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-8 whitespace-nowrap px-2 py-1 text-[0.62rem] font-bold uppercase tracking-wide"
@@ -81,15 +81,51 @@ export default function CartButton({ item, variant = 'card', locale = 'en' }: Pr
       <button
         type="button"
         onClick={handleClick}
-        className="outline-button text-xs flex items-center gap-1"
+        className="outline-button shop-card-cart-button text-xs flex w-full min-h-9 items-center justify-center gap-1 whitespace-nowrap"
         style={inCart ? { borderColor: GOLD, color: GOLD, background: `color-mix(in srgb, ${GOLD} 8%, transparent)` } : undefined}
         aria-pressed={inCart}
       >
         <span className="material-symbols-outlined" style={{ fontSize: '13px', lineHeight: 1 }}>
           {inCart ? 'remove_shopping_cart' : 'add_shopping_cart'}
         </span>
-        {inCart ? (isEs ? 'Quitar del carrito' : 'Remove from Cart') : (isEs ? 'Agregar al carrito' : 'Add to Cart')}
+        <span className="shop-card-cart-label-full">
+          {inCart ? (isEs ? 'Quitar del carrito' : 'Remove from Cart') : (isEs ? 'Agregar al carrito' : 'Add to Cart')}
+        </span>
+        <span className="shop-card-cart-label-compact" aria-hidden="true">
+          {inCart ? (isEs ? 'Quitar' : 'Remove') : (isEs ? 'Agregar' : 'Add')}
+        </span>
       </button>
+      <style>{`
+        .shop-card-cart-button {
+          min-width: 0;
+          width: 100%;
+          box-sizing: border-box;
+          padding-inline: 0.55rem;
+          letter-spacing: 0.08em;
+        }
+        .shop-card-cart-label-compact {
+          display: none;
+        }
+        @media (max-width: 480px) {
+          .shop-card-cart-button {
+            padding-inline: 0.38rem;
+            font-size: 0.58rem;
+            gap: 0.22rem;
+            letter-spacing: 0.045em;
+          }
+          .shop-card-cart-button .material-symbols-outlined {
+            font-size: 12px !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .shop-card-cart-label-full {
+            display: none;
+          }
+          .shop-card-cart-label-compact {
+            display: inline;
+          }
+        }
+      `}</style>
     </div>
   );
 }

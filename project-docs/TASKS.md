@@ -32,6 +32,65 @@
 
 ## Completed
 
+- **Mobile shop card cart button overflow fixed** (2026-06-13): tightened
+  card-only cart button spacing and switched to compact Add/Remove labels on
+  slim mobile widths. Verified 320px/375px in-browser and `npm run build`.
+- **Shop sort dropdown added** (2026-06-13): added a URL-backed Sort dropdown
+  to the shop filter pop-out for price and weight ordering. Verified
+  `/shop?sort=price-asc`, `/shop?sort=weight-desc`, and `npm run build`.
+- **Estate route redirect loop fixed** (2026-06-13): updated the proxy
+  English-locale internal rewrite handling so `/estate-jewelry` and
+  `/estate-services` render instead of redirecting back to themselves. Verified
+  `/estate-jewelry` in-browser and `npm run build`.
+- **Admin drag-to-reorder inventory added** (2026-06-13): added a drag handle
+  column to the product admin master list and persist row reorder changes to
+  product `sort_order` values for the relevant Available/Sold group. Verified
+  `/admin` render in-browser and `npm run build`.
+- **Account profile full-name field hidden** (2026-06-13): removed the visible
+  Full Name input from the complete profile form while preserving internal
+  `full_name` generation from first/last name. Verified `/account` in-browser
+  and `npm run build`.
+- **Complete customer profiles added** (2026-06-13): added editable account
+  profile fields for name, contact email, phone, alternate phone, complete
+  address, country, and marketing opt-in; added Supabase profile migration SQL;
+  checkout prefill now uses saved profile data. Verified `/account` render and
+  `npm run build`.
+- **Checkout account prefill added** (2026-06-13): checkout customer fields now
+  prefill from the signed-in Supabase user/profile where data is available,
+  while remaining editable. Verified build and in-browser email prefill.
+- **Checkout-to-payment step added** (2026-06-13): removed the secure-payment
+  placeholder from checkout, changed the button to Continue to Payment, added a
+  `/payment` route with payment fields, and reused the order summary there.
+  Verified in-browser and `npm run build`.
+- **Checkout shipping rates added** (2026-06-13): priced Local Pickup at $0,
+  Express Overnight Insured at $75, and Priority Insured at $45, with shipping
+  included in the estimated total. Verified in-browser and `npm run build`.
+- **Checkout shipping option selector added** (2026-06-13): added Local Pickup,
+  Express Overnight, and Priority Insured options under Florida sales tax in
+  the checkout order summary. Verified in-browser and `npm run build`.
+- **Checkout summary remove control added** (2026-06-13): added per-item remove
+  buttons to the checkout page's right-hand order summary, updating cart state
+  and totals immediately. Verified in-browser and `npm run build`.
+- **Shop length filter scoped by item type** (2026-06-13): length buttons now
+  appear only for Necklace or Bracelet item types, with chain lengths for
+  necklaces and bracelet lengths for bracelets. Verified in-browser and
+  `npm run build`.
+- **Shop length buttons made checkable** (2026-06-13): updated the horizontal
+  length multi-select controls with embedded checked-state indicators while
+  preserving URL-backed toggling. Verified in-browser and `npm run build`.
+- **Shop card cart button alignment fixed** (2026-06-13): standardized gallery
+  title height/action placement and fixed card cart button height so cart
+  actions align across rows. Verified desktop/mobile in-browser and
+  `npm run build`.
+- **Shop length selector layout refined** (2026-06-13): moved the multi-select
+  length options into a horizontal button row beneath the main shop filter
+  dropdowns. Verified in-browser and `npm run build`.
+- **Shop length multi-select added** (2026-06-13): changed the shop gallery
+  length filter to support multiple selected lengths via checkboxes and a
+  URL-backed `length` value. Verified in-browser and `npm run build`.
+- **Product detail scrap value added** (2026-06-13): added the current scrap
+  gold/silver value under "This is your price" on product detail pages. Verified
+  in-browser and `npm run build`.
 - **Shop card cart toggle updated** (2026-06-13): gallery Add to Cart buttons
   now show a brief local confirmation, switch to Remove from Cart after adding,
   and remove the item on the next click. Verified in-browser and `npm run build`.

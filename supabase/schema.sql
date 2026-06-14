@@ -8,8 +8,12 @@ create extension if not exists "pgcrypto";
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
+  first_name text,
+  last_name text,
   full_name text,
+  email text,
   phone text,
+  alternate_phone text,
   address_line1 text,
   address_line2 text,
   city text,
@@ -42,6 +46,11 @@ create table if not exists public.favorites (
 create index if not exists favorites_user_idx on public.favorites (user_id);
 
 alter table public.profiles
+  add column if not exists first_name text,
+  add column if not exists last_name text,
+  add column if not exists email text,
+  add column if not exists phone text,
+  add column if not exists alternate_phone text,
   add column if not exists address_line1 text,
   add column if not exists address_line2 text,
   add column if not exists city text,
@@ -58,8 +67,15 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id, full_name)
-  values (new.id, coalesce(new.raw_user_meta_data->>'full_name', ''))
+  insert into public.profiles (id, first_name, last_name, full_name, email, phone)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'first_name', ''),
+    coalesce(new.raw_user_meta_data->>'last_name', ''),
+    coalesce(new.raw_user_meta_data->>'full_name', ''),
+    new.email,
+    coalesce(new.phone, new.raw_user_meta_data->>'phone', '')
+  )
   on conflict (id) do nothing;
 
   insert into public.customer_carts (user_id, items)

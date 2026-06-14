@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/server';
 import type { Product } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
+import { calcSpotPriceValue } from '@/lib/pricing';
 import ProductCard from '@/components/shop/ProductCard';
 import ShopFilters from '@/components/shop/ShopFilters';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -20,9 +21,10 @@ interface Props {
     status?: string;
     itemType?: string;
     chainType?: string;
-    length?: string;
+    length?: string | string[];
     gender?: string;
     q?: string;
+    sort?: string;
   }>;
 }
 
@@ -46,14 +48,48 @@ const ITEM_TYPE_KEYWORDS: Record<string, string[]> = {
   watch: ['watch'],
 };
 
-const LENGTH_PATTERNS: Record<string, string[]> = {
-  '22':       ['22 inch', '22"'],
-  '23':       ['23 inch', '23"'],
-  '24':       ['24 inch', '24"'],
-  '25-plus':  ['25 inch', '25.5 inch', '26 inch', '27 inch', '27.5 inch', '28 inch', '29 inch'],
-  '30':       ['30 inch', '30"'],
-  'bracelet': ['bracelet'],
-};
+const NECKLACE_LENGTH_VALUES = ['16 in', '18 in', '20 in', '22 in', '24 in', '26 in', '28 in', '30 in'];
+const BRACELET_LENGTH_VALUES = ['7 in', '7.5 in', '8 in'];
+
+function getAllowedLengthValues(itemType: string | undefined): string[] {
+  if (itemType === 'necklace') return NECKLACE_LENGTH_VALUES;
+  if (itemType === 'bracelet') return BRACELET_LENGTH_VALUES;
+  return [];
+}
+
+function normalizeLengths(length: string | string[] | undefined): string[] {
+  const values = Array.isArray(length) ? length : length ? [length] : [];
+  return values
+    .flatMap((value) => value.split(','))
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function parsePriceLabel(value: string | null): number | null {
+  if (!value) return null;
+  const match = value.replace(/,/g, '').match(/\d+(\.\d+)?/);
+  return match ? Number(match[0]) : null;
+}
+
+function getSortablePrice(product: Product, spotData: Awaited<ReturnType<typeof fetchSpotData>>): number | null {
+  if (product.price_mode === 'spot-multiplier') {
+    return calcSpotPriceValue(product, spotData);
+  }
+  return parsePriceLabel(product.manual_price_label ?? product.price_label);
+}
+
+function compareNullableNumbers(
+  a: number | null | undefined,
+  b: number | null | undefined,
+  direction: 'asc' | 'desc',
+) {
+  const aMissing = a == null || Number.isNaN(a);
+  const bMissing = b == null || Number.isNaN(b);
+  if (aMissing && bMissing) return 0;
+  if (aMissing) return 1;
+  if (bMissing) return -1;
+  return direction === 'asc' ? a - b : b - a;
+}
 
 export default async function ShopPage({ params, searchParams }: Props) {
   const { locale } = await params;
@@ -67,6 +103,9 @@ export default async function ShopPage({ params, searchParams }: Props) {
 
   const spotData = await fetchSpotData();
   const allProducts: Product[] = (products ?? []) as Product[];
+  const selectedLengths = normalizeLengths(filters.length);
+  const allowedLengthValues = getAllowedLengthValues(filters.itemType);
+  const effectiveSelectedLengths = selectedLengths.filter((length) => allowedLengthValues.includes(length));
 
   const filtered = allProducts.filter((p) => {
     if (filters.metal) {
@@ -96,9 +135,9 @@ export default async function ShopPage({ params, searchParams }: Props) {
         if (!kws.some(k => txt.includes(k))) return false;
       }
     }
-    if (filters.length) {
+    if (effectiveSelectedLengths.length > 0) {
       const lenTag = (p.tags ?? []).find((t: string) => t.startsWith('len:'));
-      if (!lenTag || lenTag.slice(4) !== filters.length) return false;
+      if (!lenTag || !effectiveSelectedLengths.includes(lenTag.slice(4))) return false;
     }
     if (filters.gender) {
       const g = p.gender ?? 'Unisex';
@@ -108,9 +147,25 @@ export default async function ShopPage({ params, searchParams }: Props) {
     return true;
   });
 
-  // Available items first, then sold — preserving sort_order within each group
+  // Available items first, then selected sort within each group.
   const sorted = [...filtered].sort((a, b) => {
     if (a.status !== b.status) return a.status === 'Available' ? -1 : 1;
+    if (filters.sort === 'weight-asc' || filters.sort === 'weight-desc') {
+      const byWeight = compareNullableNumbers(
+        a.weight_grams,
+        b.weight_grams,
+        filters.sort === 'weight-asc' ? 'asc' : 'desc',
+      );
+      if (byWeight !== 0) return byWeight;
+    }
+    if (filters.sort === 'price-asc' || filters.sort === 'price-desc') {
+      const byPrice = compareNullableNumbers(
+        getSortablePrice(a, spotData),
+        getSortablePrice(b, spotData),
+        filters.sort === 'price-asc' ? 'asc' : 'desc',
+      );
+      if (byPrice !== 0) return byPrice;
+    }
     return (a.sort_order ?? 0) - (b.sort_order ?? 0);
   });
 

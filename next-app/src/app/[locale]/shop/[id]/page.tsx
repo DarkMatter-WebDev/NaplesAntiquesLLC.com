@@ -74,8 +74,8 @@ export default async function ProductDetailPage({ params }: Props) {
   const price = getDisplayPrice(p, spotData);
   const isSold = p.status === 'Sold';
 
-  // Store-credit price = raw melt value at spot (multiplier = 1.0)
-  let storeCreditPrice: string | null = null;
+  // Raw melt/scrap value at spot (multiplier = 1.0)
+  let scrapValue: string | null = null;
   if (
     p.price_mode === 'spot-multiplier' &&
     p.weight_grams && p.purity &&
@@ -86,7 +86,7 @@ export default async function ProductDetailPage({ params }: Props) {
       ? (spotData.silverPerTroyOz ?? 33)
       : spotData.goldPerTroyOz;
     const melt = p.weight_grams * purityToFraction(p.purity) * (spotPerOz / GRAMS_PER_TROY_OZ);
-    storeCreditPrice = new Intl.NumberFormat('en-US', {
+    scrapValue = new Intl.NumberFormat('en-US', {
       style: 'currency', currency: 'USD', maximumFractionDigits: 0,
     }).format(melt);
   }
@@ -242,10 +242,20 @@ export default async function ProductDetailPage({ params }: Props) {
                   <span style={{ color: 'var(--color-primary)' }}>✓</span>
                   {isEs ? 'Este es su precio' : 'This is your price'}
                 </p>
+                {scrapValue && (
+                  <p
+                    className="mt-2 text-xs font-semibold"
+                    style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                  >
+                    {isEs
+                      ? `Valor actual de ${p.category === 'Silver' ? 'plata' : 'oro'} para fundir: ${scrapValue}`
+                      : `Current scrap ${p.category === 'Silver' ? 'silver' : 'gold'} value: ${scrapValue}`}
+                  </p>
+                )}
               </div>
 
               {/* Store credit line */}
-              {storeCreditPrice && !isSold && (
+              {scrapValue && !isSold && (
                 <div
                   style={{
                     display: 'flex',
@@ -260,9 +270,9 @@ export default async function ProductDetailPage({ params }: Props) {
                   <span style={{ fontSize: '1rem', lineHeight: 1, flexShrink: 0 }}>⬡</span>
                   <p style={{ fontSize: '0.8125rem', color: 'var(--color-on-surface)', margin: 0, lineHeight: 1.4 }}>
                     {isEs ? (
-                      <>Llévalo por <strong style={{ color: 'var(--color-primary)' }}>{storeCreditPrice}</strong> cuando aplicas tu valor de intercambio</>
+                      <>Llévalo por <strong style={{ color: 'var(--color-primary)' }}>{scrapValue}</strong> cuando aplicas tu valor de intercambio</>
                     ) : (
-                      <>Get this item for <strong style={{ color: 'var(--color-primary)' }}>{storeCreditPrice}</strong> when you apply your trade-in value</>
+                      <>Get this item for <strong style={{ color: 'var(--color-primary)' }}>{scrapValue}</strong> when you apply your trade-in value</>
                     )}
                   </p>
                 </div>

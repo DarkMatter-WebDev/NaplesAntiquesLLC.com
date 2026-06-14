@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SignOutButton from '@/components/account/SignOutButton';
+import AccountProfileForm, { type CustomerProfile } from '@/components/account/AccountProfileForm';
 import SiteFooter from '@/components/layout/SiteFooter';
 
 export const metadata: Metadata = {
@@ -25,16 +26,32 @@ export default async function AccountPage({ params }: Props) {
     redirect(isEs ? '/es/account/sign-in' : '/account/sign-in');
   }
 
-  // Check admin status
   const { data: profile } = await supabase
     .from('profiles')
-    .select('is_admin, full_name')
+    .select('*')
     .eq('id', user.id)
     .single();
 
-  const displayName = profile?.full_name ?? user.email ?? 'Member';
-  const isAdmin = profile?.is_admin === true;
+  const profileData = (profile ?? {}) as Partial<CustomerProfile> & { is_admin?: boolean };
+  const displayName = profileData.full_name ?? user.email ?? 'Member';
+  const isAdmin = profileData.is_admin === true;
   const shopHref = isEs ? '/es/shop' : '/shop';
+  const editableProfile: CustomerProfile = {
+    id: user.id,
+    first_name: profileData.first_name ?? null,
+    last_name: profileData.last_name ?? null,
+    full_name: profileData.full_name ?? null,
+    email: profileData.email ?? user.email ?? null,
+    phone: profileData.phone ?? null,
+    alternate_phone: profileData.alternate_phone ?? null,
+    address_line1: profileData.address_line1 ?? null,
+    address_line2: profileData.address_line2 ?? null,
+    city: profileData.city ?? null,
+    state: profileData.state ?? null,
+    postal_code: profileData.postal_code ?? null,
+    country: profileData.country ?? 'United States',
+    marketing_opt_in: profileData.marketing_opt_in ?? false,
+  };
 
   return (
     <>
@@ -55,6 +72,8 @@ export default async function AccountPage({ params }: Props) {
             </h1>
           </div>
 
+          <AccountProfileForm profile={editableProfile} fallbackEmail={user.email ?? null} locale={locale} />
+
           {/* Profile card */}
           <div className="border rounded-none p-6 mb-6"
             style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-lowest)' }}>
@@ -71,13 +90,13 @@ export default async function AccountPage({ params }: Props) {
                   {user.email}
                 </dd>
               </div>
-              {profile?.full_name && (
+              {profileData.full_name && (
                 <div className="flex flex-col gap-0.5">
                   <dt className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
                     {isEs ? 'Nombre' : 'Name'}
                   </dt>
                   <dd className="text-sm font-medium" style={{ color: 'var(--color-on-surface)' }}>
-                    {profile.full_name}
+                    {profileData.full_name}
                   </dd>
                 </div>
               )}

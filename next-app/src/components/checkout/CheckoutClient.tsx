@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import Image from 'next/image';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useCart, type CartItem } from '@/context/CartContext';
+import { useRouter } from 'next/navigation';
+import { useCart } from '@/context/CartContext';
+import OrderSummary, { SHIPPING_OPTIONS } from '@/components/checkout/OrderSummary';
+import { createClient } from '@/lib/supabase/client';
 
 const GOLD = '#735c00';
 const BORDER = '#d8d0c2';
-const FL_TAX = 0.07;
 
 interface CustomerInfo {
   name: string;
@@ -16,66 +17,53 @@ interface CustomerInfo {
   notes: string;
 }
 
-async function initiateStripeCheckout(_items: CartItem[], _customer: CustomerInfo) {
-  throw new Error('STRIPE_NOT_CONFIGURED');
-}
-
-function parsePrice(label: string): number | null {
-  const m = label.replace(/,/g, '').match(/\$([\d.]+)/);
-  return m ? parseFloat(m[1]) : null;
-}
-
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(n);
-}
-
 export default function CheckoutClient({ locale }: { locale: string }) {
-  const { items, clear } = useCart();
+  const router = useRouter();
+  const { items, remove } = useCart();
   const isEs = locale === 'es';
   const prefix = isEs ? '/es' : '';
   const [customer, setCustomer] = useState<CustomerInfo>({ name: '', email: '', phone: '', notes: '' });
-  const [submitting, setSubmitting] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
+  const [shippingMethod, setShippingMethod] = useState(SHIPPING_OPTIONS[0].value);
 
-  async function handlePlaceOrder(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      await initiateStripeCheckout(items, customer);
-    } catch {
-      setConfirmed(true);
-      clear();
-    } finally {
-      setSubmitting(false);
+  useEffect(() => {
+    let cancelled = false;
+
+    async function prefillCustomerInfo() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const metadata = user.user_metadata ?? {};
+      const profileName = profile?.full_name ?? [profile?.first_name, profile?.last_name].filter(Boolean).join(' ');
+      const knownName = profileName || metadata.full_name || metadata.name || '';
+      const knownEmail = profile?.email ?? user.email ?? metadata.email ?? '';
+      const knownPhone = profile?.phone ?? user.phone ?? metadata.phone ?? metadata.phone_number ?? '';
+
+      if (cancelled) return;
+      setCustomer((current) => ({
+        ...current,
+        name: current.name || String(knownName || ''),
+        email: current.email || String(knownEmail || ''),
+        phone: current.phone || String(knownPhone || ''),
+      }));
     }
-  }
 
-  if (confirmed) {
-    return (
-      <div className="max-w-xl mx-auto text-center px-6 py-16">
-        <span className="material-symbols-outlined" style={{ fontSize: '48px', color: GOLD }}>check_circle</span>
-        <h1 className="text-3xl md:text-4xl font-bold mt-4 mb-4" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-          {isEs ? 'Pedido recibido' : 'Order Received'}
-        </h1>
-        <p className="leading-relaxed mb-8" style={{ color: 'var(--color-on-surface-variant)' }}>
-          {isEs
-            ? 'Le contactaremos pronto para finalizar su compra. Tambien puede llamarnos directamente.'
-            : "We'll be in touch shortly to finalize your purchase. You can also call us directly."}
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <a href="tel:2394048505" className="gold-button">
-            {isEs ? 'Llamar: (239) 404-8505' : 'Call: (239) 404-8505'}
-          </a>
-          <Link href={`${prefix}/shop`} className="outline-button">
-            {isEs ? 'Volver a la tienda' : 'Back to Shop'}
-          </Link>
-        </div>
-      </div>
-    );
+    prefillCustomerInfo();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleContinueToPayment(e: React.FormEvent) {
+    e.preventDefault();
+    router.push(`${prefix}/payment?shipping=${encodeURIComponent(shippingMethod)}`);
   }
 
   if (items.length === 0) {
@@ -110,7 +98,7 @@ export default function CheckoutClient({ locale }: { locale: string }) {
       </div>
 
       <div className="grid lg:grid-cols-[1fr_24rem] gap-8 items-start">
-        <form onSubmit={handlePlaceOrder} className="border p-5 md:p-7 flex flex-col gap-4" style={{ borderColor: BORDER, background: 'var(--color-surface-container-lowest)' }}>
+        <form onSubmit={handleContinueToPayment} className="border p-5 md:p-7 flex flex-col gap-4" style={{ borderColor: BORDER, background: 'var(--color-surface-container-lowest)' }}>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="form-label">{isEs ? 'Nombre completo' : 'Full Name'} *</label>
@@ -130,81 +118,19 @@ export default function CheckoutClient({ locale }: { locale: string }) {
             <textarea rows={4} className="form-field resize-none" value={customer.notes} onChange={(e) => setCustomer({ ...customer, notes: e.target.value })} />
           </div>
 
-          <div className="rounded border-2 border-dashed px-4 py-4 flex flex-col gap-2 text-center" style={{ borderColor: 'var(--color-outline-variant)' }}>
-            <span className="material-symbols-outlined mx-auto" style={{ fontSize: '28px', color: 'var(--color-outline-variant)' }}>lock</span>
-            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-              {isEs ? 'Pago seguro - Proximamente' : 'Secure Payment - Coming Soon'}
-            </p>
-            <p className="text-[0.72rem] leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
-              {isEs
-                ? 'El pago con Stripe se integrara aqui. Por ahora, recibira una llamada de confirmacion.'
-                : "Stripe payment will be integrated here. For now, we'll call to confirm your order."}
-            </p>
-          </div>
-
-          <button type="submit" disabled={submitting} className="gold-button justify-center disabled:opacity-50" style={{ width: '100%' }}>
-            {submitting ? '...' : (isEs ? 'Enviar pedido ->' : 'Place Order ->')}
+          <button type="submit" className="gold-button justify-center" style={{ width: '100%' }}>
+            {isEs ? 'Continuar al pago ->' : 'Continue to Payment ->'}
           </button>
         </form>
 
-        <OrderSummary items={items} isEs={isEs} prefix={prefix} />
-      </div>
-    </div>
-  );
-}
-
-function OrderSummary({ items, isEs, prefix }: { items: CartItem[]; isEs: boolean; prefix: string }) {
-  const prices = items.map((i) => parsePrice(i.priceLabel));
-  const knownPrices = prices.filter((p): p is number => p !== null);
-  const hasUnknown = knownPrices.length < prices.length;
-  const subtotal = knownPrices.reduce((a, b) => a + b, 0);
-  const tax = subtotal * FL_TAX;
-  const total = subtotal + tax;
-
-  return (
-    <aside className="border p-4 md:p-5 lg:sticky lg:top-24" style={{ borderColor: BORDER, background: 'var(--color-surface-container-lowest)' }}>
-      <h2 className="text-sm font-bold uppercase tracking-widest mb-4" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-        {isEs ? 'Resumen' : 'Order Summary'}
-      </h2>
-      <div className="flex flex-col gap-3 mb-5">
-        {items.map((item) => (
-          <SummaryRow key={item.id} item={item} isEs={isEs} prefix={prefix} />
-        ))}
-      </div>
-      <div className="flex flex-col gap-1 text-xs border-t pt-4" style={{ borderColor: BORDER, fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}>
-        <div className="flex justify-between">
-          <span>Subtotal</span>
-          <span>{subtotal > 0 ? fmt(subtotal) : '-'}{hasUnknown ? '*' : ''}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>{isEs ? 'Impuesto FL (7%)' : 'FL Sales Tax (7%)'}</span>
-          <span>{subtotal > 0 ? fmt(tax) : '-'}</span>
-        </div>
-        <div className="flex justify-between pt-2 mt-2 font-bold text-base" style={{ borderTop: `1px solid ${BORDER}`, color: 'var(--color-on-surface)' }}>
-          <span>{isEs ? 'Total estimado' : 'Est. Total'}</span>
-          <span style={{ color: GOLD }}>{subtotal > 0 ? fmt(total) : '-'}</span>
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-function SummaryRow({ item, isEs, prefix }: { item: CartItem; isEs: boolean; prefix: string }) {
-  const title = isEs && item.title_es ? item.title_es : item.title;
-  return (
-    <div className="flex gap-3">
-      <Link href={`${prefix}/shop/${item.id}`} className="relative w-14 h-14 flex-shrink-0 overflow-hidden" style={{ background: 'var(--color-surface-container)' }}>
-        {item.image
-          ? <Image src={item.image} alt={title} fill sizes="56px" className="object-contain" unoptimized={item.image.startsWith('/assets/')} />
-          : <div className="w-full h-full flex items-center justify-center text-xs opacity-40">Photo</div>}
-      </Link>
-      <div className="min-w-0">
-        <Link href={`${prefix}/shop/${item.id}`} className="text-xs font-bold leading-snug line-clamp-2 hover:underline" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-          {title}
-        </Link>
-        <p className="text-[0.68rem] font-bold mt-1" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-          {item.priceLabel}
-        </p>
+        <OrderSummary
+          items={items}
+          isEs={isEs}
+          prefix={prefix}
+          shippingMethod={shippingMethod}
+          onShippingMethodChange={setShippingMethod}
+          onRemove={remove}
+        />
       </div>
     </div>
   );

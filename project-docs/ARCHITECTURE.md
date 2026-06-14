@@ -75,11 +75,15 @@ Next-generated SEO endpoints:
 Supabase is the source for app data:
 
 - `products` - shop catalog, pricing inputs, copy, status, images, sort order.
-- `profiles` - user profile/admin flags.
+- `profiles` - customer profile/contact/address details plus admin/VIP flags.
 - `favorites` / cart-related account data - customer saved state.
 - `inquiries` - submitted seller/buyer inquiries.
 
 SQL setup and policy scripts live in `supabase/`.
+
+Existing Supabase projects should run `supabase/profile-contact-fields.sql` to
+add the full editable customer profile fields used by `/account` and checkout
+prefill.
 
 ## Product Images
 

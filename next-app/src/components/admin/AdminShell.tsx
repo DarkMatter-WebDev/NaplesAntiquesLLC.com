@@ -104,6 +104,13 @@ const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null }[] = [
   { label: '', sortKey: null },
 ];
 
+function getMasterProductOrder(products: Product[]): Product[] {
+  return [...products].sort((a, b) => {
+    if (a.status !== b.status) return a.status === 'Available' ? -1 : 1;
+    return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+  });
+}
+
 function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
   return {
     id: '',
@@ -197,6 +204,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [sortOrderManual, setSortOrderManual] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
+  const [draggedProductId, setDraggedProductId] = useState<string | null>(null);
+  const [dragTargetProductId, setDragTargetProductId] = useState<string | null>(null);
+  const [reordering, setReordering] = useState(false);
   const [chainTypeInput, setChainTypeInput] = useState('');
   const [lengthInput, setLengthInput] = useState('');
   const [quickEntry, setQuickEntry] = useState('');
@@ -453,8 +463,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
     setDeleteTarget(null);
   }
 
+  const masterOrderedProducts = useMemo(() => getMasterProductOrder(products), [products]);
+
   // --- Filtered list ---
-  const filtered = products.filter((p) => {
+  const filtered = masterOrderedProducts.filter((p) => {
     if (search && !p.title.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterMetal === 'gold' && p.category !== 'Gold') return false;
     if (filterMetal === 'silver' && p.category !== 'Silver') return false;
@@ -473,12 +485,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
   });
 
   const inventoryNumbers = useMemo(() => {
-    const ordered = [...products].sort((a, b) => {
-      if (a.status !== b.status) return a.status === 'Available' ? -1 : 1;
-      return (a.sort_order ?? 0) - (b.sort_order ?? 0);
-    });
-    return new Map(ordered.map((product, index) => [product.id, index + 1]));
-  }, [products]);
+    return new Map(masterOrderedProducts.map((product, index) => [product.id, index + 1]));
+  }, [masterOrderedProducts]);
 
   const sortedProducts = useMemo(() => {
     if (!sortConfig) return filtered;
@@ -500,6 +508,77 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
       if (!current || current.key !== key) return { key, direction: 'asc' };
       return { key, direction: current.direction === 'asc' ? 'desc' : 'asc' };
     });
+  }
+
+  const hasActiveTableFilters = !!(
+    search ||
+    filterMetal ||
+    filterPurity ||
+    filterChainType ||
+    filterLength
+  );
+  const canDragReorder = !sortConfig && !hasActiveTableFilters && !reordering;
+
+  function resetRowDrag() {
+    setDraggedProductId(null);
+    setDragTargetProductId(null);
+  }
+
+  async function handleProductDrop(targetProduct: Product) {
+    if (!draggedProductId || draggedProductId === targetProduct.id || !canDragReorder) {
+      resetRowDrag();
+      return;
+    }
+
+    const draggedProduct = products.find((product) => product.id === draggedProductId);
+    if (!draggedProduct) {
+      resetRowDrag();
+      return;
+    }
+
+    if (draggedProduct.status !== targetProduct.status) {
+      flash('Move items within Available or Sold. Change status first to move across groups.', false);
+      resetRowDrag();
+      return;
+    }
+
+    const statusGroup = masterOrderedProducts.filter((product) => product.status === draggedProduct.status);
+    const fromIndex = statusGroup.findIndex((product) => product.id === draggedProduct.id);
+    const toIndex = statusGroup.findIndex((product) => product.id === targetProduct.id);
+    if (fromIndex < 0 || toIndex < 0) {
+      resetRowDrag();
+      return;
+    }
+
+    const reorderedGroup = [...statusGroup];
+    const [moved] = reorderedGroup.splice(fromIndex, 1);
+    reorderedGroup.splice(toIndex, 0, moved);
+    const orderById = new Map(reorderedGroup.map((product, index) => [product.id, index + 1]));
+
+    setReordering(true);
+    const results = await Promise.all(
+      reorderedGroup.map((product, index) =>
+        supabase.from('products').update({ sort_order: index + 1 }).eq('id', product.id)
+      )
+    );
+    const failed = results.find((result) => result.error);
+    if (failed?.error) {
+      flash(`Reorder failed: ${failed.error.message}`, false);
+      setReordering(false);
+      resetRowDrag();
+      return;
+    }
+
+    setProducts((prev) =>
+      prev.map((product) =>
+        orderById.has(product.id)
+          ? { ...product, sort_order: orderById.get(product.id)! }
+          : product
+      )
+    );
+    flash('Inventory order saved');
+    setReordering(false);
+    resetRowDrag();
   }
 
   const total = products.length;
@@ -692,10 +771,48 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
 
         {/* Product table */}
         <div className="border" style={{ borderColor: 'var(--color-outline-variant)' }}>
+          <div
+            className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2 text-xs"
+            style={{
+              borderColor: 'var(--color-outline-variant)',
+              color: 'var(--color-on-surface-variant)',
+              fontFamily: 'var(--font-label)',
+            }}
+          >
+            <span>Drag the grip in the master list to reorder gallery inventory numbers.</span>
+            {!canDragReorder && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  setFilterMetal('');
+                  setFilterPurity('');
+                  setFilterChainType('');
+                  setFilterLength('');
+                  setSortConfig(null);
+                }}
+                className="font-bold uppercase tracking-wide hover:underline"
+                style={{ color: 'var(--color-primary)' }}
+              >
+                Reset view to drag reorder
+              </button>
+            )}
+            {reordering && (
+              <span className="font-bold uppercase tracking-wide" style={{ color: 'var(--color-primary)' }}>
+                Saving order...
+              </span>
+            )}
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}>
+                  <th
+                    className="px-4 py-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap"
+                    style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                  >
+                    Order
+                  </th>
                   {PRODUCT_TABLE_COLUMNS.map(({ label, sortKey }) => {
                     const active = sortConfig?.key === sortKey;
                     return (
@@ -730,8 +847,48 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
               <tbody>
                 {sortedProducts.map((p) => (
                   <tr key={p.id}
+                    draggable={canDragReorder}
+                    onDragStart={(e) => {
+                      if (!canDragReorder) return;
+                      setDraggedProductId(p.id);
+                      e.dataTransfer.effectAllowed = 'move';
+                      e.dataTransfer.setData('text/plain', p.id);
+                    }}
+                    onDragOver={(e) => {
+                      if (!canDragReorder || !draggedProductId || draggedProductId === p.id) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      setDragTargetProductId(p.id);
+                    }}
+                    onDragLeave={() => {
+                      if (dragTargetProductId === p.id) setDragTargetProductId(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      handleProductDrop(p);
+                    }}
+                    onDragEnd={resetRowDrag}
                     className="border-b hover:bg-[color:var(--color-surface-container-low)] transition-colors"
-                    style={{ borderColor: 'var(--color-outline-variant)' }}>
+                    style={{
+                      borderColor: dragTargetProductId === p.id ? 'var(--color-primary)' : 'var(--color-outline-variant)',
+                      background: dragTargetProductId === p.id
+                        ? 'color-mix(in srgb, var(--color-primary) 8%, transparent)'
+                        : undefined,
+                    }}>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span
+                        className="material-symbols-outlined inline-flex h-8 w-8 items-center justify-center"
+                        aria-hidden="true"
+                        style={{
+                          color: canDragReorder ? 'var(--color-primary)' : 'var(--color-outline-variant)',
+                          cursor: canDragReorder ? 'grab' : 'not-allowed',
+                          fontSize: '20px',
+                          userSelect: 'none',
+                        }}
+                      >
+                        drag_indicator
+                      </span>
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap font-bold text-xs" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
                       #{inventoryNumbers.get(p.id) ?? '—'}
                     </td>
@@ -811,7 +968,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
                 ))}
                 {sortedProducts.length === 0 && (
                   <tr>
-                    <td colSpan={PRODUCT_TABLE_COLUMNS.length} className="px-4 py-12 text-center text-sm"
+                    <td colSpan={PRODUCT_TABLE_COLUMNS.length + 1} className="px-4 py-12 text-center text-sm"
                       style={{ color: 'var(--color-on-surface-variant)' }}>
                       No products found.
                     </td>
