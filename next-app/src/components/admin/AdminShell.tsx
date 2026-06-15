@@ -128,6 +128,27 @@ function parseInventoryNumber(value: string | number | null | undefined): number
   return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
 }
 
+function getDisplayedInventoryNumber(product: Product, products: Product[]): number | null {
+  if (product.inventory_number) return product.inventory_number;
+  const masterIndex = getMasterProductOrder(products).findIndex((item) => item.id === product.id);
+  return masterIndex >= 0 ? masterIndex + 1 : null;
+}
+
+function getNextInventoryNumber(products: Product[], excludeId?: string): number {
+  const usedNumbers = new Set<number>();
+  const masterOrderedProducts = getMasterProductOrder(products);
+
+  masterOrderedProducts.forEach((product, index) => {
+    if (excludeId && product.id === excludeId) return;
+    const displayedNumber = product.inventory_number ?? index + 1;
+    if (displayedNumber > 0) usedNumbers.add(displayedNumber);
+  });
+
+  let candidate = 1;
+  while (usedNumbers.has(candidate)) candidate += 1;
+  return candidate;
+}
+
 const CHAIN_KEYWORDS: Record<string, string[]> = {
   'cuban-link':     ['cuban'],
   'figaro-link':    ['figaro'],
@@ -161,6 +182,10 @@ type SortKey =
   | 'status';
 
 type SortDirection = 'asc' | 'desc';
+type ImageTarget = { url: string; index: number };
+type CropRect = { x: number; y: number; width: number; height: number };
+type CropDragMode = 'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+const FULL_IMAGE_CROP: CropRect = { x: 0, y: 0, width: 100, height: 100 };
 
 const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null }[] = [
   { label: 'Inv #', sortKey: 'inventoryNumber' },
@@ -284,6 +309,30 @@ function compareSortValues(a: string | number | null, b: string | number | null)
   return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
 }
 
+function foldExtraDetailsIntoInternalNotes(product: ReturnType<typeof emptyProduct>): string | null {
+  const currentNotes = product.internal_notes?.trim() ?? '';
+  const extraDetails = [...(product.details ?? []), ...(product.details_es ?? [])]
+    .map((detail) => detail.trim())
+    .filter(Boolean);
+
+  if (extraDetails.length === 0) return currentNotes || null;
+
+  const extraBlock = ['Former extra notes:', ...extraDetails.map((detail) => `- ${detail}`)].join('\n');
+  if (currentNotes.includes(extraBlock)) return currentNotes;
+  return [currentNotes, extraBlock].filter(Boolean).join('\n\n');
+}
+
+function getProductImageStoragePath(url: string): string | null {
+  const markers = [
+    '/storage/v1/object/public/product-images/',
+    '/storage/v1/object/sign/product-images/',
+  ];
+  const marker = markers.find((item) => url.includes(item));
+  if (!marker) return null;
+  const path = url.slice(url.indexOf(marker) + marker.length).split('?')[0];
+  return path ? decodeURIComponent(path) : null;
+}
+
 export default function AdminShell({ initialProducts, userEmail, spotData, locale, unreadMessagesCount }: Props) {
   const router = useRouter();
   const adminBasePath = locale === 'es' ? '/es/admin' : '/admin';
@@ -306,9 +355,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [dragOver, setDragOver] = useState(false);
   const [dragSrcIdx, setDragSrcIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
-  const [previewImg, setPreviewImg] = useState<string | null>(null);
+  const [previewImg, setPreviewImg] = useState<ImageTarget | null>(null);
+  const [cropTarget, setCropTarget] = useState<ImageTarget | null>(null);
+  const [cropRect, setCropRect] = useState<CropRect>(FULL_IMAGE_CROP);
+  const [cropping, setCropping] = useState(false);
   const [formErrors, setFormErrors] = useState<string[]>([]);
-  const [sortOrderManual, setSortOrderManual] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection } | null>(null);
   const [draggedProductId, setDraggedProductId] = useState<string | null>(null);
   const [dragTargetProductId, setDragTargetProductId] = useState<string | null>(null);
@@ -317,6 +368,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [lengthInput, setLengthInput] = useState('');
   const [quickEntry, setQuickEntry] = useState('');
   const [showAdvancedIds, setShowAdvancedIds] = useState(false);
+  const [inventoryNumberManual, setInventoryNumberManual] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   const flash = (text: string, ok = true) => {
@@ -337,7 +389,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   function openAdd() {
     originalRef.current = null;
     setFormErrors([]);
-    setSortOrderManual(false);
     setChainTypeInput('');
     setLengthInput('');
     setQuickEntry('');
@@ -345,7 +396,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     const autoOrder = products.length > 0
       ? Math.max(...products.map(p => p.sort_order ?? 0)) + 1
       : 1;
-    setEditing({ ...emptyProduct(), sort_order: autoOrder });
+    setInventoryNumberManual(false);
+    setEditing({ ...emptyProduct(), inventory_number: getNextInventoryNumber(products), sort_order: autoOrder });
     setIsNew(true);
   }
 
@@ -371,8 +423,30 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setFormErrors([]);
     setQuickEntry('');
     setShowAdvancedIds(!!(p.sku || p.slug));
-    setEditing(copy);
+    setInventoryNumberManual(false);
+    const autoInventoryNumber =
+      copy.inventory_number ??
+      getDisplayedInventoryNumber(copy, products) ??
+      getNextInventoryNumber(products, copy.id);
+    setEditing({ ...copy, inventory_number: autoInventoryNumber });
     setIsNew(false);
+  }
+
+  function getAutoInventoryNumber() {
+    if (!editing) return getNextInventoryNumber(products);
+    const originalNumber = parseInventoryNumber(originalRef.current?.inventory_number);
+    if (!isNew && originalNumber) return originalNumber;
+    if (!isNew && originalRef.current) {
+      return getDisplayedInventoryNumber(originalRef.current as Product, products) ?? getNextInventoryNumber(products, editing.id || undefined);
+    }
+    return getNextInventoryNumber(products, editing.id || undefined);
+  }
+
+  function setManualInventoryNumber(checked: boolean) {
+    setInventoryNumberManual(checked);
+    if (!checked && editing) {
+      setEditing({ ...editing, inventory_number: getAutoInventoryNumber() });
+    }
   }
 
   function applyQuickEntry() {
@@ -451,7 +525,48 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
   function closeModal() {
     setEditing(null);
+    setPreviewImg(null);
+    setCropTarget(null);
   }
+
+  const uploadImageBlob = useCallback(async (blob: Blob): Promise<string | null> => {
+    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.webp`;
+    const path = `products/${filename}`;
+
+    const { error } = await supabase.storage
+      .from('product-images')
+      .upload(path, blob, { contentType: 'image/webp', upsert: false });
+
+    if (error) {
+      flash(`Upload failed: ${error.message}`, false);
+      return null;
+    }
+
+    const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+    return data.publicUrl;
+  }, [supabase]);
+
+  const deleteUploadedImageIfUnused = useCallback(async (url: string, sourceIndex: number) => {
+    const path = getProductImageStoragePath(url);
+    if (!path || !editing) return;
+
+    const currentProductStillUsesImage = [
+      ...(editing.images ?? []).filter((_, index) => index !== sourceIndex),
+      ...(editing.image_urls ?? []).filter((_, index) => index !== sourceIndex),
+    ].includes(url);
+
+    const anotherProductUsesImage = products.some((product) => {
+      if (editing.id && product.id === editing.id) return false;
+      return [...(product.images ?? []), ...(product.image_urls ?? [])].includes(url);
+    });
+
+    if (currentProductStillUsesImage || anotherProductUsesImage) return;
+
+    const { error } = await supabase.storage.from('product-images').remove([path]);
+    if (error) {
+      flash(`Cropped image saved, but old file cleanup failed: ${error.message}`, false);
+    }
+  }, [editing, products, supabase]);
 
   // --- Image upload ---
   const handleImageUpload = useCallback(async (files: FileList) => {
@@ -474,26 +589,131 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         canvas.toBlob((b) => res(b!), 'image/webp', 0.85)
       );
 
-      const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.webp`;
-      const path = `products/${filename}`;
-
-      const { error } = await supabase.storage
-        .from('product-images')
-        .upload(path, blob, { contentType: 'image/webp', upsert: false });
-
-      if (error) {
-        flash(`Upload failed: ${error.message}`, false);
-        continue;
-      }
-
-      const { data } = supabase.storage.from('product-images').getPublicUrl(path);
-      urls.push(data.publicUrl);
+      const url = await uploadImageBlob(blob);
+      if (url) urls.push(url);
     }
 
     setEditing((prev) => prev ? { ...prev, images: [...prev.images, ...urls] } : prev);
     setUploading(false);
     if (urls.length) flash(`${urls.length} image(s) uploaded`);
-  }, [editing, supabase]);
+  }, [editing, uploadImageBlob]);
+
+  async function saveCroppedImage() {
+    if (!editing || !cropTarget) return;
+    const isFullImageCrop =
+      cropRect.x === FULL_IMAGE_CROP.x &&
+      cropRect.y === FULL_IMAGE_CROP.y &&
+      cropRect.width === FULL_IMAGE_CROP.width &&
+      cropRect.height === FULL_IMAGE_CROP.height;
+
+    if (isFullImageCrop) {
+      setCropTarget(null);
+      flash('No crop changes applied');
+      return;
+    }
+
+    setCropping(true);
+
+    try {
+      const image = new window.Image();
+      image.crossOrigin = 'anonymous';
+      image.src = cropTarget.url;
+      await image.decode();
+
+      const sx = Math.round((cropRect.x / 100) * image.naturalWidth);
+      const sy = Math.round((cropRect.y / 100) * image.naturalHeight);
+      const sw = Math.round((cropRect.width / 100) * image.naturalWidth);
+      const sh = Math.round((cropRect.height / 100) * image.naturalHeight);
+      const MAX = 1200;
+      const scale = Math.min(1, MAX / Math.max(sw, sh));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(sw * scale));
+      canvas.height = Math.max(1, Math.round(sh * scale));
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Crop canvas is unavailable.');
+
+      ctx.drawImage(image, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Could not create cropped image.')), 'image/webp', 0.9)
+      );
+      const croppedUrl = await uploadImageBlob(blob);
+      if (!croppedUrl) return;
+
+      const oldUrl = cropTarget.url;
+      setEditing((prev) => {
+        if (!prev) return prev;
+        const images = [...prev.images];
+        images[cropTarget.index] = croppedUrl;
+        const imageUrls = prev.image_urls?.length ? [...prev.image_urls] : [];
+        if (imageUrls.length) imageUrls[cropTarget.index] = croppedUrl;
+        return { ...prev, images, image_urls: imageUrls.length ? imageUrls : images };
+      });
+      await deleteUploadedImageIfUnused(oldUrl, cropTarget.index);
+      setPreviewImg({ url: croppedUrl, index: cropTarget.index });
+      setCropTarget(null);
+      flash('Cropped image saved');
+    } catch {
+      flash('Crop failed. Try a newly uploaded image if this photo is from an older source.', false);
+    } finally {
+      setCropping(false);
+    }
+  }
+
+  function updateCropRect(patch: Partial<CropRect>) {
+    setCropRect((current) => {
+      const width = Math.min(100, Math.max(10, patch.width ?? current.width));
+      const height = Math.min(100, Math.max(10, patch.height ?? current.height));
+      const x = Math.min(100 - width, Math.max(0, patch.x ?? current.x));
+      const y = Math.min(100 - height, Math.max(0, patch.y ?? current.y));
+      return { x, y, width, height };
+    });
+  }
+
+  function startCropDrag(event: React.PointerEvent<HTMLElement>, mode: CropDragMode) {
+    event.preventDefault();
+    event.stopPropagation();
+    const cropArea = event.currentTarget.closest('[data-crop-area="true"]') as HTMLElement | null;
+    if (!cropArea) return;
+    const bounds = cropArea.getBoundingClientRect();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startRect = cropRect;
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const dx = ((moveEvent.clientX - startX) / bounds.width) * 100;
+      const dy = ((moveEvent.clientY - startY) / bounds.height) * 100;
+      const next = { ...startRect };
+
+      if (mode.includes('e')) next.width = startRect.width + dx;
+      if (mode.includes('s')) next.height = startRect.height + dy;
+      if (mode.includes('w')) {
+        next.x = startRect.x + dx;
+        next.width = startRect.width - dx;
+      }
+      if (mode.includes('n')) {
+        next.y = startRect.y + dy;
+        next.height = startRect.height - dy;
+      }
+      if (mode === 'move') {
+        next.x = startRect.x + dx;
+        next.y = startRect.y + dy;
+      }
+
+      updateCropRect(next);
+    };
+
+    const onPointerUp = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+  }
 
   function removeImage(idx: number) {
     setEditing((prev) => prev ? { ...prev, images: prev.images.filter((_, i) => i !== idx) } : prev);
@@ -514,7 +734,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     const copy = {
       ...product,
       id: copyId,
-      inventory_number: null,
+      inventory_number: getNextInventoryNumber(products),
       sku: null,
       slug: copyId,
       title: `${product.title} (Copy)`,
@@ -524,9 +744,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     };
     originalRef.current = null;
     setFormErrors([]);
-    setSortOrderManual(false);
     setQuickEntry('');
     setShowAdvancedIds(true);
+    setInventoryNumberManual(false);
     setChainTypeInput(getProductChainType(product));
     setLengthInput(getProductLength(product));
     setEditing(copy);
@@ -558,8 +778,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       pricing_multiplier: editing.pricing_multiplier ?? null,
       status: normalizeProductStatus(editing.status),
       location: editing.location || 'showcase',
-      image_urls: editing.image_urls?.length ? editing.image_urls : editing.images,
+      image_urls: editing.images,
       tags: finalTags,
+      details: [],
+      details_es: [],
+      internal_notes: foldExtraDetailsIntoInternalNotes(editing),
     };
 
     if (isNew) {
@@ -568,7 +791,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       setFormErrors([]);
       const { data, error } = await supabase.from('products').insert(payload).select().single();
       if (error) { flash(error.message, false); setSaving(false); return; }
-      setProducts((prev) => [data ?? (payload as Product), ...prev]);
+      setProducts((prev) => [data ?? (payload as unknown as Product), ...prev]);
     } else {
       // Skip the network call entirely if nothing changed.
       if (JSON.stringify(payload) === JSON.stringify(originalRef.current)) {
@@ -581,7 +804,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       // causing PGRST116 and blocking the modal from closing.
       const { error } = await supabase.from('products').update(payload).eq('id', payload.id);
       if (error) { flash(error.message, false); setSaving(false); return; }
-      setProducts((prev) => prev.map((p) => p.id === payload.id ? (payload as Product) : p));
+      setProducts((prev) => prev.map((p) => p.id === payload.id ? (payload as unknown as Product) : p));
     }
 
     flash(isNew ? 'Product added' : 'Product saved');
@@ -1290,16 +1513,34 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
               <div className="grid md:grid-cols-[minmax(0,1fr)_auto] gap-4 items-end">
                 <div>
-                  <label className="form-label">Inventory #</label>
+                  <div className="mb-1 flex items-center justify-between gap-3">
+                    <label className="form-label mb-0">Inventory #</label>
+                    <label className="flex items-center gap-1.5 text-[0.68rem] font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                      <input
+                        type="checkbox"
+                        checked={inventoryNumberManual}
+                        onChange={(e) => setManualInventoryNumber(e.target.checked)}
+                        style={{ accentColor: 'var(--color-primary)' }}
+                      />
+                      Manual
+                    </label>
+                  </div>
                   <input
                     type="number"
                     min="1"
                     step="1"
                     inputMode="numeric"
                     className="form-field w-full"
+                    disabled={!inventoryNumberManual}
                     value={editing.inventory_number ?? ''}
                     onChange={(e) => setEditing({ ...editing, inventory_number: parseInventoryNumber(e.target.value) })}
+                    style={!inventoryNumberManual ? { background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface-variant)' } : undefined}
                   />
+                  {!inventoryNumberManual && (
+                    <p className="mt-1 text-[0.68rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      Auto-filled with the next available inventory number.
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -1486,42 +1727,15 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               <div className="grid md:grid-cols-4 gap-4">
                 <div>
                   <label className="form-label">Asking Price</label>
-                  <input type="number" step="0.01" className="form-field w-full"
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="form-field w-full"
+                    disabled={editing.price_mode !== 'manual'}
                     value={editing.asking_price ?? ''}
-                    onChange={(e) => setEditing({ ...editing, asking_price: e.target.value ? Number(e.target.value) : null })} />
-                </div>
-                <div>
-                  <label className="form-label">Minimum Price</label>
-                  <input type="number" step="0.01" className="form-field w-full"
-                    value={editing.minimum_price ?? ''}
-                    onChange={(e) => setEditing({ ...editing, minimum_price: e.target.value ? Number(e.target.value) : null })} />
-                </div>
-                <div>
-                  <label className="form-label">Cost Basis</label>
-                  <input type="number" step="0.01" className="form-field w-full"
-                    value={editing.cost_basis ?? ''}
-                    onChange={(e) => setEditing({ ...editing, cost_basis: e.target.value ? Number(e.target.value) : null })} />
-                </div>
-                <div>
-                  <label className="form-label">Melt Value Snapshot</label>
-                  <input type="number" step="0.01" className="form-field w-full"
-                    value={editing.melt_value ?? ''}
-                    onChange={(e) => setEditing({ ...editing, melt_value: e.target.value ? Number(e.target.value) : null })} />
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <label className="form-label">Acquisition Date</label>
-                  <input type="date" className="form-field w-full"
-                    value={editing.acquisition_date ?? ''}
-                    onChange={(e) => setEditing({ ...editing, acquisition_date: e.target.value || null })} />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="form-label">Acquisition Source</label>
-                  <input className="form-field w-full"
-                    value={editing.acquisition_source ?? ''}
-                    onChange={(e) => setEditing({ ...editing, acquisition_source: e.target.value })} />
+                    onChange={(e) => setEditing({ ...editing, asking_price: e.target.value ? Number(e.target.value) : null })}
+                    style={editing.price_mode !== 'manual' ? { background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface-variant)' } : undefined}
+                  />
                 </div>
               </div>
 
@@ -1556,53 +1770,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 </div>
               </div>
 
-              {/* Extra notes + Sort Order side by side */}
-              <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 14rem' }}>
-                <div>
-                  <label className="form-label">Extra notes about this item (optional)</label>
-                  <input
-                    className="form-field w-full"
-                    placeholder="e.g. Lobster claw clasp, diamond-cut finish, estate piece…"
-                    value={(editing.details ?? [])[0] ?? ''}
-                    onChange={(e) => setEditing({ ...editing, details: e.target.value ? [e.target.value] : [] })}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Sort Order</label>
-                  {isNew && !sortOrderManual ? (
-                    <div className="flex items-center gap-2">
-                      <span className="form-field flex-1 flex items-center text-sm select-none"
-                        style={{ color: 'var(--color-on-surface-variant)', background: 'var(--color-surface-container-low)' }}>
-                        {editing.sort_order} (auto)
-                      </span>
-                      <button type="button" onClick={() => setSortOrderManual(true)}
-                        className="text-xs font-bold uppercase tracking-wide hover:underline flex-shrink-0"
-                        style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-                        Set
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <input type="number" className="form-field flex-1"
-                        value={editing.sort_order}
-                        onChange={(e) => setEditing({ ...editing, sort_order: Number(e.target.value) })} />
-                      {isNew && (
-                        <button type="button"
-                          onClick={() => {
-                            const autoOrder = products.length > 0 ? Math.max(...products.map(p => p.sort_order ?? 0)) + 1 : 1;
-                            setEditing({ ...editing, sort_order: autoOrder });
-                            setSortOrderManual(false);
-                          }}
-                          className="text-xs font-bold uppercase tracking-wide hover:underline flex-shrink-0"
-                          style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-                          Auto
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
               {/* Images */}
               <div>
                 <label className="form-label">Images</label>
@@ -1629,7 +1796,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 {editing.images.length > 0 && (
                   <div>
                     <p className="text-[0.62rem] mb-2" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-                      Drag to reorder · First image is the cover photo
+                      Click to preview or crop · Drag to reorder · First image is the cover photo
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {editing.images.map((img, i) => (
@@ -1652,6 +1819,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                             setDragOverIdx(null);
                           }}
                           onDragEnd={() => { setDragSrcIdx(null); setDragOverIdx(null); }}
+                          onClick={(e) => {
+                            if ((e.target as HTMLElement).closest('button')) return;
+                            setPreviewImg({ url: img, index: i });
+                          }}
                           className="relative w-16 h-16 group cursor-grab"
                           style={{
                             opacity: dragSrcIdx === i ? 0.4 : 1,
@@ -1677,7 +1848,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                           >
                             <button
                               type="button"
-                              onClick={() => setPreviewImg(img)}
+                              onClick={() => setPreviewImg({ url: img, index: i })}
                               className="flex-1 flex items-center justify-center text-white"
                               title="Preview"
                             >
@@ -1729,7 +1900,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     const clone = {
                       ...editing,
                       id: '',
-                      inventory_number: null,
+                      inventory_number: getNextInventoryNumber(products),
                       sku: null,
                       slug: null,
                       title: `${editing.title} (Copy)`,
@@ -1741,8 +1912,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     };
                     originalRef.current = null;
                     setFormErrors([]);
-                    setSortOrderManual(false);
                     setQuickEntry('');
+                    setInventoryNumberManual(false);
                     setLengthInput(getProductLength(editing as Product));
                     setEditing(clone);
                     setIsNew(true);
@@ -1776,13 +1947,28 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
           style={{ background: 'rgba(0,0,0,0.85)' }}
           onClick={() => setPreviewImg(null)}
         >
-          <div className="relative max-w-3xl w-full max-h-[85vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <div className="relative max-w-3xl w-full max-h-[85vh] flex flex-col items-center justify-center gap-3" onClick={(e) => e.stopPropagation()}>
             <img
-              src={previewImg}
+              src={previewImg.url}
               alt="Preview"
-              className="max-w-full max-h-[85vh] object-contain"
+              className="max-w-full max-h-[78vh] object-contain"
               style={{ boxShadow: '0 8px 40px rgba(0,0,0,0.6)' }}
             />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setCropRect(FULL_IMAGE_CROP);
+                  setCropTarget(previewImg);
+                }}
+                className="gold-button text-xs"
+              >
+                Crop
+              </button>
+              <button type="button" onClick={() => setPreviewImg(null)} className="outline-button text-xs">
+                Close
+              </button>
+            </div>
             <button
               type="button"
               onClick={() => setPreviewImg(null)}
@@ -1791,6 +1977,90 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             >
               ✕
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Image crop editor */}
+      {cropTarget && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.88)' }}
+          onClick={() => setCropTarget(null)}
+        >
+          <div
+            className="w-full max-w-4xl border p-4 flex flex-col gap-4"
+            style={{ background: 'var(--color-background)', borderColor: 'var(--color-outline-variant)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
+                Crop Photo
+              </h2>
+              <button
+                type="button"
+                onClick={() => setCropTarget(null)}
+                className="text-sm font-bold uppercase tracking-wide"
+                style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+              >
+                × Close
+              </button>
+            </div>
+
+            <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+              Drag inside the crop box to move it. Drag an edge or corner to resize it.
+            </p>
+
+            <div className="flex justify-center overflow-auto max-h-[62vh]">
+              <div className="relative inline-block select-none touch-none" data-crop-area="true">
+                <img
+                  src={cropTarget.url}
+                  alt="Crop preview"
+                  className="block max-w-full max-h-[60vh] object-contain"
+                  draggable={false}
+                />
+                <div
+                  className="absolute touch-none"
+                  data-crop-box="true"
+                  style={{
+                    left: `${cropRect.x}%`,
+                    top: `${cropRect.y}%`,
+                    width: `${cropRect.width}%`,
+                    height: `${cropRect.height}%`,
+                    border: '2px solid var(--color-primary)',
+                    boxShadow: '0 0 0 1px rgba(255,255,255,0.7)',
+                    cursor: 'move',
+                  }}
+                  onPointerDown={(e) => startCropDrag(e, 'move')}
+                >
+                  {([
+                    ['n', 'top-0 left-3 right-3 h-3 -translate-y-1/2 cursor-ns-resize'],
+                    ['s', 'bottom-0 left-3 right-3 h-3 translate-y-1/2 cursor-ns-resize'],
+                    ['w', 'left-0 top-3 bottom-3 w-3 -translate-x-1/2 cursor-ew-resize'],
+                    ['e', 'right-0 top-3 bottom-3 w-3 translate-x-1/2 cursor-ew-resize'],
+                    ['nw', 'left-0 top-0 w-4 h-4 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize'],
+                    ['ne', 'right-0 top-0 w-4 h-4 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize'],
+                    ['sw', 'left-0 bottom-0 w-4 h-4 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize'],
+                    ['se', 'right-0 bottom-0 w-4 h-4 translate-x-1/2 translate-y-1/2 cursor-nwse-resize'],
+                  ] as [CropDragMode, string][]).map(([mode, className]) => (
+                    <div
+                      key={mode}
+                      className={`absolute ${className}`}
+                      onPointerDown={(e) => startCropDrag(e, mode)}
+                    />
+                  ))}
+                </div>
+             </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setCropTarget(null)} className="outline-button text-sm">
+                Cancel
+              </button>
+              <button type="button" onClick={saveCroppedImage} disabled={cropping} className="gold-button text-sm disabled:opacity-50">
+                {cropping ? 'Saving Crop…' : 'Save Crop'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -129,9 +129,6 @@ export default async function ProductDetailPage({ params }: Props) {
     });
   }
 
-  // Extra notes entered in the admin "Extra notes" field (details[0])
-  const extraNote = (p.details ?? [])[0] ?? null;
-
   const cartItem: CartItem = {
     id: p.id,
     title: p.title,
@@ -309,14 +306,6 @@ export default async function ProductDetailPage({ params }: Props) {
                       </div>
                     ))}
                   </dl>
-                  {extraNote && (
-                    <p
-                      className="text-sm mt-3 leading-relaxed"
-                      style={{ color: 'var(--color-on-surface-variant)', borderTop: '1px solid var(--color-outline-variant)', paddingTop: '0.75rem', marginTop: '0.75rem' }}
-                    >
-                      {extraNote}
-                    </p>
-                  )}
                 </div>
               )}
 
