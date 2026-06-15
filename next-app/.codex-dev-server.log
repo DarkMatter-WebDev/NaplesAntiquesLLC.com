@@ -1032,3 +1032,44 @@ Parsing ecmascript source code failed
  GET /admin 200 in 998ms (next.js: 20ms, proxy.ts: 151ms, application-code: 827ms)
  GET /admin/subscribers 200 in 636ms (next.js: 16ms, proxy.ts: 133ms, application-code: 486ms)
  GET / 200 in 264ms (next.js: 10ms, proxy.ts: 212ms, application-code: 42ms)
+✓ Compiled in 96ms
+ GET / 200 in 1063ms (next.js: 199ms, proxy.ts: 725ms, application-code: 140ms)
+ GET / 200 in 743ms (next.js: 70ms, proxy.ts: 183ms, application-code: 490ms)
+ GET /shop 200 in 2.2s (next.js: 404ms, proxy.ts: 222ms, application-code: 1553ms)
+[browser] Image with src "http://localhost:3000/assets/images/shop/shop-18k-rectangular-anchor-link-chain-01.png" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "http://localhost:3000/assets/images/shop/shop-14k-heavy-diamond-cut-cuban-chain-01.png" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "http://localhost:3000/assets/images/shop/shop-10k-hollow-cuban-chain-necklace-01.png" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "http://localhost:3000/assets/images/shop/shop-14k-vintage-diamond-cut-figaro-chain-01.png" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "http://localhost:3000/assets/images/shop/shop-18k-italian-anchor-link-infinity-chain-06.png" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "http://localhost:3000/assets/images/shop/shop-10k-monaco-edge-cuban-chain-01.png" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "http://localhost:3000/assets/images/shop/shop-14k-oval-link-chain-necklace-01.png" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "http://localhost:3000/assets/images/shop/shop-10k-cuban-chain-06.png" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "http://localhost:3000/assets/images/shop/shop-14k-infinity-rope-chain-01.png" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "http://localhost:3000/assets/images/shop/shop-10k-semi-solid-cuban-link-6mm-chain-01.png" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "http://localhost:3000/assets/images/shop/shop-14k-byzantine-link-chain-01.png" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "http://localhost:3000/assets/images/shop/shop-new-listing-01-01.png" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "http://localhost:3000/assets/images/shop/shop-new-listing-02-01.png" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "http://localhost:3000/assets/images/shop/shop-new-listing-03-01.png" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "http://localhost:3000/assets/images/shop/shop-new-listing-04-01.png" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+[browser] Image with src "http://localhost:3000/assets/images/shop/shop-new-listing-05-01.png" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+ GET /account 200 in 920ms (next.js: 152ms, proxy.ts: 289ms, application-code: 479ms)
+ GET /admin 200 in 1012ms (next.js: 30ms, proxy.ts: 125ms, application-code: 857ms)
+ GET / 200 in 405ms (next.js: 10ms, proxy.ts: 365ms, application-code: 29ms)
+ GET /shop 200 in 597ms (next.js: 16ms, proxy.ts: 134ms, application-code: 447ms)
+[browser] Image with src "http://localhost:3000/assets/images/shop/shop-new-listing-06-01.png" has "fill" and parent element with invalid "position". Provided "static" should be one of absolute,fixed,relative.
+ GET /account 200 in 500ms (next.js: 10ms, proxy.ts: 169ms, application-code: 320ms)
+ GET /admin 200 in 842ms (next.js: 18ms, proxy.ts: 124ms, application-code: 701ms)
+ GET /admin/messages 200 in 973ms (next.js: 38ms, proxy.ts: 366ms, application-code: 568ms)
+ GET /admin/orders 200 in 779ms (next.js: 33ms, proxy.ts: 124ms, application-code: 623ms)
+ GET /admin/orders/5b6c3124-9733-4096-b8d5-74d91111fb29 200 in 1046ms (next.js: 246ms, proxy.ts: 128ms, application-code: 672ms)
+ GET /admin/orders/5b6c3124-9733-4096-b8d5-74d91111fb29 200 in 631ms (next.js: 12ms, proxy.ts: 121ms, application-code: 497ms)
+ GET /admin/orders/5b6c3124-9733-4096-b8d5-74d91111fb29 200 in 695ms (next.js: 13ms, proxy.ts: 200ms, application-code: 482ms)
+ GET /admin/orders/5b6c3124-9733-4096-b8d5-74d91111fb29 200 in 924ms (next.js: 10ms, proxy.ts: 183ms, application-code: 732ms)
+ GET /admin/orders/5b6c3124-9733-4096-b8d5-74d91111fb29 200 in 631ms (next.js: 12ms, proxy.ts: 129ms, application-code: 490ms)
+ GET /admin/orders 200 in 1067ms (next.js: 26ms, proxy.ts: 179ms, application-code: 861ms)
+ GET /admin/orders/5b6c3124-9733-4096-b8d5-74d91111fb29 200 in 925ms (next.js: 13ms, proxy.ts: 316ms, application-code: 596ms)
+ GET /admin/orders/5b6c3124-9733-4096-b8d5-74d91111fb29 200 in 706ms (next.js: 15ms, proxy.ts: 188ms, application-code: 503ms)
+ GET /admin/orders 200 in 755ms (next.js: 17ms, proxy.ts: 141ms, application-code: 597ms)
+ GET /admin/orders/5b6c3124-9733-4096-b8d5-74d91111fb29 200 in 624ms (next.js: 12ms, proxy.ts: 137ms, application-code: 475ms)
+ GET /admin/orders/5b6c3124-9733-4096-b8d5-74d91111fb29 200 in 1001ms (next.js: 10ms, proxy.ts: 173ms, application-code: 819ms)
+ GET /admin/orders 200 in 712ms (next.js: 11ms, proxy.ts: 123ms, application-code: 577ms)

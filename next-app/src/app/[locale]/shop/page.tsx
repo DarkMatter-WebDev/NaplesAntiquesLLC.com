@@ -65,6 +65,10 @@ function normalizeLengths(length: string | string[] | undefined): string[] {
     .filter(Boolean);
 }
 
+function isVisibleInPublicGallery(product: Product): boolean {
+  return normalizeProductStatus(product.status) !== 'pending_payment';
+}
+
 function parsePriceLabel(value: string | null): number | null {
   if (!value) return null;
   const match = value.replace(/,/g, '').match(/\d+(\.\d+)?/);
@@ -103,11 +107,12 @@ export default async function ShopPage({ params, searchParams }: Props) {
 
   const spotData = await fetchSpotData();
   const allProducts: Product[] = (products ?? []) as Product[];
+  const publicGalleryProducts = allProducts.filter(isVisibleInPublicGallery);
   const selectedLengths = normalizeLengths(filters.length);
   const allowedLengthValues = getAllowedLengthValues(filters.itemType);
   const effectiveSelectedLengths = selectedLengths.filter((length) => allowedLengthValues.includes(length));
 
-  const filtered = allProducts.filter((p) => {
+  const filtered = publicGalleryProducts.filter((p) => {
     if (filters.metal) {
       if (filters.metal === 'gold' && p.category !== 'Gold') return false;
       if (filters.metal === 'silver' && p.category !== 'Silver') return false;
@@ -270,7 +275,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
             locale={locale}
             currentFilters={filters}
             filteredCount={sorted.length}
-            allCount={allProducts.length}
+            allCount={publicGalleryProducts.length}
             spotData={spotData}
           />
 
