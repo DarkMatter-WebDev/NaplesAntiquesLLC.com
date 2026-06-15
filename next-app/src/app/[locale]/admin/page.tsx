@@ -5,7 +5,7 @@ import type { Product } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
 import AdminShell from '@/components/admin/AdminShell';
 
-export const metadata: Metadata = { title: 'Product Admin' };
+export const metadata: Metadata = { title: 'Admin - Products' };
 
 interface Props {
   params: Promise<{ locale: string }>;
@@ -31,9 +31,13 @@ export default async function AdminPage({ params }: Props) {
     redirect(locale === 'es' ? '/es/account' : '/account');
   }
 
-  const [{ data: products }, spotData] = await Promise.all([
+  const [{ data: products }, spotData, { count: unreadMessagesCount }] = await Promise.all([
     supabase.from('products').select('*').order('sort_order', { ascending: true }),
     fetchSpotData(),
+    supabase
+      .from('admin_notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_read', false),
   ]);
 
   return (
@@ -41,6 +45,8 @@ export default async function AdminPage({ params }: Props) {
       initialProducts={(products ?? []) as Product[]}
       userEmail={user.email ?? ''}
       spotData={spotData}
+      locale={locale}
+      unreadMessagesCount={unreadMessagesCount ?? 0}
     />
   );
 }

@@ -1,9 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import Image from 'next/image';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import type { Product } from '@/types/product';
+import { isProductPurchasable, isProductSold, productStatusLabel, type Product } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
 import { getDisplayPrice, purityToFraction } from '@/lib/pricing';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -72,28 +71,31 @@ export default async function ProductDetailPage({ params }: Props) {
   const title = isEs && p.title_es ? p.title_es : p.title;
   const description = isEs && p.description_es ? p.description_es : p.description;
   const price = getDisplayPrice(p, spotData);
-  const isSold = p.status === 'Sold';
+  const isSold = isProductSold(p.status);
+  const isPurchasable = isProductPurchasable(p.status);
+  const productImages = p.image_urls?.length ? p.image_urls : p.images ?? [];
+  const productWeight = p.gram_weight ?? p.weight_grams;
 
   // Raw melt/scrap value at spot (multiplier = 1.0)
   let scrapValue: string | null = null;
   if (
     p.price_mode === 'spot-multiplier' &&
-    p.weight_grams && p.purity &&
+    productWeight && p.purity &&
     p.pricing_multiplier && p.pricing_multiplier !== 1 &&
     spotData
   ) {
     const spotPerOz = p.category === 'Silver'
       ? (spotData.silverPerTroyOz ?? 33)
       : spotData.goldPerTroyOz;
-    const melt = p.weight_grams * purityToFraction(p.purity) * (spotPerOz / GRAMS_PER_TROY_OZ);
+    const melt = productWeight * purityToFraction(p.purity) * (spotPerOz / GRAMS_PER_TROY_OZ);
     scrapValue = new Intl.NumberFormat('en-US', {
       style: 'currency', currency: 'USD', maximumFractionDigits: 0,
     }).format(melt);
   }
 
   // Auto-compile specs from structured fields
-  const chainType = (p.tags ?? []).find(t => t.startsWith('ct:'))?.slice(3) ?? null;
-  const length = (p.tags ?? []).find(t => t.startsWith('len:'))?.slice(4) ?? null;
+  const chainType = p.chain_type ?? (p.tags ?? []).find(t => t.startsWith('ct:'))?.slice(3) ?? null;
+  const length = p.length ?? (p.tags ?? []).find(t => t.startsWith('len:'))?.slice(4) ?? null;
   const specs: { label: string; value: string }[] = [];
 
   const metalValue = [
@@ -102,14 +104,14 @@ export default async function ProductDetailPage({ params }: Props) {
   ].filter(Boolean).join(' · ');
   if (metalValue) specs.push({ label: isEs ? 'Metal' : 'Metal', value: metalValue });
 
-  if (p.weight_grams) {
-    let weightValue = `${p.weight_grams.toFixed(2)} g`;
+  if (productWeight) {
+    let weightValue = `${productWeight.toFixed(2)} g`;
     if (p.purity) {
-      const fineGrams = p.weight_grams * purityToFraction(p.purity);
+      const fineGrams = productWeight * purityToFraction(p.purity);
       const fineTroyOz = fineGrams / GRAMS_PER_TROY_OZ;
       weightValue = isEs
-        ? `${p.weight_grams.toFixed(2)} g total · ${fineGrams.toFixed(2)} g ${p.category === 'Gold' ? 'oro fino' : 'plata fina'} · ${fineTroyOz.toFixed(4)} oz troy`
-        : `${p.weight_grams.toFixed(2)} g total · ${fineGrams.toFixed(2)} g fine ${p.category === 'Gold' ? 'gold' : 'silver'} · ${fineTroyOz.toFixed(4)} troy oz`;
+        ? `${productWeight.toFixed(2)} g total · ${fineGrams.toFixed(2)} g ${p.category === 'Gold' ? 'oro fino' : 'plata fina'} · ${fineTroyOz.toFixed(4)} oz troy`
+        : `${productWeight.toFixed(2)} g total · ${fineGrams.toFixed(2)} g fine ${p.category === 'Gold' ? 'gold' : 'silver'} · ${fineTroyOz.toFixed(4)} troy oz`;
     }
     specs.push({ label: isEs ? 'Peso' : 'Weight', value: weightValue });
   }
@@ -134,7 +136,7 @@ export default async function ProductDetailPage({ params }: Props) {
     id: p.id,
     title: p.title,
     title_es: p.title_es,
-    image: p.images?.[0] ?? null,
+    image: productImages[0] ?? null,
     status: p.status,
     priceLabel: price,
   };
@@ -143,7 +145,7 @@ export default async function ProductDetailPage({ params }: Props) {
     id: p.id,
     title: p.title,
     title_es: p.title_es,
-    image: p.images?.[0] ?? null,
+    image: productImages[0] ?? null,
     status: p.status,
     price_mode: p.price_mode,
     purity: p.purity,
@@ -159,14 +161,14 @@ export default async function ProductDetailPage({ params }: Props) {
     '@type': 'Product',
     name: title,
     ...(description ? { description } : {}),
-    ...(p.images?.[0] ? { image: p.images[0] } : {}),
+    ...(productImages[0] ? { image: productImages[0] } : {}),
     brand: { '@type': 'Organization', name: 'Naples Estate Jewelry Co' },
     offers: {
       '@type': 'Offer',
       url: `https://naplesestatejewelry.co${locale === 'es' ? '/es' : ''}/shop/${p.id}`,
       priceCurrency: 'USD',
       ...(/^\d+(\.\d+)?$/.test(priceNumeric) ? { price: priceNumeric } : {}),
-      availability: isSold ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
+      availability: isPurchasable ? 'https://schema.org/InStock' : 'https://schema.org/SoldOut',
       itemCondition: 'https://schema.org/UsedCondition',
     },
   };
@@ -192,7 +194,7 @@ export default async function ProductDetailPage({ params }: Props) {
           <div className="grid md:grid-cols-2 gap-10 lg:gap-16">
 
             {/* Gallery */}
-            <ProductImageGallery images={p.images ?? []} title={title} />
+            <ProductImageGallery images={productImages} title={title} />
 
             {/* Info */}
             <div className="flex flex-col gap-5">
@@ -209,13 +211,13 @@ export default async function ProductDetailPage({ params }: Props) {
                 <span
                   className="text-[0.6rem] font-bold uppercase tracking-widest px-2 py-0.5"
                   style={{
-                    background: isSold ? 'var(--color-on-surface)' : 'var(--color-primary)',
-                    color: isSold ? 'var(--color-surface)' : 'var(--color-on-primary)',
+                    background: isPurchasable ? 'var(--color-primary)' : 'var(--color-on-surface)',
+                    color: isPurchasable ? 'var(--color-on-primary)' : 'var(--color-surface)',
                   }}
                 >
-                  {isSold
-                    ? (isEs ? 'Vendido' : 'Sold')
-                    : (isEs ? 'Disponible' : 'Available')}
+                  {isPurchasable
+                    ? (isEs ? 'Disponible' : 'Available')
+                    : isSold ? (isEs ? 'Vendido' : 'Sold') : productStatusLabel(p.status)}
                 </span>
               </div>
 
@@ -255,7 +257,7 @@ export default async function ProductDetailPage({ params }: Props) {
               </div>
 
               {/* Store credit line */}
-              {scrapValue && !isSold && (
+              {scrapValue && isPurchasable && (
                 <div
                   style={{
                     display: 'flex',
@@ -319,7 +321,7 @@ export default async function ProductDetailPage({ params }: Props) {
               )}
 
               {/* CTAs */}
-              {!isSold && (
+              {isPurchasable && (
                 <div className="flex flex-wrap gap-3 pt-2">
                   <CartButton item={cartItem} variant="detail" locale={locale} />
                   <WishlistButton item={wishlistItem} variant="button" locale={locale} />
@@ -332,7 +334,7 @@ export default async function ProductDetailPage({ params }: Props) {
                 </div>
               )}
 
-              {isSold && (
+              {!isPurchasable && (
                 <div>
                   <p className="text-sm mb-3" style={{ color: 'var(--color-on-surface-variant)' }}>
                     {isEs

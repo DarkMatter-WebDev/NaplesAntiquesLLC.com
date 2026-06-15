@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
+import HomeSubscriberForm from '@/components/home/HomeSubscriberForm';
 
 export const metadata: Metadata = {
   title: 'Naples Estate Jewelry — Fine Gold & Estate Pieces',
@@ -83,6 +84,9 @@ export default async function HomePage({ params }: Props) {
               >
                 {isEs ? 'Rara. Auténtica. Atemporal.' : 'Rare. Authentic. Timeless.'}
               </h1>
+              <div className="mb-10 flex w-full justify-center px-2">
+                <HomeSubscriberForm locale={locale} />
+              </div>
               <div className="flex flex-col items-center gap-4 mb-20">
                 <div className="flex flex-wrap justify-center gap-4 md:gap-5">
                   <Link

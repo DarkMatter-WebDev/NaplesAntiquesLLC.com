@@ -493,8 +493,8 @@ export default function ShopFilters({ locale, currentFilters, filteredCount, all
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.8125rem', fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}>
               <input
                 type="checkbox"
-                checked={currentFilters.status === 'Available'}
-                onChange={(e) => updateFilter('status', e.target.checked ? 'Available' : '')}
+                checked={currentFilters.status === 'available' || currentFilters.status === 'Available'}
+                onChange={(e) => updateFilter('status', e.target.checked ? 'available' : '')}
                 style={{ accentColor: '#735c00', width: '0.9rem', height: '0.9rem' }}
               />
               {isEs ? 'Solo disponibles' : 'Available only'}

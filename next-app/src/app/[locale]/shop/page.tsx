@@ -1,6 +1,6 @@
 ﻿import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
-import type { Product } from '@/types/product';
+import { isProductPurchasable, normalizeProductStatus, type Product, type ProductStatus } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
 import { calcSpotPriceValue } from '@/lib/pricing';
 import ProductCard from '@/components/shop/ProductCard';
@@ -115,29 +115,29 @@ export default async function ShopPage({ params, searchParams }: Props) {
     if (filters.purity) {
       if (p.purity !== parseInt(filters.purity)) return false;
     }
-    if (filters.status && p.status !== filters.status) return false;
+    if (filters.status && normalizeProductStatus(p.status) !== normalizeProductStatus(filters.status as ProductStatus)) return false;
     if (filters.itemType) {
       const kws = ITEM_TYPE_KEYWORDS[filters.itemType];
       if (kws) {
-        const txt = [p.title, p.title_es, ...(p.tags ?? []), ...(p.tags_es ?? [])].join(' ').toLowerCase();
+        const txt = [p.title, p.title_es, p.chain_type, p.length, ...(p.tags ?? []), ...(p.tags_es ?? [])].join(' ').toLowerCase();
         if (!kws.some(k => txt.includes(k))) return false;
       }
     }
     if (filters.q) {
       const q = filters.q.toLowerCase();
-      const txt = [p.title, p.title_es, ...(p.tags ?? []), ...(p.tags_es ?? [])].join(' ').toLowerCase();
+      const txt = [p.title, p.title_es, p.inventory_number, p.sku, p.chain_type, p.length, ...(p.tags ?? []), ...(p.tags_es ?? [])].join(' ').toLowerCase();
       if (!txt.includes(q)) return false;
     }
     if (filters.chainType) {
       const kws = CHAIN_KEYWORDS[filters.chainType];
       if (kws) {
-        const txt = [p.title, ...(p.tags ?? [])].join(' ').toLowerCase();
+        const txt = [p.title, p.chain_type, ...(p.tags ?? [])].join(' ').toLowerCase();
         if (!kws.some(k => txt.includes(k))) return false;
       }
     }
     if (effectiveSelectedLengths.length > 0) {
-      const lenTag = (p.tags ?? []).find((t: string) => t.startsWith('len:'));
-      if (!lenTag || !effectiveSelectedLengths.includes(lenTag.slice(4))) return false;
+      const lenTag = p.length ?? (p.tags ?? []).find((t: string) => t.startsWith('len:'))?.slice(4);
+      if (!lenTag || !effectiveSelectedLengths.includes(lenTag)) return false;
     }
     if (filters.gender) {
       const g = p.gender ?? 'Unisex';
@@ -149,11 +149,11 @@ export default async function ShopPage({ params, searchParams }: Props) {
 
   // Available items first, then selected sort within each group.
   const sorted = [...filtered].sort((a, b) => {
-    if (a.status !== b.status) return a.status === 'Available' ? -1 : 1;
+    if (isProductPurchasable(a.status) !== isProductPurchasable(b.status)) return isProductPurchasable(a.status) ? -1 : 1;
     if (filters.sort === 'weight-asc' || filters.sort === 'weight-desc') {
       const byWeight = compareNullableNumbers(
-        a.weight_grams,
-        b.weight_grams,
+        a.gram_weight ?? a.weight_grams,
+        b.gram_weight ?? b.weight_grams,
         filters.sort === 'weight-asc' ? 'asc' : 'desc',
       );
       if (byWeight !== 0) return byWeight;

@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import type { Product, SpotData } from '@/types/product';
+import { isProductPurchasable, isProductSold, productStatusLabel, type Product, type SpotData } from '@/types/product';
 import { getDisplayPrice } from '@/lib/pricing';
 import WishlistButton from '@/components/shop/WishlistButton';
 import type { WishlistItem } from '@/context/WishlistContext';
@@ -18,10 +18,12 @@ export default function ProductCard({ product, spotData, locale }: Props) {
   const title = isEs && product.title_es ? product.title_es : product.title;
   const price = getDisplayPrice(product, spotData);
   const purityLabel = formatPurity(product, isEs);
-  const weightLabel = formatWeight(product.weight_grams);
-  const thumb = product.images?.[0];
+  const weightLabel = formatWeight(product.gram_weight ?? product.weight_grams);
+  const images = product.image_urls?.length ? product.image_urls : product.images;
+  const thumb = images?.[0];
   const href = locale === 'es' ? `/es/shop/${product.id}` : `/shop/${product.id}`;
-  const isSold = product.status === 'Sold';
+  const isSold = isProductSold(product.status);
+  const isPurchasable = isProductPurchasable(product.status);
 
   const cartItem: CartItem = {
     id: product.id,
@@ -61,9 +63,9 @@ export default function ProductCard({ product, spotData, locale }: Props) {
         {!isSold && (
           <div
             className="absolute top-3 left-3 z-10 text-[0.6rem] font-bold tracking-widest uppercase px-2 py-0.5"
-            style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}
+            style={{ background: isPurchasable ? 'var(--color-primary)' : '#8a5a00', color: 'var(--color-on-primary)' }}
           >
-            {isEs ? 'Disponible' : 'Available'}
+            {isPurchasable ? (isEs ? 'Disponible' : 'Available') : productStatusLabel(product.status)}
           </div>
         )}
         {/* Wishlist button — top-right of image */}

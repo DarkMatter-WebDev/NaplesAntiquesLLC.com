@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCart, type CartItem } from '@/context/CartContext';
+import { isProductPurchasable, productStatusLabel } from '@/types/product';
 
 const GOLD = '#735c00';
 const BORDER = '#d8d0c2';
@@ -191,9 +192,9 @@ function CartItemRow({ item, isEs, prefix, onRemove }: { item: CartItem; isEs: b
         <p className="text-[0.6rem] font-bold uppercase tracking-wide" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
           {item.priceLabel}
         </p>
-        {item.status === 'Sold' && (
+        {!isProductPurchasable(item.status) && (
           <span className="text-[0.55rem] font-bold uppercase tracking-widest" style={{ color: 'var(--color-error)' }}>
-            {isEs ? 'Vendido' : 'Sold'}
+            {isEs ? 'No disponible' : productStatusLabel(item.status)}
           </span>
         )}
       </div>

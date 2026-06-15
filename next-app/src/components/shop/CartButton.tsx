@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useCart, type CartItem } from '@/context/CartContext';
+import { isProductPurchasable } from '@/types/product';
 
 interface Props {
   item: CartItem;
@@ -13,6 +14,7 @@ export default function CartButton({ item, variant = 'card', locale = 'en' }: Pr
   const { isIn, add, remove, openDrawer, notifyAdded } = useCart();
   const inCart = isIn(item.id);
   const isEs = locale === 'es';
+  const canPurchase = isProductPurchasable(item.status);
   const [showCardConfirmation, setShowCardConfirmation] = useState(false);
   const confirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -25,6 +27,7 @@ export default function CartButton({ item, variant = 'card', locale = 'en' }: Pr
   function handleClick(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+    if (!canPurchase && !inCart) return;
     if (inCart) {
       if (confirmationTimer.current) clearTimeout(confirmationTimer.current);
       setShowCardConfirmation(false);
@@ -47,8 +50,9 @@ export default function CartButton({ item, variant = 'card', locale = 'en' }: Pr
       <button
         type="button"
         onClick={handleClick}
+        disabled={!canPurchase && !inCart}
         className={inCart ? 'outline-button flex items-center gap-2' : 'gold-button flex items-center gap-2'}
-        style={inCart ? { borderColor: GOLD, color: GOLD } : undefined}
+        style={inCart ? { borderColor: GOLD, color: GOLD } : !canPurchase ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
         aria-pressed={inCart}
       >
         <span className="material-symbols-outlined" style={{ fontSize: '16px', lineHeight: 1 }}>
@@ -56,7 +60,7 @@ export default function CartButton({ item, variant = 'card', locale = 'en' }: Pr
         </span>
         {inCart
           ? (isEs ? 'En el carrito' : 'In Cart')
-          : (isEs ? 'Agregar al carrito' : 'Add to Cart')}
+          : canPurchase ? (isEs ? 'Agregar al carrito' : 'Add to Cart') : (isEs ? 'No disponible' : 'Unavailable')}
       </button>
     );
   }
@@ -81,18 +85,19 @@ export default function CartButton({ item, variant = 'card', locale = 'en' }: Pr
       <button
         type="button"
         onClick={handleClick}
+        disabled={!canPurchase && !inCart}
         className="outline-button shop-card-cart-button text-xs flex w-full min-h-9 items-center justify-center gap-1 whitespace-nowrap"
-        style={inCart ? { borderColor: GOLD, color: GOLD, background: `color-mix(in srgb, ${GOLD} 8%, transparent)` } : undefined}
+        style={inCart ? { borderColor: GOLD, color: GOLD, background: `color-mix(in srgb, ${GOLD} 8%, transparent)` } : !canPurchase ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
         aria-pressed={inCart}
       >
         <span className="material-symbols-outlined" style={{ fontSize: '13px', lineHeight: 1 }}>
           {inCart ? 'remove_shopping_cart' : 'add_shopping_cart'}
         </span>
         <span className="shop-card-cart-label-full">
-          {inCart ? (isEs ? 'Quitar del carrito' : 'Remove from Cart') : (isEs ? 'Agregar al carrito' : 'Add to Cart')}
+          {inCart ? (isEs ? 'Quitar del carrito' : 'Remove from Cart') : canPurchase ? (isEs ? 'Agregar al carrito' : 'Add to Cart') : (isEs ? 'No disponible' : 'Unavailable')}
         </span>
         <span className="shop-card-cart-label-compact" aria-hidden="true">
-          {inCart ? (isEs ? 'Quitar' : 'Remove') : (isEs ? 'Agregar' : 'Add')}
+          {inCart ? (isEs ? 'Quitar' : 'Remove') : canPurchase ? (isEs ? 'Agregar' : 'Add') : (isEs ? 'No' : 'N/A')}
         </span>
       </button>
       <style>{`

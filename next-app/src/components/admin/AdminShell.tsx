@@ -1,22 +1,38 @@
 'use client';
 
 import { useState, useCallback, useMemo, useRef } from 'react';
-import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import type { Product, SpotData } from '@/types/product';
+import type { Product, ProductStatus, SpotData } from '@/types/product';
 import { getDisplayPrice } from '@/lib/pricing';
 import ComboboxInput from './ComboboxInput';
+import AdminHeader from './AdminHeader';
 
 interface Props {
   initialProducts: Product[];
   userEmail: string;
   spotData: SpotData | null;
+  locale: string;
+  unreadMessagesCount: number;
 }
 
 const CATEGORIES = ['Gold', 'Silver'] as const;
-const STATUSES = ['Available', 'Sold'] as const;
+const STATUSES: { value: ProductStatus; label: string }[] = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'available', label: 'Available' },
+  { value: 'reserved', label: 'Reserved' },
+  { value: 'pending_payment', label: 'Pending Payment' },
+  { value: 'sold', label: 'Sold' },
+  { value: 'archived', label: 'Archived' },
+];
+const LOCATIONS = [
+  { value: 'showcase', label: 'Showcase' },
+  { value: 'safe', label: 'Safe' },
+  { value: 'offsite', label: 'Offsite' },
+  { value: 'shipped', label: 'Shipped' },
+  { value: 'picked_up', label: 'Picked Up' },
+];
 
 const PREDEFINED_CHAIN_TYPES = [
   'Cuban link',
@@ -38,6 +54,10 @@ function getChainTypeFromTags(tags: string[] | null): string {
   return tag ? tag.slice(3) : '';
 }
 
+function getProductChainType(product: Product): string {
+  return product.chain_type || getChainTypeFromTags(product.tags);
+}
+
 const PREDEFINED_LENGTHS = [
   '16 in', '18 in', '20 in', '22 in', '24 in', '26 in', '28 in', '30 in',
   '7 in', '7.5 in', '8 in',
@@ -46,6 +66,66 @@ const PREDEFINED_LENGTHS = [
 function getLengthFromTags(tags: string[] | null): string {
   const tag = (tags ?? []).find(t => t.startsWith('len:'));
   return tag ? tag.slice(4) : '';
+}
+
+function getProductLength(product: Product): string {
+  return product.length || getLengthFromTags(product.tags);
+}
+
+function normalizeProductStatus(status: Product['status'] | null | undefined): ProductStatus {
+  const value = String(status ?? 'available').toLowerCase().replace(/\s+/g, '_');
+  if (value === 'available') return 'available';
+  if (value === 'sold') return 'sold';
+  if (value === 'draft') return 'draft';
+  if (value === 'reserved') return 'reserved';
+  if (value === 'pending_payment') return 'pending_payment';
+  if (value === 'archived') return 'archived';
+  return 'available';
+}
+
+function getStatusLabel(status: Product['status'] | null | undefined): string {
+  const normalized = normalizeProductStatus(status);
+  return STATUSES.find((item) => item.value === normalized)?.label ?? 'Available';
+}
+
+function getStatusTone(status: Product['status'] | null | undefined) {
+  const normalized = normalizeProductStatus(status);
+  if (normalized === 'available') return { bg: 'var(--color-primary)', fg: 'var(--color-on-primary)' };
+  if (normalized === 'sold') return { bg: 'var(--color-on-surface)', fg: 'var(--color-surface)' };
+  if (normalized === 'reserved' || normalized === 'pending_payment') return { bg: '#8a5a00', fg: '#fff' };
+  if (normalized === 'archived') return { bg: '#6b7280', fg: '#fff' };
+  return { bg: 'var(--color-surface-container-high)', fg: 'var(--color-on-surface)' };
+}
+
+function getStatusRank(status: Product['status'] | null | undefined): number {
+  const normalized = normalizeProductStatus(status);
+  const ranks: Record<string, number> = {
+    available: 0,
+    reserved: 1,
+    pending_payment: 2,
+    draft: 3,
+    sold: 4,
+    archived: 5,
+  };
+  return ranks[normalized] ?? 0;
+}
+
+function getProductMetal(product: Product): string {
+  return product.metal || product.category;
+}
+
+function getProductWeight(product: Product): number | null {
+  return product.gram_weight ?? product.weight_grams ?? null;
+}
+
+function getProductImages(product: Product): string[] {
+  return product.image_urls?.length ? product.image_urls : product.images ?? [];
+}
+
+function parseInventoryNumber(value: string | number | null | undefined): number | null {
+  if (value == null || value === '') return null;
+  const numeric = Number(String(value).replace(/\D/g, ''));
+  return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
 }
 
 const CHAIN_KEYWORDS: Record<string, string[]> = {
@@ -59,14 +139,6 @@ const CHAIN_KEYWORDS: Record<string, string[]> = {
   'ring':           ['ring'],
 };
 
-const LENGTH_PATTERNS: Record<string, string[]> = {
-  '22':       ['22 inch', '22"'],
-  '23':       ['23 inch', '23"'],
-  '24':       ['24 inch', '24"'],
-  '25-plus':  ['25 inch', '25.5 inch', '26 inch', '27 inch', '27.5 inch', '28 inch', '29 inch'],
-  '30':       ['30 inch', '30"'],
-  'bracelet': ['bracelet'],
-};
 const PRICE_MODES = [
   { value: 'spot-multiplier', label: 'Spot × Multiplier' },
   { value: 'manual', label: 'Manual / Fixed' },
@@ -80,6 +152,8 @@ type SortKey =
   | 'gender'
   | 'chainType'
   | 'length'
+  | 'location'
+  | 'featured'
   | 'purity'
   | 'weight'
   | 'mode'
@@ -96,6 +170,8 @@ const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null }[] = [
   { label: 'Gender', sortKey: 'gender' },
   { label: 'Chain Type', sortKey: 'chainType' },
   { label: 'Length', sortKey: 'length' },
+  { label: 'Location', sortKey: 'location' },
+  { label: 'Featured', sortKey: 'featured' },
   { label: 'Purity', sortKey: 'purity' },
   { label: 'Weight', sortKey: 'weight' },
   { label: 'Mode', sortKey: 'mode' },
@@ -106,7 +182,8 @@ const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null }[] = [
 
 function getMasterProductOrder(products: Product[]): Product[] {
   return [...products].sort((a, b) => {
-    if (a.status !== b.status) return a.status === 'Available' ? -1 : 1;
+    const statusCompared = getStatusRank(a.status) - getStatusRank(b.status);
+    if (statusCompared) return statusCompared;
     return (a.sort_order ?? 0) - (b.sort_order ?? 0);
   });
 }
@@ -122,9 +199,19 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
     price_mode: 'spot-multiplier',
     purity: null,
     weight_grams: null,
+    inventory_number: null,
+    sku: null,
+    slug: null,
+    metal: 'Gold',
+    gram_weight: null,
+    stone_details: null,
+    chain_type: null,
+    length: null,
     pricing_multiplier: 1.25,
-    status: 'Available',
+    status: 'available',
+    location: 'showcase',
     images: [],
+    image_urls: [],
     description: '',
     description_es: '',
     details: [],
@@ -133,6 +220,16 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
     tags_es: [],
     private_price_label: null,
     gender: 'Unisex',
+    cost_basis: null,
+    melt_value: null,
+    asking_price: null,
+    minimum_price: null,
+    live_spot_snapshot: null,
+    acquisition_date: null,
+    acquisition_source: null,
+    internal_notes: null,
+    public_notes: null,
+    featured: false,
     sort_order: 0,
   };
 }
@@ -150,9 +247,9 @@ function getSortValue(
 ): string | number | null {
   switch (key) {
     case 'inventoryNumber':
-      return inventoryNumbers.get(product.id) ?? null;
+      return product.inventory_number || inventoryNumbers.get(product.id) || null;
     case 'image':
-      return product.images?.[0] ? 1 : 0;
+      return getProductImages(product)[0] ? 1 : 0;
     case 'title':
       return product.title;
     case 'category':
@@ -160,19 +257,23 @@ function getSortValue(
     case 'gender':
       return product.gender ?? 'Unisex';
     case 'chainType':
-      return getChainTypeFromTags(product.tags);
+      return getProductChainType(product);
     case 'length':
-      return getLengthFromTags(product.tags);
+      return getProductLength(product);
+    case 'location':
+      return product.location ?? 'showcase';
+    case 'featured':
+      return product.featured ? 1 : 0;
     case 'purity':
       return product.purity;
     case 'weight':
-      return product.weight_grams;
+      return getProductWeight(product);
     case 'mode':
       return product.price_mode === 'manual' ? 'Manual' : `Spot ${product.pricing_multiplier ?? ''}`;
     case 'currentPrice':
       return parseDisplayPrice(getDisplayPrice(product, spotData));
     case 'status':
-      return product.status;
+      return getStatusLabel(product.status);
   }
 }
 
@@ -183,18 +284,23 @@ function compareSortValues(a: string | number | null, b: string | number | null)
   return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
 }
 
-export default function AdminShell({ initialProducts, userEmail, spotData }: Props) {
+export default function AdminShell({ initialProducts, userEmail, spotData, locale, unreadMessagesCount }: Props) {
   const router = useRouter();
+  const adminBasePath = locale === 'es' ? '/es/admin' : '/admin';
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<ReturnType<typeof emptyProduct> | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [filterStatus, setFilterStatus] = useState('');
   const [filterMetal, setFilterMetal] = useState('');
   const [filterPurity, setFilterPurity] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
   const [filterChainType, setFilterChainType] = useState('');
   const [filterLength, setFilterLength] = useState('');
+  const [filterLocation, setFilterLocation] = useState('');
+  const [filterFeatured, setFilterFeatured] = useState('');
   const originalRef = useRef<ReturnType<typeof emptyProduct> | null>(null);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -210,6 +316,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
   const [chainTypeInput, setChainTypeInput] = useState('');
   const [lengthInput, setLengthInput] = useState('');
   const [quickEntry, setQuickEntry] = useState('');
+  const [showAdvancedIds, setShowAdvancedIds] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   const flash = (text: string, ok = true) => {
@@ -234,6 +341,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
     setChainTypeInput('');
     setLengthInput('');
     setQuickEntry('');
+    setShowAdvancedIds(false);
     const autoOrder = products.length > 0
       ? Math.max(...products.map(p => p.sort_order ?? 0)) + 1
       : 1;
@@ -258,10 +366,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
   function openEdit(p: Product) {
     const copy = { ...p };
     originalRef.current = copy;
-    setChainTypeInput(getChainTypeFromTags(p.tags));
-    setLengthInput(getLengthFromTags(p.tags));
+    setChainTypeInput(getProductChainType(p));
+    setLengthInput(getProductLength(p));
     setFormErrors([]);
     setQuickEntry('');
+    setShowAdvancedIds(!!(p.sku || p.slug));
     setEditing(copy);
     setIsNew(false);
   }
@@ -287,8 +396,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
       if (lower === 'women' || lower === 'womens' || lower === "women's") { updates.gender = 'Women'; applied.push('Gender'); continue; }
 
       // Status
-      if (lower === 'available') { updates.status = 'Available'; applied.push('Status'); continue; }
-      if (lower === 'sold')      { updates.status = 'Sold';      applied.push('Status'); continue; }
+      if (lower === 'draft') { updates.status = 'draft'; applied.push('Status'); continue; }
+      if (lower === 'available') { updates.status = 'available'; applied.push('Status'); continue; }
+      if (lower === 'reserved') { updates.status = 'reserved'; applied.push('Status'); continue; }
+      if (lower === 'pending payment' || lower === 'pending_payment') { updates.status = 'pending_payment'; applied.push('Status'); continue; }
+      if (lower === 'sold') { updates.status = 'sold'; applied.push('Status'); continue; }
+      if (lower === 'archived') { updates.status = 'archived'; applied.push('Status'); continue; }
 
       // Price mode
       if (lower === 'spot' || lower === 'spot-multiplier' || lower === 'spot multiplier') {
@@ -386,13 +499,38 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
     setEditing((prev) => prev ? { ...prev, images: prev.images.filter((_, i) => i !== idx) } : prev);
   }
 
-  // --- Quick status toggle (click badge in table) ---
-  async function handleQuickStatus(product: Product) {
-    const newStatus = product.status === 'Available' ? 'Sold' : 'Available';
-    const { error } = await supabase.from('products').update({ status: newStatus }).eq('id', product.id);
+  async function updateProductStatus(product: Product, status: ProductStatus) {
+    const { error } = await supabase.from('products').update({ status }).eq('id', product.id);
     if (!error) {
-      setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, status: newStatus } : p));
+      setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, status } : p));
+      flash(`${product.title} marked ${getStatusLabel(status)}`);
+      return;
     }
+    flash(error.message, false);
+  }
+
+  function duplicateProduct(product: Product) {
+    const copyId = `${product.id}-copy-${Date.now()}`;
+    const copy = {
+      ...product,
+      id: copyId,
+      inventory_number: null,
+      sku: null,
+      slug: copyId,
+      title: `${product.title} (Copy)`,
+      title_es: product.title_es ? `${product.title_es} (Copia)` : null,
+      status: 'draft' as ProductStatus,
+      sort_order: products.length > 0 ? Math.max(...products.map(p => p.sort_order ?? 0)) + 1 : 1,
+    };
+    originalRef.current = null;
+    setFormErrors([]);
+    setSortOrderManual(false);
+    setQuickEntry('');
+    setShowAdvancedIds(true);
+    setChainTypeInput(getProductChainType(product));
+    setLengthInput(getProductLength(product));
+    setEditing(copy);
+    setIsNew(true);
   }
 
   // --- Save product ---
@@ -408,9 +546,19 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
     const payload = {
       ...editing,
       id: editing.id || editing.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now(),
+      slug: editing.slug || editing.id || editing.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+      inventory_number: parseInventoryNumber(editing.inventory_number),
+      sku: editing.sku?.trim() || (editing.inventory_number ? String(editing.inventory_number) : null),
+      metal: editing.metal || editing.category,
       purity: editing.purity ?? null,
       weight_grams: editing.weight_grams ?? null,
+      gram_weight: editing.gram_weight ?? editing.weight_grams ?? null,
+      chain_type: chainTypeInput.trim() || null,
+      length: lengthInput.trim() || null,
       pricing_multiplier: editing.pricing_multiplier ?? null,
+      status: normalizeProductStatus(editing.status),
+      location: editing.location || 'showcase',
+      image_urls: editing.image_urls?.length ? editing.image_urls : editing.images,
       tags: finalTags,
     };
 
@@ -456,6 +604,26 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
   // --- Delete product ---
   async function handleDelete() {
     if (!deleteTarget) return;
+
+    const { count, error: orderLookupError } = await supabase
+      .from('order_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('product_id', deleteTarget.id);
+
+    if (orderLookupError && orderLookupError.code !== '42P01') {
+      flash(orderLookupError.message, false);
+      return;
+    }
+
+    if ((count ?? 0) > 0) {
+      const { error } = await supabase.from('products').update({ status: 'archived' }).eq('id', deleteTarget.id);
+      if (error) { flash(error.message, false); return; }
+      setProducts((prev) => prev.map((p) => p.id === deleteTarget.id ? { ...p, status: 'archived' } : p));
+      flash('Product has order history, so it was archived instead of deleted.');
+      setDeleteTarget(null);
+      return;
+    }
+
     const { error } = await supabase.from('products').delete().eq('id', deleteTarget.id);
     if (error) { flash(error.message, false); return; }
     setProducts((prev) => prev.filter((p) => p.id !== deleteTarget.id));
@@ -467,19 +635,35 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
 
   // --- Filtered list ---
   const filtered = masterOrderedProducts.filter((p) => {
-    if (search && !p.title.toLowerCase().includes(search.toLowerCase())) return false;
-    if (filterMetal === 'gold' && p.category !== 'Gold') return false;
-    if (filterMetal === 'silver' && p.category !== 'Silver') return false;
+    const searchText = [
+      p.title,
+      p.id,
+      p.inventory_number,
+      p.sku,
+      getProductMetal(p),
+      p.category,
+      p.purity ? `${p.purity}` : '',
+      getProductChainType(p),
+      getProductLength(p),
+    ].filter(Boolean).join(' ').toLowerCase();
+    if (search && !searchText.includes(search.toLowerCase())) return false;
+    if (filterStatus && normalizeProductStatus(p.status) !== filterStatus) return false;
+    if (filterMetal === 'gold' && getProductMetal(p).toLowerCase() !== 'gold') return false;
+    if (filterMetal === 'silver' && getProductMetal(p).toLowerCase() !== 'silver') return false;
+    if (filterCategory && p.category !== filterCategory) return false;
     if (filterPurity && p.purity !== parseInt(filterPurity)) return false;
+    if (filterLocation && (p.location ?? 'showcase') !== filterLocation) return false;
+    if (filterFeatured === 'featured' && !p.featured) return false;
+    if (filterFeatured === 'not-featured' && p.featured) return false;
     if (filterChainType) {
       const kws = CHAIN_KEYWORDS[filterChainType];
       if (kws) {
-        const txt = [p.title, ...(p.tags ?? [])].join(' ').toLowerCase();
+        const txt = [p.title, getProductChainType(p), ...(p.tags ?? [])].join(' ').toLowerCase();
         if (!kws.some(k => txt.includes(k))) return false;
       }
     }
     if (filterLength) {
-      if (getLengthFromTags(p.tags) !== filterLength) return false;
+      if (getProductLength(p) !== filterLength) return false;
     }
     return true;
   });
@@ -512,10 +696,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
 
   const hasActiveTableFilters = !!(
     search ||
+    filterStatus ||
     filterMetal ||
     filterPurity ||
+    filterCategory ||
     filterChainType ||
-    filterLength
+    filterLength ||
+    filterLocation ||
+    filterFeatured
   );
   const canDragReorder = !sortConfig && !hasActiveTableFilters && !reordering;
 
@@ -536,13 +724,13 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
       return;
     }
 
-    if (draggedProduct.status !== targetProduct.status) {
-      flash('Move items within Available or Sold. Change status first to move across groups.', false);
+    if (normalizeProductStatus(draggedProduct.status) !== normalizeProductStatus(targetProduct.status)) {
+      flash('Move items within the same status group. Change status first to move across groups.', false);
       resetRowDrag();
       return;
     }
 
-    const statusGroup = masterOrderedProducts.filter((product) => product.status === draggedProduct.status);
+    const statusGroup = masterOrderedProducts.filter((product) => normalizeProductStatus(product.status) === normalizeProductStatus(draggedProduct.status));
     const fromIndex = statusGroup.findIndex((product) => product.id === draggedProduct.id);
     const toIndex = statusGroup.findIndex((product) => product.id === targetProduct.id);
     if (fromIndex < 0 || toIndex < 0) {
@@ -582,36 +770,20 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
   }
 
   const total = products.length;
-  const available = products.filter((p) => p.status === 'Available').length;
-  const sold = products.filter((p) => p.status === 'Sold').length;
-  const goldCount = products.filter((p) => p.category === 'Gold').length;
+  const available = products.filter((p) => normalizeProductStatus(p.status) === 'available').length;
+  const reserved = products.filter((p) => normalizeProductStatus(p.status) === 'reserved').length;
+  const sold = products.filter((p) => normalizeProductStatus(p.status) === 'sold').length;
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-background)' }}>
 
-      {/* Top bar */}
-      <header
-        className="sticky top-0 z-40 border-b flex items-center justify-between px-4 md:px-8 py-3 gap-4"
-        style={{ background: 'var(--color-background)', borderColor: 'var(--color-outline-variant)' }}
-      >
-        <div className="flex items-center gap-4 min-w-0">
-          <Link href="/"
-            className="text-xs font-bold uppercase tracking-widest flex-shrink-0"
-            style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-            ← Site
-          </Link>
-          <span
-            className="text-sm font-bold truncate"
-            style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-            Product Admin
-          </span>
-          <Link href="/admin/inquiries"
-            className="text-xs font-bold uppercase tracking-widest flex-shrink-0 hover:underline"
-            style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-            Inquiries
-          </Link>
-        </div>
-        <div className="flex items-center gap-3">
+      <AdminHeader
+        adminBasePath={adminBasePath}
+        active="products"
+        unreadMessagesCount={unreadMessagesCount}
+        userEmail={userEmail}
+        rightContent={(
+          <>
           {spotData && (
             <span className="text-xs hidden md:flex items-center gap-2 flex-shrink-0"
               style={{ fontFamily: 'var(--font-label)' }}>
@@ -628,9 +800,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
               </span>
             </span>
           )}
-          <span className="text-xs hidden md:block truncate" style={{ color: 'var(--color-on-surface-variant)' }}>
-            {userEmail}
-          </span>
           <button
             type="button"
             onClick={handleSignOut}
@@ -638,8 +807,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
           >
             Sign Out
           </button>
-        </div>
-      </header>
+          </>
+        )}
+      />
 
       <div className="max-w-[1700px] mx-auto px-4 md:px-8 py-8">
 
@@ -662,8 +832,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
           {[
             { label: 'Total', value: total },
             { label: 'Available', value: available },
+            { label: 'Reserved', value: reserved },
             { label: 'Sold', value: sold },
-            { label: 'Gold Items', value: goldCount },
           ].map(({ label, value }) => (
             <div key={label}
               className="border p-4"
@@ -693,12 +863,28 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
           <div className="flex flex-wrap gap-2 items-end">
             {[
               {
+                label: 'Status', value: filterStatus, set: setFilterStatus,
+                options: [['', 'All Statuses'], ...STATUSES.map((status) => [status.value, status.label])],
+              },
+              {
                 label: 'Metal', value: filterMetal, set: setFilterMetal,
                 options: [['', 'All Metals'], ['gold', 'Gold'], ['silver', 'Silver']],
               },
               {
+                label: 'Category', value: filterCategory, set: setFilterCategory,
+                options: [['', 'All Categories'], ...CATEGORIES.map((category) => [category, category])],
+              },
+              {
                 label: 'Purity', value: filterPurity, set: setFilterPurity,
                 options: [['', 'All Purities'], ['18', '18K'], ['14', '14K'], ['10', '10K'], ['925', '925 Sterling']],
+              },
+              {
+                label: 'Location', value: filterLocation, set: setFilterLocation,
+                options: [['', 'All Locations'], ...LOCATIONS.map((location) => [location.value, location.label])],
+              },
+              {
+                label: 'Featured', value: filterFeatured, set: setFilterFeatured,
+                options: [['', 'All Items'], ['featured', 'Featured'], ['not-featured', 'Not Featured']],
               },
               {
                 label: 'Chain Type', value: filterChainType, set: setFilterChainType,
@@ -751,10 +937,19 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
             ))}
 
             {/* Clear filters */}
-            {(filterMetal || filterPurity || filterChainType || filterLength) && (
+            {(filterStatus || filterMetal || filterPurity || filterCategory || filterChainType || filterLength || filterLocation || filterFeatured) && (
               <button
                 type="button"
-                onClick={() => { setFilterMetal(''); setFilterPurity(''); setFilterChainType(''); setFilterLength(''); }}
+                onClick={() => {
+                  setFilterStatus('');
+                  setFilterMetal('');
+                  setFilterPurity('');
+                  setFilterCategory('');
+                  setFilterChainType('');
+                  setFilterLength('');
+                  setFilterLocation('');
+                  setFilterFeatured('');
+                }}
                 className="text-xs font-bold uppercase tracking-wide hover:underline self-end pb-1"
                 style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
               >
@@ -785,10 +980,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
                 type="button"
                 onClick={() => {
                   setSearch('');
+                  setFilterStatus('');
                   setFilterMetal('');
                   setFilterPurity('');
+                  setFilterCategory('');
                   setFilterChainType('');
                   setFilterLength('');
+                  setFilterLocation('');
+                  setFilterFeatured('');
                   setSortConfig(null);
                 }}
                 className="font-bold uppercase tracking-wide hover:underline"
@@ -890,18 +1089,18 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap font-bold text-xs" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-                      #{inventoryNumbers.get(p.id) ?? '—'}
+                      {p.inventory_number || `#${inventoryNumbers.get(p.id) ?? '-'}`}
                     </td>
                     <td className="p-0">
-                      {p.images?.[0] ? (
+                      {getProductImages(p)[0] ? (
                         <div className="relative w-16 h-16">
                           <Image
-                            src={p.images[0]}
+                            src={getProductImages(p)[0]}
                             alt={p.title}
                             fill
                             sizes="64px"
                             className="object-contain"
-                            unoptimized={p.images[0].startsWith('/assets/')}
+                            unoptimized={getProductImages(p)[0].startsWith('/assets/')}
                           />
                         </div>
                       ) : (
@@ -915,20 +1114,26 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
                     <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>{p.category}</td>
                     <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>{p.gender ?? 'Unisex'}</td>
                     <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
-                      {getChainTypeFromTags(p.tags) || '—'}
+                      {getProductChainType(p) || '-'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
-                      {getLengthFromTags(p.tags) || '—'}
+                      {getProductLength(p) || '-'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      {LOCATIONS.find((location) => location.value === (p.location ?? 'showcase'))?.label ?? p.location ?? 'Showcase'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-xs" style={{ color: p.featured ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>
+                      {p.featured ? 'Yes' : 'No'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
                       {p.purity
                         ? p.purity <= 24
                           ? `${p.purity}k`
                           : ({ 999:'99.9%', 950:'95%', 925:'92.5%', 900:'90%', 850:'85%', 800:'80%' } as Record<number,string>)[p.purity] ?? `${p.purity}`
-                        : '—'}
+                        : '-'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
-                      {p.weight_grams ? `${p.weight_grams}g` : '—'}
+                      {getProductWeight(p) ? `${getProductWeight(p)}g` : '-'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
                       {p.price_mode === 'manual' ? 'Manual' : `Spot ×${p.pricing_multiplier ?? '?'}`}
@@ -937,26 +1142,56 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
                       {getDisplayPrice(p, spotData)}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => handleQuickStatus(p)}
-                        title="Click to toggle Available / Sold"
-                        className="text-[0.6rem] font-bold uppercase tracking-widest px-2 py-0.5 cursor-pointer hover:opacity-75 transition-opacity"
+                      <span
+                        className="inline-flex text-[0.6rem] font-bold uppercase tracking-widest px-2 py-0.5"
                         style={{
-                          background: p.status === 'Available' ? 'var(--color-primary)' : 'var(--color-on-surface)',
-                          color: p.status === 'Available' ? 'var(--color-on-primary)' : 'var(--color-surface)',
+                          background: getStatusTone(p.status).bg,
+                          color: getStatusTone(p.status).fg,
                           border: 'none',
                         }}>
-                        {p.status}
-                      </button>
+                        {getStatusLabel(p.status)}
+                      </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={() => openEdit(p)}
                           className="text-xs font-bold uppercase tracking-wide hover:underline"
                           style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
                           Edit
                         </button>
+                        <button type="button" onClick={() => duplicateProduct(p)}
+                          className="text-xs font-bold uppercase tracking-wide hover:underline"
+                          style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                          Duplicate
+                        </button>
+                        {normalizeProductStatus(p.status) !== 'available' && (
+                          <button type="button" onClick={() => updateProductStatus(p, 'available')}
+                            className="text-xs font-bold uppercase tracking-wide hover:underline"
+                            style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
+                            Available
+                          </button>
+                        )}
+                        {normalizeProductStatus(p.status) !== 'reserved' && (
+                          <button type="button" onClick={() => updateProductStatus(p, 'reserved')}
+                            className="text-xs font-bold uppercase tracking-wide hover:underline"
+                            style={{ color: '#8a5a00', fontFamily: 'var(--font-label)' }}>
+                            Reserve
+                          </button>
+                        )}
+                        {normalizeProductStatus(p.status) !== 'sold' && (
+                          <button type="button" onClick={() => updateProductStatus(p, 'sold')}
+                            className="text-xs font-bold uppercase tracking-wide hover:underline"
+                            style={{ color: 'var(--color-on-surface)', fontFamily: 'var(--font-label)' }}>
+                            Sold
+                          </button>
+                        )}
+                        {normalizeProductStatus(p.status) !== 'archived' && (
+                          <button type="button" onClick={() => updateProductStatus(p, 'archived')}
+                            className="text-xs font-bold uppercase tracking-wide hover:underline"
+                            style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                            Archive
+                          </button>
+                        )}
                         <button type="button" onClick={() => setDeleteTarget(p)}
                           className="text-xs font-bold uppercase tracking-wide hover:underline"
                           style={{ color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}>
@@ -1033,7 +1268,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
                 </div>
                 <p className="text-[0.6rem] leading-relaxed" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
                   Only include what differs from the defaults — omit anything already set correctly.
-                  Recognized tokens: <strong>Category</strong> (Gold / Silver) · <strong>Status</strong> (Available / Sold) ·&nbsp;
+                  Recognized tokens: <strong>Category</strong> (Gold / Silver) · <strong>Status</strong> (Draft / Available / Reserved / Pending Payment / Sold / Archived) ·&nbsp;
                   <strong>Chain Type</strong> (Cuban link / Bracelet / Ring / etc.) ·&nbsp;
                   <strong>Length</strong> (22in / 7.5in) ·&nbsp;
                   <strong>Price Mode</strong> (Spot / Manual) ·&nbsp;
@@ -1050,6 +1285,46 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
                   <input className="form-field w-full" placeholder="my-product-slug"
                     value={editing.id}
                     onChange={(e) => setEditing({ ...editing, id: e.target.value })} />
+                </div>
+              )}
+
+              <div className="grid md:grid-cols-[minmax(0,1fr)_auto] gap-4 items-end">
+                <div>
+                  <label className="form-label">Inventory #</label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    inputMode="numeric"
+                    className="form-field w-full"
+                    value={editing.inventory_number ?? ''}
+                    onChange={(e) => setEditing({ ...editing, inventory_number: parseInventoryNumber(e.target.value) })}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedIds((current) => !current)}
+                  className="outline-button text-xs h-10"
+                >
+                  {showAdvancedIds ? 'Hide SKU' : 'SKU / Slug'}
+                </button>
+              </div>
+
+              {showAdvancedIds && (
+                <div
+                  className="grid md:grid-cols-2 gap-4 p-4 border"
+                  style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-lowest)' }}
+                >
+                  <div>
+                    <label className="form-label">SKU</label>
+                    <input className="form-field w-full" value={editing.sku ?? ''}
+                      onChange={(e) => setEditing({ ...editing, sku: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="form-label">Public Slug</label>
+                    <input className="form-field w-full" value={editing.slug ?? ''}
+                      onChange={(e) => setEditing({ ...editing, slug: e.target.value })} />
+                  </div>
                 </div>
               )}
 
@@ -1072,15 +1347,15 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
                 <div>
                   <label className="form-label">Category</label>
                   <select className="form-field w-full" value={editing.category}
-                    onChange={(e) => setEditing({ ...editing, category: e.target.value as 'Gold' | 'Silver', purity: null })}>
+                    onChange={(e) => setEditing({ ...editing, category: e.target.value as 'Gold' | 'Silver', metal: e.target.value, purity: null })}>
                     {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="form-label">Status</label>
                   <select className="form-field w-full" value={editing.status}
-                    onChange={(e) => setEditing({ ...editing, status: e.target.value as 'Available' | 'Sold' })}>
-                    {STATUSES.map((s) => <option key={s}>{s}</option>)}
+                    onChange={(e) => setEditing({ ...editing, status: e.target.value as ProductStatus })}>
+                    {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </div>
                 <div>
@@ -1092,6 +1367,25 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
                     <option value="Women">Women</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label className="form-label">Location</label>
+                  <select className="form-field w-full" value={editing.location ?? 'showcase'}
+                    onChange={(e) => setEditing({ ...editing, location: e.target.value })}>
+                    {LOCATIONS.map((location) => <option key={location.value} value={location.value}>{location.label}</option>)}
+                  </select>
+                </div>
+                <label className="flex items-end gap-2 text-sm pb-2" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  <input
+                    type="checkbox"
+                    checked={editing.featured === true}
+                    onChange={(e) => setEditing({ ...editing, featured: e.target.checked })}
+                    style={{ accentColor: 'var(--color-primary)' }}
+                  />
+                  Featured in shop
+                </label>
               </div>
 
               {/* Chain Type + Length */}
@@ -1189,6 +1483,48 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
                 </div>
               </div>
 
+              <div className="grid md:grid-cols-4 gap-4">
+                <div>
+                  <label className="form-label">Asking Price</label>
+                  <input type="number" step="0.01" className="form-field w-full"
+                    value={editing.asking_price ?? ''}
+                    onChange={(e) => setEditing({ ...editing, asking_price: e.target.value ? Number(e.target.value) : null })} />
+                </div>
+                <div>
+                  <label className="form-label">Minimum Price</label>
+                  <input type="number" step="0.01" className="form-field w-full"
+                    value={editing.minimum_price ?? ''}
+                    onChange={(e) => setEditing({ ...editing, minimum_price: e.target.value ? Number(e.target.value) : null })} />
+                </div>
+                <div>
+                  <label className="form-label">Cost Basis</label>
+                  <input type="number" step="0.01" className="form-field w-full"
+                    value={editing.cost_basis ?? ''}
+                    onChange={(e) => setEditing({ ...editing, cost_basis: e.target.value ? Number(e.target.value) : null })} />
+                </div>
+                <div>
+                  <label className="form-label">Melt Value Snapshot</label>
+                  <input type="number" step="0.01" className="form-field w-full"
+                    value={editing.melt_value ?? ''}
+                    onChange={(e) => setEditing({ ...editing, melt_value: e.target.value ? Number(e.target.value) : null })} />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label className="form-label">Acquisition Date</label>
+                  <input type="date" className="form-field w-full"
+                    value={editing.acquisition_date ?? ''}
+                    onChange={(e) => setEditing({ ...editing, acquisition_date: e.target.value || null })} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="form-label">Acquisition Source</label>
+                  <input className="form-field w-full"
+                    value={editing.acquisition_source ?? ''}
+                    onChange={(e) => setEditing({ ...editing, acquisition_source: e.target.value })} />
+                </div>
+              </div>
+
               {/* Description */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
@@ -1202,6 +1538,21 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
                   <textarea rows={4} className="form-field w-full resize-y"
                     value={editing.description_es ?? ''}
                     onChange={(e) => setEditing({ ...editing, description_es: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label">Public Notes</label>
+                  <textarea rows={3} className="form-field w-full resize-y"
+                    value={editing.public_notes ?? ''}
+                    onChange={(e) => setEditing({ ...editing, public_notes: e.target.value })} />
+                </div>
+                <div>
+                  <label className="form-label">Internal Notes</label>
+                  <textarea rows={3} className="form-field w-full resize-y"
+                    value={editing.internal_notes ?? ''}
+                    onChange={(e) => setEditing({ ...editing, internal_notes: e.target.value })} />
                 </div>
               </div>
 
@@ -1378,8 +1729,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
                     const clone = {
                       ...editing,
                       id: '',
+                      inventory_number: null,
+                      sku: null,
+                      slug: null,
                       title: `${editing.title} (Copy)`,
                       title_es: editing.title_es ? `${editing.title_es} (Copia)` : null,
+                      status: 'draft' as ProductStatus,
                       sort_order: products.length > 0
                         ? Math.max(...products.map(p => p.sort_order ?? 0)) + 1
                         : 1,
@@ -1388,7 +1743,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData }: Pro
                     setFormErrors([]);
                     setSortOrderManual(false);
                     setQuickEntry('');
-                    setLengthInput(getLengthFromTags(editing.tags));
+                    setLengthInput(getProductLength(editing as Product));
                     setEditing(clone);
                     setIsNew(true);
                   }}

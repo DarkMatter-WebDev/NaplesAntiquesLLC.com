@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useWishlist, type WishlistItem } from '@/context/WishlistContext';
+import { isProductSold } from '@/types/product';
 
 const GOLD = '#735c00';
 const BORDER = '#d8d0c2';
@@ -128,7 +129,7 @@ function DrawerItem({
 }) {
   const { remove } = useWishlist();
   const title = isEs && item.title_es ? item.title_es : item.title;
-  const isSold = item.status === 'Sold';
+  const isSold = isProductSold(item.status);
 
   const priceLabel =
     item.price_mode === 'manual'

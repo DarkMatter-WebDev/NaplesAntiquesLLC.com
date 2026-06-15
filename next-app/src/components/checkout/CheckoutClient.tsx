@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
 import OrderSummary, { SHIPPING_OPTIONS } from '@/components/checkout/OrderSummary';
 import { createClient } from '@/lib/supabase/client';
@@ -18,12 +17,14 @@ interface CustomerInfo {
 }
 
 export default function CheckoutClient({ locale }: { locale: string }) {
-  const router = useRouter();
-  const { items, remove } = useCart();
+  const { items, remove, clear } = useCart();
   const isEs = locale === 'es';
   const prefix = isEs ? '/es' : '';
   const [customer, setCustomer] = useState<CustomerInfo>({ name: '', email: '', phone: '', notes: '' });
   const [shippingMethod, setShippingMethod] = useState(SHIPPING_OPTIONS[0].value);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [createdOrder, setCreatedOrder] = useState<{ orderNumber: string; total: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,9 +62,51 @@ export default function CheckoutClient({ locale }: { locale: string }) {
     };
   }, []);
 
-  function handleContinueToPayment(e: React.FormEvent) {
+  async function handleSubmitOrder(e: React.FormEvent) {
     e.preventDefault();
-    router.push(`${prefix}/payment?shipping=${encodeURIComponent(shippingMethod)}`);
+    setSubmitting(true);
+    setError(null);
+
+    const res = await fetch('/api/checkout/order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        productIds: items.map((item) => item.id),
+        customer,
+        shippingMethod,
+      }),
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) {
+      setError(data?.error ?? (isEs ? 'No se pudo enviar el pedido.' : 'Could not submit order.'));
+      setSubmitting(false);
+      return;
+    }
+
+    clear();
+    setCreatedOrder({ orderNumber: data.orderNumber, total: data.total });
+    setSubmitting(false);
+  }
+
+  if (createdOrder) {
+    return (
+      <div className="max-w-xl mx-auto text-center px-6 py-16">
+        <span className="material-symbols-outlined" style={{ fontSize: '44px', color: GOLD }}>check_circle</span>
+        <h1 className="text-3xl md:text-4xl font-bold mt-4 mb-4" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
+          {isEs ? 'Pedido recibido' : 'Order Received'}
+        </h1>
+        <p className="mb-2" style={{ color: 'var(--color-on-surface-variant)' }}>
+          {isEs ? 'Su pedido fue enviado correctamente.' : 'Your order was submitted successfully.'}
+        </p>
+        <p className="mb-8 text-sm font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+          {createdOrder.orderNumber}
+        </p>
+        <Link href={`${prefix}/shop`} className="gold-button">
+          {isEs ? 'Volver a la tienda' : 'Back to Shop'}
+        </Link>
+      </div>
+    );
   }
 
   if (items.length === 0) {
@@ -98,7 +141,7 @@ export default function CheckoutClient({ locale }: { locale: string }) {
       </div>
 
       <div className="grid lg:grid-cols-[1fr_24rem] gap-8 items-start">
-        <form onSubmit={handleContinueToPayment} className="border p-5 md:p-7 flex flex-col gap-4" style={{ borderColor: BORDER, background: 'var(--color-surface-container-lowest)' }}>
+        <form onSubmit={handleSubmitOrder} className="border p-5 md:p-7 flex flex-col gap-4" style={{ borderColor: BORDER, background: 'var(--color-surface-container-lowest)' }}>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="form-label">{isEs ? 'Nombre completo' : 'Full Name'} *</label>
@@ -118,8 +161,16 @@ export default function CheckoutClient({ locale }: { locale: string }) {
             <textarea rows={4} className="form-field resize-none" value={customer.notes} onChange={(e) => setCustomer({ ...customer, notes: e.target.value })} />
           </div>
 
-          <button type="submit" className="gold-button justify-center" style={{ width: '100%' }}>
-            {isEs ? 'Continuar al pago ->' : 'Continue to Payment ->'}
+          {error && (
+            <p className="text-sm" style={{ color: 'var(--color-error)' }}>
+              {error}
+            </p>
+          )}
+
+          <button type="submit" disabled={submitting} className="gold-button justify-center disabled:opacity-60" style={{ width: '100%' }}>
+            {submitting
+              ? (isEs ? 'Enviando...' : 'Submitting...')
+              : (isEs ? 'Enviar pedido' : 'Submit Order')}
           </button>
         </form>
 

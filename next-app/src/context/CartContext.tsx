@@ -2,13 +2,14 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import CartDrawer from '@/components/cart/CartDrawer';
+import type { ProductStatus } from '@/types/product';
 
 export interface CartItem {
   id: string;
   title: string;
   title_es: string | null;
   image: string | null;
-  status: 'Available' | 'Sold';
+  status: ProductStatus;
   priceLabel: string;
 }
 
@@ -54,8 +55,11 @@ export function CartProvider({
   const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setItems(loadFromStorage());
-    setHydrated(true);
+    const timer = setTimeout(() => {
+      setItems(loadFromStorage());
+      setHydrated(true);
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {

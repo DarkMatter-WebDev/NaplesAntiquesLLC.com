@@ -24,14 +24,15 @@ export function calcSpotPrice(product: Product, spotData: SpotData | null): stri
 
 export function calcSpotPriceValue(product: Product, spotData: SpotData | null): number | null {
   if (product.price_mode !== 'spot-multiplier') return null;
-  const { weight_grams, purity, pricing_multiplier } = product;
-  if (!weight_grams || !purity || !pricing_multiplier) return null;
+  const weightGrams = product.gram_weight ?? product.weight_grams;
+  const { purity, pricing_multiplier } = product;
+  if (!weightGrams || !purity || !pricing_multiplier) return null;
 
   const spotPerOz = product.category === 'Silver'
     ? (spotData?.silverPerTroyOz ?? FALLBACK_SILVER_SPOT)
     : (spotData?.goldPerTroyOz ?? FALLBACK_GOLD_SPOT);
   const spotPerGram = spotPerOz / GRAMS_PER_TROY_OZ;
-  const meltValue = weight_grams * purityToFraction(purity) * spotPerGram;
+  const meltValue = weightGrams * purityToFraction(purity) * spotPerGram;
   return meltValue * pricing_multiplier;
 }
 

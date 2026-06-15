@@ -2,13 +2,14 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import WishlistDrawer from '@/components/wishlist/WishlistDrawer';
+import type { ProductStatus } from '@/types/product';
 
 export interface WishlistItem {
   id: string;
   title: string;
   title_es: string | null;
   image: string | null;
-  status: 'Available' | 'Sold';
+  status: ProductStatus;
   price_mode: 'spot-multiplier' | 'manual';
   purity: number | null;
   weight_grams: number | null;
@@ -53,8 +54,11 @@ export function WishlistProvider({
 
   // Hydrate from localStorage once on mount
   useEffect(() => {
-    setItems(loadFromStorage());
-    setHydrated(true);
+    const timer = setTimeout(() => {
+      setItems(loadFromStorage());
+      setHydrated(true);
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   // Persist whenever items change (after hydration)
