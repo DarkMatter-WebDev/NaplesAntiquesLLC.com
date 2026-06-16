@@ -15,6 +15,10 @@ export function calcSpotPrice(product: Product, spotData: SpotData | null): stri
   const price = calcSpotPriceValue(product, spotData);
   if (price == null) return null;
 
+  return formatUsdPrice(price);
+}
+
+export function formatUsdPrice(price: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -24,16 +28,27 @@ export function calcSpotPrice(product: Product, spotData: SpotData | null): stri
 
 export function calcSpotPriceValue(product: Product, spotData: SpotData | null): number | null {
   if (product.price_mode !== 'spot-multiplier') return null;
+  const { pricing_multiplier } = product;
+  const meltValue = calcSpotMeltValue(product, spotData);
+  if (meltValue == null || !pricing_multiplier) return null;
+  return meltValue * pricing_multiplier;
+}
+
+export function calcSpotMeltValue(product: Product, spotData: SpotData | null): number | null {
   const weightGrams = product.gram_weight ?? product.weight_grams;
-  const { purity, pricing_multiplier } = product;
-  if (!weightGrams || !purity || !pricing_multiplier) return null;
+  const { purity } = product;
+  if (!weightGrams || !purity) return null;
 
   const spotPerOz = product.category === 'Silver'
     ? (spotData?.silverPerTroyOz ?? FALLBACK_SILVER_SPOT)
     : (spotData?.goldPerTroyOz ?? FALLBACK_GOLD_SPOT);
   const spotPerGram = spotPerOz / GRAMS_PER_TROY_OZ;
-  const meltValue = weightGrams * purityToFraction(purity) * spotPerGram;
-  return meltValue * pricing_multiplier;
+  return weightGrams * purityToFraction(purity) * spotPerGram;
+}
+
+export function getSpotMeltDisplayPrice(product: Product, spotData: SpotData | null): string {
+  const value = calcSpotMeltValue(product, spotData);
+  return value == null ? '-' : formatUsdPrice(value);
 }
 
 export function getDisplayPrice(product: Product, spotData: SpotData | null): string {

@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
-import type { SpotData } from '@/types/product';
+import { PRODUCT_METAL_VARIANTS, type SpotData } from '@/types/product';
 
 const GOLD = '#735c00';
 const BORDER = 'rgba(115, 92, 0, 0.35)';
@@ -37,6 +37,10 @@ function getLengthOptionsForItemType(itemType: string | undefined) {
   return [];
 }
 
+function itemTypeSupportsLinkType(itemType: string | undefined) {
+  return itemType === 'necklace' || itemType === 'bracelet';
+}
+
 function normalizeLengths(length: string | string[] | undefined): string[] {
   const values = Array.isArray(length) ? length : length ? [length] : [];
   return values
@@ -45,42 +49,62 @@ function normalizeLengths(length: string | string[] | undefined): string[] {
     .filter(Boolean);
 }
 
+function getMetalColorOptions(metal: string | undefined) {
+  if (metal === 'gold') return PRODUCT_METAL_VARIANTS.Gold;
+  if (metal === 'silver') return PRODUCT_METAL_VARIANTS.Silver;
+  return [...PRODUCT_METAL_VARIANTS.Gold, ...PRODUCT_METAL_VARIANTS.Silver];
+}
+
 interface Props {
   locale: string;
   currentFilters: {
     metal?: string;
+    metalColor?: string;
+    metalType?: string;
     purity?: string;
     status?: string;
     itemType?: string;
     chainType?: string;
     length?: string | string[];
     gender?: string;
+    brand?: string;
     q?: string;
     sort?: string;
+    page?: string;
+    perPage?: string;
   };
+  brandOptions: string[];
   filteredCount: number;
   allCount: number;
   spotData: SpotData | null;
 }
 
-export default function ShopFilters({ locale, currentFilters, filteredCount, allCount, spotData }: Props) {
+export default function ShopFilters({ locale, currentFilters, brandOptions, filteredCount, allCount, spotData }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isEs = locale === 'es';
+  const selectedMetalColor = currentFilters.metalColor ?? currentFilters.metalType;
+  const metalColorOptions = getMetalColorOptions(currentFilters.metal);
+  const visibleMetalColor = metalColorOptions.some((variant) => variant.value === selectedMetalColor)
+    ? selectedMetalColor
+    : undefined;
   const selectedLengths = normalizeLengths(currentFilters.length);
   const lengthOptions = getLengthOptionsForItemType(currentFilters.itemType);
   const visibleLengthValues = lengthOptions.map((option) => option.value);
   const visibleSelectedLengths = selectedLengths.filter((value) => visibleLengthValues.includes(value));
   const showLengthFilter = lengthOptions.length > 0;
+  const showLinkTypeFilter = itemTypeSupportsLinkType(currentFilters.itemType);
   const hasDrawerFilters = !!(
     currentFilters.metal ||
+    visibleMetalColor ||
     currentFilters.purity ||
     currentFilters.status ||
     currentFilters.itemType ||
-    currentFilters.chainType ||
+    (showLinkTypeFilter && currentFilters.chainType) ||
     visibleSelectedLengths.length > 0 ||
     currentFilters.gender ||
+    currentFilters.brand ||
     currentFilters.sort
   );
   const [filtersOpen, setFiltersOpen] = useState(hasDrawerFilters);
@@ -93,6 +117,7 @@ export default function ShopFilters({ locale, currentFilters, filteredCount, all
       } else {
         params.delete(key);
       }
+      params.delete('page');
       router.push(`${pathname}?${params.toString()}`, { scroll: false });
     },
     [pathname, router, searchParams]
@@ -107,6 +132,33 @@ export default function ShopFilters({ locale, currentFilters, filteredCount, all
         params.delete('itemType');
       }
       params.delete('length');
+      params.delete('page');
+      if (!itemTypeSupportsLinkType(value)) params.delete('chainType');
+      const qs = params.toString();
+      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
+
+  const updateMetalFilter = useCallback(
+    (value: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value) {
+        params.set('metal', value);
+      } else {
+        params.delete('metal');
+      }
+
+      const selectedColor = params.get('metalColor') ?? params.get('metalType');
+      const goldTypes = new Set<string>(PRODUCT_METAL_VARIANTS.Gold.map((variant) => variant.value));
+      const silverTypes = new Set<string>(PRODUCT_METAL_VARIANTS.Silver.map((variant) => variant.value));
+      if ((value === 'gold' && selectedColor && !goldTypes.has(selectedColor)) ||
+          (value === 'silver' && selectedColor && !silverTypes.has(selectedColor))) {
+        params.delete('metalColor');
+        params.delete('metalType');
+      }
+      params.delete('page');
+
       const qs = params.toString();
       router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
@@ -128,6 +180,7 @@ export default function ShopFilters({ locale, currentFilters, filteredCount, all
       } else {
         params.delete('length');
       }
+      params.delete('page');
       const qs = params.toString();
       router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
@@ -140,24 +193,28 @@ export default function ShopFilters({ locale, currentFilters, filteredCount, all
 
   const hasFilters = !!(
     currentFilters.metal ||
+    visibleMetalColor ||
     currentFilters.purity ||
     currentFilters.status ||
     currentFilters.itemType ||
-    currentFilters.chainType ||
+    (showLinkTypeFilter && currentFilters.chainType) ||
     visibleSelectedLengths.length > 0 ||
     currentFilters.gender ||
+    currentFilters.brand ||
     currentFilters.q ||
     currentFilters.sort
   );
 
   const activeDrawerFilterCount = [
     currentFilters.metal,
+    visibleMetalColor,
     currentFilters.purity,
     currentFilters.status,
     currentFilters.itemType,
-    currentFilters.chainType,
+    showLinkTypeFilter ? currentFilters.chainType : undefined,
     ...visibleSelectedLengths,
     currentFilters.gender,
+    currentFilters.brand,
     currentFilters.sort,
   ].filter(Boolean).length;
 
@@ -222,7 +279,7 @@ export default function ShopFilters({ locale, currentFilters, filteredCount, all
   };
 
   return (
-    <div style={{ marginBottom: '1.5rem' }}>
+    <div className="shop-filters" style={{ marginBottom: '1.5rem' }}>
 
       {/* Search + live metal prices */}
       <div className="shop-search-spot-row">
@@ -264,7 +321,7 @@ export default function ShopFilters({ locale, currentFilters, filteredCount, all
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: filtersOpen ? '0.85rem' : '0.5rem' }}>
+      <div className="shop-filter-toggle-row" style={{ display: 'flex', justifyContent: 'center', marginBottom: filtersOpen ? '0.85rem' : '0.5rem' }}>
         <button
           type="button"
           aria-expanded={filtersOpen}
@@ -302,13 +359,12 @@ export default function ShopFilters({ locale, currentFilters, filteredCount, all
         </button>
       </div>
 
-      {filtersOpen && (
-        <div id="shop-filter-panel">
+      <div id="shop-filter-panel" className={`shop-filter-panel${filtersOpen ? ' is-open' : ''}`}>
           {/* Labeled dropdowns */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+              gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
               gap: '0.6rem',
               maxWidth: '66rem',
               margin: '0 auto 0.85rem',
@@ -320,12 +376,38 @@ export default function ShopFilters({ locale, currentFilters, filteredCount, all
               <label style={labelStyle}>{isEs ? 'Metal' : 'Metal'}</label>
               <select
                 value={currentFilters.metal ?? ''}
-                onChange={(e) => updateFilter('metal', e.target.value)}
+                onChange={(e) => updateMetalFilter(e.target.value)}
                 style={selectStyle}
               >
                 <option value="">{isEs ? 'Todos los metales' : 'All metals'}</option>
                 <option value="gold">{isEs ? 'Oro' : 'Gold'}</option>
                 <option value="silver">{isEs ? 'Plata' : 'Silver'}</option>
+              </select>
+            </div>
+
+            {/* Metal Color */}
+            <div>
+              <label style={labelStyle}>{isEs ? 'Color del metal' : 'Metal Color'}</label>
+              <select
+                value={visibleMetalColor ?? ''}
+                onChange={(e) => {
+                  const params = new URLSearchParams(searchParams.toString());
+                  if (e.target.value) {
+                    params.set('metalColor', e.target.value);
+                  } else {
+                    params.delete('metalColor');
+                  }
+                  params.delete('metalType');
+                  params.delete('page');
+                  const qs = params.toString();
+                  router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+                }}
+                style={selectStyle}
+              >
+                <option value="">{isEs ? 'Todos los colores' : 'All colors'}</option>
+                {metalColorOptions.map((variant) => (
+                  <option key={variant.value} value={variant.value}>{isEs ? variant.labelEs : variant.label}</option>
+                ))}
               </select>
             </div>
 
@@ -359,27 +441,50 @@ export default function ShopFilters({ locale, currentFilters, filteredCount, all
                 <option value="earrings">{isEs ? 'Aretes' : 'Earrings'}</option>
                 <option value="ring">{isEs ? 'Anillos' : 'Rings'}</option>
                 <option value="pendant">{isEs ? 'Dijes' : 'Pendants'}</option>
+                <option value="brooch">{isEs ? 'Broches' : 'Brooches'}</option>
                 <option value="watch">{isEs ? 'Relojes' : 'Watches'}</option>
+                <option value="coin">{isEs ? 'Monedas' : 'Coins'}</option>
+                <option value="bullion">{isEs ? 'Lingotes' : 'Bullion'}</option>
+                <option value="loose-diamond">{isEs ? 'Diamantes sueltos' : 'Loose Diamonds'}</option>
+                <option value="loose-gemstone">{isEs ? 'Gemas sueltas' : 'Loose Gemstones'}</option>
+                <option value="silverware">{isEs ? 'Plateria' : 'Silverware'}</option>
+                <option value="estate-lot">{isEs ? 'Lotes de sucesion' : 'Estate Lots'}</option>
               </select>
             </div>
 
-            {/* Chain Type */}
+            {/* Link Type */}
+            {showLinkTypeFilter && (
+              <div>
+                <label style={labelStyle}>{isEs ? 'Tipo de enlace' : 'Link Type'}</label>
+                <select
+                  value={currentFilters.chainType ?? ''}
+                  onChange={(e) => updateFilter('chainType', e.target.value)}
+                  style={selectStyle}
+                >
+                  <option value="">{isEs ? 'Todos los enlaces' : 'All link types'}</option>
+                  <option value="cuban-link">{isEs ? 'Cubana' : 'Cuban link'}</option>
+                  <option value="figaro-link">{isEs ? 'Figaro' : 'Figaro link'}</option>
+                  <option value="rope-chain">{isEs ? 'Cuerda' : 'Rope chain'}</option>
+                  <option value="anchor-link">{isEs ? 'Ancla / Gucci' : 'Anchor / Gucci'}</option>
+                  <option value="oval-link">{isEs ? 'Ovalada' : 'Oval link'}</option>
+                  <option value="byzantine-link">{isEs ? 'Bizantina' : 'Byzantine'}</option>
+                  <option value="box-link">{isEs ? 'Caja' : 'Box link'}</option>
+                </select>
+              </div>
+            )}
+
+            {/* Brand */}
             <div>
-              <label style={labelStyle}>{isEs ? 'Tipo' : 'Chain Type'}</label>
+              <label style={labelStyle}>{isEs ? 'Marca' : 'Brand'}</label>
               <select
-                value={currentFilters.chainType ?? ''}
-                onChange={(e) => updateFilter('chainType', e.target.value)}
+                value={currentFilters.brand ?? ''}
+                onChange={(e) => updateFilter('brand', e.target.value)}
                 style={selectStyle}
               >
-                <option value="">{isEs ? 'Todos los tipos' : 'All types'}</option>
-                <option value="cuban-link">{isEs ? 'Cubana' : 'Cuban link'}</option>
-                <option value="figaro-link">{isEs ? 'Figaro' : 'Figaro link'}</option>
-                <option value="rope-chain">{isEs ? 'Cuerda' : 'Rope chain'}</option>
-                <option value="anchor-link">{isEs ? 'Ancla / Gucci' : 'Anchor / Gucci'}</option>
-                <option value="oval-link">{isEs ? 'Ovalada' : 'Oval link'}</option>
-                <option value="byzantine-link">{isEs ? 'Bizantina' : 'Byzantine'}</option>
-                <option value="bracelet">{isEs ? 'Pulsera' : 'Bracelet'}</option>
-                <option value="ring">{isEs ? 'Anillo' : 'Ring'}</option>
+                <option value="">{isEs ? 'Todas las marcas' : 'All brands'}</option>
+                {brandOptions.map((brand) => (
+                  <option key={brand} value={brand}>{brand}</option>
+                ))}
               </select>
             </div>
 
@@ -411,6 +516,8 @@ export default function ShopFilters({ locale, currentFilters, filteredCount, all
                 <option value="price-desc">{isEs ? 'Precio: mayor a menor' : 'Price: high to low'}</option>
                 <option value="weight-asc">{isEs ? 'Peso: menor a mayor' : 'Weight: low to high'}</option>
                 <option value="weight-desc">{isEs ? 'Peso: mayor a menor' : 'Weight: high to low'}</option>
+                <option value="brand-asc">{isEs ? 'Marca: A a Z' : 'Brand: A to Z'}</option>
+                <option value="brand-desc">{isEs ? 'Marca: Z a A' : 'Brand: Z to A'}</option>
               </select>
             </div>
 
@@ -489,7 +596,7 @@ export default function ShopFilters({ locale, currentFilters, filteredCount, all
           )}
 
           {/* Available only toggle */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.5rem' }}>
+          <div className="shop-available-row" style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.5rem' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.8125rem', fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}>
               <input
                 type="checkbox"
@@ -501,7 +608,6 @@ export default function ShopFilters({ locale, currentFilters, filteredCount, all
             </label>
           </div>
         </div>
-      )}
 
       {/* Meta: count + clear */}
       <div
@@ -553,6 +659,55 @@ export default function ShopFilters({ locale, currentFilters, filteredCount, all
           gap: 0.75rem;
           margin: 0 auto 0.85rem;
           max-width: 48rem;
+        }
+        .shop-filter-panel {
+          display: none;
+        }
+        .shop-filter-panel.is-open {
+          display: block;
+        }
+        @media (min-width: 1024px) {
+          .shop-filters {
+            border: 1px solid rgba(115, 92, 0, 0.22);
+            background: color-mix(in srgb, var(--color-primary) 3%, var(--color-background));
+            padding: 0.85rem;
+            margin-bottom: 0 !important;
+          }
+          .shop-filter-toggle-row {
+            display: none !important;
+          }
+          .shop-filter-panel {
+            display: block;
+          }
+          .shop-search-spot-row {
+            grid-template-columns: 1fr;
+            max-width: none;
+            gap: 0.5rem;
+            margin-bottom: 0.9rem;
+          }
+          .shop-search-spot-row > div {
+            width: 100% !important;
+            max-width: none !important;
+          }
+          .shop-search-spot-row > div:nth-child(2) {
+            grid-row: 1;
+          }
+          .shop-filter-grid {
+            grid-template-columns: 1fr !important;
+            max-width: none !important;
+            margin-bottom: 0.9rem !important;
+          }
+          .shop-length-multi {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+          .shop-length-button {
+            width: 100%;
+            min-width: 0 !important;
+          }
+          .shop-available-row {
+            justify-content: flex-start !important;
+          }
         }
         @media (max-width: 900px) {
           .shop-filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }

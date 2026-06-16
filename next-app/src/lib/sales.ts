@@ -1,4 +1,5 @@
 import type { Product } from '@/types/product';
+import { productMetalVariantLabel } from '@/types/product';
 import type { SpotData } from '@/types/product';
 import { calcSpotPriceValue } from '@/lib/pricing';
 
@@ -17,7 +18,7 @@ export function getProductImages(product: Product): string[] {
 }
 
 export function getProductMetal(product: Product): string {
-  return product.metal || product.category;
+  return productMetalVariantLabel(product.metal_variant, product.category);
 }
 
 export function getProductWeight(product: Product): number | null {

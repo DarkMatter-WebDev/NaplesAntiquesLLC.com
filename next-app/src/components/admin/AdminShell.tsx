@@ -1,13 +1,41 @@
 'use client';
 
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import type { Product, ProductStatus, SpotData } from '@/types/product';
-import { getDisplayPrice } from '@/lib/pricing';
+import { copyTextToClipboard } from '@/lib/clipboard';
+import {
+  PRODUCT_METAL_VARIANTS,
+  PRODUCT_METAL_TYPES,
+  PRODUCT_JEWELRY_TYPES,
+  PRODUCT_LINK_TYPES,
+  getDefaultMetalVariant,
+  inferProductJewelryType,
+  normalizeProductJewelryType,
+  normalizeProductMetalType,
+  normalizeProductLinkType,
+  normalizeProductMetalVariant,
+  productJewelryTypeLabel,
+  productMetalTypeLabel,
+  productSupportsLinkType,
+  productMetalVariantLabel,
+  type Product,
+  type ProductJewelryType,
+  type ProductMetalType,
+  type ProductMetalVariant,
+  type ProductStatus,
+  type SpotData,
+} from '@/types/product';
+import { calcSpotMeltValue, getDisplayPrice, getSpotMeltDisplayPrice } from '@/lib/pricing';
 import ComboboxInput from './ComboboxInput';
 import AdminHeader from './AdminHeader';
+import {
+  DEFAULT_QUICK_FILL_AI_FORMAT_PROMPT,
+  QUICK_FILL_PROMPT_STORAGE_KEY,
+  ensureQuickFillPromptHasCurrentBrandRules,
+} from '@/lib/admin-settings';
 
 interface Props {
   initialProducts: Product[];
@@ -17,7 +45,6 @@ interface Props {
   unreadMessagesCount: number;
 }
 
-const CATEGORIES = ['Gold', 'Silver'] as const;
 const STATUSES: { value: ProductStatus; label: string }[] = [
   { value: 'draft', label: 'Draft' },
   { value: 'available', label: 'Available' },
@@ -34,20 +61,12 @@ const LOCATIONS = [
   { value: 'picked_up', label: 'Picked Up' },
 ];
 
-const PREDEFINED_CHAIN_TYPES = [
-  'Cuban link',
-  'Figaro link',
-  'Rope chain',
-  'Anchor / Gucci link',
-  'Oval link',
-  'Byzantine link',
-  'Box link',
-  'Bracelet',
-  'Ring',
-  'Pendant',
-  'Earrings',
-  'Other',
-];
+function getQuickFillLinkType(value: string, allowCustom = false): string | null {
+  const normalized = normalizeProductLinkType(value);
+  if (normalized) return normalized;
+  const trimmed = value.trim().replace(/\s+/g, ' ');
+  return allowCustom && trimmed ? trimmed : null;
+}
 
 function getChainTypeFromTags(tags: string[] | null): string {
   const tag = (tags ?? []).find(t => t.startsWith('ct:'));
@@ -56,6 +75,20 @@ function getChainTypeFromTags(tags: string[] | null): string {
 
 function getProductChainType(product: Product): string {
   return product.chain_type || getChainTypeFromTags(product.tags);
+}
+
+function getProductJewelryType(product: Product): ProductJewelryType {
+  return inferProductJewelryType(product);
+}
+
+function getProductMetalType(product: Product): ProductMetalType {
+  return normalizeProductMetalType(product.metal_type, product.category);
+}
+
+function getProductLinkType(product: Product): string {
+  const jewelryType = getProductJewelryType(product);
+  if (!productSupportsLinkType(jewelryType)) return '';
+  return getProductChainType(product);
 }
 
 const PREDEFINED_LENGTHS = [
@@ -70,6 +103,30 @@ function getLengthFromTags(tags: string[] | null): string {
 
 function getProductLength(product: Product): string {
   return product.length || getLengthFromTags(product.tags);
+}
+
+function getLengthSizeLabel(jewelryType: string | null | undefined): string {
+  return normalizeProductJewelryType(jewelryType) === 'Ring' ? 'Size' : 'Length';
+}
+
+function productUsesLength(productType: string | null | undefined): boolean {
+  const normalized = normalizeProductJewelryType(productType);
+  return normalized === 'Necklace' || normalized === 'Bracelet';
+}
+
+function productUsesSize(productType: string | null | undefined): boolean {
+  return normalizeProductJewelryType(productType) === 'Ring';
+}
+
+function productUsesGender(productType: string | null | undefined): boolean {
+  const normalized = normalizeProductJewelryType(productType);
+  return normalized === 'Necklace' ||
+    normalized === 'Bracelet' ||
+    normalized === 'Ring' ||
+    normalized === 'Pendant' ||
+    normalized === 'Earrings' ||
+    normalized === 'Brooch' ||
+    normalized === 'Watch';
 }
 
 function normalizeProductStatus(status: Product['status'] | null | undefined): ProductStatus {
@@ -114,6 +171,23 @@ function getProductMetal(product: Product): string {
   return product.metal || product.category;
 }
 
+function getProductMetalVariant(product: Product): ProductMetalVariant {
+  return normalizeProductMetalVariant(product.metal_variant, product.category);
+}
+
+function getCategoryForMetalVariant(value: ProductMetalVariant | string): 'Gold' | 'Silver' {
+  return PRODUCT_METAL_VARIANTS.Silver.some((variant) => variant.value === value)
+    ? 'Silver'
+    : 'Gold';
+}
+
+function getLegacyCategoryForMetalType(value: string | null | undefined, fallback: 'Gold' | 'Silver' = 'Gold'): 'Gold' | 'Silver' {
+  const normalized = normalizeProductMetalType(value, fallback);
+  if (normalized === 'Silver' || normalized === 'Platinum' || normalized === 'Palladium') return 'Silver';
+  if (normalized === 'Gold') return 'Gold';
+  return fallback;
+}
+
 function getProductWeight(product: Product): number | null {
   return product.gram_weight ?? product.weight_grams ?? null;
 }
@@ -126,6 +200,16 @@ function parseInventoryNumber(value: string | number | null | undefined): number
   if (value == null || value === '') return null;
   const numeric = Number(String(value).replace(/\D/g, ''));
   return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
+}
+
+function slugifyProductText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function buildGeneratedProductId(product: ReturnType<typeof emptyProduct>): string {
+  const titleSlug = slugifyProductText(product.title) || 'product';
+  const inventoryNumber = parseInventoryNumber(product.inventory_number);
+  return inventoryNumber ? `${titleSlug}-${inventoryNumber}` : titleSlug;
 }
 
 function getDisplayedInventoryNumber(product: Product, products: Product[]): number | null {
@@ -149,6 +233,22 @@ function getNextInventoryNumber(products: Product[], excludeId?: string): number
   return candidate;
 }
 
+function getInventoryNumberOwner(
+  products: Product[],
+  inventoryNumber: number | null,
+  excludeId?: string,
+): Product | null {
+  if (!inventoryNumber) return null;
+  return getMasterProductOrder(products).find((product, index) => {
+    if (excludeId && product.id === excludeId) return false;
+    return (parseInventoryNumber(product.inventory_number) ?? index + 1) === inventoryNumber;
+  }) ?? null;
+}
+
+function getDuplicateInventoryNumberMessage(owner: Product, inventoryNumber: number): string {
+  return `Inventory #${inventoryNumber} is already assigned to "${owner.title}". Choose a different inventory number before saving.`;
+}
+
 const CHAIN_KEYWORDS: Record<string, string[]> = {
   'cuban-link':     ['cuban'],
   'figaro-link':    ['figaro'],
@@ -156,8 +256,7 @@ const CHAIN_KEYWORDS: Record<string, string[]> = {
   'anchor-link':    ['anchor', 'gucci'],
   'oval-link':      ['oval link'],
   'byzantine-link': ['byzantine'],
-  'bracelet':       ['bracelet'],
-  'ring':           ['ring'],
+  'box-link':       ['box link'],
 };
 
 const PRICE_MODES = [
@@ -169,14 +268,18 @@ type SortKey =
   | 'inventoryNumber'
   | 'image'
   | 'title'
+  | 'brand'
   | 'category'
+  | 'metalVariant'
   | 'gender'
+  | 'jewelryType'
   | 'chainType'
   | 'length'
   | 'location'
   | 'featured'
   | 'purity'
   | 'weight'
+  | 'melt'
   | 'mode'
   | 'currentPrice'
   | 'status';
@@ -186,19 +289,68 @@ type ImageTarget = { url: string; index: number };
 type CropRect = { x: number; y: number; width: number; height: number };
 type CropDragMode = 'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 const FULL_IMAGE_CROP: CropRect = { x: 0, y: 0, width: 100, height: 100 };
+type QuickFillField =
+  | 'title'
+  | 'titleEs'
+  | 'brand'
+  | 'productType'
+  | 'metalType'
+  | 'category'
+  | 'metalVariant'
+  | 'status'
+  | 'jewelryType'
+  | 'chainType'
+  | 'length'
+  | 'location'
+  | 'priceMode'
+  | 'askingPrice'
+  | 'purity'
+  | 'weight'
+  | 'gender'
+  | 'multiplier'
+  | 'description'
+  | 'descriptionEs'
+  | 'publicNotes'
+  | 'internalNotes';
+
+const QUICK_FILL_FORM_ORDER: QuickFillField[] = [
+  'title',
+  'titleEs',
+  'productType',
+  'brand',
+  'metalType',
+  'category',
+  'purity',
+  'weight',
+  'chainType',
+  'length',
+  'priceMode',
+  'multiplier',
+  'askingPrice',
+  'location',
+  'status',
+  'gender',
+  'description',
+  'descriptionEs',
+  'publicNotes',
+  'internalNotes',
+];
 
 const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null }[] = [
   { label: 'Inv #', sortKey: 'inventoryNumber' },
   { label: 'Image', sortKey: 'image' },
   { label: 'Title', sortKey: 'title' },
-  { label: 'Category', sortKey: 'category' },
+  { label: 'Brand', sortKey: 'brand' },
+  { label: 'Metal Type', sortKey: 'category' },
+  { label: 'Metal Color', sortKey: 'metalVariant' },
   { label: 'Gender', sortKey: 'gender' },
-  { label: 'Chain Type', sortKey: 'chainType' },
-  { label: 'Length', sortKey: 'length' },
+  { label: 'Product Type', sortKey: 'jewelryType' },
+  { label: 'Length/Size', sortKey: 'length' },
   { label: 'Location', sortKey: 'location' },
   { label: 'Featured', sortKey: 'featured' },
   { label: 'Purity', sortKey: 'purity' },
   { label: 'Weight', sortKey: 'weight' },
+  { label: 'Melt', sortKey: 'melt' },
   { label: 'Mode', sortKey: 'mode' },
   { label: 'Current Price', sortKey: 'currentPrice' },
   { label: 'Status', sortKey: 'status' },
@@ -217,6 +369,8 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
   return {
     id: '',
     category: 'Gold',
+    metal_type: 'Gold',
+    metal_variant: 'yellow_gold',
     title: '',
     title_es: '',
     price_label: null,
@@ -230,6 +384,9 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
     metal: 'Gold',
     gram_weight: null,
     stone_details: null,
+    brand: null,
+    product_type: 'Necklace',
+    jewelry_type: 'Necklace',
     chain_type: null,
     length: null,
     pricing_multiplier: 1.25,
@@ -277,12 +434,18 @@ function getSortValue(
       return getProductImages(product)[0] ? 1 : 0;
     case 'title':
       return product.title;
+    case 'brand':
+      return product.brand ?? '';
     case 'category':
-      return product.category;
+      return productMetalTypeLabel(product.metal_type, product.category);
+    case 'metalVariant':
+      return productMetalVariantLabel(product.metal_variant, product.category);
     case 'gender':
       return product.gender ?? 'Unisex';
+    case 'jewelryType':
+      return productJewelryTypeLabel(getProductJewelryType(product));
     case 'chainType':
-      return getProductChainType(product);
+      return getProductLinkType(product);
     case 'length':
       return getProductLength(product);
     case 'location':
@@ -293,6 +456,8 @@ function getSortValue(
       return product.purity;
     case 'weight':
       return getProductWeight(product);
+    case 'melt':
+      return calcSpotMeltValue(product, spotData);
     case 'mode':
       return product.price_mode === 'manual' ? 'Manual' : `Spot ${product.pricing_multiplier ?? ''}`;
     case 'currentPrice':
@@ -333,6 +498,96 @@ function getProductImageStoragePath(url: string): string | null {
   return path ? decodeURIComponent(path) : null;
 }
 
+function splitQuickFillColumns(line: string, keepEmpty = false): string[] {
+  const columns: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const nextChar = line[index + 1];
+    if (char === '"' && inQuotes && nextChar === '"') {
+      current += '"';
+      index += 1;
+      continue;
+    }
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (char === ',' && !inQuotes) {
+      const value = current.trim();
+      if (keepEmpty || value) columns.push(value);
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+
+  const value = current.trim();
+  if (keepEmpty || value) columns.push(value);
+  return columns;
+}
+
+function normalizeQuickFillFieldName(value: string): QuickFillField | null {
+  const normalized = value.trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+  if (['title', 'title english', 'title en', 'english title', 'title (english)'].includes(normalized)) return 'title';
+  if (['title spanish', 'title es', 'spanish title', 'title (spanish)'].includes(normalized)) return 'titleEs';
+  if (
+    normalized === 'brand' ||
+    normalized === 'brand name' ||
+    normalized === 'maker' ||
+    normalized === 'maker name' ||
+    normalized === 'designer' ||
+    normalized === 'designer name' ||
+    normalized === 'manufacturer' ||
+    normalized === 'manufacturer name'
+  ) return 'brand';
+  if (normalized === 'product type' || normalized === 'item type' || normalized === 'jewelry type') return 'productType';
+  if (normalized === 'metal type' || normalized === 'material' || normalized === 'primary metal') return 'metalType';
+  if (normalized === 'category' || normalized === 'metal') return 'category';
+  if (normalized === 'metal color' || normalized === 'gold color' || normalized === 'silver color' || normalized === 'metal subtype' || normalized === 'metal variant' || normalized === 'gold type' || normalized === 'silver type') return 'metalVariant';
+  if (normalized === 'status') return 'status';
+  if (normalized === 'link type' || normalized === 'chain type' || normalized === 'chain' || normalized === 'link style' || normalized === 'type') return 'chainType';
+  if (normalized === 'length' || normalized === 'size' || normalized === 'ring size') return 'length';
+  if (normalized === 'location') return 'location';
+  if (normalized === 'price mode' || normalized === 'pricing mode' || normalized === 'mode') return 'priceMode';
+  if (normalized === 'asking price' || normalized === 'ask price' || normalized === 'price' || normalized === 'manual price') return 'askingPrice';
+  if (normalized === 'purity' || normalized === 'karat' || normalized === 'karats') return 'purity';
+  if (normalized === 'weight' || normalized === 'weight g' || normalized === 'grams' || normalized === 'gram weight') return 'weight';
+  if (normalized === 'gender') return 'gender';
+  if (normalized === 'multiplier' || normalized === 'pricing multiplier') return 'multiplier';
+  if (['description', 'description english', 'description en', 'description (en)', 'description (english)', 'english description'].includes(normalized)) return 'description';
+  if (['description spanish', 'description es', 'description (es)', 'description (spanish)', 'spanish description'].includes(normalized)) return 'descriptionEs';
+  if (normalized === 'public notes' || normalized === 'public note') return 'publicNotes';
+  if (normalized === 'internal notes' || normalized === 'internal note' || normalized === 'private notes' || normalized === 'private note') return 'internalNotes';
+  return null;
+}
+
+function getQuickFillTokens(input: string): string[] {
+  const lines = input.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length >= 2) {
+    const headers = splitQuickFillColumns(lines[0]);
+    const fields = headers.map(normalizeQuickFillFieldName);
+    if (fields.length > 0 && fields.every(Boolean)) {
+      const values = splitQuickFillColumns(lines[1], true);
+      return values
+        .map((value, index) => fields[index] ? `${headers[index]}:${value}` : value)
+        .filter(Boolean);
+    }
+  }
+
+  return splitQuickFillColumns(input.replace(/\r?\n/g, ','), false)
+    .map((token) => token.trim())
+    .filter((token) => token && !/^\.+$/.test(token));
+}
+
+function getQuickFillFormOrderTokens(input: string): string[] {
+  const lines = input.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const row = lines.length >= 2 ? lines[1] : lines.join(' ');
+  return splitQuickFillColumns(row, true).map((token) => token.trim());
+}
+
 export default function AdminShell({ initialProducts, userEmail, spotData, locale, unreadMessagesCount }: Props) {
   const router = useRouter();
   const adminBasePath = locale === 'es' ? '/es/admin' : '/admin';
@@ -344,8 +599,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [filterStatus, setFilterStatus] = useState('');
   const [filterMetal, setFilterMetal] = useState('');
+  const [filterMetalVariant, setFilterMetalVariant] = useState('');
   const [filterPurity, setFilterPurity] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
+  const [filterBrand, setFilterBrand] = useState('');
+  const [filterJewelryType, setFilterJewelryType] = useState('');
   const [filterChainType, setFilterChainType] = useState('');
   const [filterLength, setFilterLength] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
@@ -365,8 +623,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [dragTargetProductId, setDragTargetProductId] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
   const [chainTypeInput, setChainTypeInput] = useState('');
+  const [jewelryTypeInput, setJewelryTypeInput] = useState<ProductJewelryType>('Necklace');
   const [lengthInput, setLengthInput] = useState('');
   const [quickEntry, setQuickEntry] = useState('');
+  const [quickFillPrompt, setQuickFillPrompt] = useState(DEFAULT_QUICK_FILL_AI_FORMAT_PROMPT);
+  const [quickFillNotice, setQuickFillNotice] = useState<{ text: string; ok: boolean } | null>(null);
+  const quickFillNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const quickFillPromptTextRef = useRef<HTMLTextAreaElement | null>(null);
+  const [showQuickFillPrompt, setShowQuickFillPrompt] = useState(false);
   const [showAdvancedIds, setShowAdvancedIds] = useState(false);
   const [inventoryNumberManual, setInventoryNumberManual] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -374,6 +638,44 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const flash = (text: string, ok = true) => {
     setMsg({ text, ok });
     setTimeout(() => setMsg(null), 3500);
+  };
+
+  const showQuickFillNotice = (text: string, ok = true) => {
+    if (quickFillNoticeTimer.current) clearTimeout(quickFillNoticeTimer.current);
+    setQuickFillNotice({ text, ok });
+    quickFillNoticeTimer.current = setTimeout(() => setQuickFillNotice(null), 5000);
+  };
+
+  useEffect(() => {
+    const loadStoredPrompt = () => {
+      const storedPrompt = window.localStorage.getItem(QUICK_FILL_PROMPT_STORAGE_KEY)?.trim();
+      setQuickFillPrompt(ensureQuickFillPromptHasCurrentBrandRules(storedPrompt || DEFAULT_QUICK_FILL_AI_FORMAT_PROMPT));
+    };
+
+    loadStoredPrompt();
+    window.addEventListener('storage', loadStoredPrompt);
+    window.addEventListener('focus', loadStoredPrompt);
+    return () => {
+      window.removeEventListener('storage', loadStoredPrompt);
+      window.removeEventListener('focus', loadStoredPrompt);
+    };
+  }, []);
+
+  const copyQuickFillPrompt = async () => {
+    const copied = await copyTextToClipboard(quickFillPrompt);
+    if (!copied) {
+      setShowQuickFillPrompt(true);
+      window.setTimeout(() => {
+        quickFillPromptTextRef.current?.focus();
+        quickFillPromptTextRef.current?.select();
+      }, 50);
+    }
+    showQuickFillNotice(
+      copied
+        ? 'AI formatting prompt copied.'
+        : 'Clipboard access was blocked. Prompt text is open and selected for manual copy.',
+      copied,
+    );
   };
 
   const supabase = createClient();
@@ -387,23 +689,36 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
   // --- Open add/edit modal ---
   function openAdd() {
+    openAddFromProducts(products);
+  }
+
+  function openAddFromProducts(sourceProducts: Product[]) {
     originalRef.current = null;
     setFormErrors([]);
+    setJewelryTypeInput('Necklace');
     setChainTypeInput('');
     setLengthInput('');
     setQuickEntry('');
+    setQuickFillNotice(null);
     setShowAdvancedIds(false);
-    const autoOrder = products.length > 0
-      ? Math.max(...products.map(p => p.sort_order ?? 0)) + 1
+    const autoOrder = sourceProducts.length > 0
+      ? Math.max(...sourceProducts.map(p => p.sort_order ?? 0)) + 1
       : 1;
     setInventoryNumberManual(false);
-    setEditing({ ...emptyProduct(), inventory_number: getNextInventoryNumber(products), sort_order: autoOrder });
+    setEditing({ ...emptyProduct(), inventory_number: getNextInventoryNumber(sourceProducts), sort_order: autoOrder });
     setIsNew(true);
   }
 
-  function validate(e: ReturnType<typeof emptyProduct>): string[] {
+  function validate(e: ReturnType<typeof emptyProduct>, excludeId?: string): string[] {
     const errs: string[] = [];
     if (!e.title.trim()) errs.push('Title (English) is required.');
+    const inventoryNumber = parseInventoryNumber(e.inventory_number);
+    if (!inventoryNumber) {
+      errs.push('Inventory # is required.');
+    } else {
+      const duplicateOwner = getInventoryNumberOwner(products, inventoryNumber, excludeId);
+      if (duplicateOwner) errs.push(getDuplicateInventoryNumberMessage(duplicateOwner, inventoryNumber));
+    }
     if (e.price_mode === 'spot-multiplier') {
       if (!e.purity) errs.push('Purity is required for spot-price mode.');
       if (!e.weight_grams) errs.push('Weight is required for spot-price mode.');
@@ -416,12 +731,21 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   }
 
   function openEdit(p: Product) {
-    const copy = { ...p };
+    const nextProductType = getProductJewelryType(p);
+    const nextMetalType = getProductMetalType(p);
+    const copy = {
+      ...p,
+      product_type: p.product_type ?? nextProductType,
+      jewelry_type: p.jewelry_type ?? nextProductType,
+      metal_type: p.metal_type ?? nextMetalType,
+    };
     originalRef.current = copy;
-    setChainTypeInput(getProductChainType(p));
+    setJewelryTypeInput(nextProductType);
+    setChainTypeInput(productSupportsLinkType(nextProductType) ? getProductLinkType(p) : '');
     setLengthInput(getProductLength(p));
     setFormErrors([]);
     setQuickEntry('');
+    setQuickFillNotice(null);
     setShowAdvancedIds(!!(p.sku || p.slug));
     setInventoryNumberManual(false);
     const autoInventoryNumber =
@@ -451,75 +775,425 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
   function applyQuickEntry() {
     if (!editing || !quickEntry.trim()) return;
-    const tokens = quickEntry.split(',').map(t => t.trim()).filter(Boolean);
+    const tokens = getQuickFillTokens(quickEntry);
     const updates: Partial<ReturnType<typeof emptyProduct>> = {};
+    let newJewelryType = jewelryTypeInput;
     let newChainType = chainTypeInput;
     let newLength = lengthInput;
+    let categoryWasUpdated = false;
+    let metalVariantWasUpdated = false;
+    let purityWasUpdated = false;
     const applied: string[] = [];
+    const notApplied: string[] = [];
+
+    const clearTokenValue = (field: QuickFillField) => {
+      if (field === 'title') { updates.title = ''; applied.push('Title (English)'); return true; }
+      if (field === 'titleEs') { updates.title_es = ''; applied.push('Title (Spanish)'); return true; }
+      if (field === 'brand') { updates.brand = null; applied.push('Brand'); return true; }
+      if (field === 'description') { updates.description = ''; applied.push('Description (EN)'); return true; }
+      if (field === 'descriptionEs') { updates.description_es = ''; applied.push('Description (ES)'); return true; }
+      if (field === 'publicNotes') { updates.public_notes = ''; applied.push('Public Notes'); return true; }
+      if (field === 'internalNotes') { updates.internal_notes = ''; applied.push('Internal Notes'); return true; }
+      if (field === 'productType') {
+        newJewelryType = 'Other';
+        updates.product_type = 'Other';
+        updates.jewelry_type = 'Other';
+        newChainType = '';
+        newLength = '';
+        applied.push('Product Type');
+        return true;
+      }
+      if (field === 'chainType') { newChainType = ''; applied.push('Link Type'); return true; }
+      if (field === 'length') { newLength = ''; applied.push(getLengthSizeLabel(newJewelryType)); return true; }
+      if (field === 'askingPrice') {
+        updates.asking_price = null;
+        updates.manual_price_label = null;
+        applied.push('Asking Price');
+        return true;
+      }
+      if (field === 'purity') {
+        updates.purity = null;
+        purityWasUpdated = true;
+        applied.push('Purity');
+        return true;
+      }
+      if (field === 'weight') {
+        updates.weight_grams = null;
+        applied.push('Weight');
+        return true;
+      }
+      if (field === 'multiplier') {
+        updates.pricing_multiplier = null;
+        applied.push('Multiplier');
+        return true;
+      }
+      if (field === 'metalVariant') {
+        updates.metal_variant = getDefaultMetalVariant(updates.category ?? editing.category);
+        metalVariantWasUpdated = true;
+        applied.push('Metal Color');
+        return true;
+      }
+      if (field === 'metalType') {
+        updates.metal_type = editing.category;
+        updates.metal = editing.category;
+        applied.push('Metal Type');
+        return true;
+      }
+      return false;
+    };
+
+    const applyTokenValue = (rawValue: string, field: QuickFillField | null = null) => {
+      const value = rawValue.replace(/\.{3,}$/g, '').trim();
+      if (!value) return field ? clearTokenValue(field) : false;
+      const lower = value.toLowerCase();
+
+      if (field === 'title') {
+        updates.title = value;
+        applied.push('Title (English)');
+        return true;
+      }
+      if (field === 'titleEs') {
+        updates.title_es = value;
+        applied.push('Title (Spanish)');
+        return true;
+      }
+      if (field === 'brand') {
+        updates.brand = value;
+        applied.push('Brand');
+        return true;
+      }
+      if (field === 'description') {
+        updates.description = value;
+        applied.push('Description (EN)');
+        return true;
+      }
+      if (field === 'descriptionEs') {
+        updates.description_es = value;
+        applied.push('Description (ES)');
+        return true;
+      }
+      if (field === 'publicNotes') {
+        updates.public_notes = value;
+        applied.push('Public Notes');
+        return true;
+      }
+      if (field === 'internalNotes') {
+        updates.internal_notes = value;
+        applied.push('Internal Notes');
+        return true;
+      }
+
+      if (!field || field === 'productType') {
+        const matchedJewelryType = normalizeProductJewelryType(value);
+        if (matchedJewelryType) {
+          newJewelryType = matchedJewelryType;
+          updates.product_type = matchedJewelryType;
+          updates.jewelry_type = matchedJewelryType;
+          if (!productSupportsLinkType(matchedJewelryType)) newChainType = '';
+          if (!productUsesLength(matchedJewelryType) && !productUsesSize(matchedJewelryType)) newLength = '';
+          applied.push('Product Type');
+          return true;
+        }
+      }
+
+      if ((!field || field === 'metalType') && PRODUCT_METAL_TYPES.some((type) => type.value.toLowerCase() === lower || type.label.toLowerCase() === lower || type.labelEs.toLowerCase() === lower)) {
+        const nextMetalType = normalizeProductMetalType(value, editing.category);
+        updates.metal_type = nextMetalType;
+        updates.metal = nextMetalType;
+        if (nextMetalType === 'Gold' || nextMetalType === 'Silver') {
+          updates.category = nextMetalType;
+          if (!metalVariantWasUpdated) updates.metal_variant = getDefaultMetalVariant(nextMetalType);
+          categoryWasUpdated = true;
+        }
+        applied.push('Metal Type');
+        return true;
+      }
+
+      if ((!field || field === 'category') && lower === 'gold') {
+        updates.category = 'Gold';
+        updates.metal = 'Gold';
+        updates.metal_type = 'Gold';
+        if (!metalVariantWasUpdated) updates.metal_variant = getDefaultMetalVariant('Gold');
+        categoryWasUpdated = true;
+        applied.push('Category');
+        return true;
+      }
+      if ((!field || field === 'category') && lower === 'silver') {
+        updates.category = 'Silver';
+        updates.metal = 'Silver';
+        updates.metal_type = 'Silver';
+        if (!metalVariantWasUpdated) updates.metal_variant = getDefaultMetalVariant('Silver');
+        categoryWasUpdated = true;
+        applied.push('Category');
+        return true;
+      }
+
+      if (!field || field === 'metalVariant') {
+        const variantValue = lower.replace(/[-\s]+/g, '_');
+        const variantOptions = [...PRODUCT_METAL_VARIANTS.Gold, ...PRODUCT_METAL_VARIANTS.Silver];
+        const matchedVariant = variantOptions.find((variant) => (
+          variant.value === variantValue ||
+          variant.label.toLowerCase() === lower ||
+          variant.labelEs.toLowerCase() === lower ||
+          (variant.value === 'tricolor_gold' && lower === 'tri color gold') ||
+          (variant.value === 'tricolor_gold' && lower === 'tri-color gold') ||
+          (variant.value === 'tricolor_gold' && lower === 'tricolor') ||
+          (variant.value === 'bicolor_gold' && lower === 'bi color gold') ||
+          (variant.value === 'bicolor_gold' && lower === 'bi-color gold') ||
+          (variant.value === 'bicolor_gold' && lower === 'bicolor') ||
+          (variant.value === 'yellow_gold' && lower === 'yellow') ||
+          (variant.value === 'white_gold' && lower === 'white') ||
+          (variant.value === 'rose_gold' && lower === 'rose')
+        ));
+        if (matchedVariant) {
+          const nextCategory = PRODUCT_METAL_VARIANTS.Silver.some((variant) => variant.value === matchedVariant.value)
+            ? 'Silver'
+            : 'Gold';
+          updates.category = nextCategory;
+          updates.metal = nextCategory;
+          updates.metal_type = nextCategory;
+          updates.metal_variant = matchedVariant.value;
+          categoryWasUpdated = true;
+          metalVariantWasUpdated = true;
+          applied.push('Metal Color');
+          return true;
+        }
+      }
+
+      if (!field || field === 'gender') {
+        if (lower === 'unisex') { updates.gender = 'Unisex'; applied.push('Gender'); return true; }
+        if (lower === 'men' || lower === 'mens' || lower === 'male') { updates.gender = 'Men'; applied.push('Gender'); return true; }
+        if (lower === 'women' || lower === 'womens' || lower === "women's" || lower === 'female') { updates.gender = 'Women'; applied.push('Gender'); return true; }
+      }
+
+      if (!field || field === 'status') {
+        if (lower === 'draft') { updates.status = 'draft'; applied.push('Status'); return true; }
+        if (lower === 'available') { updates.status = 'available'; applied.push('Status'); return true; }
+        if (lower === 'reserved') { updates.status = 'reserved'; applied.push('Status'); return true; }
+        if (lower === 'pending payment' || lower === 'pending_payment') { updates.status = 'pending_payment'; applied.push('Status'); return true; }
+        if (lower === 'sold') { updates.status = 'sold'; applied.push('Status'); return true; }
+        if (lower === 'archived') { updates.status = 'archived'; applied.push('Status'); return true; }
+      }
+
+      if (!field || field === 'location') {
+        const matchedLocation = LOCATIONS.find((location) => {
+          const normalizedValue = lower.replace(/\s+/g, '_');
+          return lower === location.label.toLowerCase() || normalizedValue === location.value;
+        });
+        if (matchedLocation) {
+          updates.location = matchedLocation.value;
+          applied.push('Location');
+          return true;
+        }
+      }
+
+      if (!field || field === 'priceMode') {
+        if (lower === 'spot' || lower === 'spot-multiplier' || lower === 'spot multiplier') {
+          updates.price_mode = 'spot-multiplier'; applied.push('Price Mode'); return true;
+        }
+        if (lower === 'manual' || lower === 'fixed' || lower === 'manual fixed price') {
+          updates.price_mode = 'manual'; applied.push('Price Mode'); return true;
+        }
+      }
+
+      if (field === 'askingPrice' || (!field && /^\$\s*\d/.test(value))) {
+        const numericPrice = Number(value.replace(/[$,\s]/g, ''));
+        if (Number.isFinite(numericPrice) && numericPrice >= 0) {
+          updates.asking_price = numericPrice;
+          updates.manual_price_label = `$${numericPrice.toLocaleString()}`;
+          applied.push('Asking Price');
+          return true;
+        }
+      }
+
+      const purityMatch = lower.match(/^(\d+)\s*k?$/);
+      if ((!field || field === 'purity') && purityMatch) {
+        const val = parseInt(purityMatch[1]);
+        if ([10, 14, 18, 24, 925].includes(val)) {
+          updates.purity = val;
+          purityWasUpdated = true;
+          applied.push('Purity');
+          return true;
+        }
+      }
+
+      const weightMatch = lower.match(field === 'weight' ? /^(\d+(?:\.\d+)?)\s*(?:g(?:rams?)?)?$/ : /^(\d+(?:\.\d+)?)\s*g(rams?)?$/);
+      if ((!field || field === 'weight') && weightMatch) {
+        updates.weight_grams = parseFloat(weightMatch[1]);
+        applied.push('Weight');
+        return true;
+      }
+
+      const multA = lower.match(/^(\d+(?:\.\d+)?)\s*[xÃ—]$/);
+      const multB = lower.match(/^[xÃ—]\s*(\d+(?:\.\d+)?)$/);
+      const multC = field === 'multiplier' ? lower.match(/^(\d+(?:\.\d+)?)$/) : null;
+      if ((!field || field === 'multiplier') && multA) { updates.pricing_multiplier = parseFloat(multA[1]); applied.push('Multiplier'); return true; }
+      if ((!field || field === 'multiplier') && multB) { updates.pricing_multiplier = parseFloat(multB[1]); applied.push('Multiplier'); return true; }
+      if (field === 'multiplier' && multC) { updates.pricing_multiplier = parseFloat(multC[1]); applied.push('Multiplier'); return true; }
+
+      if (!field || field === 'chainType') {
+        const matchedChain = getQuickFillLinkType(value, field === 'chainType');
+        if (matchedChain) {
+          newChainType = matchedChain;
+          if (!productSupportsLinkType(newJewelryType)) {
+            newJewelryType = 'Necklace';
+            updates.product_type = 'Necklace';
+            updates.jewelry_type = 'Necklace';
+            applied.push('Product Type');
+          }
+          applied.push('Link Type');
+          return true;
+        }
+      }
+
+      const lenMatch = lower.match(field === 'length' ? /^(\d+(?:\.\d+)?)\s*(?:(?:in(?:ch(?:es?)?)?)|")?$/ : /^(\d+(?:\.\d+)?)\s*(?:in(?:ch(?:es?)?)?|")$/);
+      if ((!field || field === 'length') && lenMatch) {
+        newLength = normalizeProductJewelryType(newJewelryType) === 'Ring' ? lenMatch[1] : `${lenMatch[1]} in`;
+        applied.push(getLengthSizeLabel(newJewelryType));
+        return true;
+      }
+      if (field === 'length') {
+        newLength = value;
+        applied.push(getLengthSizeLabel(newJewelryType));
+        return true;
+      }
+
+      return false;
+    };
 
     for (const tok of tokens) {
-      const lower = tok.toLowerCase();
+      const cleanedToken = tok.replace(/\.{3,}$/g, '').trim();
+      const keyedMatch = cleanedToken.match(/^([^:]+):(.*)$/);
+      const field = keyedMatch ? normalizeQuickFillFieldName(keyedMatch[1]) : null;
+      const value = keyedMatch ? keyedMatch[2].trim() : cleanedToken;
 
-      // Category
-      if (lower === 'gold')   { updates.category = 'Gold';   applied.push('Category'); continue; }
-      if (lower === 'silver') { updates.category = 'Silver'; applied.push('Category'); continue; }
-
-      // Gender
-      if (lower === 'unisex')                    { updates.gender = 'Unisex'; applied.push('Gender'); continue; }
-      if (lower === 'men' || lower === 'mens')   { updates.gender = 'Men';    applied.push('Gender'); continue; }
-      if (lower === 'women' || lower === 'womens' || lower === "women's") { updates.gender = 'Women'; applied.push('Gender'); continue; }
-
-      // Status
-      if (lower === 'draft') { updates.status = 'draft'; applied.push('Status'); continue; }
-      if (lower === 'available') { updates.status = 'available'; applied.push('Status'); continue; }
-      if (lower === 'reserved') { updates.status = 'reserved'; applied.push('Status'); continue; }
-      if (lower === 'pending payment' || lower === 'pending_payment') { updates.status = 'pending_payment'; applied.push('Status'); continue; }
-      if (lower === 'sold') { updates.status = 'sold'; applied.push('Status'); continue; }
-      if (lower === 'archived') { updates.status = 'archived'; applied.push('Status'); continue; }
-
-      // Price mode
-      if (lower === 'spot' || lower === 'spot-multiplier' || lower === 'spot multiplier') {
-        updates.price_mode = 'spot-multiplier'; applied.push('Price Mode'); continue;
+      if (!applyTokenValue(value, field)) {
+        notApplied.push(cleanedToken);
       }
-      if (lower === 'manual' || lower === 'fixed') {
-        updates.price_mode = 'manual'; applied.push('Price Mode'); continue;
-      }
-
-      // Purity: 18k / 14k / 10k / 925
-      const purityMatch = lower.match(/^(\d+)\s*k?$/);
-      if (purityMatch) {
-        const val = parseInt(purityMatch[1]);
-        if ([10, 14, 18, 24, 925].includes(val)) { updates.purity = val; applied.push('Purity'); continue; }
-      }
-
-      // Weight: 25.3g / 25.3grams
-      const weightMatch = lower.match(/^(\d+\.?\d*)\s*g(rams?)?$/);
-      if (weightMatch) { updates.weight_grams = parseFloat(weightMatch[1]); applied.push('Weight'); continue; }
-
-      // Multiplier: 1.25x / x1.25 / ×1.25
-      const multA = lower.match(/^(\d+\.?\d*)\s*[x×]$/);
-      const multB = lower.match(/^[x×]\s*(\d+\.?\d*)$/);
-      if (multA) { updates.pricing_multiplier = parseFloat(multA[1]); applied.push('Multiplier'); continue; }
-      if (multB) { updates.pricing_multiplier = parseFloat(multB[1]); applied.push('Multiplier'); continue; }
-
-      // Chain / jewelry type — exact then partial match against predefined list
-      const exactChain = PREDEFINED_CHAIN_TYPES.find(ct => ct.toLowerCase() === lower);
-      const partialChain = PREDEFINED_CHAIN_TYPES.find(ct => ct.toLowerCase().includes(lower) || lower.includes(ct.toLowerCase().split(' ')[0]));
-      const matchedChain = exactChain ?? partialChain;
-      if (matchedChain) { newChainType = matchedChain; applied.push('Chain Type'); continue; }
-
-      // Length: "22in", "22 in", "22inch", "7.5in", '22"'
-      const lenMatch = lower.match(/^(\d+(?:\.\d+)?)\s*(?:in(?:ch(?:es?)?)?|")$/);
-      if (lenMatch) { newLength = `${lenMatch[1]} in`; applied.push('Length'); continue; }
     }
 
-    setEditing({ ...editing, ...updates });
-    setChainTypeInput(newChainType);
-    setLengthInput(newLength);
+    const hasExplicitFields = tokens.some((token) => {
+        const keyedMatch = token.match(/^([^:]+):(.*)$/);
+        return keyedMatch ? normalizeQuickFillFieldName(keyedMatch[1]) !== null : false;
+      });
+
+    if (notApplied.length > 0 && !hasExplicitFields) {
+      const orderedUpdates: Partial<ReturnType<typeof emptyProduct>> = {};
+      let orderedJewelryType = jewelryTypeInput;
+      let orderedChainType = chainTypeInput;
+      let orderedLength = lengthInput;
+      let orderedCategoryWasUpdated = false;
+      let orderedMetalVariantWasUpdated = false;
+      let orderedPurityWasUpdated = false;
+      const orderedApplied: string[] = [];
+      const orderedNotApplied: string[] = [];
+
+      const previous = {
+        updates: { ...updates },
+        jewelryType: newJewelryType,
+        chainType: newChainType,
+        length: newLength,
+        categoryWasUpdated,
+        metalVariantWasUpdated,
+        purityWasUpdated,
+        applied: [...applied],
+      };
+
+      Object.keys(updates).forEach((key) => {
+        delete updates[key as keyof typeof updates];
+      });
+      newJewelryType = orderedJewelryType;
+      newChainType = orderedChainType;
+      newLength = orderedLength;
+      categoryWasUpdated = false;
+      metalVariantWasUpdated = false;
+      purityWasUpdated = false;
+      applied.length = 0;
+
+      getQuickFillFormOrderTokens(quickEntry).forEach((token, index) => {
+        const field = QUICK_FILL_FORM_ORDER[index];
+        const value = token.replace(/\.{3,}$/g, '').trim();
+        if (!field) {
+          orderedNotApplied.push(value);
+          return;
+        }
+        if (!applyTokenValue(value, field)) {
+          orderedNotApplied.push(value);
+        }
+      });
+
+      Object.assign(orderedUpdates, updates);
+      orderedJewelryType = newJewelryType;
+      orderedChainType = newChainType;
+      orderedLength = newLength;
+      orderedCategoryWasUpdated = categoryWasUpdated;
+      orderedMetalVariantWasUpdated = metalVariantWasUpdated;
+      orderedPurityWasUpdated = purityWasUpdated;
+      orderedApplied.push(...applied);
+
+      Object.keys(updates).forEach((key) => {
+        delete updates[key as keyof typeof updates];
+      });
+
+      if (orderedApplied.length > previous.applied.length && orderedNotApplied.length < notApplied.length) {
+        Object.assign(updates, orderedUpdates);
+        newJewelryType = orderedJewelryType;
+        newChainType = orderedChainType;
+        newLength = orderedLength;
+        categoryWasUpdated = orderedCategoryWasUpdated;
+        metalVariantWasUpdated = orderedMetalVariantWasUpdated;
+        purityWasUpdated = orderedPurityWasUpdated;
+        applied.length = 0;
+        applied.push(...orderedApplied);
+        notApplied.length = 0;
+        notApplied.push(...orderedNotApplied);
+      } else {
+        Object.assign(updates, previous.updates);
+        newJewelryType = previous.jewelryType;
+        newChainType = previous.chainType;
+        newLength = previous.length;
+        categoryWasUpdated = previous.categoryWasUpdated;
+        metalVariantWasUpdated = previous.metalVariantWasUpdated;
+        purityWasUpdated = previous.purityWasUpdated;
+        applied.length = 0;
+        applied.push(...previous.applied);
+      }
+    }
+
+    if (categoryWasUpdated && !purityWasUpdated && updates.category !== editing.category) {
+      updates.purity = null;
+    }
+
+    if (metalVariantWasUpdated && updates.metal_variant) {
+      const nextCategory = getCategoryForMetalVariant(updates.metal_variant);
+      updates.category = nextCategory;
+      updates.metal = nextCategory;
+      updates.metal_type = nextCategory;
+    }
+
+    if (!productSupportsLinkType(newJewelryType)) {
+      newChainType = '';
+    }
+    if (!productUsesLength(newJewelryType) && !productUsesSize(newJewelryType)) {
+      newLength = '';
+    }
+
     if (applied.length) {
-      flash(`Applied: ${applied.join(', ')}`);
+      setEditing({ ...editing, ...updates });
+      setJewelryTypeInput(newJewelryType);
+      setChainTypeInput(newChainType);
+      setLengthInput(newLength);
+      setQuickEntry('');
+    }
+
+    if (applied.length && notApplied.length) {
+      showQuickFillNotice(`Applied: ${applied.join(', ')}. Not applied: ${notApplied.map((item) => `"${item}"`).join(', ')}.`, false);
+    } else if (applied.length) {
+      showQuickFillNotice(`Applied: ${applied.join(', ')}`);
+    } else if (notApplied.length) {
+      showQuickFillNotice(`Not applied: ${notApplied.map((item) => `"${item}"`).join(', ')}. No fields were changed.`, false);
     } else {
-      flash('No recognized fields in that string.', false);
+      showQuickFillNotice('No recognized fields in that string.', false);
     }
   }
 
@@ -527,6 +1201,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setEditing(null);
     setPreviewImg(null);
     setCropTarget(null);
+    setQuickFillNotice(null);
   }
 
   const uploadImageBlob = useCallback(async (blob: Blob): Promise<string | null> => {
@@ -747,7 +1422,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setQuickEntry('');
     setShowAdvancedIds(true);
     setInventoryNumberManual(false);
-    setChainTypeInput(getProductChainType(product));
+    const nextProductType = getProductJewelryType(product);
+    setJewelryTypeInput(nextProductType);
+    setChainTypeInput(productSupportsLinkType(nextProductType) ? getProductLinkType(product) : '');
     setLengthInput(getProductLength(product));
     setEditing(copy);
     setIsNew(true);
@@ -758,23 +1435,38 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     if (!editing) return;
     setSaving(true);
 
-    // Build tags with updated ct: and len: entries
-    const baseTags = (editing.tags ?? []).filter(t => !t.startsWith('ct:') && !t.startsWith('len:'));
-    const withChain = chainTypeInput.trim() ? [...baseTags, `ct:${chainTypeInput.trim()}`] : baseTags;
-    const finalTags = lengthInput.trim() ? [...withChain, `len:${lengthInput.trim()}`] : withChain;
+    // Build tags with updated jt:, ct:, and len: entries
+    const normalizedJewelryType = normalizeProductJewelryType(jewelryTypeInput) ?? 'Other';
+    const supportsLinkType = productSupportsLinkType(normalizedJewelryType);
+    const supportsLength = productUsesLength(normalizedJewelryType);
+    const supportsSize = productUsesSize(normalizedJewelryType);
+    const normalizedLinkType = supportsLinkType ? chainTypeInput.trim() : '';
+    const normalizedLength = supportsLength || supportsSize ? lengthInput.trim() : '';
+    const normalizedMetalType = normalizeProductMetalType(editing.metal_type, editing.category);
+    const legacyCategory = getLegacyCategoryForMetalType(normalizedMetalType, editing.category);
+    const baseTags = (editing.tags ?? []).filter(t => !t.startsWith('jt:') && !t.startsWith('ct:') && !t.startsWith('len:'));
+    const withJewelryType = normalizedJewelryType ? [...baseTags, `jt:${normalizedJewelryType}`] : baseTags;
+    const withChain = normalizedLinkType ? [...withJewelryType, `ct:${normalizedLinkType}`] : withJewelryType;
+    const finalTags = normalizedLength ? [...withChain, `len:${normalizedLength}`] : withChain;
 
     const payload = {
       ...editing,
-      id: editing.id || editing.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now(),
-      slug: editing.slug || editing.id || editing.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+      id: editing.id || buildGeneratedProductId(editing),
+      slug: editing.slug || editing.id || slugifyProductText(editing.title),
       inventory_number: parseInventoryNumber(editing.inventory_number),
       sku: editing.sku?.trim() || (editing.inventory_number ? String(editing.inventory_number) : null),
-      metal: editing.metal || editing.category,
+      category: legacyCategory,
+      metal: normalizedMetalType,
+      metal_type: normalizedMetalType,
+      metal_variant: normalizeProductMetalVariant(editing.metal_variant, legacyCategory),
       purity: editing.purity ?? null,
       weight_grams: editing.weight_grams ?? null,
       gram_weight: editing.gram_weight ?? editing.weight_grams ?? null,
-      chain_type: chainTypeInput.trim() || null,
-      length: lengthInput.trim() || null,
+      brand: editing.brand?.trim() || null,
+      product_type: normalizedJewelryType,
+      jewelry_type: normalizedJewelryType,
+      chain_type: normalizedLinkType || null,
+      length: normalizedLength || null,
       pricing_multiplier: editing.pricing_multiplier ?? null,
       status: normalizeProductStatus(editing.status),
       location: editing.location || 'showcase',
@@ -784,14 +1476,19 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       details_es: [],
       internal_notes: foldExtraDetailsIntoInternalNotes(editing),
     };
+    const originalProductId = originalRef.current?.id ?? payload.id;
+    const errs = validate(payload, isNew ? undefined : originalProductId);
+    if (errs.length) { setFormErrors(errs); setSaving(false); return; }
+    setFormErrors([]);
+
+    let nextProducts = products;
 
     if (isNew) {
-      const errs = validate(payload);
-      if (errs.length) { setFormErrors(errs); setSaving(false); return; }
-      setFormErrors([]);
       const { data, error } = await supabase.from('products').insert(payload).select().single();
       if (error) { flash(error.message, false); setSaving(false); return; }
-      setProducts((prev) => [data ?? (payload as unknown as Product), ...prev]);
+      const savedProduct = (data ?? payload) as unknown as Product;
+      nextProducts = [savedProduct, ...products];
+      setProducts(nextProducts);
     } else {
       // Skip the network call entirely if nothing changed.
       if (JSON.stringify(payload) === JSON.stringify(originalRef.current)) {
@@ -802,9 +1499,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       }
       // Don't use .select().single() on update — RLS may allow UPDATE but not SELECT,
       // causing PGRST116 and blocking the modal from closing.
-      const { error } = await supabase.from('products').update(payload).eq('id', payload.id);
+      const { error } = await supabase.from('products').update(payload).eq('id', originalProductId);
       if (error) { flash(error.message, false); setSaving(false); return; }
-      setProducts((prev) => prev.map((p) => p.id === payload.id ? (payload as unknown as Product) : p));
+      nextProducts = products.map((p) => p.id === originalProductId ? (payload as unknown as Product) : p);
+      setProducts(nextProducts);
     }
 
     flash(isNew ? 'Product added' : 'Product saved');
@@ -813,7 +1511,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     if (afterSave === 'close') {
       closeModal();
     } else if (afterSave === 'another') {
-      openAdd();
+      openAddFromProducts(nextProducts);
     } else {
       // 'stay' — update originalRef so no-op check is correct on next save
       originalRef.current = payload as ReturnType<typeof emptyProduct>;
@@ -860,29 +1558,38 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const filtered = masterOrderedProducts.filter((p) => {
     const searchText = [
       p.title,
+      p.brand,
       p.id,
       p.inventory_number,
       p.sku,
       getProductMetal(p),
       p.category,
+      productMetalTypeLabel(p.metal_type, p.category),
+      productMetalVariantLabel(p.metal_variant, p.category),
+      productJewelryTypeLabel(getProductJewelryType(p)),
       p.purity ? `${p.purity}` : '',
-      getProductChainType(p),
+      getProductLinkType(p),
       getProductLength(p),
     ].filter(Boolean).join(' ').toLowerCase();
     if (search && !searchText.includes(search.toLowerCase())) return false;
     if (filterStatus && normalizeProductStatus(p.status) !== filterStatus) return false;
-    if (filterMetal === 'gold' && getProductMetal(p).toLowerCase() !== 'gold') return false;
-    if (filterMetal === 'silver' && getProductMetal(p).toLowerCase() !== 'silver') return false;
-    if (filterCategory && p.category !== filterCategory) return false;
+    if (filterMetal === 'gold' && getProductMetalType(p) !== 'Gold') return false;
+    if (filterMetal === 'silver' && getProductMetalType(p) !== 'Silver') return false;
+    if (filterMetalVariant && getProductMetalVariant(p) !== filterMetalVariant) return false;
+    if (filterCategory && getProductMetalType(p) !== filterCategory) return false;
+    if (filterBrand && p.brand !== filterBrand) return false;
     if (filterPurity && p.purity !== parseInt(filterPurity)) return false;
     if (filterLocation && (p.location ?? 'showcase') !== filterLocation) return false;
     if (filterFeatured === 'featured' && !p.featured) return false;
     if (filterFeatured === 'not-featured' && p.featured) return false;
+    if (filterJewelryType && getProductJewelryType(p) !== filterJewelryType) return false;
     if (filterChainType) {
       const kws = CHAIN_KEYWORDS[filterChainType];
       if (kws) {
-        const txt = [p.title, getProductChainType(p), ...(p.tags ?? [])].join(' ').toLowerCase();
+        const txt = [getProductLinkType(p), ...(p.tags ?? [])].join(' ').toLowerCase();
         if (!kws.some(k => txt.includes(k))) return false;
+      } else if (getProductLinkType(p) !== filterChainType) {
+        return false;
       }
     }
     if (filterLength) {
@@ -921,8 +1628,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     search ||
     filterStatus ||
     filterMetal ||
+    filterMetalVariant ||
     filterPurity ||
     filterCategory ||
+    filterBrand ||
+    filterJewelryType ||
     filterChainType ||
     filterLength ||
     filterLocation ||
@@ -996,6 +1706,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const available = products.filter((p) => normalizeProductStatus(p.status) === 'available').length;
   const reserved = products.filter((p) => normalizeProductStatus(p.status) === 'reserved').length;
   const sold = products.filter((p) => normalizeProductStatus(p.status) === 'sold').length;
+  const existingBrandOptions = Array.from(new Set(products.map((product) => product.brand?.trim()).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b));
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-background)' }}>
@@ -1034,7 +1745,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         )}
       />
 
-      <div className="max-w-[1700px] mx-auto px-4 md:px-8 py-8">
+      <div className="max-w-[1700px] 2xl:max-w-[2200px] mx-auto px-4 md:px-8 2xl:px-10 py-8">
 
         {/* Flash message */}
         {msg && (
@@ -1090,12 +1801,24 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 options: [['', 'All Statuses'], ...STATUSES.map((status) => [status.value, status.label])],
               },
               {
-                label: 'Metal', value: filterMetal, set: setFilterMetal,
-                options: [['', 'All Metals'], ['gold', 'Gold'], ['silver', 'Silver']],
+                label: 'Pricing Metal', value: filterMetal, set: setFilterMetal,
+                options: [['', 'All Pricing Metals'], ['gold', 'Gold'], ['silver', 'Silver']],
               },
               {
-                label: 'Category', value: filterCategory, set: setFilterCategory,
-                options: [['', 'All Categories'], ...CATEGORIES.map((category) => [category, category])],
+                label: 'Metal Color', value: filterMetalVariant, set: setFilterMetalVariant,
+                options: [
+                  ['', 'All Types'],
+                  ...PRODUCT_METAL_VARIANTS.Gold.map((variant) => [variant.value, variant.label]),
+                  ...PRODUCT_METAL_VARIANTS.Silver.map((variant) => [variant.value, variant.label]),
+                ],
+              },
+              {
+                label: 'Metal Type', value: filterCategory, set: setFilterCategory,
+                options: [['', 'All Metal Types'], ...PRODUCT_METAL_TYPES.map((metalType) => [metalType.value, metalType.label])],
+              },
+              {
+                label: 'Brand', value: filterBrand, set: setFilterBrand,
+                options: [['', 'All Brands'], ...existingBrandOptions.map((brand) => [brand, brand])],
               },
               {
                 label: 'Purity', value: filterPurity, set: setFilterPurity,
@@ -1110,23 +1833,26 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 options: [['', 'All Items'], ['featured', 'Featured'], ['not-featured', 'Not Featured']],
               },
               {
-                label: 'Chain Type', value: filterChainType, set: setFilterChainType,
+                label: 'Product Type', value: filterJewelryType, set: setFilterJewelryType,
+                options: [['', 'All Product Types'], ...PRODUCT_JEWELRY_TYPES.map((type) => [type.value, type.label])],
+              },
+              {
+                label: 'Link Type', value: filterChainType, set: setFilterChainType,
                 options: [
-                  ['', 'All Types'],
+                  ['', 'All Link Types'],
                   ['cuban-link', 'Cuban link'],
                   ['figaro-link', 'Figaro link'],
                   ['rope-chain', 'Rope chain'],
                   ['anchor-link', 'Anchor / Gucci'],
                   ['oval-link', 'Oval link'],
                   ['byzantine-link', 'Byzantine'],
-                  ['bracelet', 'Bracelet'],
-                  ['ring', 'Ring'],
+                  ['box-link', 'Box link'],
                 ],
               },
               {
-                label: 'Length', value: filterLength, set: setFilterLength,
+                label: 'Length/Size', value: filterLength, set: setFilterLength,
                 options: [
-                  ['', 'All Lengths'],
+                  ['', 'All Lengths/Sizes'],
                   ['16 in', '16 in'],
                   ['18 in', '18 in'],
                   ['20 in', '20 in'],
@@ -1138,6 +1864,25 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   ['7 in', '7 in (bracelet)'],
                   ['7.5 in', '7.5 in (bracelet)'],
                   ['8 in', '8 in (bracelet)'],
+                  ['4', 'Size 4'],
+                  ['4.5', 'Size 4.5'],
+                  ['5', 'Size 5'],
+                  ['5.5', 'Size 5.5'],
+                  ['6', 'Size 6'],
+                  ['6.5', 'Size 6.5'],
+                  ['7', 'Size 7'],
+                  ['7.5', 'Size 7.5'],
+                  ['8', 'Size 8'],
+                  ['8.5', 'Size 8.5'],
+                  ['9', 'Size 9'],
+                  ['9.5', 'Size 9.5'],
+                  ['10', 'Size 10'],
+                  ['10.5', 'Size 10.5'],
+                  ['11', 'Size 11'],
+                  ['11.5', 'Size 11.5'],
+                  ['12', 'Size 12'],
+                  ['12.5', 'Size 12.5'],
+                  ['13', 'Size 13'],
                 ],
               },
             ].map(({ label, value, set, options }) => (
@@ -1160,14 +1905,17 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             ))}
 
             {/* Clear filters */}
-            {(filterStatus || filterMetal || filterPurity || filterCategory || filterChainType || filterLength || filterLocation || filterFeatured) && (
+            {(filterStatus || filterMetal || filterMetalVariant || filterPurity || filterCategory || filterBrand || filterJewelryType || filterChainType || filterLength || filterLocation || filterFeatured) && (
               <button
                 type="button"
                 onClick={() => {
                   setFilterStatus('');
                   setFilterMetal('');
+                  setFilterMetalVariant('');
                   setFilterPurity('');
                   setFilterCategory('');
+                  setFilterBrand('');
+                  setFilterJewelryType('');
                   setFilterChainType('');
                   setFilterLength('');
                   setFilterLocation('');
@@ -1205,8 +1953,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   setSearch('');
                   setFilterStatus('');
                   setFilterMetal('');
+                  setFilterMetalVariant('');
                   setFilterPurity('');
                   setFilterCategory('');
+                  setFilterBrand('');
+                  setFilterJewelryType('');
                   setFilterChainType('');
                   setFilterLength('');
                   setFilterLocation('');
@@ -1226,7 +1977,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             )}
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[2020px] 2xl:min-w-[2170px] text-sm">
               <thead>
                 <tr className="border-b text-left" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}>
                   <th
@@ -1334,10 +2085,16 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     <td className="px-4 py-3 font-medium max-w-xs" style={{ color: 'var(--color-on-surface)' }}>
                       <span className="line-clamp-2">{p.title}</span>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>{p.category}</td>
+                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      {p.brand || '-'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>{productMetalTypeLabel(p.metal_type, p.category)}</td>
+                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      {productMetalVariantLabel(p.metal_variant, p.category)}
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>{p.gender ?? 'Unisex'}</td>
                     <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
-                      {getProductChainType(p) || '-'}
+                      {productJewelryTypeLabel(getProductJewelryType(p))}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
                       {getProductLength(p) || '-'}
@@ -1358,6 +2115,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
                       {getProductWeight(p) ? `${getProductWeight(p)}g` : '-'}
                     </td>
+                    <td className="px-4 py-3 whitespace-nowrap font-semibold" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      {getSpotMeltDisplayPrice(p, spotData)}
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
                       {p.price_mode === 'manual' ? 'Manual' : `Spot ×${p.pricing_multiplier ?? '?'}`}
                     </td>
@@ -1375,8 +2135,15 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                         {getStatusLabel(p.status)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex flex-wrap gap-2">
+                    <td className="px-3 py-3 w-[255px] min-w-[255px] max-w-[255px] align-top">
+                      <div className="flex w-[230px] flex-wrap gap-x-3 gap-y-2 leading-none">
+                        <Link
+                          href={`${locale === 'es' ? '/es' : ''}/shop/${p.id}?returnTo=admin`}
+                          className="text-xs font-bold uppercase tracking-wide hover:underline"
+                          style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                        >
+                          View
+                        </Link>
                         <button type="button" onClick={() => openEdit(p)}
                           className="text-xs font-bold uppercase tracking-wide hover:underline"
                           style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
@@ -1473,13 +2240,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 }}
               >
                 <label className="form-label" style={{ marginBottom: 0 }}>Quick Fill</label>
-                <div className="flex gap-2">
-                  <input
-                    className="form-field flex-1 text-sm"
-                    placeholder="18k, 25.3g, Cuban link"
+                <div className="flex gap-2 items-start">
+                  <textarea
+                    className="form-field flex-1 text-sm min-h-[44px]"
+                    placeholder="Title English:..., Brand:Omega, Jewelry Type:Watch, Metal Color:Bicolor Gold, Status:Available, Purity:14k, Weight:25.3g"
+                    rows={2}
                     value={quickEntry}
                     onChange={(e) => setQuickEntry(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyQuickEntry(); } }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); applyQuickEntry(); } }}
                   />
                   <button
                     type="button"
@@ -1489,20 +2257,69 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     Apply
                   </button>
                 </div>
+                {quickFillNotice && (
+                  <div
+                    className="px-3 py-2 text-xs font-medium"
+                    role="status"
+                    style={{
+                      background: quickFillNotice.ok ? 'color-mix(in srgb, var(--color-primary) 10%, transparent)' : 'color-mix(in srgb, var(--color-error) 10%, transparent)',
+                      border: `1px solid ${quickFillNotice.ok ? 'color-mix(in srgb, var(--color-primary) 28%, transparent)' : 'color-mix(in srgb, var(--color-error) 28%, transparent)'}`,
+                      color: quickFillNotice.ok ? 'var(--color-primary)' : 'var(--color-error)',
+                      fontFamily: 'var(--font-label)',
+                    }}
+                  >
+                    {quickFillNotice.text}
+                  </div>
+                )}
+                <div
+                  className="text-[0.62rem] leading-relaxed p-3"
+                  style={{
+                    color: 'var(--color-on-surface-variant)',
+                    fontFamily: 'var(--font-label)',
+                    background: 'color-mix(in srgb, var(--color-surface) 70%, transparent)',
+                    border: '1px solid color-mix(in srgb, var(--color-outline-variant) 75%, transparent)',
+                  }}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="font-bold uppercase tracking-wide" style={{ color: 'var(--color-primary)' }}>
+                      Prompt for AI formatting
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={copyQuickFillPrompt}
+                        className="outline-button text-[0.58rem] px-2 py-1"
+                      >
+                        Copy Prompt
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowQuickFillPrompt(true)}
+                        className="outline-button text-[0.58rem] px-2 py-1"
+                      >
+                        View AI Prompt
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 <p className="text-[0.6rem] leading-relaxed" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-                  Only include what differs from the defaults — omit anything already set correctly.
+                  Best format: one labeled <strong>Field:Value</strong> per line. Include <strong>Brand</strong> when the maker/designer/brand is known. Include <strong>Metal Color</strong> as Yellow Gold, White Gold, Rose Gold, Tricolor Gold, Bicolor Gold, Silver, or Vermeil. Metal Color automatically sets Category to Gold or Silver. Bicolor Gold is stored as a gold color but appears under both Gold and Silver broad shop filters. Use <strong>Jewelry Type</strong> for Necklace, Bracelet, Ring, Pendant, Earrings, Watch, or Other. Use <strong>Jewelry Type:Watch</strong> for any watch, wristwatch, or timepiece; do not use Link Type for watches. Use <strong>Link Type</strong> only when Jewelry Type is Necklace or Bracelet. Labeled Brand, Link Type, and Length/Size values can be entered directly into the form, including custom text, without adding them as permanent dropdown choices. Use <strong>Size</strong> or <strong>Ring Size</strong> for rings; use <strong>Length</strong> for necklaces and bracelets. Other labels: Title English, Title Spanish, Status, Gender, Location, Price Mode, Purity, Weight, Multiplier, Asking Price, Description English, Description Spanish, Public Notes, and Internal Notes.
+                </p>
+                <p className="text-[0.6rem] leading-relaxed hidden" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                  Paste comma values, Field:Value pairs, or a two-line CSV header/value list. Labeled fields can be in any order; unlabeled CSV rows use the form order. Only include what differs from the defaults.
                   Recognized tokens: <strong>Category</strong> (Gold / Silver) · <strong>Status</strong> (Draft / Available / Reserved / Pending Payment / Sold / Archived) ·&nbsp;
-                  <strong>Chain Type</strong> (Cuban link / Bracelet / Ring / etc.) ·&nbsp;
-                  <strong>Length</strong> (22in / 7.5in) ·&nbsp;
+                  <strong>Jewelry Type</strong> (Necklace / Bracelet / Ring / Pendant / Earrings / Watch) ·&nbsp;
+                  <strong>Link Type</strong> (Cuban link / Figaro link / Rope chain / etc.) ·&nbsp;
+                  <strong>Length/Size</strong> (22in / 7.5in / ring size 7) ·&nbsp;
                   <strong>Price Mode</strong> (Spot / Manual) ·&nbsp;
                   <strong>Purity</strong> (18k / 14k / 10k / 925) ·&nbsp;
                   <strong>Weight</strong> (25.3g) ·&nbsp;
-                  <strong>Multiplier</strong> (1.25x)
+                  <strong>Multiplier</strong> (1.25x). Field labels can also target Title English, Title Spanish, Location, Asking Price, Description English, Description Spanish, Public Notes, and Internal Notes.
                 </p>
               </div>
 
-              {/* ID (new only) */}
-              {isNew && (
+              {/* ID (edit only) */}
+              {!isNew && (
                 <div>
                   <label className="form-label">ID (slug, auto-generated if blank)</label>
                   <input className="form-field w-full" placeholder="my-product-slug"
@@ -1541,6 +2358,16 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                       Auto-filled with the next available inventory number.
                     </p>
                   )}
+                  {(() => {
+                    const inventoryNumber = parseInventoryNumber(editing.inventory_number);
+                    const duplicateOwner = getInventoryNumberOwner(products, inventoryNumber, isNew ? undefined : editing.id);
+                    if (!inventoryNumber || !duplicateOwner) return null;
+                    return (
+                      <p className="mt-1 text-[0.68rem] font-semibold" style={{ color: 'var(--color-error)' }}>
+                        {getDuplicateInventoryNumberMessage(duplicateOwner, inventoryNumber)}
+                      </p>
+                    );
+                  })()}
                 </div>
                 <button
                   type="button"
@@ -1583,91 +2410,103 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 </div>
               </div>
 
-              {/* Category + Status + Gender */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label className="form-label">Category</label>
-                  <select className="form-field w-full" value={editing.category}
-                    onChange={(e) => setEditing({ ...editing, category: e.target.value as 'Gold' | 'Silver', metal: e.target.value, purity: null })}>
-                    {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                  <label className="form-label">Product Type</label>
+                  <select
+                    className="form-field w-full"
+                    value={jewelryTypeInput}
+                    onChange={(e) => {
+                      const nextProductType = (normalizeProductJewelryType(e.target.value) ?? 'Other') as ProductJewelryType;
+                      setJewelryTypeInput(nextProductType);
+                      setEditing({ ...editing, product_type: nextProductType, jewelry_type: nextProductType });
+                      if (!productSupportsLinkType(nextProductType)) setChainTypeInput('');
+                      if (!productUsesLength(nextProductType) && !productUsesSize(nextProductType)) setLengthInput('');
+                    }}
+                  >
+                    {PRODUCT_JEWELRY_TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>{type.label}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
-                  <label className="form-label">Status</label>
-                  <select className="form-field w-full" value={editing.status}
-                    onChange={(e) => setEditing({ ...editing, status: e.target.value as ProductStatus })}>
-                    {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">Gender</label>
-                  <select className="form-field w-full" value={editing.gender ?? 'Unisex'}
-                    onChange={(e) => setEditing({ ...editing, gender: e.target.value })}>
-                    <option value="Unisex">Unisex</option>
-                    <option value="Men">Men</option>
-                    <option value="Women">Women</option>
-                  </select>
+                  <label className="form-label">Brand</label>
+                  <input
+                    type="text"
+                    className="form-field w-full"
+                    value={editing.brand ?? ''}
+                    onChange={(e) => setEditing({ ...editing, brand: e.target.value })}
+                    placeholder="e.g. David Yurman, Tiffany & Co., Cartier..."
+                  />
                 </div>
               </div>
 
+              {/* Metal hierarchy */}
               <div className="grid md:grid-cols-3 gap-4">
                 <div>
-                  <label className="form-label">Location</label>
-                  <select className="form-field w-full" value={editing.location ?? 'showcase'}
-                    onChange={(e) => setEditing({ ...editing, location: e.target.value })}>
-                    {LOCATIONS.map((location) => <option key={location.value} value={location.value}>{location.label}</option>)}
+                  <label className="form-label">Metal Type</label>
+                  <select className="form-field w-full" value={normalizeProductMetalType(editing.metal_type, editing.category)}
+                    onChange={(e) => {
+                      const nextMetalType = normalizeProductMetalType(e.target.value, editing.category);
+                      const nextCategory = getLegacyCategoryForMetalType(nextMetalType, editing.category);
+                      setEditing({
+                        ...editing,
+                        metal_type: nextMetalType,
+                        metal: nextMetalType,
+                        category: nextCategory,
+                        metal_variant: getDefaultMetalVariant(nextCategory),
+                        purity: null,
+                      });
+                    }}>
+                    {PRODUCT_METAL_TYPES.map((metalType) => (
+                      <option key={metalType.value} value={metalType.value}>{metalType.label}</option>
+                    ))}
                   </select>
                 </div>
-                <label className="flex items-end gap-2 text-sm pb-2" style={{ color: 'var(--color-on-surface-variant)' }}>
-                  <input
-                    type="checkbox"
-                    checked={editing.featured === true}
-                    onChange={(e) => setEditing({ ...editing, featured: e.target.checked })}
-                    style={{ accentColor: 'var(--color-primary)' }}
-                  />
-                  Featured in shop
-                </label>
+                <div>
+                  <label className="form-label">Metal Color</label>
+                  <select
+                    className="form-field w-full"
+                    value={normalizeProductMetalVariant(editing.metal_variant, getLegacyCategoryForMetalType(editing.metal_type, editing.category))}
+                    onChange={(e) => setEditing({ ...editing, metal_variant: e.target.value as ProductMetalVariant })}
+                  >
+                    {PRODUCT_METAL_VARIANTS[getLegacyCategoryForMetalType(editing.metal_type, editing.category)].map((variant) => (
+                      <option key={variant.value} value={variant.value}>{variant.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              {/* Chain Type + Length */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Conditional product detail fields */}
+              <div className="grid md:grid-cols-2 gap-4">
                 {(() => {
-                  const existingChainTypes = Array.from(
-                    new Set(
-                      products
-                        .flatMap(p => (p.tags ?? []).filter(t => t.startsWith('ct:')).map(t => t.slice(3)))
-                        .filter(Boolean)
-                    )
-                  );
-                  const allOptions = Array.from(new Set([...PREDEFINED_CHAIN_TYPES, ...existingChainTypes]));
-                  return (
+                  const canUseLinkType = productSupportsLinkType(jewelryTypeInput);
+                  return canUseLinkType ? (
                     <div>
-                      <label className="form-label">Chain / Jewelry Type</label>
+                      <label className="form-label">Link Type</label>
                       <ComboboxInput
                         value={chainTypeInput}
                         onChange={setChainTypeInput}
-                        options={allOptions}
-                        placeholder="e.g. Cuban link, Bracelet…"
+                        options={[...PRODUCT_LINK_TYPES]}
+                        placeholder="e.g. Cuban link, Rope chain..."
                       />
                     </div>
-                  );
+                  ) : null;
                 })()}
                 {(() => {
-                  const existingLengths = Array.from(new Set(
-                    products.flatMap(p => (p.tags ?? []).filter(t => t.startsWith('len:')).map(t => t.slice(4))).filter(Boolean)
-                  ));
-                  const allOptions = Array.from(new Set([...PREDEFINED_LENGTHS, ...existingLengths]));
-                  return (
+                  const lengthSizeLabel = getLengthSizeLabel(jewelryTypeInput);
+                  const canUseLengthOrSize = productUsesLength(jewelryTypeInput) || productUsesSize(jewelryTypeInput);
+                  return canUseLengthOrSize ? (
                     <div>
-                      <label className="form-label">Length</label>
+                      <label className="form-label">{lengthSizeLabel}</label>
                       <ComboboxInput
                         value={lengthInput}
                         onChange={setLengthInput}
-                        options={allOptions}
-                        placeholder="e.g. 22 in, 24 in, 7.5 in…"
+                        options={PREDEFINED_LENGTHS}
+                        placeholder={lengthSizeLabel === 'Size' ? 'e.g. 6.5, 7, 8...' : 'e.g. 22 in, 24 in, 7.5 in...'}
                       />
                     </div>
-                  );
+                  ) : null;
                 })()}
               </div>
 
@@ -1681,8 +2520,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   </select>
                 </div>
                 <div>
-                  <label className="form-label">{editing.category === 'Silver' ? 'Purity' : 'Purity (k)'}</label>
-                  {editing.category === 'Silver' ? (
+                  <label className="form-label">{getLegacyCategoryForMetalType(editing.metal_type, editing.category) === 'Silver' ? 'Purity' : 'Purity (k)'}</label>
+                  {getLegacyCategoryForMetalType(editing.metal_type, editing.category) === 'Silver' ? (
                     <select className="form-field w-full" value={editing.purity ?? ''}
                       onChange={(e) => setEditing({ ...editing, purity: e.target.value ? Number(e.target.value) : null })}>
                       <option value="">— select —</option>
@@ -1737,6 +2576,43 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     style={editing.price_mode !== 'manual' ? { background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface-variant)' } : undefined}
                   />
                 </div>
+              </div>
+
+              <div className="grid md:grid-cols-4 gap-4">
+                <div>
+                  <label className="form-label">Location</label>
+                  <select className="form-field w-full" value={editing.location ?? 'showcase'}
+                    onChange={(e) => setEditing({ ...editing, location: e.target.value })}>
+                    {LOCATIONS.map((location) => <option key={location.value} value={location.value}>{location.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Status</label>
+                  <select className="form-field w-full" value={editing.status}
+                    onChange={(e) => setEditing({ ...editing, status: e.target.value as ProductStatus })}>
+                    {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </select>
+                </div>
+                {productUsesGender(jewelryTypeInput) && (
+                  <div>
+                    <label className="form-label">Gender</label>
+                    <select className="form-field w-full" value={editing.gender ?? 'Unisex'}
+                      onChange={(e) => setEditing({ ...editing, gender: e.target.value })}>
+                      <option value="Unisex">Unisex</option>
+                      <option value="Men">Men</option>
+                      <option value="Women">Women</option>
+                    </select>
+                  </div>
+                )}
+                <label className="flex items-end gap-2 text-sm pb-2" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  <input
+                    type="checkbox"
+                    checked={editing.featured === true}
+                    onChange={(e) => setEditing({ ...editing, featured: e.target.checked })}
+                    style={{ accentColor: 'var(--color-primary)' }}
+                  />
+                  Featured in shop
+                </label>
               </div>
 
               {/* Description */}
@@ -1934,6 +2810,55 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               </button>
               <button type="button" onClick={() => handleSave('close')} disabled={saving} className="gold-button text-sm disabled:opacity-50">
                 {saving ? 'Saving…' : 'Save and Close'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Fill AI prompt viewer */}
+      {showQuickFillPrompt && (
+        <div
+          className="fixed inset-0 z-[65] flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.58)' }}
+          onClick={() => setShowQuickFillPrompt(false)}
+        >
+          <div
+            className="w-full max-w-3xl max-h-[82vh] border p-5 flex flex-col gap-4"
+            style={{ background: 'var(--color-background)', borderColor: 'var(--color-outline-variant)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
+                AI Formatting Prompt
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowQuickFillPrompt(false)}
+                className="text-sm font-bold uppercase tracking-wide"
+                style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+              >
+                Close
+              </button>
+            </div>
+            <textarea
+              ref={quickFillPromptTextRef}
+              readOnly
+              value={quickFillPrompt}
+              className="form-field w-full min-h-[52vh] whitespace-pre-wrap overflow-auto p-4 text-xs leading-relaxed"
+              style={{
+                color: 'var(--color-on-surface-variant)',
+                fontFamily: 'var(--font-body)',
+                background: 'var(--color-surface-container-lowest)',
+                border: '1px solid var(--color-outline-variant)',
+              }}
+            />
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={copyQuickFillPrompt} className="outline-button text-sm">
+                Copy Prompt
+              </button>
+              <button type="button" onClick={() => setShowQuickFillPrompt(false)} className="gold-button text-sm">
+                Done
               </button>
             </div>
           </div>

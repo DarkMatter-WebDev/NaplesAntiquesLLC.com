@@ -72,6 +72,23 @@ export default async function AccountPage({ params }: Props) {
             </h1>
           </div>
 
+          {/* Admin shortcut */}
+          {isAdmin && (
+            <div className="border p-6 mb-6"
+              style={{ borderColor: 'var(--color-primary)', background: 'color-mix(in srgb, var(--color-primary) 5%, transparent)' }}>
+              <h2 className="text-xs font-bold uppercase tracking-widest mb-2"
+                style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
+                {isEs ? 'Panel de Administración' : 'Admin Panel'}
+              </h2>
+              <p className="text-sm mb-4" style={{ color: 'var(--color-on-surface-variant)' }}>
+                {isEs ? 'Gestionar productos, imágenes y precios.' : 'Manage products, images, and pricing.'}
+              </p>
+              <Link href={isEs ? '/es/admin' : '/admin'} className="gold-button text-sm">
+                {isEs ? 'Abrir Admin' : 'Open Admin Panel'}
+              </Link>
+            </div>
+          )}
+
           <AccountProfileForm profile={editableProfile} fallbackEmail={user.email ?? null} locale={locale} />
 
           {/* Profile card */}
@@ -112,23 +129,6 @@ export default async function AccountPage({ params }: Props) {
               </div>
             </dl>
           </div>
-
-          {/* Admin shortcut */}
-          {isAdmin && (
-            <div className="border p-6 mb-6"
-              style={{ borderColor: 'var(--color-primary)', background: 'color-mix(in srgb, var(--color-primary) 5%, transparent)' }}>
-              <h2 className="text-xs font-bold uppercase tracking-widest mb-2"
-                style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-                {isEs ? 'Panel de Administración' : 'Admin Panel'}
-              </h2>
-              <p className="text-sm mb-4" style={{ color: 'var(--color-on-surface-variant)' }}>
-                {isEs ? 'Gestionar productos, imágenes y precios.' : 'Manage products, images, and pricing.'}
-              </p>
-              <Link href={isEs ? '/es/admin' : '/admin'} className="gold-button text-sm">
-                {isEs ? 'Abrir Admin' : 'Open Admin Panel'}
-              </Link>
-            </div>
-          )}
 
           {/* Quick links */}
           <div className="border p-6 mb-8"

@@ -8,9 +8,10 @@ interface Props {
   options: string[];
   placeholder?: string;
   id?: string;
+  disabled?: boolean;
 }
 
-export default function ComboboxInput({ value, onChange, options, placeholder, id }: Props) {
+export default function ComboboxInput({ value, onChange, options, placeholder, id, disabled = false }: Props) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -37,9 +38,17 @@ export default function ComboboxInput({ value, onChange, options, placeholder, i
           value={value}
           placeholder={placeholder}
           className="form-field"
-          style={{ flex: 1, borderRight: 'none', borderRadius: '2px 0 0 2px', borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
+          disabled={disabled}
+          style={{
+            flex: 1,
+            borderRight: 'none',
+            borderRadius: '2px 0 0 2px',
+            borderTopRightRadius: 0,
+            borderBottomRightRadius: 0,
+            ...(disabled ? { background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface-variant)' } : {}),
+          }}
           onChange={(e) => { onChange(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => { if (!disabled) setOpen(true); }}
           onKeyDown={(e) => {
             if (e.key === 'Escape') setOpen(false);
             if (e.key === 'Enter') setOpen(false);
@@ -49,7 +58,8 @@ export default function ComboboxInput({ value, onChange, options, placeholder, i
         <button
           type="button"
           aria-label={open ? 'Close options' : 'Show options'}
-          onClick={() => setOpen(o => !o)}
+          disabled={disabled}
+          onClick={() => { if (!disabled) setOpen(o => !o); }}
           style={{
             width: '2.25rem',
             flexShrink: 0,
@@ -61,7 +71,7 @@ export default function ComboboxInput({ value, onChange, options, placeholder, i
             borderRadius: '0 2px 2px 0',
             background: 'var(--color-surface-container-low)',
             color: 'var(--color-on-surface-variant)',
-            cursor: 'pointer',
+            cursor: disabled ? 'not-allowed' : 'pointer',
             fontSize: '0.7rem',
             transition: 'background 0.12s',
           }}

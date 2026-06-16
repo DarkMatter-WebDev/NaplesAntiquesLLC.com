@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { isProductPurchasable, isProductSold, productStatusLabel, type Product, type SpotData } from '@/types/product';
+import { inferProductJewelryType, isProductPurchasable, isProductSold, productMetalVariantLabel, productStatusLabel, type Product, type SpotData } from '@/types/product';
 import { getDisplayPrice } from '@/lib/pricing';
 import WishlistButton from '@/components/shop/WishlistButton';
 import type { WishlistItem } from '@/context/WishlistContext';
@@ -13,12 +13,22 @@ interface Props {
   locale: string;
 }
 
+function formatLengthSize(product: Product, isEs: boolean): string | null {
+  const value = product.length?.trim();
+  if (!value) return null;
+  const isRing = inferProductJewelryType(product) === 'Ring';
+  const label = isRing ? (isEs ? 'Talla' : 'Size') : (isEs ? 'Largo' : 'Length');
+  return `${label}: ${value}`;
+}
+
 export default function ProductCard({ product, spotData, locale }: Props) {
   const isEs = locale === 'es';
   const title = isEs && product.title_es ? product.title_es : product.title;
   const price = getDisplayPrice(product, spotData);
+  const metalLabel = productMetalVariantLabel(product.metal_variant, product.category, locale);
   const purityLabel = formatPurity(product, isEs);
   const weightLabel = formatWeight(product.gram_weight ?? product.weight_grams);
+  const lengthLabel = formatLengthSize(product, isEs);
   const images = product.image_urls?.length ? product.image_urls : product.images;
   const thumb = images?.[0];
   const href = locale === 'es' ? `/es/shop/${product.id}` : `/shop/${product.id}`;
@@ -97,7 +107,7 @@ export default function ProductCard({ product, spotData, locale }: Props) {
           className="text-[0.62rem] font-bold uppercase tracking-[0.28em]"
           style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
         >
-          {isEs ? (product.category === 'Gold' ? 'Oro' : 'Plata') : product.category}
+          {metalLabel}
         </span>
 
         <Link href={href} className="group/title">
@@ -130,13 +140,18 @@ export default function ProductCard({ product, spotData, locale }: Props) {
             {price}
           </span>
         </p>
-        <p
-          className="text-[0.76rem] leading-snug font-semibold opacity-85 flex flex-wrap gap-x-2 gap-y-0.5"
+        <div
+          className="text-[0.76rem] leading-snug font-semibold opacity-85 flex items-start justify-between gap-x-3 gap-y-0.5"
           style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
         >
-          <span>{isEs ? 'Pureza' : 'Purity'}: {purityLabel}</span>
-          <span>{isEs ? 'Gramos' : 'Grams'}: {weightLabel}</span>
-        </p>
+          <div className="flex flex-wrap gap-x-2 gap-y-0.5 min-w-0">
+            <span>{isEs ? 'Pureza' : 'Purity'}: {purityLabel}</span>
+            <span>{isEs ? 'Gramos' : 'Grams'}: {weightLabel}</span>
+          </div>
+          {lengthLabel && (
+            <span className="shrink-0 text-right">{lengthLabel}</span>
+          )}
+        </div>
 
         {/* Actions */}
         <div className="flex flex-wrap gap-2 mt-auto pt-3">

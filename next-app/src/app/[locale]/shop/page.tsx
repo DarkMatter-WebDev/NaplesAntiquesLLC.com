@@ -1,10 +1,21 @@
 ﻿import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
-import { isProductPurchasable, normalizeProductStatus, type Product, type ProductStatus } from '@/types/product';
+import {
+  PRODUCT_METAL_VARIANTS,
+  inferProductJewelryType,
+  isProductPurchasable,
+  normalizeProductMetalVariant,
+  normalizeProductStatus,
+  productMetalVariantLabel,
+  productSupportsLinkType,
+  type Product,
+  type ProductStatus,
+} from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
 import { calcSpotPriceValue } from '@/lib/pricing';
 import ProductCard from '@/components/shop/ProductCard';
 import ShopFilters from '@/components/shop/ShopFilters';
+import ShopPagination from '@/components/shop/ShopPagination';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 
@@ -17,14 +28,19 @@ interface Props {
   params: Promise<{ locale: string }>;
   searchParams: Promise<{
     metal?: string;
+    metalColor?: string;
+    metalType?: string;
     purity?: string;
     status?: string;
     itemType?: string;
     chainType?: string;
     length?: string | string[];
     gender?: string;
+    brand?: string;
     q?: string;
     sort?: string;
+    page?: string;
+    perPage?: string;
   }>;
 }
 
@@ -35,8 +51,7 @@ const CHAIN_KEYWORDS: Record<string, string[]> = {
   'anchor-link':   ['anchor', 'gucci'],
   'oval-link':     ['oval link'],
   'byzantine-link':['byzantine'],
-  'bracelet':      ['bracelet'],
-  'ring':          ['ring'],
+  'box-link':      ['box link'],
 };
 
 const ITEM_TYPE_KEYWORDS: Record<string, string[]> = {
@@ -45,8 +60,37 @@ const ITEM_TYPE_KEYWORDS: Record<string, string[]> = {
   earrings: ['earring', 'earrings'],
   ring: ['ring'],
   pendant: ['pendant', 'charm'],
-  watch: ['watch'],
+  brooch: ['brooch', 'pin'],
+  watch: ['watch', 'wristwatch', 'wrist watch', 'timepiece'],
+  coin: ['coin'],
+  bullion: ['bullion', 'bar', 'round', 'ingot'],
+  'loose-diamond': ['loose diamond', 'diamond'],
+  'loose-gemstone': ['loose gemstone', 'gemstone', 'gem'],
+  silverware: ['silverware', 'flatware', 'hollowware'],
+  'estate-lot': ['estate lot', 'estate collection'],
 };
+
+const ITEM_TYPE_VALUES: Record<string, ReturnType<typeof inferProductJewelryType>> = {
+  necklace: 'Necklace',
+  bracelet: 'Bracelet',
+  earrings: 'Earrings',
+  ring: 'Ring',
+  pendant: 'Pendant',
+  brooch: 'Brooch',
+  watch: 'Watch',
+  coin: 'Coin',
+  bullion: 'Bullion',
+  'loose-diamond': 'Loose Diamond',
+  'loose-gemstone': 'Loose Gemstone',
+  silverware: 'Silverware',
+  'estate-lot': 'Estate Lot',
+};
+
+function getProductLinkType(product: Product): string {
+  const jewelryType = inferProductJewelryType(product);
+  if (!productSupportsLinkType(jewelryType)) return '';
+  return product.chain_type ?? (product.tags ?? []).find((t: string) => t.startsWith('ct:'))?.slice(3) ?? '';
+}
 
 const NECKLACE_LENGTH_VALUES = ['16 in', '18 in', '20 in', '22 in', '24 in', '26 in', '28 in', '30 in'];
 const BRACELET_LENGTH_VALUES = ['7 in', '7.5 in', '8 in'];
@@ -63,6 +107,28 @@ function normalizeLengths(length: string | string[] | undefined): string[] {
     .flatMap((value) => value.split(','))
     .map((value) => value.trim())
     .filter(Boolean);
+}
+
+function getEffectiveMetalColor(metal: string | undefined, metalColor: string | undefined): string | undefined {
+  if (!metalColor) return undefined;
+  if (metal === 'gold') {
+    return PRODUCT_METAL_VARIANTS.Gold.some((variant) => variant.value === metalColor) ? metalColor : undefined;
+  }
+  if (metal === 'silver') {
+    return PRODUCT_METAL_VARIANTS.Silver.some((variant) => variant.value === metalColor) ? metalColor : undefined;
+  }
+  return [...PRODUCT_METAL_VARIANTS.Gold, ...PRODUCT_METAL_VARIANTS.Silver].some((variant) => variant.value === metalColor)
+    ? metalColor
+    : undefined;
+}
+
+function productMatchesBroadMetal(product: Product, metal: string | undefined): boolean {
+  if (!metal) return true;
+  const metalVariant = normalizeProductMetalVariant(product.metal_variant, product.category);
+  if (metalVariant === 'bicolor_gold') return metal === 'gold' || metal === 'silver';
+  if (metal === 'gold') return product.category === 'Gold';
+  if (metal === 'silver') return product.category === 'Silver';
+  return true;
 }
 
 function isVisibleInPublicGallery(product: Product): boolean {
@@ -95,6 +161,19 @@ function compareNullableNumbers(
   return direction === 'asc' ? a - b : b - a;
 }
 
+const PER_PAGE_OPTIONS = [12, 24, 48, 96];
+const DEFAULT_PER_PAGE = 24;
+
+function parsePerPage(value: string | undefined): number {
+  const parsed = Number(value);
+  return PER_PAGE_OPTIONS.includes(parsed) ? parsed : DEFAULT_PER_PAGE;
+}
+
+function parsePage(value: string | undefined): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
+
 export default async function ShopPage({ params, searchParams }: Props) {
   const { locale } = await params;
   const filters = await searchParams;
@@ -108,35 +187,46 @@ export default async function ShopPage({ params, searchParams }: Props) {
   const spotData = await fetchSpotData();
   const allProducts: Product[] = (products ?? []) as Product[];
   const publicGalleryProducts = allProducts.filter(isVisibleInPublicGallery);
+  const brandOptions = Array.from(new Set(
+    publicGalleryProducts
+      .map((product) => product.brand?.trim())
+      .filter(Boolean) as string[],
+  )).sort((a, b) => a.localeCompare(b));
+  const selectedMetalColor = getEffectiveMetalColor(filters.metal, filters.metalColor ?? filters.metalType);
   const selectedLengths = normalizeLengths(filters.length);
   const allowedLengthValues = getAllowedLengthValues(filters.itemType);
   const effectiveSelectedLengths = selectedLengths.filter((length) => allowedLengthValues.includes(length));
 
   const filtered = publicGalleryProducts.filter((p) => {
     if (filters.metal) {
-      if (filters.metal === 'gold' && p.category !== 'Gold') return false;
-      if (filters.metal === 'silver' && p.category !== 'Silver') return false;
+      if (!productMatchesBroadMetal(p, filters.metal)) return false;
+    }
+    if (selectedMetalColor && normalizeProductMetalVariant(p.metal_variant, p.category) !== selectedMetalColor) {
+      return false;
     }
     if (filters.purity) {
       if (p.purity !== parseInt(filters.purity)) return false;
     }
     if (filters.status && normalizeProductStatus(p.status) !== normalizeProductStatus(filters.status as ProductStatus)) return false;
     if (filters.itemType) {
+      const selectedJewelryType = ITEM_TYPE_VALUES[filters.itemType];
+      if (selectedJewelryType && inferProductJewelryType(p) !== selectedJewelryType) return false;
       const kws = ITEM_TYPE_KEYWORDS[filters.itemType];
-      if (kws) {
+      if (!selectedJewelryType && kws) {
         const txt = [p.title, p.title_es, p.chain_type, p.length, ...(p.tags ?? []), ...(p.tags_es ?? [])].join(' ').toLowerCase();
         if (!kws.some(k => txt.includes(k))) return false;
       }
     }
     if (filters.q) {
       const q = filters.q.toLowerCase();
-      const txt = [p.title, p.title_es, p.inventory_number, p.sku, p.chain_type, p.length, ...(p.tags ?? []), ...(p.tags_es ?? [])].join(' ').toLowerCase();
+      const txt = [p.title, p.title_es, p.brand, p.inventory_number, p.sku, productMetalVariantLabel(p.metal_variant, p.category), p.chain_type, p.length, ...(p.tags ?? []), ...(p.tags_es ?? [])].join(' ').toLowerCase();
       if (!txt.includes(q)) return false;
     }
-    if (filters.chainType) {
+    if (filters.chainType && (filters.itemType === 'necklace' || filters.itemType === 'bracelet')) {
       const kws = CHAIN_KEYWORDS[filters.chainType];
       if (kws) {
-        const txt = [p.title, p.chain_type, ...(p.tags ?? [])].join(' ').toLowerCase();
+        if (!productSupportsLinkType(inferProductJewelryType(p))) return false;
+        const txt = [getProductLinkType(p), ...(p.tags ?? [])].join(' ').toLowerCase();
         if (!kws.some(k => txt.includes(k))) return false;
       }
     }
@@ -149,6 +239,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
       // Unisex items appear in all gender categories
       if (g !== 'Unisex' && g !== filters.gender) return false;
     }
+    if (filters.brand && p.brand?.trim() !== filters.brand) return false;
     return true;
   });
 
@@ -171,8 +262,24 @@ export default async function ShopPage({ params, searchParams }: Props) {
       );
       if (byPrice !== 0) return byPrice;
     }
+    if (filters.sort === 'brand-asc' || filters.sort === 'brand-desc') {
+      const aBrand = a.brand?.trim() ?? '';
+      const bBrand = b.brand?.trim() ?? '';
+      if (!aBrand && bBrand) return 1;
+      if (aBrand && !bBrand) return -1;
+      const byBrand = aBrand.localeCompare(bBrand, undefined, { sensitivity: 'base' });
+      if (byBrand !== 0) return filters.sort === 'brand-asc' ? byBrand : -byBrand;
+    }
     return (a.sort_order ?? 0) - (b.sort_order ?? 0);
   });
+
+  const perPage = parsePerPage(filters.perPage);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / perPage));
+  const currentPage = Math.min(parsePage(filters.page), totalPages);
+  const startIndex = (currentPage - 1) * perPage;
+  const paginatedProducts = sorted.slice(startIndex, startIndex + perPage);
+  const showingStart = sorted.length === 0 ? 0 : startIndex + 1;
+  const showingEnd = startIndex + paginatedProducts.length;
 
   const isEs = locale === 'es';
 
@@ -270,39 +377,77 @@ export default async function ShopPage({ params, searchParams }: Props) {
             </div>
           </section>
 
-          {/* ── Filters ────────────────────────────────────────── */}
-          <ShopFilters
-            locale={locale}
-            currentFilters={filters}
-            filteredCount={sorted.length}
-            allCount={publicGalleryProducts.length}
-            spotData={spotData}
-          />
+          <div className="shop-catalog-layout">
+            {/* ── Filters ────────────────────────────────────────── */}
+            <aside className="shop-filter-sidebar" aria-label={isEs ? 'Filtros de tienda' : 'Shop filters'}>
+              <ShopFilters
+                locale={locale}
+                currentFilters={filters}
+                brandOptions={brandOptions}
+                filteredCount={sorted.length}
+                allCount={publicGalleryProducts.length}
+                spotData={spotData}
+              />
+            </aside>
 
-          {/* ── Grid ───────────────────────────────────────────── */}
-          {filtered.length === 0 ? (
-            <p
-              className="py-24 text-center text-sm"
-              style={{ color: 'var(--color-on-surface-variant)' }}
-            >
-              {isEs ? 'Ningún artículo coincide con sus filtros.' : 'No items match your filters.'}
-            </p>
-          ) : (
-            <div className="shop-product-grid grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-5 mt-8">
-              {sorted.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  spotData={spotData}
-                  locale={locale}
-                />
-              ))}
-            </div>
-          )}
+            {/* ── Grid ───────────────────────────────────────────── */}
+            <section className="min-w-0">
+              {filtered.length === 0 ? (
+                <p
+                  className="py-24 text-center text-sm"
+                  style={{ color: 'var(--color-on-surface-variant)' }}
+                >
+                  {isEs ? 'Ningún artículo coincide con sus filtros.' : 'No items match your filters.'}
+                </p>
+              ) : (
+                <>
+                  <div className="shop-product-grid grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-5">
+                    {paginatedProducts.map((product) => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        spotData={spotData}
+                        locale={locale}
+                      />
+                    ))}
+                  </div>
+                  <ShopPagination
+                    locale={locale}
+                    currentPage={currentPage}
+                    perPage={perPage}
+                    totalPages={totalPages}
+                    totalCount={sorted.length}
+                    showingStart={showingStart}
+                    showingEnd={showingEnd}
+                  />
+                </>
+              )}
+            </section>
+          </div>
           <style>{`
+            .shop-catalog-layout {
+              display: block;
+              margin-top: 2rem;
+            }
+            .shop-filter-sidebar {
+              min-width: 0;
+            }
+            @media (min-width: 1024px) {
+              .shop-catalog-layout {
+                display: grid;
+                grid-template-columns: minmax(17rem, 19rem) minmax(0, 1fr);
+                align-items: start;
+                gap: 1.5rem;
+              }
+              .shop-filter-sidebar {
+                position: sticky;
+                top: 6.5rem;
+                align-self: start;
+              }
+            }
             @media (min-width: 1720px) {
               .shop-product-grid {
-                grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+                grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
               }
             }
           `}</style>

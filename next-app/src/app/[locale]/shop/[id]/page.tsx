@@ -2,9 +2,18 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { isProductPurchasable, isProductSold, productStatusLabel, type Product } from '@/types/product';
+import {
+  inferProductJewelryType,
+  isProductPurchasable,
+  isProductSold,
+  productJewelryTypeLabel,
+  productMetalVariantLabel,
+  productStatusLabel,
+  productSupportsLinkType,
+  type Product,
+} from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
-import { getDisplayPrice, purityToFraction } from '@/lib/pricing';
+import { calcSpotMeltValue, formatUsdPrice, getDisplayPrice, purityToFraction } from '@/lib/pricing';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import ProductImageGallery from '@/components/shop/ProductImageGallery';
@@ -12,9 +21,11 @@ import WishlistButton from '@/components/shop/WishlistButton';
 import type { WishlistItem } from '@/context/WishlistContext';
 import CartButton from '@/components/shop/CartButton';
 import type { CartItem } from '@/context/CartContext';
+import PriceUpdateTicker from '@/components/shop/PriceUpdateTicker';
 
 interface Props {
   params: Promise<{ locale: string; id: string }>;
+  searchParams?: Promise<{ returnTo?: string }>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -38,6 +49,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 const GRAMS_PER_TROY_OZ = 31.1034768;
+const SPOT_PRICE_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
 
 const SILVER_PURITY_LABELS: Record<number, string> = {
   999: '99.9%', 950: '95%', 925: '92.5%', 900: '90%', 850: '85%', 800: '80%',
@@ -50,10 +62,16 @@ function formatKarat(purity: number): string {
   return `${purity}%`;
 }
 
-export default async function ProductDetailPage({ params }: Props) {
+export default async function ProductDetailPage({ params, searchParams }: Props) {
   const { locale, id } = await params;
+  const query = searchParams ? await searchParams : {};
   const isEs = locale === 'es';
   const shopHref = isEs ? '/es/shop' : '/shop';
+  const adminHref = isEs ? '/es/admin' : '/admin';
+  const backHref = query.returnTo === 'admin' ? adminHref : shopHref;
+  const backLabel = query.returnTo === 'admin'
+    ? (isEs ? 'Volver al admin' : 'Back to Admin')
+    : (isEs ? 'Volver a la tienda' : 'Back to Shop');
   const contactHref = isEs ? '/es/contact' : '/contact';
 
   const supabase = await createClient();
@@ -70,36 +88,44 @@ export default async function ProductDetailPage({ params }: Props) {
 
   const title = isEs && p.title_es ? p.title_es : p.title;
   const description = isEs && p.description_es ? p.description_es : p.description;
+  const publicNotes = p.public_notes?.trim();
+  const metalLabel = productMetalVariantLabel(p.metal_variant, p.category, locale);
   const price = getDisplayPrice(p, spotData);
   const isSold = isProductSold(p.status);
   const isPurchasable = isProductPurchasable(p.status);
   const productImages = p.image_urls?.length ? p.image_urls : p.images ?? [];
   const productWeight = p.gram_weight ?? p.weight_grams;
 
-  // Raw melt/scrap value at spot (multiplier = 1.0)
-  let scrapValue: string | null = null;
-  if (
+  const showScrapValue =
     p.price_mode === 'spot-multiplier' &&
-    productWeight && p.purity &&
+    Boolean(productWeight && p.purity) &&
     p.pricing_multiplier && p.pricing_multiplier !== 1 &&
-    spotData
-  ) {
-    const spotPerOz = p.category === 'Silver'
-      ? (spotData.silverPerTroyOz ?? 33)
-      : spotData.goldPerTroyOz;
-    const melt = productWeight * purityToFraction(p.purity) * (spotPerOz / GRAMS_PER_TROY_OZ);
-    scrapValue = new Intl.NumberFormat('en-US', {
-      style: 'currency', currency: 'USD', maximumFractionDigits: 0,
-    }).format(melt);
-  }
+    Boolean(spotData);
+  const meltValue = showScrapValue ? calcSpotMeltValue(p, spotData) : null;
+  const scrapValue = meltValue == null ? null : formatUsdPrice(meltValue);
+  const spotPerOz = p.category === 'Silver'
+    ? spotData.silverPerTroyOz
+    : spotData.goldPerTroyOz;
+  const spotValueLabel = spotPerOz == null ? null : new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(spotPerOz);
+  const nextSpotUpdateAt = spotData.fetchedAt + SPOT_PRICE_UPDATE_INTERVAL_MS;
 
   // Auto-compile specs from structured fields
-  const chainType = p.chain_type ?? (p.tags ?? []).find(t => t.startsWith('ct:'))?.slice(3) ?? null;
+  const jewelryType = inferProductJewelryType(p);
+  const chainType = productSupportsLinkType(jewelryType)
+    ? p.chain_type ?? (p.tags ?? []).find(t => t.startsWith('ct:'))?.slice(3) ?? null
+    : null;
   const length = p.length ?? (p.tags ?? []).find(t => t.startsWith('len:'))?.slice(4) ?? null;
   const specs: { label: string; value: string }[] = [];
 
+  if (p.brand?.trim()) specs.push({ label: isEs ? 'Marca' : 'Brand', value: p.brand.trim() });
+
   const metalValue = [
-    isEs ? (p.category === 'Gold' ? 'Oro' : 'Plata') : p.category,
+    metalLabel,
     p.purity ? formatKarat(p.purity) : null,
   ].filter(Boolean).join(' · ');
   if (metalValue) specs.push({ label: isEs ? 'Metal' : 'Metal', value: metalValue });
@@ -116,8 +142,12 @@ export default async function ProductDetailPage({ params }: Props) {
     specs.push({ label: isEs ? 'Peso' : 'Weight', value: weightValue });
   }
 
-  if (chainType) specs.push({ label: isEs ? 'Tipo' : 'Type', value: chainType });
-  if (length) specs.push({ label: isEs ? 'Largo' : 'Length', value: length });
+  specs.push({ label: isEs ? 'Tipo de producto' : 'Product Type', value: productJewelryTypeLabel(jewelryType, locale) });
+  if (chainType) specs.push({ label: isEs ? 'Tipo de enlace' : 'Link Type', value: chainType });
+  if (length) specs.push({
+    label: jewelryType === 'Ring' ? (isEs ? 'Talla' : 'Size') : (isEs ? 'Largo' : 'Length'),
+    value: length,
+  });
 
   const gender = p.gender ?? 'Unisex';
   if (gender !== 'Unisex') {
@@ -179,11 +209,11 @@ export default async function ProductDetailPage({ params }: Props) {
         {/* Back to shop */}
         <div className="max-w-7xl mx-auto px-4 md:px-8 mb-6">
           <Link
-            href={shopHref}
+            href={backHref}
             className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest hover:underline underline-offset-2"
             style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
           >
-            ← {isEs ? 'Volver a la tienda' : 'Back to Shop'}
+            ← {backLabel}
           </Link>
         </div>
 
@@ -202,7 +232,7 @@ export default async function ProductDetailPage({ params }: Props) {
                   className="text-[0.62rem] font-bold uppercase tracking-[0.3em]"
                   style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
                 >
-                  {isEs ? (p.category === 'Gold' ? 'Oro' : 'Plata') : p.category}
+                  {metalLabel}
                   {p.purity ? ` · ${formatKarat(p.purity)}` : ''}
                 </span>
                 <span
@@ -241,15 +271,77 @@ export default async function ProductDetailPage({ params }: Props) {
                   <span style={{ color: 'var(--color-primary)' }}>✓</span>
                   {isEs ? 'Este es su precio' : 'This is your price'}
                 </p>
+                {isPurchasable && (
+                  <div className="flex flex-wrap gap-3 pt-3">
+                    <CartButton item={cartItem} variant="detail" locale={locale} />
+                    <WishlistButton item={wishlistItem} variant="button" locale={locale} />
+                    <Link href={`${contactHref}?item=${encodeURIComponent(p.title)}`} className="outline-button">
+                      {isEs ? 'Consultar' : 'Inquire'}
+                    </Link>
+                    <a href="tel:2394048505" className="outline-button">
+                      {isEs ? 'Llamar' : 'Call'}
+                    </a>
+                  </div>
+                )}
                 {scrapValue && (
-                  <p
-                    className="mt-2 text-xs font-semibold"
-                    style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                  <div
+                    className="mt-3 border p-1.5"
+                    style={{
+                      borderColor: '#e2d2aa',
+                      background: '#fbf7ee',
+                      borderRadius: '8px',
+                    }}
                   >
-                    {isEs
-                      ? `Valor actual de ${p.category === 'Silver' ? 'plata' : 'oro'} para fundir: ${scrapValue}`
-                      : `Current scrap ${p.category === 'Silver' ? 'silver' : 'gold'} value: ${scrapValue}`}
-                  </p>
+                    <div className="grid gap-1.5 sm:grid-cols-2">
+                      <div
+                        className="px-3 py-2.5"
+                        style={{
+                          background: 'linear-gradient(135deg, #c9a13d 0%, #a9821e 100%)',
+                          borderRadius: '8px',
+                          boxShadow: '0 8px 18px rgba(169, 130, 30, 0.18)',
+                        }}
+                      >
+                        <span
+                          className="block text-[0.58rem] font-bold uppercase tracking-[0.12em]"
+                          style={{ color: 'rgba(255, 249, 232, 0.82)', fontFamily: 'var(--font-label)' }}
+                        >
+                          {isEs
+                            ? `Valor de ${p.category === 'Silver' ? 'plata' : 'oro'}`
+                            : `Scrap ${p.category === 'Silver' ? 'silver' : 'gold'} value`}
+                        </span>
+                        <span
+                          className="mt-1 block text-[0.95rem] font-extrabold"
+                          style={{ color: '#ffffff', fontFamily: 'var(--font-label)' }}
+                        >
+                          {scrapValue}
+                        </span>
+                      </div>
+                      {spotValueLabel && (
+                        <div
+                          className="border px-3 py-2.5"
+                          style={{
+                            borderColor: '#eadfca',
+                            background: '#f4eddf',
+                            borderRadius: '8px',
+                          }}
+                        >
+                          <span
+                            className="block text-[0.58rem] font-bold uppercase tracking-[0.12em]"
+                            style={{ color: '#8b7b5a', fontFamily: 'var(--font-label)' }}
+                          >
+                            {isEs ? 'Basado en spot' : 'Based on spot'}
+                          </span>
+                          <span
+                            className="mt-1 block text-[0.95rem] font-extrabold"
+                            style={{ color: '#3b3324', fontFamily: 'var(--font-label)' }}
+                          >
+                            {spotValueLabel}/oz
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <PriceUpdateTicker nextUpdateAt={nextSpotUpdateAt} locale={locale} />
+                  </div>
                 )}
               </div>
 
@@ -309,20 +401,6 @@ export default async function ProductDetailPage({ params }: Props) {
                 </div>
               )}
 
-              {/* CTAs */}
-              {isPurchasable && (
-                <div className="flex flex-wrap gap-3 pt-2">
-                  <CartButton item={cartItem} variant="detail" locale={locale} />
-                  <WishlistButton item={wishlistItem} variant="button" locale={locale} />
-                  <Link href={`${contactHref}?item=${encodeURIComponent(p.title)}`} className="outline-button">
-                    {isEs ? 'Consultar' : 'Inquire'}
-                  </Link>
-                  <a href="tel:2394048505" className="outline-button">
-                    {isEs ? 'Llamar' : 'Call'}
-                  </a>
-                </div>
-              )}
-
               {!isPurchasable && (
                 <div>
                   <p className="text-sm mb-3" style={{ color: 'var(--color-on-surface-variant)' }}>
@@ -333,6 +411,21 @@ export default async function ProductDetailPage({ params }: Props) {
                   <Link href={contactHref} className="outline-button">
                     {isEs ? 'Consultar piezas similares' : 'Ask About Similar Pieces'}
                   </Link>
+                </div>
+              )}
+
+              {/* Public notes */}
+              {publicNotes && (
+                <div className="border-t pt-4" style={{ borderColor: 'var(--color-outline-variant)' }}>
+                  <p
+                    className="text-[0.62rem] font-bold uppercase tracking-[0.2em] mb-3"
+                    style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+                  >
+                    {isEs ? 'Notas' : 'Notes'}
+                  </p>
+                  <p className="whitespace-pre-line text-sm leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    {publicNotes}
+                  </p>
                 </div>
               )}
 
