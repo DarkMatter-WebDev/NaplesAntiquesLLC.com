@@ -59,11 +59,11 @@ export default function ShopPagination({
   return (
     <nav
       aria-label={isEs ? 'Paginacion de productos' : 'Product pagination'}
-      className="mt-8 flex flex-col gap-4 border-t pt-5 md:flex-row md:items-center md:justify-between"
+      className="mt-8 grid gap-4 border-t pt-5 md:grid-cols-[1fr_auto_1fr] md:items-center"
       style={{ borderColor: 'rgba(115, 92, 0, 0.24)' }}
     >
       <div
-        className="flex flex-wrap items-center gap-3 text-sm"
+        className="text-sm"
         style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
       >
         <span>
@@ -75,27 +75,11 @@ export default function ShopPagination({
               ? 'No hay resultados'
               : 'No results'}
         </span>
-        <label className="flex items-center gap-2">
-          <span>{isEs ? 'Por pagina' : 'Per page'}</span>
-          <select
-            value={perPage}
-            onChange={(event) => updatePerPage(event.target.value)}
-            className="border bg-[color:var(--color-background)] px-2 py-1 text-sm"
-            style={{
-              borderColor: 'rgba(115, 92, 0, 0.35)',
-              color: 'var(--color-on-surface)',
-              fontFamily: 'var(--font-label)',
-            }}
-          >
-            {PER_PAGE_OPTIONS.map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-        </label>
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        {totalPages > 1 && (
+          <>
           <PageLink
             href={buildHref(Math.max(1, currentPage - 1))}
             disabled={currentPage <= 1}
@@ -114,8 +98,30 @@ export default function ShopPagination({
             disabled={currentPage >= totalPages}
             label={isEs ? 'Siguiente' : 'Next'}
           />
-        </div>
-      )}
+          </>
+        )}
+      </div>
+
+      <label
+        className="flex items-center gap-2 text-sm md:justify-self-end"
+        style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+      >
+        <span>{isEs ? 'Por pagina' : 'Per page'}</span>
+        <select
+          value={perPage}
+          onChange={(event) => updatePerPage(event.target.value)}
+          className="border bg-[color:var(--color-background)] px-2 py-1 text-sm"
+          style={{
+            borderColor: 'rgba(115, 92, 0, 0.35)',
+            color: 'var(--color-on-surface)',
+            fontFamily: 'var(--font-label)',
+          }}
+        >
+          {PER_PAGE_OPTIONS.map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+      </label>
     </nav>
   );
 }

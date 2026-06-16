@@ -1,6 +1,9 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { inferProductJewelryType, isProductPurchasable, isProductSold, productMetalVariantLabel, productStatusLabel, type Product, type SpotData } from '@/types/product';
+import { isProductPurchasable, isProductSold, productImagePaddingBackground, productLengthSizeDisplay, productMetalVariantLabel, productStatusLabel, type Product, type SpotData } from '@/types/product';
 import { getDisplayPrice } from '@/lib/pricing';
 import WishlistButton from '@/components/shop/WishlistButton';
 import type { WishlistItem } from '@/context/WishlistContext';
@@ -11,29 +14,35 @@ interface Props {
   product: Product;
   spotData: SpotData | null;
   locale: string;
+  variant?: 'classic' | 'modern';
 }
 
-function formatLengthSize(product: Product, isEs: boolean): string | null {
-  const value = product.length?.trim();
-  if (!value) return null;
-  const isRing = inferProductJewelryType(product) === 'Ring';
-  const label = isRing ? (isEs ? 'Talla' : 'Size') : (isEs ? 'Largo' : 'Length');
-  return `${label}: ${value}`;
-}
-
-export default function ProductCard({ product, spotData, locale }: Props) {
+export default function ProductCard({ product, spotData, locale, variant = 'classic' }: Props) {
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [isImageHovering, setIsImageHovering] = useState(false);
   const isEs = locale === 'es';
   const title = isEs && product.title_es ? product.title_es : product.title;
   const price = getDisplayPrice(product, spotData);
   const metalLabel = productMetalVariantLabel(product.metal_variant, product.category, locale);
   const purityLabel = formatPurity(product, isEs);
+  const purityChipStyle = getPurityChipStyle(product);
   const weightLabel = formatWeight(product.gram_weight ?? product.weight_grams);
-  const lengthLabel = formatLengthSize(product, isEs);
-  const images = product.image_urls?.length ? product.image_urls : product.images;
-  const thumb = images?.[0];
+  const lengthLabel = productLengthSizeDisplay(product);
+  const images = useMemo(
+    () => (product.image_urls?.length ? product.image_urls : product.images ?? []).filter(Boolean),
+    [product.image_urls, product.images],
+  );
+  const thumb = images[0];
+  const safeActiveImageIndex = activeImageIndex < images.length ? activeImageIndex : 0;
+  const activeImage = images[safeActiveImageIndex] ?? thumb;
+  const hasMultipleImages = images.length > 1;
+  const canShowPreviousImage = hasMultipleImages && safeActiveImageIndex > 0;
+  const canShowNextImage = hasMultipleImages && safeActiveImageIndex < images.length - 1;
+  const imageFrameBackground = productImagePaddingBackground(product.image_padding);
   const href = locale === 'es' ? `/es/shop/${product.id}` : `/shop/${product.id}`;
   const isSold = isProductSold(product.status);
   const isPurchasable = isProductPurchasable(product.status);
+  const isModern = variant === 'modern';
 
   const cartItem: CartItem = {
     id: product.id,
@@ -57,15 +66,63 @@ export default function ProductCard({ product, spotData, locale }: Props) {
     manual_price_label: product.manual_price_label,
   };
 
+  useEffect(() => {
+    if (!isImageHovering || !canShowNextImage) return;
+    const timer = window.setInterval(() => {
+      setActiveImageIndex((current) => Math.min(current + 1, images.length - 1));
+    }, 1150);
+    return () => window.clearInterval(timer);
+  }, [canShowNextImage, images.length, isImageHovering]);
+
+  useEffect(() => {
+    if (isImageHovering || activeImageIndex === 0) return;
+    const timer = window.setTimeout(() => {
+      setActiveImageIndex(0);
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [activeImageIndex, isImageHovering]);
+
+  const showPreviousImage = () => {
+    if (!canShowPreviousImage) return;
+    setActiveImageIndex((current) => Math.max(current - 1, 0));
+  };
+
+  const showNextImage = () => {
+    if (!canShowNextImage) return;
+    setActiveImageIndex((current) => Math.min(current + 1, images.length - 1));
+  };
+
   return (
-    <article className="group relative flex flex-col bg-[color:var(--color-surface-container-lowest)] border border-[color:var(--color-outline-variant)] overflow-hidden">
+    <article
+      className={`group relative flex flex-col overflow-hidden ${
+        isModern
+          ? 'modern-product-card bg-white'
+          : 'bg-[color:var(--color-surface-container-lowest)] border border-[color:var(--color-outline-variant)]'
+      }`}
+      style={isModern ? {
+        border: '1px solid rgba(115, 92, 0, 0.12)',
+        borderRadius: '8px',
+        boxShadow: '0 12px 32px rgba(42, 34, 12, 0.10)',
+      } : undefined}
+    >
 
       {/* Image */}
-      <div className="relative aspect-square overflow-hidden bg-[color:var(--color-surface-container)]">
+      <div
+        className={`relative aspect-square overflow-hidden ${isModern ? 'modern-product-image' : ''}`}
+        style={{ background: imageFrameBackground }}
+        onPointerEnter={() => setIsImageHovering(true)}
+        onPointerLeave={() => setIsImageHovering(false)}
+        onMouseEnter={() => setIsImageHovering(true)}
+        onMouseLeave={() => setIsImageHovering(false)}
+      >
         {isSold && (
           <div
             className="absolute top-3 left-3 z-10 text-[0.6rem] font-bold tracking-widest uppercase px-2 py-0.5"
-            style={{ background: 'var(--color-on-surface)', color: 'var(--color-surface)' }}
+            style={{
+              background: isModern ? '#1f2321' : 'var(--color-on-surface)',
+              color: 'var(--color-surface)',
+              borderRadius: isModern ? '4px' : undefined,
+            }}
           >
             {isEs ? 'Vendido' : 'Sold'}
           </div>
@@ -73,7 +130,12 @@ export default function ProductCard({ product, spotData, locale }: Props) {
         {!isSold && (
           <div
             className="absolute top-3 left-3 z-10 text-[0.6rem] font-bold tracking-widest uppercase px-2 py-0.5"
-            style={{ background: isPurchasable ? 'var(--color-primary)' : '#8a5a00', color: 'var(--color-on-primary)' }}
+            style={{
+              background: isPurchasable ? (isModern ? 'linear-gradient(135deg, #d5a820, #ad8507)' : 'var(--color-primary)') : '#8a5a00',
+              color: isModern ? '#fffdf7' : 'var(--color-on-primary)',
+              borderRadius: isModern ? '4px' : undefined,
+              boxShadow: isModern ? '0 8px 18px rgba(115, 92, 0, 0.16)' : undefined,
+            }}
           >
             {isPurchasable ? (isEs ? 'Disponible' : 'Available') : productStatusLabel(product.status)}
           </div>
@@ -83,21 +145,70 @@ export default function ProductCard({ product, spotData, locale }: Props) {
           <WishlistButton item={wishlistItem} variant="icon" locale={locale} />
         </div>
 
-        {thumb ? (
-          <Link href={href}>
-            <Image
-              src={thumb}
-              alt={title}
-              fill
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              className="object-contain object-center"
-              loading="lazy"
-              // Local assets in the static folder aren't in remotePatterns; unoptimized for those
-              unoptimized={thumb.startsWith('/assets/')}
-            />
+        {activeImage ? (
+          <Link href={href} className="absolute inset-0">
+            {images.map((image, index) => (
+              <Image
+                key={`${product.id}-${index}-${image}`}
+                src={image}
+                alt={title}
+                fill
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                className={`pointer-events-none object-contain object-center transition-opacity duration-700 ease-in-out ${
+                  index === safeActiveImageIndex ? 'opacity-100' : 'opacity-0'
+                }`}
+                loading="lazy"
+                // Local assets in the static folder aren't in remotePatterns; unoptimized for those
+                unoptimized={image.startsWith('/assets/')}
+              />
+            ))}
           </Link>
         ) : (
           <div className="w-full h-full flex items-center justify-center text-3xl opacity-30">📷</div>
+        )}
+        {hasMultipleImages && (
+          <>
+            {canShowPreviousImage && (
+              <button
+                type="button"
+                aria-label={isEs ? 'Imagen anterior' : 'Previous image'}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  showPreviousImage();
+                }}
+                className="absolute bottom-2 left-2 z-20 inline-flex h-6 w-6 items-center justify-center border text-sm font-bold transition-colors"
+                style={{
+                  borderColor: 'rgba(115, 92, 0, 0.3)',
+                  background: 'rgba(255, 252, 246, 0.9)',
+                  color: 'var(--color-primary)',
+                  boxShadow: '0 3px 10px rgba(0,0,0,0.12)',
+                }}
+              >
+                &lsaquo;
+              </button>
+            )}
+            {canShowNextImage && (
+              <button
+                type="button"
+                aria-label={isEs ? 'Imagen siguiente' : 'Next image'}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  showNextImage();
+                }}
+                className="absolute bottom-2 right-2 z-20 inline-flex h-6 w-6 items-center justify-center border text-sm font-bold transition-colors"
+                style={{
+                  borderColor: 'rgba(115, 92, 0, 0.3)',
+                  background: 'rgba(255, 252, 246, 0.9)',
+                  color: 'var(--color-primary)',
+                  boxShadow: '0 3px 10px rgba(0,0,0,0.12)',
+                }}
+              >
+                &rsaquo;
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -124,33 +235,64 @@ export default function ProductCard({ product, spotData, locale }: Props) {
         </Link>
 
         <p
-          className="pt-0.5 flex items-baseline gap-1.5 flex-wrap"
-          style={{ fontFamily: 'var(--font-label)' }}
+          className={`mt-1 flex items-baseline gap-2 px-2 py-1.5 ${isModern ? 'modern-price-row' : 'border-y'}`}
+          style={{
+            background: isModern ? 'linear-gradient(135deg, rgba(255, 250, 238, 0.92), rgba(249, 244, 232, 0.96))' : 'rgba(194, 155, 45, 0.06)',
+            borderColor: 'rgba(115, 92, 0, 0.18)',
+            borderTop: isModern ? '1px solid rgba(115, 92, 0, 0.14)' : undefined,
+            borderBottom: isModern ? '1px solid rgba(115, 92, 0, 0.14)' : undefined,
+            borderRadius: isModern ? '6px' : undefined,
+            fontFamily: 'var(--font-label)',
+          }}
         >
           <span
-            className="text-xs font-bold uppercase tracking-widest"
+            className="text-[0.68rem] font-extrabold uppercase tracking-widest"
             style={{ color: 'var(--color-on-surface-variant)' }}
           >
             {isEs ? 'Tu precio' : 'Your price'}
           </span>
           <span
-            className="text-xs font-extrabold uppercase tracking-widest"
+            className="text-base font-extrabold uppercase tracking-wide"
             style={{ color: 'var(--color-primary)' }}
           >
             {price}
           </span>
         </p>
         <div
-          className="text-[0.76rem] leading-snug font-semibold opacity-85 flex items-start justify-between gap-x-3 gap-y-0.5"
-          style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+          className="grid grid-cols-3 gap-1 text-[0.68rem] font-bold leading-none"
+          style={{ fontFamily: 'var(--font-label)' }}
         >
-          <div className="flex flex-wrap gap-x-2 gap-y-0.5 min-w-0">
-            <span>{isEs ? 'Pureza' : 'Purity'}: {purityLabel}</span>
-            <span>{isEs ? 'Gramos' : 'Grams'}: {weightLabel}</span>
-          </div>
-          {lengthLabel && (
-            <span className="shrink-0 text-right">{lengthLabel}</span>
-          )}
+          <span
+            className="inline-flex min-w-0 items-center justify-center whitespace-nowrap border px-1 py-1"
+            style={{
+              background: purityChipStyle.background,
+              borderColor: purityChipStyle.borderColor,
+              color: purityChipStyle.color,
+            }}
+          >
+            {purityLabel}
+          </span>
+          <span
+            className="inline-flex min-w-0 items-center justify-center whitespace-nowrap border px-1 py-1"
+            style={{
+              background: 'rgba(72, 65, 52, 0.07)',
+              borderColor: 'rgba(72, 65, 52, 0.18)',
+              color: 'var(--color-on-surface-variant)',
+            }}
+          >
+            {weightLabel}
+          </span>
+          <span
+            className="inline-flex min-w-0 items-center justify-center whitespace-nowrap border px-1 py-1"
+            style={{
+              background: lengthLabel ? 'rgba(139, 85, 36, 0.08)' : 'transparent',
+              borderColor: lengthLabel ? 'rgba(139, 85, 36, 0.2)' : 'transparent',
+              color: '#7a4a1f',
+              visibility: lengthLabel ? 'visible' : 'hidden',
+            }}
+          >
+            {lengthLabel ?? ''}
+          </span>
         </div>
 
         {/* Actions */}
@@ -158,6 +300,27 @@ export default function ProductCard({ product, spotData, locale }: Props) {
           <CartButton item={cartItem} variant="card" locale={locale} />
         </div>
       </div>
+      {isModern && (
+        <style>{`
+          .modern-product-card {
+            transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+          }
+          .modern-product-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(181, 137, 12, 0.26) !important;
+            box-shadow: 0 18px 44px rgba(42, 34, 12, 0.14) !important;
+          }
+          .modern-product-card .shop-card-cart-button {
+            border-radius: 6px;
+            border-color: rgba(181, 137, 12, 0.38) !important;
+            background: rgba(255, 253, 248, 0.86);
+          }
+          .modern-product-card .shop-card-cart-button:hover {
+            background: linear-gradient(135deg, #d9ad2f, #b98c09);
+            color: #fffdf7;
+          }
+        `}</style>
+      )}
     </article>
   );
 }
@@ -170,6 +333,27 @@ function formatPurity(product: Product, isEs: boolean): string {
       : `${product.purity}`;
   }
   return `${product.purity}K`;
+}
+
+function getPurityChipStyle(product: Product) {
+  if (!product.purity || product.category !== 'Gold' || product.purity > 24) {
+    return {
+      background: 'rgba(194, 155, 45, 0.1)',
+      borderColor: 'rgba(115, 92, 0, 0.22)',
+      color: 'var(--color-primary)',
+    };
+  }
+
+  const karat = Math.min(24, Math.max(10, product.purity));
+  const intensity = (karat - 10) / 12;
+  const fillPercent = Math.round(18 + intensity * 42);
+  const borderPercent = Math.round(32 + intensity * 38);
+
+  return {
+    background: `color-mix(in srgb, #ffd84d ${fillPercent}%, var(--color-background))`,
+    borderColor: `color-mix(in srgb, #c99800 ${borderPercent}%, rgba(115, 92, 0, 0.22))`,
+    color: karat >= 18 ? '#6f4e00' : karat >= 14 ? '#735c00' : '#6f622f',
+  };
 }
 
 function formatWeight(weight: number | null): string {

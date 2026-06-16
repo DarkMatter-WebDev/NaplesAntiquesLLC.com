@@ -50,6 +50,9 @@ export type ProductJewelryType =
   | 'Estate Lot'
   | 'Other';
 
+export type ProductImagePadding = 'none' | 'white' | 'black';
+const PRODUCT_IMAGE_PADDING_HEX_PATTERN = /^#[0-9a-f]{6}$/i;
+
 export interface Product {
   id: string;
   category: 'Gold' | 'Silver';
@@ -78,6 +81,7 @@ export interface Product {
   location: ProductLocation | string | null;
   images: string[];
   image_urls: string[];
+  image_padding: ProductImagePadding | string | null;
   description: string | null;
   description_es: string | null;
   details: string[];
@@ -99,6 +103,35 @@ export interface Product {
   sort_order: number;
   created_at: string;
   updated_at: string;
+}
+
+export function normalizeProductImagePadding(value: string | null | undefined): ProductImagePadding {
+  const normalized = String(value ?? '').trim().toLowerCase().replace(/[_\s-]+/g, '_');
+  if (normalized === 'white') return 'white';
+  if (normalized === 'black') return 'black';
+  return 'none';
+}
+
+export function normalizeProductImagePaddingValue(value: string | null | undefined): ProductImagePadding | string {
+  const raw = String(value ?? '').trim();
+  if (PRODUCT_IMAGE_PADDING_HEX_PATTERN.test(raw)) return raw.toLowerCase();
+  return normalizeProductImagePadding(raw);
+}
+
+export function isProductImagePaddingCustomColor(value: string | null | undefined): boolean {
+  return PRODUCT_IMAGE_PADDING_HEX_PATTERN.test(String(value ?? '').trim());
+}
+
+export function hasProductImagePadding(value: string | null | undefined): boolean {
+  return normalizeProductImagePaddingValue(value) !== 'none';
+}
+
+export function productImagePaddingBackground(value: string | null | undefined): string {
+  const normalized = normalizeProductImagePaddingValue(value);
+  if (isProductImagePaddingCustomColor(normalized)) return normalized;
+  if (normalized === 'white') return '#ffffff';
+  if (normalized === 'black') return '#000000';
+  return 'var(--color-surface-container)';
 }
 
 export interface SpotData {
@@ -269,6 +302,19 @@ export function productMetalTypeLabel(value: string | null | undefined, category
 export function productSupportsLinkType(jewelryType: string | null | undefined): boolean {
   const normalized = normalizeProductJewelryType(jewelryType);
   return normalized === 'Necklace' || normalized === 'Bracelet';
+}
+
+export function productLengthSizeDisplay(
+  product: Pick<Product, 'length' | 'tags' | 'jewelry_type' | 'product_type' | 'title' | 'title_es' | 'chain_type' | 'tags_es'>,
+): string | null {
+  const rawValue = product.length ?? (product.tags ?? []).find((tag) => tag.startsWith('len:'))?.slice(4) ?? null;
+  const value = rawValue?.trim().replace(/\s+/g, ' ');
+  if (!value) return null;
+
+  if (inferProductJewelryType(product) === 'Ring') return `Size: ${value.replace(/^size:\s*/i, '')}`;
+
+  const inchValue = value.match(/\d+(?:\.\d+)?/);
+  return inchValue ? `${inchValue[0]} in` : value;
 }
 
 export function normalizeProductLinkType(value: string | null | undefined): string | null {

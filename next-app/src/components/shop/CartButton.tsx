@@ -51,7 +51,7 @@ export default function CartButton({ item, variant = 'card', locale = 'en' }: Pr
         type="button"
         onClick={handleClick}
         disabled={!canPurchase && !inCart}
-        className={inCart ? 'outline-button flex items-center gap-2' : 'gold-button flex items-center gap-2'}
+        className={inCart ? 'outline-button flex items-center gap-2' : 'gold-button detail-cart-button flex items-center gap-2'}
         style={inCart ? { borderColor: GOLD, color: GOLD } : !canPurchase ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
         aria-pressed={inCart}
       >

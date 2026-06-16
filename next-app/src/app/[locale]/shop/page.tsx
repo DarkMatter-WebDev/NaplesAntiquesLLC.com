@@ -1,4 +1,5 @@
 ﻿import type { Metadata } from 'next';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import {
   PRODUCT_METAL_VARIANTS,
@@ -163,6 +164,30 @@ function compareNullableNumbers(
 
 const PER_PAGE_OPTIONS = [12, 24, 48, 96];
 const DEFAULT_PER_PAGE = 24;
+type ShopFiltersSearchParams = Awaited<Props['searchParams']>;
+
+function buildGenderTabHref(
+  locale: string,
+  filters: ShopFiltersSearchParams,
+  gender: 'Men' | 'Women' | '',
+  routeSegment = 'shop',
+): string {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value == null || key === 'gender' || key === 'page') return;
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item) params.append(key, item);
+      });
+      return;
+    }
+    if (value) params.set(key, value);
+  });
+  if (gender) params.set('gender', gender);
+  const query = params.toString();
+  const path = locale === 'es' ? `/es/${routeSegment}` : `/${routeSegment}`;
+  return query ? `${path}?${query}` : path;
+}
 
 function parsePerPage(value: string | undefined): number {
   const parsed = Number(value);
@@ -175,6 +200,15 @@ function parsePage(value: string | undefined): number {
 }
 
 export default async function ShopPage({ params, searchParams }: Props) {
+  return renderShopPage({ params, searchParams, variant: 'modern', routeSegment: 'shop' });
+}
+
+export async function renderShopPage({
+  params,
+  searchParams,
+  variant = 'classic',
+  routeSegment,
+}: Props & { variant?: 'classic' | 'modern'; routeSegment?: 'shop' | 'shop-modern' }) {
   const { locale } = await params;
   const filters = await searchParams;
 
@@ -282,6 +316,8 @@ export default async function ShopPage({ params, searchParams }: Props) {
   const showingEnd = startIndex + paginatedProducts.length;
 
   const isEs = locale === 'es';
+  const isModern = variant === 'modern';
+  const currentRouteSegment = routeSegment ?? (isModern ? 'shop-modern' : 'shop');
 
   const investStyle = {
     border: '1px solid rgba(115, 92, 0, 0.24)',
@@ -302,15 +338,19 @@ export default async function ShopPage({ params, searchParams }: Props) {
   return (
     <>
       <SiteHeader />
-      <main className="pt-20 md:pt-32 pb-20">
+      <main className={isModern ? 'modern-shop-page pt-20 md:pt-28 pb-20' : 'pt-20 md:pt-32 pb-20'}>
         <div className="max-w-[1760px] mx-auto px-4 md:px-8 2xl:px-10">
 
           {/* Investment transparency note */}
           <section
-            className="mb-2 md:mb-10 text-center px-3 md:px-5 py-2 md:py-8"
-            style={investStyle}
+            className={isModern
+              ? 'modern-shop-hero mb-6 md:mb-8 overflow-hidden text-left'
+              : 'mb-2 md:mb-10 text-center px-3 md:px-5 py-2 md:py-8'}
+            style={isModern ? undefined : investStyle}
             aria-labelledby="shop-invest-heading"
           >
+            {isModern && <div className="modern-shop-hero-media" aria-hidden="true" />}
+            <div className={isModern ? 'modern-shop-hero-content px-6 py-8 md:px-14 md:py-16' : ''}>
             <p
               className="text-[0.55rem] md:text-[0.68rem] font-bold uppercase tracking-[0.22em] mb-0.5 md:mb-2"
               style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
@@ -319,13 +359,17 @@ export default async function ShopPage({ params, searchParams }: Props) {
             </p>
             <h2
               id="shop-invest-heading"
-              className="text-base md:text-4xl font-bold mt-0 mb-0 md:mb-3 tracking-tight"
+              className={isModern
+                ? 'text-4xl md:text-6xl font-bold mt-3 mb-4 tracking-tight max-w-2xl'
+                : 'text-base md:text-4xl font-bold mt-0 mb-0 md:mb-3 tracking-tight'}
               style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
             >
               {isEs ? 'No solo compres. Invierte.' : "Don't just buy. Invest."}
             </h2>
             <p
-              className="hidden md:block text-sm leading-relaxed max-w-2xl mx-auto mb-5"
+              className={isModern
+                ? 'hidden md:block text-base leading-8 max-w-xl mb-9'
+                : 'hidden md:block text-sm leading-relaxed max-w-2xl mx-auto mb-5'}
               style={{ color: 'var(--color-on-surface-variant)' }}
             >
               {isEs
@@ -335,34 +379,45 @@ export default async function ShopPage({ params, searchParams }: Props) {
 
             {/* 3-column points — hidden on mobile */}
             <div
-              className="hidden md:grid md:grid-cols-3 gap-3 mt-4 text-center"
-              style={{ borderTop: '1px solid rgba(115, 92, 0, 0.16)', paddingTop: '1rem' }}
+              className={isModern
+                ? 'hidden md:grid md:grid-cols-3 gap-4 mt-4 max-w-5xl'
+                : 'hidden md:grid md:grid-cols-3 gap-3 mt-4 text-center'}
+              style={isModern ? undefined : { borderTop: '1px solid rgba(115, 92, 0, 0.16)', paddingTop: '1rem' }}
             >
               {[
                 {
+                  icon: 'monitoring',
                   label: isEs ? 'Precios en vivo' : 'Live spot prices',
                   copy: isEs
                     ? 'Los valores del oro se actualizan mientras compras, usando los mismos datos del mercado que impulsan cada listado.'
                     : 'Gold values update as you shop, using the same market data that powers each listing.',
                 },
                 {
+                  icon: 'sell',
                   label: isEs ? 'Chatarra y precio' : 'Scrap and price',
                   copy: isEs
                     ? 'Cada listado muestra el valor exacto de chatarra de oro junto a tu precio — nada oculto.'
                     : 'Each listing shows the exact gold scrap value next to your price — nothing hidden.',
                 },
                 {
+                  icon: 'auto_awesome',
                   label: isEs ? 'En cada página' : 'On every product page',
                   copy: isEs
                     ? 'Ve el multiplicador spot detrás del precio, más una oferta especial de intercambio para tu propio oro.'
                     : 'See the spot multiplier behind the price, plus a special trade-in offer for your own gold.',
                 },
-              ].map(({ label, copy }) => (
+              ].map(({ icon, label, copy }) => (
                 <div
                   key={label}
-                  className="py-3 px-2"
-                  style={{ borderTop: '1px solid rgba(115, 92, 0, 0.18)' }}
+                  className={isModern ? 'modern-shop-proof-point' : 'py-3 px-2'}
+                  style={isModern ? undefined : { borderTop: '1px solid rgba(115, 92, 0, 0.18)' }}
                 >
+                  {isModern && (
+                    <span className="material-symbols-outlined modern-shop-proof-icon" aria-hidden="true">
+                      {icon}
+                    </span>
+                  )}
+                  <div>
                   <strong
                     className="block text-[0.68rem] font-bold uppercase tracking-[0.14em] mb-1"
                     style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
@@ -372,13 +427,15 @@ export default async function ShopPage({ params, searchParams }: Props) {
                   <span className="text-xs leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
                     {copy}
                   </span>
+                  </div>
                 </div>
               ))}
+            </div>
             </div>
           </section>
 
           <div className="shop-catalog-layout">
-            {/* ── Filters ────────────────────────────────────────── */}
+            {/* -- Filters ------------------------------------------ */}
             <aside className="shop-filter-sidebar" aria-label={isEs ? 'Filtros de tienda' : 'Shop filters'}>
               <ShopFilters
                 locale={locale}
@@ -387,11 +444,35 @@ export default async function ShopPage({ params, searchParams }: Props) {
                 filteredCount={sorted.length}
                 allCount={publicGalleryProducts.length}
                 spotData={spotData}
+                variant={isModern ? 'modern' : 'classic'}
               />
             </aside>
 
-            {/* ── Grid ───────────────────────────────────────────── */}
+            {/* -- Grid --------------------------------------------- */}
             <section className="min-w-0">
+              <nav
+                className="shop-gender-tabs"
+                aria-label={isEs ? 'Filtro principal de tienda' : 'Main shop filter'}
+              >
+                {[
+                  { value: 'Men' as const, label: isEs ? 'Hombres' : "Men's" },
+                  { value: '' as const, label: isEs ? 'Todo' : 'All' },
+                  { value: 'Women' as const, label: isEs ? 'Damas' : "Ladies'" },
+                ].map((tab) => {
+                  const active = tab.value ? filters.gender === tab.value : !filters.gender;
+                  return (
+                    <Link
+                      key={tab.label}
+                      href={buildGenderTabHref(locale, filters, tab.value, currentRouteSegment)}
+                      aria-current={active ? 'page' : undefined}
+                      className="shop-gender-tab"
+                      data-active={active ? 'true' : 'false'}
+                    >
+                      {tab.label}
+                    </Link>
+                  );
+                })}
+              </nav>
               {filtered.length === 0 ? (
                 <p
                   className="py-24 text-center text-sm"
@@ -408,6 +489,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
                         product={product}
                         spotData={spotData}
                         locale={locale}
+                        variant={isModern ? 'modern' : 'classic'}
                       />
                     ))}
                   </div>
@@ -425,6 +507,108 @@ export default async function ShopPage({ params, searchParams }: Props) {
             </section>
           </div>
           <style>{`
+            .modern-shop-page {
+              background:
+                radial-gradient(circle at 78% 8%, rgba(220, 188, 96, 0.16), transparent 34rem),
+                linear-gradient(180deg, #fffdf8 0%, #f8f6f0 44%, #f5f2ea 100%);
+            }
+            .modern-shop-hero {
+              position: relative;
+              min-height: 25rem;
+              border: 1px solid rgba(115, 92, 0, 0.15);
+              border-radius: 8px;
+              background: #ffffff;
+              box-shadow: 0 18px 52px rgba(42, 34, 12, 0.09);
+              isolation: isolate;
+            }
+            .modern-shop-hero-media {
+              position: absolute;
+              inset: 0;
+              background:
+                linear-gradient(90deg, #ffffff 0%, rgba(255, 255, 255, 0.88) 34%, rgba(255, 255, 255, 0.26) 56%, rgba(255, 255, 255, 0.06) 100%),
+                url('/assets/images/pages/shop-modern-chain.png') center right / cover no-repeat;
+              z-index: -1;
+            }
+            .modern-shop-hero-content {
+              max-width: 64rem;
+            }
+            .modern-shop-proof-point {
+              display: grid;
+              grid-template-columns: 3.25rem 1fr;
+              gap: 1rem;
+              align-items: start;
+              padding: 1rem 1.1rem;
+              border-left: 1px solid rgba(115, 92, 0, 0.14);
+              background: rgba(255, 253, 248, 0.62);
+              backdrop-filter: blur(4px);
+            }
+            .modern-shop-proof-icon {
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              width: 2.75rem;
+              height: 2.75rem;
+              border-radius: 999px;
+              color: #a98208;
+              background: rgba(212, 175, 55, 0.14);
+              font-size: 1.3rem;
+              line-height: 1;
+            }
+            .modern-shop-page .shop-catalog-layout {
+              margin-top: 1.25rem;
+            }
+            .modern-shop-page .shop-filter-sidebar {
+              border: 1px solid rgba(115, 92, 0, 0.14);
+              border-radius: 8px;
+              background: rgba(255, 253, 248, 0.82);
+              box-shadow: 0 12px 34px rgba(42, 34, 12, 0.08);
+              padding: 1rem;
+            }
+            .modern-shop-page .shop-gender-tabs {
+              max-width: 42rem;
+              margin-bottom: 1.6rem;
+              border-radius: 8px;
+              border-color: rgba(115, 92, 0, 0.12);
+              background: rgba(255, 255, 255, 0.78);
+              box-shadow: 0 10px 30px rgba(42, 34, 12, 0.08);
+              overflow: hidden;
+            }
+            .modern-shop-page .shop-gender-tab {
+              min-height: 2.85rem;
+              border-radius: 6px;
+              letter-spacing: 0.13em;
+            }
+            .modern-shop-page .shop-gender-tab[data-active="true"] {
+              background: linear-gradient(135deg, #dcb336, #b5890c);
+              color: #fffdf7;
+              border-color: transparent;
+              box-shadow: 0 10px 24px rgba(181, 137, 12, 0.18);
+            }
+            .modern-shop-page .shop-filters {
+              margin-bottom: 0 !important;
+            }
+            .modern-shop-page .shop-filter-toggle-row {
+              display: none !important;
+            }
+            .modern-shop-page .shop-filter-panel {
+              display: block !important;
+            }
+            .modern-shop-page .shop-search-spot-row > div,
+            .modern-shop-page .shop-filter-panel {
+              border-radius: 8px !important;
+            }
+            @media (max-width: 767px) {
+              .modern-shop-hero {
+                min-height: 0;
+              }
+              .modern-shop-hero-media {
+                opacity: 0.18;
+                width: 100%;
+              }
+              .modern-shop-proof-point {
+                grid-template-columns: 1fr;
+              }
+            }
             .shop-catalog-layout {
               display: block;
               margin-top: 2rem;
@@ -432,12 +616,52 @@ export default async function ShopPage({ params, searchParams }: Props) {
             .shop-filter-sidebar {
               min-width: 0;
             }
+            .shop-gender-tabs {
+              display: grid;
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+              max-width: 36rem;
+              margin: 0 auto 1.15rem;
+              padding: 0.25rem;
+              border: 1px solid rgba(115, 92, 0, 0.22);
+              background: linear-gradient(135deg, rgba(255, 253, 247, 0.92), rgba(247, 242, 228, 0.84));
+              box-shadow: 0 14px 34px rgba(48, 38, 12, 0.08);
+            }
+            .shop-gender-tab {
+              min-height: 2.55rem;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              padding: 0.65rem 0.75rem;
+              border: 1px solid transparent;
+              color: var(--color-on-surface-variant);
+              font-family: var(--font-label);
+              font-size: 0.72rem;
+              font-weight: 800;
+              letter-spacing: 0.16em;
+              text-transform: uppercase;
+              text-decoration: none;
+              transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+              white-space: nowrap;
+            }
+            .shop-gender-tab[data-active="true"] {
+              background: linear-gradient(135deg, rgba(212, 175, 55, 0.28), rgba(255, 245, 198, 0.72));
+              border-color: rgba(115, 92, 0, 0.34);
+              color: var(--color-primary);
+              box-shadow: 0 8px 22px rgba(115, 92, 0, 0.12);
+            }
+            .shop-gender-tab:hover {
+              background: rgba(212, 175, 55, 0.12);
+              color: var(--color-primary);
+            }
             @media (min-width: 1024px) {
               .shop-catalog-layout {
                 display: grid;
                 grid-template-columns: minmax(17rem, 19rem) minmax(0, 1fr);
                 align-items: start;
                 gap: 1.5rem;
+              }
+              .modern-shop-page .shop-filter-sidebar {
+                margin-top: 4.95rem;
               }
               .shop-filter-sidebar {
                 position: sticky;

@@ -7,6 +7,7 @@ import {
   isProductPurchasable,
   isProductSold,
   productJewelryTypeLabel,
+  productLengthSizeDisplay,
   productMetalVariantLabel,
   productStatusLabel,
   productSupportsLinkType,
@@ -62,6 +63,12 @@ function formatKarat(purity: number): string {
   return `${purity}%`;
 }
 
+function formatInventoryReference(value: string | number | null | undefined): string | null {
+  if (value == null || value === '') return null;
+  const normalized = String(value).trim().replace(/^#\s*/, '');
+  return normalized || null;
+}
+
 export default async function ProductDetailPage({ params, searchParams }: Props) {
   const { locale, id } = await params;
   const query = searchParams ? await searchParams : {};
@@ -95,31 +102,27 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   const isPurchasable = isProductPurchasable(p.status);
   const productImages = p.image_urls?.length ? p.image_urls : p.images ?? [];
   const productWeight = p.gram_weight ?? p.weight_grams;
+  const inventoryReference = formatInventoryReference(p.inventory_number);
 
-  const showScrapValue =
-    p.price_mode === 'spot-multiplier' &&
-    Boolean(productWeight && p.purity) &&
-    p.pricing_multiplier && p.pricing_multiplier !== 1 &&
-    Boolean(spotData);
-  const meltValue = showScrapValue ? calcSpotMeltValue(p, spotData) : null;
+  const meltValue = productWeight && p.purity ? calcSpotMeltValue(p, spotData) : null;
   const scrapValue = meltValue == null ? null : formatUsdPrice(meltValue);
   const spotPerOz = p.category === 'Silver'
-    ? spotData.silverPerTroyOz
-    : spotData.goldPerTroyOz;
+    ? spotData?.silverPerTroyOz
+    : spotData?.goldPerTroyOz;
   const spotValueLabel = spotPerOz == null ? null : new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(spotPerOz);
-  const nextSpotUpdateAt = spotData.fetchedAt + SPOT_PRICE_UPDATE_INTERVAL_MS;
+  const nextSpotUpdateAt = spotData ? spotData.fetchedAt + SPOT_PRICE_UPDATE_INTERVAL_MS : null;
 
   // Auto-compile specs from structured fields
   const jewelryType = inferProductJewelryType(p);
   const chainType = productSupportsLinkType(jewelryType)
     ? p.chain_type ?? (p.tags ?? []).find(t => t.startsWith('ct:'))?.slice(3) ?? null
     : null;
-  const length = p.length ?? (p.tags ?? []).find(t => t.startsWith('len:'))?.slice(4) ?? null;
+  const buyerLength = productLengthSizeDisplay(p);
   const specs: { label: string; value: string }[] = [];
 
   if (p.brand?.trim()) specs.push({ label: isEs ? 'Marca' : 'Brand', value: p.brand.trim() });
@@ -139,14 +142,19 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
         ? `${productWeight.toFixed(2)} g total · ${fineGrams.toFixed(2)} g ${p.category === 'Gold' ? 'oro fino' : 'plata fina'} · ${fineTroyOz.toFixed(4)} oz troy`
         : `${productWeight.toFixed(2)} g total · ${fineGrams.toFixed(2)} g fine ${p.category === 'Gold' ? 'gold' : 'silver'} · ${fineTroyOz.toFixed(4)} troy oz`;
     }
+    if (p.purity) {
+      weightValue = isEs
+        ? weightValue.replace(' oz troy', ` oz troy de ${p.category === 'Gold' ? 'oro fino' : 'plata fina'}`)
+        : weightValue.replace(' troy oz', ` troy oz fine ${p.category === 'Gold' ? 'gold' : 'silver'}`);
+    }
     specs.push({ label: isEs ? 'Peso' : 'Weight', value: weightValue });
   }
 
   specs.push({ label: isEs ? 'Tipo de producto' : 'Product Type', value: productJewelryTypeLabel(jewelryType, locale) });
   if (chainType) specs.push({ label: isEs ? 'Tipo de enlace' : 'Link Type', value: chainType });
-  if (length) specs.push({
+  if (buyerLength) specs.push({
     label: jewelryType === 'Ring' ? (isEs ? 'Talla' : 'Size') : (isEs ? 'Largo' : 'Length'),
-    value: length,
+    value: buyerLength,
   });
 
   const gender = p.gender ?? 'Unisex';
@@ -187,6 +195,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: title,
+    ...(inventoryReference ? { sku: inventoryReference } : {}),
     ...(description ? { description } : {}),
     ...(productImages[0] ? { image: productImages[0] } : {}),
     brand: { '@type': 'Organization', name: 'Naples Estate Jewelry Co' },
@@ -221,20 +230,22 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
           <div className="grid md:grid-cols-2 gap-10 lg:gap-16">
 
             {/* Gallery */}
-            <ProductImageGallery images={productImages} title={title} />
+            <ProductImageGallery images={productImages} title={title} imagePadding={p.image_padding} />
 
             {/* Info */}
             <div className="flex flex-col gap-5">
 
               {/* Category + status */}
-              <div className="flex items-center gap-3">
-                <span
-                  className="text-[0.62rem] font-bold uppercase tracking-[0.3em]"
-                  style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
-                >
-                  {metalLabel}
-                  {p.purity ? ` · ${formatKarat(p.purity)}` : ''}
-                </span>
+              <div className="flex flex-col gap-2">
+                {inventoryReference && (
+                  <p
+                    className="text-[0.62rem] font-bold uppercase tracking-[0.22em]"
+                    style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                  >
+                    {isEs ? 'Articulo #' : 'Item #'}{inventoryReference}
+                  </p>
+                )}
+                <div className="flex flex-wrap items-center gap-3">
                 <span
                   className="text-[0.6rem] font-bold uppercase tracking-widest px-2 py-0.5"
                   style={{
@@ -246,6 +257,22 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                     ? (isEs ? 'Disponible' : 'Available')
                     : isSold ? (isEs ? 'Vendido' : 'Sold') : productStatusLabel(p.status)}
                 </span>
+                <span
+                  className="text-[0.62rem] font-bold uppercase tracking-[0.3em]"
+                  style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+                >
+                  {metalLabel}
+                  {p.purity ? ` · ${formatKarat(p.purity)}` : ''}
+                </span>
+                {buyerLength && (
+                  <span
+                    className="text-[0.62rem] font-bold uppercase tracking-[0.3em]"
+                    style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+                  >
+                    &middot; {buyerLength}
+                  </span>
+                )}
+                </div>
               </div>
 
               {/* Title */}
@@ -340,7 +367,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                         </div>
                       )}
                     </div>
-                    <PriceUpdateTicker nextUpdateAt={nextSpotUpdateAt} locale={locale} />
+                    {nextSpotUpdateAt && <PriceUpdateTicker nextUpdateAt={nextSpotUpdateAt} locale={locale} />}
                   </div>
                 )}
               </div>

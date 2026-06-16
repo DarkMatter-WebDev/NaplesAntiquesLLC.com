@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface Props {
   value: string;
@@ -13,9 +13,13 @@ interface Props {
 
 export default function ComboboxInput({ value, onChange, options, placeholder, id, disabled = false }: Props) {
   const [open, setOpen] = useState(false);
+  const [clearArmed, setClearArmed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const filtered = value.trim()
+  const filtered = clearArmed
+    ? options
+    : value.trim()
     ? options.filter(opt => opt.toLowerCase().includes(value.toLowerCase()))
     : options;
 
@@ -23,16 +27,22 @@ export default function ComboboxInput({ value, onChange, options, placeholder, i
     function onOutsideClick(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
+        setClearArmed(false);
       }
     }
     document.addEventListener('mousedown', onOutsideClick);
     return () => document.removeEventListener('mousedown', onOutsideClick);
   }, []);
 
+  function focusInput() {
+    window.setTimeout(() => inputRef.current?.focus(), 0);
+  }
+
   return (
     <div ref={containerRef} style={{ position: 'relative' }}>
       <div style={{ display: 'flex' }}>
         <input
+          ref={inputRef}
           id={id}
           type="text"
           value={value}
@@ -47,19 +57,32 @@ export default function ComboboxInput({ value, onChange, options, placeholder, i
             borderBottomRightRadius: 0,
             ...(disabled ? { background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface-variant)' } : {}),
           }}
-          onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+          onChange={(e) => { onChange(e.target.value); setOpen(true); setClearArmed(false); }}
           onFocus={() => { if (!disabled) setOpen(true); }}
           onKeyDown={(e) => {
-            if (e.key === 'Escape') setOpen(false);
-            if (e.key === 'Enter') setOpen(false);
+            if (e.key === 'Escape') { setOpen(false); setClearArmed(false); }
+            if (e.key === 'Enter') { setOpen(false); setClearArmed(false); }
           }}
           autoComplete="off"
         />
         <button
           type="button"
-          aria-label={open ? 'Close options' : 'Show options'}
+          aria-label={value && clearArmed ? 'Clear field' : open ? 'Close options' : 'Show options'}
           disabled={disabled}
-          onClick={() => { if (!disabled) setOpen(o => !o); }}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            if (disabled) return;
+            if (value && clearArmed) {
+              onChange('');
+              setOpen(false);
+              setClearArmed(false);
+              focusInput();
+              return;
+            }
+            setOpen(true);
+            setClearArmed(Boolean(value));
+            focusInput();
+          }}
           style={{
             width: '2.25rem',
             flexShrink: 0,
@@ -69,19 +92,22 @@ export default function ComboboxInput({ value, onChange, options, placeholder, i
             border: '1px solid var(--color-outline-variant)',
             borderLeft: 'none',
             borderRadius: '0 2px 2px 0',
-            background: 'var(--color-surface-container-low)',
+            background: value && clearArmed ? 'var(--color-surface-container-lowest)' : 'var(--color-surface-container-low)',
             color: 'var(--color-on-surface-variant)',
             cursor: disabled ? 'not-allowed' : 'pointer',
-            fontSize: '0.7rem',
-            transition: 'background 0.12s',
+            fontSize: value && clearArmed ? '0.85rem' : '0.7rem',
+            fontWeight: value && clearArmed ? 800 : 400,
+            transition: 'background 0.12s, color 0.12s',
           }}
         >
-          <span style={{
-            display: 'inline-block',
-            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.15s',
-            lineHeight: 1,
-          }}>▾</span>
+          {value && clearArmed ? 'x' : (
+            <span style={{
+              display: 'inline-block',
+              transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.15s',
+              lineHeight: 1,
+            }}>v</span>
+          )}
         </button>
       </div>
 
@@ -113,9 +139,10 @@ export default function ComboboxInput({ value, onChange, options, placeholder, i
             <li
               key={opt}
               onMouseDown={(e) => {
-                e.preventDefault(); // prevent input blur before click registers
+                e.preventDefault();
                 onChange(opt);
                 setOpen(false);
+                setClearArmed(false);
               }}
               style={{
                 padding: '0.45rem 0.75rem',

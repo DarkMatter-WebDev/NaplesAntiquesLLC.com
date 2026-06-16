@@ -128,7 +128,11 @@ export default function AccountProfileForm({
   const inputStyle = 'form-field w-full';
 
   return (
-    <form onSubmit={handleSubmit} className="border p-5 md:p-6 mb-6" style={{ borderColor: BORDER, background: 'var(--color-surface-container-lowest)' }}>
+    <form
+      onSubmit={handleSubmit}
+      className="account-profile-form border p-6 md:p-10 mb-6"
+      style={{ borderColor: BORDER, background: 'var(--color-surface-container-lowest)' }}
+    >
       <div className="flex flex-col gap-1 mb-5">
         <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
           {isEs ? 'Perfil completo' : 'Complete Profile'}
@@ -140,7 +144,7 @@ export default function AccountProfileForm({
         </p>
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid sm:grid-cols-2 gap-5">
         <label>
           <span className="form-label">{isEs ? 'Nombre' : 'First Name'}</span>
           <input className={inputStyle} autoComplete="given-name" value={form.first_name} onChange={(e) => updateField('first_name', e.target.value)} />
@@ -169,7 +173,7 @@ export default function AccountProfileForm({
         </h3>
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid sm:grid-cols-2 gap-5">
         <label className="sm:col-span-2">
           <span className="form-label">{isEs ? 'Direccion linea 1' : 'Address Line 1'}</span>
           <input className={inputStyle} autoComplete="address-line1" value={form.address_line1} onChange={(e) => updateField('address_line1', e.target.value)} />

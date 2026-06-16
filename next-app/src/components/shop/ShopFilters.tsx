@@ -77,9 +77,10 @@ interface Props {
   filteredCount: number;
   allCount: number;
   spotData: SpotData | null;
+  variant?: 'classic' | 'modern';
 }
 
-export default function ShopFilters({ locale, currentFilters, brandOptions, filteredCount, allCount, spotData }: Props) {
+export default function ShopFilters({ locale, currentFilters, brandOptions, filteredCount, allCount, spotData, variant = 'classic' }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -217,6 +218,12 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
     currentFilters.brand,
     currentFilters.sort,
   ].filter(Boolean).length;
+  const isModern = variant === 'modern';
+  const genderOptions = [
+    { value: 'Men', label: isEs ? 'Hombres' : "Men's" },
+    { value: 'Women', label: isEs ? 'Damas' : "Ladies'" },
+    { value: '', label: isEs ? 'Todo' : 'All' },
+  ];
 
   const labelStyle = {
     color: GOLD,
@@ -279,7 +286,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
   };
 
   return (
-    <div className="shop-filters" style={{ marginBottom: '1.5rem' }}>
+    <div className={`shop-filters${isModern ? ' shop-filters-modern' : ''}`} style={{ marginBottom: '1.5rem' }}>
 
       {/* Search + live metal prices */}
       <div className="shop-search-spot-row">
@@ -320,6 +327,29 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
           <span style={spotPriceStyle}>{formatSpot(spotData?.goldPerTroyOz)}</span>
         </div>
       </div>
+
+      {isModern && (
+        <div className="modern-sidebar-gender">
+          <span className="modern-sidebar-label">{isEs ? 'Genero' : 'Gender'}</span>
+          <div className="modern-sidebar-gender-grid">
+            {genderOptions.map((option) => {
+              const active = option.value ? currentFilters.gender === option.value : !currentFilters.gender;
+              return (
+                <button
+                  key={option.label}
+                  type="button"
+                  onClick={() => updateFilter('gender', option.value)}
+                  aria-pressed={active}
+                  className="modern-sidebar-gender-button"
+                  data-active={active ? 'true' : 'false'}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="shop-filter-toggle-row" style={{ display: 'flex', justifyContent: 'center', marginBottom: filtersOpen ? '0.85rem' : '0.5rem' }}>
         <button
@@ -371,6 +401,61 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
             }}
             className="shop-filter-grid"
           >
+            {/* Gender */}
+            <div>
+              <label style={labelStyle}>{isEs ? 'Genero' : 'Gender'}</label>
+              <select
+                value={currentFilters.gender ?? ''}
+                onChange={(e) => updateFilter('gender', e.target.value)}
+                style={selectStyle}
+              >
+                <option value="">{isEs ? 'Todos' : 'All'}</option>
+                <option value="Unisex">{isEs ? 'Unisex' : 'Unisex'}</option>
+                <option value="Men">{isEs ? 'Hombres' : 'Men'}</option>
+                <option value="Women">{isEs ? 'Mujeres' : 'Women'}</option>
+              </select>
+            </div>
+
+            {/* Item Type */}
+            <div>
+              <label style={labelStyle}>{isEs ? 'Artículo' : 'Item Type'}</label>
+              <select
+                value={currentFilters.itemType ?? ''}
+                onChange={(e) => updateItemTypeFilter(e.target.value)}
+                style={selectStyle}
+              >
+                <option value="">{isEs ? 'Todos' : 'All items'}</option>
+                <option value="necklace">{isEs ? 'Collares' : 'Necklaces'}</option>
+                <option value="bracelet">{isEs ? 'Pulseras' : 'Bracelets'}</option>
+                <option value="earrings">{isEs ? 'Aretes' : 'Earrings'}</option>
+                <option value="ring">{isEs ? 'Anillos' : 'Rings'}</option>
+                <option value="pendant">{isEs ? 'Dijes' : 'Pendants'}</option>
+                <option value="brooch">{isEs ? 'Broches' : 'Brooches'}</option>
+                <option value="watch">{isEs ? 'Relojes' : 'Watches'}</option>
+                <option value="coin">{isEs ? 'Monedas' : 'Coins'}</option>
+                <option value="bullion">{isEs ? 'Lingotes' : 'Bullion'}</option>
+                <option value="loose-diamond">{isEs ? 'Diamantes sueltos' : 'Loose Diamonds'}</option>
+                <option value="loose-gemstone">{isEs ? 'Gemas sueltas' : 'Loose Gemstones'}</option>
+                <option value="silverware">{isEs ? 'Plateria' : 'Silverware'}</option>
+                <option value="estate-lot">{isEs ? 'Lotes de sucesion' : 'Estate Lots'}</option>
+              </select>
+            </div>
+
+            {/* Brand */}
+            <div>
+              <label style={labelStyle}>{isEs ? 'Marca' : 'Brand'}</label>
+              <select
+                value={currentFilters.brand ?? ''}
+                onChange={(e) => updateFilter('brand', e.target.value)}
+                style={selectStyle}
+              >
+                <option value="">{isEs ? 'Todas las marcas' : 'All brands'}</option>
+                {brandOptions.map((brand) => (
+                  <option key={brand} value={brand}>{brand}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Metal */}
             <div>
               <label style={labelStyle}>{isEs ? 'Metal' : 'Metal'}</label>
@@ -427,31 +512,6 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
               </select>
             </div>
 
-            {/* Item Type */}
-            <div>
-              <label style={labelStyle}>{isEs ? 'Artículo' : 'Item Type'}</label>
-              <select
-                value={currentFilters.itemType ?? ''}
-                onChange={(e) => updateItemTypeFilter(e.target.value)}
-                style={selectStyle}
-              >
-                <option value="">{isEs ? 'Todos' : 'All items'}</option>
-                <option value="necklace">{isEs ? 'Collares' : 'Necklaces'}</option>
-                <option value="bracelet">{isEs ? 'Pulseras' : 'Bracelets'}</option>
-                <option value="earrings">{isEs ? 'Aretes' : 'Earrings'}</option>
-                <option value="ring">{isEs ? 'Anillos' : 'Rings'}</option>
-                <option value="pendant">{isEs ? 'Dijes' : 'Pendants'}</option>
-                <option value="brooch">{isEs ? 'Broches' : 'Brooches'}</option>
-                <option value="watch">{isEs ? 'Relojes' : 'Watches'}</option>
-                <option value="coin">{isEs ? 'Monedas' : 'Coins'}</option>
-                <option value="bullion">{isEs ? 'Lingotes' : 'Bullion'}</option>
-                <option value="loose-diamond">{isEs ? 'Diamantes sueltos' : 'Loose Diamonds'}</option>
-                <option value="loose-gemstone">{isEs ? 'Gemas sueltas' : 'Loose Gemstones'}</option>
-                <option value="silverware">{isEs ? 'Plateria' : 'Silverware'}</option>
-                <option value="estate-lot">{isEs ? 'Lotes de sucesion' : 'Estate Lots'}</option>
-              </select>
-            </div>
-
             {/* Link Type */}
             {showLinkTypeFilter && (
               <div>
@@ -472,36 +532,6 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
                 </select>
               </div>
             )}
-
-            {/* Brand */}
-            <div>
-              <label style={labelStyle}>{isEs ? 'Marca' : 'Brand'}</label>
-              <select
-                value={currentFilters.brand ?? ''}
-                onChange={(e) => updateFilter('brand', e.target.value)}
-                style={selectStyle}
-              >
-                <option value="">{isEs ? 'Todas las marcas' : 'All brands'}</option>
-                {brandOptions.map((brand) => (
-                  <option key={brand} value={brand}>{brand}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Gender */}
-            <div>
-              <label style={labelStyle}>{isEs ? 'Para' : 'For'}</label>
-              <select
-                value={currentFilters.gender ?? ''}
-                onChange={(e) => updateFilter('gender', e.target.value)}
-                style={selectStyle}
-              >
-                <option value="">{isEs ? 'Todos' : 'All'}</option>
-                <option value="Unisex">{isEs ? 'Unisex' : 'Unisex'}</option>
-                <option value="Men">{isEs ? 'Hombres' : 'Men'}</option>
-                <option value="Women">{isEs ? 'Mujeres' : 'Women'}</option>
-              </select>
-            </div>
 
             {/* Sort */}
             <div>
@@ -708,6 +738,99 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
           .shop-available-row {
             justify-content: flex-start !important;
           }
+        }
+        .shop-filters-modern {
+          border: none !important;
+          background: transparent !important;
+          padding: 0 !important;
+        }
+        .shop-filters-modern .shop-search-spot-row {
+          gap: 0.55rem;
+        }
+        .shop-filters-modern .shop-search-spot-row > div {
+          border-radius: 7px !important;
+          box-shadow: 0 10px 24px rgba(42, 34, 12, 0.06);
+        }
+        .shop-filters-modern .shop-search-spot-row > div:nth-child(1) {
+          grid-row: 2;
+        }
+        .shop-filters-modern .shop-search-spot-row > div:nth-child(2) {
+          grid-row: 1;
+        }
+        .shop-filters-modern .shop-search-spot-row > div:nth-child(3) {
+          grid-row: 3;
+        }
+        .shop-filters-modern input[type="search"] {
+          min-height: 2.75rem;
+          border-color: rgba(115, 92, 0, 0.16) !important;
+          border-radius: 7px !important;
+          background: #fffefa !important;
+          box-shadow: 0 10px 24px rgba(42, 34, 12, 0.05);
+        }
+        .modern-sidebar-gender {
+          margin: 0.9rem 0;
+        }
+        .modern-sidebar-label {
+          display: block;
+          margin-bottom: 0.45rem;
+          color: var(--color-on-surface-variant);
+          font-family: var(--font-label);
+          font-size: 0.62rem;
+          font-weight: 800;
+          letter-spacing: 0.14em;
+          line-height: 1;
+          text-transform: uppercase;
+        }
+        .modern-sidebar-gender-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 0.55rem;
+        }
+        .modern-sidebar-gender-button {
+          min-height: 2.7rem;
+          border: 1px solid rgba(115, 92, 0, 0.16);
+          border-radius: 6px;
+          background: #fffefa;
+          color: var(--color-on-surface-variant);
+          cursor: pointer;
+          font-family: var(--font-label);
+          font-size: 0.68rem;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          box-shadow: 0 8px 18px rgba(42, 34, 12, 0.05);
+          transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+        }
+        .modern-sidebar-gender-button[data-active="true"] {
+          background: linear-gradient(135deg, #dbb236, #b88a0b);
+          border-color: transparent;
+          color: #fffdf7;
+          box-shadow: 0 12px 22px rgba(181, 137, 12, 0.18);
+        }
+        .modern-sidebar-gender-button:hover {
+          transform: translateY(-1px);
+        }
+        .shop-filters-modern .shop-filter-grid {
+          gap: 0.72rem !important;
+        }
+        .shop-filters-modern .shop-filter-grid > div:first-child {
+          display: none;
+        }
+        .shop-filters-modern select {
+          min-height: 2.65rem;
+          border-color: rgba(115, 92, 0, 0.18) !important;
+          border-radius: 7px !important;
+          background-color: #fffefa !important;
+          box-shadow: 0 8px 18px rgba(42, 34, 12, 0.04);
+        }
+        .shop-filters-modern .shop-available-row {
+          padding-top: 0.1rem;
+        }
+        .shop-filters-modern > div:last-of-type {
+          justify-content: space-between !important;
+          border-top: 1px solid rgba(115, 92, 0, 0.12);
+          margin-top: 0.9rem;
+          padding-top: 0.8rem;
         }
         @media (max-width: 900px) {
           .shop-filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }

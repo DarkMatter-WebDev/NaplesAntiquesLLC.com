@@ -18,10 +18,16 @@ import {
   normalizeProductLinkType,
   normalizeProductMetalVariant,
   productJewelryTypeLabel,
+  hasProductImagePadding,
+  isProductImagePaddingCustomColor,
+  normalizeProductImagePadding,
+  normalizeProductImagePaddingValue,
+  productImagePaddingBackground,
   productMetalTypeLabel,
   productSupportsLinkType,
   productMetalVariantLabel,
   type Product,
+  type ProductImagePadding,
   type ProductJewelryType,
   type ProductMetalType,
   type ProductMetalVariant,
@@ -202,6 +208,10 @@ function parseInventoryNumber(value: string | number | null | undefined): number
   return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
 }
 
+function formatInventoryNumberDisplay(value: string | number | null | undefined): string {
+  return parseInventoryNumber(value)?.toString() ?? '-';
+}
+
 function slugifyProductText(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
@@ -249,6 +259,72 @@ function getDuplicateInventoryNumberMessage(owner: Product, inventoryNumber: num
   return `Inventory #${inventoryNumber} is already assigned to "${owner.title}". Choose a different inventory number before saving.`;
 }
 
+function ClearableField({
+  children,
+  onClear,
+  show = true,
+  disabled = false,
+  multiline = false,
+}: {
+  children: React.ReactNode;
+  onClear: () => void;
+  show?: boolean;
+  disabled?: boolean;
+  multiline?: boolean;
+}) {
+  const fieldRef = useRef<HTMLDivElement>(null);
+  const [hasSelect, setHasSelect] = useState(false);
+  const [clearArmed, setClearArmed] = useState(false);
+
+  useEffect(() => {
+    setHasSelect(Boolean(fieldRef.current?.querySelector('select')));
+  }, [children]);
+
+  return (
+    <div
+      ref={fieldRef}
+      className={`clearable-field${show ? ' clearable-field--active' : ''}${clearArmed ? ' clearable-field--clear-armed' : ''}${multiline ? ' clearable-field--multiline' : ''}`}
+    >
+      {children}
+      {show && (
+        <button
+          type="button"
+          className="clearable-field__button"
+          aria-label={hasSelect && !clearArmed ? 'Show options' : 'Clear field'}
+          title={hasSelect && !clearArmed ? 'Show options' : 'Clear field'}
+          disabled={disabled}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={(event) => {
+            const field = event.currentTarget.parentElement?.querySelector<HTMLElement>('input, select, textarea');
+            if (hasSelect && !clearArmed) {
+              setClearArmed(true);
+              window.setTimeout(() => {
+                field?.focus();
+                if (field instanceof HTMLSelectElement) {
+                  const selectField = field as HTMLSelectElement & { showPicker?: () => void };
+                  if (selectField.showPicker) {
+                    selectField.showPicker();
+                  } else {
+                    selectField.click();
+                  }
+                }
+              }, 0);
+              return;
+            }
+            onClear();
+            setClearArmed(false);
+            window.setTimeout(() => {
+              field?.focus();
+            }, 0);
+          }}
+        >
+          {hasSelect && !clearArmed ? 'v' : 'x'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 const CHAIN_KEYWORDS: Record<string, string[]> = {
   'cuban-link':     ['cuban'],
   'figaro-link':    ['figaro'],
@@ -288,7 +364,14 @@ type SortDirection = 'asc' | 'desc';
 type ImageTarget = { url: string; index: number };
 type CropRect = { x: number; y: number; width: number; height: number };
 type CropDragMode = 'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+type BrowserEyeDropper = { open: () => Promise<{ sRGBHex: string }> };
+type WindowWithEyeDropper = Window & { EyeDropper?: new () => BrowserEyeDropper };
 const FULL_IMAGE_CROP: CropRect = { x: 0, y: 0, width: 100, height: 100 };
+const IMAGE_PADDING_OPTIONS: { value: ProductImagePadding; label: string; description: string }[] = [
+  { value: 'none', label: 'No Padding', description: 'Use the normal site image frame.' },
+  { value: 'white', label: 'White Padding', description: 'Fill side padding with white.' },
+  { value: 'black', label: 'Black Padding', description: 'Fill side padding with black.' },
+];
 type QuickFillField =
   | 'title'
   | 'titleEs'
@@ -336,25 +419,22 @@ const QUICK_FILL_FORM_ORDER: QuickFillField[] = [
   'internalNotes',
 ];
 
-const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null }[] = [
-  { label: 'Inv #', sortKey: 'inventoryNumber' },
-  { label: 'Image', sortKey: 'image' },
-  { label: 'Title', sortKey: 'title' },
-  { label: 'Brand', sortKey: 'brand' },
-  { label: 'Metal Type', sortKey: 'category' },
-  { label: 'Metal Color', sortKey: 'metalVariant' },
-  { label: 'Gender', sortKey: 'gender' },
-  { label: 'Product Type', sortKey: 'jewelryType' },
-  { label: 'Length/Size', sortKey: 'length' },
-  { label: 'Location', sortKey: 'location' },
-  { label: 'Featured', sortKey: 'featured' },
-  { label: 'Purity', sortKey: 'purity' },
-  { label: 'Weight', sortKey: 'weight' },
-  { label: 'Melt', sortKey: 'melt' },
-  { label: 'Mode', sortKey: 'mode' },
-  { label: 'Current Price', sortKey: 'currentPrice' },
-  { label: 'Status', sortKey: 'status' },
-  { label: '', sortKey: null },
+const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null; widthClass?: string }[] = [
+  { label: 'Inv #', sortKey: 'inventoryNumber', widthClass: 'w-[54px]' },
+  { label: 'Image', sortKey: 'image', widthClass: 'w-16' },
+  { label: 'Title', sortKey: 'title', widthClass: 'w-[210px]' },
+  { label: 'Brand', sortKey: 'brand', widthClass: 'w-[92px]' },
+  { label: 'Metal Color', sortKey: 'metalVariant', widthClass: 'w-[104px]' },
+  { label: 'Type', sortKey: 'jewelryType', widthClass: 'w-[78px]' },
+  { label: 'Size', sortKey: 'length', widthClass: 'w-[72px]' },
+  { label: 'Featured', sortKey: 'featured', widthClass: 'w-[72px]' },
+  { label: 'Purity', sortKey: 'purity', widthClass: 'w-[64px]' },
+  { label: 'Weight', sortKey: 'weight', widthClass: 'w-[76px]' },
+  { label: 'Melt', sortKey: 'melt', widthClass: 'w-[84px]' },
+  { label: 'Mode', sortKey: 'mode', widthClass: 'w-[94px]' },
+  { label: 'Price', sortKey: 'currentPrice', widthClass: 'w-[92px]' },
+  { label: 'Status', sortKey: 'status', widthClass: 'w-[92px]' },
+  { label: '', sortKey: null, widthClass: 'w-[224px]' },
 ];
 
 function getMasterProductOrder(products: Product[]): Product[] {
@@ -394,6 +474,7 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
     location: 'showcase',
     images: [],
     image_urls: [],
+    image_padding: 'none',
     description: '',
     description_es: '',
     details: [],
@@ -597,6 +678,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [imagePaddingTarget, setImagePaddingTarget] = useState<Product | null>(null);
+  const [imagePaddingCustomColor, setImagePaddingCustomColor] = useState('#ffffff');
+  const [imagePaddingNotice, setImagePaddingNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const [filterStatus, setFilterStatus] = useState('');
   const [filterMetal, setFilterMetal] = useState('');
   const [filterMetalVariant, setFilterMetalVariant] = useState('');
@@ -645,6 +729,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setQuickFillNotice({ text, ok });
     quickFillNoticeTimer.current = setTimeout(() => setQuickFillNotice(null), 5000);
   };
+
+  function openImagePaddingChooser(product: Product) {
+    const paddingValue = normalizeProductImagePaddingValue(product.image_padding);
+    const fallbackColor = productImagePaddingBackground(paddingValue) === '#000000' ? '#000000' : '#ffffff';
+    setImagePaddingCustomColor(isProductImagePaddingCustomColor(paddingValue) ? paddingValue : fallbackColor);
+    setImagePaddingNotice(null);
+    setImagePaddingTarget(product);
+  }
 
   useEffect(() => {
     const loadStoredPrompt = () => {
@@ -1187,7 +1279,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     }
 
     if (applied.length && notApplied.length) {
-      showQuickFillNotice(`Applied: ${applied.join(', ')}. Not applied: ${notApplied.map((item) => `"${item}"`).join(', ')}.`, false);
+      showQuickFillNotice(`Applied: ${applied.join(', ')}. Not applied: ${notApplied.map((item) => `"${item}"`).join(', ')}.`);
     } else if (applied.length) {
       showQuickFillNotice(`Applied: ${applied.join(', ')}`);
     } else if (notApplied.length) {
@@ -1404,6 +1496,57 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     flash(error.message, false);
   }
 
+  async function updateProductImagePadding(product: Product, imagePadding: ProductImagePadding | string) {
+    const paddingValue = normalizeProductImagePaddingValue(imagePadding);
+    const { error } = await supabase
+      .from('products')
+      .update({ image_padding: paddingValue })
+      .eq('id', product.id);
+
+    if (!error) {
+      setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, image_padding: paddingValue } : p));
+      setImagePaddingTarget(null);
+      const builtInLabel = IMAGE_PADDING_OPTIONS.find((option) => option.value === paddingValue)?.label;
+      flash(`Image padding set to ${builtInLabel ?? paddingValue}`);
+      return;
+    }
+
+    const message = error.message.includes('products_image_padding_check')
+      ? 'Custom padding colors need the updated Supabase image-padding SQL. Run supabase/product-image-padding.sql, then try again.'
+      : error.message;
+    setImagePaddingNotice({ text: message, ok: false });
+    flash(message, false);
+  }
+
+  async function pickImagePaddingColorFromScreen() {
+    if (!imagePaddingTarget) return;
+    const EyeDropper = (window as WindowWithEyeDropper).EyeDropper;
+    if (!EyeDropper) {
+      setImagePaddingNotice({
+        text: 'This browser does not support screen color picking. Use the color swatch instead.',
+        ok: false,
+      });
+      return;
+    }
+
+    try {
+      setImagePaddingNotice({ text: 'Pick a color from the first photo or anywhere on screen.', ok: true });
+      const result = await new EyeDropper().open();
+      const color = result.sRGBHex.toLowerCase();
+      setImagePaddingCustomColor(color);
+      await updateProductImagePadding(imagePaddingTarget, color);
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setImagePaddingNotice(null);
+        return;
+      }
+      setImagePaddingNotice({
+        text: error instanceof Error ? error.message : 'Color picking was cancelled.',
+        ok: false,
+      });
+    }
+  }
+
   function duplicateProduct(product: Product) {
     const copyId = `${product.id}-copy-${Date.now()}`;
     const copy = {
@@ -1471,6 +1614,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       status: normalizeProductStatus(editing.status),
       location: editing.location || 'showcase',
       image_urls: editing.images,
+      image_padding: normalizeProductImagePadding(editing.image_padding),
       tags: finalTags,
       details: [],
       details_es: [],
@@ -1977,29 +2121,35 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             )}
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[2020px] 2xl:min-w-[2170px] text-sm">
+            <table className="w-max min-w-[1680px] 2xl:min-w-[1840px] text-sm">
               <thead>
                 <tr className="border-b text-left" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}>
                   <th
-                    className="px-4 py-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap"
+                    className="px-3 py-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap"
                     style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
                   >
                     Order
                   </th>
-                  {PRODUCT_TABLE_COLUMNS.map(({ label, sortKey }) => {
+                  {PRODUCT_TABLE_COLUMNS.map(({ label, sortKey, widthClass }) => {
                     const active = sortConfig?.key === sortKey;
+                    const isActionsColumn = !sortKey;
                     return (
                       <th
                         key={label || 'actions'}
                         aria-sort={active ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : undefined}
-                        className="px-4 py-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap"
-                        style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                        className={`px-2 py-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap ${widthClass ?? ''}${label === 'Brand' ? ' border-l text-center' : ''}${isActionsColumn ? ' sticky right-0 z-10' : ''}`}
+                        style={{
+                          color: 'var(--color-on-surface-variant)',
+                          fontFamily: 'var(--font-label)',
+                          borderColor: label === 'Brand' ? 'var(--color-outline-variant)' : undefined,
+                          background: isActionsColumn ? 'var(--color-surface-container-low)' : undefined,
+                        }}
                       >
                         {sortKey ? (
                           <button
                             type="button"
                             onClick={() => toggleSort(sortKey)}
-                            className="flex items-center gap-1 uppercase tracking-wide hover:opacity-75"
+                            className={`flex items-center gap-1 uppercase tracking-wide hover:opacity-75${label === 'Brand' ? ' mx-auto justify-center' : ''}`}
                             style={{ fontFamily: 'var(--font-label)' }}
                           >
                             <span>{label}</span>
@@ -2048,7 +2198,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                         ? 'color-mix(in srgb, var(--color-primary) 8%, transparent)'
                         : undefined,
                     }}>
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-2 py-3 whitespace-nowrap w-[52px]">
                       <span
                         className="material-symbols-outlined inline-flex h-8 w-8 items-center justify-center"
                         aria-hidden="true"
@@ -2062,18 +2212,21 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                         drag_indicator
                       </span>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap font-bold text-xs" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-                      {p.inventory_number || `#${inventoryNumbers.get(p.id) ?? '-'}`}
+                    <td className="px-2 py-3 whitespace-nowrap w-[54px] font-bold text-xs" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
+                      {formatInventoryNumberDisplay(p.inventory_number ?? inventoryNumbers.get(p.id))}
                     </td>
                     <td className="p-0">
                       {getProductImages(p)[0] ? (
-                        <div className="relative w-16 h-16">
+                        <div
+                          className="relative w-16 h-16 overflow-hidden"
+                          style={{ background: productImagePaddingBackground(p.image_padding) }}
+                        >
                           <Image
                             src={getProductImages(p)[0]}
                             alt={p.title}
                             fill
                             sizes="64px"
-                            className="object-contain"
+                            className="object-contain object-center"
                             unoptimized={getProductImages(p)[0].startsWith('/assets/')}
                           />
                         </div>
@@ -2082,49 +2235,47 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                           style={{ background: 'var(--color-surface-container)' }}>📷</div>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-medium max-w-xs" style={{ color: 'var(--color-on-surface)' }}>
+                    <td className="px-2 py-3 font-medium w-[210px] max-w-[210px]" style={{ color: 'var(--color-on-surface)' }}>
                       <span className="line-clamp-2">{p.title}</span>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
-                      {p.brand || '-'}
+                    <td
+                      className="border-l px-2 py-3 whitespace-nowrap w-[92px] max-w-[92px]"
+                      style={{ color: 'var(--color-on-surface-variant)', borderColor: 'var(--color-outline-variant)' }}
+                    >
+                      <span className="block truncate text-center">{p.brand || '-'}</span>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>{productMetalTypeLabel(p.metal_type, p.category)}</td>
-                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    <td className="px-2 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
                       {productMetalVariantLabel(p.metal_variant, p.category)}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>{p.gender ?? 'Unisex'}</td>
-                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    <td className="px-2 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
                       {productJewelryTypeLabel(getProductJewelryType(p))}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    <td className="px-2 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
                       {getProductLength(p) || '-'}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                      {LOCATIONS.find((location) => location.value === (p.location ?? 'showcase'))?.label ?? p.location ?? 'Showcase'}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-xs" style={{ color: p.featured ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>
+                    <td className="px-2 py-3 whitespace-nowrap text-xs" style={{ color: p.featured ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>
                       {p.featured ? 'Yes' : 'No'}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    <td className="px-2 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
                       {p.purity
                         ? p.purity <= 24
                           ? `${p.purity}k`
                           : ({ 999:'99.9%', 950:'95%', 925:'92.5%', 900:'90%', 850:'85%', 800:'80%' } as Record<number,string>)[p.purity] ?? `${p.purity}`
                         : '-'}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    <td className="px-2 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
                       {getProductWeight(p) ? `${getProductWeight(p)}g` : '-'}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap font-semibold" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    <td className="px-2 py-3 whitespace-nowrap font-semibold" style={{ color: 'var(--color-on-surface-variant)' }}>
                       {getSpotMeltDisplayPrice(p, spotData)}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    <td className="px-2 py-3 whitespace-nowrap text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
                       {p.price_mode === 'manual' ? 'Manual' : `Spot ×${p.pricing_multiplier ?? '?'}`}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap font-semibold" style={{ color: 'var(--color-primary)' }}>
+                    <td className="px-2 py-3 whitespace-nowrap font-semibold" style={{ color: 'var(--color-primary)' }}>
                       {getDisplayPrice(p, spotData)}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-2 py-3 whitespace-nowrap">
                       <span
                         className="inline-flex text-[0.6rem] font-bold uppercase tracking-widest px-2 py-0.5"
                         style={{
@@ -2135,8 +2286,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                         {getStatusLabel(p.status)}
                       </span>
                     </td>
-                    <td className="px-3 py-3 w-[255px] min-w-[255px] max-w-[255px] align-top">
-                      <div className="flex w-[230px] flex-wrap gap-x-3 gap-y-2 leading-none">
+                    <td className="sticky right-0 z-10 px-2 py-3 w-[224px] min-w-[224px] max-w-[224px] align-top" style={{ background: dragTargetProductId === p.id ? 'color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-container-lowest))' : 'var(--color-surface-container-lowest)' }}>
+                      <div className="flex w-[208px] flex-wrap gap-x-2 gap-y-2 leading-none">
                         <Link
                           href={`${locale === 'es' ? '/es' : ''}/shop/${p.id}?returnTo=admin`}
                           className="text-xs font-bold uppercase tracking-wide hover:underline"
@@ -2153,6 +2304,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                           className="text-xs font-bold uppercase tracking-wide hover:underline"
                           style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
                           Duplicate
+                        </button>
+                        <button type="button" onClick={() => openImagePaddingChooser(p)}
+                          className="text-xs font-bold uppercase tracking-wide hover:underline"
+                          style={{
+                            color: hasProductImagePadding(p.image_padding) ? '#0f7a4f' : '#7a4a1f',
+                            fontFamily: 'var(--font-label)',
+                          }}>
+                          Pad
                         </button>
                         {normalizeProductStatus(p.status) !== 'available' && (
                           <button type="button" onClick={() => updateProductStatus(p, 'available')}
@@ -2262,9 +2421,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     className="px-3 py-2 text-xs font-medium"
                     role="status"
                     style={{
-                      background: quickFillNotice.ok ? 'color-mix(in srgb, var(--color-primary) 10%, transparent)' : 'color-mix(in srgb, var(--color-error) 10%, transparent)',
-                      border: `1px solid ${quickFillNotice.ok ? 'color-mix(in srgb, var(--color-primary) 28%, transparent)' : 'color-mix(in srgb, var(--color-error) 28%, transparent)'}`,
-                      color: quickFillNotice.ok ? 'var(--color-primary)' : 'var(--color-error)',
+                      background: quickFillNotice.ok ? 'color-mix(in srgb, #166534 10%, transparent)' : 'color-mix(in srgb, var(--color-error) 10%, transparent)',
+                      border: `1px solid ${quickFillNotice.ok ? 'color-mix(in srgb, #166534 30%, transparent)' : 'color-mix(in srgb, var(--color-error) 28%, transparent)'}`,
+                      color: quickFillNotice.ok ? '#166534' : 'var(--color-error)',
                       fontFamily: 'var(--font-label)',
                     }}
                   >
@@ -2302,9 +2461,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     </div>
                   </div>
                 </div>
-                <p className="text-[0.6rem] leading-relaxed" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-                  Best format: one labeled <strong>Field:Value</strong> per line. Include <strong>Brand</strong> when the maker/designer/brand is known. Include <strong>Metal Color</strong> as Yellow Gold, White Gold, Rose Gold, Tricolor Gold, Bicolor Gold, Silver, or Vermeil. Metal Color automatically sets Category to Gold or Silver. Bicolor Gold is stored as a gold color but appears under both Gold and Silver broad shop filters. Use <strong>Jewelry Type</strong> for Necklace, Bracelet, Ring, Pendant, Earrings, Watch, or Other. Use <strong>Jewelry Type:Watch</strong> for any watch, wristwatch, or timepiece; do not use Link Type for watches. Use <strong>Link Type</strong> only when Jewelry Type is Necklace or Bracelet. Labeled Brand, Link Type, and Length/Size values can be entered directly into the form, including custom text, without adding them as permanent dropdown choices. Use <strong>Size</strong> or <strong>Ring Size</strong> for rings; use <strong>Length</strong> for necklaces and bracelets. Other labels: Title English, Title Spanish, Status, Gender, Location, Price Mode, Purity, Weight, Multiplier, Asking Price, Description English, Description Spanish, Public Notes, and Internal Notes.
-                </p>
                 <p className="text-[0.6rem] leading-relaxed hidden" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
                   Paste comma values, Field:Value pairs, or a two-line CSV header/value list. Labeled fields can be in any order; unlabeled CSV rows use the form order. Only include what differs from the defaults.
                   Recognized tokens: <strong>Category</strong> (Gold / Silver) · <strong>Status</strong> (Draft / Available / Reserved / Pending Payment / Sold / Archived) ·&nbsp;
@@ -2322,13 +2478,15 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               {!isNew && (
                 <div>
                   <label className="form-label">ID (slug, auto-generated if blank)</label>
-                  <input className="form-field w-full" placeholder="my-product-slug"
-                    value={editing.id}
-                    onChange={(e) => setEditing({ ...editing, id: e.target.value })} />
+                  <ClearableField onClear={() => setEditing({ ...editing, id: '' })} show={!!editing.id}>
+                    <input className="form-field w-full" placeholder="my-product-slug"
+                      value={editing.id}
+                      onChange={(e) => setEditing({ ...editing, id: e.target.value })} />
+                  </ClearableField>
                 </div>
               )}
 
-              <div className="grid md:grid-cols-[minmax(0,1fr)_auto] gap-4 items-end">
+              <div className="grid md:grid-cols-[minmax(0,1fr)_auto] gap-4 items-start">
                 <div>
                   <div className="mb-1 flex items-center justify-between gap-3">
                     <label className="form-label mb-0">Inventory #</label>
@@ -2342,17 +2500,23 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                       Manual
                     </label>
                   </div>
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    inputMode="numeric"
-                    className="form-field w-full"
+                  <ClearableField
+                    onClear={() => setEditing({ ...editing, inventory_number: null })}
+                    show={inventoryNumberManual && !!editing.inventory_number}
                     disabled={!inventoryNumberManual}
-                    value={editing.inventory_number ?? ''}
-                    onChange={(e) => setEditing({ ...editing, inventory_number: parseInventoryNumber(e.target.value) })}
-                    style={!inventoryNumberManual ? { background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface-variant)' } : undefined}
-                  />
+                  >
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      inputMode="numeric"
+                      className="form-field w-full"
+                      disabled={!inventoryNumberManual}
+                      value={editing.inventory_number ?? ''}
+                      onChange={(e) => setEditing({ ...editing, inventory_number: parseInventoryNumber(e.target.value) })}
+                      style={!inventoryNumberManual ? { background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface-variant)' } : undefined}
+                    />
+                  </ClearableField>
                   {!inventoryNumberManual && (
                     <p className="mt-1 text-[0.68rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
                       Auto-filled with the next available inventory number.
@@ -2372,7 +2536,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 <button
                   type="button"
                   onClick={() => setShowAdvancedIds((current) => !current)}
-                  className="outline-button text-xs h-10"
+                  className="outline-button text-xs h-10 md:mt-[1.55rem]"
                 >
                   {showAdvancedIds ? 'Hide SKU' : 'SKU / Slug'}
                 </button>
@@ -2385,13 +2549,17 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 >
                   <div>
                     <label className="form-label">SKU</label>
-                    <input className="form-field w-full" value={editing.sku ?? ''}
-                      onChange={(e) => setEditing({ ...editing, sku: e.target.value })} />
+                    <ClearableField onClear={() => setEditing({ ...editing, sku: '' })} show={!!editing.sku}>
+                      <input className="form-field w-full" value={editing.sku ?? ''}
+                        onChange={(e) => setEditing({ ...editing, sku: e.target.value })} />
+                    </ClearableField>
                   </div>
                   <div>
                     <label className="form-label">Public Slug</label>
-                    <input className="form-field w-full" value={editing.slug ?? ''}
-                      onChange={(e) => setEditing({ ...editing, slug: e.target.value })} />
+                    <ClearableField onClear={() => setEditing({ ...editing, slug: '' })} show={!!editing.slug}>
+                      <input className="form-field w-full" value={editing.slug ?? ''}
+                        onChange={(e) => setEditing({ ...editing, slug: e.target.value })} />
+                    </ClearableField>
                   </div>
                 </div>
               )}
@@ -2400,44 +2568,60 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">Title (English)</label>
-                  <input className="form-field w-full" value={editing.title}
-                    onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
+                  <ClearableField onClear={() => setEditing({ ...editing, title: '' })} show={!!editing.title}>
+                    <input className="form-field w-full" value={editing.title}
+                      onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
+                  </ClearableField>
                 </div>
                 <div>
                   <label className="form-label">Title (Spanish)</label>
-                  <input className="form-field w-full" value={editing.title_es ?? ''}
-                    onChange={(e) => setEditing({ ...editing, title_es: e.target.value })} />
+                  <ClearableField onClear={() => setEditing({ ...editing, title_es: '' })} show={!!editing.title_es}>
+                    <input className="form-field w-full" value={editing.title_es ?? ''}
+                      onChange={(e) => setEditing({ ...editing, title_es: e.target.value })} />
+                  </ClearableField>
                 </div>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">Product Type</label>
-                  <select
-                    className="form-field w-full"
-                    value={jewelryTypeInput}
-                    onChange={(e) => {
-                      const nextProductType = (normalizeProductJewelryType(e.target.value) ?? 'Other') as ProductJewelryType;
-                      setJewelryTypeInput(nextProductType);
-                      setEditing({ ...editing, product_type: nextProductType, jewelry_type: nextProductType });
-                      if (!productSupportsLinkType(nextProductType)) setChainTypeInput('');
-                      if (!productUsesLength(nextProductType) && !productUsesSize(nextProductType)) setLengthInput('');
+                  <ClearableField
+                    onClear={() => {
+                      setJewelryTypeInput('Other');
+                      setEditing({ ...editing, product_type: 'Other', jewelry_type: 'Other' });
+                      setChainTypeInput('');
+                      setLengthInput('');
                     }}
+                    show={jewelryTypeInput !== 'Other'}
                   >
-                    {PRODUCT_JEWELRY_TYPES.map((type) => (
-                      <option key={type.value} value={type.value}>{type.label}</option>
-                    ))}
-                  </select>
+                    <select
+                      className="form-field w-full"
+                      value={jewelryTypeInput}
+                      onChange={(e) => {
+                        const nextProductType = (normalizeProductJewelryType(e.target.value) ?? 'Other') as ProductJewelryType;
+                        setJewelryTypeInput(nextProductType);
+                        setEditing({ ...editing, product_type: nextProductType, jewelry_type: nextProductType });
+                        if (!productSupportsLinkType(nextProductType)) setChainTypeInput('');
+                        if (!productUsesLength(nextProductType) && !productUsesSize(nextProductType)) setLengthInput('');
+                      }}
+                    >
+                      {PRODUCT_JEWELRY_TYPES.map((type) => (
+                        <option key={type.value} value={type.value}>{type.label}</option>
+                      ))}
+                    </select>
+                  </ClearableField>
                 </div>
                 <div>
                   <label className="form-label">Brand</label>
-                  <input
-                    type="text"
-                    className="form-field w-full"
-                    value={editing.brand ?? ''}
-                    onChange={(e) => setEditing({ ...editing, brand: e.target.value })}
-                    placeholder="e.g. David Yurman, Tiffany & Co., Cartier..."
-                  />
+                  <ClearableField onClear={() => setEditing({ ...editing, brand: '' })} show={!!editing.brand}>
+                    <input
+                      type="text"
+                      className="form-field w-full"
+                      value={editing.brand ?? ''}
+                      onChange={(e) => setEditing({ ...editing, brand: e.target.value })}
+                      placeholder="e.g. David Yurman, Tiffany & Co., Cartier..."
+                    />
+                  </ClearableField>
                 </div>
               </div>
 
@@ -2445,35 +2629,55 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               <div className="grid md:grid-cols-3 gap-4">
                 <div>
                   <label className="form-label">Metal Type</label>
-                  <select className="form-field w-full" value={normalizeProductMetalType(editing.metal_type, editing.category)}
-                    onChange={(e) => {
-                      const nextMetalType = normalizeProductMetalType(e.target.value, editing.category);
-                      const nextCategory = getLegacyCategoryForMetalType(nextMetalType, editing.category);
-                      setEditing({
-                        ...editing,
-                        metal_type: nextMetalType,
-                        metal: nextMetalType,
-                        category: nextCategory,
-                        metal_variant: getDefaultMetalVariant(nextCategory),
-                        purity: null,
-                      });
-                    }}>
-                    {PRODUCT_METAL_TYPES.map((metalType) => (
-                      <option key={metalType.value} value={metalType.value}>{metalType.label}</option>
-                    ))}
-                  </select>
+                  <ClearableField
+                    onClear={() => setEditing({
+                      ...editing,
+                      metal_type: 'Other',
+                      metal: 'Other',
+                      category: 'Gold',
+                      metal_variant: getDefaultMetalVariant('Gold'),
+                      purity: null,
+                    })}
+                    show={normalizeProductMetalType(editing.metal_type, editing.category) !== 'Other'}
+                  >
+                    <select className="form-field w-full" value={normalizeProductMetalType(editing.metal_type, editing.category)}
+                      onChange={(e) => {
+                        const nextMetalType = normalizeProductMetalType(e.target.value, editing.category);
+                        const nextCategory = getLegacyCategoryForMetalType(nextMetalType, editing.category);
+                        setEditing({
+                          ...editing,
+                          metal_type: nextMetalType,
+                          metal: nextMetalType,
+                          category: nextCategory,
+                          metal_variant: getDefaultMetalVariant(nextCategory),
+                          purity: null,
+                        });
+                      }}>
+                      {PRODUCT_METAL_TYPES.map((metalType) => (
+                        <option key={metalType.value} value={metalType.value}>{metalType.label}</option>
+                      ))}
+                    </select>
+                  </ClearableField>
                 </div>
                 <div>
                   <label className="form-label">Metal Color</label>
-                  <select
-                    className="form-field w-full"
-                    value={normalizeProductMetalVariant(editing.metal_variant, getLegacyCategoryForMetalType(editing.metal_type, editing.category))}
-                    onChange={(e) => setEditing({ ...editing, metal_variant: e.target.value as ProductMetalVariant })}
+                  <ClearableField
+                    onClear={() => {
+                      const nextCategory = getLegacyCategoryForMetalType(editing.metal_type, editing.category);
+                      setEditing({ ...editing, metal_variant: getDefaultMetalVariant(nextCategory) });
+                    }}
+                    show={normalizeProductMetalVariant(editing.metal_variant, getLegacyCategoryForMetalType(editing.metal_type, editing.category)) !== getDefaultMetalVariant(getLegacyCategoryForMetalType(editing.metal_type, editing.category))}
                   >
-                    {PRODUCT_METAL_VARIANTS[getLegacyCategoryForMetalType(editing.metal_type, editing.category)].map((variant) => (
-                      <option key={variant.value} value={variant.value}>{variant.label}</option>
-                    ))}
-                  </select>
+                    <select
+                      className="form-field w-full"
+                      value={normalizeProductMetalVariant(editing.metal_variant, getLegacyCategoryForMetalType(editing.metal_type, editing.category))}
+                      onChange={(e) => setEditing({ ...editing, metal_variant: e.target.value as ProductMetalVariant })}
+                    >
+                      {PRODUCT_METAL_VARIANTS[getLegacyCategoryForMetalType(editing.metal_type, editing.category)].map((variant) => (
+                        <option key={variant.value} value={variant.value}>{variant.label}</option>
+                      ))}
+                    </select>
+                  </ClearableField>
                 </div>
               </div>
 
@@ -2514,14 +2718,20 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               <div className="grid grid-cols-4 gap-4">
                 <div>
                   <label className="form-label">Price Mode</label>
-                  <select className="form-field w-full" value={editing.price_mode}
-                    onChange={(e) => setEditing({ ...editing, price_mode: e.target.value as 'spot-multiplier' | 'manual' })}>
-                    {PRICE_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-                  </select>
+                  <ClearableField
+                    onClear={() => setEditing({ ...editing, price_mode: 'spot-multiplier', manual_price_label: null, asking_price: null })}
+                    show={editing.price_mode !== 'spot-multiplier'}
+                  >
+                    <select className="form-field w-full" value={editing.price_mode}
+                      onChange={(e) => setEditing({ ...editing, price_mode: e.target.value as 'spot-multiplier' | 'manual' })}>
+                      {PRICE_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
+                  </ClearableField>
                 </div>
                 <div>
                   <label className="form-label">{getLegacyCategoryForMetalType(editing.metal_type, editing.category) === 'Silver' ? 'Purity' : 'Purity (k)'}</label>
                   {getLegacyCategoryForMetalType(editing.metal_type, editing.category) === 'Silver' ? (
+                    <ClearableField onClear={() => setEditing({ ...editing, purity: null })} show={!!editing.purity}>
                     <select className="form-field w-full" value={editing.purity ?? ''}
                       onChange={(e) => setEditing({ ...editing, purity: e.target.value ? Number(e.target.value) : null })}>
                       <option value="">— select —</option>
@@ -2532,32 +2742,41 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                       <option value="850">85%</option>
                       <option value="800">80%</option>
                     </select>
+                    </ClearableField>
                   ) : (
+                    <ClearableField onClear={() => setEditing({ ...editing, purity: null })} show={!!editing.purity}>
                     <input type="number" className="form-field w-full" placeholder="18"
                       value={editing.purity ?? ''}
                       onChange={(e) => setEditing({ ...editing, purity: e.target.value ? Number(e.target.value) : null })} />
+                    </ClearableField>
                   )}
                 </div>
                 <div>
                   <label className="form-label">Weight (g)</label>
+                  <ClearableField onClear={() => setEditing({ ...editing, weight_grams: null })} show={!!editing.weight_grams}>
                   <input type="number" step="0.01" className="form-field w-full"
                     value={editing.weight_grams ?? ''}
                     onChange={(e) => setEditing({ ...editing, weight_grams: e.target.value ? Number(e.target.value) : null })} />
+                  </ClearableField>
                 </div>
                 <div>
                   {editing.price_mode === 'spot-multiplier' ? (
                     <>
                       <label className="form-label">Multiplier</label>
+                      <ClearableField onClear={() => setEditing({ ...editing, pricing_multiplier: null })} show={!!editing.pricing_multiplier}>
                       <input type="number" step="0.01" className="form-field w-full"
                         value={editing.pricing_multiplier ?? ''}
                         onChange={(e) => setEditing({ ...editing, pricing_multiplier: e.target.value ? Number(e.target.value) : null })} />
+                      </ClearableField>
                     </>
                   ) : (
                     <>
                       <label className="form-label">Price Label</label>
+                      <ClearableField onClear={() => setEditing({ ...editing, manual_price_label: '' })} show={!!editing.manual_price_label}>
                       <input className="form-field w-full" placeholder="$1,200"
                         value={editing.manual_price_label ?? ''}
                         onChange={(e) => setEditing({ ...editing, manual_price_label: e.target.value })} />
+                      </ClearableField>
                     </>
                   )}
                 </div>
@@ -2566,6 +2785,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               <div className="grid md:grid-cols-4 gap-4">
                 <div>
                   <label className="form-label">Asking Price</label>
+                  <ClearableField
+                    onClear={() => setEditing({ ...editing, asking_price: null })}
+                    show={editing.price_mode === 'manual' && !!editing.asking_price}
+                    disabled={editing.price_mode !== 'manual'}
+                  >
                   <input
                     type="number"
                     step="0.01"
@@ -2575,33 +2799,40 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     onChange={(e) => setEditing({ ...editing, asking_price: e.target.value ? Number(e.target.value) : null })}
                     style={editing.price_mode !== 'manual' ? { background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface-variant)' } : undefined}
                   />
+                  </ClearableField>
                 </div>
               </div>
 
               <div className="grid md:grid-cols-4 gap-4">
                 <div>
                   <label className="form-label">Location</label>
+                  <ClearableField onClear={() => setEditing({ ...editing, location: 'showcase' })} show={(editing.location ?? 'showcase') !== 'showcase'}>
                   <select className="form-field w-full" value={editing.location ?? 'showcase'}
                     onChange={(e) => setEditing({ ...editing, location: e.target.value })}>
                     {LOCATIONS.map((location) => <option key={location.value} value={location.value}>{location.label}</option>)}
                   </select>
+                  </ClearableField>
                 </div>
                 <div>
                   <label className="form-label">Status</label>
+                  <ClearableField onClear={() => setEditing({ ...editing, status: 'available' })} show={normalizeProductStatus(editing.status) !== 'available'}>
                   <select className="form-field w-full" value={editing.status}
                     onChange={(e) => setEditing({ ...editing, status: e.target.value as ProductStatus })}>
                     {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
+                  </ClearableField>
                 </div>
                 {productUsesGender(jewelryTypeInput) && (
                   <div>
                     <label className="form-label">Gender</label>
+                    <ClearableField onClear={() => setEditing({ ...editing, gender: 'Unisex' })} show={(editing.gender ?? 'Unisex') !== 'Unisex'}>
                     <select className="form-field w-full" value={editing.gender ?? 'Unisex'}
                       onChange={(e) => setEditing({ ...editing, gender: e.target.value })}>
                       <option value="Unisex">Unisex</option>
                       <option value="Men">Men</option>
                       <option value="Women">Women</option>
                     </select>
+                    </ClearableField>
                   </div>
                 )}
                 <label className="flex items-end gap-2 text-sm pb-2" style={{ color: 'var(--color-on-surface-variant)' }}>
@@ -2619,30 +2850,38 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">Description (EN)</label>
+                  <ClearableField onClear={() => setEditing({ ...editing, description: '' })} show={!!editing.description} multiline>
                   <textarea rows={4} className="form-field w-full resize-y"
                     value={editing.description ?? ''}
                     onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
+                  </ClearableField>
                 </div>
                 <div>
                   <label className="form-label">Description (ES)</label>
+                  <ClearableField onClear={() => setEditing({ ...editing, description_es: '' })} show={!!editing.description_es} multiline>
                   <textarea rows={4} className="form-field w-full resize-y"
                     value={editing.description_es ?? ''}
                     onChange={(e) => setEditing({ ...editing, description_es: e.target.value })} />
+                  </ClearableField>
                 </div>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">Public Notes</label>
+                  <ClearableField onClear={() => setEditing({ ...editing, public_notes: '' })} show={!!editing.public_notes} multiline>
                   <textarea rows={3} className="form-field w-full resize-y"
                     value={editing.public_notes ?? ''}
                     onChange={(e) => setEditing({ ...editing, public_notes: e.target.value })} />
+                  </ClearableField>
                 </div>
                 <div>
                   <label className="form-label">Internal Notes</label>
+                  <ClearableField onClear={() => setEditing({ ...editing, internal_notes: '' })} show={!!editing.internal_notes} multiline>
                   <textarea rows={3} className="form-field w-full resize-y"
                     value={editing.internal_notes ?? ''}
                     onChange={(e) => setEditing({ ...editing, internal_notes: e.target.value })} />
+                  </ClearableField>
                 </div>
               </div>
 
@@ -2650,7 +2889,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               <div>
                 <label className="form-label">Images</label>
                 <label
-                  className="flex flex-col items-center justify-center border-2 border-dashed p-6 cursor-pointer text-sm transition-colors mb-3"
+                  className="flex min-h-24 flex-col items-center justify-center border-2 border-dashed p-8 cursor-pointer text-sm transition-colors mb-4"
                   style={{
                     borderColor: dragOver ? 'var(--color-primary)' : 'var(--color-outline-variant)',
                     color: dragOver ? 'var(--color-primary)' : 'var(--color-on-surface-variant)',
@@ -2674,7 +2913,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     <p className="text-[0.62rem] mb-2" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
                       Click to preview or crop · Drag to reorder · First image is the cover photo
                     </p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-3">
                       {editing.images.map((img, i) => (
                         <div
                           key={img + i}
@@ -2699,7 +2938,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                             if ((e.target as HTMLElement).closest('button')) return;
                             setPreviewImg({ url: img, index: i });
                           }}
-                          className="relative w-16 h-16 group cursor-grab"
+                          className="relative h-28 w-28 group cursor-grab"
                           style={{
                             opacity: dragSrcIdx === i ? 0.4 : 1,
                             outline: dragOverIdx === i && dragSrcIdx !== i ? '2px solid var(--color-primary)' : undefined,
@@ -2709,13 +2948,13 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                           {/* Cover badge */}
                           {i === 0 && (
                             <div
-                              className="absolute bottom-0 left-0 right-0 z-20 text-center text-[0.45rem] font-bold uppercase tracking-wide leading-4"
+                              className="absolute bottom-0 left-0 right-0 z-20 text-center text-[0.52rem] font-bold uppercase tracking-wide leading-5"
                               style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}
                             >
                               Cover
                             </div>
                           )}
-                          <Image src={img} alt="" fill sizes="64px" className="object-contain"
+                          <Image src={img} alt="" fill sizes="112px" className="object-contain"
                             unoptimized={img.startsWith('/assets/')} />
                           {/* Hover overlay: preview + remove */}
                           <div
@@ -2728,12 +2967,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                               className="flex-1 flex items-center justify-center text-white"
                               title="Preview"
                             >
-                              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>zoom_in</span>
+                              <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>zoom_in</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => removeImage(i)}
-                              className="h-5 flex items-center justify-center text-white text-[0.6rem] font-bold"
+                              className="h-7 flex items-center justify-center text-white text-[0.72rem] font-bold"
                               style={{ background: 'rgba(180,0,0,0.75)' }}
                               title="Remove"
                             >
@@ -2984,6 +3223,129 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               </button>
               <button type="button" onClick={saveCroppedImage} disabled={cropping} className="gold-button text-sm disabled:opacity-50">
                 {cropping ? 'Saving Crop…' : 'Save Crop'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image padding chooser */}
+      {imagePaddingTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          style={{ background: 'rgba(0,0,0,0.5)' }}
+          onClick={() => setImagePaddingTarget(null)}
+        >
+          <div
+            className="w-full max-w-md border p-5 flex flex-col gap-4"
+            style={{ background: 'var(--color-background)', borderColor: 'var(--color-outline-variant)' }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div>
+              <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
+                Image Padding
+              </h2>
+              <p className="mt-1 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                Choose the frame color behind contained product photos.
+              </p>
+            </div>
+            {(() => {
+              const firstImage = getProductImages(imagePaddingTarget)[0];
+              const currentPaddingValue = normalizeProductImagePaddingValue(imagePaddingTarget.image_padding);
+              const customActive = isProductImagePaddingCustomColor(currentPaddingValue);
+              const validCustomColor = isProductImagePaddingCustomColor(imagePaddingCustomColor) ? imagePaddingCustomColor : '#ffffff';
+              return (
+                <>
+                  <div
+                    className="grid grid-cols-[88px_1fr] gap-3 border p-3"
+                    style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-lowest)' }}
+                  >
+                    <div
+                      className="relative h-24 w-24 overflow-hidden border"
+                      style={{
+                        borderColor: 'var(--color-outline-variant)',
+                        background: customActive ? validCustomColor : productImagePaddingBackground(imagePaddingTarget.image_padding),
+                      }}
+                    >
+                      {firstImage ? (
+                        <Image
+                          src={firstImage}
+                          alt={`${imagePaddingTarget.title} first photo preview`}
+                          fill
+                          sizes="96px"
+                          className="object-contain object-center"
+                          unoptimized={firstImage.startsWith('/assets/')}
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-xs uppercase tracking-widest opacity-50">No Photo</div>
+                      )}
+                    </div>
+                    <div className="flex flex-col justify-center gap-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      <span className="font-bold" style={{ color: 'var(--color-on-surface)' }}>
+                        First photo preview
+                      </span>
+                      <span>
+                        Use the eyedropper to sample a color from the photo, or choose a custom color manually.
+                      </span>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+            <div className="grid gap-2">
+              {IMAGE_PADDING_OPTIONS.map((option) => {
+                const active = normalizeProductImagePadding(imagePaddingTarget.image_padding) === option.value;
+                const isBlackOption = option.value === 'black';
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => updateProductImagePadding(imagePaddingTarget, option.value)}
+                    className="border px-4 py-3 text-left transition-colors"
+                    style={{
+                      borderColor: active ? 'var(--color-primary)' : isBlackOption ? '#111111' : 'var(--color-outline-variant)',
+                      background: isBlackOption ? '#050505' : active ? 'rgba(194, 155, 45, 0.1)' : 'var(--color-surface-container-lowest)',
+                    }}
+                  >
+                    <span
+                      className="block text-sm font-bold uppercase tracking-wide"
+                      style={{
+                        color: isBlackOption ? '#ffffff' : active ? 'var(--color-primary)' : 'var(--color-on-surface)',
+                        fontFamily: 'var(--font-label)',
+                      }}
+                    >
+                      {option.label}
+                    </span>
+                    <span
+                      className="mt-1 block text-xs"
+                      style={{ color: isBlackOption ? 'rgba(255,255,255,0.78)' : 'var(--color-on-surface-variant)' }}
+                    >
+                      {option.description}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="border p-4" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-lowest)' }}>
+              <button
+                type="button"
+                onClick={pickImagePaddingColorFromScreen}
+                className="outline-button inline-flex w-full items-center justify-center gap-2 text-xs"
+              >
+                <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '16px', lineHeight: 1 }}>
+                  colorize
+                </span>
+                Pick From First Photo
+              </button>
+              {imagePaddingNotice && (
+                <p className="mt-3 text-xs" style={{ color: imagePaddingNotice.ok ? 'var(--color-primary)' : 'var(--color-error)' }}>
+                  {imagePaddingNotice.text}
+                </p>
+              )}
+            </div>
+            <div className="flex justify-end">
+              <button type="button" onClick={() => setImagePaddingTarget(null)} className="outline-button text-sm">
+                Cancel
               </button>
             </div>
           </div>

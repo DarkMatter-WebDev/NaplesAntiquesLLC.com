@@ -93,9 +93,12 @@ export default async function HomePage({ params }: Props) {
                     href={shopHref}
                     className="inline-flex justify-center min-w-[9rem] md:min-w-[10rem] border px-8 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest transition-colors"
                     style={{
-                      borderColor: 'rgba(212,175,55,0.6)',
+                      background: 'rgba(212,175,55,0.14)',
+                      borderColor: 'rgba(233,195,73,0.72)',
                       color: '#e9c349',
                       fontFamily: 'var(--font-label)',
+                      boxShadow: '0 0 18px rgba(212,175,55,0.12)',
+                      backdropFilter: 'blur(3px)',
                     }}
                   >
                     {isEs ? 'Comprar' : 'Buy'}
@@ -104,9 +107,12 @@ export default async function HomePage({ params }: Props) {
                     href={isEs ? '/es/estate-jewelry' : '/estate-jewelry'}
                     className="inline-flex justify-center min-w-[9rem] md:min-w-[10rem] border px-8 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest transition-colors"
                     style={{
-                      borderColor: 'rgba(212,175,55,0.6)',
+                      background: 'rgba(212,175,55,0.14)',
+                      borderColor: 'rgba(233,195,73,0.72)',
                       color: '#e9c349',
                       fontFamily: 'var(--font-label)',
+                      boxShadow: '0 0 18px rgba(212,175,55,0.12)',
+                      backdropFilter: 'blur(3px)',
                     }}
                   >
                     {isEs ? 'Vender' : 'Sell'}
@@ -115,9 +121,12 @@ export default async function HomePage({ params }: Props) {
                     href={isEs ? '/es/contact' : '/contact'}
                     className="inline-flex justify-center min-w-[9rem] md:min-w-[10rem] border px-8 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest transition-colors"
                     style={{
-                      borderColor: 'rgba(212,175,55,0.6)',
+                      background: 'rgba(212,175,55,0.14)',
+                      borderColor: 'rgba(233,195,73,0.72)',
                       color: '#e9c349',
                       fontFamily: 'var(--font-label)',
+                      boxShadow: '0 0 18px rgba(212,175,55,0.12)',
+                      backdropFilter: 'blur(3px)',
                     }}
                   >
                     {isEs ? 'Intercambiar' : 'Trade'}

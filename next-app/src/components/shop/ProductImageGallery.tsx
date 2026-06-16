@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import Image from 'next/image';
+import { productImagePaddingBackground } from '@/types/product';
 
 const LENS = 100;  // lens square side px
 const ZOOM = 3;    // magnification
@@ -11,6 +12,7 @@ const MOBILE_PANEL = 190;
 interface Props {
   images: string[];
   title: string;
+  imagePadding?: string | null;
 }
 
 interface ZoomState {
@@ -25,7 +27,7 @@ interface ZoomState {
   bh: number;
 }
 
-export default function ProductImageGallery({ images, title }: Props) {
+export default function ProductImageGallery({ images, title, imagePadding = null }: Props) {
   const [active, setActive] = useState(0);
   const [zoom, setZoom] = useState<ZoomState | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -125,6 +127,7 @@ export default function ProductImageGallery({ images, title }: Props) {
   }
 
   const current = images[active];
+  const imageFrameBackground = productImagePaddingBackground(imagePadding);
 
   return (
     <div className="flex flex-col gap-3">
@@ -132,7 +135,7 @@ export default function ProductImageGallery({ images, title }: Props) {
       <div
         ref={containerRef}
         className="relative aspect-square overflow-hidden"
-        style={{ background: 'var(--color-surface-container)', cursor: 'crosshair', touchAction: 'none' }}
+        style={{ background: imageFrameBackground, cursor: 'crosshair', touchAction: 'none' }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerLeave={handlePointerLeave}
@@ -179,6 +182,7 @@ export default function ProductImageGallery({ images, title }: Props) {
               className="relative w-16 h-16 overflow-hidden flex-shrink-0 border-2 transition-all"
               style={{
                 borderColor: i === active ? 'var(--color-primary)' : 'var(--color-outline-variant)',
+                background: imageFrameBackground,
               }}
               aria-label={`View image ${i + 1}`}
             >
