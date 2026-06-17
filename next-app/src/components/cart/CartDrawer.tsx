@@ -23,7 +23,7 @@ function fmt(n: number) {
 }
 
 export default function CartDrawer({ locale }: { locale: string }) {
-  const { items, remove, drawerOpen, closeDrawer } = useCart();
+  const { items, remove, clear, drawerOpen, closeDrawer } = useCart();
   const isEs = locale === 'es';
   const prefix = isEs ? '/es' : '';
 
@@ -86,7 +86,7 @@ export default function CartDrawer({ locale }: { locale: string }) {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <CartView items={items} isEs={isEs} prefix={prefix} onRemove={remove} onClose={handleClose} />
+          <CartView items={items} isEs={isEs} prefix={prefix} onRemove={remove} onClear={clear} onClose={handleClose} />
         </div>
       </div>
     </>
@@ -98,12 +98,14 @@ function CartView({
   isEs,
   prefix,
   onRemove,
+  onClear,
   onClose,
 }: {
   items: CartItem[];
   isEs: boolean;
   prefix: string;
   onRemove: (id: string) => void;
+  onClear: () => void;
   onClose: () => void;
 }) {
   if (items.length === 0) {
@@ -167,6 +169,18 @@ function CartView({
         <Link href={`${prefix}/checkout`} onClick={onClose} className="gold-button justify-center" style={{ width: '100%' }}>
           {isEs ? 'Proceder al pago ->' : 'Proceed to Checkout ->'}
         </Link>
+        <button
+          type="button"
+          onClick={onClear}
+          className="outline-button justify-center text-xs"
+          style={{
+            width: '100%',
+            borderColor: 'rgba(186, 26, 26, 0.32)',
+            color: 'var(--color-error)',
+          }}
+        >
+          {isEs ? 'Vaciar carrito' : 'Clear Cart'}
+        </button>
         <Link href={`${prefix}/shop`} onClick={onClose} className="outline-button justify-center text-xs" style={{ width: '100%' }}>
           {isEs ? 'Seguir comprando' : 'Continue Shopping'}
         </Link>

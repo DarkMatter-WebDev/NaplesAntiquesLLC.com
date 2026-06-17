@@ -44,10 +44,6 @@ import {
 } from '@/lib/admin-settings';
 import type { ProductAutofillDraft, ProductAutofillFields } from '@/lib/ai-product-schema';
 
-// Quick Fill is archived/removed from the editor UI for now. Flip to true to restore the section.
-// Full original implementation preserved in src/components/admin/_archive/AdminShell.with-quickfill.tsx.bak
-const SHOW_QUICK_FILL: boolean = false;
-
 interface Props {
   initialProducts: Product[];
   userEmail: string;
@@ -440,6 +436,7 @@ const QUICK_FILL_FORM_ORDER: QuickFillField[] = [
 
 const AI_PRODUCT_FIELD_LABELS: Record<keyof ProductAutofillFields, string> = {
   title: 'Title (English)',
+  title_es: 'Title (Spanish)',
   product_type: 'Product Type',
   brand: 'Brand',
   metal_type: 'Metal Type',
@@ -454,7 +451,9 @@ const AI_PRODUCT_FIELD_LABELS: Record<keyof ProductAutofillFields, string> = {
   asking_price: 'Asking Price',
   manual_price_label: 'Price Label',
   description: 'Description (EN)',
+  description_es: 'Description (ES)',
   public_notes: 'Public Notes',
+  internal_notes: 'Internal Notes',
 };
 
 const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null; widthClass?: string }[] = [
@@ -1427,9 +1426,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(data?.error ?? 'AI listing generation failed.');
-      const draft = data.draft as ProductAutofillDraft;
-      setAiDraft(draft);
-      applyAiDraftToForm(draft);
+      setAiDraft(data.draft as ProductAutofillDraft);
+      showAiNotice('AI draft generated. Review it before applying.');
     } catch (error) {
       showAiNotice(error instanceof Error ? error.message : 'AI listing generation failed.', false);
     } finally {
@@ -1437,9 +1435,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     }
   }
 
-  function applyAiDraftToForm(draft: ProductAutofillDraft) {
-    if (!editing) return;
-    const fields = draft.fields;
+  function applyAiDraftToForm() {
+    if (!editing || !aiDraft) return;
+    const fields = aiDraft.fields;
     const nextEditing = { ...editing };
     let nextJewelryType = jewelryTypeInput;
     let nextChainType = chainTypeInput;
@@ -1467,9 +1465,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     });
 
     setField('title', 'Title (English)', (value) => { nextEditing.title = value; });
+    setField('title_es', 'Title (Spanish)', (value) => { nextEditing.title_es = value; });
     setField('brand', 'Brand', (value) => { nextEditing.brand = value; });
     setField('description', 'Description (EN)', (value) => { nextEditing.description = value; });
+    setField('description_es', 'Description (ES)', (value) => { nextEditing.description_es = value; });
     setField('public_notes', 'Public Notes', (value) => { nextEditing.public_notes = value; });
+    setField('internal_notes', 'Internal Notes', (value) => { nextEditing.internal_notes = value; });
     setField('gender', 'Gender', (value) => { nextEditing.gender = value; });
     setField('price_mode', 'Price Mode', (value) => { nextEditing.price_mode = value; });
     setField('purity', 'Purity', (value) => { nextEditing.purity = value; });
@@ -1529,7 +1530,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setChainTypeInput(aiUndoSnapshot.chainTypeInput);
     setLengthInput(aiUndoSnapshot.lengthInput);
     setAiUndoSnapshot(null);
-    setAiDraft(null);
     showAiNotice('AI fill undone.');
   }
 
@@ -1826,32 +1826,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     if (!editing) return;
     setSaving(true);
 
-    // English now / Spanish on save: the listing AI generates English only, so fill any
-    // missing Spanish title/description by translating the English at save time.
-    let nextTitleEs = editing.title_es ?? null;
-    let nextDescriptionEs = editing.description_es ?? null;
-    const needTitleEs = !!editing.title?.trim() && !editing.title_es?.trim();
-    const needDescriptionEs = !!editing.description?.trim() && !editing.description_es?.trim();
-    if (needTitleEs || needDescriptionEs) {
-      try {
-        const res = await fetch('/api/admin/translate', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            title: needTitleEs ? editing.title : '',
-            description: needDescriptionEs ? editing.description : '',
-          }),
-        });
-        const data = await res.json().catch(() => null);
-        if (res.ok && data) {
-          if (needTitleEs && data.title_es) nextTitleEs = data.title_es;
-          if (needDescriptionEs && data.description_es) nextDescriptionEs = data.description_es;
-        }
-      } catch {
-        // Non-blocking: if translation fails, the save proceeds with existing ES values.
-      }
-    }
-
     // Build tags with updated jt:, ct:, and len: entries
     const normalizedJewelryType = normalizeProductJewelryType(jewelryTypeInput) ?? 'Other';
     const supportsLinkType = productSupportsLinkType(normalizedJewelryType);
@@ -1892,8 +1866,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       tags: finalTags,
       details: [],
       details_es: [],
-      title_es: nextTitleEs,
-      description_es: nextDescriptionEs,
       internal_notes: foldExtraDetailsIntoInternalNotes(editing),
     };
     const originalProductId = originalRef.current?.id ?? payload.id;
@@ -2713,73 +2685,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   <span className="material-symbols-outlined" aria-hidden="true">photo_camera</span>
                   Take photos
                 </label>
-
-                {/* Uploaded photo gallery — click to preview & crop, drag to reorder */}
-                {editing.images.length > 0 && (
-                  <div>
-                    <p className="text-[0.62rem] mb-2" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-                      {editing.images.length} {editing.images.length === 1 ? 'photo' : 'photos'} · Click to preview &amp; crop · Drag to reorder · First is the cover
-                    </p>
-                    <div className="product-photo-gallery">
-                      {editing.images.map((img, i) => (
-                        <div
-                          key={img + i}
-                          draggable
-                          onDragStart={() => setDragSrcIdx(i)}
-                          onDragEnter={(e) => { e.preventDefault(); setDragOverIdx(i); }}
-                          onDragOver={(e) => { e.preventDefault(); setDragOverIdx(i); }}
-                          onDragLeave={() => setDragOverIdx(null)}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (dragSrcIdx === null || dragSrcIdx === i) { setDragSrcIdx(null); setDragOverIdx(null); return; }
-                            const imgs = [...editing.images];
-                            const [moved] = imgs.splice(dragSrcIdx, 1);
-                            imgs.splice(i, 0, moved);
-                            setEditing({ ...editing, images: imgs });
-                            setDragSrcIdx(null);
-                            setDragOverIdx(null);
-                          }}
-                          onDragEnd={() => { setDragSrcIdx(null); setDragOverIdx(null); }}
-                          onClick={(e) => {
-                            if ((e.target as HTMLElement).closest('button')) return;
-                            setPreviewImg({ url: img, index: i });
-                          }}
-                          className="product-photo-thumb group"
-                          style={{
-                            opacity: dragSrcIdx === i ? 0.4 : 1,
-                            outline: dragOverIdx === i && dragSrcIdx !== i ? '2px solid var(--color-primary)' : undefined,
-                            outlineOffset: '2px',
-                          }}
-                        >
-                          {i === 0 && <div className="product-photo-cover-badge">Cover</div>}
-                          <Image src={img} alt="" fill sizes="120px" className="object-cover"
-                            unoptimized={img.startsWith('/assets/')} />
-                          <div className="product-photo-thumb-overlay">
-                            <button
-                              type="button"
-                              onClick={() => setPreviewImg({ url: img, index: i })}
-                              className="product-photo-thumb-action"
-                              title="Preview & crop"
-                              aria-label="Preview and crop"
-                            >
-                              <span className="material-symbols-outlined" aria-hidden="true">crop</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => removeImage(i)}
-                              className="product-photo-thumb-action is-danger"
-                              title="Remove"
-                              aria-label="Remove photo"
-                            >
-                              <span className="material-symbols-outlined" aria-hidden="true">delete</span>
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* AI Listing Assistant */}
@@ -2806,7 +2711,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     <div>
                       <h3 className="product-editor-section-title">Smart listing assistant</h3>
                       <p className="product-editor-section-copy">
-                        Add photos, describe the item, and AI fills in the form below automatically. You can undo right after.
+                        Add photos, describe the item, and AI fills in the details below for review.
                       </p>
                     </div>
                   </div>
@@ -2904,7 +2809,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   <div className="grid gap-3 border p-3" style={{ borderColor: 'var(--color-outline-variant)', background: 'rgba(255,255,255,0.62)' }}>
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <strong className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-                        AI Filled These Fields
+                        Review AI Draft
                       </strong>
                     </div>
 
@@ -2943,13 +2848,15 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                           Undo AI Fill
                         </button>
                       )}
+                      <button type="button" onClick={applyAiDraftToForm} className="gold-button text-xs">
+                        Apply Fields
+                      </button>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Quick Fill — removed from UI; archived in _archive/AdminShell.with-quickfill.tsx.bak. Flip SHOW_QUICK_FILL to restore. */}
-              {SHOW_QUICK_FILL && (
+              {/* Quick Fill */}
               <div
                 className="product-editor-panel product-editor-quick-panel"
                 style={{
@@ -3040,7 +2947,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   <strong>Multiplier</strong> (1.25x). Field labels can also target Title English, Title Spanish, Location, Asking Price, Description English, Description Spanish, Public Notes, and Internal Notes.
                 </p>
               </div>
-              )}
 
               {/* AI Listing Assistant */}
               <div
@@ -3069,7 +2975,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     <div>
                       <h3 className="product-editor-section-title">Smart listing assistant</h3>
                       <p className="product-editor-section-copy">
-                        Add photos, describe the item, and AI fills in the form below automatically. You can undo right after.
+                        Add photos, describe the item, and AI fills in the details below for review.
                       </p>
                     </div>
                   </div>
@@ -3167,7 +3073,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   <div className="grid gap-3 border p-3" style={{ borderColor: 'var(--color-outline-variant)', background: 'rgba(255,255,255,0.62)' }}>
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <strong className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-                        AI Filled These Fields
+                        Review AI Draft
                       </strong>
                     </div>
 
@@ -3206,22 +3112,13 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                           Undo AI Fill
                         </button>
                       )}
+                      <button type="button" onClick={applyAiDraftToForm} className="gold-button text-xs">
+                        Apply Fields
+                      </button>
                     </div>
                   </div>
                 )}
               </div>
-
-              {/* Listing details — modern card matching the panels above */}
-              <div className="product-editor-panel product-editor-fields-panel">
-                <div className="flex items-start gap-3">
-                  <div className="product-editor-icon" style={{ background: 'rgba(212, 175, 55, 0.18)', color: '#a9760a' }}>
-                    <span className="material-symbols-outlined" aria-hidden="true">edit_note</span>
-                  </div>
-                  <div>
-                    <h3 className="product-editor-section-title">Listing details</h3>
-                    <p className="product-editor-section-copy">Review and fine-tune everything before saving.</p>
-                  </div>
-                </div>
 
               {/* ID (edit only) */}
               {!isNew && (
@@ -3633,6 +3530,106 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   </ClearableField>
                 </div>
               </div>
+
+              {/* Images */}
+              <div className="hidden">
+                <label className="form-label">Images</label>
+                <label
+                  className="flex min-h-24 flex-col items-center justify-center border-2 border-dashed p-8 cursor-pointer text-sm transition-colors mb-4"
+                  style={{
+                    borderColor: dragOver ? 'var(--color-primary)' : 'var(--color-outline-variant)',
+                    color: dragOver ? 'var(--color-primary)' : 'var(--color-on-surface-variant)',
+                    background: dragOver ? 'color-mix(in srgb, var(--color-primary) 6%, transparent)' : undefined,
+                  }}
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragEnter={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOver(false);
+                    if (e.dataTransfer.files.length) handleImageUpload(e.dataTransfer.files);
+                  }}
+                >
+                  <input type="file" accept="image/*" multiple className="sr-only"
+                    onChange={(e) => e.target.files && handleImageUpload(e.target.files)} />
+                  {uploading ? 'Uploading…' : 'Click or drag images here (compressed to WebP automatically)'}
+                </label>
+                {editing.images.length > 0 && (
+                  <div>
+                    <p className="text-[0.62rem] mb-2" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                      Click to preview or crop · Drag to reorder · First image is the cover photo
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      {editing.images.map((img, i) => (
+                        <div
+                          key={img + i}
+                          draggable
+                          onDragStart={() => setDragSrcIdx(i)}
+                          onDragEnter={(e) => { e.preventDefault(); setDragOverIdx(i); }}
+                          onDragOver={(e) => { e.preventDefault(); setDragOverIdx(i); }}
+                          onDragLeave={() => setDragOverIdx(null)}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (dragSrcIdx === null || dragSrcIdx === i) { setDragSrcIdx(null); setDragOverIdx(null); return; }
+                            const imgs = [...editing.images];
+                            const [moved] = imgs.splice(dragSrcIdx, 1);
+                            imgs.splice(i, 0, moved);
+                            setEditing({ ...editing, images: imgs });
+                            setDragSrcIdx(null);
+                            setDragOverIdx(null);
+                          }}
+                          onDragEnd={() => { setDragSrcIdx(null); setDragOverIdx(null); }}
+                          onClick={(e) => {
+                            if ((e.target as HTMLElement).closest('button')) return;
+                            setPreviewImg({ url: img, index: i });
+                          }}
+                          className="relative h-28 w-28 group cursor-grab"
+                          style={{
+                            opacity: dragSrcIdx === i ? 0.4 : 1,
+                            outline: dragOverIdx === i && dragSrcIdx !== i ? '2px solid var(--color-primary)' : undefined,
+                            outlineOffset: '2px',
+                          }}
+                        >
+                          {/* Cover badge */}
+                          {i === 0 && (
+                            <div
+                              className="absolute bottom-0 left-0 right-0 z-20 text-center text-[0.52rem] font-bold uppercase tracking-wide leading-5"
+                              style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}
+                            >
+                              Cover
+                            </div>
+                          )}
+                          <Image src={img} alt="" fill sizes="112px" className="object-contain"
+                            unoptimized={img.startsWith('/assets/')} />
+                          {/* Hover overlay: preview + remove */}
+                          <div
+                            className="absolute inset-0 z-10 flex flex-col opacity-0 group-hover:opacity-100 transition-opacity"
+                            style={{ background: 'rgba(0,0,0,0.45)' }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setPreviewImg({ url: img, index: i })}
+                              className="flex-1 flex items-center justify-center text-white"
+                              title="Preview"
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>zoom_in</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeImage(i)}
+                              className="h-7 flex items-center justify-center text-white text-[0.72rem] font-bold"
+                              style={{ background: 'rgba(180,0,0,0.75)' }}
+                              title="Remove"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
             </div>
@@ -3696,7 +3693,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               <button type="button" onClick={() => handleSave('another')} disabled={saving} className="outline-button text-sm disabled:opacity-50">
                 Save + Add Another
               </button>
-              <button type="button" onClick={() => handleSave('close')} disabled={saving} className="gold-button gold-button-gradient text-sm disabled:opacity-50">
+              <button type="button" onClick={() => handleSave('close')} disabled={saving} className="gold-button text-sm disabled:opacity-50">
                 {saving ? 'Saving…' : 'Save and Close'}
               </button>
             </div>
@@ -3704,8 +3701,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         </div>
       )}
 
-      {/* Quick Fill AI prompt viewer — archived with the Quick Fill section. */}
-      {SHOW_QUICK_FILL && showQuickFillPrompt && (
+      {/* Quick Fill AI prompt viewer */}
+      {showQuickFillPrompt && (
         <div
           className="fixed inset-0 z-[65] flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.58)' }}

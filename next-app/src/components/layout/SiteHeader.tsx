@@ -10,10 +10,143 @@ import { useCart } from '@/context/CartContext';
 
 const GOLD = '#735c00';
 const SECONDARY = '#5e5e5d';
-const BORDER = '#d8d0c2';
 
 const navLinkBase =
   'text-sm font-medium tracking-wide px-1 py-2 transition-colors hover:text-[#735c00]';
+
+const HEADER_STYLES = `
+  /* Desktop dropdown — white card matching the auth/shop modernization */
+  .nav-dropdown {
+    left: 0;
+    top: calc(100% + 6px);
+    min-width: 210px;
+    background: #ffffff;
+    border: 1px solid rgba(115, 92, 0, 0.15);
+    border-radius: 8px;
+    box-shadow: 0 18px 52px rgba(42, 34, 12, 0.12);
+    padding: 0.4rem;
+  }
+  /* Invisible bridge so hover survives the gap between trigger and panel */
+  .nav-dropdown::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 0;
+    right: 0;
+    height: 8px;
+  }
+  .nav-dropdown-link {
+    display: block;
+    padding: 0.6rem 0.85rem;
+    border-radius: 6px;
+    font-family: var(--font-label);
+    font-size: 0.82rem;
+    color: var(--color-on-surface);
+    text-decoration: none;
+    transition: background 150ms ease, color 150ms ease;
+  }
+  .nav-dropdown-link:hover {
+    background: linear-gradient(135deg, #dcb336, #b5890c);
+    color: #fffdf7;
+  }
+
+  /* Gold-gradient call CTA */
+  .nav-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.65rem 1.4rem;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #dcb336, #b5890c);
+    color: #fffdf7;
+    font-family: var(--font-label);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-decoration: none;
+    box-shadow: 0 10px 24px rgba(181, 137, 12, 0.18);
+    transition: filter 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  }
+  .nav-cta:hover {
+    filter: brightness(1.04);
+    box-shadow: 0 14px 30px rgba(181, 137, 12, 0.24);
+    transform: translateY(-1px);
+  }
+
+  /* Menu toggle (mobile) */
+  .menu-toggle {
+    border: 1px solid rgba(115, 92, 0, 0.5);
+    border-radius: 6px;
+    color: ${GOLD};
+    font-family: var(--font-label);
+    transition: background 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  }
+  .menu-toggle[data-open="true"] {
+    background: linear-gradient(135deg, #dcb336, #b5890c);
+    border-color: transparent;
+    color: #fffdf7;
+    box-shadow: 0 8px 20px rgba(181, 137, 12, 0.2);
+  }
+
+  /* Mobile menu panel — elevated, warm-tinted, rounded */
+  .mobile-menu-panel {
+    border-top: 1px solid rgba(115, 92, 0, 0.12);
+    border-radius: 0 0 14px 14px;
+    box-shadow: 0 24px 44px rgba(42, 34, 12, 0.12);
+    background:
+      radial-gradient(circle at 92% 0%, rgba(220, 188, 96, 0.12), transparent 16rem),
+      rgba(252, 251, 247, 0.98);
+    overflow: hidden;
+  }
+  .mobile-row {
+    border-bottom: 1px solid rgba(115, 92, 0, 0.10);
+  }
+  .mobile-row:last-child {
+    border-bottom: none;
+  }
+  .mobile-nav-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.85rem 0.65rem;
+    border-radius: 6px;
+    font-family: var(--font-label);
+    transition: background 150ms ease, color 150ms ease;
+  }
+  .mobile-nav-link:hover,
+  .mobile-nav-link:active {
+    color: ${GOLD};
+    background: rgba(212, 175, 55, 0.10);
+  }
+  .mobile-accordion-btn[data-open="true"] {
+    background: rgba(212, 175, 55, 0.12);
+    color: ${GOLD};
+  }
+  .mobile-sub-list {
+    margin: 0.15rem 0 0.5rem;
+    padding: 0.3rem;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(115, 92, 0, 0.1);
+  }
+  .mobile-sub-link {
+    display: block;
+    padding: 0.6rem 0.75rem;
+    border-radius: 6px;
+    font-family: var(--font-label);
+    font-size: 0.9rem;
+    color: ${GOLD};
+    text-decoration: none;
+    transition: background 150ms ease, color 150ms ease;
+  }
+  .mobile-sub-link:hover,
+  .mobile-sub-link:active {
+    background: linear-gradient(135deg, #dcb336, #b5890c);
+    color: #fffdf7;
+  }
+`;
 
 export default function SiteHeader() {
   const t = useTranslations('nav');
@@ -24,7 +157,7 @@ export default function SiteHeader() {
   const [sellOpen, setSellOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const { count: wishlistCount, openDrawer: openWishlist } = useWishlist();
-  const { count: cartCount, openDrawer: openCart, recentlyAdded, dismissAdded } = useCart();
+  const { count: cartCount, openDrawer: openCart, clear: clearCart, recentlyAdded, dismissAdded } = useCart();
 
   function href(path: string) {
     return `${locale === 'es' ? '/es' : ''}${path}`;
@@ -61,7 +194,11 @@ export default function SiteHeader() {
   return (
     <header
       className="fixed top-0 w-full z-50 backdrop-blur-sm"
-      style={{ background: 'rgba(249,249,247,0.95)', borderBottom: `1px solid ${BORDER}` }}
+      style={{
+        background: 'rgba(249,249,247,0.95)',
+        borderBottom: '1px solid rgba(115,92,0,0.12)',
+        boxShadow: '0 6px 24px rgba(42,34,12,0.05)',
+      }}
     >
       <div className="flex items-center justify-between gap-2 px-3 py-3 md:px-8 md:py-5 w-full max-w-[1440px] mx-auto">
 
@@ -197,10 +334,10 @@ export default function SiteHeader() {
                   right: 0,
                   width: '220px',
                   background: 'white',
-                  border: `1px solid rgba(115,92,0,0.25)`,
-                  borderRadius: '4px',
-                  boxShadow: '0 6px 24px rgba(0,0,0,0.12)',
-                  padding: '0.75rem',
+                  border: '1px solid rgba(115,92,0,0.15)',
+                  borderRadius: '8px',
+                  boxShadow: '0 18px 52px rgba(42,34,12,0.12)',
+                  padding: '0.85rem',
                   zIndex: 60,
                 }}
               >
@@ -212,7 +349,7 @@ export default function SiteHeader() {
                   width: '10px',
                   height: '10px',
                   background: 'white',
-                  border: `1px solid rgba(115,92,0,0.25)`,
+                  border: '1px solid rgba(115,92,0,0.15)',
                   borderBottom: 'none',
                   borderRight: 'none',
                   transform: 'rotate(45deg)',
@@ -223,18 +360,27 @@ export default function SiteHeader() {
                 <p style={{ fontSize: '0.75rem', color: '#555', marginBottom: '0.6rem', lineHeight: 1.3 }} className="line-clamp-2">
                   {recentlyAdded}
                 </p>
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     onClick={() => { dismissAdded(); openCart(); }}
-                    style={{ flex: 1, fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0.35rem 0.5rem', background: GOLD, color: 'white', border: 'none', borderRadius: '2px', cursor: 'pointer', fontFamily: 'var(--font-label)' }}
+                    style={{ flex: 1, fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0.45rem 0.5rem', background: 'linear-gradient(135deg, #dcb336, #b5890c)', color: '#fffdf7', border: 'none', borderRadius: '6px', cursor: 'pointer', fontFamily: 'var(--font-label)', boxShadow: '0 8px 18px rgba(181,137,12,0.18)' }}
                   >
                     {locale === 'es' ? 'Ver carrito' : 'Go to cart'}
                   </button>
+                  {cartCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => { clearCart(); dismissAdded(); }}
+                      style={{ flex: '1 1 100%', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0.4rem 0.5rem', background: 'rgba(186,26,26,0.06)', border: '1px solid rgba(186,26,26,0.32)', color: 'var(--color-error)', borderRadius: '6px', cursor: 'pointer', fontFamily: 'var(--font-label)' }}
+                    >
+                      {locale === 'es' ? 'Vaciar carrito' : 'Clear Cart'}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={dismissAdded}
-                    style={{ fontSize: '0.7rem', padding: '0.35rem 0.5rem', background: 'none', border: '1px solid rgba(115,92,0,0.3)', color: GOLD, borderRadius: '2px', cursor: 'pointer' }}
+                    style={{ fontSize: '0.7rem', padding: '0.4rem 0.55rem', background: 'none', border: '1px solid rgba(115,92,0,0.3)', color: GOLD, borderRadius: '6px', cursor: 'pointer' }}
                     aria-label="Dismiss"
                   >
                     ✕
@@ -244,9 +390,10 @@ export default function SiteHeader() {
             )}
           </div>
 
-          {/* Call Now — hidden on mobile; inline-flex at 2xl. Wrapped in span to prevent gold-button display override */}
+          {/* Call Now — hidden on mobile; inline-flex at 2xl. Wrapped in span so the
+              span controls visibility and .nav-cta's display doesn't override `hidden`. */}
           <span className="hidden 2xl:inline-flex">
-            <a href="tel:2394048505" className="gold-button">{t('callNow')}</a>
+            <a href="tel:2394048505" className="nav-cta">{t('callNow')}</a>
           </span>
 
 
@@ -255,8 +402,8 @@ export default function SiteHeader() {
             onClick={() => {
               if (menuOpen) { closeAll(); } else { setMenuOpen(true); }
             }}
-            className="2xl:hidden border px-2.5 py-1.5 md:px-3 md:py-2 text-[10px] md:text-xs font-bold tracking-widest uppercase"
-            style={{ borderColor: `${GOLD}80`, color: GOLD, fontFamily: 'var(--font-label)' }}
+            className="menu-toggle 2xl:hidden px-2.5 py-1.5 md:px-3 md:py-2 text-[10px] md:text-xs font-bold tracking-widest uppercase"
+            data-open={menuOpen ? 'true' : 'false'}
             aria-expanded={menuOpen}
             aria-label={menuOpen ? t('close') : t('menu')}
           >
@@ -267,10 +414,7 @@ export default function SiteHeader() {
 
       {/* Mobile menu */}
       {menuOpen && (
-        <div
-          className="2xl:hidden border-t"
-          style={{ borderColor: BORDER, background: 'rgba(249,249,247,0.98)' }}
-        >
+        <div className="mobile-menu-panel 2xl:hidden">
           <div className="flex flex-col px-4 py-3" style={{ fontFamily: 'var(--font-label)' }}>
 
             <MobileLink href={href('/')} onClick={closeAll} style={{ color: GOLD }}>{t('home')}</MobileLink>
@@ -280,7 +424,7 @@ export default function SiteHeader() {
               onToggle={() => setShopOpen(o => !o)}
             >
               {SHOP_ITEMS.map(({ key, path }) => (
-                <MobileLink key={key} href={href(path)} onClick={closeAll} sub>{t(key)}</MobileLink>
+                <Link key={key} href={href(path)} onClick={closeAll} className="mobile-sub-link">{t(key)}</Link>
               ))}
             </MobileAccordion>
 
@@ -291,7 +435,7 @@ export default function SiteHeader() {
               onToggle={() => setSellOpen(o => !o)}
             >
               {SELL_ITEMS.map(({ key, path }) => (
-                <MobileLink key={key} href={href(path)} onClick={closeAll} sub>{t(key)}</MobileLink>
+                <Link key={key} href={href(path)} onClick={closeAll} className="mobile-sub-link">{t(key)}</Link>
               ))}
             </MobileAccordion>
 
@@ -302,7 +446,7 @@ export default function SiteHeader() {
               onToggle={() => setAboutOpen(o => !o)}
             >
               {ABOUT_ITEMS.map(({ key, path }) => (
-                <MobileLink key={key} href={href(path)} onClick={closeAll} sub>{t(key)}</MobileLink>
+                <Link key={key} href={href(path)} onClick={closeAll} className="mobile-sub-link">{t(key)}</Link>
               ))}
             </MobileAccordion>
 
@@ -310,22 +454,24 @@ export default function SiteHeader() {
             <MobileLink href={href('/account')} onClick={closeAll}>{t('myAccount')}</MobileLink>
 
             {/* Wishlist — opens drawer */}
-            <button
-              type="button"
-              onClick={() => { closeAll(); openWishlist(); }}
-              className="py-3 border-b text-xs font-bold uppercase tracking-[0.08em] flex items-center justify-between w-full transition-colors hover:text-[#735c00]"
-              style={{ borderColor: BORDER, color: '#1a1c1c', fontFamily: 'var(--font-label)' }}
-            >
-              <span>{locale === 'en' ? 'Saved Items' : 'Lista de deseos'}</span>
-              {wishlistCount > 0 && (
-                <span
-                  className="text-[0.5rem] font-bold px-1.5 py-0.5 rounded-full"
-                  style={{ background: GOLD, color: '#fff' }}
-                >
-                  {wishlistCount}
-                </span>
-              )}
-            </button>
+            <div className="mobile-row">
+              <button
+                type="button"
+                onClick={() => { closeAll(); openWishlist(); }}
+                className="mobile-nav-link text-xs font-bold uppercase tracking-[0.08em]"
+                style={{ color: '#1a1c1c' }}
+              >
+                <span>{locale === 'en' ? 'Saved Items' : 'Lista de deseos'}</span>
+                {wishlistCount > 0 && (
+                  <span
+                    className="text-[0.5rem] font-bold px-1.5 py-0.5 rounded-full"
+                    style={{ background: GOLD, color: '#fff' }}
+                  >
+                    {wishlistCount}
+                  </span>
+                )}
+              </button>
+            </div>
 
             <MobileLink href={altHref} onClick={closeAll} style={{ color: GOLD }}>
               {locale === 'en' ? 'Español' : 'English'}
@@ -334,6 +480,8 @@ export default function SiteHeader() {
           </div>
         </div>
       )}
+
+      <style>{HEADER_STYLES}</style>
     </header>
   );
 }
@@ -351,20 +499,10 @@ function DesktopDropdown({
 }) {
   return (
     <div
-      className="absolute left-0 top-full z-50 min-w-[190px] py-2 opacity-0 pointer-events-none -translate-y-1 transition-all duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0"
-      style={{
-        background: 'rgba(47,49,49,0.99)',
-        border: '1px solid rgba(216,208,194,0.18)',
-        boxShadow: '0 18px 40px rgba(0,0,0,0.28)',
-      }}
+      className="nav-dropdown absolute z-50 opacity-0 pointer-events-none -translate-y-1 transition-all duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0"
     >
       {items.map(({ key, path }) => (
-        <Link
-          key={key}
-          href={href(path)}
-          className="block px-3 py-[0.65rem] text-sm transition-colors hover:bg-white/5"
-          style={{ color: '#d7d0c3', fontFamily: 'var(--font-label)' }}
-        >
+        <Link key={key} href={href(path)} className="nav-dropdown-link">
           {t(key)}
         </Link>
       ))}
@@ -384,17 +522,17 @@ function MobileAccordion({
   children: React.ReactNode;
 }) {
   return (
-    <div>
+    <div className="mobile-row">
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between border-b py-3 transition-colors hover:text-[#735c00]"
-        style={{ borderColor: BORDER, fontFamily: 'var(--font-label)' }}
+        className="mobile-nav-link mobile-accordion-btn"
+        data-open={open ? 'true' : 'false'}
         aria-expanded={open}
       >
         <span
           className="text-xs font-bold uppercase tracking-[0.08em]"
-          style={{ color: '#1a1c1c' }}
+          style={{ color: 'inherit' }}
         >
           {label}
         </span>
@@ -405,7 +543,7 @@ function MobileAccordion({
           expand_more
         </span>
       </button>
-      {open && <div className="flex flex-col">{children}</div>}
+      {open && <div className="mobile-sub-list flex flex-col">{children}</div>}
     </div>
   );
 }
@@ -414,32 +552,23 @@ function MobileLink({
   href,
   onClick,
   children,
-  sub = false,
   style,
 }: {
   href: string;
   onClick: () => void;
   children: React.ReactNode;
-  sub?: boolean;
   style?: React.CSSProperties;
 }) {
   return (
-    <Link
-      href={href}
-      onClick={onClick}
-      className="py-3 border-b text-sm font-medium transition-colors hover:text-[#735c00]"
-      style={{
-        borderColor: BORDER,
-        color: sub ? GOLD : '#1a1c1c',
-        paddingLeft: sub ? '1.75rem' : undefined,
-        fontSize: sub ? '0.9rem' : '0.75rem',
-        textTransform: sub ? 'none' : 'uppercase',
-        letterSpacing: sub ? '0.02em' : '0.08em',
-        fontWeight: sub ? 500 : 700,
-        ...style,
-      }}
-    >
-      {children}
-    </Link>
+    <div className="mobile-row">
+      <Link
+        href={href}
+        onClick={onClick}
+        className="mobile-nav-link text-xs font-bold uppercase tracking-[0.08em]"
+        style={{ color: '#1a1c1c', ...style }}
+      >
+        {children}
+      </Link>
+    </div>
   );
 }

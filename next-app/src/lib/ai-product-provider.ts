@@ -1,0 +1,293 @@
+import { PRODUCT_AUTOFILL_SCHEMA, type ProductAutofillProviderResult } from '@/lib/ai-product-schema';
+
+export type GenerateProductDraftInput = {
+  transcript: string;
+  images: string[];
+  origin?: string;
+  schema: typeof PRODUCT_AUTOFILL_SCHEMA;
+  mode?: 'fast' | 'accurate' | 'premium';
+};
+
+export type GenerateProductDraftOutput = {
+  draft: ProductAutofillProviderResult;
+  meta: {
+    provider: string;
+    model: string;
+    promptVersion: string;
+    usage?: Record<string, unknown>;
+  };
+};
+
+const PROMPT_VERSION = 'product-listing-extraction-v4';
+const DEFAULT_TIMEOUT_MS = 30000;
+
+const PRODUCT_EXTRACTION_SYSTEM_PROMPT = `You are a careful jewelry catalog assistant for Naples Estate Jewelry. You help an admin populate intake fields from item photos plus an optional spoken or typed description. You are interpretive but not imaginative: organize messy input, classify obvious item forms from photos, and write useful titles and descriptions — but never invent unsupported jewelry facts. Think like a careful catalog assistant, not a salesperson, appraiser, or inventory manager.
+
+Use the photos and the transcript together. Photos are the primary source; the transcript adds seller-stated facts. Return only the requested structured data. Any field you cannot support with evidence must be null. Prefer omission over guessing. Never output the operational fields status or location — those are not AI-controlled.
+
+VISUAL CLASSIFICATION — you MAY infer these from clear photo evidence:
+- product_type: classify aggressively when the item form is obvious (Ring, Bracelet, Necklace, Pendant, Earrings, Brooch, Watch, Coin, Bullion, Loose Diamond, Loose Gemstone, Silverware, Estate Lot). If unclear, use Other or null.
+- metal_variant: the visible tone/appearance (yellow_gold, white_gold, rose_gold, tricolor_gold, bicolor_gold, silver, vermeil, platinum). This describes appearance only and does NOT verify composition.
+- chain_type: only for Necklace or Bracelet, when the link/style is clearly visible (e.g. Cuban Link, Figaro, Rope, Box, Snake, Wheat).
+- gender, title, description: from safe visual observation.
+
+EXPLICIT-ONLY hard facts — set ONLY when stated in the transcript or clearly visible as a marking, stamp, engraving, hallmark, or logo:
+- brand: from a stated maker, visible logo, hallmark, engraving, or maker stamp. Normalize to the canonical name (e.g. "Tiffany" -> "Tiffany & Co.", "Rolex" -> "Rolex", a dial reading "SEIKO" -> "Seiko"). Never infer brand from style alone. If uncertain, null.
+- metal_type: a factual composition claim. Only when marked, tested, or stated (e.g. 14K, 18K, 925, sterling silver, platinum). A yellow tone is NOT "Gold"; a white tone is NOT "Platinum". Do not convert appearance into metal_type.
+- purity: only from a stated mark or test (e.g. "marked 14K", "tested 18K", "925"). Never from color alone.
+- weight_grams: only when explicitly stated. Never estimate from photos or dimensions.
+- length: only when explicitly stated or shown with reliable measurement evidence. Never guess ring size, bracelet length, or necklace length from appearance.
+- asking_price: only when clearly stated (e.g. "asking 1200", "put it at 875").
+- manual_price_label: may be formatted from a stated asking_price (e.g. 1200 -> "$1,200").
+- price_mode and pricing_multiplier: only when explicitly stated (e.g. "manual pricing", "1.7 times spot"). Never infer.
+
+TAXONOMY:
+- Product Type is the broad item form. Link Type (chain_type) is only the chain/link/style for Necklace or Bracelet.
+- Do not combine origin/maker words with link style as one phrase. "Italian" is origin/manufacture; "Cuban" is link style.
+
+WRITING (English only — Spanish translations are generated separately, never produce Spanish here):
+- VOICE: write everything in the first-person voice of the seller's own listing. State marked or known facts directly, as the seller (e.g. "Marked 14K on the end link and lobster clasp."). NEVER use third-person attributions such as "seller states", "per the seller", "seller-stated", or "according to the seller", and never write "visible in the image" or "in the photo".
+- NO COMMENTARY: write only listing copy that describes the item. Never add advice, recommendations, workflow or process notes, or QC reminders (e.g. "measure before listing", "verify before publishing", "confirm exact text", "consistent with seller statement").
+- Titles: specific and useful, not generic. Prefer "Yellow-Tone Ring With Clear Stone Accents" over "Ring"; use stronger claims like "14K Yellow Gold Diamond Ring" only when the transcript or visible markings support them. NEVER include gram weight in the title.
+- Descriptions: state known facts plus safe visual observations (yellow-tone, white-tone, clear stone accents, engraved marking, textured/polished finish, visible wear). Do not assert diamond, a specific karat gold, platinum, a natural gemstone species, named-brand authenticity, or an era (Victorian/antique) unless the transcript or visible markings support it.
+- public_notes: optional, short, buyer-facing caveats in the same direct voice (e.g. "Marked 14K on the end link and clasp."). Omit when there is nothing useful to add.
+- warnings and uncertainties: optional; at most ONE brief line each, and only when genuinely important. Prefer omitting them — do not be verbose.
+
+Use transcript evidence for factual claims, visible evidence for classification, and null for everything unsupported.
+
+OUTPUT FORMAT — respond with a single raw JSON object (no markdown, no code fences), shaped EXACTLY like this:
+{"fields": { <every field name from schema.fields>: <value or null> }, "warnings": [<string>], "uncertainties": [<string>], "confidence": { <field name>: "low" | "medium" | "high" }}
+Put EVERY extracted value INSIDE the "fields" object — never at the top level. Include each schema field key in "fields", using null when unsupported. "warnings", "uncertainties", and "confidence" are optional.`;
+
+type PreparedImage = {
+  dataUrl: string;
+  base64: string;
+  mimeType: string;
+};
+
+function getConfiguredModel(mode?: GenerateProductDraftInput['mode']) {
+  if (mode === 'accurate' && process.env.AI_MODEL_ACCURATE) return process.env.AI_MODEL_ACCURATE;
+  if (mode === 'premium' && process.env.AI_MODEL_PREMIUM) return process.env.AI_MODEL_PREMIUM;
+  if (mode === 'fast' && process.env.AI_MODEL_FAST) return process.env.AI_MODEL_FAST;
+  return process.env.AI_MODEL;
+}
+
+function providerConfig(mode?: GenerateProductDraftInput['mode']) {
+  const provider = process.env.AI_PROVIDER?.trim().toLowerCase();
+  const model = getConfiguredModel(mode)?.trim();
+  if (!provider) throw new Error('AI provider is not configured.');
+  if (!model) throw new Error('AI model is not configured.');
+  return { provider, model };
+}
+
+function buildUserPrompt(input: GenerateProductDraftInput) {
+  return JSON.stringify({
+    task: 'extract_product_listing_fields',
+    promptVersion: PROMPT_VERSION,
+    schema: input.schema,
+    transcript: input.transcript,
+    imageCount: input.images.length,
+    respondWith: {
+      fields: 'object — include EVERY name from schema.fields as a key, with its value or null',
+      warnings: 'string[] (optional)',
+      uncertainties: 'string[] (optional)',
+      confidence: 'object — filled field name -> "low" | "medium" | "high" (optional)',
+    },
+  });
+}
+
+function getImageUrl(src: string, origin?: string) {
+  if (src.startsWith('/')) {
+    if (!origin) return null;
+    return new URL(src, origin).toString();
+  }
+  return src;
+}
+
+async function prepareImages(input: GenerateProductDraftInput): Promise<PreparedImage[]> {
+  const maxBytes = Number(process.env.AI_MAX_IMAGE_BYTES ?? 4_000_000);
+
+  // Fetch/encode all images concurrently so multiple photos don't add up serially.
+  const prepared = await Promise.all(input.images.map(async (src): Promise<PreparedImage | null> => {
+    const url = getImageUrl(src, input.origin);
+    if (!url) return null;
+
+    const response = await fetch(url);
+    if (!response.ok) return null;
+
+    const mimeType = response.headers.get('content-type')?.split(';')[0]?.trim() || 'image/jpeg';
+    if (!mimeType.startsWith('image/')) return null;
+
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.byteLength > maxBytes) return null;
+
+    const base64 = bytes.toString('base64');
+    return {
+      dataUrl: `data:${mimeType};base64,${base64}`,
+      base64,
+      mimeType,
+    };
+  }));
+
+  return prepared.filter((image): image is PreparedImage => image !== null);
+}
+
+function withTimeout(ms = DEFAULT_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ms);
+  return { signal: controller.signal, clear: () => clearTimeout(timeout) };
+}
+
+function parseJsonObject(value: unknown): ProductAutofillProviderResult {
+  if (value && typeof value === 'object' && !Array.isArray(value)) return value as ProductAutofillProviderResult;
+  if (typeof value !== 'string') throw new Error('AI response did not contain structured output.');
+  const trimmed = value.trim().replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
+  const parsed = JSON.parse(trimmed);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('AI response JSON was not an object.');
+  return parsed as ProductAutofillProviderResult;
+}
+
+async function postJson(url: string, headers: Record<string, string>, body: unknown) {
+  const timeout = withTimeout(Number(process.env.AI_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS));
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+      signal: timeout.signal,
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      const message = data?.error?.message ?? data?.message ?? `AI provider request failed with status ${response.status}.`;
+      throw new Error(message);
+    }
+    return data;
+  } finally {
+    timeout.clear();
+  }
+}
+
+async function callOpenAi(input: GenerateProductDraftInput, model: string): Promise<GenerateProductDraftOutput> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error('OpenAI API key is not configured.');
+  const images = await prepareImages(input);
+  const data = await postJson(
+    'https://api.openai.com/v1/chat/completions',
+    { authorization: `Bearer ${apiKey}` },
+    {
+      model,
+      temperature: 0.1,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: PRODUCT_EXTRACTION_SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: buildUserPrompt(input) },
+            ...images.map((image) => ({ type: 'image_url', image_url: { url: image.dataUrl } })),
+          ],
+        },
+      ],
+    },
+  );
+  return {
+    draft: parseJsonObject(data?.choices?.[0]?.message?.content),
+    meta: { provider: 'openai', model, promptVersion: PROMPT_VERSION, usage: data?.usage },
+  };
+}
+
+async function callAnthropic(input: GenerateProductDraftInput, model: string): Promise<GenerateProductDraftOutput> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('Anthropic API key is not configured.');
+  const images = await prepareImages(input);
+  const data = await postJson(
+    'https://api.anthropic.com/v1/messages',
+    {
+      'x-api-key': apiKey,
+      'anthropic-version': process.env.ANTHROPIC_VERSION ?? '2023-06-01',
+    },
+    {
+      model,
+      max_tokens: Number(process.env.AI_MAX_OUTPUT_TOKENS ?? 1800),
+      temperature: 0.1,
+      system: [{ type: 'text', text: PRODUCT_EXTRACTION_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: buildUserPrompt(input) },
+          ...images.map((image) => ({
+            type: 'image',
+            source: { type: 'base64', media_type: image.mimeType, data: image.base64 },
+          })),
+        ],
+      }],
+    },
+  );
+  const text = Array.isArray(data?.content)
+    ? data.content.map((part: { text?: string }) => part.text ?? '').join('\n')
+    : null;
+  return {
+    draft: parseJsonObject(text),
+    meta: { provider: 'anthropic', model, promptVersion: PROMPT_VERSION, usage: data?.usage },
+  };
+}
+
+async function callGoogle(input: GenerateProductDraftInput, model: string): Promise<GenerateProductDraftOutput> {
+  const apiKey = process.env.GOOGLE_AI_API_KEY;
+  if (!apiKey) throw new Error('Google AI API key is not configured.');
+  const images = await prepareImages(input);
+  const data = await postJson(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {},
+    {
+      generationConfig: {
+        temperature: 0.1,
+        responseMimeType: 'application/json',
+        maxOutputTokens: Number(process.env.AI_MAX_OUTPUT_TOKENS ?? 1800),
+      },
+      systemInstruction: { parts: [{ text: PRODUCT_EXTRACTION_SYSTEM_PROMPT }] },
+      contents: [{
+        role: 'user',
+        parts: [
+          { text: buildUserPrompt(input) },
+          ...images.map((image) => ({ inlineData: { mimeType: image.mimeType, data: image.base64 } })),
+        ],
+      }],
+    },
+  );
+  const text = data?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text ?? '').join('\n');
+  return {
+    draft: parseJsonObject(text),
+    meta: { provider: 'google', model, promptVersion: PROMPT_VERSION, usage: data?.usageMetadata },
+  };
+}
+
+async function callLocal(input: GenerateProductDraftInput, model: string): Promise<GenerateProductDraftOutput> {
+  const endpoint = process.env.AI_LOCAL_ENDPOINT;
+  if (!endpoint) throw new Error('Local AI endpoint is not configured.');
+  const images = await prepareImages(input);
+  const data = await postJson(
+    endpoint,
+    process.env.AI_LOCAL_API_KEY ? { authorization: `Bearer ${process.env.AI_LOCAL_API_KEY}` } : {},
+    {
+      model,
+      system: PRODUCT_EXTRACTION_SYSTEM_PROMPT,
+      prompt: buildUserPrompt(input),
+      images: images.map((image) => ({ dataUrl: image.dataUrl, mimeType: image.mimeType })),
+      schema: input.schema,
+    },
+  );
+  return {
+    draft: parseJsonObject(data?.draft ?? data),
+    meta: { provider: 'local', model, promptVersion: PROMPT_VERSION, usage: data?.usage },
+  };
+}
+
+export async function generateProductDraft(input: GenerateProductDraftInput): Promise<GenerateProductDraftOutput> {
+  const { provider, model } = providerConfig(input.mode);
+  if (provider === 'openai') return callOpenAi(input, model);
+  if (provider === 'anthropic') return callAnthropic(input, model);
+  if (provider === 'google') return callGoogle(input, model);
+  if (provider === 'local' || provider === 'self-hosted' || provider === 'self_hosted') return callLocal(input, model);
+  throw new Error(`Unsupported AI provider: ${provider}`);
+}

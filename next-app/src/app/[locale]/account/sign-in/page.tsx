@@ -34,16 +34,19 @@ export default function SignInPage() {
   return (
     <>
       <SiteHeader />
-      <main className="min-h-screen flex items-center justify-center px-4 pt-20 pb-16"
-        style={{ background: 'var(--color-background)' }}>
-        <div className="w-full max-w-sm">
+      <main className="modern-auth-page min-h-screen flex items-center justify-center px-4 pt-24 pb-20">
+        <div className="modern-auth-card w-full max-w-sm">
 
-          <div className="mb-8">
+          <span className="material-symbols-outlined modern-auth-icon" aria-hidden="true">
+            lock
+          </span>
+
+          <div className="mb-7">
             <p className="text-[0.65rem] font-bold uppercase tracking-[0.35em] mb-3"
               style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
               My Account
             </p>
-            <h1 className="text-3xl font-bold"
+            <h1 className="text-3xl font-bold tracking-tight"
               style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
               Sign In
             </h1>
@@ -85,13 +88,13 @@ export default function SignInPage() {
             <button
               type="submit"
               disabled={loading}
-              className="gold-button mt-2 disabled:opacity-50"
+              className="modern-auth-submit mt-2 disabled:opacity-60"
             >
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
 
-          <p className="mt-6 text-sm text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
+          <p className="mt-7 text-sm text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
             Don&apos;t have an account?{' '}
             <Link href="/account/sign-up"
               className="font-bold hover:underline underline-offset-2"
@@ -101,6 +104,59 @@ export default function SignInPage() {
           </p>
 
         </div>
+
+        <style>{`
+          .modern-auth-page {
+            background:
+              radial-gradient(circle at 78% 8%, rgba(220, 188, 96, 0.16), transparent 34rem),
+              linear-gradient(180deg, #fffdf8 0%, #f8f6f0 44%, #f5f2ea 100%);
+          }
+          .modern-auth-card {
+            position: relative;
+            border: 1px solid rgba(115, 92, 0, 0.15);
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 18px 52px rgba(42, 34, 12, 0.09);
+            padding: 3.25rem 2rem 2.25rem;
+          }
+          .modern-auth-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 3rem;
+            height: 3rem;
+            margin-bottom: 1.4rem;
+            border-radius: 999px;
+            color: #a98208;
+            background: rgba(212, 175, 55, 0.14);
+            font-size: 1.5rem;
+            line-height: 1;
+          }
+          .modern-auth-submit {
+            width: 100%;
+            min-height: 2.95rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background: linear-gradient(135deg, #dcb336, #b5890c);
+            color: #fffdf7;
+            font-family: var(--font-label);
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            box-shadow: 0 10px 24px rgba(181, 137, 12, 0.18);
+            transition: filter 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+          }
+          .modern-auth-submit:hover:not(:disabled) {
+            filter: brightness(1.04);
+            box-shadow: 0 14px 30px rgba(181, 137, 12, 0.24);
+            transform: translateY(-1px);
+          }
+          .modern-auth-submit:disabled {
+            cursor: default;
+          }
+        `}</style>
       </main>
     </>
   );

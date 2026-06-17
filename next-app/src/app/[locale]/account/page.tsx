@@ -1,11 +1,11 @@
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import SiteHeader from '@/components/layout/SiteHeader';
-import SignOutButton from '@/components/account/SignOutButton';
-import AccountProfileForm, { type CustomerProfile } from '@/components/account/AccountProfileForm';
+import AccountDashboard from '@/components/account/AccountDashboard';
+import { type CustomerProfile } from '@/components/account/AccountProfileForm';
 import SiteFooter from '@/components/layout/SiteFooter';
+import type { Order } from '@/types/sales';
 
 export const metadata: Metadata = {
   title: 'My Account',
@@ -35,7 +35,9 @@ export default async function AccountPage({ params }: Props) {
   const profileData = (profile ?? {}) as Partial<CustomerProfile> & { is_admin?: boolean };
   const displayName = profileData.full_name ?? profileData.first_name ?? user.email ?? 'Member';
   const isAdmin = profileData.is_admin === true;
-  const shopHref = isEs ? '/es/shop' : '/shop';
+  const memberSince = user.created_at
+    ? new Intl.DateTimeFormat(isEs ? 'es-US' : 'en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(user.created_at))
+    : (isEs ? 'No disponible' : 'Not available');
   const editableProfile: CustomerProfile = {
     id: user.id,
     first_name: profileData.first_name ?? null,
@@ -52,6 +54,12 @@ export default async function AccountPage({ params }: Props) {
     country: profileData.country ?? 'United States',
     marketing_opt_in: profileData.marketing_opt_in ?? false,
   };
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('*, order_items(*)')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(25);
 
   return (
     <>
@@ -81,122 +89,45 @@ export default async function AccountPage({ params }: Props) {
           </div>
         </section>
 
-        <div className="account-content max-w-6xl mx-auto px-4 md:px-8">
-          {isAdmin && (
-            <div className="account-card account-admin-card mb-7">
-              <div className="account-card-icon" aria-hidden="true">
-                <span className="material-symbols-outlined">admin_panel_settings</span>
-              </div>
-              <div>
-                <h2
-                  className="text-xs font-bold uppercase tracking-[0.22em] mb-2"
-                  style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
-                >
-                  {isEs ? 'Panel de Administracion' : 'Admin Panel'}
-                </h2>
-                <p className="text-sm mb-5" style={{ color: 'var(--color-on-surface-variant)' }}>
-                  {isEs ? 'Gestionar productos, imagenes y precios.' : 'Manage products, images, and pricing.'}
-                </p>
-                <Link href={isEs ? '/es/admin' : '/admin'} className="gold-button text-sm account-arrow-button">
-                  {isEs ? 'Abrir Admin' : 'Open Admin Panel'}
-                  <span className="material-symbols-outlined" aria-hidden="true">chevron_right</span>
-                </Link>
-              </div>
-            </div>
-          )}
-
-          <AccountProfileForm profile={editableProfile} fallbackEmail={user.email ?? null} locale={locale} />
-
-          <div className="account-card account-profile-card mb-8">
-            <p
-              className="text-xs font-bold uppercase tracking-[0.22em] mb-6"
-              style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
-            >
-              {isEs ? 'Perfil' : 'Profile'}
-            </p>
-            <div className="flex flex-col gap-6 md:flex-row md:items-center">
-              <div className="account-card-icon" aria-hidden="true">
-                <span className="material-symbols-outlined">person</span>
-              </div>
-              <div className="flex-1">
-                <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--color-on-surface)' }}>
-                  {isEs ? 'Detalles de cuenta' : 'Account Details'}
-                </h2>
-                <p className="text-sm mb-4" style={{ color: 'var(--color-on-surface-variant)' }}>
-                  {isEs
-                    ? 'Actualiza tu informacion o administra la configuracion de tu cuenta.'
-                    : 'Update your information or manage your account settings.'}
-                </p>
-                <div className="account-detail-grid">
-                  <div>
-                    <span>{isEs ? 'Correo' : 'Email'}</span>
-                    <strong>{user.email}</strong>
-                  </div>
-                  <div>
-                    <span>{isEs ? 'Tipo de cuenta' : 'Account type'}</span>
-                    <strong>{isAdmin ? (isEs ? 'Administrador' : 'Administrator') : (isEs ? 'Miembro' : 'Member')}</strong>
-                  </div>
-                </div>
-                <Link href={shopHref} className="outline-button text-sm mt-5 account-arrow-button">
-                  {isEs ? 'Ver tienda' : 'Browse Shop'}
-                  <span className="material-symbols-outlined" aria-hidden="true">chevron_right</span>
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          <div className="account-actions mb-12">
-            <Link href={isEs ? '/es/contact' : '/contact'} className="outline-button text-sm account-arrow-button">
-              {isEs ? 'Contacto' : 'Contact Us'}
-              <span className="material-symbols-outlined" aria-hidden="true">chevron_right</span>
-            </Link>
-            <SignOutButton
-              label={isEs ? 'Cerrar Sesion' : 'Sign Out'}
-              locale={locale}
-            />
-          </div>
-        </div>
-
-        <section className="account-trust-strip px-4 md:px-8">
-          <div className="max-w-6xl mx-auto grid gap-6 md:grid-cols-3">
-            {[
-              ['lock', isEs ? 'Seguro y privado' : 'Secure & Private', isEs ? 'Tu informacion siempre esta segura con nosotros.' : 'Your information is always safe with us.'],
-              ['verified', isEs ? 'Expertos confiables' : 'Trusted Experts', isEs ? 'Decadas de experiencia en oro y joyeria.' : 'Decades of experience in gold and jewelry.'],
-              ['support_agent', isEs ? 'Ayuda cuando la necesites' : 'Help When You Need It', isEs ? 'Nuestro equipo esta aqui para apoyarte.' : 'Our team is here to support you.'],
-            ].map(([icon, title, copy]) => (
-              <div key={title} className="account-trust-item">
-                <span className="material-symbols-outlined" aria-hidden="true">{icon}</span>
-                <div>
-                  <strong>{title}</strong>
-                  <p>{copy}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        <AccountDashboard
+          profile={editableProfile}
+          fallbackEmail={user.email ?? null}
+          locale={locale}
+          isAdmin={isAdmin}
+          memberSince={memberSince}
+          orders={(orders ?? []) as Order[]}
+        />
       </main>
       <SiteFooter locale={locale} />
       <style>{`
         .account-page {
+          position: relative;
+          isolation: isolate;
           background:
             radial-gradient(circle at 76% 5%, rgba(220, 188, 96, 0.13), transparent 34rem),
             linear-gradient(180deg, #fffdf8 0%, #f8f6f0 44%, #f5f2ea 100%);
+        }
+        .account-page::before {
+          content: '';
+          position: fixed;
+          top: 0;
+          right: 0;
+          left: 0;
+          height: min(42rem, 82vh);
+          pointer-events: none;
+          z-index: 0;
+          background:
+            linear-gradient(180deg, rgba(255, 253, 248, 0) 0%, rgba(255, 253, 248, 0) 64%, rgba(248, 246, 240, 0.86) 91%, #f8f6f0 100%),
+            linear-gradient(90deg, #fffdf8 0%, rgba(255, 253, 248, 0.94) 35%, rgba(255, 253, 248, 0.26) 62%, rgba(255, 253, 248, 0.02) 100%),
+            url('/assets/images/pages/account-hero-jewelry.png') top right / cover no-repeat;
         }
         .account-hero {
           position: relative;
           min-height: 19rem;
           display: flex;
           align-items: center;
-          overflow: hidden;
-        }
-        .account-hero::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background:
-            linear-gradient(90deg, #fffdf8 0%, rgba(255, 253, 248, 0.94) 38%, rgba(255, 253, 248, 0.26) 62%, rgba(255, 253, 248, 0.02) 100%),
-            url('/assets/images/pages/account-hero-jewelry.png') center right / cover no-repeat;
-          z-index: 0;
+          overflow: visible;
+          z-index: 1;
         }
         .account-hero-inner {
           position: relative;
@@ -210,7 +141,7 @@ export default async function AccountPage({ params }: Props) {
         .account-content {
           position: relative;
           z-index: 2;
-          margin-top: -1.25rem;
+          margin-top: -2.35rem;
         }
         .account-card,
         .account-profile-form {
@@ -219,16 +150,436 @@ export default async function AccountPage({ params }: Props) {
           background: rgba(255, 255, 255, 0.92) !important;
           box-shadow: 0 18px 48px rgba(42, 34, 12, 0.09);
         }
+        .account-tabs {
+          display: flex;
+          align-items: stretch;
+          overflow-x: auto;
+          border: 1px solid rgba(115, 92, 0, 0.1);
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.92);
+          box-shadow: 0 18px 50px rgba(42, 34, 12, 0.08);
+        }
+        .account-tabs button,
+        .account-tabs a {
+          position: relative;
+          min-width: 10.5rem;
+          min-height: 4.6rem;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.65rem;
+          padding: 1rem 1.25rem;
+          color: var(--color-on-surface-variant);
+          font-size: 0.82rem;
+          font-weight: 700;
+          white-space: nowrap;
+          border-right: 1px solid rgba(115, 92, 0, 0.1);
+          background: transparent;
+          cursor: pointer;
+        }
+        .account-tabs button:last-child,
+        .account-tabs a:last-child {
+          border-right: 0;
+        }
+        .account-tabs button.active,
+        .account-tabs a.active {
+          color: var(--color-primary);
+        }
+        .account-tabs button.active::after,
+        .account-tabs a.active::after {
+          content: '';
+          position: absolute;
+          right: 1rem;
+          bottom: 0;
+          left: 1rem;
+          height: 2px;
+          background: var(--color-primary);
+        }
+        .account-tabs .material-symbols-outlined {
+          font-size: 1.25rem;
+        }
+        .account-dashboard-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1.9fr) minmax(18rem, 1fr);
+          gap: 1.45rem;
+          margin-top: 1.45rem;
+          align-items: start;
+        }
+        .account-overview-panel .account-profile-form {
+          margin-bottom: 0 !important;
+          min-height: 31rem;
+        }
+        .account-tab-stack {
+          display: grid;
+          gap: 1rem;
+        }
+        .account-tab-heading {
+          padding: 1.4rem 1.8rem;
+          border: 1px solid rgba(115, 92, 0, 0.1);
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.78);
+        }
+        .account-tab-heading p,
+        .account-tab-eyebrow {
+          color: var(--color-primary);
+          font-family: var(--font-label);
+          font-size: 0.64rem;
+          font-weight: 800;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+        }
+        .account-tab-heading h2,
+        .account-tab-card h2 {
+          margin-top: 0.35rem;
+          color: var(--color-on-surface);
+          font-size: 1.15rem;
+          font-weight: 800;
+        }
+        .account-tab-heading span,
+        .account-tab-card > p:not(.account-tab-eyebrow) {
+          display: block;
+          margin-top: 0.35rem;
+          color: var(--color-on-surface-variant);
+          font-size: 0.9rem;
+          line-height: 1.45;
+        }
+        .account-tab-card {
+          min-height: 31rem;
+          padding: 2.1rem;
+        }
+        .account-empty-state {
+          min-height: 18rem;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 0.55rem;
+          margin-top: 1.5rem;
+          border: 1px dashed rgba(115, 92, 0, 0.2);
+          border-radius: 8px;
+          background: rgba(255, 253, 248, 0.68);
+          text-align: center;
+        }
+        .account-empty-state .material-symbols-outlined {
+          color: rgba(115, 92, 0, 0.34);
+          font-size: 2.5rem;
+        }
+        .account-empty-state strong {
+          color: var(--color-on-surface);
+          font-size: 1rem;
+        }
+        .account-empty-state p {
+          max-width: 22rem;
+          color: var(--color-on-surface-variant);
+          font-size: 0.86rem;
+        }
+        .account-order-list {
+          display: grid;
+          gap: 0.75rem;
+          margin-top: 1.5rem;
+        }
+        .account-order-row {
+          position: relative;
+          display: grid;
+          grid-template-columns: 1.2fr repeat(3, minmax(0, 0.75fr)) auto;
+          gap: 1rem;
+          align-items: center;
+          width: 100%;
+          text-align: left;
+          padding: 1rem;
+          border: 1px solid rgba(115, 92, 0, 0.12);
+          border-radius: 8px;
+          background: rgba(255, 253, 248, 0.78);
+          transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+          cursor: pointer;
+        }
+        .account-order-row:hover,
+        .account-order-row:focus-visible {
+          border-color: rgba(115, 92, 0, 0.32);
+          box-shadow: 0 12px 28px rgba(42, 34, 12, 0.08);
+          transform: translateY(-1px);
+          outline: none;
+        }
+        .account-order-row span {
+          display: block;
+          color: var(--color-on-surface-variant);
+          font-family: var(--font-label);
+          font-size: 0.6rem;
+          font-weight: 800;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+        }
+        .account-order-row strong {
+          display: block;
+          margin-top: 0.22rem;
+          color: var(--color-on-surface);
+          font-size: 0.88rem;
+        }
+        .account-order-row-icon {
+          color: var(--color-primary) !important;
+          font-family: 'Material Symbols Outlined' !important;
+          font-size: 1.15rem !important;
+          font-weight: 400 !important;
+          letter-spacing: 0 !important;
+          line-height: 1 !important;
+          text-transform: none !important;
+        }
+        .account-order-dialog-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 80;
+          display: grid;
+          place-items: center;
+          padding: 1.25rem;
+          background: rgba(20, 18, 14, 0.38);
+          backdrop-filter: blur(5px);
+        }
+        .account-order-dialog {
+          position: relative;
+          width: min(54rem, 100%);
+          max-height: min(42rem, calc(100vh - 2.5rem));
+          overflow: auto;
+          padding: 4.25rem 2rem 2rem;
+          border: 1px solid rgba(115, 92, 0, 0.16);
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.98);
+          box-shadow: 0 28px 80px rgba(20, 18, 14, 0.24);
+        }
+        .account-order-dialog-close {
+          position: absolute;
+          top: 1rem;
+          left: 1rem;
+          width: 2.4rem;
+          height: 2.4rem;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid rgba(115, 92, 0, 0.18);
+          border-radius: 999px;
+          color: var(--color-primary);
+          background: #fffdf8;
+          box-shadow: 0 8px 18px rgba(42, 34, 12, 0.08);
+        }
+        .account-order-dialog-close .material-symbols-outlined {
+          font-size: 1.25rem;
+        }
+        .account-order-dialog-header {
+          padding-bottom: 1.1rem;
+          border-bottom: 1px solid rgba(115, 92, 0, 0.12);
+        }
+        .account-order-dialog-header h2 {
+          margin-top: 0.25rem;
+          color: var(--color-on-surface);
+          font-size: 1.45rem;
+          font-weight: 800;
+        }
+        .account-order-dialog-header > span,
+        .account-order-muted {
+          display: block;
+          margin-top: 0.25rem;
+          color: var(--color-on-surface-variant);
+          font-size: 0.88rem;
+        }
+        .account-order-detail-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 0.75rem;
+          margin: 1rem 0;
+        }
+        .account-order-detail-grid > div,
+        .account-order-dialog-section {
+          border: 1px solid rgba(115, 92, 0, 0.12);
+          border-radius: 8px;
+          background: rgba(255, 253, 248, 0.72);
+        }
+        .account-order-detail-grid > div {
+          padding: 0.85rem;
+        }
+        .account-order-detail-grid span,
+        .account-order-detail-line span {
+          display: block;
+          color: var(--color-primary);
+          font-family: var(--font-label);
+          font-size: 0.58rem;
+          font-weight: 800;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+        .account-order-detail-grid strong,
+        .account-order-detail-line strong {
+          display: block;
+          margin-top: 0.28rem;
+          color: var(--color-on-surface);
+          font-size: 0.88rem;
+          overflow-wrap: anywhere;
+        }
+        .account-order-dialog-section {
+          margin-top: 1rem;
+          padding: 1rem;
+        }
+        .account-order-dialog-section h3 {
+          color: var(--color-on-surface);
+          font-size: 0.98rem;
+          font-weight: 800;
+          margin-bottom: 0.75rem;
+        }
+        .account-order-item-list {
+          display: grid;
+          gap: 0.7rem;
+        }
+        .account-order-item {
+          display: grid;
+          grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+          gap: 0.85rem;
+          align-items: center;
+          padding: 0.75rem;
+          border: 1px solid rgba(115, 92, 0, 0.1);
+          border-radius: 6px;
+          background: rgba(255, 255, 255, 0.74);
+        }
+        .account-order-item-image {
+          position: relative;
+          min-height: 4.5rem;
+          border-radius: 6px;
+          background: var(--color-surface-container);
+          overflow: hidden;
+        }
+        .account-order-item-image > .material-symbols-outlined {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: rgba(115, 92, 0, 0.28);
+          font-size: 1.8rem;
+        }
+        .account-order-item strong {
+          display: block;
+          color: var(--color-on-surface);
+          font-size: 0.9rem;
+          line-height: 1.25;
+        }
+        .account-order-item span {
+          display: block;
+          margin-top: 0.25rem;
+          color: var(--color-on-surface-variant);
+          font-size: 0.76rem;
+        }
+        .account-order-item b {
+          color: var(--color-primary);
+          font-size: 0.92rem;
+          white-space: nowrap;
+        }
+        .account-order-dialog-columns {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 1rem;
+        }
+        .account-order-detail-line {
+          display: grid;
+          grid-template-columns: minmax(7rem, 0.45fr) minmax(0, 1fr);
+          gap: 0.75rem;
+          align-items: start;
+          padding-block: 0.42rem;
+          border-top: 1px solid rgba(115, 92, 0, 0.08);
+        }
+        .account-order-detail-line:first-of-type {
+          border-top: 0;
+          padding-top: 0;
+        }
+        .account-order-detail-line.strong strong {
+          color: var(--color-primary);
+          font-size: 1rem;
+        }
+        .account-wishlist-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 1rem;
+          margin-top: 1.5rem;
+        }
+        .account-wishlist-card {
+          display: grid;
+          grid-template-columns: 6rem 1fr;
+          gap: 0.9rem;
+          padding: 0.85rem;
+          border: 1px solid rgba(115, 92, 0, 0.12);
+          border-radius: 8px;
+          background: rgba(255, 253, 248, 0.78);
+        }
+        .account-wishlist-image {
+          position: relative;
+          min-height: 6rem;
+          border-radius: 6px;
+          background: var(--color-surface-container);
+          overflow: hidden;
+        }
+        .account-wishlist-image > .material-symbols-outlined {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: rgba(115, 92, 0, 0.28);
+          font-size: 2rem;
+        }
+        .account-wishlist-card a:not(.account-wishlist-image) {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          color: var(--color-on-surface);
+          font-family: var(--font-headline);
+          font-size: 0.98rem;
+          font-weight: 800;
+          line-height: 1.2;
+        }
+        .account-wishlist-card span {
+          display: block;
+          margin-top: 0.4rem;
+          color: var(--color-primary);
+          font-family: var(--font-label);
+          font-size: 0.62rem;
+          font-weight: 800;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+        }
+        .account-wishlist-card button {
+          margin-top: 0.7rem;
+          color: var(--color-error);
+          font-family: var(--font-label);
+          font-size: 0.62rem;
+          font-weight: 800;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+        }
+        .account-side-rail {
+          display: grid;
+          gap: 1.2rem;
+        }
+        .account-side-card {
+          padding: 2rem;
+        }
+        .account-side-card h2 {
+          color: var(--color-on-surface);
+          font-size: 1.05rem;
+          font-weight: 800;
+          margin-bottom: 0.45rem;
+        }
+        .account-side-card p {
+          color: var(--color-on-surface-variant);
+          font-size: 0.86rem;
+          line-height: 1.45;
+          margin-bottom: 1.35rem;
+        }
         .account-admin-card {
           display: grid;
           grid-template-columns: auto 1fr;
-          gap: 1.5rem;
+          gap: 1rem;
           align-items: center;
-          padding: 1.8rem 2.2rem;
         }
         .account-card-icon {
-          width: 5.75rem;
-          height: 5.75rem;
+          width: 3.65rem;
+          height: 3.65rem;
           border-radius: 999px;
           display: inline-flex;
           align-items: center;
@@ -238,10 +589,7 @@ export default async function AccountPage({ params }: Props) {
           flex: 0 0 auto;
         }
         .account-card-icon .material-symbols-outlined {
-          font-size: 2.4rem;
-        }
-        .account-profile-card {
-          padding: 1.8rem 2.2rem;
+          font-size: 1.65rem;
         }
         .account-profile-form .form-field {
           min-height: 3.05rem;
@@ -255,11 +603,48 @@ export default async function AccountPage({ params }: Props) {
           font-weight: 800;
           letter-spacing: 0.14em;
         }
-        .account-detail-grid {
+        .account-profile-preview {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 1rem;
-          margin-top: 0.5rem;
+          gap: 0.95rem;
+        }
+        .account-profile-preview > div {
+          min-height: 5.1rem;
+          display: grid;
+          grid-template-columns: auto minmax(0, 1fr);
+          gap: 0.9rem;
+          align-items: center;
+          border: 1px solid rgba(115, 92, 0, 0.12);
+          border-radius: 6px;
+          padding: 0.95rem 1rem;
+          background: rgba(255, 253, 248, 0.76);
+        }
+        .account-profile-preview-copy {
+          min-width: 0;
+        }
+        .account-profile-preview-label {
+          display: block;
+          color: var(--color-primary);
+          font-family: var(--font-label);
+          font-size: 0.6rem;
+          font-weight: 800;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          line-height: 1.2;
+        }
+        .account-profile-preview-value {
+          display: block;
+          margin-top: 0.38rem;
+          color: var(--color-on-surface);
+          font-size: 0.95rem;
+          font-weight: 800;
+          line-height: 1.3;
+          overflow-wrap: anywhere;
+        }
+        .account-detail-grid {
+          display: grid;
+          gap: 1.1rem;
+          margin: 1.4rem 0 1rem;
         }
         .account-detail-grid span {
           display: block;
@@ -284,60 +669,127 @@ export default async function AccountPage({ params }: Props) {
         .account-arrow-button .material-symbols-outlined {
           font-size: 1rem;
         }
-        .account-actions {
+        .account-shop-card {
+          position: relative;
+          overflow: hidden;
+          min-height: 10.5rem;
           display: flex;
-          flex-wrap: wrap;
+          justify-content: space-between;
+          gap: 1rem;
+        }
+        .account-shop-card > .material-symbols-outlined {
+          align-self: flex-end;
+          color: rgba(115, 92, 0, 0.08);
+          font-size: 5.5rem;
+        }
+        .account-password-panel {
+          display: grid;
+          gap: 0.8rem;
+          margin: 1rem 0;
+        }
+        .account-password-panel form {
+          display: grid;
           gap: 0.75rem;
+          padding: 1rem;
+          border: 1px solid rgba(115, 92, 0, 0.12);
+          border-radius: 8px;
+          background: rgba(255, 253, 248, 0.72);
+        }
+        .account-password-panel .form-field {
+          min-height: 2.7rem;
+          border-color: rgba(115, 92, 0, 0.2);
+          border-radius: 6px;
+          background: #fffefa;
+        }
+        .account-form-error,
+        .account-form-success {
+          font-size: 0.78rem;
+          font-weight: 700;
+        }
+        .account-form-error {
+          color: var(--color-error);
+        }
+        .account-form-success {
+          color: var(--color-primary);
+        }
+        .account-support-strip {
+          display: grid;
+          grid-template-columns: 1.25fr 1fr 1fr auto;
+          gap: 1.5rem;
           align-items: center;
+          margin: 1.45rem 0 4rem;
+          padding: 1.65rem 2rem;
+          border: 1px solid rgba(115, 92, 0, 0.12);
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.92);
+          box-shadow: 0 18px 48px rgba(42, 34, 12, 0.07);
         }
-        .account-trust-strip {
-          margin-top: 4rem;
-          padding-block: 2rem;
-          border-top: 1px solid rgba(115, 92, 0, 0.12);
-          background: rgba(255, 255, 255, 0.58);
+        .account-support-strip h2 {
+          color: var(--color-on-surface);
+          font-size: 1rem;
+          font-weight: 800;
+          margin-bottom: 0.25rem;
         }
-        .account-trust-item {
+        .account-support-strip p,
+        .account-support-strip a {
+          color: var(--color-on-surface-variant);
+          font-size: 0.86rem;
+        }
+        .account-support-item {
           display: grid;
           grid-template-columns: auto 1fr;
-          gap: 1rem;
+          gap: 0.8rem;
           align-items: center;
-          padding-inline: 1rem;
         }
-        .account-trust-item > .material-symbols-outlined {
-          width: 3.35rem;
-          height: 3.35rem;
+        .account-support-item > .material-symbols-outlined {
+          color: var(--color-primary);
+          font-size: 1.8rem;
+        }
+        .account-support-item strong {
+          display: block;
+          color: var(--color-on-surface);
+          font-size: 0.84rem;
+          font-weight: 700;
+          margin-bottom: 0.18rem;
+        }
+        .account-profile-preview-icon {
+          width: 3.15rem;
+          height: 3.15rem;
           border-radius: 999px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           color: #a98208;
-          background: rgba(212, 175, 55, 0.12);
-          font-size: 1.45rem;
-        }
-        .account-trust-item strong {
-          color: var(--color-primary);
-          font-family: var(--font-label);
-          font-size: 0.68rem;
-          font-weight: 800;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-        }
-        .account-trust-item p {
-          margin-top: 0.25rem;
-          color: var(--color-on-surface-variant);
-          font-size: 0.84rem;
-          line-height: 1.4;
+          background: rgba(212, 175, 55, 0.11);
+          font-size: 1.35rem;
         }
         @media (max-width: 700px) {
           .account-hero {
             min-height: 17rem;
           }
-          .account-hero::before {
+          .account-page::before {
             opacity: 0.72;
             background-position: 62% center;
+            height: 32rem;
+          }
+          .account-content {
+            margin-top: -1.1rem;
+          }
+          .account-tabs {
+            margin-inline: -0.25rem;
+          }
+          .account-tabs button,
+          .account-tabs a {
+            min-width: 9.5rem;
+          }
+          .account-dashboard-grid,
+          .account-support-strip {
+            grid-template-columns: 1fr;
+          }
+          .account-support-strip {
+            padding: 1.35rem;
           }
           .account-admin-card,
-          .account-profile-card,
           .account-profile-form {
             padding: 1.35rem !important;
           }
@@ -350,6 +802,32 @@ export default async function AccountPage({ params }: Props) {
           }
           .account-detail-grid {
             grid-template-columns: 1fr;
+          }
+          .account-profile-preview {
+            grid-template-columns: 1fr;
+          }
+          .account-profile-preview > div {
+            grid-template-columns: auto minmax(0, 1fr);
+          }
+          .account-order-row,
+          .account-order-detail-grid,
+          .account-order-dialog-columns,
+          .account-wishlist-grid,
+          .account-wishlist-card {
+            grid-template-columns: 1fr;
+          }
+          .account-order-dialog {
+            padding: 4rem 1rem 1rem;
+          }
+          .account-order-item {
+            grid-template-columns: 4.25rem minmax(0, 1fr);
+          }
+          .account-order-item b {
+            grid-column: 2;
+          }
+          .account-order-detail-line {
+            grid-template-columns: 1fr;
+            gap: 0.2rem;
           }
         }
       `}</style>

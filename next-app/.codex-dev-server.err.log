@@ -664,3 +664,721 @@ Caused by:
 - invalid utf-8 sequence of 1 bytes from index 12935 
 [browser] Image with src "/assets/images/shop/shop-18k-italian-anchor-link-infinity-chain-06.png" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
 Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+⚠ Fast Refresh had to perform a full reload when ./src/components/account/AccountDashboard.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload when ./src/components/account/AccountDashboard.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload when ./src/components/account/AccountDashboard.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⨯ Error: Failed to call `useTranslations` because the context from `NextIntlClientProvider` was not found.
+
+This can happen because:
+1) You intended to render this component as a Server Component, the render
+   failed, and therefore React attempted to render the component on the client
+   instead. If this is the case, check the console for server errors.
+2) You intended to render this component on the client side, but no context was found.
+   Learn more about this error here: https://next-intl.dev/docs/environments/server-client-components#missing-context
+    at SiteHeader (src\components\layout\SiteHeader.tsx:19:28)
+  17 |
+  18 | export default function SiteHeader() {
+> 19 |   const t = useTranslations('nav');
+     |                            ^
+  20 |   const locale = useLocale();
+  21 |   const pathname = usePathname();
+  22 |   const [menuOpen, setMenuOpen] = useState(false); {
+  digest: '2476805689'
+}
+⚠ Server is approaching the used memory threshold, restarting...
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+      <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+        <LoadingBoundary name="account/" loading={null}>
+          <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+            <RedirectBoundary>
+              <RedirectErrorBoundary router={{...}}>
+                <InnerLayoutRouter url="/account?t..." tree={[...]} params={{locale:"en"}} cacheNode={{rsc:{...}, ...}} ...>
+                  <SegmentViewNode type="page" pagePath="[locale]/a...">
+                    <SegmentTrieNode>
+                    <AccountPage>
+                      <SiteHeader>
+                      <main className="account-pa...">
+                        <section>
+                        <AccountDashboard profile={{id:"f4bb3a...", ...}} fallbackEmail="rcman12589..." locale="en" ...>
+                          <div className="account-co...">
+                            <nav className="account-tabs" aria-label="Account menu">
+                              <button
+                                type="button"
++                               className=""
+-                               className="active"
++                               aria-current={undefined}
+-                               aria-current="page"
+                                onClick={function onClick}
+                              >
+                              <button
+                                type="button"
++                               className="active"
+-                               className=""
++                               aria-current="page"
+-                               aria-current={null}
+                                onClick={function onClick}
+                              >
+                              ...
+                              ...
+                            <section id="account-ov..." className="account-da...">
+                              <div className="account-ov...">
+                                <OrdersTab orders={[...]} locale="en">
+                                  <div
++                                   className="account-card account-tab-card"
+-                                   className="account-tab-stack"
+                                  >
++                                   <p className="account-tab-eyebrow">
+-                                   <div className="account-tab-heading">
+                                    ...
+                              ...
+                            ...
+                      ...
+                  ...
+                ...
+      ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at p (<anonymous>)
+    at OrdersTab (src/components/account/AccountDashboard.tsx:227:7)
+    at AccountDashboard (src/components/account/AccountDashboard.tsx:95:38)
+    at AccountPage (src\app\[locale]\account\page.tsx:92:9)
+  225 |   return (
+  226 |     <div className="account-card account-tab-card">
+> 227 |       <p className="account-tab-eyebrow">{isEs ? 'Pedidos' : 'Orders'}</p>
+      |       ^
+  228 |       <h2>{isEs ? 'Historial de pedidos' : 'Order History'}</h2>
+  229 |       <p>{isEs ? 'Revisa tus pedidos y estados recientes.' : 'Review your recent order to...
+  230 |       {orders.length === 0 ? (
+⚠ Fast Refresh had to perform a full reload when ./src/components/account/AccountDashboard.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload when ./src/components/account/AccountDashboard.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⨯ Error: Failed to call `useTranslations` because the context from `NextIntlClientProvider` was not found.
+
+This can happen because:
+1) You intended to render this component as a Server Component, the render
+   failed, and therefore React attempted to render the component on the client
+   instead. If this is the case, check the console for server errors.
+2) You intended to render this component on the client side, but no context was found.
+   Learn more about this error here: https://next-intl.dev/docs/environments/server-client-components#missing-context
+    at SiteHeader (src\components\layout\SiteHeader.tsx:19:28)
+  17 |
+  18 | export default function SiteHeader() {
+> 19 |   const t = useTranslations('nav');
+     |                            ^
+  20 |   const locale = useLocale();
+  21 |   const pathname = usePathname();
+  22 |   const [menuOpen, setMenuOpen] = useState(false); {
+  digest: '507092977'
+}
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+      <LoadingBoundary name="account/" loading={null}>
+        <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/account?t..." tree={[...]} params={{locale:"en"}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="page" pagePath="[locale]/a...">
+                  <SegmentTrieNode>
+                  <AccountPage>
+                    <SiteHeader>
+                    <main className="account-pa...">
+                      <section>
+                      <AccountDashboard profile={{id:"f4bb3a...", ...}} fallbackEmail="rcman12589..." locale="en" ...>
+                        <div className="account-co...">
+                          <AccountTabs activeSection="wishlist" locale="en" onSelectTab={function selectTab}>
+                            <nav className="account-tabs" aria-label="Account menu">
+                              <button
+                                type="button"
++                               className=""
+-                               className="active"
++                               aria-current={undefined}
+-                               aria-current="page"
+                                onClick={function onClick}
+                              >
+                              <button>
+                              <button
+                                type="button"
++                               className="active"
+-                               className=""
++                               aria-current="page"
+-                               aria-current={null}
+                                onClick={function onClick}
+                              >
+                              ...
+                          <section id="account-ov..." className="account-da...">
+                            <div className="account-ov...">
+                              <WishlistTab locale="en">
+                                <div
++                                 className="account-card account-tab-card"
+-                                 className="account-tab-stack"
+                                >
++                                 <p className="account-tab-eyebrow">
+-                                 <div className="account-tab-heading">
+                                  ...
+                            ...
+                          ...
+                    ...
+                ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at p (<anonymous>)
+    at WishlistTab (src/components/account/AccountDashboard.tsx:310:7)
+    at AccountDashboard (src/components/account/AccountDashboard.tsx:64:40)
+    at AccountPage (src\app\[locale]\account\page.tsx:92:9)
+  308 |   return (
+  309 |     <div className="account-card account-tab-card">
+> 310 |       <p className="account-tab-eyebrow">{isEs ? 'Favoritos' : 'Wishlist'}</p>
+      |       ^
+  311 |       <h2>{isEs ? 'Piezas guardadas' : 'Saved Pieces'}</h2>
+  312 |       <p>{isEs ? 'Tus piezas guardadas desde la tienda.' : 'Your saved items from the sho...
+  313 |       {items.length === 0 ? (
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+      <LoadingBoundary name="account/" loading={null}>
+        <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/account?t..." tree={[...]} params={{locale:"en"}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="page" pagePath="[locale]/a...">
+                  <SegmentTrieNode>
+                  <AccountPage>
+                    <SiteHeader>
+                    <main className="account-pa...">
+                      <section>
+                      <AccountDashboard profile={{id:"f4bb3a...", ...}} fallbackEmail="rcman12589..." locale="en" ...>
+                        <div className="account-co...">
+                          <AccountTabs activeSection="wishlist" locale="en" onSelectTab={function selectTab}>
+                            <nav className="account-tabs" aria-label="Account menu">
+                              <button
+                                type="button"
++                               className=""
+-                               className="active"
++                               aria-current={undefined}
+-                               aria-current="page"
+                                onClick={function onClick}
+                              >
+                              <button>
+                              <button
+                                type="button"
++                               className="active"
+-                               className=""
++                               aria-current="page"
+-                               aria-current={null}
+                                onClick={function onClick}
+                              >
+                              ...
+                          <section id="account-ov..." className="account-da...">
+                            <div className="account-ov...">
+                              <WishlistTab locale="en">
+                                <div
++                                 className="account-card account-tab-card"
+-                                 className="account-tab-stack"
+                                >
++                                 <p className="account-tab-eyebrow">
+-                                 <div className="account-tab-heading">
+                                  ...
+                            ...
+                          ...
+                    ...
+                ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at p (<anonymous>)
+    at WishlistTab (src/components/account/AccountDashboard.tsx:310:7)
+    at AccountDashboard (src/components/account/AccountDashboard.tsx:64:40)
+    at AccountPage (src\app\[locale]\account\page.tsx:92:9)
+  308 |   return (
+  309 |     <div className="account-card account-tab-card">
+> 310 |       <p className="account-tab-eyebrow">{isEs ? 'Favoritos' : 'Wishlist'}</p>
+      |       ^
+  311 |       <h2>{isEs ? 'Piezas guardadas' : 'Saved Pieces'}</h2>
+  312 |       <p>{isEs ? 'Tus piezas guardadas desde la tienda.' : 'Your saved items from the sho...
+  313 |       {items.length === 0 ? (
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+      <LoadingBoundary name="account/" loading={null}>
+        <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/account?t..." tree={[...]} params={{locale:"en"}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="page" pagePath="[locale]/a...">
+                  <SegmentTrieNode>
+                  <AccountPage>
+                    <SiteHeader>
+                    <main className="account-pa...">
+                      <section>
+                      <AccountDashboard profile={{id:"f4bb3a...", ...}} fallbackEmail="rcman12589..." locale="en" ...>
+                        <div className="account-co...">
+                          <AccountTabs activeSection="wishlist" locale="en" onSelectTab={function selectTab}>
+                            <nav className="account-tabs" aria-label="Account menu">
+                              <button
+                                type="button"
++                               className=""
+-                               className="active"
++                               aria-current={undefined}
+-                               aria-current="page"
+                                onClick={function onClick}
+                              >
+                              <button>
+                              <button
+                                type="button"
++                               className="active"
+-                               className=""
++                               aria-current="page"
+-                               aria-current={null}
+                                onClick={function onClick}
+                              >
+                              ...
+                          <section id="account-ov..." className="account-da...">
+                            <div className="account-ov...">
+                              <WishlistTab locale="en">
+                                <div
++                                 className="account-card account-tab-card"
+-                                 className="account-tab-stack"
+                                >
++                                 <p className="account-tab-eyebrow">
+-                                 <div className="account-tab-heading">
+                                  ...
+                            ...
+                          ...
+                    ...
+                ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at p (<anonymous>)
+    at WishlistTab (src/components/account/AccountDashboard.tsx:310:7)
+    at AccountDashboard (src/components/account/AccountDashboard.tsx:64:40)
+    at AccountPage (src\app\[locale]\account\page.tsx:92:9)
+  308 |   return (
+  309 |     <div className="account-card account-tab-card">
+> 310 |       <p className="account-tab-eyebrow">{isEs ? 'Favoritos' : 'Wishlist'}</p>
+      |       ^
+  311 |       <h2>{isEs ? 'Piezas guardadas' : 'Saved Pieces'}</h2>
+  312 |       <p>{isEs ? 'Tus piezas guardadas desde la tienda.' : 'Your saved items from the sho...
+  313 |       {items.length === 0 ? (
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+      <LoadingBoundary name="account/" loading={null}>
+        <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/account?t..." tree={[...]} params={{locale:"en"}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="page" pagePath="[locale]/a...">
+                  <SegmentTrieNode>
+                  <AccountPage>
+                    <SiteHeader>
+                    <main className="account-pa...">
+                      <section>
+                      <AccountDashboard profile={{id:"f4bb3a...", ...}} fallbackEmail="rcman12589..." locale="en" ...>
+                        <div className="account-co...">
+                          <AccountTabs activeSection="wishlist" locale="en" onSelectTab={function selectTab}>
+                            <nav className="account-tabs" aria-label="Account menu">
+                              <button
+                                type="button"
++                               className=""
+-                               className="active"
++                               aria-current={undefined}
+-                               aria-current="page"
+                                onClick={function onClick}
+                              >
+                              <button>
+                              <button
+                                type="button"
++                               className="active"
+-                               className=""
++                               aria-current="page"
+-                               aria-current={null}
+                                onClick={function onClick}
+                              >
+                              ...
+                          <section id="account-ov..." className="account-da...">
+                            <div className="account-ov...">
+                              <WishlistTab locale="en">
+                                <div
++                                 className="account-card account-tab-card"
+-                                 className="account-tab-stack"
+                                >
++                                 <p className="account-tab-eyebrow">
+-                                 <div className="account-tab-heading">
+                                  ...
+                            ...
+                          ...
+                    ...
+                ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at p (<anonymous>)
+    at WishlistTab (src/components/account/AccountDashboard.tsx:310:7)
+    at AccountDashboard (src/components/account/AccountDashboard.tsx:64:40)
+    at AccountPage (src\app\[locale]\account\page.tsx:92:9)
+  308 |   return (
+  309 |     <div className="account-card account-tab-card">
+> 310 |       <p className="account-tab-eyebrow">{isEs ? 'Favoritos' : 'Wishlist'}</p>
+      |       ^
+  311 |       <h2>{isEs ? 'Piezas guardadas' : 'Saved Pieces'}</h2>
+  312 |       <p>{isEs ? 'Tus piezas guardadas desde la tienda.' : 'Your saved items from the sho...
+  313 |       {items.length === 0 ? (
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+      <LoadingBoundary name="account/" loading={null}>
+        <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/account?t..." tree={[...]} params={{locale:"en"}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="page" pagePath="[locale]/a...">
+                  <SegmentTrieNode>
+                  <AccountPage>
+                    <SiteHeader>
+                    <main className="account-pa...">
+                      <section>
+                      <AccountDashboard profile={{id:"f4bb3a...", ...}} fallbackEmail="rcman12589..." locale="en" ...>
+                        <div className="account-co...">
+                          <AccountTabs activeSection="wishlist" locale="en" onSelectTab={function selectTab}>
+                            <nav className="account-tabs" aria-label="Account menu">
+                              <button
+                                type="button"
++                               className=""
+-                               className="active"
++                               aria-current={undefined}
+-                               aria-current="page"
+                                onClick={function onClick}
+                              >
+                              <button>
+                              <button
+                                type="button"
++                               className="active"
+-                               className=""
++                               aria-current="page"
+-                               aria-current={null}
+                                onClick={function onClick}
+                              >
+                              ...
+                          <section id="account-ov..." className="account-da...">
+                            <div className="account-ov...">
+                              <WishlistTab locale="en">
+                                <div
++                                 className="account-card account-tab-card"
+-                                 className="account-tab-stack"
+                                >
++                                 <p className="account-tab-eyebrow">
+-                                 <div className="account-tab-heading">
+                                  ...
+                            ...
+                          ...
+                    ...
+                ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at p (<anonymous>)
+    at WishlistTab (src/components/account/AccountDashboard.tsx:310:7)
+    at AccountDashboard (src/components/account/AccountDashboard.tsx:64:40)
+    at AccountPage (src\app\[locale]\account\page.tsx:92:9)
+  308 |   return (
+  309 |     <div className="account-card account-tab-card">
+> 310 |       <p className="account-tab-eyebrow">{isEs ? 'Favoritos' : 'Wishlist'}</p>
+      |       ^
+  311 |       <h2>{isEs ? 'Piezas guardadas' : 'Saved Pieces'}</h2>
+  312 |       <p>{isEs ? 'Tus piezas guardadas desde la tienda.' : 'Your saved items from the sho...
+  313 |       {items.length === 0 ? (
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+      <LoadingBoundary name="account/" loading={null}>
+        <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/account?t..." tree={[...]} params={{locale:"en"}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="page" pagePath="[locale]/a...">
+                  <SegmentTrieNode>
+                  <AccountPage>
+                    <SiteHeader>
+                    <main className="account-pa...">
+                      <section>
+                      <AccountDashboard profile={{id:"f4bb3a...", ...}} fallbackEmail="rcman12589..." locale="en" ...>
+                        <div className="account-co...">
+                          <AccountTabs activeSection="orders" locale="en" onSelectTab={function selectTab}>
+                            <nav className="account-tabs" aria-label="Account menu">
+                              <button
+                                type="button"
++                               className=""
+-                               className="active"
++                               aria-current={undefined}
+-                               aria-current="page"
+                                onClick={function onClick}
+                              >
+                              <button
+                                type="button"
++                               className="active"
+-                               className=""
++                               aria-current="page"
+-                               aria-current={null}
+                                onClick={function onClick}
+                              >
+                              ...
+                          <section id="account-ov..." className="account-da...">
+                            <div className="account-ov...">
+                              <OrdersTab orders={[...]} locale="en">
+                                <div
++                                 className="account-card account-tab-card"
+-                                 className="account-tab-stack"
+                                >
++                                 <p className="account-tab-eyebrow">
+-                                 <div className="account-tab-heading">
+                                  ...
+                            ...
+                          ...
+                    ...
+                ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at p (<anonymous>)
+    at OrdersTab (src/components/account/AccountDashboard.tsx:268:7)
+    at AccountDashboard (src/components/account/AccountDashboard.tsx:63:38)
+    at AccountPage (src\app\[locale]\account\page.tsx:92:9)
+  266 |   return (
+  267 |     <div className="account-card account-tab-card">
+> 268 |       <p className="account-tab-eyebrow">{isEs ? 'Pedidos' : 'Orders'}</p>
+      |       ^
+  269 |       <h2>{isEs ? 'Historial de pedidos' : 'Order History'}</h2>
+  270 |       <p>{isEs ? 'Revisa tus pedidos y estados recientes.' : 'Review your recent order to...
+  271 |       {orders.length === 0 ? (
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+      <LoadingBoundary name="account/" loading={null}>
+        <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/account?t..." tree={[...]} params={{locale:"en"}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="page" pagePath="[locale]/a...">
+                  <SegmentTrieNode>
+                  <AccountPage>
+                    <SiteHeader>
+                    <main className="account-pa...">
+                      <section>
+                      <AccountDashboard profile={{id:"f4bb3a...", ...}} fallbackEmail="rcman12589..." locale="en" ...>
+                        <div className="account-co...">
+                          <AccountTabs activeSection="orders" locale="en" onSelectTab={function selectTab}>
+                            <nav className="account-tabs" aria-label="Account menu">
+                              <button
+                                type="button"
++                               className=""
+-                               className="active"
++                               aria-current={undefined}
+-                               aria-current="page"
+                                onClick={function onClick}
+                              >
+                              <button
+                                type="button"
++                               className="active"
+-                               className=""
++                               aria-current="page"
+-                               aria-current={null}
+                                onClick={function onClick}
+                              >
+                              ...
+                          <section id="account-ov..." className="account-da...">
+                            <div className="account-ov...">
+                              <OrdersTab orders={[...]} locale="en">
+                                <div
++                                 className="account-card account-tab-card"
+-                                 className="account-tab-stack"
+                                >
++                                 <p className="account-tab-eyebrow">
+-                                 <div className="account-tab-heading">
+                                  ...
+                            ...
+                          ...
+                    ...
+                ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at p (<anonymous>)
+    at OrdersTab (src/components/account/AccountDashboard.tsx:268:7)
+    at AccountDashboard (src/components/account/AccountDashboard.tsx:63:38)
+    at AccountPage (src\app\[locale]\account\page.tsx:92:9)
+  266 |   return (
+  267 |     <div className="account-card account-tab-card">
+> 268 |       <p className="account-tab-eyebrow">{isEs ? 'Pedidos' : 'Orders'}</p>
+      |       ^
+  269 |       <h2>{isEs ? 'Historial de pedidos' : 'Order History'}</h2>
+  270 |       <p>{isEs ? 'Revisa tus pedidos y estados recientes.' : 'Review your recent order to...
+  271 |       {orders.length === 0 ? (
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+      <LoadingBoundary name="account/" loading={null}>
+        <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/account?t..." tree={[...]} params={{locale:"en"}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="page" pagePath="[locale]/a...">
+                  <SegmentTrieNode>
+                  <AccountPage>
+                    <SiteHeader>
+                    <main className="account-pa...">
+                      <section>
+                      <AccountDashboard profile={{id:"f4bb3a...", ...}} fallbackEmail="rcman12589..." locale="en" ...>
+                        <div className="account-co...">
+                          <AccountTabs activeSection="orders" locale="en" onSelectTab={function selectTab}>
+                            <nav className="account-tabs" aria-label="Account menu">
+                              <button
+                                type="button"
++                               className=""
+-                               className="active"
++                               aria-current={undefined}
+-                               aria-current="page"
+                                onClick={function onClick}
+                              >
+                              <button
+                                type="button"
++                               className="active"
+-                               className=""
++                               aria-current="page"
+-                               aria-current={null}
+                                onClick={function onClick}
+                              >
+                              ...
+                          <section id="account-ov..." className="account-da...">
+                            <div className="account-ov...">
+                              <OrdersTab orders={[...]} locale="en">
+                                <div
++                                 className="account-card account-tab-card"
+-                                 className="account-tab-stack"
+                                >
++                                 <p className="account-tab-eyebrow">
+-                                 <div className="account-tab-heading">
+                                  ...
+                            ...
+                          ...
+                    ...
+                ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at p (<anonymous>)
+    at OrdersTab (src/components/account/AccountDashboard.tsx:268:7)
+    at AccountDashboard (src/components/account/AccountDashboard.tsx:63:38)
+    at AccountPage (src\app\[locale]\account\page.tsx:92:9)
+  266 |   return (
+  267 |     <div className="account-card account-tab-card">
+> 268 |       <p className="account-tab-eyebrow">{isEs ? 'Pedidos' : 'Orders'}</p>
+      |       ^
+  269 |       <h2>{isEs ? 'Historial de pedidos' : 'Order History'}</h2>
+  270 |       <p>{isEs ? 'Revisa tus pedidos y estados recientes.' : 'Review your recent order to...
+  271 |       {orders.length === 0 ? (
+[browser] Image with src "/assets/images/pages/gold.webp" has "fill" but is missing "sizes" prop. Please add it to improve page performance. Read more: https://nextjs.org/docs/api-reference/next/image#sizes
+[browser] Image with src "/assets/images/pages/signed.webp" has "fill" but is missing "sizes" prop. Please add it to improve page performance. Read more: https://nextjs.org/docs/api-reference/next/image#sizes
+[browser] Image with src "/assets/images/pages/patek.webp" has "fill" but is missing "sizes" prop. Please add it to improve page performance. Read more: https://nextjs.org/docs/api-reference/next/image#sizes

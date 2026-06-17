@@ -61,17 +61,27 @@ function buildInitialState(profile: CustomerProfile, fallbackEmail: string | nul
   };
 }
 
+function displayValue(value: string | null | undefined, fallback: string) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : fallback;
+}
+
 export default function AccountProfileForm({
   profile,
   fallbackEmail,
   locale,
+  headingLabel,
+  headingCopy,
 }: {
   profile: CustomerProfile;
   fallbackEmail: string | null;
   locale: string;
+  headingLabel?: string;
+  headingCopy?: string;
 }) {
   const isEs = locale === 'es';
   const [form, setForm] = useState<ProfileFormState>(() => buildInitialState(profile, fallbackEmail));
+  const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -122,10 +132,19 @@ export default function AccountProfileForm({
     }
 
     setMessage(isEs ? 'Perfil guardado.' : 'Profile saved.');
+    setIsEditing(false);
     setSaving(false);
   }
 
   const inputStyle = 'form-field w-full';
+  const missingLabel = isEs ? 'No agregado' : 'Not added';
+  const displayName = displayValue(form.full_name || `${form.first_name} ${form.last_name}`.trim(), missingLabel);
+  const displayEmail = displayValue(form.email, missingLabel);
+  const displayPhone = displayValue(form.phone, missingLabel);
+  const displayAltPhone = displayValue(form.alternate_phone, missingLabel);
+  const streetAddress = [form.address_line1, form.address_line2].map((part) => part.trim()).filter(Boolean).join(', ');
+  const cityLine = [form.city, form.state, form.postal_code].map((part) => part.trim()).filter(Boolean).join(', ');
+  const displayAddress = displayValue([streetAddress, cityLine, form.country.trim()].filter(Boolean).join(' · '), missingLabel);
 
   return (
     <form
@@ -135,14 +154,55 @@ export default function AccountProfileForm({
     >
       <div className="flex flex-col gap-1 mb-5">
         <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-          {isEs ? 'Perfil completo' : 'Complete Profile'}
+          {headingLabel ?? (isEs ? 'Resumen de cuenta' : 'Account Overview')}
         </h2>
         <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-          {isEs
-            ? 'Guarde su informacion de contacto y direccion para acelerar el checkout.'
-            : 'Save your contact and address information to speed up checkout.'}
+          {headingCopy ?? (isEs
+            ? 'Resumen rapido de tu informacion de cuenta.'
+            : 'Quick summary of your account information.')}
         </p>
       </div>
+
+      {!isEditing && (
+        <>
+          <div className="account-profile-preview">
+            {[
+              ['person', isEs ? 'Nombre' : 'Name', displayName, ''],
+              ['mail', isEs ? 'Correo' : 'Email', displayEmail, ''],
+              ['call', isEs ? 'Telefono' : 'Phone', displayPhone, ''],
+              ['phone_in_talk', isEs ? 'Telefono alternativo' : 'Alternate Phone', displayAltPhone, ''],
+              ['location_on', isEs ? 'Direccion' : 'Address', displayAddress, 'sm:col-span-2'],
+              ['notifications', isEs ? 'Actualizaciones' : 'Updates', form.marketing_opt_in ? (isEs ? 'Suscrito' : 'Subscribed') : (isEs ? 'No suscrito' : 'Not subscribed'), 'sm:col-span-2'],
+            ].map(([icon, label, value, className]) => (
+              <div key={label} className={className}>
+                <span className="material-symbols-outlined account-profile-preview-icon" aria-hidden="true">{icon}</span>
+                <div className="account-profile-preview-copy">
+                  <span className="account-profile-preview-label">{label}</span>
+                  <strong className="account-profile-preview-value">{value}</strong>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {message && <p className="mt-4 text-sm font-bold" style={{ color: GOLD }}>{message}</p>}
+          {error && <p className="mt-4 text-sm" style={{ color: 'var(--color-error)' }}>{error}</p>}
+
+          <button
+            type="button"
+            className="gold-button mt-5"
+            onClick={() => {
+              setMessage(null);
+              setError(null);
+              setIsEditing(true);
+            }}
+          >
+            {isEs ? 'Editar perfil' : 'Edit Profile'}
+          </button>
+        </>
+      )}
+
+      {isEditing && (
+        <>
 
       <div className="grid sm:grid-cols-2 gap-5">
         <label>
@@ -216,6 +276,8 @@ export default function AccountProfileForm({
       <button type="submit" disabled={saving} className="gold-button mt-5 disabled:opacity-50">
         {saving ? (isEs ? 'Guardando...' : 'Saving...') : (isEs ? 'Guardar perfil' : 'Save Profile')}
       </button>
+        </>
+      )}
     </form>
   );
 }
