@@ -18,7 +18,7 @@ export type GenerateProductDraftOutput = {
   };
 };
 
-const PROMPT_VERSION = 'product-listing-extraction-v4';
+const PROMPT_VERSION = 'product-listing-extraction-v5';
 const DEFAULT_TIMEOUT_MS = 30000;
 
 // Anthropic has no `response_format` JSON mode and (for some models) rejects assistant
@@ -54,7 +54,7 @@ EXPLICIT-ONLY hard facts — set ONLY when stated in the transcript or clearly v
 - metal_type: a factual composition claim. Only when marked, tested, or stated (e.g. 14K, 18K, 925, sterling silver, platinum). A yellow tone is NOT "Gold"; a white tone is NOT "Platinum". Do not convert appearance into metal_type.
 - purity: only from a stated mark or test (e.g. "marked 14K", "tested 18K", "925"). Never from color alone.
 - weight_grams: only when explicitly stated. Never estimate from photos or dimensions.
-- length: only when explicitly stated or shown with reliable measurement evidence. Never guess ring size, bracelet length, or necklace length from appearance. Provide a SINGLE numeric value only (e.g. "7" or "18") — no ranges, no approximations, no unit words or extra text. If only a range or approximate span is known (e.g. "6 to 6.25 inches"), omit it (null).
+- length: the single measurement for the size/length field. Its meaning depends on the product_type: for Necklace or Bracelet it is the LENGTH; for Ring it is the RING SIZE; for EVERY OTHER item form (Pendant, Brooch, Earrings, Watch, Coin, Loose Diamond, etc.) it is the item's HEIGHT in inches measured top to bottom (e.g. a brooch 1.5 in tall -> "1.5", a pendant 0.75 in tall -> "0.75"). Set it only when explicitly stated or shown with reliable measurement evidence (a ruler, scale, or stated dimension) — never guess a length, ring size, or height from appearance alone. Provide a SINGLE numeric value only (e.g. "7", "18", "1.5", "0.75"), always with a leading zero for values under one — no ranges, no approximations, no unit words or extra text. If only a range or approximate span is known (e.g. "6 to 6.25 inches"), omit it (null).
 - asking_price: only when clearly stated (e.g. "asking 1200", "put it at 875").
 - manual_price_label: may be formatted from a stated asking_price (e.g. 1200 -> "$1,200").
 - price_mode and pricing_multiplier: only when explicitly stated (e.g. "manual pricing", "1.7 times spot"). Never infer.

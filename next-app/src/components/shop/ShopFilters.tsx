@@ -371,7 +371,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
       </div>
 
       {isModern && (
-        <div className="modern-sidebar-gender">
+        <div className="modern-sidebar-gender" data-filters-open={filtersOpen ? 'true' : 'false'}>
           <span className="modern-sidebar-label">{isEs ? 'Genero' : 'Gender'}</span>
           <div className="modern-sidebar-gender-grid">
             {genderOptions.map((option) => {
@@ -893,6 +893,54 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
         @media (max-width: 400px) {
           .shop-filter-grid { grid-template-columns: 1fr !important; }
           .shop-length-button { flex-basis: calc(50% - 0.4rem); }
+        }
+        @media (max-width: 767px) {
+          /* Hide the sidebar gender buttons until the Filters panel is opened */
+          .shop-filters-modern .modern-sidebar-gender[data-filters-open="false"] {
+            display: none;
+          }
+          /* Place the gold + silver spot pills side by side on mobile */
+          .shop-filters-modern .shop-search-spot-row {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            max-width: 24rem;
+          }
+          .shop-filters-modern .shop-search-spot-row > div:nth-child(2) {
+            grid-row: 1;
+            grid-column: 1 / -1;
+          }
+          .shop-filters-modern .shop-search-spot-row > div:nth-child(1) {
+            grid-row: 2;
+            grid-column: 1;
+          }
+          .shop-filters-modern .shop-search-spot-row > div:nth-child(3) {
+            grid-row: 2;
+            grid-column: 2;
+          }
+        }
+        @media (min-width: 768px) and (max-width: 1023px) {
+          /* Tablet: hide the sidebar gender buttons until the Filters panel is opened */
+          .shop-filters-modern .modern-sidebar-gender[data-filters-open="false"] {
+            display: none;
+          }
+          /* Tablet: lay search + spot prices out horizontally (silver · search · gold) */
+          .shop-filters-modern .shop-search-spot-row {
+            grid-template-columns: minmax(9rem, 0.55fr) minmax(0, 2fr) minmax(9rem, 0.55fr);
+            max-width: none;
+            gap: 0.65rem;
+          }
+          .shop-filters-modern .shop-search-spot-row > div:nth-child(1) {
+            grid-row: 1;
+            grid-column: 1;
+          }
+          .shop-filters-modern .shop-search-spot-row > div:nth-child(2) {
+            grid-row: 1;
+            grid-column: 2;
+            max-width: none !important;
+          }
+          .shop-filters-modern .shop-search-spot-row > div:nth-child(3) {
+            grid-row: 1;
+            grid-column: 3;
+          }
         }
       `}</style>
     </div>

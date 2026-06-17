@@ -288,3 +288,4 @@
  GET /shop 200 in 399ms (next.js: 12ms, proxy.ts: 42ms, application-code: 345ms)
  GET /shop 200 in 779ms (next.js: 8ms, proxy.ts: 657ms, application-code: 114ms)
  GET /shop 200 in 292ms (next.js: 8ms, proxy.ts: 168ms, application-code: 117ms)
+[?25h

@@ -257,9 +257,9 @@ export function coerceProductAutofill(input: ProductAutofillProviderResult): Pro
   if (fields.product_type && fields.product_type !== 'Necklace' && fields.product_type !== 'Bracelet') {
     fields.chain_type = null;
   }
-  if (fields.product_type && fields.product_type !== 'Necklace' && fields.product_type !== 'Bracelet' && fields.product_type !== 'Ring') {
-    fields.length = null;
-  }
+  // The size/length field carries the length for Necklace/Bracelet, the ring size for Ring,
+  // and the item's height for every other form (e.g. a 1.5 in brooch, a 0.75 in pendant).
+  // It is kept for all product types, so no clearing here.
 
   return {
     fields,

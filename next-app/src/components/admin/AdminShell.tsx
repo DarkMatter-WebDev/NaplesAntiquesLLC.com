@@ -118,7 +118,10 @@ function getProductLength(product: Product): string {
 }
 
 function getLengthSizeLabel(jewelryType: string | null | undefined): string {
-  return normalizeProductJewelryType(jewelryType) === 'Ring' ? 'Size' : 'Length';
+  const normalized = normalizeProductJewelryType(jewelryType);
+  if (normalized === 'Ring') return 'Size';
+  if (normalized === 'Necklace' || normalized === 'Bracelet') return 'Length';
+  return 'Height';
 }
 
 function productUsesLength(productType: string | null | undefined): boolean {
@@ -128,6 +131,14 @@ function productUsesLength(productType: string | null | undefined): boolean {
 
 function productUsesSize(productType: string | null | undefined): boolean {
   return normalizeProductJewelryType(productType) === 'Ring';
+}
+
+// Anything that is not a Necklace, Bracelet, or Ring uses the size field to store the
+// item's height (e.g. a 1.5 in brooch, a 0.75 in pendant).
+function productUsesHeight(productType: string | null | undefined): boolean {
+  const normalized = normalizeProductJewelryType(productType);
+  if (!normalized) return false;
+  return normalized !== 'Necklace' && normalized !== 'Bracelet' && normalized !== 'Ring';
 }
 
 function productUsesGender(productType: string | null | undefined): boolean {
@@ -1039,7 +1050,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
           updates.product_type = matchedJewelryType;
           updates.jewelry_type = matchedJewelryType;
           if (!productSupportsLinkType(matchedJewelryType)) newChainType = '';
-          if (!productUsesLength(matchedJewelryType) && !productUsesSize(matchedJewelryType)) newLength = '';
+          if (!productUsesLength(matchedJewelryType) && !productUsesSize(matchedJewelryType) && !productUsesHeight(matchedJewelryType)) newLength = '';
           applied.push('Product Type');
           return true;
         }
@@ -1323,7 +1334,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     if (!productSupportsLinkType(newJewelryType)) {
       newChainType = '';
     }
-    if (!productUsesLength(newJewelryType) && !productUsesSize(newJewelryType)) {
+    if (!productUsesLength(newJewelryType) && !productUsesSize(newJewelryType) && !productUsesHeight(newJewelryType)) {
       newLength = '';
     }
 
@@ -1505,7 +1516,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       nextEditing.product_type = value;
       nextEditing.jewelry_type = value;
       if (!productSupportsLinkType(value)) nextChainType = '';
-      if (!productUsesLength(value) && !productUsesSize(value)) nextLength = '';
+      if (!productUsesLength(value) && !productUsesSize(value) && !productUsesHeight(value)) nextLength = '';
     });
     setField('chain_type', 'Link Type', (value) => {
       if (!productSupportsLinkType(nextJewelryType)) nextJewelryType = 'Necklace';
@@ -1524,7 +1535,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setEditing(nextEditing);
     setJewelryTypeInput(nextJewelryType);
     setChainTypeInput(productSupportsLinkType(nextJewelryType) ? nextChainType : '');
-    setLengthInput(productUsesLength(nextJewelryType) || productUsesSize(nextJewelryType) ? nextLength : '');
+    setLengthInput(productUsesLength(nextJewelryType) || productUsesSize(nextJewelryType) || productUsesHeight(nextJewelryType) ? nextLength : '');
     showAiNotice(`Applied AI fields: ${applied.join(', ')}.`);
   }
 
@@ -1863,8 +1874,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     const supportsLinkType = productSupportsLinkType(normalizedJewelryType);
     const supportsLength = productUsesLength(normalizedJewelryType);
     const supportsSize = productUsesSize(normalizedJewelryType);
+    const supportsHeight = productUsesHeight(normalizedJewelryType);
     const normalizedLinkType = supportsLinkType ? chainTypeInput.trim() : '';
-    const normalizedLength = supportsLength || supportsSize ? normalizeProductLengthSizeValue(lengthInput) : '';
+    const normalizedLength = supportsLength || supportsSize || supportsHeight ? normalizeProductLengthSizeValue(lengthInput) : '';
     const normalizedMetalType = normalizeProductMetalType(editing.metal_type, editing.category);
     const legacyCategory = getLegacyCategoryForMetalType(normalizedMetalType, editing.category);
     const baseTags = (editing.tags ?? []).filter(t => !t.startsWith('jt:') && !t.startsWith('ct:') && !t.startsWith('len:'));
@@ -3457,7 +3469,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                         setJewelryTypeInput(nextProductType);
                         setEditing({ ...editing, product_type: nextProductType, jewelry_type: nextProductType });
                         if (!productSupportsLinkType(nextProductType)) setChainTypeInput('');
-                        if (!productUsesLength(nextProductType) && !productUsesSize(nextProductType)) setLengthInput('');
+                        if (!productUsesLength(nextProductType) && !productUsesSize(nextProductType) && !productUsesHeight(nextProductType)) setLengthInput('');
                       }}
                     >
                       {PRODUCT_JEWELRY_TYPES.map((type) => (
@@ -3554,18 +3566,25 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 })()}
                 {(() => {
                   const lengthSizeLabel = getLengthSizeLabel(jewelryTypeInput);
-                  const canUseLengthOrSize = productUsesLength(jewelryTypeInput) || productUsesSize(jewelryTypeInput);
-                  return canUseLengthOrSize ? (
+                  const usesHeight = productUsesHeight(jewelryTypeInput);
+                  const canUseLengthOrSize = productUsesLength(jewelryTypeInput) || productUsesSize(jewelryTypeInput) || usesHeight;
+                  if (!canUseLengthOrSize) return null;
+                  const placeholder = usesHeight
+                    ? 'height in inches, e.g. 1.5, 0.75...'
+                    : lengthSizeLabel === 'Size'
+                      ? 'e.g. 6.5, 7, 8...'
+                      : 'e.g. 22, 24, 7.5...';
+                  return (
                     <div>
                       <label className="form-label">{lengthSizeLabel}</label>
                       <ComboboxInput
                         value={lengthInput}
                         onChange={(value) => setLengthInput(normalizeProductLengthSizeValue(value))}
-                        options={PREDEFINED_LENGTHS}
-                        placeholder={lengthSizeLabel === 'Size' ? 'e.g. 6.5, 7, 8...' : 'e.g. 22, 24, 7.5...'}
+                        options={usesHeight ? [] : PREDEFINED_LENGTHS}
+                        placeholder={placeholder}
                       />
                     </div>
-                  ) : null;
+                  );
                 })()}
               </div>
 

@@ -111,24 +111,23 @@ export default function CartButton({ item, variant = 'card', locale = 'en' }: Pr
         .shop-card-cart-label-compact {
           display: none;
         }
-        @media (max-width: 480px) {
-          .shop-card-cart-button {
-            padding-inline: 0.38rem;
-            font-size: 0.58rem;
-            gap: 0.22rem;
-            letter-spacing: 0.045em;
-          }
-          .shop-card-cart-button .material-symbols-outlined {
-            font-size: 12px !important;
-          }
+        /* Compact card button — applied at all breakpoints */
+        .shop-card-cart-button {
+          min-height: 1.9rem;
+          padding-block: 0.18rem;
+          padding-inline: 0.38rem;
+          font-size: 0.58rem;
+          gap: 0.22rem;
+          letter-spacing: 0.045em;
         }
-        @media (max-width: 480px) {
-          .shop-card-cart-label-full {
-            display: none;
-          }
-          .shop-card-cart-label-compact {
-            display: inline;
-          }
+        .shop-card-cart-button .material-symbols-outlined {
+          font-size: 12px !important;
+        }
+        .shop-card-cart-label-full {
+          display: none;
+        }
+        .shop-card-cart-label-compact {
+          display: inline;
         }
       `}</style>
     </div>

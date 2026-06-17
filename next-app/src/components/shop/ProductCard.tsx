@@ -227,10 +227,15 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
             )}
           </>
         )}
+        {isModern && (
+          <div className="modern-card-hover-title" aria-hidden="true">
+            {title}
+          </div>
+        )}
       </div>
 
       {/* Body */}
-      <div className="flex flex-col flex-1 p-4 gap-1.5">
+      <div className="modern-card-body flex flex-col flex-1 p-4 gap-1.5">
         <span
           className="text-[0.62rem] font-bold uppercase tracking-[0.28em]"
           style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
@@ -335,6 +340,80 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
           .modern-product-card .shop-card-cart-button:hover {
             background: linear-gradient(135deg, #d9ad2f, #b98c09);
             color: #fffdf7;
+          }
+          /* Compact card body — applied at all breakpoints (mobile, tablet, desktop) */
+          .modern-product-card .modern-card-body {
+            padding: 0.3rem 0.6rem 0.6rem;
+            gap: 0.2rem;
+          }
+          /* Hide the metal label ("YELLOW GOLD") and the product title */
+          .modern-product-card .modern-card-body > span:first-child,
+          .modern-product-card .modern-card-body > a {
+            display: none;
+          }
+          /* Price floats on the white card — no cream background or borders */
+          .modern-product-card .modern-price-row {
+            margin-top: 0;
+            padding: 0 0.45rem;
+            gap: 0.35rem;
+            line-height: 1.1;
+            justify-content: center;
+            background: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+          }
+          .modern-product-card .modern-price-row span:first-child {
+            display: none;
+          }
+          .modern-product-card .modern-price-row span:last-child {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 0.92rem;
+            font-weight: 700;
+            letter-spacing: 0.005em;
+            text-transform: none;
+            font-variant-numeric: tabular-nums;
+          }
+          /* Compact spec chips (purity / weight / length) */
+          .modern-product-card .modern-card-body > .grid span {
+            padding-top: 0.22rem;
+            padding-bottom: 0.22rem;
+          }
+          /* Tighten the action row above the Add button */
+          .modern-product-card .modern-card-body > .flex:last-child {
+            padding-top: 0.4rem;
+          }
+          /* Title hover tooltip — desktop only (title is hidden in the card body) */
+          .modern-card-hover-title {
+            display: none;
+          }
+          @media (min-width: 1024px) {
+            .modern-card-hover-title {
+              display: block;
+              position: absolute;
+              left: 0.7rem;
+              right: 0.7rem;
+              bottom: 0.7rem;
+              padding: 0.5rem 0.75rem;
+              border-radius: 8px;
+              background: rgba(24, 19, 9, 0.86);
+              backdrop-filter: blur(3px);
+              color: #fffdf7;
+              font-family: var(--font-headline);
+              font-size: 0.74rem;
+              font-weight: 600;
+              line-height: 1.3;
+              text-align: center;
+              opacity: 0;
+              transform: translateY(8px);
+              transition: opacity 200ms ease, transform 200ms ease;
+              pointer-events: none;
+              z-index: 15;
+              box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
+            }
+            .modern-product-card:hover .modern-card-hover-title {
+              opacity: 1;
+              transform: translateY(0);
+            }
           }
         `}</style>
       )}

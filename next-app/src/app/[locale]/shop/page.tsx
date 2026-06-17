@@ -596,8 +596,26 @@ export async function renderShopPage({
               border-radius: 8px !important;
             }
             @media (max-width: 767px) {
+              /* Merge the hero and the filter card into one seamless card */
               .modern-shop-hero {
                 min-height: 0;
+                margin-bottom: 0;
+                border-bottom: none;
+                border-bottom-left-radius: 0;
+                border-bottom-right-radius: 0;
+                box-shadow: none;
+              }
+              .modern-shop-hero-content {
+                padding-top: 1.35rem !important;
+                padding-bottom: 0.6rem !important;
+              }
+              .modern-shop-page .shop-catalog-layout {
+                margin-top: 0;
+              }
+              .modern-shop-page .shop-filter-sidebar {
+                border-top: none;
+                border-top-left-radius: 0;
+                border-top-right-radius: 0;
               }
               .modern-shop-hero-media {
                 opacity: 0.18;
@@ -605,6 +623,20 @@ export async function renderShopPage({
               }
               .modern-shop-proof-point {
                 grid-template-columns: 1fr;
+              }
+              /* Hide the gender tabs on mobile (gender stays available in the filters panel) */
+              .shop-gender-tabs {
+                display: none !important;
+              }
+              /* Collapse filters behind the toggle button on mobile */
+              .modern-shop-page .shop-filter-toggle-row {
+                display: flex !important;
+              }
+              .modern-shop-page .shop-filter-panel {
+                display: none !important;
+              }
+              .modern-shop-page .shop-filter-panel.is-open {
+                display: block !important;
               }
             }
             .shop-catalog-layout {
@@ -659,12 +691,75 @@ export async function renderShopPage({
                 gap: 1.5rem;
               }
               .modern-shop-page .shop-filter-sidebar {
-                margin-top: 4.95rem;
+                margin-top: 0;
               }
               .shop-filter-sidebar {
                 position: sticky;
                 top: 6.5rem;
                 align-self: start;
+              }
+              /* Gender is handled by the sidebar buttons, so hide the redundant toggle */
+              .modern-shop-page .shop-gender-tabs {
+                display: none;
+              }
+            }
+            @media (min-width: 768px) and (max-width: 1023px) {
+              /* Tablet: the sidebar gender buttons cover gender, so hide the redundant tabs */
+              .shop-gender-tabs {
+                display: none !important;
+              }
+              /* Tablet: collapse the filters behind the toggle button (same as mobile) */
+              .modern-shop-page .shop-filter-toggle-row {
+                display: flex !important;
+              }
+              .modern-shop-page .shop-filter-panel {
+                display: none !important;
+              }
+              .modern-shop-page .shop-filter-panel.is-open {
+                display: block !important;
+              }
+              /* Tablet: denser product grid */
+              .shop-product-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+              }
+              /* Tablet: 3-up filter dropdowns so option text (e.g. Sort) isn't clipped */
+              .shop-filter-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+              }
+              /* Tablet: vertically compact the whole hero */
+              .modern-shop-hero-content {
+                padding-top: 2rem;
+                padding-bottom: 2rem;
+              }
+              .modern-shop-hero-content #shop-invest-heading {
+                font-size: 2.75rem;
+                margin-top: 0.4rem;
+                margin-bottom: 0.6rem;
+              }
+              .modern-shop-hero-content > p:last-of-type {
+                margin-bottom: 1.1rem;
+              }
+              .modern-shop-hero-content > div:last-child {
+                margin-top: 0.5rem;
+              }
+              /* Tablet: trim down the hero proof-point blocks */
+              .modern-shop-proof-point {
+                grid-template-columns: 2rem 1fr;
+                gap: 0.6rem;
+                padding: 0.55rem 0.7rem;
+              }
+              .modern-shop-proof-icon {
+                width: 1.95rem;
+                height: 1.95rem;
+                font-size: 1rem;
+              }
+              .modern-shop-proof-point strong {
+                font-size: 0.58rem;
+                margin-bottom: 0.2rem;
+              }
+              .modern-shop-proof-point div span {
+                font-size: 0.66rem;
+                line-height: 1.3;
               }
             }
             @media (min-width: 1720px) {
