@@ -65,7 +65,7 @@ body {
 
 /* ── Shared component patterns ──────────────────────────── */
 .gold-button {
-  background: var(--color-primary);
+  background: linear-gradient(135deg, #dcb336, #b5890c);
   color: var(--color-on-primary);
   font-family: var(--font-label);
   font-size: 0.68rem;
@@ -80,10 +80,13 @@ body {
   align-items: center;
   gap: 0.4rem;
   text-decoration: none;
-  transition: background 0.15s;
+  box-shadow: 0 10px 24px rgba(181, 137, 12, 0.18);
+  transition: filter 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 .gold-button:hover {
-  background: color-mix(in srgb, var(--color-primary) 85%, black);
+  filter: brightness(1.04);
+  box-shadow: 0 14px 30px rgba(181, 137, 12, 0.24);
+  transform: translateY(-1px);
 }
 
 .detail-cart-button {
@@ -116,7 +119,7 @@ body {
   transition: background 0.15s, color 0.15s;
 }
 .outline-button:hover {
-  background: var(--color-primary);
+  background: linear-gradient(135deg, #dcb336, #b5890c);
   color: var(--color-on-primary);
 }
 
@@ -167,8 +170,8 @@ body {
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 .clearable-field__button:hover {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: linear-gradient(135deg, #dcb336, #b5890c);
+  border-color: transparent;
   color: var(--color-on-primary);
 }
 .clearable-field__button:disabled {

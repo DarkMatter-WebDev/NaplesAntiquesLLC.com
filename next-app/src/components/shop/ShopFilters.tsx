@@ -14,6 +14,12 @@ type LengthOption = {
   labelEn?: string;
 };
 
+type PurityOption = {
+  value: string;
+  label: string;
+  labelEs?: string;
+};
+
 const NECKLACE_LENGTH_OPTIONS: LengthOption[] = [
   { value: '16 in', label: '16 in' },
   { value: '18 in', label: '18 in' },
@@ -29,6 +35,16 @@ const BRACELET_LENGTH_OPTIONS: LengthOption[] = [
   { value: '7 in', label: '7 in', labelEs: '7 in (pulsera)', labelEn: '7 in (bracelet)' },
   { value: '7.5 in', label: '7.5 in', labelEs: '7.5 in (pulsera)', labelEn: '7.5 in (bracelet)' },
   { value: '8 in', label: '8 in', labelEs: '8 in (pulsera)', labelEn: '8 in (bracelet)' },
+];
+
+const GOLD_PURITY_OPTIONS: PurityOption[] = [
+  { value: '18', label: '18K' },
+  { value: '14', label: '14K' },
+  { value: '10', label: '10K' },
+];
+
+const SILVER_PURITY_OPTIONS: PurityOption[] = [
+  { value: '925', label: '925 Sterling', labelEs: '925 Esterlina' },
 ];
 
 function getLengthOptionsForItemType(itemType: string | undefined) {
@@ -87,6 +103,15 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
   const isEs = locale === 'es';
   const selectedMetalColor = currentFilters.metalColor ?? currentFilters.metalType;
   const metalColorOptions = getMetalColorOptions(currentFilters.metal);
+  const silverwareOnlyMetal = currentFilters.itemType === 'silverware';
+  const purityOptions = currentFilters.metal === 'silver'
+    ? SILVER_PURITY_OPTIONS
+    : currentFilters.metal === 'gold'
+      ? GOLD_PURITY_OPTIONS
+      : [...GOLD_PURITY_OPTIONS, ...SILVER_PURITY_OPTIONS];
+  const visiblePurity = purityOptions.some((option) => option.value === currentFilters.purity)
+    ? currentFilters.purity
+    : '';
   const visibleMetalColor = metalColorOptions.some((variant) => variant.value === selectedMetalColor)
     ? selectedMetalColor
     : undefined;
@@ -135,6 +160,18 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
       params.delete('length');
       params.delete('page');
       if (!itemTypeSupportsLinkType(value)) params.delete('chainType');
+      if (value === 'silverware') {
+        params.set('metal', 'silver');
+        if (params.get('purity') && !SILVER_PURITY_OPTIONS.some((option) => option.value === params.get('purity'))) {
+          params.delete('purity');
+        }
+        const selectedColor = params.get('metalColor') ?? params.get('metalType');
+        const silverTypes = new Set<string>(PRODUCT_METAL_VARIANTS.Silver.map((variant) => variant.value));
+        if (selectedColor && !silverTypes.has(selectedColor)) {
+          params.delete('metalColor');
+          params.delete('metalType');
+        }
+      }
       const qs = params.toString();
       router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
@@ -157,6 +194,11 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
           (value === 'silver' && selectedColor && !silverTypes.has(selectedColor))) {
         params.delete('metalColor');
         params.delete('metalType');
+      }
+      const selectedPurity = params.get('purity');
+      if ((value === 'gold' && selectedPurity && !GOLD_PURITY_OPTIONS.some((option) => option.value === selectedPurity)) ||
+          (value === 'silver' && selectedPurity && !SILVER_PURITY_OPTIONS.some((option) => option.value === selectedPurity))) {
+        params.delete('purity');
       }
       params.delete('page');
 
@@ -436,7 +478,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
                 <option value="bullion">{isEs ? 'Lingotes' : 'Bullion'}</option>
                 <option value="loose-diamond">{isEs ? 'Diamantes sueltos' : 'Loose Diamonds'}</option>
                 <option value="loose-gemstone">{isEs ? 'Gemas sueltas' : 'Loose Gemstones'}</option>
-                <option value="silverware">{isEs ? 'Plateria' : 'Silverware'}</option>
+                <option value="silverware">{isEs ? 'Plateria / sterling' : 'Silverware / Sterling'}</option>
                 <option value="estate-lot">{isEs ? 'Lotes de sucesion' : 'Estate Lots'}</option>
               </select>
             </div>
@@ -464,8 +506,8 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
                 onChange={(e) => updateMetalFilter(e.target.value)}
                 style={selectStyle}
               >
-                <option value="">{isEs ? 'Todos los metales' : 'All metals'}</option>
-                <option value="gold">{isEs ? 'Oro' : 'Gold'}</option>
+                {!silverwareOnlyMetal && <option value="">{isEs ? 'Todos los metales' : 'All metals'}</option>}
+                {!silverwareOnlyMetal && <option value="gold">{isEs ? 'Oro' : 'Gold'}</option>}
                 <option value="silver">{isEs ? 'Plata' : 'Silver'}</option>
               </select>
             </div>
@@ -500,15 +542,16 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
             <div>
               <label style={labelStyle}>{isEs ? 'Pureza' : 'Purity'}</label>
               <select
-                value={currentFilters.purity ?? ''}
+                value={visiblePurity}
                 onChange={(e) => updateFilter('purity', e.target.value)}
                 style={selectStyle}
               >
                 <option value="">{isEs ? 'Todas' : 'All purities'}</option>
-                <option value="18">18K</option>
-                <option value="14">14K</option>
-                <option value="10">10K</option>
-                <option value="925">925 {isEs ? 'Esterlina' : 'Sterling'}</option>
+                {purityOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {isEs ? option.labelEs ?? option.label : option.label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -764,7 +807,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
           min-height: 2.75rem;
           border-color: rgba(115, 92, 0, 0.16) !important;
           border-radius: 7px !important;
-          background: #fffefa !important;
+          background: #ffffff !important;
           box-shadow: 0 10px 24px rgba(42, 34, 12, 0.05);
         }
         .modern-sidebar-gender {
@@ -790,7 +833,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
           min-height: 2.7rem;
           border: 1px solid rgba(115, 92, 0, 0.16);
           border-radius: 6px;
-          background: #fffefa;
+          background: #ffffff;
           color: var(--color-on-surface-variant);
           cursor: pointer;
           font-family: var(--font-label);
@@ -820,7 +863,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
           min-height: 2.65rem;
           border-color: rgba(115, 92, 0, 0.18) !important;
           border-radius: 7px !important;
-          background-color: #fffefa !important;
+          background-color: #ffffff !important;
           box-shadow: 0 8px 18px rgba(42, 34, 12, 0.04);
         }
         .shop-filters-modern .shop-available-row {

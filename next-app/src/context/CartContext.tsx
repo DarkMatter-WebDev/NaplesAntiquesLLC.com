@@ -2,15 +2,32 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import CartDrawer from '@/components/cart/CartDrawer';
-import type { ProductStatus } from '@/types/product';
+import type { Product, ProductStatus } from '@/types/product';
 
 export interface CartItem {
   id: string;
   title: string;
   title_es: string | null;
+  description?: string | null;
+  description_es?: string | null;
+  public_notes?: string | null;
   image: string | null;
   status: ProductStatus;
   priceLabel: string;
+  category?: Product['category'];
+  metal_type?: string | null;
+  metal_variant?: string | null;
+  purity?: number | null;
+  weight_grams?: number | null;
+  gram_weight?: number | null;
+  product_type?: string | null;
+  jewelry_type?: string | null;
+  chain_type?: string | null;
+  length?: string | null;
+  brand?: string | null;
+  tags?: string[];
+  tags_es?: string[];
+  gender?: string | null;
 }
 
 interface CartContextValue {

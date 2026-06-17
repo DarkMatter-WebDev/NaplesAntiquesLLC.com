@@ -7,9 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 
 const MODERN_AUTH_STYLES = `
   .modern-auth-page {
-    background:
-      radial-gradient(circle at 78% 8%, rgba(220, 188, 96, 0.16), transparent 34rem),
-      linear-gradient(180deg, #fffdf8 0%, #f8f6f0 44%, #f5f2ea 100%);
+    background: #ffffff;
   }
   .modern-auth-card {
     position: relative;

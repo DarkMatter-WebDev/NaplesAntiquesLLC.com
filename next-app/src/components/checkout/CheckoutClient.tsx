@@ -2,12 +2,31 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useCart } from '@/context/CartContext';
+import { useCart, type CartItem } from '@/context/CartContext';
 import OrderSummary, { SHIPPING_OPTIONS } from '@/components/checkout/OrderSummary';
 import { createClient } from '@/lib/supabase/client';
 
 const GOLD = '#735c00';
-const BORDER = '#d8d0c2';
+type CartProductInfo = Pick<
+  CartItem,
+  | 'description'
+  | 'description_es'
+  | 'public_notes'
+  | 'category'
+  | 'metal_type'
+  | 'metal_variant'
+  | 'purity'
+  | 'weight_grams'
+  | 'gram_weight'
+  | 'product_type'
+  | 'jewelry_type'
+  | 'chain_type'
+  | 'length'
+  | 'brand'
+  | 'tags'
+  | 'tags_es'
+  | 'gender'
+>;
 
 interface CustomerInfo {
   name: string;
@@ -22,6 +41,7 @@ export default function CheckoutClient({ locale }: { locale: string }) {
   const prefix = isEs ? '/es' : '';
   const [customer, setCustomer] = useState<CustomerInfo>({ name: '', email: '', phone: '', notes: '' });
   const [shippingMethod, setShippingMethod] = useState(SHIPPING_OPTIONS[0].value);
+  const [productInfoById, setProductInfoById] = useState<Record<string, CartProductInfo>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdOrder, setCreatedOrder] = useState<{ orderNumber: string; total: number } | null>(null);
@@ -61,6 +81,73 @@ export default function CheckoutClient({ locale }: { locale: string }) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const missingProductInfoIds = items
+      .filter((item) => (
+        !item.description &&
+        !item.description_es &&
+        !item.public_notes
+      ) || (
+        !item.category &&
+        !item.metal_variant &&
+        !item.purity &&
+        !item.length &&
+        !item.chain_type &&
+        !item.product_type &&
+        !item.jewelry_type
+      ))
+      .map((item) => item.id);
+
+    if (missingProductInfoIds.length === 0) return;
+
+    async function loadCartProductInfo() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('products')
+        .select('id, description, description_es, public_notes, category, metal_type, metal_variant, purity, weight_grams, gram_weight, product_type, jewelry_type, chain_type, length, brand, tags, tags_es, gender')
+        .in('id', missingProductInfoIds);
+
+      if (cancelled || !data) return;
+      setProductInfoById((current) => ({
+        ...current,
+        ...Object.fromEntries(data.map((product) => [
+          product.id,
+          {
+            description: product.description,
+            description_es: product.description_es,
+            public_notes: product.public_notes,
+            category: product.category,
+            metal_type: product.metal_type,
+            metal_variant: product.metal_variant,
+            purity: product.purity,
+            weight_grams: product.weight_grams,
+            gram_weight: product.gram_weight,
+            product_type: product.product_type,
+            jewelry_type: product.jewelry_type,
+            chain_type: product.chain_type,
+            length: product.length,
+            brand: product.brand,
+            tags: product.tags,
+            tags_es: product.tags_es,
+            gender: product.gender,
+          },
+        ])),
+      }));
+    }
+
+    loadCartProductInfo();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
+
+  const summaryItems = items.map((item) => ({
+    ...item,
+    ...productInfoById[item.id],
+  }));
 
   async function handleSubmitOrder(e: React.FormEvent) {
     e.preventDefault();
@@ -127,8 +214,9 @@ export default function CheckoutClient({ locale }: { locale: string }) {
   }
 
   return (
-    <div className="container mx-auto px-4 md:px-8 py-10 md:py-16 max-w-6xl">
-      <div className="mb-8">
+    <div className="checkout-page">
+      <div className="checkout-shell">
+      <section className="checkout-hero">
         <Link href={`${prefix}/shop`} className="text-xs font-bold uppercase tracking-widest hover:underline" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
           {isEs ? '< Volver a la tienda' : '< Back to shop'}
         </Link>
@@ -138,10 +226,29 @@ export default function CheckoutClient({ locale }: { locale: string }) {
         <p style={{ color: 'var(--color-on-surface-variant)' }}>
           {isEs ? 'Complete sus datos para reservar los articulos de su carrito.' : 'Complete your details to reserve the items in your cart.'}
         </p>
-      </div>
+      </section>
 
-      <div className="grid lg:grid-cols-[1fr_24rem] gap-8 items-start">
-        <form onSubmit={handleSubmitOrder} className="border p-5 md:p-7 flex flex-col gap-4" style={{ borderColor: BORDER, background: 'var(--color-surface-container-lowest)' }}>
+      <div className="checkout-dashboard">
+        <OrderSummary
+          items={summaryItems}
+          isEs={isEs}
+          prefix={prefix}
+          shippingMethod={shippingMethod}
+          onShippingMethodChange={setShippingMethod}
+          onRemove={remove}
+          variant="expanded"
+        />
+
+        <form onSubmit={handleSubmitOrder} className="checkout-contact-panel">
+          <div className="checkout-panel-heading">
+            <span className="material-symbols-outlined" aria-hidden="true">person</span>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                {isEs ? 'Datos de contacto' : 'Contact Details'}
+              </p>
+              <h2>{isEs ? 'Como podemos contactarte?' : 'How should we contact you?'}</h2>
+            </div>
+          </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="form-label">{isEs ? 'Nombre completo' : 'Full Name'} *</label>
@@ -173,16 +280,65 @@ export default function CheckoutClient({ locale }: { locale: string }) {
               : (isEs ? 'Enviar pedido' : 'Submit Order')}
           </button>
         </form>
-
-        <OrderSummary
-          items={items}
-          isEs={isEs}
-          prefix={prefix}
-          shippingMethod={shippingMethod}
-          onShippingMethodChange={setShippingMethod}
-          onRemove={remove}
-        />
       </div>
+      </div>
+
+      <style jsx>{`
+        .checkout-page {
+          min-height: 100vh;
+          padding: 3rem 0 4rem;
+          background:
+            linear-gradient(180deg, rgba(255, 253, 248, 0.94) 0%, rgba(249, 247, 239, 0.98) 46%, #f9f7ef 100%),
+            radial-gradient(circle at top right, rgba(212, 175, 55, 0.18), transparent 34%);
+        }
+        .checkout-shell {
+          width: min(1160px, calc(100% - 2rem));
+          margin: 0 auto;
+        }
+        .checkout-hero {
+          margin-bottom: 1.5rem;
+          padding: clamp(1.25rem, 3vw, 2rem);
+          border: 1px solid rgba(216, 208, 194, 0.86);
+          background: rgba(255, 255, 255, 0.82);
+          box-shadow: 0 18px 48px rgba(75, 60, 24, 0.08);
+        }
+        .checkout-dashboard {
+          display: flex;
+          flex-direction: column;
+          gap: 1.5rem;
+        }
+        .checkout-contact-panel {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+          padding: clamp(1.25rem, 3vw, 1.75rem);
+          border: 1px solid rgba(216, 208, 194, 0.94);
+          background: rgba(255, 255, 255, 0.86);
+          box-shadow: 0 14px 36px rgba(75, 60, 24, 0.07);
+        }
+        .checkout-panel-heading {
+          display: flex;
+          align-items: center;
+          gap: 0.85rem;
+          padding-bottom: 0.35rem;
+        }
+        .checkout-panel-heading > .material-symbols-outlined {
+          display: inline-flex;
+          width: 2.5rem;
+          height: 2.5rem;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          background: rgba(212, 175, 55, 0.12);
+          color: ${GOLD};
+        }
+        .checkout-panel-heading h2 {
+          margin: 0.15rem 0 0;
+          font-family: var(--font-headline);
+          font-size: clamp(1.25rem, 2.4vw, 1.75rem);
+          color: var(--color-on-surface);
+        }
+      `}</style>
     </div>
   );
 }

@@ -14,6 +14,7 @@ import {
   getDefaultMetalVariant,
   inferProductJewelryType,
   normalizeProductJewelryType,
+  normalizeProductLengthSizeValue,
   normalizeProductMetalType,
   normalizeProductLinkType,
   normalizeProductMetalVariant,
@@ -103,8 +104,8 @@ function getProductLinkType(product: Product): string {
 }
 
 const PREDEFINED_LENGTHS = [
-  '16 in', '18 in', '20 in', '22 in', '24 in', '26 in', '28 in', '30 in',
-  '7 in', '7.5 in', '8 in',
+  '16', '18', '20', '22', '24', '26', '28', '30',
+  '7', '7.5', '8',
 ];
 
 function getLengthFromTags(tags: string[] | null): string {
@@ -113,7 +114,7 @@ function getLengthFromTags(tags: string[] | null): string {
 }
 
 function getProductLength(product: Product): string {
-  return product.length || getLengthFromTags(product.tags);
+  return normalizeProductLengthSizeValue(product.length || getLengthFromTags(product.tags));
 }
 
 function getLengthSizeLabel(jewelryType: string | null | undefined): string {
@@ -344,6 +345,9 @@ const PRICE_MODES = [
   { value: 'spot-multiplier', label: 'Spot × Multiplier' },
   { value: 'manual', label: 'Manual / Fixed' },
 ] as const;
+
+const GOLD_FILTER_PURITY_OPTIONS = [['18', '18K'], ['14', '14K'], ['10', '10K']];
+const SILVER_FILTER_PURITY_OPTIONS = [['925', '925 Sterling']];
 
 type SortKey =
   | 'inventoryNumber'
@@ -725,11 +729,13 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [filterPurity, setFilterPurity] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterBrand, setFilterBrand] = useState('');
+  const [filterGender, setFilterGender] = useState('');
   const [filterJewelryType, setFilterJewelryType] = useState('');
   const [filterChainType, setFilterChainType] = useState('');
   const [filterLength, setFilterLength] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
   const [filterFeatured, setFilterFeatured] = useState('');
+  const [showTableFilters, setShowTableFilters] = useState(false);
   const originalRef = useRef<ReturnType<typeof emptyProduct> | null>(null);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -1191,12 +1197,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
       const lenMatch = lower.match(field === 'length' ? /^(\d+(?:\.\d+)?)\s*(?:(?:in(?:ch(?:es?)?)?)|")?$/ : /^(\d+(?:\.\d+)?)\s*(?:in(?:ch(?:es?)?)?|")$/);
       if ((!field || field === 'length') && lenMatch) {
-        newLength = normalizeProductJewelryType(newJewelryType) === 'Ring' ? lenMatch[1] : `${lenMatch[1]} in`;
+        newLength = normalizeProductLengthSizeValue(lenMatch[0]);
         applied.push(getLengthSizeLabel(newJewelryType));
         return true;
       }
       if (field === 'length') {
-        newLength = value;
+        newLength = normalizeProductLengthSizeValue(value);
         applied.push(getLengthSizeLabel(newJewelryType));
         return true;
       }
@@ -1507,7 +1513,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       nextEditing.product_type = nextJewelryType;
       nextEditing.jewelry_type = nextJewelryType;
     });
-    setField('length', getLengthSizeLabel(nextJewelryType), (value) => { nextLength = value; });
+    setField('length', getLengthSizeLabel(nextJewelryType), (value) => { nextLength = normalizeProductLengthSizeValue(value); });
 
     if (applied.length === 0) {
       showAiNotice('No AI values to apply. Generate a listing first.', false);
@@ -1858,7 +1864,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     const supportsLength = productUsesLength(normalizedJewelryType);
     const supportsSize = productUsesSize(normalizedJewelryType);
     const normalizedLinkType = supportsLinkType ? chainTypeInput.trim() : '';
-    const normalizedLength = supportsLength || supportsSize ? lengthInput.trim() : '';
+    const normalizedLength = supportsLength || supportsSize ? normalizeProductLengthSizeValue(lengthInput) : '';
     const normalizedMetalType = normalizeProductMetalType(editing.metal_type, editing.category);
     const legacyCategory = getLegacyCategoryForMetalType(normalizedMetalType, editing.category);
     const baseTags = (editing.tags ?? []).filter(t => !t.startsWith('jt:') && !t.startsWith('ct:') && !t.startsWith('len:'));
@@ -1998,6 +2004,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     if (filterMetalVariant && getProductMetalVariant(p) !== filterMetalVariant) return false;
     if (filterCategory && getProductMetalType(p) !== filterCategory) return false;
     if (filterBrand && p.brand !== filterBrand) return false;
+    if (filterGender && String(p.gender ?? '').toLowerCase() !== filterGender) return false;
     if (filterPurity && p.purity !== parseInt(filterPurity)) return false;
     if (filterLocation && (p.location ?? 'showcase') !== filterLocation) return false;
     if (filterFeatured === 'featured' && !p.featured) return false;
@@ -2052,13 +2059,81 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     filterPurity ||
     filterCategory ||
     filterBrand ||
+    filterGender ||
     filterJewelryType ||
     filterChainType ||
     filterLength ||
     filterLocation ||
     filterFeatured
   );
+  const activeDropdownFilterCount = [
+    filterStatus,
+    filterMetal,
+    filterMetalVariant,
+    filterPurity,
+    filterCategory,
+    filterBrand,
+    filterGender,
+    filterJewelryType,
+    filterChainType,
+    filterLength,
+    filterLocation,
+    filterFeatured,
+  ].filter(Boolean).length;
   const canDragReorder = !sortConfig && !hasActiveTableFilters && !reordering;
+  const selectedFilterProductType = normalizeProductJewelryType(filterJewelryType);
+  const adminSilverwareOnlyMetal = selectedFilterProductType === 'Silverware';
+  const adminPurityOptions = filterMetal === 'silver' || filterCategory === 'Silver'
+    ? SILVER_FILTER_PURITY_OPTIONS
+    : filterMetal === 'gold' || filterCategory === 'Gold'
+      ? GOLD_FILTER_PURITY_OPTIONS
+      : [...GOLD_FILTER_PURITY_OPTIONS, ...SILVER_FILTER_PURITY_OPTIONS];
+  const visibleAdminPurity = adminPurityOptions.some(([value]) => value === filterPurity) ? filterPurity : '';
+  const showAdminLinkTypeFilter = productSupportsLinkType(selectedFilterProductType);
+  const showAdminSizeFilter = productUsesSize(selectedFilterProductType);
+  const scopedLengthSizeOptions = selectedFilterProductType === 'Necklace'
+    ? [
+        ['', 'All Lengths'],
+        ['16', '16 in'],
+        ['18', '18 in'],
+        ['20', '20 in'],
+        ['22', '22 in'],
+        ['24', '24 in'],
+        ['26', '26 in'],
+        ['28', '28 in'],
+        ['30', '30 in'],
+      ]
+    : selectedFilterProductType === 'Bracelet'
+      ? [
+        ['', 'All Lengths'],
+        ['7', '7 in (bracelet)'],
+        ['7.5', '7.5 in (bracelet)'],
+        ['8', '8 in (bracelet)'],
+      ]
+    : showAdminSizeFilter
+      ? [
+          ['', 'All Sizes'],
+          ['4', 'Size 4'],
+          ['4.5', 'Size 4.5'],
+          ['5', 'Size 5'],
+          ['5.5', 'Size 5.5'],
+          ['6', 'Size 6'],
+          ['6.5', 'Size 6.5'],
+          ['7', 'Size 7'],
+          ['7.5', 'Size 7.5'],
+          ['8', 'Size 8'],
+          ['8.5', 'Size 8.5'],
+          ['9', 'Size 9'],
+          ['9.5', 'Size 9.5'],
+          ['10', 'Size 10'],
+          ['10.5', 'Size 10.5'],
+          ['11', 'Size 11'],
+          ['11.5', 'Size 11.5'],
+          ['12', 'Size 12'],
+          ['12.5', 'Size 12.5'],
+          ['13', 'Size 13'],
+        ]
+      : [];
 
   function resetRowDrag() {
     setDraggedProductId(null);
@@ -2211,38 +2286,123 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             <button type="button" onClick={openAdd} className="gold-button text-sm flex-shrink-0">
               + Add Product
             </button>
+            <button
+              type="button"
+              onClick={() => setShowTableFilters((current) => !current)}
+              className="outline-button inline-flex items-center gap-2 text-sm flex-shrink-0"
+              aria-expanded={showTableFilters}
+              aria-controls="admin-product-table-filters"
+              aria-label="Filters"
+            >
+              <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '17px', lineHeight: 1 }}>
+                filter_list
+              </span>
+              Filters{activeDropdownFilterCount > 0 ? ` (${activeDropdownFilterCount})` : ''}
+            </button>
+            <span className="text-xs ml-auto"
+              style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+              {filtered.length} / {products.length}
+            </span>
           </div>
 
           {/* Filter dropdowns */}
-          <div className="flex flex-wrap gap-2 items-end">
+          {showTableFilters && (
+          <div
+            id="admin-product-table-filters"
+            className="flex flex-wrap gap-2 items-end border px-3 py-3"
+            style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-lowest)' }}
+          >
             {[
               {
-                label: 'Status', value: filterStatus, set: setFilterStatus,
-                options: [['', 'All Statuses'], ...STATUSES.map((status) => [status.value, status.label])],
+                label: 'Gender', value: filterGender, set: setFilterGender,
+                options: [['', 'All Genders'], ['unisex', 'Unisex'], ['men', 'Men'], ['women', 'Women']],
               },
               {
-                label: 'Pricing Metal', value: filterMetal, set: setFilterMetal,
-                options: [['', 'All Pricing Metals'], ['gold', 'Gold'], ['silver', 'Silver']],
-              },
-              {
-                label: 'Metal Color', value: filterMetalVariant, set: setFilterMetalVariant,
-                options: [
-                  ['', 'All Types'],
-                  ...PRODUCT_METAL_VARIANTS.Gold.map((variant) => [variant.value, variant.label]),
-                  ...PRODUCT_METAL_VARIANTS.Silver.map((variant) => [variant.value, variant.label]),
-                ],
-              },
-              {
-                label: 'Metal Type', value: filterCategory, set: setFilterCategory,
-                options: [['', 'All Metal Types'], ...PRODUCT_METAL_TYPES.map((metalType) => [metalType.value, metalType.label])],
+                label: 'Product Type', value: filterJewelryType, set: (value: string) => {
+                  setFilterJewelryType(value);
+                  setFilterChainType('');
+                  setFilterLength('');
+                  if (value === 'Silverware') {
+                    setFilterMetal('silver');
+                    setFilterCategory('Silver');
+                    if (!SILVER_FILTER_PURITY_OPTIONS.some(([optionValue]) => optionValue === filterPurity)) {
+                      setFilterPurity('');
+                    }
+                    if (!PRODUCT_METAL_VARIANTS.Silver.some((variant) => variant.value === filterMetalVariant)) {
+                      setFilterMetalVariant('');
+                    }
+                  }
+                },
+                options: [['', 'All Product Types'], ...PRODUCT_JEWELRY_TYPES.map((type) => [type.value, type.label])],
               },
               {
                 label: 'Brand', value: filterBrand, set: setFilterBrand,
                 options: [['', 'All Brands'], ...existingBrandOptions.map((brand) => [brand, brand])],
               },
               {
-                label: 'Purity', value: filterPurity, set: setFilterPurity,
-                options: [['', 'All Purities'], ['18', '18K'], ['14', '14K'], ['10', '10K'], ['925', '925 Sterling']],
+                label: 'Metal', value: filterMetal, set: (value: string) => {
+                  setFilterMetal(value);
+                  if (value === 'silver' && !SILVER_FILTER_PURITY_OPTIONS.some(([optionValue]) => optionValue === filterPurity)) {
+                    setFilterPurity('');
+                  }
+                  if (value === 'gold' && !GOLD_FILTER_PURITY_OPTIONS.some(([optionValue]) => optionValue === filterPurity)) {
+                    setFilterPurity('');
+                  }
+                },
+                options: adminSilverwareOnlyMetal
+                  ? [['silver', 'Silver']]
+                  : [['', 'All Metals'], ['gold', 'Gold'], ['silver', 'Silver']],
+              },
+              {
+                label: 'Metal Type', value: filterCategory, set: (value: string) => {
+                  setFilterCategory(value);
+                  if (value === 'Silver' && !SILVER_FILTER_PURITY_OPTIONS.some(([optionValue]) => optionValue === filterPurity)) {
+                    setFilterPurity('');
+                  }
+                  if (value === 'Gold' && !GOLD_FILTER_PURITY_OPTIONS.some(([optionValue]) => optionValue === filterPurity)) {
+                    setFilterPurity('');
+                  }
+                },
+                options: [['', 'All Metal Types'], ...PRODUCT_METAL_TYPES.map((metalType) => [metalType.value, metalType.label])],
+              },
+              {
+                label: 'Metal Color', value: filterMetalVariant, set: setFilterMetalVariant,
+                options: [
+                  ['', 'All Colors'],
+                  ...PRODUCT_METAL_VARIANTS.Gold.map((variant) => [variant.value, variant.label]),
+                  ...PRODUCT_METAL_VARIANTS.Silver.map((variant) => [variant.value, variant.label]),
+                ],
+              },
+              {
+                label: 'Purity', value: visibleAdminPurity, set: setFilterPurity,
+                options: [['', 'All Purities'], ...adminPurityOptions],
+              },
+              ...(showAdminLinkTypeFilter ? [
+                {
+                  label: 'Link Type', value: filterChainType, set: setFilterChainType,
+                  options: [
+                    ['', 'All Link Types'],
+                    ['cuban-link', 'Cuban link'],
+                    ['figaro-link', 'Figaro link'],
+                    ['rope-chain', 'Rope chain'],
+                    ['anchor-link', 'Anchor / Gucci'],
+                    ['oval-link', 'Oval link'],
+                    ['byzantine-link', 'Byzantine'],
+                    ['box-link', 'Box link'],
+                  ],
+                },
+              ] : []),
+              ...(scopedLengthSizeOptions.length > 0 ? [
+                {
+                  label: showAdminSizeFilter ? 'Size' : 'Length',
+                  value: filterLength,
+                  set: (value: string) => setFilterLength(normalizeProductLengthSizeValue(value)),
+                  options: scopedLengthSizeOptions,
+                },
+              ] : []),
+              {
+                label: 'Status', value: filterStatus, set: setFilterStatus,
+                options: [['', 'All Statuses'], ...STATUSES.map((status) => [status.value, status.label])],
               },
               {
                 label: 'Location', value: filterLocation, set: setFilterLocation,
@@ -2251,59 +2411,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               {
                 label: 'Featured', value: filterFeatured, set: setFilterFeatured,
                 options: [['', 'All Items'], ['featured', 'Featured'], ['not-featured', 'Not Featured']],
-              },
-              {
-                label: 'Product Type', value: filterJewelryType, set: setFilterJewelryType,
-                options: [['', 'All Product Types'], ...PRODUCT_JEWELRY_TYPES.map((type) => [type.value, type.label])],
-              },
-              {
-                label: 'Link Type', value: filterChainType, set: setFilterChainType,
-                options: [
-                  ['', 'All Link Types'],
-                  ['cuban-link', 'Cuban link'],
-                  ['figaro-link', 'Figaro link'],
-                  ['rope-chain', 'Rope chain'],
-                  ['anchor-link', 'Anchor / Gucci'],
-                  ['oval-link', 'Oval link'],
-                  ['byzantine-link', 'Byzantine'],
-                  ['box-link', 'Box link'],
-                ],
-              },
-              {
-                label: 'Length/Size', value: filterLength, set: setFilterLength,
-                options: [
-                  ['', 'All Lengths/Sizes'],
-                  ['16 in', '16 in'],
-                  ['18 in', '18 in'],
-                  ['20 in', '20 in'],
-                  ['22 in', '22 in'],
-                  ['24 in', '24 in'],
-                  ['26 in', '26 in'],
-                  ['28 in', '28 in'],
-                  ['30 in', '30 in'],
-                  ['7 in', '7 in (bracelet)'],
-                  ['7.5 in', '7.5 in (bracelet)'],
-                  ['8 in', '8 in (bracelet)'],
-                  ['4', 'Size 4'],
-                  ['4.5', 'Size 4.5'],
-                  ['5', 'Size 5'],
-                  ['5.5', 'Size 5.5'],
-                  ['6', 'Size 6'],
-                  ['6.5', 'Size 6.5'],
-                  ['7', 'Size 7'],
-                  ['7.5', 'Size 7.5'],
-                  ['8', 'Size 8'],
-                  ['8.5', 'Size 8.5'],
-                  ['9', 'Size 9'],
-                  ['9.5', 'Size 9.5'],
-                  ['10', 'Size 10'],
-                  ['10.5', 'Size 10.5'],
-                  ['11', 'Size 11'],
-                  ['11.5', 'Size 11.5'],
-                  ['12', 'Size 12'],
-                  ['12.5', 'Size 12.5'],
-                  ['13', 'Size 13'],
-                ],
               },
             ].map(({ label, value, set, options }) => (
               <div key={label} className="flex flex-col gap-0.5">
@@ -2325,7 +2432,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             ))}
 
             {/* Clear filters */}
-            {(filterStatus || filterMetal || filterMetalVariant || filterPurity || filterCategory || filterBrand || filterJewelryType || filterChainType || filterLength || filterLocation || filterFeatured) && (
+            {(filterStatus || filterMetal || filterMetalVariant || filterPurity || filterCategory || filterBrand || filterGender || filterJewelryType || filterChainType || filterLength || filterLocation || filterFeatured) && (
               <button
                 type="button"
                 onClick={() => {
@@ -2335,6 +2442,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   setFilterPurity('');
                   setFilterCategory('');
                   setFilterBrand('');
+                  setFilterGender('');
                   setFilterJewelryType('');
                   setFilterChainType('');
                   setFilterLength('');
@@ -2348,11 +2456,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               </button>
             )}
 
-            <span className="text-xs self-end pb-1 ml-auto"
-              style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-              {filtered.length} / {products.length}
-            </span>
           </div>
+          )}
         </div>
 
         {/* Product table */}
@@ -2377,6 +2482,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   setFilterPurity('');
                   setFilterCategory('');
                   setFilterBrand('');
+                  setFilterGender('');
                   setFilterJewelryType('');
                   setFilterChainType('');
                   setFilterLength('');
@@ -3454,9 +3560,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                       <label className="form-label">{lengthSizeLabel}</label>
                       <ComboboxInput
                         value={lengthInput}
-                        onChange={setLengthInput}
+                        onChange={(value) => setLengthInput(normalizeProductLengthSizeValue(value))}
                         options={PREDEFINED_LENGTHS}
-                        placeholder={lengthSizeLabel === 'Size' ? 'e.g. 6.5, 7, 8...' : 'e.g. 22 in, 24 in, 7.5 in...'}
+                        placeholder={lengthSizeLabel === 'Size' ? 'e.g. 6.5, 7, 8...' : 'e.g. 22, 24, 7.5...'}
                       />
                     </div>
                   ) : null;

@@ -98,9 +98,7 @@ export default async function AccountSecurityPage({ params }: Props) {
         .account-page {
           position: relative;
           isolation: isolate;
-          background:
-            radial-gradient(circle at 76% 5%, rgba(220, 188, 96, 0.13), transparent 34rem),
-            linear-gradient(180deg, #fffdf8 0%, #f8f6f0 44%, #f5f2ea 100%);
+          background: #ffffff;
         }
         .account-page::before {
           content: '';
@@ -112,8 +110,8 @@ export default async function AccountSecurityPage({ params }: Props) {
           pointer-events: none;
           z-index: 0;
           background:
-            linear-gradient(180deg, rgba(255, 253, 248, 0) 0%, rgba(255, 253, 248, 0) 64%, rgba(248, 246, 240, 0.86) 91%, #f8f6f0 100%),
-            linear-gradient(90deg, #fffdf8 0%, rgba(255, 253, 248, 0.94) 35%, rgba(255, 253, 248, 0.26) 62%, rgba(255, 253, 248, 0.02) 100%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 64%, rgba(255, 255, 255, 0.86) 91%, #ffffff 100%),
+            linear-gradient(90deg, #ffffff 0%, rgba(255, 255, 255, 0.94) 35%, rgba(255, 255, 255, 0.26) 62%, rgba(255, 255, 255, 0.02) 100%),
             url('/assets/images/pages/account-hero-jewelry.png') top right / cover no-repeat;
         }
         .account-hero {
@@ -141,7 +139,7 @@ export default async function AccountSecurityPage({ params }: Props) {
         .account-card {
           border: 1px solid rgba(115, 92, 0, 0.12) !important;
           border-radius: 8px;
-          background: rgba(255, 255, 255, 0.92) !important;
+          background: #ffffff !important;
           box-shadow: 0 18px 48px rgba(42, 34, 12, 0.09);
         }
         .account-tabs {
@@ -150,7 +148,7 @@ export default async function AccountSecurityPage({ params }: Props) {
           overflow-x: auto;
           border: 1px solid rgba(115, 92, 0, 0.1);
           border-radius: 8px;
-          background: rgba(255, 255, 255, 0.92);
+          background: #ffffff;
           box-shadow: 0 18px 50px rgba(42, 34, 12, 0.08);
         }
         .account-tabs button,
@@ -187,7 +185,7 @@ export default async function AccountSecurityPage({ params }: Props) {
           bottom: 0;
           left: 1rem;
           height: 2px;
-          background: var(--color-primary);
+          background: linear-gradient(135deg, #dcb336, #b5890c);
         }
         .account-tabs .material-symbols-outlined {
           font-size: 1.25rem;
@@ -247,7 +245,7 @@ export default async function AccountSecurityPage({ params }: Props) {
           padding: 1rem;
           border: 1px solid rgba(115, 92, 0, 0.12);
           border-radius: 8px;
-          background: rgba(255, 253, 248, 0.72);
+          background: #ffffff;
         }
         .account-security-card > .material-symbols-outlined,
         .account-card-icon {
@@ -306,13 +304,13 @@ export default async function AccountSecurityPage({ params }: Props) {
           padding: 1rem;
           border: 1px solid rgba(115, 92, 0, 0.12);
           border-radius: 8px;
-          background: rgba(255, 253, 248, 0.72);
+          background: #ffffff;
         }
         .account-password-panel .form-field {
           min-height: 2.7rem;
           border-color: rgba(115, 92, 0, 0.2);
           border-radius: 6px;
-          background: #fffefa;
+          background: #ffffff;
         }
         .account-form-error {
           color: var(--color-error);
@@ -333,7 +331,7 @@ export default async function AccountSecurityPage({ params }: Props) {
           padding: 1.65rem 2rem;
           border: 1px solid rgba(115, 92, 0, 0.12);
           border-radius: 8px;
-          background: rgba(255, 255, 255, 0.92);
+          background: #ffffff;
           box-shadow: 0 18px 48px rgba(42, 34, 12, 0.07);
         }
         .account-support-strip h2 {

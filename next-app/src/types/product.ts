@@ -202,7 +202,7 @@ export const PRODUCT_JEWELRY_TYPES: { value: ProductJewelryType; label: string; 
   { value: 'Bullion', label: 'Bullion', labelEs: 'Lingote' },
   { value: 'Loose Diamond', label: 'Loose Diamond', labelEs: 'Diamante suelto' },
   { value: 'Loose Gemstone', label: 'Loose Gemstone', labelEs: 'Gema suelta' },
-  { value: 'Silverware', label: 'Silverware', labelEs: 'Plateria' },
+  { value: 'Silverware', label: 'Silverware / Sterling', labelEs: 'Plateria / sterling' },
   { value: 'Estate Lot', label: 'Estate Lot', labelEs: 'Lote de sucesion' },
   { value: 'Other', label: 'Other', labelEs: 'Otro' },
 ];
@@ -302,6 +302,15 @@ export function productMetalTypeLabel(value: string | null | undefined, category
 export function productSupportsLinkType(jewelryType: string | null | undefined): boolean {
   const normalized = normalizeProductJewelryType(jewelryType);
   return normalized === 'Necklace' || normalized === 'Bracelet';
+}
+
+export function normalizeProductLengthSizeValue(value: string | null | undefined): string {
+  const raw = String(value ?? '').trim().replace(/\s+/g, ' ');
+  if (!raw) return '';
+  const numericMeasurement = raw.match(/^(\d+(?:\.\d+)?)\s*(?:in(?:ch(?:es?)?)?\.?|")?$/i);
+  if (numericMeasurement) return numericMeasurement[1];
+  const ringSize = raw.match(/^size\s*:?\s*(\d+(?:\.\d+)?)$/i);
+  return ringSize ? ringSize[1] : raw;
 }
 
 export function productLengthSizeDisplay(

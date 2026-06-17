@@ -55,9 +55,9 @@ export default function CartDrawer({ locale }: { locale: string }) {
       )}
 
       <div
-        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-sm flex flex-col shadow-2xl transition-transform duration-300"
+        className="fixed right-0 top-0 bottom-0 z-50 flex w-full max-w-md flex-col shadow-2xl transition-transform duration-300"
         style={{
-          background: 'var(--color-background)',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,253,248,0.98) 100%)',
           borderLeft: `1px solid ${BORDER}`,
           transform: drawerOpen ? 'translateX(0)' : 'translateX(100%)',
         }}
@@ -65,23 +65,43 @@ export default function CartDrawer({ locale }: { locale: string }) {
         aria-label={isEs ? 'Carrito' : 'Cart'}
         aria-hidden={!drawerOpen}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style={{ borderColor: BORDER }}>
-          <h2 className="text-sm font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-            {isEs ? 'Mi Carrito' : 'My Cart'}
-            {items.length > 0 && (
-              <span className="ml-2 font-normal normal-case tracking-normal text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                ({items.length})
-              </span>
-            )}
-          </h2>
+        <div className="flex items-center justify-between border-b px-5 py-5 flex-shrink-0" style={{ borderColor: BORDER }}>
+          <div className="flex items-center gap-3">
+            <span
+              className="material-symbols-outlined"
+              aria-hidden="true"
+              style={{
+                width: '2.35rem',
+                height: '2.35rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '999px',
+                background: 'rgba(212, 175, 55, 0.12)',
+                color: GOLD,
+              }}
+            >
+              shopping_bag
+            </span>
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                {isEs ? 'Mi Carrito' : 'My Cart'}
+              </h2>
+              <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                {items.length > 0
+                  ? `${items.length} ${isEs ? 'articulo(s)' : 'item(s)'}`
+                  : (isEs ? 'Sin articulos' : 'No items yet')}
+              </p>
+            </div>
+          </div>
           <button
             type="button"
             onClick={handleClose}
-            className="p-1 text-sm font-bold transition-colors hover:text-[#735c00]"
+            className="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-[rgba(212,175,55,0.12)] hover:text-[#735c00]"
             style={{ color: 'var(--color-on-surface-variant)' }}
             aria-label="Close"
           >
-            x
+            <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '20px' }}>close</span>
           </button>
         </div>
 
@@ -137,7 +157,7 @@ function CartView({
         ))}
       </div>
 
-      <div className="px-4 pt-3 pb-1 border-t" style={{ borderColor: BORDER }}>
+      <div className="mx-4 border px-4 py-3" style={{ borderColor: BORDER, background: 'rgba(255, 253, 248, 0.82)' }}>
         <div className="flex flex-col gap-1 text-xs" style={{ fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}>
           <div className="flex justify-between">
             <span>Subtotal</span>
@@ -165,9 +185,10 @@ function CartView({
         </div>
       </div>
 
-      <div className="px-4 py-3 flex flex-col gap-2 flex-shrink-0">
+      <div className="px-4 py-4 flex flex-col gap-2 flex-shrink-0">
         <Link href={`${prefix}/checkout`} onClick={onClose} className="gold-button justify-center" style={{ width: '100%' }}>
-          {isEs ? 'Proceder al pago ->' : 'Proceed to Checkout ->'}
+          {isEs ? 'Proceder al pago' : 'Proceed to Checkout'}
+          <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '17px', lineHeight: 1 }}>chevron_right</span>
         </Link>
         <button
           type="button"
@@ -191,29 +212,37 @@ function CartView({
 
 function CartItemRow({ item, isEs, prefix, onRemove }: { item: CartItem; isEs: boolean; prefix: string; onRemove: () => void }) {
   const title = isEs && item.title_es ? item.title_es : item.title;
+  const description = (isEs && item.description_es ? item.description_es : item.description) ?? item.public_notes ?? null;
   return (
-    <div className="flex gap-3 items-start pb-3 border-b" style={{ borderColor: BORDER }}>
-      <Link href={`${prefix}/shop/${item.id}`} className="relative flex-shrink-0 w-14 h-14 overflow-hidden" style={{ background: 'var(--color-surface-container)' }}>
+    <div className="flex gap-3 items-start border p-3" style={{ borderColor: BORDER, background: 'rgba(255, 255, 255, 0.74)' }}>
+      <Link href={`${prefix}/shop/${item.id}`} className="relative flex-shrink-0 w-20 h-20 overflow-hidden" style={{ background: 'var(--color-surface-container)' }}>
         {item.image
-          ? <Image src={item.image} alt={title} fill sizes="56px" className="object-contain" unoptimized={item.image.startsWith('/assets/')} />
+          ? <Image src={item.image} alt={title} fill sizes="80px" className="object-contain" unoptimized={item.image.startsWith('/assets/')} />
           : <div className="w-full h-full flex items-center justify-center text-xl opacity-30">Photo</div>}
       </Link>
       <div className="flex-1 min-w-0 flex flex-col gap-1">
-        <Link href={`${prefix}/shop/${item.id}`} className="text-xs font-bold leading-snug hover:underline line-clamp-2"
+        <Link href={`${prefix}/shop/${item.id}`} className="text-sm font-bold leading-snug hover:underline"
           style={{ color: 'var(--color-on-surface)', fontFamily: 'var(--font-headline)' }}>
           {title}
         </Link>
-        <p className="text-[0.6rem] font-bold uppercase tracking-wide" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+        <p className="text-xs font-bold uppercase tracking-wide" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
           {item.priceLabel}
         </p>
+        {description && (
+          <p className="line-clamp-2 text-xs leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
+            {description}
+          </p>
+        )}
         {!isProductPurchasable(item.status) && (
           <span className="text-[0.55rem] font-bold uppercase tracking-widest" style={{ color: 'var(--color-error)' }}>
             {isEs ? 'No disponible' : productStatusLabel(item.status)}
           </span>
         )}
       </div>
-      <button type="button" onClick={onRemove} className="flex-shrink-0 p-1 text-xs transition-colors hover:text-[color:var(--color-error)]"
-        style={{ color: 'var(--color-on-surface-variant)' }} aria-label={isEs ? 'Eliminar' : 'Remove'}>x</button>
+      <button type="button" onClick={onRemove} className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[rgba(186,26,26,0.08)] hover:text-[color:var(--color-error)]"
+        style={{ color: 'var(--color-on-surface-variant)' }} aria-label={isEs ? 'Eliminar' : 'Remove'}>
+        <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '18px' }}>close</span>
+      </button>
     </div>
   );
 }

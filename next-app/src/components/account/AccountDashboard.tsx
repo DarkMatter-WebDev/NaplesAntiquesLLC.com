@@ -55,6 +55,13 @@ export default function AccountDashboard({
               eyebrow={isEs ? 'Resumen de cuenta' : 'Account Overview'}
               title={isEs ? 'Tu informacion principal' : 'Your main account information'}
               copy={isEs ? 'Una vista rapida de tu perfil, datos de contacto y preferencias.' : 'A quick view of your profile, contact details, and preferences.'}
+              action={
+                <SignOutButton
+                  label={isEs ? 'Cerrar Sesion' : 'Sign Out'}
+                  locale={locale}
+                  className="account-heading-signout"
+                />
+              }
             >
               <AccountProfileForm profile={profile} fallbackEmail={fallbackEmail} locale={locale} />
             </AccountTabShell>
@@ -240,19 +247,24 @@ function AccountTabShell({
   eyebrow,
   title,
   copy,
+  action,
   children,
 }: {
   eyebrow: string;
   title: string;
   copy: string;
+  action?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="account-tab-stack">
       <div className="account-tab-heading">
-        <p>{eyebrow}</p>
-        <h2>{title}</h2>
-        <span>{copy}</span>
+        <div>
+          <p>{eyebrow}</p>
+          <h2>{title}</h2>
+          <span>{copy}</span>
+        </div>
+        {action && <div className="account-tab-heading-action">{action}</div>}
       </div>
       {children}
     </div>

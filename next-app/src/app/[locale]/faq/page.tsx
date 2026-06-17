@@ -151,13 +151,13 @@ export default async function FaqPage({ params }: Props) {
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center flex-wrap">
               <a
                 href="tel:2394048505"
-                className="bg-[#735c00] text-white px-8 py-4 font-bold text-xs uppercase tracking-widest hover:bg-[#5a4700] transition-colors"
+                className="bg-[linear-gradient(135deg,#dcb336,#b5890c)] text-white px-8 py-4 font-bold text-xs uppercase tracking-widest hover:brightness-[1.04] transition"
               >
                 (239) 404-8505
               </a>
               <Link
                 href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
-                className="border border-[#735c00]/60 text-[#735c00] px-8 py-4 font-bold text-xs uppercase tracking-widest hover:bg-[#735c00] hover:text-white transition-colors"
+                className="border border-[#735c00]/60 text-[#735c00] px-8 py-4 font-bold text-xs uppercase tracking-widest hover:bg-[linear-gradient(135deg,#dcb336,#b5890c)] hover:text-white transition"
               >
                 {isEs ? 'Programar una Consulta' : 'Schedule a Consultation'}
               </Link>

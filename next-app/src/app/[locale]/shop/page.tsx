@@ -163,7 +163,7 @@ function compareNullableNumbers(
 }
 
 const PER_PAGE_OPTIONS = [12, 24, 48, 96];
-const DEFAULT_PER_PAGE = 24;
+const DEFAULT_PER_PAGE = 48;
 type ShopFiltersSearchParams = Awaited<Props['searchParams']>;
 
 function buildGenderTabHref(
@@ -508,9 +508,7 @@ export async function renderShopPage({
           </div>
           <style>{`
             .modern-shop-page {
-              background:
-                radial-gradient(circle at 78% 8%, rgba(220, 188, 96, 0.16), transparent 34rem),
-                linear-gradient(180deg, #fffdf8 0%, #f8f6f0 44%, #f5f2ea 100%);
+              background: #ffffff;
             }
             .modern-shop-hero {
               position: relative;
@@ -560,7 +558,7 @@ export async function renderShopPage({
             .modern-shop-page .shop-filter-sidebar {
               border: 1px solid rgba(115, 92, 0, 0.14);
               border-radius: 8px;
-              background: rgba(255, 253, 248, 0.82);
+              background: #ffffff;
               box-shadow: 0 12px 34px rgba(42, 34, 12, 0.08);
               padding: 1rem;
             }

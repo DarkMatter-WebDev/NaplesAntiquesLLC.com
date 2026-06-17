@@ -108,8 +108,9 @@ export default function SignInPage() {
         <style>{`
           .modern-auth-page {
             background:
-              radial-gradient(circle at 78% 8%, rgba(220, 188, 96, 0.16), transparent 34rem),
-              linear-gradient(180deg, #fffdf8 0%, #f8f6f0 44%, #f5f2ea 100%);
+              linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.82) 48%, rgba(255, 255, 255, 0.7) 100%),
+              url('/assets/images/pages/login.png') center bottom / min(1780px, 118vw) auto no-repeat,
+              #ffffff;
           }
           .modern-auth-card {
             position: relative;

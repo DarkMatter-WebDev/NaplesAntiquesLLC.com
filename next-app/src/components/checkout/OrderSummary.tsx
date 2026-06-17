@@ -3,6 +3,12 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { CartItem } from '@/context/CartContext';
+import {
+  inferProductJewelryType,
+  productJewelryTypeLabel,
+  productLengthSizeDisplay,
+  productMetalVariantLabel,
+} from '@/types/product';
 
 const GOLD = '#735c00';
 const BORDER = '#d8d0c2';
@@ -34,6 +40,7 @@ export default function OrderSummary({
   shippingMethod,
   onShippingMethodChange,
   onRemove,
+  variant = 'compact',
 }: {
   items: CartItem[];
   isEs: boolean;
@@ -41,6 +48,7 @@ export default function OrderSummary({
   shippingMethod: string;
   onShippingMethodChange?: (value: string) => void;
   onRemove?: (id: string) => void;
+  variant?: 'compact' | 'expanded';
 }) {
   const prices = items.map((i) => parsePrice(i.priceLabel));
   const knownPrices = prices.filter((p): p is number => p !== null);
@@ -51,12 +59,28 @@ export default function OrderSummary({
   const shipping = selectedShipping.price;
   const total = subtotal + tax + shipping;
 
+  const expanded = variant === 'expanded';
+
   return (
-    <aside className="border p-4 md:p-5 lg:sticky lg:top-24" style={{ borderColor: BORDER, background: 'var(--color-surface-container-lowest)' }}>
-      <h2 className="text-sm font-bold uppercase tracking-widest mb-4" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-        {isEs ? 'Resumen' : 'Order Summary'}
-      </h2>
-      <div className="flex flex-col gap-3 mb-5">
+    <aside
+      className={`border ${expanded ? 'p-5 md:p-7' : 'p-4 md:p-5 lg:sticky lg:top-24'}`}
+      style={{
+        borderColor: BORDER,
+        background: expanded ? 'rgba(255, 255, 255, 0.9)' : 'var(--color-surface-container-lowest)',
+        boxShadow: expanded ? '0 16px 42px rgba(75, 60, 24, 0.08)' : undefined,
+      }}
+    >
+      <div className={expanded ? 'mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between' : ''}>
+        <h2 className={`${expanded ? 'text-base' : 'text-sm'} font-bold uppercase tracking-widest ${expanded ? '' : 'mb-4'}`} style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+          {isEs ? 'Resumen' : 'Order Summary'}
+        </h2>
+        {expanded && (
+          <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+            {items.length} {isEs ? 'articulo(s)' : 'item(s)'}
+          </p>
+        )}
+      </div>
+      <div className={`${expanded ? 'grid gap-4' : 'flex flex-col gap-3'} mb-5`}>
         {items.map((item) => (
           <SummaryRow
             key={item.id}
@@ -64,10 +88,11 @@ export default function OrderSummary({
             isEs={isEs}
             prefix={prefix}
             onRemove={onRemove ? () => onRemove(item.id) : undefined}
+            expanded={expanded}
           />
         ))}
       </div>
-      <div className="flex flex-col gap-1 text-xs border-t pt-4" style={{ borderColor: BORDER, fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}>
+      <div className={`${expanded ? 'ml-auto max-w-md rounded-sm bg-[rgba(255,253,248,0.78)] px-4 py-4' : ''} flex flex-col gap-1 text-xs border-t pt-4`} style={{ borderColor: BORDER, fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}>
         <div className="flex justify-between">
           <span>Subtotal</span>
           <span>{subtotal > 0 ? fmt(subtotal) : '-'}{hasUnknown ? '*' : ''}</span>
@@ -116,27 +141,65 @@ function SummaryRow({
   isEs,
   prefix,
   onRemove,
+  expanded = false,
 }: {
   item: CartItem;
   isEs: boolean;
   prefix: string;
   onRemove?: () => void;
+  expanded?: boolean;
 }) {
   const title = isEs && item.title_es ? item.title_es : item.title;
+  const description = (isEs && item.description_es ? item.description_es : item.description) ?? item.public_notes ?? null;
+  const specs = buildSpecLine(item, isEs);
   return (
-    <div className="flex gap-3 items-start">
-      <Link href={`${prefix}/shop/${item.id}`} className="relative w-14 h-14 flex-shrink-0 overflow-hidden" style={{ background: 'var(--color-surface-container)' }}>
+    <div className={`flex gap-3 items-start ${expanded ? 'border p-2.5 md:gap-3 md:p-3' : ''}`} style={expanded ? { borderColor: BORDER, background: 'rgba(255, 253, 248, 0.76)' } : undefined}>
+      <Link
+        href={`${prefix}/shop/${item.id}`}
+        className={`relative flex-shrink-0 overflow-hidden ${expanded ? 'h-20 w-20 md:h-24 md:w-24' : 'w-14 h-14'}`}
+        style={{ background: 'var(--color-surface-container)' }}
+      >
         {item.image
-          ? <Image src={item.image} alt={title} fill sizes="56px" className="object-contain" unoptimized={item.image.startsWith('/assets/')} />
+          ? <Image src={item.image} alt={title} fill sizes={expanded ? '(max-width: 768px) 80px, 96px' : '56px'} className="object-contain" unoptimized={item.image.startsWith('/assets/')} />
           : <div className="w-full h-full flex items-center justify-center text-xs opacity-40">Photo</div>}
       </Link>
-      <div className="min-w-0 flex-1">
-        <Link href={`${prefix}/shop/${item.id}`} className="text-xs font-bold leading-snug line-clamp-2 hover:underline" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-          {title}
-        </Link>
-        <p className="text-[0.68rem] font-bold mt-1" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-          {item.priceLabel}
-        </p>
+      <div className={`min-w-0 flex-1 ${expanded ? 'grid gap-2 md:grid-cols-[minmax(0,1fr)_7.75rem] md:gap-3' : ''}`}>
+        <div className="min-w-0">
+          <Link
+            href={`${prefix}/shop/${item.id}`}
+            className={`${expanded ? 'text-sm md:text-base line-clamp-2' : 'text-xs line-clamp-2'} font-bold leading-snug hover:underline`}
+            style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
+          >
+            {title}
+          </Link>
+          {!expanded && (
+            <p className="text-[0.68rem] flex-shrink-0 font-bold" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+              {item.priceLabel}
+            </p>
+          )}
+          {expanded && specs && (
+            <p className="mt-1 truncate text-[0.7rem] font-bold uppercase tracking-wide" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+              {specs}
+            </p>
+          )}
+          {expanded && description && (
+            <p className="mt-1 line-clamp-1 text-xs leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
+              {description}
+            </p>
+          )}
+        </div>
+        {expanded && (
+          <div className="flex min-h-full items-center justify-center border-l pl-3" style={{ borderColor: BORDER }}>
+            <div className="w-full rounded-sm border px-2.5 py-2.5 text-center" style={{ borderColor: 'rgba(115, 92, 0, 0.18)', background: 'rgba(255, 255, 255, 0.72)' }}>
+              <span className="block text-[0.62rem] font-bold uppercase tracking-widest" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                {isEs ? 'Precio' : 'Price'}
+              </span>
+              <p className="mt-1 text-base font-bold leading-none md:text-lg" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                {item.priceLabel}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
       {onRemove && (
         <button
@@ -154,4 +217,60 @@ function SummaryRow({
       )}
     </div>
   );
+}
+
+function buildSpecLine(item: CartItem, isEs: boolean): string | null {
+  const category = item.category ?? (item.purity && item.purity > 24 ? 'Silver' : 'Gold');
+  const jewelryType = inferProductJewelryType({
+    title: item.title,
+    title_es: item.title_es,
+    chain_type: item.chain_type ?? null,
+    tags: item.tags ?? [],
+    tags_es: item.tags_es ?? [],
+    jewelry_type: item.jewelry_type ?? null,
+    product_type: item.product_type ?? null,
+  });
+  const purity = formatPurity(item.purity, category, isEs);
+  const metal = item.metal_variant ? productMetalVariantLabel(item.metal_variant, category, isEs ? 'es' : 'en') : null;
+  const length = productLengthSizeDisplay({
+    length: item.length ?? null,
+    tags: item.tags ?? [],
+    jewelry_type: item.jewelry_type ?? null,
+    product_type: item.product_type ?? null,
+    title: item.title,
+    title_es: item.title_es,
+    chain_type: item.chain_type ?? null,
+    tags_es: item.tags_es ?? [],
+  });
+  const weight = formatWeight(item.gram_weight ?? item.weight_grams ?? null);
+  const productType = productJewelryTypeLabel(jewelryType, isEs ? 'es' : 'en');
+  const parts = [
+    purity,
+    metal,
+    productType,
+    item.chain_type,
+    length,
+    weight,
+    item.brand,
+  ]
+    .map((part) => part?.trim())
+    .filter((part): part is string => !!part);
+
+  const uniqueParts = parts.filter((part, index) => parts.findIndex((candidate) => candidate.toLowerCase() === part.toLowerCase()) === index);
+  return uniqueParts.length > 0 ? uniqueParts.join(' · ') : null;
+}
+
+function formatPurity(purity: number | null | undefined, category: CartItem['category'], isEs: boolean): string | null {
+  if (!purity) return null;
+  if (category === 'Silver' && purity >= 100) {
+    return purity === 925 ? `925 ${isEs ? 'esterlina' : 'sterling'}` : `${purity}`;
+  }
+  return `${purity}K`;
+}
+
+function formatWeight(weight: number | null | undefined): string | null {
+  if (!weight) return null;
+  return `${new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: weight % 1 === 0 ? 0 : 2,
+  }).format(weight)}g`;
 }

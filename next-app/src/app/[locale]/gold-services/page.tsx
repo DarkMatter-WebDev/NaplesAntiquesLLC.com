@@ -25,9 +25,9 @@ const KARAT_CARDS = [
 
 const ACQUIRE_ITEMS = [
   { key: 'bullion', titleEn: 'Bullion & Coins', titleEs: 'Lingotes y Monedas', descEn: 'Sovereigns, Eagles, Krugerrands, and bars of any weight or mint.', descEs: 'Soberanos, Eagles, Krugerrands y barras de cualquier peso o casa de moneda.', img: '/assets/images/pages/bullion.webp' },
-  { key: 'jewelry', titleEn: 'Fine Jewelry', titleEs: 'Joyería Fina', descEn: 'Designer pieces, wedding bands, necklaces, and heirloom estates.', descEs: 'Piezas de diseñador, anillos de boda, collares y patrimonios de familia.', img: '/assets/images/pages/gold.webp' },
-  { key: 'scrap', titleEn: 'Scrap & Broken', titleEs: 'Chatarra y Roto', descEn: 'Damaged items, single earrings, and tangled chains are still highly valuable.', descEs: 'Los artículos dañados, aretes sueltos y cadenas enredadas siguen siendo muy valiosos.', img: null },
-  { key: 'dental', titleEn: 'Dental Gold', titleEs: 'Oro Dental', descEn: 'Crowns, bridges, and dental alloys. We provide competitive payouts for all dental gold.', descEs: 'Coronas, puentes y aleaciones dentales. Ofrecemos pagos competitivos para todo el oro dental.', img: null },
+  { key: 'jewelry', titleEn: 'Fine Jewelry', titleEs: 'Joyería Fina', descEn: 'Designer pieces, wedding bands, necklaces, and heirloom estates.', descEs: 'Piezas de diseñador, anillos de boda, collares y patrimonios de familia.', img: '/assets/images/pages/gold.png' },
+  { key: 'scrap', titleEn: 'Scrap & Broken', titleEs: 'Chatarra y Roto', descEn: 'Damaged items, single earrings, and tangled chains are still highly valuable.', descEs: 'Los artículos dañados, aretes sueltos y cadenas enredadas siguen siendo muy valiosos.', img: '/assets/images/pages/scrap.jpg' },
+  { key: 'dental', titleEn: 'Dental Gold', titleEs: 'Oro Dental', descEn: 'Crowns, bridges, and dental alloys. We provide competitive payouts for all dental gold.', descEs: 'Coronas, puentes y aleaciones dentales. Ofrecemos pagos competitivos para todo el oro dental.', img: '/assets/images/pages/dental.webp' },
 ];
 
 export default async function GoldServicesPage({ params }: Props) {
@@ -68,7 +68,7 @@ export default async function GoldServicesPage({ params }: Props) {
               <div className="flex flex-wrap gap-4">
                 <Link
                   href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
-                  className="bg-[#735c00] text-white px-8 py-4 text-xs font-bold tracking-widest uppercase hover:bg-[#5a4700] transition-colors"
+                  className="bg-[linear-gradient(135deg,#dcb336,#b5890c)] text-white px-8 py-4 text-xs font-bold tracking-widest uppercase hover:brightness-[1.04] transition"
                 >
                   {isEs ? 'OBTENER ESTIMADO' : 'GET AN ESTIMATE'}
                 </Link>
@@ -112,6 +112,59 @@ export default async function GoldServicesPage({ params }: Props) {
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Items We Acquire */}
+        <section className="py-20 max-w-[1440px] mx-auto px-4 md:px-8">
+          <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-8">
+            <div className="max-w-xl">
+              <h2 className="font-[family-name:var(--font-headline)] text-3xl md:text-4xl font-bold text-[#1a1c1c] mb-4">
+                {isEs ? 'Artículos que Adquirimos' : 'Items We Acquire'}
+              </h2>
+              <p className="text-[#4d4635] text-sm leading-relaxed">
+                {isEs
+                  ? 'Compramos una amplia variedad de activos de oro, independientemente de su condición. Desde monedas de inversión impecables hasta joyería rota y chatarra industrial.'
+                  : 'We purchase a wide variety of gold assets, regardless of their condition. From pristine investment coins to broken jewelry and industrial scrap.'}
+              </p>
+            </div>
+            <Link
+              href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
+              className="bg-[#2f3131] text-[#e9c349] px-8 py-4 text-xs font-bold tracking-widest inline-flex items-center gap-4 uppercase hover:bg-[#1a1c1c] transition-colors shrink-0"
+            >
+              {isEs ? 'INICIAR EVALUACIÓN' : 'START EVALUATION'}
+              <span className="material-symbols-outlined">trending_flat</span>
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {ACQUIRE_ITEMS.map(({ key, titleEn, titleEs, descEn, descEs, img }) => (
+              <div key={key} className="group cursor-pointer">
+                <div className="overflow-hidden mb-6 aspect-square bg-[#e8e8e8]">
+                  {img ? (
+                    <Image
+                      src={img}
+                      alt={isEs ? titleEs : titleEn}
+                      width={400}
+                      height={400}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span
+                        className="material-symbols-outlined text-[#735c00]"
+                        style={{ fontSize: '3.5rem', fontVariationSettings: "'FILL' 0, 'wght' 200" }}
+                      >
+                        diamond
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <h3 className="font-[family-name:var(--font-headline)] text-lg font-bold mb-2">
+                  {isEs ? titleEs : titleEn}
+                </h3>
+                <p className="text-[#4d4635] text-sm leading-relaxed">{isEs ? descEs : descEn}</p>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -220,59 +273,6 @@ export default async function GoldServicesPage({ params }: Props) {
           </div>
         </section>
 
-        {/* Items We Acquire */}
-        <section className="py-20 max-w-[1440px] mx-auto px-4 md:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-8">
-            <div className="max-w-xl">
-              <h2 className="font-[family-name:var(--font-headline)] text-3xl md:text-4xl font-bold text-[#1a1c1c] mb-4">
-                {isEs ? 'Artículos que Adquirimos' : 'Items We Acquire'}
-              </h2>
-              <p className="text-[#4d4635] text-sm leading-relaxed">
-                {isEs
-                  ? 'Compramos una amplia variedad de activos de oro, independientemente de su condición. Desde monedas de inversión impecables hasta joyería rota y chatarra industrial.'
-                  : 'We purchase a wide variety of gold assets, regardless of their condition. From pristine investment coins to broken jewelry and industrial scrap.'}
-              </p>
-            </div>
-            <Link
-              href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
-              className="bg-[#2f3131] text-[#e9c349] px-8 py-4 text-xs font-bold tracking-widest inline-flex items-center gap-4 uppercase hover:bg-[#1a1c1c] transition-colors shrink-0"
-            >
-              {isEs ? 'INICIAR EVALUACIÓN' : 'START EVALUATION'}
-              <span className="material-symbols-outlined">trending_flat</span>
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {ACQUIRE_ITEMS.map(({ key, titleEn, titleEs, descEn, descEs, img }) => (
-              <div key={key} className="group cursor-pointer">
-                <div className="overflow-hidden mb-6 aspect-square bg-[#e8e8e8]">
-                  {img ? (
-                    <Image
-                      src={img}
-                      alt={isEs ? titleEs : titleEn}
-                      width={400}
-                      height={400}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <span
-                        className="material-symbols-outlined text-[#735c00]"
-                        style={{ fontSize: '3.5rem', fontVariationSettings: "'FILL' 0, 'wght' 200" }}
-                      >
-                        diamond
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <h3 className="font-[family-name:var(--font-headline)] text-lg font-bold mb-2">
-                  {isEs ? titleEs : titleEn}
-                </h3>
-                <p className="text-[#4d4635] text-sm leading-relaxed">{isEs ? descEs : descEn}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
         {/* Trust CTA */}
         <section className="bg-[#2f3131] py-24 text-center">
           <div className="max-w-2xl mx-auto px-4">
@@ -293,7 +293,7 @@ export default async function GoldServicesPage({ params }: Props) {
             <div className="flex flex-col md:flex-row justify-center gap-6">
               <Link
                 href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
-                className="bg-[#735c00] text-white px-12 py-4 text-xs font-bold tracking-widest uppercase hover:bg-[#5a4700] transition-colors"
+                className="bg-[linear-gradient(135deg,#dcb336,#b5890c)] text-white px-12 py-4 text-xs font-bold tracking-widest uppercase hover:brightness-[1.04] transition"
               >
                 {isEs ? 'PROGRAMAR CITA' : 'SCHEDULE APPOINTMENT'}
               </Link>

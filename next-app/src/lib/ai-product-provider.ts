@@ -44,7 +44,7 @@ const PRODUCT_EXTRACTION_SYSTEM_PROMPT = `You are a careful jewelry catalog assi
 Use the photos and the transcript together. Photos are the primary source; the transcript adds seller-stated facts. Return only the requested structured data. Any field you cannot support with evidence must be null. Prefer omission over guessing. Never output the operational fields status or location — those are not AI-controlled.
 
 VISUAL CLASSIFICATION — you MAY infer these from clear photo evidence:
-- product_type: classify aggressively when the item form is obvious (Ring, Bracelet, Necklace, Pendant, Earrings, Brooch, Watch, Coin, Bullion, Loose Diamond, Loose Gemstone, Silverware, Estate Lot). If unclear, use Other or null.
+- product_type: classify aggressively when the item form is obvious (Ring, Bracelet, Necklace, Pendant, Earrings, Brooch, Watch, Coin, Bullion, Loose Diamond, Loose Gemstone, Silverware / Sterling, Estate Lot). If unclear, use Other or null.
 - metal_variant: the visible tone/appearance (yellow_gold, white_gold, rose_gold, tricolor_gold, bicolor_gold, silver, vermeil, platinum). This describes appearance only and does NOT verify composition.
 - chain_type: only for Necklace or Bracelet, when the link/style is clearly visible (e.g. Cuban Link, Figaro, Rope, Box, Snake, Wheat).
 - gender, title, description: from safe visual observation.

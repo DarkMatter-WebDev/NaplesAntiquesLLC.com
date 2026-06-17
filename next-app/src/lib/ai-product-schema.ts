@@ -3,6 +3,7 @@ import {
   PRODUCT_METAL_TYPES,
   PRODUCT_METAL_VARIANTS,
   normalizeProductJewelryType,
+  normalizeProductLengthSizeValue,
   normalizeProductMetalType,
   normalizeProductMetalVariant,
   type Product,
@@ -200,15 +201,14 @@ function cleanMetalVariant(value: unknown, fallbackCategory: Product['category']
   return allValues.includes(normalized) ? normalized : null;
 }
 
-function cleanLength(value: unknown, productType: ProductJewelryType | null): string | null {
+function cleanLength(value: unknown): string | null {
   const raw = cleanString(value, MAX_SHORT_TEXT_LENGTH);
   if (!raw) return null;
   // Accept only a single numeric value (optionally with an inch unit). Reject ranges
   // like "6 to 6.25 inches" and any free text — the field stores one measurement.
   const match = raw.toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(?:in(?:ch(?:es?)?)?|")?$/);
   if (!match) return null;
-  // Rings store a bare size number; chains/bracelets store "N in" (matches quick-fill).
-  return productType === 'Ring' ? match[1] : `${match[1]} in`;
+  return normalizeProductLengthSizeValue(match[0]);
 }
 
 function cleanConfidence(value: unknown): ProductAutofillDraft['confidence'] {
@@ -243,7 +243,7 @@ export function coerceProductAutofill(input: ProductAutofillProviderResult): Pro
     metal_variant: cleanMetalVariant(rawFields.metal_variant, fallbackCategory),
     gender: cleanGender(rawFields.gender),
     chain_type: cleanString(rawFields.chain_type, MAX_SHORT_TEXT_LENGTH),
-    length: cleanLength(rawFields.length, productType),
+    length: cleanLength(rawFields.length),
     price_mode: cleanPriceMode(rawFields.price_mode),
     purity: cleanPurity(rawFields.purity),
     weight_grams: cleanNumber(rawFields.weight_grams, { min: 0.01, max: 100000, decimals: 2 }),

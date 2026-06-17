@@ -293,7 +293,7 @@ export default async function SilverServicesPage({ params }: Props) {
             <div className="flex flex-col md:flex-row gap-4 justify-center">
               <Link
                 href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
-                className="bg-[#735c00] text-white px-10 py-5 text-xs font-bold uppercase tracking-widest hover:bg-[#5a4700] transition-colors"
+                className="bg-[linear-gradient(135deg,#dcb336,#b5890c)] text-white px-10 py-5 text-xs font-bold uppercase tracking-widest hover:brightness-[1.04] transition"
               >
                 {isEs ? 'PROGRAMAR UNA CITA' : 'Schedule a Time'}
               </Link>

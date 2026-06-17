@@ -6,9 +6,10 @@ import { createClient } from '@/lib/supabase/client';
 interface Props {
   label: string;
   locale: string;
+  className?: string;
 }
 
-export default function SignOutButton({ label, locale }: Props) {
+export default function SignOutButton({ label, locale, className }: Props) {
   const router = useRouter();
 
   async function handleSignOut() {
@@ -22,7 +23,7 @@ export default function SignOutButton({ label, locale }: Props) {
     <button
       type="button"
       onClick={handleSignOut}
-      className="outline-button text-sm"
+      className={['outline-button text-sm', className].filter(Boolean).join(' ')}
     >
       {label}
     </button>
