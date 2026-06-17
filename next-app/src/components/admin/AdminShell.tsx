@@ -861,6 +861,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setQuickEntry('');
     setQuickFillNotice(null);
     setShowAdvancedIds(false);
+    // Reset the Smart Listing Assistant so the next item starts completely fresh
+    // (transcript, generated draft, notices, undo snapshot, and any active recording).
+    stopAiRecording();
+    setAiTranscript('');
+    setAiDraft(null);
+    setAiUndoSnapshot(null);
+    setAiNotice(null);
+    setAiGenerating(false);
     const autoOrder = sourceProducts.length > 0
       ? Math.max(...sourceProducts.map(p => p.sort_order ?? 0)) + 1
       : 1;
