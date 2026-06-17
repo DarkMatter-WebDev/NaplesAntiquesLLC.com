@@ -106,6 +106,46 @@ function cleanString(value: unknown, maxLength = MAX_TEXT_LENGTH): string | null
   return cleaned.slice(0, maxLength);
 }
 
+// Measured specs that live in their own fields must never appear in the title. The prompt
+// forbids them, but enforce it here so a model slip (e.g. "13.44 g", "1.6 in", "size 7",
+// "20 mm", "$1,200") can never reach the title. Karat/metal descriptors like "14K" or
+// "18 carat gold" are intentionally preserved — they identify the item, not a spec field.
+const TITLE_SPEC_PATTERNS: RegExp[] = [
+  /\b\d+(?:\.\d+)?\s*(?:grams?|gms?|gr|g|dwt|ozt|oz)\b\.?/gi, // weight: 13.44 g, 2 dwt, 1.2 oz
+  /\b\d+(?:\.\d+)?\s*(?:millimeters?|mm|centimeters?|cm)\b\.?/gi, // dimensions: 20 mm, 4.3 cm
+  /\b\d+(?:\.\d+)?\s*(?:inch(?:es)?|in)\b\.?/gi, // length: 1.6 in, 7 inches
+  /\d+(?:\.\d+)?\s*"/g, // length in inch-mark form: 18"
+  /\b(?:sizes?|sz)\s*\d+(?:\.\d+)?\b/gi, // ring/bracelet size: size 7, sz 6.5
+  /(?<![\dkK])\b(?:800|850|900|925|950|999)\b(?![\dkK])/g, // bare millesimal purity: 925
+  /\$\s*\d[\d,]*(?:\.\d+)?\b/g, // price: $1,200
+];
+
+// Minor hardware and findings clutter the title without identifying the item — clasp type,
+// jump rings, end links, closures. Strip them too. Each descriptor word is only consumed
+// when immediately followed by "clasp"/"closure", so real item nouns (e.g. "Hook Earrings",
+// "Box Link Necklace", "Toggle-Bar Necklace") are preserved.
+const TITLE_TRIVIA_PATTERNS: RegExp[] = [
+  /\s*(?:,\s*|with\s+|featuring\s+|and\s+(?:a\s+)?|w\/\s*)?(?:(?:lobster(?:\s+claw)?|spring[-\s]?ring|toggle|box|fold[-\s]?over|push|barrel|hook|fish[-\s]?hook|s[-\s]?hook|magnetic|screw|snap|bolt[-\s]?ring|bayonet|fishhook)\s+)?(?:clasps?|closures?|fastenings?)\b\.?/gi,
+  /\s*(?:,\s*|with\s+|and\s+(?:a\s+)?)?(?:jump[-\s]?rings?|spring[-\s]?rings?|end[-\s]?links?|findings?)\b\.?/gi,
+];
+
+function cleanTitle(value: unknown): string | null {
+  const raw = cleanString(value, MAX_SHORT_TEXT_LENGTH);
+  if (!raw) return null;
+  let out = raw;
+  for (const pattern of TITLE_SPEC_PATTERNS) out = out.replace(pattern, ' ');
+  for (const pattern of TITLE_TRIVIA_PATTERNS) out = out.replace(pattern, ' ');
+  out = out
+    // Drop connective words left dangling once their spec/finding was removed (e.g. "Ring With" / "weighing").
+    .replace(/\s+(?:with|featuring|and|weigh(?:s|ing)?|measur(?:es|ing)|total(?:ing)?|approx(?:imately)?)\s*(?=$|[,.;:)\]])/gi, ' ')
+    .replace(/\s{2,}/g, ' ') // collapse gaps left by removals
+    .replace(/\s+([,.;:])/g, '$1') // tidy space before punctuation
+    .replace(/[\s,;:.–—-]+$/g, '') // trailing separators/dashes
+    .replace(/^[\s,;:.–—-]+/g, '') // leading separators/dashes
+    .trim();
+  return out || null;
+}
+
 function cleanStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map((item) => cleanString(item, 260)).filter((item): item is string => Boolean(item));
@@ -160,6 +200,17 @@ function cleanMetalVariant(value: unknown, fallbackCategory: Product['category']
   return allValues.includes(normalized) ? normalized : null;
 }
 
+function cleanLength(value: unknown, productType: ProductJewelryType | null): string | null {
+  const raw = cleanString(value, MAX_SHORT_TEXT_LENGTH);
+  if (!raw) return null;
+  // Accept only a single numeric value (optionally with an inch unit). Reject ranges
+  // like "6 to 6.25 inches" and any free text — the field stores one measurement.
+  const match = raw.toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(?:in(?:ch(?:es?)?)?|")?$/);
+  if (!match) return null;
+  // Rings store a bare size number; chains/bracelets store "N in" (matches quick-fill).
+  return productType === 'Ring' ? match[1] : `${match[1]} in`;
+}
+
 function cleanConfidence(value: unknown): ProductAutofillDraft['confidence'] {
   if (!value || typeof value !== 'object') return {};
   const confidence: ProductAutofillDraft['confidence'] = {};
@@ -182,16 +233,17 @@ export function coerceProductAutofill(input: ProductAutofillProviderResult): Pro
   const fallbackMetalType = cleanString(rawFields.metal_type, MAX_SHORT_TEXT_LENGTH);
   const metalType = fallbackMetalType ? normalizeProductMetalType(fallbackMetalType, 'Gold') : null;
   const fallbackCategory: Product['category'] = metalType === 'Silver' || metalType === 'Platinum' || metalType === 'Palladium' ? 'Silver' : 'Gold';
+  const productType = normalizeProductJewelryType(cleanString(rawFields.product_type, MAX_SHORT_TEXT_LENGTH));
 
   const fields: ProductAutofillFields = {
-    title: cleanString(rawFields.title, MAX_SHORT_TEXT_LENGTH),
-    product_type: normalizeProductJewelryType(cleanString(rawFields.product_type, MAX_SHORT_TEXT_LENGTH)),
+    title: cleanTitle(rawFields.title),
+    product_type: productType,
     brand: cleanString(rawFields.brand, MAX_SHORT_TEXT_LENGTH),
     metal_type: metalType,
     metal_variant: cleanMetalVariant(rawFields.metal_variant, fallbackCategory),
     gender: cleanGender(rawFields.gender),
     chain_type: cleanString(rawFields.chain_type, MAX_SHORT_TEXT_LENGTH),
-    length: cleanString(rawFields.length, MAX_SHORT_TEXT_LENGTH),
+    length: cleanLength(rawFields.length, productType),
     price_mode: cleanPriceMode(rawFields.price_mode),
     purity: cleanPurity(rawFields.purity),
     weight_grams: cleanNumber(rawFields.weight_grams, { min: 0.01, max: 100000, decimals: 2 }),

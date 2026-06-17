@@ -21,6 +21,24 @@ export type GenerateProductDraftOutput = {
 const PROMPT_VERSION = 'product-listing-extraction-v4';
 const DEFAULT_TIMEOUT_MS = 30000;
 
+// Anthropic has no `response_format` JSON mode and (for some models) rejects assistant
+// prefill. Forcing a single tool call is the supported way to guarantee structured JSON:
+// the model must return the tool input as an object, never prose like "The transcript...".
+const ANTHROPIC_OUTPUT_TOOL = {
+  name: 'product_listing_draft',
+  description: 'Return the extracted product listing fields as structured data.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      fields: { type: 'object' },
+      warnings: { type: 'array', items: { type: 'string' } },
+      uncertainties: { type: 'array', items: { type: 'string' } },
+      confidence: { type: 'object' },
+    },
+    required: ['fields'],
+  },
+} as const;
+
 const PRODUCT_EXTRACTION_SYSTEM_PROMPT = `You are a careful jewelry catalog assistant for Naples Estate Jewelry. You help an admin populate intake fields from item photos plus an optional spoken or typed description. You are interpretive but not imaginative: organize messy input, classify obvious item forms from photos, and write useful titles and descriptions — but never invent unsupported jewelry facts. Think like a careful catalog assistant, not a salesperson, appraiser, or inventory manager.
 
 Use the photos and the transcript together. Photos are the primary source; the transcript adds seller-stated facts. Return only the requested structured data. Any field you cannot support with evidence must be null. Prefer omission over guessing. Never output the operational fields status or location — those are not AI-controlled.
@@ -36,7 +54,7 @@ EXPLICIT-ONLY hard facts — set ONLY when stated in the transcript or clearly v
 - metal_type: a factual composition claim. Only when marked, tested, or stated (e.g. 14K, 18K, 925, sterling silver, platinum). A yellow tone is NOT "Gold"; a white tone is NOT "Platinum". Do not convert appearance into metal_type.
 - purity: only from a stated mark or test (e.g. "marked 14K", "tested 18K", "925"). Never from color alone.
 - weight_grams: only when explicitly stated. Never estimate from photos or dimensions.
-- length: only when explicitly stated or shown with reliable measurement evidence. Never guess ring size, bracelet length, or necklace length from appearance.
+- length: only when explicitly stated or shown with reliable measurement evidence. Never guess ring size, bracelet length, or necklace length from appearance. Provide a SINGLE numeric value only (e.g. "7" or "18") — no ranges, no approximations, no unit words or extra text. If only a range or approximate span is known (e.g. "6 to 6.25 inches"), omit it (null).
 - asking_price: only when clearly stated (e.g. "asking 1200", "put it at 875").
 - manual_price_label: may be formatted from a stated asking_price (e.g. 1200 -> "$1,200").
 - price_mode and pricing_multiplier: only when explicitly stated (e.g. "manual pricing", "1.7 times spot"). Never infer.
@@ -48,7 +66,7 @@ TAXONOMY:
 WRITING (English only — Spanish translations are generated separately, never produce Spanish here):
 - VOICE: write everything in the first-person voice of the seller's own listing. State marked or known facts directly, as the seller (e.g. "Marked 14K on the end link and lobster clasp."). NEVER use third-person attributions such as "seller states", "per the seller", "seller-stated", or "according to the seller", and never write "visible in the image" or "in the photo".
 - NO COMMENTARY: write only listing copy that describes the item. Never add advice, recommendations, workflow or process notes, or QC reminders (e.g. "measure before listing", "verify before publishing", "confirm exact text", "consistent with seller statement").
-- Titles: specific and useful, not generic. Prefer "Yellow-Tone Ring With Clear Stone Accents" over "Ring"; use stronger claims like "14K Yellow Gold Diamond Ring" only when the transcript or visible markings support them. NEVER include gram weight in the title.
+- Titles: specific and useful, not generic. Prefer "Yellow-Tone Ring With Clear Stone Accents" over "Ring"; use stronger claims like "14K Yellow Gold Diamond Ring" only when the transcript or visible markings support them. NEVER put measured specs that already have their own field into the title — no gram weight, no length or ring/bracelet/necklace size, no width or dimensions, no purity figure beyond the karat/metal descriptor (e.g. "14K" as a quality descriptor is fine; "13.44 g", "1.6 in", "size 7", "20 mm" are not), and no price. The title names the item; the spec fields carry the numbers. Also leave out minor hardware and findings — clasp type (lobster, spring-ring, toggle, etc.), jump rings, end links, closures, fittings, and similar low-importance parts. The title should capture the item's essential identity (metal/quality, item type, notable style, stone, or maker), not catalog every small component; mention the clasp in the description if it matters.
 - Descriptions: state known facts plus safe visual observations (yellow-tone, white-tone, clear stone accents, engraved marking, textured/polished finish, visible wear). Do not assert diamond, a specific karat gold, platinum, a natural gemstone species, named-brand authenticity, or an era (Victorian/antique) unless the transcript or visible markings support it.
 - public_notes: optional, short, buyer-facing caveats in the same direct voice (e.g. "Marked 14K on the end link and clasp."). Omit when there is nothing useful to add.
 - warnings and uncertainties: optional; at most ONE brief line each, and only when genuinely important. Prefer omitting them — do not be verbose.
@@ -138,13 +156,33 @@ function withTimeout(ms = DEFAULT_TIMEOUT_MS) {
   return { signal: controller.signal, clear: () => clearTimeout(timeout) };
 }
 
+function asJsonObject(text: string): ProductAutofillProviderResult | null {
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as ProductAutofillProviderResult;
+    }
+  } catch {
+    // Not parseable as-is; caller may retry with an extracted span.
+  }
+  return null;
+}
+
 function parseJsonObject(value: unknown): ProductAutofillProviderResult {
   if (value && typeof value === 'object' && !Array.isArray(value)) return value as ProductAutofillProviderResult;
   if (typeof value !== 'string') throw new Error('AI response did not contain structured output.');
   const trimmed = value.trim().replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
-  const parsed = JSON.parse(trimmed);
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('AI response JSON was not an object.');
-  return parsed as ProductAutofillProviderResult;
+  // Try a direct parse first, then fall back to extracting the outermost { ... } span
+  // in case the model wrapped the JSON in surrounding prose.
+  const direct = asJsonObject(trimmed);
+  if (direct) return direct;
+  const start = trimmed.indexOf('{');
+  const end = trimmed.lastIndexOf('}');
+  if (start !== -1 && end > start) {
+    const sliced = asJsonObject(trimmed.slice(start, end + 1));
+    if (sliced) return sliced;
+  }
+  throw new Error('AI response was not valid JSON.');
 }
 
 async function postJson(url: string, headers: Record<string, string>, body: unknown) {
@@ -211,23 +249,32 @@ async function callAnthropic(input: GenerateProductDraftInput, model: string): P
       max_tokens: Number(process.env.AI_MAX_OUTPUT_TOKENS ?? 1800),
       temperature: 0.1,
       system: [{ type: 'text', text: PRODUCT_EXTRACTION_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: buildUserPrompt(input) },
-          ...images.map((image) => ({
-            type: 'image',
-            source: { type: 'base64', media_type: image.mimeType, data: image.base64 },
-          })),
-        ],
-      }],
+      tools: [ANTHROPIC_OUTPUT_TOOL],
+      tool_choice: { type: 'tool', name: ANTHROPIC_OUTPUT_TOOL.name },
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: buildUserPrompt(input) },
+            ...images.map((image) => ({
+              type: 'image',
+              source: { type: 'base64', media_type: image.mimeType, data: image.base64 },
+            })),
+          ],
+        },
+      ],
     },
   );
+  // Forced tool use returns the structured object directly in a tool_use block. Fall back
+  // to any text content only if the tool block is somehow absent.
+  const toolBlock = Array.isArray(data?.content)
+    ? data.content.find((part: { type?: string }) => part?.type === 'tool_use') as { input?: unknown } | undefined
+    : undefined;
   const text = Array.isArray(data?.content)
     ? data.content.map((part: { text?: string }) => part.text ?? '').join('\n')
     : null;
   return {
-    draft: parseJsonObject(text),
+    draft: parseJsonObject(toolBlock?.input ?? text),
     meta: { provider: 'anthropic', model, promptVersion: PROMPT_VERSION, usage: data?.usage },
   };
 }
