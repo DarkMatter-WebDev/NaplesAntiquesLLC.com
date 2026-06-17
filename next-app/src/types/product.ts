@@ -51,6 +51,7 @@ export type ProductJewelryType =
   | 'Other';
 
 export type ProductImagePadding = 'none' | 'white' | 'black';
+export type ProductImagePaddingMap = Record<string, ProductImagePadding | string | null | undefined>;
 const PRODUCT_IMAGE_PADDING_HEX_PATTERN = /^#[0-9a-f]{6}$/i;
 
 export interface Product {
@@ -82,6 +83,7 @@ export interface Product {
   images: string[];
   image_urls: string[];
   image_padding: ProductImagePadding | string | null;
+  image_padding_by_image: ProductImagePaddingMap | null;
   description: string | null;
   description_es: string | null;
   details: string[];
@@ -132,6 +134,44 @@ export function productImagePaddingBackground(value: string | null | undefined):
   if (normalized === 'white') return '#ffffff';
   if (normalized === 'black') return '#000000';
   return 'var(--color-surface-container)';
+}
+
+export function normalizeProductImagePaddingMap(value: unknown): ProductImagePaddingMap {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .map(([key, padding]) => [key, normalizeProductImagePaddingValue(String(padding ?? 'none'))])
+      .filter(([key]) => key.trim().length > 0),
+  );
+}
+
+export function productImagePaddingMapKey(image: string | null | undefined, index: number): string {
+  return image?.trim() || String(index);
+}
+
+export function productImagePaddingForImage(
+  fallback: string | null | undefined,
+  map: ProductImagePaddingMap | null | undefined,
+  image: string | null | undefined,
+  index: number,
+): ProductImagePadding | string {
+  const normalizedMap = normalizeProductImagePaddingMap(map);
+  const key = productImagePaddingMapKey(image, index);
+  if (Object.prototype.hasOwnProperty.call(normalizedMap, key)) {
+    return normalizeProductImagePaddingValue(normalizedMap[key]);
+  }
+  if (Object.prototype.hasOwnProperty.call(normalizedMap, String(index))) {
+    return normalizeProductImagePaddingValue(normalizedMap[String(index)]);
+  }
+  return normalizeProductImagePaddingValue(fallback);
+}
+
+export function hasAnyProductImagePadding(
+  fallback: string | null | undefined,
+  map: ProductImagePaddingMap | null | undefined,
+): boolean {
+  return hasProductImagePadding(fallback)
+    || Object.values(normalizeProductImagePaddingMap(map)).some((value) => hasProductImagePadding(value));
 }
 
 export interface SpotData {

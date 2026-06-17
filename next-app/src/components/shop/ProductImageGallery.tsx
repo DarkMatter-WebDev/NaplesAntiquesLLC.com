@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import Image from 'next/image';
-import { productImagePaddingBackground } from '@/types/product';
+import { productImagePaddingBackground, productImagePaddingForImage, type ProductImagePaddingMap } from '@/types/product';
 
 const LENS = 100;  // lens square side px
 const ZOOM = 3;    // magnification
@@ -13,6 +13,7 @@ interface Props {
   images: string[];
   title: string;
   imagePadding?: string | null;
+  imagePaddingByImage?: ProductImagePaddingMap | null;
 }
 
 interface ZoomState {
@@ -27,12 +28,34 @@ interface ZoomState {
   bh: number;
 }
 
-export default function ProductImageGallery({ images, title, imagePadding = null }: Props) {
+export default function ProductImageGallery({ images, title, imagePadding = null, imagePaddingByImage = null }: Props) {
   const [active, setActive] = useState(0);
   const [zoom, setZoom] = useState<ZoomState | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const touchZoomingRef = useRef(false);
+
+  const hasMultipleImages = images.length > 1;
+
+  const closeZoom = useCallback(() => {
+    touchZoomingRef.current = false;
+    setZoom(null);
+  }, []);
+
+  const moveToImage = useCallback((index: number) => {
+    closeZoom();
+    setActive(index);
+  }, [closeZoom]);
+
+  const showPreviousImage = useCallback(() => {
+    closeZoom();
+    setActive((currentIndex) => (currentIndex - 1 + images.length) % images.length);
+  }, [closeZoom, images.length]);
+
+  const showNextImage = useCallback(() => {
+    closeZoom();
+    setActive((currentIndex) => (currentIndex + 1) % images.length);
+  }, [closeZoom, images.length]);
 
   const updateZoom = useCallback((clientX: number, clientY: number, mode: 'mouse' | 'touch') => {
     const el = containerRef.current;
@@ -87,6 +110,11 @@ export default function ProductImageGallery({ images, title, imagePadding = null
   }, []);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.target instanceof HTMLElement && e.target.closest('.product-gallery-edge-button')) {
+      closeZoom();
+      return;
+    }
+
     if (e.pointerType === 'mouse') {
       updateZoom(e.clientX, e.clientY, 'mouse');
       return;
@@ -96,7 +124,12 @@ export default function ProductImageGallery({ images, title, imagePadding = null
       e.preventDefault();
       updateZoom(e.clientX, e.clientY, 'touch');
     }
-  }, [updateZoom]);
+  }, [closeZoom, updateZoom]);
+
+  const handleNavigationPointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    closeZoom();
+  }, [closeZoom]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse') return;
@@ -105,11 +138,6 @@ export default function ProductImageGallery({ images, title, imagePadding = null
     e.currentTarget.setPointerCapture(e.pointerId);
     updateZoom(e.clientX, e.clientY, 'touch');
   }, [updateZoom]);
-
-  const closeZoom = useCallback(() => {
-    touchZoomingRef.current = false;
-    setZoom(null);
-  }, []);
 
   const handlePointerLeave = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse') closeZoom();
@@ -127,7 +155,12 @@ export default function ProductImageGallery({ images, title, imagePadding = null
   }
 
   const current = images[active];
-  const imageFrameBackground = productImagePaddingBackground(imagePadding);
+  const imageFrameBackground = productImagePaddingBackground(productImagePaddingForImage(imagePadding, imagePaddingByImage, current, active));
+  const visibleThumbnailIndexes = hasMultipleImages
+    ? images.length === 2
+      ? [active, (active + 1) % images.length]
+      : [-1, 0, 1].map((offset) => (active + offset + images.length) % images.length)
+    : [active];
 
   return (
     <div className="flex flex-col gap-3">
@@ -153,6 +186,49 @@ export default function ProductImageGallery({ images, title, imagePadding = null
           unoptimized={current.startsWith('/assets/')}
         />
 
+        {hasMultipleImages && (
+          <>
+            <button
+              type="button"
+              className="product-gallery-edge-button product-gallery-edge-prev absolute left-0 top-0 z-10 flex h-full w-[28%] items-center justify-start px-3 text-[var(--color-primary)] opacity-0 transition-opacity hover:opacity-100 focus:opacity-100"
+              onPointerEnter={closeZoom}
+              onPointerMove={closeZoom}
+              onPointerDown={handleNavigationPointerDown}
+              onClick={showPreviousImage}
+              aria-label="Previous image"
+              title="Previous image"
+            >
+              <span
+                className="flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(115,92,0,0.28)] bg-white/85 shadow-sm backdrop-blur"
+                aria-hidden="true"
+              >
+                <span className="material-symbols-outlined text-[30px] leading-none">
+                  chevron_left
+                </span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="product-gallery-edge-button product-gallery-edge-next absolute right-0 top-0 z-10 flex h-full w-[28%] items-center justify-end px-3 text-[var(--color-primary)] opacity-0 transition-opacity hover:opacity-100 focus:opacity-100"
+              onPointerEnter={closeZoom}
+              onPointerMove={closeZoom}
+              onPointerDown={handleNavigationPointerDown}
+              onClick={showNextImage}
+              aria-label="Next image"
+              title="Next image"
+            >
+              <span
+                className="flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(115,92,0,0.28)] bg-white/85 shadow-sm backdrop-blur"
+                aria-hidden="true"
+              >
+                <span className="material-symbols-outlined text-[30px] leading-none">
+                  chevron_right
+                </span>
+              </span>
+            </button>
+          </>
+        )}
+
         {/* Lens square */}
         {zoom && (
           <div
@@ -173,29 +249,61 @@ export default function ProductImageGallery({ images, title, imagePadding = null
 
       {/* Thumbnails */}
       {images.length > 1 && (
-        <div className="flex gap-2 flex-wrap">
-          {images.map((img, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setActive(i)}
-              className="relative w-16 h-16 overflow-hidden flex-shrink-0 border-2 transition-all"
-              style={{
-                borderColor: i === active ? 'var(--color-primary)' : 'var(--color-outline-variant)',
-                background: imageFrameBackground,
-              }}
-              aria-label={`View image ${i + 1}`}
-            >
-              <Image
-                src={img}
-                alt={`${title} ${i + 1}`}
-                fill
-                sizes="64px"
-                className="object-contain object-center"
-                unoptimized={img.startsWith('/assets/')}
-              />
-            </button>
-          ))}
+        <div className="flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={showPreviousImage}
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center border border-[var(--color-outline-variant)] bg-white text-[var(--color-primary)] transition-colors hover:border-[var(--color-primary)] hover:bg-[rgba(212,160,23,0.08)]"
+            aria-label="Previous thumbnail"
+            title="Previous image"
+          >
+            <span className="material-symbols-outlined text-2xl" aria-hidden="true">
+              chevron_left
+            </span>
+          </button>
+
+          <div className="product-gallery-thumbnails flex items-center justify-center gap-2">
+            {visibleThumbnailIndexes.map((i, slotIndex) => {
+              const img = images[i] ?? current;
+              const thumbnailFrameBackground = productImagePaddingBackground(productImagePaddingForImage(imagePadding, imagePaddingByImage, img, i));
+
+              return (
+                <button
+                  key={`${i}-${slotIndex}`}
+                  type="button"
+                  onClick={() => moveToImage(i)}
+                  className="product-gallery-thumbnail relative h-16 w-16 flex-shrink-0 overflow-hidden border-2 transition-all"
+                  data-active={i === active ? 'true' : 'false'}
+                  style={{
+                    borderColor: i === active ? 'var(--color-primary)' : 'var(--color-outline-variant)',
+                    background: thumbnailFrameBackground,
+                  }}
+                  aria-label={`View image ${i + 1}`}
+                >
+                  <Image
+                    src={img}
+                    alt={`${title} ${i + 1}`}
+                    fill
+                    sizes="64px"
+                    className="object-contain object-center"
+                    unoptimized={img.startsWith('/assets/')}
+                  />
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={showNextImage}
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center border border-[var(--color-outline-variant)] bg-white text-[var(--color-primary)] transition-colors hover:border-[var(--color-primary)] hover:bg-[rgba(212,160,23,0.08)]"
+            aria-label="Next thumbnail"
+            title="Next image"
+          >
+            <span className="material-symbols-outlined text-2xl" aria-hidden="true">
+              chevron_right
+            </span>
+          </button>
         </div>
       )}
 

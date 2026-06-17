@@ -7,6 +7,7 @@ import {
   inferProductJewelryType,
   productJewelryTypeLabel,
   productLengthSizeDisplay,
+  productImagePaddingBackground,
   productMetalVariantLabel,
 } from '@/types/product';
 
@@ -152,12 +153,13 @@ function SummaryRow({
   const title = isEs && item.title_es ? item.title_es : item.title;
   const description = (isEs && item.description_es ? item.description_es : item.description) ?? item.public_notes ?? null;
   const specs = buildSpecLine(item, isEs);
+  const imageFrameBackground = productImagePaddingBackground(item.image_padding);
   return (
     <div className={`flex gap-3 items-start ${expanded ? 'border p-2.5 md:gap-3 md:p-3' : ''}`} style={expanded ? { borderColor: BORDER, background: 'rgba(255, 253, 248, 0.76)' } : undefined}>
       <Link
         href={`${prefix}/shop/${item.id}`}
         className={`relative flex-shrink-0 overflow-hidden ${expanded ? 'h-20 w-20 md:h-24 md:w-24' : 'w-14 h-14'}`}
-        style={{ background: 'var(--color-surface-container)' }}
+        style={{ background: imageFrameBackground }}
       >
         {item.image
           ? <Image src={item.image} alt={title} fill sizes={expanded ? '(max-width: 768px) 80px, 96px' : '56px'} className="object-contain" unoptimized={item.image.startsWith('/assets/')} />

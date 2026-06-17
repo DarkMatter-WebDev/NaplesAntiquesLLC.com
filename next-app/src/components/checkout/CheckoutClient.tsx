@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useCart, type CartItem } from '@/context/CartContext';
 import OrderSummary, { SHIPPING_OPTIONS } from '@/components/checkout/OrderSummary';
 import { createClient } from '@/lib/supabase/client';
+import { productImagePaddingForImage } from '@/types/product';
 
 const GOLD = '#735c00';
 type CartProductInfo = Pick<
@@ -12,6 +13,7 @@ type CartProductInfo = Pick<
   | 'description'
   | 'description_es'
   | 'public_notes'
+  | 'image_padding'
   | 'category'
   | 'metal_type'
   | 'metal_variant'
@@ -90,6 +92,8 @@ export default function CheckoutClient({ locale }: { locale: string }) {
         !item.description_es &&
         !item.public_notes
       ) || (
+        item.image_padding === undefined
+      ) || (
         !item.category &&
         !item.metal_variant &&
         !item.purity &&
@@ -106,18 +110,21 @@ export default function CheckoutClient({ locale }: { locale: string }) {
       const supabase = createClient();
       const { data } = await supabase
         .from('products')
-        .select('id, description, description_es, public_notes, category, metal_type, metal_variant, purity, weight_grams, gram_weight, product_type, jewelry_type, chain_type, length, brand, tags, tags_es, gender')
+        .select('id, description, description_es, public_notes, image_padding, image_padding_by_image, category, metal_type, metal_variant, purity, weight_grams, gram_weight, product_type, jewelry_type, chain_type, length, brand, tags, tags_es, gender')
         .in('id', missingProductInfoIds);
 
       if (cancelled || !data) return;
       setProductInfoById((current) => ({
         ...current,
-        ...Object.fromEntries(data.map((product) => [
-          product.id,
-          {
+        ...Object.fromEntries(data.map((product) => {
+          const cartItem = items.find((item) => item.id === product.id);
+          return [
+            product.id,
+            {
             description: product.description,
             description_es: product.description_es,
             public_notes: product.public_notes,
+            image_padding: productImagePaddingForImage(product.image_padding, product.image_padding_by_image, cartItem?.image, 0),
             category: product.category,
             metal_type: product.metal_type,
             metal_variant: product.metal_variant,
@@ -133,7 +140,8 @@ export default function CheckoutClient({ locale }: { locale: string }) {
             tags_es: product.tags_es,
             gender: product.gender,
           },
-        ])),
+          ];
+        })),
       }));
     }
 

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { isProductPurchasable, isProductSold, productImagePaddingBackground, productLengthSizeDisplay, productMetalVariantLabel, productStatusLabel, type Product, type SpotData } from '@/types/product';
+import { isProductPurchasable, isProductSold, productImagePaddingBackground, productImagePaddingForImage, productLengthSizeDisplay, productMetalVariantLabel, productStatusLabel, type Product, type SpotData } from '@/types/product';
 import { getDisplayPrice } from '@/lib/pricing';
 import WishlistButton from '@/components/shop/WishlistButton';
 import type { WishlistItem } from '@/context/WishlistContext';
@@ -38,7 +38,8 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
   const hasMultipleImages = images.length > 1;
   const canShowPreviousImage = hasMultipleImages && safeActiveImageIndex > 0;
   const canShowNextImage = hasMultipleImages && safeActiveImageIndex < images.length - 1;
-  const imageFrameBackground = productImagePaddingBackground(product.image_padding);
+  const imageFrameBackground = productImagePaddingBackground(productImagePaddingForImage(product.image_padding, product.image_padding_by_image, activeImage, safeActiveImageIndex));
+  const thumbPadding = productImagePaddingForImage(product.image_padding, product.image_padding_by_image, thumb, 0);
   const href = locale === 'es' ? `/es/shop/${product.id}` : `/shop/${product.id}`;
   const isSold = isProductSold(product.status);
   const isPurchasable = isProductPurchasable(product.status);
@@ -52,6 +53,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
     description_es: product.description_es,
     public_notes: product.public_notes,
     image: thumb ?? null,
+    image_padding: thumbPadding,
     status: product.status,
     priceLabel: price,
     category: product.category,
@@ -75,6 +77,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
     title: product.title,
     title_es: product.title_es,
     image: thumb ?? null,
+    image_padding: thumbPadding,
     status: product.status,
     price_mode: product.price_mode,
     purity: product.purity,

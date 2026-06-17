@@ -9,6 +9,7 @@ import SignOutButton from '@/components/account/SignOutButton';
 import { createClient } from '@/lib/supabase/client';
 import { useWishlist } from '@/context/WishlistContext';
 import { formatCurrency, formatOrderDate, orderStatusLabel, type Order } from '@/types/sales';
+import { productImagePaddingBackground } from '@/types/product';
 
 type AccountTab = 'overview' | 'orders' | 'wishlist';
 type AccountSection = AccountTab | 'security';
@@ -473,9 +474,10 @@ function WishlistTab({ locale }: { locale: string }) {
         <div className="account-wishlist-grid">
           {items.map((item) => {
             const title = isEs && item.title_es ? item.title_es : item.title;
+            const imageFrameBackground = productImagePaddingBackground(item.image_padding);
             return (
               <article key={item.id} className="account-wishlist-card">
-                <Link href={`${prefix}/shop/${item.id}`} className="account-wishlist-image">
+                <Link href={`${prefix}/shop/${item.id}`} className="account-wishlist-image" style={{ background: imageFrameBackground }}>
                   {item.image ? (
                     <Image src={item.image} alt={title} fill sizes="180px" className="object-contain" unoptimized={item.image.startsWith('/assets/')} />
                   ) : (

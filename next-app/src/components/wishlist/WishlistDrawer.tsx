@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useWishlist, type WishlistItem } from '@/context/WishlistContext';
-import { isProductSold } from '@/types/product';
+import { isProductSold, productImagePaddingBackground } from '@/types/product';
 
 const GOLD = '#735c00';
 const BORDER = '#d8d0c2';
@@ -130,6 +130,7 @@ function DrawerItem({
   const { remove } = useWishlist();
   const title = isEs && item.title_es ? item.title_es : item.title;
   const isSold = isProductSold(item.status);
+  const imageFrameBackground = productImagePaddingBackground(item.image_padding);
 
   const priceLabel =
     item.price_mode === 'manual'
@@ -144,7 +145,7 @@ function DrawerItem({
       <Link
         href={`${prefix}/shop/${item.id}`}
         className="relative flex-shrink-0 w-14 h-14 overflow-hidden"
-        style={{ background: 'var(--color-surface-container)' }}
+        style={{ background: imageFrameBackground }}
       >
         {item.image ? (
           <Image

@@ -7,6 +7,7 @@ import {
   isProductPurchasable,
   isProductSold,
   productJewelryTypeLabel,
+  productImagePaddingForImage,
   productLengthSizeDisplay,
   productMetalVariantLabel,
   productStatusLabel,
@@ -101,6 +102,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   const isSold = isProductSold(p.status);
   const isPurchasable = isProductPurchasable(p.status);
   const productImages = p.image_urls?.length ? p.image_urls : p.images ?? [];
+  const firstImagePadding = productImagePaddingForImage(p.image_padding, p.image_padding_by_image, productImages[0], 0);
   const productWeight = p.gram_weight ?? p.weight_grams;
   const inventoryReference = formatInventoryReference(p.inventory_number);
 
@@ -175,6 +177,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
     description_es: p.description_es,
     public_notes: p.public_notes,
     image: productImages[0] ?? null,
+    image_padding: firstImagePadding,
     status: p.status,
     priceLabel: price,
     category: p.category,
@@ -198,6 +201,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
     title: p.title,
     title_es: p.title_es,
     image: productImages[0] ?? null,
+    image_padding: firstImagePadding,
     status: p.status,
     price_mode: p.price_mode,
     purity: p.purity,
@@ -247,7 +251,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
           <div className="grid md:grid-cols-2 gap-10 lg:gap-16">
 
             {/* Gallery */}
-            <ProductImageGallery images={productImages} title={title} imagePadding={p.image_padding} />
+            <ProductImageGallery images={productImages} title={title} imagePadding={p.image_padding} imagePaddingByImage={p.image_padding_by_image} />
 
             {/* Info */}
             <div className="flex flex-col gap-5">

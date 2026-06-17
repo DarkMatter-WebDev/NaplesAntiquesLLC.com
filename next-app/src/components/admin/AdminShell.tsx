@@ -19,11 +19,14 @@ import {
   normalizeProductLinkType,
   normalizeProductMetalVariant,
   productJewelryTypeLabel,
-  hasProductImagePadding,
+  hasAnyProductImagePadding,
   isProductImagePaddingCustomColor,
   normalizeProductImagePadding,
+  normalizeProductImagePaddingMap,
   normalizeProductImagePaddingValue,
   productImagePaddingBackground,
+  productImagePaddingForImage,
+  productImagePaddingMapKey,
   productMetalTypeLabel,
   productSupportsLinkType,
   productMetalVariantLabel,
@@ -528,6 +531,7 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
     images: [],
     image_urls: [],
     image_padding: 'none',
+    image_padding_by_image: {},
     description: '',
     description_es: '',
     details: [],
@@ -732,6 +736,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [imagePaddingTarget, setImagePaddingTarget] = useState<Product | null>(null);
+  const [imagePaddingTargetIndex, setImagePaddingTargetIndex] = useState(0);
+  const imagePaddingTargetIndexRef = useRef(0);
   const [imagePaddingCustomColor, setImagePaddingCustomColor] = useState('#ffffff');
   const [imagePaddingNotice, setImagePaddingNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const [filterStatus, setFilterStatus] = useState('');
@@ -799,10 +805,13 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   };
 
   function openImagePaddingChooser(product: Product) {
-    const paddingValue = normalizeProductImagePaddingValue(product.image_padding);
+    const firstImage = getProductImages(product)[0] ?? null;
+    const paddingValue = productImagePaddingForImage(product.image_padding, product.image_padding_by_image, firstImage, 0);
     const fallbackColor = productImagePaddingBackground(paddingValue) === '#000000' ? '#000000' : '#ffffff';
     setImagePaddingCustomColor(isProductImagePaddingCustomColor(paddingValue) ? paddingValue : fallbackColor);
     setImagePaddingNotice(null);
+    imagePaddingTargetIndexRef.current = 0;
+    setImagePaddingTargetIndex(0);
     setImagePaddingTarget(product);
   }
 
@@ -1769,30 +1778,43 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     flash(error.message, false);
   }
 
-  async function updateProductImagePadding(product: Product, imagePadding: ProductImagePadding | string) {
+  async function updateProductImagePadding(product: Product, imagePadding: ProductImagePadding | string, imageIndex = imagePaddingTargetIndex) {
     const paddingValue = normalizeProductImagePaddingValue(imagePadding);
+    const images = getProductImages(product);
+    const image = images[imageIndex] ?? null;
+    const key = productImagePaddingMapKey(image, imageIndex);
+    const nextMap = {
+      ...normalizeProductImagePaddingMap(product.image_padding_by_image),
+      [key]: paddingValue,
+    };
     const { error } = await supabase
       .from('products')
-      .update({ image_padding: paddingValue })
+      .update({ image_padding_by_image: nextMap })
       .eq('id', product.id);
 
     if (!error) {
-      setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, image_padding: paddingValue } : p));
-      setImagePaddingTarget(null);
+      const nextProduct = { ...product, image_padding_by_image: nextMap };
+      setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, image_padding_by_image: nextMap } : p));
+      setImagePaddingTarget(nextProduct);
       const builtInLabel = IMAGE_PADDING_OPTIONS.find((option) => option.value === paddingValue)?.label;
-      flash(`Image padding set to ${builtInLabel ?? paddingValue}`);
-      return;
+      flash(`Photo ${imageIndex + 1} padding set to ${builtInLabel ?? paddingValue}`);
+      return true;
     }
 
-    const message = error.message.includes('products_image_padding_check')
+    const message = error.message.includes('image_padding_by_image')
+      ? 'Per-photo padding needs the updated Supabase image-padding SQL. Run supabase/product-image-padding.sql, then try again.'
+      : error.message.includes('products_image_padding_check')
       ? 'Custom padding colors need the updated Supabase image-padding SQL. Run supabase/product-image-padding.sql, then try again.'
       : error.message;
     setImagePaddingNotice({ text: message, ok: false });
     flash(message, false);
+    return false;
   }
 
   async function pickImagePaddingColorFromScreen() {
     if (!imagePaddingTarget) return;
+    const selectedProduct = imagePaddingTarget;
+    const selectedIndex = imagePaddingTargetIndexRef.current;
     const EyeDropper = (window as WindowWithEyeDropper).EyeDropper;
     if (!EyeDropper) {
       setImagePaddingNotice({
@@ -1803,11 +1825,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     }
 
     try {
-      setImagePaddingNotice({ text: 'Pick a color from the first photo or anywhere on screen.', ok: true });
       const result = await new EyeDropper().open();
       const color = result.sRGBHex.toLowerCase();
       setImagePaddingCustomColor(color);
-      await updateProductImagePadding(imagePaddingTarget, color);
+      const saved = await updateProductImagePadding(selectedProduct, color, selectedIndex);
+      if (saved) setImagePaddingNotice({ text: `Photo ${selectedIndex + 1} padding set to ${color}.`, ok: true });
     } catch (error: unknown) {
       if (error instanceof DOMException && error.name === 'AbortError') {
         setImagePaddingNotice(null);
@@ -1914,7 +1936,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       status: normalizeProductStatus(editing.status),
       location: editing.location || 'showcase',
       image_urls: editing.images,
-      image_padding: normalizeProductImagePadding(editing.image_padding),
+      image_padding: normalizeProductImagePaddingValue(editing.image_padding),
+      image_padding_by_image: normalizeProductImagePaddingMap(editing.image_padding_by_image),
       tags: finalTags,
       details: [],
       details_es: [],
@@ -2621,7 +2644,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                       {getProductImages(p)[0] ? (
                         <div
                           className="relative w-16 h-16 overflow-hidden"
-                          style={{ background: productImagePaddingBackground(p.image_padding) }}
+                          style={{ background: productImagePaddingBackground(productImagePaddingForImage(p.image_padding, p.image_padding_by_image, getProductImages(p)[0], 0)) }}
                         >
                           <Image
                             src={getProductImages(p)[0]}
@@ -2710,7 +2733,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                         <button type="button" onClick={() => openImagePaddingChooser(p)}
                           className="text-xs font-bold uppercase tracking-wide hover:underline"
                           style={{
-                            color: hasProductImagePadding(p.image_padding) ? '#0f7a4f' : '#7a4a1f',
+                            color: hasAnyProductImagePadding(p.image_padding, p.image_padding_by_image) ? '#0f7a4f' : '#7a4a1f',
                             fontFamily: 'var(--font-label)',
                           }}>
                           Pad
@@ -4019,7 +4042,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
           onClick={() => setImagePaddingTarget(null)}
         >
           <div
-            className="w-full max-w-md border p-5 flex flex-col gap-4"
+            className="w-full max-w-2xl border p-5 flex flex-col gap-4"
             style={{ background: 'var(--color-background)', borderColor: 'var(--color-outline-variant)' }}
             onClick={(event) => event.stopPropagation()}
           >
@@ -4028,35 +4051,91 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 Image Padding
               </h2>
               <p className="mt-1 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-                Choose the frame color behind contained product photos.
+                Choose the frame color behind each contained product photo.
               </p>
             </div>
             {(() => {
-              const firstImage = getProductImages(imagePaddingTarget)[0];
-              const currentPaddingValue = normalizeProductImagePaddingValue(imagePaddingTarget.image_padding);
+              const images = getProductImages(imagePaddingTarget);
+              const selectedImage = images[imagePaddingTargetIndex] ?? null;
+              const currentPaddingValue = productImagePaddingForImage(
+                imagePaddingTarget.image_padding,
+                imagePaddingTarget.image_padding_by_image,
+                selectedImage,
+                imagePaddingTargetIndex,
+              );
               const customActive = isProductImagePaddingCustomColor(currentPaddingValue);
               const validCustomColor = isProductImagePaddingCustomColor(imagePaddingCustomColor) ? imagePaddingCustomColor : '#ffffff';
               return (
                 <>
+                  {images.length > 1 && (
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                      {images.map((image, index) => {
+                        const imagePadding = productImagePaddingForImage(
+                          imagePaddingTarget.image_padding,
+                          imagePaddingTarget.image_padding_by_image,
+                          image,
+                          index,
+                        );
+                        const active = index === imagePaddingTargetIndex;
+
+                        return (
+                          <button
+                            key={`${image}-${index}`}
+                            type="button"
+                            onClick={() => {
+                              imagePaddingTargetIndexRef.current = index;
+                              setImagePaddingTargetIndex(index);
+                              const nextColor = productImagePaddingBackground(imagePadding) === '#000000' ? '#000000' : '#ffffff';
+                              setImagePaddingCustomColor(isProductImagePaddingCustomColor(imagePadding) ? imagePadding : nextColor);
+                              setImagePaddingNotice(null);
+                            }}
+                            className="border p-1 text-left transition-colors"
+                            style={{
+                              borderColor: active ? 'var(--color-primary)' : 'var(--color-outline-variant)',
+                              background: active ? 'rgba(194, 155, 45, 0.1)' : 'var(--color-surface-container-lowest)',
+                            }}
+                            aria-pressed={active}
+                          >
+                            <div
+                              className="relative aspect-square overflow-hidden"
+                              style={{ background: productImagePaddingBackground(imagePadding) }}
+                            >
+                              <Image
+                                src={image}
+                                alt={`${imagePaddingTarget.title} photo ${index + 1}`}
+                                fill
+                                sizes="104px"
+                                className="object-contain object-center"
+                                unoptimized={image.startsWith('/assets/')}
+                              />
+                            </div>
+                            <span className="mt-1 block text-[0.62rem] font-bold uppercase tracking-wide" style={{ color: active ? 'var(--color-primary)' : 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                              Photo {index + 1}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                   <div
-                    className="grid grid-cols-[88px_1fr] gap-3 border p-3"
+                    className="grid grid-cols-[136px_1fr] gap-4 border p-3"
                     style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-lowest)' }}
                   >
                     <div
-                      className="relative h-24 w-24 overflow-hidden border"
+                      className="relative h-32 w-32 overflow-hidden border"
                       style={{
                         borderColor: 'var(--color-outline-variant)',
-                        background: customActive ? validCustomColor : productImagePaddingBackground(imagePaddingTarget.image_padding),
+                        background: customActive ? validCustomColor : productImagePaddingBackground(currentPaddingValue),
                       }}
                     >
-                      {firstImage ? (
+                      {selectedImage ? (
                         <Image
-                          src={firstImage}
-                          alt={`${imagePaddingTarget.title} first photo preview`}
+                          src={selectedImage}
+                          alt={`${imagePaddingTarget.title} photo ${imagePaddingTargetIndex + 1} preview`}
                           fill
-                          sizes="96px"
+                          sizes="128px"
                           className="object-contain object-center"
-                          unoptimized={firstImage.startsWith('/assets/')}
+                          unoptimized={selectedImage.startsWith('/assets/')}
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-xs uppercase tracking-widest opacity-50">No Photo</div>
@@ -4064,10 +4143,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     </div>
                     <div className="flex flex-col justify-center gap-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
                       <span className="font-bold" style={{ color: 'var(--color-on-surface)' }}>
-                        First photo preview
+                        Photo {imagePaddingTargetIndex + 1} preview
                       </span>
                       <span>
-                        Use the eyedropper to sample a color from the photo, or choose a custom color manually.
+                        Select a photo above, then use the eyedropper to sample a color or choose a standard padding option.
                       </span>
                     </div>
                   </div>
@@ -4076,13 +4155,20 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             })()}
             <div className="grid gap-2">
               {IMAGE_PADDING_OPTIONS.map((option) => {
-                const active = normalizeProductImagePadding(imagePaddingTarget.image_padding) === option.value;
+                const currentImage = getProductImages(imagePaddingTarget)[imagePaddingTargetIndex] ?? null;
+                const currentPaddingValue = productImagePaddingForImage(
+                  imagePaddingTarget.image_padding,
+                  imagePaddingTarget.image_padding_by_image,
+                  currentImage,
+                  imagePaddingTargetIndex,
+                );
+                const active = normalizeProductImagePadding(currentPaddingValue) === option.value && !isProductImagePaddingCustomColor(currentPaddingValue);
                 const isBlackOption = option.value === 'black';
                 return (
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => updateProductImagePadding(imagePaddingTarget, option.value)}
+                    onClick={() => updateProductImagePadding(imagePaddingTarget, option.value, imagePaddingTargetIndex)}
                     className="border px-4 py-3 text-left transition-colors"
                     style={{
                       borderColor: active ? 'var(--color-primary)' : isBlackOption ? '#111111' : 'var(--color-outline-variant)',
@@ -4117,7 +4203,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '16px', lineHeight: 1 }}>
                   colorize
                 </span>
-                Pick From First Photo
+                Pick From Selected Photo
               </button>
               {imagePaddingNotice && (
                 <p className="mt-3 text-xs" style={{ color: imagePaddingNotice.ok ? 'var(--color-primary)' : 'var(--color-error)' }}>
@@ -4126,8 +4212,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               )}
             </div>
             <div className="flex justify-end">
-              <button type="button" onClick={() => setImagePaddingTarget(null)} className="outline-button text-sm">
-                Cancel
+              <button type="button" onClick={() => setImagePaddingTarget(null)} className="gold-button text-sm">
+                Close
               </button>
             </div>
           </div>

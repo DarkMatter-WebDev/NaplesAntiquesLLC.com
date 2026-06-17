@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCart, type CartItem } from '@/context/CartContext';
-import { isProductPurchasable, productStatusLabel } from '@/types/product';
+import { isProductPurchasable, productImagePaddingBackground, productStatusLabel } from '@/types/product';
 
 const GOLD = '#735c00';
 const BORDER = '#d8d0c2';
@@ -213,9 +213,10 @@ function CartView({
 function CartItemRow({ item, isEs, prefix, onRemove }: { item: CartItem; isEs: boolean; prefix: string; onRemove: () => void }) {
   const title = isEs && item.title_es ? item.title_es : item.title;
   const description = (isEs && item.description_es ? item.description_es : item.description) ?? item.public_notes ?? null;
+  const imageFrameBackground = productImagePaddingBackground(item.image_padding);
   return (
     <div className="flex gap-3 items-start border p-3" style={{ borderColor: BORDER, background: 'rgba(255, 255, 255, 0.74)' }}>
-      <Link href={`${prefix}/shop/${item.id}`} className="relative flex-shrink-0 w-20 h-20 overflow-hidden" style={{ background: 'var(--color-surface-container)' }}>
+      <Link href={`${prefix}/shop/${item.id}`} className="relative flex-shrink-0 w-20 h-20 overflow-hidden" style={{ background: imageFrameBackground }}>
         {item.image
           ? <Image src={item.image} alt={title} fill sizes="80px" className="object-contain" unoptimized={item.image.startsWith('/assets/')} />
           : <div className="w-full h-full flex items-center justify-center text-xl opacity-30">Photo</div>}
