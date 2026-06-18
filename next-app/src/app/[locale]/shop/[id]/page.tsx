@@ -70,15 +70,37 @@ function formatInventoryReference(value: string | number | null | undefined): st
   return normalized || null;
 }
 
+function safeReturnHref(value: string | undefined, locale: string): string | null {
+  if (!value) return null;
+  const normalized = value.trim();
+  const isEs = locale === 'es';
+  const allowedPrefixes = [
+    isEs ? '/es/admin' : '/admin',
+    isEs ? '/es/account' : '/account',
+  ];
+  const isAllowed = allowedPrefixes.some((prefix) => (
+    normalized === prefix ||
+    normalized.startsWith(`${prefix}/`) ||
+    normalized.startsWith(`${prefix}?`)
+  ));
+
+  if (isAllowed) {
+    return normalized;
+  }
+  return null;
+}
+
 export default async function ProductDetailPage({ params, searchParams }: Props) {
   const { locale, id } = await params;
   const query = searchParams ? await searchParams : {};
   const isEs = locale === 'es';
   const shopHref = isEs ? '/es/shop' : '/shop';
-  const adminHref = isEs ? '/es/admin' : '/admin';
-  const backHref = query.returnTo === 'admin' ? adminHref : shopHref;
-  const backLabel = query.returnTo === 'admin'
-    ? (isEs ? 'Volver al admin' : 'Back to Admin')
+  const returnHref = safeReturnHref(query.returnTo, locale);
+  const accountPrefix = isEs ? '/es/account' : '/account';
+  const isAccountReturn = returnHref?.startsWith(accountPrefix);
+  const backHref = returnHref ?? shopHref;
+  const backLabel = returnHref
+    ? (isAccountReturn ? (isEs ? 'Volver a pedidos' : 'Back to Orders') : (isEs ? 'Volver al admin' : 'Back to Admin'))
     : (isEs ? 'Volver a la tienda' : 'Back to Shop');
   const contactHref = isEs ? '/es/contact' : '/contact';
 

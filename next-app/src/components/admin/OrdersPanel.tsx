@@ -69,6 +69,9 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
   const [orderFilter, setOrderFilter] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [selectedProductDiscounts, setSelectedProductDiscounts] = useState<Record<string, string>>({});
+  const [productSearch, setProductSearch] = useState('');
+  const [showAllProductMatches, setShowAllProductMatches] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
@@ -83,8 +86,34 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
     [products, selectedProductIds],
   );
 
-  const subtotal = selectedProducts.reduce((sum, product) => sum + getSnapshotPrice(product, spotData), 0);
-  const discount = Number(form.discount) || 0;
+  const productMatches = useMemo(() => {
+    const term = productSearch.trim().toLowerCase();
+    const unselectedProducts = availableProducts.filter((product) => !selectedProductIds.includes(product.id));
+    if (!term) return showAllProductMatches ? unselectedProducts : [];
+    return unselectedProducts
+      .filter((product) => {
+        const searchable = [
+          product.inventory_number != null ? String(product.inventory_number) : '',
+          product.sku,
+          product.id,
+          product.title,
+          product.title_es,
+        ].filter(Boolean).join(' ').toLowerCase();
+        return searchable.includes(term);
+      })
+      .slice(0, 8);
+  }, [availableProducts, productSearch, selectedProductIds, showAllProductMatches]);
+
+  const selectedProductPrices = useMemo(
+    () => Object.fromEntries(selectedProducts.map((product) => [product.id, getSnapshotPrice(product, spotData)])),
+    [selectedProducts, spotData],
+  );
+  const subtotal = selectedProducts.reduce((sum, product) => sum + selectedProductPrices[product.id], 0);
+  const lineDiscount = selectedProducts.reduce(
+    (sum, product) => sum + clampMoneyDiscount(Number(selectedProductDiscounts[product.id]) || 0, selectedProductPrices[product.id]),
+    0,
+  );
+  const discount = (Number(form.discount) || 0) + lineDiscount;
   const shippingFee = Number(form.shipping_fee) || 0;
   const tax = Math.max(subtotal - discount, 0) * FL_TAX_RATE;
   const total = Math.max(subtotal - discount, 0) + tax + shippingFee;
@@ -106,12 +135,19 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
     return true;
   });
 
-  function toggleProduct(id: string) {
-    setSelectedProductIds((current) =>
-      current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [...current, id],
-    );
+  function addProduct(id: string) {
+    setSelectedProductIds((current) => current.includes(id) ? current : [...current, id]);
+    setProductSearch('');
+    setShowAllProductMatches(false);
+  }
+
+  function removeProduct(id: string) {
+    setSelectedProductIds((current) => current.filter((item) => item !== id));
+    setSelectedProductDiscounts((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
   }
 
   async function createOrder() {
@@ -175,7 +211,8 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
       metal_snapshot: getProductMetal(product),
       purity_snapshot: product.purity ? String(product.purity) : null,
       gram_weight_snapshot: getProductWeight(product),
-      price_snapshot: getSnapshotPrice(product, spotData),
+      price_snapshot: selectedProductPrices[product.id],
+      discount: clampMoneyDiscount(Number(selectedProductDiscounts[product.id]) || 0, selectedProductPrices[product.id]),
       image_snapshot: getProductImages(product)[0] ?? null,
     }));
 
@@ -201,15 +238,18 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
     setSaving(false);
     setShowCreate(false);
     setSelectedProductIds([]);
+    setSelectedProductDiscounts({});
+    setProductSearch('');
+    setShowAllProductMatches(false);
     setForm(emptyForm);
     router.push(`${adminBasePath}/orders/${order.id}`);
     router.refresh();
   }
 
   return (
-    <main className="px-4 md:px-8 py-8">
+    <main className="px-4 md:px-8 py-6 md:py-8">
       <div className="max-w-[1500px] mx-auto">
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="mb-6 md:mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-[0.65rem] font-bold uppercase tracking-[0.35em] mb-3"
               style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
@@ -220,7 +260,7 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
               Orders
             </h1>
           </div>
-          <button type="button" onClick={() => setShowCreate(true)} className="gold-button text-sm">
+          <button type="button" onClick={() => setShowCreate(true)} className="gold-button w-full justify-center text-sm md:w-auto">
             Create Manual Order
           </button>
         </div>
@@ -236,22 +276,24 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
           </div>
         )}
 
-        <div className="mb-5 flex flex-wrap gap-2 items-end">
+        <div className="mb-5 rounded-lg border bg-white p-3 shadow-sm md:flex md:flex-wrap md:items-end md:gap-2 md:rounded-none md:border-0 md:bg-transparent md:p-0 md:shadow-none">
           <input
             type="search"
             placeholder="Search order, customer, item..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="form-field flex-1 min-w-60"
+            className="form-field mb-3 w-full md:mb-0 md:min-w-60 md:flex-1"
           />
-          <Filter label="Payment" value={paymentFilter} setValue={setPaymentFilter} options={['unpaid', 'pending', 'paid', 'failed', 'refunded', 'partially_refunded']} />
-          <Filter label="Fulfillment" value={fulfillmentFilter} setValue={setFulfillmentFilter} options={['pending', 'packed', 'shipped', 'picked_up', 'cancelled']} />
-          <Filter label="Order" value={orderFilter} setValue={setOrderFilter} options={['open', 'completed', 'cancelled', 'refunded']} />
+          <div className="grid grid-cols-2 gap-2 md:contents">
+            <Filter label="Payment" value={paymentFilter} setValue={setPaymentFilter} options={['unpaid', 'pending', 'paid', 'failed', 'refunded', 'partially_refunded']} />
+            <Filter label="Fulfillment" value={fulfillmentFilter} setValue={setFulfillmentFilter} options={['pending', 'packed', 'shipped', 'picked_up', 'cancelled']} />
+            <Filter label="Order" value={orderFilter} setValue={setOrderFilter} options={['open', 'completed', 'cancelled', 'refunded']} />
+          </div>
           {(search || paymentFilter || fulfillmentFilter || orderFilter) && (
             <button
               type="button"
               onClick={() => { setSearch(''); setPaymentFilter(''); setFulfillmentFilter(''); setOrderFilter(''); }}
-              className="text-xs font-bold uppercase tracking-wide hover:underline pb-2"
+              className="mt-3 text-xs font-bold uppercase tracking-wide hover:underline md:mt-0 md:pb-2"
               style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
             >
               Clear
@@ -259,7 +301,74 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
           )}
         </div>
 
-        <div className="overflow-x-auto border" style={{ borderColor: BORDER, background: 'white' }}>
+        <div className="mb-3 flex items-center justify-between text-xs md:hidden" style={{ color: 'var(--color-on-surface-variant)' }}>
+          <span>{filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}</span>
+          <span>Tap View for details</span>
+        </div>
+
+        <div className="grid gap-3 md:hidden">
+          {filteredOrders.map((order) => (
+            <article key={order.id} className="rounded-lg border bg-white p-4 shadow-sm" style={{ borderColor: BORDER }}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[0.62rem] font-bold uppercase tracking-[0.18em]" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                    Order
+                  </p>
+                  <h2 className="mt-1 text-lg font-bold leading-tight" style={{ color: GOLD }}>
+                    {order.order_number}
+                  </h2>
+                  <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    {formatOrderDate(order.created_at)}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-[0.58rem] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                    Total
+                  </p>
+                  <strong className="mt-1 block text-base" style={{ color: GOLD }}>
+                    {formatCurrency(order.total)}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-md border p-3" style={{ borderColor: 'rgba(115, 92, 0, 0.12)', background: 'var(--color-surface-container-low)' }}>
+                <p className="font-semibold leading-snug" style={{ color: 'var(--color-on-surface)' }}>
+                  {order.customer_name || 'No customer name'}
+                </p>
+                <p className="mt-1 break-words text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  {order.customer_email || 'No email'}
+                </p>
+                {order.customer_phone && (
+                  <p className="mt-0.5 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    {order.customer_phone}
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-4">
+                <p className="text-[0.58rem] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                  Items
+                </p>
+                <p className="mt-1 line-clamp-2 text-sm leading-relaxed" style={{ color: 'var(--color-on-surface)' }}>
+                  {(order.order_items ?? []).map((item) => item.title_snapshot).join(', ') || '-'}
+                </p>
+              </div>
+
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                <StatusBlock label="Payment" value={order.payment_status} />
+                <StatusBlock label="Fulfillment" value={order.fulfillment_status} />
+                <StatusBlock label="Status" value={order.order_status} />
+              </div>
+
+              <Link href={`${adminBasePath}/orders/${order.id}`} className="gold-button mt-4 w-full justify-center text-sm">
+                View Order
+              </Link>
+            </article>
+          ))}
+          {filteredOrders.length === 0 && <EmptyOrders />}
+        </div>
+
+        <div className="hidden overflow-x-auto border md:block" style={{ borderColor: BORDER, background: 'white' }}>
           <table className="w-full min-w-[1100px] text-left text-sm">
             <thead style={{ background: 'var(--color-surface-container-low)' }}>
               <tr>
@@ -308,9 +417,9 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
       </div>
 
       {showCreate && (
-        <div className="fixed inset-0 z-50 overflow-y-auto px-4 py-8" style={{ background: 'rgba(0,0,0,0.5)' }}>
-          <div className="mx-auto w-full max-w-5xl border" style={{ background: 'var(--color-background)', borderColor: BORDER }}>
-            <div className="flex items-center justify-between border-b px-6 py-4" style={{ borderColor: BORDER }}>
+        <div className="fixed inset-0 z-50 overflow-y-auto px-3 py-4 md:px-4 md:py-8" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="mx-auto w-full max-w-5xl overflow-hidden rounded-lg border md:rounded-none" style={{ background: 'var(--color-background)', borderColor: BORDER }}>
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-4 py-4 md:px-6" style={{ borderColor: BORDER }}>
               <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
                 Create Manual Order
               </h2>
@@ -321,7 +430,7 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
               </button>
             </div>
 
-            <div className="grid lg:grid-cols-[1fr_21rem] gap-6 p-6">
+            <div className="grid gap-5 p-4 md:gap-6 md:p-6 lg:grid-cols-[1fr_21rem]">
               <div className="flex flex-col gap-5">
                 <section>
                   <h3 className="form-label">Customer</h3>
@@ -334,25 +443,104 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
 
                 <section>
                   <h3 className="form-label">Products</h3>
-                  <div className="border max-h-72 overflow-y-auto" style={{ borderColor: BORDER }}>
-                    {availableProducts.map((product) => {
+                  <div className="relative">
+                    <div className="relative">
+                      <input
+                        className="form-field w-full pr-12"
+                        type="search"
+                        placeholder="Search by inventory # or product title"
+                        value={productSearch}
+                        onChange={(e) => {
+                          setProductSearch(e.target.value);
+                          setShowAllProductMatches(false);
+                        }}
+                        aria-describedby="product-search-help"
+                      />
+                      <button
+                        type="button"
+                        aria-label={showAllProductMatches ? 'Hide all products' : 'Show all products'}
+                        aria-expanded={showAllProductMatches}
+                        onClick={() => {
+                          setProductSearch('');
+                          setShowAllProductMatches((current) => !current);
+                        }}
+                        className="absolute bottom-0 right-0 top-0 flex w-11 items-center justify-center border-l"
+                        style={{ borderColor: 'rgba(115, 92, 0, 0.16)', color: GOLD }}
+                      >
+                        <span className="material-symbols-outlined text-[1.35rem]" aria-hidden="true">
+                          {showAllProductMatches ? 'expand_less' : 'expand_more'}
+                        </span>
+                      </button>
+                    </div>
+                    <p id="product-search-help" className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      Type an inventory number or any part of the item title, then choose a match.
+                    </p>
+                  {(productSearch.trim() || showAllProductMatches) && (
+                      <div className="absolute left-0 right-0 top-[5.25rem] z-20 max-h-72 overflow-y-auto rounded-md border bg-white shadow-xl" style={{ borderColor: BORDER }}>
+                    {productMatches.map((product) => {
                       const price = getSnapshotPrice(product, spotData);
                       return (
-                        <label key={product.id} className="flex items-center gap-3 border-b px-3 py-2 cursor-pointer" style={{ borderColor: BORDER }}>
-                          <input type="checkbox" checked={selectedProductIds.includes(product.id)} onChange={() => toggleProduct(product.id)} style={{ accentColor: GOLD }} />
-                          <span className="flex-1 min-w-0">
+                        <button key={product.id} type="button" onClick={() => addProduct(product.id)} className="grid w-full cursor-pointer grid-cols-[minmax(0,1fr)] gap-x-3 gap-y-1 border-b px-3 py-3 text-left hover:bg-[var(--color-surface-container-low)] md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:py-2" style={{ borderColor: BORDER }}>
+                          <span className="min-w-0">
                             <span className="block text-sm font-semibold truncate" style={{ color: 'var(--color-on-surface)' }}>{product.title}</span>
                             <span className="block text-[0.68rem] uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-                              {product.inventory_number || product.sku || product.id} · {productStatusLabel(product.status)}
+                                {product.inventory_number || product.sku || product.id} - {productStatusLabel(product.status)}
                             </span>
                           </span>
                           <span className="text-sm font-bold" style={{ color: GOLD }}>{formatCurrency(price)}</span>
-                        </label>
+                        </button>
                       );
                     })}
-                    {availableProducts.length === 0 && (
-                      <p className="px-3 py-8 text-center text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-                        No available products to add.
+                    {productMatches.length === 0 && (
+                      <p className="px-3 py-4 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                        {productSearch.trim() ? 'No available products match that search.' : 'No available products to add.'}
+                      </p>
+                    )}
+                  </div>
+                  )}
+                  </div>
+
+                  <div className="mt-3 rounded-md border bg-white" style={{ borderColor: BORDER }}>
+                    <div className="flex items-center justify-between gap-3 border-b px-3 py-2" style={{ borderColor: 'rgba(115, 92, 0, 0.12)' }}>
+                      <span className="text-[0.62rem] font-bold uppercase tracking-[0.14em]" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                        Selected Products
+                      </span>
+                      <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                        {selectedProducts.length} selected
+                      </span>
+                    </div>
+                    {selectedProducts.length > 0 ? (
+                      <div className="grid gap-2 p-3">
+                        {selectedProducts.map((product) => (
+                          <div key={product.id} className="grid gap-2 rounded-md border p-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center" style={{ borderColor: 'rgba(115, 92, 0, 0.12)' }}>
+                            <div className="min-w-0">
+                              <strong className="block truncate text-sm" style={{ color: 'var(--color-on-surface)' }}>{product.title}</strong>
+                              <span className="mt-1 block text-[0.68rem] uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                                {product.inventory_number || product.sku || product.id} - {productStatusLabel(product.status)}
+                              </span>
+                              <span className="mt-1 block text-sm font-bold" style={{ color: GOLD }}>{formatCurrency(selectedProductPrices[product.id])}</span>
+                              <label className="mt-3 grid max-w-44 gap-1">
+                                <span className="form-label">Line Discount</span>
+                                <input
+                                  className="form-field"
+                                  type="number"
+                                  min="0"
+                                  max={selectedProductPrices[product.id]}
+                                  step="0.01"
+                                  value={selectedProductDiscounts[product.id] ?? '0'}
+                                  onChange={(event) => setSelectedProductDiscounts((current) => ({ ...current, [product.id]: event.target.value }))}
+                                />
+                              </label>
+                            </div>
+                            <button type="button" onClick={() => removeProduct(product.id)} className="text-left text-xs font-bold uppercase tracking-wide md:text-right" style={{ color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}>
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="px-3 py-6 text-center text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                        No products selected yet.
                       </p>
                     )}
                   </div>
@@ -361,21 +549,48 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
                 <section>
                   <h3 className="form-label">Shipping / Pickup</h3>
                   <div className="grid md:grid-cols-3 gap-3">
-                    <select className="form-field" value={form.shipping_method} onChange={(e) => setForm({ ...form, shipping_method: e.target.value as ShippingMethod })}>
-                      <option value="pickup">Pickup</option>
-                      <option value="shipping">Shipping</option>
-                      <option value="local_delivery">Local Delivery</option>
-                    </select>
-                    <input className="form-field" type="number" step="0.01" placeholder="Shipping fee" value={form.shipping_fee} onChange={(e) => setForm({ ...form, shipping_fee: e.target.value })} />
-                    <input className="form-field" type="number" step="0.01" placeholder="Discount" value={form.discount} onChange={(e) => setForm({ ...form, discount: e.target.value })} />
+                    <label className="grid gap-1">
+                      <span className="form-label">Delivery Method</span>
+                      <select className="form-field" value={form.shipping_method} onChange={(e) => setForm({ ...form, shipping_method: e.target.value as ShippingMethod })}>
+                        <option value="pickup">Pickup</option>
+                        <option value="shipping">Shipping</option>
+                        <option value="local_delivery">Local Delivery</option>
+                      </select>
+                    </label>
+                    <label className="grid gap-1">
+                      <span className="form-label">Shipping Fee</span>
+                      <input className="form-field" type="number" step="0.01" placeholder="0.00" value={form.shipping_fee} onChange={(e) => setForm({ ...form, shipping_fee: e.target.value })} />
+                    </label>
+                    <label className="grid gap-1">
+                      <span className="form-label">Order Discount</span>
+                      <input className="form-field" type="number" step="0.01" placeholder="0.00" value={form.discount} onChange={(e) => setForm({ ...form, discount: e.target.value })} />
+                    </label>
                   </div>
                   <div className="mt-3 grid md:grid-cols-2 gap-3">
-                    <input className="form-field md:col-span-2" placeholder="Address line 1" value={form.address_line1} onChange={(e) => setForm({ ...form, address_line1: e.target.value })} />
-                    <input className="form-field md:col-span-2" placeholder="Address line 2" value={form.address_line2} onChange={(e) => setForm({ ...form, address_line2: e.target.value })} />
-                    <input className="form-field" placeholder="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-                    <input className="form-field" placeholder="State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
-                    <input className="form-field" placeholder="Postal code" value={form.postal_code} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} />
-                    <input className="form-field" placeholder="Country" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
+                    <label className="grid gap-1 md:col-span-2">
+                      <span className="form-label">Address Line 1</span>
+                      <input className="form-field" placeholder="Street address" value={form.address_line1} onChange={(e) => setForm({ ...form, address_line1: e.target.value })} />
+                    </label>
+                    <label className="grid gap-1 md:col-span-2">
+                      <span className="form-label">Address Line 2</span>
+                      <input className="form-field" placeholder="Apartment, suite, or unit" value={form.address_line2} onChange={(e) => setForm({ ...form, address_line2: e.target.value })} />
+                    </label>
+                    <label className="grid gap-1">
+                      <span className="form-label">City</span>
+                      <input className="form-field" placeholder="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+                    </label>
+                    <label className="grid gap-1">
+                      <span className="form-label">State</span>
+                      <input className="form-field" placeholder="State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
+                    </label>
+                    <label className="grid gap-1">
+                      <span className="form-label">Postal Code</span>
+                      <input className="form-field" placeholder="Postal code" value={form.postal_code} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} />
+                    </label>
+                    <label className="grid gap-1">
+                      <span className="form-label">Country</span>
+                      <input className="form-field" placeholder="Country" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
+                    </label>
                   </div>
                 </section>
 
@@ -388,12 +603,13 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
                 </section>
               </div>
 
-              <aside className="border p-4 h-fit" style={{ borderColor: BORDER, background: 'white' }}>
+              <aside className="sticky bottom-0 rounded-md border p-4 shadow-sm lg:static lg:h-fit lg:shadow-none" style={{ borderColor: BORDER, background: 'white' }}>
                 <h3 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
                   Order Summary
                 </h3>
                 <SummaryRow label="Subtotal" value={formatCurrency(subtotal)} />
-                <SummaryRow label="Discount" value={`-${formatCurrency(discount)}`} />
+                {lineDiscount > 0 && <SummaryRow label="Line Discounts" value={`-${formatCurrency(lineDiscount)}`} />}
+                <SummaryRow label="Total Discount" value={`-${formatCurrency(discount)}`} />
                 <SummaryRow label="Tax" value={formatCurrency(tax)} />
                 <SummaryRow label="Shipping" value={formatCurrency(shippingFee)} />
                 <div className="border-t mt-3 pt-3" style={{ borderColor: BORDER }}>
@@ -432,6 +648,35 @@ function Badge({ value }: { value: string }) {
   );
 }
 
+function StatusBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-md border bg-white p-2" style={{ borderColor: 'rgba(115, 92, 0, 0.12)' }}>
+      <span className="block text-[0.54rem] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+        {label}
+      </span>
+      <strong className="mt-1 block truncate text-[0.72rem]" style={{ color: GOLD }}>
+        {orderStatusLabel(value)}
+      </strong>
+    </div>
+  );
+}
+
+function EmptyOrders() {
+  return (
+    <div className="rounded-lg border bg-white px-4 py-10 text-center shadow-sm" style={{ borderColor: BORDER }}>
+      <span className="material-symbols-outlined mx-auto block text-4xl" aria-hidden="true" style={{ color: 'rgba(115, 92, 0, 0.32)' }}>
+        receipt_long
+      </span>
+      <strong className="mt-3 block" style={{ color: 'var(--color-on-surface)' }}>
+        No orders found.
+      </strong>
+      <p className="mt-1 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+        Try clearing filters or creating a manual order.
+      </p>
+    </div>
+  );
+}
+
 function SummaryRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className="flex justify-between gap-4 py-1 text-sm" style={{ color: strong ? GOLD : 'var(--color-on-surface-variant)' }}>
@@ -439,4 +684,9 @@ function SummaryRow({ label, value, strong = false }: { label: string; value: st
       <span className={strong ? 'font-bold' : ''}>{value}</span>
     </div>
   );
+}
+
+function clampMoneyDiscount(value: number, max: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(Math.max(value, 0), Math.max(max, 0));
 }

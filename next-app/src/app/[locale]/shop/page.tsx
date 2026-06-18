@@ -60,7 +60,8 @@ const ITEM_TYPE_KEYWORDS: Record<string, string[]> = {
   bracelet: ['bracelet', 'bangle'],
   earrings: ['earring', 'earrings'],
   ring: ['ring'],
-  pendant: ['pendant', 'charm'],
+  pendant: ['pendant'],
+  charm: ['charm', 'charms'],
   brooch: ['brooch', 'pin'],
   watch: ['watch', 'wristwatch', 'wrist watch', 'timepiece'],
   coin: ['coin'],
@@ -77,6 +78,7 @@ const ITEM_TYPE_VALUES: Record<string, ReturnType<typeof inferProductJewelryType
   earrings: 'Earrings',
   ring: 'Ring',
   pendant: 'Pendant',
+  charm: 'Charm',
   brooch: 'Brooch',
   watch: 'Watch',
   coin: 'Coin',
@@ -339,7 +341,7 @@ export async function renderShopPage({
     <>
       <SiteHeader />
       <main className={isModern ? 'modern-shop-page pt-20 md:pt-28 pb-20' : 'pt-20 md:pt-32 pb-20'}>
-        <div className="max-w-[1760px] mx-auto px-4 md:px-8 2xl:px-10">
+        <div className="max-w-[2400px] mx-auto px-4 md:px-8 2xl:px-10 min-[2200px]:px-12">
 
           {/* Investment transparency note */}
           <section
@@ -482,7 +484,7 @@ export async function renderShopPage({
                 </p>
               ) : (
                 <>
-                  <div className="shop-product-grid grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-5">
+                  <div className="shop-product-grid grid grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-5">
                     {paginatedProducts.map((product) => (
                       <ProductCard
                         key={product.id}
@@ -765,6 +767,16 @@ export async function renderShopPage({
             @media (min-width: 1720px) {
               .shop-product-grid {
                 grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+              }
+            }
+            @media (min-width: 1960px) {
+              .shop-product-grid {
+                grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+              }
+            }
+            @media (min-width: 2320px) {
+              .shop-product-grid {
+                grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
               }
             }
           `}</style>

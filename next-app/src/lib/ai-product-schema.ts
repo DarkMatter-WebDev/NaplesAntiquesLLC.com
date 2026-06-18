@@ -186,7 +186,9 @@ function cleanPriceMode(value: unknown): ProductAutofillFields['price_mode'] {
 function cleanPurity(value: unknown): number | null {
   const raw = cleanString(value, MAX_SHORT_TEXT_LENGTH);
   if (!raw) return null;
-  const match = raw.toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(?:k|karat|%)?$/);
+  // Accept bare numbers, karat marks ("14K", "18K"), plumb-gold suffix ("14KP"),
+  // karat-spelled-out ("14KT", "14 karat"), and millesimal fineness ("925%").
+  const match = raw.toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(?:k(?:[pt])?|karat|%)?$/);
   const numeric = match ? Number(match[1]) : Number(raw);
   if (!Number.isFinite(numeric)) return null;
   const allowed = [10, 14, 18, 22, 24, 800, 850, 900, 925, 950, 999];

@@ -451,6 +451,24 @@ export default async function AccountPage({ params }: Props) {
           border-radius: 6px;
           background: rgba(255, 255, 255, 0.74);
         }
+        .account-order-item-link {
+          color: inherit;
+          text-decoration: none;
+          transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+        }
+        .account-order-item-link:hover,
+        .account-order-item-link:focus-visible {
+          border-color: rgba(115, 92, 0, 0.32);
+          box-shadow: 0 10px 24px rgba(42, 34, 12, 0.08);
+          outline: none;
+          transform: translateY(-1px);
+        }
+        .account-order-item-link:hover strong,
+        .account-order-item-link:focus-visible strong {
+          text-decoration: underline;
+          text-decoration-thickness: 1px;
+          text-underline-offset: 3px;
+        }
         .account-order-item-image {
           position: relative;
           min-height: 4.5rem;

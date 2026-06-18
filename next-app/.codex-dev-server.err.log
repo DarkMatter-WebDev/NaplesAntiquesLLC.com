@@ -1,16 +1,647 @@
-[browser] Image with src "/assets/images/shop/shop-18k-rectangular-anchor-link-chain-01.png" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+[browser] Uncaught ReferenceError: StatusBlock is not defined
+    at eval (src/components/admin/OrdersPanel.tsx:318:18)
+    at Array.map (<anonymous>)
+    at OrdersPanel (src/components/admin/OrdersPanel.tsx:270:27)
+    at AdminOrdersPage (src\app\[locale]\admin\orders\page.tsx:63:7)
+  316 |
+  317 |               <div className="mt-4 grid grid-cols-3 gap-2">
+> 318 |                 <StatusBlock label="Payment" value={order.payment_status} />
+      |                  ^
+  319 |                 <StatusBlock label="Fulfillment" value={order.fulfillment_status} />
+  320 |                 <StatusBlock label="Status" value={order.order_status} />
+  321 |               </div>
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] ./src/components/admin/OrdersPanel.tsx:462:18
+Unterminated regexp literal
+  460 |                     )}
+  461 |                   </div>
+> 462 |                 </section>
+      |                  ^^^^^^^^^
+  463 |
+  464 |                 <section>
+  465 |                   <h3 className="form-label">Shipping / Pickup</h3>
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/components/admin/OrdersPanel.tsx
+    ./src/app/[locale]/admin/orders/page.tsx 
+[browser] ./src/components/admin/OrdersPanel.tsx:462:18
+Unterminated regexp literal
+  460 |                     )}
+  461 |                   </div>
+> 462 |                 </section>
+      |                  ^^^^^^^^^
+  463 |
+  464 |                 <section>
+  465 |                   <h3 className="form-label">Shipping / Pickup</h3>
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/components/admin/OrdersPanel.tsx
+    ./src/app/[locale]/admin/orders/page.tsx 
+⨯ ./src/components/admin/OrdersPanel.tsx:462:18
+Unterminated regexp literal
+  [90m460 |[0m                     )}
+  [90m461 |[0m                   </div>
+[31m[1m>[0m [90m462 |[0m                 </section>
+  [90m    |[0m                  [31m[1m^^^^^^^^^[0m
+  [90m463 |[0m
+  [90m464 |[0m                 <section>
+  [90m465 |[0m                   <h3 className=[32m"form-label"[0m>[33mShipping[0m / [33mPickup[0m</h3>
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/components/admin/OrdersPanel.tsx
+    ./src/app/[locale]/admin/orders/page.tsx
+
+
+[browser] ./src/components/admin/OrdersPanel.tsx:462:18
+Unterminated regexp literal
+  460 |                     )}
+  461 |                   </div>
+> 462 |                 </section>
+      |                  ^^^^^^^^^
+  463 |
+  464 |                 <section>
+  465 |                   <h3 className="form-label">Shipping / Pickup</h3>
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/components/admin/OrdersPanel.tsx
+    ./src/app/[locale]/admin/orders/page.tsx 
+[browser] ./src/components/admin/OrdersPanel.tsx:462:18
+Unterminated regexp literal
+  460 |                     )}
+  461 |                   </div>
+> 462 |                 </section>
+      |                  ^^^^^^^^^
+  463 |
+  464 |                 <section>
+  465 |                   <h3 className="form-label">Shipping / Pickup</h3>
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/components/admin/OrdersPanel.tsx
+    ./src/app/[locale]/admin/orders/page.tsx 
+⨯ ./src/components/admin/OrdersPanel.tsx:462:18
+Unterminated regexp literal
+  [90m460 |[0m                     )}
+  [90m461 |[0m                   </div>
+[31m[1m>[0m [90m462 |[0m                 </section>
+  [90m    |[0m                  [31m[1m^^^^^^^^^[0m
+  [90m463 |[0m
+  [90m464 |[0m                 <section>
+  [90m465 |[0m                   <h3 className=[32m"form-label"[0m>[33mShipping[0m / [33mPickup[0m</h3>
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/components/admin/OrdersPanel.tsx
+    ./src/app/[locale]/admin/orders/page.tsx
+
+
+[browser] ./src/components/admin/OrdersPanel.tsx:462:18
+Unterminated regexp literal
+  460 |                     )}
+  461 |                   </div>
+> 462 |                 </section>
+      |                  ^^^^^^^^^
+  463 |
+  464 |                 <section>
+  465 |                   <h3 className="form-label">Shipping / Pickup</h3>
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/components/admin/OrdersPanel.tsx
+    ./src/app/[locale]/admin/orders/page.tsx 
+⨯ ./src/components/admin/OrdersPanel.tsx:462:18
+Unterminated regexp literal
+  [90m460 |[0m                     )}
+  [90m461 |[0m                   </div>
+[31m[1m>[0m [90m462 |[0m                 </section>
+  [90m    |[0m                  [31m[1m^^^^^^^^^[0m
+  [90m463 |[0m
+  [90m464 |[0m                 <section>
+  [90m465 |[0m                   <h3 className=[32m"form-label"[0m>[33mShipping[0m / [33mPickup[0m</h3>
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/components/admin/OrdersPanel.tsx
+    ./src/app/[locale]/admin/orders/page.tsx
+
+
+[browser] Uncaught Error: ./src/components/admin/OrdersPanel.tsx:462:18
+Unterminated regexp literal
+  460 |                     )}
+  461 |                   </div>
+> 462 |                 </section>
+      |                  ^^^^^^^^^
+  463 |
+  464 |                 <section>
+  465 |                   <h3 className="form-label">Shipping / Pickup</h3>
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/components/admin/OrdersPanel.tsx
+    ./src/app/[locale]/admin/orders/page.tsx
+
+
+    at <unknown> (Error: ./src/components/admin/OrdersPanel.tsx:462:18)
+    at <unknown> (Error: (./src/components/admin/OrdersPanel.tsx:462:18)
+[browser] ./src/components/admin/OrdersPanel.tsx:462:18
+Unterminated regexp literal
+  460 |                     )}
+  461 |                   </div>
+> 462 |                 </section>
+      |                  ^^^^^^^^^
+  463 |
+  464 |                 <section>
+  465 |                   <h3 className="form-label">Shipping / Pickup</h3>
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/components/admin/OrdersPanel.tsx
+    ./src/app/[locale]/admin/orders/page.tsx 
+[browser] ./src/components/admin/OrdersPanel.tsx:462:18
+Unterminated regexp literal
+  460 |                     )}
+  461 |                   </div>
+> 462 |                 </section>
+      |                  ^^^^^^^^^
+  463 |
+  464 |                 <section>
+  465 |                   <h3 className="form-label">Shipping / Pickup</h3>
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/components/admin/OrdersPanel.tsx
+    ./src/app/[locale]/admin/orders/page.tsx 
+[browser] ./src/components/admin/OrdersPanel.tsx:462:18
+Unterminated regexp literal
+  460 |                     )}
+  461 |                   </div>
+> 462 |                 </section>
+      |                  ^^^^^^^^^
+  463 |
+  464 |                 <section>
+  465 |                   <h3 className="form-label">Shipping / Pickup</h3>
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/components/admin/OrdersPanel.tsx
+    ./src/app/[locale]/admin/orders/page.tsx 
+[browser] ./src/components/admin/OrdersPanel.tsx:462:18
+Unterminated regexp literal
+  460 |                     )}
+  461 |                   </div>
+> 462 |                 </section>
+      |                  ^^^^^^^^^
+  463 |
+  464 |                 <section>
+  465 |                   <h3 className="form-label">Shipping / Pickup</h3>
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/components/admin/OrdersPanel.tsx
+    ./src/app/[locale]/admin/orders/page.tsx 
+[browser] ./src/components/admin/OrdersPanel.tsx:462:18
+Unterminated regexp literal
+  460 |                     )}
+  461 |                   </div>
+> 462 |                 </section>
+      |                  ^^^^^^^^^
+  463 |
+  464 |                 <section>
+  465 |                   <h3 className="form-label">Shipping / Pickup</h3>
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/components/admin/OrdersPanel.tsx
+    ./src/app/[locale]/admin/orders/page.tsx 
+[browser] ./src/components/admin/OrdersPanel.tsx:461:18
+Unterminated regexp literal
+  459 |                     )}
+  460 |                   </div>
+> 461 |                 </section>
+      |                  ^^^^^^^^^
+  462 |
+  463 |                 <section>
+  464 |                   <h3 className="form-label">Shipping / Pickup</h3>
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/components/admin/OrdersPanel.tsx
+    ./src/app/[locale]/admin/orders/page.tsx 
+[browser] ./src/components/admin/OrdersPanel.tsx:461:18
+Unterminated regexp literal
+  459 |                     )}
+  460 |                   </div>
+> 461 |                 </section>
+      |                  ^^^^^^^^^
+  462 |
+  463 |                 <section>
+  464 |                   <h3 className="form-label">Shipping / Pickup</h3>
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/components/admin/OrdersPanel.tsx
+    ./src/app/[locale]/admin/orders/page.tsx 
+[browser] ./src/components/admin/OrdersPanel.tsx:461:18
+Unterminated regexp literal
+  459 |                     )}
+  460 |                   </div>
+> 461 |                 </section>
+      |                  ^^^^^^^^^
+  462 |
+  463 |                 <section>
+  464 |                   <h3 className="form-label">Shipping / Pickup</h3>
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/components/admin/OrdersPanel.tsx
+    ./src/app/[locale]/admin/orders/page.tsx 
+⚠ Fast Refresh had to perform a full reload when ./node_modules/next/dist/client/image-component.js changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+[browser] Image with src "/assets/images/shop/shop-14k-curb-link-bracelet-01.png" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
 Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
-⚠ Fast Refresh had to perform a full reload when ./src/context/CartContext.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
-⚠ Fast Refresh had to perform a full reload when ./src/context/CartContext.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
-Error [AuthApiError]: Invalid Refresh Token: Refresh Token Not Found
-    at ignore-listed frames {
-  __isAuthError: true,
-  status: 400,
-  code: 'refresh_token_not_found'
+[browser] Uncaught ReferenceError: clampDiscount is not defined
+    at eval (src/lib/order-invoice-email.ts:42:22)
+    at Array.map (<anonymous>)
+    at buildInvoiceEmailContent (src/lib/order-invoice-email.ts:41:35)
+    at OrderDetailPanel (src/components/admin/OrderDetailPanel.tsx:42:43)
+    at AdminOrderDetailPage (src\app\[locale]\admin\orders\[id]\page.tsx:72:7)
+  40 |   const customerName = order.customer_name || 'there';
+  41 |   const items = order.order_items.map((item) => {
+> 42 |     const discount = clampDiscount(Number(item.discount ?? 0), item.price_snapshot);
+     |                      ^
+  43 |     const lineTotal = Math.max(item.price_snapshot - discount, 0);
+  44 |     const details = [
+  45 |       item.metal_snapshot,
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Uncaught ReferenceError: clampDiscount is not defined
+    at eval (src/lib/order-invoice-email.ts:42:22)
+    at Array.map (<anonymous>)
+    at buildInvoiceEmailContent (src/lib/order-invoice-email.ts:41:35)
+    at OrderDetailPanel (src/components/admin/OrderDetailPanel.tsx:42:43)
+    at Set.forEach (<anonymous>)
+    at AdminOrderDetailPage (src\app\[locale]\admin\orders\[id]\page.tsx:72:7)
+  40 |   const customerName = order.customer_name || 'there';
+  41 |   const items = order.order_items.map((item) => {
+> 42 |     const discount = clampDiscount(Number(item.discount ?? 0), item.price_snapshot);
+     |                      ^
+  43 |     const lineTotal = Math.max(item.price_snapshot - discount, 0);
+  44 |     const details = [
+  45 |       item.metal_snapshot,
+⨯ ReferenceError: clampDiscount is not defined
+    at <unknown> (src\lib\order-invoice-email.ts:42:22)
+    at Array.map (<anonymous>)
+    at buildInvoiceEmailContent (src\lib\order-invoice-email.ts:41:35)
+    at OrderDetailPanel (src\components\admin\OrderDetailPanel.tsx:47:48)
+  40 |   const customerName = order.customer_name || 'there';
+  41 |   const items = order.order_items.map((item) => {
+> 42 |     const discount = clampDiscount(Number(item.discount ?? 0), item.price_snapshot);
+     |                      ^
+  43 |     const lineTotal = Math.max(item.price_snapshot - discount, 0);
+  44 |     const details = [
+  45 |       item.metal_snapshot, {
+  digest: '3516840363'
 }
-Error [AuthApiError]: Invalid Refresh Token: Refresh Token Not Found
-    at ignore-listed frames {
-  __isAuthError: true,
-  status: 400,
-  code: 'refresh_token_not_found'
+[browser] Uncaught ReferenceError: clampDiscount is not defined
+    at <unknown> (src/lib/order-invoice-email.ts:42:22)
+    at Array.map (<anonymous>)
+    at buildInvoiceEmailContent (src/lib/order-invoice-email.ts:41:35)
+    at OrderDetailPanel (src/components/admin/OrderDetailPanel.tsx:47:48)
+    at AdminOrderDetailPage (src\app\[locale]\admin\orders\[id]\page.tsx:72:7)
+  40 |   const customerName = order.customer_name || 'there';
+  41 |   const items = order.order_items.map((item) => {
+> 42 |     const discount = clampDiscount(Number(item.discount ?? 0), item.price_snapshot);
+     |                      ^
+  43 |     const lineTotal = Math.max(item.price_snapshot - discount, 0);
+  44 |     const details = [
+  45 |       item.metal_snapshot,
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⨯ ReferenceError: clampDiscount is not defined
+    at <unknown> (src\lib\order-invoice-email.ts:42:22)
+    at Array.map (<anonymous>)
+    at buildInvoiceEmailContent (src\lib\order-invoice-email.ts:41:35)
+    at OrderDetailPanel (src\components\admin\OrderDetailPanel.tsx:47:48)
+  40 |   const customerName = order.customer_name || 'there';
+  41 |   const items = order.order_items.map((item) => {
+> 42 |     const discount = clampDiscount(Number(item.discount ?? 0), item.price_snapshot);
+     |                      ^
+  43 |     const lineTotal = Math.max(item.price_snapshot - discount, 0);
+  44 |     const details = [
+  45 |       item.metal_snapshot, {
+  digest: '4264603980'
 }
+[browser] Uncaught ReferenceError: clampDiscount is not defined
+    at <unknown> (src/lib/order-invoice-email.ts:42:22)
+    at Array.map (<anonymous>)
+    at buildInvoiceEmailContent (src/lib/order-invoice-email.ts:41:35)
+    at OrderDetailPanel (src/components/admin/OrderDetailPanel.tsx:47:48)
+    at AdminOrderDetailPage (src\app\[locale]\admin\orders\[id]\page.tsx:72:7)
+  40 |   const customerName = order.customer_name || 'there';
+  41 |   const items = order.order_items.map((item) => {
+> 42 |     const discount = clampDiscount(Number(item.discount ?? 0), item.price_snapshot);
+     |                      ^
+  43 |     const lineTotal = Math.max(item.price_snapshot - discount, 0);
+  44 |     const details = [
+  45 |       item.metal_snapshot,
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Uncaught ReferenceError: clampMoneyDiscount is not defined
+    at eval (src/components/admin/OrderDetailPanel.tsx:51:79)
+    at Array.reduce (<anonymous>)
+    at OrderDetailPanel (src/components/admin/OrderDetailPanel.tsx:51:51)
+    at AdminOrderDetailPage (src\app\[locale]\admin\orders\[id]\page.tsx:72:7)
+  49 | ...erForOrder(order, latestInvoice?.invoice_number);
+  50 | ...EmailContent(order, invoiceNumber);
+> 51 | ...er.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(item.discount ?? 0...
+     |                                               ^
+  52 | ...order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[item.id...
+  53 | ...ax(order.discount - persistedLineDiscount, 0);
+  54 | ...LevelDiscount + editedLineDiscount;
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Uncaught ReferenceError: clampMoneyDiscount is not defined
+    at eval (src/components/admin/OrderDetailPanel.tsx:51:79)
+    at Array.reduce (<anonymous>)
+    at OrderDetailPanel (src/components/admin/OrderDetailPanel.tsx:51:51)
+    at Set.forEach (<anonymous>)
+    at AdminOrderDetailPage (src\app\[locale]\admin\orders\[id]\page.tsx:72:7)
+  49 | ...erForOrder(order, latestInvoice?.invoice_number);
+  50 | ...EmailContent(order, invoiceNumber);
+> 51 | ...er.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(item.discount ?? 0...
+     |                                               ^
+  52 | ...order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[item.id...
+  53 | ...ax(order.discount - persistedLineDiscount, 0);
+  54 | ...LevelDiscount + editedLineDiscount;
+⨯ ReferenceError: clampMoneyDiscount is not defined
+    at <unknown> (src\components\admin\OrderDetailPanel.tsx:51:73)
+    at Array.reduce (<anonymous>)
+    at OrderDetailPanel (src\components\admin\OrderDetailPanel.tsx:51:51)
+  49 | ...ceNumberForOrder(order, latestInvoice?.invoice_number);
+  50 | ...nvoiceEmailContent(order, invoiceNumber);
+> 51 | ... = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(item.discoun...
+     |                                               ^
+  52 | ...order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[i...
+  53 | ...Math.max(order.discount - persistedLineDiscount, 0);
+  54 | ... orderLevelDiscount + editedLineDiscount; {
+  digest: '400915696'
+}
+[browser] Uncaught ReferenceError: clampMoneyDiscount is not defined
+    at <unknown> (src/components/admin/OrderDetailPanel.tsx:51:73)
+    at Array.reduce (<anonymous>)
+    at OrderDetailPanel (src/components/admin/OrderDetailPanel.tsx:51:51)
+    at AdminOrderDetailPage (src\app\[locale]\admin\orders\[id]\page.tsx:72:7)
+  49 | ...ceNumberForOrder(order, latestInvoice?.invoice_number);
+  50 | ...nvoiceEmailContent(order, invoiceNumber);
+> 51 | ... = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(item.discoun...
+     |                                               ^
+  52 | ...order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[i...
+  53 | ...Math.max(order.discount - persistedLineDiscount, 0);
+  54 | ... orderLevelDiscount + editedLineDiscount;
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⨯ ReferenceError: clampMoneyDiscount is not defined
+    at <unknown> (src\components\admin\OrderDetailPanel.tsx:51:73)
+    at Array.reduce (<anonymous>)
+    at OrderDetailPanel (src\components\admin\OrderDetailPanel.tsx:51:51)
+  49 | ...ceNumberForOrder(order, latestInvoice?.invoice_number);
+  50 | ...nvoiceEmailContent(order, invoiceNumber);
+> 51 | ... = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(item.discoun...
+     |                                               ^
+  52 | ...order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[i...
+  53 | ...Math.max(order.discount - persistedLineDiscount, 0);
+  54 | ... orderLevelDiscount + editedLineDiscount; {
+  digest: '665914846'
+}
+[browser] Uncaught ReferenceError: clampMoneyDiscount is not defined
+    at <unknown> (src/components/admin/OrderDetailPanel.tsx:51:73)
+    at Array.reduce (<anonymous>)
+    at OrderDetailPanel (src/components/admin/OrderDetailPanel.tsx:51:51)
+    at AdminOrderDetailPage (src\app\[locale]\admin\orders\[id]\page.tsx:72:7)
+  49 | ...ceNumberForOrder(order, latestInvoice?.invoice_number);
+  50 | ...nvoiceEmailContent(order, invoiceNumber);
+> 51 | ... = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(item.discoun...
+     |                                               ^
+  52 | ...order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[i...
+  53 | ...Math.max(order.discount - persistedLineDiscount, 0);
+  54 | ... orderLevelDiscount + editedLineDiscount;
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⨯ ReferenceError: clampMoneyDiscount is not defined
+    at <unknown> (src\components\admin\OrderDetailPanel.tsx:53:73)
+    at Array.reduce (<anonymous>)
+    at OrderDetailPanel (src\components\admin\OrderDetailPanel.tsx:53:51)
+  51 | ...iceLineDiscounts(order, numericItemDiscounts);
+  52 | ...nvoiceEmailContent(emailOrder, invoiceNumber);
+> 53 | ... = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(item.discoun...
+     |                                               ^
+  54 | ...order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[i...
+  55 | ...Math.max(order.discount - persistedLineDiscount, 0);
+  56 | ... orderLevelDiscount + editedLineDiscount; {
+  digest: '665914846'
+}
+[browser] Uncaught ReferenceError: clampMoneyDiscount is not defined
+    at <unknown> (src/components/admin/OrderDetailPanel.tsx:53:73)
+    at Array.reduce (<anonymous>)
+    at OrderDetailPanel (src/components/admin/OrderDetailPanel.tsx:53:51)
+    at AdminOrderDetailPage (src\app\[locale]\admin\orders\[id]\page.tsx:72:7)
+  51 | ...iceLineDiscounts(order, numericItemDiscounts);
+  52 | ...nvoiceEmailContent(emailOrder, invoiceNumber);
+> 53 | ... = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(item.discoun...
+     |                                               ^
+  54 | ...order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[i...
+  55 | ...Math.max(order.discount - persistedLineDiscount, 0);
+  56 | ... orderLevelDiscount + editedLineDiscount;
+⨯ ReferenceError: clampMoneyDiscount is not defined
+    at <unknown> (src\components\admin\OrderDetailPanel.tsx:53:73)
+    at Array.reduce (<anonymous>)
+    at OrderDetailPanel (src\components\admin\OrderDetailPanel.tsx:53:51)
+  51 | ...iceLineDiscounts(order, numericItemDiscounts);
+  52 | ...nvoiceEmailContent(emailOrder, invoiceNumber);
+> 53 | ... = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(item.discoun...
+     |                                               ^
+  54 | ...order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[i...
+  55 | ...Math.max(order.discount - persistedLineDiscount, 0);
+  56 | ... orderLevelDiscount + editedLineDiscount; {
+  digest: '665914846'
+}
+[browser] Uncaught ReferenceError: clampMoneyDiscount is not defined
+    at <unknown> (src/components/admin/OrderDetailPanel.tsx:53:73)
+    at Array.reduce (<anonymous>)
+    at OrderDetailPanel (src/components/admin/OrderDetailPanel.tsx:53:51)
+    at AdminOrderDetailPage (src\app\[locale]\admin\orders\[id]\page.tsx:72:7)
+  51 | ...iceLineDiscounts(order, numericItemDiscounts);
+  52 | ...nvoiceEmailContent(emailOrder, invoiceNumber);
+> 53 | ... = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(item.discoun...
+     |                                               ^
+  54 | ...order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[i...
+  55 | ...Math.max(order.discount - persistedLineDiscount, 0);
+  56 | ... orderLevelDiscount + editedLineDiscount;
+⨯ ReferenceError: clampMoneyDiscount is not defined
+    at <unknown> (src\components\admin\OrderDetailPanel.tsx:53:73)
+    at Array.reduce (<anonymous>)
+    at OrderDetailPanel (src\components\admin\OrderDetailPanel.tsx:53:51)
+  51 | ...iceLineDiscounts(order, numericItemDiscounts);
+  52 | ...nvoiceEmailContent(emailOrder, invoiceNumber);
+> 53 | ... = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(item.discoun...
+     |                                               ^
+  54 | ...order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[i...
+  55 | ...Math.max(order.discount - persistedLineDiscount, 0);
+  56 | ... orderLevelDiscount + editedLineDiscount; {
+  digest: '665914846'
+}
+[browser] Uncaught ReferenceError: clampMoneyDiscount is not defined
+    at <unknown> (src/components/admin/OrderDetailPanel.tsx:53:73)
+    at Array.reduce (<anonymous>)
+    at OrderDetailPanel (src/components/admin/OrderDetailPanel.tsx:53:51)
+    at AdminOrderDetailPage (src\app\[locale]\admin\orders\[id]\page.tsx:72:7)
+  51 | ...iceLineDiscounts(order, numericItemDiscounts);
+  52 | ...nvoiceEmailContent(emailOrder, invoiceNumber);
+> 53 | ... = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(item.discoun...
+     |                                               ^
+  54 | ...order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[i...
+  55 | ...Math.max(order.discount - persistedLineDiscount, 0);
+  56 | ... orderLevelDiscount + editedLineDiscount;
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Image with src "/assets/images/pages/gold.webp" has "fill" but is missing "sizes" prop. Please add it to improve page performance. Read more: https://nextjs.org/docs/api-reference/next/image#sizes
+[browser] Image with src "/assets/images/pages/signed.webp" has "fill" but is missing "sizes" prop. Please add it to improve page performance. Read more: https://nextjs.org/docs/api-reference/next/image#sizes
+[browser] Image with src "/assets/images/pages/patek.webp" has "fill" but is missing "sizes" prop. Please add it to improve page performance. Read more: https://nextjs.org/docs/api-reference/next/image#sizes
+[browser] Image with src "/assets/images/shop/shop-14k-oval-link-chain-necklace-01.png" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "/assets/images/shop/shop-18k-italian-anchor-link-infinity-chain-06.png" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Uncaught ReferenceError: formatLengthChip is not defined
+    at ProductCard (src/components/shop/ProductCard.tsx:31:23)
+    at <anonymous> (src\app\[locale]\shop\page.tsx:489:23)
+    at Array.map (<anonymous>:1:18)
+    at renderShopPage (src\app\[locale]\shop\page.tsx:488:40)
+  29 |   const purityChipStyle = getPurityChipStyle(product);
+  30 |   const weightLabel = formatWeight(product.gram_weight ?? product.weight_grams);
+> 31 |   const lengthLabel = formatLengthChip(productLengthSizeDisplay(product));
+     |                       ^
+  32 |   const images = useMemo(
+  33 |     () => (product.image_urls?.length ? product.image_urls : product.images ?? []).filter(...
+  34 |     [product.image_urls, product.images],
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Image with src "/assets/images/shop/shop-18k-italian-anchor-link-infinity-chain-06.png" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "/assets/images/shop/shop-18k-italian-anchor-link-infinity-chain-06.png" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Uncaught ReferenceError: getProductCardFlagFallback is not defined
+    at ProductCard (src/components/shop/ProductCard.tsx:49:30)
+    at <anonymous> (src\app\[locale]\shop\page.tsx:489:23)
+    at Array.map (<anonymous>:1:18)
+    at renderShopPage (src\app\[locale]\shop\page.tsx:488:40)
+  47 |   const isModern = variant === 'modern';
+  48 |   const brand = product.brand?.trim() ?? '';
+> 49 |   const flagLabel = brand || getProductCardFlagFallback(product);
+     |                              ^
+  50 |   const showBrandTag = flagLabel.length > 0 && safeActiveImageIndex === 0 && !isImageArrow...
+  51 |
+  52 |   const cartItem: CartItem = {
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+      <LoadingBoundary name="account/" loading={null}>
+        <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/account?t..." tree={[...]} params={{locale:"en"}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="page" pagePath="[locale]/a...">
+                  <SegmentTrieNode>
+                  <AccountPage>
+                    <SiteHeader>
+                    <main className="account-pa...">
+                      <section>
+                      <AccountDashboard profile={{id:"f4bb3a...", ...}} fallbackEmail="rcman12589..." locale="en" ...>
+                        <div className="account-co...">
+                          <AccountTabs activeSection="orders" locale="en" onSelectTab={function selectTab}>
+                            <nav className="account-tabs" aria-label="Account menu">
+                              <button
+                                type="button"
++                               className=""
+-                               className="active"
++                               aria-current={undefined}
+-                               aria-current="page"
+                                onClick={function onClick}
+                              >
+                              <button
+                                type="button"
++                               className="active"
+-                               className=""
++                               aria-current="page"
+-                               aria-current={null}
+                                onClick={function onClick}
+                              >
+                              ...
+                          <section id="account-ov..." className="account-da...">
+                            <div className="account-ov...">
+                              <OrdersTab orders={[...]} locale="en">
+                                <div
++                                 className="account-card account-tab-card"
+-                                 className="account-tab-stack"
+                                >
++                                 <p className="account-tab-eyebrow">
+-                                 <div className="account-tab-heading">
+                                  ...
+                            ...
+                          ...
+                    ...
+                ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at p (<anonymous>)
+    at OrdersTab (src/components/account/AccountDashboard.tsx:281:7)
+    at AccountDashboard (src/components/account/AccountDashboard.tsx:71:38)
+    at AccountPage (src\app\[locale]\account\page.tsx:92:9)
+  279 |   return (
+  280 |     <div className="account-card account-tab-card">
+> 281 |       <p className="account-tab-eyebrow">{isEs ? 'Pedidos' : 'Orders'}</p>
+      |       ^
+  282 |       <h2>{isEs ? 'Historial de pedidos' : 'Order History'}</h2>
+  283 |       <p>{isEs ? 'Revisa tus pedidos y estados recientes.' : 'Review your recent order to...
+  284 |       {orders.length === 0 ? (

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { isProductPurchasable, isProductSold, productImagePaddingBackground, productImagePaddingForImage, productLengthSizeDisplay, productMetalVariantLabel, productStatusLabel, type Product, type SpotData } from '@/types/product';
+import { inferProductJewelryType, isProductPurchasable, isProductSold, productImagePaddingBackground, productImagePaddingForImage, productLengthSizeDisplay, productMetalVariantLabel, productStatusLabel, productSupportsLinkType, type Product, type SpotData } from '@/types/product';
 import { getDisplayPrice } from '@/lib/pricing';
 import WishlistButton from '@/components/shop/WishlistButton';
 import type { WishlistItem } from '@/context/WishlistContext';
@@ -20,6 +20,7 @@ interface Props {
 export default function ProductCard({ product, spotData, locale, variant = 'classic' }: Props) {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isImageHovering, setIsImageHovering] = useState(false);
+  const [isImageArrowHovering, setIsImageArrowHovering] = useState(false);
   const isEs = locale === 'es';
   const title = isEs && product.title_es ? product.title_es : product.title;
   const price = getDisplayPrice(product, spotData);
@@ -27,7 +28,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
   const purityLabel = formatPurity(product, isEs);
   const purityChipStyle = getPurityChipStyle(product);
   const weightLabel = formatWeight(product.gram_weight ?? product.weight_grams);
-  const lengthLabel = productLengthSizeDisplay(product);
+  const lengthLabel = formatLengthChip(productLengthSizeDisplay(product));
   const images = useMemo(
     () => (product.image_urls?.length ? product.image_urls : product.images ?? []).filter(Boolean),
     [product.image_urls, product.images],
@@ -44,6 +45,11 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
   const isSold = isProductSold(product.status);
   const isPurchasable = isProductPurchasable(product.status);
   const isModern = variant === 'modern';
+  const brand = product.brand?.trim() ?? '';
+  const fallbackFlagLabel = getProductCardFlagFallback(product);
+  const flagLabel = brand || fallbackFlagLabel;
+  const isBrandFlag = brand.length > 0;
+  const showBrandTag = flagLabel.length > 0 && safeActiveImageIndex === 0 && !isImageArrowHovering;
 
   const cartItem: CartItem = {
     id: product.id,
@@ -137,7 +143,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
       >
         {isSold && (
           <div
-            className="absolute top-3 left-3 z-10 text-[0.6rem] font-bold tracking-widest uppercase px-2 py-0.5"
+            className="shop-card-status-tag absolute top-3 left-3 z-10 text-[0.6rem] font-bold tracking-widest uppercase px-2 py-0.5"
             style={{
               background: isModern ? '#1f2321' : 'var(--color-on-surface)',
               color: 'var(--color-surface)',
@@ -149,7 +155,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
         )}
         {!isSold && (
           <div
-            className="absolute top-3 left-3 z-10 text-[0.6rem] font-bold tracking-widest uppercase px-2 py-0.5"
+            className="shop-card-status-tag absolute top-3 left-3 z-10 text-[0.6rem] font-bold tracking-widest uppercase px-2 py-0.5"
             style={{
               background: isPurchasable ? (isModern ? 'linear-gradient(135deg, #d5a820, #ad8507)' : 'var(--color-primary)') : '#8a5a00',
               color: isModern ? '#fffdf7' : 'var(--color-on-primary)',
@@ -165,6 +171,29 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
           <WishlistButton item={wishlistItem} variant="icon" locale={locale} />
         </div>
 
+        {showBrandTag && (
+          <div
+            className={`shop-card-brand-tag ${isBrandFlag ? 'shop-card-brand-tag-brand' : 'shop-card-brand-tag-link'} absolute bottom-2 left-2 z-10 max-w-[70%] truncate px-2.5 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.16em] transition-opacity duration-150`}
+            style={{
+              background: isBrandFlag
+                ? 'linear-gradient(135deg, rgba(255, 253, 246, 0.96), rgba(246, 232, 184, 0.94))'
+                : 'rgba(255, 252, 246, 0.92)',
+              border: isBrandFlag
+                ? '1px solid rgba(181, 137, 12, 0.42)'
+                : '1px solid rgba(115, 92, 0, 0.22)',
+              borderRadius: isModern ? '6px' : undefined,
+              color: 'var(--color-primary)',
+              fontFamily: 'var(--font-label)',
+              boxShadow: isBrandFlag
+                ? '0 7px 18px rgba(42, 34, 12, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.82)'
+                : '0 6px 16px rgba(42, 34, 12, 0.14)',
+              textShadow: isBrandFlag ? '0 1px 0 rgba(255, 255, 255, 0.72)' : undefined,
+            }}
+          >
+            {flagLabel}
+          </div>
+        )}
+
         {activeImage ? (
           <Link href={href} className="absolute inset-0">
             {images.map((image, index) => (
@@ -173,7 +202,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
                 src={image}
                 alt={title}
                 fill
-                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1719px) 25vw, (max-width: 1959px) 20vw, (max-width: 2319px) 16vw, 14vw"
                 className={`pointer-events-none object-contain object-center transition-opacity duration-700 ease-in-out ${
                   index === safeActiveImageIndex ? 'opacity-100' : 'opacity-0'
                 }`}
@@ -197,6 +226,10 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
                   event.stopPropagation();
                   showPreviousImage();
                 }}
+                onPointerEnter={() => setIsImageArrowHovering(true)}
+                onPointerLeave={() => setIsImageArrowHovering(false)}
+                onFocus={() => setIsImageArrowHovering(true)}
+                onBlur={() => setIsImageArrowHovering(false)}
                 className="absolute bottom-2 left-2 z-20 inline-flex h-6 w-6 items-center justify-center border text-sm font-bold transition-colors"
                 style={{
                   borderColor: 'rgba(115, 92, 0, 0.3)',
@@ -217,6 +250,10 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
                   event.stopPropagation();
                   showNextImage();
                 }}
+                onPointerEnter={() => setIsImageArrowHovering(true)}
+                onPointerLeave={() => setIsImageArrowHovering(false)}
+                onFocus={() => setIsImageArrowHovering(true)}
+                onBlur={() => setIsImageArrowHovering(false)}
                 className="absolute bottom-2 right-2 z-20 inline-flex h-6 w-6 items-center justify-center border text-sm font-bold transition-colors"
                 style={{
                   borderColor: 'rgba(115, 92, 0, 0.3)',
@@ -381,6 +418,48 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
             padding-top: 0.22rem;
             padding-bottom: 0.22rem;
           }
+          @media (max-width: 640px) {
+            .shop-card-status-tag {
+              top: 0.35rem !important;
+              left: 0.35rem !important;
+              padding: 0.12rem 0.32rem !important;
+              font-size: 0.44rem !important;
+              letter-spacing: 0.08em !important;
+              border-radius: 3px !important;
+              box-shadow: 0 4px 10px rgba(115, 92, 0, 0.14) !important;
+            }
+          }
+          .shop-card-brand-tag-link {
+            padding-top: 0.22rem !important;
+            padding-bottom: 0.22rem !important;
+            font-size: 0.56rem !important;
+            line-height: 1 !important;
+            letter-spacing: 0.12em !important;
+          }
+          @media (max-width: 640px) {
+            .shop-card-brand-tag-link {
+              bottom: 0.35rem !important;
+              left: 0.35rem !important;
+              padding: 0.14rem 0.38rem !important;
+              font-size: 0.48rem !important;
+              letter-spacing: 0.08em !important;
+              border-radius: 3px !important;
+            }
+          }
+          @media (max-width: 640px) {
+            .modern-product-card .modern-card-body {
+              padding-left: 0.35rem;
+              padding-right: 0.35rem;
+            }
+            .modern-product-card .modern-card-body > .grid {
+              gap: 0.08rem;
+              font-size: 0.58rem;
+            }
+            .modern-product-card .modern-card-body > .grid span {
+              padding-left: 0.08rem;
+              padding-right: 0.08rem;
+            }
+          }
           /* Tighten the action row above the Add button */
           .modern-product-card .modern-card-body > .flex:last-child {
             padding-top: 0.4rem;
@@ -417,6 +496,10 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
               opacity: 1;
               transform: translateY(0);
             }
+            .modern-product-card:hover .shop-card-brand-tag,
+            .modern-product-card:focus-within .shop-card-brand-tag {
+              opacity: 0;
+            }
           }
         `}</style>
       )}
@@ -427,9 +510,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
 function formatPurity(product: Product, isEs: boolean): string {
   if (!product.purity) return isEs ? 'No indicado' : 'Not listed';
   if (product.category === 'Silver' && product.purity >= 100) {
-    return product.purity === 925
-      ? `925 ${isEs ? 'esterlina' : 'sterling'}`
-      : `${product.purity}`;
+    return `${product.purity}`;
   }
   return `${product.purity}K`;
 }
@@ -457,7 +538,32 @@ function getPurityChipStyle(product: Product) {
 
 function formatWeight(weight: number | null): string {
   if (!weight) return '—';
+  const maximumFractionDigits = weight >= 100 ? 1 : weight >= 10 ? 1 : 2;
   return `${new Intl.NumberFormat('en-US', {
-    maximumFractionDigits: weight % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: weight % 1 === 0 ? 0 : maximumFractionDigits,
   }).format(weight)}g`;
+}
+
+function formatLengthChip(value: string | null): string | null {
+  if (!value) return null;
+  const ringSize = value.match(/^Size:\s*(.+)$/i);
+  if (ringSize) return ringSize[1];
+
+  const inchValue = value.match(/^(\d+(?:\.\d+)?)\s*in$/i);
+  if (!inchValue) return value;
+
+  const numeric = Number(inchValue[1]);
+  if (!Number.isFinite(numeric)) return value;
+  const compact = numeric >= 10
+    ? Math.round(numeric)
+    : Number.isInteger(numeric) ? numeric : Number(numeric.toFixed(1));
+  return `${compact}in`;
+}
+
+function getProductCardFlagFallback(product: Product): string {
+  const jewelryType = inferProductJewelryType(product);
+  if (!productSupportsLinkType(jewelryType)) return '';
+
+  const linkType = product.chain_type ?? (product.tags ?? []).find((tag) => tag.startsWith('ct:'))?.slice(3) ?? '';
+  return linkType.trim();
 }

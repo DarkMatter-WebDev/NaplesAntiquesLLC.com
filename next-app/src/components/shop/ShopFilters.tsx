@@ -472,6 +472,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
                 <option value="earrings">{isEs ? 'Aretes' : 'Earrings'}</option>
                 <option value="ring">{isEs ? 'Anillos' : 'Rings'}</option>
                 <option value="pendant">{isEs ? 'Dijes' : 'Pendants'}</option>
+                <option value="charm">{isEs ? 'Charms' : 'Charms'}</option>
                 <option value="brooch">{isEs ? 'Broches' : 'Brooches'}</option>
                 <option value="watch">{isEs ? 'Relojes' : 'Watches'}</option>
                 <option value="coin">{isEs ? 'Monedas' : 'Coins'}</option>
@@ -482,6 +483,27 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
                 <option value="estate-lot">{isEs ? 'Lotes de sucesion' : 'Estate Lots'}</option>
               </select>
             </div>
+
+            {/* Link Type */}
+            {showLinkTypeFilter && (
+              <div>
+                <label style={labelStyle}>{isEs ? 'Tipo de enlace' : 'Link Type'}</label>
+                <select
+                  value={currentFilters.chainType ?? ''}
+                  onChange={(e) => updateFilter('chainType', e.target.value)}
+                  style={selectStyle}
+                >
+                  <option value="">{isEs ? 'Todos los enlaces' : 'All link types'}</option>
+                  <option value="cuban-link">{isEs ? 'Cubana' : 'Cuban link'}</option>
+                  <option value="figaro-link">{isEs ? 'Figaro' : 'Figaro link'}</option>
+                  <option value="rope-chain">{isEs ? 'Cuerda' : 'Rope chain'}</option>
+                  <option value="anchor-link">{isEs ? 'Ancla / Gucci' : 'Anchor / Gucci'}</option>
+                  <option value="oval-link">{isEs ? 'Ovalada' : 'Oval link'}</option>
+                  <option value="byzantine-link">{isEs ? 'Bizantina' : 'Byzantine'}</option>
+                  <option value="box-link">{isEs ? 'Caja' : 'Box link'}</option>
+                </select>
+              </div>
+            )}
 
             {/* Brand */}
             <div>
@@ -554,27 +576,6 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
                 ))}
               </select>
             </div>
-
-            {/* Link Type */}
-            {showLinkTypeFilter && (
-              <div>
-                <label style={labelStyle}>{isEs ? 'Tipo de enlace' : 'Link Type'}</label>
-                <select
-                  value={currentFilters.chainType ?? ''}
-                  onChange={(e) => updateFilter('chainType', e.target.value)}
-                  style={selectStyle}
-                >
-                  <option value="">{isEs ? 'Todos los enlaces' : 'All link types'}</option>
-                  <option value="cuban-link">{isEs ? 'Cubana' : 'Cuban link'}</option>
-                  <option value="figaro-link">{isEs ? 'Figaro' : 'Figaro link'}</option>
-                  <option value="rope-chain">{isEs ? 'Cuerda' : 'Rope chain'}</option>
-                  <option value="anchor-link">{isEs ? 'Ancla / Gucci' : 'Anchor / Gucci'}</option>
-                  <option value="oval-link">{isEs ? 'Ovalada' : 'Oval link'}</option>
-                  <option value="byzantine-link">{isEs ? 'Bizantina' : 'Byzantine'}</option>
-                  <option value="box-link">{isEs ? 'Caja' : 'Box link'}</option>
-                </select>
-              </div>
-            )}
 
             {/* Sort */}
             <div>

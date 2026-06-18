@@ -336,6 +336,7 @@ function OrderDetailsDialog({
 }) {
   const isEs = locale === 'es';
   const itemCount = order.order_items?.length ?? 0;
+  const accountOrdersHref = isEs ? '/es/account?tab=orders' : '/account?tab=orders';
 
   return (
     <div className="account-order-dialog-backdrop" role="dialog" aria-modal="true" aria-label={isEs ? 'Detalles del pedido' : 'Order details'}>
@@ -363,8 +364,12 @@ function OrderDetailsDialog({
             <p className="account-order-muted">{isEs ? 'No hay articulos guardados para este pedido.' : 'No saved items are attached to this order.'}</p>
           ) : (
             <div className="account-order-item-list">
-              {order.order_items?.map((item) => (
-                <div key={item.id} className="account-order-item">
+              {order.order_items?.map((item) => {
+                const productHref = item.product_id
+                  ? `${isEs ? '/es/shop' : '/shop'}/${item.product_id}?returnTo=${encodeURIComponent(accountOrdersHref)}`
+                  : null;
+                const rowContent = (
+                  <>
                   <div className="account-order-item-image">
                     {item.image_snapshot ? (
                       <Image src={item.image_snapshot} alt={item.title_snapshot} fill sizes="96px" className="object-contain" unoptimized={item.image_snapshot.startsWith('/assets/')} />
@@ -381,8 +386,19 @@ function OrderDetailsDialog({
                     </span>
                   </div>
                   <b>{formatCurrency(item.price_snapshot)}</b>
-                </div>
-              ))}
+                  </>
+                );
+
+                return productHref ? (
+                  <Link key={item.id} href={productHref} className="account-order-item account-order-item-link">
+                    {rowContent}
+                  </Link>
+                ) : (
+                  <div key={item.id} className="account-order-item">
+                    {rowContent}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

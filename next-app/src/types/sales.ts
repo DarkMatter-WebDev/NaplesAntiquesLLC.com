@@ -27,6 +27,7 @@ export interface OrderItem {
   purity_snapshot: string | null;
   gram_weight_snapshot: number | null;
   price_snapshot: number;
+  discount?: number;
   image_snapshot: string | null;
   created_at: string;
 }

@@ -39,6 +39,7 @@ export type ProductJewelryType =
   | 'Bracelet'
   | 'Ring'
   | 'Pendant'
+  | 'Charm'
   | 'Earrings'
   | 'Brooch'
   | 'Watch'
@@ -235,6 +236,7 @@ export const PRODUCT_JEWELRY_TYPES: { value: ProductJewelryType; label: string; 
   { value: 'Bracelet', label: 'Bracelet', labelEs: 'Pulsera' },
   { value: 'Ring', label: 'Ring', labelEs: 'Anillo' },
   { value: 'Pendant', label: 'Pendant', labelEs: 'Dije' },
+  { value: 'Charm', label: 'Charm', labelEs: 'Charm' },
   { value: 'Earrings', label: 'Earrings', labelEs: 'Aretes' },
   { value: 'Brooch', label: 'Brooch', labelEs: 'Broche' },
   { value: 'Watch', label: 'Watch', labelEs: 'Reloj' },
@@ -262,7 +264,8 @@ const JEWELRY_TYPE_KEYWORDS: Record<ProductJewelryType, string[]> = {
   Necklace: ['necklace', 'chain', 'collar', 'cadena'],
   Bracelet: ['bracelet', 'bangle', 'pulsera', 'esclava'],
   Ring: ['ring', 'band', 'anillo'],
-  Pendant: ['pendant', 'charm', 'dije'],
+  Pendant: ['pendant', 'dije'],
+  Charm: ['charm', 'charms'],
   Earrings: ['earring', 'earrings', 'arete', 'aretes'],
   Brooch: ['brooch', 'pin', 'broche'],
   Watch: ['watch', 'watches', 'wristwatch', 'wrist watch', 'timepiece', 'reloj'],
@@ -283,7 +286,8 @@ export function normalizeProductJewelryType(value: string | null | undefined): P
   if (normalized === 'necklaces' || normalized === 'chain' || normalized === 'chains') return 'Necklace';
   if (normalized === 'bracelets' || normalized === 'bangle') return 'Bracelet';
   if (normalized === 'rings' || normalized === 'band') return 'Ring';
-  if (normalized === 'pendants' || normalized === 'charm') return 'Pendant';
+  if (normalized === 'pendants') return 'Pendant';
+  if (normalized === 'charms') return 'Charm';
   if (normalized === 'earring') return 'Earrings';
   if (normalized === 'brooches' || normalized === 'pin') return 'Brooch';
   if (normalized === 'watches' || normalized === 'wristwatch' || normalized === 'wrist watch' || normalized === 'timepiece' || normalized === 'timepieces') return 'Watch';

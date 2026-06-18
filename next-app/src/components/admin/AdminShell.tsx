@@ -32,6 +32,7 @@ import {
   productMetalVariantLabel,
   type Product,
   type ProductImagePadding,
+  type ProductImagePaddingMap,
   type ProductJewelryType,
   type ProductMetalType,
   type ProductMetalVariant,
@@ -1622,9 +1623,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     if (!editing) return;
     setUploading(true);
 
-    const urls: string[] = [];
-    for (const file of Array.from(files)) {
-      // Compress to WebP via canvas
+    const [firstFile, ...restFiles] = Array.from(files);
+
+    async function processAndUpload(file: File): Promise<string | null> {
       const bitmap = await createImageBitmap(file);
       const canvas = document.createElement('canvas');
       const MAX = 1200;
@@ -1633,18 +1634,32 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       canvas.height = Math.round(bitmap.height * scale);
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-
       const blob = await new Promise<Blob>((res) =>
         canvas.toBlob((b) => res(b!), 'image/webp', 0.85)
       );
-
-      const url = await uploadImageBlob(blob);
-      if (url) urls.push(url);
+      return uploadImageBlob(blob);
     }
 
-    setEditing((prev) => prev ? { ...prev, images: [...prev.images, ...urls] } : prev);
+    let successCount = 0;
+
+    // Upload the first photo and add it to state immediately so the AI assistant
+    // becomes available while the remaining photos continue uploading in the background.
+    const firstUrl = await processAndUpload(firstFile);
+    if (firstUrl) {
+      successCount++;
+      setEditing((prev) => prev ? { ...prev, images: [...prev.images, firstUrl] } : prev);
+    }
+
+    for (const file of restFiles) {
+      const url = await processAndUpload(file);
+      if (url) {
+        successCount++;
+        setEditing((prev) => prev ? { ...prev, images: [...prev.images, url] } : prev);
+      }
+    }
+
     setUploading(false);
-    if (urls.length) flash(`${urls.length} image(s) uploaded`);
+    if (successCount) flash(`${successCount} image(s) uploaded`);
   }, [editing, uploadImageBlob]);
 
   async function saveCroppedImage() {
@@ -1798,6 +1813,37 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       setImagePaddingTarget(nextProduct);
       const builtInLabel = IMAGE_PADDING_OPTIONS.find((option) => option.value === paddingValue)?.label;
       flash(`Photo ${imageIndex + 1} padding set to ${builtInLabel ?? paddingValue}`);
+      return true;
+    }
+
+    const message = error.message.includes('image_padding_by_image')
+      ? 'Per-photo padding needs the updated Supabase image-padding SQL. Run supabase/product-image-padding.sql, then try again.'
+      : error.message.includes('products_image_padding_check')
+      ? 'Custom padding colors need the updated Supabase image-padding SQL. Run supabase/product-image-padding.sql, then try again.'
+      : error.message;
+    setImagePaddingNotice({ text: message, ok: false });
+    flash(message, false);
+    return false;
+  }
+
+  async function applyImagePaddingToAll(product: Product, paddingValue: ProductImagePadding | string) {
+    const normalized = normalizeProductImagePaddingValue(paddingValue);
+    const images = getProductImages(product);
+    const nextMap: ProductImagePaddingMap = {};
+    images.forEach((image, index) => {
+      nextMap[productImagePaddingMapKey(image, index)] = normalized;
+    });
+    const { error } = await supabase
+      .from('products')
+      .update({ image_padding_by_image: nextMap })
+      .eq('id', product.id);
+
+    if (!error) {
+      const nextProduct = { ...product, image_padding_by_image: nextMap };
+      setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, image_padding_by_image: nextMap } : p));
+      setImagePaddingTarget(nextProduct);
+      const builtInLabel = IMAGE_PADDING_OPTIONS.find((option) => option.value === normalized)?.label;
+      flash(`Padding set to ${builtInLabel ?? normalized} for all ${images.length} photos`);
       return true;
     }
 
@@ -2996,28 +3042,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   {aiRecording ? 'Listening... tap to stop' : "Let's begin - tap here to talk"}
                 </button>
 
-                <div className="ai-helper-card">
-                  <h4>Help us create the best listing</h4>
-                  <p>Start recording, slowly scroll through these prompts, and describe the item out loud. You can also type or edit the transcript below.</p>
-                  <div className="ai-question-list">
-                    {[
-                      ['What is it?', 'Tell us what the item is.'],
-                      ['Where did it come from?', 'Mention maker, brand, origin, estate source, or anything known.'],
-                      ['What condition is it in?', 'Note wear, scratches, repairs, damage, or missing pieces.'],
-                      ['Do you see names, labels, stamps, or markings?', 'Read anything written on the item, tag, clasp, box, or underside.'],
-                      ['What measurements are known?', 'Include purity, weight, size, length, width, or stone details if known.'],
-                    ].map(([title, copy], index) => (
-                      <div key={title} className="ai-question-item">
-                        <span>{index + 1}</span>
-                        <div>
-                          <strong>{title}</strong>
-                          <p>{copy}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
                 <textarea
                   className="form-field w-full text-sm min-h-[96px]"
                   placeholder="Speak or type: marked 14K, 25.3 grams, Omega watch, light wear, box clasp, 7.5 inch bracelet..."
@@ -3258,28 +3282,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   <span className="material-symbols-outlined" aria-hidden="true">{aiRecording ? 'stop_circle' : 'mic'}</span>
                   {aiRecording ? 'Listening... tap to stop' : "Let's begin - tap here to talk"}
                 </button>
-
-                <div className="ai-helper-card">
-                  <h4>Help us create the best listing</h4>
-                  <p>Start recording, slowly scroll through these prompts, and describe the item out loud. You can also type or edit the transcript below.</p>
-                  <div className="ai-question-list">
-                    {[
-                      ['What is it?', 'Tell us what the item is.'],
-                      ['Where did it come from?', 'Mention maker, brand, origin, estate source, or anything known.'],
-                      ['What condition is it in?', 'Note wear, scratches, repairs, damage, or missing pieces.'],
-                      ['Do you see names, labels, stamps, or markings?', 'Read anything written on the item, tag, clasp, box, or underside.'],
-                      ['What measurements are known?', 'Include purity, weight, size, length, width, or stone details if known.'],
-                    ].map(([title, copy], index) => (
-                      <div key={title} className="ai-question-item">
-                        <span>{index + 1}</span>
-                        <div>
-                          <strong>{title}</strong>
-                          <p>{copy}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
 
                 <textarea
                   className="form-field w-full text-sm min-h-[96px]"
@@ -4211,7 +4213,27 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 </p>
               )}
             </div>
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-3">
+              {(() => {
+                const allImages = getProductImages(imagePaddingTarget);
+                if (allImages.length <= 1) return <span />;
+                const selImage = allImages[imagePaddingTargetIndex] ?? null;
+                const curPad = productImagePaddingForImage(
+                  imagePaddingTarget.image_padding,
+                  imagePaddingTarget.image_padding_by_image,
+                  selImage,
+                  imagePaddingTargetIndex,
+                );
+                return (
+                  <button
+                    type="button"
+                    onClick={() => applyImagePaddingToAll(imagePaddingTarget, curPad)}
+                    className="outline-button text-sm"
+                  >
+                    Apply to All Photos
+                  </button>
+                );
+              })()}
               <button type="button" onClick={() => setImagePaddingTarget(null)} className="gold-button text-sm">
                 Close
               </button>
