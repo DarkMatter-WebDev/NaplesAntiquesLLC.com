@@ -5,7 +5,7 @@ import SiteHeader from '@/components/layout/SiteHeader';
 import AccountDashboard from '@/components/account/AccountDashboard';
 import { type CustomerProfile } from '@/components/account/AccountProfileForm';
 import SiteFooter from '@/components/layout/SiteFooter';
-import type { Order } from '@/types/sales';
+import type { Order, OrderItem } from '@/types/sales';
 
 export const metadata: Metadata = {
   title: 'My Account',
@@ -60,6 +60,33 @@ export default async function AccountPage({ params }: Props) {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(25);
+  const accountOrders = (orders ?? []) as Order[];
+  const productIds = Array.from(new Set(
+    accountOrders
+      .flatMap((order) => order.order_items ?? [])
+      .map((item) => item.product_id)
+      .filter((id): id is string => Boolean(id)),
+  ));
+  const { data: productInventoryRows } = productIds.length > 0
+    ? await supabase
+        .from('products')
+        .select('id, inventory_number')
+        .in('id', productIds)
+    : { data: [] };
+  const productInventoryById = new Map(
+    (productInventoryRows ?? []).map((product) => [String(product.id), product.inventory_number == null ? null : String(product.inventory_number)]),
+  );
+  const ordersWithInventory = accountOrders.map((order) => ({
+    ...order,
+    order_items: (order.order_items ?? []).map((item: OrderItem) => {
+      const snapshotInventory = formatCustomerInventoryValue(item.inventory_number);
+      const productInventory = item.product_id ? formatCustomerInventoryValue(productInventoryById.get(item.product_id)) : null;
+      return {
+        ...item,
+        inventory_number: snapshotInventory ?? productInventory,
+      };
+    }),
+  }));
 
   return (
     <>
@@ -95,7 +122,7 @@ export default async function AccountPage({ params }: Props) {
           locale={locale}
           isAdmin={isAdmin}
           memberSince={memberSince}
-          orders={(orders ?? []) as Order[]}
+          orders={ordersWithInventory}
         />
       </main>
       <SiteFooter locale={locale} />
@@ -491,6 +518,23 @@ export default async function AccountPage({ params }: Props) {
           font-size: 0.9rem;
           line-height: 1.25;
         }
+        .account-order-item-inventory {
+          display: inline-flex;
+          width: fit-content;
+          margin-top: 0.3rem;
+          border: 1px solid rgba(115, 92, 0, 0.18);
+          border-radius: 999px;
+          background: rgba(181, 137, 12, 0.07);
+          color: var(--color-primary);
+          font-family: var(--font-label);
+          font-size: 0.62rem;
+          font-style: normal;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          line-height: 1;
+          padding: 0.22rem 0.45rem;
+          text-transform: uppercase;
+        }
         .account-order-item span {
           display: block;
           margin-top: 0.25rem;
@@ -873,4 +917,10 @@ export default async function AccountPage({ params }: Props) {
       `}</style>
     </>
   );
+}
+
+function formatCustomerInventoryValue(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value).trim().replace(/^#\s*/, '');
+  return /^\d+$/.test(normalized) ? normalized : null;
 }

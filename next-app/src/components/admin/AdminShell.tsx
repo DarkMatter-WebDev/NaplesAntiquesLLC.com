@@ -476,13 +476,14 @@ const AI_PRODUCT_FIELD_LABELS: Record<keyof ProductAutofillFields, string> = {
   public_notes: 'Public Notes',
 };
 
-const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null; widthClass?: string }[] = [
+const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null; widthClass?: string; responsiveClass?: string }[] = [
   { label: 'Inv #', sortKey: 'inventoryNumber', widthClass: 'w-[54px]' },
   { label: 'Image', sortKey: 'image', widthClass: 'w-16' },
   { label: 'Title', sortKey: 'title', widthClass: 'w-[210px]' },
   { label: 'Brand', sortKey: 'brand', widthClass: 'w-[92px]' },
   { label: 'Metal Color', sortKey: 'metalVariant', widthClass: 'w-[104px]' },
   { label: 'Type', sortKey: 'jewelryType', widthClass: 'w-[78px]' },
+  { label: 'Link Type', sortKey: 'chainType', widthClass: 'w-[118px]', responsiveClass: 'hidden 2xl:table-cell' },
   { label: 'Size', sortKey: 'length', widthClass: 'w-[72px]' },
   { label: 'Featured', sortKey: 'featured', widthClass: 'w-[72px]' },
   { label: 'Purity', sortKey: 'purity', widthClass: 'w-[64px]' },
@@ -1783,6 +1784,21 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setEditing((prev) => prev ? { ...prev, images: prev.images.filter((_, i) => i !== idx) } : prev);
   }
 
+  function moveImage(idx: number, direction: -1 | 1) {
+    moveImageToIndex(idx, idx + direction);
+  }
+
+  function moveImageToIndex(idx: number, nextIndex: number) {
+    setEditing((prev) => {
+      if (!prev) return prev;
+      if (nextIndex < 0 || nextIndex >= prev.images.length || nextIndex === idx) return prev;
+      const images = [...prev.images];
+      const [moved] = images.splice(idx, 1);
+      images.splice(nextIndex, 0, moved);
+      return { ...prev, images, image_urls: images };
+    });
+  }
+
   async function updateProductStatus(product: Product, status: ProductStatus) {
     const { error } = await supabase.from('products').update({ status }).eq('id', product.id);
     if (!error) {
@@ -2592,7 +2608,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             )}
           </div>
           <div className="overflow-x-auto">
-            <table className="w-max min-w-[1680px] 2xl:min-w-[1840px] text-sm">
+            <table className="w-max min-w-[1680px] 2xl:min-w-[1960px] text-sm">
               <thead>
                 <tr className="border-b text-left" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}>
                   <th
@@ -2601,14 +2617,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   >
                     Order
                   </th>
-                  {PRODUCT_TABLE_COLUMNS.map(({ label, sortKey, widthClass }) => {
+                  {PRODUCT_TABLE_COLUMNS.map(({ label, sortKey, widthClass, responsiveClass }) => {
                     const active = sortConfig?.key === sortKey;
                     const isActionsColumn = !sortKey;
                     return (
                       <th
                         key={label || 'actions'}
                         aria-sort={active ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : undefined}
-                        className={`px-2 py-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap ${widthClass ?? ''}${label === 'Brand' ? ' border-l text-center' : ''}${isActionsColumn ? ' sticky right-0 z-10' : ''}`}
+                        className={`px-2 py-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap ${widthClass ?? ''}${responsiveClass ? ` ${responsiveClass}` : ''}${label === 'Brand' ? ' border-l text-center' : ''}${isActionsColumn ? ' sticky right-0 z-10' : ''}`}
                         style={{
                           color: 'var(--color-on-surface-variant)',
                           fontFamily: 'var(--font-label)',
@@ -2720,6 +2736,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     </td>
                     <td className="px-2 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
                       {productJewelryTypeLabel(getProductJewelryType(p))}
+                    </td>
+                    <td className="hidden px-2 py-3 w-[118px] max-w-[118px] 2xl:table-cell" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      <span className="block truncate">{getProductLinkType(p) || '-'}</span>
                     </td>
                     <td className="px-2 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
                       {getProductLength(p) || '-'}
@@ -2928,10 +2947,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                             e.preventDefault();
                             e.stopPropagation();
                             if (dragSrcIdx === null || dragSrcIdx === i) { setDragSrcIdx(null); setDragOverIdx(null); return; }
-                            const imgs = [...editing.images];
-                            const [moved] = imgs.splice(dragSrcIdx, 1);
-                            imgs.splice(i, 0, moved);
-                            setEditing({ ...editing, images: imgs });
+                            moveImageToIndex(dragSrcIdx, i);
                             setDragSrcIdx(null);
                             setDragOverIdx(null);
                           }}
@@ -2950,6 +2966,31 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                           {i === 0 && <div className="product-photo-cover-badge">Cover</div>}
                           <Image src={img} alt="" fill sizes="120px" className="object-cover"
                             unoptimized={img.startsWith('/assets/')} />
+                          {editing.images.length > 1 && (
+                            <div className="product-photo-reorder-controls" aria-label={`Reorder photo ${i + 1}`}>
+                              <button
+                                type="button"
+                                onClick={() => moveImage(i, -1)}
+                                className="product-photo-reorder-button"
+                                disabled={i === 0}
+                                title="Move earlier"
+                                aria-label={`Move photo ${i + 1} earlier`}
+                              >
+                                <span className="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+                              </button>
+                              <span className="product-photo-order-count">{i + 1}</span>
+                              <button
+                                type="button"
+                                onClick={() => moveImage(i, 1)}
+                                className="product-photo-reorder-button"
+                                disabled={i === editing.images.length - 1}
+                                title="Move later"
+                                aria-label={`Move photo ${i + 1} later`}
+                              >
+                                <span className="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+                              </button>
+                            </div>
+                          )}
                           <div className="product-photo-thumb-overlay">
                             <button
                               type="button"

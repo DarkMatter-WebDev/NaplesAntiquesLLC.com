@@ -123,6 +123,18 @@ export default function CartButton({ item, variant = 'card', locale = 'en' }: Pr
         .shop-card-cart-button .material-symbols-outlined {
           font-size: 12px !important;
         }
+        @media (max-width: 430px) {
+          .shop-card-cart-button {
+            min-height: 1.55rem;
+            padding-block: 0.08rem;
+            padding-inline: 0.28rem;
+            font-size: 0.52rem;
+            gap: 0.16rem;
+          }
+          .shop-card-cart-button .material-symbols-outlined {
+            font-size: 10px !important;
+          }
+        }
         .shop-card-cart-label-full {
           display: none;
         }

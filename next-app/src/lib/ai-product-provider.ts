@@ -6,6 +6,11 @@ export type GenerateProductDraftInput = {
   origin?: string;
   schema: typeof PRODUCT_AUTOFILL_SCHEMA;
   mode?: 'fast' | 'accurate' | 'premium';
+  /**
+   * Optional admin-configured system prompt override (from the ai_settings
+   * table). When omitted or blank, the built-in default below is used.
+   */
+  systemPrompt?: string;
 };
 
 export type GenerateProductDraftOutput = {
@@ -18,7 +23,7 @@ export type GenerateProductDraftOutput = {
   };
 };
 
-const PROMPT_VERSION = 'product-listing-extraction-v5';
+export const PROMPT_VERSION = 'product-listing-extraction-v5';
 const DEFAULT_TIMEOUT_MS = 30000;
 
 // Anthropic has no `response_format` JSON mode and (for some models) rejects assistant
@@ -39,7 +44,7 @@ const ANTHROPIC_OUTPUT_TOOL = {
   },
 } as const;
 
-const PRODUCT_EXTRACTION_SYSTEM_PROMPT = `You are a careful jewelry catalog assistant for Naples Estate Jewelry. You help an admin populate intake fields from item photos plus an optional spoken or typed description. You are interpretive but not imaginative: organize messy input, classify obvious item forms from photos, and write useful titles and descriptions — but never invent unsupported jewelry facts. Think like a careful catalog assistant, not a salesperson, appraiser, or inventory manager.
+export const PRODUCT_EXTRACTION_SYSTEM_PROMPT = `You are a careful jewelry catalog assistant for Naples Estate Jewelry. You help an admin populate intake fields from item photos plus an optional spoken or typed description. You are interpretive but not imaginative: organize messy input, classify obvious item forms from photos, and write useful titles and descriptions — but never invent unsupported jewelry facts. Think like a careful catalog assistant, not a salesperson, appraiser, or inventory manager.
 
 Use the photos and the transcript together. Photos are the primary source; the transcript adds seller-stated facts. Return only the requested structured data. Any field you cannot support with evidence must be null. Prefer omission over guessing. Never output the operational fields status or location — those are not AI-controlled.
 
@@ -96,6 +101,11 @@ function providerConfig(mode?: GenerateProductDraftInput['mode']) {
   if (!provider) throw new Error('AI provider is not configured.');
   if (!model) throw new Error('AI model is not configured.');
   return { provider, model };
+}
+
+/** The active system prompt: the admin override when set, else the default. */
+function resolveSystemPrompt(input: GenerateProductDraftInput): string {
+  return input.systemPrompt?.trim() || PRODUCT_EXTRACTION_SYSTEM_PROMPT;
 }
 
 function buildUserPrompt(input: GenerateProductDraftInput) {
@@ -209,6 +219,7 @@ async function callOpenAi(input: GenerateProductDraftInput, model: string): Prom
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OpenAI API key is not configured.');
   const images = await prepareImages(input);
+  const systemPrompt = resolveSystemPrompt(input);
   const data = await postJson(
     'https://api.openai.com/v1/chat/completions',
     { authorization: `Bearer ${apiKey}` },
@@ -217,7 +228,7 @@ async function callOpenAi(input: GenerateProductDraftInput, model: string): Prom
       temperature: 0.1,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: PRODUCT_EXTRACTION_SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         {
           role: 'user',
           content: [
@@ -238,6 +249,7 @@ async function callAnthropic(input: GenerateProductDraftInput, model: string): P
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('Anthropic API key is not configured.');
   const images = await prepareImages(input);
+  const systemPrompt = resolveSystemPrompt(input);
   const data = await postJson(
     'https://api.anthropic.com/v1/messages',
     {
@@ -248,7 +260,7 @@ async function callAnthropic(input: GenerateProductDraftInput, model: string): P
       model,
       max_tokens: Number(process.env.AI_MAX_OUTPUT_TOKENS ?? 1800),
       temperature: 0.1,
-      system: [{ type: 'text', text: PRODUCT_EXTRACTION_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
       tools: [ANTHROPIC_OUTPUT_TOOL],
       tool_choice: { type: 'tool', name: ANTHROPIC_OUTPUT_TOOL.name },
       messages: [
@@ -283,6 +295,7 @@ async function callGoogle(input: GenerateProductDraftInput, model: string): Prom
   const apiKey = process.env.GOOGLE_AI_API_KEY;
   if (!apiKey) throw new Error('Google AI API key is not configured.');
   const images = await prepareImages(input);
+  const systemPrompt = resolveSystemPrompt(input);
   const data = await postJson(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
     {},
@@ -292,7 +305,7 @@ async function callGoogle(input: GenerateProductDraftInput, model: string): Prom
         responseMimeType: 'application/json',
         maxOutputTokens: Number(process.env.AI_MAX_OUTPUT_TOKENS ?? 1800),
       },
-      systemInstruction: { parts: [{ text: PRODUCT_EXTRACTION_SYSTEM_PROMPT }] },
+      systemInstruction: { parts: [{ text: systemPrompt }] },
       contents: [{
         role: 'user',
         parts: [
@@ -313,12 +326,13 @@ async function callLocal(input: GenerateProductDraftInput, model: string): Promi
   const endpoint = process.env.AI_LOCAL_ENDPOINT;
   if (!endpoint) throw new Error('Local AI endpoint is not configured.');
   const images = await prepareImages(input);
+  const systemPrompt = resolveSystemPrompt(input);
   const data = await postJson(
     endpoint,
     process.env.AI_LOCAL_API_KEY ? { authorization: `Bearer ${process.env.AI_LOCAL_API_KEY}` } : {},
     {
       model,
-      system: PRODUCT_EXTRACTION_SYSTEM_PROMPT,
+      system: systemPrompt,
       prompt: buildUserPrompt(input),
       images: images.map((image) => ({ dataUrl: image.dataUrl, mimeType: image.mimeType })),
       schema: input.schema,

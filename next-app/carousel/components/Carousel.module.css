@@ -1,0 +1,116 @@
+/* 3D rotating photo carousel — CSS Module.
+   Class names are locally scoped by Next.js, so nothing leaks. */
+
+.scene {
+  --spin: 32s;          /* seconds per full rotation        */
+  --cardW: 17.5em;      /* base card width                  */
+  --ar: 1 / 1;          /* card aspect ratio (square default) */
+  --bg: #ffffff;        /* backdrop color (overridden by JS) */
+  --perspective: 35em;  /* smaller = more extreme 3D effect */
+
+  display: grid;
+  place-items: center;
+  block-size: 80vh;
+  inline-size: 100%;
+  overflow: hidden;
+  perspective: var(--perspective);
+  background: var(--bg);
+  /* lateral fade toward the edges */
+  -webkit-mask: linear-gradient(90deg, #0000, red 20% 80%, #0000);
+          mask: linear-gradient(90deg, #0000, red 20% 80%, #0000);
+}
+
+.ring {
+  display: grid;
+  place-self: center;
+  transform-style: preserve-3d;
+  animation: ry var(--spin) linear infinite;
+  /* The ring container's 2D hit-box would intercept clicks before they reach
+     the front card in 3D space. Pass through to children instead. */
+  pointer-events: none;
+}
+
+/* Browsers inherit pointer-events: none from .ring, so re-enable on cards. */
+.card { pointer-events: auto; }
+
+@keyframes ry { to { rotate: y 1turn; } }
+
+.card {
+  --ba: calc(1turn / var(--n));
+  grid-area: 1 / 1;
+  position: relative;
+  width: var(--cardW);
+  aspect-ratio: var(--ar);
+  border-radius: 1.5em;
+  /* Padding around contained images uses this card's background color, so
+     a white-shot photo gets white padding and a black-shot photo gets black.
+     --card-bg is set per-card by the component; falls back to the global --bg. */
+  background: var(--card-bg, var(--bg));
+  overflow: hidden;
+  backface-visibility: hidden;
+  transform:
+    rotateY(calc(var(--i) * var(--ba)))
+    translateZ(calc(-1 * (.5 * var(--cardW) + .5em) / tan(.5 * var(--ba))));
+}
+
+/* Soft edge fade in the background color so a photo whose edges don't match
+   (i.e. not a cleanly floating item) blends gracefully into the background.
+   White background -> fades to white; black -> fades to black.
+   - box-shadow: a brief vignette on ALL four edges (works whether or not the
+     edge has contain padding, so a subject reaching any edge is softened).
+   - linear-gradient: a slightly stronger fade at the BOTTOM, where product
+     subjects most often rest right against the edge with no breathing room. */
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 1.5em 0.5em var(--card-bg, var(--bg));
+  background: linear-gradient(to top, var(--card-bg, var(--bg)) 0%, transparent 16%);
+}
+
+.card,
+.link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+/* clickable cards get a pointer + a subtle lift on hover */
+.link { cursor: pointer; transition: scale 0.2s ease; }
+.link:hover { scale: 1.04; }
+
+.img {
+  width: 100%;
+  height: 100%;
+  /* contain = show the whole image, never crop; surrounding space is filled
+     by the card's background (see .card) as matching padding. */
+  object-fit: contain;
+  border-radius: 1.5em;
+  display: block;
+}
+
+/* optional caption (name / price) under each card */
+.caption {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0.6em;
+  text-align: center;
+  font: 500 0.8em/1.2 system-ui, sans-serif;
+  color: #fff;
+  text-shadow: 0 1px 4px #000a;
+  padding: 0 0.5em;
+}
+
+.price { opacity: 0.85; font-weight: 400; }
+
+.empty {
+  place-self: center;
+  font: 400 1em/1.4 system-ui, sans-serif;
+  color: #00000080;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring { animation-duration: 128s; }
+}

@@ -42,6 +42,8 @@ interface Props {
     sort?: string;
     page?: string;
     perPage?: string;
+    priceMin?: string;
+    priceMax?: string;
   }>;
 }
 
@@ -201,6 +203,12 @@ function parsePage(value: string | undefined): number {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
 }
 
+function parsePriceFilter(value: string | undefined): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
 export default async function ShopPage({ params, searchParams }: Props) {
   return renderShopPage({ params, searchParams, variant: 'modern', routeSegment: 'shop' });
 }
@@ -232,6 +240,29 @@ export async function renderShopPage({
   const selectedLengths = normalizeLengths(filters.length);
   const allowedLengthValues = getAllowedLengthValues(filters.itemType);
   const effectiveSelectedLengths = selectedLengths.filter((length) => allowedLengthValues.includes(length));
+  const publicPrices = publicGalleryProducts
+    .map((product) => getSortablePrice(product, spotData))
+    .filter((price): price is number => price != null && Number.isFinite(price));
+  const priceRange = publicPrices.length > 0
+    ? {
+        min: Math.floor(Math.min(...publicPrices) / 50) * 50,
+        max: Math.ceil(Math.max(...publicPrices) / 50) * 50,
+      }
+    : null;
+  const parsedPriceMin = parsePriceFilter(filters.priceMin);
+  const parsedPriceMax = parsePriceFilter(filters.priceMax);
+  const selectedPriceMin = priceRange && parsedPriceMin != null
+    ? Math.min(Math.max(parsedPriceMin, priceRange.min), priceRange.max)
+    : null;
+  const selectedPriceMax = priceRange && parsedPriceMax != null
+    ? Math.min(Math.max(parsedPriceMax, priceRange.min), priceRange.max)
+    : null;
+  const effectivePriceMin = selectedPriceMin != null && selectedPriceMax != null
+    ? Math.min(selectedPriceMin, selectedPriceMax)
+    : selectedPriceMin;
+  const effectivePriceMax = selectedPriceMin != null && selectedPriceMax != null
+    ? Math.max(selectedPriceMin, selectedPriceMax)
+    : selectedPriceMax;
 
   const filtered = publicGalleryProducts.filter((p) => {
     if (filters.metal) {
@@ -276,6 +307,12 @@ export async function renderShopPage({
       if (g !== 'Unisex' && g !== filters.gender) return false;
     }
     if (filters.brand && p.brand?.trim() !== filters.brand) return false;
+    if (effectivePriceMin != null || effectivePriceMax != null) {
+      const price = getSortablePrice(p, spotData);
+      if (price == null) return false;
+      if (effectivePriceMin != null && price < effectivePriceMin) return false;
+      if (effectivePriceMax != null && price > effectivePriceMax) return false;
+    }
     return true;
   });
 
@@ -446,6 +483,7 @@ export async function renderShopPage({
                 filteredCount={sorted.length}
                 allCount={publicGalleryProducts.length}
                 spotData={spotData}
+                priceRange={priceRange}
                 variant={isModern ? 'modern' : 'classic'}
               />
             </aside>

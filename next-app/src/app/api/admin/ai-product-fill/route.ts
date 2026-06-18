@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { generateProductDraft } from '@/lib/ai-product-provider';
+import { fetchSystemPromptOverride } from '@/lib/ai-settings-store';
 import { PRODUCT_AUTOFILL_SCHEMA, coerceProductAutofill } from '@/lib/ai-product-schema';
 
 const MAX_TRANSCRIPT_LENGTH = 8000;
@@ -78,6 +79,9 @@ export async function POST(req: Request) {
   }
   const mode = body?.mode === 'accurate' || body?.mode === 'premium' || body?.mode === 'fast' ? body.mode : undefined;
 
+  // Admin-editable system prompt (Settings panel). Null = use the built-in default.
+  const systemPromptOverride = await fetchSystemPromptOverride(supabase);
+
   try {
     const result = await generateProductDraft({
       transcript,
@@ -85,6 +89,7 @@ export async function POST(req: Request) {
       origin: new URL(req.url).origin,
       schema: PRODUCT_AUTOFILL_SCHEMA,
       mode,
+      systemPrompt: systemPromptOverride ?? undefined,
     });
     const draft = coerceProductAutofill(result.draft);
     const populatedFields = Object.entries(draft.fields)
@@ -99,6 +104,7 @@ export async function POST(req: Request) {
       userId: user.id,
       provider: result.meta.provider,
       model: result.meta.model,
+      promptSource: systemPromptOverride ? 'custom' : 'default',
       populatedFields,
       rawTopLevelKeys,
       rawHadNestedFields,

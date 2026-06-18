@@ -35,16 +35,28 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
     setFullName('');
   }
 
+  // Inputs use a solid light fill with dark text so they're clearly legible
+  // over both the white and black hero backgrounds the carousel sweeps through.
+  const inputStyle: React.CSSProperties = {
+    background: 'rgba(255,255,255,0.96)',
+    borderColor: GOLD,
+    color: '#1a1a1a',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
+  };
+
   return (
     <form
       onSubmit={handleSubmit}
       className="w-full max-w-2xl"
       style={{
-        color: '#f9f9f7',
+        color: 'var(--hero-text)',
         fontFamily: 'var(--font-label)',
       }}
     >
-      <p className="mb-3 text-[0.68rem] font-bold uppercase tracking-[0.24em]" style={{ color: GOLD }}>
+      <p
+        className="mb-3 text-[0.68rem] font-bold uppercase tracking-[0.24em]"
+        style={{ color: 'var(--hero-eyebrow)', textShadow: '0 1px 10px rgba(var(--hero-fade), 0.9)' }}
+      >
         {isEs ? 'Reciba nuevas piezas primero' : 'Get first look at new pieces'}
       </p>
       <div
@@ -55,8 +67,8 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
           value={fullName}
           onChange={(event) => setFullName(event.target.value)}
           placeholder={isEs ? 'Nombre' : 'Name'}
-          className="h-11 min-w-0 border bg-white/10 px-3 text-sm outline-none placeholder:text-white/55"
-          style={{ borderColor: 'rgba(233,195,73,0.45)', color: '#fff' }}
+          className="h-11 min-w-0 border px-3 text-sm outline-none placeholder:text-black/50"
+          style={inputStyle}
         />
         <input
           type="email"
@@ -64,20 +76,23 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           placeholder={isEs ? 'Correo electronico' : 'Email address'}
-          className="h-11 min-w-0 border bg-white/10 px-3 text-sm outline-none placeholder:text-white/55"
-          style={{ borderColor: 'rgba(233,195,73,0.45)', color: '#fff' }}
+          className="h-11 min-w-0 border px-3 text-sm outline-none placeholder:text-black/50"
+          style={inputStyle}
         />
         <button
           type="submit"
           disabled={status === 'saving'}
           className="h-11 px-5 text-xs font-bold uppercase tracking-widest disabled:opacity-60"
-          style={{ background: GOLD, color: '#171717' }}
+          style={{ background: GOLD, color: '#171717', boxShadow: '0 2px 10px rgba(0,0,0,0.18)' }}
         >
           {status === 'saving' ? (isEs ? 'Enviando' : 'Joining') : (isEs ? 'Unirse' : 'Join')}
         </button>
       </div>
       {message && (
-        <p className="mt-2 text-xs" style={{ color: status === 'error' ? '#ffdfdf' : '#f9f9f7' }}>
+        <p
+          className="mt-2 text-xs"
+          style={{ color: status === 'error' ? '#d33' : 'var(--hero-text)', textShadow: '0 1px 10px rgba(var(--hero-fade), 0.9)' }}
+        >
           {message}
         </p>
       )}

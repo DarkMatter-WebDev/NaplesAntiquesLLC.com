@@ -168,7 +168,7 @@ export default function SiteHeader() {
   const altHref = altLocale === 'es' ? `/es${altPath === '/' ? '' : altPath}` : altPath;
 
   const SHOP_ITEMS = [
-    { key: 'store' as const, path: '/shop' },
+    { key: 'store' as const, path: '/store' },
     { key: 'auctions' as const, path: '/auctions' },
   ];
 
@@ -232,7 +232,7 @@ export default function SiteHeader() {
         <nav className="hidden 2xl:flex items-center gap-5" style={{ fontFamily: 'var(--font-label)' }}>
           <Link href={href('/')} className={navLinkBase} style={{ color: SECONDARY }}>{t('home')}</Link>
           <div className="group relative flex items-center">
-            <Link href={href('/shop')} className={navLinkBase} style={{ color: SECONDARY }}>
+            <Link href={href('/store')} className={navLinkBase} style={{ color: SECONDARY }}>
               {t('shop')}
             </Link>
             <DesktopDropdown items={SHOP_ITEMS} t={t} href={href} />

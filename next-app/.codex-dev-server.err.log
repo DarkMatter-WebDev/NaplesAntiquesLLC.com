@@ -645,3 +645,290 @@ https://react.dev/link/hydration-mismatch
   282 |       <h2>{isEs ? 'Historial de pedidos' : 'Order History'}</h2>
   283 |       <p>{isEs ? 'Revisa tus pedidos y estados recientes.' : 'Review your recent order to...
   284 |       {orders.length === 0 ? (
+[browser] Uncaught ReferenceError: getProductCardFlagFitClass is not defined
+    at ProductCard (src/components/shop/ProductCard.tsx:52:24)
+    at <anonymous> (src\app\[locale]\shop\page.tsx:527:23)
+    at Array.map (<anonymous>:1:18)
+    at renderShopPage (src\app\[locale]\shop\page.tsx:526:40)
+  50 |   const flagLabel = brand || fallbackFlagLabel;
+  51 |   const isBrandFlag = brand.length > 0;
+> 52 |   const flagFitClass = getProductCardFlagFitClass(flagLabel);
+     |                        ^
+  53 |   const showBrandTag = flagLabel.length > 0 && safeActiveImageIndex === 0 && !isImageArrow...
+  54 |
+  55 |   const cartItem: CartItem = {
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Image with src "https://evzluixourmsefwdsieu.supabase.co/storage/v1/object/public/product-images/products/1781545635635-74q69sk3j23.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "https://evzluixourmsefwdsieu.supabase.co/storage/v1/object/public/product-images/products/1781545635635-74q69sk3j23.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "https://evzluixourmsefwdsieu.supabase.co/storage/v1/object/public/product-images/products/1781568970582-ade8tymjy0m.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "https://evzluixourmsefwdsieu.supabase.co/storage/v1/object/public/product-images/products/1781572408839-yszrhfjyod.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+      <LoadingBoundary name="account/" loading={null}>
+        <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/account?t..." tree={[...]} params={{locale:"en"}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="page" pagePath="[locale]/a...">
+                  <SegmentTrieNode>
+                  <AccountPage>
+                    <SiteHeader>
+                    <main className="account-pa...">
+                      <section>
+                      <AccountDashboard profile={{id:"f4bb3a...", ...}} fallbackEmail="rcman12589..." locale="en" ...>
+                        <div className="account-co...">
+                          <AccountTabs activeSection="orders" locale="en" onSelectTab={function selectTab}>
+                            <nav className="account-tabs" aria-label="Account menu">
+                              <button
+                                type="button"
++                               className=""
+-                               className="active"
++                               aria-current={undefined}
+-                               aria-current="page"
+                                onClick={function onClick}
+                              >
+                              <button
+                                type="button"
++                               className="active"
+-                               className=""
++                               aria-current="page"
+-                               aria-current={null}
+                                onClick={function onClick}
+                              >
+                              ...
+                          <section id="account-ov..." className="account-da...">
+                            <div className="account-ov...">
+                              <OrdersTab orders={[...]} locale="en">
+                                <div
++                                 className="account-card account-tab-card"
+-                                 className="account-tab-stack"
+                                >
++                                 <p className="account-tab-eyebrow">
+-                                 <div className="account-tab-heading">
+                                  ...
+                            ...
+                          ...
+                    ...
+                ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at p (<anonymous>)
+    at OrdersTab (src/components/account/AccountDashboard.tsx:281:7)
+    at AccountDashboard (src/components/account/AccountDashboard.tsx:71:38)
+    at AccountPage (src\app\[locale]\account\page.tsx:92:9)
+  279 |   return (
+  280 |     <div className="account-card account-tab-card">
+> 281 |       <p className="account-tab-eyebrow">{isEs ? 'Pedidos' : 'Orders'}</p>
+      |       ^
+  282 |       <h2>{isEs ? 'Historial de pedidos' : 'Order History'}</h2>
+  283 |       <p>{isEs ? 'Revisa tus pedidos y estados recientes.' : 'Review your recent order to...
+  284 |       {orders.length === 0 ? (
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+      <LoadingBoundary name="account/" loading={null}>
+        <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/account?t..." tree={[...]} params={{locale:"en"}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="page" pagePath="[locale]/a...">
+                  <SegmentTrieNode>
+                  <AccountPage>
+                    <SiteHeader>
+                    <main className="account-pa...">
+                      <section>
+                      <AccountDashboard profile={{id:"f4bb3a...", ...}} fallbackEmail="rcman12589..." locale="en" ...>
+                        <div className="account-co...">
+                          <AccountTabs activeSection="orders" locale="en" onSelectTab={function selectTab}>
+                            <nav className="account-tabs" aria-label="Account menu">
+                              <button
+                                type="button"
++                               className=""
+-                               className="active"
++                               aria-current={undefined}
+-                               aria-current="page"
+                                onClick={function onClick}
+                              >
+                              <button
+                                type="button"
++                               className="active"
+-                               className=""
++                               aria-current="page"
+-                               aria-current={null}
+                                onClick={function onClick}
+                              >
+                              ...
+                          <section id="account-ov..." className="account-da...">
+                            <div className="account-ov...">
+                              <OrdersTab orders={[...]} locale="en">
+                                <div
++                                 className="account-card account-tab-card"
+-                                 className="account-tab-stack"
+                                >
++                                 <p className="account-tab-eyebrow">
+-                                 <div className="account-tab-heading">
+                                  ...
+                            ...
+                          ...
+                    ...
+                ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at p (<anonymous>)
+    at OrdersTab (src/components/account/AccountDashboard.tsx:281:7)
+    at AccountDashboard (src/components/account/AccountDashboard.tsx:71:38)
+    at AccountPage (src\app\[locale]\account\page.tsx:119:9)
+  279 |   return (
+  280 |     <div className="account-card account-tab-card">
+> 281 |       <p className="account-tab-eyebrow">{isEs ? 'Pedidos' : 'Orders'}</p>
+      |       ^
+  282 |       <h2>{isEs ? 'Historial de pedidos' : 'Order History'}</h2>
+  283 |       <p>{isEs ? 'Revisa tus pedidos y estados recientes.' : 'Review your recent order to...
+  284 |       {orders.length === 0 ? (
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+      <LoadingBoundary name="account/" loading={null}>
+        <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/account?t..." tree={[...]} params={{locale:"en"}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="page" pagePath="[locale]/a...">
+                  <SegmentTrieNode>
+                  <AccountPage>
+                    <SiteHeader>
+                    <main className="account-pa...">
+                      <section>
+                      <AccountDashboard profile={{id:"f4bb3a...", ...}} fallbackEmail="rcman12589..." locale="en" ...>
+                        <div className="account-co...">
+                          <AccountTabs activeSection="orders" locale="en" onSelectTab={function selectTab}>
+                            <nav className="account-tabs" aria-label="Account menu">
+                              <button
+                                type="button"
++                               className=""
+-                               className="active"
++                               aria-current={undefined}
+-                               aria-current="page"
+                                onClick={function onClick}
+                              >
+                              <button
+                                type="button"
++                               className="active"
+-                               className=""
++                               aria-current="page"
+-                               aria-current={null}
+                                onClick={function onClick}
+                              >
+                              ...
+                          <section id="account-ov..." className="account-da...">
+                            <div className="account-ov...">
+                              <OrdersTab orders={[...]} locale="en">
+                                <div
++                                 className="account-card account-tab-card"
+-                                 className="account-tab-stack"
+                                >
++                                 <p className="account-tab-eyebrow">
+-                                 <div className="account-tab-heading">
+                                  ...
+                            ...
+                          ...
+                    ...
+                ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at p (<anonymous>)
+    at OrdersTab (src/components/account/AccountDashboard.tsx:281:7)
+    at AccountDashboard (src/components/account/AccountDashboard.tsx:71:38)
+    at AccountPage (src\app\[locale]\account\page.tsx:119:9)
+  279 |   return (
+  280 |     <div className="account-card account-tab-card">
+> 281 |       <p className="account-tab-eyebrow">{isEs ? 'Pedidos' : 'Orders'}</p>
+      |       ^
+  282 |       <h2>{isEs ? 'Historial de pedidos' : 'Order History'}</h2>
+  283 |       <p>{isEs ? 'Revisa tus pedidos y estados recientes.' : 'Review your recent order to...
+  284 |       {orders.length === 0 ? (
+⨯ Error: Failed to call `useTranslations` because the context from `NextIntlClientProvider` was not found.
+
+This can happen because:
+1) You intended to render this component as a Server Component, the render
+   failed, and therefore React attempted to render the component on the client
+   instead. If this is the case, check the console for server errors.
+2) You intended to render this component on the client side, but no context was found.
+   Learn more about this error here: https://next-intl.dev/docs/environments/server-client-components#missing-context
+    at SiteHeader (src\components\layout\SiteHeader.tsx:152:28)
+  150 |
+  151 | export default function SiteHeader() {
+> 152 |   const t = useTranslations('nav');
+      |                            ^
+  153 |   const locale = useLocale();
+  154 |   const pathname = usePathname();
+  155 |   const [menuOpen, setMenuOpen] = useState(false); {
+  digest: '416018340'
+}
+⨯ Error: Failed to call `useTranslations` because the context from `NextIntlClientProvider` was not found.
+
+This can happen because:
+1) You intended to render this component as a Server Component, the render
+   failed, and therefore React attempted to render the component on the client
+   instead. If this is the case, check the console for server errors.
+2) You intended to render this component on the client side, but no context was found.
+   Learn more about this error here: https://next-intl.dev/docs/environments/server-client-components#missing-context
+    at SiteHeader (src\components\layout\SiteHeader.tsx:152:28)
+  150 |
+  151 | export default function SiteHeader() {
+> 152 |   const t = useTranslations('nav');
+      |                            ^
+  153 |   const locale = useLocale();
+  154 |   const pathname = usePathname();
+  155 |   const [menuOpen, setMenuOpen] = useState(false); {
+  digest: '416018340'
+}
+[browser] GoTrueClient@sb-evzluixourmsefwdsieu-auth-token:1 (2.108.1) 2026-06-18T18:06:24.457Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key. (carousel/lib/supabaseClient.ts:23:37)
+[browser] GoTrueClient@sb-evzluixourmsefwdsieu-auth-token:1 (2.108.1) 2026-06-18T18:07:55.525Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key. (carousel/lib/supabaseClient.ts:23:37)
+[browser] GoTrueClient@sb-evzluixourmsefwdsieu-auth-token:1 (2.108.1) 2026-06-18T18:08:37.860Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key. (src/lib/supabase/client.ts:6:29)
+npm notice
+npm notice New minor version of npm available! 11.13.0 -> 11.17.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.17.0
+npm notice To update run: npm install -g npm@11.17.0
+npm notice

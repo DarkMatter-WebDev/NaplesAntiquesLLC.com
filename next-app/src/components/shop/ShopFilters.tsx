@@ -2,10 +2,12 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { PRODUCT_METAL_VARIANTS, type SpotData } from '@/types/product';
 
 const GOLD = '#735c00';
 const BORDER = 'rgba(115, 92, 0, 0.35)';
+const PRICE_STEP = 50;
 
 type LengthOption = {
   value: string;
@@ -88,19 +90,44 @@ interface Props {
     sort?: string;
     page?: string;
     perPage?: string;
+    priceMin?: string;
+    priceMax?: string;
   };
   brandOptions: string[];
   filteredCount: number;
   allCount: number;
   spotData: SpotData | null;
+  priceRange: { min: number; max: number } | null;
   variant?: 'classic' | 'modern';
 }
 
-export default function ShopFilters({ locale, currentFilters, brandOptions, filteredCount, allCount, spotData, variant = 'classic' }: Props) {
+function parseFilterPrice(value: string | undefined): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function clampPrice(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+export default function ShopFilters({ locale, currentFilters, brandOptions, filteredCount, allCount, spotData, priceRange, variant = 'classic' }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isEs = locale === 'es';
+  const priceFloor = priceRange?.min ?? 0;
+  const priceCeiling = priceRange?.max ?? 0;
+  const parsedPriceMin = parseFilterPrice(currentFilters.priceMin);
+  const parsedPriceMax = parseFilterPrice(currentFilters.priceMax);
+  const currentPriceMin = priceRange ? clampPrice(parsedPriceMin ?? priceFloor, priceFloor, priceCeiling) : 0;
+  const currentPriceMax = priceRange ? clampPrice(parsedPriceMax ?? priceCeiling, priceFloor, priceCeiling) : 0;
+  const selectedPriceMin = Math.min(currentPriceMin, currentPriceMax);
+  const selectedPriceMax = Math.max(currentPriceMin, currentPriceMax);
+  const priceFilterActive = !!priceRange && (
+    selectedPriceMin > priceFloor ||
+    selectedPriceMax < priceCeiling
+  );
   const selectedMetalColor = currentFilters.metalColor ?? currentFilters.metalType;
   const metalColorOptions = getMetalColorOptions(currentFilters.metal);
   const silverwareOnlyMetal = currentFilters.itemType === 'silverware';
@@ -131,9 +158,21 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
     visibleSelectedLengths.length > 0 ||
     currentFilters.gender ||
     currentFilters.brand ||
+    priceFilterActive ||
     currentFilters.sort
   );
   const [filtersOpen, setFiltersOpen] = useState(hasDrawerFilters);
+  const selectedPriceSource = `${selectedPriceMin}:${selectedPriceMax}`;
+  const [draftPrice, setDraftPrice] = useState({
+    source: selectedPriceSource,
+    min: selectedPriceMin,
+    max: selectedPriceMax,
+  });
+  const activeDraftPrice = draftPrice.source === selectedPriceSource
+    ? draftPrice
+    : { source: selectedPriceSource, min: selectedPriceMin, max: selectedPriceMax };
+  const draftPriceMin = activeDraftPrice.min;
+  const draftPriceMax = activeDraftPrice.max;
 
   const updateFilter = useCallback(
     (key: string, value: string) => {
@@ -245,6 +284,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
     currentFilters.gender ||
     currentFilters.brand ||
     currentFilters.q ||
+    priceFilterActive ||
     currentFilters.sort
   );
 
@@ -258,6 +298,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
     ...visibleSelectedLengths,
     currentFilters.gender,
     currentFilters.brand,
+    priceFilterActive ? 'price' : undefined,
     currentFilters.sort,
   ].filter(Boolean).length;
   const isModern = variant === 'modern';
@@ -326,6 +367,38 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
     fontWeight: 800,
     lineHeight: 1.05,
   };
+
+  const formatPrice = (value: number) => new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(value);
+
+  const commitPriceRange = useCallback(
+    (low: number, high: number) => {
+      if (!priceRange) return;
+      const nextLow = clampPrice(Math.min(low, high), priceFloor, priceCeiling);
+      const nextHigh = clampPrice(Math.max(low, high), priceFloor, priceCeiling);
+      const params = new URLSearchParams(searchParams.toString());
+      if (nextLow > priceFloor) {
+        params.set('priceMin', String(nextLow));
+      } else {
+        params.delete('priceMin');
+      }
+      if (nextHigh < priceCeiling) {
+        params.set('priceMax', String(nextHigh));
+      } else {
+        params.delete('priceMax');
+      }
+      params.delete('page');
+      const qs = params.toString();
+      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, priceCeiling, priceFloor, priceRange, router, searchParams],
+  );
+  const priceTrackSpan = priceRange && priceCeiling > priceFloor ? priceCeiling - priceFloor : 1;
+  const priceTrackLeft = ((draftPriceMin - priceFloor) / priceTrackSpan) * 100;
+  const priceTrackRight = 100 - ((draftPriceMax - priceFloor) / priceTrackSpan) * 100;
 
   return (
     <div className={`shop-filters${isModern ? ' shop-filters-modern' : ''}`} style={{ marginBottom: '1.5rem' }}>
@@ -597,6 +670,105 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
 
           </div>
 
+          {priceRange && priceCeiling > priceFloor && (
+            <div className="shop-price-filter">
+              <div className="shop-price-filter-header">
+                <div>
+                  <span style={labelStyle}>{isEs ? 'Precio' : 'Price'}</span>
+                  <strong>{formatPrice(draftPriceMin)} - {formatPrice(draftPriceMax)}</strong>
+                </div>
+                {priceFilterActive && (
+                  <button
+                    type="button"
+                    onClick={() => commitPriceRange(priceFloor, priceCeiling)}
+                  >
+                    {isEs ? 'Restablecer' : 'Reset'}
+                  </button>
+                )}
+              </div>
+              <div
+                className="shop-price-slider"
+                style={{
+                  '--price-left': `${priceTrackLeft}%`,
+                  '--price-right': `${priceTrackRight}%`,
+                } as CSSProperties}
+              >
+                <input
+                  type="range"
+                  min={priceFloor}
+                  max={priceCeiling}
+                  step={PRICE_STEP}
+                  value={draftPriceMin}
+                  aria-label={isEs ? 'Precio minimo' : 'Minimum price'}
+                  onChange={(event) => setDraftPrice({
+                    source: selectedPriceSource,
+                    min: Math.min(Number(event.target.value), draftPriceMax),
+                    max: draftPriceMax,
+                  })}
+                  onMouseUp={() => commitPriceRange(draftPriceMin, draftPriceMax)}
+                  onTouchEnd={() => commitPriceRange(draftPriceMin, draftPriceMax)}
+                  onBlur={() => commitPriceRange(draftPriceMin, draftPriceMax)}
+                />
+                <input
+                  type="range"
+                  min={priceFloor}
+                  max={priceCeiling}
+                  step={PRICE_STEP}
+                  value={draftPriceMax}
+                  aria-label={isEs ? 'Precio maximo' : 'Maximum price'}
+                  onChange={(event) => setDraftPrice({
+                    source: selectedPriceSource,
+                    min: draftPriceMin,
+                    max: Math.max(Number(event.target.value), draftPriceMin),
+                  })}
+                  onMouseUp={() => commitPriceRange(draftPriceMin, draftPriceMax)}
+                  onTouchEnd={() => commitPriceRange(draftPriceMin, draftPriceMax)}
+                  onBlur={() => commitPriceRange(draftPriceMin, draftPriceMax)}
+                />
+              </div>
+              <div className="shop-price-input-row">
+                <label>
+                  <span>{isEs ? 'Min' : 'Min'}</span>
+                  <input
+                    type="number"
+                    min={priceFloor}
+                    max={priceCeiling}
+                    step={PRICE_STEP}
+                    value={draftPriceMin}
+                    onChange={(event) => setDraftPrice({
+                      source: selectedPriceSource,
+                      min: clampPrice(Number(event.target.value), priceFloor, draftPriceMax),
+                      max: draftPriceMax,
+                    })}
+                    onBlur={() => commitPriceRange(draftPriceMin, draftPriceMax)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') commitPriceRange(draftPriceMin, draftPriceMax);
+                    }}
+                  />
+                </label>
+                <label>
+                  <span>{isEs ? 'Max' : 'Max'}</span>
+                  <input
+                    type="number"
+                    min={priceFloor}
+                    max={priceCeiling}
+                    step={PRICE_STEP}
+                    value={draftPriceMax}
+                    onChange={(event) => setDraftPrice({
+                      source: selectedPriceSource,
+                      min: draftPriceMin,
+                      max: clampPrice(Number(event.target.value), draftPriceMin, priceCeiling),
+                    })}
+                    onBlur={() => commitPriceRange(draftPriceMin, draftPriceMax)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') commitPriceRange(draftPriceMin, draftPriceMax);
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+          )}
+
           {showLengthFilter && (
             <div style={{ maxWidth: '56rem', margin: '0 auto 0.85rem' }}>
               <span style={labelStyle}>{isEs ? 'Longitud' : 'Length'}</span>
@@ -739,6 +911,141 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
         }
         .shop-filter-panel.is-open {
           display: block;
+        }
+        .shop-price-filter {
+          max-width: 38rem;
+          margin: 0 auto 0.95rem;
+          padding: 0.8rem 0.9rem 0.9rem;
+          border: 1px solid rgba(115, 92, 0, 0.18);
+          border-radius: 7px;
+          background: rgba(255, 255, 255, 0.76);
+          box-shadow: 0 10px 24px rgba(42, 34, 12, 0.05);
+        }
+        .shop-price-filter-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 0.75rem;
+          margin-bottom: 0.85rem;
+        }
+        .shop-price-filter-header strong {
+          display: block;
+          color: var(--color-on-surface);
+          font-family: var(--font-label);
+          font-size: 0.9rem;
+          font-weight: 900;
+          line-height: 1.1;
+        }
+        .shop-price-filter-header button {
+          border: 0;
+          background: none;
+          color: ${GOLD};
+          cursor: pointer;
+          font-family: var(--font-label);
+          font-size: 0.62rem;
+          font-weight: 800;
+          letter-spacing: 0.12em;
+          line-height: 1.4;
+          padding: 0.05rem 0;
+          text-decoration: underline;
+          text-transform: uppercase;
+          text-underline-offset: 3px;
+        }
+        .shop-price-slider {
+          position: relative;
+          height: 1.7rem;
+          margin: 0.15rem 0 0.75rem;
+        }
+        .shop-price-slider::before,
+        .shop-price-slider::after {
+          content: '';
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 50%;
+          height: 0.28rem;
+          border-radius: 999px;
+          transform: translateY(-50%);
+        }
+        .shop-price-slider::before {
+          background: rgba(115, 92, 0, 0.16);
+        }
+        .shop-price-slider::after {
+          left: var(--price-left);
+          right: var(--price-right);
+          background: linear-gradient(90deg, #d8ad2d, #9c7608);
+        }
+        .shop-price-slider input[type='range'] {
+          position: absolute;
+          inset: 0;
+          z-index: 2;
+          width: 100%;
+          height: 1.7rem;
+          margin: 0;
+          appearance: none;
+          background: transparent;
+          pointer-events: none;
+        }
+        .shop-price-slider input[type='range']::-webkit-slider-runnable-track {
+          height: 0.28rem;
+          background: transparent;
+        }
+        .shop-price-slider input[type='range']::-webkit-slider-thumb {
+          width: 1rem;
+          height: 1rem;
+          margin-top: -0.36rem;
+          appearance: none;
+          border: 2px solid #fffdf7;
+          border-radius: 999px;
+          background: ${GOLD};
+          box-shadow: 0 3px 10px rgba(42, 34, 12, 0.24);
+          cursor: grab;
+          pointer-events: auto;
+        }
+        .shop-price-slider input[type='range']::-moz-range-track {
+          height: 0.28rem;
+          background: transparent;
+        }
+        .shop-price-slider input[type='range']::-moz-range-thumb {
+          width: 1rem;
+          height: 1rem;
+          border: 2px solid #fffdf7;
+          border-radius: 999px;
+          background: ${GOLD};
+          box-shadow: 0 3px 10px rgba(42, 34, 12, 0.24);
+          cursor: grab;
+          pointer-events: auto;
+        }
+        .shop-price-slider input[type='range']:focus-visible::-webkit-slider-thumb {
+          outline: 2px solid rgba(115, 92, 0, 0.34);
+          outline-offset: 3px;
+        }
+        .shop-price-input-row {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 0.6rem;
+        }
+        .shop-price-input-row label {
+          display: grid;
+          gap: 0.25rem;
+          color: var(--color-on-surface-variant);
+          font-family: var(--font-label);
+          font-size: 0.58rem;
+          font-weight: 800;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+        .shop-price-input-row input {
+          min-height: 2.25rem;
+          width: 100%;
+          border: 1px solid rgba(115, 92, 0, 0.22);
+          border-radius: 5px;
+          background: #ffffff;
+          color: var(--color-on-surface);
+          font-family: var(--font-label);
+          font-size: 0.82rem;
+          font-weight: 800;
+          padding: 0.3rem 0.55rem;
         }
         @media (min-width: 1024px) {
           .shop-filters {
@@ -890,6 +1197,9 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
           }
           .shop-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
           .shop-length-button { flex: 1 1 calc(33.333% - 0.4rem); min-width: 0 !important; }
+          .shop-price-filter {
+            padding: 0.7rem;
+          }
         }
         @media (max-width: 400px) {
           .shop-filter-grid { grid-template-columns: 1fr !important; }

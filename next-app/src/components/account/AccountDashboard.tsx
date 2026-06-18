@@ -368,6 +368,8 @@ function OrderDetailsDialog({
                 const productHref = item.product_id
                   ? `${isEs ? '/es/shop' : '/shop'}/${item.product_id}?returnTo=${encodeURIComponent(accountOrdersHref)}`
                   : null;
+                const inventoryLabel = formatPublicInventoryNumber(item.inventory_number);
+                const purityLabel = formatPublicPurity(item.purity_snapshot);
                 const rowContent = (
                   <>
                   <div className="account-order-item-image">
@@ -379,8 +381,9 @@ function OrderDetailsDialog({
                   </div>
                   <div>
                     <strong>{item.title_snapshot}</strong>
+                    {inventoryLabel && <em className="account-order-item-inventory">{inventoryLabel}</em>}
                     <span>
-                      {[item.inventory_number ? `#${item.inventory_number}` : null, item.metal_snapshot, item.purity_snapshot, item.gram_weight_snapshot ? `${item.gram_weight_snapshot}g` : null]
+                      {[item.metal_snapshot, purityLabel, item.gram_weight_snapshot ? `${item.gram_weight_snapshot}g` : null]
                         .filter(Boolean)
                         .join(' · ')}
                     </span>
@@ -440,6 +443,22 @@ function OrderDetailBlock({ label, value }: { label: string; value: string | nul
       <strong>{value || '-'}</strong>
     </div>
   );
+}
+
+function formatPublicInventoryNumber(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value).trim().replace(/^#\s*/, '');
+  return /^\d+$/.test(normalized) ? `Inv #${normalized}` : null;
+}
+
+function formatPublicPurity(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  const normalized = String(value).trim();
+  const numeric = Number(normalized);
+  if (Number.isFinite(numeric) && numeric > 0 && numeric <= 24) {
+    return `${numeric}K`;
+  }
+  return normalized;
 }
 
 function OrderDetailLine({

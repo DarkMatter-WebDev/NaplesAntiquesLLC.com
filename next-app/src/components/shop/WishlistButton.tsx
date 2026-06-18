@@ -50,7 +50,7 @@ export default function WishlistButton({ item, variant = 'icon', locale = 'en' }
     <button
       type="button"
       onClick={handleClick}
-      className="flex items-center justify-center w-7 h-7 rounded-full transition-colors"
+      className="shop-card-wishlist-button flex items-center justify-center w-7 h-7 rounded-full transition-colors"
       style={{
         background: 'rgba(249,249,247,0.9)',
         color: saved ? '#735c00' : '#5e5e5d',
@@ -61,6 +61,7 @@ export default function WishlistButton({ item, variant = 'icon', locale = 'en' }
     >
       <span
         className="material-symbols-outlined"
+        data-wishlist-icon="true"
         style={{
           fontSize: '15px',
           lineHeight: 1,

@@ -49,6 +49,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
   const fallbackFlagLabel = getProductCardFlagFallback(product);
   const flagLabel = brand || fallbackFlagLabel;
   const isBrandFlag = brand.length > 0;
+  const flagFitClass = getProductCardFlagFitClass(flagLabel);
   const showBrandTag = flagLabel.length > 0 && safeActiveImageIndex === 0 && !isImageArrowHovering;
 
   const cartItem: CartItem = {
@@ -167,13 +168,13 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
           </div>
         )}
         {/* Wishlist button — top-right of image */}
-        <div className="absolute top-2 right-2 z-10">
+        <div className="shop-card-wishlist-wrap absolute top-2 right-2 z-10">
           <WishlistButton item={wishlistItem} variant="icon" locale={locale} />
         </div>
 
         {showBrandTag && (
           <div
-            className={`shop-card-brand-tag ${isBrandFlag ? 'shop-card-brand-tag-brand' : 'shop-card-brand-tag-link'} absolute bottom-2 left-2 z-10 max-w-[70%] truncate px-2.5 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.16em] transition-opacity duration-150`}
+            className={`shop-card-brand-tag ${isBrandFlag ? 'shop-card-brand-tag-brand' : 'shop-card-brand-tag-link'} ${flagFitClass} absolute bottom-2 left-2 z-10 max-w-[70%] truncate px-2.5 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.16em] transition-opacity duration-150`}
             style={{
               background: isBrandFlag
                 ? 'linear-gradient(135deg, rgba(255, 253, 246, 0.96), rgba(246, 232, 184, 0.94))'
@@ -230,7 +231,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
                 onPointerLeave={() => setIsImageArrowHovering(false)}
                 onFocus={() => setIsImageArrowHovering(true)}
                 onBlur={() => setIsImageArrowHovering(false)}
-                className="absolute bottom-2 left-2 z-20 inline-flex h-6 w-6 items-center justify-center border text-sm font-bold transition-colors"
+                className="shop-card-image-arrow absolute bottom-2 left-2 z-20 inline-flex h-6 w-6 items-center justify-center border text-sm font-bold transition-colors"
                 style={{
                   borderColor: 'rgba(115, 92, 0, 0.3)',
                   background: 'rgba(255, 252, 246, 0.9)',
@@ -254,7 +255,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
                 onPointerLeave={() => setIsImageArrowHovering(false)}
                 onFocus={() => setIsImageArrowHovering(true)}
                 onBlur={() => setIsImageArrowHovering(false)}
-                className="absolute bottom-2 right-2 z-20 inline-flex h-6 w-6 items-center justify-center border text-sm font-bold transition-colors"
+                className="shop-card-image-arrow absolute bottom-2 right-2 z-20 inline-flex h-6 w-6 items-center justify-center border text-sm font-bold transition-colors"
                 style={{
                   borderColor: 'rgba(115, 92, 0, 0.3)',
                   background: 'rgba(255, 252, 246, 0.9)',
@@ -420,13 +421,39 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
           }
           @media (max-width: 640px) {
             .shop-card-status-tag {
-              top: 0.35rem !important;
+              top: 0.28rem !important;
+              left: 0.28rem !important;
+              padding: 0.08rem 0.24rem !important;
+              font-size: 0.38rem !important;
+              letter-spacing: 0.05em !important;
+              border-radius: 2px !important;
+              box-shadow: 0 3px 7px rgba(115, 92, 0, 0.12) !important;
+            }
+            .shop-card-wishlist-wrap {
+              top: 0.32rem !important;
+              right: 0.32rem !important;
+            }
+            .shop-card-wishlist-button {
+              width: 1.35rem !important;
+              height: 1.35rem !important;
+              box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+            }
+            .shop-card-wishlist-button [data-wishlist-icon="true"] {
+              font-size: 12px !important;
+            }
+            .shop-card-image-arrow {
+              width: 1.15rem !important;
+              height: 1.15rem !important;
+              bottom: 0.35rem !important;
+              font-size: 0.7rem !important;
+              line-height: 1 !important;
+              box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
+            }
+            .shop-card-image-arrow.left-2 {
               left: 0.35rem !important;
-              padding: 0.12rem 0.32rem !important;
-              font-size: 0.44rem !important;
-              letter-spacing: 0.08em !important;
-              border-radius: 3px !important;
-              box-shadow: 0 4px 10px rgba(115, 92, 0, 0.14) !important;
+            }
+            .shop-card-image-arrow.right-2 {
+              right: 0.35rem !important;
             }
           }
           .shop-card-brand-tag-link {
@@ -438,12 +465,35 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
           }
           @media (max-width: 640px) {
             .shop-card-brand-tag-link {
-              bottom: 0.35rem !important;
-              left: 0.35rem !important;
-              padding: 0.14rem 0.38rem !important;
-              font-size: 0.48rem !important;
-              letter-spacing: 0.08em !important;
-              border-radius: 3px !important;
+              bottom: 0.28rem !important;
+              left: 0.28rem !important;
+              padding: 0.1rem 0.28rem !important;
+              font-size: 0.4rem !important;
+              letter-spacing: 0.05em !important;
+              border-radius: 2px !important;
+            }
+            .shop-card-brand-tag-fit-medium {
+              font-size: 0.36rem !important;
+              letter-spacing: 0.03em !important;
+            }
+            .shop-card-brand-tag-fit-long {
+              font-size: 0.32rem !important;
+              letter-spacing: 0.01em !important;
+              padding-left: 0.22rem !important;
+              padding-right: 0.22rem !important;
+            }
+          }
+          @media (max-width: 640px) {
+            .shop-card-brand-tag-brand {
+              bottom: 0.28rem !important;
+              left: 0.28rem !important;
+              max-width: 62% !important;
+              padding: 0.1rem 0.28rem !important;
+              font-size: 0.4rem !important;
+              line-height: 1 !important;
+              letter-spacing: 0.05em !important;
+              border-radius: 2px !important;
+              box-shadow: 0 3px 7px rgba(42, 34, 12, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.72) !important;
             }
           }
           @media (max-width: 640px) {
@@ -458,6 +508,9 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
             .modern-product-card .modern-card-body > .grid span {
               padding-left: 0.08rem;
               padding-right: 0.08rem;
+            }
+            .modern-product-card .modern-card-body > .flex:last-child {
+              padding-top: 0.25rem !important;
             }
           }
           /* Tighten the action row above the Add button */
@@ -566,4 +619,11 @@ function getProductCardFlagFallback(product: Product): string {
 
   const linkType = product.chain_type ?? (product.tags ?? []).find((tag) => tag.startsWith('ct:'))?.slice(3) ?? '';
   return linkType.trim();
+}
+
+function getProductCardFlagFitClass(label: string): string {
+  const length = label.trim().length;
+  if (length >= 18) return 'shop-card-brand-tag-fit-long';
+  if (length >= 13) return 'shop-card-brand-tag-fit-medium';
+  return '';
 }

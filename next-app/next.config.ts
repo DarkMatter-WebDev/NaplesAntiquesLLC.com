@@ -29,6 +29,13 @@ const nextConfig: NextConfig = {
     return rules;
   },
   images: {
+    // AVIF first (smaller at the same visual quality), WebP fallback. The
+    // browser gets whichever it supports; both are served at the requested
+    // display size, so a full-res source is never shipped to a small card.
+    formats: ['image/avif', 'image/webp'],
+    // Next 16 only honors quality values listed here. 90 = visually lossless
+    // for the carousel; 75 is the default used by other <Image> on the site.
+    qualities: [75, 90],
     remotePatterns: [
       {
         protocol: 'https',
