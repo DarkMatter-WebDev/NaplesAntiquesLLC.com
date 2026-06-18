@@ -330,10 +330,12 @@ export default function HomeHero({ locale, fallbackItems }: Props) {
             font-size: clamp(1.9rem, 7vw, 2.5rem);
           }
 
-          /* Sign-up + actions sit just under the carousel items. */
+          /* Sign-up + actions anchored to the bottom of the hero so the Trade
+             button always stays inside it (with a small gap before the next
+             section) regardless of viewport height / browser-chrome changes. */
           .home-hero-bottom {
-            top: 62%;
-            bottom: auto;
+            top: auto;
+            bottom: clamp(1rem, 3svh, 2rem);
             gap: 0.85rem;
           }
         }

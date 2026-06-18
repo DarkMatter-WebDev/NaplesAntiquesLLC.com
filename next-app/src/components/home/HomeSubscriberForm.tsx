@@ -54,20 +54,20 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
       }}
     >
       <p
-        className="mb-3 text-[0.68rem] font-bold uppercase tracking-[0.24em]"
+        className="mb-2 text-[0.6rem] sm:mb-3 sm:text-[0.68rem] font-bold uppercase tracking-[0.24em]"
         style={{ color: 'var(--hero-eyebrow)', textShadow: '0 1px 10px rgba(var(--hero-fade), 0.9)' }}
       >
         {isEs ? 'Reciba nuevas piezas primero' : 'Get first look at new pieces'}
       </p>
       <div
-        className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_auto]"
+        className="grid gap-1.5 sm:gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_auto]"
         style={{ alignItems: 'stretch' }}
       >
         <input
           value={fullName}
           onChange={(event) => setFullName(event.target.value)}
           placeholder={isEs ? 'Nombre' : 'Name'}
-          className="h-11 min-w-0 border px-3 text-sm outline-none placeholder:text-black/50"
+          className="h-9 sm:h-11 min-w-0 border px-3 text-xs sm:text-sm outline-none placeholder:text-black/50"
           style={inputStyle}
         />
         <input
@@ -76,13 +76,13 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           placeholder={isEs ? 'Correo electronico' : 'Email address'}
-          className="h-11 min-w-0 border px-3 text-sm outline-none placeholder:text-black/50"
+          className="h-9 sm:h-11 min-w-0 border px-3 text-xs sm:text-sm outline-none placeholder:text-black/50"
           style={inputStyle}
         />
         <button
           type="submit"
           disabled={status === 'saving'}
-          className="h-11 px-5 text-xs font-bold uppercase tracking-widest disabled:opacity-60"
+          className="h-9 sm:h-11 px-4 sm:px-5 text-[0.7rem] sm:text-xs font-bold uppercase tracking-widest disabled:opacity-60"
           style={{ background: GOLD, color: '#171717', boxShadow: '0 2px 10px rgba(0,0,0,0.18)' }}
         >
           {status === 'saving' ? (isEs ? 'Enviando' : 'Joining') : (isEs ? 'Unirse' : 'Join')}
