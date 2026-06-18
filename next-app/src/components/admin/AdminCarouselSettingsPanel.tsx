@@ -84,9 +84,9 @@ export default function AdminCarouselSettingsPanel() {
         selectedIds
           .map((id) => {
             const item = catalog.get(id);
-            return item ? { ...item, bgColor: itemBg.get(id) || DEFAULT_BG } : undefined;
+            return item ? { ...item, bgColor: itemBg.get(id) || DEFAULT_BG } : null;
           })
-          .filter((item): item is CarouselItem => Boolean(item)),
+          .filter((item): item is CarouselItem & { bgColor: string } => item !== null),
       ),
     [catalog, selectedIds, itemBg],
   );
