@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation';
+﻿import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -138,7 +138,7 @@ export default async function AccountSecurityPage({ params }: Props) {
         }
         .account-card {
           border: 1px solid rgba(115, 92, 0, 0.12) !important;
-          border-radius: 8px;
+          border-radius: var(--radius-xl);
           background: #ffffff !important;
           box-shadow: 0 18px 48px rgba(42, 34, 12, 0.09);
         }
@@ -147,7 +147,7 @@ export default async function AccountSecurityPage({ params }: Props) {
           align-items: stretch;
           overflow-x: auto;
           border: 1px solid rgba(115, 92, 0, 0.1);
-          border-radius: 8px;
+          border-radius: var(--radius-xl);
           background: #ffffff;
           box-shadow: 0 18px 50px rgba(42, 34, 12, 0.08);
         }
@@ -244,7 +244,7 @@ export default async function AccountSecurityPage({ params }: Props) {
           margin: 1.5rem 0;
           padding: 1rem;
           border: 1px solid rgba(115, 92, 0, 0.12);
-          border-radius: 8px;
+          border-radius: var(--radius-xl);
           background: #ffffff;
         }
         .account-security-card > .material-symbols-outlined,
@@ -303,13 +303,13 @@ export default async function AccountSecurityPage({ params }: Props) {
           gap: 0.75rem;
           padding: 1rem;
           border: 1px solid rgba(115, 92, 0, 0.12);
-          border-radius: 8px;
+          border-radius: var(--radius-xl);
           background: #ffffff;
         }
         .account-password-panel .form-field {
           min-height: 2.7rem;
           border-color: rgba(115, 92, 0, 0.2);
-          border-radius: 6px;
+          border-radius: var(--radius-lg);
           background: #ffffff;
         }
         .account-form-error {
@@ -330,7 +330,7 @@ export default async function AccountSecurityPage({ params }: Props) {
           margin: 1.45rem 0 4rem;
           padding: 1.65rem 2rem;
           border: 1px solid rgba(115, 92, 0, 0.12);
-          border-radius: 8px;
+          border-radius: var(--radius-xl);
           background: #ffffff;
           box-shadow: 0 18px 48px rgba(42, 34, 12, 0.07);
         }
@@ -400,3 +400,4 @@ export default async function AccountSecurityPage({ params }: Props) {
     </>
   );
 }
+

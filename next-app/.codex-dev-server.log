@@ -1,10 +1,8 @@
 
-> next-app@0.1.0 dev
-> set NODE_OPTIONS=--max-old-space-size=4096&& next dev
+> next-app@0.1.0 start
+> next start
 
-▲ Next.js 16.2.9 (Turbopack)
+▲ Next.js 16.2.9
 - Local:         http://localhost:3000
 - Network:       http://192.168.119.224:3000
-- Environments: .env.local
-✓ Ready in 732ms
-[?25h
+✓ Ready in 239ms

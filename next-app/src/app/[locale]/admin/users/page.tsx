@@ -24,6 +24,7 @@ type SiteUser = {
   postal_code: string | null;
   country: string | null;
   marketing_opt_in: boolean | null;
+  marketing_opt_out: boolean | null;
   is_vip: boolean | null;
   is_admin: boolean | null;
   created_at: string | null;
@@ -96,6 +97,7 @@ export default async function AdminUsersPage({ params }: Props) {
         postal_code,
         country,
         marketing_opt_in,
+        marketing_opt_out,
         is_vip,
         is_admin,
         created_at,
@@ -133,7 +135,7 @@ export default async function AdminUsersPage({ params }: Props) {
     if (!invoice.user_id) continue;
     invoiceCountByUser.set(invoice.user_id, (invoiceCountByUser.get(invoice.user_id) ?? 0) + 1);
   }
-  const marketingCount = siteUsers.filter((siteUser) => siteUser.marketing_opt_in).length;
+  const marketingCount = siteUsers.filter((siteUser) => siteUser.marketing_opt_out !== true).length;
   const adminCount = siteUsers.filter((siteUser) => siteUser.is_admin).length;
   const enrichedUsers = siteUsers.map((siteUser) => ({
     ...siteUser,
@@ -170,7 +172,7 @@ export default async function AdminUsersPage({ params }: Props) {
               </div>
               <div className="border px-4 py-3" style={{ borderColor: 'var(--color-outline-variant)', background: 'white' }}>
                 <p className="text-2xl font-bold" style={{ color: 'var(--color-on-surface)' }}>{marketingCount}</p>
-                <p className="text-[0.62rem] uppercase tracking-widest" style={{ color: 'var(--color-on-surface-variant)' }}>Opt-ins</p>
+                <p className="text-[0.62rem] uppercase tracking-widest" style={{ color: 'var(--color-on-surface-variant)' }}>Reachable</p>
               </div>
               <div className="border px-4 py-3" style={{ borderColor: 'var(--color-outline-variant)', background: 'white' }}>
                 <p className="text-2xl font-bold" style={{ color: 'var(--color-on-surface)' }}>{adminCount}</p>
@@ -239,8 +241,8 @@ export default async function AdminUsersPage({ params }: Props) {
                             <span style={{ color: 'var(--color-on-surface-variant)' }}>-</span>
                           )}
                         </td>
-                        <td className="px-4 py-3" style={{ color: siteUser.marketing_opt_in ? '#2f6b3f' : 'var(--color-on-surface-variant)' }}>
-                          {siteUser.marketing_opt_in ? 'Yes' : 'No'}
+                        <td className="px-4 py-3" style={{ color: siteUser.marketing_opt_out !== true ? '#2f6b3f' : 'var(--color-on-surface-variant)' }}>
+                          {siteUser.marketing_opt_out === true ? 'Opted out' : 'Reachable'}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1.5">

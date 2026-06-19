@@ -68,13 +68,14 @@ export default async function GoldServicesPage({ params }: Props) {
               <div className="flex flex-wrap gap-4">
                 <Link
                   href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
-                  className="bg-[linear-gradient(135deg,#dcb336,#b5890c)] text-white px-8 py-4 text-xs font-bold tracking-widest uppercase hover:brightness-[1.04] transition"
+                  className="gold-button"
                 >
                   {isEs ? 'OBTENER ESTIMADO' : 'GET AN ESTIMATE'}
                 </Link>
                 <Link
                   href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
-                  className="border border-white text-white px-8 py-4 text-xs font-bold tracking-widest uppercase hover:bg-white hover:text-[#1a1c1c] transition-colors"
+                  className="outline-button"
+                  style={{ borderColor: 'rgba(255,255,255,0.48)', color: 'white', background: 'rgba(255,255,255,0.08)' }}
                 >
                   {isEs ? 'EVALUACIÓN GRATIS' : 'FREE EVALUATION'}
                 </Link>
@@ -101,7 +102,7 @@ export default async function GoldServicesPage({ params }: Props) {
                 </p>
               </div>
               <div className="lg:col-span-7">
-                <div className="bg-[#e8e8e8] border border-[#d0c5af] overflow-hidden">
+                <div className="overflow-hidden rounded-2xl border border-[#d0c5af] bg-white shadow-[0_18px_54px_rgba(38,28,6,0.07)]">
                   <div className="px-5 pt-4 pb-2 flex items-center justify-between">
                     <h3 className="font-[family-name:var(--font-headline)] text-xl font-bold text-[#735c00]">Gold</h3>
                     <span className="text-xs text-[#4d4635] uppercase tracking-wider">Spot</span>
@@ -130,7 +131,8 @@ export default async function GoldServicesPage({ params }: Props) {
             </div>
             <Link
               href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
-              className="bg-[#2f3131] text-[#e9c349] px-8 py-4 text-xs font-bold tracking-widest inline-flex items-center gap-4 uppercase hover:bg-[#1a1c1c] transition-colors shrink-0"
+              className="outline-button inline-flex items-center gap-4 shrink-0"
+              style={{ color: '#735c00' }}
             >
               {isEs ? 'INICIAR EVALUACIÓN' : 'START EVALUATION'}
               <span className="material-symbols-outlined">trending_flat</span>
@@ -139,7 +141,7 @@ export default async function GoldServicesPage({ params }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {ACQUIRE_ITEMS.map(({ key, titleEn, titleEs, descEn, descEs, img }) => (
               <div key={key} className="group cursor-pointer">
-                <div className="overflow-hidden mb-6 aspect-square bg-[#e8e8e8]">
+                <div className="mb-6 aspect-square overflow-hidden rounded-2xl bg-[#e8e8e8] shadow-[0_14px_38px_rgba(38,28,6,0.08)]">
                   {img ? (
                     <Image
                       src={img}
@@ -185,7 +187,7 @@ export default async function GoldServicesPage({ params }: Props) {
             {KARAT_CARDS.map(({ karat, purity, purityEs, desc, descEs }) => (
               <div
                 key={karat}
-                className="border border-[#d0c5af] p-6 md:p-8 flex flex-col items-center text-center hover:shadow-xl transition-all bg-white"
+                className="flex flex-col items-center rounded-2xl border border-[#d0c5af] bg-white p-6 text-center shadow-[0_14px_38px_rgba(38,28,6,0.05)] transition-all hover:-translate-y-0.5 hover:shadow-xl md:p-8"
               >
                 <span className="font-[family-name:var(--font-headline)] text-4xl md:text-5xl font-bold text-[#735c00] mb-2">
                   {karat}
@@ -215,7 +217,7 @@ export default async function GoldServicesPage({ params }: Props) {
                 </p>
                 <div className="space-y-8">
                   <div className="flex gap-6">
-                    <div className="w-12 h-12 flex-shrink-0 bg-[#d4af37] flex items-center justify-center">
+                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#d4af37]">
                       <span className="material-symbols-outlined text-white text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>biotech</span>
                     </div>
                     <div>
@@ -230,7 +232,7 @@ export default async function GoldServicesPage({ params }: Props) {
                     </div>
                   </div>
                   <div className="flex gap-6">
-                    <div className="w-12 h-12 flex-shrink-0 bg-[#d4af37] flex items-center justify-center">
+                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#d4af37]">
                       <span className="material-symbols-outlined text-white text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>science</span>
                     </div>
                     <div>
@@ -247,7 +249,7 @@ export default async function GoldServicesPage({ params }: Props) {
                 </div>
               </div>
               <div className="relative">
-                <div className="w-full aspect-[4/5] bg-[#e8e8e8] flex items-center justify-center">
+                <div className="flex aspect-[4/5] w-full items-center justify-center rounded-2xl bg-[#e8e8e8] shadow-[0_18px_54px_rgba(38,28,6,0.08)]">
                   <div className="text-center px-8">
                     <span
                       className="material-symbols-outlined text-[#735c00] block mb-4"
@@ -260,7 +262,7 @@ export default async function GoldServicesPage({ params }: Props) {
                     </p>
                   </div>
                 </div>
-                <div className="absolute -bottom-8 -left-8 bg-[#2f3131] p-10 hidden md:block">
+                <div className="absolute -bottom-8 -left-8 hidden rounded-2xl bg-[#2f3131] p-10 shadow-[0_18px_54px_rgba(0,0,0,0.22)] md:block">
                   <p className="text-[#e9c349] font-[family-name:var(--font-headline)] text-xl font-bold">
                     {isEs ? '100% de Exactitud' : '100% Accuracy'}
                   </p>
@@ -293,13 +295,14 @@ export default async function GoldServicesPage({ params }: Props) {
             <div className="flex flex-col md:flex-row justify-center gap-6">
               <Link
                 href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
-                className="bg-[linear-gradient(135deg,#dcb336,#b5890c)] text-white px-12 py-4 text-xs font-bold tracking-widest uppercase hover:brightness-[1.04] transition"
+                className="gold-button"
               >
                 {isEs ? 'PROGRAMAR CITA' : 'SCHEDULE APPOINTMENT'}
               </Link>
               <a
                 href="tel:2394048505"
-                className="border border-[#7f7663] text-white px-12 py-4 text-xs font-bold tracking-widest uppercase hover:bg-[#3d3f3f] transition-colors"
+                className="outline-button"
+                style={{ borderColor: 'rgba(255,255,255,0.32)', color: 'white', background: 'rgba(255,255,255,0.08)' }}
               >
                 CALL (239) 404-8505
               </a>

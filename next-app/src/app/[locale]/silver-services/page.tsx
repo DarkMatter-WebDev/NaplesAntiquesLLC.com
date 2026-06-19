@@ -61,13 +61,13 @@ export default async function SilverServicesPage({ params }: Props) {
               <div className="flex flex-wrap gap-4">
                 <Link
                   href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
-                  className="bg-[#1a1c1c] text-[#e9c349] px-8 py-4 text-xs font-bold uppercase tracking-widest hover:bg-[#2f3131] transition-colors"
+                  className="gold-button"
                 >
                   {isEs ? 'PROGRAMAR EVALUACIÓN' : 'Schedule Evaluation'}
                 </Link>
                 <Link
                   href={isEs ? '/es/bullion' : '/bullion'}
-                  className="border border-[#7f7663] text-[#1a1c1c] px-8 py-4 text-xs font-bold uppercase tracking-widest hover:bg-[#f3f3f3] transition-colors"
+                  className="outline-button"
                 >
                   {isEs ? 'PRECIOS DE PLATA' : 'Current Silver Rates'}
                 </Link>
@@ -94,7 +94,7 @@ export default async function SilverServicesPage({ params }: Props) {
                 </p>
               </div>
               <div className="lg:col-span-7">
-                <div className="bg-[#e8e8e8] border border-[#d0c5af] overflow-hidden">
+                <div className="overflow-hidden rounded-2xl border border-[#d0c5af] bg-white shadow-[0_18px_54px_rgba(38,28,6,0.07)]">
                   <div className="px-5 pt-4 pb-2 flex items-center justify-between">
                     <h3 className="font-[family-name:var(--font-headline)] text-xl font-bold text-[#735c00]">Silver</h3>
                     <span className="text-xs text-[#4d4635] uppercase tracking-wider">Spot</span>
@@ -118,7 +118,7 @@ export default async function SilverServicesPage({ params }: Props) {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
             {/* Sterling Silver */}
-            <div className="p-10 border border-[#d0c5af] bg-white flex flex-col">
+            <div className="flex flex-col rounded-2xl border border-[#d0c5af] bg-white p-8 shadow-[0_18px_54px_rgba(38,28,6,0.06)] md:p-10">
               <div className="mb-8">
                 <span className="text-[10px] font-bold text-[#735c00] uppercase tracking-widest">
                   {isEs ? 'Activo Premium' : 'Premium Asset'}
@@ -144,7 +144,7 @@ export default async function SilverServicesPage({ params }: Props) {
                   </li>
                 ))}
               </ul>
-              <div className="aspect-video bg-[#f3f3f3] overflow-hidden">
+              <div className="aspect-video overflow-hidden rounded-xl bg-[#f3f3f3]">
                 <div className="w-full h-full flex items-center justify-center">
                   <span className="text-[#735c00] font-[family-name:var(--font-body)] text-xs uppercase tracking-widest">
                     {isEs ? '925 — Plata Esterlina' : '925 — Sterling Silver'}
@@ -154,7 +154,7 @@ export default async function SilverServicesPage({ params }: Props) {
             </div>
 
             {/* Silver Plate */}
-            <div className="p-10 border border-[#d0c5af] bg-white flex flex-col">
+            <div className="flex flex-col rounded-2xl border border-[#d0c5af] bg-white p-8 shadow-[0_18px_54px_rgba(38,28,6,0.06)] md:p-10">
               <div className="mb-8">
                 <span className="text-[10px] font-bold text-[#4d4635] uppercase tracking-widest">
                   {isEs ? 'Metal Base' : 'Base Metal'}
@@ -180,7 +180,7 @@ export default async function SilverServicesPage({ params }: Props) {
                   </li>
                 ))}
               </ul>
-              <div className="aspect-video bg-[#f3f3f3] overflow-hidden">
+              <div className="aspect-video overflow-hidden rounded-xl bg-[#f3f3f3]">
                 <div className="w-full h-full flex items-center justify-center">
                   <span className="text-[#7f7663] font-[family-name:var(--font-body)] text-xs uppercase tracking-widest">
                     {isEs ? 'EPNS — Metal Base Chapado' : 'EPNS — Silver Plated Base Metal'}
@@ -217,8 +217,8 @@ export default async function SilverServicesPage({ params }: Props) {
                   { icon: 'iron', titleEn: 'Magnetism', titleEs: 'Magnetismo', descEn: 'Silver is non-magnetic. We use rare-earth neodymium testing to identify ferrous cores.', descEs: 'La plata no es magnética. Usamos pruebas de neodimio para identificar núcleos ferrosos.' },
                   { icon: 'science', titleEn: 'Assay Analysis', titleEs: 'Análisis de Ensayo', descEn: 'Onsite acid testing at your appointment; offsite XRF spectrometry when exact assay documentation is needed.', descEs: 'Prueba ácida en el sitio; espectrometría XRF externa cuando se necesita documentación exacta.' },
                 ].map(({ icon, titleEn, titleEs, descEn, descEs }) => (
-                  <div key={icon} className="p-8 border border-white/10 bg-white/5">
-                    <div className="w-12 h-12 flex items-center justify-center bg-[#735c00] mb-6">
+                  <div key={icon} className="rounded-2xl border border-white/10 bg-white/5 p-8 shadow-[0_16px_44px_rgba(0,0,0,0.12)]">
+                    <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full bg-[#735c00]">
                       <span className="material-symbols-outlined text-white" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
                     </div>
                     <h4 className="font-[family-name:var(--font-headline)] text-lg font-bold mb-4 text-[#e9c349]">
@@ -250,7 +250,7 @@ export default async function SilverServicesPage({ params }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {GALLERY_ITEMS.map(({ key, titleEn, titleEs, subEn, subEs, img }) => (
               <div key={key} className="group cursor-pointer">
-                <div className="aspect-[3/4] overflow-hidden bg-[#e8e8e8] mb-4">
+                <div className="mb-4 aspect-[3/4] overflow-hidden rounded-2xl bg-[#e8e8e8] shadow-[0_14px_38px_rgba(38,28,6,0.08)]">
                   {img ? (
                     <Image
                       src={img}
@@ -293,13 +293,13 @@ export default async function SilverServicesPage({ params }: Props) {
             <div className="flex flex-col md:flex-row gap-4 justify-center">
               <Link
                 href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
-                className="bg-[linear-gradient(135deg,#dcb336,#b5890c)] text-white px-10 py-5 text-xs font-bold uppercase tracking-widest hover:brightness-[1.04] transition"
+                className="gold-button"
               >
                 {isEs ? 'PROGRAMAR UNA CITA' : 'Schedule a Time'}
               </Link>
               <a
                 href="tel:2394048505"
-                className="bg-[#2f3131] text-[#e9c349] px-10 py-5 text-xs font-bold uppercase tracking-widest hover:bg-[#1a1c1c] transition-colors"
+                className="outline-button"
               >
                 Call (239) 404-8505
               </a>

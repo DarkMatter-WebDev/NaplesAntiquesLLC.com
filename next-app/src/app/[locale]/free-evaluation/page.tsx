@@ -24,20 +24,20 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
 
   const categories = isEs
     ? [
-        { icon: '💰', label: 'Oro y Cadenas' },
-        { icon: '💎', label: 'Diamantes y Anillos' },
-        { icon: '⌚', label: 'Relojes' },
-        { icon: '🍴', label: 'Plata Esterlina' },
-        { icon: '🪙', label: 'Monedas y Lingotes' },
-        { icon: '📦', label: 'Antigüedades y Reliquias' },
+        { icon: 'payments', label: 'Oro y Cadenas' },
+        { icon: 'diamond', label: 'Diamantes y Anillos' },
+        { icon: 'watch', label: 'Relojes' },
+        { icon: 'dining', label: 'Plata Esterlina' },
+        { icon: 'toll', label: 'Monedas y Lingotes' },
+        { icon: 'inventory_2', label: 'Antigüedades y Reliquias' },
       ]
     : [
-        { icon: '💰', label: 'Gold & Chains' },
-        { icon: '💎', label: 'Diamonds & Rings' },
-        { icon: '⌚', label: 'Watches' },
-        { icon: '🍴', label: 'Sterling Silver' },
-        { icon: '🪙', label: 'Coins & Bullion' },
-        { icon: '📦', label: 'Antiques & Heirlooms' },
+        { icon: 'payments', label: 'Gold & Chains' },
+        { icon: 'diamond', label: 'Diamonds & Rings' },
+        { icon: 'watch', label: 'Watches' },
+        { icon: 'dining', label: 'Sterling Silver' },
+        { icon: 'toll', label: 'Coins & Bullion' },
+        { icon: 'inventory_2', label: 'Antiques & Heirlooms' },
       ];
 
   const steps = isEs
@@ -149,7 +149,10 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
                     fontFamily: 'var(--font-label)',
                   }}
                 >
-                  ✓ {chip}
+                  <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }} aria-hidden="true">
+                    check_circle
+                  </span>
+                  {chip}
                 </li>
               ))}
             </ul>
@@ -188,7 +191,13 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
                   href="tel:2394048505"
                   className="fe-icon-tile"
                 >
-                  <span className="text-4xl mb-3" aria-hidden="true">{cat.icon}</span>
+                  <span
+                    className="material-symbols-outlined mb-3 text-[#735c00]"
+                    style={{ fontSize: '2.35rem', fontVariationSettings: "'FILL' 1" }}
+                    aria-hidden="true"
+                  >
+                    {cat.icon}
+                  </span>
                   <span className="text-sm font-bold leading-tight" style={{ fontFamily: 'var(--font-label)' }}>
                     {cat.label}
                   </span>
@@ -219,7 +228,7 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
               {steps.map((step) => (
                 <div
                   key={step.num}
-                  className="flex flex-col md:flex-row md:items-center py-8 px-6 md:px-8 rounded-sm"
+                  className="flex flex-col rounded-2xl px-6 py-8 shadow-[0_14px_38px_rgba(38,28,6,0.05)] md:flex-row md:items-center md:px-8"
                   style={{ background: 'var(--color-surface-container-high)' }}
                 >
                   <span
@@ -249,18 +258,24 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
             <div className="grid md:grid-cols-3 gap-6 text-center">
               {(isEs
                 ? [
-                    { icon: '✓', title: 'Sin Costo, Sin Trampa', body: 'La evaluación es genuinamente gratuita y no tiene ninguna obligación de vender.' },
-                    { icon: '📈', title: 'Precios de Mercado en Vivo', body: 'El oro y la plata se valoran según los precios spot en tiempo real, mostrados abiertamente.' },
-                    { icon: '🔒', title: 'Privado y Discreto', body: 'Móvil y solo con cita. Sus artículos e información permanecen confidenciales.' },
+                    { icon: 'check_circle', title: 'Sin Costo, Sin Trampa', body: 'La evaluación es genuinamente gratuita y no tiene ninguna obligación de vender.' },
+                    { icon: 'monitoring', title: 'Precios de Mercado en Vivo', body: 'El oro y la plata se valoran según los precios spot en tiempo real, mostrados abiertamente.' },
+                    { icon: 'lock', title: 'Privado y Discreto', body: 'Móvil y solo con cita. Sus artículos e información permanecen confidenciales.' },
                   ]
                 : [
-                    { icon: '✓', title: 'No Cost, No Catch', body: 'The evaluation is genuinely free and carries zero obligation to sell.' },
-                    { icon: '📈', title: 'Live Market Pricing', body: 'Gold and silver are valued against real-time spot prices, shown openly.' },
-                    { icon: '🔒', title: 'Private & Discreet', body: 'Mobile and appointment-only. Your items and information stay confidential.' },
+                    { icon: 'check_circle', title: 'No Cost, No Catch', body: 'The evaluation is genuinely free and carries zero obligation to sell.' },
+                    { icon: 'monitoring', title: 'Live Market Pricing', body: 'Gold and silver are valued against real-time spot prices, shown openly.' },
+                    { icon: 'lock', title: 'Private & Discreet', body: 'Mobile and appointment-only. Your items and information stay confidential.' },
                   ]
               ).map((pillar) => (
                 <div key={pillar.title} className="p-6">
-                  <div className="text-3xl mb-3">{pillar.icon}</div>
+                  <span
+                    className="material-symbols-outlined mb-3 block text-[#735c00]"
+                    style={{ fontSize: '2.2rem', fontVariationSettings: "'FILL' 1" }}
+                    aria-hidden="true"
+                  >
+                    {pillar.icon}
+                  </span>
                   <h3
                     className="text-lg font-bold mb-2"
                     style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}

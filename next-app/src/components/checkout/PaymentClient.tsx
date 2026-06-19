@@ -93,6 +93,24 @@ export default function PaymentClient({ locale }: { locale: string }) {
             </p>
           </div>
 
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
+            {isEs
+              ? 'No envie informacion de pago real hasta que un procesador de pagos seguro este conectado. Revise nuestras '
+              : 'Do not submit real payment information until a secure payment processor is connected. Review our '}
+            <Link href={`${prefix}/terms`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
+              {isEs ? 'Terminos' : 'Terms'}
+            </Link>
+            {', '}
+            <Link href={`${prefix}/privacy`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
+              {isEs ? 'Privacidad' : 'Privacy Policy'}
+            </Link>
+            {isEs ? ' y ' : ', and '}
+            <Link href={`${prefix}/returns-refunds`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
+              {isEs ? 'Devoluciones' : 'Returns & Refunds'}
+            </Link>
+            .
+          </p>
+
           <button type="button" className="gold-button justify-center opacity-70" style={{ width: '100%' }} disabled>
             {isEs ? 'Completar pago' : 'Complete Payment'}
           </button>

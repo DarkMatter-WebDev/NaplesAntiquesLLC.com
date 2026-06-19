@@ -3960,12 +3960,17 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
           onClick={() => setPreviewImg(null)}
         >
           <div className="relative max-w-3xl w-full max-h-[85vh] flex flex-col items-center justify-center gap-3" onClick={(e) => e.stopPropagation()}>
-            <img
-              src={previewImg.url}
-              alt="Preview"
-              className="max-w-full max-h-[78vh] object-contain"
-              style={{ boxShadow: '0 8px 40px rgba(0,0,0,0.6)' }}
-            />
+            <div className="relative h-[78vh] max-h-[78vh] w-full">
+              <Image
+                src={previewImg.url}
+                alt="Preview"
+                fill
+                sizes="(max-width: 768px) 92vw, 768px"
+                className="object-contain"
+                style={{ filter: 'drop-shadow(0 8px 40px rgba(0,0,0,0.6))' }}
+                unoptimized
+              />
+            </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -4025,11 +4030,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
             <div className="flex justify-center overflow-auto max-h-[62vh]">
               <div className="relative inline-block select-none touch-none" data-crop-area="true">
-                <img
+                <Image
                   src={cropTarget.url}
                   alt="Crop preview"
-                  className="block max-w-full max-h-[60vh] object-contain"
+                  width={1200}
+                  height={900}
+                  className="block max-h-[60vh] w-auto max-w-full object-contain"
                   draggable={false}
+                  unoptimized
                 />
                 <div
                   className="absolute touch-none"

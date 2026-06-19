@@ -101,7 +101,7 @@ export default async function EstateJewelryPage({ params }: Props) {
                   alt={isEs ? 'Herramientas de joyería en el banco de trabajo' : "Jeweler's workbench with precision tools"}
                   width={700}
                   height={525}
-                  className="w-full rounded-sm shadow-xl object-cover"
+                  className="w-full rounded-2xl object-cover shadow-xl"
                   style={{ aspectRatio: '4/3' }}
                 />
               </div>
@@ -178,7 +178,7 @@ export default async function EstateJewelryPage({ params }: Props) {
                     isEs ? 'Pago inmediato al llegar a un acuerdo' : 'Immediate payment upon agreement',
                   ].map((item, i) => (
                     <li key={i} className="flex items-start gap-4">
-                      <span style={{ color: '#f2ca50', flexShrink: 0, marginTop: '0.1rem' }}>✓</span>
+                      <span className="material-symbols-outlined text-sm" style={{ color: '#f2ca50', flexShrink: 0, marginTop: '0.1rem', fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                       <span
                         className="text-sm font-bold uppercase tracking-wide"
                         style={{ fontFamily: 'var(--font-label)', color: 'white' }}
@@ -197,14 +197,20 @@ export default async function EstateJewelryPage({ params }: Props) {
               </div>
 
               <div
-                className="aspect-square flex items-center justify-center p-12"
+                className="flex aspect-square items-center justify-center rounded-2xl p-8 shadow-[0_18px_54px_rgba(0,0,0,0.16)] md:p-12"
                 style={{ background: 'var(--color-surface-container-highest)' }}
               >
                 <div
-                  className="w-full h-full flex flex-col justify-center text-center p-10"
-                  style={{ border: '1px solid var(--color-outline)' }}
+                  className="flex h-full w-full flex-col justify-center rounded-xl p-8 text-center md:p-10"
+                  style={{ border: '1px solid rgba(115, 92, 0, 0.18)' }}
                 >
-                  <div className="text-6xl mb-6" style={{ color: 'var(--color-primary)' }}>🏅</div>
+                  <span
+                    className="material-symbols-outlined mb-6 block"
+                    style={{ color: 'var(--color-primary)', fontSize: '4rem', fontVariationSettings: "'FILL' 1" }}
+                    aria-hidden="true"
+                  >
+                    verified
+                  </span>
                   <h3
                     className="text-2xl font-bold mb-4"
                     style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
@@ -251,7 +257,7 @@ export default async function EstateJewelryPage({ params }: Props) {
             {/* Gallery grid */}
             <div className="grid md:grid-cols-2 gap-4">
               {/* Main feature — Patek / signed watches */}
-              <div className="relative group overflow-hidden rounded-sm" style={{ minHeight: 400 }}>
+              <div className="relative group overflow-hidden rounded-2xl shadow-[0_18px_54px_rgba(38,28,6,0.08)]" style={{ minHeight: 400 }}>
                 <Image
                   src="/assets/images/pages/patek.webp"
                   alt={isEs ? 'Reloj de lujo Patek Philippe' : 'Patek Philippe luxury watch'}
@@ -278,7 +284,7 @@ export default async function EstateJewelryPage({ params }: Props) {
 
               <div className="grid grid-rows-2 gap-4">
                 {/* Gold & chains */}
-                <div className="relative group overflow-hidden rounded-sm" style={{ minHeight: 190 }}>
+                <div className="relative group overflow-hidden rounded-2xl shadow-[0_14px_38px_rgba(38,28,6,0.08)]" style={{ minHeight: 190 }}>
                   <Image
                     src="/assets/images/pages/gold.webp"
                     alt={isEs ? 'Joyería de oro y cadenas' : 'Gold jewelry and chains'}
@@ -300,7 +306,7 @@ export default async function EstateJewelryPage({ params }: Props) {
                 </div>
 
                 {/* Estate pieces */}
-                <div className="relative group overflow-hidden rounded-sm" style={{ minHeight: 190 }}>
+                <div className="relative group overflow-hidden rounded-2xl shadow-[0_14px_38px_rgba(38,28,6,0.08)]" style={{ minHeight: 190 }}>
                   <Image
                     src="/assets/images/pages/signed.webp"
                     alt={isEs ? 'Broches y colgantes victorianos de oro' : 'Victorian gold brooches and pendants'}

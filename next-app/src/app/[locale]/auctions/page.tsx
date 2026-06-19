@@ -18,6 +18,7 @@ export default async function AuctionsPage({ params }: Props) {
   const isEs = locale === 'es';
   const contactHref = isEs ? '/es/contact' : '/contact';
   const evaluationHref = isEs ? '/es/free-evaluation' : '/free-evaluation';
+  const auctionTermsHref = isEs ? '/es/auction-terms' : '/auction-terms';
 
   const steps = [
     {
@@ -72,6 +73,9 @@ export default async function AuctionsPage({ params }: Props) {
               </Link>
               <Link href={contactHref} className="outline-button">
                 {isEs ? 'Hablar con Chris' : 'Talk With Chris'}
+              </Link>
+              <Link href={auctionTermsHref} className="outline-button">
+                {isEs ? 'Terminos de Subasta' : 'Auction Terms'}
               </Link>
             </div>
           </div>

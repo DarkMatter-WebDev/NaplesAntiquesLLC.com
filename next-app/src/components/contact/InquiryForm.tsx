@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 
 interface Props {
   locale: string;
@@ -45,7 +46,12 @@ export default function InquiryForm({ locale, itemName, submitted: initialSubmit
     return (
       <section className="py-16 md:py-24" style={{ background: 'var(--color-background)' }}>
         <div className="container mx-auto px-6 md:px-8 max-w-2xl text-center">
-          <div className="text-5xl mb-4">✓</div>
+          <div
+            className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full text-xs font-bold uppercase tracking-[0.12em]"
+            style={{ background: '#f7efd7', color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+          >
+            OK
+          </div>
           <p
             className="text-2xl font-bold mb-3"
             style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
@@ -67,7 +73,7 @@ export default function InquiryForm({ locale, itemName, submitted: initialSubmit
       <div className="container mx-auto px-6 md:px-8 max-w-3xl">
 
         <div
-          className="mb-8 p-4 rounded-sm text-sm"
+          className="mb-8 rounded-2xl p-4 text-sm shadow-[0_12px_34px_rgba(38,28,6,0.05)]"
           style={{
             background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)',
             border: '1px solid color-mix(in srgb, var(--color-primary) 20%, transparent)',
@@ -82,8 +88,8 @@ export default function InquiryForm({ locale, itemName, submitted: initialSubmit
 
         <form
           onSubmit={handleSubmit}
-          className="grid gap-5 p-6 md:p-8 rounded-sm border"
-          style={{ background: 'white', borderColor: 'var(--color-outline-variant)' }}
+          className="grid gap-5 rounded-2xl border p-6 shadow-[0_18px_54px_rgba(38,28,6,0.07)] md:p-8"
+          style={{ background: 'rgba(255,255,255,0.86)', borderColor: 'rgba(115, 92, 0, 0.14)' }}
         >
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="grid gap-1">
@@ -147,6 +153,8 @@ export default function InquiryForm({ locale, itemName, submitted: initialSubmit
           {err && (
             <p className="text-sm" style={{ color: 'var(--color-error, #b91c1c)' }}>{err}</p>
           )}
+
+          <FormPrivacyNotice locale={locale} />
 
           <div className="flex gap-3 items-center pt-1">
             <button type="submit" className="gold-button" disabled={sending}>

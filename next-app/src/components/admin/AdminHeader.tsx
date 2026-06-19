@@ -4,7 +4,7 @@ import AdminMessagesLink from './AdminMessagesLink';
 
 const GOLD = '#735c00';
 
-export type AdminSection = 'products' | 'orders' | 'messages' | 'inquiries' | 'subscribers' | 'users' | 'settings';
+export type AdminSection = 'products' | 'orders' | 'messages' | 'inquiries' | 'subscribers' | 'marketing' | 'users' | 'settings';
 
 const linkStyle = {
   fontSize: '0.8125rem',
@@ -123,6 +123,9 @@ export default function AdminHeader({
       </AdminNavItem>
       <AdminNavItem href={`${adminBasePath}/subscribers`} active={active === 'subscribers'}>
         Subscribers
+      </AdminNavItem>
+      <AdminNavItem href={`${adminBasePath}/marketing`} active={active === 'marketing'}>
+        Email Campaigns
       </AdminNavItem>
       <AdminNavItem href={`${adminBasePath}/users`} active={active === 'users'}>
         Users

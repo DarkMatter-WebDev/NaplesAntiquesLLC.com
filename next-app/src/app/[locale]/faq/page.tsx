@@ -97,7 +97,7 @@ export default async function FaqPage({ params }: Props) {
               {FAQ_ITEMS.map(({ questionEn, questionEs, answerEn, answerEs }) => (
                 <details
                   key={questionEn}
-                  className="group bg-[#e8e8e8] overflow-hidden border border-[#d0c5af]"
+                  className="group overflow-hidden rounded-2xl border border-[#d0c5af] bg-white shadow-[0_14px_38px_rgba(38,28,6,0.05)]"
                 >
                   <summary className="flex justify-between items-center cursor-pointer px-6 py-5 hover:bg-[#f3f3f3] transition-colors list-none [&::-webkit-details-marker]:hidden">
                     <span className="font-[family-name:var(--font-headline)] font-bold text-lg pr-4">
@@ -151,13 +151,13 @@ export default async function FaqPage({ params }: Props) {
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center flex-wrap">
               <a
                 href="tel:2394048505"
-                className="bg-[linear-gradient(135deg,#dcb336,#b5890c)] text-white px-8 py-4 font-bold text-xs uppercase tracking-widest hover:brightness-[1.04] transition"
+                className="gold-button"
               >
                 (239) 404-8505
               </a>
               <Link
                 href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
-                className="border border-[#735c00]/60 text-[#735c00] px-8 py-4 font-bold text-xs uppercase tracking-widest hover:bg-[linear-gradient(135deg,#dcb336,#b5890c)] hover:text-white transition"
+                className="outline-button"
               >
                 {isEs ? 'Programar una Consulta' : 'Schedule a Consultation'}
               </Link>

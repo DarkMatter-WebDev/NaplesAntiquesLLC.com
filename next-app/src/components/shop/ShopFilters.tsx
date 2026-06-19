@@ -340,32 +340,56 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
     }).format(value);
   };
 
-  const priceBadgeStyle = {
+  const priceBadgeBaseStyle: CSSProperties = {
     minWidth: '8.75rem',
-    border: `1px solid ${BORDER}`,
-    background: 'color-mix(in srgb, var(--color-primary) 5%, var(--color-background))',
     padding: '0.42rem 0.7rem',
-    textAlign: 'center' as const,
+    textAlign: 'center',
     fontFamily: 'var(--font-label)',
   };
 
-  const spotLabelStyle = {
+  const silverBadgeStyle: CSSProperties = {
+    ...priceBadgeBaseStyle,
+    border: '1px solid rgba(129, 138, 146, 0.46)',
+    background:
+      'linear-gradient(135deg, rgba(255,255,255,0.96), rgba(232,236,239,0.82) 48%, rgba(247,248,248,0.96))',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.88), 0 8px 22px rgba(95,105,113,0.08)',
+  };
+
+  const goldBadgeStyle: CSSProperties = {
+    ...priceBadgeBaseStyle,
+    border: '1px solid rgba(181, 137, 12, 0.46)',
+    background:
+      'linear-gradient(135deg, rgba(255,253,247,0.98), rgba(250,240,201,0.86) 48%, rgba(255,250,235,0.98))',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9), 0 8px 22px rgba(143,108,6,0.1)',
+  };
+
+  const silverLabelStyle: CSSProperties = {
     display: 'block',
-    color: 'var(--color-on-surface-variant)',
+    color: '#58626a',
     fontSize: '0.52rem',
     fontWeight: 700,
     letterSpacing: '0.14em',
     lineHeight: 1,
     marginBottom: '0.22rem',
-    textTransform: 'uppercase' as const,
+    textTransform: 'uppercase',
   };
 
-  const spotPriceStyle = {
+  const goldLabelStyle: CSSProperties = {
+    ...silverLabelStyle,
+    color: '#735c00',
+  };
+
+  const silverPriceStyle: CSSProperties = {
     display: 'block',
-    color: GOLD,
+    color: '#3f4a52',
     fontSize: '0.86rem',
     fontWeight: 800,
     lineHeight: 1.05,
+  };
+
+  const goldPriceStyle: CSSProperties = {
+    ...silverPriceStyle,
+    color: GOLD,
   };
 
   const formatPrice = (value: number) => new Intl.NumberFormat('en-US', {
@@ -406,11 +430,11 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
       {/* Search + live metal prices */}
       <div className="shop-search-spot-row">
         <div
-          style={priceBadgeStyle}
+          style={silverBadgeStyle}
           aria-label={isEs ? 'Precio de plata en vivo por onza troy' : 'Live silver price per troy ounce'}
         >
-          <span style={spotLabelStyle}>{isEs ? 'Plata / oz' : 'Silver / oz'}</span>
-          <span style={spotPriceStyle}>{formatSpot(spotData?.silverPerTroyOz)}</span>
+          <span style={silverLabelStyle}>{isEs ? 'Plata / oz' : 'Silver / oz'}</span>
+          <span style={silverPriceStyle}>{formatSpot(spotData?.silverPerTroyOz)}</span>
         </div>
 
         <div style={{ width: '100%', maxWidth: '24rem' }}>
@@ -435,11 +459,11 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
         </div>
 
         <div
-          style={priceBadgeStyle}
+          style={goldBadgeStyle}
           aria-label={isEs ? 'Precio de oro en vivo por onza troy' : 'Live gold price per troy ounce'}
         >
-          <span style={spotLabelStyle}>{isEs ? 'Oro / oz' : 'Gold / oz'}</span>
-          <span style={spotPriceStyle}>{formatSpot(spotData?.goldPerTroyOz)}</span>
+          <span style={goldLabelStyle}>{isEs ? 'Oro / oz' : 'Gold / oz'}</span>
+          <span style={goldPriceStyle}>{formatSpot(spotData?.goldPerTroyOz)}</span>
         </div>
       </div>
 
@@ -550,10 +574,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
                 <option value="watch">{isEs ? 'Relojes' : 'Watches'}</option>
                 <option value="coin">{isEs ? 'Monedas' : 'Coins'}</option>
                 <option value="bullion">{isEs ? 'Lingotes' : 'Bullion'}</option>
-                <option value="loose-diamond">{isEs ? 'Diamantes sueltos' : 'Loose Diamonds'}</option>
-                <option value="loose-gemstone">{isEs ? 'Gemas sueltas' : 'Loose Gemstones'}</option>
                 <option value="silverware">{isEs ? 'Plateria / sterling' : 'Silverware / Sterling'}</option>
-                <option value="estate-lot">{isEs ? 'Lotes de sucesion' : 'Estate Lots'}</option>
               </select>
             </div>
 
@@ -866,6 +887,10 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
           fontSize: '0.8125rem',
           color: 'var(--color-on-surface-variant)',
           fontFamily: 'var(--font-label)',
+          border: '1px solid rgba(115, 92, 0, 0.12)',
+          borderRadius: 'var(--radius-xl)',
+          background: 'rgba(255, 255, 255, 0.72)',
+          padding: '0.55rem 0.85rem',
         }}
       >
         <span>
@@ -1140,7 +1165,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
         .modern-sidebar-gender-button {
           min-height: 2.7rem;
           border: 1px solid rgba(115, 92, 0, 0.16);
-          border-radius: 6px;
+          border-radius: var(--radius-lg);
           background: #ffffff;
           color: var(--color-on-surface-variant);
           cursor: pointer;

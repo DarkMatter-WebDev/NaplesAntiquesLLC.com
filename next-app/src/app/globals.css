@@ -46,9 +46,9 @@
   --font-label:    var(--font-hanken), "Hanken Grotesk", system-ui, sans-serif;
 
   /* ── Border radius ────────────────────────────────────── */
-  --radius:    0.125rem;
-  --radius-lg: 0.25rem;
-  --radius-xl: 0.5rem;
+  --radius:    0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
 }
 
 /* ── Base styles ──────────────────────────────────────────── */
@@ -73,15 +73,15 @@ body {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   padding: 0.65rem 1.5rem;
-  border-radius: var(--radius);
+  border-radius: 999px;
   border: none;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
   text-decoration: none;
-  box-shadow: 0 10px 24px rgba(181, 137, 12, 0.18);
-  transition: filter 0.15s, box-shadow 0.15s, transform 0.15s;
+  box-shadow: 0 12px 26px rgba(181, 137, 12, 0.18);
+  transition: filter 0.15s, box-shadow 0.15s, transform 0.15s, background 0.15s;
 }
 .gold-button:hover {
   filter: brightness(1.04);
@@ -101,7 +101,7 @@ body {
 }
 
 .outline-button {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.72);
   color: var(--color-primary);
   border: 1px solid color-mix(in srgb, var(--color-primary) 50%, transparent);
   font-family: var(--font-label);
@@ -110,23 +110,27 @@ body {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   padding: 0.6rem 1.4rem;
-  border-radius: var(--radius);
+  border-radius: 999px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
   text-decoration: none;
-  transition: background 0.15s, color 0.15s;
+  box-shadow: 0 8px 20px rgba(38, 28, 6, 0.04);
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 .outline-button:hover {
-  background: linear-gradient(135deg, #dcb336, #b5890c);
-  color: var(--color-on-primary);
+  background: #ffffff;
+  border-color: color-mix(in srgb, var(--color-primary) 72%, transparent);
+  color: var(--color-primary);
+  box-shadow: 0 12px 24px rgba(38, 28, 6, 0.08);
+  transform: translateY(-1px);
 }
 
 .form-field {
   width: 100%;
   border: 1px solid var(--color-outline-variant);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   padding: 0.65rem 0.85rem;
   background: var(--color-surface-container-lowest);
   color: var(--color-on-surface);

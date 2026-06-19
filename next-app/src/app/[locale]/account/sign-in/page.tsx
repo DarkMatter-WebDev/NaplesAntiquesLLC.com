@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -34,7 +34,7 @@ export default function SignInPage() {
   return (
     <>
       <SiteHeader />
-      <main className="modern-auth-page min-h-screen flex items-center justify-center px-4 pt-24 pb-20">
+      <main className="modern-auth-page min-h-screen flex items-start justify-center px-4 pt-20 pb-10 md:items-center md:pt-24 md:pb-20">
         <div className="modern-auth-card w-full max-w-sm">
 
           <span className="material-symbols-outlined modern-auth-icon" aria-hidden="true">
@@ -77,7 +77,7 @@ export default function SignInPage() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 className="form-field w-full"
-                placeholder="••••••••"
+                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
               />
             </div>
 
@@ -90,7 +90,7 @@ export default function SignInPage() {
               disabled={loading}
               className="modern-auth-submit mt-2 disabled:opacity-60"
             >
-              {loading ? 'Signing in…' : 'Sign In'}
+              {loading ? 'Signing inâ€¦' : 'Sign In'}
             </button>
           </form>
 
@@ -115,7 +115,7 @@ export default function SignInPage() {
           .modern-auth-card {
             position: relative;
             border: 1px solid rgba(115, 92, 0, 0.15);
-            border-radius: 8px;
+            border-radius: var(--radius-xl);
             background: #ffffff;
             box-shadow: 0 18px 52px rgba(42, 34, 12, 0.09);
             padding: 3.25rem 2rem 2.25rem;
@@ -137,7 +137,7 @@ export default function SignInPage() {
             width: 100%;
             min-height: 2.95rem;
             border: none;
-            border-radius: 6px;
+            border-radius: var(--radius-lg);
             cursor: pointer;
             background: linear-gradient(135deg, #dcb336, #b5890c);
             color: #fffdf7;
@@ -157,8 +157,20 @@ export default function SignInPage() {
           .modern-auth-submit:disabled {
             cursor: default;
           }
+          @media (max-width: 767px) {
+            .modern-auth-page {
+              background: #ffffff;
+            }
+            .modern-auth-card {
+              padding: 2rem 1.25rem 1.5rem;
+            }
+            .modern-auth-icon {
+              margin-bottom: 1rem;
+            }
+          }
         `}</style>
       </main>
     </>
   );
 }
+

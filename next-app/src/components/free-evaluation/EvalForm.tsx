@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 
 interface Props {
   locale: string;
@@ -24,11 +25,11 @@ export default function EvalForm({ locale, submitted }: Props) {
       data-netlify="true"
       data-netlify-honeypot="bot-field"
       encType="multipart/form-data"
-      className="rounded-sm p-6 grid gap-4"
+      className="grid gap-4 rounded-2xl border p-5 shadow-[0_22px_70px_rgba(38,28,6,0.18)] md:p-6"
       style={{
-        background: 'rgba(255,255,255,0.97)',
+        background: 'rgba(255,255,255,0.9)',
+        borderColor: 'rgba(115, 92, 0, 0.16)',
         maxWidth: 540,
-        boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
       }}
     >
       <input type="hidden" name="form-name" value="free-evaluation-request" />
@@ -38,7 +39,12 @@ export default function EvalForm({ locale, submitted }: Props) {
 
       {submitted ? (
         <div className="text-center py-8 px-4">
-          <div className="text-4xl mb-4">✓</div>
+          <div
+            className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full text-xs font-bold uppercase tracking-[0.12em]"
+            style={{ background: '#f7efd7', color: '#735c00', fontFamily: 'var(--font-label)' }}
+          >
+            OK
+          </div>
           <p
             className="text-lg font-bold mb-2"
             style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
@@ -62,21 +68,21 @@ export default function EvalForm({ locale, submitted }: Props) {
               {isEs ? 'Fotos — seleccione una o más' : 'Photos — select one or more'}
             </span>
             <label
-              className="flex flex-col items-center justify-center text-center cursor-pointer rounded-sm transition-colors"
+              className="flex flex-col items-center justify-center rounded-2xl text-center cursor-pointer transition-colors"
               style={{
                 minHeight: '10rem',
-                border: '1.5px dashed #b9a982',
-                background: '#fbfaf6',
+                border: '1.5px dashed rgba(115, 92, 0, 0.24)',
+                background: '#fffdf8',
                 color: '#735c00',
                 padding: '1.5rem',
               }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLElement).style.borderColor = '#735c00';
-                (e.currentTarget as HTMLElement).style.background = '#f8f3e5';
+                (e.currentTarget as HTMLElement).style.background = '#fbf5e7';
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.borderColor = '#b9a982';
-                (e.currentTarget as HTMLElement).style.background = '#fbfaf6';
+                (e.currentTarget as HTMLElement).style.borderColor = 'rgba(115, 92, 0, 0.24)';
+                (e.currentTarget as HTMLElement).style.background = '#fffdf8';
               }}
             >
               <input
@@ -89,7 +95,12 @@ export default function EvalForm({ locale, submitted }: Props) {
                 className="sr-only"
                 onChange={(e) => setPhotoCount(e.target.files?.length ?? 0)}
               />
-              <span className="text-4xl block mb-2" aria-hidden="true">📷</span>
+              <span className="mb-3 grid h-12 w-12 place-items-center rounded-full bg-[#f7efd7]" aria-hidden="true">
+                <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="#735c00" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4.5 8.5h3l1.5-2h6l1.5 2h3A1.5 1.5 0 0 1 21 10v7a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17v-7a1.5 1.5 0 0 1 1.5-1.5Z" />
+                  <circle cx="12" cy="13.5" r="3.2" />
+                </svg>
+              </span>
               <span className="text-base font-bold block">
                 {isEs ? 'Toca para añadir fotos' : 'Tap to add photos'}
               </span>
@@ -122,7 +133,7 @@ export default function EvalForm({ locale, submitted }: Props) {
               placeholder={isEs
                 ? 'Cadena de oro, anillo de diamante, colección de monedas — cualquier detalle ayuda.'
                 : 'Gold chain, diamond ring, coin collection — any details help.'}
-              className="w-full rounded-sm text-sm px-3 py-2"
+              className="w-full rounded-xl px-3 py-2 text-sm"
               style={{
                 border: '1px solid #d8d0c2',
                 background: 'white',
@@ -150,7 +161,7 @@ export default function EvalForm({ locale, submitted }: Props) {
                 type="text"
                 autoComplete="name"
                 required
-                className="w-full rounded-sm text-sm px-3 py-2"
+                className="w-full rounded-xl px-3 py-2 text-sm"
                 style={{ border: '1px solid #d8d0c2', background: 'white', color: '#1a1c1c' }}
               />
             </div>
@@ -168,7 +179,7 @@ export default function EvalForm({ locale, submitted }: Props) {
                 type="tel"
                 autoComplete="tel"
                 required
-                className="w-full rounded-sm text-sm px-3 py-2"
+                className="w-full rounded-xl px-3 py-2 text-sm"
                 style={{ border: '1px solid #d8d0c2', background: 'white', color: '#1a1c1c' }}
               />
             </div>
@@ -188,10 +199,12 @@ export default function EvalForm({ locale, submitted }: Props) {
               name="email"
               type="email"
               autoComplete="email"
-              className="w-full rounded-sm text-sm px-3 py-2"
+              className="w-full rounded-xl px-3 py-2 text-sm"
               style={{ border: '1px solid #d8d0c2', background: 'white', color: '#1a1c1c' }}
             />
           </div>
+
+          <FormPrivacyNotice locale={locale} />
 
           <button type="submit" className="gold-button w-full">
             {isEs ? 'Enviar para Evaluación Gratuita' : 'Send for Free Evaluation'}

@@ -21,6 +21,7 @@ export interface CustomerProfile {
   postal_code: string | null;
   country: string | null;
   marketing_opt_in: boolean | null;
+  marketing_opt_out: boolean | null;
 }
 
 type ProfileFormState = {
@@ -36,7 +37,7 @@ type ProfileFormState = {
   state: string;
   postal_code: string;
   country: string;
-  marketing_opt_in: boolean;
+  marketing_subscribed: boolean;
 };
 
 function valueOrEmpty(value: string | null | undefined) {
@@ -57,7 +58,7 @@ function buildInitialState(profile: CustomerProfile, fallbackEmail: string | nul
     state: valueOrEmpty(profile.state),
     postal_code: valueOrEmpty(profile.postal_code),
     country: valueOrEmpty(profile.country || 'United States'),
-    marketing_opt_in: profile.marketing_opt_in === true,
+    marketing_subscribed: profile.marketing_opt_out !== true,
   };
 }
 
@@ -118,7 +119,8 @@ export default function AccountProfileForm({
       state: form.state.trim() || null,
       postal_code: form.postal_code.trim() || null,
       country: form.country.trim() || 'United States',
-      marketing_opt_in: form.marketing_opt_in,
+      marketing_opt_in: form.marketing_subscribed,
+      marketing_opt_out: !form.marketing_subscribed,
     };
 
     const { error: saveError } = await supabase
@@ -172,7 +174,7 @@ export default function AccountProfileForm({
               ['call', isEs ? 'Telefono' : 'Phone', displayPhone, ''],
               ['phone_in_talk', isEs ? 'Telefono alternativo' : 'Alternate Phone', displayAltPhone, ''],
               ['location_on', isEs ? 'Direccion' : 'Address', displayAddress, 'sm:col-span-2'],
-              ['notifications', isEs ? 'Actualizaciones' : 'Updates', form.marketing_opt_in ? (isEs ? 'Suscrito' : 'Subscribed') : (isEs ? 'No suscrito' : 'Not subscribed'), 'sm:col-span-2'],
+              ['notifications', isEs ? 'Actualizaciones' : 'Updates', form.marketing_subscribed ? (isEs ? 'Recibiendo actualizaciones' : 'Receiving updates') : (isEs ? 'No recibe actualizaciones' : 'Opted out'), 'sm:col-span-2'],
             ].map(([icon, label, value, className]) => (
               <div key={label} className={className}>
                 <span className="material-symbols-outlined account-profile-preview-icon" aria-hidden="true">{icon}</span>
@@ -263,11 +265,11 @@ export default function AccountProfileForm({
       <label className="mt-5 flex items-center gap-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
         <input
           type="checkbox"
-          checked={form.marketing_opt_in}
-          onChange={(e) => updateField('marketing_opt_in', e.target.checked)}
+          checked={form.marketing_subscribed}
+          onChange={(e) => updateField('marketing_subscribed', e.target.checked)}
           style={{ accentColor: GOLD }}
         />
-        {isEs ? 'Acepto recibir actualizaciones ocasionales.' : 'I agree to receive occasional updates.'}
+        {isEs ? 'Enviarme actualizaciones ocasionales y novedades.' : 'Send me occasional updates and new arrivals.'}
       </label>
 
       {message && <p className="mt-4 text-sm font-bold" style={{ color: GOLD }}>{message}</p>}

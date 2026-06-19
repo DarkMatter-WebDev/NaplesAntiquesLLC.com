@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 
 const GOLD = '#e9c349';
 
@@ -67,7 +68,7 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
           value={fullName}
           onChange={(event) => setFullName(event.target.value)}
           placeholder={isEs ? 'Nombre' : 'Name'}
-          className="h-9 sm:h-11 min-w-0 border px-3 text-xs sm:text-sm outline-none placeholder:text-black/50"
+          className="h-9 min-w-0 rounded-xl border px-3 text-xs outline-none placeholder:text-black/50 sm:h-11 sm:text-sm"
           style={inputStyle}
         />
         <input
@@ -76,13 +77,13 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           placeholder={isEs ? 'Correo electronico' : 'Email address'}
-          className="h-9 sm:h-11 min-w-0 border px-3 text-xs sm:text-sm outline-none placeholder:text-black/50"
+          className="h-9 min-w-0 rounded-xl border px-3 text-xs outline-none placeholder:text-black/50 sm:h-11 sm:text-sm"
           style={inputStyle}
         />
         <button
           type="submit"
           disabled={status === 'saving'}
-          className="h-9 sm:h-11 px-4 sm:px-5 text-[0.7rem] sm:text-xs font-bold uppercase tracking-widest disabled:opacity-60"
+          className="h-9 rounded-full px-4 text-[0.7rem] font-bold uppercase tracking-widest disabled:opacity-60 sm:h-11 sm:px-5 sm:text-xs"
           style={{ background: GOLD, color: '#171717', boxShadow: '0 2px 10px rgba(0,0,0,0.18)' }}
         >
           {status === 'saving' ? (isEs ? 'Enviando' : 'Joining') : (isEs ? 'Unirse' : 'Join')}
@@ -96,6 +97,7 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
           {message}
         </p>
       )}
+      <FormPrivacyNotice locale={locale} className="mt-2" color="var(--hero-text)" linkColor={GOLD} />
     </form>
   );
 }

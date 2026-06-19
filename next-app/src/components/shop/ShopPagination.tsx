@@ -127,7 +127,7 @@ export default function ShopPagination({
           margin-top: 2rem;
           padding: 0.85rem;
           border: 1px solid rgba(115, 92, 0, 0.12);
-          border-radius: 8px;
+          border-radius: var(--radius-xl);
           background: #ffffff;
           box-shadow: 0 14px 36px rgba(42, 34, 12, 0.07);
         }
@@ -154,7 +154,7 @@ export default function ShopPagination({
           gap: 0.28rem;
           padding: 0.28rem;
           border: 1px solid rgba(115, 92, 0, 0.1);
-          border-radius: 8px;
+          border-radius: var(--radius-xl);
           background: rgba(255, 255, 255, 0.96);
         }
         .shop-pagination-size {

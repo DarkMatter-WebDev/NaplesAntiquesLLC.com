@@ -25,6 +25,8 @@ export const metadata: Metadata = {
   description: 'Browse estate gold jewelry, chains, bracelets, and rings with live pricing.',
 };
 
+type ShopCollection = 'default' | 'silverTableware';
+
 interface Props {
   params: Promise<{ locale: string }>;
   searchParams: Promise<{
@@ -68,10 +70,7 @@ const ITEM_TYPE_KEYWORDS: Record<string, string[]> = {
   watch: ['watch', 'wristwatch', 'wrist watch', 'timepiece'],
   coin: ['coin'],
   bullion: ['bullion', 'bar', 'round', 'ingot'],
-  'loose-diamond': ['loose diamond', 'diamond'],
-  'loose-gemstone': ['loose gemstone', 'gemstone', 'gem'],
   silverware: ['silverware', 'flatware', 'hollowware'],
-  'estate-lot': ['estate lot', 'estate collection'],
 };
 
 const ITEM_TYPE_VALUES: Record<string, ReturnType<typeof inferProductJewelryType>> = {
@@ -85,10 +84,7 @@ const ITEM_TYPE_VALUES: Record<string, ReturnType<typeof inferProductJewelryType
   watch: 'Watch',
   coin: 'Coin',
   bullion: 'Bullion',
-  'loose-diamond': 'Loose Diamond',
-  'loose-gemstone': 'Loose Gemstone',
   silverware: 'Silverware',
-  'estate-lot': 'Estate Lot',
 };
 
 function getProductLinkType(product: Product): string {
@@ -218,9 +214,13 @@ export async function renderShopPage({
   searchParams,
   variant = 'classic',
   routeSegment,
-}: Props & { variant?: 'classic' | 'modern'; routeSegment?: 'shop' | 'shop-modern' }) {
+  collection = 'default',
+}: Props & { variant?: 'classic' | 'modern'; routeSegment?: 'shop' | 'shop-modern' | 'silver-tableware'; collection?: ShopCollection }) {
   const { locale } = await params;
-  const filters = await searchParams;
+  const rawFilters = await searchParams;
+  const filters = collection === 'silverTableware'
+    ? { ...rawFilters, metal: 'silver', itemType: 'silverware' }
+    : rawFilters;
 
   const supabase = await createClient();
   const { data: products, error } = await supabase
@@ -231,8 +231,11 @@ export async function renderShopPage({
   const spotData = await fetchSpotData();
   const allProducts: Product[] = (products ?? []) as Product[];
   const publicGalleryProducts = allProducts.filter(isVisibleInPublicGallery);
+  const collectionProducts = collection === 'silverTableware'
+    ? publicGalleryProducts.filter((product) => inferProductJewelryType(product) === 'Silverware' && productMatchesBroadMetal(product, 'silver'))
+    : publicGalleryProducts;
   const brandOptions = Array.from(new Set(
-    publicGalleryProducts
+    collectionProducts
       .map((product) => product.brand?.trim())
       .filter(Boolean) as string[],
   )).sort((a, b) => a.localeCompare(b));
@@ -240,7 +243,7 @@ export async function renderShopPage({
   const selectedLengths = normalizeLengths(filters.length);
   const allowedLengthValues = getAllowedLengthValues(filters.itemType);
   const effectiveSelectedLengths = selectedLengths.filter((length) => allowedLengthValues.includes(length));
-  const publicPrices = publicGalleryProducts
+  const publicPrices = collectionProducts
     .map((product) => getSortablePrice(product, spotData))
     .filter((price): price is number => price != null && Number.isFinite(price));
   const priceRange = publicPrices.length > 0
@@ -264,7 +267,7 @@ export async function renderShopPage({
     ? Math.max(selectedPriceMin, selectedPriceMax)
     : selectedPriceMax;
 
-  const filtered = publicGalleryProducts.filter((p) => {
+  const filtered = collectionProducts.filter((p) => {
     if (filters.metal) {
       if (!productMatchesBroadMetal(p, filters.metal)) return false;
     }
@@ -357,6 +360,68 @@ export async function renderShopPage({
   const isEs = locale === 'es';
   const isModern = variant === 'modern';
   const currentRouteSegment = routeSegment ?? (isModern ? 'shop-modern' : 'shop');
+  const isSilverTableware = collection === 'silverTableware';
+  const heroContent = isSilverTableware
+    ? {
+        eyebrow: isEs ? 'Plateria sterling seleccionada' : 'Curated sterling silver',
+        title: isEs ? 'Plateria Sterling y Mas' : 'Sterling Tableware & More',
+        copy: isEs
+          ? 'Explore piezas hermosas de plata sterling para la mesa y el hogar, seleccionadas por su calidad, historia, utilidad y valor.'
+          : 'Browse beautiful sterling silver pieces for the table and home, chosen for quality, history, usefulness, and value.',
+        points: [
+          {
+            icon: 'diamond',
+            label: isEs ? 'Belleza de herencia' : 'Heirloom beauty',
+            copy: isEs
+              ? 'Bandejas, copas, cubiertos y objetos sterling con caracter real, hechos para usarse, regalarse y conservarse.'
+              : 'Trays, cups, flatware, and sterling objects with real character, made to be used, gifted, and kept.',
+          },
+          {
+            icon: 'savings',
+            label: isEs ? 'Precios razonables' : 'Reasonable prices',
+            copy: isEs
+              ? 'Compramos con cuidado y mantenemos precios practicos, para que piezas finas de plata sterling sigan siendo alcanzables.'
+              : 'We buy carefully and price practically, so fine sterling pieces remain attainable rather than inflated.',
+          },
+          {
+            icon: 'visibility',
+            label: isEs ? 'Compra transparente' : 'Transparent buying',
+            copy: isEs
+              ? 'Los listados muestran fotos claras, detalles utiles y contexto honesto para que sepa exactamente que esta viendo.'
+              : 'Listings show clear photos, useful details, and honest context so you know exactly what you are viewing.',
+          },
+        ],
+      }
+    : {
+        eyebrow: isEs ? 'Una forma más inteligente de poseer oro' : 'A smarter way to own gold',
+        title: isEs ? 'No solo compres. Invierte.' : "Don't just buy. Invest.",
+        copy: isEs
+          ? 'Cada pieza tiene precio en vivo contra el mercado spot del oro, con el valor exacto de chatarra de oro mostrado junto a tu precio. No solo compras joyería — estás poniendo tu dinero en oro real y usable a un valor que puedes verificar.'
+          : "Every piece is priced live against the gold spot market, with the exact gold scrap value shown right next to your price. You're not just buying jewelry — you're putting your money into real, wearable gold at a value you can verify.",
+        points: [
+          {
+            icon: 'monitoring',
+            label: isEs ? 'Precios en vivo' : 'Live spot prices',
+            copy: isEs
+              ? 'Los valores del oro se actualizan mientras compras, usando los mismos datos del mercado que impulsan cada listado.'
+              : 'Gold values update as you shop, using the same market data that powers each listing.',
+          },
+          {
+            icon: 'sell',
+            label: isEs ? 'Chatarra y precio' : 'Scrap and price',
+            copy: isEs
+              ? 'Cada listado muestra el valor exacto de chatarra de oro junto a tu precio — nada oculto.'
+              : 'Each listing shows the exact gold scrap value next to your price — nothing hidden.',
+          },
+          {
+            icon: 'auto_awesome',
+            label: isEs ? 'En cada página' : 'On every product page',
+            copy: isEs
+              ? 'Ve el multiplicador spot detrás del precio, más una oferta especial de intercambio para tu propio oro.'
+              : 'See the spot multiplier behind the price, plus a special trade-in offer for your own gold.',
+          },
+        ],
+      };
 
   const investStyle = {
     border: '1px solid rgba(115, 92, 0, 0.24)',
@@ -394,7 +459,7 @@ export async function renderShopPage({
               className="text-[0.55rem] md:text-[0.68rem] font-bold uppercase tracking-[0.22em] mb-0.5 md:mb-2"
               style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
             >
-              {isEs ? 'Una forma más inteligente de poseer oro' : 'A smarter way to own gold'}
+              {heroContent.eyebrow}
             </p>
             <h2
               id="shop-invest-heading"
@@ -403,7 +468,7 @@ export async function renderShopPage({
                 : 'text-base md:text-4xl font-bold mt-0 mb-0 md:mb-3 tracking-tight'}
               style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
             >
-              {isEs ? 'No solo compres. Invierte.' : "Don't just buy. Invest."}
+              {heroContent.title}
             </h2>
             <p
               className={isModern
@@ -411,9 +476,7 @@ export async function renderShopPage({
                 : 'hidden md:block text-sm leading-relaxed max-w-2xl mx-auto mb-5'}
               style={{ color: 'var(--color-on-surface-variant)' }}
             >
-              {isEs
-                ? 'Cada pieza tiene precio en vivo contra el mercado spot del oro, con el valor exacto de chatarra de oro mostrado junto a tu precio. No solo compras joyería — estás poniendo tu dinero en oro real y usable a un valor que puedes verificar.'
-                : "Every piece is priced live against the gold spot market, with the exact gold scrap value shown right next to your price. You're not just buying jewelry — you're putting your money into real, wearable gold at a value you can verify."}
+              {heroContent.copy}
             </p>
 
             {/* 3-column points — hidden on mobile */}
@@ -423,29 +486,7 @@ export async function renderShopPage({
                 : 'hidden md:grid md:grid-cols-3 gap-3 mt-4 text-center'}
               style={isModern ? undefined : { borderTop: '1px solid rgba(115, 92, 0, 0.16)', paddingTop: '1rem' }}
             >
-              {[
-                {
-                  icon: 'monitoring',
-                  label: isEs ? 'Precios en vivo' : 'Live spot prices',
-                  copy: isEs
-                    ? 'Los valores del oro se actualizan mientras compras, usando los mismos datos del mercado que impulsan cada listado.'
-                    : 'Gold values update as you shop, using the same market data that powers each listing.',
-                },
-                {
-                  icon: 'sell',
-                  label: isEs ? 'Chatarra y precio' : 'Scrap and price',
-                  copy: isEs
-                    ? 'Cada listado muestra el valor exacto de chatarra de oro junto a tu precio — nada oculto.'
-                    : 'Each listing shows the exact gold scrap value next to your price — nothing hidden.',
-                },
-                {
-                  icon: 'auto_awesome',
-                  label: isEs ? 'En cada página' : 'On every product page',
-                  copy: isEs
-                    ? 'Ve el multiplicador spot detrás del precio, más una oferta especial de intercambio para tu propio oro.'
-                    : 'See the spot multiplier behind the price, plus a special trade-in offer for your own gold.',
-                },
-              ].map(({ icon, label, copy }) => (
+              {heroContent.points.map(({ icon, label, copy }) => (
                 <div
                   key={label}
                   className={isModern ? 'modern-shop-proof-point' : 'py-3 px-2'}
@@ -481,7 +522,7 @@ export async function renderShopPage({
                 currentFilters={filters}
                 brandOptions={brandOptions}
                 filteredCount={sorted.length}
-                allCount={publicGalleryProducts.length}
+                allCount={collectionProducts.length}
                 spotData={spotData}
                 priceRange={priceRange}
                 variant={isModern ? 'modern' : 'classic'}
@@ -554,7 +595,7 @@ export async function renderShopPage({
               position: relative;
               min-height: 25rem;
               border: 1px solid rgba(115, 92, 0, 0.15);
-              border-radius: 8px;
+              border-radius: var(--radius-xl);
               background: #ffffff;
               box-shadow: 0 18px 52px rgba(42, 34, 12, 0.09);
               isolation: isolate;
@@ -597,7 +638,7 @@ export async function renderShopPage({
             }
             .modern-shop-page .shop-filter-sidebar {
               border: 1px solid rgba(115, 92, 0, 0.14);
-              border-radius: 8px;
+              border-radius: var(--radius-xl);
               background: #ffffff;
               box-shadow: 0 12px 34px rgba(42, 34, 12, 0.08);
               padding: 1rem;
@@ -605,7 +646,7 @@ export async function renderShopPage({
             .modern-shop-page .shop-gender-tabs {
               max-width: 42rem;
               margin-bottom: 1.6rem;
-              border-radius: 8px;
+              border-radius: var(--radius-xl);
               border-color: rgba(115, 92, 0, 0.12);
               background: rgba(255, 255, 255, 0.78);
               box-shadow: 0 10px 30px rgba(42, 34, 12, 0.08);
@@ -613,7 +654,7 @@ export async function renderShopPage({
             }
             .modern-shop-page .shop-gender-tab {
               min-height: 2.85rem;
-              border-radius: 6px;
+              border-radius: var(--radius-lg);
               letter-spacing: 0.13em;
             }
             .modern-shop-page .shop-gender-tab[data-active="true"] {
@@ -633,7 +674,7 @@ export async function renderShopPage({
             }
             .modern-shop-page .shop-search-spot-row > div,
             .modern-shop-page .shop-filter-panel {
-              border-radius: 8px !important;
+              border-radius: var(--radius-xl) !important;
             }
             @media (max-width: 767px) {
               /* Merge the hero and the filter card into one seamless card */
@@ -654,8 +695,8 @@ export async function renderShopPage({
               }
               .modern-shop-page .shop-filter-sidebar {
                 border-top: none;
-                border-top-left-radius: 0;
-                border-top-right-radius: 0;
+                border-top-left-radius: var(--radius-xl);
+                border-top-right-radius: var(--radius-xl);
               }
               .modern-shop-hero-media {
                 opacity: 0.18;

@@ -115,7 +115,7 @@ export default async function EstateServicesPage({ params }: Props) {
               href="tel:2394048505"
               className="group inline-flex items-center gap-6"
             >
-              <div className="w-20 h-20 rounded-full border border-[#735c00]/30 flex items-center justify-center hover:bg-[linear-gradient(135deg,#dcb336,#b5890c)] transition group-hover:bg-[linear-gradient(135deg,#dcb336,#b5890c)]">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-[#735c00]/30 bg-white/60 shadow-[0_14px_38px_rgba(38,28,6,0.08)] transition group-hover:bg-[#735c00]">
                 <span className="material-symbols-outlined text-[#735c00] group-hover:text-white transition-colors">call</span>
               </div>
               <div>
@@ -145,7 +145,7 @@ export default async function EstateServicesPage({ params }: Props) {
             </div>
             <div className="grid md:grid-cols-2 gap-6">
               {WHEN_FAMILIES_CALL.map(({ icon, titleEn, titleEs, descEn, descEs }) => (
-                <div key={icon} className="bg-white p-8 border border-[#d0c5af]">
+                <div key={icon} className="rounded-2xl border border-[#d0c5af] bg-white p-8 shadow-[0_14px_38px_rgba(38,28,6,0.06)]">
                   <span
                     className="material-symbols-outlined text-[#735c00] block mb-4"
                     style={{ fontSize: '2.5rem' }}
@@ -174,7 +174,7 @@ export default async function EstateServicesPage({ params }: Props) {
               {HOW_IT_WORKS.map(({ num, titleEn, titleEs, descEn, descEs }) => (
                 <div
                   key={num}
-                  className="flex flex-col md:flex-row md:items-center py-8 px-6 md:px-8 bg-[#e8e8e8]"
+                  className="flex flex-col rounded-2xl bg-white px-6 py-8 shadow-[0_14px_38px_rgba(38,28,6,0.06)] md:flex-row md:items-center md:px-8"
                 >
                   <span className="text-[#e9c349] font-[family-name:var(--font-headline)] text-4xl md:mr-12 mb-4 md:mb-0 opacity-50 font-bold italic">
                     {num}
@@ -205,13 +205,13 @@ export default async function EstateServicesPage({ params }: Props) {
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center flex-wrap">
               <a
                 href="tel:2394048505"
-                className="bg-[linear-gradient(135deg,#dcb336,#b5890c)] text-white px-8 py-4 font-bold text-xs uppercase tracking-widest hover:brightness-[1.04] transition"
+                className="gold-button"
               >
                 (239) 404-8505
               </a>
               <Link
                 href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
-                className="border border-[#735c00]/60 text-[#735c00] px-8 py-4 font-bold text-xs uppercase tracking-widest hover:bg-[linear-gradient(135deg,#dcb336,#b5890c)] hover:text-white transition"
+                className="outline-button"
               >
                 {isEs ? 'Programar una Consulta' : 'Schedule a Consultation'}
               </Link>

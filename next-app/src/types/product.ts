@@ -45,10 +45,7 @@ export type ProductJewelryType =
   | 'Watch'
   | 'Coin'
   | 'Bullion'
-  | 'Loose Diamond'
-  | 'Loose Gemstone'
   | 'Silverware'
-  | 'Estate Lot'
   | 'Other';
 
 export type ProductImagePadding = 'none' | 'white' | 'black';
@@ -242,10 +239,7 @@ export const PRODUCT_JEWELRY_TYPES: { value: ProductJewelryType; label: string; 
   { value: 'Watch', label: 'Watch', labelEs: 'Reloj' },
   { value: 'Coin', label: 'Coin', labelEs: 'Moneda' },
   { value: 'Bullion', label: 'Bullion', labelEs: 'Lingote' },
-  { value: 'Loose Diamond', label: 'Loose Diamond', labelEs: 'Diamante suelto' },
-  { value: 'Loose Gemstone', label: 'Loose Gemstone', labelEs: 'Gema suelta' },
   { value: 'Silverware', label: 'Silverware / Sterling', labelEs: 'Plateria / sterling' },
-  { value: 'Estate Lot', label: 'Estate Lot', labelEs: 'Lote de sucesion' },
   { value: 'Other', label: 'Other', labelEs: 'Otro' },
 ];
 
@@ -271,10 +265,7 @@ const JEWELRY_TYPE_KEYWORDS: Record<ProductJewelryType, string[]> = {
   Watch: ['watch', 'watches', 'wristwatch', 'wrist watch', 'timepiece', 'reloj'],
   Coin: ['coin', 'coins', 'moneda'],
   Bullion: ['bullion', 'bar', 'round', 'ingot', 'lingote'],
-  'Loose Diamond': ['loose diamond', 'diamond', 'diamante'],
-  'Loose Gemstone': ['loose gemstone', 'gemstone', 'gem', 'stone', 'gema'],
   Silverware: ['silverware', 'flatware', 'hollowware', 'plateria'],
-  'Estate Lot': ['estate lot', 'estate collection', 'lote'],
   Other: ['other'],
 };
 
@@ -293,10 +284,7 @@ export function normalizeProductJewelryType(value: string | null | undefined): P
   if (normalized === 'watches' || normalized === 'wristwatch' || normalized === 'wrist watch' || normalized === 'timepiece' || normalized === 'timepieces') return 'Watch';
   if (normalized === 'coins') return 'Coin';
   if (normalized === 'bars' || normalized === 'round' || normalized === 'rounds' || normalized === 'ingot') return 'Bullion';
-  if (normalized === 'diamond' || normalized === 'loose diamonds') return 'Loose Diamond';
-  if (normalized === 'gemstone' || normalized === 'gemstones' || normalized === 'loose gemstones' || normalized === 'gem' || normalized === 'stone') return 'Loose Gemstone';
   if (normalized === 'flatware' || normalized === 'hollowware') return 'Silverware';
-  if (normalized === 'estate' || normalized === 'estate collection') return 'Estate Lot';
   return null;
 }
 

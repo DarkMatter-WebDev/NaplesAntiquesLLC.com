@@ -157,7 +157,11 @@ function DrawerItem({
             unoptimized={item.image.startsWith('/assets/')}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-xl opacity-30">📷</div>
+          <div className="flex h-full w-full items-center justify-center text-[#735c00]/35">
+            <span className="material-symbols-outlined" style={{ fontSize: '1.4rem' }} aria-hidden="true">
+              image
+            </span>
+          </div>
         )}
         {isSold && (
           <div

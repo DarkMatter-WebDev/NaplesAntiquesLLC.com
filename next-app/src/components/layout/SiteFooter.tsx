@@ -22,7 +22,17 @@ export default function SiteFooter({ locale = 'en' }: Props) {
     { label: isEs ? 'Nosotros' : 'About', href: p('/about') },
     { label: isEs ? 'Contacto' : 'Contact', href: p('/contact') },
     { label: isEs ? 'Mi Cuenta' : 'My Account', href: p('/account') },
+  ];
+
+  const legalLinks = [
     { label: isEs ? 'Privacidad' : 'Privacy Policy', href: p('/privacy') },
+    { label: isEs ? 'Terminos' : 'Terms of Service', href: p('/terms') },
+    { label: isEs ? 'Cookies' : 'Cookie Preferences', href: p('/cookie-preferences') },
+    { label: isEs ? 'Accesibilidad' : 'Accessibility', href: p('/accessibility') },
+    { label: isEs ? 'Contacto' : 'Contact Us', href: p('/contact') },
+    { label: isEs ? 'Devoluciones' : 'Returns & Refunds', href: p('/returns-refunds') },
+    { label: isEs ? 'Envios' : 'Shipping Policy', href: p('/shipping') },
+    { label: isEs ? 'Terminos de subasta' : 'Auction Terms', href: p('/auction-terms') },
   ];
 
   return (
@@ -30,23 +40,23 @@ export default function SiteFooter({ locale = 'en' }: Props) {
       className="mt-auto border-t"
       style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}
     >
-      <div className="mx-auto max-w-7xl px-5 py-8 sm:px-6 md:px-8 md:py-16">
-        <div className="grid grid-cols-2 gap-x-8 gap-y-8 md:grid-cols-3 md:gap-8">
-          <div className="col-span-2 flex flex-col items-center gap-3 text-center md:col-span-1 md:items-start md:text-left">
+      <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 md:px-8 md:py-16">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-4 md:gap-8">
+          <div className="col-span-2 flex flex-col items-center gap-2 text-center md:col-span-1 md:items-start md:gap-3 md:text-left">
             <p
-              className="text-xs font-bold uppercase tracking-[0.22em] md:text-sm md:tracking-widest"
+              className="text-[0.68rem] font-bold uppercase tracking-[0.18em] md:text-sm md:tracking-widest"
               style={{ fontFamily: 'var(--font-label)', color: 'var(--color-primary)' }}
             >
               Naples Estate Jewelry Co
             </p>
-            <p className="max-w-[20rem] text-sm leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
+            <p className="max-w-[20rem] text-xs leading-snug md:text-sm md:leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
               {isEs
                 ? 'Compramos y vendemos joyería de patrimonio fina en Naples, Florida. Evaluaciones gratuitas.'
                 : 'Buying and selling fine estate jewelry in Naples, Florida. Free walk-in appraisals.'}
             </p>
             <a
               href="tel:2394048505"
-              className="mt-1 inline-flex min-h-10 items-center justify-center border px-4 text-sm font-bold md:min-h-0 md:border-0 md:px-0"
+              className="inline-flex min-h-8 items-center justify-center border px-3 text-xs font-bold md:mt-1 md:min-h-0 md:border-0 md:px-0 md:text-sm"
               style={{
                 borderColor: 'var(--color-outline-variant)',
                 color: 'var(--color-primary)',
@@ -57,9 +67,9 @@ export default function SiteFooter({ locale = 'en' }: Props) {
             </a>
           </div>
 
-          <nav className="flex flex-col gap-2.5 md:gap-3" aria-label={isEs ? 'Enlaces de tienda' : 'Shop links'}>
+          <nav className="hidden md:flex md:flex-col md:gap-3" aria-label={isEs ? 'Enlaces de tienda' : 'Shop links'}>
             <p
-              className="text-[0.62rem] font-bold uppercase tracking-[0.24em] md:text-[0.65rem] md:tracking-[0.3em]"
+              className="text-[0.65rem] font-bold uppercase tracking-[0.3em]"
               style={{ fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}
             >
               {isEs ? 'Tienda' : 'Shop'}
@@ -68,7 +78,7 @@ export default function SiteFooter({ locale = 'en' }: Props) {
               <Link
                 key={href}
                 href={href}
-                className="w-fit py-1 text-sm leading-tight transition-colors hover:underline md:py-0 md:underline-offset-2"
+                className="w-fit py-0.5 text-xs leading-tight transition-colors hover:underline md:py-0 md:text-sm md:underline-offset-2"
                 style={{ color: 'var(--color-on-surface-variant)' }}
               >
                 {label}
@@ -76,9 +86,9 @@ export default function SiteFooter({ locale = 'en' }: Props) {
             ))}
           </nav>
 
-          <nav className="flex flex-col gap-2.5 md:gap-3" aria-label={isEs ? 'Enlaces de empresa' : 'Company links'}>
+          <nav className="col-span-2 grid grid-cols-3 items-start gap-x-3 gap-y-1 text-center md:col-span-1 md:flex md:flex-col md:items-start md:gap-3 md:text-left" aria-label={isEs ? 'Enlaces de empresa' : 'Company links'}>
             <p
-              className="text-[0.62rem] font-bold uppercase tracking-[0.24em] md:text-[0.65rem] md:tracking-[0.3em]"
+              className="col-span-3 text-[0.56rem] font-bold uppercase tracking-[0.2em] md:col-span-1 md:text-[0.65rem] md:tracking-[0.3em]"
               style={{ fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}
             >
               {isEs ? 'Empresa' : 'Company'}
@@ -87,7 +97,26 @@ export default function SiteFooter({ locale = 'en' }: Props) {
               <Link
                 key={href}
                 href={href}
-                className="w-fit py-1 text-sm leading-tight transition-colors hover:underline md:py-0 md:underline-offset-2"
+                className="justify-self-center py-0.5 text-[0.68rem] leading-tight transition-colors hover:underline md:w-fit md:justify-self-auto md:py-0 md:text-sm md:underline-offset-2"
+                style={{ color: 'var(--color-on-surface-variant)' }}
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
+
+          <nav className="col-span-2 grid grid-cols-2 gap-x-4 gap-y-1 md:col-span-1 md:flex md:flex-col md:gap-3" aria-label={isEs ? 'Enlaces legales' : 'Legal links'}>
+            <p
+              className="col-span-2 text-center text-[0.56rem] font-bold uppercase tracking-[0.2em] md:col-span-1 md:text-left md:text-[0.65rem] md:tracking-[0.3em]"
+              style={{ fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}
+            >
+              {isEs ? 'Legal' : 'Legal'}
+            </p>
+            {legalLinks.map(({ label, href }) => (
+              <Link
+                key={href}
+                href={href}
+                className="justify-self-center py-0.5 text-center text-[0.68rem] leading-tight transition-colors hover:underline md:w-fit md:justify-self-auto md:py-0 md:text-left md:text-sm md:underline-offset-2"
                 style={{ color: 'var(--color-on-surface-variant)' }}
               >
                 {label}
@@ -97,17 +126,17 @@ export default function SiteFooter({ locale = 'en' }: Props) {
         </div>
 
         <div
-          className="mt-8 flex flex-col items-center justify-between gap-2 border-t pt-5 text-center md:mt-10 md:flex-row md:items-center md:gap-3 md:pt-6 md:text-left"
+          className="mt-4 flex flex-col items-center justify-between gap-1 border-t pt-3 text-center md:mt-10 md:flex-row md:items-center md:gap-3 md:pt-6 md:text-left"
           style={{ borderColor: 'var(--color-outline-variant)' }}
         >
           <p
-            className="max-w-[22rem] text-[0.68rem] leading-relaxed md:max-w-none md:text-xs"
+            className="max-w-[22rem] text-[0.6rem] leading-snug md:max-w-none md:text-xs md:leading-relaxed"
             style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
           >
             © {year} Naples Estate Jewelry Co · Naples, FL · {isEs ? 'Todos los derechos reservados' : 'All rights reserved'}
           </p>
           <p
-            className="text-[0.68rem] leading-relaxed md:text-xs"
+            className="text-[0.6rem] leading-snug md:text-xs md:leading-relaxed"
             style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
           >
             naplesestatejewelry.co

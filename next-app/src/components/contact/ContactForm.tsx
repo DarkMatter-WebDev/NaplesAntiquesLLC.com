@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 
 interface Props {
   locale: string;
@@ -60,10 +61,15 @@ export default function ContactForm({ locale, submitted }: Props) {
 
             {submitted ? (
               <div
-                className="text-center py-16 px-8 rounded-sm border"
-                style={{ background: 'var(--color-surface-container-low)', borderColor: 'var(--color-outline-variant)' }}
+                className="rounded-2xl border px-8 py-16 text-center shadow-[0_18px_54px_rgba(38,28,6,0.07)]"
+                style={{ background: 'rgba(255,255,255,0.82)', borderColor: 'rgba(115, 92, 0, 0.14)' }}
               >
-                <div className="text-5xl mb-4">✓</div>
+                <div
+                  className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full text-xs font-bold uppercase tracking-[0.12em]"
+                  style={{ background: '#f7efd7', color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+                >
+                  OK
+                </div>
                 <p
                   className="text-xl font-bold mb-2"
                   style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
@@ -84,8 +90,8 @@ export default function ContactForm({ locale, submitted }: Props) {
                 data-netlify="true"
                 data-netlify-honeypot="bot-field"
                 encType="multipart/form-data"
-                className="grid gap-4 p-6 md:p-8 rounded-sm border"
-                style={{ background: 'white', borderColor: 'var(--color-outline-variant)' }}
+                className="grid gap-4 rounded-2xl border p-5 shadow-[0_18px_54px_rgba(38,28,6,0.07)] md:p-8"
+                style={{ background: 'rgba(255,255,255,0.86)', borderColor: 'rgba(115, 92, 0, 0.14)' }}
               >
                 <input type="hidden" name="form-name" value="submit-item" />
                 <p className="sr-only">
@@ -96,21 +102,21 @@ export default function ContactForm({ locale, submitted }: Props) {
 
                 {/* Photo drop zone */}
                 <label
-                  className="flex flex-col items-center justify-center text-center cursor-pointer rounded-sm transition-colors"
+                  className="flex flex-col items-center justify-center rounded-2xl text-center cursor-pointer transition-colors"
                   style={{
                     minHeight: '16rem',
-                    border: '1.5px dashed var(--color-outline-variant)',
-                    background: '#fbfaf6',
+                    border: '1.5px dashed rgba(115, 92, 0, 0.22)',
+                    background: '#fffdf8',
                     color: 'var(--color-on-surface-variant)',
                     padding: '1.5rem',
                   }}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-primary)';
-                    (e.currentTarget as HTMLElement).style.background = '#f8f3e5';
+                    (e.currentTarget as HTMLElement).style.background = '#fbf5e7';
                   }}
                   onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-outline-variant)';
-                    (e.currentTarget as HTMLElement).style.background = '#fbfaf6';
+                    (e.currentTarget as HTMLElement).style.borderColor = 'rgba(115, 92, 0, 0.22)';
+                    (e.currentTarget as HTMLElement).style.background = '#fffdf8';
                   }}
                 >
                   <input
@@ -122,7 +128,12 @@ export default function ContactForm({ locale, submitted }: Props) {
                     className="sr-only"
                     onChange={(e) => openDialog(e.target.files)}
                   />
-                  <span className="text-5xl mb-3" aria-hidden="true">📷</span>
+                  <span className="mb-4 grid h-14 w-14 place-items-center rounded-full bg-[#f7efd7]" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4.5 8.5h3l1.5-2h6l1.5 2h3A1.5 1.5 0 0 1 21 10v7a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17v-7a1.5 1.5 0 0 1 1.5-1.5Z" />
+                      <circle cx="12" cy="13.5" r="3.2" />
+                    </svg>
+                  </span>
                   <span
                     className="text-xl md:text-2xl font-bold block"
                     style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-primary)' }}
@@ -147,13 +158,13 @@ export default function ContactForm({ locale, submitted }: Props) {
                 {/* Details modal */}
                 <dialog
                   ref={dialogRef}
-                  className="rounded-sm p-0"
+                  className="rounded-2xl p-0"
                   style={{
                     width: 'min(42rem, calc(100vw - 2rem))',
                     maxHeight: 'min(88vh, 48rem)',
                     overflow: 'auto',
-                    border: '1px solid var(--color-outline-variant)',
-                    background: 'white',
+                    border: '1px solid rgba(115, 92, 0, 0.16)',
+                    background: 'rgba(255,255,255,0.96)',
                     color: 'var(--color-on-surface)',
                     boxShadow: '0 24px 80px rgba(0,0,0,0.26)',
                   }}
@@ -189,7 +200,7 @@ export default function ContactForm({ locale, submitted }: Props) {
                           background: 'transparent',
                         }}
                       >
-                        ✕
+                        <span aria-hidden="true">x</span>
                       </button>
                     </div>
 
@@ -201,8 +212,8 @@ export default function ContactForm({ locale, submitted }: Props) {
 
                     {/* Additional photos */}
                     <div
-                      className="grid gap-3 rounded-sm p-4"
-                      style={{ border: '1px solid var(--color-outline-variant)', background: '#fbfaf6' }}
+                      className="grid gap-3 rounded-xl p-4"
+                      style={{ border: '1px solid rgba(115, 92, 0, 0.14)', background: '#fffdf8' }}
                     >
                       <div>
                         <p
@@ -219,10 +230,11 @@ export default function ContactForm({ locale, submitted }: Props) {
                         {[2, 3, 4, 5].map((slot, i) => (
                           <label
                             key={slot}
-                            className="flex items-center justify-center text-center cursor-pointer rounded-sm py-3 px-4 transition-colors"
+                            className="flex items-center justify-center rounded-xl text-center cursor-pointer py-3 px-4 transition-colors"
                             style={{
                               minHeight: '3.25rem',
-                              border: '1px dashed var(--color-outline-variant)',
+                              border: '1px dashed rgba(115, 92, 0, 0.24)',
+                              background: 'rgba(255,255,255,0.72)',
                               color: 'var(--color-primary)',
                               fontSize: '0.76rem',
                               fontWeight: 700,
@@ -328,13 +340,15 @@ export default function ContactForm({ locale, submitted }: Props) {
                     </div>
 
                     {/* Actions */}
+                    <FormPrivacyNotice locale={locale} />
+
                     <div className="flex flex-wrap gap-3 items-center pt-1">
                       <button type="submit" className="gold-button">
                         {isEs ? 'Enviar artículo' : 'Send item'}
                       </button>
                       <label
                         htmlFor="item-photo-1"
-                        className="cursor-pointer text-xs font-bold uppercase tracking-[0.12em] px-5 py-3 rounded-sm transition-colors"
+                        className="outline-button cursor-pointer"
                         style={{
                           border: '1px solid var(--color-primary)',
                           color: 'var(--color-primary)',
@@ -402,7 +416,7 @@ export default function ContactForm({ locale, submitted }: Props) {
                     </p>
                     <a
                       href="tel:2394048505"
-                      className="inline-block text-xs font-bold uppercase tracking-widest px-6 py-3 rounded-sm transition-colors"
+                      className="outline-button inline-flex"
                       style={{
                         border: '1px solid color-mix(in srgb, var(--color-primary) 60%, transparent)',
                         color: 'var(--color-primary)',
@@ -417,8 +431,8 @@ export default function ContactForm({ locale, submitted }: Props) {
             ].map((card) => (
               <div
                 key={card.title}
-                className="rounded-sm p-6"
-                style={{ background: 'white', border: '1px solid var(--color-outline-variant)' }}
+                className="rounded-2xl p-6 shadow-[0_16px_44px_rgba(38,28,6,0.06)]"
+                style={{ background: 'rgba(255,255,255,0.82)', border: '1px solid rgba(115, 92, 0, 0.14)' }}
               >
                 <h3
                   className="font-bold mb-2"

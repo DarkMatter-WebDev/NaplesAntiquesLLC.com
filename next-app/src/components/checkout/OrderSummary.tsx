@@ -93,7 +93,7 @@ export default function OrderSummary({
           />
         ))}
       </div>
-      <div className={`${expanded ? 'ml-auto max-w-md rounded-sm bg-[rgba(255,253,248,0.78)] px-4 py-4' : ''} flex flex-col gap-1 text-xs border-t pt-4`} style={{ borderColor: BORDER, fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}>
+      <div className={`${expanded ? 'ml-auto max-w-md rounded-2xl bg-[rgba(255,253,248,0.78)] px-4 py-4 shadow-[0_12px_34px_rgba(38,28,6,0.05)]' : ''} flex flex-col gap-1 text-xs border-t pt-4`} style={{ borderColor: BORDER, fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}>
         <div className="flex justify-between">
           <span>Subtotal</span>
           <span>{subtotal > 0 ? fmt(subtotal) : '-'}{hasUnknown ? '*' : ''}</span>
@@ -108,7 +108,7 @@ export default function OrderSummary({
             value={selectedShipping.value}
             onChange={(e) => onShippingMethodChange?.(e.target.value)}
             disabled={!onShippingMethodChange}
-            className="w-full border px-2 py-2 text-xs font-bold uppercase tracking-wide disabled:opacity-100"
+            className="w-full rounded-xl border px-2 py-2 text-xs font-bold uppercase tracking-wide disabled:opacity-100"
             style={{
               borderColor: BORDER,
               background: 'var(--color-background)',
@@ -155,10 +155,10 @@ function SummaryRow({
   const specs = buildSpecLine(item, isEs);
   const imageFrameBackground = productImagePaddingBackground(item.image_padding);
   return (
-    <div className={`flex gap-3 items-start ${expanded ? 'border p-2.5 md:gap-3 md:p-3' : ''}`} style={expanded ? { borderColor: BORDER, background: 'rgba(255, 253, 248, 0.76)' } : undefined}>
+    <div className={`flex gap-3 items-start ${expanded ? 'rounded-2xl border p-2.5 md:gap-3 md:p-3' : ''}`} style={expanded ? { borderColor: BORDER, background: 'rgba(255, 253, 248, 0.76)' } : undefined}>
       <Link
         href={`${prefix}/shop/${item.id}`}
-        className={`relative flex-shrink-0 overflow-hidden ${expanded ? 'h-20 w-20 md:h-24 md:w-24' : 'w-14 h-14'}`}
+        className={`relative flex-shrink-0 overflow-hidden rounded-xl ${expanded ? 'h-20 w-20 md:h-24 md:w-24' : 'w-14 h-14'}`}
         style={{ background: imageFrameBackground }}
       >
         {item.image
@@ -192,7 +192,7 @@ function SummaryRow({
         </div>
         {expanded && (
           <div className="flex min-h-full items-center justify-center border-l pl-3" style={{ borderColor: BORDER }}>
-            <div className="w-full rounded-sm border px-2.5 py-2.5 text-center" style={{ borderColor: 'rgba(115, 92, 0, 0.18)', background: 'rgba(255, 255, 255, 0.72)' }}>
+            <div className="w-full rounded-xl border px-2.5 py-2.5 text-center" style={{ borderColor: 'rgba(115, 92, 0, 0.18)', background: 'rgba(255, 255, 255, 0.72)' }}>
               <span className="block text-[0.62rem] font-bold uppercase tracking-widest" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
                 {isEs ? 'Precio' : 'Price'}
               </span>

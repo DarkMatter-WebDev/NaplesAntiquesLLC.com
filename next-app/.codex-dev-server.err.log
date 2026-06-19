@@ -1,8 +1,0 @@
-⨯ Another next dev server is already running.
-
-- Local:        http://localhost:3002
-- PID:          28728
-- Dir:          C:\Users\rcman\OneDrive\Documents\NaplesEstateJewelry.co\next-app
-- Log:          .next\dev\logs\next-development.log
-
-Run taskkill /PID 28728 /F to stop it.

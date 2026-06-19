@@ -14,7 +14,7 @@
 // Or pass items yourself to bypass the Supabase fetch entirely:
 //   <Carousel items={myItems} showPrice bg="#ffffff" />
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Image from "next/image";
 import styles from "./Carousel.module.css";
 import {
@@ -174,32 +174,55 @@ export function Carousel({
   const effectiveVisible = Math.min(visibleCount, Math.max(data.length, 1));
 
   // slotItems[p] = index into `data` currently shown by ring slot p.
-  const [slotItems, setSlotItems] = useState<number[]>(() =>
-    Array.from({ length: effectiveVisible }, (_, p) => p),
-  );
+  const windowKey = `${data.length}:${effectiveVisible}`;
+  const initialSlotItems = useMemo(() => {
+    const len = Math.max(data.length, 1);
+    return Array.from({ length: effectiveVisible }, (_, p) => p % len);
+  }, [data.length, effectiveVisible]);
+
+  const [slotItemsState, setSlotItemsState] = useState<{ key: string; items: number[] }>(() => ({
+    key: windowKey,
+    items: initialSlotItems,
+  }));
+  const slotItems = slotItemsState.key === windowKey ? slotItemsState.items : initialSlotItems;
 
   // Always-fresh refs so the single rAF loop below reads the latest values
   // without re-subscribing (re-subscribing mid-animation caused stale closures).
   const dataRef = useRef(data);
-  dataRef.current = data;
   const onFrontItemChangeRef = useRef(onFrontItemChange);
-  onFrontItemChangeRef.current = onFrontItemChange;
   const onBackgroundChangeRef = useRef(onBackgroundChange);
-  onBackgroundChangeRef.current = onBackgroundChange;
   const slotItemsRef = useRef(slotItems);
-  slotItemsRef.current = slotItems;
+  const windowKeyRef = useRef(windowKey);
   const prevSlotAnglesRef = useRef<number[]>([]);
   const lastFrontKeyRef = useRef("");
-  const startedAtRef = useRef(typeof performance !== "undefined" ? performance.now() : 0);
+  const startedAtRef = useRef(0);
 
-  // Reset the window whenever the list length or visible count changes.
   useEffect(() => {
-    const len = Math.max(data.length, 1);
-    const next = Array.from({ length: effectiveVisible }, (_, p) => p % len);
-    slotItemsRef.current = next;
+    dataRef.current = data;
+  }, [data]);
+
+  useEffect(() => {
+    onFrontItemChangeRef.current = onFrontItemChange;
+  }, [onFrontItemChange]);
+
+  useEffect(() => {
+    onBackgroundChangeRef.current = onBackgroundChange;
+  }, [onBackgroundChange]);
+
+  useEffect(() => {
+    slotItemsRef.current = slotItems;
+  }, [slotItems]);
+
+  // Reset the imperative window state whenever the list length or visible count
+  // changes. Render uses `initialSlotItems` immediately for the new key, so this
+  // effect only resets refs used by the animation loop.
+  useEffect(() => {
+    windowKeyRef.current = windowKey;
+    slotItemsRef.current = initialSlotItems;
     prevSlotAnglesRef.current = [];
-    setSlotItems(next);
-  }, [effectiveVisible, data.length]);
+    lastFrontKeyRef.current = "";
+    startedAtRef.current = typeof performance !== "undefined" ? performance.now() : 0;
+  }, [windowKey, initialSlotItems]);
 
   // Per-frame sample: advance the window as slots cross the hidden back, find
   // the centered card (text theme), and compute the swept background. Reads the
@@ -258,7 +281,7 @@ export function Carousel({
 
     if (nextSlots) {
       slotItemsRef.current = nextSlots;
-      setSlotItems(nextSlots);
+      setSlotItemsState({ key: windowKeyRef.current, items: nextSlots });
     }
 
     const front = items[slots[best]];

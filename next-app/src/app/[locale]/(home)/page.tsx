@@ -3,6 +3,7 @@ import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import HomeHero from '@/components/home/HomeHero';
+import ServiceIconCanvas from '@/components/home/ServiceIconCanvas';
 import type { CarouselItem } from '../../../../carousel/lib/carouselData';
 
 export const metadata: Metadata = {
@@ -45,10 +46,10 @@ export default async function HomePage({ params }: Props) {
 
         {/* Services strip */}
         <section
-          className="py-20 px-6 border-t"
+          className="border-t px-6 py-14 md:py-20"
           style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}
         >
-          <div className="max-w-5xl mx-auto grid md:grid-cols-3 gap-8">
+          <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-3 md:gap-8">
             {[
               {
                 icon: '💛',
@@ -77,11 +78,17 @@ export default async function HomePage({ params }: Props) {
                 href: contactHref,
                 cta: isEs ? 'Contáctenos →' : 'Contact us →',
               },
-            ].map((item) => (
-              <div key={item.title} className="flex flex-col gap-3">
-                <span className="text-3xl">{item.icon}</span>
+            ].map((item, index) => (
+              <div
+                key={item.title}
+                className="group flex flex-col gap-3 border-b pb-6 md:border-b-0 md:border-l md:pb-0 md:pl-7"
+                style={{ borderColor: 'rgba(115, 92, 0, 0.16)' }}
+              >
+                <div className="transition duration-300 group-hover:-translate-y-0.5">
+                  <ServiceIconCanvas kind={index === 0 ? 'gold' : index === 1 ? 'jewelry' : 'contact'} />
+                </div>
                 <h3
-                  className="text-xl font-bold"
+                  className="text-xl font-bold leading-tight"
                   style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
                 >
                   {item.title}
@@ -91,7 +98,7 @@ export default async function HomePage({ params }: Props) {
                 </p>
                 <Link
                   href={item.href}
-                  className="text-xs font-bold tracking-wide uppercase"
+                  className="w-fit text-xs font-bold uppercase tracking-[0.16em] transition-colors hover:underline"
                   style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
                 >
                   {item.cta}

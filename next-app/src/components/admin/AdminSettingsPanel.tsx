@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import AdminCarouselSettingsPanel from './AdminCarouselSettingsPanel';
+import MarketingSettingsPanel from './MarketingSettingsPanel';
 
 type AiSettingsResponse = {
   systemPrompt: string;
@@ -216,6 +217,7 @@ export default function AdminSettingsPanel() {
             </div>
           </div>
         </section>
+        <MarketingSettingsPanel />
       </div>
 
       {/* Carousel panel gets a wider container so its two tables can use the

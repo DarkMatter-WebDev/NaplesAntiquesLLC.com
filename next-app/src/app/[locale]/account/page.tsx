@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation';
+﻿import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -53,6 +53,7 @@ export default async function AccountPage({ params }: Props) {
     postal_code: profileData.postal_code ?? null,
     country: profileData.country ?? 'United States',
     marketing_opt_in: profileData.marketing_opt_in ?? false,
+    marketing_opt_out: profileData.marketing_opt_out ?? false,
   };
   const { data: orders } = await supabase
     .from('orders')
@@ -171,7 +172,7 @@ export default async function AccountPage({ params }: Props) {
         .account-card,
         .account-profile-form {
           border: 1px solid rgba(115, 92, 0, 0.12) !important;
-          border-radius: 8px;
+          border-radius: var(--radius-xl);
           background: #ffffff !important;
           box-shadow: 0 18px 48px rgba(42, 34, 12, 0.09);
         }
@@ -180,7 +181,7 @@ export default async function AccountPage({ params }: Props) {
           align-items: stretch;
           overflow-x: auto;
           border: 1px solid rgba(115, 92, 0, 0.1);
-          border-radius: 8px;
+          border-radius: var(--radius-xl);
           background: #ffffff;
           box-shadow: 0 18px 50px rgba(42, 34, 12, 0.08);
         }
@@ -245,7 +246,7 @@ export default async function AccountPage({ params }: Props) {
           gap: 1.25rem;
           padding: 1.4rem 1.8rem;
           border: 1px solid rgba(115, 92, 0, 0.1);
-          border-radius: 8px;
+          border-radius: var(--radius-xl);
           background: #ffffff;
         }
         .account-tab-heading > div:first-child {
@@ -297,7 +298,7 @@ export default async function AccountPage({ params }: Props) {
           gap: 0.55rem;
           margin-top: 1.5rem;
           border: 1px dashed rgba(115, 92, 0, 0.2);
-          border-radius: 8px;
+          border-radius: var(--radius-xl);
           background: #ffffff;
           text-align: center;
         }
@@ -329,7 +330,7 @@ export default async function AccountPage({ params }: Props) {
           text-align: left;
           padding: 1rem;
           border: 1px solid rgba(115, 92, 0, 0.12);
-          border-radius: 8px;
+          border-radius: var(--radius-xl);
           background: #ffffff;
           transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
           cursor: pointer;
@@ -382,7 +383,7 @@ export default async function AccountPage({ params }: Props) {
           overflow: auto;
           padding: 4.25rem 2rem 2rem;
           border: 1px solid rgba(115, 92, 0, 0.16);
-          border-radius: 8px;
+          border-radius: var(--radius-xl);
           background: rgba(255, 255, 255, 0.98);
           box-shadow: 0 28px 80px rgba(20, 18, 14, 0.24);
         }
@@ -430,7 +431,7 @@ export default async function AccountPage({ params }: Props) {
         .account-order-detail-grid > div,
         .account-order-dialog-section {
           border: 1px solid rgba(115, 92, 0, 0.12);
-          border-radius: 8px;
+          border-radius: var(--radius-xl);
           background: #ffffff;
         }
         .account-order-detail-grid > div {
@@ -475,7 +476,7 @@ export default async function AccountPage({ params }: Props) {
           align-items: center;
           padding: 0.75rem;
           border: 1px solid rgba(115, 92, 0, 0.1);
-          border-radius: 6px;
+          border-radius: var(--radius-lg);
           background: rgba(255, 255, 255, 0.74);
         }
         .account-order-item-link {
@@ -499,7 +500,7 @@ export default async function AccountPage({ params }: Props) {
         .account-order-item-image {
           position: relative;
           min-height: 4.5rem;
-          border-radius: 6px;
+          border-radius: var(--radius-lg);
           background: var(--color-surface-container);
           overflow: hidden;
         }
@@ -579,13 +580,13 @@ export default async function AccountPage({ params }: Props) {
           gap: 0.9rem;
           padding: 0.85rem;
           border: 1px solid rgba(115, 92, 0, 0.12);
-          border-radius: 8px;
+          border-radius: var(--radius-xl);
           background: #ffffff;
         }
         .account-wishlist-image {
           position: relative;
           min-height: 6rem;
-          border-radius: 6px;
+          border-radius: var(--radius-lg);
           background: var(--color-surface-container);
           overflow: hidden;
         }
@@ -670,7 +671,7 @@ export default async function AccountPage({ params }: Props) {
         .account-profile-form .form-field {
           min-height: 3.05rem;
           border-color: rgba(115, 92, 0, 0.2);
-          border-radius: 6px;
+          border-radius: var(--radius-lg);
           background: #ffffff;
         }
         .account-profile-form .form-label {
@@ -691,7 +692,7 @@ export default async function AccountPage({ params }: Props) {
           gap: 0.9rem;
           align-items: center;
           border: 1px solid rgba(115, 92, 0, 0.12);
-          border-radius: 6px;
+          border-radius: var(--radius-lg);
           padding: 0.95rem 1rem;
           background: #ffffff;
         }
@@ -768,13 +769,13 @@ export default async function AccountPage({ params }: Props) {
           gap: 0.75rem;
           padding: 1rem;
           border: 1px solid rgba(115, 92, 0, 0.12);
-          border-radius: 8px;
+          border-radius: var(--radius-xl);
           background: #ffffff;
         }
         .account-password-panel .form-field {
           min-height: 2.7rem;
           border-color: rgba(115, 92, 0, 0.2);
-          border-radius: 6px;
+          border-radius: var(--radius-lg);
           background: #ffffff;
         }
         .account-form-error,
@@ -796,7 +797,7 @@ export default async function AccountPage({ params }: Props) {
           margin: 1.45rem 0 4rem;
           padding: 1.65rem 2rem;
           border: 1px solid rgba(115, 92, 0, 0.12);
-          border-radius: 8px;
+          border-radius: var(--radius-xl);
           background: rgba(255, 255, 255, 0.92);
           box-shadow: 0 18px 48px rgba(42, 34, 12, 0.07);
         }
@@ -924,3 +925,4 @@ function formatCustomerInventoryValue(value: string | number | null | undefined)
   const normalized = String(value).trim().replace(/^#\s*/, '');
   return /^\d+$/.test(normalized) ? normalized : null;
 }
+

@@ -146,10 +146,12 @@ export default function ProductImageGallery({ images, title, imagePadding = null
   if (!images.length) {
     return (
       <div
-        className="aspect-square flex items-center justify-center text-6xl opacity-20"
+        className="flex aspect-square items-center justify-center rounded-2xl text-[#735c00]/35"
         style={{ background: 'var(--color-surface-container)' }}
       >
-        📷
+        <span className="material-symbols-outlined" style={{ fontSize: '4rem' }} aria-hidden="true">
+          image
+        </span>
       </div>
     );
   }

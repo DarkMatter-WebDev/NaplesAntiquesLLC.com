@@ -338,7 +338,9 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                   className="flex items-center gap-1 mt-1.5"
                   style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
                 >
-                  <span style={{ color: 'var(--color-primary)' }}>✓</span>
+                  <span className="material-symbols-outlined text-sm" style={{ color: 'var(--color-primary)', fontVariationSettings: "'FILL' 1" }} aria-hidden="true">
+                    check_circle
+                  </span>
                   {isEs ? 'Este es su precio' : 'This is your price'}
                 </p>
                 {isPurchasable && (

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { routing } from '@/i18n/routing';
 import { WishlistProvider } from '@/context/WishlistContext';
 import { CartProvider } from '@/context/CartContext';
+import CookieNotice from '@/components/legal/CookieNotice';
 
 interface Props {
   children: React.ReactNode;
@@ -24,6 +25,7 @@ export default async function LocaleLayout({ children, params }: Props) {
       <WishlistProvider locale={locale}>
         <CartProvider locale={locale}>
           {children}
+          <CookieNotice locale={locale} />
         </CartProvider>
       </WishlistProvider>
     </NextIntlClientProvider>

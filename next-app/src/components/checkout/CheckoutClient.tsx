@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useCart, type CartItem } from '@/context/CartContext';
 import OrderSummary, { SHIPPING_OPTIONS } from '@/components/checkout/OrderSummary';
+import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 import { createClient } from '@/lib/supabase/client';
 import { productImagePaddingForImage } from '@/types/product';
 
@@ -281,6 +282,28 @@ export default function CheckoutClient({ locale }: { locale: string }) {
               {error}
             </p>
           )}
+
+          <FormPrivacyNotice locale={locale} />
+
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
+            {isEs ? 'Antes de enviar, revise nuestras ' : 'Before submitting, please review our '}
+            <Link href={`${prefix}/returns-refunds`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
+              {isEs ? 'Devoluciones' : 'Returns & Refunds'}
+            </Link>
+            {', '}
+            <Link href={`${prefix}/shipping`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
+              {isEs ? 'Envios' : 'Shipping'}
+            </Link>
+            {isEs ? ', ' : ', '}
+            <Link href={`${prefix}/terms`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
+              {isEs ? 'Terminos' : 'Terms'}
+            </Link>
+            {isEs ? ' y ' : ', and '}
+            <Link href={`${prefix}/privacy`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
+              {isEs ? 'Privacidad' : 'Privacy Policy'}
+            </Link>
+            .
+          </p>
 
           <button type="submit" disabled={submitting} className="gold-button justify-center disabled:opacity-60" style={{ width: '100%' }}>
             {submitting

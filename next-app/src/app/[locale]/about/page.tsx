@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -53,7 +53,7 @@ export default async function AboutPage({ params }: Props) {
             </h1>
             <p className="text-xl italic max-w-2xl mx-auto leading-relaxed" style={{ color: '#d8d1c2' }}>
               {isEs
-                ? 'Nacido y criado en Naples, Chris ha pasado más de 15 años trabajando en privado con familias locales para adquirir joyería fina, plata esterlina, antigüedades, oro y colecciones heredadas.'
+                ? 'Nacido y criado en Naples, Chris ha pasado mÃ¡s de 15 aÃ±os trabajando en privado con familias locales para adquirir joyerÃ­a fina, plata esterlina, antigÃ¼edades, oro y colecciones heredadas.'
                 : 'Born and raised in Naples, Chris has spent 15+ years working privately with local families to acquire fine jewelry, sterling silver, antiques, gold, and inherited collections.'}
             </p>
           </div>
@@ -77,7 +77,7 @@ export default async function AboutPage({ params }: Props) {
                     alt={isEs ? 'Chris de Naples Estate Jewelry' : 'Chris of Naples Estate Jewelry'}
                     width={520}
                     height={600}
-                    className="relative z-10 w-full max-w-[520px] mx-auto rounded-sm shadow-2xl object-cover md:scale-105 md:-rotate-2"
+                    className="relative z-10 mx-auto w-full max-w-[520px] rounded-2xl object-cover shadow-2xl md:scale-105 md:-rotate-2"
                   />
                 </div>
               </div>
@@ -95,29 +95,29 @@ export default async function AboutPage({ params }: Props) {
                 >
                   <p>
                     {isEs ? (
-                      <>Nacido y criado en Naples, Chris ha pasado <strong style={{ color: 'var(--color-primary)' }}>más de 15 años</strong> trabajando directamente con clientes privados en todo el suroeste de Florida para adquirir joyería fina, plata esterlina, antigüedades, oro y colecciones heredadas.</>
+                      <>Nacido y criado en Naples, Chris ha pasado <strong style={{ color: 'var(--color-primary)' }}>mÃ¡s de 15 aÃ±os</strong> trabajando directamente con clientes privados en todo el suroeste de Florida para adquirir joyerÃ­a fina, plata esterlina, antigÃ¼edades, oro y colecciones heredadas.</>
                     ) : (
                       <>Born and raised in Naples, Chris has spent <strong style={{ color: 'var(--color-primary)' }}>15+ years</strong> working directly with private clients throughout Southwest Florida to acquire fine jewelry, sterling silver, antiques, gold, and inherited collections.</>
                     )}
                   </p>
                   <p>
                     {isEs
-                      ? 'Al operar como un servicio móvil privado, solo por cita, mantenemos los gastos generales bajos y trasladamos esos ahorros como algunos de los pagos más competitivos de la región. Cada consulta se maneja de forma personal y confidencial — sin presión de tienda física, sin intermediarios y sin obligación.'
-                      : 'By operating as a private, appointment-only mobile service, we keep overhead low and pass those savings on as some of the most competitive payouts in the region. Every consultation is handled personally and confidentially — no storefront pressure, no middlemen, and no obligation.'}
+                      ? 'Al operar como un servicio mÃ³vil privado, solo por cita, mantenemos los gastos generales bajos y trasladamos esos ahorros como algunos de los pagos mÃ¡s competitivos de la regiÃ³n. Cada consulta se maneja de forma personal y confidencial â€” sin presiÃ³n de tienda fÃ­sica, sin intermediarios y sin obligaciÃ³n.'
+                      : 'By operating as a private, appointment-only mobile service, we keep overhead low and pass those savings on as some of the most competitive payouts in the region. Every consultation is handled personally and confidentially â€” no storefront pressure, no middlemen, and no obligation.'}
                   </p>
                   <p>
                     {isEs
-                      ? 'Ya sea que esté pensando en vender una sola reliquia familiar o liquidar un patrimonio multigeneracional, Chris aporta un enfoque discreto e informado a cada conversación.'
+                      ? 'Ya sea que estÃ© pensando en vender una sola reliquia familiar o liquidar un patrimonio multigeneracional, Chris aporta un enfoque discreto e informado a cada conversaciÃ³n.'
                       : 'Whether you\'re considering selling a single heirloom or liquidating a multi-generational estate, Chris brings a discreet, informed approach to every conversation.'}
                   </p>
                 </div>
 
                 <div className="mt-10 grid grid-cols-2 gap-6">
                   {[
-                    { stat: '15+', label: isEs ? 'Años de Experiencia' : 'Years Experience' },
+                    { stat: '15+', label: isEs ? 'AÃ±os de Experiencia' : 'Years Experience' },
                     { stat: '100%', label: isEs ? 'Privado y Confidencial' : 'Private & Confidential' },
-                    { stat: isEs ? 'Mismo Día' : 'Same-Day', label: isEs ? 'Pago Disponible' : 'Payment Available' },
-                    { stat: isEs ? 'Móvil' : 'Mobile', label: isEs ? 'Vamos a Usted' : 'We Come to You' },
+                    { stat: isEs ? 'Mismo DÃ­a' : 'Same-Day', label: isEs ? 'Pago Disponible' : 'Payment Available' },
+                    { stat: isEs ? 'MÃ³vil' : 'Mobile', label: isEs ? 'Vamos a Usted' : 'We Come to You' },
                   ].map((item) => (
                     <div
                       key={item.label}
@@ -144,108 +144,6 @@ export default async function AboutPage({ params }: Props) {
           </div>
         </section>
 
-        {/* How It Works */}
-        <section id="process" className="py-20 md:py-28">
-          <div className="container mx-auto px-6 md:px-8">
-            <div className="text-center max-w-3xl mx-auto mb-16">
-              <span
-                className="text-xs font-bold uppercase tracking-[0.4em]"
-                style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
-              >
-                {isEs ? 'Cómo Funciona' : 'How It Works'}
-              </span>
-              <h2
-                className="text-4xl md:text-5xl font-bold mt-4 mb-6 tracking-tight"
-                style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
-              >
-                {isEs ? 'Ofertas Competitivas. Pago Inmediato.' : 'Competitive Offers. Immediate Payment.'}
-              </h2>
-              <p className="text-lg" style={{ color: 'var(--color-on-surface-variant)' }}>
-                {isEs
-                  ? 'Al mantener los gastos generales bajos y operar por cita, ofrecemos pagos altamente competitivos con opciones de pago inmediato.'
-                  : 'By keeping overhead low and operating by appointment, we offer highly competitive payouts with immediate payment options.'}
-              </p>
-            </div>
-
-            <div className="max-w-4xl mx-auto space-y-4">
-              {[
-                {
-                  num: '01',
-                  title: isEs ? 'Consulta Inicial' : 'Initial Consultation',
-                  body: isEs
-                    ? 'En muchos casos, proporcionamos ofertas preliminares directamente de fotos enviadas por mensaje de texto o correo electrónico. También podemos discutir colecciones por teléfono o videollamada antes de organizar una evaluación en persona.'
-                    : 'In many cases, we provide preliminary offers directly from photos sent by text or email. We\'re also happy to discuss collections by phone or video call before arranging an in-person evaluation.',
-                },
-                {
-                  num: '02',
-                  title: isEs ? 'Evaluación en el Lugar' : 'On-Site Evaluation',
-                  body: isEs
-                    ? 'Viajamos directamente a su ubicación preferida para una revisión en persona conveniente de su joyería de patrimonio, antigüedades o metales preciosos.'
-                    : 'We travel directly to your preferred location for a convenient in-person review of your estate jewelry, antiques, or precious metals.',
-                },
-                {
-                  num: '03',
-                  title: isEs ? 'Ofertas y Pago Inmediato' : 'Immediate Offers & Payment',
-                  body: isEs
-                    ? 'Las compras calificadas reciben ofertas transparentes con opciones de pago inmediato al llegar a un acuerdo — efectivo, cheque certificado o transferencia bancaria.'
-                    : 'Qualified purchases receive transparent offers with immediate payment available upon agreement — cash, certified check, or wire transfer.',
-                },
-              ].map((step) => (
-                <div
-                  key={step.num}
-                  className="flex flex-col md:flex-row md:items-center py-10 px-6 md:px-8 rounded-sm"
-                  style={{ background: 'var(--color-surface-container-high)' }}
-                >
-                  <span
-                    className="font-bold italic text-4xl md:mr-12 mb-4 md:mb-0 opacity-50"
-                    style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-primary)' }}
-                  >
-                    {step.num}
-                  </span>
-                  <div className="flex-1">
-                    <h4
-                      className="text-xl font-bold mb-1"
-                      style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
-                    >
-                      {step.title}
-                    </h4>
-                    <p style={{ color: 'var(--color-on-surface-variant)' }}>{step.body}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Imagined storefront */}
-            <div
-              className="mt-14 max-w-5xl mx-auto overflow-hidden rounded-sm shadow-2xl"
-              style={{ background: 'var(--color-surface-container-high)', border: '1px solid rgba(255,255,255,0.1)' }}
-            >
-              <Image
-                src="/assets/images/pages/about-if-we-had-a-store.webp"
-                alt={isEs ? 'Sala de exposición de joyería de estilo antiguo imaginada' : 'Imagined old-world jewelry showroom with antique display cases'}
-                width={1000}
-                height={560}
-                className="w-full h-auto object-cover"
-              />
-              <div className="p-6 md:p-8 text-center">
-                <span
-                  className="text-xs font-bold uppercase tracking-[0.35em]"
-                  style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
-                >
-                  {isEs ? 'Sin Tienda, Solo Imaginación' : 'No Storefront, Just Imagination'}
-                </span>
-                <p
-                  className="mt-4 text-lg md:text-xl leading-relaxed max-w-3xl mx-auto"
-                  style={{ color: 'var(--color-on-surface-variant)' }}
-                >
-                  {isEs
-                    ? 'No tenemos una tienda, pero si la tuviéramos, podría verse algo así: iluminación dramática, demasiadas alfombras y al menos una vitrina que hace que cada reloj parezca necesitar su propia seguridad. Por ahora, lo mantenemos móvil y vamos a usted.'
-                    : "We do not have a store, but if we did, it might look something like this: dramatic lighting, too many rugs, and at least one display case that makes every watch feel like it needs its own security detail. For now, we keep it mobile and come to you."}
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
 
         {/* CTA */}
         <section
@@ -257,11 +155,11 @@ export default async function AboutPage({ params }: Props) {
               className="text-4xl md:text-5xl font-bold mb-6 tracking-tight"
               style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
             >
-              {isEs ? '¿Listo para Comenzar una Conversación?' : 'Ready to Start a Conversation?'}
+              {isEs ? 'Â¿Listo para Comenzar una ConversaciÃ³n?' : 'Ready to Start a Conversation?'}
             </h2>
             <p className="text-lg mb-10 max-w-2xl mx-auto" style={{ color: 'var(--color-on-surface-variant)' }}>
               {isEs
-                ? 'Llame o envíe un mensaje de texto a Chris directamente, o programe una consulta privada en un momento que le convenga.'
+                ? 'Llame o envÃ­e un mensaje de texto a Chris directamente, o programe una consulta privada en un momento que le convenga.'
                 : 'Call or text Chris directly, or schedule a private consultation at a time that works for you.'}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center flex-wrap">
@@ -272,7 +170,7 @@ export default async function AboutPage({ params }: Props) {
                 href={isEs ? '/es/contact' : '/contact'}
                 className="outline-button"
               >
-                {isEs ? 'Contáctenos' : 'Contact Us'}
+                {isEs ? 'ContÃ¡ctenos' : 'Contact Us'}
               </Link>
             </div>
             <div className="mt-8">
@@ -280,10 +178,11 @@ export default async function AboutPage({ params }: Props) {
                 href="https://share.google/yQQMAvFDiOLppBZ30"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest transition-colors border-b pb-1"
+                className="inline-flex items-center gap-2 border-b pb-1 text-sm font-bold uppercase tracking-widest transition-colors"
                 style={{ color: 'var(--color-primary)', borderColor: 'color-mix(in srgb, var(--color-primary) 30%, transparent)', fontFamily: 'var(--font-label)' }}
               >
-                ★ {isEs ? 'Lea lo que dicen los clientes en Google' : 'Read what clients say on Google'} ↗
+                <span>{isEs ? 'Lea lo que dicen los clientes en Google' : 'Read what clients say on Google'}</span>
+                <span aria-hidden="true">-&gt;</span>
               </a>
             </div>
           </div>

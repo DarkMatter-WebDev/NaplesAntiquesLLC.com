@@ -7,6 +7,7 @@ const STATIC_PAGES = [
   { path: '', priority: 1.0, changeFrequency: 'weekly' },
   { path: '/store', priority: 0.9, changeFrequency: 'weekly' },
   { path: '/shop', priority: 0.9, changeFrequency: 'daily' },
+  { path: '/silver-tableware', priority: 0.8, changeFrequency: 'weekly' },
   { path: '/auctions', priority: 0.7, changeFrequency: 'monthly' },
   { path: '/about', priority: 0.7, changeFrequency: 'monthly' },
   { path: '/contact', priority: 0.8, changeFrequency: 'monthly' },
@@ -18,6 +19,14 @@ const STATIC_PAGES = [
   { path: '/bullion', priority: 0.7, changeFrequency: 'weekly' },
   { path: '/faq', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/estate-services', priority: 0.8, changeFrequency: 'monthly' },
+  { path: '/privacy', priority: 0.3, changeFrequency: 'yearly' },
+  { path: '/terms', priority: 0.3, changeFrequency: 'yearly' },
+  { path: '/cookie-preferences', priority: 0.2, changeFrequency: 'yearly' },
+  { path: '/accessibility', priority: 0.2, changeFrequency: 'yearly' },
+  { path: '/returns-refunds', priority: 0.3, changeFrequency: 'yearly' },
+  { path: '/shipping', priority: 0.3, changeFrequency: 'yearly' },
+  { path: '/auction-terms', priority: 0.2, changeFrequency: 'yearly' },
+  { path: '/vendor-terms', priority: 0.1, changeFrequency: 'yearly' },
 ] as const;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

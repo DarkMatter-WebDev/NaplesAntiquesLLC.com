@@ -110,7 +110,7 @@ export default async function BullionPage({ params }: Props) {
               {CHARTS.map(({ symbol, labelEn, labelEs }) => (
                 <div
                   key={symbol}
-                  className="bg-[#1a1c1c] border border-[#735c00]/30 overflow-hidden"
+                  className="overflow-hidden rounded-2xl border border-[#735c00]/30 bg-[#1a1c1c] shadow-[0_18px_54px_rgba(0,0,0,0.14)]"
                 >
                   <div className="px-5 pt-4 pb-2 flex items-center justify-between">
                     <h3 className="font-[family-name:var(--font-headline)] font-bold text-lg text-[#e9c349]">
@@ -150,7 +150,7 @@ export default async function BullionPage({ params }: Props) {
             </div>
             <div className="grid md:grid-cols-3 gap-6">
               {PROCESS_STEPS.map(({ icon, titleEn, titleEs, descEn, descEs }) => (
-                <div key={icon} className="bg-[#e8e8e8] p-6 border border-white/5">
+                <div key={icon} className="rounded-2xl border border-[#d0c5af]/60 bg-white p-6 shadow-[0_14px_38px_rgba(38,28,6,0.06)]">
                   <span
                     className="material-symbols-outlined text-[#735c00] block mb-3"
                     style={{ fontSize: '2rem' }}
@@ -164,7 +164,7 @@ export default async function BullionPage({ params }: Props) {
                 </div>
               ))}
             </div>
-            <div className="mt-12 p-6 md:p-8 bg-[#735c00]/5 border border-[#735c00]/20">
+            <div className="mt-12 rounded-2xl border border-[#735c00]/20 bg-[#735c00]/5 p-6 shadow-[0_14px_38px_rgba(38,28,6,0.05)] md:p-8">
               <p className="text-center text-[#4d4635] text-sm md:text-base leading-relaxed italic">
                 <span className="text-[#735c00] font-[family-name:var(--font-headline)] not-italic font-bold">
                   {isEs ? 'Consejo:' : 'Tip:'}
@@ -200,13 +200,13 @@ export default async function BullionPage({ params }: Props) {
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center flex-wrap">
               <Link
                 href={isEs ? '/es/contact' : '/contact'}
-                className="bg-[linear-gradient(135deg,#dcb336,#b5890c)] text-white px-8 py-4 font-bold text-xs uppercase tracking-widest hover:brightness-[1.04] transition"
+                className="gold-button"
               >
                 {isEs ? 'ENVIAR FOTOS AHORA' : 'Send Photos Now'}
               </Link>
               <a
                 href="tel:2394048505"
-                className="border border-[#735c00]/60 text-[#735c00] px-8 py-4 font-bold text-xs uppercase tracking-widest hover:bg-[linear-gradient(135deg,#dcb336,#b5890c)] hover:text-white transition"
+                className="outline-button"
               >
                 Call (239) 404-8505
               </a>

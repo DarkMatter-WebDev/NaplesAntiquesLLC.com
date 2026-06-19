@@ -214,7 +214,11 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
             ))}
           </Link>
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-3xl opacity-30">📷</div>
+          <div className="flex h-full w-full items-center justify-center text-[#735c00]/35">
+            <span className="material-symbols-outlined" style={{ fontSize: '2rem' }} aria-hidden="true">
+              image
+            </span>
+          </div>
         )}
         {hasMultipleImages && (
           <>
@@ -326,7 +330,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
           style={{ fontFamily: 'var(--font-label)' }}
         >
           <span
-            className="inline-flex min-w-0 items-center justify-center whitespace-nowrap border px-1 py-1"
+            className="inline-flex min-w-0 items-center justify-center whitespace-nowrap rounded-full border px-1.5 py-1"
             style={{
               background: purityChipStyle.background,
               borderColor: purityChipStyle.borderColor,
@@ -336,7 +340,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
             {purityLabel}
           </span>
           <span
-            className="inline-flex min-w-0 items-center justify-center whitespace-nowrap border px-1 py-1"
+            className="inline-flex min-w-0 items-center justify-center whitespace-nowrap rounded-full border px-1.5 py-1"
             style={{
               background: 'rgba(72, 65, 52, 0.07)',
               borderColor: 'rgba(72, 65, 52, 0.18)',
@@ -346,7 +350,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
             {weightLabel}
           </span>
           <span
-            className="inline-flex min-w-0 items-center justify-center whitespace-nowrap border px-1 py-1"
+            className="inline-flex min-w-0 items-center justify-center whitespace-nowrap rounded-full border px-1.5 py-1"
             style={{
               background: lengthLabel ? 'rgba(139, 85, 36, 0.08)' : 'transparent',
               borderColor: lengthLabel ? 'rgba(139, 85, 36, 0.2)' : 'transparent',
@@ -373,8 +377,11 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
             border-color: rgba(181, 137, 12, 0.26) !important;
             box-shadow: 0 18px 44px rgba(42, 34, 12, 0.14) !important;
           }
+          .modern-product-card .modern-product-image {
+            border-radius: var(--radius-xl);
+          }
           .modern-product-card .shop-card-cart-button {
-            border-radius: 6px;
+            border-radius: 999px;
             border-color: rgba(181, 137, 12, 0.38) !important;
             background: rgba(255, 253, 248, 0.86);
           }
@@ -529,7 +536,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
               right: 0.7rem;
               bottom: 0.7rem;
               padding: 0.5rem 0.75rem;
-              border-radius: 8px;
+              border-radius: var(--radius-lg);
               background: rgba(24, 19, 9, 0.86);
               backdrop-filter: blur(3px);
               color: #fffdf7;

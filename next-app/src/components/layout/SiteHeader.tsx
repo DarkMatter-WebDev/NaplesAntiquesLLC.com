@@ -12,7 +12,7 @@ const GOLD = '#735c00';
 const SECONDARY = '#5e5e5d';
 
 const navLinkBase =
-  'text-sm font-medium tracking-wide px-1 py-2 transition-colors hover:text-[#735c00]';
+  'nav-link text-sm font-medium tracking-wide px-1 py-2 transition-colors hover:text-[#735c00]';
 
 const HEADER_STYLES = `
   /* Desktop dropdown — white card matching the auth/shop modernization */
@@ -22,7 +22,7 @@ const HEADER_STYLES = `
     min-width: 210px;
     background: #ffffff;
     border: 1px solid rgba(115, 92, 0, 0.15);
-    border-radius: 8px;
+    border-radius: var(--radius-xl);
     box-shadow: 0 18px 52px rgba(42, 34, 12, 0.12);
     padding: 0.4rem;
   }
@@ -38,7 +38,7 @@ const HEADER_STYLES = `
   .nav-dropdown-link {
     display: block;
     padding: 0.6rem 0.85rem;
-    border-radius: 6px;
+    border-radius: var(--radius-lg);
     font-family: var(--font-label);
     font-size: 0.82rem;
     color: var(--color-on-surface);
@@ -49,6 +49,34 @@ const HEADER_STYLES = `
     background: linear-gradient(135deg, #dcb336, #b5890c);
     color: #fffdf7;
   }
+  .nav-link {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+  }
+  .nav-link::after {
+    content: '';
+    position: absolute;
+    left: 0.25rem;
+    right: 0.25rem;
+    bottom: 0.22rem;
+    height: 1px;
+    background: linear-gradient(90deg, #735c00, #dcb336);
+    transform: scaleX(0);
+    transform-origin: left center;
+    opacity: 0;
+    transition: transform 190ms ease, opacity 190ms ease;
+  }
+  .nav-link:hover::after,
+  .nav-link:focus-visible::after,
+  .nav-link[data-active="true"]::after {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  .nav-link[data-active="true"] {
+    color: #735c00 !important;
+  }
 
   /* Gold-gradient call CTA */
   .nav-cta {
@@ -56,7 +84,7 @@ const HEADER_STYLES = `
     align-items: center;
     gap: 0.4rem;
     padding: 0.65rem 1.4rem;
-    border-radius: 6px;
+    border-radius: 999px;
     background: linear-gradient(135deg, #dcb336, #b5890c);
     color: #fffdf7;
     font-family: var(--font-label);
@@ -77,7 +105,7 @@ const HEADER_STYLES = `
   /* Menu toggle (mobile) */
   .menu-toggle {
     border: 1px solid rgba(115, 92, 0, 0.5);
-    border-radius: 6px;
+    border-radius: var(--radius-lg);
     color: ${GOLD};
     font-family: var(--font-label);
     transition: background 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
@@ -111,7 +139,7 @@ const HEADER_STYLES = `
     justify-content: space-between;
     width: 100%;
     padding: 0.85rem 0.65rem;
-    border-radius: 6px;
+    border-radius: var(--radius-lg);
     font-family: var(--font-label);
     transition: background 150ms ease, color 150ms ease;
   }
@@ -127,14 +155,14 @@ const HEADER_STYLES = `
   .mobile-sub-list {
     margin: 0.15rem 0 0.5rem;
     padding: 0.3rem;
-    border-radius: 8px;
+    border-radius: var(--radius-xl);
     background: rgba(255, 255, 255, 0.7);
     border: 1px solid rgba(115, 92, 0, 0.1);
   }
   .mobile-sub-link {
     display: block;
     padding: 0.6rem 0.75rem;
-    border-radius: 6px;
+    border-radius: var(--radius-lg);
     font-family: var(--font-label);
     font-size: 0.9rem;
     color: ${GOLD};
@@ -191,6 +219,15 @@ export default function SiteHeader() {
     setAboutOpen(false);
   }
 
+  function isActive(path: string) {
+    const currentPath = pathname.replace(/^\/es(?=\/|$)/, '') || '/';
+    return currentPath === path || (path !== '/' && currentPath.startsWith(`${path}/`));
+  }
+
+  function isAnyActive(items: { path: string }[]) {
+    return items.some((item) => isActive(item.path));
+  }
+
   return (
     <header
       className="fixed top-0 w-full z-50 backdrop-blur-sm"
@@ -200,7 +237,7 @@ export default function SiteHeader() {
         boxShadow: '0 6px 24px rgba(42,34,12,0.05)',
       }}
     >
-      <div className="flex items-center justify-between gap-2 px-3 py-3 md:px-8 md:py-5 w-full max-w-[1440px] mx-auto">
+      <div className="flex w-full items-center justify-between gap-3 px-3 py-3 md:px-5 md:py-5 2xl:px-8">
 
         {/* Brand */}
         <Link href={href('/')} className="flex items-center gap-2 min-w-0 shrink">
@@ -230,32 +267,32 @@ export default function SiteHeader() {
 
         {/* Desktop nav — 2xl and up */}
         <nav className="hidden 2xl:flex items-center gap-5" style={{ fontFamily: 'var(--font-label)' }}>
-          <Link href={href('/')} className={navLinkBase} style={{ color: SECONDARY }}>{t('home')}</Link>
-          <div className="group relative flex items-center">
-            <Link href={href('/store')} className={navLinkBase} style={{ color: SECONDARY }}>
-              {t('shop')}
-            </Link>
+            <Link href={href('/')} className={navLinkBase} data-active={isActive('/') ? 'true' : 'false'} style={{ color: SECONDARY }}>{t('home')}</Link>
+            <div className="group relative flex items-center">
+              <Link href={href('/store')} className={navLinkBase} data-active={isActive('/store') || isActive('/shop') || isActive('/silver-tableware') || isAnyActive(SHOP_ITEMS) ? 'true' : 'false'} style={{ color: SECONDARY }}>
+                {t('shop')}
+              </Link>
             <DesktopDropdown items={SHOP_ITEMS} t={t} href={href} />
           </div>
 
           {/* Sell To Us dropdown */}
           <div className="group relative flex items-center">
-            <Link href={href('/estate-jewelry')} className={navLinkBase} style={{ color: SECONDARY }}>
-              {t('sellToUs')}
-            </Link>
+              <Link href={href('/estate-jewelry')} className={navLinkBase} data-active={isAnyActive(SELL_ITEMS) ? 'true' : 'false'} style={{ color: SECONDARY }}>
+                {t('sellToUs')}
+              </Link>
             <DesktopDropdown items={SELL_ITEMS} t={t} href={href} />
           </div>
 
           {/* About dropdown */}
           <div className="group relative flex items-center">
-            <Link href={href('/about')} className={navLinkBase} style={{ color: SECONDARY }}>
-              {t('about')}
-            </Link>
+              <Link href={href('/about')} className={navLinkBase} data-active={isAnyActive(ABOUT_ITEMS) ? 'true' : 'false'} style={{ color: SECONDARY }}>
+                {t('about')}
+              </Link>
             <DesktopDropdown items={ABOUT_ITEMS} t={t} href={href} />
           </div>
 
-          <Link href={href('/contact')} className={navLinkBase} style={{ color: SECONDARY }}>{t('contact')}</Link>
-          <Link href={href('/account')} className={navLinkBase} style={{ color: SECONDARY }}>{t('myAccount')}</Link>
+            <Link href={href('/contact')} className={navLinkBase} data-active={isActive('/contact') ? 'true' : 'false'} style={{ color: SECONDARY }}>{t('contact')}</Link>
+            <Link href={href('/account')} className={navLinkBase} data-active={isActive('/account') ? 'true' : 'false'} style={{ color: SECONDARY }}>{t('myAccount')}</Link>
         </nav>
 
         {/* Actions */}
