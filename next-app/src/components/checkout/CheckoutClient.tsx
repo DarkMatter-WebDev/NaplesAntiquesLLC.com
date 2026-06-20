@@ -59,7 +59,7 @@ export default function CheckoutClient({ locale }: { locale: string }) {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('*')
+        .select('full_name, first_name, last_name, email, phone')
         .eq('id', user.id)
         .maybeSingle();
 

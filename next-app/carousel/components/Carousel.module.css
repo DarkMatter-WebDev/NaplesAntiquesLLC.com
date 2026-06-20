@@ -15,9 +15,6 @@
   overflow: hidden;
   perspective: var(--perspective);
   background: var(--bg);
-  /* lateral fade toward the edges */
-  -webkit-mask: linear-gradient(90deg, #0000, red 20% 80%, #0000);
-          mask: linear-gradient(90deg, #0000, red 20% 80%, #0000);
 }
 
 .ring {
@@ -51,23 +48,6 @@
   transform:
     rotateY(calc(var(--i) * var(--ba)))
     translateZ(calc(-1 * (.5 * var(--cardW) + .5em) / tan(.5 * var(--ba))));
-}
-
-/* Soft edge fade in the background color so a photo whose edges don't match
-   (i.e. not a cleanly floating item) blends gracefully into the background.
-   White background -> fades to white; black -> fades to black.
-   - box-shadow: a brief vignette on ALL four edges (works whether or not the
-     edge has contain padding, so a subject reaching any edge is softened).
-   - linear-gradient: a slightly stronger fade at the BOTTOM, where product
-     subjects most often rest right against the edge with no breathing room. */
-.card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  box-shadow: inset 0 0 1.5em 0.5em var(--card-bg, var(--bg));
-  background: linear-gradient(to top, var(--card-bg, var(--bg)) 0%, transparent 16%);
 }
 
 .card,

@@ -7,6 +7,38 @@ import type { Order, OrderItem } from '@/types/sales';
 
 export const metadata: Metadata = { title: 'Admin - Order Detail' };
 
+const ORDER_DETAIL_COLUMNS = [
+  'id',
+  'order_number',
+  'user_id',
+  'customer_name',
+  'customer_email',
+  'customer_phone',
+  'subtotal',
+  'tax',
+  'shipping_fee',
+  'discount',
+  'total',
+  'payment_status',
+  'fulfillment_status',
+  'order_status',
+  'payment_method',
+  'payment_reference',
+  'shipping_method',
+  'shipping_address',
+  'billing_address',
+  'internal_notes',
+  'customer_notes',
+  'created_at',
+  'updated_at',
+  'order_items(id, order_id, product_id, inventory_number, title_snapshot, item_year_snapshot, metal_snapshot, purity_snapshot, gram_weight_snapshot, price_snapshot, discount, image_snapshot, created_at)',
+].join(', ');
+const ORDER_DETAIL_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT = ORDER_DETAIL_COLUMNS.replace('item_year_snapshot, ', '');
+
+function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
+  return Boolean(error?.message?.toLowerCase().includes('item_year'));
+}
+
 interface Props {
   params: Promise<{ locale: string; id: string }>;
 }
@@ -41,10 +73,10 @@ export default async function AdminOrderDetailPage({ params }: Props) {
     redirect(isEs ? '/es/account' : '/account');
   }
 
-  const [{ data: order }, { data: invoices }, { count: unreadMessagesCount }] = await Promise.all([
+  const [orderResult, { data: invoices }, { count: unreadMessagesCount }] = await Promise.all([
     supabase
       .from('orders')
-      .select('*, order_items(*)')
+      .select(ORDER_DETAIL_COLUMNS)
       .eq('id', id)
       .single(),
     supabase
@@ -57,6 +89,15 @@ export default async function AdminOrderDetailPage({ params }: Props) {
       .select('id', { count: 'exact', head: true })
       .eq('is_read', false),
   ]);
+  let order = orderResult.data;
+  if (isMissingItemYearColumnError(orderResult.error)) {
+    const fallback = await supabase
+      .from('orders')
+      .select(ORDER_DETAIL_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT)
+      .eq('id', id)
+      .single();
+    order = fallback.data;
+  }
 
   if (!order) notFound();
 
@@ -70,7 +111,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
       />
 
       <OrderDetailPanel
-        initialOrder={order as Order & { order_items: OrderItem[] }}
+        initialOrder={order as unknown as Order & { order_items: OrderItem[] }}
         initialInvoices={(invoices ?? []) as Invoice[]}
         locale={locale}
       />

@@ -1,0 +1,975 @@
+[browser] Image with src "https://evzluixourmsefwdsieu.supabase.co/storage/v1/object/public/product-images/products/1781545635635-74q69sk3j23.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "/assets/images/shop/shop-18k-heraldic-cross-ring-01.png" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+⨯ ReferenceError: Cannot access 'selectedMetalColor' before initialization
+    at renderShopPage (src\app\[locale]\shop\page.tsx:300:3)
+  298 |     productQuery = productQuery.eq('purity', parseInt(filters.purity, 10));
+  299 |   }
+> 300 |   if (selectedMetalColor) {
+      |   ^
+  301 |     productQuery = productQuery.eq('metal_variant', selectedMetalColor);
+  302 |   } else if (filters.metal === 'gold') {
+  303 |     productQuery = productQuery.eq('category', 'Gold'); {
+  digest: '1598632308'
+}
+⨯ ReferenceError: Cannot access 'selectedMetalColor' before initialization
+    at renderShopPage (src\app\[locale]\shop\page.tsx:300:3)
+  298 |     productQuery = productQuery.eq('purity', parseInt(filters.purity, 10));
+  299 |   }
+> 300 |   if (selectedMetalColor) {
+      |   ^
+  301 |     productQuery = productQuery.eq('metal_variant', selectedMetalColor);
+  302 |   } else if (filters.metal === 'gold') {
+  303 |     productQuery = productQuery.eq('category', 'Gold'); {
+  digest: '1598632308'
+}
+[browser] Uncaught ReferenceError: Cannot access 'selectedMetalColor' before initialization
+    at renderShopPage (src\app\[locale]\shop\page.tsx:300:3)
+  298 |     productQuery = productQuery.eq('purity', parseInt(filters.purity, 10));
+  299 |   }
+> 300 |   if (selectedMetalColor) {
+      |   ^
+  301 |     productQuery = productQuery.eq('metal_variant', selectedMetalColor);
+  302 |   } else if (filters.metal === 'gold') {
+  303 |     productQuery = productQuery.eq('category', 'Gold');
+[browser] Image with src "/assets/images/shop/shop-14k-curb-link-bracelet-01.png" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "/assets/images/shop/shop-10k-hollow-cuban-chain-necklace-01.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+⚠ Fast Refresh had to perform a full reload when ./src/context/CartContext.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload when ./src/context/WishlistContext.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+[browser] Image with src "/assets/images/shop/shop-10k-hollow-cuban-chain-necklace-01.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "/assets/images/shop/shop-14k-byzantine-link-chain-01.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="(home)/" loading={[...]}>
+              <Suspense name="(home)/" fallback={<Fragment>}>
+                <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/" tree={[...]} params={{locale:"en"}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="page" pagePath="[locale]/(...">
+                          <SegmentTrieNode>
+                          <HomePage>
+                            <SiteHeader>
+                            <main className="flex flex-...">
+                              <HomeHero locale="en" fallbackItems={[...]}>
+                                <section
+                                  ref={{current:null}}
+                                  className="home-carousel-hero relative overflow-hidden border-b"
+                                  style={{
++                                   borderColor: "rgba(220, 179, 54, 0.22)"
++                                   --hero-fade: "255, 253, 247"
+-                                   --hero-fade: "255, 253, 247"
++                                   --hero-text: "#17130c"
+-                                   --hero-text: "#17130c"
++                                   --hero-eyebrow: "#8f6c06"
+-                                   --hero-eyebrow: "#8f6c06"
++                                   --hero-btn-color: "#7a5800"
+-                                   --hero-btn-color: "#7a5800"
++                                   --hero-btn-border: "rgba(139, 103, 0, 0.55)"
+-                                   --hero-btn-border: "rgba(139, 103, 0, 0.55)"
++                                   --hero-btn-bg: "rgba(180, 130, 0, 0.10)"
+-                                   --hero-btn-bg: "rgba(180, 130, 0, 0.10)"
+-                                   border-top-color: "rgba(220, 179, 54, 0.22)"
+-                                   border-right-color: "rgba(220, 179, 54, 0.22)"
+-                                   border-bottom-color: "rgba(220, 179, 54, 0.22)"
+-                                   border-left-color: "rgba(220, 179, 54, 0.22)"
+-                                   --customer-reveal-delay: "0ms"
+                                  }}
+-                                 data-customer-reveal="pending"
+                                >
+                                  <div className="home-carou...">
+                                    <Carousel items={[...]} showPrice={false} bg="#ffffff" cardWidth={15.5} ...>
+                                      <div ref={{current:null}} className="Carousel-m..." style={{--spin:"32s", ...}} ...>
+                                        <div ref={{current:null}} className="Carousel-m..." style={{--n:6}}>
+                                          <a
+                                            href="/shop"
+                                            className="Carousel-module__XM-yxG__card Carousel-module__XM-yxG__link"
++                                           style={{--i:0}}
+-                                           style={{--i:"0",--customer-reveal-delay:"70ms"}}
+-                                           data-customer-reveal="visible"
+                                          >
+                                          <a
+                                            href="/shop"
+                                            className="Carousel-module__XM-yxG__card Carousel-module__XM-yxG__link"
++                                           style={{--i:1}}
+-                                           style={{--i:"1",--customer-reveal-delay:"140ms"}}
+-                                           data-customer-reveal="visible"
+                                          >
+                                          <a
+                                            href="/shop"
+                                            className="Carousel-module__XM-yxG__card Carousel-module__XM-yxG__link"
++                                           style={{--i:2}}
+-                                           style={{--i:"2",--customer-reveal-delay:"210ms"}}
+-                                           data-customer-reveal="pending"
+                                          >
+                                          <a
+                                            href="/shop"
+                                            className="Carousel-module__XM-yxG__card Carousel-module__XM-yxG__link"
++                                           style={{--i:3}}
+-                                           style={{--i:"3",--customer-reveal-delay:"280ms"}}
+-                                           data-customer-reveal="pending"
+                                          >
+                                          <a
+                                            href="/shop"
+                                            className="Carousel-module__XM-yxG__card Carousel-module__XM-yxG__link"
++                                           style={{--i:4}}
+-                                           style={{--i:"4",--customer-reveal-delay:"350ms"}}
+-                                           data-customer-reveal="pending"
+                                          >
+                                          <a
+                                            href="/shop"
+                                            className="Carousel-module__XM-yxG__card Carousel-module__XM-yxG__link"
++                                           style={{--i:5}}
+-                                           style={{--i:"5",--customer-reveal-delay:"420ms"}}
+-                                           data-customer-reveal="visible"
+                                          >
+                                  <div>
+                                  <div>
+                                  <div
+                                    className="home-hero-top"
+-                                   data-customer-reveal="visible"
+-                                   style={{--customer-reveal-delay:"490ms"}}
+                                  >
+                                  <div
+                                    className="home-hero-bottom"
+-                                   data-customer-reveal="visible"
+-                                   style={{--customer-reveal-delay:"490ms"}}
+                                  >
+                                    <div className="flex w-ful..." style={{...}}>
+                                      <HomeSubscriberForm locale="en">
+                                        <form
+                                          onSubmit={function handleSubmit}
+                                          className="w-full max-w-2xl"
+                                          style={{
++                                           color: "var(--hero-text)"
+-                                           color: "var(--hero-text)"
++                                           fontFamily: "var(--font-label)"
+-                                           font-family: "var(--font-label)"
+-                                           --customer-reveal-delay: "490ms"
+                                          }}
+-                                         data-customer-reveal="visible"
+                                        >
+                                    <div className="flex flex-..." style={{...}}>
+                                      <LinkComponent href="/shop" className="hero-cta i..." style={{...}}>
+                                        <a
+                                          className="hero-cta inline-flex justify-center min-w-[9rem] md:min-w-[10rem]..."
+                                          style={{
++                                           background: "var(--hero-btn-bg)"
++                                           borderColor: "var(--hero-btn-border)"
++                                           color: "var(--hero-btn-color)"
+-                                           color: "var(--hero-btn-color)"
++                                           fontFamily: "var(--font-label)"
++                                           boxShadow: "0 0 18px rgba(212,175,55,0.12)"
++                                           backdropFilter: "blur(3px)"
+-                                           background-image: ""
+-                                           background-position-x: ""
+-                                           background-position-y: ""
+-                                           background-size: ""
+-                                           background-repeat: ""
+-                                           background-attachment: ""
+-                                           background-origin: ""
+-                                           background-clip: ""
+-                                           background-color: ""
+-                                           border-top-color: ""
+-                                           border-right-color: ""
+-                                           border-bottom-color: ""
+-                                           border-left-color: ""
+-                                           font-family: "var(--font-label)"
+-                                           box-shadow: "rgba(212, 175, 55, 0.12) 0px 0px 18px"
+-                                           backdrop-filter: "blur(3px)"
+-                                           --customer-reveal-delay: "490ms"
+                                          }}
+                                          ref={function}
+                                          onClick={function onClick}
+                                          onMouseEnter={function onMouseEnter}
+                                          onTouchStart={function onTouchStart}
+                                          href="/shop"
+-                                         data-customer-reveal="visible"
+                                        >
++                                         Buy
+                                      <LinkComponent href="/estate-je..." className="hero-cta i..." style={{...}}>
+                                        <a
+                                          className="hero-cta inline-flex justify-center min-w-[9rem] md:min-w-[10rem]..."
+                                          style={{
++                                           background: "var(--hero-btn-bg)"
++                                           borderColor: "var(--hero-btn-border)"
++                                           color: "var(--hero-btn-color)"
+-                                           color: "var(--hero-btn-color)"
++                                           fontFamily: "var(--font-label)"
++                                           boxShadow: "0 0 18px rgba(212,175,55,0.12)"
++                                           backdropFilter: "blur(3px)"
+-                                           background-image: ""
+-                                           background-position-x: ""
+-                                           background-position-y: ""
+-                                           background-size: ""
+-                                           background-repeat: ""
+-                                           background-attachment: ""
+-                                           background-origin: ""
+-                                           background-clip: ""
+-                                           background-color: ""
+-                                           border-top-color: ""
+-                                           border-right-color: ""
+-                                           border-bottom-color: ""
+-                                           border-left-color: ""
+-                                           font-family: "var(--font-label)"
+-                                           box-shadow: "rgba(212, 175, 55, 0.12) 0px 0px 18px"
+-                                           backdrop-filter: "blur(3px)"
+-                                           --customer-reveal-delay: "490ms"
+                                          }}
+                                          ref={function}
+                                          onClick={function onClick}
+                                          onMouseEnter={function onMouseEnter}
+                                          onTouchStart={function onTouchStart}
+                                          href="/estate-jewelry"
+-                                         data-customer-reveal="visible"
+                                        >
++                                         Sell
+                                      <LinkComponent href="/contact" className="hero-cta i..." style={{...}}>
+                                        <a
+                                          className="hero-cta inline-flex justify-center min-w-[9rem] md:min-w-[10rem]..."
+                                          style={{
++                                           background: "var(--hero-btn-bg)"
++                                           borderColor: "var(--hero-btn-border)"
++                                           color: "var(--hero-btn-color)"
+-                                           color: "var(--hero-btn-color)"
++                                           fontFamily: "var(--font-label)"
++                                           boxShadow: "0 0 18px rgba(212,175,55,0.12)"
++                                           backdropFilter: "blur(3px)"
+-                                           background-image: ""
+-                                           background-position-x: ""
+-                                           background-position-y: ""
+-                                           background-size: ""
+-                                           background-repeat: ""
+-                                           background-attachment: ""
+-                                           background-origin: ""
+-                                           background-clip: ""
+-                                           background-color: ""
+-                                           border-top-color: ""
+-                                           border-right-color: ""
+-                                           border-bottom-color: ""
+-                                           border-left-color: ""
+-                                           font-family: "var(--font-label)"
+-                                           box-shadow: "rgba(212, 175, 55, 0.12) 0px 0px 18px"
+-                                           backdrop-filter: "blur(3px)"
+-                                           --customer-reveal-delay: "490ms"
+                                          }}
+                                          ref={function}
+                                          onClick={function onClick}
+                                          onMouseEnter={function onMouseEnter}
+                                          onTouchStart={function onTouchStart}
+                                          href="/contact"
+-                                         data-customer-reveal="visible"
+                                        >
++                                         Trade
+                                  ...
+                              <section
+                                className="border-t px-6 py-14 md:py-20"
+                                style={{
++                                 borderColor: "var(--color-outline-variant)"
++                                 background: "var(--color-surface-container-low)"
+-                                 border-top-color: ""
+-                                 border-right-color: ""
+-                                 border-bottom-color: ""
+-                                 border-left-color: ""
+-                                 background-image: ""
+-                                 background-position-x: ""
+-                                 background-position-y: ""
+-                                 background-size: ""
+-                                 background-repeat: ""
+-                                 background-attachment: ""
+-                                 background-origin: ""
+-                                 background-clip: ""
+-                                 background-color: ""
+-                                 --customer-reveal-delay: "490ms"
+                                }}
+-                               data-customer-reveal="visible"
+                              >
+                              <section
+                                className="py-20 px-6 text-center border-t"
+                                style={{
++                                 borderColor: "var(--color-outline-variant)"
+-                                 border-top-color: ""
+-                                 border-right-color: ""
+-                                 border-bottom-color: ""
+-                                 border-left-color: ""
+-                                 --customer-reveal-delay: "490ms"
+                                }}
+-                               data-customer-reveal="visible"
+                              >
+                            <SiteFooter>
+                              <footer
+                                className="mt-auto border-t"
+                                style={{
++                                 borderColor: "var(--color-outline-variant)"
++                                 background: "var(--color-surface-container-low)"
+-                                 border-top-color: ""
+-                                 border-right-color: ""
+-                                 border-bottom-color: ""
+-                                 border-left-color: ""
+-                                 background-image: ""
+-                                 background-position-x: ""
+-                                 background-position-y: ""
+-                                 background-size: ""
+-                                 background-repeat: ""
+-                                 background-attachment: ""
+-                                 background-origin: ""
+-                                 background-clip: ""
+-                                 background-color: ""
+-                                 --customer-reveal-delay: "490ms"
+                                }}
+-                               data-customer-reveal="visible"
+                              >
+                        ...
+                      ...
+          ...
+ 
+[browser] Image with src "https://evzluixourmsefwdsieu.supabase.co/storage/v1/object/public/product-images/products/1781735122948-w4h9rxe4p4n.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "https://evzluixourmsefwdsieu.supabase.co/storage/v1/object/public/product-images/products/1781795284238-jb9n3ug30d.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="(home)/" loading={[...]}>
+              <Suspense name="(home)/" fallback={<Fragment>}>
+                <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/" tree={[...]} params={{locale:"en"}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="page" pagePath="[locale]/(...">
+                          <SegmentTrieNode>
+                          <HomePage>
+                            <SiteHeader>
+                            <main className="flex flex-...">
+                              <HomeHero locale="en" fallbackItems={[...]}>
+                                <section
+                                  ref={{current:null}}
+                                  className="home-carousel-hero relative overflow-hidden border-b"
+                                  style={{
++                                   borderColor: "rgba(220, 179, 54, 0.22)"
++                                   --hero-fade: "255, 253, 247"
+-                                   --hero-fade: "255, 253, 247"
++                                   --hero-text: "#17130c"
+-                                   --hero-text: "#17130c"
++                                   --hero-eyebrow: "#8f6c06"
+-                                   --hero-eyebrow: "#8f6c06"
++                                   --hero-btn-color: "#7a5800"
+-                                   --hero-btn-color: "#7a5800"
++                                   --hero-btn-border: "rgba(139, 103, 0, 0.55)"
+-                                   --hero-btn-border: "rgba(139, 103, 0, 0.55)"
++                                   --hero-btn-bg: "rgba(180, 130, 0, 0.10)"
+-                                   --hero-btn-bg: "rgba(180, 130, 0, 0.10)"
+-                                   border-top-color: "rgba(220, 179, 54, 0.22)"
+-                                   border-right-color: "rgba(220, 179, 54, 0.22)"
+-                                   border-bottom-color: "rgba(220, 179, 54, 0.22)"
+-                                   border-left-color: "rgba(220, 179, 54, 0.22)"
+-                                   --customer-reveal-delay: "0ms"
+                                  }}
+-                                 data-customer-reveal="visible"
+                                >
+                                  <div className="home-carou...">
+                                    <Carousel items={[...]} showPrice={false} bg="#ffffff" cardWidth={15.5} ...>
+                                      <div ref={{current:null}} className="Carousel-m..." style={{--spin:"32s", ...}} ...>
+                                        <div ref={{current:null}} className="Carousel-m..." style={{--n:6}}>
+                                          <a
+                                            href="/shop"
+                                            className="Carousel-module__XM-yxG__card Carousel-module__XM-yxG__link"
++                                           style={{--i:0}}
+-                                           style={{--i:"0",--customer-reveal-delay:"70ms"}}
+-                                           data-customer-reveal="visible"
+                                          >
+                                          <a
+                                            href="/shop"
+                                            className="Carousel-module__XM-yxG__card Carousel-module__XM-yxG__link"
++                                           style={{--i:1}}
+-                                           style={{--i:"1",--customer-reveal-delay:"140ms"}}
+-                                           data-customer-reveal="visible"
+                                          >
+                                          <a
+                                            href="/shop"
+                                            className="Carousel-module__XM-yxG__card Carousel-module__XM-yxG__link"
++                                           style={{--i:2}}
+-                                           style={{--i:"2",--customer-reveal-delay:"210ms"}}
+-                                           data-customer-reveal="visible"
+                                          >
+                                          <a
+                                            href="/shop"
+                                            className="Carousel-module__XM-yxG__card Carousel-module__XM-yxG__link"
++                                           style={{--i:3}}
+-                                           style={{--i:"3",--customer-reveal-delay:"280ms"}}
+-                                           data-customer-reveal="visible"
+                                          >
+                                          <a
+                                            href="/shop"
+                                            className="Carousel-module__XM-yxG__card Carousel-module__XM-yxG__link"
++                                           style={{--i:4}}
+-                                           style={{--i:"4",--customer-reveal-delay:"350ms"}}
+-                                           data-customer-reveal="visible"
+                                          >
+                                          <a
+                                            href="/shop"
+                                            className="Carousel-module__XM-yxG__card Carousel-module__XM-yxG__link"
++                                           style={{--i:5}}
+-                                           style={{--i:"5",--customer-reveal-delay:"420ms"}}
+-                                           data-customer-reveal="visible"
+                                          >
+                                  <div>
+                                  <div>
+                                  <div
+                                    className="home-hero-top"
+-                                   data-customer-reveal="visible"
+-                                   style={{--customer-reveal-delay:"490ms"}}
+                                  >
+                                  <div
+                                    className="home-hero-bottom"
+-                                   data-customer-reveal="visible"
+-                                   style={{--customer-reveal-delay:"490ms"}}
+                                  >
+                                    <div className="flex w-ful..." style={{...}}>
+                                      <HomeSubscriberForm locale="en">
+                                        <form
+                                          onSubmit={function handleSubmit}
+                                          className="w-full max-w-2xl"
+                                          style={{
++                                           color: "var(--hero-text)"
+-                                           color: "var(--hero-text)"
++                                           fontFamily: "var(--font-label)"
+-                                           font-family: "var(--font-label)"
+-                                           --customer-reveal-delay: "490ms"
+                                          }}
+-                                         data-customer-reveal="visible"
+                                        >
+                                    <div className="flex flex-..." style={{...}}>
+                                      <LinkComponent href="/shop" className="hero-cta i..." style={{...}}>
+                                        <a
+                                          className="hero-cta inline-flex justify-center min-w-[9rem] md:min-w-[10rem]..."
+                                          style={{
++                                           background: "var(--hero-btn-bg)"
++                                           borderColor: "var(--hero-btn-border)"
++                                           color: "var(--hero-btn-color)"
+-                                           color: "var(--hero-btn-color)"
++                                           fontFamily: "var(--font-label)"
++                                           boxShadow: "0 0 18px rgba(212,175,55,0.12)"
++                                           backdropFilter: "blur(3px)"
+-                                           background-image: ""
+-                                           background-position-x: ""
+-                                           background-position-y: ""
+-                                           background-size: ""
+-                                           background-repeat: ""
+-                                           background-attachment: ""
+-                                           background-origin: ""
+-                                           background-clip: ""
+-                                           background-color: ""
+-                                           border-top-color: ""
+-                                           border-right-color: ""
+-                                           border-bottom-color: ""
+-                                           border-left-color: ""
+-                                           font-family: "var(--font-label)"
+-                                           box-shadow: "rgba(212, 175, 55, 0.12) 0px 0px 18px"
+-                                           backdrop-filter: "blur(3px)"
+-                                           --customer-reveal-delay: "490ms"
+                                          }}
+                                          ref={function}
+                                          onClick={function onClick}
+                                          onMouseEnter={function onMouseEnter}
+                                          onTouchStart={function onTouchStart}
+                                          href="/shop"
+-                                         data-customer-reveal="visible"
+                                        >
++                                         Buy
+                                      <LinkComponent href="/estate-je..." className="hero-cta i..." style={{...}}>
+                                        <a
+                                          className="hero-cta inline-flex justify-center min-w-[9rem] md:min-w-[10rem]..."
+                                          style={{
++                                           background: "var(--hero-btn-bg)"
++                                           borderColor: "var(--hero-btn-border)"
++                                           color: "var(--hero-btn-color)"
+-                                           color: "var(--hero-btn-color)"
++                                           fontFamily: "var(--font-label)"
++                                           boxShadow: "0 0 18px rgba(212,175,55,0.12)"
++                                           backdropFilter: "blur(3px)"
+-                                           background-image: ""
+-                                           background-position-x: ""
+-                                           background-position-y: ""
+-                                           background-size: ""
+-                                           background-repeat: ""
+-                                           background-attachment: ""
+-                                           background-origin: ""
+-                                           background-clip: ""
+-                                           background-color: ""
+-                                           border-top-color: ""
+-                                           border-right-color: ""
+-                                           border-bottom-color: ""
+-                                           border-left-color: ""
+-                                           font-family: "var(--font-label)"
+-                                           box-shadow: "rgba(212, 175, 55, 0.12) 0px 0px 18px"
+-                                           backdrop-filter: "blur(3px)"
+-                                           --customer-reveal-delay: "490ms"
+                                          }}
+                                          ref={function}
+                                          onClick={function onClick}
+                                          onMouseEnter={function onMouseEnter}
+                                          onTouchStart={function onTouchStart}
+                                          href="/estate-jewelry"
+-                                         data-customer-reveal="visible"
+                                        >
++                                         Sell
+                                      <LinkComponent href="/contact" className="hero-cta i..." style={{...}}>
+                                        <a
+                                          className="hero-cta inline-flex justify-center min-w-[9rem] md:min-w-[10rem]..."
+                                          style={{
++                                           background: "var(--hero-btn-bg)"
++                                           borderColor: "var(--hero-btn-border)"
++                                           color: "var(--hero-btn-color)"
+-                                           color: "var(--hero-btn-color)"
++                                           fontFamily: "var(--font-label)"
++                                           boxShadow: "0 0 18px rgba(212,175,55,0.12)"
++                                           backdropFilter: "blur(3px)"
+-                                           background-image: ""
+-                                           background-position-x: ""
+-                                           background-position-y: ""
+-                                           background-size: ""
+-                                           background-repeat: ""
+-                                           background-attachment: ""
+-                                           background-origin: ""
+-                                           background-clip: ""
+-                                           background-color: ""
+-                                           border-top-color: ""
+-                                           border-right-color: ""
+-                                           border-bottom-color: ""
+-                                           border-left-color: ""
+-                                           font-family: "var(--font-label)"
+-                                           box-shadow: "rgba(212, 175, 55, 0.12) 0px 0px 18px"
+-                                           backdrop-filter: "blur(3px)"
+-                                           --customer-reveal-delay: "490ms"
+                                          }}
+                                          ref={function}
+                                          onClick={function onClick}
+                                          onMouseEnter={function onMouseEnter}
+                                          onTouchStart={function onTouchStart}
+                                          href="/contact"
+-                                         data-customer-reveal="visible"
+                                        >
++                                         Trade
+                                  ...
+                              <section
+                                className="border-t px-6 py-14 md:py-20"
+                                style={{
++                                 borderColor: "var(--color-outline-variant)"
++                                 background: "var(--color-surface-container-low)"
+-                                 border-top-color: ""
+-                                 border-right-color: ""
+-                                 border-bottom-color: ""
+-                                 border-left-color: ""
+-                                 background-image: ""
+-                                 background-position-x: ""
+-                                 background-position-y: ""
+-                                 background-size: ""
+-                                 background-repeat: ""
+-                                 background-attachment: ""
+-                                 background-origin: ""
+-                                 background-clip: ""
+-                                 background-color: ""
+-                                 --customer-reveal-delay: "490ms"
+                                }}
+-                               data-customer-reveal="visible"
+                              >
+                              <section
+                                className="py-20 px-6 text-center border-t"
+                                style={{
++                                 borderColor: "var(--color-outline-variant)"
+-                                 border-top-color: ""
+-                                 border-right-color: ""
+-                                 border-bottom-color: ""
+-                                 border-left-color: ""
+-                                 --customer-reveal-delay: "490ms"
+                                }}
+-                               data-customer-reveal="visible"
+                              >
+                            <SiteFooter>
+                              <footer
+                                className="mt-auto border-t"
+                                style={{
++                                 borderColor: "var(--color-outline-variant)"
++                                 background: "var(--color-surface-container-low)"
+-                                 border-top-color: ""
+-                                 border-right-color: ""
+-                                 border-bottom-color: ""
+-                                 border-left-color: ""
+-                                 background-image: ""
+-                                 background-position-x: ""
+-                                 background-position-y: ""
+-                                 background-size: ""
+-                                 background-repeat: ""
+-                                 background-attachment: ""
+-                                 background-origin: ""
+-                                 background-clip: ""
+-                                 background-color: ""
+-                                 --customer-reveal-delay: "490ms"
+                                }}
+-                               data-customer-reveal="visible"
+                              >
+                        ...
+                      ...
+          ...
+ 
+[browser] Image with src "/assets/images/shop/shop-10k-hollow-cuban-chain-necklace-01.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="(home)/" loading={[...]}>
+              <Suspense name="(home)/" fallback={<Fragment>}>
+                <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/" tree={[...]} params={{locale:"en"}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="page" pagePath="[locale]/(...">
+                          <SegmentTrieNode>
+                          <HomePage>
+                            <SiteHeader>
+                            <main className="flex flex-...">
+                              <HomeHero locale="en" fallbackItems={[...]}>
+                                <section
+                                  ref={{current:null}}
+                                  className="home-carousel-hero relative overflow-hidden border-b"
+                                  style={{
++                                   borderColor: "rgba(220, 179, 54, 0.22)"
++                                   --hero-fade: "255, 253, 247"
+-                                   --hero-fade: "255, 253, 247"
++                                   --hero-text: "#17130c"
+-                                   --hero-text: "#17130c"
++                                   --hero-eyebrow: "#8f6c06"
+-                                   --hero-eyebrow: "#8f6c06"
++                                   --hero-btn-color: "#7a5800"
+-                                   --hero-btn-color: "#7a5800"
++                                   --hero-btn-border: "rgba(139, 103, 0, 0.55)"
+-                                   --hero-btn-border: "rgba(139, 103, 0, 0.55)"
++                                   --hero-btn-bg: "rgba(180, 130, 0, 0.10)"
+-                                   --hero-btn-bg: "rgba(180, 130, 0, 0.10)"
+-                                   border-top-color: "rgba(220, 179, 54, 0.22)"
+-                                   border-right-color: "rgba(220, 179, 54, 0.22)"
+-                                   border-bottom-color: "rgba(220, 179, 54, 0.22)"
+-                                   border-left-color: "rgba(220, 179, 54, 0.22)"
+-                                   --customer-reveal-delay: "0ms"
+                                  }}
+-                                 data-customer-reveal="visible"
+                                >
+                                  <div className="home-carou...">
+                                    <Carousel items={[...]} showPrice={false} bg="#ffffff" cardWidth={15.5} ...>
+                                      <div ref={{current:null}} className="Carousel-m..." style={{--spin:"32s", ...}} ...>
+                                        <div ref={{current:null}} className="Carousel-m..." style={{--n:6}}>
+                                          <a
+                                            href="/shop"
+                                            className="Carousel-module__XM-yxG__card Carousel-module__XM-yxG__link"
++                                           style={{--i:0}}
+-                                           style={{--i:"0",--customer-reveal-delay:"70ms"}}
+-                                           data-customer-reveal="visible"
+                                          >
+                                          <a
+                                            href="/shop"
+                                            className="Carousel-module__XM-yxG__card Carousel-module__XM-yxG__link"
++                                           style={{--i:1}}
+-                                           style={{--i:"1",--customer-reveal-delay:"140ms"}}
+-                                           data-customer-reveal="visible"
+                                          >
+                                          <a
+                                            href="/shop"
+                                            className="Carousel-module__XM-yxG__card Carousel-module__XM-yxG__link"
++                                           style={{--i:2}}
+-                                           style={{--i:"2",--customer-reveal-delay:"210ms"}}
+-                                           data-customer-reveal="visible"
+                                          >
+                                          <a
+                                            href="/shop"
+                                            className="Carousel-module__XM-yxG__card Carousel-module__XM-yxG__link"
++                                           style={{--i:3}}
+-                                           style={{--i:"3",--customer-reveal-delay:"280ms"}}
+-                                           data-customer-reveal="visible"
+                                          >
+                                          <a
+                                            href="/shop"
+                                            className="Carousel-module__XM-yxG__card Carousel-module__XM-yxG__link"
++                                           style={{--i:4}}
+-                                           style={{--i:"4",--customer-reveal-delay:"350ms"}}
+-                                           data-customer-reveal="visible"
+                                          >
+                                          <a
+                                            href="/shop"
+                                            className="Carousel-module__XM-yxG__card Carousel-module__XM-yxG__link"
++                                           style={{--i:5}}
+-                                           style={{--i:"5",--customer-reveal-delay:"420ms"}}
+-                                           data-customer-reveal="visible"
+                                          >
+                                  <div>
+                                  <div>
+                                  <div
+                                    className="home-hero-top"
+-                                   data-customer-reveal="visible"
+-                                   style={{--customer-reveal-delay:"490ms"}}
+                                  >
+                                  <div
+                                    className="home-hero-bottom"
+-                                   data-customer-reveal="visible"
+-                                   style={{--customer-reveal-delay:"490ms"}}
+                                  >
+                                    <div className="flex w-ful..." style={{...}}>
+                                      <HomeSubscriberForm locale="en">
+                                        <form
+                                          onSubmit={function handleSubmit}
+                                          className="w-full max-w-2xl"
+                                          style={{
++                                           color: "var(--hero-text)"
+-                                           color: "var(--hero-text)"
++                                           fontFamily: "var(--font-label)"
+-                                           font-family: "var(--font-label)"
+-                                           --customer-reveal-delay: "490ms"
+                                          }}
+-                                         data-customer-reveal="visible"
+                                        >
+                                    <div className="flex flex-..." style={{...}}>
+                                      <LinkComponent href="/shop" className="hero-cta i..." style={{...}}>
+                                        <a
+                                          className="hero-cta inline-flex justify-center min-w-[9rem] md:min-w-[10rem]..."
+                                          style={{
++                                           background: "var(--hero-btn-bg)"
++                                           borderColor: "var(--hero-btn-border)"
++                                           color: "var(--hero-btn-color)"
+-                                           color: "var(--hero-btn-color)"
++                                           fontFamily: "var(--font-label)"
++                                           boxShadow: "0 0 18px rgba(212,175,55,0.12)"
++                                           backdropFilter: "blur(3px)"
+-                                           background-image: ""
+-                                           background-position-x: ""
+-                                           background-position-y: ""
+-                                           background-size: ""
+-                                           background-repeat: ""
+-                                           background-attachment: ""
+-                                           background-origin: ""
+-                                           background-clip: ""
+-                                           background-color: ""
+-                                           border-top-color: ""
+-                                           border-right-color: ""
+-                                           border-bottom-color: ""
+-                                           border-left-color: ""
+-                                           font-family: "var(--font-label)"
+-                                           box-shadow: "rgba(212, 175, 55, 0.12) 0px 0px 18px"
+-                                           backdrop-filter: "blur(3px)"
+-                                           --customer-reveal-delay: "490ms"
+                                          }}
+                                          ref={function}
+                                          onClick={function onClick}
+                                          onMouseEnter={function onMouseEnter}
+                                          onTouchStart={function onTouchStart}
+                                          href="/shop"
+-                                         data-customer-reveal="visible"
+                                        >
++                                         Buy
+                                      <LinkComponent href="/estate-je..." className="hero-cta i..." style={{...}}>
+                                        <a
+                                          className="hero-cta inline-flex justify-center min-w-[9rem] md:min-w-[10rem]..."
+                                          style={{
++                                           background: "var(--hero-btn-bg)"
++                                           borderColor: "var(--hero-btn-border)"
++                                           color: "var(--hero-btn-color)"
+-                                           color: "var(--hero-btn-color)"
++                                           fontFamily: "var(--font-label)"
++                                           boxShadow: "0 0 18px rgba(212,175,55,0.12)"
++                                           backdropFilter: "blur(3px)"
+-                                           background-image: ""
+-                                           background-position-x: ""
+-                                           background-position-y: ""
+-                                           background-size: ""
+-                                           background-repeat: ""
+-                                           background-attachment: ""
+-                                           background-origin: ""
+-                                           background-clip: ""
+-                                           background-color: ""
+-                                           border-top-color: ""
+-                                           border-right-color: ""
+-                                           border-bottom-color: ""
+-                                           border-left-color: ""
+-                                           font-family: "var(--font-label)"
+-                                           box-shadow: "rgba(212, 175, 55, 0.12) 0px 0px 18px"
+-                                           backdrop-filter: "blur(3px)"
+-                                           --customer-reveal-delay: "490ms"
+                                          }}
+                                          ref={function}
+                                          onClick={function onClick}
+                                          onMouseEnter={function onMouseEnter}
+                                          onTouchStart={function onTouchStart}
+                                          href="/estate-jewelry"
+-                                         data-customer-reveal="visible"
+                                        >
++                                         Sell
+                                      <LinkComponent href="/contact" className="hero-cta i..." style={{...}}>
+                                        <a
+                                          className="hero-cta inline-flex justify-center min-w-[9rem] md:min-w-[10rem]..."
+                                          style={{
++                                           background: "var(--hero-btn-bg)"
++                                           borderColor: "var(--hero-btn-border)"
++                                           color: "var(--hero-btn-color)"
+-                                           color: "var(--hero-btn-color)"
++                                           fontFamily: "var(--font-label)"
++                                           boxShadow: "0 0 18px rgba(212,175,55,0.12)"
++                                           backdropFilter: "blur(3px)"
+-                                           background-image: ""
+-                                           background-position-x: ""
+-                                           background-position-y: ""
+-                                           background-size: ""
+-                                           background-repeat: ""
+-                                           background-attachment: ""
+-                                           background-origin: ""
+-                                           background-clip: ""
+-                                           background-color: ""
+-                                           border-top-color: ""
+-                                           border-right-color: ""
+-                                           border-bottom-color: ""
+-                                           border-left-color: ""
+-                                           font-family: "var(--font-label)"
+-                                           box-shadow: "rgba(212, 175, 55, 0.12) 0px 0px 18px"
+-                                           backdrop-filter: "blur(3px)"
+-                                           --customer-reveal-delay: "490ms"
+                                          }}
+                                          ref={function}
+                                          onClick={function onClick}
+                                          onMouseEnter={function onMouseEnter}
+                                          onTouchStart={function onTouchStart}
+                                          href="/contact"
+-                                         data-customer-reveal="visible"
+                                        >
++                                         Trade
+                                  ...
+                              <section
+                                className="border-t px-6 py-14 md:py-20"
+                                style={{
++                                 borderColor: "var(--color-outline-variant)"
++                                 background: "var(--color-surface-container-low)"
+-                                 border-top-color: ""
+-                                 border-right-color: ""
+-                                 border-bottom-color: ""
+-                                 border-left-color: ""
+-                                 background-image: ""
+-                                 background-position-x: ""
+-                                 background-position-y: ""
+-                                 background-size: ""
+-                                 background-repeat: ""
+-                                 background-attachment: ""
+-                                 background-origin: ""
+-                                 background-clip: ""
+-                                 background-color: ""
+-                                 --customer-reveal-delay: "490ms"
+                                }}
+-                               data-customer-reveal="visible"
+                              >
+                              <section
+                                className="py-20 px-6 text-center border-t"
+                                style={{
++                                 borderColor: "var(--color-outline-variant)"
+-                                 border-top-color: ""
+-                                 border-right-color: ""
+-                                 border-bottom-color: ""
+-                                 border-left-color: ""
+-                                 --customer-reveal-delay: "490ms"
+                                }}
+-                               data-customer-reveal="visible"
+                              >
+                            <SiteFooter>
+                              <footer
+                                className="mt-auto border-t"
+                                style={{
++                                 borderColor: "var(--color-outline-variant)"
++                                 background: "var(--color-surface-container-low)"
+-                                 border-top-color: ""
+-                                 border-right-color: ""
+-                                 border-bottom-color: ""
+-                                 border-left-color: ""
+-                                 background-image: ""
+-                                 background-position-x: ""
+-                                 background-position-y: ""
+-                                 background-size: ""
+-                                 background-repeat: ""
+-                                 background-attachment: ""
+-                                 background-origin: ""
+-                                 background-clip: ""
+-                                 background-color: ""
+-                                 --customer-reveal-delay: "490ms"
+                                }}
+-                               data-customer-reveal="visible"
+                              >
+                        ...
+                      ...
+          ...
+ 
+[browser] Image with src "/assets/images/shop/shop-10k-hollow-cuban-chain-necklace-01.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "/assets/images/shop/shop-10k-hollow-cuban-chain-necklace-01.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "https://evzluixourmsefwdsieu.supabase.co/storage/v1/object/public/product-images/products/1781734394473-rqs5cw4bp89.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "/assets/images/shop/shop-10k-hollow-cuban-chain-necklace-01.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "/assets/images/shop/shop-10k-hollow-cuban-chain-necklace-01.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "/assets/images/shop/shop-10k-hollow-cuban-chain-necklace-01.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "/assets/images/shop/shop-14k-curb-link-bracelet-01.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "/assets/images/shop/shop-10k-hollow-cuban-chain-necklace-01.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "https://evzluixourmsefwdsieu.supabase.co/storage/v1/object/public/product-images/products/1781734824921-hu4raz9eh7o.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "https://evzluixourmsefwdsieu.supabase.co/storage/v1/object/public/product-images/products/1781716191303-jsltovk1sr.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "https://evzluixourmsefwdsieu.supabase.co/storage/v1/object/public/product-images/products/1781716191303-jsltovk1sr.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] Image with src "https://evzluixourmsefwdsieu.supabase.co/storage/v1/object/public/product-images/products/1781716191303-jsltovk1sr.webp" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading

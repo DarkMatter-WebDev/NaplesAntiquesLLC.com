@@ -13,6 +13,10 @@ import { buildAddressObject, generateOrderNumber, getProductImages, getProductMe
 
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
+
+function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
+  return Boolean(error?.message?.toLowerCase().includes('item_year'));
+}
 const FL_TAX_RATE = 0.065;
 
 interface Props {
@@ -208,6 +212,7 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
       product_id: product.id,
       inventory_number: product.inventory_number != null ? String(product.inventory_number) : product.sku ?? product.id,
       title_snapshot: product.title,
+      item_year_snapshot: product.item_year,
       metal_snapshot: getProductMetal(product),
       purity_snapshot: product.purity ? String(product.purity) : null,
       gram_weight_snapshot: getProductWeight(product),
@@ -216,7 +221,16 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
       image_snapshot: getProductImages(product)[0] ?? null,
     }));
 
-    const { error: itemsError } = await supabase.from('order_items').insert(itemPayloads);
+    let { error: itemsError } = await supabase.from('order_items').insert(itemPayloads);
+    if (isMissingItemYearColumnError(itemsError)) {
+      const fallbackPayloads = itemPayloads.map((item) => {
+        const fallbackItem: Record<string, unknown> = { ...item };
+        delete fallbackItem.item_year_snapshot;
+        return fallbackItem;
+      });
+      const retry = await supabase.from('order_items').insert(fallbackPayloads);
+      itemsError = retry.error;
+    }
     if (itemsError) {
       setMessage({ text: itemsError.message, ok: false });
       setSaving(false);

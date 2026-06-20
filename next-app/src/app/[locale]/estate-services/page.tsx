@@ -92,6 +92,7 @@ export default async function EstateServicesPage({ params }: Props) {
               src="/assets/images/pages/pen.webp"
               alt="Estate documents"
               fill
+              sizes="100vw"
               className="object-cover estate-pen-pan"
               style={{ objectPosition: 'center 46%' }}
               priority

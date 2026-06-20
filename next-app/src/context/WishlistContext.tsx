@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import WishlistDrawer from '@/components/wishlist/WishlistDrawer';
 import { productImagePaddingForImage, type Product, type ProductStatus } from '@/types/product';
 import { createClient } from '@/lib/supabase/client';
+import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 
 export interface WishlistItem {
   id: string;
@@ -34,10 +35,14 @@ const WishlistContext = createContext<WishlistContextValue | null>(null);
 
 const LS_KEY = 'nej-wishlist';
 
+function normalizeWishlistItem(item: WishlistItem): WishlistItem {
+  return { ...item, image: normalizeLegacyLocalImageUrl(item.image) };
+}
+
 function loadFromStorage(): WishlistItem[] {
   try {
     const raw = localStorage.getItem(LS_KEY);
-    return raw ? (JSON.parse(raw) as WishlistItem[]) : [];
+    return raw ? (JSON.parse(raw) as WishlistItem[]).map(normalizeWishlistItem) : [];
   } catch {
     return [];
   }
@@ -111,10 +116,11 @@ export function WishlistProvider({
   const isIn = useCallback((id: string) => items.some((i) => i.id === id), [items]);
 
   const toggle = useCallback((item: WishlistItem) => {
+    const normalized = normalizeWishlistItem(item);
     setItems((prev) =>
-      prev.some((i) => i.id === item.id)
-        ? prev.filter((i) => i.id !== item.id)
-        : [...prev, item]
+      prev.some((i) => i.id === normalized.id)
+        ? prev.filter((i) => i.id !== normalized.id)
+        : [...prev, normalized]
     );
   }, []);
 

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import {
   inferProductJewelryType,
+  formatProductItemYear,
   isProductPurchasable,
   isProductSold,
   productJewelryTypeLabel,
@@ -60,7 +61,8 @@ const SILVER_PURITY_LABELS: Record<number, string> = {
 function formatKarat(purity: number): string {
   if (purity <= 24) return `${purity}k`;
   if (SILVER_PURITY_LABELS[purity]) return SILVER_PURITY_LABELS[purity];
-  if (purity > 100) return `${(purity / 10).toFixed(1)}‰`;
+  // Millesimal fineness (parts per 1000) shown as a percentage, e.g. 835 -> 83.5%.
+  if (purity > 100) return `${Number((purity / 10).toFixed(1))}%`;
   return `${purity}%`;
 }
 
@@ -127,6 +129,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   const firstImagePadding = productImagePaddingForImage(p.image_padding, p.image_padding_by_image, productImages[0], 0);
   const productWeight = p.gram_weight ?? p.weight_grams;
   const inventoryReference = formatInventoryReference(p.inventory_number);
+  const itemDateLabel = formatProductItemYear(p.item_year);
 
   const meltValue = productWeight && p.purity ? calcSpotMeltValue(p, spotData) : null;
   const scrapValue = meltValue == null ? null : formatUsdPrice(meltValue);
@@ -150,6 +153,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   const specs: { label: string; value: string }[] = [];
 
   if (p.brand?.trim()) specs.push({ label: isEs ? 'Marca' : 'Brand', value: p.brand.trim() });
+  if (itemDateLabel) specs.push({ label: 'Circa', value: itemDateLabel });
 
   const metalValue = [
     metalLabel,
@@ -213,6 +217,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
     chain_type: p.chain_type,
     length: p.length,
     brand: p.brand,
+    item_year: p.item_year,
     tags: p.tags,
     tags_es: p.tags_es,
     gender: p.gender,
@@ -461,8 +466,8 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                     {specs.map(({ label, value }) => (
                       <div key={label} className="flex gap-3 text-sm">
                         <dt
-                          className="w-20 flex-shrink-0 font-semibold text-xs uppercase tracking-wide pt-px"
-                          style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                          className="w-20 flex-shrink-0 font-semibold text-xs normal-case tracking-wide pt-px"
+                          style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
                         >
                           {label}
                         </dt>

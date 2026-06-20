@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Naples Estate Jewelry - Next App
 
-## Getting Started
+This is the active Next.js App Router application for Naples Estate Jewelry &
+Antiques. The parent repository contains project docs, Supabase SQL, and Netlify
+configuration; runtime app code lives here.
 
-First, run the development server:
+## Development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Local preview normally runs at:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```text
+http://127.0.0.1:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Verification
 
-## Learn More
+Run from this directory after TypeScript, React, route, config, or schema-contract
+changes:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run lint
+npm run build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project Memory
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Read the parent project docs before making changes:
 
-## Deploy on Vercel
+```text
+../project-docs/PROJECT_OVERVIEW.md
+../project-docs/CURRENT_STATUS.md
+../project-docs/TASKS.md
+../project-docs/DECISIONS.md
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+See `../AGENTS.md` and `../project-docs/README.md` for the full agent workflow.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Data And Services
+
+- Supabase project ref: `evzluixourmsefwdsieu`
+- Product catalog: Supabase `products`
+- Product uploads: Supabase Storage bucket `product-images`
+- Public assets: `public/assets`
+- Hosting: Netlify, configured from the parent `netlify.toml` with
+  `base = "next-app"`
+
+Keep secrets in `.env.local` or deployment environment settings only. Do not
+commit service-role keys, email provider keys, or other credentials.

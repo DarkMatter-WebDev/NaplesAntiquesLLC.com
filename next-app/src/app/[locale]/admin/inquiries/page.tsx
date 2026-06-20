@@ -11,6 +11,17 @@ interface Props {
   params: Promise<{ locale: string }>;
 }
 
+const INQUIRY_LIST_COLUMNS = [
+  'id',
+  'item_title',
+  'name',
+  'phone',
+  'email',
+  'message',
+  'status',
+  'created_at',
+].join(', ');
+
 export default async function AdminInquiriesPage({ params }: Props) {
   const { locale } = await params;
   const adminBasePath = locale === 'es' ? '/es/admin' : '/admin';
@@ -35,7 +46,7 @@ export default async function AdminInquiriesPage({ params }: Props) {
   const [{ data: inquiries }, { count: unreadMessagesCount }] = await Promise.all([
     supabase
       .from('inquiries')
-      .select('*')
+      .select(INQUIRY_LIST_COLUMNS)
       .order('created_at', { ascending: false }),
     supabase
       .from('admin_notifications')
@@ -52,7 +63,7 @@ export default async function AdminInquiriesPage({ params }: Props) {
         userEmail={user.email}
       />
 
-      <InquiriesPanel inquiries={(inquiries ?? []) as Inquiry[]} />
+      <InquiriesPanel inquiries={(inquiries ?? []) as unknown as Inquiry[]} />
     </div>
   );
 }

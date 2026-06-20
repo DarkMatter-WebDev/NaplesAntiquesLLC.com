@@ -1,26 +1,41 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { inferProductJewelryType, isProductPurchasable, isProductSold, productImagePaddingBackground, productImagePaddingForImage, productLengthSizeDisplay, productMetalVariantLabel, productStatusLabel, productSupportsLinkType, type Product, type SpotData } from '@/types/product';
+import { formatProductItemYear, inferProductJewelryType, isProductPurchasable, isProductSold, productImagePaddingBackground, productImagePaddingForImage, productLengthSizeDisplay, productMetalVariantLabel, productStatusLabel, productSupportsLinkType, type Product, type SpotData } from '@/types/product';
 import { getDisplayPrice } from '@/lib/pricing';
 import WishlistButton from '@/components/shop/WishlistButton';
 import type { WishlistItem } from '@/context/WishlistContext';
 import CartButton from '@/components/shop/CartButton';
 import type { CartItem } from '@/context/CartContext';
+import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 
 interface Props {
   product: Product;
   spotData: SpotData | null;
   locale: string;
   variant?: 'classic' | 'modern';
+  revealIndex?: number;
+  revealColumnCount?: number;
+  prioritizeImage?: boolean;
 }
 
-export default function ProductCard({ product, spotData, locale, variant = 'classic' }: Props) {
+export default function ProductCard({
+  product,
+  spotData,
+  locale,
+  variant = 'classic',
+  revealIndex = 0,
+  revealColumnCount = 3,
+  prioritizeImage = false,
+}: Props) {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isImageHovering, setIsImageHovering] = useState(false);
   const [isImageArrowHovering, setIsImageArrowHovering] = useState(false);
+  const [loadedCoverKey, setLoadedCoverKey] = useState<string | null>(null);
+  const [revealedCoverKey, setRevealedCoverKey] = useState<string | null>(null);
+  const coverImageRef = useRef<HTMLImageElement | null>(null);
   const isEs = locale === 'es';
   const title = isEs && product.title_es ? product.title_es : product.title;
   const price = getDisplayPrice(product, spotData);
@@ -29,11 +44,15 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
   const purityChipStyle = getPurityChipStyle(product);
   const weightLabel = formatWeight(product.gram_weight ?? product.weight_grams);
   const lengthLabel = formatLengthChip(productLengthSizeDisplay(product));
+  const itemDateLabel = formatProductItemYear(product.item_year);
   const images = useMemo(
-    () => (product.image_urls?.length ? product.image_urls : product.images ?? []).filter(Boolean),
+    () =>
+      (product.image_urls?.length ? product.image_urls : product.images ?? [])
+        .map((image) => normalizeLegacyLocalImageUrl(image))
+        .filter((image): image is string => Boolean(image)),
     [product.image_urls, product.images],
   );
-  const thumb = images[0];
+  const thumb = images[0] ?? null;
   const safeActiveImageIndex = activeImageIndex < images.length ? activeImageIndex : 0;
   const activeImage = images[safeActiveImageIndex] ?? thumb;
   const hasMultipleImages = images.length > 1;
@@ -51,6 +70,13 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
   const isBrandFlag = brand.length > 0;
   const flagFitClass = getProductCardFlagFitClass(flagLabel);
   const showBrandTag = flagLabel.length > 0 && safeActiveImageIndex === 0 && !isImageArrowHovering;
+  const revealColumns = Math.max(1, revealColumnCount);
+  const revealRow = Math.floor(revealIndex / revealColumns);
+  const revealColumn = revealIndex % revealColumns;
+  const revealDelayMs = revealRow * (revealColumns * 90 + 140) + revealColumn * 90;
+  const coverKey = `${product.id}:${revealIndex}:${thumb ?? 'no-image'}`;
+  const coverImageLoaded = !thumb || loadedCoverKey === coverKey;
+  const isRevealed = revealedCoverKey === coverKey;
 
   const cartItem: CartItem = {
     id: product.id,
@@ -59,7 +85,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
     description: product.description,
     description_es: product.description_es,
     public_notes: product.public_notes,
-    image: thumb ?? null,
+    image: thumb,
     image_padding: thumbPadding,
     status: product.status,
     priceLabel: price,
@@ -74,6 +100,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
     chain_type: product.chain_type,
     length: product.length,
     brand: product.brand,
+    item_year: product.item_year,
     tags: product.tags,
     tags_es: product.tags_es,
     gender: product.gender,
@@ -83,7 +110,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
     id: product.id,
     title: product.title,
     title_es: product.title_es,
-    image: thumb ?? null,
+    image: thumb,
     image_padding: thumbPadding,
     status: product.status,
     price_mode: product.price_mode,
@@ -100,6 +127,39 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
     }, 1150);
     return () => window.clearInterval(timer);
   }, [canShowNextImage, images.length, isImageHovering]);
+
+  useEffect(() => {
+    if (!thumb) return;
+
+    let frame = 0;
+    let attempts = 0;
+
+    const checkCoverImage = () => {
+      const coverImage = coverImageRef.current;
+      if (coverImage?.complete && coverImage.naturalWidth > 0) {
+        setLoadedCoverKey(coverKey);
+        return;
+      }
+
+      attempts += 1;
+      if (attempts < 120) {
+        frame = window.requestAnimationFrame(checkCoverImage);
+      }
+    };
+
+    frame = window.requestAnimationFrame(checkCoverImage);
+    return () => window.cancelAnimationFrame(frame);
+  }, [coverKey, thumb]);
+
+  useEffect(() => {
+    if (!coverImageLoaded) return;
+
+    const timer = window.setTimeout(() => {
+      setRevealedCoverKey(coverKey);
+    }, revealDelayMs);
+
+    return () => window.clearTimeout(timer);
+  }, [coverImageLoaded, coverKey, revealDelayMs]);
 
   useEffect(() => {
     if (isImageHovering || activeImageIndex === 0) return;
@@ -125,7 +185,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
         isModern
           ? 'modern-product-card bg-white'
           : 'bg-[color:var(--color-surface-container-lowest)] border border-[color:var(--color-outline-variant)]'
-      }`}
+      } shop-card-reveal ${isRevealed ? 'is-visible' : ''}`}
       style={isModern ? {
         border: '1px solid rgba(115, 92, 0, 0.12)',
         borderRadius: '8px',
@@ -200,6 +260,7 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
             {images.map((image, index) => (
               <Image
                 key={`${product.id}-${index}-${image}`}
+                ref={index === 0 ? coverImageRef : undefined}
                 src={image}
                 alt={title}
                 fill
@@ -207,7 +268,13 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
                 className={`pointer-events-none object-contain object-center transition-opacity duration-700 ease-in-out ${
                   index === safeActiveImageIndex ? 'opacity-100' : 'opacity-0'
                 }`}
-                loading="lazy"
+                loading={prioritizeImage && index === 0 ? 'eager' : 'lazy'}
+                onLoad={() => {
+                  if (index === 0) setLoadedCoverKey(coverKey);
+                }}
+                onError={() => {
+                  if (index === 0) setLoadedCoverKey(coverKey);
+                }}
                 // Local assets in the static folder aren't in remotePatterns; unoptimized for those
                 unoptimized={image.startsWith('/assets/')}
               />
@@ -301,6 +368,15 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
           </h3>
         </Link>
 
+        {itemDateLabel && (
+          <p
+            className="text-[0.66rem] font-semibold uppercase tracking-[0.16em]"
+            style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+          >
+            <span className="normal-case">Ca.</span> {itemDateLabel}
+          </p>
+        )}
+
         <p
           className={`mt-1 flex items-baseline gap-2 px-2 py-1.5 ${isModern ? 'modern-price-row' : 'border-y'}`}
           style={{
@@ -369,10 +445,34 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
       </div>
       {isModern && (
         <style>{`
-          .modern-product-card {
-            transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+          .shop-card-reveal {
+            opacity: 0;
+            transform: translateY(18px) scale(0.985);
+            filter: blur(6px);
+            pointer-events: none;
+            transition:
+              opacity 520ms ease,
+              transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1),
+              filter 520ms ease,
+              box-shadow 180ms ease,
+              border-color 180ms ease;
+            will-change: opacity, transform, filter;
           }
-          .modern-product-card:hover {
+          .shop-card-reveal.is-visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            filter: blur(0);
+            pointer-events: auto;
+          }
+          .modern-product-card {
+            transition:
+              opacity 520ms ease,
+              transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1),
+              filter 520ms ease,
+              box-shadow 180ms ease,
+              border-color 180ms ease;
+          }
+          .modern-product-card.is-visible:hover {
             transform: translateY(-3px);
             border-color: rgba(181, 137, 12, 0.26) !important;
             box-shadow: 0 18px 44px rgba(42, 34, 12, 0.14) !important;
@@ -559,6 +659,16 @@ export default function ProductCard({ product, spotData, locale, variant = 'clas
             .modern-product-card:hover .shop-card-brand-tag,
             .modern-product-card:focus-within .shop-card-brand-tag {
               opacity: 0;
+            }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .shop-card-reveal,
+            .shop-card-reveal.is-visible,
+            .modern-product-card,
+            .modern-product-card.is-visible:hover {
+              transition: none;
+              transform: none;
+              filter: none;
             }
           }
         `}</style>

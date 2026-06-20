@@ -191,12 +191,14 @@ export default function SiteHeader() {
     return `${locale === 'es' ? '/es' : ''}${path}`;
   }
 
+  const normalizedPathname = pathname.replace(/^\/(?:en|es)(?=\/|$)/, '') || '/';
+
   const altLocale = locale === 'en' ? 'es' : 'en';
-  const altPath = pathname.replace(/^\/(es)(\/|$)/, '/').replace(/^(?!\/)/, '/');
+  const altPath = normalizedPathname.replace(/^(?!\/)/, '/');
   const altHref = altLocale === 'es' ? `/es${altPath === '/' ? '' : altPath}` : altPath;
 
   const SHOP_ITEMS = [
-    { key: 'store' as const, path: '/store' },
+    { key: 'store' as const, path: '/shop' },
     { key: 'auctions' as const, path: '/auctions' },
   ];
 
@@ -220,8 +222,7 @@ export default function SiteHeader() {
   }
 
   function isActive(path: string) {
-    const currentPath = pathname.replace(/^\/es(?=\/|$)/, '') || '/';
-    return currentPath === path || (path !== '/' && currentPath.startsWith(`${path}/`));
+    return normalizedPathname === path || (path !== '/' && normalizedPathname.startsWith(`${path}/`));
   }
 
   function isAnyActive(items: { path: string }[]) {
@@ -269,7 +270,7 @@ export default function SiteHeader() {
         <nav className="hidden 2xl:flex items-center gap-5" style={{ fontFamily: 'var(--font-label)' }}>
             <Link href={href('/')} className={navLinkBase} data-active={isActive('/') ? 'true' : 'false'} style={{ color: SECONDARY }}>{t('home')}</Link>
             <div className="group relative flex items-center">
-              <Link href={href('/store')} className={navLinkBase} data-active={isActive('/store') || isActive('/shop') || isActive('/silver-tableware') || isAnyActive(SHOP_ITEMS) ? 'true' : 'false'} style={{ color: SECONDARY }}>
+              <Link href={href('/shop')} className={navLinkBase} data-active={isActive('/shop') || isAnyActive(SHOP_ITEMS) ? 'true' : 'false'} style={{ color: SECONDARY }}>
                 {t('shop')}
               </Link>
             <DesktopDropdown items={SHOP_ITEMS} t={t} href={href} />

@@ -2,12 +2,11 @@ import {
   PRODUCT_JEWELRY_TYPES,
   PRODUCT_METAL_TYPES,
   PRODUCT_METAL_VARIANTS,
-  normalizeProductJewelryType,
   normalizeProductLengthSizeValue,
   normalizeProductMetalType,
   normalizeProductMetalVariant,
+  normalizeProductTypeValue,
   type Product,
-  type ProductJewelryType,
   type ProductMetalType,
   type ProductMetalVariant,
 } from '@/types/product';
@@ -16,7 +15,7 @@ export type ProductAutofillConfidence = 'low' | 'medium' | 'high';
 
 export type ProductAutofillFields = {
   title: string | null;
-  product_type: ProductJewelryType | null;
+  product_type: string | null;
   brand: string | null;
   metal_type: ProductMetalType | null;
   metal_variant: ProductMetalVariant | null;
@@ -87,7 +86,7 @@ export const EMPTY_PRODUCT_AUTOFILL_FIELDS: ProductAutofillFields = {
 
 export const PRODUCT_AUTOFILL_SCHEMA = {
   name: 'product_listing_draft',
-  description: 'Nullable catalog fields for a Naples Estate Jewelry product listing. Unknown or unsupported values must be null. Do not return operational fields (status, location) — they are not AI-controlled.',
+  description: 'Nullable catalog fields for a Naples Estate Jewelry product listing. Product type may be one of the common values or a concise new item form when the item does not fit the list. Do not return operational fields (status, location) — they are not AI-controlled.',
   fields: PRODUCT_AUTOFILL_FIELD_KEYS,
   productTypes: PRODUCT_JEWELRY_TYPES.map((item) => item.value),
   metalTypes: PRODUCT_METAL_TYPES.map((item) => item.value),
@@ -187,12 +186,15 @@ function cleanPurity(value: unknown): number | null {
   const raw = cleanString(value, MAX_SHORT_TEXT_LENGTH);
   if (!raw) return null;
   // Accept bare numbers, karat marks ("14K", "18K"), plumb-gold suffix ("14KP"),
-  // karat-spelled-out ("14KT", "14 karat"), and millesimal fineness ("925%").
-  const match = raw.toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(?:k(?:[pt])?|karat|%)?$/);
+  // karat-spelled-out ("14KT", "14 karat"), and millesimal fineness ("925", "800/1000").
+  const match = raw.toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(?:k(?:[pt])?|karat|%|\/1000)?$/);
   const numeric = match ? Number(match[1]) : Number(raw);
   if (!Number.isFinite(numeric)) return null;
-  const allowed = [10, 14, 18, 22, 24, 800, 850, 900, 925, 950, 999];
-  return allowed.includes(numeric) ? numeric : null;
+  // Gold karat (1–24) or silver/metal millesimal fineness as parts per 1000
+  // (e.g. 800, 830, 835, 900, 925, 950, 999). Anything else is rejected.
+  if (numeric >= 1 && numeric <= 24) return Math.round(numeric);
+  if (numeric >= 100 && numeric <= 1000) return Math.round(numeric);
+  return null;
 }
 
 function cleanMetalVariant(value: unknown, fallbackCategory: Product['category'] = 'Gold'): ProductMetalVariant | null {
@@ -235,7 +237,7 @@ export function coerceProductAutofill(input: ProductAutofillProviderResult): Pro
   const fallbackMetalType = cleanString(rawFields.metal_type, MAX_SHORT_TEXT_LENGTH);
   const metalType = fallbackMetalType ? normalizeProductMetalType(fallbackMetalType, 'Gold') : null;
   const fallbackCategory: Product['category'] = metalType === 'Silver' || metalType === 'Platinum' || metalType === 'Palladium' ? 'Silver' : 'Gold';
-  const productType = normalizeProductJewelryType(cleanString(rawFields.product_type, MAX_SHORT_TEXT_LENGTH));
+  const productType = normalizeProductTypeValue(cleanString(rawFields.product_type, MAX_SHORT_TEXT_LENGTH));
 
   const fields: ProductAutofillFields = {
     title: cleanTitle(rawFields.title),

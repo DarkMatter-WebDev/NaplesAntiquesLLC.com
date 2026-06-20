@@ -3,8 +3,10 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { CartItem } from '@/context/CartContext';
+import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 import {
   inferProductJewelryType,
+  formatProductItemYear,
   productJewelryTypeLabel,
   productLengthSizeDisplay,
   productImagePaddingBackground,
@@ -152,8 +154,10 @@ function SummaryRow({
 }) {
   const title = isEs && item.title_es ? item.title_es : item.title;
   const description = (isEs && item.description_es ? item.description_es : item.description) ?? item.public_notes ?? null;
+  const circa = formatProductItemYear(item.item_year);
   const specs = buildSpecLine(item, isEs);
   const imageFrameBackground = productImagePaddingBackground(item.image_padding);
+  const image = normalizeLegacyLocalImageUrl(item.image);
   return (
     <div className={`flex gap-3 items-start ${expanded ? 'rounded-2xl border p-2.5 md:gap-3 md:p-3' : ''}`} style={expanded ? { borderColor: BORDER, background: 'rgba(255, 253, 248, 0.76)' } : undefined}>
       <Link
@@ -161,8 +165,8 @@ function SummaryRow({
         className={`relative flex-shrink-0 overflow-hidden rounded-xl ${expanded ? 'h-20 w-20 md:h-24 md:w-24' : 'w-14 h-14'}`}
         style={{ background: imageFrameBackground }}
       >
-        {item.image
-          ? <Image src={item.image} alt={title} fill sizes={expanded ? '(max-width: 768px) 80px, 96px' : '56px'} className="object-contain" unoptimized={item.image.startsWith('/assets/')} />
+        {image
+          ? <Image src={image} alt={title} fill sizes={expanded ? '(max-width: 768px) 80px, 96px' : '56px'} className="object-contain" unoptimized={image.startsWith('/assets/')} />
           : <div className="w-full h-full flex items-center justify-center text-xs opacity-40">Photo</div>}
       </Link>
       <div className={`min-w-0 flex-1 ${expanded ? 'grid gap-2 md:grid-cols-[minmax(0,1fr)_7.75rem] md:gap-3' : ''}`}>
@@ -179,8 +183,10 @@ function SummaryRow({
               {item.priceLabel}
             </p>
           )}
-          {expanded && specs && (
+          {expanded && (circa || specs) && (
             <p className="mt-1 truncate text-[0.7rem] font-bold uppercase tracking-wide" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+              {circa && <span className="normal-case">Ca. {circa}</span>}
+              {circa && specs && ' · '}
               {specs}
             </p>
           )}

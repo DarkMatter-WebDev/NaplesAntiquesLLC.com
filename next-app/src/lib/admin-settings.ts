@@ -25,7 +25,8 @@ export const QUICK_FILL_WATCH_RULES_ADDENDUM = `${QUICK_FILL_WATCH_RULES_MARKER}
 export const QUICK_FILL_PRODUCT_HIERARCHY_RULES_ADDENDUM = `${QUICK_FILL_PRODUCT_HIERARCHY_RULES_MARKER}
 
 * Use Product Type as the primary item classification.
-* Product Type options are Necklace, Bracelet, Ring, Pendant, Earrings, Brooch, Watch, Coin, Bullion, Silverware / Sterling, or Other.
+* Product Type options include Necklace, Bracelet, Ring, Pendant, Charm, Earrings, Brooch, Cufflinks, Watch, Coin, Bullion, Silverware / Sterling, or Other.
+* If the item form is clear but is not listed, output a concise new Product Type instead of forcing Other.
 * Use Metal Type as the material classification.
 * Metal Type options are Gold, Silver, Platinum, Palladium, Mixed Metal, Non-Metal, or Other.
 * Use Metal Color as the color/subtype, such as Yellow Gold, White Gold, Rose Gold, Tricolor Gold, Bicolor Gold, Silver, Vermeil, or Platinum.
@@ -40,7 +41,7 @@ The Quick Fill parser expects labeled field-targeted lines. Use Field:Value exac
 Use only these field labels when known:
 Title English, Title Spanish, Product Type, Brand, Metal Type, Metal Color, Status, Gender, Location, Link Type, Length, Size, Price Mode, Purity, Weight, Multiplier, Asking Price, Description English, Description Spanish, Public Notes, Internal Notes.
 
-Use Product Type as Necklace, Bracelet, Ring, Pendant, Earrings, Brooch, Watch, Coin, Bullion, Silverware / Sterling, or Other.
+Use Product Type as Necklace, Bracelet, Ring, Pendant, Charm, Earrings, Brooch, Cufflinks, Watch, Coin, Bullion, Silverware / Sterling, or another concise item form when needed.
 
 Use Metal Type as Gold, Silver, Platinum, Palladium, Mixed Metal, Non-Metal, or Other.
 

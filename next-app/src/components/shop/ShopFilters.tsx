@@ -92,12 +92,14 @@ interface Props {
     perPage?: string;
     priceMin?: string;
     priceMax?: string;
+    itemGroup?: string;
   };
   brandOptions: string[];
   filteredCount: number;
   allCount: number;
   spotData: SpotData | null;
   priceRange: { min: number; max: number } | null;
+  itemTypeOptions?: ItemTypeOption[];
   variant?: 'classic' | 'modern';
 }
 
@@ -111,7 +113,31 @@ function clampPrice(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-export default function ShopFilters({ locale, currentFilters, brandOptions, filteredCount, allCount, spotData, priceRange, variant = 'classic' }: Props) {
+const ITEM_TYPE_OPTIONS = [
+  { value: 'necklace', label: 'Necklaces', labelEs: 'Collares' },
+  { value: 'bracelet', label: 'Bracelets', labelEs: 'Pulseras' },
+  { value: 'earrings', label: 'Earrings', labelEs: 'Aretes' },
+  { value: 'ring', label: 'Rings', labelEs: 'Anillos' },
+  { value: 'pendant', label: 'Pendants', labelEs: 'Dijes' },
+  { value: 'charm', label: 'Charms', labelEs: 'Charms' },
+  { value: 'brooch', label: 'Brooches', labelEs: 'Broches' },
+  { value: 'cufflinks', label: 'Cufflinks', labelEs: 'Gemelos' },
+  { value: 'watch', label: 'Watches', labelEs: 'Relojes' },
+  { value: 'coin', label: 'Coins', labelEs: 'Monedas' },
+  { value: 'silverware', label: 'Silverware / Sterling', labelEs: 'Plateria / sterling' },
+];
+
+type ItemTypeOption = (typeof ITEM_TYPE_OPTIONS)[number];
+
+const EVERYTHING_ELSE_ITEM_TYPES = ['watch', 'coin', 'silverware'];
+
+function getItemGroupForItemType(itemType: string | undefined) {
+  if (itemType === 'all') return undefined;
+  if (itemType && EVERYTHING_ELSE_ITEM_TYPES.includes(itemType)) return 'everything-else';
+  return itemType ? 'jewelry' : undefined;
+}
+
+export default function ShopFilters({ locale, currentFilters, brandOptions, filteredCount, allCount, spotData, priceRange, itemTypeOptions, variant = 'classic' }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -148,6 +174,9 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
   const visibleSelectedLengths = selectedLengths.filter((value) => visibleLengthValues.includes(value));
   const showLengthFilter = lengthOptions.length > 0;
   const showLinkTypeFilter = itemTypeSupportsLinkType(currentFilters.itemType);
+  const currentItemGroup = currentFilters.itemGroup ?? getItemGroupForItemType(currentFilters.itemType);
+  const showMetalFilter = currentItemGroup !== 'everything-else';
+  const showGenderFilter = currentItemGroup !== 'everything-else';
   const hasDrawerFilters = !!(
     currentFilters.metal ||
     visibleMetalColor ||
@@ -159,7 +188,8 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
     currentFilters.gender ||
     currentFilters.brand ||
     priceFilterActive ||
-    currentFilters.sort
+    currentFilters.sort ||
+    currentFilters.itemGroup
   );
   const [filtersOpen, setFiltersOpen] = useState(hasDrawerFilters);
   const selectedPriceSource = `${selectedPriceMin}:${selectedPriceMax}`;
@@ -196,9 +226,16 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
       } else {
         params.delete('itemType');
       }
+      params.delete('itemGroup');
       params.delete('length');
       params.delete('page');
       if (!itemTypeSupportsLinkType(value)) params.delete('chainType');
+      if (value === 'all') {
+        params.delete('metal');
+        params.delete('metalColor');
+        params.delete('metalType');
+        params.delete('purity');
+      }
       if (value === 'silverware') {
         params.set('metal', 'silver');
         if (params.get('purity') && !SILVER_PURITY_OPTIONS.some((option) => option.value === params.get('purity'))) {
@@ -247,6 +284,39 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
     [pathname, router, searchParams]
   );
 
+  const updateItemGroupFilter = useCallback(
+    (value: 'jewelry' | 'everything-else') => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('itemGroup', value);
+      params.delete('itemType');
+      params.delete('chainType');
+      params.delete('length');
+      params.delete('page');
+      if (value === 'jewelry') {
+        params.delete('metal');
+        params.delete('metalColor');
+        params.delete('metalType');
+        params.delete('purity');
+      } else {
+        params.set('metal', 'silver');
+        params.delete('gender');
+        const selectedPurity = params.get('purity');
+        if (selectedPurity && !SILVER_PURITY_OPTIONS.some((option) => option.value === selectedPurity)) {
+          params.delete('purity');
+        }
+        const selectedColor = params.get('metalColor') ?? params.get('metalType');
+        const silverTypes = new Set<string>(PRODUCT_METAL_VARIANTS.Silver.map((variant) => variant.value));
+        if (selectedColor && !silverTypes.has(selectedColor)) {
+          params.delete('metalColor');
+          params.delete('metalType');
+        }
+      }
+      const qs = params.toString();
+      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
   const toggleLengthFilter = useCallback(
     (value: string) => {
       const params = new URLSearchParams(
@@ -285,7 +355,8 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
     currentFilters.brand ||
     currentFilters.q ||
     priceFilterActive ||
-    currentFilters.sort
+    currentFilters.sort ||
+    currentFilters.itemGroup
   );
 
   const activeDrawerFilterCount = [
@@ -300,12 +371,24 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
     currentFilters.brand,
     priceFilterActive ? 'price' : undefined,
     currentFilters.sort,
+    currentFilters.itemGroup,
   ].filter(Boolean).length;
   const isModern = variant === 'modern';
-  const genderOptions = [
-    { value: 'Men', label: isEs ? 'Hombres' : "Men's" },
-    { value: 'Women', label: isEs ? 'Damas' : "Ladies'" },
-    { value: '', label: isEs ? 'Todo' : 'All' },
+  const visibleItemType = currentFilters.itemType ?? '';
+  const allItemTypeOptions = (() => {
+    const seen = new Set<string>();
+    return [...ITEM_TYPE_OPTIONS, ...(itemTypeOptions ?? [])].filter((option) => {
+      if (seen.has(option.value)) return false;
+      seen.add(option.value);
+      return true;
+    });
+  })();
+  const visibleItemTypeOptions = currentItemGroup === 'everything-else'
+    ? allItemTypeOptions.filter((option) => option.value === 'silverware')
+    : allItemTypeOptions.filter((option) => option.value !== 'silverware');
+  const itemGroupOptions = [
+    { value: 'jewelry' as const, label: isEs ? 'Joyeria y relojes' : 'Jewelry & Watches' },
+    { value: 'everything-else' as const, label: isEs ? 'Plata sterling' : 'Sterling Silver' },
   ];
 
   const labelStyle = {
@@ -469,15 +552,15 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
 
       {isModern && (
         <div className="modern-sidebar-gender" data-filters-open={filtersOpen ? 'true' : 'false'}>
-          <span className="modern-sidebar-label">{isEs ? 'Genero' : 'Gender'}</span>
+          <span className="modern-sidebar-label">{isEs ? 'Categoria' : 'Category'}</span>
           <div className="modern-sidebar-gender-grid">
-            {genderOptions.map((option) => {
-              const active = option.value ? currentFilters.gender === option.value : !currentFilters.gender;
+            {itemGroupOptions.map((option) => {
+              const active = currentItemGroup === option.value;
               return (
                 <button
                   key={option.label}
                   type="button"
-                  onClick={() => updateFilter('gender', option.value)}
+                  onClick={() => updateItemGroupFilter(option.value)}
                   aria-pressed={active}
                   className="modern-sidebar-gender-button"
                   data-active={active ? 'true' : 'false'}
@@ -540,41 +623,36 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
             }}
             className="shop-filter-grid"
           >
-            {/* Gender */}
-            <div>
-              <label style={labelStyle}>{isEs ? 'Genero' : 'Gender'}</label>
-              <select
-                value={currentFilters.gender ?? ''}
-                onChange={(e) => updateFilter('gender', e.target.value)}
-                style={selectStyle}
-              >
-                <option value="">{isEs ? 'Todos' : 'All'}</option>
-                <option value="Unisex">{isEs ? 'Unisex' : 'Unisex'}</option>
-                <option value="Men">{isEs ? 'Hombres' : 'Men'}</option>
-                <option value="Women">{isEs ? 'Mujeres' : 'Women'}</option>
-              </select>
-            </div>
+            {showGenderFilter && (
+              <div>
+                <label style={labelStyle}>{isEs ? 'Genero' : 'Gender'}</label>
+                <select
+                  value={currentFilters.gender ?? ''}
+                  onChange={(e) => updateFilter('gender', e.target.value)}
+                  style={selectStyle}
+                >
+                  <option value="">{isEs ? 'Todos' : 'All'}</option>
+                  <option value="Unisex">{isEs ? 'Unisex' : 'Unisex'}</option>
+                  <option value="Men">{isEs ? 'Hombres' : 'Men'}</option>
+                  <option value="Women">{isEs ? 'Mujeres' : 'Women'}</option>
+                </select>
+              </div>
+            )}
 
             {/* Item Type */}
             <div>
               <label style={labelStyle}>{isEs ? 'Artículo' : 'Item Type'}</label>
               <select
-                value={currentFilters.itemType ?? ''}
+                value={visibleItemType}
                 onChange={(e) => updateItemTypeFilter(e.target.value)}
                 style={selectStyle}
               >
                 <option value="">{isEs ? 'Todos' : 'All items'}</option>
-                <option value="necklace">{isEs ? 'Collares' : 'Necklaces'}</option>
-                <option value="bracelet">{isEs ? 'Pulseras' : 'Bracelets'}</option>
-                <option value="earrings">{isEs ? 'Aretes' : 'Earrings'}</option>
-                <option value="ring">{isEs ? 'Anillos' : 'Rings'}</option>
-                <option value="pendant">{isEs ? 'Dijes' : 'Pendants'}</option>
-                <option value="charm">{isEs ? 'Charms' : 'Charms'}</option>
-                <option value="brooch">{isEs ? 'Broches' : 'Brooches'}</option>
-                <option value="watch">{isEs ? 'Relojes' : 'Watches'}</option>
-                <option value="coin">{isEs ? 'Monedas' : 'Coins'}</option>
-                <option value="bullion">{isEs ? 'Lingotes' : 'Bullion'}</option>
-                <option value="silverware">{isEs ? 'Plateria / sterling' : 'Silverware / Sterling'}</option>
+                {visibleItemTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {isEs ? option.labelEs : option.label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -614,19 +692,20 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
               </select>
             </div>
 
-            {/* Metal */}
-            <div>
-              <label style={labelStyle}>{isEs ? 'Metal' : 'Metal'}</label>
-              <select
-                value={currentFilters.metal ?? ''}
-                onChange={(e) => updateMetalFilter(e.target.value)}
-                style={selectStyle}
-              >
-                {!silverwareOnlyMetal && <option value="">{isEs ? 'Todos los metales' : 'All metals'}</option>}
-                {!silverwareOnlyMetal && <option value="gold">{isEs ? 'Oro' : 'Gold'}</option>}
-                <option value="silver">{isEs ? 'Plata' : 'Silver'}</option>
-              </select>
-            </div>
+            {showMetalFilter && (
+              <div>
+                <label style={labelStyle}>{isEs ? 'Metal' : 'Metal'}</label>
+                <select
+                  value={currentFilters.metal ?? ''}
+                  onChange={(e) => updateMetalFilter(e.target.value)}
+                  style={selectStyle}
+                >
+                  {!silverwareOnlyMetal && <option value="">{isEs ? 'Todos los metales' : 'All metals'}</option>}
+                  {!silverwareOnlyMetal && <option value="gold">{isEs ? 'Oro' : 'Gold'}</option>}
+                  <option value="silver">{isEs ? 'Plata' : 'Silver'}</option>
+                </select>
+              </div>
+            )}
 
             {/* Metal Color */}
             <div>
@@ -1127,14 +1206,16 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
           border-radius: 7px !important;
           box-shadow: 0 10px 24px rgba(42, 34, 12, 0.06);
         }
+        /* Stacked sidebar order, top to bottom: gold, silver, search.
+           DOM order is silver(1), search(2), gold(3); rows reorder them. */
         .shop-filters-modern .shop-search-spot-row > div:nth-child(1) {
           grid-row: 2;
         }
         .shop-filters-modern .shop-search-spot-row > div:nth-child(2) {
-          grid-row: 1;
+          grid-row: 3;
         }
         .shop-filters-modern .shop-search-spot-row > div:nth-child(3) {
-          grid-row: 3;
+          grid-row: 1;
         }
         .shop-filters-modern input[type="search"] {
           min-height: 2.75rem;
@@ -1159,7 +1240,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
         }
         .modern-sidebar-gender-grid {
           display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 0.55rem;
         }
         .modern-sidebar-gender-button {
@@ -1188,9 +1269,6 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
         }
         .shop-filters-modern .shop-filter-grid {
           gap: 0.72rem !important;
-        }
-        .shop-filters-modern .shop-filter-grid > div:first-child {
-          display: none;
         }
         .shop-filters-modern select {
           min-height: 2.65rem;

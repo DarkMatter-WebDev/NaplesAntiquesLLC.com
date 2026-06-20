@@ -25,7 +25,7 @@ const KARAT_CARDS = [
 
 const ACQUIRE_ITEMS = [
   { key: 'bullion', titleEn: 'Bullion & Coins', titleEs: 'Lingotes y Monedas', descEn: 'Sovereigns, Eagles, Krugerrands, and bars of any weight or mint.', descEs: 'Soberanos, Eagles, Krugerrands y barras de cualquier peso o casa de moneda.', img: '/assets/images/pages/bullion.webp' },
-  { key: 'jewelry', titleEn: 'Fine Jewelry', titleEs: 'Joyería Fina', descEn: 'Designer pieces, wedding bands, necklaces, and heirloom estates.', descEs: 'Piezas de diseñador, anillos de boda, collares y patrimonios de familia.', img: '/assets/images/pages/gold.png' },
+  { key: 'jewelry', titleEn: 'Fine Jewelry', titleEs: 'Joyería Fina', descEn: 'Designer pieces, wedding bands, necklaces, and heirloom estates.', descEs: 'Piezas de diseñador, anillos de boda, collares y patrimonios de familia.', img: '/assets/images/pages/gold.webp' },
   { key: 'scrap', titleEn: 'Scrap & Broken', titleEs: 'Chatarra y Roto', descEn: 'Damaged items, single earrings, and tangled chains are still highly valuable.', descEs: 'Los artículos dañados, aretes sueltos y cadenas enredadas siguen siendo muy valiosos.', img: '/assets/images/pages/scrap.jpg' },
   { key: 'dental', titleEn: 'Dental Gold', titleEs: 'Oro Dental', descEn: 'Crowns, bridges, and dental alloys. We provide competitive payouts for all dental gold.', descEs: 'Coronas, puentes y aleaciones dentales. Ofrecemos pagos competitivos para todo el oro dental.', img: '/assets/images/pages/dental.webp' },
 ];
@@ -46,6 +46,7 @@ export default async function GoldServicesPage({ params }: Props) {
               src="/assets/images/pages/bullion.webp"
               alt="Gold bars"
               fill
+              sizes="100vw"
               className="object-cover"
               priority
             />

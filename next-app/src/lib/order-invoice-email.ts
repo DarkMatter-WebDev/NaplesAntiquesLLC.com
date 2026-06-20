@@ -1,5 +1,7 @@
 import type { Order, OrderItem } from '@/types/sales';
 import { formatCurrency, orderStatusLabel } from '@/types/sales';
+import { formatProductItemYear } from '@/types/product';
+import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 
 export type InvoiceEmailOrder = Order & { order_items: OrderItem[] };
 
@@ -64,7 +66,9 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
   const items = order.order_items.map((item) => {
     const discount = clampDiscount(Number(item.discount ?? 0), item.price_snapshot);
     const lineTotal = Math.max(item.price_snapshot - discount, 0);
+    const circa = formatProductItemYear(item.item_year_snapshot);
     const details = [
+      circa ? `Ca. ${circa}` : null,
       item.metal_snapshot,
       item.purity_snapshot ? `${item.purity_snapshot} purity` : null,
       item.gram_weight_snapshot ? `${item.gram_weight_snapshot}g` : null,
@@ -77,7 +81,7 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
       price: formatCurrency(lineTotal),
       originalPrice: formatCurrency(item.price_snapshot),
       discount: discount > 0 ? `-${formatCurrency(discount)}` : null,
-      imageUrl: absoluteImageUrl(item.image_snapshot),
+      imageUrl: absoluteImageUrl(normalizeLegacyLocalImageUrl(item.image_snapshot)),
     };
   });
   const totals = {

@@ -38,6 +38,7 @@ export default async function SilverServicesPage({ params }: Props) {
               src="/assets/images/pages/silver.jpg"
               alt="Silver estate pieces"
               fill
+              sizes="100vw"
               className="object-cover grayscale opacity-80"
               priority
             />

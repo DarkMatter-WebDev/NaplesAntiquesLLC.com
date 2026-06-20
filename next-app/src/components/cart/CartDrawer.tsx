@@ -3,7 +3,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCart, type CartItem } from '@/context/CartContext';
-import { isProductPurchasable, productImagePaddingBackground, productStatusLabel } from '@/types/product';
+import { formatProductItemYear, isProductPurchasable, productImagePaddingBackground, productStatusLabel } from '@/types/product';
+import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 
 const GOLD = '#735c00';
 const BORDER = '#d8d0c2';
@@ -214,11 +215,13 @@ function CartItemRow({ item, isEs, prefix, onRemove }: { item: CartItem; isEs: b
   const title = isEs && item.title_es ? item.title_es : item.title;
   const description = (isEs && item.description_es ? item.description_es : item.description) ?? item.public_notes ?? null;
   const imageFrameBackground = productImagePaddingBackground(item.image_padding);
+  const image = normalizeLegacyLocalImageUrl(item.image);
+  const itemDate = formatProductItemYear(item.item_year);
   return (
     <div className="flex gap-3 items-start border p-3" style={{ borderColor: BORDER, background: 'rgba(255, 255, 255, 0.74)' }}>
       <Link href={`${prefix}/shop/${item.id}`} className="relative flex-shrink-0 w-20 h-20 overflow-hidden" style={{ background: imageFrameBackground }}>
-        {item.image
-          ? <Image src={item.image} alt={title} fill sizes="80px" className="object-contain" unoptimized={item.image.startsWith('/assets/')} />
+        {image
+          ? <Image src={image} alt={title} fill sizes="80px" className="object-contain" unoptimized={image.startsWith('/assets/')} />
           : <div className="w-full h-full flex items-center justify-center text-xl opacity-30">Photo</div>}
       </Link>
       <div className="flex-1 min-w-0 flex flex-col gap-1">
@@ -229,6 +232,11 @@ function CartItemRow({ item, isEs, prefix, onRemove }: { item: CartItem; isEs: b
         <p className="text-xs font-bold uppercase tracking-wide" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
           {item.priceLabel}
         </p>
+        {itemDate && (
+          <p className="text-[0.64rem] font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+            <span className="normal-case">Ca.</span> {itemDate}
+          </p>
+        )}
         {description && (
           <p className="line-clamp-2 text-xs leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
             {description}

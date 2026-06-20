@@ -10,6 +10,13 @@ export const metadata: Metadata = {
   title: 'Admin and Security',
 };
 
+const SECURITY_PROFILE_COLUMNS = [
+  'first_name',
+  'full_name',
+  'email',
+  'is_admin',
+].join(', ');
+
 interface Props {
   params: Promise<{ locale: string }>;
 }
@@ -26,7 +33,7 @@ export default async function AccountSecurityPage({ params }: Props) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('*')
+    .select(SECURITY_PROFILE_COLUMNS)
     .eq('id', user.id)
     .single();
 
@@ -112,7 +119,7 @@ export default async function AccountSecurityPage({ params }: Props) {
           background:
             linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 64%, rgba(255, 255, 255, 0.86) 91%, #ffffff 100%),
             linear-gradient(90deg, #ffffff 0%, rgba(255, 255, 255, 0.94) 35%, rgba(255, 255, 255, 0.26) 62%, rgba(255, 255, 255, 0.02) 100%),
-            url('/assets/images/pages/account-hero-jewelry.png') top right / cover no-repeat;
+            url('/assets/images/pages/account-hero-jewelry.webp') top right / cover no-repeat;
         }
         .account-hero {
           position: relative;

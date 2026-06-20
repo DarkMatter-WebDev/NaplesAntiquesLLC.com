@@ -12,6 +12,17 @@ type AiSettingsResponse = {
   promptVersion: string;
 };
 
+type StorageGcResult = {
+  dryRun: boolean;
+  objectCount: number;
+  referencedPathCount: number;
+  orphanCount: number;
+  skippedUnknownAgeCount: number;
+  samplePaths: string[];
+  deletedCount: number;
+  deletedSamplePaths: string[];
+};
+
 export default function AdminSettingsPanel() {
   const [prompt, setPrompt] = useState('');
   const [defaultPrompt, setDefaultPrompt] = useState('');
@@ -22,6 +33,9 @@ export default function AdminSettingsPanel() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const [editing, setEditing] = useState(false);
+  const [gcRunning, setGcRunning] = useState(false);
+  const [gcResult, setGcResult] = useState<StorageGcResult | null>(null);
+  const [gcNotice, setGcNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const promptTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const showNotice = (text: string, ok = true) => {
@@ -102,6 +116,31 @@ export default function AdminSettingsPanel() {
   };
 
   const isDefaultText = prompt.trim() === defaultPrompt.trim();
+
+  const runStorageGc = async (confirm = false) => {
+    setGcRunning(true);
+    setGcNotice(null);
+    try {
+      const res = await fetch('/api/admin/storage-gc', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ confirm }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || 'Storage cleanup check failed.');
+      setGcResult(data as StorageGcResult);
+      setGcNotice({
+        ok: true,
+        text: confirm
+          ? `Deleted ${(data as StorageGcResult).deletedCount} old unreferenced file(s).`
+          : `Dry run found ${(data as StorageGcResult).orphanCount} old unreferenced file(s).`,
+      });
+    } catch (err) {
+      setGcNotice({ ok: false, text: err instanceof Error ? err.message : 'Storage cleanup check failed.' });
+    } finally {
+      setGcRunning(false);
+    }
+  };
 
   return (
     <main className="px-4 md:px-8 py-8">
@@ -215,6 +254,70 @@ export default function AdminSettingsPanel() {
                 )}
               </div>
             </div>
+          </div>
+        </section>
+        <section className="mt-6 border bg-white" style={{ borderColor: 'var(--color-outline-variant)' }}>
+          <div className="border-b px-5 py-4" style={{ borderColor: 'var(--color-outline-variant)' }}>
+            <h2
+              className="text-xl font-bold"
+              style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
+            >
+              Product Image Storage Cleanup
+            </h2>
+            <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+              Dry-run first. Confirmed cleanup deletes only old Supabase Storage objects that are not referenced by products, orders, or inquiries.
+            </p>
+          </div>
+          <div className="p-5 flex flex-col gap-4">
+            {gcNotice && (
+              <div
+                className="px-3 py-2 text-xs font-medium"
+                role="status"
+                style={{
+                  background: gcNotice.ok ? 'color-mix(in srgb, var(--color-primary) 10%, transparent)' : 'color-mix(in srgb, var(--color-error) 10%, transparent)',
+                  border: `1px solid ${gcNotice.ok ? 'color-mix(in srgb, var(--color-primary) 28%, transparent)' : 'color-mix(in srgb, var(--color-error) 28%, transparent)'}`,
+                  color: gcNotice.ok ? 'var(--color-primary)' : 'var(--color-error)',
+                  fontFamily: 'var(--font-label)',
+                }}
+              >
+                {gcNotice.text}
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => void runStorageGc(false)} disabled={gcRunning} className="outline-button text-sm">
+                {gcRunning ? 'Checking...' : 'Dry Run'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void runStorageGc(true)}
+                disabled={gcRunning || !gcResult || gcResult.orphanCount === 0}
+                className="gold-button text-sm disabled:opacity-50"
+              >
+                Delete Old Orphans
+              </button>
+            </div>
+
+            {gcResult && (
+              <div className="grid gap-3 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                <p>
+                  Checked {gcResult.objectCount} object(s), with {gcResult.referencedPathCount} referenced path(s).
+                  {' '}Skipped {gcResult.skippedUnknownAgeCount} object(s) with unknown age.
+                </p>
+                <p>
+                  {gcResult.dryRun
+                    ? `Dry run would delete ${gcResult.orphanCount} old unreferenced object(s).`
+                    : `Confirmed run deleted ${gcResult.deletedCount} object(s).`}
+                </p>
+                {(gcResult.samplePaths.length > 0 || gcResult.deletedSamplePaths.length > 0) && (
+                  <ul className="max-h-44 overflow-auto border p-3 font-mono text-[0.7rem]" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}>
+                    {(gcResult.deletedSamplePaths.length > 0 ? gcResult.deletedSamplePaths : gcResult.samplePaths).map((path) => (
+                      <li key={path}>{path}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
         </section>
         <MarketingSettingsPanel />

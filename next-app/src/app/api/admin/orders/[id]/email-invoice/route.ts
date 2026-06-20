@@ -7,6 +7,38 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
+const ORDER_INVOICE_COLUMNS = [
+  'id',
+  'order_number',
+  'user_id',
+  'customer_name',
+  'customer_email',
+  'customer_phone',
+  'subtotal',
+  'tax',
+  'shipping_fee',
+  'discount',
+  'total',
+  'payment_status',
+  'fulfillment_status',
+  'order_status',
+  'payment_method',
+  'payment_reference',
+  'shipping_method',
+  'shipping_address',
+  'billing_address',
+  'internal_notes',
+  'customer_notes',
+  'created_at',
+  'updated_at',
+  'order_items(id, order_id, product_id, inventory_number, title_snapshot, item_year_snapshot, metal_snapshot, purity_snapshot, gram_weight_snapshot, price_snapshot, discount, image_snapshot, created_at)',
+].join(', ');
+const ORDER_INVOICE_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT = ORDER_INVOICE_COLUMNS.replace('item_year_snapshot, ', '');
+
+function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
+  return Boolean(error?.message?.toLowerCase().includes('item_year'));
+}
+
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
@@ -47,10 +79,10 @@ export async function POST(req: Request, { params }: Props) {
     return NextResponse.json({ error: 'Admin access required.' }, { status: 403 });
   }
 
-  const [{ data: order, error: orderError }, { data: invoices }] = await Promise.all([
+  const [orderResult, { data: invoices }] = await Promise.all([
     supabase
       .from('orders')
-      .select('*, order_items(*)')
+      .select(ORDER_INVOICE_COLUMNS)
       .eq('id', id)
       .single(),
     supabase
@@ -60,13 +92,24 @@ export async function POST(req: Request, { params }: Props) {
       .order('created_at', { ascending: false })
       .limit(1),
   ]);
+  let order = orderResult.data;
+  let orderError = orderResult.error;
+  if (isMissingItemYearColumnError(orderError)) {
+    const fallback = await supabase
+      .from('orders')
+      .select(ORDER_INVOICE_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT)
+      .eq('id', id)
+      .single();
+    order = fallback.data;
+    orderError = fallback.error;
+  }
 
   if (orderError || !order) {
     return NextResponse.json({ error: orderError?.message ?? 'Order not found.' }, { status: 404 });
   }
 
   const invoiceNumber = invoices?.[0]?.invoice_number ?? null;
-  const emailOrder = withInvoiceLineDiscounts(order as Order & { order_items: OrderItem[] }, itemDiscounts);
+  const emailOrder = withInvoiceLineDiscounts(order as unknown as Order & { order_items: OrderItem[] }, itemDiscounts);
   const content = buildInvoiceEmailContent(emailOrder, invoiceNumber);
 
   try {

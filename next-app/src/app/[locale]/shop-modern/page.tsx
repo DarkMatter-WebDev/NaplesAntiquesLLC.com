@@ -18,6 +18,7 @@ interface Props {
     sort?: string;
     page?: string;
     perPage?: string;
+    itemGroup?: string;
   }>;
 }
 
@@ -27,5 +28,5 @@ export const metadata: Metadata = {
 };
 
 export default async function ShopModernPage({ params, searchParams }: Props) {
-  return renderShopPage({ params, searchParams, variant: 'modern', routeSegment: 'shop-modern' });
+  return renderShopPage({ params, searchParams, variant: 'modern' });
 }

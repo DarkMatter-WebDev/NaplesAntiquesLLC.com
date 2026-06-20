@@ -63,6 +63,7 @@ export default async function BullionPage({ params }: Props) {
               src="/assets/images/pages/bullion.webp"
               alt="Precious metal bullion"
               fill
+              sizes="100vw"
               className="object-cover bullion-pan"
               style={{ objectPosition: 'center 52%' }}
               priority

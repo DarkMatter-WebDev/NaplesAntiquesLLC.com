@@ -42,6 +42,7 @@ export type ProductJewelryType =
   | 'Charm'
   | 'Earrings'
   | 'Brooch'
+  | 'Cufflinks'
   | 'Watch'
   | 'Coin'
   | 'Bullion'
@@ -90,6 +91,7 @@ export interface Product {
   tags_es: string[];
   private_price_label: string | null;
   gender: string | null;
+  item_year: number | null;
   cost_basis: number | null;
   melt_value: number | null;
   asking_price: number | null;
@@ -179,6 +181,23 @@ export interface SpotData {
   source: 'api' | 'fallback';
 }
 
+// The year the physical jewelry item was made (e.g. 1930), not the date the
+// listing was created. Accepts a number or a numeric string and validates a
+// sane range; anything else normalizes to null.
+export function normalizeProductItemYear(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  const cleaned = String(value).trim();
+  if (!cleaned || !/^\d{1,4}$/.test(cleaned)) return null;
+  const year = Number(cleaned);
+  if (!Number.isInteger(year) || year < 1 || year > 2200) return null;
+  return year;
+}
+
+export function formatProductItemYear(value: string | number | null | undefined): string | null {
+  const normalized = normalizeProductItemYear(value);
+  return normalized === null ? null : String(normalized);
+}
+
 export function normalizeProductStatus(status: ProductStatus | null | undefined): ProductStatus {
   const value = String(status ?? 'available').toLowerCase().replace(/\s+/g, '_');
   if (value === 'draft') return 'draft';
@@ -236,6 +255,7 @@ export const PRODUCT_JEWELRY_TYPES: { value: ProductJewelryType; label: string; 
   { value: 'Charm', label: 'Charm', labelEs: 'Charm' },
   { value: 'Earrings', label: 'Earrings', labelEs: 'Aretes' },
   { value: 'Brooch', label: 'Brooch', labelEs: 'Broche' },
+  { value: 'Cufflinks', label: 'Cufflinks', labelEs: 'Gemelos' },
   { value: 'Watch', label: 'Watch', labelEs: 'Reloj' },
   { value: 'Coin', label: 'Coin', labelEs: 'Moneda' },
   { value: 'Bullion', label: 'Bullion', labelEs: 'Lingote' },
@@ -262,6 +282,7 @@ const JEWELRY_TYPE_KEYWORDS: Record<ProductJewelryType, string[]> = {
   Charm: ['charm', 'charms'],
   Earrings: ['earring', 'earrings', 'arete', 'aretes'],
   Brooch: ['brooch', 'pin', 'broche'],
+  Cufflinks: ['cufflink', 'cufflinks', 'gemelo', 'gemelos'],
   Watch: ['watch', 'watches', 'wristwatch', 'wrist watch', 'timepiece', 'reloj'],
   Coin: ['coin', 'coins', 'moneda'],
   Bullion: ['bullion', 'bar', 'round', 'ingot', 'lingote'],
@@ -281,6 +302,7 @@ export function normalizeProductJewelryType(value: string | null | undefined): P
   if (normalized === 'charms') return 'Charm';
   if (normalized === 'earring') return 'Earrings';
   if (normalized === 'brooches' || normalized === 'pin') return 'Brooch';
+  if (normalized === 'cufflink' || normalized === 'cufflinks' || normalized === 'cuff links' || normalized === 'gemelo' || normalized === 'gemelos') return 'Cufflinks';
   if (normalized === 'watches' || normalized === 'wristwatch' || normalized === 'wrist watch' || normalized === 'timepiece' || normalized === 'timepieces') return 'Watch';
   if (normalized === 'coins') return 'Coin';
   if (normalized === 'bars' || normalized === 'round' || normalized === 'rounds' || normalized === 'ingot') return 'Bullion';
@@ -289,6 +311,12 @@ export function normalizeProductJewelryType(value: string | null | undefined): P
 }
 
 export const normalizeProductType = normalizeProductJewelryType;
+
+export function normalizeProductTypeValue(value: string | null | undefined): string | null {
+  const cleaned = String(value ?? '').replace(/\u0000/g, '').trim().replace(/\s+/g, ' ');
+  if (!cleaned) return null;
+  return normalizeProductJewelryType(cleaned) ?? cleaned.slice(0, 80);
+}
 
 export function normalizeProductMetalType(value: string | null | undefined, fallback: Product['category'] = 'Gold'): ProductMetalType {
   const normalized = String(value ?? '').trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
@@ -299,14 +327,14 @@ export function normalizeProductMetalType(value: string | null | undefined, fall
   return fallback;
 }
 
-export function getJewelryTypeFromTags(tags: string[] | null | undefined): ProductJewelryType | null {
+export function getJewelryTypeFromTags(tags: string[] | null | undefined): string | null {
   const tag = (tags ?? []).find((item) => item.startsWith('jt:'));
-  return normalizeProductJewelryType(tag?.slice(3));
+  return normalizeProductTypeValue(tag?.slice(3));
 }
 
-export function inferProductJewelryType(product: Pick<Product, 'title' | 'title_es' | 'chain_type' | 'tags' | 'tags_es' | 'jewelry_type'> & { product_type?: string | null }): ProductJewelryType {
-  const direct = normalizeProductJewelryType(product.product_type) ?? normalizeProductJewelryType(product.jewelry_type) ?? getJewelryTypeFromTags(product.tags);
-  if (direct) return direct;
+export function inferProductJewelryType(product: Pick<Product, 'title' | 'title_es' | 'chain_type' | 'tags' | 'tags_es' | 'jewelry_type'> & { product_type?: string | null }): string {
+  const direct = normalizeProductTypeValue(product.product_type) ?? normalizeProductTypeValue(product.jewelry_type) ?? getJewelryTypeFromTags(product.tags);
+  if (direct && direct !== 'Other') return direct;
   const text = [product.title, product.title_es, product.chain_type, ...(product.tags ?? []), ...(product.tags_es ?? [])]
     .join(' ')
     .toLowerCase();
@@ -318,9 +346,10 @@ export function inferProductJewelryType(product: Pick<Product, 'title' | 'title_
 }
 
 export function productJewelryTypeLabel(value: string | null | undefined, locale = 'en'): string {
-  const normalized = normalizeProductJewelryType(value) ?? 'Other';
+  const cleaned = normalizeProductTypeValue(value) ?? 'Other';
+  const normalized = normalizeProductJewelryType(cleaned);
   const option = PRODUCT_JEWELRY_TYPES.find((type) => type.value === normalized);
-  return locale === 'es' ? option?.labelEs ?? normalized : option?.label ?? normalized;
+  return locale === 'es' ? option?.labelEs ?? cleaned : option?.label ?? cleaned;
 }
 
 export const productTypeLabel = productJewelryTypeLabel;

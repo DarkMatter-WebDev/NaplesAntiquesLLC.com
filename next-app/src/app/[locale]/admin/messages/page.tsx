@@ -6,6 +6,18 @@ import AdminHeader from '@/components/admin/AdminHeader';
 
 export const metadata: Metadata = { title: 'Admin - Messages' };
 
+const ADMIN_NOTIFICATION_COLUMNS = [
+  'id',
+  'type',
+  'title',
+  'body',
+  'order_id',
+  'customer_name',
+  'customer_email',
+  'is_read',
+  'created_at',
+].join(', ');
+
 interface Props {
   params: Promise<{ locale: string }>;
 }
@@ -34,10 +46,10 @@ export default async function AdminMessagesPage({ params }: Props) {
 
   const { data: notifications } = await supabase
     .from('admin_notifications')
-    .select('*')
+    .select(ADMIN_NOTIFICATION_COLUMNS)
     .order('created_at', { ascending: false })
     .limit(100);
-  const unreadMessagesCount = ((notifications ?? []) as AdminNotification[]).filter((item) => !item.is_read).length;
+  const unreadMessagesCount = ((notifications ?? []) as unknown as AdminNotification[]).filter((item) => !item.is_read).length;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-background, #fafaf8)' }}>
@@ -48,7 +60,7 @@ export default async function AdminMessagesPage({ params }: Props) {
         userEmail={user.email}
       />
 
-      <MessagesPanel notifications={(notifications ?? []) as AdminNotification[]} locale={locale} />
+      <MessagesPanel notifications={(notifications ?? []) as unknown as AdminNotification[]} locale={locale} />
     </div>
   );
 }

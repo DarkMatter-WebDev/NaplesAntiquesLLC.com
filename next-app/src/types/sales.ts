@@ -23,6 +23,7 @@ export interface OrderItem {
   product_id: string | null;
   inventory_number: string | null;
   title_snapshot: string;
+  item_year_snapshot: number | null;
   metal_snapshot: string | null;
   purity_snapshot: string | null;
   gram_weight_snapshot: number | null;

@@ -5,9 +5,7 @@ const BASE = 'https://naplesestatejewelry.co';
 
 const STATIC_PAGES = [
   { path: '', priority: 1.0, changeFrequency: 'weekly' },
-  { path: '/store', priority: 0.9, changeFrequency: 'weekly' },
   { path: '/shop', priority: 0.9, changeFrequency: 'daily' },
-  { path: '/silver-tableware', priority: 0.8, changeFrequency: 'weekly' },
   { path: '/auctions', priority: 0.7, changeFrequency: 'monthly' },
   { path: '/about', priority: 0.7, changeFrequency: 'monthly' },
   { path: '/contact', priority: 0.8, changeFrequency: 'monthly' },

@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useWishlist } from '@/context/WishlistContext';
 import { formatCurrency, formatOrderDate, orderStatusLabel, type Order } from '@/types/sales';
 import { productImagePaddingBackground } from '@/types/product';
+import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 
 type AccountTab = 'overview' | 'orders' | 'wishlist';
 type AccountSection = AccountTab | 'security';
@@ -370,11 +371,19 @@ function OrderDetailsDialog({
                   : null;
                 const inventoryLabel = formatPublicInventoryNumber(item.inventory_number);
                 const purityLabel = formatPublicPurity(item.purity_snapshot);
+                const imageSnapshot = normalizeLegacyLocalImageUrl(item.image_snapshot);
                 const rowContent = (
                   <>
                   <div className="account-order-item-image">
-                    {item.image_snapshot ? (
-                      <Image src={item.image_snapshot} alt={item.title_snapshot} fill sizes="96px" className="object-contain" unoptimized={item.image_snapshot.startsWith('/assets/')} />
+                    {imageSnapshot ? (
+                      <Image
+                        src={imageSnapshot}
+                        alt={item.title_snapshot}
+                        fill
+                        sizes="96px"
+                        className="object-contain"
+                        unoptimized={imageSnapshot.startsWith('/assets/')}
+                      />
                     ) : (
                       <span className="material-symbols-outlined" aria-hidden="true">photo_camera</span>
                     )}

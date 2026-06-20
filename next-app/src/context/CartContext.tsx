@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import CartDrawer from '@/components/cart/CartDrawer';
 import { productImagePaddingForImage, type Product, type ProductStatus } from '@/types/product';
 import { createClient } from '@/lib/supabase/client';
+import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 
 export interface CartItem {
   id: string;
@@ -27,6 +28,7 @@ export interface CartItem {
   chain_type?: string | null;
   length?: string | null;
   brand?: string | null;
+  item_year?: number | null;
   tags?: string[];
   tags_es?: string[];
   gender?: string | null;
@@ -51,10 +53,14 @@ const CartContext = createContext<CartContextValue | null>(null);
 
 const LS_KEY = 'nej-cart';
 
+function normalizeCartItem(item: CartItem): CartItem {
+  return { ...item, image: normalizeLegacyLocalImageUrl(item.image) };
+}
+
 function loadFromStorage(): CartItem[] {
   try {
     const raw = localStorage.getItem(LS_KEY);
-    return raw ? (JSON.parse(raw) as CartItem[]) : [];
+    return raw ? (JSON.parse(raw) as CartItem[]).map(normalizeCartItem) : [];
   } catch {
     return [];
   }
@@ -126,7 +132,8 @@ export function CartProvider({
   const isIn = useCallback((id: string) => items.some((i) => i.id === id), [items]);
 
   const add = useCallback((item: CartItem) => {
-    setItems((prev) => prev.some((i) => i.id === item.id) ? prev : [...prev, item]);
+    const normalized = normalizeCartItem(item);
+    setItems((prev) => prev.some((i) => i.id === normalized.id) ? prev : [...prev, normalized]);
   }, []);
 
   const remove = useCallback((id: string) => {

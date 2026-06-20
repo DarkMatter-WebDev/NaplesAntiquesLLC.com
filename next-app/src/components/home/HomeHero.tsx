@@ -13,7 +13,6 @@ import { Carousel } from '../../../carousel/components/Carousel';
 import {
   fetchSelectedItems,
   fetchSettings,
-  groupByBackground,
   type CarouselItem,
   type CarouselSettings,
 } from '../../../carousel/lib/carouselData';
@@ -66,11 +65,13 @@ const DARK_THEME: CSSProperties = {
 
 export default function HomeHero({ locale, fallbackItems }: Props) {
   const isEs = locale === 'es';
-  const storeHref = isEs ? '/es/store' : '/store';
+  const storeHref = isEs ? '/es/shop' : '/shop';
 
   const sectionRef = useRef<HTMLElement>(null);
   const [selectedItems, setSelectedItems] = useState<CarouselItem[]>([]);
   const [settings, setSettings] = useState<CarouselSettings>(FALLBACK_SETTINGS);
+  const [carouselDataSettled, setCarouselDataSettled] = useState(false);
+  const [heroReady, setHeroReady] = useState(false);
   // Only the text theme lives in React state (it flips rarely); the background
   // is set imperatively every frame to avoid a re-render per frame.
   const [dark, setDark] = useState(false);
@@ -84,6 +85,7 @@ export default function HomeHero({ locale, fallbackItems }: Props) {
         // Only the price flag comes from settings now; each photo carries its
         // own background (white or black group).
         if (settingsResult.status === 'fulfilled') setSettings(settingsResult.value);
+        setCarouselDataSettled(true);
       },
     );
     return () => {
@@ -108,11 +110,45 @@ export default function HomeHero({ locale, fallbackItems }: Props) {
   const visibleCount = isMobile ? settings.visibleCountMobile : settings.visibleCountDesktop;
 
   const items = selectedItems.length > 0 ? selectedItems : fallbackItems;
-  // Group into a white arc + a black arc so the ring has two clean seams.
+  // Render in the admin's curated order (position). The background sweep follows
+  // each photo's own bg color as it reaches the front.
   const localizedItems = useMemo(
-    () => groupByBackground(items.map((item) => withLocaleHref(item, locale))),
+    () => items.map((item) => withLocaleHref(item, locale)),
     [items, locale],
   );
+
+  useEffect(() => {
+    if (!carouselDataSettled) return;
+
+    let cancelled = false;
+
+    const visibleImages = localizedItems
+      .slice(0, Math.max(1, visibleCount))
+      .map((item) => item.imageUrl)
+      .filter(Boolean);
+
+    const imagePromises = visibleImages.map(
+      (src) =>
+        new Promise<void>((resolve) => {
+          const image = new window.Image();
+          image.onload = () => resolve();
+          image.onerror = () => resolve();
+          image.src = src;
+        }),
+    );
+    const fontsReady = 'fonts' in document ? document.fonts.ready.catch(() => undefined) : Promise.resolve();
+
+    Promise.allSettled([...imagePromises, fontsReady]).then(() => {
+      if (cancelled) return;
+      window.requestAnimationFrame(() => {
+        if (!cancelled) setHeroReady(true);
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [carouselDataSettled, localizedItems, visibleCount]);
 
   // Flip the text theme to match the photo centered behind the headline.
   const handleFrontItem = useCallback(
@@ -136,8 +172,9 @@ export default function HomeHero({ locale, fallbackItems }: Props) {
   return (
     <section
       ref={sectionRef}
-      className="home-carousel-hero relative overflow-hidden border-b"
+      className={`home-carousel-hero relative overflow-hidden border-b ${heroReady ? 'is-ready' : ''}`}
       style={{ borderColor: 'rgba(220, 179, 54, 0.22)', ...theme }}
+      data-customer-reveal-skip
     >
       {/* Carousel background */}
       <div className="home-carousel-theme">
@@ -207,14 +244,67 @@ export default function HomeHero({ locale, fallbackItems }: Props) {
              so no CSS transition here — it would lag the sweep. */
         }
 
+        .home-carousel-theme,
+        .home-hero-top,
+        .home-hero-bottom {
+          opacity: 0;
+        }
+
+        .home-carousel-hero.is-ready .home-carousel-theme {
+          animation: home-carousel-fade-in 760ms ease 260ms both;
+        }
+
+        .home-carousel-hero.is-ready .home-hero-top {
+          animation: home-hero-top-fade-in 720ms cubic-bezier(0.2, 0.8, 0.2, 1) 80ms both;
+        }
+
+        .home-carousel-hero.is-ready .home-hero-bottom {
+          animation: home-hero-bottom-fade-in 720ms cubic-bezier(0.2, 0.8, 0.2, 1) 500ms both;
+        }
+
+        @keyframes home-carousel-fade-in {
+          from {
+            opacity: 0;
+            filter: blur(8px);
+          }
+          to {
+            opacity: 1;
+            filter: blur(0);
+          }
+        }
+
+        @keyframes home-hero-top-fade-in {
+          from {
+            opacity: 0;
+            filter: blur(6px);
+            transform: translateX(-50%) translateY(14px);
+          }
+          to {
+            opacity: 1;
+            filter: blur(0);
+            transform: translateX(-50%) translateY(0);
+          }
+        }
+
+        @keyframes home-hero-bottom-fade-in {
+          from {
+            opacity: 0;
+            filter: blur(6px);
+            transform: translateX(-50%) translateY(18px);
+          }
+          to {
+            opacity: 1;
+            filter: blur(0);
+            transform: translateX(-50%) translateY(0);
+          }
+        }
+
         /* Carousel scene: full height, transparent so the section color shows
-           through the masked edges, inner horizontal mask, base scale. */
+           through, base scale. */
         .home-carousel-hero .home-carousel-theme > div:first-child {
           min-height: calc(100svh - 4rem);
           block-size: calc(100svh - 4rem);
           background: transparent !important;
-          -webkit-mask: linear-gradient(90deg, #0000 0%, red 9%, red 91%, #0000 100%);
-                  mask: linear-gradient(90deg, #0000 0%, red 9%, red 91%, #0000 100%);
           transform: scale(1.22);
           transform-origin: center center;
         }
@@ -337,6 +427,21 @@ export default function HomeHero({ locale, fallbackItems }: Props) {
             top: auto;
             bottom: clamp(1rem, 3svh, 2rem);
             gap: 0.85rem;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .home-carousel-theme,
+          .home-hero-top,
+          .home-hero-bottom {
+            opacity: 1;
+            filter: none;
+            animation: none !important;
+          }
+
+          .home-hero-top,
+          .home-hero-bottom {
+            transform: translateX(-50%);
           }
         }
       `}</style>

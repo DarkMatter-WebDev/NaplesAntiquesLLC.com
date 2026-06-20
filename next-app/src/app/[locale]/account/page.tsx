@@ -11,6 +11,56 @@ export const metadata: Metadata = {
   title: 'My Account',
 };
 
+const CUSTOMER_PROFILE_COLUMNS = [
+  'first_name',
+  'last_name',
+  'full_name',
+  'email',
+  'phone',
+  'alternate_phone',
+  'address_line1',
+  'address_line2',
+  'city',
+  'state',
+  'postal_code',
+  'country',
+  'marketing_opt_in',
+  'marketing_opt_out',
+  'is_admin',
+].join(', ');
+
+const ACCOUNT_ORDER_COLUMNS = [
+  'id',
+  'order_number',
+  'user_id',
+  'customer_name',
+  'customer_email',
+  'customer_phone',
+  'subtotal',
+  'tax',
+  'shipping_fee',
+  'discount',
+  'total',
+  'payment_status',
+  'fulfillment_status',
+  'order_status',
+  'payment_method',
+  'payment_reference',
+  'shipping_method',
+  'shipping_address',
+  'billing_address',
+  'internal_notes',
+  'customer_notes',
+  'created_at',
+  'updated_at',
+  'order_items(id, order_id, product_id, inventory_number, title_snapshot, item_year_snapshot, metal_snapshot, purity_snapshot, gram_weight_snapshot, price_snapshot, discount, image_snapshot, created_at)',
+].join(', ');
+const ACCOUNT_ORDER_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT = ACCOUNT_ORDER_COLUMNS.replace('item_year_snapshot, ', '');
+
+function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
+  return Boolean(error?.message?.toLowerCase().includes('item_year'));
+}
+
 interface Props {
   params: Promise<{ locale: string }>;
 }
@@ -28,7 +78,7 @@ export default async function AccountPage({ params }: Props) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('*')
+    .select(CUSTOMER_PROFILE_COLUMNS)
     .eq('id', user.id)
     .single();
 
@@ -55,13 +105,23 @@ export default async function AccountPage({ params }: Props) {
     marketing_opt_in: profileData.marketing_opt_in ?? false,
     marketing_opt_out: profileData.marketing_opt_out ?? false,
   };
-  const { data: orders } = await supabase
+  const ordersResult = await supabase
     .from('orders')
-    .select('*, order_items(*)')
+    .select(ACCOUNT_ORDER_COLUMNS)
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(25);
-  const accountOrders = (orders ?? []) as Order[];
+  let orders = ordersResult.data;
+  if (isMissingItemYearColumnError(ordersResult.error)) {
+    const fallback = await supabase
+      .from('orders')
+      .select(ACCOUNT_ORDER_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(25);
+    orders = fallback.data;
+  }
+  const accountOrders = (orders ?? []) as unknown as Order[];
   const productIds = Array.from(new Set(
     accountOrders
       .flatMap((order) => order.order_items ?? [])
@@ -145,7 +205,7 @@ export default async function AccountPage({ params }: Props) {
           background:
             linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 64%, rgba(255, 255, 255, 0.86) 91%, #ffffff 100%),
             linear-gradient(90deg, #ffffff 0%, rgba(255, 255, 255, 0.94) 35%, rgba(255, 255, 255, 0.26) 62%, rgba(255, 255, 255, 0.02) 100%),
-            url('/assets/images/pages/account-hero-jewelry.png') top right / cover no-repeat;
+            url('/assets/images/pages/account-hero-jewelry.webp') top right / cover no-repeat;
         }
         .account-hero {
           position: relative;
@@ -925,4 +985,3 @@ function formatCustomerInventoryValue(value: string | number | null | undefined)
   const normalized = String(value).trim().replace(/^#\s*/, '');
   return /^\d+$/.test(normalized) ? normalized : null;
 }
-

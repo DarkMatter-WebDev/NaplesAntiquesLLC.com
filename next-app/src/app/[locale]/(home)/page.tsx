@@ -15,18 +15,18 @@ interface Props {
 }
 
 const HOME_CAROUSEL_FALLBACK: CarouselItem[] = [
-  { id: 'h1', imageUrl: '/assets/images/shop/shop-14k-curb-link-bracelet-01.png',         name: 'Estate bracelet',       priceLabel: null, href: '/shop', status: 'available', bgColor: null },
-  { id: 'h2', imageUrl: '/assets/images/shop/shop-14k-byzantine-link-chain-01.png',        name: 'Byzantine chain',       priceLabel: null, href: '/shop', status: 'available', bgColor: null },
-  { id: 'h3', imageUrl: '/assets/images/shop/shop-10k-cuban-chain-01.png',                 name: 'Cuban chain',           priceLabel: null, href: '/shop', status: 'available', bgColor: null },
-  { id: 'h4', imageUrl: '/assets/images/shop/shop-10k-hollow-cuban-chain-necklace-01.png', name: 'Hollow Cuban necklace', priceLabel: null, href: '/shop', status: 'available', bgColor: null },
-  { id: 'h5', imageUrl: '/assets/images/shop/shop-10k-monaco-edge-cuban-chain-01.png',     name: 'Monaco Cuban chain',    priceLabel: null, href: '/shop', status: 'available', bgColor: null },
-  { id: 'h6', imageUrl: '/assets/images/shop/shop-14k-curb-link-bracelet-01.png',          name: 'Gold bracelet',         priceLabel: null, href: '/shop', status: 'available', bgColor: null },
+  { id: 'h1', imageUrl: '/assets/images/shop/shop-14k-curb-link-bracelet-01.webp',        name: 'Estate bracelet',       priceLabel: null, href: '/shop', status: 'available', bgColor: null },
+  { id: 'h2', imageUrl: '/assets/images/shop/shop-14k-byzantine-link-chain-01.webp',       name: 'Byzantine chain',       priceLabel: null, href: '/shop', status: 'available', bgColor: null },
+  { id: 'h3', imageUrl: '/assets/images/shop/shop-10k-cuban-chain-01.webp',                name: 'Cuban chain',           priceLabel: null, href: '/shop', status: 'available', bgColor: null },
+  { id: 'h4', imageUrl: '/assets/images/shop/shop-10k-hollow-cuban-chain-necklace-01.webp', name: 'Hollow Cuban necklace', priceLabel: null, href: '/shop', status: 'available', bgColor: null },
+  { id: 'h5', imageUrl: '/assets/images/shop/shop-10k-monaco-edge-cuban-chain-01.webp',    name: 'Monaco Cuban chain',    priceLabel: null, href: '/shop', status: 'available', bgColor: null },
+  { id: 'h6', imageUrl: '/assets/images/shop/shop-14k-curb-link-bracelet-01.webp',         name: 'Gold bracelet',         priceLabel: null, href: '/shop', status: 'available', bgColor: null },
 ];
 
 export default async function HomePage({ params }: Props) {
   const { locale } = await params;
   const isEs = locale === 'es';
-  const storeHref = isEs ? '/es/store' : '/store';
+  const storeHref = isEs ? '/es/shop' : '/shop';
   const evalHref = isEs ? '/es/free-evaluation' : '/free-evaluation';
   const contactHref = isEs ? '/es/contact' : '/contact';
 

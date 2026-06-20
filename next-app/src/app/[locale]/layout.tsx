@@ -5,6 +5,7 @@ import { routing } from '@/i18n/routing';
 import { WishlistProvider } from '@/context/WishlistContext';
 import { CartProvider } from '@/context/CartContext';
 import CookieNotice from '@/components/legal/CookieNotice';
+import CustomerReveal from '@/components/layout/CustomerReveal';
 
 interface Props {
   children: React.ReactNode;
@@ -24,7 +25,10 @@ export default async function LocaleLayout({ children, params }: Props) {
     <NextIntlClientProvider locale={locale} messages={messages}>
       <WishlistProvider locale={locale}>
         <CartProvider locale={locale}>
-          {children}
+          <div data-customer-reveal-root className="contents">
+            {children}
+            <CustomerReveal />
+          </div>
           <CookieNotice locale={locale} />
         </CartProvider>
       </WishlistProvider>

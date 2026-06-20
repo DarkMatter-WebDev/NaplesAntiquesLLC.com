@@ -12,12 +12,15 @@ import {
   PRODUCT_JEWELRY_TYPES,
   PRODUCT_LINK_TYPES,
   getDefaultMetalVariant,
+  formatProductItemYear,
   inferProductJewelryType,
+  normalizeProductItemYear,
   normalizeProductJewelryType,
   normalizeProductLengthSizeValue,
   normalizeProductMetalType,
   normalizeProductLinkType,
   normalizeProductMetalVariant,
+  normalizeProductTypeValue,
   productJewelryTypeLabel,
   hasAnyProductImagePadding,
   isProductImagePaddingCustomColor,
@@ -33,7 +36,6 @@ import {
   type Product,
   type ProductImagePadding,
   type ProductImagePaddingMap,
-  type ProductJewelryType,
   type ProductMetalType,
   type ProductMetalVariant,
   type ProductStatus,
@@ -47,10 +49,11 @@ import {
   QUICK_FILL_PROMPT_STORAGE_KEY,
   ensureQuickFillPromptHasCurrentBrandRules,
 } from '@/lib/admin-settings';
+import { PRODUCT_IMAGES_BUCKET, getProductImageStoragePath, uniqueProductImageStoragePaths } from '@/lib/product-image-storage';
 import type { ProductAutofillDraft, ProductAutofillFields } from '@/lib/ai-product-schema';
 
-// Quick Fill is archived/removed from the editor UI for now. Flip to true to restore the section.
-// Full original implementation preserved in src/components/admin/_archive/AdminShell.with-quickfill.tsx.bak
+// Quick Fill is removed from the editor UI for now. The parser and panel still
+// live in this file behind the flag so it can be restored without a backup copy.
 const SHOW_QUICK_FILL: boolean = false;
 
 interface Props {
@@ -69,6 +72,8 @@ const STATUSES: { value: ProductStatus; label: string }[] = [
   { value: 'sold', label: 'Sold' },
   { value: 'archived', label: 'Archived' },
 ];
+const MAX_PRODUCT_IMAGE_COUNT = 20;
+const MAX_PRODUCT_IMAGE_UPLOAD_BYTES = 25 * 1024 * 1024;
 const LOCATIONS = [
   { value: 'showcase', label: 'Showcase' },
   { value: 'safe', label: 'Safe' },
@@ -93,7 +98,7 @@ function getProductChainType(product: Product): string {
   return product.chain_type || getChainTypeFromTags(product.tags);
 }
 
-function getProductJewelryType(product: Product): ProductJewelryType {
+function getProductJewelryType(product: Product): string {
   return inferProductJewelryType(product);
 }
 
@@ -121,6 +126,20 @@ function getProductLength(product: Product): string {
   return normalizeProductLengthSizeValue(product.length || getLengthFromTags(product.tags));
 }
 
+function formatItemYear(value: string | number | null | undefined): string {
+  return formatProductItemYear(value) ?? '-';
+}
+
+function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
+  return Boolean(error?.message?.toLowerCase().includes('item_year'));
+}
+
+function withoutItemYear<T extends { item_year?: unknown }>(payload: T): Omit<T, 'item_year'> {
+  const rest = { ...payload };
+  delete rest.item_year;
+  return rest;
+}
+
 function getLengthSizeLabel(jewelryType: string | null | undefined): string {
   const normalized = normalizeProductJewelryType(jewelryType);
   if (normalized === 'Ring') return 'Size';
@@ -141,18 +160,20 @@ function productUsesSize(productType: string | null | undefined): boolean {
 // item's height (e.g. a 1.5 in brooch, a 0.75 in pendant).
 function productUsesHeight(productType: string | null | undefined): boolean {
   const normalized = normalizeProductJewelryType(productType);
-  if (!normalized) return false;
+  if (!normalized) return Boolean(String(productType ?? '').trim());
   return normalized !== 'Necklace' && normalized !== 'Bracelet' && normalized !== 'Ring';
 }
 
 function productUsesGender(productType: string | null | undefined): boolean {
   const normalized = normalizeProductJewelryType(productType);
+  if (!normalized) return Boolean(String(productType ?? '').trim());
   return normalized === 'Necklace' ||
     normalized === 'Bracelet' ||
     normalized === 'Ring' ||
     normalized === 'Pendant' ||
     normalized === 'Earrings' ||
     normalized === 'Brooch' ||
+    normalized === 'Cufflinks' ||
     normalized === 'Watch';
 }
 
@@ -375,6 +396,7 @@ type SortKey =
   | 'jewelryType'
   | 'chainType'
   | 'length'
+  | 'itemYear'
   | 'location'
   | 'featured'
   | 'purity'
@@ -422,6 +444,7 @@ type QuickFillField =
   | 'jewelryType'
   | 'chainType'
   | 'length'
+  | 'itemYear'
   | 'location'
   | 'priceMode'
   | 'askingPrice'
@@ -445,6 +468,7 @@ const QUICK_FILL_FORM_ORDER: QuickFillField[] = [
   'weight',
   'chainType',
   'length',
+  'itemYear',
   'priceMode',
   'multiplier',
   'askingPrice',
@@ -485,6 +509,7 @@ const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null; widthClas
   { label: 'Type', sortKey: 'jewelryType', widthClass: 'w-[78px]' },
   { label: 'Link Type', sortKey: 'chainType', widthClass: 'w-[118px]', responsiveClass: 'hidden 2xl:table-cell' },
   { label: 'Size', sortKey: 'length', widthClass: 'w-[72px]' },
+  { label: 'Date', sortKey: 'itemYear', widthClass: 'w-[92px]' },
   { label: 'Featured', sortKey: 'featured', widthClass: 'w-[72px]' },
   { label: 'Purity', sortKey: 'purity', widthClass: 'w-[64px]' },
   { label: 'Weight', sortKey: 'weight', widthClass: 'w-[76px]' },
@@ -542,6 +567,7 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
     tags_es: [],
     private_price_label: null,
     gender: 'Unisex',
+    item_year: null,
     cost_basis: null,
     melt_value: null,
     asking_price: null,
@@ -588,6 +614,8 @@ function getSortValue(
       return getProductLinkType(product);
     case 'length':
       return getProductLength(product);
+    case 'itemYear':
+      return product.item_year != null ? String(product.item_year) : '';
     case 'location':
       return product.location ?? 'showcase';
     case 'featured':
@@ -625,17 +653,6 @@ function foldExtraDetailsIntoInternalNotes(product: ReturnType<typeof emptyProdu
   const extraBlock = ['Former extra notes:', ...extraDetails.map((detail) => `- ${detail}`)].join('\n');
   if (currentNotes.includes(extraBlock)) return currentNotes;
   return [currentNotes, extraBlock].filter(Boolean).join('\n\n');
-}
-
-function getProductImageStoragePath(url: string): string | null {
-  const markers = [
-    '/storage/v1/object/public/product-images/',
-    '/storage/v1/object/sign/product-images/',
-  ];
-  const marker = markers.find((item) => url.includes(item));
-  if (!marker) return null;
-  const path = url.slice(url.indexOf(marker) + marker.length).split('?')[0];
-  return path ? decodeURIComponent(path) : null;
 }
 
 function splitQuickFillColumns(line: string, keepEmpty = false): string[] {
@@ -690,6 +707,7 @@ function normalizeQuickFillFieldName(value: string): QuickFillField | null {
   if (normalized === 'status') return 'status';
   if (normalized === 'link type' || normalized === 'chain type' || normalized === 'chain' || normalized === 'link style' || normalized === 'type') return 'chainType';
   if (normalized === 'length' || normalized === 'size' || normalized === 'ring size') return 'length';
+  if (normalized === 'year' || normalized === 'year made' || normalized === 'date made' || normalized === 'made' || normalized === 'circa' || normalized === 'date' || normalized === 'item year' || normalized === 'item date') return 'itemYear';
   if (normalized === 'location') return 'location';
   if (normalized === 'price mode' || normalized === 'pricing mode' || normalized === 'mode') return 'priceMode';
   if (normalized === 'asking price' || normalized === 'ask price' || normalized === 'price' || normalized === 'manual price') return 'askingPrice';
@@ -757,6 +775,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [showTableFilters, setShowTableFilters] = useState(false);
   const originalRef = useRef<ReturnType<typeof emptyProduct> | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [sessionUploadedImageUrls, setSessionUploadedImageUrls] = useState<Set<string>>(() => new Set());
   const [dragOver, setDragOver] = useState(false);
   const [dragSrcIdx, setDragSrcIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
@@ -770,7 +789,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [dragTargetProductId, setDragTargetProductId] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
   const [chainTypeInput, setChainTypeInput] = useState('');
-  const [jewelryTypeInput, setJewelryTypeInput] = useState<ProductJewelryType>('Necklace');
+  const [jewelryTypeInput, setJewelryTypeInput] = useState('Necklace');
   const [lengthInput, setLengthInput] = useState('');
   const [quickEntry, setQuickEntry] = useState('');
   const [quickFillPrompt, setQuickFillPrompt] = useState(DEFAULT_QUICK_FILL_AI_FORMAT_PROMPT);
@@ -787,13 +806,32 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [aiNotice, setAiNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const [aiUndoSnapshot, setAiUndoSnapshot] = useState<{
     editing: ReturnType<typeof emptyProduct>;
-    jewelryTypeInput: ProductJewelryType;
+    jewelryTypeInput: string;
     chainTypeInput: string;
     lengthInput: string;
   } | null>(null);
   const [showAdvancedIds, setShowAdvancedIds] = useState(false);
   const [inventoryNumberManual, setInventoryNumberManual] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const productTypeOptions = useMemo(() => {
+    const base = PRODUCT_JEWELRY_TYPES.map((type) => type.value);
+    const extras = [
+      jewelryTypeInput,
+      editing?.product_type,
+      editing?.jewelry_type,
+      ...products.flatMap((product) => [product.product_type, product.jewelry_type, getProductJewelryType(product)]),
+    ]
+      .map((value) => normalizeProductTypeValue(value))
+      .filter((value): value is string => Boolean(value));
+    const seen = new Set<string>();
+    const ordered = [...base, ...extras.sort((a, b) => a.localeCompare(b))].filter((value) => {
+      const key = value.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return ordered;
+  }, [editing?.jewelry_type, editing?.product_type, jewelryTypeInput, products]);
 
   const flash = (text: string, ok = true) => {
     setMsg({ text, ok });
@@ -865,6 +903,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
   function openAddFromProducts(sourceProducts: Product[]) {
     originalRef.current = null;
+    setSessionUploadedImageUrls(new Set());
     setFormErrors([]);
     setJewelryTypeInput('Necklace');
     setChainTypeInput('');
@@ -919,6 +958,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       metal_type: p.metal_type ?? nextMetalType,
     };
     originalRef.current = copy;
+    setSessionUploadedImageUrls(new Set());
     setJewelryTypeInput(nextProductType);
     setChainTypeInput(productSupportsLinkType(nextProductType) ? getProductLinkType(p) : '');
     setLengthInput(getProductLength(p));
@@ -984,6 +1024,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       }
       if (field === 'chainType') { newChainType = ''; applied.push('Link Type'); return true; }
       if (field === 'length') { newLength = ''; applied.push(getLengthSizeLabel(newJewelryType)); return true; }
+      if (field === 'itemYear') { updates.item_year = null; applied.push('Date'); return true; }
       if (field === 'askingPrice') {
         updates.asking_price = null;
         updates.manual_price_label = null;
@@ -1061,6 +1102,13 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         applied.push('Internal Notes');
         return true;
       }
+      if (field === 'itemYear') {
+        const itemYear = normalizeProductItemYear(value);
+        if (!itemYear) return false;
+        updates.item_year = itemYear;
+        applied.push('Date');
+        return true;
+      }
 
       if (!field || field === 'productType') {
         const matchedJewelryType = normalizeProductJewelryType(value);
@@ -1070,6 +1118,16 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
           updates.jewelry_type = matchedJewelryType;
           if (!productSupportsLinkType(matchedJewelryType)) newChainType = '';
           if (!productUsesLength(matchedJewelryType) && !productUsesSize(matchedJewelryType) && !productUsesHeight(matchedJewelryType)) newLength = '';
+          applied.push('Product Type');
+          return true;
+        }
+        const customProductType = field === 'productType' ? normalizeProductTypeValue(value) : null;
+        if (customProductType) {
+          newJewelryType = customProductType;
+          updates.product_type = customProductType;
+          updates.jewelry_type = customProductType;
+          newChainType = '';
+          if (!productUsesLength(customProductType) && !productUsesSize(customProductType) && !productUsesHeight(customProductType)) newLength = '';
           applied.push('Product Type');
           return true;
         }
@@ -1188,7 +1246,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       const purityMatch = lower.match(/^(\d+)\s*k?$/);
       if ((!field || field === 'purity') && purityMatch) {
         const val = parseInt(purityMatch[1]);
-        if ([10, 14, 18, 24, 925].includes(val)) {
+        if ((val >= 1 && val <= 24) || (val >= 100 && val <= 1000)) {
           updates.purity = val;
           purityWasUpdated = true;
           applied.push('Purity');
@@ -1203,8 +1261,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         return true;
       }
 
-      const multA = lower.match(/^(\d+(?:\.\d+)?)\s*[xÃ—]$/);
-      const multB = lower.match(/^[xÃ—]\s*(\d+(?:\.\d+)?)$/);
+      const multA = lower.match(/^(\d+(?:\.\d+)?)\s*x$/);
+      const multB = lower.match(/^x\s*(\d+(?:\.\d+)?)$/);
       const multC = field === 'multiplier' ? lower.match(/^(\d+(?:\.\d+)?)$/) : null;
       if ((!field || field === 'multiplier') && multA) { updates.pricing_multiplier = parseFloat(multA[1]); applied.push('Multiplier'); return true; }
       if ((!field || field === 'multiplier') && multB) { updates.pricing_multiplier = parseFloat(multB[1]); applied.push('Multiplier'); return true; }
@@ -1571,6 +1629,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
   function closeModal() {
     setEditing(null);
+    setSessionUploadedImageUrls(new Set());
     setPreviewImg(null);
     setCropTarget(null);
     setQuickFillNotice(null);
@@ -1585,16 +1644,26 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     const path = `products/${filename}`;
 
     const { error } = await supabase.storage
-      .from('product-images')
-      .upload(path, blob, { contentType: 'image/webp', upsert: false });
+      .from(PRODUCT_IMAGES_BUCKET)
+      .upload(path, blob, { contentType: 'image/webp', cacheControl: '31536000', upsert: false });
 
     if (error) {
       flash(`Upload failed: ${error.message}`, false);
       return null;
     }
 
-    const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+    const { data } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path);
     return data.publicUrl;
+  }, [supabase]);
+
+  const deleteImagePaths = useCallback(async (paths: string[]) => {
+    if (paths.length === 0) return true;
+    const { error } = await supabase.storage.from(PRODUCT_IMAGES_BUCKET).remove(paths);
+    if (error) {
+      flash(`Image cleanup failed: ${error.message}`, false);
+      return false;
+    }
+    return true;
   }, [supabase]);
 
   const deleteUploadedImageIfUnused = useCallback(async (url: string, sourceIndex: number) => {
@@ -1613,23 +1682,57 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
     if (currentProductStillUsesImage || anotherProductUsesImage) return;
 
-    const { error } = await supabase.storage.from('product-images').remove([path]);
-    if (error) {
-      flash(`Cropped image saved, but old file cleanup failed: ${error.message}`, false);
-    }
-  }, [editing, products, supabase]);
+    await deleteImagePaths([path]);
+  }, [deleteImagePaths, editing, products]);
+
+  const deleteProductImagesIfUnused = useCallback(async (
+    urls: Iterable<string | null | undefined>,
+    sourceProductId: string | null,
+    nextProducts: Product[],
+    currentProductImages: string[] = [],
+  ) => {
+    const currentPaths = new Set(uniqueProductImageStoragePaths(currentProductImages));
+    const candidatePaths = uniqueProductImageStoragePaths(urls).filter((path) => !currentPaths.has(path));
+    if (candidatePaths.length === 0) return;
+
+    const referencedPaths = new Set<string>();
+    nextProducts.forEach((product) => {
+      if (sourceProductId && product.id === sourceProductId) return;
+      uniqueProductImageStoragePaths([...(product.images ?? []), ...(product.image_urls ?? [])])
+        .forEach((path) => referencedPaths.add(path));
+    });
+
+    const deletablePaths = candidatePaths.filter((path) => !referencedPaths.has(path));
+    await deleteImagePaths(deletablePaths);
+  }, [deleteImagePaths]);
 
   // --- Image upload ---
   const handleImageUpload = useCallback(async (files: FileList) => {
     if (!editing) return;
+    const availableSlots = Math.max(0, MAX_PRODUCT_IMAGE_COUNT - editing.images.length);
+    if (availableSlots <= 0) {
+      flash(`Maximum ${MAX_PRODUCT_IMAGE_COUNT} photos per product. Remove a photo before uploading another.`, false);
+      return;
+    }
+    const acceptedFiles = Array.from(files).slice(0, availableSlots);
+    const rejectedForCount = files.length - acceptedFiles.length;
+    const oversizedFiles = acceptedFiles.filter((file) => file.size > MAX_PRODUCT_IMAGE_UPLOAD_BYTES);
+    const uploadFiles = acceptedFiles.filter((file) => file.size <= MAX_PRODUCT_IMAGE_UPLOAD_BYTES);
+    if (rejectedForCount > 0) {
+      flash(`Only ${availableSlots} more photo(s) allowed. ${rejectedForCount} file(s) were skipped.`, false);
+    }
+    if (oversizedFiles.length > 0) {
+      flash(`Skipped ${oversizedFiles.length} oversized file(s). Each image must be 25 MB or less.`, false);
+    }
+    if (uploadFiles.length === 0) return;
     setUploading(true);
 
-    const [firstFile, ...restFiles] = Array.from(files);
+    const [firstFile, ...restFiles] = uploadFiles;
 
     async function processAndUpload(file: File): Promise<string | null> {
       const bitmap = await createImageBitmap(file);
       const canvas = document.createElement('canvas');
-      const MAX = 1200;
+      const MAX = 2048;
       const scale = Math.min(1, MAX / Math.max(bitmap.width, bitmap.height));
       canvas.width = Math.round(bitmap.width * scale);
       canvas.height = Math.round(bitmap.height * scale);
@@ -1648,6 +1751,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     const firstUrl = await processAndUpload(firstFile);
     if (firstUrl) {
       successCount++;
+      setSessionUploadedImageUrls((current) => new Set(current).add(firstUrl));
       setEditing((prev) => prev ? { ...prev, images: [...prev.images, firstUrl] } : prev);
     }
 
@@ -1655,6 +1759,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       const url = await processAndUpload(file);
       if (url) {
         successCount++;
+        setSessionUploadedImageUrls((current) => new Set(current).add(url));
         setEditing((prev) => prev ? { ...prev, images: [...prev.images, url] } : prev);
       }
     }
@@ -1689,7 +1794,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       const sy = Math.round((cropRect.y / 100) * image.naturalHeight);
       const sw = Math.round((cropRect.width / 100) * image.naturalWidth);
       const sh = Math.round((cropRect.height / 100) * image.naturalHeight);
-      const MAX = 1200;
+      const MAX = 2048;
       const scale = Math.min(1, MAX / Math.max(sw, sh));
       const canvas = document.createElement('canvas');
       canvas.width = Math.max(1, Math.round(sw * scale));
@@ -1713,7 +1818,19 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         if (imageUrls.length) imageUrls[cropTarget.index] = croppedUrl;
         return { ...prev, images, image_urls: imageUrls.length ? imageUrls : images };
       });
-      await deleteUploadedImageIfUnused(oldUrl, cropTarget.index);
+      setSessionUploadedImageUrls((current) => {
+        const next = new Set(current);
+        next.add(croppedUrl);
+        return next;
+      });
+      if (sessionUploadedImageUrls.has(oldUrl)) {
+        await deleteUploadedImageIfUnused(oldUrl, cropTarget.index);
+        setSessionUploadedImageUrls((current) => {
+          const next = new Set(current);
+          next.delete(oldUrl);
+          return next;
+        });
+      }
       setPreviewImg({ url: croppedUrl, index: cropTarget.index });
       setCropTarget(null);
       flash('Cropped image saved');
@@ -1780,8 +1897,22 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     window.addEventListener('pointercancel', onPointerUp);
   }
 
-  function removeImage(idx: number) {
-    setEditing((prev) => prev ? { ...prev, images: prev.images.filter((_, i) => i !== idx) } : prev);
+  async function removeImage(idx: number) {
+    const url = editing?.images[idx];
+    setEditing((prev) => prev ? {
+      ...prev,
+      images: prev.images.filter((_, i) => i !== idx),
+      image_urls: (prev.image_urls?.length ? prev.image_urls : prev.images).filter((_, i) => i !== idx),
+    } : prev);
+
+    if (url && sessionUploadedImageUrls.has(url)) {
+      await deleteUploadedImageIfUnused(url, idx);
+      setSessionUploadedImageUrls((current) => {
+        const next = new Set(current);
+        next.delete(url);
+        return next;
+      });
+    }
   }
 
   function moveImage(idx: number, direction: -1 | 1) {
@@ -1962,7 +2093,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     }
 
     // Build tags with updated jt:, ct:, and len: entries
-    const normalizedJewelryType = normalizeProductJewelryType(jewelryTypeInput) ?? 'Other';
+    const normalizedJewelryType = normalizeProductTypeValue(jewelryTypeInput) ?? 'Other';
     const supportsLinkType = productSupportsLinkType(normalizedJewelryType);
     const supportsLength = productUsesLength(normalizedJewelryType);
     const supportsSize = productUsesSize(normalizedJewelryType);
@@ -1997,6 +2128,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       pricing_multiplier: editing.pricing_multiplier ?? null,
       status: normalizeProductStatus(editing.status),
       location: editing.location || 'showcase',
+      item_year: normalizeProductItemYear(editing.item_year),
       image_urls: editing.images,
       image_padding: normalizeProductImagePaddingValue(editing.image_padding),
       image_padding_by_image: normalizeProductImagePaddingMap(editing.image_padding_by_image),
@@ -2008,6 +2140,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       internal_notes: foldExtraDetailsIntoInternalNotes(editing),
     };
     const originalProductId = originalRef.current?.id ?? payload.id;
+    const originalImageUrls = originalRef.current
+      ? [...(originalRef.current.images ?? []), ...(originalRef.current.image_urls ?? [])]
+      : [];
     const errs = validate(payload, isNew ? undefined : originalProductId);
     if (errs.length) { setFormErrors(errs); setSaving(false); return; }
     setFormErrors([]);
@@ -2015,7 +2150,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     let nextProducts = products;
 
     if (isNew) {
-      const { data, error } = await supabase.from('products').insert(payload).select().single();
+      let { data, error } = await supabase.from('products').insert(payload).select().single();
+      if (isMissingItemYearColumnError(error)) {
+        const retry = await supabase.from('products').insert(withoutItemYear(payload)).select().single();
+        data = retry.data;
+        error = retry.error;
+      }
       if (error) { flash(error.message, false); setSaving(false); return; }
       const savedProduct = (data ?? payload) as unknown as Product;
       nextProducts = [savedProduct, ...products];
@@ -2030,11 +2170,25 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       }
       // Don't use .select().single() on update — RLS may allow UPDATE but not SELECT,
       // causing PGRST116 and blocking the modal from closing.
-      const { error } = await supabase.from('products').update(payload).eq('id', originalProductId);
+      let { error } = await supabase.from('products').update(payload).eq('id', originalProductId);
+      if (isMissingItemYearColumnError(error)) {
+        const retry = await supabase.from('products').update(withoutItemYear(payload)).eq('id', originalProductId);
+        error = retry.error;
+      }
       if (error) { flash(error.message, false); setSaving(false); return; }
       nextProducts = products.map((p) => p.id === originalProductId ? (payload as unknown as Product) : p);
       setProducts(nextProducts);
     }
+
+    if (!isNew && originalImageUrls.length > 0) {
+      await deleteProductImagesIfUnused(
+        originalImageUrls,
+        originalProductId,
+        nextProducts,
+        [...(payload.images ?? []), ...(payload.image_urls ?? [])],
+      );
+    }
+    setSessionUploadedImageUrls(new Set());
 
     flash(isNew ? 'Product added' : 'Product saved');
     setSaving(false);
@@ -2076,9 +2230,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       return;
     }
 
+    const deleteImageUrls = [...(deleteTarget.images ?? []), ...(deleteTarget.image_urls ?? [])];
     const { error } = await supabase.from('products').delete().eq('id', deleteTarget.id);
     if (error) { flash(error.message, false); return; }
-    setProducts((prev) => prev.filter((p) => p.id !== deleteTarget.id));
+    const nextProducts = products.filter((p) => p.id !== deleteTarget.id);
+    setProducts(nextProducts);
+    await deleteProductImagesIfUnused(deleteImageUrls, deleteTarget.id, nextProducts);
     flash('Product deleted');
     setDeleteTarget(null);
   }
@@ -2438,7 +2595,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     }
                   }
                 },
-                options: [['', 'All Product Types'], ...PRODUCT_JEWELRY_TYPES.map((type) => [type.value, type.label])],
+                options: [['', 'All Product Types'], ...productTypeOptions.map((value) => [value, productJewelryTypeLabel(value)])],
               },
               {
                 label: 'Brand', value: filterBrand, set: setFilterBrand,
@@ -2742,6 +2899,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     </td>
                     <td className="px-2 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
                       {getProductLength(p) || '-'}
+                    </td>
+                    <td className="px-2 py-3 whitespace-nowrap text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      {formatItemYear(p.item_year)}
                     </td>
                     <td className="px-2 py-3 whitespace-nowrap text-xs" style={{ color: p.featured ? 'var(--color-primary)' : 'var(--color-on-surface-variant)' }}>
                       {p.featured ? 'Yes' : 'No'}
@@ -3162,7 +3322,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 )}
               </div>
 
-              {/* Quick Fill — removed from UI; archived in _archive/AdminShell.with-quickfill.tsx.bak. Flip SHOW_QUICK_FILL to restore. */}
+              {/* Quick Fill — removed from UI. Flip SHOW_QUICK_FILL to restore. */}
               {SHOW_QUICK_FILL && (
               <div
                 className="product-editor-panel product-editor-quick-panel"
@@ -3523,7 +3683,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-3 gap-4">
                 <div>
                   <label className="form-label">Product Type</label>
                   <ClearableField
@@ -3535,21 +3695,34 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     }}
                     show={jewelryTypeInput !== 'Other'}
                   >
-                    <select
-                      className="form-field w-full"
+                    <ComboboxInput
                       value={jewelryTypeInput}
-                      onChange={(e) => {
-                        const nextProductType = (normalizeProductJewelryType(e.target.value) ?? 'Other') as ProductJewelryType;
+                      onChange={(value) => {
+                        const nextProductType = normalizeProductTypeValue(value) ?? 'Other';
                         setJewelryTypeInput(nextProductType);
                         setEditing({ ...editing, product_type: nextProductType, jewelry_type: nextProductType });
                         if (!productSupportsLinkType(nextProductType)) setChainTypeInput('');
                         if (!productUsesLength(nextProductType) && !productUsesSize(nextProductType) && !productUsesHeight(nextProductType)) setLengthInput('');
                       }}
-                    >
-                      {PRODUCT_JEWELRY_TYPES.map((type) => (
-                        <option key={type.value} value={type.value}>{type.label}</option>
-                      ))}
-                    </select>
+                      options={productTypeOptions}
+                      placeholder="e.g. Necklace, Cufflinks, Tie Clip..."
+                    />
+                  </ClearableField>
+                </div>
+                <div>
+                  <label className="form-label">Date (Year Made)</label>
+                  <ClearableField onClear={() => setEditing({ ...editing, item_year: null })} show={editing.item_year != null}>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={2200}
+                      step={1}
+                      placeholder="e.g. 1930"
+                      className="form-field w-full"
+                      value={editing.item_year ?? ''}
+                      onChange={(e) => setEditing({ ...editing, item_year: normalizeProductItemYear(e.target.value) })}
+                    />
                   </ClearableField>
                 </div>
                 <div>
@@ -3677,19 +3850,31 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   </ClearableField>
                 </div>
                 <div>
-                  <label className="form-label">{getLegacyCategoryForMetalType(editing.metal_type, editing.category) === 'Silver' ? 'Purity' : 'Purity (k)'}</label>
+                  <label className="form-label">{getLegacyCategoryForMetalType(editing.metal_type, editing.category) === 'Silver' ? 'Purity (/1000)' : 'Purity (k)'}</label>
                   {getLegacyCategoryForMetalType(editing.metal_type, editing.category) === 'Silver' ? (
                     <ClearableField onClear={() => setEditing({ ...editing, purity: null })} show={!!editing.purity}>
-                    <select className="form-field w-full" value={editing.purity ?? ''}
-                      onChange={(e) => setEditing({ ...editing, purity: e.target.value ? Number(e.target.value) : null })}>
-                      <option value="">— select —</option>
+                    <input
+                      type="number"
+                      list="silver-purity-presets"
+                      min={100}
+                      max={1000}
+                      step={1}
+                      className="form-field w-full"
+                      placeholder="925 sterling · 900 · 800 (parts per 1000)"
+                      value={editing.purity ?? ''}
+                      onChange={(e) => setEditing({ ...editing, purity: e.target.value ? Number(e.target.value) : null })}
+                    />
+                    <datalist id="silver-purity-presets">
                       <option value="999">99.9% fine</option>
+                      <option value="958">95.8% Britannia</option>
                       <option value="950">95%</option>
                       <option value="925">92.5% Sterling</option>
                       <option value="900">90% Coin</option>
                       <option value="850">85%</option>
+                      <option value="835">83.5%</option>
+                      <option value="830">83%</option>
                       <option value="800">80%</option>
-                    </select>
+                    </datalist>
                     </ClearableField>
                   ) : (
                     <ClearableField onClear={() => setEditing({ ...editing, purity: null })} show={!!editing.purity}>

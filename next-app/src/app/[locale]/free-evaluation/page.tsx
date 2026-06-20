@@ -88,6 +88,7 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
               src="/assets/images/pages/jeweler.webp"
               alt={isEs ? 'Joyero midiendo un anillo con calibradores durante una evaluación gratuita' : 'Jeweler measuring a diamond ring with calipers during a free evaluation'}
               fill
+              sizes="100vw"
               priority
               className="object-cover"
               style={{ objectPosition: 'center 38%', filter: 'grayscale(12%) contrast(1.02)' }}

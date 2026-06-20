@@ -77,7 +77,7 @@ export default function SignInPage() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 className="form-field w-full"
-                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                placeholder="Enter your password"
               />
             </div>
 
@@ -90,7 +90,7 @@ export default function SignInPage() {
               disabled={loading}
               className="modern-auth-submit mt-2 disabled:opacity-60"
             >
-              {loading ? 'Signing inâ€¦' : 'Sign In'}
+              {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
 
@@ -109,7 +109,7 @@ export default function SignInPage() {
           .modern-auth-page {
             background:
               linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.82) 48%, rgba(255, 255, 255, 0.7) 100%),
-              url('/assets/images/pages/login.png') center bottom / min(1780px, 118vw) auto no-repeat,
+              url('/assets/images/pages/login.webp') center bottom / min(1780px, 118vw) auto no-repeat,
               #ffffff;
           }
           .modern-auth-card {
@@ -173,4 +173,3 @@ export default function SignInPage() {
     </>
   );
 }
-

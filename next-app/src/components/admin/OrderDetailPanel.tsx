@@ -1,12 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Order, OrderItem, FulfillmentStatus, OrderStatus } from '@/types/sales';
 import { formatCurrency, formatOrderDate, orderStatusLabel } from '@/types/sales';
+import { formatProductItemYear } from '@/types/product';
 import { buildInvoiceEmailContent, invoiceNumberForOrder, withInvoiceLineDiscounts } from '@/lib/order-invoice-email';
+import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
@@ -312,7 +315,7 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
                 <table className="w-full min-w-[780px] text-sm">
                   <thead style={{ background: 'var(--color-surface-container-low)' }}>
                     <tr>
-                      {['Item', 'Inventory', 'Metal', 'Purity', 'Weight', 'Price', 'Discount', 'Product'].map((heading) => (
+                      {['Item', 'Date', 'Inventory', 'Metal', 'Purity', 'Weight', 'Price', 'Discount', 'Product'].map((heading) => (
                         <th key={heading} className="px-4 py-3 text-left text-[0.68rem] uppercase tracking-widest" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
                           {heading}
                         </th>
@@ -323,6 +326,7 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
                     {order.order_items.map((item) => (
                       <tr key={item.id} className="border-t" style={{ borderColor: BORDER }}>
                         <td className="px-4 py-3 font-semibold" style={{ color: 'var(--color-on-surface)' }}>{item.title_snapshot}</td>
+                        <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>{formatProductItemYear(item.item_year_snapshot) ?? '-'}</td>
                         <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>{item.inventory_number || '-'}</td>
                         <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>{item.metal_snapshot || '-'}</td>
                         <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>{item.purity_snapshot || '-'}</td>
@@ -481,13 +485,21 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
                   <p>{emailContent.greeting}</p>
                   <p className="mt-3">{emailContent.intro}</p>
                   <div className="mt-5 overflow-hidden border" style={{ borderColor: BORDER }}>
-                    {emailContent.items.length > 0 ? emailContent.items.map((item) => (
+                    {emailContent.items.length > 0 ? emailContent.items.map((item) => {
+                      const imageUrl = normalizeLegacyLocalImageUrl(item.imageUrl);
+                      return (
                       <div key={`${item.inventory}-${item.title}`} className="grid gap-3 border-b px-3 py-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center" style={{ borderColor: 'rgba(115, 92, 0, 0.12)' }}>
                         <div className="grid min-w-0 grid-cols-[4.5rem_minmax(0,1fr)] gap-3">
                           <div className="relative h-[4.5rem] overflow-hidden border" style={{ borderColor: 'rgba(115, 92, 0, 0.18)', background: '#f7f3e8' }}>
-                            {item.imageUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={item.imageUrl} alt={item.title} className="h-full w-full object-contain" />
+                            {imageUrl ? (
+                              <Image
+                                src={imageUrl}
+                                alt={item.title}
+                                fill
+                                sizes="72px"
+                                className="object-contain"
+                                unoptimized={imageUrl.startsWith('/assets/')}
+                              />
                             ) : (
                               <span className="material-symbols-outlined flex h-full w-full items-center justify-center text-[1.4rem]" aria-hidden="true" style={{ color: 'rgba(115, 92, 0, 0.34)' }}>
                                 photo_camera
@@ -515,7 +527,7 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
                           <span>{item.price}</span>
                         </div>
                       </div>
-                    )) : (
+                    ); }) : (
                       <p className="px-3 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>No item details were attached.</p>
                     )}
                   </div>

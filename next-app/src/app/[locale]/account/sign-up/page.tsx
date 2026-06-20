@@ -332,7 +332,7 @@ export default function SignUpPage() {
               disabled={loading}
               className="modern-auth-submit mt-2 disabled:opacity-60"
             >
-              {loading ? 'Creating accountâ€¦' : 'Create Account'}
+              {loading ? 'Creating account...' : 'Create Account'}
             </button>
           </form>
 

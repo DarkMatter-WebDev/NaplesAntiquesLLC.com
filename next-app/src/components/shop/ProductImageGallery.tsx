@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { productImagePaddingBackground, productImagePaddingForImage, type ProductImagePaddingMap } from '@/types/product';
 
@@ -31,6 +32,7 @@ interface ZoomState {
 export default function ProductImageGallery({ images, title, imagePadding = null, imagePaddingByImage = null }: Props) {
   const [active, setActive] = useState(0);
   const [zoom, setZoom] = useState<ZoomState | null>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const touchZoomingRef = useRef(false);
@@ -56,6 +58,30 @@ export default function ProductImageGallery({ images, title, imagePadding = null
     closeZoom();
     setActive((currentIndex) => (currentIndex + 1) % images.length);
   }, [closeZoom, images.length]);
+
+  const openLightbox = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    // Ignore clicks that land on the prev/next edge buttons.
+    if (e.target instanceof HTMLElement && e.target.closest('.product-gallery-edge-button')) return;
+    closeZoom();
+    setLightboxOpen(true);
+  }, [closeZoom]);
+
+  // While the lightbox is open: lock body scroll and wire Esc / arrow keys.
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setLightboxOpen(false);
+      else if (event.key === 'ArrowLeft') showPreviousImage();
+      else if (event.key === 'ArrowRight') showNextImage();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [lightboxOpen, showPreviousImage, showNextImage]);
 
   const updateZoom = useCallback((clientX: number, clientY: number, mode: 'mouse' | 'touch') => {
     const el = containerRef.current;
@@ -171,6 +197,8 @@ export default function ProductImageGallery({ images, title, imagePadding = null
         ref={containerRef}
         className="relative aspect-square overflow-hidden"
         style={{ background: imageFrameBackground, cursor: 'crosshair', touchAction: 'none' }}
+        title="Click to view full size"
+        onClick={openLightbox}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerLeave={handlePointerLeave}
@@ -328,6 +356,102 @@ export default function ProductImageGallery({ images, title, imagePadding = null
             pointerEvents: 'none',
           }}
         />
+      )}
+
+      {/* Full-size lightbox — portaled to body so ancestor transforms don't
+          clip the fixed overlay. */}
+      {lightboxOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[1000] flex flex-col"
+          style={{ background: 'rgba(18,14,7,0.94)' }}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${title} — full size image viewer`}
+          onClick={(e) => { if (e.target === e.currentTarget) setLightboxOpen(false); }}
+        >
+          <button
+            type="button"
+            onClick={() => setLightboxOpen(false)}
+            aria-label="Close image viewer"
+            title="Close"
+            className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-black/30 text-white transition-colors hover:bg-black/60"
+          >
+            <span className="material-symbols-outlined text-[28px] leading-none" aria-hidden="true">close</span>
+          </button>
+
+          <div
+            className="relative flex flex-1 items-center justify-center px-4 pt-16 pb-4"
+            onClick={(e) => { if (e.target === e.currentTarget) setLightboxOpen(false); }}
+          >
+            <div className="relative h-full w-full max-w-5xl">
+              <Image
+                src={current}
+                alt={title}
+                fill
+                sizes="100vw"
+                className="object-contain object-center"
+                unoptimized={current.startsWith('/assets/')}
+              />
+            </div>
+
+            {hasMultipleImages && (
+              <>
+                <button
+                  type="button"
+                  onClick={showPreviousImage}
+                  aria-label="Previous image"
+                  title="Previous image"
+                  className="absolute left-3 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/30 text-white transition-colors hover:bg-black/60"
+                >
+                  <span className="material-symbols-outlined text-[32px] leading-none" aria-hidden="true">chevron_left</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={showNextImage}
+                  aria-label="Next image"
+                  title="Next image"
+                  className="absolute right-3 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/30 text-white transition-colors hover:bg-black/60"
+                >
+                  <span className="material-symbols-outlined text-[32px] leading-none" aria-hidden="true">chevron_right</span>
+                </button>
+              </>
+            )}
+          </div>
+
+          {hasMultipleImages && (
+            <div className="overflow-x-auto pb-6">
+              <div className="mx-auto flex w-max gap-2 px-4">
+                {images.map((img, i) => {
+                  const thumbBg = productImagePaddingBackground(productImagePaddingForImage(imagePadding, imagePaddingByImage, img, i));
+                  return (
+                    <button
+                      key={`lightbox-${i}`}
+                      type="button"
+                      onClick={() => moveToImage(i)}
+                      className="relative h-16 w-16 flex-shrink-0 overflow-hidden border-2 transition-all"
+                      style={{
+                        borderColor: i === active ? 'var(--color-primary)' : 'rgba(255,255,255,0.35)',
+                        background: thumbBg,
+                      }}
+                      aria-label={`View image ${i + 1}`}
+                      aria-current={i === active ? 'true' : undefined}
+                    >
+                      <Image
+                        src={img}
+                        alt={`${title} ${i + 1}`}
+                        fill
+                        sizes="64px"
+                        className="object-contain object-center"
+                        unoptimized={img.startsWith('/assets/')}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>,
+        document.body,
       )}
     </div>
   );

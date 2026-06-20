@@ -1,5 +1,4 @@
-﻿import type { Metadata } from 'next';
-import Link from 'next/link';
+import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import {
   PRODUCT_METAL_VARIANTS,
@@ -9,14 +8,17 @@ import {
   normalizeProductStatus,
   productMetalVariantLabel,
   productSupportsLinkType,
+  productJewelryTypeLabel,
   type Product,
   type ProductStatus,
 } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
 import { calcSpotPriceValue } from '@/lib/pricing';
-import ProductCard from '@/components/shop/ProductCard';
+import ShopProductGrid from '@/components/shop/ShopProductGrid';
 import ShopFilters from '@/components/shop/ShopFilters';
+import ShopYearFilter from '@/components/shop/ShopYearFilter';
 import ShopPagination from '@/components/shop/ShopPagination';
+import { JEWELRY_ERA_MIN_YEAR, jewelryEraMaxYear, parseYearFilter } from '@/lib/jewelry-eras';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 
@@ -24,8 +26,6 @@ export const metadata: Metadata = {
   title: 'Shop',
   description: 'Browse estate gold jewelry, chains, bracelets, and rings with live pricing.',
 };
-
-type ShopCollection = 'default' | 'silverTableware';
 
 interface Props {
   params: Promise<{ locale: string }>;
@@ -46,6 +46,9 @@ interface Props {
     perPage?: string;
     priceMin?: string;
     priceMax?: string;
+    yearMin?: string;
+    yearMax?: string;
+    itemGroup?: string;
   }>;
 }
 
@@ -67,9 +70,9 @@ const ITEM_TYPE_KEYWORDS: Record<string, string[]> = {
   pendant: ['pendant'],
   charm: ['charm', 'charms'],
   brooch: ['brooch', 'pin'],
+  cufflinks: ['cufflink', 'cufflinks'],
   watch: ['watch', 'wristwatch', 'wrist watch', 'timepiece'],
   coin: ['coin'],
-  bullion: ['bullion', 'bar', 'round', 'ingot'],
   silverware: ['silverware', 'flatware', 'hollowware'],
 };
 
@@ -81,11 +84,66 @@ const ITEM_TYPE_VALUES: Record<string, ReturnType<typeof inferProductJewelryType
   pendant: 'Pendant',
   charm: 'Charm',
   brooch: 'Brooch',
+  cufflinks: 'Cufflinks',
   watch: 'Watch',
   coin: 'Coin',
-  bullion: 'Bullion',
   silverware: 'Silverware',
 };
+
+const JEWELRY_ITEM_TYPES = new Set(['necklace', 'bracelet', 'earrings', 'ring', 'pendant', 'charm', 'brooch', 'cufflinks', 'watch']);
+const EVERYTHING_ELSE_ITEM_TYPES = new Set(['watch', 'coin', 'silverware']);
+
+function slugifyItemType(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function getProductItemTypeKey(product: Product): string | undefined {
+  const productType = inferProductJewelryType(product);
+  return Object.entries(ITEM_TYPE_VALUES).find(([, type]) => type === productType)?.[0] ?? slugifyItemType(productType);
+}
+
+function productMatchesItemGroup(product: Product, itemGroup: string | undefined): boolean {
+  if (!itemGroup) return true;
+  const typeKey = getProductItemTypeKey(product);
+  if (!typeKey) return false;
+  if (itemGroup === 'jewelry') return JEWELRY_ITEM_TYPES.has(typeKey) || !EVERYTHING_ELSE_ITEM_TYPES.has(typeKey);
+  if (itemGroup === 'everything-else') return EVERYTHING_ELSE_ITEM_TYPES.has(typeKey);
+  return true;
+}
+
+function getShopItemTypeOptions(products: Product[]) {
+  const knownOrder = ['necklace', 'bracelet', 'earrings', 'ring', 'pendant', 'charm', 'brooch', 'cufflinks', 'watch', 'coin', 'silverware'];
+  const knownOptions: Record<string, { value: string; label: string; labelEs: string }> = {
+    necklace: { value: 'necklace', label: 'Necklaces', labelEs: 'Collares' },
+    bracelet: { value: 'bracelet', label: 'Bracelets', labelEs: 'Pulseras' },
+    earrings: { value: 'earrings', label: 'Earrings', labelEs: 'Aretes' },
+    ring: { value: 'ring', label: 'Rings', labelEs: 'Anillos' },
+    pendant: { value: 'pendant', label: 'Pendants', labelEs: 'Dijes' },
+    charm: { value: 'charm', label: 'Charms', labelEs: 'Charms' },
+    brooch: { value: 'brooch', label: 'Brooches', labelEs: 'Broches' },
+    cufflinks: { value: 'cufflinks', label: 'Cufflinks', labelEs: 'Gemelos' },
+    watch: { value: 'watch', label: 'Watches', labelEs: 'Relojes' },
+    coin: { value: 'coin', label: 'Coins', labelEs: 'Monedas' },
+    silverware: { value: 'silverware', label: 'Silverware / Sterling', labelEs: 'Plateria / sterling' },
+  };
+  const dynamic = products
+    .map((product) => {
+      const productType = inferProductJewelryType(product);
+      const value = getProductItemTypeKey(product);
+      if (!value || value === 'other' || knownOptions[value]) return null;
+      const label = productJewelryTypeLabel(productType, 'en');
+      return { value, label, labelEs: label };
+    })
+    .filter((option): option is { value: string; label: string; labelEs: string } => Boolean(option));
+  const uniqueDynamic = Array.from(new Map(dynamic.map((option) => [option.value, option])).values())
+    .sort((a, b) => a.label.localeCompare(b.label));
+  return [...knownOrder.map((value) => knownOptions[value]), ...uniqueDynamic];
+}
 
 function getProductLinkType(product: Product): string {
   const jewelryType = inferProductJewelryType(product);
@@ -164,29 +222,46 @@ function compareNullableNumbers(
 
 const PER_PAGE_OPTIONS = [12, 24, 48, 96];
 const DEFAULT_PER_PAGE = 48;
-type ShopFiltersSearchParams = Awaited<Props['searchParams']>;
+const SHOP_PRODUCT_COLUMNS = [
+  'id',
+  'category',
+  'metal_type',
+  'metal_variant',
+  'title',
+  'title_es',
+  'price_label',
+  'manual_price_label',
+  'price_mode',
+  'purity',
+  'weight_grams',
+  'inventory_number',
+  'sku',
+  'slug',
+  'gram_weight',
+  'brand',
+  'product_type',
+  'jewelry_type',
+  'chain_type',
+  'length',
+  'pricing_multiplier',
+  'status',
+  'images',
+  'image_urls',
+  'image_padding',
+  'image_padding_by_image',
+  'tags',
+  'tags_es',
+  'gender',
+  'item_year',
+  'sort_order',
+].join(', ');
+const SHOP_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR = SHOP_PRODUCT_COLUMNS
+  .split(', ')
+  .filter((column) => column !== 'item_year')
+  .join(', ');
 
-function buildGenderTabHref(
-  locale: string,
-  filters: ShopFiltersSearchParams,
-  gender: 'Men' | 'Women' | '',
-  routeSegment = 'shop',
-): string {
-  const params = new URLSearchParams();
-  Object.entries(filters).forEach(([key, value]) => {
-    if (value == null || key === 'gender' || key === 'page') return;
-    if (Array.isArray(value)) {
-      value.forEach((item) => {
-        if (item) params.append(key, item);
-      });
-      return;
-    }
-    if (value) params.set(key, value);
-  });
-  if (gender) params.set('gender', gender);
-  const query = params.toString();
-  const path = locale === 'es' ? `/es/${routeSegment}` : `/${routeSegment}`;
-  return query ? `${path}?${query}` : path;
+function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
+  return Boolean(error?.message?.toLowerCase().includes('item_year'));
 }
 
 function parsePerPage(value: string | undefined): number {
@@ -206,40 +281,90 @@ function parsePriceFilter(value: string | undefined): number | null {
 }
 
 export default async function ShopPage({ params, searchParams }: Props) {
-  return renderShopPage({ params, searchParams, variant: 'modern', routeSegment: 'shop' });
+  return renderShopPage({ params, searchParams, variant: 'modern' });
 }
 
 export async function renderShopPage({
   params,
   searchParams,
   variant = 'classic',
-  routeSegment,
-  collection = 'default',
-}: Props & { variant?: 'classic' | 'modern'; routeSegment?: 'shop' | 'shop-modern' | 'silver-tableware'; collection?: ShopCollection }) {
+}: Props & { variant?: 'classic' | 'modern' }) {
   const { locale } = await params;
   const rawFilters = await searchParams;
-  const filters = collection === 'silverTableware'
-    ? { ...rawFilters, metal: 'silver', itemType: 'silverware' }
-    : rawFilters;
+  const filters = rawFilters.itemGroup === 'everything-else' && !rawFilters.metal
+    ? { ...rawFilters, metal: 'silver' }
+    : !rawFilters.itemType && !rawFilters.itemGroup
+      ? { ...rawFilters, itemGroup: 'jewelry' }
+      : rawFilters;
+  const selectedMetalColor = getEffectiveMetalColor(filters.metal, filters.metalColor ?? filters.metalType);
 
   const supabase = await createClient();
-  const { data: products, error } = await supabase
+  const buildProductQuery = (columns: string) => supabase
     .from('products')
-    .select('*')
+    .select(columns)
+    .neq('status', 'pending_payment')
     .order('sort_order', { ascending: true });
 
+  let productQuery = buildProductQuery(SHOP_PRODUCT_COLUMNS);
+
+  if (filters.status) {
+    productQuery = productQuery.eq('status', normalizeProductStatus(filters.status as ProductStatus));
+  }
+  if (filters.purity) {
+    productQuery = productQuery.eq('purity', parseInt(filters.purity, 10));
+  }
+  if (selectedMetalColor) {
+    productQuery = productQuery.eq('metal_variant', selectedMetalColor);
+  } else if (filters.metal === 'gold') {
+    productQuery = productQuery.eq('category', 'Gold');
+  } else if (filters.metal === 'silver') {
+    productQuery = productQuery.or('category.eq.Silver,metal_variant.eq.bicolor_gold');
+  }
+  if (filters.brand) {
+    productQuery = productQuery.eq('brand', filters.brand);
+  }
+
+  const productResult = await productQuery;
+  let products: unknown[] | null = productResult.data as unknown[] | null;
+  let error = productResult.error;
+  if (isMissingItemYearColumnError(error)) {
+    let fallbackQuery = buildProductQuery(SHOP_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR);
+    if (filters.status) {
+      fallbackQuery = fallbackQuery.eq('status', normalizeProductStatus(filters.status as ProductStatus));
+    }
+    if (filters.purity) {
+      fallbackQuery = fallbackQuery.eq('purity', parseInt(filters.purity, 10));
+    }
+    if (selectedMetalColor) {
+      fallbackQuery = fallbackQuery.eq('metal_variant', selectedMetalColor);
+    } else if (filters.metal === 'gold') {
+      fallbackQuery = fallbackQuery.eq('category', 'Gold');
+    } else if (filters.metal === 'silver') {
+      fallbackQuery = fallbackQuery.or('category.eq.Silver,metal_variant.eq.bicolor_gold');
+    }
+    if (filters.brand) {
+      fallbackQuery = fallbackQuery.eq('brand', filters.brand);
+    }
+    const fallback = await fallbackQuery;
+    products = (fallback.data as unknown[] | null)?.map((product) => ({ ...(product as Record<string, unknown>), item_year: null })) ?? null;
+    error = fallback.error;
+  }
+
   const spotData = await fetchSpotData();
-  const allProducts: Product[] = (products ?? []) as Product[];
+  const allProducts: Product[] = (products ?? []) as unknown as Product[];
   const publicGalleryProducts = allProducts.filter(isVisibleInPublicGallery);
-  const collectionProducts = collection === 'silverTableware'
-    ? publicGalleryProducts.filter((product) => inferProductJewelryType(product) === 'Silverware' && productMatchesBroadMetal(product, 'silver'))
-    : publicGalleryProducts;
+  const collectionProducts = publicGalleryProducts;
+  const itemTypeOptions = getShopItemTypeOptions(collectionProducts);
+  const brandScopeProducts = collectionProducts.filter((product) => {
+    if (!productMatchesItemGroup(product, filters.itemGroup)) return false;
+    if (filters.itemGroup === 'everything-else') return productMatchesBroadMetal(product, 'silver');
+    return true;
+  });
   const brandOptions = Array.from(new Set(
-    collectionProducts
+    brandScopeProducts
       .map((product) => product.brand?.trim())
       .filter(Boolean) as string[],
   )).sort((a, b) => a.localeCompare(b));
-  const selectedMetalColor = getEffectiveMetalColor(filters.metal, filters.metalColor ?? filters.metalType);
   const selectedLengths = normalizeLengths(filters.length);
   const allowedLengthValues = getAllowedLengthValues(filters.itemType);
   const effectiveSelectedLengths = selectedLengths.filter((length) => allowedLengthValues.includes(length));
@@ -267,6 +392,25 @@ export async function renderShopPage({
     ? Math.max(selectedPriceMin, selectedPriceMax)
     : selectedPriceMax;
 
+  // Era / year range. Bounds run from the start of the Victorian era to the
+  // current year. A blank or full-span selection shows everything (including
+  // items with no year yet). The lower handle at the floor means "1837 &
+  // earlier", so it imposes no lower limit (pre-Victorian pieces stay visible);
+  // likewise the upper handle at the ceiling imposes no upper limit. A bound is
+  // only enforced when its handle sits strictly inside the full span.
+  const yearMinBound = JEWELRY_ERA_MIN_YEAR;
+  const yearMaxBound = jewelryEraMaxYear(new Date().getFullYear());
+  const clampYear = (year: number) => Math.min(Math.max(year, yearMinBound), yearMaxBound);
+  const parsedYearMin = parseYearFilter(filters.yearMin);
+  const parsedYearMax = parseYearFilter(filters.yearMax);
+  const selectedYearMin = parsedYearMin != null ? clampYear(parsedYearMin) : null;
+  const selectedYearMax = parsedYearMax != null ? clampYear(parsedYearMax) : null;
+  const effectiveYearMin = selectedYearMin != null ? Math.min(selectedYearMin, selectedYearMax ?? yearMaxBound) : null;
+  const effectiveYearMax = selectedYearMax != null ? Math.max(selectedYearMax, selectedYearMin ?? yearMinBound) : null;
+  const yearLowerLimit = effectiveYearMin != null && effectiveYearMin > yearMinBound ? effectiveYearMin : null;
+  const yearUpperLimit = effectiveYearMax != null && effectiveYearMax < yearMaxBound ? effectiveYearMax : null;
+  const isYearFilterActive = yearLowerLimit != null || yearUpperLimit != null;
+
   const filtered = collectionProducts.filter((p) => {
     if (filters.metal) {
       if (!productMatchesBroadMetal(p, filters.metal)) return false;
@@ -278,10 +422,12 @@ export async function renderShopPage({
       if (p.purity !== parseInt(filters.purity)) return false;
     }
     if (filters.status && normalizeProductStatus(p.status) !== normalizeProductStatus(filters.status as ProductStatus)) return false;
-    if (filters.itemType) {
+    if (!productMatchesItemGroup(p, filters.itemGroup)) return false;
+    if (filters.itemType && filters.itemType !== 'all') {
       const selectedJewelryType = ITEM_TYPE_VALUES[filters.itemType];
       if (selectedJewelryType && inferProductJewelryType(p) !== selectedJewelryType) return false;
       const kws = ITEM_TYPE_KEYWORDS[filters.itemType];
+      if (!selectedJewelryType && !kws && getProductItemTypeKey(p) !== filters.itemType) return false;
       if (!selectedJewelryType && kws) {
         const txt = [p.title, p.title_es, p.chain_type, p.length, ...(p.tags ?? []), ...(p.tags_es ?? [])].join(' ').toLowerCase();
         if (!kws.some(k => txt.includes(k))) return false;
@@ -304,12 +450,17 @@ export async function renderShopPage({
       const lenTag = p.length ?? (p.tags ?? []).find((t: string) => t.startsWith('len:'))?.slice(4);
       if (!lenTag || !effectiveSelectedLengths.includes(lenTag)) return false;
     }
-    if (filters.gender) {
+    if (filters.gender && filters.itemGroup !== 'everything-else') {
       const g = p.gender ?? 'Unisex';
       // Unisex items appear in all gender categories
       if (g !== 'Unisex' && g !== filters.gender) return false;
     }
     if (filters.brand && p.brand?.trim() !== filters.brand) return false;
+    if (isYearFilterActive) {
+      if (p.item_year == null) return false;
+      if (yearLowerLimit != null && p.item_year < yearLowerLimit) return false;
+      if (yearUpperLimit != null && p.item_year > yearUpperLimit) return false;
+    }
     if (effectivePriceMin != null || effectivePriceMax != null) {
       const price = getSortablePrice(p, spotData);
       if (price == null) return false;
@@ -359,8 +510,7 @@ export async function renderShopPage({
 
   const isEs = locale === 'es';
   const isModern = variant === 'modern';
-  const currentRouteSegment = routeSegment ?? (isModern ? 'shop-modern' : 'shop');
-  const isSilverTableware = collection === 'silverTableware';
+  const isSilverTableware = false;
   const heroContent = isSilverTableware
     ? {
         eyebrow: isEs ? 'Plateria sterling seleccionada' : 'Curated sterling silver',
@@ -393,32 +543,32 @@ export async function renderShopPage({
         ],
       }
     : {
-        eyebrow: isEs ? 'Una forma más inteligente de poseer oro' : 'A smarter way to own gold',
+        eyebrow: isEs ? 'Una forma más inteligente de poseer oro' : 'A smarter way to own precious metals',
         title: isEs ? 'No solo compres. Invierte.' : "Don't just buy. Invest.",
         copy: isEs
           ? 'Cada pieza tiene precio en vivo contra el mercado spot del oro, con el valor exacto de chatarra de oro mostrado junto a tu precio. No solo compras joyería — estás poniendo tu dinero en oro real y usable a un valor que puedes verificar.'
-          : "Every piece is priced live against the gold spot market, with the exact gold scrap value shown right next to your price. You're not just buying jewelry — you're putting your money into real, wearable gold at a value you can verify.",
+          : "Every piece is priced live against the metals spot market, with the exact scrap value shown right next to your price. You're not just shopping — you're putting your money into something useful at a value you can verify.",
         points: [
           {
             icon: 'monitoring',
             label: isEs ? 'Precios en vivo' : 'Live spot prices',
             copy: isEs
               ? 'Los valores del oro se actualizan mientras compras, usando los mismos datos del mercado que impulsan cada listado.'
-              : 'Gold values update as you shop, using the same market data that powers each listing.',
+              : 'Spot values update as you shop, using the same market data that powers each listing.',
           },
           {
             icon: 'sell',
             label: isEs ? 'Chatarra y precio' : 'Scrap and price',
             copy: isEs
               ? 'Cada listado muestra el valor exacto de chatarra de oro junto a tu precio — nada oculto.'
-              : 'Each listing shows the exact gold scrap value next to your price — nothing hidden.',
+              : 'Each listing shows the exact precious metal scrap value next to your price — nothing hidden.',
           },
           {
             icon: 'auto_awesome',
             label: isEs ? 'En cada página' : 'On every product page',
             copy: isEs
               ? 'Ve el multiplicador spot detrás del precio, más una oferta especial de intercambio para tu propio oro.'
-              : 'See the spot multiplier behind the price, plus a special trade-in offer for your own gold.',
+              : 'See the spot multiplier behind the price, plus a special trade-in offer for your own gold or silver.',
           },
         ],
       };
@@ -448,7 +598,7 @@ export async function renderShopPage({
           {/* Investment transparency note */}
           <section
             className={isModern
-              ? 'modern-shop-hero mb-6 md:mb-8 overflow-hidden text-left'
+              ? 'modern-shop-hero shop-entry-reveal shop-entry-reveal-hero mb-6 md:mb-8 overflow-hidden text-left'
               : 'mb-2 md:mb-10 text-center px-3 md:px-5 py-2 md:py-8'}
             style={isModern ? undefined : investStyle}
             aria-labelledby="shop-invest-heading"
@@ -514,9 +664,18 @@ export async function renderShopPage({
             </div>
           </section>
 
+          <ShopYearFilter
+            key={`${selectedYearMin ?? 'min'}-${selectedYearMax ?? 'max'}`}
+            locale={locale}
+            minYear={yearMinBound}
+            maxYear={yearMaxBound}
+            selectedMin={selectedYearMin}
+            selectedMax={selectedYearMax}
+          />
+
           <div className="shop-catalog-layout">
             {/* -- Filters ------------------------------------------ */}
-            <aside className="shop-filter-sidebar" aria-label={isEs ? 'Filtros de tienda' : 'Shop filters'}>
+            <aside className={isModern ? 'shop-filter-sidebar shop-entry-reveal shop-entry-reveal-filters' : 'shop-filter-sidebar'} aria-label={isEs ? 'Filtros de tienda' : 'Shop filters'}>
               <ShopFilters
                 locale={locale}
                 currentFilters={filters}
@@ -525,35 +684,13 @@ export async function renderShopPage({
                 allCount={collectionProducts.length}
                 spotData={spotData}
                 priceRange={priceRange}
+                itemTypeOptions={itemTypeOptions}
                 variant={isModern ? 'modern' : 'classic'}
               />
             </aside>
 
             {/* -- Grid --------------------------------------------- */}
             <section className="min-w-0">
-              <nav
-                className="shop-gender-tabs"
-                aria-label={isEs ? 'Filtro principal de tienda' : 'Main shop filter'}
-              >
-                {[
-                  { value: 'Men' as const, label: isEs ? 'Hombres' : "Men's" },
-                  { value: '' as const, label: isEs ? 'Todo' : 'All' },
-                  { value: 'Women' as const, label: isEs ? 'Damas' : "Ladies'" },
-                ].map((tab) => {
-                  const active = tab.value ? filters.gender === tab.value : !filters.gender;
-                  return (
-                    <Link
-                      key={tab.label}
-                      href={buildGenderTabHref(locale, filters, tab.value, currentRouteSegment)}
-                      aria-current={active ? 'page' : undefined}
-                      className="shop-gender-tab"
-                      data-active={active ? 'true' : 'false'}
-                    >
-                      {tab.label}
-                    </Link>
-                  );
-                })}
-              </nav>
               {filtered.length === 0 ? (
                 <p
                   className="py-24 text-center text-sm"
@@ -563,17 +700,12 @@ export async function renderShopPage({
                 </p>
               ) : (
                 <>
-                  <div className="shop-product-grid grid grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-5">
-                    {paginatedProducts.map((product) => (
-                      <ProductCard
-                        key={product.id}
-                        product={product}
-                        spotData={spotData}
-                        locale={locale}
-                        variant={isModern ? 'modern' : 'classic'}
-                      />
-                    ))}
-                  </div>
+                  <ShopProductGrid
+                    products={paginatedProducts}
+                    spotData={spotData}
+                    locale={locale}
+                    variant={isModern ? 'modern' : 'classic'}
+                  />
                   <ShopPagination
                     locale={locale}
                     currentPage={currentPage}
@@ -591,6 +723,29 @@ export async function renderShopPage({
             .modern-shop-page {
               background: #ffffff;
             }
+            .shop-entry-reveal {
+              opacity: 0;
+              animation: shop-entry-reveal 620ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+              will-change: opacity, transform, filter;
+            }
+            .shop-entry-reveal-hero {
+              animation-delay: 80ms;
+            }
+            .shop-entry-reveal-filters {
+              animation-delay: 260ms;
+            }
+            @keyframes shop-entry-reveal {
+              from {
+                opacity: 0;
+                transform: translateY(18px) scale(0.992);
+                filter: blur(6px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+                filter: blur(0);
+              }
+            }
             .modern-shop-hero {
               position: relative;
               min-height: 25rem;
@@ -605,7 +760,7 @@ export async function renderShopPage({
               inset: 0;
               background:
                 linear-gradient(90deg, #ffffff 0%, rgba(255, 255, 255, 0.88) 34%, rgba(255, 255, 255, 0.26) 56%, rgba(255, 255, 255, 0.06) 100%),
-                url('/assets/images/pages/shop-modern-chain.png') center right / cover no-repeat;
+                url('/assets/images/pages/shop-modern-chain.webp') center right / cover no-repeat;
               z-index: -1;
             }
             .modern-shop-hero-content {
@@ -856,6 +1011,14 @@ export async function renderShopPage({
             @media (min-width: 2320px) {
               .shop-product-grid {
                 grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+              }
+            }
+            @media (prefers-reduced-motion: reduce) {
+              .shop-entry-reveal {
+                opacity: 1;
+                animation: none;
+                transform: none;
+                filter: none;
               }
             }
           `}</style>

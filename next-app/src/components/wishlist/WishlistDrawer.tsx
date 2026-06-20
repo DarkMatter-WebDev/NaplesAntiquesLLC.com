@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useWishlist, type WishlistItem } from '@/context/WishlistContext';
 import { isProductSold, productImagePaddingBackground } from '@/types/product';
+import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 
 const GOLD = '#735c00';
 const BORDER = '#d8d0c2';
@@ -131,6 +132,7 @@ function DrawerItem({
   const title = isEs && item.title_es ? item.title_es : item.title;
   const isSold = isProductSold(item.status);
   const imageFrameBackground = productImagePaddingBackground(item.image_padding);
+  const image = normalizeLegacyLocalImageUrl(item.image);
 
   const priceLabel =
     item.price_mode === 'manual'
@@ -147,14 +149,14 @@ function DrawerItem({
         className="relative flex-shrink-0 w-14 h-14 overflow-hidden"
         style={{ background: imageFrameBackground }}
       >
-        {item.image ? (
+        {image ? (
           <Image
-            src={item.image}
+            src={image}
             alt={title}
             fill
             sizes="56px"
             className="object-contain"
-            unoptimized={item.image.startsWith('/assets/')}
+            unoptimized={image.startsWith('/assets/')}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-[#735c00]/35">

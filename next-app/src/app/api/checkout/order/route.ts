@@ -12,6 +12,34 @@ const SHIPPING_FEES: Record<string, number> = {
   'express-overnight-insured': 75,
   'priority-insured': 45,
 };
+const CHECKOUT_PRODUCT_COLUMNS = [
+  'id',
+  'category',
+  'metal_type',
+  'metal_variant',
+  'title',
+  'item_year',
+  'price_mode',
+  'purity',
+  'weight_grams',
+  'inventory_number',
+  'sku',
+  'gram_weight',
+  'pricing_multiplier',
+  'status',
+  'images',
+  'image_urls',
+  'manual_price_label',
+  'asking_price',
+].join(', ');
+const CHECKOUT_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR = CHECKOUT_PRODUCT_COLUMNS
+  .split(', ')
+  .filter((column) => column !== 'item_year')
+  .join(', ');
+
+function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
+  return Boolean(error?.message?.toLowerCase().includes('item_year'));
+}
 
 function shippingMethodForDb(value: string) {
   if (value === 'local-pickup') return 'pickup';
@@ -45,17 +73,24 @@ export async function POST(req: Request) {
   }
 
   const supabase = await createClient();
-  const [{ data: { user } }, { data: products, error: productsError }, spotData] = await Promise.all([
+  const [{ data: { user } }, productResult, spotData] = await Promise.all([
     supabase.auth.getUser(),
-    supabase.from('products').select('*').in('id', productIds),
+    supabase.from('products').select(CHECKOUT_PRODUCT_COLUMNS).in('id', productIds),
     fetchSpotData(),
   ]);
+  let products: unknown[] | null = productResult.data as unknown[] | null;
+  let productsError = productResult.error;
+  if (isMissingItemYearColumnError(productsError)) {
+    const fallback = await supabase.from('products').select(CHECKOUT_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR).in('id', productIds);
+    products = (fallback.data as unknown[] | null)?.map((product) => ({ ...(product as Record<string, unknown>), item_year: null })) ?? null;
+    productsError = fallback.error;
+  }
 
   if (productsError) {
     return NextResponse.json({ error: productsError.message }, { status: 500 });
   }
 
-  const typedProducts = (products ?? []) as Product[];
+  const typedProducts = (products ?? []) as unknown as Product[];
   if (typedProducts.length !== productIds.length) {
     return NextResponse.json({ error: 'One or more cart items could not be found' }, { status: 400 });
   }
@@ -71,6 +106,7 @@ export async function POST(req: Request) {
     product_id: product.id,
     inventory_number: product.inventory_number != null ? String(product.inventory_number) : product.sku ?? product.id,
     title_snapshot: product.title,
+    item_year_snapshot: product.item_year,
     metal_snapshot: getProductMetal(product),
     purity_snapshot: product.purity ? String(product.purity) : null,
     gram_weight_snapshot: getProductWeight(product),

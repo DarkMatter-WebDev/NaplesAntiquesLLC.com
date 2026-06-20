@@ -33,6 +33,7 @@ export default async function EstateJewelryPage({ params }: Props) {
               src="/assets/images/pages/jeweler.webp"
               alt={isEs ? 'Joyero midiendo un anillo de patrimonio durante una evaluación privada' : 'Jeweler measuring an estate ring during a private evaluation'}
               fill
+              sizes="100vw"
               priority
               className="object-cover object-center"
             />
@@ -262,6 +263,7 @@ export default async function EstateJewelryPage({ params }: Props) {
                   src="/assets/images/pages/patek.webp"
                   alt={isEs ? 'Reloj de lujo Patek Philippe' : 'Patek Philippe luxury watch'}
                   fill
+                  sizes="(max-width: 768px) 100vw, 50vw"
                   className="object-cover group-hover:scale-105 transition-transform duration-700"
                   style={{ objectPosition: 'center 68%' }}
                 />
@@ -289,6 +291,7 @@ export default async function EstateJewelryPage({ params }: Props) {
                     src="/assets/images/pages/gold.webp"
                     alt={isEs ? 'Joyería de oro y cadenas' : 'Gold jewelry and chains'}
                     fill
+                    sizes="(max-width: 768px) 100vw, 50vw"
                     className="object-cover group-hover:scale-105 transition-transform duration-700"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
@@ -311,6 +314,7 @@ export default async function EstateJewelryPage({ params }: Props) {
                     src="/assets/images/pages/signed.webp"
                     alt={isEs ? 'Broches y colgantes victorianos de oro' : 'Victorian gold brooches and pendants'}
                     fill
+                    sizes="(max-width: 768px) 100vw, 50vw"
                     className="object-cover group-hover:scale-105 transition-transform duration-700"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
