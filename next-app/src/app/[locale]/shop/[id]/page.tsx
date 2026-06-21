@@ -8,6 +8,7 @@ import {
   formatProductItemYear,
   isProductPurchasable,
   isProductSold,
+  isProductVisibleInShop,
   productJewelryTypeLabel,
   productImagePaddingBackground,
   productImagePaddingForImage,
@@ -38,17 +39,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const supabase = await createClient();
   const { data } = await supabase
     .from('products')
-    .select('title, description, images')
+    .select('title, description, images, image_urls, status')
     .eq('id', id)
     .single();
 
-  if (!data) return { title: 'Product Not Found' };
+  if (!data || !isProductVisibleInShop(data.status)) return { title: 'Product Not Found' };
+
+  const image = data.image_urls?.[0] ?? data.images?.[0];
 
   return {
     title: data.title,
     description: data.description ?? `${data.title} — Naples Estate Jewelry Co`,
     openGraph: {
-      images: data.images?.[0] ? [{ url: data.images[0] }] : [],
+      images: image ? [{ url: image }] : [],
     },
   };
 }
@@ -131,6 +134,8 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   if (error || !product) notFound();
 
   const p = product as Product;
+  if (!isProductVisibleInShop(p.status) && !returnHref) notFound();
+
   const spotData = await fetchSpotData();
 
   const title = isEs && p.title_es ? p.title_es : p.title;

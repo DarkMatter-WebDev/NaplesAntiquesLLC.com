@@ -216,6 +216,13 @@ export function isProductPurchasable(status: ProductStatus | null | undefined): 
   return normalizeProductStatus(status) === 'available';
 }
 
+export const PUBLIC_SHOP_PRODUCT_STATUSES = ['available', 'sold', 'Available', 'Sold'] as const;
+
+export function isProductVisibleInShop(status: ProductStatus | null | undefined): boolean {
+  const normalized = normalizeProductStatus(status);
+  return normalized === 'available' || normalized === 'sold';
+}
+
 export function productStatusLabel(status: ProductStatus | null | undefined): string {
   const normalized = normalizeProductStatus(status);
   if (normalized === 'pending_payment') return 'Pending Payment';

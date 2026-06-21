@@ -2,8 +2,10 @@ import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import {
   PRODUCT_METAL_VARIANTS,
+  PUBLIC_SHOP_PRODUCT_STATUSES,
   inferProductJewelryType,
   isProductPurchasable,
+  isProductVisibleInShop,
   normalizeProductMetalVariant,
   normalizeProductStatus,
   productMetalVariantLabel,
@@ -16,6 +18,7 @@ import { fetchSpotData } from '@/lib/spot-price';
 import { calcSpotPriceValue } from '@/lib/pricing';
 import ShopProductGrid from '@/components/shop/ShopProductGrid';
 import ShopFilters from '@/components/shop/ShopFilters';
+import ShopSortSelect from '@/components/shop/ShopSortSelect';
 import ShopYearFilter from '@/components/shop/ShopYearFilter';
 import ShopPagination from '@/components/shop/ShopPagination';
 import { JEWELRY_ERA_MIN_YEAR, jewelryEraMaxYear, parseYearFilter } from '@/lib/jewelry-eras';
@@ -194,7 +197,7 @@ function productMatchesBroadMetal(product: Product, metal: string | undefined): 
 }
 
 function isVisibleInPublicGallery(product: Product): boolean {
-  return normalizeProductStatus(product.status) !== 'pending_payment';
+  return isProductVisibleInShop(product.status);
 }
 
 function parsePriceLabel(value: string | null): number | null {
@@ -306,7 +309,7 @@ export async function renderShopPage({
   const buildProductQuery = (columns: string) => supabase
     .from('products')
     .select(columns)
-    .neq('status', 'pending_payment')
+    .in('status', [...PUBLIC_SHOP_PRODUCT_STATUSES])
     .order('sort_order', { ascending: true });
 
   let productQuery = buildProductQuery(SHOP_PRODUCT_COLUMNS);
@@ -362,7 +365,7 @@ export async function renderShopPage({
     supabase
       .from('products')
       .select('id', { count: 'exact', head: true })
-      .neq('status', 'pending_payment'),
+      .in('status', [...PUBLIC_SHOP_PRODUCT_STATUSES]),
   ]);
   const totalInventoryCount = totalInventoryResult.count ?? null;
   const allProducts: Product[] = (products ?? []) as unknown as Product[];
@@ -766,6 +769,9 @@ export async function renderShopPage({
 
             {/* -- Grid --------------------------------------------- */}
             <section className="min-w-0">
+              <div className="shop-gallery-toolbar">
+                <ShopSortSelect locale={locale} currentSort={filters.sort} />
+              </div>
               {filtered.length === 0 ? (
                 <p
                   className="py-24 text-center text-sm"
@@ -922,6 +928,18 @@ export async function renderShopPage({
               border-radius: var(--radius-xl) !important;
             }
             @media (max-width: 767px) {
+              .shop-gallery-toolbar {
+                justify-content: stretch;
+              }
+              .shop-gallery-sort {
+                width: 100%;
+                justify-content: space-between;
+              }
+              .shop-gallery-sort select {
+                min-width: 0;
+                flex: 1;
+                text-align: right;
+              }
               /* Merge the hero and the filter card into one seamless card */
               .modern-shop-hero {
                 min-height: 0;
@@ -968,6 +986,46 @@ export async function renderShopPage({
             .shop-catalog-layout {
               display: block;
               margin-top: 2rem;
+            }
+            .shop-gallery-toolbar {
+              display: flex;
+              justify-content: flex-end;
+              margin-bottom: 0.8rem;
+            }
+            .shop-gallery-sort {
+              display: inline-flex;
+              align-items: center;
+              gap: 0.45rem;
+              min-height: 2.25rem;
+              max-width: 100%;
+              border: 1px solid rgba(115, 92, 0, 0.18);
+              border-radius: 7px;
+              background: #ffffff;
+              box-shadow: 0 8px 18px rgba(42, 34, 12, 0.05);
+              color: var(--color-on-surface-variant);
+              font-family: var(--font-label);
+              padding: 0 0.55rem 0 0.75rem;
+            }
+            .shop-gallery-sort span {
+              color: var(--color-primary);
+              font-size: 0.58rem;
+              font-weight: 800;
+              letter-spacing: 0.14em;
+              line-height: 1;
+              text-transform: uppercase;
+              white-space: nowrap;
+            }
+            .shop-gallery-sort select {
+              min-width: 11.5rem;
+              height: 2.15rem;
+              border: 0;
+              background: transparent;
+              color: var(--color-on-surface);
+              cursor: pointer;
+              font-family: var(--font-label);
+              font-size: 0.78rem;
+              font-weight: 800;
+              outline: none;
             }
             .shop-filter-sidebar {
               min-width: 0;

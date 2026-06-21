@@ -4,6 +4,7 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { PRODUCT_METAL_VARIANTS, type SpotData } from '@/types/product';
+import ShopSortSelect from '@/components/shop/ShopSortSelect';
 
 const GOLD = '#735c00';
 const BORDER = 'rgba(115, 92, 0, 0.35)';
@@ -560,6 +561,15 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
       </div>
 
       <div id="shop-filter-panel" className={`shop-filter-panel${filtersOpen ? ' is-open' : ''}`}>
+        {hasFilters && (
+          <div className="shop-clear-filters-top">
+            <button type="button" onClick={clearAll}>
+              <span className="material-symbols-outlined" aria-hidden="true">close</span>
+              {isEs ? 'Limpiar filtros' : 'Clear filters'}
+            </button>
+          </div>
+        )}
+
         {/* Search + live metal prices */}
         <div className="shop-search-spot-row">
           <div
@@ -770,22 +780,13 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
             </div>
 
             {/* Sort */}
-            <div>
-              <label style={labelStyle}>{isEs ? 'Ordenar' : 'Sort'}</label>
-              <select
-                value={currentFilters.sort ?? ''}
-                onChange={(e) => updateFilter('sort', e.target.value)}
-                style={selectStyle}
-              >
-                <option value="">{isEs ? 'Inventario' : 'Inventory order'}</option>
-                <option value="price-asc">{isEs ? 'Precio: menor a mayor' : 'Price: low to high'}</option>
-                <option value="price-desc">{isEs ? 'Precio: mayor a menor' : 'Price: high to low'}</option>
-                <option value="weight-asc">{isEs ? 'Peso: menor a mayor' : 'Weight: low to high'}</option>
-                <option value="weight-desc">{isEs ? 'Peso: mayor a menor' : 'Weight: high to low'}</option>
-                <option value="brand-asc">{isEs ? 'Marca: A a Z' : 'Brand: A to Z'}</option>
-                <option value="brand-desc">{isEs ? 'Marca: Z a A' : 'Brand: Z to A'}</option>
-              </select>
-            </div>
+            <ShopSortSelect
+              locale={locale}
+              currentSort={currentFilters.sort}
+              appearance="filter"
+              labelStyle={labelStyle}
+              selectStyle={selectStyle}
+            />
 
           </div>
 
@@ -1034,6 +1035,35 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
         }
         .shop-filter-panel.is-open {
           display: block;
+        }
+        .shop-clear-filters-top {
+          display: flex;
+          justify-content: flex-end;
+          margin-bottom: 0.75rem;
+        }
+        .shop-clear-filters-top button {
+          min-height: 2.15rem;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.35rem;
+          border: 1px solid rgba(115, 92, 0, 0.18);
+          border-radius: 7px;
+          background: #ffffff;
+          box-shadow: 0 8px 18px rgba(42, 34, 12, 0.05);
+          color: ${GOLD};
+          cursor: pointer;
+          font-family: var(--font-label);
+          font-size: 0.64rem;
+          font-weight: 800;
+          letter-spacing: 0.12em;
+          line-height: 1;
+          padding: 0.35rem 0.7rem;
+          text-transform: uppercase;
+        }
+        .shop-clear-filters-top .material-symbols-outlined {
+          font-size: 1rem;
+          line-height: 1;
         }
         .shop-price-filter {
           max-width: 38rem;
