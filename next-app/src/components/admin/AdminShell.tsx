@@ -493,6 +493,7 @@ const AI_PRODUCT_FIELD_LABELS: Record<keyof ProductAutofillFields, string> = {
   price_mode: 'Price Mode',
   purity: 'Purity',
   weight_grams: 'Weight (g)',
+  item_year: 'Date (Year Made)',
   pricing_multiplier: 'Multiplier',
   asking_price: 'Asking Price',
   manual_price_label: 'Price Label',
@@ -517,8 +518,11 @@ const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null; widthClas
   { label: 'Mode', sortKey: 'mode', widthClass: 'w-[94px]' },
   { label: 'Price', sortKey: 'currentPrice', widthClass: 'w-[92px]' },
   { label: 'Status', sortKey: 'status', widthClass: 'w-[92px]' },
-  { label: '', sortKey: null, widthClass: 'w-[224px]' },
+  { label: '', sortKey: null, widthClass: 'w-[44px]', responsiveClass: 'max-md:w-[28px] max-md:min-w-[28px] max-md:max-w-[28px]' },
 ];
+
+// Shared styling for a single item inside the row Actions dropdown menu.
+const ROW_ACTION_MENU_ITEM_CLASS = 'px-3 py-2 text-left text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-colors hover:bg-[var(--color-surface-container)]';
 
 function getMasterProductOrder(products: Product[]): Product[] {
   return [...products].sort((a, b) => {
@@ -532,8 +536,8 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
   return {
     id: '',
     category: 'Gold',
-    metal_type: 'Gold',
-    metal_variant: 'yellow_gold',
+    metal_type: '',
+    metal_variant: '',
     title: '',
     title_es: '',
     price_label: null,
@@ -544,15 +548,15 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
     inventory_number: null,
     sku: null,
     slug: null,
-    metal: 'Gold',
+    metal: '',
     gram_weight: null,
     stone_details: null,
     brand: null,
-    product_type: 'Necklace',
-    jewelry_type: 'Necklace',
+    product_type: '',
+    jewelry_type: '',
     chain_type: null,
     length: null,
-    pricing_multiplier: 1.25,
+    pricing_multiplier: null,
     status: 'available',
     location: 'showcase',
     images: [],
@@ -566,7 +570,7 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
     tags: [],
     tags_es: [],
     private_price_label: null,
-    gender: 'Unisex',
+    gender: '',
     item_year: null,
     cost_basis: null,
     melt_value: null,
@@ -755,6 +759,24 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null);
+  // Confirmation gate for the listing editor's close/cancel/save actions.
+  const [editorConfirm, setEditorConfirm] = useState<{
+    title: string;
+    message: string;
+    confirmLabel: string;
+    onConfirm: () => void;
+  } | null>(null);
+  // Mobile-only collapse state for the editor's blocks (no effect on desktop).
+  const [openEditorSections, setOpenEditorSections] = useState<{ photos: boolean; ai: boolean; details: boolean }>({
+    photos: false,
+    ai: false,
+    details: false,
+  });
+  const toggleEditorSection = (key: 'photos' | 'ai' | 'details') =>
+    setOpenEditorSections((current) => ({ ...current, [key]: !current[key] }));
+  // Heads-up dialog shown before the Smart Assistant starts listening.
+  const [showMicPrompt, setShowMicPrompt] = useState(false);
   const [imagePaddingTarget, setImagePaddingTarget] = useState<Product | null>(null);
   const [imagePaddingTargetIndex, setImagePaddingTargetIndex] = useState(0);
   const imagePaddingTargetIndexRef = useRef(0);
@@ -905,7 +927,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     originalRef.current = null;
     setSessionUploadedImageUrls(new Set());
     setFormErrors([]);
-    setJewelryTypeInput('Necklace');
+    setJewelryTypeInput('');
     setChainTypeInput('');
     setLengthInput('');
     setQuickEntry('');
@@ -1568,6 +1590,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setField('price_mode', 'Price Mode', (value) => { nextEditing.price_mode = value; });
     setField('purity', 'Purity', (value) => { nextEditing.purity = value; });
     setField('weight_grams', 'Weight', (value) => { nextEditing.weight_grams = value; });
+    setField('item_year', 'Date (Year Made)', (value) => { nextEditing.item_year = value; });
     setField('pricing_multiplier', 'Multiplier', (value) => { nextEditing.pricing_multiplier = value; });
     setField('asking_price', 'Asking Price', (value) => {
       nextEditing.asking_price = value;
@@ -1628,6 +1651,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   }
 
   function closeModal() {
+    setEditorConfirm(null);
+    setShowMicPrompt(false);
     setEditing(null);
     setSessionUploadedImageUrls(new Set());
     setPreviewImg(null);
@@ -1637,6 +1662,25 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setAiNotice(null);
     setAiDraft(null);
     setAiUndoSnapshot(null);
+  }
+
+  // The editor never closes from an outside click; closing or saving always
+  // routes through a confirmation step.
+  function requestCloseEditor() {
+    setEditorConfirm({
+      title: 'Close this listing?',
+      message: 'Any unsaved changes will be lost.',
+      confirmLabel: 'Close',
+      onConfirm: () => { setEditorConfirm(null); closeModal(); },
+    });
+  }
+  function requestSaveEditor(afterSave: 'stay' | 'another' | 'close') {
+    setEditorConfirm({
+      title: 'Save this listing?',
+      message: 'Your changes will be saved to the catalog.',
+      confirmLabel: 'Save',
+      onConfirm: () => { setEditorConfirm(null); void handleSave(afterSave); },
+    });
   }
 
   const uploadImageBlob = useCallback(async (blob: Blob): Promise<string | null> => {
@@ -2769,10 +2813,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               <thead>
                 <tr className="border-b text-left" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}>
                   <th
-                    className="px-3 py-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap"
+                    className="px-3 py-3 max-md:px-1 text-xs font-bold uppercase tracking-wide whitespace-nowrap"
                     style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
                   >
-                    Order
+                    <span className="max-md:hidden">Order</span>
                   </th>
                   {PRODUCT_TABLE_COLUMNS.map(({ label, sortKey, widthClass, responsiveClass }) => {
                     const active = sortConfig?.key === sortKey;
@@ -2842,7 +2886,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                         ? 'color-mix(in srgb, var(--color-primary) 8%, transparent)'
                         : undefined,
                     }}>
-                    <td className="px-2 py-3 whitespace-nowrap w-[52px]">
+                    <td className="px-2 py-3 max-md:px-0.5 max-md:w-[36px] whitespace-nowrap w-[52px]">
                       <span
                         className="material-symbols-outlined inline-flex h-8 w-8 items-center justify-center"
                         aria-hidden="true"
@@ -2856,7 +2900,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                         drag_indicator
                       </span>
                     </td>
-                    <td className="px-2 py-3 whitespace-nowrap w-[54px] font-bold text-xs" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
+                    <td className="px-2 py-3 max-md:px-1 whitespace-nowrap w-[54px] font-bold text-xs" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
                       {formatInventoryNumberDisplay(p.inventory_number ?? inventoryNumbers.get(p.id))}
                     </td>
                     <td className="p-0">
@@ -2936,66 +2980,91 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                         {getStatusLabel(p.status)}
                       </span>
                     </td>
-                    <td className="sticky right-0 z-10 px-2 py-3 w-[224px] min-w-[224px] max-w-[224px] align-top" style={{ background: dragTargetProductId === p.id ? 'color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-container-lowest))' : 'var(--color-surface-container-lowest)' }}>
-                      <div className="flex w-[208px] flex-wrap gap-x-2 gap-y-2 leading-none">
-                        <Link
-                          href={`${locale === 'es' ? '/es' : ''}/shop/${p.id}?returnTo=admin`}
-                          className="text-xs font-bold uppercase tracking-wide hover:underline"
-                          style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                    <td className={`sticky right-0 px-1 max-md:px-0 py-3 w-[44px] min-w-[44px] max-w-[44px] max-md:w-[28px] max-md:min-w-[28px] max-md:max-w-[28px] ${actionMenuId === p.id ? 'z-30' : 'z-10'}`} style={{ background: dragTargetProductId === p.id ? 'color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-container-lowest))' : 'var(--color-surface-container-lowest)' }}>
+                      <div className="relative flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setActionMenuId((current) => (current === p.id ? null : p.id))}
+                          className="flex items-center justify-center rounded p-0.5 hover:bg-black/5"
+                          style={{ color: 'var(--color-primary)' }}
+                          aria-haspopup="menu"
+                          aria-expanded={actionMenuId === p.id}
+                          aria-label="Actions"
                         >
-                          View
-                        </Link>
-                        <button type="button" onClick={() => openEdit(p)}
-                          className="text-xs font-bold uppercase tracking-wide hover:underline"
-                          style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-                          Edit
+                          <span className="material-symbols-outlined text-xl leading-none" aria-hidden="true">
+                            {actionMenuId === p.id ? 'arrow_drop_up' : 'arrow_drop_down'}
+                          </span>
                         </button>
-                        <button type="button" onClick={() => duplicateProduct(p)}
-                          className="text-xs font-bold uppercase tracking-wide hover:underline"
-                          style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-                          Duplicate
-                        </button>
-                        <button type="button" onClick={() => openImagePaddingChooser(p)}
-                          className="text-xs font-bold uppercase tracking-wide hover:underline"
-                          style={{
-                            color: hasAnyProductImagePadding(p.image_padding, p.image_padding_by_image) ? '#0f7a4f' : '#7a4a1f',
-                            fontFamily: 'var(--font-label)',
-                          }}>
-                          Pad
-                        </button>
-                        {normalizeProductStatus(p.status) !== 'available' && (
-                          <button type="button" onClick={() => updateProductStatus(p, 'available')}
-                            className="text-xs font-bold uppercase tracking-wide hover:underline"
-                            style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-                            Available
-                          </button>
+                        {actionMenuId === p.id && (
+                          <>
+                            <div className="fixed inset-0 z-20" onClick={() => setActionMenuId(null)} aria-hidden="true" />
+                            <div
+                              role="menu"
+                              className="absolute right-0 z-30 mt-1 flex min-w-[150px] flex-col overflow-hidden rounded-md border shadow-lg"
+                              style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-lowest)', fontFamily: 'var(--font-label)' }}
+                            >
+                              <Link
+                                href={`${locale === 'es' ? '/es' : ''}/shop/${p.id}?returnTo=admin`}
+                                onClick={() => setActionMenuId(null)}
+                                className={ROW_ACTION_MENU_ITEM_CLASS}
+                                style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                              >
+                                View
+                              </Link>
+                              <button type="button" onClick={() => { setActionMenuId(null); openEdit(p); }}
+                                className={ROW_ACTION_MENU_ITEM_CLASS}
+                                style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
+                                Edit
+                              </button>
+                              <button type="button" onClick={() => { setActionMenuId(null); duplicateProduct(p); }}
+                                className={ROW_ACTION_MENU_ITEM_CLASS}
+                                style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                                Duplicate
+                              </button>
+                              <button type="button" onClick={() => { setActionMenuId(null); openImagePaddingChooser(p); }}
+                                className={ROW_ACTION_MENU_ITEM_CLASS}
+                                style={{
+                                  color: hasAnyProductImagePadding(p.image_padding, p.image_padding_by_image) ? '#0f7a4f' : '#7a4a1f',
+                                  fontFamily: 'var(--font-label)',
+                                }}>
+                                Pad
+                              </button>
+                              {normalizeProductStatus(p.status) !== 'available' && (
+                                <button type="button" onClick={() => { setActionMenuId(null); updateProductStatus(p, 'available'); }}
+                                  className={ROW_ACTION_MENU_ITEM_CLASS}
+                                  style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
+                                  Available
+                                </button>
+                              )}
+                              {normalizeProductStatus(p.status) !== 'reserved' && (
+                                <button type="button" onClick={() => { setActionMenuId(null); updateProductStatus(p, 'reserved'); }}
+                                  className={ROW_ACTION_MENU_ITEM_CLASS}
+                                  style={{ color: '#8a5a00', fontFamily: 'var(--font-label)' }}>
+                                  Reserve
+                                </button>
+                              )}
+                              {normalizeProductStatus(p.status) !== 'sold' && (
+                                <button type="button" onClick={() => { setActionMenuId(null); updateProductStatus(p, 'sold'); }}
+                                  className={ROW_ACTION_MENU_ITEM_CLASS}
+                                  style={{ color: 'var(--color-on-surface)', fontFamily: 'var(--font-label)' }}>
+                                  Sold
+                                </button>
+                              )}
+                              {normalizeProductStatus(p.status) !== 'archived' && (
+                                <button type="button" onClick={() => { setActionMenuId(null); updateProductStatus(p, 'archived'); }}
+                                  className={ROW_ACTION_MENU_ITEM_CLASS}
+                                  style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                                  Archive
+                                </button>
+                              )}
+                              <button type="button" onClick={() => { setActionMenuId(null); setDeleteTarget(p); }}
+                                className={ROW_ACTION_MENU_ITEM_CLASS}
+                                style={{ color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}>
+                                Delete
+                              </button>
+                            </div>
+                          </>
                         )}
-                        {normalizeProductStatus(p.status) !== 'reserved' && (
-                          <button type="button" onClick={() => updateProductStatus(p, 'reserved')}
-                            className="text-xs font-bold uppercase tracking-wide hover:underline"
-                            style={{ color: '#8a5a00', fontFamily: 'var(--font-label)' }}>
-                            Reserve
-                          </button>
-                        )}
-                        {normalizeProductStatus(p.status) !== 'sold' && (
-                          <button type="button" onClick={() => updateProductStatus(p, 'sold')}
-                            className="text-xs font-bold uppercase tracking-wide hover:underline"
-                            style={{ color: 'var(--color-on-surface)', fontFamily: 'var(--font-label)' }}>
-                            Sold
-                          </button>
-                        )}
-                        {normalizeProductStatus(p.status) !== 'archived' && (
-                          <button type="button" onClick={() => updateProductStatus(p, 'archived')}
-                            className="text-xs font-bold uppercase tracking-wide hover:underline"
-                            style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-                            Archive
-                          </button>
-                        )}
-                        <button type="button" onClick={() => setDeleteTarget(p)}
-                          className="text-xs font-bold uppercase tracking-wide hover:underline"
-                          style={{ color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}>
-                          Delete
-                        </button>
                       </div>
                     </td>
                   </tr>
@@ -3019,7 +3088,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         <div
           className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto py-8 px-4"
           style={{ background: 'rgba(0,0,0,0.5)' }}
-          onClick={(e) => e.target === e.currentTarget && closeModal()}
         >
           <div
             className="w-full max-w-5xl border flex flex-col overflow-hidden product-editor-modal"
@@ -3036,28 +3104,37 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   {isNew ? 'New listing' : 'Edit listing'}
                 </h2>
               </div>
-              <button type="button" onClick={closeModal}
+              <button type="button" onClick={requestCloseEditor}
                 className="text-sm font-bold uppercase tracking-wide"
                 style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
                 ✕ Close
               </button>
             </div>
 
-            <div className="product-editor-body p-7 flex flex-col gap-5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 14rem)' }}>
+            <div className="product-editor-body p-4 md:p-7 flex flex-col gap-4 md:gap-5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 14rem)' }}>
 
               {/* Photos */}
               <div
                 className="product-editor-panel product-editor-photos-panel"
                 style={{ background: '#edf6ff', borderColor: '#cddff5' }}
+                data-collapsed={openEditorSections.photos ? 'false' : 'true'}
               >
-                <div className="flex items-start gap-3">
+                <div className="editor-collapse-header flex items-start gap-3" role="button" tabIndex={0}
+                  aria-expanded={openEditorSections.photos}
+                  onClick={() => toggleEditorSection('photos')}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleEditorSection('photos'); } }}>
                   <div className="product-editor-icon" style={{ background: '#ffe2ee', color: '#db2777' }}>
                     <span className="material-symbols-outlined" aria-hidden="true">photo_camera</span>
                   </div>
                   <div>
                     <h3 className="product-editor-section-title">Photos</h3>
-                    <p className="product-editor-section-copy">Add clear photos. The first image is the cover image and gives the AI assistant visual context.</p>
+                    <p className={`product-editor-section-copy${openEditorSections.photos ? '' : ' max-md:hidden'}`}>Add clear photos. The first image is the cover image and gives the AI assistant visual context.</p>
                   </div>
+                  <span className="ml-auto self-center md:hidden" aria-hidden="true">
+                    <span className="material-symbols-outlined" style={{ color: '#db2777' }}>
+                      {openEditorSections.photos ? 'expand_less' : 'expand_more'}
+                    </span>
+                  </span>
                 </div>
                 <label
                   className="product-photo-dropzone"
@@ -3182,6 +3259,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               <div
                 className="product-editor-panel relative overflow-hidden"
                 style={{ background: '#fff1f7', borderColor: '#f5c5d6' }}
+                data-collapsed={openEditorSections.ai ? 'false' : 'true'}
               >
                 {aiRecording && (
                   <div className="ai-recording-pop" role="status">
@@ -3194,18 +3272,26 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     Recording
                   </div>
                 )}
-                <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="editor-collapse-header flex flex-wrap items-start justify-between gap-3" role="button" tabIndex={0}
+                  aria-expanded={openEditorSections.ai}
+                  onClick={() => toggleEditorSection('ai')}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleEditorSection('ai'); } }}>
                   <div className="flex items-start gap-3">
                     <div className="product-editor-icon" style={{ background: '#8b7cf6', color: '#ffffff' }}>
                       <span className="material-symbols-outlined" aria-hidden="true">auto_awesome</span>
                     </div>
                     <div>
                       <h3 className="product-editor-section-title">Smart listing assistant</h3>
-                      <p className="product-editor-section-copy">
+                      <p className={`product-editor-section-copy${openEditorSections.ai ? '' : ' max-md:hidden'}`}>
                         Add photos, describe the item, and AI fills in the form below automatically. You can undo right after.
                       </p>
                     </div>
                   </div>
+                  <span className="self-center md:hidden" aria-hidden="true">
+                    <span className="material-symbols-outlined" style={{ color: '#8b7cf6' }}>
+                      {openEditorSections.ai ? 'expand_less' : 'expand_more'}
+                    </span>
+                  </span>
                 </div>
 
                 {editing.images.length === 0 ? (
@@ -3236,7 +3322,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
                 <button
                   type="button"
-                  onClick={aiRecording ? stopAiRecording : startAiRecording}
+                  onClick={() => { if (aiRecording) { stopAiRecording(); } else { setShowMicPrompt(true); } }}
                   className={aiRecording ? 'ai-talk-button ai-talk-button-recording' : 'ai-talk-button'}
                 >
                   <span className="material-symbols-outlined" aria-hidden="true">{aiRecording ? 'stop_circle' : 'mic'}</span>
@@ -3442,7 +3528,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     </div>
                     <div>
                       <h3 className="product-editor-section-title">Smart listing assistant</h3>
-                      <p className="product-editor-section-copy">
+                      <p className={`product-editor-section-copy${openEditorSections.ai ? '' : ' max-md:hidden'}`}>
                         Add photos, describe the item, and AI fills in the form below automatically. You can undo right after.
                       </p>
                     </div>
@@ -3477,7 +3563,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
                 <button
                   type="button"
-                  onClick={aiRecording ? stopAiRecording : startAiRecording}
+                  onClick={() => { if (aiRecording) { stopAiRecording(); } else { setShowMicPrompt(true); } }}
                   className={aiRecording ? 'ai-talk-button ai-talk-button-recording' : 'ai-talk-button'}
                 >
                   <span className="material-symbols-outlined" aria-hidden="true">{aiRecording ? 'stop_circle' : 'mic'}</span>
@@ -3564,15 +3650,23 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               </div>
 
               {/* Listing details — modern card matching the panels above */}
-              <div className="product-editor-panel product-editor-fields-panel">
-                <div className="flex items-start gap-3">
+              <div className="product-editor-panel product-editor-fields-panel" data-collapsed={openEditorSections.details ? 'false' : 'true'}>
+                <div className="editor-collapse-header flex items-start gap-3" role="button" tabIndex={0}
+                  aria-expanded={openEditorSections.details}
+                  onClick={() => toggleEditorSection('details')}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleEditorSection('details'); } }}>
                   <div className="product-editor-icon" style={{ background: 'rgba(212, 175, 55, 0.18)', color: '#a9760a' }}>
                     <span className="material-symbols-outlined" aria-hidden="true">edit_note</span>
                   </div>
                   <div>
                     <h3 className="product-editor-section-title">Listing details</h3>
-                    <p className="product-editor-section-copy">Review and fine-tune everything before saving.</p>
+                    <p className={`product-editor-section-copy${openEditorSections.details ? '' : ' max-md:hidden'}`}>Review and fine-tune everything before saving.</p>
                   </div>
+                  <span className="ml-auto self-center md:hidden" aria-hidden="true">
+                    <span className="material-symbols-outlined" style={{ color: '#a9760a' }}>
+                      {openEditorSections.details ? 'expand_less' : 'expand_more'}
+                    </span>
+                  </span>
                 </div>
 
               {/* ID (edit only) */}
@@ -3669,8 +3763,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">Title (English)</label>
-                  <ClearableField onClear={() => setEditing({ ...editing, title: '' })} show={!!editing.title}>
-                    <input className="form-field w-full" value={editing.title}
+                  <ClearableField onClear={() => setEditing({ ...editing, title: '' })} show={!!editing.title} multiline>
+                    <textarea rows={2} className="form-field w-full resize-y" value={editing.title}
                       onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
                   </ClearableField>
                 </div>
@@ -3746,16 +3840,19 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   <ClearableField
                     onClear={() => setEditing({
                       ...editing,
-                      metal_type: 'Other',
-                      metal: 'Other',
-                      category: 'Gold',
-                      metal_variant: getDefaultMetalVariant('Gold'),
+                      metal_type: '',
+                      metal: '',
+                      metal_variant: '',
                       purity: null,
                     })}
-                    show={normalizeProductMetalType(editing.metal_type, editing.category) !== 'Other'}
+                    show={!!editing.metal_type}
                   >
-                    <select className="form-field w-full" value={normalizeProductMetalType(editing.metal_type, editing.category)}
+                    <select className="form-field w-full" value={editing.metal_type ? normalizeProductMetalType(editing.metal_type, editing.category) : ''}
                       onChange={(e) => {
+                        if (!e.target.value) {
+                          setEditing({ ...editing, metal_type: '', metal: '', metal_variant: '', purity: null });
+                          return;
+                        }
                         const nextMetalType = normalizeProductMetalType(e.target.value, editing.category);
                         const nextCategory = getLegacyCategoryForMetalType(nextMetalType, editing.category);
                         setEditing({
@@ -3767,6 +3864,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                           purity: null,
                         });
                       }}>
+                      <option value="">— Select —</option>
                       {PRODUCT_METAL_TYPES.map((metalType) => (
                         <option key={metalType.value} value={metalType.value}>{metalType.label}</option>
                       ))}
@@ -3776,17 +3874,15 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 <div>
                   <label className="form-label">Metal Color</label>
                   <ClearableField
-                    onClear={() => {
-                      const nextCategory = getLegacyCategoryForMetalType(editing.metal_type, editing.category);
-                      setEditing({ ...editing, metal_variant: getDefaultMetalVariant(nextCategory) });
-                    }}
-                    show={normalizeProductMetalVariant(editing.metal_variant, getLegacyCategoryForMetalType(editing.metal_type, editing.category)) !== getDefaultMetalVariant(getLegacyCategoryForMetalType(editing.metal_type, editing.category))}
+                    onClear={() => setEditing({ ...editing, metal_variant: '' })}
+                    show={!!editing.metal_variant}
                   >
                     <select
                       className="form-field w-full"
-                      value={normalizeProductMetalVariant(editing.metal_variant, getLegacyCategoryForMetalType(editing.metal_type, editing.category))}
-                      onChange={(e) => setEditing({ ...editing, metal_variant: e.target.value as ProductMetalVariant })}
+                      value={editing.metal_variant ? normalizeProductMetalVariant(editing.metal_variant, getLegacyCategoryForMetalType(editing.metal_type, editing.category)) : ''}
+                      onChange={(e) => setEditing({ ...editing, metal_variant: e.target.value })}
                     >
+                      <option value="">— Select —</option>
                       {PRODUCT_METAL_VARIANTS[getLegacyCategoryForMetalType(editing.metal_type, editing.category)].map((variant) => (
                         <option key={variant.value} value={variant.value}>{variant.label}</option>
                       ))}
@@ -3835,8 +3931,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 })()}
               </div>
 
-              {/* Pricing — 4-col: Mode · Purity · Weight · Multiplier or Price Label */}
-              <div className="grid grid-cols-4 gap-4">
+              {/* Pricing — Mode · Purity · Weight · Multiplier/Price Label (2-up on mobile, 4-up on desktop) */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <label className="form-label">Price Mode</label>
                   <ClearableField
@@ -3897,7 +3993,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     <>
                       <label className="form-label">Multiplier</label>
                       <ClearableField onClear={() => setEditing({ ...editing, pricing_multiplier: null })} show={!!editing.pricing_multiplier}>
-                      <input type="number" step="0.01" className="form-field w-full"
+                      <input type="number" step="0.01" className="form-field w-full" placeholder="e.g. 1.25"
                         value={editing.pricing_multiplier ?? ''}
                         onChange={(e) => setEditing({ ...editing, pricing_multiplier: e.target.value ? Number(e.target.value) : null })} />
                       </ClearableField>
@@ -3958,9 +4054,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 {productUsesGender(jewelryTypeInput) && (
                   <div>
                     <label className="form-label">Gender</label>
-                    <ClearableField onClear={() => setEditing({ ...editing, gender: 'Unisex' })} show={(editing.gender ?? 'Unisex') !== 'Unisex'}>
-                    <select className="form-field w-full" value={editing.gender ?? 'Unisex'}
+                    <ClearableField onClear={() => setEditing({ ...editing, gender: '' })} show={!!editing.gender}>
+                    <select className="form-field w-full" value={editing.gender ?? ''}
                       onChange={(e) => setEditing({ ...editing, gender: e.target.value })}>
+                      <option value="">— Select —</option>
                       <option value="Unisex">Unisex</option>
                       <option value="Men">Men</option>
                       <option value="Women">Women</option>
@@ -4036,8 +4133,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               </div>
             )}
 
-            {/* Modal footer */}
-            <div className="flex items-center gap-1.5 px-3 py-4 border-t"
+            {/* Modal footer — 2-up grid on mobile (so nothing overflows), single row on desktop */}
+            <div className="grid grid-cols-2 gap-2 px-3 py-4 border-t [&>button]:w-full md:flex md:items-center md:gap-1.5 md:[&>button]:w-auto"
               style={{ borderColor: 'var(--color-outline-variant)' }}>
               {/* Clone — edit mode only, pushed to the left */}
               {!isNew && (
@@ -4071,16 +4168,16 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   Clone
                 </button>
               )}
-              <button type="button" onClick={closeModal} className="outline-button text-sm">
+              <button type="button" onClick={requestCloseEditor} className="outline-button text-sm">
                 Cancel
               </button>
-              <button type="button" onClick={() => handleSave('stay')} disabled={saving} className="outline-button text-sm disabled:opacity-50">
+              <button type="button" onClick={() => requestSaveEditor('stay')} disabled={saving} className="outline-button text-sm disabled:opacity-50">
                 {saving ? 'Saving…' : 'Save'}
               </button>
-              <button type="button" onClick={() => handleSave('another')} disabled={saving} className="outline-button text-sm disabled:opacity-50">
+              <button type="button" onClick={() => requestSaveEditor('another')} disabled={saving} className="outline-button text-sm disabled:opacity-50">
                 Save + Add Another
               </button>
-              <button type="button" onClick={() => handleSave('close')} disabled={saving} className="gold-button gold-button-gradient text-sm disabled:opacity-50">
+              <button type="button" onClick={() => requestSaveEditor('close')} disabled={saving} className="gold-button gold-button-gradient text-sm disabled:opacity-50">
                 {saving ? 'Saving…' : 'Save and Close'}
               </button>
             </div>
@@ -4500,6 +4597,69 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 className="text-sm font-bold px-4 py-2"
                 style={{ background: 'var(--color-error)', color: '#fff', fontFamily: 'var(--font-label)' }}>
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation gate for the listing editor's close / cancel / save actions */}
+      {editing && editorConfirm && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center px-4"
+          style={{ background: 'rgba(0,0,0,0.55)' }}
+        >
+          <div
+            className="w-full max-w-sm border p-6 flex flex-col gap-4"
+            style={{ background: 'var(--color-background)', borderColor: 'var(--color-outline-variant)' }}
+          >
+            <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
+              {editorConfirm.title}
+            </h2>
+            <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+              {editorConfirm.message}
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button type="button" onClick={() => setEditorConfirm(null)} className="outline-button text-sm">
+                Keep editing
+              </button>
+              <button type="button" onClick={editorConfirm.onConfirm} className="gold-button gold-button-gradient text-sm">
+                {editorConfirm.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Heads-up before the Smart Assistant starts listening */}
+      {editing && showMicPrompt && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center px-4"
+          style={{ background: 'rgba(0,0,0,0.55)' }}
+        >
+          <div
+            className="w-full max-w-sm border p-6 flex flex-col gap-4"
+            style={{ background: 'var(--color-background)', borderColor: 'var(--color-outline-variant)' }}
+          >
+            <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
+              Before you start talking
+            </h2>
+            <div className="flex flex-col gap-3 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+              <p className="flex gap-2">
+                <span className="material-symbols-outlined text-[1.1rem] leading-5" aria-hidden="true" style={{ color: 'var(--color-primary)' }}>mic</span>
+                <span>Your browser may pop up a request for microphone access — be sure to tap <strong>Allow</strong> (or Approve) so the assistant can hear you.</span>
+              </p>
+              <p className="flex gap-2">
+                <span className="material-symbols-outlined text-[1.1rem] leading-5" aria-hidden="true" style={{ color: 'var(--color-primary)' }}>visibility</span>
+                <span>Once you begin, watch the text box below — your words will appear after a few moments. That&rsquo;s how you know it&rsquo;s working.</span>
+              </p>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button type="button" onClick={() => setShowMicPrompt(false)} className="outline-button text-sm">
+                Cancel
+              </button>
+              <button type="button" onClick={() => { setShowMicPrompt(false); startAiRecording(); }} className="gold-button gold-button-gradient text-sm">
+                Start recording
               </button>
             </div>
           </div>

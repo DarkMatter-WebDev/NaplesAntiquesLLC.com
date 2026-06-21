@@ -389,11 +389,29 @@ export default async function AccountSecurityPage({ params }: Props) {
             margin-top: -1.1rem;
           }
           .account-tabs {
-            margin-inline: -0.25rem;
+            margin-inline: 0;
+            overflow-x: hidden;
           }
           .account-tabs button,
           .account-tabs a {
-            min-width: 9.5rem;
+            min-width: 0;
+            flex: 1 1 0;
+            flex-direction: column;
+            gap: 0.28rem;
+            padding: 0.55rem 0.3rem;
+            min-height: 0;
+            font-size: 0.6rem;
+            line-height: 1.15;
+            white-space: normal;
+            text-align: center;
+          }
+          .account-tabs .material-symbols-outlined {
+            font-size: 1.15rem;
+          }
+          .account-tabs button.active::after,
+          .account-tabs a.active::after {
+            right: 0.4rem;
+            left: 0.4rem;
           }
           .account-dashboard-grid,
           .account-support-strip {

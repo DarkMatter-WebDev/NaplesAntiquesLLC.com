@@ -2,6 +2,7 @@ import {
   PRODUCT_JEWELRY_TYPES,
   PRODUCT_METAL_TYPES,
   PRODUCT_METAL_VARIANTS,
+  normalizeProductItemYear,
   normalizeProductLengthSizeValue,
   normalizeProductMetalType,
   normalizeProductMetalVariant,
@@ -25,6 +26,7 @@ export type ProductAutofillFields = {
   price_mode: 'spot-multiplier' | 'manual' | null;
   purity: number | null;
   weight_grams: number | null;
+  item_year: number | null;
   pricing_multiplier: number | null;
   asking_price: number | null;
   manual_price_label: string | null;
@@ -58,6 +60,7 @@ export const PRODUCT_AUTOFILL_FIELD_KEYS = [
   'price_mode',
   'purity',
   'weight_grams',
+  'item_year',
   'pricing_multiplier',
   'asking_price',
   'manual_price_label',
@@ -77,6 +80,7 @@ export const EMPTY_PRODUCT_AUTOFILL_FIELDS: ProductAutofillFields = {
   price_mode: null,
   purity: null,
   weight_grams: null,
+  item_year: null,
   pricing_multiplier: null,
   asking_price: null,
   manual_price_label: null,
@@ -251,6 +255,7 @@ export function coerceProductAutofill(input: ProductAutofillProviderResult): Pro
     price_mode: cleanPriceMode(rawFields.price_mode),
     purity: cleanPurity(rawFields.purity),
     weight_grams: cleanNumber(rawFields.weight_grams, { min: 0.01, max: 100000, decimals: 2 }),
+    item_year: normalizeProductItemYear(rawFields.item_year as string | number | null | undefined),
     pricing_multiplier: cleanNumber(rawFields.pricing_multiplier, { min: 0.01, max: 100, decimals: 3 }),
     asking_price: cleanNumber(rawFields.asking_price, { min: 0, max: MAX_PRICE, decimals: 2 }),
     manual_price_label: cleanString(rawFields.manual_price_label, MAX_SHORT_TEXT_LENGTH),

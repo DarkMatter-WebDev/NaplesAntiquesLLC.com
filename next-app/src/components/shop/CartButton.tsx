@@ -6,7 +6,7 @@ import { isProductPurchasable } from '@/types/product';
 
 interface Props {
   item: CartItem;
-  variant?: 'card' | 'detail';
+  variant?: 'card' | 'detail' | 'icon';
   locale?: string;
 }
 
@@ -61,6 +61,36 @@ export default function CartButton({ item, variant = 'card', locale = 'en' }: Pr
         {inCart
           ? (isEs ? 'En el carrito' : 'In Cart')
           : canPurchase ? (isEs ? 'Agregar al carrito' : 'Add to Cart') : (isEs ? 'No disponible' : 'Unavailable')}
+      </button>
+    );
+  }
+
+  if (variant === 'icon') {
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={!canPurchase && !inCart}
+        aria-label={inCart ? (isEs ? 'Quitar del carrito' : 'Remove from cart') : (isEs ? 'Agregar al carrito' : 'Add to cart')}
+        aria-pressed={inCart}
+        className="shop-card-cart-icon-button flex items-center justify-center w-7 h-7 rounded-full transition-colors"
+        style={{
+          background: inCart ? 'linear-gradient(135deg, #d9ad2f, #b98c09)' : 'rgba(255, 252, 246, 0.92)',
+          border: `1px solid ${inCart ? 'rgba(181, 137, 12, 0.5)' : 'rgba(115, 92, 0, 0.22)'}`,
+          color: inCart ? '#fffdf7' : GOLD,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+          opacity: !canPurchase && !inCart ? 0.5 : 1,
+          cursor: canPurchase || inCart ? 'pointer' : 'not-allowed',
+        }}
+      >
+        <span
+          className="material-symbols-outlined"
+          aria-hidden="true"
+          data-cart-icon="true"
+          style={{ fontSize: '13px', lineHeight: 1, fontVariationSettings: inCart ? "'FILL' 1" : "'FILL' 0" }}
+        >
+          shopping_bag
+        </span>
       </button>
     );
   }

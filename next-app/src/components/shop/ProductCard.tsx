@@ -216,7 +216,7 @@ export default function ProductCard({
         )}
         {!isSold && (
           <div
-            className="shop-card-status-tag absolute top-3 left-3 z-10 text-[0.6rem] font-bold tracking-widest uppercase px-2 py-0.5"
+            className="shop-card-status-tag shop-card-status-available absolute top-3 left-3 z-10 text-[0.6rem] font-bold tracking-widest uppercase px-2 py-0.5"
             style={{
               background: isPurchasable ? (isModern ? 'linear-gradient(135deg, #d5a820, #ad8507)' : 'var(--color-primary)') : '#8a5a00',
               color: isModern ? '#fffdf7' : 'var(--color-on-primary)',
@@ -227,6 +227,13 @@ export default function ProductCard({
             {isPurchasable ? (isEs ? 'Disponible' : 'Available') : productStatusLabel(product.status)}
           </div>
         )}
+        {/* Cart icon button — mobile only, top-left (replaces Available tag on small screens) */}
+        {isPurchasable && (
+          <div className="shop-card-cart-icon-wrap absolute top-2 left-2 z-10">
+            <CartButton item={cartItem} variant="icon" locale={locale} />
+          </div>
+        )}
+
         {/* Wishlist button — top-right of image */}
         <div className="shop-card-wishlist-wrap absolute top-2 right-2 z-10">
           <WishlistButton item={wishlistItem} variant="icon" locale={locale} />
@@ -370,7 +377,7 @@ export default function ProductCard({
 
         {itemDateLabel && (
           <p
-            className="text-[0.66rem] font-semibold uppercase tracking-[0.16em]"
+            className="modern-card-date text-[0.66rem] font-semibold uppercase tracking-[0.16em]"
             style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
           >
             <span className="normal-case">Ca.</span> {itemDateLabel}
@@ -616,8 +623,35 @@ export default function ProductCard({
               padding-left: 0.08rem;
               padding-right: 0.08rem;
             }
+            /* Hide bottom cart button row on mobile — cart icon is in the image instead */
             .modern-product-card .modern-card-body > .flex:last-child {
-              padding-top: 0.25rem !important;
+              display: none !important;
+            }
+            /* Hide date label on mobile */
+            .modern-product-card .modern-card-date {
+              display: none;
+            }
+            /* Hide the Available text tag on mobile — replaced by cart icon */
+            .shop-card-status-available {
+              display: none !important;
+            }
+            /* Show cart icon button on mobile */
+            .shop-card-cart-icon-wrap {
+              display: flex;
+            }
+            .shop-card-cart-icon-button {
+              width: 1.35rem !important;
+              height: 1.35rem !important;
+              box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+            }
+            .shop-card-cart-icon-button [data-cart-icon="true"] {
+              font-size: 11px !important;
+            }
+          }
+          /* Cart icon button — hidden on tablet/desktop, visible on mobile */
+          @media (min-width: 641px) {
+            .shop-card-cart-icon-wrap {
+              display: none;
             }
           }
           /* Tighten the action row above the Add button */

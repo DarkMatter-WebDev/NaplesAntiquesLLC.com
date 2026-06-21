@@ -1,10 +1,22 @@
+'use client';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState, useEffect } from 'react';
 import AdminMessagesLink from './AdminMessagesLink';
 
 const GOLD = '#735c00';
 
 export type AdminSection = 'products' | 'orders' | 'messages' | 'inquiries' | 'subscribers' | 'marketing' | 'users' | 'settings';
+
+const SECTION_LABELS: Record<AdminSection, string> = {
+  products: 'Products',
+  orders: 'Orders',
+  messages: 'Messages',
+  inquiries: 'Inquiries',
+  subscribers: 'Subscribers',
+  marketing: 'Email Campaigns',
+  users: 'Users',
+  settings: 'Admin Settings',
+};
 
 const linkStyle = {
   fontSize: '0.8125rem',
@@ -52,6 +64,8 @@ function AdminNavItem({
   );
 }
 
+const STORAGE_KEY = 'admin-nav-collapsed';
+
 export default function AdminHeader({
   adminBasePath,
   active,
@@ -66,6 +80,103 @@ export default function AdminHeader({
   rightContent?: ReactNode;
 }) {
   const homeHref = adminBasePath.startsWith('/es') ? '/es' : '/';
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(STORAGE_KEY) === 'true') setCollapsed(true);
+    } catch {}
+  }, []);
+
+  const toggle = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(STORAGE_KEY, String(next)); } catch {}
+      return next;
+    });
+  };
+
+  const toggleBtn = (
+    <button
+      type="button"
+      onClick={toggle}
+      title={collapsed ? 'Expand admin menu' : 'Collapse admin menu'}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '2rem',
+        height: '2rem',
+        borderRadius: '0.375rem',
+        border: 'none',
+        background: 'transparent',
+        cursor: 'pointer',
+        color: GOLD,
+        flexShrink: 0,
+      }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(115,92,0,0.08)'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+    >
+      <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '1.25rem', lineHeight: 1 }}>
+        {collapsed ? 'menu' : 'menu_open'}
+      </span>
+    </button>
+  );
+
+  if (collapsed) {
+    return (
+      <header
+        style={{
+          borderBottom: '1px solid rgba(115,92,0,0.2)',
+          padding: '0 1rem',
+          height: '2.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          background: 'white',
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+        }}
+      >
+        <Link
+          href={homeHref}
+          style={{ fontSize: '0.8125rem', color: GOLD, textDecoration: 'none', textUnderlineOffset: '3px', flexShrink: 0 }}
+        >
+          ← Home
+        </Link>
+        <span
+          style={{
+            fontSize: '0.5rem',
+            fontWeight: 700,
+            letterSpacing: '0.22em',
+            textTransform: 'uppercase',
+            background: GOLD,
+            color: 'white',
+            padding: '0.2rem 0.45rem',
+            flexShrink: 0,
+          }}
+        >
+          Admin
+        </span>
+        <span
+          style={{
+            fontSize: '0.8125rem',
+            fontWeight: 600,
+            color: GOLD,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {SECTION_LABELS[active]}
+        </span>
+        <span style={{ marginLeft: 'auto', flexShrink: 0 }}>
+          {toggleBtn}
+        </span>
+      </header>
+    );
+  }
 
   return (
     <header
@@ -148,6 +259,7 @@ export default function AdminHeader({
             {userEmail}
           </span>
         )}
+        {toggleBtn}
       </span>
     </header>
   );

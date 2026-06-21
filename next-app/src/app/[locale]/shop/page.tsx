@@ -664,14 +664,65 @@ export async function renderShopPage({
             </div>
           </section>
 
-          <ShopYearFilter
-            key={`${selectedYearMin ?? 'min'}-${selectedYearMax ?? 'max'}`}
-            locale={locale}
-            minYear={yearMinBound}
-            maxYear={yearMaxBound}
-            selectedMin={selectedYearMin}
-            selectedMax={selectedYearMax}
-          />
+          {/* Spot prices: visible on mobile/tablet only — desktop sees them in the sidebar */}
+          {spotData && (
+            <div className="shop-spot-mobile-row">
+              <div
+                style={{
+                  padding: '0.42rem 0.7rem',
+                  textAlign: 'center',
+                  fontFamily: 'var(--font-label)',
+                  border: '1px solid rgba(129, 138, 146, 0.46)',
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.96), rgba(232,236,239,0.82) 48%, rgba(247,248,248,0.96))',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.88), 0 8px 22px rgba(95,105,113,0.08)',
+                  borderRadius: 'var(--radius-xl)',
+                }}
+                aria-label={isEs ? 'Precio de plata en vivo por onza troy' : 'Live silver price per troy ounce'}
+              >
+                <span style={{ display: 'block', color: '#58626a', fontSize: '0.52rem', fontWeight: 700, letterSpacing: '0.14em', lineHeight: 1, marginBottom: '0.22rem', textTransform: 'uppercase' }}>
+                  {isEs ? 'Plata / oz' : 'Silver / oz'}
+                </span>
+                <span style={{ display: 'block', color: '#3f4a52', fontSize: '0.86rem', fontWeight: 800, lineHeight: 1.05 }}>
+                  {spotData.silverPerTroyOz
+                    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: spotData.silverPerTroyOz >= 100 ? 0 : 2 }).format(spotData.silverPerTroyOz)
+                    : '--'}
+                </span>
+              </div>
+              <div
+                style={{
+                  padding: '0.42rem 0.7rem',
+                  textAlign: 'center',
+                  fontFamily: 'var(--font-label)',
+                  border: '1px solid rgba(181, 137, 12, 0.46)',
+                  background: 'linear-gradient(135deg, rgba(255,253,247,0.98), rgba(250,240,201,0.86) 48%, rgba(255,250,235,0.98))',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9), 0 8px 22px rgba(143,108,6,0.1)',
+                  borderRadius: 'var(--radius-xl)',
+                }}
+                aria-label={isEs ? 'Precio de oro en vivo por onza troy' : 'Live gold price per troy ounce'}
+              >
+                <span style={{ display: 'block', color: '#735c00', fontSize: '0.52rem', fontWeight: 700, letterSpacing: '0.14em', lineHeight: 1, marginBottom: '0.22rem', textTransform: 'uppercase' }}>
+                  {isEs ? 'Oro / oz' : 'Gold / oz'}
+                </span>
+                <span style={{ display: 'block', color: '#735c00', fontSize: '0.86rem', fontWeight: 800, lineHeight: 1.05 }}>
+                  {spotData.goldPerTroyOz
+                    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: spotData.goldPerTroyOz >= 100 ? 0 : 2 }).format(spotData.goldPerTroyOz)
+                    : '--'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Desktop only: standalone year filter above the catalog */}
+          <div className="shop-year-filter-standalone">
+            <ShopYearFilter
+              key={`${selectedYearMin ?? 'min'}-${selectedYearMax ?? 'max'}`}
+              locale={locale}
+              minYear={yearMinBound}
+              maxYear={yearMaxBound}
+              selectedMin={selectedYearMin}
+              selectedMax={selectedYearMax}
+            />
+          </div>
 
           <div className="shop-catalog-layout">
             {/* -- Filters ------------------------------------------ */}
@@ -686,6 +737,16 @@ export async function renderShopPage({
                 priceRange={priceRange}
                 itemTypeOptions={itemTypeOptions}
                 variant={isModern ? 'modern' : 'classic'}
+                yearFilterNode={
+                  <ShopYearFilter
+                    key={`mobile-${selectedYearMin ?? 'min'}-${selectedYearMax ?? 'max'}`}
+                    locale={locale}
+                    minYear={yearMinBound}
+                    maxYear={yearMaxBound}
+                    selectedMin={selectedYearMin}
+                    selectedMax={selectedYearMax}
+                  />
+                }
               />
             </aside>
 
@@ -720,6 +781,21 @@ export async function renderShopPage({
             </section>
           </div>
           <style>{`
+            .shop-spot-mobile-row {
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              gap: 0.65rem;
+              max-width: 24rem;
+              margin: 0 auto 0.85rem;
+              padding: 0 1rem;
+            }
+            @media (min-width: 1024px) {
+              .shop-spot-mobile-row { display: none; }
+            }
+            .shop-year-filter-standalone { display: block; }
+            @media (max-width: 1023px) {
+              .shop-year-filter-standalone { display: none; }
+            }
             .modern-shop-page {
               background: #ffffff;
             }

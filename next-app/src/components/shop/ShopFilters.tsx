@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { PRODUCT_METAL_VARIANTS, type SpotData } from '@/types/product';
 
 const GOLD = '#735c00';
@@ -101,6 +101,7 @@ interface Props {
   priceRange: { min: number; max: number } | null;
   itemTypeOptions?: ItemTypeOption[];
   variant?: 'classic' | 'modern';
+  yearFilterNode?: ReactNode;
 }
 
 function parseFilterPrice(value: string | undefined): number | null {
@@ -137,7 +138,7 @@ function getItemGroupForItemType(itemType: string | undefined) {
   return itemType ? 'jewelry' : undefined;
 }
 
-export default function ShopFilters({ locale, currentFilters, brandOptions, filteredCount, allCount, spotData, priceRange, itemTypeOptions, variant = 'classic' }: Props) {
+export default function ShopFilters({ locale, currentFilters, brandOptions, filteredCount, allCount, spotData, priceRange, itemTypeOptions, variant = 'classic', yearFilterNode }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -191,7 +192,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
     currentFilters.sort ||
     currentFilters.itemGroup
   );
-  const [filtersOpen, setFiltersOpen] = useState(hasDrawerFilters);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const selectedPriceSource = `${selectedPriceMin}:${selectedPriceMax}`;
   const [draftPrice, setDraftPrice] = useState({
     source: selectedPriceSource,
@@ -508,71 +509,9 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
   const priceTrackRight = 100 - ((draftPriceMax - priceFloor) / priceTrackSpan) * 100;
 
   return (
-    <div className={`shop-filters${isModern ? ' shop-filters-modern' : ''}`} style={{ marginBottom: '1.5rem' }}>
+    <div className={`shop-filters${isModern ? ' shop-filters-modern' : ''}`} style={{ marginBottom: '1.5rem' }} data-filters-open={filtersOpen ? 'true' : 'false'}>
 
-      {/* Search + live metal prices */}
-      <div className="shop-search-spot-row">
-        <div
-          style={silverBadgeStyle}
-          aria-label={isEs ? 'Precio de plata en vivo por onza troy' : 'Live silver price per troy ounce'}
-        >
-          <span style={silverLabelStyle}>{isEs ? 'Plata / oz' : 'Silver / oz'}</span>
-          <span style={silverPriceStyle}>{formatSpot(spotData?.silverPerTroyOz)}</span>
-        </div>
-
-        <div style={{ width: '100%', maxWidth: '24rem' }}>
-        <input
-          type="search"
-          defaultValue={currentFilters.q ?? ''}
-          placeholder={isEs
-            ? 'Buscar oro, cadena, pulsera, collar, anillo…'
-            : 'Search gold, chain, bracelet, necklace, ring…'}
-          onChange={(e) => updateFilter('q', e.target.value)}
-          style={{
-            width: '100%',
-            padding: '0.45rem 0.8rem',
-            border: `1px solid rgba(115, 92, 0, 0.5)`,
-            borderRadius: '2px',
-            background: 'var(--color-background)',
-            color: 'var(--color-on-surface)',
-            fontFamily: 'var(--font-label)',
-            fontSize: '0.875rem',
-          }}
-        />
-        </div>
-
-        <div
-          style={goldBadgeStyle}
-          aria-label={isEs ? 'Precio de oro en vivo por onza troy' : 'Live gold price per troy ounce'}
-        >
-          <span style={goldLabelStyle}>{isEs ? 'Oro / oz' : 'Gold / oz'}</span>
-          <span style={goldPriceStyle}>{formatSpot(spotData?.goldPerTroyOz)}</span>
-        </div>
-      </div>
-
-      {isModern && (
-        <div className="modern-sidebar-gender" data-filters-open={filtersOpen ? 'true' : 'false'}>
-          <span className="modern-sidebar-label">{isEs ? 'Categoria' : 'Category'}</span>
-          <div className="modern-sidebar-gender-grid">
-            {itemGroupOptions.map((option) => {
-              const active = currentItemGroup === option.value;
-              return (
-                <button
-                  key={option.label}
-                  type="button"
-                  onClick={() => updateItemGroupFilter(option.value)}
-                  aria-pressed={active}
-                  className="modern-sidebar-gender-button"
-                  data-active={active ? 'true' : 'false'}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
+      {/* Filters toggle — always visible on mobile/tablet, hidden on desktop */}
       <div className="shop-filter-toggle-row" style={{ display: 'flex', justifyContent: 'center', marginBottom: filtersOpen ? '0.85rem' : '0.5rem' }}>
         <button
           type="button"
@@ -612,6 +551,77 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
       </div>
 
       <div id="shop-filter-panel" className={`shop-filter-panel${filtersOpen ? ' is-open' : ''}`}>
+        {/* Search + live metal prices */}
+        <div className="shop-search-spot-row">
+          <div
+            style={silverBadgeStyle}
+            aria-label={isEs ? 'Precio de plata en vivo por onza troy' : 'Live silver price per troy ounce'}
+          >
+            <span style={silverLabelStyle}>{isEs ? 'Plata / oz' : 'Silver / oz'}</span>
+            <span style={silverPriceStyle}>{formatSpot(spotData?.silverPerTroyOz)}</span>
+          </div>
+
+          <div style={{ width: '100%', maxWidth: '24rem' }}>
+            <input
+              type="search"
+              defaultValue={currentFilters.q ?? ''}
+              placeholder={isEs
+                ? 'Buscar oro, cadena, pulsera, collar, anillo…'
+                : 'Search gold, chain, bracelet, necklace, ring…'}
+              onChange={(e) => updateFilter('q', e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.45rem 0.8rem',
+                border: `1px solid rgba(115, 92, 0, 0.5)`,
+                borderRadius: '2px',
+                background: 'var(--color-background)',
+                color: 'var(--color-on-surface)',
+                fontFamily: 'var(--font-label)',
+                fontSize: '0.875rem',
+              }}
+            />
+          </div>
+
+          <div
+            style={goldBadgeStyle}
+            aria-label={isEs ? 'Precio de oro en vivo por onza troy' : 'Live gold price per troy ounce'}
+          >
+            <span style={goldLabelStyle}>{isEs ? 'Oro / oz' : 'Gold / oz'}</span>
+            <span style={goldPriceStyle}>{formatSpot(spotData?.goldPerTroyOz)}</span>
+          </div>
+        </div>
+
+        {/* ERA/Year slider — mobile/tablet only; desktop shows it above the catalog */}
+        {yearFilterNode && (
+          <div className="shop-year-filter-in-panel">
+            {yearFilterNode}
+          </div>
+        )}
+
+        {/* Category */}
+        {isModern && (
+          <div className="modern-sidebar-gender">
+            <span className="modern-sidebar-label">{isEs ? 'Categoria' : 'Category'}</span>
+            <div className="modern-sidebar-gender-grid">
+              {itemGroupOptions.map((option) => {
+                const active = currentItemGroup === option.value;
+                return (
+                  <button
+                    key={option.label}
+                    type="button"
+                    onClick={() => updateItemGroupFilter(option.value)}
+                    aria-pressed={active}
+                    className="modern-sidebar-gender-button"
+                    data-active={active ? 'true' : 'false'}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
           {/* Labeled dropdowns */}
           <div
             style={{
@@ -1309,51 +1319,49 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
           .shop-length-button { flex-basis: calc(50% - 0.4rem); }
         }
         @media (max-width: 767px) {
-          /* Hide the sidebar gender buttons until the Filters panel is opened */
-          .shop-filters-modern .modern-sidebar-gender[data-filters-open="false"] {
+          /* Spot prices moved above the era slider; show only search bar here */
+          .shop-filters-modern .shop-search-spot-row > div:nth-child(1),
+          .shop-filters-modern .shop-search-spot-row > div:nth-child(3) {
             display: none;
           }
-          /* Place the gold + silver spot pills side by side on mobile */
           .shop-filters-modern .shop-search-spot-row {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            max-width: 24rem;
+            grid-template-columns: 1fr;
+            max-width: none;
           }
           .shop-filters-modern .shop-search-spot-row > div:nth-child(2) {
             grid-row: 1;
-            grid-column: 1 / -1;
-          }
-          .shop-filters-modern .shop-search-spot-row > div:nth-child(1) {
-            grid-row: 2;
             grid-column: 1;
-          }
-          .shop-filters-modern .shop-search-spot-row > div:nth-child(3) {
-            grid-row: 2;
-            grid-column: 2;
           }
         }
         @media (min-width: 768px) and (max-width: 1023px) {
-          /* Tablet: hide the sidebar gender buttons until the Filters panel is opened */
-          .shop-filters-modern .modern-sidebar-gender[data-filters-open="false"] {
+          /* Tablet: spot prices moved above the era slider; show only search bar here */
+          .shop-filters-modern .shop-search-spot-row > div:nth-child(1),
+          .shop-filters-modern .shop-search-spot-row > div:nth-child(3) {
             display: none;
           }
-          /* Tablet: lay search + spot prices out horizontally (silver · search · gold) */
           .shop-filters-modern .shop-search-spot-row {
-            grid-template-columns: minmax(9rem, 0.55fr) minmax(0, 2fr) minmax(9rem, 0.55fr);
+            grid-template-columns: 1fr;
             max-width: none;
-            gap: 0.65rem;
-          }
-          .shop-filters-modern .shop-search-spot-row > div:nth-child(1) {
-            grid-row: 1;
-            grid-column: 1;
           }
           .shop-filters-modern .shop-search-spot-row > div:nth-child(2) {
             grid-row: 1;
-            grid-column: 2;
+            grid-column: 1;
             max-width: none !important;
           }
-          .shop-filters-modern .shop-search-spot-row > div:nth-child(3) {
-            grid-row: 1;
-            grid-column: 3;
+        }
+        /* ERA/Year slider embedded in the filter panel (mobile/tablet only) */
+        .shop-year-filter-in-panel {
+          margin-bottom: 0.85rem;
+        }
+        .shop-year-filter-in-panel .shop-year-toggle {
+          display: none !important;
+        }
+        .shop-year-filter-in-panel .shop-year-body {
+          display: block !important;
+        }
+        @media (min-width: 1024px) {
+          .shop-year-filter-in-panel {
+            display: none;
           }
         }
       `}</style>

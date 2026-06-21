@@ -6,6 +6,18 @@ import { getJewelryEras, getJewelryEraBoundaries, getJewelryEraLevels } from '@/
 
 const GOLD = '#735c00';
 
+// These 4 eras get labels on mobile.
+const MOBILE_PRIMARY_KEYS = new Set(['victorian', 'art-deco', 'modern', 'contemporary']);
+
+// On mobile, alternate era labels above/below the center divider so they don't overlap.
+// Victorian + Modern sit above; Art Deco + Contemporary sit below.
+const MOBILE_ROW: Record<string, 'top' | 'bottom'> = {
+  victorian: 'top',
+  'art-deco': 'bottom',
+  modern: 'top',
+  contemporary: 'bottom',
+};
+
 interface Props {
   locale: string;
   minYear: number;
@@ -19,6 +31,7 @@ export default function ShopYearFilter({ locale, minYear, maxYear, selectedMin, 
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [open, setOpen] = useState(false);
 
   // Drafts initialize from the committed selection. The parent remounts this
   // component (via key) whenever the committed range changes, so navigation
@@ -77,18 +90,19 @@ export default function ShopYearFilter({ locale, minYear, maxYear, selectedMin, 
     '--year-right': `${rightPct}%`,
   } as CSSProperties;
 
+  const readout = isFullSpan
+    ? (isEs ? 'Todos los años' : 'All years')
+    : `${draftMin <= minYear ? `${minYear} ${isEs ? 'y antes' : '& earlier'}` : draftMin} – ${draftMax}`;
+
   return (
     <section
       className="shop-year-filter shop-entry-reveal shop-entry-reveal-hero"
       aria-label={isEs ? 'Filtrar por época o año' : 'Filter by era or year'}
+      data-open={open ? 'true' : 'false'}
     >
       <div className="shop-year-head">
         <span className="shop-year-title">{isEs ? 'Época / Año' : 'Era / Year'}</span>
-        <span className="shop-year-readout">
-          {isFullSpan
-            ? (isEs ? 'Todos los años' : 'All years')
-            : `${draftMin <= minYear ? `${minYear} ${isEs ? 'y antes' : '& earlier'}` : draftMin} – ${draftMax}`}
-        </span>
+        <span className="shop-year-readout">{readout}</span>
         <button
           type="button"
           className="shop-year-reset"
@@ -98,82 +112,104 @@ export default function ShopYearFilter({ locale, minYear, maxYear, selectedMin, 
         >
           {isEs ? 'Restablecer' : 'Reset'}
         </button>
+        <button
+          type="button"
+          className="shop-year-toggle"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          aria-label={open
+            ? (isEs ? 'Ocultar filtro de año' : 'Collapse year filter')
+            : (isEs ? 'Mostrar filtro de año' : 'Expand year filter')}
+        >
+          <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '1.15rem', lineHeight: 1 }}>
+            {open ? 'expand_less' : 'expand_more'}
+          </span>
+        </button>
       </div>
 
-      <div className="shop-year-eras">
-        {levels.map((level) => (
-          <div key={level} className="shop-year-era-row">
-            {eras
-              .filter((era) => era.level === level)
-              .map((era) => {
-                const left = ((era.start - minYear) / span) * 100;
-                const width = ((era.end - era.start) / span) * 100;
-                const label = isEs ? era.labelEs : era.label;
-                const isActive = selectedMin === era.start && selectedMax === era.end;
-                const isOverlap = era.level > 1;
-                return (
-                  <button
-                    type="button"
-                    key={era.key}
-                    className={`shop-year-era${isOverlap ? ' shop-year-era-overlap' : ''}${isActive ? ' shop-year-era-active' : ''}`}
-                    style={{ left: `${left}%`, width: `${width}%` }}
-                    aria-pressed={isActive}
-                    aria-label={isEs
-                      ? `Filtrar a ${label}, ${era.start} a ${era.end}`
-                      : `Filter to ${label}, ${era.start} to ${era.end}`}
-                    onClick={() => selectEra(era.start, era.end)}
-                  >
-                    {isOverlap && <span className="shop-year-era-cap shop-year-era-cap-start" aria-hidden="true" />}
-                    <span className="shop-year-era-full">{label}</span>
-                    <span className="shop-year-era-short">{isEs ? era.shortLabelEs : era.shortLabel}</span>
-                    {isOverlap && <span className="shop-year-era-cap shop-year-era-cap-end" aria-hidden="true" />}
-                  </button>
-                );
-              })}
-          </div>
-        ))}
-      </div>
+      <div className="shop-year-body">
+        <div className="shop-year-eras">
+          {levels.map((level) => (
+            <div key={level} className={`shop-year-era-row${level > 1 ? ' shop-year-era-row-overlap' : ''}`}>
+              {eras
+                .filter((era) => era.level === level)
+                .map((era) => {
+                  const left = ((era.start - minYear) / span) * 100;
+                  const width = ((era.end - era.start) / span) * 100;
+                  const label = isEs ? era.labelEs : era.label;
+                  const isActive = selectedMin === era.start && selectedMax === era.end;
+                  const isOverlap = era.level > 1;
+                  const isMobilePrimary = MOBILE_PRIMARY_KEYS.has(era.key);
+                  return (
+                    <button
+                      type="button"
+                      key={era.key}
+                      className={`shop-year-era${isOverlap ? ' shop-year-era-overlap' : ''}${isActive ? ' shop-year-era-active' : ''}`}
+                      style={{ left: `${left}%`, width: `${width}%` }}
+                      aria-pressed={isActive}
+                      aria-label={isEs
+                        ? `Filtrar a ${label}, ${era.start} a ${era.end}`
+                        : `Filter to ${label}, ${era.start} to ${era.end}`}
+                      onClick={() => selectEra(era.start, era.end)}
+                      data-mobile-primary={isMobilePrimary ? 'true' : undefined}
+                      data-mobile-row={isMobilePrimary ? (MOBILE_ROW[era.key] ?? 'top') : undefined}
+                    >
+                      {isOverlap && <span className="shop-year-era-cap shop-year-era-cap-start" aria-hidden="true" />}
+                      <span className="shop-year-era-full">{label}</span>
+                      <span className="shop-year-era-short">{isEs ? era.shortLabelEs : era.shortLabel}</span>
+                      {isOverlap && <span className="shop-year-era-cap shop-year-era-cap-end" aria-hidden="true" />}
+                    </button>
+                  );
+                })}
+            </div>
+          ))}
+        </div>
 
-      <div className="shop-year-slider" style={trackStyle}>
-        <input
-          type="range"
-          min={minYear}
-          max={maxYear}
-          step={1}
-          value={draftMin}
-          aria-label={isEs ? 'Año mínimo' : 'Minimum year'}
-          onChange={(event) => setDraftMin(Math.min(Number(event.target.value), draftMax))}
-          onMouseUp={() => commit(draftMin, draftMax)}
-          onTouchEnd={() => commit(draftMin, draftMax)}
-          onBlur={() => commit(draftMin, draftMax)}
-        />
-        <input
-          type="range"
-          min={minYear}
-          max={maxYear}
-          step={1}
-          value={draftMax}
-          aria-label={isEs ? 'Año máximo' : 'Maximum year'}
-          onChange={(event) => setDraftMax(Math.max(Number(event.target.value), draftMin))}
-          onMouseUp={() => commit(draftMin, draftMax)}
-          onTouchEnd={() => commit(draftMin, draftMax)}
-          onBlur={() => commit(draftMin, draftMax)}
-        />
-      </div>
+        <div className="shop-year-slider" style={trackStyle}>
+          <input
+            type="range"
+            min={minYear}
+            max={maxYear}
+            step={1}
+            value={draftMin}
+            aria-label={isEs ? 'Año mínimo' : 'Minimum year'}
+            onChange={(event) => setDraftMin(Math.min(Number(event.target.value), draftMax))}
+            onMouseUp={() => commit(draftMin, draftMax)}
+            onTouchEnd={() => commit(draftMin, draftMax)}
+            onBlur={() => commit(draftMin, draftMax)}
+          />
+          <input
+            type="range"
+            min={minYear}
+            max={maxYear}
+            step={1}
+            value={draftMax}
+            aria-label={isEs ? 'Año máximo' : 'Maximum year'}
+            onChange={(event) => setDraftMax(Math.max(Number(event.target.value), draftMin))}
+            onMouseUp={() => commit(draftMin, draftMax)}
+            onTouchEnd={() => commit(draftMin, draftMax)}
+            onBlur={() => commit(draftMin, draftMax)}
+          />
+        </div>
 
-      <div className="shop-year-ticks" aria-hidden="true">
-        {boundaries.map((year, index) => {
-          const left = ((year - minYear) / span) * 100;
-          const edge = index === 0 ? 'start' : index === boundaries.length - 1 ? 'end' : 'mid';
-          return (
-            <span key={year} className={`shop-year-tick shop-year-tick-${edge}`} style={{ left: `${left}%` }}>
-              <span className="shop-year-tick-mark" />
-              <span className="shop-year-tick-label">
-                {index === 0 ? (isEs ? `${year} y antes` : `${year} & earlier`) : year}
+        <div className="shop-year-ticks" aria-hidden="true">
+          {boundaries.map((year, index) => {
+            const left = ((year - minYear) / span) * 100;
+            const edge = index === 0 ? 'start' : index === boundaries.length - 1 ? 'end' : 'mid';
+            return (
+              <span
+                key={year}
+                className={`shop-year-tick shop-year-tick-${edge}`}
+                style={{ left: `${left}%` }}
+              >
+                <span className="shop-year-tick-mark" />
+                <span className="shop-year-tick-label">
+                  {index === 0 ? (isEs ? `${year} y antes` : `${year} & earlier`) : year}
+                </span>
               </span>
-            </span>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       <style>{`
@@ -186,7 +222,7 @@ export default function ShopYearFilter({ locale, minYear, maxYear, selectedMin, 
         }
         .shop-year-head {
           display: flex;
-          align-items: baseline;
+          align-items: center;
           gap: 0.85rem;
           margin-bottom: 0.65rem;
         }
@@ -197,6 +233,7 @@ export default function ShopYearFilter({ locale, minYear, maxYear, selectedMin, 
           font-weight: 800;
           letter-spacing: 0.18em;
           text-transform: uppercase;
+          flex-shrink: 0;
         }
         .shop-year-readout {
           color: var(--color-on-surface);
@@ -216,12 +253,28 @@ export default function ShopYearFilter({ locale, minYear, maxYear, selectedMin, 
           text-decoration: underline;
           text-underline-offset: 3px;
           cursor: pointer;
+          flex-shrink: 0;
         }
         .shop-year-reset:disabled {
           opacity: 0.4;
           cursor: default;
           text-decoration: none;
         }
+        .shop-year-toggle {
+          display: none;
+          align-items: center;
+          justify-content: center;
+          width: 1.6rem;
+          height: 1.6rem;
+          padding: 0;
+          border: none;
+          background: none;
+          cursor: pointer;
+          color: var(--color-on-surface-variant);
+          flex-shrink: 0;
+          border-radius: 4px;
+        }
+        .shop-year-toggle:hover { background: rgba(115, 92, 0, 0.08); }
         .shop-year-eras {
           display: flex;
           flex-direction: column;
@@ -252,8 +305,6 @@ export default function ShopYearFilter({ locale, minYear, maxYear, selectedMin, 
         .shop-year-era:last-child {
           border-right: 1px solid rgba(115, 92, 0, 0.18);
         }
-        /* Overlapping bands are narrow, so let labels spill past their edges
-           (each overlap row holds a single band with empty space around it). */
         .shop-year-era-overlap {
           overflow: visible;
         }
@@ -376,7 +427,7 @@ export default function ShopYearFilter({ locale, minYear, maxYear, selectedMin, 
         }
         .shop-year-ticks {
           position: relative;
-          height: 1.1rem;
+          height: 1.5rem;
           margin-top: 0.15rem;
         }
         .shop-year-tick {
@@ -402,10 +453,67 @@ export default function ShopYearFilter({ locale, minYear, maxYear, selectedMin, 
           letter-spacing: 0.02em;
           white-space: nowrap;
         }
+
+        /* ── Mobile ─────────────────────────────────────────── */
         @media (max-width: 767px) {
+          .shop-year-toggle { display: flex; }
+          .shop-year-reset { margin-left: auto; margin-right: 0; }
+          .shop-year-filter[data-open="false"] .shop-year-head { margin-bottom: 0; }
+          .shop-year-filter[data-open="false"] .shop-year-body { display: none; }
+
+          /* Hide Art Nouveau overlap row */
+          .shop-year-era-row-overlap { display: none; }
+
+          /* Taller era row to hold staggered labels above + below the center line */
+          .shop-year-era-row { height: 2.9rem; }
+
+          /* Horizontal divider line at the vertical midpoint of the era row */
+          .shop-year-era-row::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: rgba(115, 92, 0, 0.2);
+            pointer-events: none;
+          }
+
+          /* Era buttons: span full row height, allow labels to overflow bounds */
+          .shop-year-era { overflow: visible; height: 100%; }
+
+          /* Hide all era label text by default */
           .shop-year-era-full { display: none; }
-          .shop-year-era-short { display: inline; }
-          .shop-year-tick-mid .shop-year-tick-label { display: none; }
+          .shop-year-era-short { display: none; }
+
+          /* Featured era labels: absolutely positioned within the button */
+          .shop-year-era[data-mobile-primary] .shop-year-era-short {
+            display: block;
+            position: absolute;
+            left: 0;
+            right: 0;
+            text-align: center;
+            white-space: nowrap;
+            pointer-events: none;
+            font-size: 0.46rem;
+            letter-spacing: 0.1em;
+          }
+          /* Victorian + Modern: label above the center line */
+          .shop-year-era[data-mobile-row="top"] .shop-year-era-short {
+            top: 0.28rem;
+            bottom: auto;
+          }
+          /* Art Deco + Contemporary: label below the center line */
+          .shop-year-era[data-mobile-row="bottom"] .shop-year-era-short {
+            bottom: 0.28rem;
+            top: auto;
+          }
+
+          /* Tick section: show only the leftmost (1837) and rightmost (maxYear) labels */
+          .shop-year-ticks { height: 1.25rem; }
+          .shop-year-tick:not(.shop-year-tick-start):not(.shop-year-tick-end) .shop-year-tick-label {
+            display: none;
+          }
         }
       `}</style>
     </section>

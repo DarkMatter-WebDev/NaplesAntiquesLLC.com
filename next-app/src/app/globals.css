@@ -330,6 +330,21 @@ body {
   padding: 1.5rem;
 }
 
+/* Mobile: each editor block collapses under its title. Tapping the header
+   toggles it; on desktop (>=768px) everything is always shown. */
+@media (max-width: 767px) {
+  .product-editor-panel {
+    padding: 1.05rem;
+  }
+  .editor-collapse-header {
+    cursor: pointer;
+    user-select: none;
+  }
+  .product-editor-panel[data-collapsed="true"] > :not(.editor-collapse-header) {
+    display: none !important;
+  }
+}
+
 .product-editor-icon {
   display: inline-flex;
   height: 2.5rem;
