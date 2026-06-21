@@ -5,10 +5,12 @@ import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { productImagePaddingBackground, productImagePaddingForImage, type ProductImagePaddingMap } from '@/types/product';
 
-const LENS = 100;  // lens square side px
 const ZOOM = 3;    // magnification
 const PANEL = 220; // floating zoom box size px
 const MOBILE_PANEL = 190;
+// A small non-interactive border around each image where the magnifier does not
+// activate, so the prev/next buttons at the edges stay usable.
+const EDGE_DEAD_ZONE = 44;
 
 interface Props {
   images: string[];
@@ -18,8 +20,10 @@ interface Props {
 }
 
 interface ZoomState {
+  source: 'main' | 'lightbox'; // which image is being magnified
   lensX: number;
   lensY: number;
+  lensSize: number;   // matches the magnified region (panelSize / ZOOM)
   panelLeft: number;  // viewport x for the floating box
   panelTop: number;   // viewport y for the floating box
   panelSize: number;
@@ -35,7 +39,13 @@ export default function ProductImageGallery({ images, title, imagePadding = null
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+  const lightboxContainerRef = useRef<HTMLDivElement>(null);
+  const lightboxImageRef = useRef<HTMLImageElement>(null);
   const touchZoomingRef = useRef(false);
+  // Cross-fade between image switches: the outgoing image stays underneath while
+  // the new one fades in on top, then is cleared when the fade completes.
+  const [prevImage, setPrevImage] = useState<string | null>(null);
+  const [lastActive, setLastActive] = useState(active);
 
   const hasMultipleImages = images.length > 1;
 
@@ -66,11 +76,18 @@ export default function ProductImageGallery({ images, title, imagePadding = null
     setLightboxOpen(true);
   }, [closeZoom]);
 
+  // Closing the lightbox also clears any active magnifier — the zoom panel
+  // renders outside the lightbox portal, so it would otherwise linger.
+  const closeLightbox = useCallback(() => {
+    closeZoom();
+    setLightboxOpen(false);
+  }, [closeZoom]);
+
   // While the lightbox is open: lock body scroll and wire Esc / arrow keys.
   useEffect(() => {
     if (!lightboxOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setLightboxOpen(false);
+      if (event.key === 'Escape') closeLightbox();
       else if (event.key === 'ArrowLeft') showPreviousImage();
       else if (event.key === 'ArrowRight') showNextImage();
     };
@@ -81,13 +98,27 @@ export default function ProductImageGallery({ images, title, imagePadding = null
       window.removeEventListener('keydown', onKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [lightboxOpen, showPreviousImage, showNextImage]);
+  }, [lightboxOpen, closeLightbox, showPreviousImage, showNextImage]);
 
-  const updateZoom = useCallback((clientX: number, clientY: number, mode: 'mouse' | 'touch') => {
-    const el = containerRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const img = imageRef.current;
+  // Remove the outgoing cross-fade layer once the incoming image has faded in.
+  // A timer (rather than onAnimationEnd) keeps this robust for reduced-motion and
+  // rapid switches.
+  useEffect(() => {
+    if (!prevImage) return;
+    const timer = window.setTimeout(() => setPrevImage(null), 320);
+    return () => window.clearTimeout(timer);
+  }, [prevImage]);
+
+  const updateZoom = useCallback((
+    clientX: number,
+    clientY: number,
+    mode: 'mouse' | 'touch',
+    container: HTMLDivElement | null,
+    img: HTMLImageElement | null,
+    source: 'main' | 'lightbox',
+  ) => {
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
     let imageLeft = rect.left;
     let imageTop = rect.top;
     let imageWidth = rect.width;
@@ -111,20 +142,23 @@ export default function ProductImageGallery({ images, title, imagePadding = null
     const x = Math.max(0, Math.min(clientX - imageLeft, imageWidth));
     const y = Math.max(0, Math.min(clientY - imageTop, imageHeight));
 
-    const lensX = imageLeft - rect.left + x - LENS / 2;
-    const lensY = imageTop - rect.top + y - LENS / 2;
     const panelSize = mode === 'touch'
       ? Math.min(MOBILE_PANEL, Math.max(150, window.innerWidth - 32))
       : PANEL;
+    // The lens marks exactly the region the panel magnifies (panelSize / ZOOM),
+    // so the on-image highlight and the zoomed view stay in alignment.
+    const lensSize = panelSize / ZOOM;
+    const lensX = imageLeft - rect.left + x - lensSize / 2;
+    const lensY = imageTop - rect.top + y - lensSize / 2;
 
-    // Desktop centers on cursor. Touch keeps the panel offset from the finger.
+    // Center the magnifier on the cursor (a magnifying glass), clamped to the
+    // viewport so it stays fully on-screen near the edges.
     let panelLeft = clientX - panelSize / 2;
-    let panelTop = mode === 'touch' ? clientY - panelSize - 18 : clientY - panelSize / 2;
-    if (mode === 'touch' && panelTop < 0) panelTop = clientY + 18;
-    if (panelLeft < 0) panelLeft = 0;
-    if (panelTop < 0) panelTop = 0;
-    if (panelLeft + panelSize > window.innerWidth) panelLeft = window.innerWidth - panelSize;
-    if (panelTop + panelSize > window.innerHeight) panelTop = window.innerHeight - panelSize;
+    let panelTop = clientY - panelSize / 2;
+    if (panelLeft < 8) panelLeft = 8;
+    else if (panelLeft + panelSize > window.innerWidth - 8) panelLeft = window.innerWidth - 8 - panelSize;
+    if (panelTop < 8) panelTop = 8;
+    else if (panelTop + panelSize > window.innerHeight - 8) panelTop = window.innerHeight - 8 - panelSize;
 
     // Center the hovered point in the zoom box
     const bw = imageWidth * ZOOM;
@@ -132,23 +166,36 @@ export default function ProductImageGallery({ images, title, imagePadding = null
     const bgX = -(x * ZOOM - panelSize / 2);
     const bgY = -(y * ZOOM - panelSize / 2);
 
-    setZoom({ lensX, lensY, panelLeft, panelTop, panelSize, bgX, bgY, bw, bh });
+    setZoom({ source, lensX, lensY, lensSize, panelLeft, panelTop, panelSize, bgX, bgY, bw, bh });
   }, []);
 
-  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.target instanceof HTMLElement && e.target.closest('.product-gallery-edge-button')) {
+  const handleZoomPointerMove = useCallback((
+    e: React.PointerEvent<HTMLDivElement>,
+    container: HTMLDivElement | null,
+    img: HTMLImageElement | null,
+    source: 'main' | 'lightbox',
+  ) => {
+    if (!container) return;
+    // Non-interactive perimeter: don't magnify within a small margin of the image
+    // edges, so the prev/next buttons at the sides stay usable without the
+    // magnifier fighting them. (Clicking the edge buttons still navigates.)
+    const rect = container.getBoundingClientRect();
+    if (
+      e.clientX < rect.left + EDGE_DEAD_ZONE || e.clientX > rect.right - EDGE_DEAD_ZONE ||
+      e.clientY < rect.top + EDGE_DEAD_ZONE || e.clientY > rect.bottom - EDGE_DEAD_ZONE
+    ) {
       closeZoom();
       return;
     }
 
     if (e.pointerType === 'mouse') {
-      updateZoom(e.clientX, e.clientY, 'mouse');
+      updateZoom(e.clientX, e.clientY, 'mouse', container, img, source);
       return;
     }
 
     if (touchZoomingRef.current) {
       e.preventDefault();
-      updateZoom(e.clientX, e.clientY, 'touch');
+      updateZoom(e.clientX, e.clientY, 'touch', container, img, source);
     }
   }, [closeZoom, updateZoom]);
 
@@ -157,12 +204,17 @@ export default function ProductImageGallery({ images, title, imagePadding = null
     closeZoom();
   }, [closeZoom]);
 
-  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+  const handleZoomPointerDown = useCallback((
+    e: React.PointerEvent<HTMLDivElement>,
+    container: HTMLDivElement | null,
+    img: HTMLImageElement | null,
+    source: 'main' | 'lightbox',
+  ) => {
     if (e.pointerType === 'mouse') return;
     e.preventDefault();
     touchZoomingRef.current = true;
     e.currentTarget.setPointerCapture(e.pointerId);
-    updateZoom(e.clientX, e.clientY, 'touch');
+    updateZoom(e.clientX, e.clientY, 'touch', container, img, source);
   }, [updateZoom]);
 
   const handlePointerLeave = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -182,8 +234,23 @@ export default function ProductImageGallery({ images, title, imagePadding = null
     );
   }
 
+  // On the product detail page the image frame defaults to white. A padding the
+  // admin explicitly set (white/black/custom) is still honored; only the unset
+  // default ('none') — which would otherwise be light gray — becomes white.
+  const resolveFrameBackground = (image: string, index: number) => {
+    const padding = productImagePaddingForImage(imagePadding, imagePaddingByImage, image, index);
+    return padding === 'none' ? '#ffffff' : productImagePaddingBackground(padding);
+  };
+
   const current = images[active];
-  const imageFrameBackground = productImagePaddingBackground(productImagePaddingForImage(imagePadding, imagePaddingByImage, current, active));
+  // When the displayed image changes, remember the outgoing one so it can sit
+  // beneath the incoming image during its fade-in (a clean cross-fade).
+  if (lastActive !== active) {
+    setPrevImage(images[lastActive] ?? null);
+    setLastActive(active);
+  }
+  const fadingFrom = prevImage && prevImage !== current ? prevImage : null;
+  const imageFrameBackground = resolveFrameBackground(current, active);
   const visibleThumbnailIndexes = hasMultipleImages
     ? images.length === 2
       ? [active, (active + 1) % images.length]
@@ -199,19 +266,32 @@ export default function ProductImageGallery({ images, title, imagePadding = null
         style={{ background: imageFrameBackground, cursor: 'crosshair', touchAction: 'none' }}
         title="Click to view full size"
         onClick={openLightbox}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
+        onPointerDown={(e) => handleZoomPointerDown(e, containerRef.current, imageRef.current, 'main')}
+        onPointerMove={(e) => handleZoomPointerMove(e, containerRef.current, imageRef.current, 'main')}
         onPointerLeave={handlePointerLeave}
         onPointerUp={closeZoom}
         onPointerCancel={closeZoom}
       >
+        {fadingFrom && (
+          <Image
+            key={`prev-${fadingFrom}`}
+            src={fadingFrom}
+            alt=""
+            aria-hidden="true"
+            fill
+            sizes="(max-width: 768px) 100vw, 50vw"
+            className="object-contain object-center"
+            unoptimized={fadingFrom.startsWith('/assets/')}
+          />
+        )}
         <Image
+          key={current}
           ref={imageRef}
           src={current}
           alt={title}
           fill
           sizes="(max-width: 768px) 100vw, 50vw"
-          className="object-contain object-center"
+          className="object-contain object-center product-gallery-fade-in"
           priority
           unoptimized={current.startsWith('/assets/')}
         />
@@ -221,8 +301,6 @@ export default function ProductImageGallery({ images, title, imagePadding = null
             <button
               type="button"
               className="product-gallery-edge-button product-gallery-edge-prev absolute left-0 top-0 z-10 flex h-full w-[28%] items-center justify-start px-3 text-[var(--color-primary)] opacity-0 transition-opacity hover:opacity-100 focus:opacity-100"
-              onPointerEnter={closeZoom}
-              onPointerMove={closeZoom}
               onPointerDown={handleNavigationPointerDown}
               onClick={showPreviousImage}
               aria-label="Previous image"
@@ -240,8 +318,6 @@ export default function ProductImageGallery({ images, title, imagePadding = null
             <button
               type="button"
               className="product-gallery-edge-button product-gallery-edge-next absolute right-0 top-0 z-10 flex h-full w-[28%] items-center justify-end px-3 text-[var(--color-primary)] opacity-0 transition-opacity hover:opacity-100 focus:opacity-100"
-              onPointerEnter={closeZoom}
-              onPointerMove={closeZoom}
               onPointerDown={handleNavigationPointerDown}
               onClick={showNextImage}
               aria-label="Next image"
@@ -260,14 +336,14 @@ export default function ProductImageGallery({ images, title, imagePadding = null
         )}
 
         {/* Lens square */}
-        {zoom && (
+        {zoom && zoom.source === 'main' && (
           <div
             style={{
               position: 'absolute',
               left: zoom.lensX,
               top: zoom.lensY,
-              width: LENS,
-              height: LENS,
+              width: zoom.lensSize,
+              height: zoom.lensSize,
               border: '2px solid rgba(115,92,0,0.65)',
               background: 'rgba(255,255,255,0.12)',
               pointerEvents: 'none',
@@ -295,7 +371,7 @@ export default function ProductImageGallery({ images, title, imagePadding = null
           <div className="product-gallery-thumbnails flex items-center justify-center gap-2">
             {visibleThumbnailIndexes.map((i, slotIndex) => {
               const img = images[i] ?? current;
-              const thumbnailFrameBackground = productImagePaddingBackground(productImagePaddingForImage(imagePadding, imagePaddingByImage, img, i));
+              const thumbnailFrameBackground = resolveFrameBackground(img, i);
 
               return (
                 <button
@@ -337,8 +413,11 @@ export default function ProductImageGallery({ images, title, imagePadding = null
         </div>
       )}
 
-      {/* Zoom panel — fixed to viewport, no overflow clipping */}
-      {zoom && (
+      {/* Zoom panel — portaled to <body> so its position: fixed is relative to
+          the viewport. (An ancestor with any transform would otherwise become the
+          containing block, offsetting the panel by that ancestor's position — an
+          offset that grows with screen width via the centered max-width wrapper.) */}
+      {zoom && typeof document !== 'undefined' && createPortal(
         <div
           style={{
             position: 'fixed',
@@ -350,12 +429,14 @@ export default function ProductImageGallery({ images, title, imagePadding = null
             backgroundSize: `${zoom.bw}px ${zoom.bh}px`,
             backgroundPosition: `${zoom.bgX}px ${zoom.bgY}px`,
             backgroundRepeat: 'no-repeat',
-            border: '1px solid rgba(115,92,0,0.28)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-            zIndex: 50,
+            border: zoom.source === 'lightbox' ? '1px solid rgba(255,255,255,0.45)' : '1px solid rgba(115,92,0,0.28)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
+            // Sit above the lightbox overlay (z-1000) when magnifying it.
+            zIndex: zoom.source === 'lightbox' ? 1001 : 50,
             pointerEvents: 'none',
           }}
-        />
+        />,
+        document.body,
       )}
 
       {/* Full-size lightbox — portaled to body so ancestor transforms don't
@@ -367,11 +448,11 @@ export default function ProductImageGallery({ images, title, imagePadding = null
           role="dialog"
           aria-modal="true"
           aria-label={`${title} — full size image viewer`}
-          onClick={(e) => { if (e.target === e.currentTarget) setLightboxOpen(false); }}
+          onClick={(e) => { if (e.target === e.currentTarget) closeLightbox(); }}
         >
           <button
             type="button"
-            onClick={() => setLightboxOpen(false)}
+            onClick={() => closeLightbox()}
             aria-label="Close image viewer"
             title="Close"
             className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-black/30 text-white transition-colors hover:bg-black/60"
@@ -381,17 +462,57 @@ export default function ProductImageGallery({ images, title, imagePadding = null
 
           <div
             className="relative flex flex-1 items-center justify-center px-4 pt-16 pb-4"
-            onClick={(e) => { if (e.target === e.currentTarget) setLightboxOpen(false); }}
+            onClick={(e) => { if (e.target === e.currentTarget) closeLightbox(); }}
           >
-            <div className="relative h-full w-full max-w-5xl">
+            <div
+              ref={lightboxContainerRef}
+              className="relative h-full w-full max-w-5xl"
+              style={{ cursor: 'crosshair', touchAction: 'none' }}
+              title="Hover to magnify"
+              onPointerDown={(e) => handleZoomPointerDown(e, lightboxContainerRef.current, lightboxImageRef.current, 'lightbox')}
+              onPointerMove={(e) => handleZoomPointerMove(e, lightboxContainerRef.current, lightboxImageRef.current, 'lightbox')}
+              onPointerLeave={handlePointerLeave}
+              onPointerUp={closeZoom}
+              onPointerCancel={closeZoom}
+            >
+              {fadingFrom && (
+                <Image
+                  key={`lb-prev-${fadingFrom}`}
+                  src={fadingFrom}
+                  alt=""
+                  aria-hidden="true"
+                  fill
+                  sizes="100vw"
+                  className="object-contain object-center"
+                  unoptimized={fadingFrom.startsWith('/assets/')}
+                />
+              )}
               <Image
+                key={current}
+                ref={lightboxImageRef}
                 src={current}
                 alt={title}
                 fill
                 sizes="100vw"
-                className="object-contain object-center"
+                className="object-contain object-center product-gallery-fade-in"
                 unoptimized={current.startsWith('/assets/')}
               />
+              {/* Lens square */}
+              {zoom && zoom.source === 'lightbox' && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: zoom.lensX,
+                    top: zoom.lensY,
+                    width: zoom.lensSize,
+                    height: zoom.lensSize,
+                    border: '2px solid rgba(255,255,255,0.7)',
+                    background: 'rgba(255,255,255,0.12)',
+                    pointerEvents: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              )}
             </div>
 
             {hasMultipleImages && (
@@ -422,7 +543,7 @@ export default function ProductImageGallery({ images, title, imagePadding = null
             <div className="overflow-x-auto pb-6">
               <div className="mx-auto flex w-max gap-2 px-4">
                 {images.map((img, i) => {
-                  const thumbBg = productImagePaddingBackground(productImagePaddingForImage(imagePadding, imagePaddingByImage, img, i));
+                  const thumbBg = resolveFrameBackground(img, i);
                   return (
                     <button
                       key={`lightbox-${i}`}

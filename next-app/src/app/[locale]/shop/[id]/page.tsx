@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import type { CSSProperties } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
@@ -8,6 +9,7 @@ import {
   isProductPurchasable,
   isProductSold,
   productJewelryTypeLabel,
+  productImagePaddingBackground,
   productImagePaddingForImage,
   productLengthSizeDisplay,
   productMetalVariantLabel,
@@ -64,6 +66,19 @@ function formatKarat(purity: number): string {
   // Millesimal fineness (parts per 1000) shown as a percentage, e.g. 835 -> 83.5%.
   if (purity > 100) return `${Number((purity / 10).toFixed(1))}%`;
   return `${purity}%`;
+}
+
+// Whether a resolved page background (always a hex once padding is applied) is
+// dark enough to need light text — drives the "dark theme" product pages.
+function isDarkColor(hex: string): boolean {
+  const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!match) return false;
+  const int = parseInt(match[1], 16);
+  const r = (int >> 16) & 255;
+  const g = (int >> 8) & 255;
+  const b = int & 255;
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return luminance < 0.4;
 }
 
 function formatInventoryReference(value: string | number | null | undefined): string | null {
@@ -127,6 +142,21 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   const isPurchasable = isProductPurchasable(p.status);
   const productImages = p.image_urls?.length ? p.image_urls : p.images ?? [];
   const firstImagePadding = productImagePaddingForImage(p.image_padding, p.image_padding_by_image, productImages[0], 0);
+  // The page background matches the first image's padding color, so the gallery
+  // frame blends into the page. An unset padding ('none') resolves to white,
+  // matching the gallery's own default for that case.
+  const pageBackground = firstImagePadding === 'none' ? '#ffffff' : productImagePaddingBackground(firstImagePadding);
+  // Dark-background items get a "dark theme": page text/borders/accents lighten
+  // automatically by overriding the color tokens on <main>. Light-backed controls
+  // are restored via the `.product-page-dark` rules in globals.css.
+  const isDarkPage = isDarkColor(pageBackground);
+  const mainStyle: CSSProperties & Record<string, string> = { background: pageBackground };
+  if (isDarkPage) {
+    mainStyle['--color-on-surface'] = '#f2f2f0';
+    mainStyle['--color-on-surface-variant'] = '#cbc8c0';
+    mainStyle['--color-primary'] = '#e9c349';
+    mainStyle['--color-outline-variant'] = 'rgba(255,255,255,0.20)';
+  }
   const productWeight = p.gram_weight ?? p.weight_grams;
   const inventoryReference = formatInventoryReference(p.inventory_number);
   const itemDateLabel = formatProductItemYear(p.item_year);
@@ -185,7 +215,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
     value: buyerLength,
   });
 
-  const gender = p.gender ?? 'Unisex';
+  const gender = (p.gender ?? '').trim() || 'Unisex';
   if (gender !== 'Unisex') {
     specs.push({
       label: isEs ? 'Para' : 'For',
@@ -194,6 +224,10 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
         : gender,
     });
   }
+
+  // Only show specs that actually have a value, so a label never renders with an
+  // empty space beside it (e.g. "For" with no gender set).
+  const visibleSpecs = specs.filter((spec) => spec.value != null && String(spec.value).trim() !== '');
 
   const cartItem: CartItem = {
     id: p.id,
@@ -261,7 +295,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <SiteHeader />
-      <main className="pt-24 md:pt-28 pb-20">
+      <main className={`pt-24 md:pt-28 pb-20${isDarkPage ? ' product-page-dark' : ''}`} style={mainStyle}>
 
         {/* Back to shop */}
         <div className="max-w-7xl mx-auto px-4 md:px-8 mb-6">
@@ -297,8 +331,10 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                 <span
                   className="text-[0.6rem] font-bold uppercase tracking-widest px-2 py-0.5"
                   style={{
-                    background: isPurchasable ? 'var(--color-primary)' : 'var(--color-on-surface)',
-                    color: isPurchasable ? 'var(--color-on-primary)' : 'var(--color-surface)',
+                    background: isPurchasable
+                      ? (isDarkPage ? '#e9c349' : 'var(--color-primary)')
+                      : (isDarkPage ? '#dcd9d2' : 'var(--color-on-surface)'),
+                    color: isDarkPage ? '#1a1c1c' : (isPurchasable ? 'var(--color-on-primary)' : 'var(--color-surface)'),
                   }}
                 >
                   {isPurchasable
@@ -364,8 +400,8 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                   <div
                     className="mt-3 border p-1.5"
                     style={{
-                      borderColor: '#e2d2aa',
-                      background: '#fbf7ee',
+                      borderColor: isDarkPage ? 'rgba(255,255,255,0.16)' : '#e2e6ec',
+                      background: isDarkPage ? '#000000' : '#ffffff',
                       borderRadius: '8px',
                     }}
                   >
@@ -373,14 +409,15 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                       <div
                         className="px-3 py-2.5"
                         style={{
-                          background: 'linear-gradient(135deg, #c9a13d 0%, #a9821e 100%)',
+                          background: 'linear-gradient(135deg, #faf5e3 0%, #f1e8c9 100%)',
+                          border: '1px solid #ecdfb6',
                           borderRadius: '8px',
-                          boxShadow: '0 8px 18px rgba(169, 130, 30, 0.18)',
+                          boxShadow: '0 6px 16px rgba(150, 120, 30, 0.10)',
                         }}
                       >
                         <span
                           className="block text-[0.58rem] font-bold uppercase tracking-[0.12em]"
-                          style={{ color: 'rgba(255, 249, 232, 0.82)', fontFamily: 'var(--font-label)' }}
+                          style={{ color: '#8a7634', fontFamily: 'var(--font-label)' }}
                         >
                           {isEs
                             ? `Valor de ${p.category === 'Silver' ? 'plata' : 'oro'}`
@@ -388,7 +425,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                         </span>
                         <span
                           className="mt-1 block text-[0.95rem] font-extrabold"
-                          style={{ color: '#ffffff', fontFamily: 'var(--font-label)' }}
+                          style={{ color: '#735c00', fontFamily: 'var(--font-label)' }}
                         >
                           {scrapValue}
                         </span>
@@ -397,27 +434,27 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                         <div
                           className="border px-3 py-2.5"
                           style={{
-                            borderColor: '#eadfca',
-                            background: '#f4eddf',
+                            borderColor: '#e2e6ec',
+                            background: '#f4f7fb',
                             borderRadius: '8px',
                           }}
                         >
                           <span
                             className="block text-[0.58rem] font-bold uppercase tracking-[0.12em]"
-                            style={{ color: '#8b7b5a', fontFamily: 'var(--font-label)' }}
+                            style={{ color: '#6b7280', fontFamily: 'var(--font-label)' }}
                           >
                             {isEs ? 'Basado en spot' : 'Based on spot'}
                           </span>
                           <span
                             className="mt-1 block text-[0.95rem] font-extrabold"
-                            style={{ color: '#3b3324', fontFamily: 'var(--font-label)' }}
+                            style={{ color: '#374151', fontFamily: 'var(--font-label)' }}
                           >
                             {spotValueLabel}/oz
                           </span>
                         </div>
                       )}
                     </div>
-                    {nextSpotUpdateAt && <PriceUpdateTicker nextUpdateAt={nextSpotUpdateAt} locale={locale} />}
+                    {nextSpotUpdateAt && <PriceUpdateTicker nextUpdateAt={nextSpotUpdateAt} locale={locale} onDark={isDarkPage} />}
                   </div>
                 )}
               </div>
@@ -430,17 +467,18 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                     alignItems: 'center',
                     gap: '0.6rem',
                     padding: '0.65rem 0.9rem',
-                    background: 'color-mix(in srgb, var(--color-primary) 7%, transparent)',
-                    border: '1px solid color-mix(in srgb, var(--color-primary) 22%, transparent)',
-                    borderRadius: '2px',
+                    background: '#f4f7fb',
+                    border: '1px solid #e2e6ec',
+                    borderRadius: '8px',
+                    color: '#374151',
                   }}
                 >
                   <span style={{ fontSize: '1rem', lineHeight: 1, flexShrink: 0 }}>⬡</span>
-                  <p style={{ fontSize: '0.8125rem', color: 'var(--color-on-surface)', margin: 0, lineHeight: 1.4 }}>
+                  <p style={{ fontSize: '0.8125rem', color: '#374151', margin: 0, lineHeight: 1.4 }}>
                     {isEs ? (
-                      <>Llévalo por <strong style={{ color: 'var(--color-primary)' }}>{scrapValue}</strong> cuando aplicas tu valor de intercambio</>
+                      <>Llévalo por <strong style={{ color: '#735c00' }}>{scrapValue}</strong> cuando aplicas tu valor de intercambio</>
                     ) : (
-                      <>Get this item for <strong style={{ color: 'var(--color-primary)' }}>{scrapValue}</strong> when you apply your trade-in value</>
+                      <>Get this item for <strong style={{ color: '#735c00' }}>{scrapValue}</strong> when you apply your trade-in value</>
                     )}
                   </p>
                 </div>
@@ -454,7 +492,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
               )}
 
               {/* Specifications */}
-              {specs.length > 0 && (
+              {visibleSpecs.length > 0 && (
                 <div className="border-t pt-4" style={{ borderColor: 'var(--color-outline-variant)' }}>
                   <p
                     className="text-[0.62rem] font-bold uppercase tracking-[0.2em] mb-3"
@@ -463,7 +501,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                     {isEs ? 'Especificaciones' : 'Specifications'}
                   </p>
                   <dl className="flex flex-col gap-2">
-                    {specs.map(({ label, value }) => (
+                    {visibleSpecs.map(({ label, value }) => (
                       <div key={label} className="flex gap-3 text-sm">
                         <dt
                           className="w-20 flex-shrink-0 font-semibold text-xs normal-case tracking-wide pt-px"

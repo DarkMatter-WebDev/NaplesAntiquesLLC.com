@@ -49,7 +49,7 @@ import {
   QUICK_FILL_PROMPT_STORAGE_KEY,
   ensureQuickFillPromptHasCurrentBrandRules,
 } from '@/lib/admin-settings';
-import { PRODUCT_IMAGES_BUCKET, getProductImageStoragePath, uniqueProductImageStoragePaths } from '@/lib/product-image-storage';
+import { PRODUCT_IMAGES_BUCKET, uniqueProductImageStoragePaths } from '@/lib/product-image-storage';
 import type { ProductAutofillDraft, ProductAutofillFields } from '@/lib/ai-product-schema';
 
 // Quick Fill is removed from the editor UI for now. The parser and panel still
@@ -760,6 +760,49 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
+  // Fixed-viewport coordinates for the open row action menu. The menu renders as
+  // position: fixed (escaping the table's overflow-x-auto clip) and flips above
+  // the trigger when there isn't enough room below, so bottom rows stay usable.
+  const [actionMenuPos, setActionMenuPos] = useState<
+    { right: number; top?: number; bottom?: number; maxHeight: number } | null
+  >(null);
+
+  const toggleActionMenu = useCallback((id: string, trigger: HTMLElement) => {
+    setActionMenuId((current) => {
+      if (current === id) {
+        setActionMenuPos(null);
+        return null;
+      }
+      const rect = trigger.getBoundingClientRect();
+      const gap = 4;
+      const margin = 8;
+      const spaceBelow = window.innerHeight - rect.bottom - margin;
+      const spaceAbove = rect.top - margin;
+      const openUp = spaceBelow < 260 && spaceAbove > spaceBelow;
+      const maxHeight = Math.max(160, (openUp ? spaceAbove : spaceBelow) - gap);
+      const right = Math.max(margin, window.innerWidth - rect.right);
+      setActionMenuPos(
+        openUp
+          ? { right, bottom: window.innerHeight - rect.top + gap, maxHeight }
+          : { right, top: rect.bottom + gap, maxHeight },
+      );
+      return id;
+    });
+  }, []);
+
+  // The action menu is anchored to the trigger's viewport position, so close it
+  // if the user scrolls (incl. the table's horizontal scroll) or resizes.
+  useEffect(() => {
+    if (!actionMenuId) return;
+    const close = () => { setActionMenuId(null); setActionMenuPos(null); };
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [actionMenuId]);
+
   // Confirmation gate for the listing editor's close/cancel/save actions.
   const [editorConfirm, setEditorConfirm] = useState<{
     title: string;
@@ -835,6 +878,77 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [showAdvancedIds, setShowAdvancedIds] = useState(false);
   const [inventoryNumberManual, setInventoryNumberManual] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  // --- Editor undo history -------------------------------------------------
+  // Snapshots of the editable state (editing + the derived type/link/length
+  // inputs that live outside `editing`), captured as the user edits. Rapid
+  // changes within a short window coalesce into a single undo step so typing
+  // doesn't produce one step per keystroke.
+  type EditorUndoSnapshot = {
+    editing: ReturnType<typeof emptyProduct>;
+    jewelryTypeInput: string;
+    chainTypeInput: string;
+    lengthInput: string;
+  };
+  const undoStackRef = useRef<EditorUndoSnapshot[]>([]);
+  const lastEditorSnapshotRef = useRef<EditorUndoSnapshot | null>(null);
+  const lastUndoCaptureAtRef = useRef(0);
+  const skipUndoCaptureRef = useRef(false);
+  const [canUndoEdit, setCanUndoEdit] = useState(false);
+
+  useEffect(() => {
+    if (!editing) {
+      undoStackRef.current = [];
+      lastEditorSnapshotRef.current = null;
+      lastUndoCaptureAtRef.current = 0;
+      setCanUndoEdit(false);
+      return;
+    }
+    const current: EditorUndoSnapshot = { editing, jewelryTypeInput, chainTypeInput, lengthInput };
+    if (lastEditorSnapshotRef.current === null) {
+      lastEditorSnapshotRef.current = current; // baseline captured on open — no history yet
+      return;
+    }
+    if (skipUndoCaptureRef.current) {
+      skipUndoCaptureRef.current = false; // this change came from an undo/reset, don't record it
+      lastEditorSnapshotRef.current = current;
+      return;
+    }
+    const prev = lastEditorSnapshotRef.current;
+    if (
+      prev.editing === editing &&
+      prev.jewelryTypeInput === jewelryTypeInput &&
+      prev.chainTypeInput === chainTypeInput &&
+      prev.lengthInput === lengthInput
+    ) return;
+    const now = Date.now();
+    const coalesce = undoStackRef.current.length > 0 && now - lastUndoCaptureAtRef.current < 600;
+    if (!coalesce) {
+      undoStackRef.current.push(prev);
+      setCanUndoEdit(true);
+    }
+    lastEditorSnapshotRef.current = current;
+    lastUndoCaptureAtRef.current = now;
+  }, [editing, jewelryTypeInput, chainTypeInput, lengthInput]);
+
+  function resetUndoHistory() {
+    undoStackRef.current = [];
+    lastEditorSnapshotRef.current = null;
+    lastUndoCaptureAtRef.current = 0;
+    setCanUndoEdit(false);
+  }
+
+  function undoEdit() {
+    const snapshot = undoStackRef.current.pop();
+    if (!snapshot) return;
+    skipUndoCaptureRef.current = true;
+    lastUndoCaptureAtRef.current = 0;
+    setEditing(snapshot.editing);
+    setJewelryTypeInput(snapshot.jewelryTypeInput);
+    setChainTypeInput(snapshot.chainTypeInput);
+    setLengthInput(snapshot.lengthInput);
+    setCanUndoEdit(undoStackRef.current.length > 0);
+  }
   const productTypeOptions = useMemo(() => {
     const base = PRODUCT_JEWELRY_TYPES.map((type) => type.value);
     const extras = [
@@ -933,6 +1047,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setQuickEntry('');
     setQuickFillNotice(null);
     setShowAdvancedIds(false);
+    setOpenEditorSections({ photos: false, ai: false, details: false });
     // Reset the Smart Listing Assistant so the next item starts completely fresh
     // (transcript, generated draft, notices, undo snapshot, and any active recording).
     stopAiRecording();
@@ -987,7 +1102,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setFormErrors([]);
     setQuickEntry('');
     setQuickFillNotice(null);
-    setShowAdvancedIds(!!(p.sku || p.slug));
+    setShowAdvancedIds(false);
+    setOpenEditorSections({ photos: false, ai: false, details: false });
     setInventoryNumberManual(false);
     const autoInventoryNumber =
       copy.inventory_number ??
@@ -1641,6 +1757,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
   function undoAiFill() {
     if (!aiUndoSnapshot) return;
+    skipUndoCaptureRef.current = true;
     setEditing(aiUndoSnapshot.editing);
     setJewelryTypeInput(aiUndoSnapshot.jewelryTypeInput);
     setChainTypeInput(aiUndoSnapshot.chainTypeInput);
@@ -1664,6 +1781,21 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setAiUndoSnapshot(null);
   }
 
+  // Cancel reverts everything. Clean up only the photos uploaded during this
+  // editing session that were never saved to the product; keep the product's
+  // original photos and any image shared with another listing.
+  async function discardEditorDraft() {
+    const orphanUploads = [...sessionUploadedImageUrls];
+    const keepImages = originalRef.current
+      ? [...(originalRef.current.images ?? []), ...(originalRef.current.image_urls ?? [])]
+      : [];
+    const sourceId = originalRef.current?.id ?? null;
+    closeModal();
+    if (orphanUploads.length > 0) {
+      await deleteProductImagesIfUnused(orphanUploads, sourceId, products, keepImages);
+    }
+  }
+
   // The editor never closes from an outside click; closing or saving always
   // routes through a confirmation step.
   function requestCloseEditor() {
@@ -1671,7 +1803,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       title: 'Close this listing?',
       message: 'Any unsaved changes will be lost.',
       confirmLabel: 'Close',
-      onConfirm: () => { setEditorConfirm(null); closeModal(); },
+      onConfirm: () => { setEditorConfirm(null); void discardEditorDraft(); },
     });
   }
   function requestSaveEditor(afterSave: 'stay' | 'another' | 'close') {
@@ -1709,25 +1841,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     }
     return true;
   }, [supabase]);
-
-  const deleteUploadedImageIfUnused = useCallback(async (url: string, sourceIndex: number) => {
-    const path = getProductImageStoragePath(url);
-    if (!path || !editing) return;
-
-    const currentProductStillUsesImage = [
-      ...(editing.images ?? []).filter((_, index) => index !== sourceIndex),
-      ...(editing.image_urls ?? []).filter((_, index) => index !== sourceIndex),
-    ].includes(url);
-
-    const anotherProductUsesImage = products.some((product) => {
-      if (editing.id && product.id === editing.id) return false;
-      return [...(product.images ?? []), ...(product.image_urls ?? [])].includes(url);
-    });
-
-    if (currentProductStillUsesImage || anotherProductUsesImage) return;
-
-    await deleteImagePaths([path]);
-  }, [deleteImagePaths, editing, products]);
 
   const deleteProductImagesIfUnused = useCallback(async (
     urls: Iterable<string | null | undefined>,
@@ -1853,7 +1966,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       const croppedUrl = await uploadImageBlob(blob);
       if (!croppedUrl) return;
 
-      const oldUrl = cropTarget.url;
       setEditing((prev) => {
         if (!prev) return prev;
         const images = [...prev.images];
@@ -1867,14 +1979,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         next.add(croppedUrl);
         return next;
       });
-      if (sessionUploadedImageUrls.has(oldUrl)) {
-        await deleteUploadedImageIfUnused(oldUrl, cropTarget.index);
-        setSessionUploadedImageUrls((current) => {
-          const next = new Set(current);
-          next.delete(oldUrl);
-          return next;
-        });
-      }
+      // The replaced image is left in storage until the user saves (pruned then)
+      // or cancels (cleaned up) — cropping is not a destructive write before Save.
       setPreviewImg({ url: croppedUrl, index: cropTarget.index });
       setCropTarget(null);
       flash('Cropped image saved');
@@ -1941,22 +2047,15 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     window.addEventListener('pointercancel', onPointerUp);
   }
 
-  async function removeImage(idx: number) {
-    const url = editing?.images[idx];
+  function removeImage(idx: number) {
+    // Stage the removal in the draft only. Storage cleanup is deferred until the
+    // user saves (the removed image is pruned then) or cancels (session uploads
+    // are cleaned up), so no photo is deleted from storage before Save is clicked.
     setEditing((prev) => prev ? {
       ...prev,
       images: prev.images.filter((_, i) => i !== idx),
       image_urls: (prev.image_urls?.length ? prev.image_urls : prev.images).filter((_, i) => i !== idx),
     } : prev);
-
-    if (url && sessionUploadedImageUrls.has(url)) {
-      await deleteUploadedImageIfUnused(url, idx);
-      setSessionUploadedImageUrls((current) => {
-        const next = new Set(current);
-        next.delete(url);
-        return next;
-      });
-    }
   }
 
   function moveImage(idx: number, direction: -1 | 1) {
@@ -2095,7 +2194,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     originalRef.current = null;
     setFormErrors([]);
     setQuickEntry('');
-    setShowAdvancedIds(true);
+    setShowAdvancedIds(false);
+    setOpenEditorSections({ photos: false, ai: false, details: false });
     setInventoryNumberManual(false);
     const nextProductType = getProductJewelryType(product);
     setJewelryTypeInput(nextProductType);
@@ -2224,9 +2324,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       setProducts(nextProducts);
     }
 
-    if (!isNew && originalImageUrls.length > 0) {
+    // Reconcile storage on commit: delete every image this listing no longer
+    // references — photos removed from the draft (originalImageUrls) and any
+    // session uploads that didn't make it into the saved set — while keeping the
+    // saved images and anything shared with other listings.
+    const cleanupCandidates = [...originalImageUrls, ...sessionUploadedImageUrls];
+    if (cleanupCandidates.length > 0) {
       await deleteProductImagesIfUnused(
-        originalImageUrls,
+        cleanupCandidates,
         originalProductId,
         nextProducts,
         [...(payload.images ?? []), ...(payload.image_urls ?? [])],
@@ -2808,7 +2913,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               </span>
             )}
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto pb-24">
             <table className="w-max min-w-[1680px] 2xl:min-w-[1960px] text-sm">
               <thead>
                 <tr className="border-b text-left" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}>
@@ -2984,7 +3089,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                       <div className="relative flex justify-end">
                         <button
                           type="button"
-                          onClick={() => setActionMenuId((current) => (current === p.id ? null : p.id))}
+                          onClick={(e) => toggleActionMenu(p.id, e.currentTarget)}
                           className="flex items-center justify-center rounded p-0.5 hover:bg-black/5"
                           style={{ color: 'var(--color-primary)' }}
                           aria-haspopup="menu"
@@ -2995,13 +3100,21 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                             {actionMenuId === p.id ? 'arrow_drop_up' : 'arrow_drop_down'}
                           </span>
                         </button>
-                        {actionMenuId === p.id && (
+                        {actionMenuId === p.id && actionMenuPos && (
                           <>
-                            <div className="fixed inset-0 z-20" onClick={() => setActionMenuId(null)} aria-hidden="true" />
+                            <div className="fixed inset-0 z-40" onClick={() => { setActionMenuId(null); setActionMenuPos(null); }} aria-hidden="true" />
                             <div
                               role="menu"
-                              className="absolute right-0 z-30 mt-1 flex min-w-[150px] flex-col overflow-hidden rounded-md border shadow-lg"
-                              style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-lowest)', fontFamily: 'var(--font-label)' }}
+                              className="fixed z-50 flex min-w-[150px] flex-col overflow-hidden rounded-md border shadow-lg"
+                              style={{
+                                right: actionMenuPos.right,
+                                ...(actionMenuPos.top != null ? { top: actionMenuPos.top } : { bottom: actionMenuPos.bottom }),
+                                maxHeight: actionMenuPos.maxHeight,
+                                overflowY: 'auto',
+                                borderColor: 'var(--color-outline-variant)',
+                                background: 'var(--color-surface-container-lowest)',
+                                fontFamily: 'var(--font-label)',
+                              }}
                             >
                               <Link
                                 href={`${locale === 'es' ? '/es' : ''}/shop/${p.id}?returnTo=admin`}
@@ -3087,7 +3200,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       {editing && (
         <div
           className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto py-8 px-4"
-          style={{ background: 'rgba(0,0,0,0.5)' }}
+          style={{ background: 'rgba(0,0,0,0.5)', paddingBottom: 'max(5rem, calc(2rem + env(safe-area-inset-bottom, 0px)))' }}
         >
           <div
             className="w-full max-w-5xl border flex flex-col overflow-hidden product-editor-modal"
@@ -3111,7 +3224,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               </button>
             </div>
 
-            <div className="product-editor-body p-4 md:p-7 flex flex-col gap-4 md:gap-5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 14rem)' }}>
+            <div className="product-editor-body p-4 md:p-7 flex flex-col gap-4 md:gap-5 overflow-y-auto" style={{ maxHeight: 'calc(100dvh - 14rem)' }}>
 
               {/* Photos */}
               <div
@@ -3128,9 +3241,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   </div>
                   <div>
                     <h3 className="product-editor-section-title">Photos</h3>
-                    <p className={`product-editor-section-copy${openEditorSections.photos ? '' : ' max-md:hidden'}`}>Add clear photos. The first image is the cover image and gives the AI assistant visual context.</p>
+                    <p className={`product-editor-section-copy${openEditorSections.photos ? '' : ' hidden'}`}>Add clear photos. The first image is the cover image and gives the AI assistant visual context.</p>
                   </div>
-                  <span className="ml-auto self-center md:hidden" aria-hidden="true">
+                  <span className="ml-auto self-center" aria-hidden="true">
                     <span className="material-symbols-outlined" style={{ color: '#db2777' }}>
                       {openEditorSections.photos ? 'expand_less' : 'expand_more'}
                     </span>
@@ -3282,12 +3395,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     </div>
                     <div>
                       <h3 className="product-editor-section-title">Smart listing assistant</h3>
-                      <p className={`product-editor-section-copy${openEditorSections.ai ? '' : ' max-md:hidden'}`}>
+                      <p className={`product-editor-section-copy${openEditorSections.ai ? '' : ' hidden'}`}>
                         Add photos, describe the item, and AI fills in the form below automatically. You can undo right after.
                       </p>
                     </div>
                   </div>
-                  <span className="self-center md:hidden" aria-hidden="true">
+                  <span className="self-center" aria-hidden="true">
                     <span className="material-symbols-outlined" style={{ color: '#8b7cf6' }}>
                       {openEditorSections.ai ? 'expand_less' : 'expand_more'}
                     </span>
@@ -3528,7 +3641,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     </div>
                     <div>
                       <h3 className="product-editor-section-title">Smart listing assistant</h3>
-                      <p className={`product-editor-section-copy${openEditorSections.ai ? '' : ' max-md:hidden'}`}>
+                      <p className={`product-editor-section-copy${openEditorSections.ai ? '' : ' hidden'}`}>
                         Add photos, describe the item, and AI fills in the form below automatically. You can undo right after.
                       </p>
                     </div>
@@ -3660,26 +3773,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   </div>
                   <div>
                     <h3 className="product-editor-section-title">Listing details</h3>
-                    <p className={`product-editor-section-copy${openEditorSections.details ? '' : ' max-md:hidden'}`}>Review and fine-tune everything before saving.</p>
+                    <p className={`product-editor-section-copy${openEditorSections.details ? '' : ' hidden'}`}>Review and fine-tune everything before saving.</p>
                   </div>
-                  <span className="ml-auto self-center md:hidden" aria-hidden="true">
+                  <span className="ml-auto self-center" aria-hidden="true">
                     <span className="material-symbols-outlined" style={{ color: '#a9760a' }}>
                       {openEditorSections.details ? 'expand_less' : 'expand_more'}
                     </span>
                   </span>
                 </div>
-
-              {/* ID (edit only) */}
-              {!isNew && (
-                <div>
-                  <label className="form-label">ID (slug, auto-generated if blank)</label>
-                  <ClearableField onClear={() => setEditing({ ...editing, id: '' })} show={!!editing.id}>
-                    <input className="form-field w-full" placeholder="my-product-slug"
-                      value={editing.id}
-                      onChange={(e) => setEditing({ ...editing, id: e.target.value })} />
-                  </ClearableField>
-                </div>
-              )}
 
               <div className="grid md:grid-cols-[minmax(0,1fr)_auto] gap-4 items-start">
                 <div>
@@ -3733,7 +3834,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   onClick={() => setShowAdvancedIds((current) => !current)}
                   className="outline-button text-xs h-10 md:mt-[1.55rem]"
                 >
-                  {showAdvancedIds ? 'Hide SKU' : 'SKU / Slug'}
+                  {showAdvancedIds ? 'Hide' : (isNew ? 'SKU / Slug' : 'SKU / Slug / ID')}
                 </button>
               </div>
 
@@ -3742,6 +3843,16 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   className="grid md:grid-cols-2 gap-4 p-4 border"
                   style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-lowest)' }}
                 >
+                  {!isNew && (
+                    <div className="md:col-span-2">
+                      <label className="form-label">ID (slug, auto-generated if blank)</label>
+                      <ClearableField onClear={() => setEditing({ ...editing, id: '' })} show={!!editing.id}>
+                        <input className="form-field w-full" placeholder="my-product-slug"
+                          value={editing.id}
+                          onChange={(e) => setEditing({ ...editing, id: e.target.value })} />
+                      </ClearableField>
+                    </div>
+                  )}
                   <div>
                     <label className="form-label">SKU</label>
                     <ClearableField onClear={() => setEditing({ ...editing, sku: '' })} show={!!editing.sku}>
@@ -4162,12 +4273,23 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     setLengthInput(getProductLength(editing as Product));
                     setEditing(clone);
                     setIsNew(true);
+                    resetUndoHistory();
                   }}
                   className="outline-button text-sm"
                 >
                   Clone
                 </button>
               )}
+              <button
+                type="button"
+                onClick={undoEdit}
+                disabled={!canUndoEdit || saving}
+                className="outline-button text-sm disabled:opacity-40 flex items-center justify-center gap-1.5"
+                title="Undo the last change"
+              >
+                <span className="material-symbols-outlined text-base leading-none" aria-hidden="true">undo</span>
+                Undo
+              </button>
               <button type="button" onClick={requestCloseEditor} className="outline-button text-sm">
                 Cancel
               </button>

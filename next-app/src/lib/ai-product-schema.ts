@@ -270,6 +270,23 @@ export function coerceProductAutofill(input: ProductAutofillProviderResult): Pro
   // and the item's height for every other form (e.g. a 1.5 in brooch, a 0.75 in pendant).
   // It is kept for all product types, so no clearing here.
 
+  // Pricing default: when the draft carries no pricing signal at all — no mode,
+  // no multiplier, no manual/asking price — fall back to the standard spot×1.5 so
+  // every listing has a usable pricing method even if the model (or a custom/older
+  // prompt) omitted it. A stated manual price or an explicit multiplier is left
+  // untouched; a spot mode missing its multiplier is completed with the 1.5 default.
+  const hasAnyPricingSignal =
+    fields.price_mode != null ||
+    fields.pricing_multiplier != null ||
+    fields.asking_price != null ||
+    fields.manual_price_label != null;
+  if (!hasAnyPricingSignal) {
+    fields.price_mode = 'spot-multiplier';
+    fields.pricing_multiplier = 1.5;
+  } else if (fields.price_mode === 'spot-multiplier' && fields.pricing_multiplier == null) {
+    fields.pricing_multiplier = 1.5;
+  }
+
   return {
     fields,
     warnings: cleanStringArray(input.warnings),

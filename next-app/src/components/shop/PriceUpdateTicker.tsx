@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from 'react';
 interface Props {
   nextUpdateAt: number;
   locale: string;
+  /** Render light text/border for placement on a dark (black) block. */
+  onDark?: boolean;
 }
 
 function formatRemaining(ms: number): string {
@@ -14,7 +16,7 @@ function formatRemaining(ms: number): string {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
-export default function PriceUpdateTicker({ nextUpdateAt, locale }: Props) {
+export default function PriceUpdateTicker({ nextUpdateAt, locale, onDark = false }: Props) {
   const [now, setNow] = useState(() => Date.now());
   const isEs = locale === 'es';
 
@@ -33,7 +35,11 @@ export default function PriceUpdateTicker({ nextUpdateAt, locale }: Props) {
   return (
     <p
       className="mt-2 border-t pt-2 text-[0.62rem] font-semibold uppercase tracking-[0.12em]"
-      style={{ borderColor: '#eadfca', color: '#8b7b5a', fontFamily: 'var(--font-label)' }}
+      style={{
+        borderColor: onDark ? 'rgba(255,255,255,0.16)' : '#e2e6ec',
+        color: onDark ? 'rgba(255,255,255,0.72)' : '#6b7280',
+        fontFamily: 'var(--font-label)',
+      }}
     >
       {isEs
         ? `Actualiza en ${formatRemaining(nextUpdateAt - now)} · ${updateTime}`

@@ -121,12 +121,12 @@ export default function ProductCard({
   };
 
   useEffect(() => {
-    if (!isImageHovering || !canShowNextImage) return;
+    if (!isImageHovering || isImageArrowHovering || !canShowNextImage) return;
     const timer = window.setInterval(() => {
       setActiveImageIndex((current) => Math.min(current + 1, images.length - 1));
     }, 1150);
     return () => window.clearInterval(timer);
-  }, [canShowNextImage, images.length, isImageHovering]);
+  }, [canShowNextImage, images.length, isImageHovering, isImageArrowHovering]);
 
   useEffect(() => {
     if (!thumb) return;
@@ -375,7 +375,7 @@ export default function ProductCard({
           </h3>
         </Link>
 
-        {itemDateLabel && (
+        {!isModern && itemDateLabel && (
           <p
             className="modern-card-date text-[0.66rem] font-semibold uppercase tracking-[0.16em]"
             style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
@@ -387,6 +387,7 @@ export default function ProductCard({
         <p
           className={`mt-1 flex items-baseline gap-2 px-2 py-1.5 ${isModern ? 'modern-price-row' : 'border-y'}`}
           style={{
+            position: isModern ? 'relative' : undefined,
             background: isModern ? 'linear-gradient(135deg, rgba(255, 250, 238, 0.92), rgba(249, 244, 232, 0.96))' : 'rgba(194, 155, 45, 0.06)',
             borderColor: 'rgba(115, 92, 0, 0.18)',
             borderTop: isModern ? '1px solid rgba(115, 92, 0, 0.14)' : undefined,
@@ -395,14 +396,29 @@ export default function ProductCard({
             fontFamily: 'var(--font-label)',
           }}
         >
+          {isModern && itemDateLabel && (
+            <span
+              className="modern-card-date text-[0.66rem] font-semibold uppercase tracking-[0.16em]"
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--color-on-surface-variant)',
+                fontFamily: 'var(--font-label)',
+              }}
+            >
+              <span className="normal-case">Ca.</span> {itemDateLabel}
+            </span>
+          )}
           <span
-            className="text-[0.68rem] font-extrabold uppercase tracking-widest"
+            className="modern-price-label text-[0.68rem] font-extrabold uppercase tracking-widest"
             style={{ color: 'var(--color-on-surface-variant)' }}
           >
             {isEs ? 'Tu precio' : 'Your price'}
           </span>
           <span
-            className="text-base font-extrabold uppercase tracking-wide"
+            className="modern-price-value text-base font-extrabold uppercase tracking-wide"
             style={{ color: 'var(--color-primary)' }}
           >
             {price}
@@ -517,10 +533,10 @@ export default function ProductCard({
             border: none !important;
             border-radius: 0 !important;
           }
-          .modern-product-card .modern-price-row span:first-child {
+          .modern-product-card .modern-price-label {
             display: none;
           }
-          .modern-product-card .modern-price-row span:last-child {
+          .modern-product-card .modern-price-value {
             font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             font-size: 0.92rem;
             font-weight: 700;

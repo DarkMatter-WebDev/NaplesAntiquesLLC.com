@@ -130,12 +130,18 @@ const ITEM_TYPE_OPTIONS = [
 
 type ItemTypeOption = (typeof ITEM_TYPE_OPTIONS)[number];
 
-const EVERYTHING_ELSE_ITEM_TYPES = ['watch', 'coin', 'silverware'];
+// Jewelry & Watches covers wearable jewelry plus watches; every other item type
+// (coins, bullion, silverware, and tableware like spoons, trays, goblets, cups)
+// belongs to the Sterling Silver group.
+const JEWELRY_ITEM_TYPE_KEYS = ['necklace', 'bracelet', 'earrings', 'ring', 'pendant', 'charm', 'brooch', 'cufflinks', 'watch'];
+
+function isJewelryItemType(itemType: string | undefined): boolean {
+  return !!itemType && JEWELRY_ITEM_TYPE_KEYS.includes(itemType);
+}
 
 function getItemGroupForItemType(itemType: string | undefined) {
-  if (itemType === 'all') return undefined;
-  if (itemType && EVERYTHING_ELSE_ITEM_TYPES.includes(itemType)) return 'everything-else';
-  return itemType ? 'jewelry' : undefined;
+  if (!itemType || itemType === 'all') return undefined;
+  return isJewelryItemType(itemType) ? 'jewelry' : 'everything-else';
 }
 
 export default function ShopFilters({ locale, currentFilters, brandOptions, filteredCount, allCount, spotData, priceRange, itemTypeOptions, variant = 'classic', yearFilterNode }: Props) {
@@ -236,8 +242,9 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
         params.delete('metalColor');
         params.delete('metalType');
         params.delete('purity');
-      }
-      if (value === 'silverware') {
+      } else if (value && !isJewelryItemType(value)) {
+        // Sterling Silver item types (silverware, coins, tableware like spoons,
+        // trays, goblets, cups, …) live under the silver group — constrain metal.
         params.set('metal', 'silver');
         if (params.get('purity') && !SILVER_PURITY_OPTIONS.some((option) => option.value === params.get('purity'))) {
           params.delete('purity');
@@ -385,8 +392,10 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
     });
   })();
   const visibleItemTypeOptions = currentItemGroup === 'everything-else'
-    ? allItemTypeOptions.filter((option) => option.value === 'silverware')
-    : allItemTypeOptions.filter((option) => option.value !== 'silverware');
+    ? allItemTypeOptions.filter((option) => !isJewelryItemType(option.value))
+    : currentItemGroup === 'jewelry'
+      ? allItemTypeOptions.filter((option) => isJewelryItemType(option.value))
+      : allItemTypeOptions;
   const itemGroupOptions = [
     { value: 'jewelry' as const, label: isEs ? 'Joyeria y relojes' : 'Jewelry & Watches' },
     { value: 'everything-else' as const, label: isEs ? 'Plata sterling' : 'Sterling Silver' },

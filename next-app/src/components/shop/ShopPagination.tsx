@@ -7,6 +7,23 @@ const GOLD = '#735c00';
 const BRIGHT_GOLD_GRADIENT = 'linear-gradient(135deg, #dcb336, #b5890c)';
 const PER_PAGE_OPTIONS = [12, 24, 48, 96];
 
+// After paging, bring the top of the results into view: the era/year slider
+// (desktop) or the catalog/filters area (mobile), offset below the fixed header.
+// Page links use scroll={false}, so without this the window would stay parked at
+// the bottom where the pagination controls are.
+function scrollToResultsTop() {
+  if (typeof window === 'undefined') return;
+  const standalone = document.querySelector('.shop-year-filter-standalone') as HTMLElement | null;
+  const target = standalone && standalone.offsetParent !== null
+    ? standalone
+    : (document.querySelector('.shop-catalog-layout') as HTMLElement | null);
+  if (!target) return;
+  const header = document.querySelector('header');
+  const offset = (header?.offsetHeight ?? 72) + 12;
+  const top = target.getBoundingClientRect().top + window.scrollY - offset;
+  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+}
+
 interface Props {
   locale: string;
   currentPage: number;
@@ -281,7 +298,7 @@ function PageLink({
   }
 
   return (
-    <Link href={href} scroll={false} className={className} aria-current={active ? 'page' : undefined} title={label} aria-label={label}>
+    <Link href={href} scroll={false} onClick={scrollToResultsTop} className={className} aria-current={active ? 'page' : undefined} title={label} aria-label={label}>
       {contents}
     </Link>
   );

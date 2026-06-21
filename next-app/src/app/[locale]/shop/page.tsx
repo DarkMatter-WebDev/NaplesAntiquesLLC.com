@@ -90,8 +90,11 @@ const ITEM_TYPE_VALUES: Record<string, ReturnType<typeof inferProductJewelryType
   silverware: 'Silverware',
 };
 
+// "Jewelry & Watches" covers wearable jewelry plus watches. Everything else —
+// coins, bullion, silverware, and any tableware/hollowware type (spoons, trays,
+// goblets, cups, etc.) — belongs to the "Sterling Silver" group. The split is
+// binary: anything that is not a jewelry/watch type falls into Sterling Silver.
 const JEWELRY_ITEM_TYPES = new Set(['necklace', 'bracelet', 'earrings', 'ring', 'pendant', 'charm', 'brooch', 'cufflinks', 'watch']);
-const EVERYTHING_ELSE_ITEM_TYPES = new Set(['watch', 'coin', 'silverware']);
 
 function slugifyItemType(value: string): string {
   return value
@@ -111,8 +114,8 @@ function productMatchesItemGroup(product: Product, itemGroup: string | undefined
   if (!itemGroup) return true;
   const typeKey = getProductItemTypeKey(product);
   if (!typeKey) return false;
-  if (itemGroup === 'jewelry') return JEWELRY_ITEM_TYPES.has(typeKey) || !EVERYTHING_ELSE_ITEM_TYPES.has(typeKey);
-  if (itemGroup === 'everything-else') return EVERYTHING_ELSE_ITEM_TYPES.has(typeKey);
+  if (itemGroup === 'jewelry') return JEWELRY_ITEM_TYPES.has(typeKey);
+  if (itemGroup === 'everything-else') return !JEWELRY_ITEM_TYPES.has(typeKey);
   return true;
 }
 
@@ -291,11 +294,12 @@ export async function renderShopPage({
 }: Props & { variant?: 'classic' | 'modern' }) {
   const { locale } = await params;
   const rawFilters = await searchParams;
+  // A bare /shop (no category selected) shows everything across both groups —
+  // neither Jewelry & Watches nor Sterling Silver is preselected. Only the
+  // Sterling Silver group forces the metal scope to silver.
   const filters = rawFilters.itemGroup === 'everything-else' && !rawFilters.metal
     ? { ...rawFilters, metal: 'silver' }
-    : !rawFilters.itemType && !rawFilters.itemGroup
-      ? { ...rawFilters, itemGroup: 'jewelry' }
-      : rawFilters;
+    : rawFilters;
   const selectedMetalColor = getEffectiveMetalColor(filters.metal, filters.metalColor ?? filters.metalType);
 
   const supabase = await createClient();
@@ -350,7 +354,17 @@ export async function renderShopPage({
     error = fallback.error;
   }
 
-  const spotData = await fetchSpotData();
+  // Total public inventory, independent of the active filters/metal scope — the
+  // "Showing X of Y pieces" denominator reflects the whole shop, not the
+  // currently filtered collection. Runs concurrently with the spot-price fetch.
+  const [spotData, totalInventoryResult] = await Promise.all([
+    fetchSpotData(),
+    supabase
+      .from('products')
+      .select('id', { count: 'exact', head: true })
+      .neq('status', 'pending_payment'),
+  ]);
+  const totalInventoryCount = totalInventoryResult.count ?? null;
   const allProducts: Product[] = (products ?? []) as unknown as Product[];
   const publicGalleryProducts = allProducts.filter(isVisibleInPublicGallery);
   const collectionProducts = publicGalleryProducts;
@@ -732,7 +746,7 @@ export async function renderShopPage({
                 currentFilters={filters}
                 brandOptions={brandOptions}
                 filteredCount={sorted.length}
-                allCount={collectionProducts.length}
+                allCount={totalInventoryCount ?? collectionProducts.length}
                 spotData={spotData}
                 priceRange={priceRange}
                 itemTypeOptions={itemTypeOptions}

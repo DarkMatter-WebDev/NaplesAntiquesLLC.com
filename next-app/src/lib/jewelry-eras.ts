@@ -49,8 +49,6 @@ const ERA_SEEDS: EraSeed[] = [
   { key: 'mid-century', label: 'Mid-Century', labelEs: 'Mediados de siglo', shortLabel: 'Mid-Cent.', shortLabelEs: 'Mediados', start: 1950, level: 1 },
   { key: 'modern', label: 'Modern', labelEs: 'Moderna', shortLabel: 'Modern', shortLabelEs: 'Moderna', start: 1970, level: 1 },
   { key: 'contemporary', label: 'Contemporary', labelEs: 'Contemporánea', shortLabel: 'Contemp.', shortLabelEs: 'Contemp.', start: 2000, level: 1 },
-  // Levels 2+ — overlapping movements (explicit start/end), one per row.
-  { key: 'art-nouveau', label: 'Art Nouveau', labelEs: 'Art Nouveau', shortLabel: 'Nouveau', shortLabelEs: 'Nouveau', start: 1890, end: 1910, level: 2 },
 ];
 
 const LEVEL_1_SEEDS = ERA_SEEDS.filter((seed) => seed.level === 1);
