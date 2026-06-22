@@ -417,7 +417,7 @@ type BrowserSpeechRecognition = {
   interimResults: boolean;
   lang: string;
   onresult: ((event: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
@@ -863,6 +863,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const quickFillPromptTextRef = useRef<HTMLTextAreaElement | null>(null);
   const [showQuickFillPrompt, setShowQuickFillPrompt] = useState(false);
   const [aiTranscript, setAiTranscript] = useState('');
+  const [aiInterimText, setAiInterimText] = useState('');
   const [aiDraft, setAiDraft] = useState<ProductAutofillDraft | null>(null);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiRecording, setAiRecording] = useState(false);
@@ -1052,6 +1053,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     // (transcript, generated draft, notices, undo snapshot, and any active recording).
     stopAiRecording();
     setAiTranscript('');
+    setAiInterimText('');
     setAiDraft(null);
     setAiUndoSnapshot(null);
     setAiNotice(null);
@@ -1595,28 +1597,57 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     aiRecognitionRef.current?.stop();
     const recognition = new SpeechRecognitionCtor();
     recognition.continuous = true;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.lang = 'en-US';
     recognition.onresult = (event) => {
       let finalText = '';
+      let interimText = '';
       for (let index = event.resultIndex; index < event.results.length; index += 1) {
         const result = event.results[index];
-        if (result.isFinal) finalText += ` ${result[0].transcript}`;
+        if (result.isFinal) {
+          finalText += ` ${result[0].transcript}`;
+        } else {
+          interimText += ` ${result[0].transcript}`;
+        }
       }
-      appendAiTranscript(finalText);
+      if (finalText) appendAiTranscript(finalText);
+      setAiInterimText(interimText.trim());
     };
-    recognition.onerror = () => {
-      showAiNotice('Voice recording paused. You can keep typing or start recording again.', false);
+    recognition.onerror = (event) => {
+      // Fatal errors: mic permission denied — stop recording and tell the user.
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        aiRecordingRef.current = false;
+        setAiRecording(false);
+        showAiNotice('Microphone access was denied. Check your browser permissions and try again.', false);
+        return;
+      }
+      // Non-fatal errors (no-speech, network, aborted, etc.): onend fires next
+      // and will restart automatically — no notice needed.
     };
     recognition.onend = () => {
       if (!aiRecordingRef.current) return;
+      // Clear interim text during the brief gap while we restart the session.
+      setAiInterimText('');
       window.setTimeout(() => {
+        // User may have clicked Stop during the delay — check again.
+        if (!aiRecordingRef.current) return;
         try {
           recognition.start();
         } catch {
-          // Browser may already be restarting recognition.
+          // start() failed (browser mid-transition). Retry once after a longer pause.
+          window.setTimeout(() => {
+            if (!aiRecordingRef.current) return;
+            try {
+              recognition.start();
+            } catch {
+              // Both retries failed — recording is truly dead. Surface it.
+              aiRecordingRef.current = false;
+              setAiRecording(false);
+              showAiNotice('Recording stopped unexpectedly. Tap the mic to start again.', false);
+            }
+          }, 1000);
         }
-      }, 250);
+      }, 300);
     };
     aiRecognitionRef.current = recognition;
     aiRecordingRef.current = true;
@@ -1633,12 +1664,13 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   function stopAiRecording() {
     aiRecordingRef.current = false;
     setAiRecording(false);
+    setAiInterimText('');
     aiRecognitionRef.current?.stop();
   }
 
   async function generateAiDraft() {
     if (!editing) return;
-    const transcript = aiTranscript.trim();
+    const transcript = [aiTranscript, aiInterimText].filter(Boolean).join(' ').trim();
     if ((editing.images?.length ?? 0) === 0) {
       showAiNotice('Add at least one photo to generate a listing.', false);
       return;
@@ -3199,12 +3231,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       {/* Edit / Add Modal */}
       {editing && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto py-8 px-4"
-          style={{ background: 'rgba(0,0,0,0.5)', paddingBottom: 'max(5rem, calc(2rem + env(safe-area-inset-bottom, 0px)))' }}
+          className="fixed inset-0 z-50 flex md:items-start md:justify-center md:overflow-y-auto md:py-8 md:px-4"
+          style={{ background: 'rgba(0,0,0,0.5)' }}
         >
           <div
-            className="w-full max-w-5xl border flex flex-col overflow-hidden product-editor-modal"
-            style={{ background: '#f7f8fc', borderColor: '#d9deef', borderRadius: '8px' }}
+            className="w-full h-dvh md:h-auto md:max-w-5xl border flex flex-col overflow-hidden product-editor-modal md:rounded-[8px]"
+            style={{ background: '#f7f8fc', borderColor: '#d9deef' }}
           >
             {/* Modal header */}
             <div className="flex items-start justify-between px-7 py-5 border-b"
@@ -3224,7 +3256,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               </button>
             </div>
 
-            <div className="product-editor-body p-4 md:p-7 flex flex-col gap-4 md:gap-5 overflow-y-auto" style={{ maxHeight: 'calc(100dvh - 14rem)' }}>
+            <div className="product-editor-body p-4 md:p-7 flex flex-col gap-4 md:gap-5 overflow-y-auto flex-1 min-h-0">
 
               {/* Photos */}
               <div
@@ -3445,8 +3477,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 <textarea
                   className="form-field w-full text-sm min-h-[96px]"
                   placeholder="Speak or type: marked 14K, 25.3 grams, Omega watch, light wear, box clasp, 7.5 inch bracelet..."
-                  value={aiTranscript}
-                  onChange={(event) => setAiTranscript(event.target.value)}
+                  value={[aiTranscript, aiInterimText].filter(Boolean).join(' ')}
+                  onChange={(event) => { setAiTranscript(event.target.value); setAiInterimText(''); }}
                 />
 
                 <button
@@ -3686,8 +3718,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 <textarea
                   className="form-field w-full text-sm min-h-[96px]"
                   placeholder="Speak or type: marked 14K, 25.3 grams, Omega watch, light wear, box clasp, 7.5 inch bracelet..."
-                  value={aiTranscript}
-                  onChange={(event) => setAiTranscript(event.target.value)}
+                  value={[aiTranscript, aiInterimText].filter(Boolean).join(' ')}
+                  onChange={(event) => { setAiTranscript(event.target.value); setAiInterimText(''); }}
                 />
 
                 <button
@@ -4246,7 +4278,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
             {/* Modal footer — 2-up grid on mobile (so nothing overflows), single row on desktop */}
             <div className="grid grid-cols-2 gap-2 px-3 py-4 border-t [&>button]:w-full md:flex md:items-center md:gap-1.5 md:[&>button]:w-auto"
-              style={{ borderColor: 'var(--color-outline-variant)' }}>
+              style={{ borderColor: 'var(--color-outline-variant)', paddingBottom: 'max(1rem, calc(1rem + env(safe-area-inset-bottom, 0px)))' }}>
               {/* Clone — edit mode only, pushed to the left */}
               {!isNew && (
                 <button
