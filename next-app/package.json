@@ -6,7 +6,9 @@
     "dev": "set NODE_OPTIONS=--max-old-space-size=4096&& next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:compression": "node scripts/check-compression.mjs",
+    "measure:routes": "node scripts/measure-routes.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

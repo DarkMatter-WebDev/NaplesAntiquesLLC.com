@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import type { CSSProperties } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { createPublicClient } from '@/lib/supabase/public';
 import {
   inferProductJewelryType,
   formatProductItemYear,
@@ -34,14 +34,96 @@ interface Props {
   searchParams?: Promise<{ returnTo?: string }>;
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { id } = await params;
-  const supabase = await createClient();
-  const { data } = await supabase
+export const revalidate = 300;
+
+const PRODUCT_DETAIL_COLUMNS = [
+  'id',
+  'category',
+  'metal_type',
+  'metal_variant',
+  'title',
+  'title_es',
+  'description',
+  'description_es',
+  'public_notes',
+  'price_label',
+  'manual_price_label',
+  'price_mode',
+  'purity',
+  'weight_grams',
+  'gram_weight',
+  'pricing_multiplier',
+  'inventory_number',
+  'sku',
+  'slug',
+  'brand',
+  'product_type',
+  'jewelry_type',
+  'chain_type',
+  'length',
+  'status',
+  'images',
+  'image_urls',
+  'image_padding',
+  'image_padding_by_image',
+  'tags',
+  'tags_es',
+  'gender',
+  'item_year',
+].join(', ');
+
+const PRODUCT_DETAIL_COLUMNS_WITHOUT_ITEM_YEAR = PRODUCT_DETAIL_COLUMNS
+  .split(', ')
+  .filter((column) => column !== 'item_year')
+  .join(', ');
+
+function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
+  return Boolean(error?.message?.toLowerCase().includes('item_year'));
+}
+
+async function fetchPublicProduct(id: string) {
+  const supabase = createPublicClient();
+  const result = await supabase
     .from('products')
-    .select('title, description, images, image_urls, status')
+    .select(PRODUCT_DETAIL_COLUMNS)
     .eq('id', id)
     .single();
+
+  if (isMissingItemYearColumnError(result.error)) {
+    const fallback = await supabase
+      .from('products')
+      .select(PRODUCT_DETAIL_COLUMNS_WITHOUT_ITEM_YEAR)
+      .eq('id', id)
+      .single();
+    return {
+      data: fallback.data ? { ...(fallback.data as unknown as Record<string, unknown>), item_year: null } as Product : null,
+      error: fallback.error,
+    };
+  }
+
+  return {
+    data: result.data as unknown as Product | null,
+    error: result.error,
+  };
+}
+
+export async function generateStaticParams() {
+  const supabase = createPublicClient();
+  const { data } = await supabase
+    .from('products')
+    .select('id')
+    .in('status', ['available', 'Available', 'sold', 'Sold'])
+    .order('sort_order', { ascending: true });
+
+  return (data ?? []).flatMap((product) => [
+    { locale: 'en', id: product.id },
+    { locale: 'es', id: product.id },
+  ]);
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  const { data } = await fetchPublicProduct(id);
 
   if (!data || !isProductVisibleInShop(data.status)) return { title: 'Product Not Found' };
 
@@ -124,12 +206,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
     : (isEs ? 'Volver a la tienda' : 'Back to Shop');
   const contactHref = isEs ? '/es/contact' : '/contact';
 
-  const supabase = await createClient();
-  const { data: product, error } = await supabase
-    .from('products')
-    .select('*')
-    .eq('id', id)
-    .single();
+  const { data: product, error } = await fetchPublicProduct(id);
 
   if (error || !product) notFound();
 

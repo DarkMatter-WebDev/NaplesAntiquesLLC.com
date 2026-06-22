@@ -19,6 +19,7 @@ interface Props {
   revealIndex?: number;
   revealColumnCount?: number;
   prioritizeImage?: boolean;
+  includeModernStyles?: boolean;
 }
 
 export default function ProductCard({
@@ -29,6 +30,7 @@ export default function ProductCard({
   revealIndex = 0,
   revealColumnCount = 3,
   prioritizeImage = false,
+  includeModernStyles = false,
 }: Props) {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isImageHovering, setIsImageHovering] = useState(false);
@@ -470,10 +472,10 @@ export default function ProductCard({
 
         {/* Actions */}
         <div className="flex flex-wrap gap-2 mt-auto pt-3">
-          <CartButton item={cartItem} variant="card" locale={locale} />
+          <CartButton item={cartItem} variant="card" locale={locale} includeCardStyles={includeModernStyles} />
         </div>
       </div>
-      {isModern && (
+      {isModern && includeModernStyles && (
         <style>{`
           .shop-card-reveal {
             opacity: 0;

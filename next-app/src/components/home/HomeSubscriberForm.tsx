@@ -14,17 +14,23 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const submittedEmail = email;
+    const submittedFullName = fullName;
     setStatus('saving');
     setMessage('');
+    setEmail('');
+    setFullName('');
 
     const res = await fetch('/api/subscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, fullName, locale }),
+      body: JSON.stringify({ email: submittedEmail, fullName: submittedFullName, locale }),
     });
     const data = await res.json().catch(() => null);
 
     if (!res.ok || !data?.success) {
+      setEmail(submittedEmail);
+      setFullName(submittedFullName);
       setStatus('error');
       setMessage(data?.error ?? (isEs ? 'No se pudo guardar.' : 'Could not save.'));
       return;
@@ -32,8 +38,6 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
 
     setStatus('success');
     setMessage(isEs ? 'Gracias. Ya esta en la lista.' : "You're on the list.");
-    setEmail('');
-    setFullName('');
   }
 
   // Inputs use a solid light fill with dark text so they're clearly legible

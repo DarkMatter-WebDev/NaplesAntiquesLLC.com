@@ -8,9 +8,10 @@ interface Props {
   item: CartItem;
   variant?: 'card' | 'detail' | 'icon';
   locale?: string;
+  includeCardStyles?: boolean;
 }
 
-export default function CartButton({ item, variant = 'card', locale = 'en' }: Props) {
+export default function CartButton({ item, variant = 'card', locale = 'en', includeCardStyles = true }: Props) {
   const { isIn, add, remove, openDrawer, notifyAdded } = useCart();
   const inCart = isIn(item.id);
   const isEs = locale === 'es';
@@ -130,7 +131,7 @@ export default function CartButton({ item, variant = 'card', locale = 'en' }: Pr
           {inCart ? (isEs ? 'Quitar' : 'Remove') : canPurchase ? (isEs ? 'Agregar' : 'Add') : (isEs ? 'No' : 'N/A')}
         </span>
       </button>
-      <style>{`
+      {includeCardStyles && <style>{`
         .shop-card-cart-button {
           min-width: 0;
           width: 100%;
@@ -171,7 +172,7 @@ export default function CartButton({ item, variant = 'card', locale = 'en' }: Pr
         .shop-card-cart-label-compact {
           display: inline;
         }
-      `}</style>
+      `}</style>}
     </div>
   );
 }

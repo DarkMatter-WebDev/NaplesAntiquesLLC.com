@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { createClient } from '@/lib/supabase/server';
+import { createPublicClient } from '@/lib/supabase/public';
 import {
   PRODUCT_METAL_VARIANTS,
   PUBLIC_SHOP_PRODUCT_STATUSES,
@@ -29,6 +29,8 @@ export const metadata: Metadata = {
   title: 'Shop',
   description: 'Browse estate gold jewelry, chains, bracelets, and rings with live pricing.',
 };
+
+export const revalidate = 300;
 
 interface Props {
   params: Promise<{ locale: string }>;
@@ -305,7 +307,7 @@ export async function renderShopPage({
     : rawFilters;
   const selectedMetalColor = getEffectiveMetalColor(filters.metal, filters.metalColor ?? filters.metalType);
 
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const buildProductQuery = (columns: string) => supabase
     .from('products')
     .select(columns)
@@ -331,7 +333,17 @@ export async function renderShopPage({
     productQuery = productQuery.eq('brand', filters.brand);
   }
 
-  const productResult = await productQuery;
+  const spotDataPromise = fetchSpotData();
+  const totalInventoryPromise = supabase
+    .from('products')
+    .select('id', { count: 'exact', head: true })
+    .in('status', [...PUBLIC_SHOP_PRODUCT_STATUSES]);
+
+  const [productResult, spotData, totalInventoryResult] = await Promise.all([
+    productQuery,
+    spotDataPromise,
+    totalInventoryPromise,
+  ]);
   let products: unknown[] | null = productResult.data as unknown[] | null;
   let error = productResult.error;
   if (isMissingItemYearColumnError(error)) {
@@ -360,13 +372,6 @@ export async function renderShopPage({
   // Total public inventory, independent of the active filters/metal scope — the
   // "Showing X of Y pieces" denominator reflects the whole shop, not the
   // currently filtered collection. Runs concurrently with the spot-price fetch.
-  const [spotData, totalInventoryResult] = await Promise.all([
-    fetchSpotData(),
-    supabase
-      .from('products')
-      .select('id', { count: 'exact', head: true })
-      .in('status', [...PUBLIC_SHOP_PRODUCT_STATUSES]),
-  ]);
   const totalInventoryCount = totalInventoryResult.count ?? null;
   const allProducts: Product[] = (products ?? []) as unknown as Product[];
   const publicGalleryProducts = allProducts.filter(isVisibleInPublicGallery);

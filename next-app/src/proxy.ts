@@ -7,6 +7,25 @@ const intl = createIntlMiddleware(routing);
 const INTERNAL_LOCALE_HEADER = 'x-naples-internal-locale';
 const NEXT_INTL_LOCALE_HEADER = 'X-NEXT-INTL-LOCALE';
 
+const SESSION_PATH_PREFIXES = [
+  '/account',
+  '/admin',
+  '/checkout',
+  '/payment',
+  '/en/account',
+  '/en/admin',
+  '/en/checkout',
+  '/en/payment',
+  '/es/account',
+  '/es/admin',
+  '/es/checkout',
+  '/es/payment',
+];
+
+function shouldRefreshSupabaseSession(pathname: string) {
+  return SESSION_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
 async function refreshSupabaseSession(request: NextRequest, response: NextResponse) {
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,6 +53,7 @@ async function refreshSupabaseSession(request: NextRequest, response: NextRespon
 
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  const needsSessionRefresh = shouldRefreshSupabaseSession(pathname);
 
   // Next 16 currently re-runs proxy for next-intl's internal default-locale
   // rewrite (/ -> /en), which can make /en canonicalize back to / forever.
@@ -45,6 +65,7 @@ export async function proxy(request: NextRequest) {
     const headers = new Headers(request.headers);
     headers.set(NEXT_INTL_LOCALE_HEADER, 'en');
     const response = NextResponse.next({ request: { headers } });
+    if (!needsSessionRefresh) return response;
     response.cookies.set('NEXT_LOCALE', 'en', { path: '/', sameSite: 'lax' });
     return refreshSupabaseSession(request, response);
   }
@@ -58,12 +79,14 @@ export async function proxy(request: NextRequest) {
     headers.set(NEXT_INTL_LOCALE_HEADER, 'en');
 
     const response = NextResponse.rewrite(url, { request: { headers } });
+    if (!needsSessionRefresh) return response;
     response.cookies.set('NEXT_LOCALE', 'en', { path: '/', sameSite: 'lax' });
     return refreshSupabaseSession(request, response);
   }
 
   // i18n routing for Spanish and direct prefixed default-locale URLs.
   const response = intl(request);
+  if (!needsSessionRefresh) return response;
   return refreshSupabaseSession(request, response);
 }
 

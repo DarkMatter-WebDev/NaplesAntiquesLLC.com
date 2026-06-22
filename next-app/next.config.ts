@@ -19,6 +19,21 @@ const HTML_PAGES = [
 ] as const;
 
 const nextConfig: NextConfig = {
+  compress: true,
+  poweredByHeader: false,
+  async headers() {
+    return [
+      {
+        source: '/api/metal-prices',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, s-maxage=300, stale-while-revalidate=300',
+          },
+        ],
+      },
+    ];
+  },
   async redirects() {
     const rules = [];
     for (const page of HTML_PAGES) {

@@ -2583,14 +2583,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     const orderById = new Map(reorderedGroup.map((product, index) => [product.id, index + 1]));
 
     setReordering(true);
-    const results = await Promise.all(
-      reorderedGroup.map((product, index) =>
-        supabase.from('products').update({ sort_order: index + 1 }).eq('id', product.id)
-      )
-    );
-    const failed = results.find((result) => result.error);
-    if (failed?.error) {
-      flash(`Reorder failed: ${failed.error.message}`, false);
+    const { error } = await supabase
+      .from('products')
+      .upsert(
+        reorderedGroup.map((product, index) => ({ id: product.id, sort_order: index + 1 })),
+        { onConflict: 'id' },
+      );
+    if (error) {
+      flash(`Reorder failed: ${error.message}`, false);
       setReordering(false);
       resetRowDrag();
       return;

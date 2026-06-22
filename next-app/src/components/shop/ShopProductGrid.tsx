@@ -49,6 +49,7 @@ export default function ShopProductGrid({ products, spotData, locale, variant = 
           revealIndex={index}
           revealColumnCount={columnCount}
           prioritizeImage={index < columnCount}
+          includeModernStyles={index === 0}
         />
       ))}
     </div>

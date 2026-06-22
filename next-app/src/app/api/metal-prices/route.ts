@@ -8,5 +8,9 @@ export async function GET() {
   return NextResponse.json({
     ...spot,
     goldPerGram: spot.goldPerTroyOz / GRAMS_PER_TROY_OZ,
+  }, {
+    headers: {
+      'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=300',
+    },
   });
 }
