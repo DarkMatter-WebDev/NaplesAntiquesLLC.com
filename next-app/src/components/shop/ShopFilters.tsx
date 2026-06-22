@@ -514,6 +514,10 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
     },
     [pathname, priceCeiling, priceFloor, priceRange, router, searchParams],
   );
+  const applyAndCloseFilters = useCallback(() => {
+    if (priceRange) commitPriceRange(draftPriceMin, draftPriceMax);
+    setFiltersOpen(false);
+  }, [commitPriceRange, draftPriceMax, draftPriceMin, priceRange]);
   const priceTrackSpan = priceRange && priceCeiling > priceFloor ? priceCeiling - priceFloor : 1;
   const priceTrackLeft = ((draftPriceMin - priceFloor) / priceTrackSpan) * 100;
   const priceTrackRight = 100 - ((draftPriceMax - priceFloor) / priceTrackSpan) * 100;
@@ -973,6 +977,17 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
               {isEs ? 'Solo disponibles' : 'Available only'}
             </label>
           </div>
+
+          <div className="shop-apply-filters-row">
+            <button
+              type="button"
+              className="shop-apply-filters-button"
+              onClick={applyAndCloseFilters}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">check</span>
+              <span>{isEs ? 'Guardar y aplicar filtros' : 'Save and Apply Filters'}</span>
+            </button>
+          </div>
         </div>
 
       {/* Meta: count + clear */}
@@ -1063,6 +1078,44 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
         }
         .shop-clear-filters-top .material-symbols-outlined {
           font-size: 1rem;
+          line-height: 1;
+        }
+        .shop-apply-filters-row {
+          display: flex;
+          justify-content: center;
+          margin: 1rem auto 0.15rem;
+          max-width: 32rem;
+        }
+        .shop-apply-filters-button {
+          min-height: 3.2rem;
+          width: 100%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.55rem;
+          border: 1px solid rgba(145, 105, 0, 0.18);
+          border-radius: 8px;
+          background: linear-gradient(135deg, #dcb336, #b5890c);
+          color: #fffdf7;
+          cursor: pointer;
+          font-family: var(--font-label);
+          font-size: 0.78rem;
+          font-weight: 900;
+          letter-spacing: 0.1em;
+          line-height: 1.15;
+          padding: 0.75rem 1rem;
+          text-align: center;
+          text-transform: uppercase;
+          box-shadow: 0 14px 30px rgba(181, 137, 12, 0.22);
+          transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+        }
+        .shop-apply-filters-button:hover {
+          filter: brightness(1.04);
+          box-shadow: 0 16px 34px rgba(181, 137, 12, 0.28);
+          transform: translateY(-1px);
+        }
+        .shop-apply-filters-button .material-symbols-outlined {
+          font-size: 1.15rem;
           line-height: 1;
         }
         .shop-price-filter {
@@ -1241,6 +1294,9 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
           }
           .shop-available-row {
             justify-content: flex-start !important;
+          }
+          .shop-apply-filters-row {
+            display: none;
           }
         }
         .shop-filters-modern {
