@@ -133,22 +133,29 @@ export default function ProductCard({
 
     let frame = 0;
     let attempts = 0;
+    const fallbackTimer = window.setTimeout(() => {
+      setLoadedCoverKey(coverKey);
+    }, 1800);
 
     const checkCoverImage = () => {
       const coverImage = coverImageRef.current;
       if (coverImage?.complete && coverImage.naturalWidth > 0) {
+        window.clearTimeout(fallbackTimer);
         setLoadedCoverKey(coverKey);
         return;
       }
 
       attempts += 1;
-      if (attempts < 120) {
+      if (attempts < 180) {
         frame = window.requestAnimationFrame(checkCoverImage);
       }
     };
 
     frame = window.requestAnimationFrame(checkCoverImage);
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(fallbackTimer);
+    };
   }, [coverKey, thumb]);
 
   useEffect(() => {

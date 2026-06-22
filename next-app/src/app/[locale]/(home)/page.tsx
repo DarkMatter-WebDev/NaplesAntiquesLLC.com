@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
+import { CardGrid, PageContainer, Section } from '@/components/layout/ResponsiveLayout';
 import HomeHero from '@/components/home/HomeHero';
 import ServiceIconCanvas from '@/components/home/ServiceIconCanvas';
 import type { CarouselItem } from '../../../../carousel/lib/carouselData';
@@ -45,11 +46,12 @@ export default async function HomePage({ params }: Props) {
         <HomeHero locale={locale} fallbackItems={fallbackItems} />
 
         {/* Services strip */}
-        <section
-          className="border-t px-6 py-14 md:py-20"
+        <Section
+          className="border-t"
           style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}
         >
-          <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-3 md:gap-8">
+          <PageContainer max="content">
+          <CardGrid className="md:grid-cols-3">
             {[
               {
                 icon: '💛',
@@ -105,14 +107,16 @@ export default async function HomePage({ params }: Props) {
                 </Link>
               </div>
             ))}
-          </div>
-        </section>
+          </CardGrid>
+          </PageContainer>
+        </Section>
 
         {/* CTA */}
-        <section
-          className="py-20 px-6 text-center border-t"
+        <Section
+          className="text-center border-t"
           style={{ borderColor: 'var(--color-outline-variant)' }}
         >
+          <PageContainer max="narrow">
           <p
             className="text-[0.65rem] font-bold uppercase tracking-[0.35em] mb-4"
             style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
@@ -121,7 +125,7 @@ export default async function HomePage({ params }: Props) {
           </p>
           <a
             href="tel:2394048505"
-            className="text-4xl md:text-5xl font-bold transition-opacity hover:opacity-70"
+            className="responsive-title-lg font-bold transition-opacity hover:opacity-70"
             style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
           >
             (239) 404-8505
@@ -129,7 +133,8 @@ export default async function HomePage({ params }: Props) {
           <p className="mt-4 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
             {isEs ? 'Naples, Florida · Lunes–Sábado' : 'Naples, Florida · Mon–Sat'}
           </p>
-        </section>
+          </PageContainer>
+        </Section>
 
       </main>
       <SiteFooter locale={locale} />

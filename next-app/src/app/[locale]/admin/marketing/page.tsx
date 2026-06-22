@@ -215,7 +215,7 @@ export default async function AdminMarketingPage({ params }: Props) {
                 Could not load campaign history. Run `supabase/email-marketing.sql` first.
               </div>
             )}
-            <div className="overflow-x-auto">
+            <div className="responsive-table-wrap">
               <table className="w-full min-w-[1650px] text-left text-sm">
                 <thead style={{ background: 'var(--color-surface-container-low)' }}>
                   <tr>

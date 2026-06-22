@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
+import { PageContainer, Section } from '@/components/layout/ResponsiveLayout';
 
 export const metadata: Metadata = {
   title: 'About Chris | Naples Estate Jewelry',
@@ -37,7 +38,7 @@ export default async function AboutPage({ params }: Props) {
             />
             <div className="absolute inset-0 bg-black/50" />
           </div>
-          <div className="container mx-auto px-6 md:px-8 max-w-4xl text-center relative z-10">
+          <PageContainer max="narrow" className="text-center relative z-10">
             <span
               className="text-xs font-bold uppercase tracking-[0.4em]"
               style={{ color: '#f2ca50', fontFamily: 'var(--font-label)' }}
@@ -45,29 +46,28 @@ export default async function AboutPage({ params }: Props) {
               {isEs ? 'Nosotros' : 'About'}
             </span>
             <h1
-              className="text-4xl md:text-5xl text-white font-bold mt-4 mb-6 tracking-tight"
+              className="responsive-title-lg text-white font-bold mt-4 mb-6 tracking-tight"
               style={{ fontFamily: 'var(--font-headline)' }}
             >
               {isEs
                 ? 'Una Herencia de Confianza en el Suroeste de Florida'
                 : 'A Heritage of Trust in Southwest Florida'}
             </h1>
-            <p className="text-xl italic max-w-2xl mx-auto leading-relaxed" style={{ color: '#d8d1c2' }}>
+            <p className="responsive-copy italic max-w-2xl mx-auto" style={{ color: '#d8d1c2' }}>
               {isEs
                 ? 'Nacido y criado en Naples, Chris ha pasado mas de 15 anos trabajando en privado con familias locales para adquirir joyeria fina, plata esterlina, antiguedades, oro y colecciones heredadas.'
                 : 'Born and raised in Naples, Chris has spent 15+ years working privately with local families to acquire fine jewelry, sterling silver, antiques, gold, and inherited collections.'}
             </p>
-          </div>
+          </PageContainer>
         </section>
 
         {/* Meet Chris */}
-        <section
-          className="py-20 md:py-28"
+        <Section
           style={{ background: 'var(--color-surface-container-low)' }}
         >
-          <div className="container mx-auto px-6 md:px-8 max-w-6xl">
-            <div className="flex flex-col md:flex-row gap-16 items-center">
-              <div className="w-full md:w-1/2">
+          <PageContainer max="content">
+            <div className="grid gap-[clamp(2rem,5vw,4rem)] md:grid-cols-2 md:items-center">
+              <div className="w-full">
                 <div className="relative">
                   <div
                     className="absolute -top-10 -left-10 w-32 h-32 rounded-full blur-3xl"
@@ -83,9 +83,9 @@ export default async function AboutPage({ params }: Props) {
                 </div>
               </div>
 
-              <div className="w-full md:w-1/2">
+              <div className="w-full">
                 <h2
-                  className="text-3xl md:text-4xl font-bold mb-8 tracking-tight"
+                  className="responsive-title-md font-bold mb-8 tracking-tight"
                   style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
                 >
                   {isEs ? 'Conozca a Chris' : 'Meet Chris'}
@@ -113,7 +113,7 @@ export default async function AboutPage({ params }: Props) {
                   </p>
                 </div>
 
-                <div className="mt-10 grid grid-cols-2 gap-6">
+                <div className="mt-10 grid grid-cols-1 gap-5 min-[390px]:grid-cols-2 md:gap-6">
                   {[
                     { stat: '15+', label: isEs ? 'Anos de Experiencia' : 'Years Experience' },
                     { stat: '100%', label: isEs ? 'Privado y Confidencial' : 'Private & Confidential' },
@@ -142,18 +142,17 @@ export default async function AboutPage({ params }: Props) {
                 </div>
               </div>
             </div>
-          </div>
-        </section>
+          </PageContainer>
+        </Section>
 
 
         {/* CTA */}
-        <section
-          className="py-20 md:py-28"
+        <Section
           style={{ background: 'var(--color-surface-container-low)' }}
         >
-          <div className="container mx-auto px-6 md:px-8 max-w-4xl text-center">
+          <PageContainer max="narrow" className="text-center">
             <h2
-              className="text-4xl md:text-5xl font-bold mb-6 tracking-tight"
+              className="responsive-title-lg font-bold mb-6 tracking-tight"
               style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
             >
               {isEs ? 'Listo para Comenzar una Conversacion?' : 'Ready to Start a Conversation?'}
@@ -163,7 +162,7 @@ export default async function AboutPage({ params }: Props) {
                 ? 'Llame o envie un mensaje de texto a Chris directamente, o programe una consulta privada en un momento que le convenga.'
                 : 'Call or text Chris directly, or schedule a private consultation at a time that works for you.'}
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center flex-wrap">
+            <div className="responsive-actions justify-center">
               <a href="tel:2394048505" className="gold-button">
                 (239) 404-8505
               </a>
@@ -186,8 +185,8 @@ export default async function AboutPage({ params }: Props) {
                 <span aria-hidden="true">-&gt;</span>
               </a>
             </div>
-          </div>
-        </section>
+          </PageContainer>
+        </Section>
 
       </main>
       <SiteFooter locale={locale} />

@@ -265,7 +265,7 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
         </div>
       )}
 
-      <div className="overflow-x-auto border" style={{ borderColor: 'var(--color-outline-variant)', background: 'white' }}>
+      <div className="responsive-table-wrap border" style={{ borderColor: 'var(--color-outline-variant)', background: 'white' }}>
         <table className="w-full min-w-[980px] text-left text-sm">
           <thead style={{ background: 'var(--color-surface-container-low)' }}>
             <tr>

@@ -610,7 +610,7 @@ export async function renderShopPage({
     <>
       <SiteHeader />
       <main className={isModern ? 'modern-shop-page pt-20 md:pt-28 pb-20' : 'pt-20 md:pt-32 pb-20'}>
-        <div className="max-w-[2400px] mx-auto px-4 md:px-8 2xl:px-10 min-[2200px]:px-12">
+        <div className="mx-auto w-full max-w-[2400px] px-[clamp(1rem,3vw,3rem)]">
 
           {/* Investment transparency note */}
           <section
@@ -631,7 +631,7 @@ export async function renderShopPage({
             <h2
               id="shop-invest-heading"
               className={isModern
-                ? 'text-4xl md:text-6xl font-bold mt-3 mb-4 tracking-tight max-w-2xl'
+                ? 'responsive-title-lg font-bold mt-3 mb-4 tracking-tight max-w-2xl'
                 : 'text-base md:text-4xl font-bold mt-0 mb-0 md:mb-3 tracking-tight'}
               style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
             >
@@ -844,7 +844,7 @@ export async function renderShopPage({
             }
             .modern-shop-hero {
               position: relative;
-              min-height: 25rem;
+              min-height: clamp(18rem, 38vw, 25rem);
               border: 1px solid rgba(115, 92, 0, 0.15);
               border-radius: var(--radius-xl);
               background: #ffffff;
@@ -1016,7 +1016,7 @@ export async function renderShopPage({
               white-space: nowrap;
             }
             .shop-gallery-sort select {
-              min-width: 11.5rem;
+              min-width: min(11.5rem, 56vw);
               height: 2.15rem;
               border: 0;
               background: transparent;
@@ -1029,6 +1029,9 @@ export async function renderShopPage({
             }
             .shop-filter-sidebar {
               min-width: 0;
+            }
+            .shop-product-grid {
+              grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
             }
             .shop-gender-tabs {
               display: grid;
@@ -1085,6 +1088,14 @@ export async function renderShopPage({
               /* Gender is handled by the sidebar buttons, so hide the redundant toggle */
               .modern-shop-page .shop-gender-tabs {
                 display: none;
+              }
+              .shop-product-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+              }
+            }
+            @media (min-width: 1280px) {
+              .shop-product-grid {
+                grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
               }
             }
             @media (min-width: 768px) and (max-width: 1023px) {

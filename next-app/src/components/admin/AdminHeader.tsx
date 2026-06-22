@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { type ReactNode, useState, useEffect } from 'react';
+import { type ReactNode, useState } from 'react';
 import AdminMessagesLink from './AdminMessagesLink';
 
 const GOLD = '#735c00';
@@ -23,6 +23,7 @@ const linkStyle = {
   color: '#555',
   textDecoration: 'none',
   textUnderlineOffset: '3px',
+  whiteSpace: 'nowrap',
 } as const;
 
 const activeStyle = {
@@ -80,13 +81,13 @@ export default function AdminHeader({
   rightContent?: ReactNode;
 }) {
   const homeHref = adminBasePath.startsWith('/es') ? '/es' : '/';
-  const [collapsed, setCollapsed] = useState(false);
-
-  useEffect(() => {
+  const [collapsed, setCollapsed] = useState(() => {
     try {
-      if (localStorage.getItem(STORAGE_KEY) === 'true') setCollapsed(true);
-    } catch {}
-  }, []);
+      return typeof window !== 'undefined' && localStorage.getItem(STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   const toggle = () => {
     setCollapsed((prev) => {
@@ -128,7 +129,7 @@ export default function AdminHeader({
       <header
         style={{
           borderBottom: '1px solid rgba(115,92,0,0.2)',
-          padding: '0 1rem',
+          padding: '0 clamp(0.75rem, 2vw, 1rem)',
           height: '2.5rem',
           display: 'flex',
           alignItems: 'center',
@@ -182,15 +183,17 @@ export default function AdminHeader({
     <header
       style={{
         borderBottom: '1px solid rgba(115,92,0,0.2)',
-        padding: '0.75rem 2rem',
+        padding: '0.75rem clamp(0.75rem, 2vw, 2rem)',
         display: 'flex',
         alignItems: 'center',
-        gap: '1.5rem',
+        gap: 'clamp(0.75rem, 1.6vw, 1.5rem)',
         background: 'white',
         position: 'sticky',
         top: 0,
         zIndex: 10,
         flexWrap: 'wrap',
+        overflowX: 'auto',
+        overscrollBehaviorX: 'contain',
       }}
     >
       <Link
@@ -251,6 +254,7 @@ export default function AdminHeader({
           alignItems: 'center',
           gap: '0.75rem',
           flexWrap: 'wrap',
+          minWidth: 0,
         }}
       >
         {rightContent}

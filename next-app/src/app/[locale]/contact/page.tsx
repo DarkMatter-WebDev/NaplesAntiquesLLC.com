@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
+import { HeroSection, PageContainer } from '@/components/layout/ResponsiveLayout';
 import ContactForm from '@/components/contact/ContactForm';
 import InquiryForm from '@/components/contact/InquiryForm';
 
@@ -28,11 +29,11 @@ export default async function ContactPage({ params, searchParams }: Props) {
       <main className="pt-16">
 
         {/* Hero */}
-        <section
-          className="py-14 md:py-20 border-b"
+        <HeroSection
+          className="border-b text-center"
           style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}
         >
-          <div className="container mx-auto px-6 md:px-8 max-w-4xl text-center">
+          <PageContainer max="narrow">
             <span
               className="text-xs font-bold uppercase tracking-[0.4em]"
               style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
@@ -42,14 +43,14 @@ export default async function ContactPage({ params, searchParams }: Props) {
                 : (isEs ? 'Contáctenos' : 'Contact Us')}
             </span>
             <h1
-              className="text-4xl md:text-5xl font-bold mt-4 mb-6 tracking-tight"
+              className="responsive-title-lg font-bold mt-4 mb-6 tracking-tight"
               style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
             >
               {inquiryItem
                 ? (isEs ? 'Consultar Sobre Este Artículo' : 'Inquire About This Item')
                 : (isEs ? 'Comuníquese con Nosotros' : 'Get in Touch')}
             </h1>
-            <p className="text-lg md:text-xl max-w-2xl mx-auto leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
+            <p className="responsive-copy max-w-2xl mx-auto" style={{ color: 'var(--color-on-surface-variant)' }}>
               {inquiryItem
                 ? (isEs
                     ? 'Déjenos su nombre y número de teléfono y nos comunicaremos pronto.'
@@ -59,7 +60,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
                     : 'Send a quick description and optional photos for a preliminary read, or call us directly. Mobile, private evaluations throughout Southwest Florida.')}
             </p>
             {!inquiryItem && (
-              <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
+              <div className="responsive-actions justify-center mt-10">
                 <a href="#submit-item" className="gold-button">
                   {isEs ? 'Enviar su artículo' : 'Submit your item'}
                 </a>
@@ -69,7 +70,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
               </div>
             )}
             {inquiryItem && !isSubmitted && (
-              <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
+              <div className="responsive-actions justify-center mt-10">
                 <a href="#inquiry-form" className="gold-button">
                   {isEs ? 'Enviar mensaje' : 'Send a message'}
                 </a>
@@ -78,8 +79,8 @@ export default async function ContactPage({ params, searchParams }: Props) {
                 </a>
               </div>
             )}
-          </div>
-        </section>
+          </PageContainer>
+        </HeroSection>
 
         {inquiryItem
           ? (

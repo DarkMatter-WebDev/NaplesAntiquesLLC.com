@@ -188,7 +188,39 @@ export default async function AdminUsersPage({ params }: Props) {
             </div>
           )}
 
-          <div className="overflow-x-auto border" style={{ borderColor: 'var(--color-outline-variant)', background: 'white' }}>
+          <div className="grid gap-3 md:hidden">
+            {enrichedUsers.map((siteUser) => (
+              <article key={siteUser.id} className="rounded-lg border bg-white p-4 shadow-sm" style={{ borderColor: 'var(--color-outline-variant)' }}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-bold leading-tight" style={{ color: 'var(--color-on-surface)', fontFamily: 'var(--font-headline)' }}>{displayName(siteUser)}</h2>
+                    <p className="mt-1 break-words text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>{siteUser.email || '-'}</p>
+                    {siteUser.phone && <p className="mt-1 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>{siteUser.phone}</p>}
+                  </div>
+                  <span className="shrink-0 rounded-full px-2 py-1 text-[0.58rem] font-bold uppercase tracking-wide" style={{ background: siteUser.marketing_opt_out === true ? 'var(--color-surface-container-high)' : 'rgba(47,107,63,0.12)', color: siteUser.marketing_opt_out === true ? 'var(--color-on-surface-variant)' : '#2f6b3f' }}>
+                    {siteUser.marketing_opt_out === true ? 'Opted out' : 'Reachable'}
+                  </span>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                  <div className="rounded-md border p-2" style={{ borderColor: 'rgba(115, 92, 0, 0.12)' }}>
+                    <span className="block text-[0.58rem] font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>Location</span>
+                    <span className="mt-1 block break-words">{displayLocation(siteUser)}</span>
+                  </div>
+                  <div className="rounded-md border p-2" style={{ borderColor: 'rgba(115, 92, 0, 0.12)' }}>
+                    <span className="block text-[0.58rem] font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>Orders</span>
+                    <span className="mt-1 block">{siteUser.orderSummary ? `${siteUser.orderSummary.count} / ${formatCurrency(siteUser.orderSummary.total)}` : 'No'}</span>
+                  </div>
+                </div>
+                {siteUser.orderSummary && (
+                  <Link href={`${adminBasePath}/users/${siteUser.id}/invoices`} className="gold-button mt-4 w-full text-xs">
+                    Invoices{siteUser.invoiceCount > 0 ? ` (${siteUser.invoiceCount})` : ''}
+                  </Link>
+                )}
+              </article>
+            ))}
+          </div>
+
+          <div className="responsive-table-wrap hidden border md:block" style={{ borderColor: 'var(--color-outline-variant)', background: 'white' }}>
             <table className="w-full min-w-[1150px] text-left text-sm">
               <thead style={{ background: 'var(--color-surface-container-low)' }}>
                 <tr>

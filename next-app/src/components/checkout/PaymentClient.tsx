@@ -23,7 +23,7 @@ export default function PaymentClient({ locale }: { locale: string }) {
 
   if (items.length === 0) {
     return (
-      <div className="max-w-xl mx-auto text-center px-6 py-16">
+      <div className="mx-auto max-w-xl px-[clamp(1rem,4vw,2rem)] py-16 text-center">
         <span className="material-symbols-outlined" style={{ fontSize: '44px', color: 'var(--color-outline-variant)' }}>shopping_bag</span>
         <h1 className="text-3xl md:text-4xl font-bold mt-4 mb-4" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
           {isEs ? 'Su carrito esta vacio' : 'Your Cart Is Empty'}
@@ -39,7 +39,7 @@ export default function PaymentClient({ locale }: { locale: string }) {
   }
 
   return (
-    <div className="container mx-auto px-4 md:px-8 py-10 md:py-16 max-w-6xl">
+    <div className="mx-auto w-full max-w-6xl px-[clamp(1rem,4vw,2rem)] py-10 md:py-16">
       <div className="mb-8">
         <Link href={`${prefix}/checkout`} className="text-xs font-bold uppercase tracking-widest hover:underline" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
           {isEs ? '< Volver al checkout' : '< Back to checkout'}
@@ -52,13 +52,13 @@ export default function PaymentClient({ locale }: { locale: string }) {
         </p>
       </div>
 
-      <div className="grid lg:grid-cols-[1fr_24rem] gap-8 items-start">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)] lg:items-start">
         <section className="border p-5 md:p-7 flex flex-col gap-5" style={{ borderColor: BORDER, background: 'var(--color-surface-container-lowest)' }}>
           <div>
             <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
               {isEs ? 'Metodo de pago' : 'Payment Method'}
             </p>
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="responsive-form-grid">
               <label>
                 <span className="form-label">{isEs ? 'Numero de tarjeta' : 'Card Number'} *</span>
                 <input className="form-field" inputMode="numeric" autoComplete="cc-number" placeholder="1234 1234 1234 1234" />

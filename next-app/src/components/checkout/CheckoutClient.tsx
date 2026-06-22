@@ -258,7 +258,7 @@ export default function CheckoutClient({ locale }: { locale: string }) {
               <h2>{isEs ? 'Como podemos contactarte?' : 'How should we contact you?'}</h2>
             </div>
           </div>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="responsive-form-grid">
             <div>
               <label className="form-label">{isEs ? 'Nombre completo' : 'Full Name'} *</label>
               <input required className="form-field" value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} />
@@ -323,8 +323,10 @@ export default function CheckoutClient({ locale }: { locale: string }) {
             radial-gradient(circle at top right, rgba(212, 175, 55, 0.18), transparent 34%);
         }
         .checkout-shell {
-          width: min(1160px, calc(100% - 2rem));
+          width: 100%;
+          max-width: 1160px;
           margin: 0 auto;
+          padding-inline: clamp(1rem, 4vw, 2rem);
         }
         .checkout-hero {
           margin-bottom: 1.5rem;
@@ -334,8 +336,8 @@ export default function CheckoutClient({ locale }: { locale: string }) {
           box-shadow: 0 18px 48px rgba(75, 60, 24, 0.08);
         }
         .checkout-dashboard {
-          display: flex;
-          flex-direction: column;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr);
           gap: 1.5rem;
         }
         .checkout-contact-panel {
@@ -352,6 +354,18 @@ export default function CheckoutClient({ locale }: { locale: string }) {
           align-items: center;
           gap: 0.85rem;
           padding-bottom: 0.35rem;
+        }
+        @media (min-width: 1024px) {
+          .checkout-dashboard {
+            grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem);
+            align-items: start;
+          }
+          .checkout-dashboard > :first-child {
+            order: 2;
+          }
+          .checkout-dashboard > :last-child {
+            order: 1;
+          }
         }
         .checkout-panel-heading > .material-symbols-outlined {
           display: inline-flex;

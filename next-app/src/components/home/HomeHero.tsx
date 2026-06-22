@@ -31,6 +31,8 @@ const FALLBACK_SETTINGS: CarouselSettings = {
   visibleCountMobile: 4,
 };
 
+const HARD_FALLBACK_REVEAL_MS = 4500;
+
 // Matches the carousel's mobile breakpoint in the <style> below.
 const MOBILE_QUERY = '(max-width: 640px)';
 
@@ -78,18 +80,29 @@ export default function HomeHero({ locale, fallbackItems }: Props) {
 
   useEffect(() => {
     let cancelled = false;
+    let dataSettledMarked = false;
+    const markDataSettled = () => {
+      if (cancelled || dataSettledMarked) return;
+      dataSettledMarked = true;
+      setCarouselDataSettled(true);
+    };
+    const fallbackTimer = window.setTimeout(markDataSettled, HARD_FALLBACK_REVEAL_MS);
+
     Promise.allSettled([fetchSelectedItems(), fetchSettings()]).then(
       ([itemsResult, settingsResult]) => {
         if (cancelled) return;
+        window.clearTimeout(fallbackTimer);
+        if (dataSettledMarked) return;
         if (itemsResult.status === 'fulfilled') setSelectedItems(itemsResult.value);
         // Only the price flag comes from settings now; each photo carries its
         // own background (white or black group).
         if (settingsResult.status === 'fulfilled') setSettings(settingsResult.value);
-        setCarouselDataSettled(true);
+        markDataSettled();
       },
     );
     return () => {
       cancelled = true;
+      window.clearTimeout(fallbackTimer);
     };
   }, []);
 
@@ -121,6 +134,17 @@ export default function HomeHero({ locale, fallbackItems }: Props) {
     if (!carouselDataSettled) return;
 
     let cancelled = false;
+    let readyMarked = false;
+
+    const markHeroReady = () => {
+      if (cancelled || readyMarked) return;
+      readyMarked = true;
+      window.requestAnimationFrame(() => {
+        if (!cancelled) setHeroReady(true);
+      });
+    };
+
+    const fallbackTimer = window.setTimeout(markHeroReady, 1800);
 
     const visibleImages = localizedItems
       .slice(0, Math.max(1, visibleCount))
@@ -139,14 +163,13 @@ export default function HomeHero({ locale, fallbackItems }: Props) {
     const fontsReady = 'fonts' in document ? document.fonts.ready.catch(() => undefined) : Promise.resolve();
 
     Promise.allSettled([...imagePromises, fontsReady]).then(() => {
-      if (cancelled) return;
-      window.requestAnimationFrame(() => {
-        if (!cancelled) setHeroReady(true);
-      });
+      window.clearTimeout(fallbackTimer);
+      markHeroReady();
     });
 
     return () => {
       cancelled = true;
+      window.clearTimeout(fallbackTimer);
     };
   }, [carouselDataSettled, localizedItems, visibleCount]);
 

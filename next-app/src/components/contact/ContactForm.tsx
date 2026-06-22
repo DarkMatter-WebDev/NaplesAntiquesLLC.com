@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
+import { FormGrid, PageContainer, Section } from '@/components/layout/ResponsiveLayout';
 
 interface Props {
   locale: string;
@@ -34,13 +35,13 @@ export default function ContactForm({ locale, submitted }: Props) {
   }
 
   return (
-    <section
+    <Section
       id="submit-item"
-      className="scroll-mt-28 py-16 md:py-24 border-b"
+      className="scroll-mt-28 border-b"
       style={{ background: 'var(--color-background)', borderColor: 'var(--color-outline-variant)' }}
       aria-labelledby="submit-item-heading"
     >
-      <div className="container mx-auto px-6 md:px-8 max-w-6xl">
+      <PageContainer max="content">
         <div className="grid lg:grid-cols-12 gap-12 lg:gap-16 items-start">
 
           {/* Form column */}
@@ -53,7 +54,7 @@ export default function ContactForm({ locale, submitted }: Props) {
             </span>
             <h2
               id="submit-item-heading"
-              className="text-3xl md:text-4xl font-bold mt-4 mb-8 tracking-tight"
+              className="responsive-title-md font-bold mt-4 mb-8 tracking-tight"
               style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
             >
               {isEs ? 'Envíe Su Artículo' : 'Submit Your Item'}
@@ -226,7 +227,7 @@ export default function ContactForm({ locale, submitted }: Props) {
                           {isEs ? 'Opcional: añade hasta cuatro imágenes más.' : 'Optional: add up to four more images before sending.'}
                         </p>
                       </div>
-                      <div className="grid sm:grid-cols-2 gap-3">
+                    <FormGrid>
                         {[2, 3, 4, 5].map((slot, i) => (
                           <label
                             key={slot}
@@ -255,7 +256,7 @@ export default function ContactForm({ locale, submitted }: Props) {
                               : (isEs ? `Añadir foto ${slot}` : `Add photo ${slot}`)}
                           </label>
                         ))}
-                      </div>
+                    </FormGrid>
                     </div>
 
                     {/* Description */}
@@ -281,7 +282,7 @@ export default function ContactForm({ locale, submitted }: Props) {
                     </div>
 
                     {/* Name + Phone */}
-                    <div className="grid sm:grid-cols-2 gap-4">
+                    <FormGrid>
                       <div className="grid gap-1">
                         <label htmlFor="contact-name" className="form-label">
                           {isEs ? 'Su nombre' : 'Your name'} *
@@ -308,10 +309,10 @@ export default function ContactForm({ locale, submitted }: Props) {
                           className="form-field"
                         />
                       </div>
-                    </div>
+                    </FormGrid>
 
                     {/* Email + Location */}
-                    <div className="grid sm:grid-cols-2 gap-4">
+                    <FormGrid>
                       <div className="grid gap-1">
                         <label htmlFor="contact-email" className="form-label">
                           {isEs ? 'Correo electrónico' : 'Email'}
@@ -337,12 +338,12 @@ export default function ContactForm({ locale, submitted }: Props) {
                           className="form-field"
                         />
                       </div>
-                    </div>
+                    </FormGrid>
 
                     {/* Actions */}
                     <FormPrivacyNotice locale={locale} />
 
-                    <div className="flex flex-wrap gap-3 items-center pt-1">
+                    <div className="responsive-actions pt-1">
                       <button type="submit" className="gold-button">
                         {isEs ? 'Enviar artículo' : 'Send item'}
                       </button>
@@ -446,7 +447,7 @@ export default function ContactForm({ locale, submitted }: Props) {
           </aside>
 
         </div>
-      </div>
-    </section>
+      </PageContainer>
+    </Section>
   );
 }

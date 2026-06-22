@@ -19,7 +19,9 @@ function getShopGridColumnCount() {
   if (width >= 1960) return 6;
   if (width >= 1720) return 5;
   if (width >= 1280) return 4;
-  return 3;
+  if (width >= 768) return 3;
+  if (width >= 360) return 2;
+  return 1;
 }
 
 export default function ShopProductGrid({ products, spotData, locale, variant = 'classic' }: Props) {
@@ -36,7 +38,7 @@ export default function ShopProductGrid({ products, spotData, locale, variant = 
   }, []);
 
   return (
-    <div className="shop-product-grid grid grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-5">
+    <div className="shop-product-grid grid gap-2 sm:gap-5">
       {products.map((product, index) => (
         <ProductCard
           key={product.id}

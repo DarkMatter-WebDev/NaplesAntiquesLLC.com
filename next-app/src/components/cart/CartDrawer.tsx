@@ -56,11 +56,12 @@ export default function CartDrawer({ locale }: { locale: string }) {
       )}
 
       <div
-        className="fixed right-0 top-0 bottom-0 z-50 flex w-full max-w-md flex-col shadow-2xl transition-transform duration-300"
+        className="fixed right-0 top-0 bottom-0 z-50 flex w-full max-w-[min(28rem,100vw)] flex-col shadow-2xl transition-transform duration-300"
         style={{
           background: 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,253,248,0.98) 100%)',
           borderLeft: `1px solid ${BORDER}`,
           transform: drawerOpen ? 'translateX(0)' : 'translateX(100%)',
+          maxHeight: '100svh',
         }}
         role="dialog"
         aria-label={isEs ? 'Carrito' : 'Cart'}
@@ -151,7 +152,7 @@ function CartView({
   const total = subtotal + tax;
 
   return (
-    <div className="flex flex-col h-full">
+      <div className="flex min-h-0 flex-col h-full">
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
         {items.map((item) => (
           <CartItemRow key={item.id} item={item} isEs={isEs} prefix={prefix} onRemove={() => onRemove(item.id)} />
@@ -218,8 +219,8 @@ function CartItemRow({ item, isEs, prefix, onRemove }: { item: CartItem; isEs: b
   const image = normalizeLegacyLocalImageUrl(item.image);
   const itemDate = formatProductItemYear(item.item_year);
   return (
-    <div className="flex gap-3 items-start border p-3" style={{ borderColor: BORDER, background: 'rgba(255, 255, 255, 0.74)' }}>
-      <Link href={`${prefix}/shop/${item.id}`} className="relative flex-shrink-0 w-20 h-20 overflow-hidden" style={{ background: imageFrameBackground }}>
+      <div className="flex gap-3 items-start border p-3" style={{ borderColor: BORDER, background: 'rgba(255, 255, 255, 0.74)' }}>
+      <Link href={`${prefix}/shop/${item.id}`} className="relative flex-shrink-0 w-16 h-16 min-[380px]:h-20 min-[380px]:w-20 overflow-hidden" style={{ background: imageFrameBackground }}>
         {image
           ? <Image src={image} alt={title} fill sizes="80px" className="object-contain" unoptimized={image.startsWith('/assets/')} />
           : <div className="w-full h-full flex items-center justify-center text-xl opacity-30">Photo</div>}

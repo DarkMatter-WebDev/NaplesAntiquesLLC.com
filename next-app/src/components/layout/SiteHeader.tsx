@@ -126,6 +126,9 @@ const HEADER_STYLES = `
       radial-gradient(circle at 92% 0%, rgba(220, 188, 96, 0.12), transparent 16rem),
       rgba(252, 251, 247, 0.98);
     overflow: hidden;
+    max-height: calc(100svh - 3.5rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
   .mobile-row {
     border-bottom: 1px solid rgba(115, 92, 0, 0.10);
@@ -238,7 +241,7 @@ export default function SiteHeader() {
         boxShadow: '0 6px 24px rgba(42,34,12,0.05)',
       }}
     >
-      <div className="flex w-full items-center justify-between gap-3 px-3 py-3 md:px-5 md:py-5 2xl:px-8">
+      <div className="flex w-full items-center justify-between gap-3 px-[clamp(0.75rem,2vw,2rem)] py-3 md:py-4">
 
         {/* Brand */}
         <Link href={href('/')} className="flex items-center gap-2 min-w-0 shrink">
@@ -253,7 +256,7 @@ export default function SiteHeader() {
           />
           {/* Full name on md+; abbreviated on mobile */}
           <span
-            className="hidden sm:block md:text-[22px] text-[13px] tracking-normal uppercase whitespace-nowrap"
+            className="hidden sm:block text-[clamp(0.82rem,1.55vw,1.38rem)] tracking-normal uppercase whitespace-nowrap"
             style={{ fontFamily: 'var(--font-headline)', color: GOLD }}
           >
             Naples Estate Jewelry.Co
@@ -267,7 +270,7 @@ export default function SiteHeader() {
         </Link>
 
         {/* Desktop nav — 2xl and up */}
-        <nav className="hidden 2xl:flex items-center gap-5" style={{ fontFamily: 'var(--font-label)' }}>
+        <nav className="hidden xl:flex items-center justify-center gap-[clamp(0.8rem,1.3vw,1.35rem)]" style={{ fontFamily: 'var(--font-label)' }}>
             <Link href={href('/')} className={navLinkBase} data-active={isActive('/') ? 'true' : 'false'} style={{ color: SECONDARY }}>{t('home')}</Link>
             <div className="group relative flex items-center">
               <Link href={href('/shop')} className={navLinkBase} data-active={isActive('/shop') || isAnyActive(SHOP_ITEMS) ? 'true' : 'false'} style={{ color: SECONDARY }}>
@@ -310,7 +313,7 @@ export default function SiteHeader() {
           <button
             type="button"
             onClick={openWishlist}
-            className="relative hidden 2xl:flex items-center justify-center w-8 h-8 transition-colors"
+            className="relative hidden xl:flex items-center justify-center w-8 h-8 transition-colors"
             style={{ color: wishlistCount > 0 ? GOLD : '#5e5e5d' }}
             aria-label="Saved items"
           >
@@ -370,7 +373,7 @@ export default function SiteHeader() {
                   position: 'absolute',
                   top: 'calc(100% + 10px)',
                   right: 0,
-                  width: '220px',
+                  width: 'min(220px, calc(100vw - 1.5rem))',
                   background: 'white',
                   border: '1px solid rgba(115,92,0,0.15)',
                   borderRadius: '8px',
@@ -430,7 +433,7 @@ export default function SiteHeader() {
 
           {/* Call Now — hidden on mobile; inline-flex at 2xl. Wrapped in span so the
               span controls visibility and .nav-cta's display doesn't override `hidden`. */}
-          <span className="hidden 2xl:inline-flex">
+          <span className="hidden xl:inline-flex">
             <a href="tel:2394048505" className="nav-cta">{t('callNow')}</a>
           </span>
 
@@ -440,7 +443,7 @@ export default function SiteHeader() {
             onClick={() => {
               if (menuOpen) { closeAll(); } else { setMenuOpen(true); }
             }}
-            className="menu-toggle 2xl:hidden px-2.5 py-1.5 md:px-3 md:py-2 text-[10px] md:text-xs font-bold tracking-widest uppercase"
+            className="menu-toggle xl:hidden px-2.5 py-1.5 md:px-3 md:py-2 text-[10px] md:text-xs font-bold tracking-widest uppercase"
             data-open={menuOpen ? 'true' : 'false'}
             aria-expanded={menuOpen}
             aria-label={menuOpen ? t('close') : t('menu')}
@@ -452,7 +455,7 @@ export default function SiteHeader() {
 
       {/* Mobile menu */}
       {menuOpen && (
-        <div className="mobile-menu-panel 2xl:hidden">
+        <div className="mobile-menu-panel xl:hidden">
           <div className="flex flex-col px-4 py-3" style={{ fontFamily: 'var(--font-label)' }}>
 
             <MobileLink href={href('/')} onClick={closeAll} style={{ color: GOLD }}>{t('home')}</MobileLink>
