@@ -272,7 +272,7 @@ export default function ProductCard({
         )}
 
         {activeImage ? (
-          <Link href={href} className="absolute inset-0">
+          <Link href={href} prefetch={false} className="absolute inset-0">
             {images.map((image, index) => (
               <Image
                 key={`${product.id}-${index}-${image}`}
@@ -284,7 +284,11 @@ export default function ProductCard({
                 className={`pointer-events-none object-contain object-center transition-opacity duration-700 ease-in-out ${
                   index === safeActiveImageIndex ? 'opacity-100' : 'opacity-0'
                 }`}
-                loading={prioritizeImage && index === 0 ? 'eager' : 'lazy'}
+                // The first cover image of an above-the-fold card is the LCP
+                // candidate: `priority` emits a preload link + fetchpriority=high.
+                // Later (hover-carousel) images stay lazy so they don't compete.
+                priority={prioritizeImage && index === 0}
+                loading={prioritizeImage && index === 0 ? undefined : 'lazy'}
                 onLoad={() => {
                   if (index === 0) setLoadedCoverKey(coverKey);
                 }}
@@ -371,7 +375,7 @@ export default function ProductCard({
           {metalLabel}
         </span>
 
-        <Link href={href} className="group/title">
+        <Link href={href} prefetch={false} className="group/title">
           <h3
             className="font-bold text-[0.98rem] leading-snug mt-0.5 line-clamp-3 group-hover/title:underline underline-offset-2"
             style={{

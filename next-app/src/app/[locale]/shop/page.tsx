@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { unstable_cache } from 'next/cache';
 import { createPublicClient } from '@/lib/supabase/public';
 import {
   PRODUCT_METAL_VARIANTS,
@@ -272,6 +273,81 @@ function isMissingItemYearColumnError(error: { message?: string | null } | null 
   return Boolean(error?.message?.toLowerCase().includes('item_year'));
 }
 
+// The catalog read is the single most expensive part of a cold /shop render: a
+// column-narrowed scan of every public product, plus the total-inventory count.
+// Wrapping it in unstable_cache means concurrent cold visitors (the common case
+// for an external link) share ONE DB round trip per 300s window instead of each
+// triggering a fresh full-table scan. Keyed by the DB-level filter set so every
+// distinct filtered view still gets a correct, independently-cached result.
+type ShopCatalogFilterKey = {
+  status: string | null;
+  purity: string | null;
+  metalColor: string | null;
+  metal: string | null;
+  brand: string | null;
+};
+
+async function queryShopCatalog(filterKey: ShopCatalogFilterKey) {
+  const supabase = createPublicClient();
+  const buildProductQuery = (columns: string) => {
+    let query = supabase
+      .from('products')
+      .select(columns)
+      .in('status', [...PUBLIC_SHOP_PRODUCT_STATUSES])
+      .order('sort_order', { ascending: true });
+    if (filterKey.status) {
+      query = query.eq('status', normalizeProductStatus(filterKey.status as ProductStatus));
+    }
+    if (filterKey.purity) {
+      query = query.eq('purity', parseInt(filterKey.purity, 10));
+    }
+    if (filterKey.metalColor) {
+      query = query.eq('metal_variant', filterKey.metalColor);
+    } else if (filterKey.metal === 'gold') {
+      query = query.eq('category', 'Gold');
+    } else if (filterKey.metal === 'silver') {
+      query = query.or('category.eq.Silver,metal_variant.eq.bicolor_gold');
+    }
+    if (filterKey.brand) {
+      query = query.eq('brand', filterKey.brand);
+    }
+    return query;
+  };
+
+  // Products + total-inventory count run concurrently.
+  const [productResult, totalInventoryResult] = await Promise.all([
+    buildProductQuery(SHOP_PRODUCT_COLUMNS),
+    supabase
+      .from('products')
+      .select('id', { count: 'exact', head: true })
+      .in('status', [...PUBLIC_SHOP_PRODUCT_STATUSES]),
+  ]);
+
+  let products = productResult.data as unknown[] | null;
+  let errorMessage = productResult.error?.message ?? null;
+  if (isMissingItemYearColumnError(productResult.error)) {
+    const fallback = await buildProductQuery(SHOP_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR);
+    products = (fallback.data as unknown[] | null)?.map(
+      (product) => ({ ...(product as Record<string, unknown>), item_year: null }),
+    ) ?? null;
+    errorMessage = fallback.error?.message ?? null;
+  }
+
+  return {
+    products: (products ?? []) as unknown[],
+    errorMessage,
+    totalInventoryCount: totalInventoryResult.count ?? null,
+  };
+}
+
+function loadShopCatalog(filterKey: ShopCatalogFilterKey) {
+  return unstable_cache(
+    () => queryShopCatalog(filterKey),
+    ['shop-catalog', JSON.stringify(filterKey)],
+    { revalidate: 300, tags: ['shop-catalog'] },
+  )();
+}
+
 function parsePerPage(value: string | undefined): number {
   const parsed = Number(value);
   return PER_PAGE_OPTIONS.includes(parsed) ? parsed : DEFAULT_PER_PAGE;
@@ -307,73 +383,29 @@ export async function renderShopPage({
     : rawFilters;
   const selectedMetalColor = getEffectiveMetalColor(filters.metal, filters.metalColor ?? filters.metalType);
 
-  const supabase = createPublicClient();
-  const buildProductQuery = (columns: string) => supabase
-    .from('products')
-    .select(columns)
-    .in('status', [...PUBLIC_SHOP_PRODUCT_STATUSES])
-    .order('sort_order', { ascending: true });
+  // The DB-level filter set that defines this catalog read. The cached loader is
+  // keyed by exactly these values, so a bare /shop and each filtered view get
+  // their own shared-across-visitors cache entry. The spot-price fetch (its own
+  // 300s fetch cache) runs concurrently and is intentionally NOT part of the key.
+  const catalogFilterKey: ShopCatalogFilterKey = {
+    status: filters.status ?? null,
+    purity: filters.purity ?? null,
+    metalColor: selectedMetalColor || null,
+    metal: filters.metal ?? null,
+    brand: filters.brand ?? null,
+  };
 
-  let productQuery = buildProductQuery(SHOP_PRODUCT_COLUMNS);
-
-  if (filters.status) {
-    productQuery = productQuery.eq('status', normalizeProductStatus(filters.status as ProductStatus));
-  }
-  if (filters.purity) {
-    productQuery = productQuery.eq('purity', parseInt(filters.purity, 10));
-  }
-  if (selectedMetalColor) {
-    productQuery = productQuery.eq('metal_variant', selectedMetalColor);
-  } else if (filters.metal === 'gold') {
-    productQuery = productQuery.eq('category', 'Gold');
-  } else if (filters.metal === 'silver') {
-    productQuery = productQuery.or('category.eq.Silver,metal_variant.eq.bicolor_gold');
-  }
-  if (filters.brand) {
-    productQuery = productQuery.eq('brand', filters.brand);
-  }
-
-  const spotDataPromise = fetchSpotData();
-  const totalInventoryPromise = supabase
-    .from('products')
-    .select('id', { count: 'exact', head: true })
-    .in('status', [...PUBLIC_SHOP_PRODUCT_STATUSES]);
-
-  const [productResult, spotData, totalInventoryResult] = await Promise.all([
-    productQuery,
-    spotDataPromise,
-    totalInventoryPromise,
+  const [catalog, spotData] = await Promise.all([
+    loadShopCatalog(catalogFilterKey),
+    fetchSpotData(),
   ]);
-  let products: unknown[] | null = productResult.data as unknown[] | null;
-  let error = productResult.error;
-  if (isMissingItemYearColumnError(error)) {
-    let fallbackQuery = buildProductQuery(SHOP_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR);
-    if (filters.status) {
-      fallbackQuery = fallbackQuery.eq('status', normalizeProductStatus(filters.status as ProductStatus));
-    }
-    if (filters.purity) {
-      fallbackQuery = fallbackQuery.eq('purity', parseInt(filters.purity, 10));
-    }
-    if (selectedMetalColor) {
-      fallbackQuery = fallbackQuery.eq('metal_variant', selectedMetalColor);
-    } else if (filters.metal === 'gold') {
-      fallbackQuery = fallbackQuery.eq('category', 'Gold');
-    } else if (filters.metal === 'silver') {
-      fallbackQuery = fallbackQuery.or('category.eq.Silver,metal_variant.eq.bicolor_gold');
-    }
-    if (filters.brand) {
-      fallbackQuery = fallbackQuery.eq('brand', filters.brand);
-    }
-    const fallback = await fallbackQuery;
-    products = (fallback.data as unknown[] | null)?.map((product) => ({ ...(product as Record<string, unknown>), item_year: null })) ?? null;
-    error = fallback.error;
-  }
 
+  const error = catalog.errorMessage;
   // Total public inventory, independent of the active filters/metal scope — the
   // "Showing X of Y pieces" denominator reflects the whole shop, not the
-  // currently filtered collection. Runs concurrently with the spot-price fetch.
-  const totalInventoryCount = totalInventoryResult.count ?? null;
-  const allProducts: Product[] = (products ?? []) as unknown as Product[];
+  // currently filtered collection.
+  const totalInventoryCount = catalog.totalInventoryCount;
+  const allProducts: Product[] = catalog.products as unknown as Product[];
   const publicGalleryProducts = allProducts.filter(isVisibleInPublicGallery);
   const collectionProducts = publicGalleryProducts;
   const itemTypeOptions = getShopItemTypeOptions(collectionProducts);

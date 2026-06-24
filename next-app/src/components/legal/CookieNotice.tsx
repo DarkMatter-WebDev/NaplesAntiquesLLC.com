@@ -26,7 +26,7 @@ export default function CookieNotice({ locale }: { locale: string }) {
 
   return (
     <div
-      className="fixed bottom-3 left-3 right-3 z-[70] mx-auto max-w-4xl rounded-2xl border p-4 shadow-[0_18px_64px_rgba(38,28,6,0.18)] backdrop-blur md:bottom-5 md:flex md:items-center md:justify-between md:gap-5 md:p-5"
+      className="fixed bottom-3 left-3 right-3 z-[70] mx-auto max-w-4xl rounded-2xl border p-3.5 shadow-[0_18px_64px_rgba(38,28,6,0.18)] backdrop-blur md:bottom-5 md:flex md:items-center md:justify-between md:gap-5 md:p-5"
       style={{
         background: 'rgba(255,255,255,0.94)',
         borderColor: 'rgba(115, 92, 0, 0.16)',
@@ -35,8 +35,8 @@ export default function CookieNotice({ locale }: { locale: string }) {
       role="region"
       aria-label={isEs ? 'Aviso de cookies' : 'Cookie notice'}
     >
-      <div className="text-sm leading-relaxed">
-        <p className="font-bold" style={{ fontFamily: 'var(--font-label)', color: 'var(--color-primary)' }}>
+      <div className="min-w-0 text-xs leading-snug md:text-sm md:leading-relaxed">
+        <p className="text-[0.78rem] font-bold md:text-sm" style={{ fontFamily: 'var(--font-label)', color: 'var(--color-primary)' }}>
           {isEs ? 'Cookies y almacenamiento esencial' : 'Essential Cookies and Storage'}
         </p>
         <p style={{ color: 'var(--color-on-surface-variant)' }}>
@@ -45,14 +45,14 @@ export default function CookieNotice({ locale }: { locale: string }) {
             : 'We use essential cookies and browser storage for sign-in, cart, favorites, language routing, and security.'}
         </p>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2 md:mt-0 md:flex-nowrap">
-        <Link href={`${prefix}/privacy`} className="outline-button px-4 py-2 text-[0.68rem]">
+      <div className="mt-3 grid grid-cols-2 gap-2 md:mt-0 md:flex md:flex-shrink-0 md:flex-nowrap md:items-center">
+        <Link href={`${prefix}/privacy`} className="outline-button justify-center px-3 py-1.5 text-[0.62rem] md:px-4 md:py-2 md:text-[0.68rem]">
           {isEs ? 'Privacidad' : 'Privacy'}
         </Link>
-        <Link href={`${prefix}/cookie-preferences`} className="outline-button px-4 py-2 text-[0.68rem]">
+        <Link href={`${prefix}/cookie-preferences`} className="outline-button justify-center px-3 py-1.5 text-[0.62rem] md:px-4 md:py-2 md:text-[0.68rem]">
           {isEs ? 'Preferencias' : 'Preferences'}
         </Link>
-        <button type="button" onClick={accept} className="gold-button px-4 py-2 text-[0.68rem]">
+        <button type="button" onClick={accept} className="gold-button col-span-2 justify-center px-3 py-1.5 text-[0.62rem] md:px-4 md:py-2 md:text-[0.68rem]">
           {isEs ? 'Aceptar' : 'Accept'}
         </button>
       </div>

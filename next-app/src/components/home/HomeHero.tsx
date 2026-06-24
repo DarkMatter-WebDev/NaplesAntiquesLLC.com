@@ -420,12 +420,13 @@ export default function HomeHero({ locale, fallbackItems }: Props) {
 
         @media (max-width: 640px) {
           .home-carousel-hero .home-carousel-theme > div:first-child {
-            --cardW: clamp(13em, 60vw, 18em) !important;
+            --cardW: clamp(12em, 56vw, 17em) !important;
             --perspective: 30em !important;
-            /* Pulled up and zoomed in a touch (scale 1.12 -> 1.14) so the
-               focal item reads a little larger. */
-            transform: translateY(-6svh) scale(1.14);
-            transform-origin: center 55%;
+            /* Lifted higher (translateY -6svh -> -12svh) and trimmed a touch
+               (scale 1.14 -> 1.06) so the ring clears the "Get first look"
+               sign-up block on short viewports instead of sitting behind it. */
+            transform: translateY(-12svh) scale(1.06);
+            transform-origin: center 50%;
           }
 
           /* Headline near the top (nudged down a touch). */

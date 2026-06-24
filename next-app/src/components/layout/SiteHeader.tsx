@@ -244,15 +244,15 @@ export default function SiteHeader() {
       <div className="flex w-full items-center justify-between gap-3 px-[clamp(0.75rem,2vw,2rem)] py-3 md:py-4">
 
         {/* Brand */}
-        <Link href={href('/')} className="flex items-center gap-2 min-w-0 shrink">
+        <Link href={href('/')} className="flex items-center gap-2 min-w-0 shrink overflow-hidden">
           <Image
             src="/assets/images/branding/logo.webp"
             alt="Naples Estate Jewelry Logo"
             width={40}
             height={40}
+            sizes="40px"
             className="hidden md:block h-8 w-auto md:h-10 object-contain flex-shrink-0"
             priority
-            unoptimized
           />
           {/* Full name on md+; abbreviated on mobile */}
           <span
