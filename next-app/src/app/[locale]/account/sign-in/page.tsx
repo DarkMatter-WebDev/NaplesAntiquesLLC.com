@@ -1,13 +1,15 @@
 ﻿'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import { createClient } from '@/lib/supabase/client';
 
 export default function SignInPage() {
   const router = useRouter();
+  const params = useParams<{ locale?: string }>();
+  const prefix = params?.locale === 'es' ? '/es' : '';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -79,6 +81,15 @@ export default function SignInPage() {
                 className="form-field w-full"
                 placeholder="Enter your password"
               />
+              <div className="mt-2 text-right">
+                <Link
+                  href={`${prefix}/account/reset-password`}
+                  className="text-xs font-bold hover:underline underline-offset-2"
+                  style={{ color: 'var(--color-primary)' }}
+                >
+                  Forgot password?
+                </Link>
+              </div>
             </div>
 
             {error && (

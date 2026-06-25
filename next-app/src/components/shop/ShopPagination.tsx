@@ -76,7 +76,7 @@ export default function ShopPagination({
 
   return (
     <nav
-      aria-label={isEs ? 'Paginacion de productos' : 'Product pagination'}
+      aria-label={isEs ? 'Paginación de productos' : 'Product pagination'}
       className="shop-pagination"
     >
       <div className="shop-pagination-count">
@@ -124,11 +124,11 @@ export default function ShopPagination({
       <label
         className="shop-pagination-size"
       >
-        <span>{isEs ? 'Por pagina' : 'Per page'}</span>
+        <span>{isEs ? 'Por página' : 'Per page'}</span>
         <select
           value={perPage}
           onChange={(event) => updatePerPage(event.target.value)}
-          aria-label={isEs ? 'Productos por pagina' : 'Products per page'}
+          aria-label={isEs ? 'Productos por página' : 'Products per page'}
         >
           {PER_PAGE_OPTIONS.map((option) => (
             <option key={option} value={option}>{option}</option>

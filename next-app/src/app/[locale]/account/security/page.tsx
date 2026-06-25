@@ -65,7 +65,7 @@ export default async function AccountSecurityPage({ params }: Props) {
               </h1>
               <p className="mt-5 max-w-xl text-sm md:text-base leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
                 {isEs
-                  ? 'Administra el acceso a tu cuenta y cambia tu contrasena.'
+                  ? 'Administra el acceso a tu cuenta y cambia tu contraseña.'
                   : 'Manage account access and change your password.'}
               </p>
             </div>
@@ -78,17 +78,17 @@ export default async function AccountSecurityPage({ params }: Props) {
           <section className="account-dashboard-grid">
             <div className="account-card account-tab-card">
               <p className="account-tab-eyebrow">{isEs ? 'Seguridad' : 'Security'}</p>
-              <h2>{isEs ? 'Cambiar contrasena' : 'Change Password'}</h2>
+              <h2>{isEs ? 'Cambiar contraseña' : 'Change Password'}</h2>
               <p>
                 {isEs
-                  ? 'Actualiza la contrasena de tu cuenta. Usa una contrasena privada y dificil de adivinar.'
+                  ? 'Actualiza la contraseña de tu cuenta. Usa una contraseña privada y difícil de adivinar.'
                   : 'Update your account password. Use a private password that is difficult to guess.'}
               </p>
               <div className="account-security-card">
                 <span className="material-symbols-outlined" aria-hidden="true">lock_reset</span>
                 <div>
                   <strong>{isEs ? 'Acceso de cuenta' : 'Account access'}</strong>
-                  <p>{isEs ? 'Cambia tu contrasena cuando lo necesites.' : 'Change your password whenever you need to.'}</p>
+                  <p>{isEs ? 'Cambia tu contraseña cuando lo necesites.' : 'Change your password whenever you need to.'}</p>
                 </div>
               </div>
               <PasswordChangeForm locale={locale} />

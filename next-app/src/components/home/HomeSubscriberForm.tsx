@@ -37,7 +37,7 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
     }
 
     setStatus('success');
-    setMessage(isEs ? 'Gracias. Ya esta en la lista.' : "You're on the list.");
+    setMessage(isEs ? 'Gracias. Ya está en la lista.' : "You're on the list.");
   }
 
   // Inputs use a solid light fill with dark text so they're clearly legible
@@ -80,7 +80,7 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
           required
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          placeholder={isEs ? 'Correo electronico' : 'Email address'}
+          placeholder={isEs ? 'Correo electrónico' : 'Email address'}
           className="h-9 min-w-0 rounded-xl border px-3 text-xs outline-none placeholder:text-black/50 sm:h-11 sm:text-sm"
           style={inputStyle}
         />

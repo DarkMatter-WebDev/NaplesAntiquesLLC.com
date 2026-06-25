@@ -101,6 +101,7 @@ export interface Product {
   acquisition_source: string | null;
   internal_notes: string | null;
   public_notes: string | null;
+  public_notes_es: string | null;
   featured: boolean | null;
   sort_order: number;
   created_at: string;

@@ -18,7 +18,7 @@ export default async function TermsPage({ params }: Props) {
   return (
     <LegalPolicyPage
       locale={locale}
-      title={isEs ? 'Terminos de Servicio' : 'Terms of Service'}
+      title={isEs ? 'Términos de Servicio' : 'Terms of Service'}
       intro={[
         'These Terms of Service apply to naplesestatejewelry.co and related services provided by Naples Estate Jewelry & Antiques, operated by Naples Antiques LLC. By using the website, creating an account, submitting information, or placing an order, you agree to these terms.',
       ]}

@@ -130,14 +130,20 @@ function formatItemYear(value: string | number | null | undefined): string {
   return formatProductItemYear(value) ?? '-';
 }
 
-function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
-  return Boolean(error?.message?.toLowerCase().includes('item_year'));
+// Columns added by later migrations that may not exist yet on an un-migrated
+// database. If a save hits a missing one, we retry without all of them so the
+// admin can keep saving before the migration is applied.
+const OPTIONAL_PRODUCT_COLUMNS = ['item_year', 'public_notes_es'] as const;
+
+function isMissingOptionalColumnError(error: { message?: string | null } | null | undefined) {
+  const message = error?.message?.toLowerCase() ?? '';
+  return OPTIONAL_PRODUCT_COLUMNS.some((column) => message.includes(column));
 }
 
-function withoutItemYear<T extends { item_year?: unknown }>(payload: T): Omit<T, 'item_year'> {
-  const rest = { ...payload };
-  delete rest.item_year;
-  return rest;
+function withoutOptionalColumns<T extends Record<string, unknown>>(payload: T): T {
+  const rest: Record<string, unknown> = { ...payload };
+  for (const column of OPTIONAL_PRODUCT_COLUMNS) delete rest[column];
+  return rest as T;
 }
 
 function getLengthSizeLabel(jewelryType: string | null | undefined): string {
@@ -455,7 +461,7 @@ type QuickFillField =
   | 'description'
   | 'descriptionEs'
   | 'publicNotes'
-  | 'internalNotes';
+  | 'publicNotesEs';
 
 const QUICK_FILL_FORM_ORDER: QuickFillField[] = [
   'title',
@@ -478,7 +484,7 @@ const QUICK_FILL_FORM_ORDER: QuickFillField[] = [
   'description',
   'descriptionEs',
   'publicNotes',
-  'internalNotes',
+  'publicNotesEs',
 ];
 
 const AI_PRODUCT_FIELD_LABELS: Record<keyof ProductAutofillFields, string> = {
@@ -498,7 +504,7 @@ const AI_PRODUCT_FIELD_LABELS: Record<keyof ProductAutofillFields, string> = {
   asking_price: 'Asking Price',
   manual_price_label: 'Price Label',
   description: 'Description (EN)',
-  public_notes: 'Public Notes',
+  public_notes: 'Notes (EN)',
 };
 
 const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null; widthClass?: string; responsiveClass?: string }[] = [
@@ -581,6 +587,7 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
     acquisition_source: null,
     internal_notes: null,
     public_notes: null,
+    public_notes_es: null,
     featured: false,
     sort_order: 0,
   };
@@ -721,8 +728,8 @@ function normalizeQuickFillFieldName(value: string): QuickFillField | null {
   if (normalized === 'multiplier' || normalized === 'pricing multiplier') return 'multiplier';
   if (['description', 'description english', 'description en', 'description (en)', 'description (english)', 'english description'].includes(normalized)) return 'description';
   if (['description spanish', 'description es', 'description (es)', 'description (spanish)', 'spanish description'].includes(normalized)) return 'descriptionEs';
-  if (normalized === 'public notes' || normalized === 'public note') return 'publicNotes';
-  if (normalized === 'internal notes' || normalized === 'internal note' || normalized === 'private notes' || normalized === 'private note') return 'internalNotes';
+  if (normalized === 'public notes' || normalized === 'public note' || normalized === 'notes en' || normalized === 'notes english' || normalized === 'notes (en)' || normalized === 'english notes') return 'publicNotes';
+  if (normalized === 'notes es' || normalized === 'notes spanish' || normalized === 'spanish notes' || normalized === 'notes (es)' || normalized === 'public notes es' || normalized === 'public notes spanish') return 'publicNotesEs';
   return null;
 }
 
@@ -1151,8 +1158,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       if (field === 'brand') { updates.brand = null; applied.push('Brand'); return true; }
       if (field === 'description') { updates.description = ''; applied.push('Description (EN)'); return true; }
       if (field === 'descriptionEs') { updates.description_es = ''; applied.push('Description (ES)'); return true; }
-      if (field === 'publicNotes') { updates.public_notes = ''; applied.push('Public Notes'); return true; }
-      if (field === 'internalNotes') { updates.internal_notes = ''; applied.push('Internal Notes'); return true; }
+      if (field === 'publicNotes') { updates.public_notes = ''; applied.push('Notes (EN)'); return true; }
+      if (field === 'publicNotesEs') { updates.public_notes_es = ''; applied.push('Notes (ES)'); return true; }
       if (field === 'productType') {
         newJewelryType = 'Other';
         updates.product_type = 'Other';
@@ -1234,12 +1241,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       }
       if (field === 'publicNotes') {
         updates.public_notes = value;
-        applied.push('Public Notes');
+        applied.push('Notes (EN)');
         return true;
       }
-      if (field === 'internalNotes') {
-        updates.internal_notes = value;
-        applied.push('Internal Notes');
+      if (field === 'publicNotesEs') {
+        updates.public_notes_es = value;
+        applied.push('Notes (ES)');
         return true;
       }
       if (field === 'itemYear') {
@@ -1733,7 +1740,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setField('title', 'Title (English)', (value) => { nextEditing.title = value; });
     setField('brand', 'Brand', (value) => { nextEditing.brand = value; });
     setField('description', 'Description (EN)', (value) => { nextEditing.description = value; });
-    setField('public_notes', 'Public Notes', (value) => { nextEditing.public_notes = value; });
+    setField('public_notes', 'Notes (EN)', (value) => { nextEditing.public_notes = value; });
     setField('gender', 'Gender', (value) => { nextEditing.gender = value; });
     setField('price_mode', 'Price Mode', (value) => { nextEditing.price_mode = value; });
     setField('purity', 'Purity', (value) => { nextEditing.purity = value; });
@@ -2246,9 +2253,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     // missing Spanish title/description by translating the English at save time.
     let nextTitleEs = editing.title_es ?? null;
     let nextDescriptionEs = editing.description_es ?? null;
+    let nextPublicNotesEs = editing.public_notes_es ?? null;
     const needTitleEs = !!editing.title?.trim() && !editing.title_es?.trim();
     const needDescriptionEs = !!editing.description?.trim() && !editing.description_es?.trim();
-    if (needTitleEs || needDescriptionEs) {
+    const needNotesEs = !!editing.public_notes?.trim() && !editing.public_notes_es?.trim();
+    if (needTitleEs || needDescriptionEs || needNotesEs) {
       try {
         const res = await fetch('/api/admin/translate', {
           method: 'POST',
@@ -2256,12 +2265,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
           body: JSON.stringify({
             title: needTitleEs ? editing.title : '',
             description: needDescriptionEs ? editing.description : '',
+            notes: needNotesEs ? editing.public_notes : '',
           }),
         });
         const data = await res.json().catch(() => null);
         if (res.ok && data) {
           if (needTitleEs && data.title_es) nextTitleEs = data.title_es;
           if (needDescriptionEs && data.description_es) nextDescriptionEs = data.description_es;
+          if (needNotesEs && data.notes_es) nextPublicNotesEs = data.notes_es;
         }
       } catch {
         // Non-blocking: if translation fails, the save proceeds with existing ES values.
@@ -2313,6 +2324,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       details_es: [],
       title_es: nextTitleEs,
       description_es: nextDescriptionEs,
+      public_notes_es: nextPublicNotesEs,
       internal_notes: foldExtraDetailsIntoInternalNotes(editing),
     };
     const originalProductId = originalRef.current?.id ?? payload.id;
@@ -2327,8 +2339,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
     if (isNew) {
       let { data, error } = await supabase.from('products').insert(payload).select().single();
-      if (isMissingItemYearColumnError(error)) {
-        const retry = await supabase.from('products').insert(withoutItemYear(payload)).select().single();
+      if (isMissingOptionalColumnError(error)) {
+        const retry = await supabase.from('products').insert(withoutOptionalColumns(payload)).select().single();
         data = retry.data;
         error = retry.error;
       }
@@ -2347,8 +2359,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       // Don't use .select().single() on update — RLS may allow UPDATE but not SELECT,
       // causing PGRST116 and blocking the modal from closing.
       let { error } = await supabase.from('products').update(payload).eq('id', originalProductId);
-      if (isMissingItemYearColumnError(error)) {
-        const retry = await supabase.from('products').update(withoutItemYear(payload)).eq('id', originalProductId);
+      if (isMissingOptionalColumnError(error)) {
+        const retry = await supabase.from('products').update(withoutOptionalColumns(payload)).eq('id', originalProductId);
         error = retry.error;
       }
       if (error) { flash(error.message, false); setSaving(false); return; }
@@ -3642,7 +3654,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   <strong>Price Mode</strong> (Spot / Manual) ·&nbsp;
                   <strong>Purity</strong> (18k / 14k / 10k / 925) ·&nbsp;
                   <strong>Weight</strong> (25.3g) ·&nbsp;
-                  <strong>Multiplier</strong> (1.25x). Field labels can also target Title English, Title Spanish, Location, Asking Price, Description English, Description Spanish, Public Notes, and Internal Notes.
+                  <strong>Multiplier</strong> (1.25x). Field labels can also target Title English, Title Spanish, Location, Asking Price, Description English, Description Spanish, Notes (EN), and Notes (ES).
                 </p>
               </div>
               )}
@@ -4241,7 +4253,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label className="form-label">Public Notes</label>
+                  <label className="form-label">Notes (EN)</label>
                   <ClearableField onClear={() => setEditing({ ...editing, public_notes: '' })} show={!!editing.public_notes} multiline>
                   <textarea rows={3} className="form-field w-full resize-y"
                     value={editing.public_notes ?? ''}
@@ -4249,11 +4261,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   </ClearableField>
                 </div>
                 <div>
-                  <label className="form-label">Internal Notes</label>
-                  <ClearableField onClear={() => setEditing({ ...editing, internal_notes: '' })} show={!!editing.internal_notes} multiline>
+                  <label className="form-label">Notes (ES)</label>
+                  <ClearableField onClear={() => setEditing({ ...editing, public_notes_es: '' })} show={!!editing.public_notes_es} multiline>
                   <textarea rows={3} className="form-field w-full resize-y"
-                    value={editing.internal_notes ?? ''}
-                    onChange={(e) => setEditing({ ...editing, internal_notes: e.target.value })} />
+                    value={editing.public_notes_es ?? ''}
+                    onChange={(e) => setEditing({ ...editing, public_notes_es: e.target.value })} />
                   </ClearableField>
                 </div>
               </div>

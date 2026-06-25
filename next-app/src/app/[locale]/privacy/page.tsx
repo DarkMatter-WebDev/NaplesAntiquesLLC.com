@@ -18,7 +18,7 @@ export default async function PrivacyPage({ params }: Props) {
   return (
     <LegalPolicyPage
       locale={locale}
-      title={isEs ? 'Politica de Privacidad' : 'Privacy Policy'}
+      title={isEs ? 'Política de Privacidad' : 'Privacy Policy'}
       intro={[
         isEs
           ? 'Naples Estate Jewelry & Antiques, operated by Naples Antiques LLC, respects your privacy. This policy explains how we collect and use information when you visit our website, create an account, submit an item, make an inquiry, subscribe for updates, or place an online order.'
@@ -29,7 +29,7 @@ export default async function PrivacyPage({ params }: Props) {
       ]}
       sections={[
         {
-          title: isEs ? 'Informacion que recopilamos' : 'Information We Collect',
+          title: isEs ? 'Información que recopilamos' : 'Information We Collect',
           bullets: [
             'Contact information, including name, email address, phone number, and mailing or shipping address when you provide it.',
             'Account information, including login email, profile details, saved favorites, saved cart data, marketing preference, and policy acceptance records.',
@@ -40,7 +40,7 @@ export default async function PrivacyPage({ params }: Props) {
           ],
         },
         {
-          title: isEs ? 'Como usamos la informacion' : 'How We Use Information',
+          title: isEs ? 'Cómo usamos la información' : 'How We Use Information',
           bullets: [
             'Create and manage customer accounts, profiles, carts, favorites, and account security.',
             'Respond to calls, texts, item submissions, product inquiries, contact requests, and customer-support messages.',
@@ -52,7 +52,7 @@ export default async function PrivacyPage({ params }: Props) {
           ],
         },
         {
-          title: isEs ? 'Cookies, local storage y analitica' : 'Cookies, Local Storage, and Analytics',
+          title: isEs ? 'Cookies, local storage y analítica' : 'Cookies, Local Storage, and Analytics',
           body: [
             'The site uses essential cookies and browser storage for authentication, language routing, cart behavior, favorites, cookie notice preferences, and basic security. We also use normal hosting logs. During this audit, no Google Analytics, Google Tag Manager, Meta Pixel, Microsoft Clarity, Hotjar, or similar behavioral advertising pixel was found in the app source.',
             'If we add non-essential analytics or advertising tools later, we should update this policy and the Cookie Preferences page before enabling them.',
@@ -70,7 +70,7 @@ export default async function PrivacyPage({ params }: Props) {
           ],
         },
         {
-          title: isEs ? 'Cuando compartimos informacion' : 'When We Share Information',
+          title: isEs ? 'Cuándo compartimos información' : 'When We Share Information',
           body: [
             'We do not sell personal information. We share information only as needed to operate the website and business, complete requested services, process orders, communicate with you, protect the site, comply with law, or complete a business transfer such as a merger or sale of business assets.',
           ],
@@ -86,7 +86,7 @@ export default async function PrivacyPage({ params }: Props) {
           ],
         },
         {
-          title: isEs ? 'Retencion y seguridad' : 'Retention and Security',
+          title: isEs ? 'Retención y seguridad' : 'Retention and Security',
           body: [
             'We keep information only as long as reasonably needed for the purposes described above, including customer service, transaction records, legal obligations, security, fraud prevention, and business administration.',
             'We use commercially reasonable security measures, including hosted authentication, HTTPS on production, database access controls, and limited admin access. No website or transmission method is perfectly secure.',
@@ -99,7 +99,7 @@ export default async function PrivacyPage({ params }: Props) {
           ],
         },
         {
-          title: isEs ? 'Cambios a esta politica' : 'Changes to This Policy',
+          title: isEs ? 'Cambios a esta política' : 'Changes to This Policy',
           body: [
             'We may update this policy as the website, shop, legal requirements, or service providers change. The updated version will be posted on this page with a new effective date.',
           ],

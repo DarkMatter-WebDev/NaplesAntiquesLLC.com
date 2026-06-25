@@ -7,8 +7,7 @@ import MarketingSettingsPanel from './MarketingSettingsPanel';
 
 type AiSettingsResponse = {
   systemPrompt: string;
-  defaultPrompt: string;
-  isCustom: boolean;
+  builtInPrompt: string;
   promptVersion: string;
 };
 
@@ -25,8 +24,7 @@ type StorageGcResult = {
 
 export default function AdminSettingsPanel() {
   const [prompt, setPrompt] = useState('');
-  const [defaultPrompt, setDefaultPrompt] = useState('');
-  const [isCustom, setIsCustom] = useState(false);
+  const [builtInPrompt, setBuiltInPrompt] = useState('');
   const [promptVersion, setPromptVersion] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -45,8 +43,7 @@ export default function AdminSettingsPanel() {
 
   const applyResponse = (data: AiSettingsResponse) => {
     setPrompt(data.systemPrompt);
-    setDefaultPrompt(data.defaultPrompt);
-    setIsCustom(data.isCustom);
+    setBuiltInPrompt(data.builtInPrompt);
     setPromptVersion(data.promptVersion);
   };
 
@@ -95,15 +92,16 @@ export default function AdminSettingsPanel() {
 
   const savePrompt = () => {
     if (!prompt.trim()) {
-      showNotice('Prompt cannot be blank. Use Reset Default to revert to the built-in prompt.', false);
+      showNotice('Prompt cannot be blank. Use Restore Built-In to bring back the original prompt.', false);
       return;
     }
     void persist(prompt, 'AI assistant prompt saved. New listings will use it.');
   };
 
-  const resetPrompt = () => {
-    // Sending an empty prompt clears the override; the server reverts to default.
-    void persist('', 'AI assistant prompt reset to the built-in default.');
+  const restoreBuiltInPrompt = () => {
+    // Sending an empty value clears the saved prompt; the server falls back to
+    // the built-in starting prompt shipped in code.
+    void persist('', 'AI assistant prompt restored to the built-in original.');
   };
 
   const copyPrompt = async () => {
@@ -115,7 +113,7 @@ export default function AdminSettingsPanel() {
     showNotice(copied ? 'AI assistant prompt copied.' : 'Clipboard access was blocked. Prompt text is selected for manual copy.', copied);
   };
 
-  const isDefaultText = prompt.trim() === defaultPrompt.trim();
+  const isBuiltInText = prompt.trim() === builtInPrompt.trim();
 
   const runStorageGc = async (confirm = false) => {
     setGcRunning(true);
@@ -161,28 +159,17 @@ export default function AdminSettingsPanel() {
         </div>
 
         <section className="border bg-white" style={{ borderColor: 'var(--color-outline-variant)' }}>
-          <div className="border-b px-5 py-4 flex items-center justify-between gap-3" style={{ borderColor: 'var(--color-outline-variant)' }}>
-            <div>
-              <h2
-                className="text-xl font-bold"
-                style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
-              >
-                AI Listing Assistant Prompt
-              </h2>
-              <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                The system prompt that drives photo &amp; transcript autofill. Changes apply to all new listings immediately.
-              </p>
-            </div>
-            <span
-              className="shrink-0 px-2.5 py-1 text-[0.6rem] font-bold uppercase tracking-[0.12em] rounded-full"
-              style={{
-                fontFamily: 'var(--font-label)',
-                background: isCustom ? 'color-mix(in srgb, var(--color-primary) 14%, transparent)' : 'color-mix(in srgb, var(--color-on-surface) 8%, transparent)',
-                color: isCustom ? 'var(--color-primary)' : 'var(--color-on-surface-variant)',
-              }}
+          <div className="border-b px-5 py-4" style={{ borderColor: 'var(--color-outline-variant)' }}>
+            <h2
+              className="text-xl font-bold"
+              style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
             >
-              {isCustom ? 'Custom' : 'Default'}
-            </span>
+              AI Listing Assistant Prompt
+            </h2>
+            <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+              The single prompt that drives photo &amp; transcript autofill. Edit it to permanently change how
+              listings are generated &mdash; your saved text becomes the prompt and applies to all new listings immediately.
+            </p>
           </div>
           <div className="p-5 flex flex-col gap-4">
             {notice && (
@@ -232,15 +219,15 @@ export default function AdminSettingsPanel() {
 
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-[0.7rem]" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-                {promptVersion ? `Default version: ${promptVersion}` : ''}
+                {promptVersion ? `Built-in version: ${promptVersion}` : ''}
               </span>
               <div className="flex flex-wrap justify-end gap-2">
                 <button type="button" onClick={copyPrompt} disabled={loading} className="outline-button text-sm">
                   Copy Prompt
                 </button>
                 {editing && (
-                  <button type="button" onClick={resetPrompt} disabled={saving || isDefaultText} className="outline-button text-sm">
-                    Reset Default
+                  <button type="button" onClick={restoreBuiltInPrompt} disabled={saving || isBuiltInText} className="outline-button text-sm">
+                    Restore Built-In
                   </button>
                 )}
                 {editing ? (

@@ -49,7 +49,7 @@ export default function UnsubscribeForm({ locale, initialEmail = '', token = '' 
       style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-lowest)' }}
     >
       <label>
-        <span className="form-label">{isEs ? 'Correo electronico' : 'Email Address'}</span>
+        <span className="form-label">{isEs ? 'Correo electrónico' : 'Email Address'}</span>
         <input
           type="email"
           required={!token}
@@ -65,7 +65,7 @@ export default function UnsubscribeForm({ locale, initialEmail = '', token = '' 
         </p>
       )}
       <button type="submit" disabled={status === 'saving'} className="gold-button w-fit disabled:opacity-60">
-        {status === 'saving' ? (isEs ? 'Actualizando...' : 'Updating...') : (isEs ? 'Cancelar suscripcion' : 'Unsubscribe')}
+        {status === 'saving' ? (isEs ? 'Actualizando...' : 'Updating...') : (isEs ? 'Cancelar suscripción' : 'Unsubscribe')}
       </button>
     </form>
   );

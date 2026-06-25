@@ -55,11 +55,11 @@ export default function AccountDashboard({
           {activeTab === 'overview' && (
             <AccountTabShell
               eyebrow={isEs ? 'Resumen de cuenta' : 'Account Overview'}
-              title={isEs ? 'Tu informacion principal' : 'Your main account information'}
-              copy={isEs ? 'Una vista rapida de tu perfil, datos de contacto y preferencias.' : 'A quick view of your profile, contact details, and preferences.'}
+              title={isEs ? 'Tu información principal' : 'Your main account information'}
+              copy={isEs ? 'Una vista rápida de tu perfil, datos de contacto y preferencias.' : 'A quick view of your profile, contact details, and preferences.'}
               action={
                 <SignOutButton
-                  label={isEs ? 'Cerrar Sesion' : 'Sign Out'}
+                  label={isEs ? 'Cerrar Sesión' : 'Sign Out'}
                   locale={locale}
                   className="account-heading-signout"
                 />
@@ -100,7 +100,7 @@ export function AccountTabs({
   ];
 
   return (
-    <nav className="account-tabs" aria-label={isEs ? 'Menu de cuenta' : 'Account menu'}>
+    <nav className="account-tabs" aria-label={isEs ? 'Menú de cuenta' : 'Account menu'}>
       {tabs.map((tab) => {
         const isActive = activeSection === tab.key;
         const contents = (
@@ -150,20 +150,20 @@ export function AccountSupportStrip({ locale }: { locale: string }) {
   return (
     <section className="account-support-strip">
       <div>
-        <h2>{isEs ? 'Necesitas ayuda?' : 'Need Help?'}</h2>
-        <p>{isEs ? 'Nuestro equipo esta aqui para ayudarte.' : 'Our support team is here to help.'}</p>
+        <h2>{isEs ? '¿Necesitas ayuda?' : 'Need Help?'}</h2>
+        <p>{isEs ? 'Nuestro equipo está aquí para ayudarte.' : 'Our support team is here to help.'}</p>
       </div>
       <div className="account-support-item">
         <span className="material-symbols-outlined" aria-hidden="true">call</span>
         <div>
-          <strong>{isEs ? 'Llamanos' : 'Call Us'}</strong>
+          <strong>{isEs ? 'Llámanos' : 'Call Us'}</strong>
           <a href="tel:2394048505">(239) 404-8505</a>
         </div>
       </div>
       <div className="account-support-item">
         <span className="material-symbols-outlined" aria-hidden="true">mail</span>
         <div>
-          <strong>{isEs ? 'Escribenos' : 'Email Us'}</strong>
+          <strong>{isEs ? 'Escríbenos' : 'Email Us'}</strong>
           <a href="mailto:info@naplesestatejewelry.co">info@naplesestatejewelry.co</a>
         </div>
       </div>
@@ -197,8 +197,8 @@ export function AccountSideRail({
             <span className="material-symbols-outlined">admin_panel_settings</span>
           </div>
           <div>
-            <h2>{isEs ? 'Panel de Administracion' : 'Admin Panel'}</h2>
-            <p>{isEs ? 'Gestionar productos, imagenes y precios.' : 'Manage products, images, and pricing.'}</p>
+            <h2>{isEs ? 'Panel de Administración' : 'Admin Panel'}</h2>
+            <p>{isEs ? 'Gestionar productos, imágenes y precios.' : 'Manage products, images, and pricing.'}</p>
             <Link href={isEs ? '/es/admin' : '/admin'} className="gold-button text-sm account-arrow-button">
               {isEs ? 'Abrir Admin' : 'Open Admin Panel'}
               <span className="material-symbols-outlined" aria-hidden="true">chevron_right</span>
@@ -209,7 +209,7 @@ export function AccountSideRail({
 
       <div className="account-card account-side-card">
         <h2>{isEs ? 'Detalles de cuenta' : 'Account Details'}</h2>
-        <p>{isEs ? 'Configuracion y preferencias principales.' : 'Manage your account settings and preferences.'}</p>
+        <p>{isEs ? 'Configuración y preferencias principales.' : 'Manage your account settings and preferences.'}</p>
         <div className="account-detail-grid">
           <div>
             <span>{isEs ? 'Correo' : 'Email'}</span>
@@ -225,7 +225,7 @@ export function AccountSideRail({
           </div>
         </div>
         <SignOutButton
-          label={isEs ? 'Cerrar Sesion' : 'Sign Out'}
+          label={isEs ? 'Cerrar Sesión' : 'Sign Out'}
           locale={locale}
         />
       </div>
@@ -233,7 +233,7 @@ export function AccountSideRail({
       <div className="account-card account-side-card account-shop-card">
         <div>
           <h2>{isEs ? 'Comprar ahora' : 'Shop Now'}</h2>
-          <p>{isEs ? 'Explora las ultimas colecciones.' : 'Browse our latest collections.'}</p>
+          <p>{isEs ? 'Explora las últimas colecciones.' : 'Browse our latest collections.'}</p>
           <Link href={shopHref} className="outline-button text-sm account-arrow-button">
             {isEs ? 'Ver tienda' : 'Browse Shop'}
             <span className="material-symbols-outlined" aria-hidden="true">chevron_right</span>
@@ -360,9 +360,9 @@ function OrderDetailsDialog({
         </div>
 
         <div className="account-order-dialog-section">
-          <h3>{isEs ? 'Articulos' : 'Items'}</h3>
+          <h3>{isEs ? 'Artículos' : 'Items'}</h3>
           {itemCount === 0 ? (
-            <p className="account-order-muted">{isEs ? 'No hay articulos guardados para este pedido.' : 'No saved items are attached to this order.'}</p>
+            <p className="account-order-muted">{isEs ? 'No hay artículos guardados para este pedido.' : 'No saved items are attached to this order.'}</p>
           ) : (
             <div className="account-order-item-list">
               {order.order_items?.map((item) => {
@@ -420,13 +420,13 @@ function OrderDetailsDialog({
             <h3>{isEs ? 'Cliente' : 'Customer'}</h3>
             <OrderDetailLine label={isEs ? 'Nombre' : 'Name'} value={order.customer_name} />
             <OrderDetailLine label={isEs ? 'Correo' : 'Email'} value={order.customer_email} />
-            <OrderDetailLine label={isEs ? 'Telefono' : 'Phone'} value={order.customer_phone} />
+            <OrderDetailLine label={isEs ? 'Teléfono' : 'Phone'} value={order.customer_phone} />
           </div>
           <div className="account-order-dialog-section">
             <h3>{isEs ? 'Totales' : 'Totals'}</h3>
             <OrderDetailLine label={isEs ? 'Subtotal' : 'Subtotal'} value={formatCurrency(order.subtotal)} />
             <OrderDetailLine label={isEs ? 'Impuesto' : 'Tax'} value={formatCurrency(order.tax)} />
-            <OrderDetailLine label={isEs ? 'Envio' : 'Shipping'} value={formatCurrency(order.shipping_fee)} />
+            <OrderDetailLine label={isEs ? 'Envío' : 'Shipping'} value={formatCurrency(order.shipping_fee)} />
             {order.discount > 0 && <OrderDetailLine label={isEs ? 'Descuento' : 'Discount'} value={`-${formatCurrency(order.discount)}`} />}
             <OrderDetailLine label={isEs ? 'Total' : 'Total'} value={formatCurrency(order.total)} strong />
           </div>
@@ -436,8 +436,8 @@ function OrderDetailsDialog({
           <div className="account-order-dialog-section">
             <h3>{isEs ? 'Detalles adicionales' : 'Additional Details'}</h3>
             <OrderDetailLine label={isEs ? 'Notas' : 'Notes'} value={order.customer_notes} />
-            <OrderDetailLine label={isEs ? 'Direccion de entrega' : 'Shipping address'} value={formatAddress(order.shipping_address)} />
-            <OrderDetailLine label={isEs ? 'Direccion de facturacion' : 'Billing address'} value={formatAddress(order.billing_address)} />
+            <OrderDetailLine label={isEs ? 'Dirección de entrega' : 'Shipping address'} value={formatAddress(order.shipping_address)} />
+            <OrderDetailLine label={isEs ? 'Dirección de facturación' : 'Billing address'} value={formatAddress(order.billing_address)} />
           </div>
         )}
       </div>
@@ -512,7 +512,7 @@ function WishlistTab({ locale }: { locale: string }) {
         <div className="account-empty-state">
           <span className="material-symbols-outlined" aria-hidden="true">favorite</span>
           <strong>{isEs ? 'Sin favoritos todavia' : 'No saved items yet'}</strong>
-          <p>{isEs ? 'Toca el corazon en una pieza para guardarla aqui.' : 'Tap the heart on a piece to save it here.'}</p>
+          <p>{isEs ? 'Toca el corazón en una pieza para guardarla aquí.' : 'Tap the heart on a piece to save it here.'}</p>
         </div>
       ) : (
         <div className="account-wishlist-grid">
@@ -530,7 +530,7 @@ function WishlistTab({ locale }: { locale: string }) {
                 </Link>
                 <div>
                   <Link href={`${prefix}/shop/${item.id}`}>{title}</Link>
-                  <span>{item.price_mode === 'manual' ? (item.manual_price_label ?? (isEs ? 'Consultar precio' : 'Ask for price')) : (isEs ? 'Precio segun mercado' : 'Live market price')}</span>
+                  <span>{item.price_mode === 'manual' ? (item.manual_price_label ?? (isEs ? 'Consultar precio' : 'Ask for price')) : (isEs ? 'Precio según mercado' : 'Live market price')}</span>
                   <button type="button" onClick={() => remove(item.id)}>
                     {isEs ? 'Eliminar' : 'Remove'}
                   </button>
@@ -562,7 +562,7 @@ export function PasswordChangeForm({ locale }: { locale: string }) {
       return;
     }
     if (password !== confirmPassword) {
-      setError(isEs ? 'Las contrasenas no coinciden.' : 'Passwords do not match.');
+      setError(isEs ? 'Las contraseñas no coinciden.' : 'Passwords do not match.');
       return;
     }
     setSaving(true);
@@ -576,28 +576,28 @@ export function PasswordChangeForm({ locale }: { locale: string }) {
     setPassword('');
     setConfirmPassword('');
     setOpen(false);
-    setMessage(isEs ? 'Contrasena actualizada.' : 'Password updated.');
+    setMessage(isEs ? 'Contraseña actualizada.' : 'Password updated.');
   }
 
   return (
     <div className="account-password-panel">
       <button type="button" className="outline-button text-sm account-arrow-button" onClick={() => setOpen((value) => !value)}>
-        {isEs ? 'Cambiar contrasena' : 'Change Password'}
+        {isEs ? 'Cambiar contraseña' : 'Change Password'}
         <span className="material-symbols-outlined" aria-hidden="true">{open ? 'expand_less' : 'chevron_right'}</span>
       </button>
       {open && (
         <form onSubmit={handleSubmit}>
           <label>
-            <span className="form-label">{isEs ? 'Nueva contrasena' : 'New Password'}</span>
+            <span className="form-label">{isEs ? 'Nueva contraseña' : 'New Password'}</span>
             <input className="form-field w-full" type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} />
           </label>
           <label>
-            <span className="form-label">{isEs ? 'Confirmar contrasena' : 'Confirm Password'}</span>
+            <span className="form-label">{isEs ? 'Confirmar contraseña' : 'Confirm Password'}</span>
             <input className="form-field w-full" type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
           </label>
           {error && <p className="account-form-error">{error}</p>}
           <button type="submit" disabled={saving} className="gold-button text-sm disabled:opacity-50">
-            {saving ? (isEs ? 'Guardando...' : 'Saving...') : (isEs ? 'Guardar contrasena' : 'Save Password')}
+            {saving ? (isEs ? 'Guardando...' : 'Saving...') : (isEs ? 'Guardar contraseña' : 'Save Password')}
           </button>
         </form>
       )}

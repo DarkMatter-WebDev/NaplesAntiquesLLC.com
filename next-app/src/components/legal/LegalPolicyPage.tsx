@@ -43,7 +43,7 @@ export default function LegalPolicyPage({
             {title}
           </h1>
           <p className="text-sm text-[#4d4635]">
-            {isEs ? 'Ultima actualizacion: ' : 'Last updated: '}{updated}
+            {isEs ? 'Última actualización: ' : 'Last updated: '}{updated}
           </p>
           {intro.length > 0 && (
             <div className="mt-6 space-y-3 text-[#4d4635] leading-relaxed">

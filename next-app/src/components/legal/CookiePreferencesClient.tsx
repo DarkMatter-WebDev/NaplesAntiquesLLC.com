@@ -36,7 +36,7 @@ export default function CookiePreferencesClient({ locale }: { locale: string }) 
       <p className="mb-4 text-sm leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
         {accepted
           ? (isEs ? 'El aviso de cookies fue aceptado en este navegador.' : 'The cookie notice has been accepted in this browser.')
-          : (isEs ? 'El aviso de cookies no esta marcado como aceptado en este navegador.' : 'The cookie notice is not currently marked accepted in this browser.')}
+          : (isEs ? 'El aviso de cookies no está marcado como aceptado en este navegador.' : 'The cookie notice is not currently marked accepted in this browser.')}
       </p>
       <div className="flex flex-wrap gap-2.5">
         <button type="button" className="gold-button px-5 py-2.5" onClick={acceptNotice}>

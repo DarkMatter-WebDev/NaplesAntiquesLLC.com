@@ -21,12 +21,12 @@ export default async function ServicesPage({ params }: Props) {
   const options = [
     {
       href: `${prefix}/free-evaluation`,
-      eyebrow: isEs ? 'Gratis y sin obligacion' : 'Free and no obligation',
-      title: isEs ? 'Evaluacion Gratuita' : 'Free Evaluation',
+      eyebrow: isEs ? 'Gratis y sin obligación' : 'Free and no obligation',
+      title: isEs ? 'Evaluación Gratuita' : 'Free Evaluation',
       body: isEs
-        ? 'Para joyeria, oro, plata, diamantes, relojes, monedas y piezas heredadas. Obtenga un numero claro antes de decidir.'
+        ? 'Para joyería, oro, plata, diamantes, relojes, monedas y piezas heredadas. Obtenga un número claro antes de decidir.'
         : 'For jewelry, gold, silver, diamonds, watches, coins, and inherited pieces. Get a clear number before you decide.',
-      button: isEs ? 'Ver Evaluacion Gratuita' : 'View Free Evaluation',
+      button: isEs ? 'Ver Evaluación Gratuita' : 'View Free Evaluation',
     },
     {
       href: `${prefix}/estate-services`,
@@ -62,7 +62,7 @@ export default async function ServicesPage({ params }: Props) {
             </h1>
             <p className="text-lg md:text-xl max-w-2xl mx-auto leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
               {isEs
-                ? 'Dos caminos sencillos para comenzar: una evaluacion gratuita de articulos individuales o ayuda mas amplia con un patrimonio.'
+                ? 'Dos caminos sencillos para comenzar: una evaluación gratuita de artículos individuales o ayuda más amplia con un patrimonio.'
                 : 'Two simple ways to start: a free evaluation for individual items, or broader help with an estate.'}
             </p>
           </div>

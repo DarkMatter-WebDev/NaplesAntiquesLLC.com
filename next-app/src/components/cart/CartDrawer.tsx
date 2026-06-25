@@ -91,8 +91,8 @@ export default function CartDrawer({ locale }: { locale: string }) {
               </h2>
               <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
                 {items.length > 0
-                  ? `${items.length} ${isEs ? 'articulo(s)' : 'item(s)'}`
-                  : (isEs ? 'Sin articulos' : 'No items yet')}
+                  ? `${items.length} ${isEs ? 'artículo(s)' : 'item(s)'}`
+                  : (isEs ? 'Sin artículos' : 'No items yet')}
               </p>
             </div>
           </div>
@@ -135,7 +135,7 @@ function CartView({
       <div className="flex flex-col items-center gap-3 text-center mt-16 px-6">
         <span className="material-symbols-outlined" style={{ fontSize: '40px', color: 'var(--color-outline-variant)' }}>shopping_bag</span>
         <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-          {isEs ? 'Tu carrito esta vacio.' : 'Your cart is empty.'}
+          {isEs ? 'Tu carrito está vacío.' : 'Your cart is empty.'}
         </p>
         <Link href={`${prefix}/shop`} onClick={onClose} className="outline-button text-xs mt-2">
           {isEs ? 'Ver tienda' : 'Browse Shop'}
@@ -178,7 +178,7 @@ function CartView({
           </div>
           {hasUnknown && (
             <p className="text-[0.6rem] mt-1" style={{ color: 'var(--color-on-surface-variant)' }}>
-              * {isEs ? 'Algunos articulos requieren confirmacion de precio.' : 'Some items require price confirmation.'}
+              * {isEs ? 'Algunos artículos requieren confirmación de precio.' : 'Some items require price confirmation.'}
             </p>
           )}
           <p className="text-[0.6rem]" style={{ color: 'var(--color-on-surface-variant)' }}>

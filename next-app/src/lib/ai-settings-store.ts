@@ -1,18 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-/** Single-row settings table holding the editable AI listing-assistant prompt. */
+/** Single-row settings table holding the one editable AI listing-assistant prompt. */
 export const AI_SETTINGS_TABLE = 'ai_settings';
 export const AI_SETTINGS_ROW_ID = 1;
 
 /**
- * Read the admin-configured system-prompt override.
+ * Read the saved AI listing-assistant prompt.
  *
- * Returns the trimmed override when one is set, or `null` to mean "use the
- * built-in default". Any failure (table not created yet, RLS, network) is
- * swallowed and treated as `null` so the live AI assistant keeps working on
- * the default prompt rather than erroring.
+ * There is a single prompt. Returns the trimmed saved value when the admin has
+ * edited it, or `null` to mean "nothing saved yet — use the built-in starting
+ * prompt shipped in code". Any failure (table not created yet, RLS, network) is
+ * swallowed and treated as `null` so the live AI assistant keeps working on the
+ * built-in prompt rather than erroring.
  */
-export async function fetchSystemPromptOverride(
+export async function fetchStoredSystemPrompt(
   supabase: SupabaseClient
 ): Promise<string | null> {
   try {
@@ -30,10 +31,11 @@ export async function fetchSystemPromptOverride(
 }
 
 /**
- * Persist the system-prompt override. Pass a non-empty string to set a custom
- * prompt, or `null`/empty to clear it (revert to the built-in default).
+ * Persist the one AI prompt. Pass a non-empty string to save it as the active
+ * prompt, or `null`/empty to clear the saved value and fall back to the
+ * built-in starting prompt shipped in code.
  */
-export async function saveSystemPromptOverride(
+export async function saveSystemPrompt(
   supabase: SupabaseClient,
   prompt: string | null
 ): Promise<void> {

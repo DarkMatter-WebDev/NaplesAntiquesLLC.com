@@ -10,12 +10,12 @@ const TRANSLATE_TIMEOUT_MS = 20000;
 const MAX_TITLE_LENGTH = 180;
 const MAX_DESCRIPTION_LENGTH = 2400;
 
-export type TranslateProductCopyInput = { title?: string | null; description?: string | null };
-export type TranslateProductCopyResult = { title_es: string | null; description_es: string | null };
+export type TranslateProductCopyInput = { title?: string | null; description?: string | null; notes?: string | null };
+export type TranslateProductCopyResult = { title_es: string | null; description_es: string | null; notes_es: string | null };
 
-const TRANSLATE_SYSTEM_PROMPT = `You are a professional English-to-Spanish translator for a fine estate jewelry shop in Naples, Florida. Translate the provided product copy into natural, professional Latin American Spanish appropriate for a US jewelry storefront. Keep brand names, proper nouns, karat marks (e.g. 14K), measurements, and numbers exactly as written. Do not add, remove, or invent information. Respond with a single raw JSON object (no markdown), shaped exactly: {"title_es": string|null, "description_es": string|null}. Use null for any input that was null or empty.`;
+const TRANSLATE_SYSTEM_PROMPT = `You are a professional English-to-Spanish translator for a fine estate jewelry shop in Naples, Florida. Translate the provided product copy into natural, professional Latin American Spanish appropriate for a US jewelry storefront. Keep brand names, proper nouns, karat marks (e.g. 14K), measurements, and numbers exactly as written. Do not add, remove, or invent information. Respond with a single raw JSON object (no markdown), shaped exactly: {"title_es": string|null, "description_es": string|null, "notes_es": string|null}. Use null for any input that was null or empty.`;
 
-function parseTranslationJson(text: string): { title_es?: unknown; description_es?: unknown } | null {
+function parseTranslationJson(text: string): { title_es?: unknown; description_es?: unknown; notes_es?: unknown } | null {
   const trimmed = text.trim().replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
   if (!trimmed) return null;
   try {
@@ -37,7 +37,8 @@ export async function translateProductCopyToSpanish(
 ): Promise<TranslateProductCopyResult> {
   const title = (input.title ?? '').trim();
   const description = (input.description ?? '').trim();
-  if (!title && !description) return { title_es: null, description_es: null };
+  const notes = (input.notes ?? '').trim();
+  if (!title && !description && !notes) return { title_es: null, description_es: null, notes_es: null };
 
   const provider = process.env.AI_PROVIDER?.trim().toLowerCase();
   if (provider !== 'anthropic') {
@@ -52,6 +53,7 @@ export async function translateProductCopyToSpanish(
     task: 'translate_product_copy_to_spanish',
     title: title || null,
     description: description || null,
+    notes: notes || null,
   });
 
   const controller = new AbortController();
@@ -84,6 +86,7 @@ export async function translateProductCopyToSpanish(
     return {
       title_es: title ? cleanTranslated(parsed?.title_es, MAX_TITLE_LENGTH) : null,
       description_es: description ? cleanTranslated(parsed?.description_es, MAX_DESCRIPTION_LENGTH) : null,
+      notes_es: notes ? cleanTranslated(parsed?.notes_es, MAX_DESCRIPTION_LENGTH) : null,
     };
   } finally {
     clearTimeout(timeout);

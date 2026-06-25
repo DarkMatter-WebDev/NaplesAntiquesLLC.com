@@ -20,6 +20,7 @@ import { calcSpotPriceValue } from '@/lib/pricing';
 import ShopProductGrid from '@/components/shop/ShopProductGrid';
 import ShopFilters from '@/components/shop/ShopFilters';
 import ShopSortSelect from '@/components/shop/ShopSortSelect';
+import ShopViewToggle from '@/components/shop/ShopViewToggle';
 import ShopYearFilter from '@/components/shop/ShopYearFilter';
 import ShopPagination from '@/components/shop/ShopPagination';
 import { JEWELRY_ERA_MIN_YEAR, jewelryEraMaxYear, parseYearFilter } from '@/lib/jewelry-eras';
@@ -55,6 +56,7 @@ interface Props {
     yearMin?: string;
     yearMax?: string;
     itemGroup?: string;
+    view?: string;
   }>;
 }
 
@@ -138,7 +140,7 @@ function getShopItemTypeOptions(products: Product[]) {
     cufflinks: { value: 'cufflinks', label: 'Cufflinks', labelEs: 'Gemelos' },
     watch: { value: 'watch', label: 'Watches', labelEs: 'Relojes' },
     coin: { value: 'coin', label: 'Coins', labelEs: 'Monedas' },
-    silverware: { value: 'silverware', label: 'Silverware / Sterling', labelEs: 'Plateria / sterling' },
+    silverware: { value: 'silverware', label: 'Silverware / Sterling', labelEs: 'Platería / sterling' },
   };
   const dynamic = products
     .map((product) => {
@@ -564,11 +566,12 @@ export async function renderShopPage({
 
   const isEs = locale === 'es';
   const isModern = variant === 'modern';
+  const view: 'gallery' | 'list' = filters.view === 'list' ? 'list' : 'gallery';
   const isSilverTableware = false;
   const heroContent = isSilverTableware
     ? {
-        eyebrow: isEs ? 'Plateria sterling seleccionada' : 'Curated sterling silver',
-        title: isEs ? 'Plateria Sterling y Mas' : 'Sterling Tableware & More',
+        eyebrow: isEs ? 'Platería sterling seleccionada' : 'Curated sterling silver',
+        title: isEs ? 'Platería Sterling y Más' : 'Sterling Tableware & More',
         copy: isEs
           ? 'Explore piezas hermosas de plata sterling para la mesa y el hogar, seleccionadas por su calidad, historia, utilidad y valor.'
           : 'Browse beautiful sterling silver pieces for the table and home, chosen for quality, history, usefulness, and value.',
@@ -577,21 +580,21 @@ export async function renderShopPage({
             icon: 'diamond',
             label: isEs ? 'Belleza de herencia' : 'Heirloom beauty',
             copy: isEs
-              ? 'Bandejas, copas, cubiertos y objetos sterling con caracter real, hechos para usarse, regalarse y conservarse.'
+              ? 'Bandejas, copas, cubiertos y objetos sterling con carácter real, hechos para usarse, regalarse y conservarse.'
               : 'Trays, cups, flatware, and sterling objects with real character, made to be used, gifted, and kept.',
           },
           {
             icon: 'savings',
             label: isEs ? 'Precios razonables' : 'Reasonable prices',
             copy: isEs
-              ? 'Compramos con cuidado y mantenemos precios practicos, para que piezas finas de plata sterling sigan siendo alcanzables.'
+              ? 'Compramos con cuidado y mantenemos precios prácticos, para que piezas finas de plata sterling sigan siendo alcanzables.'
               : 'We buy carefully and price practically, so fine sterling pieces remain attainable rather than inflated.',
           },
           {
             icon: 'visibility',
             label: isEs ? 'Compra transparente' : 'Transparent buying',
             copy: isEs
-              ? 'Los listados muestran fotos claras, detalles utiles y contexto honesto para que sepa exactamente que esta viendo.'
+              ? 'Los listados muestran fotos claras, detalles útiles y contexto honesto para que sepa exactamente qué está viendo.'
               : 'Listings show clear photos, useful details, and honest context so you know exactly what you are viewing.',
           },
         ],
@@ -807,6 +810,7 @@ export async function renderShopPage({
             {/* -- Grid --------------------------------------------- */}
             <section className="min-w-0">
               <div className="shop-gallery-toolbar">
+                <ShopViewToggle locale={locale} currentView={view} />
                 <ShopSortSelect locale={locale} currentSort={filters.sort} />
               </div>
               {filtered.length === 0 ? (
@@ -823,6 +827,7 @@ export async function renderShopPage({
                     spotData={spotData}
                     locale={locale}
                     variant={isModern ? 'modern' : 'classic'}
+                    view={view}
                   />
                   <ShopPagination
                     locale={locale}
@@ -965,11 +970,9 @@ export async function renderShopPage({
               border-radius: var(--radius-xl) !important;
             }
             @media (max-width: 767px) {
-              .shop-gallery-toolbar {
-                justify-content: stretch;
-              }
               .shop-gallery-sort {
-                width: 100%;
+                flex: 1;
+                min-width: 0;
                 justify-content: space-between;
               }
               .shop-gallery-sort select {
@@ -1026,7 +1029,9 @@ export async function renderShopPage({
             }
             .shop-gallery-toolbar {
               display: flex;
-              justify-content: flex-end;
+              justify-content: space-between;
+              align-items: center;
+              gap: 0.6rem;
               margin-bottom: 0.8rem;
             }
             .shop-gallery-sort {

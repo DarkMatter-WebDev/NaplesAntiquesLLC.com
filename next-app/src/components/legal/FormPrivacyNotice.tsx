@@ -17,10 +17,10 @@ export default function FormPrivacyNotice({
   return (
     <p className={`text-xs leading-relaxed ${className}`} style={{ color }}>
       {isEs
-        ? 'Al enviar este formulario, acepta que usemos su informacion para responder a su consulta y proporcionar los servicios solicitados.'
+        ? 'Al enviar este formulario, acepta que usemos su información para responder a su consulta y proporcionar los servicios solicitados.'
         : 'By submitting this form, you agree that we may use your information to respond to your inquiry and provide requested services.'}{' '}
       <Link href={`${prefix}/privacy`} className="font-bold underline underline-offset-2" style={{ color: linkColor }}>
-        {isEs ? 'Politica de Privacidad' : 'Privacy Policy'}
+        {isEs ? 'Política de Privacidad' : 'Privacy Policy'}
       </Link>
       .
     </p>

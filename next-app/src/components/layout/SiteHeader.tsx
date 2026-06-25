@@ -108,7 +108,14 @@ const HEADER_STYLES = `
     border-radius: var(--radius-lg);
     color: ${GOLD};
     font-family: var(--font-label);
+    /* Set the size explicitly: a button ignores the text-[10px] utility because
+       the global 'button { font: inherit }' reset (unlayered) overrides Tailwind's
+       layered utilities. Match the adjacent language toggle (10px / 12px at md). */
+    font-size: 0.625rem;
     transition: background 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  }
+  @media (min-width: 768px) {
+    .menu-toggle { font-size: 0.75rem; }
   }
   .menu-toggle[data-open="true"] {
     background: linear-gradient(135deg, #dcb336, #b5890c);
@@ -144,6 +151,10 @@ const HEADER_STYLES = `
     padding: 0.85rem 0.65rem;
     border-radius: var(--radius-lg);
     font-family: var(--font-label);
+    /* Keep button rows (accordions, Saved Items) the same size as the link rows.
+       Without this, buttons inherit 16px from the global 'button { font: inherit }'
+       reset instead of the intended text-xs. */
+    font-size: 0.75rem;
     transition: background 150ms ease, color 150ms ease;
   }
   .mobile-nav-link:hover,

@@ -7,8 +7,9 @@ export type GenerateProductDraftInput = {
   schema: typeof PRODUCT_AUTOFILL_SCHEMA;
   mode?: 'fast' | 'accurate' | 'premium';
   /**
-   * Optional admin-configured system prompt override (from the ai_settings
-   * table). When omitted or blank, the built-in default below is used.
+   * The saved AI prompt (from the ai_settings table), when the admin has edited
+   * it. When omitted or blank, the built-in starting prompt below is used. There
+   * is a single prompt — this is its saved value, not a layered override.
    */
   systemPrompt?: string;
 };
@@ -107,7 +108,7 @@ function providerConfig(mode?: GenerateProductDraftInput['mode']) {
   return { provider, model };
 }
 
-/** The active system prompt: the admin override when set, else the default. */
+/** The one active prompt: the saved value when set, else the built-in starting prompt. */
 function resolveSystemPrompt(input: GenerateProductDraftInput): string {
   return input.systemPrompt?.trim() || PRODUCT_EXTRACTION_SYSTEM_PROMPT;
 }

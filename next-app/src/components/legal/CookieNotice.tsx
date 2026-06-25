@@ -41,7 +41,7 @@ export default function CookieNotice({ locale }: { locale: string }) {
         </p>
         <p style={{ color: 'var(--color-on-surface-variant)' }}>
           {isEs
-            ? 'Usamos cookies esenciales y almacenamiento del navegador para inicio de sesion, carrito, favoritos, idioma y seguridad.'
+            ? 'Usamos cookies esenciales y almacenamiento del navegador para inicio de sesión, carrito, favoritos, idioma y seguridad.'
             : 'We use essential cookies and browser storage for sign-in, cart, favorites, language routing, and security.'}
         </p>
       </div>

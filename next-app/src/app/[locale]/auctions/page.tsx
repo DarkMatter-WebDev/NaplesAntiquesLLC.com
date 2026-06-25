@@ -22,21 +22,21 @@ export default async function AuctionsPage({ params }: Props) {
 
   const steps = [
     {
-      title: isEs ? 'Revision Privada' : 'Private Review',
+      title: isEs ? 'Revisión Privada' : 'Private Review',
       body: isEs
-        ? 'Empezamos con fotos, una llamada o una cita privada para entender la coleccion y sus objetivos.'
+        ? 'Empezamos con fotos, una llamada o una cita privada para entender la colección y sus objetivos.'
         : 'We start with photos, a call, or a private appointment to understand the collection and your goals.',
     },
     {
       title: isEs ? 'Ruta Recomendada' : 'Recommended Path',
       body: isEs
-        ? 'Le explicamos si una venta directa, una evaluacion gratuita o una estrategia de subasta tiene mas sentido.'
+        ? 'Le explicamos si una venta directa, una evaluación gratuita o una estrategia de subasta tiene más sentido.'
         : 'We explain whether a direct sale, free evaluation, or auction strategy makes the most sense.',
     },
     {
       title: isEs ? 'Ayuda Clara' : 'Clear Guidance',
       body: isEs
-        ? 'Recibe orientacion honesta antes de mover piezas importantes, sin presion y sin compromiso.'
+        ? 'Recibe orientación honesta antes de mover piezas importantes, sin presión y sin compromiso.'
         : 'You get honest guidance before moving important pieces, with no pressure and no obligation.',
     },
   ];
@@ -64,18 +64,18 @@ export default async function AuctionsPage({ params }: Props) {
             </h1>
             <p className="text-lg md:text-xl max-w-3xl leading-relaxed mb-10" style={{ color: 'var(--color-on-surface-variant)' }}>
               {isEs
-                ? 'Algunas joyas, relojes, antiguedades, monedas y colecciones especiales pueden beneficiarse de una estrategia mas amplia. Le ayudamos a entender sus opciones antes de decidir vender directamente o explorar una subasta.'
+                ? 'Algunas joyas, relojes, antigüedades, monedas y colecciones especiales pueden beneficiarse de una estrategia más amplia. Le ayudamos a entender sus opciones antes de decidir vender directamente o explorar una subasta.'
                 : 'Some jewelry, watches, antiques, coins, and special collections may benefit from a broader strategy. We help you understand your options before deciding whether to sell directly or explore auction opportunities.'}
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link href={evaluationHref} className="gold-button">
-                {isEs ? 'Solicitar Evaluacion' : 'Request Evaluation'}
+                {isEs ? 'Solicitar Evaluación' : 'Request Evaluation'}
               </Link>
               <Link href={contactHref} className="outline-button">
                 {isEs ? 'Hablar con Chris' : 'Talk With Chris'}
               </Link>
               <Link href={auctionTermsHref} className="outline-button">
-                {isEs ? 'Terminos de Subasta' : 'Auction Terms'}
+                {isEs ? 'Términos de Subasta' : 'Auction Terms'}
               </Link>
             </div>
           </div>

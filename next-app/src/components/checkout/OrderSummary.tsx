@@ -79,7 +79,7 @@ export default function OrderSummary({
         </h2>
         {expanded && (
           <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-            {items.length} {isEs ? 'articulo(s)' : 'item(s)'}
+            {items.length} {isEs ? 'artículo(s)' : 'item(s)'}
           </p>
         )}
       </div>
@@ -105,7 +105,7 @@ export default function OrderSummary({
           <span>{subtotal > 0 ? fmt(tax) : '-'}</span>
         </div>
         <label className="flex flex-col gap-1 pt-2">
-          <span>{isEs ? 'Envio' : 'Shipping'}</span>
+          <span>{isEs ? 'Envío' : 'Shipping'}</span>
           <select
             value={selectedShipping.value}
             onChange={(e) => onShippingMethodChange?.(e.target.value)}
@@ -127,7 +127,7 @@ export default function OrderSummary({
           </select>
         </label>
         <div className="flex justify-between">
-          <span>{isEs ? 'Costo de envio' : 'Shipping Cost'}</span>
+          <span>{isEs ? 'Costo de envío' : 'Shipping Cost'}</span>
           <span>{fmt(shipping)}</span>
         </div>
         <div className="flex justify-between pt-2 mt-2 font-bold text-base" style={{ borderTop: `1px solid ${BORDER}`, color: 'var(--color-on-surface)' }}>

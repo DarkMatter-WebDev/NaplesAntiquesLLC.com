@@ -19,7 +19,7 @@ export const QUICK_FILL_WATCH_RULES_ADDENDUM = `${QUICK_FILL_WATCH_RULES_MARKER}
 * Do not use Link Type for watches. Link Type is only for necklace or bracelet link/style families.
 * Do not infer Product Type:Bracelet from a watch bracelet/strap/band. A watch with a bracelet or strap is still Product Type:Watch.
 * Include Brand for watch makers when known, such as Brand:Rolex, Brand:Patek Philippe, Brand:Omega, Brand:Cartier, Brand:Tag Heuer, or Brand:Seiko.
-* Use Description English/Public Notes/Internal Notes for watch-specific details such as model, reference number, movement, case size, bracelet/strap material, serial markings, condition, box/papers, and service notes.
+* Use Description English/Notes (EN) for watch-specific details such as model, reference number, movement, case size, bracelet/strap material, serial markings, condition, box/papers, and service notes.
 * Omit Length and Size for watches unless the user clearly provides a wearable wrist size or another measurement that belongs in the existing Length/Size field.`;
 
 export const QUICK_FILL_PRODUCT_HIERARCHY_RULES_ADDENDUM = `${QUICK_FILL_PRODUCT_HIERARCHY_RULES_MARKER}
@@ -39,7 +39,7 @@ Every output line must target a specific field label from the allowed list. Do n
 The Quick Fill parser expects labeled field-targeted lines. Use Field:Value exactly, with one product field per line.
 
 Use only these field labels when known:
-Title English, Title Spanish, Product Type, Brand, Metal Type, Metal Color, Status, Gender, Location, Link Type, Length, Size, Price Mode, Purity, Weight, Multiplier, Asking Price, Description English, Description Spanish, Public Notes, Internal Notes.
+Title English, Title Spanish, Product Type, Brand, Metal Type, Metal Color, Status, Gender, Location, Link Type, Length, Size, Price Mode, Purity, Weight, Multiplier, Asking Price, Description English, Description Spanish, Notes (EN).
 
 Use Product Type as Necklace, Bracelet, Ring, Pendant, Charm, Earrings, Brooch, Cufflinks, Watch, Coin, Bullion, Silverware / Sterling, or another concise item form when needed.
 
@@ -90,16 +90,15 @@ Important terminology rules:
 * Never combine or place "Italian" and "Cuban" directly next to each other in a title or description (for example, avoid "Italian Cuban Link Bracelet"). Instead use wording such as "Italian 14K Gold Bracelet" and describe the Cuban link style separately in the description or Link Type field.
 * Apply the same separation rule to all other chain styles (Byzantine, Figaro, Rope, etc.) when the item is described as Italian-made.
 
-Public Notes and Internal Notes rules:
+Notes (EN) rules:
 
-* Do not repeat information in Public Notes or Internal Notes that is already clearly covered in Description English or Description Spanish.
-* Public Notes should contain concise buyer-safe facts that do not already fit naturally in the description, such as extra measurements, markings, clasp details, included extras, special condition notes, or service notes.
-* Internal Notes may include administrative details that should not appear publicly.
-* Internal Notes must not be the only place where a buyer-relevant factual item detail appears; put buyer-relevant facts in Description English, Description Spanish, or Public Notes as appropriate.
+* Notes (EN) is the English buyer-facing public note. Its Spanish counterpart, Notes (ES), is generated automatically by translation on save, so do not output a Spanish notes field here.
+* Do not repeat information in Notes (EN) that is already clearly covered in Description English or Description Spanish.
+* Notes (EN) should contain concise buyer-safe facts that do not already fit naturally in the description, such as extra measurements, markings, clasp details, included extras, special condition notes, or service notes.
 
 Omit any field you cannot confidently determine.
 
-Preserve useful measurements, markings, dimensions, clasp types, condition notes, and manufacturing details in Description English, Public Notes, and Internal Notes as appropriate.`;
+Preserve useful measurements, markings, dimensions, clasp types, condition notes, and manufacturing details in Description English and Notes (EN) as appropriate.`;
 
 export function ensureQuickFillPromptHasCurrentBrandRules(prompt: string): string {
   const trimmedPrompt = prompt.trim();

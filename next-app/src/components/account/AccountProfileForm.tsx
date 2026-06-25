@@ -160,7 +160,7 @@ export default function AccountProfileForm({
         </h2>
         <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
           {headingCopy ?? (isEs
-            ? 'Resumen rapido de tu informacion de cuenta.'
+            ? 'Resumen rápido de tu información de cuenta.'
             : 'Quick summary of your account information.')}
         </p>
       </div>
@@ -171,9 +171,9 @@ export default function AccountProfileForm({
             {[
               ['person', isEs ? 'Nombre' : 'Name', displayName, ''],
               ['mail', isEs ? 'Correo' : 'Email', displayEmail, ''],
-              ['call', isEs ? 'Telefono' : 'Phone', displayPhone, ''],
-              ['phone_in_talk', isEs ? 'Telefono alternativo' : 'Alternate Phone', displayAltPhone, ''],
-              ['location_on', isEs ? 'Direccion' : 'Address', displayAddress, 'sm:col-span-2'],
+              ['call', isEs ? 'Teléfono' : 'Phone', displayPhone, ''],
+              ['phone_in_talk', isEs ? 'Teléfono alternativo' : 'Alternate Phone', displayAltPhone, ''],
+              ['location_on', isEs ? 'Dirección' : 'Address', displayAddress, 'sm:col-span-2'],
               ['notifications', isEs ? 'Actualizaciones' : 'Updates', form.marketing_subscribed ? (isEs ? 'Recibiendo actualizaciones' : 'Receiving updates') : (isEs ? 'No recibe actualizaciones' : 'Opted out'), 'sm:col-span-2'],
             ].map(([icon, label, value, className]) => (
               <div key={label} className={className}>
@@ -220,28 +220,28 @@ export default function AccountProfileForm({
           <input className={inputStyle} type="email" autoComplete="email" value={form.email} onChange={(e) => updateField('email', e.target.value)} />
         </label>
         <label>
-          <span className="form-label">{isEs ? 'Telefono' : 'Phone'}</span>
+          <span className="form-label">{isEs ? 'Teléfono' : 'Phone'}</span>
           <input className={inputStyle} type="tel" autoComplete="tel" value={form.phone} onChange={(e) => updateField('phone', e.target.value)} />
         </label>
         <label>
-          <span className="form-label">{isEs ? 'Telefono alternativo' : 'Alternate Phone'}</span>
+          <span className="form-label">{isEs ? 'Teléfono alternativo' : 'Alternate Phone'}</span>
           <input className={inputStyle} type="tel" autoComplete="tel" value={form.alternate_phone} onChange={(e) => updateField('alternate_phone', e.target.value)} />
         </label>
       </div>
 
       <div className="mt-6 mb-3">
         <h3 className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-          {isEs ? 'Direccion' : 'Address'}
+          {isEs ? 'Dirección' : 'Address'}
         </h3>
       </div>
 
       <div className="grid sm:grid-cols-2 gap-5">
         <label className="sm:col-span-2">
-          <span className="form-label">{isEs ? 'Direccion linea 1' : 'Address Line 1'}</span>
+          <span className="form-label">{isEs ? 'Dirección línea 1' : 'Address Line 1'}</span>
           <input className={inputStyle} autoComplete="address-line1" value={form.address_line1} onChange={(e) => updateField('address_line1', e.target.value)} />
         </label>
         <label className="sm:col-span-2">
-          <span className="form-label">{isEs ? 'Direccion linea 2' : 'Address Line 2'}</span>
+          <span className="form-label">{isEs ? 'Dirección línea 2' : 'Address Line 2'}</span>
           <input className={inputStyle} autoComplete="address-line2" value={form.address_line2} onChange={(e) => updateField('address_line2', e.target.value)} />
         </label>
         <label>
@@ -253,11 +253,11 @@ export default function AccountProfileForm({
           <input className={inputStyle} autoComplete="address-level1" value={form.state} onChange={(e) => updateField('state', e.target.value)} />
         </label>
         <label>
-          <span className="form-label">{isEs ? 'Codigo postal' : 'ZIP / Postal Code'}</span>
+          <span className="form-label">{isEs ? 'Código postal' : 'ZIP / Postal Code'}</span>
           <input className={inputStyle} autoComplete="postal-code" value={form.postal_code} onChange={(e) => updateField('postal_code', e.target.value)} />
         </label>
         <label>
-          <span className="form-label">{isEs ? 'Pais' : 'Country'}</span>
+          <span className="form-label">{isEs ? 'País' : 'Country'}</span>
           <input className={inputStyle} autoComplete="country-name" value={form.country} onChange={(e) => updateField('country', e.target.value)} />
         </label>
       </div>

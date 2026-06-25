@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { PRODUCT_EXTRACTION_SYSTEM_PROMPT, PROMPT_VERSION } from '@/lib/ai-product-provider';
-import { fetchSystemPromptOverride, saveSystemPromptOverride } from '@/lib/ai-settings-store';
+import { fetchStoredSystemPrompt, saveSystemPrompt } from '@/lib/ai-settings-store';
 
 const MAX_PROMPT_LENGTH = 20000;
 
@@ -27,11 +27,12 @@ export async function GET() {
   const { supabase, error } = await requireAdmin();
   if (error) return error;
 
-  const override = await fetchSystemPromptOverride(supabase);
+  const stored = await fetchStoredSystemPrompt(supabase);
   return NextResponse.json({
-    systemPrompt: override ?? PRODUCT_EXTRACTION_SYSTEM_PROMPT,
-    defaultPrompt: PRODUCT_EXTRACTION_SYSTEM_PROMPT,
-    isCustom: override !== null,
+    // The one active prompt: the saved value, or the built-in starting prompt
+    // when nothing has been saved yet.
+    systemPrompt: stored ?? PRODUCT_EXTRACTION_SYSTEM_PROMPT,
+    builtInPrompt: PRODUCT_EXTRACTION_SYSTEM_PROMPT,
     promptVersion: PROMPT_VERSION,
   });
 }
@@ -49,10 +50,11 @@ export async function PUT(req: Request) {
     );
   }
 
-  // Empty/blank clears the override and reverts to the built-in default.
+  // Saving a non-empty value makes it the active prompt. Empty/blank clears the
+  // saved value and falls back to the built-in starting prompt shipped in code.
   const trimmed = raw.trim();
   try {
-    await saveSystemPromptOverride(supabase, trimmed || null);
+    await saveSystemPrompt(supabase, trimmed || null);
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to save the AI prompt.' },
@@ -60,11 +62,9 @@ export async function PUT(req: Request) {
     );
   }
 
-  const isCustom = trimmed.length > 0;
   return NextResponse.json({
-    systemPrompt: isCustom ? trimmed : PRODUCT_EXTRACTION_SYSTEM_PROMPT,
-    defaultPrompt: PRODUCT_EXTRACTION_SYSTEM_PROMPT,
-    isCustom,
+    systemPrompt: trimmed || PRODUCT_EXTRACTION_SYSTEM_PROMPT,
+    builtInPrompt: PRODUCT_EXTRACTION_SYSTEM_PROMPT,
     promptVersion: PROMPT_VERSION,
   });
 }

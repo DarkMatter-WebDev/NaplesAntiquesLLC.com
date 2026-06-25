@@ -26,10 +26,10 @@ export default function PaymentClient({ locale }: { locale: string }) {
       <div className="mx-auto max-w-xl px-[clamp(1rem,4vw,2rem)] py-16 text-center">
         <span className="material-symbols-outlined" style={{ fontSize: '44px', color: 'var(--color-outline-variant)' }}>shopping_bag</span>
         <h1 className="text-3xl md:text-4xl font-bold mt-4 mb-4" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-          {isEs ? 'Su carrito esta vacio' : 'Your Cart Is Empty'}
+          {isEs ? 'Su carrito está vacío' : 'Your Cart Is Empty'}
         </h1>
         <p className="mb-8" style={{ color: 'var(--color-on-surface-variant)' }}>
-          {isEs ? 'Agregue un articulo antes de proceder al pago.' : 'Add an item before proceeding to payment.'}
+          {isEs ? 'Agregue un artículo antes de proceder al pago.' : 'Add an item before proceeding to payment.'}
         </p>
         <Link href={`${prefix}/shop`} className="gold-button">
           {isEs ? 'Ver tienda' : 'Browse Shop'}
@@ -56,11 +56,11 @@ export default function PaymentClient({ locale }: { locale: string }) {
         <section className="border p-5 md:p-7 flex flex-col gap-5" style={{ borderColor: BORDER, background: 'var(--color-surface-container-lowest)' }}>
           <div>
             <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-              {isEs ? 'Metodo de pago' : 'Payment Method'}
+              {isEs ? 'Método de pago' : 'Payment Method'}
             </p>
             <div className="responsive-form-grid">
               <label>
-                <span className="form-label">{isEs ? 'Numero de tarjeta' : 'Card Number'} *</span>
+                <span className="form-label">{isEs ? 'Número de tarjeta' : 'Card Number'} *</span>
                 <input className="form-field" inputMode="numeric" autoComplete="cc-number" placeholder="1234 1234 1234 1234" />
               </label>
               <label>
@@ -76,7 +76,7 @@ export default function PaymentClient({ locale }: { locale: string }) {
                 <input className="form-field" inputMode="numeric" autoComplete="cc-csc" placeholder="123" />
               </label>
               <label>
-                <span className="form-label">{isEs ? 'Codigo postal' : 'Billing ZIP'} *</span>
+                <span className="form-label">{isEs ? 'Código postal' : 'Billing ZIP'} *</span>
                 <input className="form-field" inputMode="numeric" autoComplete="postal-code" />
               </label>
             </div>
@@ -84,21 +84,21 @@ export default function PaymentClient({ locale }: { locale: string }) {
 
           <div className="border px-4 py-4" style={{ borderColor: BORDER }}>
             <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-              {isEs ? 'Confirmacion' : 'Confirmation'}
+              {isEs ? 'Confirmación' : 'Confirmation'}
             </p>
             <p className="text-sm leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
               {isEs
-                ? 'La integracion del procesador de pagos se conectara aqui antes de publicar pagos reales.'
+                ? 'La integración del procesador de pagos se conectará aquí antes de publicar pagos reales.'
                 : 'The live payment processor integration will connect here before real payments are accepted.'}
             </p>
           </div>
 
           <p className="text-xs leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
             {isEs
-              ? 'No envie informacion de pago real hasta que un procesador de pagos seguro este conectado. Revise nuestras '
+              ? 'No envíe información de pago real hasta que un procesador de pagos seguro esté conectado. Revise nuestras '
               : 'Do not submit real payment information until a secure payment processor is connected. Review our '}
             <Link href={`${prefix}/terms`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
-              {isEs ? 'Terminos' : 'Terms'}
+              {isEs ? 'Términos' : 'Terms'}
             </Link>
             {', '}
             <Link href={`${prefix}/privacy`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>

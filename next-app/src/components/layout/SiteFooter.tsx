@@ -26,13 +26,13 @@ export default function SiteFooter({ locale = 'en' }: Props) {
 
   const legalLinks = [
     { label: isEs ? 'Privacidad' : 'Privacy Policy', href: p('/privacy') },
-    { label: isEs ? 'Terminos' : 'Terms of Service', href: p('/terms') },
+    { label: isEs ? 'Términos' : 'Terms of Service', href: p('/terms') },
     { label: isEs ? 'Cookies' : 'Cookie Preferences', href: p('/cookie-preferences') },
     { label: isEs ? 'Accesibilidad' : 'Accessibility', href: p('/accessibility') },
     { label: isEs ? 'Contacto' : 'Contact Us', href: p('/contact') },
     { label: isEs ? 'Devoluciones' : 'Returns & Refunds', href: p('/returns-refunds') },
-    { label: isEs ? 'Envios' : 'Shipping Policy', href: p('/shipping') },
-    { label: isEs ? 'Terminos de subasta' : 'Auction Terms', href: p('/auction-terms') },
+    { label: isEs ? 'Envíos' : 'Shipping Policy', href: p('/shipping') },
+    { label: isEs ? 'Términos de subasta' : 'Auction Terms', href: p('/auction-terms') },
   ];
 
   return (

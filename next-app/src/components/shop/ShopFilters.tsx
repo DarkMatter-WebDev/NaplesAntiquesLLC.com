@@ -126,7 +126,7 @@ const ITEM_TYPE_OPTIONS = [
   { value: 'cufflinks', label: 'Cufflinks', labelEs: 'Gemelos' },
   { value: 'watch', label: 'Watches', labelEs: 'Relojes' },
   { value: 'coin', label: 'Coins', labelEs: 'Monedas' },
-  { value: 'silverware', label: 'Silverware / Sterling', labelEs: 'Plateria / sterling' },
+  { value: 'silverware', label: 'Silverware / Sterling', labelEs: 'Platería / sterling' },
 ];
 
 type ItemTypeOption = (typeof ITEM_TYPE_OPTIONS)[number];
@@ -398,7 +398,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
       ? allItemTypeOptions.filter((option) => isJewelryItemType(option.value))
       : allItemTypeOptions;
   const itemGroupOptions = [
-    { value: 'jewelry' as const, label: isEs ? 'Joyeria y relojes' : 'Jewelry & Watches' },
+    { value: 'jewelry' as const, label: isEs ? 'Joyería y relojes' : 'Jewelry & Watches' },
     { value: 'everything-else' as const, label: isEs ? 'Plata sterling' : 'Sterling Silver' },
   ];
 
@@ -624,7 +624,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
         {/* Category */}
         {isModern && (
           <div className="modern-sidebar-gender">
-            <span className="modern-sidebar-label">{isEs ? 'Categoria' : 'Category'}</span>
+            <span className="modern-sidebar-label">{isEs ? 'Categoría' : 'Category'}</span>
             <div className="modern-sidebar-gender-grid">
               {itemGroupOptions.map((option) => {
                 const active = currentItemGroup === option.value;
@@ -658,7 +658,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
           >
             {showGenderFilter && (
               <div>
-                <label style={labelStyle}>{isEs ? 'Genero' : 'Gender'}</label>
+                <label style={labelStyle}>{isEs ? 'Género' : 'Gender'}</label>
                 <select
                   value={currentFilters.gender ?? ''}
                   onChange={(e) => updateFilter('gender', e.target.value)}
@@ -823,7 +823,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
                   max={priceCeiling}
                   step={PRICE_STEP}
                   value={draftPriceMin}
-                  aria-label={isEs ? 'Precio minimo' : 'Minimum price'}
+                  aria-label={isEs ? 'Precio mínimo' : 'Minimum price'}
                   onChange={(event) => setDraftPrice({
                     source: selectedPriceSource,
                     min: Math.min(Number(event.target.value), draftPriceMax),
@@ -839,7 +839,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
                   max={priceCeiling}
                   step={PRICE_STEP}
                   value={draftPriceMax}
-                  aria-label={isEs ? 'Precio maximo' : 'Maximum price'}
+                  aria-label={isEs ? 'Precio máximo' : 'Maximum price'}
                   onChange={(event) => setDraftPrice({
                     source: selectedPriceSource,
                     min: draftPriceMin,

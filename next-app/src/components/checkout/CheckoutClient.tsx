@@ -210,10 +210,10 @@ export default function CheckoutClient({ locale }: { locale: string }) {
       <div className="max-w-xl mx-auto text-center px-6 py-16">
         <span className="material-symbols-outlined" style={{ fontSize: '44px', color: 'var(--color-outline-variant)' }}>shopping_bag</span>
         <h1 className="text-3xl md:text-4xl font-bold mt-4 mb-4" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-          {isEs ? 'Su carrito esta vacio' : 'Your Cart Is Empty'}
+          {isEs ? 'Su carrito está vacío' : 'Your Cart Is Empty'}
         </h1>
         <p className="mb-8" style={{ color: 'var(--color-on-surface-variant)' }}>
-          {isEs ? 'Agregue un articulo antes de proceder al pago.' : 'Add an item before proceeding to checkout.'}
+          {isEs ? 'Agregue un artículo antes de proceder al pago.' : 'Add an item before proceeding to checkout.'}
         </p>
         <Link href={`${prefix}/shop`} className="gold-button">
           {isEs ? 'Ver tienda' : 'Browse Shop'}
@@ -233,7 +233,7 @@ export default function CheckoutClient({ locale }: { locale: string }) {
           {isEs ? 'Checkout' : 'Checkout'}
         </h1>
         <p style={{ color: 'var(--color-on-surface-variant)' }}>
-          {isEs ? 'Complete sus datos para reservar los articulos de su carrito.' : 'Complete your details to reserve the items in your cart.'}
+          {isEs ? 'Complete sus datos para reservar los artículos de su carrito.' : 'Complete your details to reserve the items in your cart.'}
         </p>
       </section>
 
@@ -255,7 +255,7 @@ export default function CheckoutClient({ locale }: { locale: string }) {
               <p className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
                 {isEs ? 'Datos de contacto' : 'Contact Details'}
               </p>
-              <h2>{isEs ? 'Como podemos contactarte?' : 'How should we contact you?'}</h2>
+              <h2>{isEs ? '¿Cómo podemos contactarte?' : 'How should we contact you?'}</h2>
             </div>
           </div>
           <div className="responsive-form-grid">
@@ -264,12 +264,12 @@ export default function CheckoutClient({ locale }: { locale: string }) {
               <input required className="form-field" value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} />
             </div>
             <div>
-              <label className="form-label">{isEs ? 'Telefono' : 'Phone'} *</label>
+              <label className="form-label">{isEs ? 'Teléfono' : 'Phone'} *</label>
               <input required type="tel" className="form-field" value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} />
             </div>
           </div>
           <div>
-            <label className="form-label">{isEs ? 'Correo electronico' : 'Email'} *</label>
+            <label className="form-label">{isEs ? 'Correo electrónico' : 'Email'} *</label>
             <input required type="email" className="form-field" value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} />
           </div>
           <div>
@@ -292,11 +292,11 @@ export default function CheckoutClient({ locale }: { locale: string }) {
             </Link>
             {', '}
             <Link href={`${prefix}/shipping`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
-              {isEs ? 'Envios' : 'Shipping'}
+              {isEs ? 'Envíos' : 'Shipping'}
             </Link>
             {isEs ? ', ' : ', '}
             <Link href={`${prefix}/terms`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
-              {isEs ? 'Terminos' : 'Terms'}
+              {isEs ? 'Términos' : 'Terms'}
             </Link>
             {isEs ? ' y ' : ', and '}
             <Link href={`${prefix}/privacy`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>

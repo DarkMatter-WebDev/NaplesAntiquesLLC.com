@@ -55,7 +55,7 @@ export default async function AboutPage({ params }: Props) {
             </h1>
             <p className="responsive-copy italic max-w-2xl mx-auto" style={{ color: '#d8d1c2' }}>
               {isEs
-                ? 'Nacido y criado en Naples, Chris ha pasado mas de 15 anos trabajando en privado con familias locales para adquirir joyeria fina, plata esterlina, antiguedades, oro y colecciones heredadas.'
+                ? 'Nacido y criado en Naples, Chris ha pasado más de 15 años trabajando en privado con familias locales para adquirir joyería fina, plata esterlina, antigüedades, oro y colecciones heredadas.'
                 : 'Born and raised in Naples, Chris has spent 15+ years working privately with local families to acquire fine jewelry, sterling silver, antiques, gold, and inherited collections.'}
             </p>
           </PageContainer>
@@ -96,29 +96,29 @@ export default async function AboutPage({ params }: Props) {
                 >
                   <p>
                     {isEs ? (
-                      <>Nacido y criado en Naples, Chris ha pasado <strong style={{ color: 'var(--color-primary)' }}>mas de 15 anos</strong> trabajando directamente con clientes privados en todo el suroeste de Florida para adquirir joyeria fina, plata esterlina, antiguedades, oro y colecciones heredadas.</>
+                      <>Nacido y criado en Naples, Chris ha pasado <strong style={{ color: 'var(--color-primary)' }}>más de 15 años</strong> trabajando directamente con clientes privados en todo el suroeste de Florida para adquirir joyería fina, plata esterlina, antigüedades, oro y colecciones heredadas.</>
                     ) : (
                       <>Born and raised in Naples, Chris has spent <strong style={{ color: 'var(--color-primary)' }}>15+ years</strong> working directly with private clients throughout Southwest Florida to acquire fine jewelry, sterling silver, antiques, gold, and inherited collections.</>
                     )}
                   </p>
                   <p>
                     {isEs
-                      ? 'Al operar como un servicio movil privado, solo por cita, mantenemos los gastos generales bajos y trasladamos esos ahorros como algunos de los pagos mas competitivos de la region. Cada consulta se maneja de forma personal y confidencial - sin presion de tienda fisica, sin intermediarios y sin obligacion.'
+                      ? 'Al operar como un servicio móvil privado, solo por cita, mantenemos los gastos generales bajos y trasladamos esos ahorros como algunos de los pagos más competitivos de la región. Cada consulta se maneja de forma personal y confidencial - sin presión de tienda física, sin intermediarios y sin obligación.'
                       : 'By operating as a private, appointment-only mobile service, we keep overhead low and pass those savings on as some of the most competitive payouts in the region. Every consultation is handled personally and confidentially - no storefront pressure, no middlemen, and no obligation.'}
                   </p>
                   <p>
                     {isEs
-                      ? 'Ya sea que este pensando en vender una sola reliquia familiar o liquidar un patrimonio multigeneracional, Chris aporta un enfoque discreto e informado a cada conversacion.'
+                      ? 'Ya sea que esté pensando en vender una sola reliquia familiar o liquidar un patrimonio multigeneracional, Chris aporta un enfoque discreto e informado a cada conversación.'
                       : 'Whether you\'re considering selling a single heirloom or liquidating a multi-generational estate, Chris brings a discreet, informed approach to every conversation.'}
                   </p>
                 </div>
 
                 <div className="mt-10 grid grid-cols-1 gap-5 min-[390px]:grid-cols-2 md:gap-6">
                   {[
-                    { stat: '15+', label: isEs ? 'Anos de Experiencia' : 'Years Experience' },
+                    { stat: '15+', label: isEs ? 'Años de Experiencia' : 'Years Experience' },
                     { stat: '100%', label: isEs ? 'Privado y Confidencial' : 'Private & Confidential' },
-                    { stat: isEs ? 'Mismo Dia' : 'Same-Day', label: isEs ? 'Pago Disponible' : 'Payment Available' },
-                    { stat: isEs ? 'Movil' : 'Mobile', label: isEs ? 'Vamos a Usted' : 'We Come to You' },
+                    { stat: isEs ? 'Mismo Día' : 'Same-Day', label: isEs ? 'Pago Disponible' : 'Payment Available' },
+                    { stat: isEs ? 'Móvil' : 'Mobile', label: isEs ? 'Vamos a Usted' : 'We Come to You' },
                   ].map((item) => (
                     <div
                       key={item.label}
@@ -155,11 +155,11 @@ export default async function AboutPage({ params }: Props) {
               className="responsive-title-lg font-bold mb-6 tracking-tight"
               style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
             >
-              {isEs ? 'Listo para Comenzar una Conversacion?' : 'Ready to Start a Conversation?'}
+              {isEs ? '¿Listo para Comenzar una Conversación?' : 'Ready to Start a Conversation?'}
             </h2>
             <p className="text-lg mb-10 max-w-2xl mx-auto" style={{ color: 'var(--color-on-surface-variant)' }}>
               {isEs
-                ? 'Llame o envie un mensaje de texto a Chris directamente, o programe una consulta privada en un momento que le convenga.'
+                ? 'Llame o envíe un mensaje de texto a Chris directamente, o programe una consulta privada en un momento que le convenga.'
                 : 'Call or text Chris directly, or schedule a private consultation at a time that works for you.'}
             </p>
             <div className="responsive-actions justify-center">
@@ -170,7 +170,7 @@ export default async function AboutPage({ params }: Props) {
                 href={isEs ? '/es/contact' : '/contact'}
                 className="outline-button"
               >
-                {isEs ? 'Contactenos' : 'Contact Us'}
+                {isEs ? 'Contáctenos' : 'Contact Us'}
               </Link>
             </div>
             <div className="mt-8">

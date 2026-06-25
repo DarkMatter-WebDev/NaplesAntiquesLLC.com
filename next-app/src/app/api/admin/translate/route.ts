@@ -20,13 +20,14 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const title = (typeof body?.title === 'string' ? body.title : '').slice(0, MAX_TITLE_LENGTH);
   const description = (typeof body?.description === 'string' ? body.description : '').slice(0, MAX_DESCRIPTION_LENGTH);
+  const notes = (typeof body?.notes === 'string' ? body.notes : '').slice(0, MAX_DESCRIPTION_LENGTH);
 
-  if (!title.trim() && !description.trim()) {
-    return NextResponse.json({ title_es: null, description_es: null });
+  if (!title.trim() && !description.trim() && !notes.trim()) {
+    return NextResponse.json({ title_es: null, description_es: null, notes_es: null });
   }
 
   try {
-    const result = await translateProductCopyToSpanish({ title, description });
+    const result = await translateProductCopyToSpanish({ title, description, notes });
     return NextResponse.json(result);
   } catch (error) {
     console.error('[admin/translate] failed', {

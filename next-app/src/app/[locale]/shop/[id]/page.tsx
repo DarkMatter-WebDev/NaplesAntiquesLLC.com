@@ -46,6 +46,7 @@ const PRODUCT_DETAIL_COLUMNS = [
   'description',
   'description_es',
   'public_notes',
+  'public_notes_es',
   'price_label',
   'manual_price_label',
   'price_mode',
@@ -72,13 +73,19 @@ const PRODUCT_DETAIL_COLUMNS = [
   'item_year',
 ].join(', ');
 
-const PRODUCT_DETAIL_COLUMNS_WITHOUT_ITEM_YEAR = PRODUCT_DETAIL_COLUMNS
+// Columns introduced by later migrations that may not exist yet on an
+// un-migrated database. If any is missing, retry without all of them and
+// backfill nulls so the product page keeps working before the migration runs.
+const OPTIONAL_PRODUCT_DETAIL_COLUMNS = ['item_year', 'public_notes_es'];
+
+const PRODUCT_DETAIL_COLUMNS_REQUIRED = PRODUCT_DETAIL_COLUMNS
   .split(', ')
-  .filter((column) => column !== 'item_year')
+  .filter((column) => !OPTIONAL_PRODUCT_DETAIL_COLUMNS.includes(column))
   .join(', ');
 
-function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
-  return Boolean(error?.message?.toLowerCase().includes('item_year'));
+function isMissingOptionalColumnError(error: { message?: string | null } | null | undefined) {
+  const message = error?.message?.toLowerCase() ?? '';
+  return OPTIONAL_PRODUCT_DETAIL_COLUMNS.some((column) => message.includes(column));
 }
 
 async function fetchPublicProduct(id: string) {
@@ -89,14 +96,16 @@ async function fetchPublicProduct(id: string) {
     .eq('id', id)
     .single();
 
-  if (isMissingItemYearColumnError(result.error)) {
+  if (isMissingOptionalColumnError(result.error)) {
     const fallback = await supabase
       .from('products')
-      .select(PRODUCT_DETAIL_COLUMNS_WITHOUT_ITEM_YEAR)
+      .select(PRODUCT_DETAIL_COLUMNS_REQUIRED)
       .eq('id', id)
       .single();
     return {
-      data: fallback.data ? { ...(fallback.data as unknown as Record<string, unknown>), item_year: null } as Product : null,
+      data: fallback.data
+        ? { ...(fallback.data as unknown as Record<string, unknown>), item_year: null, public_notes_es: null } as Product
+        : null,
       error: fallback.error,
     };
   }
@@ -217,7 +226,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
 
   const title = isEs && p.title_es ? p.title_es : p.title;
   const description = isEs && p.description_es ? p.description_es : p.description;
-  const publicNotes = p.public_notes?.trim();
+  const publicNotes = (isEs && p.public_notes_es?.trim() ? p.public_notes_es : p.public_notes)?.trim();
   const metalLabel = productMetalVariantLabel(p.metal_variant, p.category, locale);
   const price = getDisplayPrice(p, spotData);
   const isSold = isProductSold(p.status);
@@ -406,7 +415,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                     className="text-[0.62rem] font-bold uppercase tracking-[0.22em]"
                     style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
                   >
-                    {isEs ? 'Articulo #' : 'Item #'}{inventoryReference}
+                    {isEs ? 'Artículo #' : 'Item #'}{inventoryReference}
                   </p>
                 )}
                 <div className="flex flex-wrap items-center gap-3">

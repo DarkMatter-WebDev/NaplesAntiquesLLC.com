@@ -103,6 +103,51 @@ const MODERN_AUTH_STYLES = `
     color: #5f4b00;
     outline: none;
   }
+  .modern-auth-alert {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid rgba(181, 137, 12, 0.35);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, rgba(255, 250, 238, 0.96), rgba(249, 244, 232, 0.96));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  }
+  .modern-auth-alert-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #8a5a00;
+    font-family: var(--font-headline);
+    font-size: 0.98rem;
+    font-weight: 800;
+  }
+  .modern-auth-alert-title .material-symbols-outlined {
+    font-size: 1.2rem;
+  }
+  .modern-auth-alert p {
+    color: var(--color-on-surface-variant);
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  .modern-auth-alert-success {
+    color: var(--color-primary) !important;
+    font-weight: 700;
+  }
+  .modern-auth-alert-link {
+    align-self: center;
+    color: var(--color-primary);
+    font-family: var(--font-label);
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-decoration: none;
+    text-transform: uppercase;
+  }
+  .modern-auth-alert-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
   @media (max-width: 767px) {
     .modern-auth-card {
       padding: 2rem 1.25rem 1.5rem;
@@ -127,11 +172,23 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  // When the entered email already belongs to an account, we surface a dedicated
+  // notice with a password-reset offer instead of the generic error line.
+  const [existingEmail, setExistingEmail] = useState<string | null>(null);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+
+  function clearExistingAccountNotice() {
+    if (existingEmail) setExistingEmail(null);
+    if (resetSent) setResetSent(false);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setExistingEmail(null);
+    setResetSent(false);
 
     if (password !== confirmPassword) {
       setError('Passwords do not match.');
@@ -148,7 +205,7 @@ export default function SignUpPage() {
     const acceptedAt = new Date().toISOString();
 
     const supabase = createClient();
-    const { error: authError } = await supabase.auth.signUp({
+    const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -162,12 +219,45 @@ export default function SignUpPage() {
     });
 
     if (authError) {
+      // Some Supabase configurations return an explicit "already registered" error.
+      if (/already\s*(registered|exists)|already\s*in\s*use/i.test(authError.message)) {
+        setExistingEmail(email);
+        setLoading(false);
+        return;
+      }
       setError(authError.message);
       setLoading(false);
       return;
     }
 
+    // With email confirmation enabled, Supabase obfuscates an existing, confirmed
+    // account: it returns a user with an EMPTY `identities` array and sends no
+    // email. That empty array is the signal the email is already taken.
+    const identities = data?.user?.identities;
+    if (data?.user && Array.isArray(identities) && identities.length === 0) {
+      setExistingEmail(email);
+      setLoading(false);
+      return;
+    }
+
     setDone(true);
+  }
+
+  async function handleSendReset() {
+    if (!existingEmail) return;
+    setResetLoading(true);
+    setError(null);
+
+    const supabase = createClient();
+    const redirectTo = `${window.location.origin}${prefix}/account/reset-password`;
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(existingEmail, { redirectTo });
+
+    setResetLoading(false);
+    if (resetError) {
+      setError(resetError.message);
+      return;
+    }
+    setResetSent(true);
   }
 
   if (done) {
@@ -243,7 +333,7 @@ export default function SignUpPage() {
                 required
                 autoComplete="email"
                 value={email}
-                onChange={e => setEmail(e.target.value)}
+                onChange={e => { setEmail(e.target.value); clearExistingAccountNotice(); }}
                 className="form-field w-full"
                 placeholder="you@example.com"
               />
@@ -322,6 +412,36 @@ export default function SignUpPage() {
                 .
               </span>
             </label>
+
+            {existingEmail && (
+              <div className="modern-auth-alert" role="alert">
+                <p className="modern-auth-alert-title">
+                  <span className="material-symbols-outlined" aria-hidden="true">info</span>
+                  This email already has an account
+                </p>
+                <p>
+                  An account with <strong>{existingEmail}</strong> already exists. If it&apos;s
+                  yours, reset your password to get back in — or sign in if you remember it.
+                </p>
+                {resetSent ? (
+                  <p className="modern-auth-alert-success">
+                    Password reset link sent to {existingEmail}. Check your inbox.
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSendReset}
+                    disabled={resetLoading}
+                    className="modern-auth-submit disabled:opacity-60"
+                  >
+                    {resetLoading ? 'Sending reset link...' : 'Reset Password'}
+                  </button>
+                )}
+                <Link href={`${prefix}/account/sign-in`} className="modern-auth-alert-link">
+                  Go to Sign In
+                </Link>
+              </div>
+            )}
 
             {error && (
               <p className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</p>
