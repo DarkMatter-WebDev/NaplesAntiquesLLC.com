@@ -1,12 +1,16 @@
--- Add per-product image frame padding preference.
+-- Add per-product and per-image frame padding preferences.
 -- Values:
 --   none  = existing site image frame color
 --   white = white frame behind contained product images
 --   black = black frame behind contained product images
 --   #rrggbb = custom frame color
+--
+-- image_padding is the product-level fallback.
+-- image_padding_by_image stores optional per-image overrides keyed by image URL.
 
 alter table public.products
-  add column if not exists image_padding text not null default 'none';
+  add column if not exists image_padding text not null default 'none',
+  add column if not exists image_padding_by_image jsonb not null default '{}'::jsonb;
 
 update public.products
 set image_padding = 'none'
@@ -34,3 +38,8 @@ begin
       or image_padding ~* '^#[0-9a-f]{6}$'
     );
 end $$;
+
+update public.products
+set image_padding_by_image = '{}'::jsonb
+where image_padding_by_image is null
+   or jsonb_typeof(image_padding_by_image) <> 'object';

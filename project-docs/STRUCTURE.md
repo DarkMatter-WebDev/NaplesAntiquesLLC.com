@@ -1,7 +1,7 @@
 # Structure & Build Integrity
 
 > Canonical map of the current project layout and the invariants that keep the
-> Next.js site consistent. Last updated: **2026-06-13**.
+> Next.js site consistent. Last updated: **2026-06-20**.
 
 ## What kind of site this is
 
@@ -22,10 +22,11 @@ The former root static HTML site has been removed. Do not reintroduce root
 
 | Concern | Single source of truth |
 |---------|------------------------|
-| Pages/routes | `next-app/src/app/[locale]/*` |
+| Pages/routes | `next-app/src/app/[locale]/*` (`(home)` owns the localized homepage route) |
 | Shared layout | `next-app/src/components/layout/*` |
 | Product data | Supabase `products` table |
 | Product type contract | `next-app/src/types/product.ts` |
+| Product uploads | Supabase Storage bucket `product-images` |
 | Product pricing | `next-app/src/lib/pricing.ts` and `next-app/src/lib/spot-price.ts` |
 | Metal price API | `next-app/src/app/api/metal-prices/route.ts` |
 | Inquiry API | `next-app/src/app/api/inquire/route.ts` and `next-app/src/app/api/inquiries/[id]/route.ts` |
@@ -75,8 +76,10 @@ NaplesEstateJewelry.co/
 3. **Products live in Supabase.** Do not rebuild a static JS product catalog.
 4. **Product ids are permanent.** Saved cart/wishlist state and URLs depend on
    product ids. Retire items by status rather than renaming ids.
-5. **Local image paths must exist under `next-app/public`.** Paths such as
-   `/assets/images/pages/trust.webp` map to `next-app/public/assets/...`.
+5. **Image bytes do not belong in product rows.** Product rows store URL/path
+   strings only. New uploaded inventory photos belong in Supabase Storage bucket
+   `product-images`; legacy local paths such as `/assets/images/pages/trust.webp`
+   must resolve inside `next-app/public/assets/...`.
 6. **Bilingual route behavior stays in `next-intl`.** Add or change localized
    strings in `messages/en.json` and `messages/es.json` or in clearly paired
    localized page logic.
@@ -90,3 +93,8 @@ NaplesEstateJewelry.co/
 The cleanest long-term shape is to promote `next-app/` to the repository root.
 Until then, keep the parent folder lean and avoid duplicating app assets or app
 configuration outside `next-app/`.
+
+Product image storage has one remaining cleanup track from the 2026-06-20 audit:
+move the remaining legacy local-only product photos to Supabase Storage. The
+91 old unreferenced `product-images/products` objects found by the audit were
+archived and deleted through the confirmed Storage GC flow.

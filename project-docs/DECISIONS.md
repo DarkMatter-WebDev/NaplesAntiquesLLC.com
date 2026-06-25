@@ -10,6 +10,1120 @@
 > **Alternatives considered:** ...
 > ```
 
+## 2026-06-25 — Lead forms post to /api/inquire, not Netlify Forms
+
+**Decision:** Fix the silently-failing `/contact` (submit-item) and
+`/free-evaluation` forms by submitting them via `fetch` to the existing
+`/api/inquire` route (Resend + Supabase `inquiries` + `/admin/inquiries`),
+instead of Netlify Forms. `/api/inquire` now branches on content-type: JSON keeps
+the original product-inquiry contract (InquiryForm, unchanged); multipart handles
+the lead forms with required photo uploads. Photos upload server-side via the
+service-role client to the `product-images` bucket under `inquiries/…` and are
+recorded in `inquiries.uploaded_image_urls` (the column the Storage-GC reference
+scan already tracks), with graceful fallback to message text if the column is
+absent. Did **not** create `public/__forms.html`.
+
+**Reason:** Netlify's form detector only parses static HTML at deploy time, so it
+never sees client-rendered React forms — submissions were lost while the UI faked
+success. The project already has a proven Resend+Supabase inquiry pipeline, so
+reusing it is more reliable, fully testable locally, keeps all leads in one admin
+inbox, and (unlike `application/x-www-form-urlencoded`) preserves the required
+photo uploads. Server-side upload via service role avoids needing an anonymous
+Storage policy.
+
+**Alternatives considered:** (1) Netlify Forms with multipart `FormData` —
+rejected: unverifiable without a deploy, AJAX file uploads to Netlify are
+unreliable, and it splits leads across a second inbox. (2) Netlify Forms with
+urlencoded exactly as first specified — rejected: cannot carry the photos, which
+are the point of these forms. (3) A brand-new `/api/inquiries` POST route —
+rejected: `/api/inquire` already exists with the email logic to reuse.
+
+## 2026-06-25 — Ship CSP in Report-Only first; consolidate to one netlify.toml
+
+**Decision:** Add the security headers and Content-Security-Policy via the **root**
+`netlify.toml` `[[headers]]` (deleting the duplicate `next-app/netlify.toml`), and
+deploy the CSP as `Content-Security-Policy-Report-Only` before enforcing. Caching
+is immutable 1y for `/_next/static/*` and `/assets/*` with a short
+`must-revalidate` catch-all; 410 `force` redirects block common probe paths.
+
+**Reason:** Two netlify.toml files invite config drift; the root file is the one
+Netlify reads (`base = "next-app"`). A CSP tight enough to matter can break inline
+scripts/styles, Google Fonts, or Supabase calls; Report-Only logs violations
+without breaking the site so the policy can be validated against real pages first.
+
+**Alternatives considered:** (1) Enforce CSP immediately — rejected: high risk of
+breaking the icon font / inline JSON-LD / Supabase before real-traffic validation.
+(2) Keep both toml files — rejected: drift risk. (3) Use a `public/_headers` file —
+equivalent, but `[[headers]]` keeps headers, redirects, and caching in one file.
+
+## 2026-06-25 — Product listing notes are bilingual; "Internal Notes" replaced by "Notes (ES)"
+
+**Decision:** Make the product listing's public notes bilingual, matching the
+title/description EN/ES pattern. The add/edit listing form's two notes fields are
+now **Notes (EN)** (`products.public_notes`, unchanged column) and **Notes (ES)**
+(new `products.public_notes_es` column), which replaces the old admin-only
+**Internal Notes** form field. The Spanish (/es) product detail page shows
+`public_notes_es` when present, falling back to the English `public_notes` (like
+`description_es` → `description`). Notes (ES) auto-translates from Notes (EN) on
+save via the existing translate flow, and is also manually editable.
+
+**Scope:** products only. The legacy `products.internal_notes` column is kept (it
+still preserves folded legacy `details` on save) but is no longer surfaced in the
+UI; no internal-notes data is migrated into the public field, so previously-private
+notes are never exposed. The separate admin `internal_notes` on **orders /
+inquiries / profiles** is intentionally left unchanged — those are unrelated
+admin-only fields (e.g. checkout auto-writes an English admin string into
+`orders.internal_notes`), so relabeling them "Notes (ES)" would be wrong and would
+ripple through the checkout RPC.
+
+**Reason:** The goal was to show a Spanish version of the public notes on the ES
+product pages. Repurposing the rarely-used Internal Notes form slot into the public
+Spanish note delivers that with the established EN/ES localization pattern. Reads
+(product detail) and writes (admin save) degrade gracefully before the migration is
+applied (generalized missing-optional-column fallback covering `item_year` and
+`public_notes_es`).
+
+**Alternatives considered:** (1) Rename `internal_notes` → notes_es on every table —
+rejected after finding it's semantically wrong and checkout-affecting for
+orders/inquiries/profiles. (2) Drop `products.internal_notes` — rejected to avoid a
+destructive migration and to keep the legacy `details` fold working. (3) Keep notes
+English-only — rejected; the owner wants Spanish notes on the ES pages.
+
+## 2026-06-25 — AI listing prompt is a single editable value, not default+override
+
+**Decision:** Present and treat the AI listing-assistant prompt as **one** prompt
+that the admin edits in `/admin/settings`. The saved value in `ai_settings` IS the
+prompt; the code constant `PRODUCT_EXTRACTION_SYSTEM_PROMPT` is only its **built-in
+starting value**, used until an edit is saved (and recoverable via a "Restore
+Built-In" action). Removed the "Custom vs Default" badge and the
+`isCustom`/`defaultPrompt`/"override" framing from the API (`/api/admin/ai-settings`
+now returns `systemPrompt` + `builtInPrompt`), the store
+(`fetchStoredSystemPrompt`/`saveSystemPrompt`), and the panel UI.
+
+**Reason:** The owner wants a single prompt they can edit so the edit permanently
+becomes the prompt — not a default layered under a separate override. The previous
+framing (NULL = default, set = override; "Custom"/"Default" badge) implied two
+prompts and could show a stored value that diverged from "the implemented prompt."
+The underlying mechanism is unchanged (saved value wins, blank clears it); only the
+model, naming, and UI were collapsed to one prompt.
+
+**Alternatives considered:** (1) Keep the default+override duality as-is — rejected:
+the owner explicitly wants one prompt. (2) Remove the `ai_settings` table and make
+the code constant the only source — rejected: that would lose runtime editability
+without a deploy, which is the whole point of the editable prompt. (3) Drop the
+"Restore Built-In" action entirely — rejected: keeping a recovery path to the
+shipped baseline operates on the same single value and avoids a footgun.
+
+**Refines:** the 2026-06-18 "Store the editable AI prompt in an admin-only
+`ai_settings` table" decision — same table and persistence, single-prompt framing.
+
+## 2026-06-25 — Detect duplicate sign-up via Supabase's empty-identities signal
+
+**Decision:** On the Create Account form, detect an already-registered email
+client-side from the `supabase.auth.signUp` response — a returned user whose
+`identities` array is empty means the email already belongs to a **confirmed**
+account (Supabase's anti-enumeration obfuscation when "Confirm email" is on) —
+with a fallback that also treats an explicit "already registered" error as a
+duplicate. On a hit, show an in-form notice with a **Reset Password** button
+(`resetPasswordForEmail` → emailed recovery link) and a Go to Sign In link.
+Password recovery is handled by a new dual-mode `/account/reset-password` page
+(request-email vs. set-new-password when a recovery session is present).
+
+**Reason:** Keeps the existing fully client-side auth flow (only the anon key
+ships to the browser) — no new server route or service-role lookup, and no email
+enumeration endpoint. The empty-`identities` check is Supabase's documented way
+to detect a duplicate without a privileged query, and it does not send a second
+confirmation email to the real owner of an existing confirmed account.
+
+**Alternatives considered:** (1) A server route using the service-role key to
+look up the email before signup — rejected: adds a privileged, enumerable
+endpoint for a check the signUp response already encodes. (2) Rely only on the
+"already registered" error — rejected: that error is only returned when email
+confirmation is disabled; with confirmation on (this project), the empty-identities
+signal is required. (3) Reuse the in-app `updateUser` password change only —
+rejected: that needs an existing session, which a locked-out user does not have,
+so an emailed recovery link is necessary.
+
+**Caveat:** An existing but **unconfirmed** account is not flagged (Supabase
+resends its confirmation instead), which is acceptable. Live verification of the
+duplicate notice + reset email is pending (see TASKS) and depends on the Supabase
+redirect-URL allowlist including `…/account/reset-password`.
+
+## 2026-06-25 — Shop list view as a separate component behind a URL param
+
+**Decision:** Add the gallery/list view choice as a `view=list` URL search param
+(defaulting to gallery), and render list mode with a brand-new `ProductListRow`
+component selected inside `ShopProductGrid`, rather than adding a layout mode to
+the existing `ProductCard`. The gallery `ProductCard` and grid markup/CSS are
+left completely untouched.
+
+**Reason:** The requirement was explicitly "do not change how the gallery cards
+look and are arranged." A separate list component guarantees the gallery path is
+byte-identical and isolates the list-only CSS, while the URL param keeps the
+choice shareable, back-button safe, and consistent with the existing `sort`
+control pattern. List CSS lives once in `ShopProductGrid`'s list branch.
+
+**Alternatives considered:** (1) Add a `layout="list"` prop to `ProductCard` and
+branch its JSX/CSS — rejected: the card already carries a large reveal/hover/mobile
+`<style>` block, and conditionally restructuring it risked regressing the gallery
+look. (2) Persist the choice in localStorage instead of the URL — rejected: not
+shareable and would flash the default on first server render.
+
+## 2026-06-24 — Cache the shop catalog read instead of making /shop static
+
+**Decision:** Keep `/shop` as dynamic SSR for now, but wrap the expensive catalog
+read (the column-narrowed product scan + total-inventory count) in
+`unstable_cache`, keyed by the DB-level filter set (`status`, `purity`,
+`metalColor`, `metal`, `brand`). Also cap the upstream metal-price fetch with a
+1.5s `AbortSignal.timeout`, and let next/image optimize the header logo (drop
+`unoptimized`).
+
+**Reason:** The cold-load slowness came from two things every external visitor
+paid for: a full-table product scan and a render-blocking live call to
+`api.gold-api.com`. Caching the catalog lets concurrent cold visitors share one
+DB round trip per 300s window; the fetch timeout stops a slow upstream from
+holding TTFB hostage. These are low-risk and preserve the existing faceted
+filtering exactly (verified: `metal=gold` still returns 47/54 vs 48/54 bare).
+
+**Alternatives considered:** (1) Make bare `/shop` fully static/ISR — higher
+value but requires extracting filtering/faceting/pagination out of the server
+component (the page awaits `searchParams`), which is a larger refactor logged in
+TASKS. (2) DB-side `.range()` pagination — deferred for the same reason: facets
+and live spot-price sorting are computed over the full row set today. (3) Leave
+the metal fetch unbounded — rejected; it was the single worst-case TTFB spike.
+
+**Decision:** Anonymous public data reads should use a cookie-free Supabase
+client, and the proxy should refresh Supabase sessions only on routes that
+actually need user state (`account`, `admin`, `checkout`, and `payment`). The
+localized layout should seed `next-intl` with static locale params so public
+marketing/legal/service pages can prerender.
+
+**Reason:** Reading request cookies for anonymous product/marketing pages was
+forcing request-time rendering without adding personalization. Cart and wishlist
+badges are already client/local-storage driven, so public HTML can be cached
+independently from logged-in account/admin flows.
+
+**Alternatives considered:** Keep the cookie-backed server client everywhere,
+or try to force all shop routes static immediately. The first preserves
+unnecessary dynamic rendering; the second would require a larger shop filtering
+refactor because `/shop` currently combines URL params, live spot pricing,
+derived item groups, and pagination on the server.
+
+## 2026-06-22 - De-duplicate repeated shop card styles before deeper shop rewrites
+
+**Decision:** Render the modern product-card and card-cart-button CSS once per
+shop grid instead of once per product card, while leaving the current
+server-filtered shop behavior intact.
+
+**Reason:** Production probes showed `/shop` was compressed but very large.
+Repeated inline card styles were an immediate payload bottleneck that could be
+removed without changing visible behavior or the product data contract.
+
+**Alternatives considered:** Reduce the default product count per page or remove
+multi-image card behavior. Those would alter storefront behavior. A larger
+client-filtered cached shell remains a backlog item.
+
+## 2026-06-22 - Customer-facing reveal gates fail open
+
+**Decision:** Homepage hero and shop card reveal animations should wait briefly
+for data, fonts, and images, but must reveal after a bounded fallback even if a
+load event stalls or is missed.
+
+**Reason:** The reveal animation is polish, while the hero and product grid are
+core content. A failed readiness signal should not leave customer-facing
+sections at opacity 0.
+
+**Alternatives considered:** Remove reveal animations entirely, or keep waiting
+for every readiness promise to settle. Removing the animations would discard the
+intended polish, while strict waiting already caused invisible hero/shop states
+in local preview.
+
+**Update (2026-06-22):** Homepage carousel fallback photos are now a hard
+fallback, not a temporary visible state. The hero waits longer for the live
+curated selection, and if fallback has already been revealed, late live results
+are ignored for that page load to avoid a visible product-image swap.
+
+## 2026-06-22 - Standardize responsive layout primitives
+
+**Decision:** Add shared responsive layout components/classes for containers,
+sections, stacks, grids, card grids, form grids, tables, hero sections, and
+responsive typography instead of continuing to tune every page with one-off
+fixed-width Tailwind combinations.
+
+**Reason:** The site has many public, shop, checkout, account, and admin
+surfaces that need consistent behavior from 320px through ultrawide desktop.
+Shared clamp/minmax/container patterns reduce drift, prevent accidental
+horizontal overflow, and give future pages a standard mobile-first structure.
+
+**Alternatives considered:** Patch only the pages that visibly overflowed, or
+hide horizontal overflow globally. One-off fixes would keep the layout system
+fragile, while blanket hiding could mask real clipped controls and tables.
+
+## 2026-06-21 - Duplicate Clear Filters controls share one clear-all path
+
+**Decision:** The top and bottom Clear Filters controls in the shop filter
+panel use the same `clearAll()` behavior and only render as active controls
+when filters are applied.
+
+**Reason:** The top control improves ergonomics for filtered browsing while
+keeping URL state, pagination reset, and visible behavior identical to the
+existing clear link.
+
+**Alternatives considered:** Add a separate top-only clear implementation;
+rejected because it could drift from the existing bottom control.
+
+## 2026-06-21 - Share shop sort state across sidebar and gallery controls
+
+**Decision:** The left filter-menu Sort dropdown and the gallery-top Sort
+dropdown use the same `ShopSortSelect` client control and the same URL-backed
+`sort` parameter.
+
+**Reason:** Shoppers expect a visible sort control above product grids, while
+the existing filter menu still needs to expose sorting alongside other filters.
+Sharing one control keeps labels, behavior, pagination reset, and selected
+state synchronized.
+
+**Alternatives considered:** Build a separate gallery-only sort menu; rejected
+because duplicate option lists would drift. Remove Sort from the left filter
+menu; rejected because the owner asked for the gallery dropdown in addition to
+the existing sort button.
+
+## 2026-06-21 - Public shop shows only available/sold products
+
+**Decision:** Treat `available` and `sold` as the only statuses visible in the
+public storefront. Draft, reserved, pending-payment, and archived products are
+excluded from `/shop` queries, public counts, filter option derivation, and
+normal shopper product-detail access. Admin/account return links may still
+preview detail pages for operational context.
+
+**Reason:** Draft and reserved inventory should not be discoverable by shoppers,
+while sold items can remain visible as historical/merchandising examples and
+available items remain purchasable.
+
+**Alternatives considered:** Hide only draft/reserved and leave archived items
+visible; rejected because archived is also not a public merchandising state.
+Block admin detail previews too; rejected because the admin table uses the
+public detail route as a convenient preview surface.
+
+## 2026-06-20 - Shop era/year filter: standard estate eras, hide blank years
+
+**Decision:** The shop's Era/Year slider uses the standard non-overlapping
+estate-jewelry eras from 1837 to the current year — Victorian (1837), Edwardian
+(1901), Art Deco (1915), Retro (1935), Mid-Century (1950), Modern (1970),
+Contemporary (2000). At full span it shows all items; once narrowed it shows
+only items whose `item_year` is in range and hides items with no year.
+
+**Reason:** Owner chose year-only provenance and the common estate vocabulary so
+buyers can shop by period. Hiding blank-year items on narrow is standard filter
+behavior; full-span-shows-all keeps the catalog complete by default while years
+are still being backfilled.
+
+**Alternatives considered:** Include Georgian (1714) — rejected as a long sparse
+early stretch; 20th-century-only span — rejected as too narrow for estate stock;
+always keep blank-year items visible — rejected as imprecise once years exist.
+
+**Update (2026-06-20):** Made the era display multi-level so overlapping
+movements can coexist with the contiguous primary row, rendered in stacked rows
+above it (one level per row so they never collide). All rows use the same
+line-based band styling (no pill); overlapping bands add small end-cap ticks at
+their exact edges since they don't align to the primary tick marks. Each era
+title is clickable and snaps the range to that era; the `level` field in
+`jewelry-eras.ts` allows more overlapping eras later.
+
+**Update (2026-06-20, revision):** Owner trimmed the scheme to a single
+overlapping era — **Art Nouveau (1890–1910)**. Belle Époque, Arts & Crafts, and
+Georgian were removed (Georgian had extended the floor to 1714); the slider's
+left bound is back to 1837. The left end is now labeled "1837 & earlier" and
+imposes **no** lower filter limit, so the floor handle captures pre-Victorian
+pieces. A bound is only enforced when its handle sits strictly inside the full
+span (`yearLowerLimit` / `yearUpperLimit` in `shop/page.tsx`).
+
+## 2026-06-20 - Item Date is a year (`item_year`), not a calendar date
+
+**Decision:** Replace the `products.item_date` (`date`) column and its
+`order_items.item_date_snapshot` with `products.item_year` (`smallint`, range
+1-2200) and `order_items.item_year_snapshot`. The Product Admin "Date" field is
+now a 4-digit year input ("Date (Year Made)", e.g. 1930). Internally the field
+stays "Date"; buyer-facing it is labeled "Ca." (circa) in both locales, so
+customers see "Ca. 1930" on cards, the detail spec, cart, checkout, and invoice.
+Migration `supabase/product-item-year.sql` drops the old column (clearing the
+values).
+
+**Reason:** The field describes when the physical piece was made, which for
+estate/antique jewelry is a year, not a precise calendar day. The prior `date`
+column had also been backfilled with each listing's `created_at`, so every
+product appeared to show its listing-creation date. A year integer matches how
+the owner enters provenance and removes the meaningless month/day.
+
+**Alternatives considered:** Free-text era ("circa 1930", "Victorian") — more
+flexible but unsortable and unvalidated; year + "circa" flag — more structure
+than needed right now. Owner chose year-only.
+
+## 2026-06-20 - Store item Date separately from audit/acquisition dates
+
+**Decision:** Add nullable `products.item_date` for the item's Date, meaning
+the date the piece was created, and snapshot it as
+`order_items.item_date_snapshot` for orders/invoices. Keep it separate from
+Postgres row `created_at` and the older internal `acquisition_date`.
+
+**Reason:** Admins need an intake/edit field that describes the item itself and
+can appear site-wide. Row `created_at` only records when the database row was
+created, while `acquisition_date` describes business intake history and was
+previously removed from the active product form.
+
+**Alternatives considered:** Reuse `created_at`, which would conflate item
+history with database audit timing; or revive `acquisition_date`, which would
+mix customer-facing item metadata with internal buying workflow.
+
+---
+
+## 2026-06-20 - Keep this folder repo-ready without git operations
+
+**Decision:** Treat `C:\Users\rcman\OneDrive\Documents\NaplesEstateJewelry.co`
+as the single source-of-truth project folder. Its contents should be exactly
+what belongs in the repository copy; future agents must not run git operations
+here, must clean up generated artifacts, and must keep ignore rules current for
+build output, caches, logs, and secrets.
+
+**Reason:** The human periodically wipes the separate GitHub repo folder and
+copies this folder wholesale into it. Any stray archive, temp file, log, or stale
+artifact left here can be copied into the repo; git deltas are irrelevant to
+that workflow.
+
+**Alternatives considered:** Manage this working folder like a normal git
+checkout or produce transfer manifests for later copying. Both were rejected
+because the operating model is a wholesale folder replacement handled by the
+human outside this project folder.
+
+---
+
+## 2026-06-20 - Product image cleanup must be dry-run-first and reference-aware
+
+**Decision:** Clean product images from Supabase Storage only when the app can
+prove the object path is no longer referenced by the current product, other
+products, order item snapshots, or inquiry upload URLs. Bulk orphan cleanup is
+admin-only and dry-run-first from `/admin/settings`, with objects younger than
+24 hours skipped.
+
+**Reason:** Product images are live inventory assets. Reference-aware deletion
+prevents shared photos or saved product images from disappearing, while the
+24-hour cutoff gives abandoned uploads and interrupted form sessions a recovery
+window before GC.
+
+**Alternatives considered:** Delete every replaced URL immediately, or run an
+automatic background sweep. Immediate deletion risks breaking a product when an
+admin cancels after crop/replace, and automatic sweeps are harder to audit for
+valuable inventory photos.
+
+---
+
+## 2026-06-20 - Remove verified stale local artifacts
+
+**Decision:** Keep current docs and active app files as the source of truth, and
+delete redundant local artifacts once traced: loose root image references, the
+standalone email-marketing handoff, and the unused `AdminShell` Quick Fill
+archive copy. Runtime logs are junk but may need to wait until the preview
+process releases them; they must remain ignored.
+
+**Reason:** These files were adding dirty-tree noise or stale guidance after the
+current Next/Supabase docs and public assets already covered the useful
+information. Removing them reduces confusion for future agents.
+
+**Alternatives considered:** Keep the files as informal backups, or move them
+into another archive folder. That would preserve more clutter and duplicate
+older guidance without improving recovery because the active code, public
+assets, and memory docs already contain the current state.
+
+---
+
+## 2026-06-20 - Product images store bytes outside product rows
+
+**Decision:** Product image bytes should live in Supabase Storage for uploaded
+inventory photos, or in `next-app/public/assets` for legacy/local site assets.
+The `products` table should store only URL/path references plus display
+metadata such as image padding.
+
+**Reason:** Keeping binary image payloads out of Postgres keeps product rows
+small, avoids bloating database backups/API responses, and matches the current
+admin upload flow, public rendering path, and Supabase Storage bucket policy.
+
+**Alternatives considered:** Store base64/data-URI image payloads directly in
+`products.images` or move all images into the app bundle. Inline payloads would
+make rows and API responses heavy; app-bundled inventory photos make live
+inventory edits require file/deploy work instead of storage-backed admin
+uploads.
+
+---
+
+## 2026-06-19 - Product types may be custom catalog values
+
+**Decision:** Keep a curated shared product type list for common choices such
+as Cufflinks, but allow admins and AI fill to save concise new product type
+strings when the item form is clear and not already listed. Public shop Item
+Type filters derive additional options from visible inventory.
+
+**Reason:** Forcing unlisted forms into Other hides real inventory from useful
+filters and can keep items from appearing in expected shop browsing paths.
+Custom values preserve the catalog signal while still keeping common types
+standardized.
+
+**Alternatives considered:** Require every new item type to be added in code
+before it can be used. That keeps the taxonomy tighter, but it slows intake and
+caused Cufflinks to be misclassified as Other.
+
+---
+
+## 2026-06-19 - Use `/shop` as the only storefront entry route
+
+**Decision:** Remove the intermediate `/store` category chooser and the
+dedicated `/silver-tableware` route. Header Shop, the Shop dropdown Store item,
+and homepage shopping CTAs should point directly to `/shop`.
+
+**Reason:** The extra category page and special tableware route added friction
+and split the storefront. The owner wants the previous direct-shop flow back,
+with one normal shop page as the browsing surface.
+
+**Alternatives considered:** Keep `/store` as a chooser and keep
+`/silver-tableware` as a category route. That was more segmented, but it made
+the shopping path less direct.
+
+---
+
+## 2026-06-19 - Keep sterling tableware as a merchandising route, not a catalog lock
+
+**Decision:** `/silver-tableware` should keep tableware-specific hero copy and
+use a tableware-first Item Type dropdown order: Silverware / Sterling, Bullion,
+Coins, Watches, Brooches, the remaining jewelry categories, and All items last.
+Plain visits should default to Silverware / Sterling + Silver, while the route
+still uses the full public shop catalog and allows shoppers to select any item
+type, including an explicit All items choice.
+
+**Reason:** The page is a useful entry point from Store for sterling
+tableware, but shoppers who arrive there should be able to continue browsing
+jewelry and other inventory without having to navigate back to the main shop.
+
+**Alternatives considered:** Keep forcing the route to Silverware / Sterling and
+Silver only. That was cleaner as a strict category page, but it blocked the
+owner's desired cross-browsing behavior.
+
+---
+
+## 2026-06-19 - Give sterling tablewares a dedicated shop route
+
+**Decision:** Add `/silver-tableware` as a separate modern shop route that
+reuses the existing shop renderer but locks the catalog context to Silverware /
+Sterling and Silver.
+
+**Reason:** Sterling tablewares are a distinct shopping path from silver
+jewelry. A dedicated URL gives the Store page a clean destination, keeps filter
+clearing from drifting back into general jewelry inventory, and gives SEO and
+future merchandising a clearer category page.
+
+**Alternatives considered:** Link the Store tile to `/shop?itemType=silverware`
+or add more product types under the main shop only. A query link works, but it
+is less durable as a category destination and easier for shoppers to clear out
+of accidentally.
+
+---
+
+## 2026-06-19 - Campaign analytics read from recorded Resend webhook events
+
+**Decision:** Show admin campaign-history analytics by aggregating the local
+`email_campaign_events` table that is populated by Resend webhooks.
+
+**Reason:** Webhook records are the site's durable audit trail for Resend
+delivery, open, click, bounce, and complaint events. Reading them on the admin
+page keeps the table fast, avoids exposing provider credentials to the browser,
+and avoids calling Resend for every history render.
+
+**Alternatives considered:** Query Resend directly on each admin page load or
+store analytics only as static campaign totals. Direct provider reads would add
+latency and credential handling, while static totals would miss per-event
+changes after the original send.
+
+---
+
+## 2026-06-19 - Email marketing uses opt-out model for account holders
+
+**Decision:** Follow the email-marketing handoff recommendations:
+newsletter subscribers remain explicit opt-in, while registered account holders
+are eligible for marketing by default unless `profiles.marketing_opt_out = true`.
+Every marketing send goes through one audience builder and includes an
+unsubscribe link plus the admin-configured physical mailing address.
+
+**Reason:** This matches the common US ecommerce retail pattern the owner chose,
+keeps the local database as the consent source of truth, and keeps the UI
+low-friction while preserving unsubscribe enforcement.
+
+**Alternatives considered:** Keep opt-in only for account holders. That is lower
+risk in stricter jurisdictions but was rejected for this deployment in favor of
+the handoff's ecommerce-default recommendation.
+
+---
+
+---
+
+## 2026-06-19 - Standardize public UI on the rounded shop radius scale
+
+**Decision:** Public-facing site surfaces should use the rounded shop aesthetic:
+`var(--radius-lg)`, `var(--radius-xl)`, `rounded-2xl`, or pill actions instead
+of small 6px/8px legacy corners and sharp square cards. Admin-only utility
+screens may remain denser and more utilitarian unless specifically redesigned.
+
+**Reason:** The customer-facing experience should read as one modern luxury
+retail site across marketing, selling, account, and shopping flows. The admin
+surface has different density and workflow needs.
+
+**Alternatives considered:** Leave small-radius controls in account/shop
+because they were technically usable, or force every admin utility surface into
+the same luxury styling immediately. The first kept visible visual drift; the
+second would create a larger admin redesign outside the customer-facing request.
+
+---
+
+## 2026-06-19 - Use the shop aesthetic for contact and Sell pages
+
+**Decision:** Bring the contact form family and primary Sell-category pages
+into the same rounded, lighter visual system used by the shop: rounded cards,
+soft borders/shadows, pill CTAs, and modern SVG/material icons instead of sharp
+square panels and emoji-style glyphs.
+
+**Reason:** The site should feel like a modern luxury ecommerce experience
+across lead capture and sell-service education, not like separate legacy
+templates. A shared visual language also makes future page cleanup easier.
+
+**Alternatives considered:** Leave the Sell pages as darker, sharper service
+pages, or redesign each page independently. The first kept the mismatch the
+owner called out; the second would increase maintenance and visual drift.
+
+---
+
+## 2026-06-19 - Add a small-business compliance foundation without enterprise consent tooling
+
+**Decision:** Add practical legal/policy pages, footer links, form disclosures,
+account age/Terms/Privacy consent, an essential cookie/storage notice, and a
+homepage-subscriber unsubscribe workflow. Treat the current site as a small
+Florida business with ecommerce/order requests, accounts, auction guidance, and
+possible future vendor workflows, but do not claim certifications or implement a
+large enterprise consent-management platform.
+
+**Reason:** The site collects real customer, account, inquiry, order, and
+subscriber information, so it needs clear disclosures and acceptance records.
+Source review found no active ad/behavioral tracking pixels, so a lightweight
+essential-cookie notice and Cookie Preferences page is more accurate than a
+full opt-in tracker manager.
+
+**Alternatives considered:** Add only static placeholder legal pages, or add a
+heavy CMP with analytics toggles. Placeholder pages would not satisfy the
+actual data flows, while a large CMP would imply optional tracking systems that
+are not present.
+
+---
+
+## 2026-06-18 - Float Store category choices over the hero image
+
+**Decision:** Keep `/store` as a simple category chooser, but remove the
+separate hero text and card sections in favor of two large square category
+controls floating over the hero image. Estate Jewelry is an active link to
+`/shop`; Sterling Silver Tablewares stays disabled until that inventory path is
+ready.
+
+**Reason:** The page is only choosing a shopping path, so letting the two
+choices be the whole first-viewport interface keeps the page direct and makes
+the category actions feel more prominent.
+
+**Alternatives considered:** Keep the original full-width category header plus
+large image cards below the hero, or add a separate floating card panel over the
+image. The old structure felt too split for a two-choice page, and a large panel
+would cover too much of the store image.
+
+---
+
+## 2026-06-18 - Carousel hero: windowed ring + two-block swept background
+
+**Decision:** Make the home hero the 3D carousel and rebuild it as a **windowed
+(infinite) ring** — render only `visibleCount` cards (admin-set, default 6 desktop /
+4 mobile) on a tight radius and cycle the full list through them as cards pass the
+hidden back. Drive the per-photo background as a **two-block sweep**: each photo is
+a White or Black group, `groupByBackground()` orders them into one white arc + one
+black arc, and the hero background is a per-frame horizontal gradient (seam projected
+by `sin` of its net angle) painted **imperatively** to `section.style.background`.
+The text theme flips via React state only when the centered color changes.
+
+**Reason:** The ring radius is derived from item count (`cardSize / tan(180°/N)`),
+so a long list pushes the camera far back. Windowing keeps the close, intimate feel
+at any length while bounding the composited-layer cost. Two contiguous blocks give
+exactly two seams (long solid fields, one clean sweep each) instead of the busy
+left/right thrash that arbitrary per-photo colors would cause. Painting the gradient
+imperatively avoids a React re-render every animation frame.
+
+**Alternatives considered:** (1) Shrink the radius with all N cards on the ring —
+rejected: cards pile on top of each other. (2) Uniform background fade triggered when
+a photo reaches center — rejected: no anticipatory/directional sweep, and it lagged.
+(3) Free per-photo colors (no blocks) — offered but rejected with the owner for the
+thrashy result. (4) CSS `transition` on the section background — rejected: it lags
+the per-frame sweep.
+
+---
+
+## 2026-06-18 - Carousel images via next/image with an off-screen preloader
+
+**Decision:** Render carousel photos through `next/image` (`fill`, viewport-based
+`sizes`, `quality 90`; `formats: ['image/avif','image/webp']`, `qualities:[75,90]`
+in `next.config.ts`) and warm the next cycle's images with a hidden off-screen layer
+that uses identical `sizes` so the browser fetches the exact same optimized variant
+ahead of time. Pause the spin + rAF loop offscreen via `IntersectionObserver`.
+
+**Reason:** Source images were already WebP but served raw at full resolution through
+a plain `<img>`, so a ~1200px image decoded for a ~500px card. Right-sizing cuts
+decode/GPU memory ~4–6× with no visible quality change — the real enabler for larger
+lineups, especially on mobile. The preloader prevents pop-in when a card's photo
+swaps at the hidden back; offscreen-pause makes item count nearly irrelevant to
+scroll/battery once the hero is out of view.
+
+**Alternatives considered:** (1) Keep raw `<img>` — rejected: full-res decode is the
+mobile bottleneck. (2) Lossless re-encode — rejected: little benefit; sizing is the
+lever and `quality 90` is already visually lossless. (3) No preload (rely on the
+~half-revolution lead time) — kept as the safety net but added preloading per the
+owner's request.
+
+---
+
+## 2026-06-18 - Carousel settings: separate desktop/mobile counts, resilient columns
+
+**Decision:** Store ring size per breakpoint (`carousel_settings.visible_count` =
+desktop, `visible_count_mobile` = mobile) and the per-photo background on
+`carousel_selection.bg_color`. `HomeHero` picks desktop vs mobile via `matchMedia`.
+All carousel reads/writes use **tiered fallbacks** so a not-yet-migrated optional
+column degrades quietly (per-photo colors don't persist; mobile mirrors desktop)
+instead of breaking the carousel or blocking a save.
+
+**Reason:** Phones want a tighter ring than wide desktops. Tiered fallbacks let the
+code ship and run before the owner has applied each Supabase migration, which has
+repeatedly been the lag point — the live carousel must never break in the interim.
+
+**Alternatives considered:** (1) One shared count — rejected: desktop/mobile want
+different densities. (2) Hard-fail when a column is missing — rejected: it broke the
+live hero / blocked saves before migrations were run.
+
+---
+
+## 2026-06-18 - Store the editable AI prompt in an admin-only `ai_settings` table
+
+**Decision:** Make the live AI listing-assistant system prompt editable from
+`/admin/settings` by storing an optional override in a single-row `ai_settings`
+table (NULL = use the built-in default). The provider keeps
+`PRODUCT_EXTRACTION_SYSTEM_PROMPT` as the exported default and accepts a
+`systemPrompt` override; the fill route reads the override per request through
+the server Supabase client and falls back to the default if the read fails. A
+new `is_app_admin()` SECURITY DEFINER function (over `profiles.is_admin`) plus
+RLS/GRANTs restrict read/write to admins, and the admin-gated
+`/api/admin/ai-settings` route is the only edit path.
+
+**Reason:** The Settings prompt editor was a leftover from the disabled Quick
+Fill workflow and controlled nothing. Routing the real prompt through a table +
+admin API lets the owner tune assistant behavior without a code deploy, while
+the default-fallback keeps generation working before/if the table is absent.
+
+**Alternatives considered:** (1) Keep the prompt hardcoded and require a code
+change/deploy to edit it — rejected as too slow for an operator. (2) Store it in
+browser localStorage like the old Quick Fill prompt — rejected because the
+prompt is consumed server-side and must be shared across sessions/devices.
+(3) Gate writes by email like the carousel's `is_carousel_admin()` — rejected
+in favor of the more robust `profiles.is_admin` mechanism.
+
+---
+
+## 2026-06-18 - Use carousel selection/settings tables for Store hero curation
+
+**Decision:** Build the Store Carousel Hero admin controls on top of the
+supplied `carousel_selection` and `carousel_settings` helpers, while keeping
+the previous hardcoded Store hero items as a storefront fallback until the
+carousel tables are installed and populated.
+
+**Reason:** The supplied widget already defines an ordered selection model,
+background setting, show-price setting, and RLS-protected admin write path.
+Using those keeps the admin form aligned with the handoff while the fallback
+prevents the public Store hero from going blank during setup or empty
+selection states.
+
+**Alternatives considered:** Store carousel choices in browser local storage or
+add fields directly to `products`. Local storage would not affect shoppers, and
+product-level flags would mix hero curation with inventory metadata while still
+needing a separate order/settings mechanism.
+
+---
+
+## 2026-06-18 - Store manual-order line discounts on order items
+
+**Decision:** Add `order_items.discount` for per-line manual order discounts
+and keep `orders.discount` as the aggregate total discount used for order and
+invoice totals.
+
+**Reason:** Line discounts need to travel with the immutable item snapshot so
+the admin can edit existing orders and invoices can show original price,
+line-level discount, and adjusted line total. Keeping the aggregate on
+`orders.discount` preserves existing summary and invoice calculations.
+
+**Alternatives considered:** Store only an order-level discount, or create a
+separate invoice-only adjustment table. Order-level only cannot explain which
+item was discounted; an invoice-only table would leave order totals and invoice
+emails out of sync.
+
+---
+
+## 2026-06-18 - Use cards for mobile admin orders
+
+**Decision:** Keep the dense Orders table for desktop admin work, but render
+orders as stacked cards on mobile screens.
+
+**Reason:** The table needs many columns for desktop scanning, but on phones it
+forces horizontal scrolling and makes key order context hard to read. Cards let
+mobile admins see order number, total, customer, items, statuses, and the View
+Order action without sideways scrolling.
+
+**Alternatives considered:** Keep the existing horizontal overflow table on all
+screen sizes or hide lower-priority columns on mobile. Horizontal overflow was
+awkward and visually clipped; hiding columns would remove important admin
+context.
+
+---
+
+## 2026-06-17 - Store per-photo image padding overrides
+
+**Decision:** Keep `products.image_padding` as the product-level fallback and
+add `products.image_padding_by_image` as a JSON map keyed by image URL for
+per-photo padding overrides.
+
+**Reason:** Existing listings and cart/wishlist payloads already depend on the
+single fallback value. A JSON override map lets admins tune individual photos
+without breaking older products or requiring separate image records.
+
+**Alternatives considered:** Replace `image_padding` with a structured value or
+create a separate product-images table. Replacing the field would break current
+displays and saved carts; a separate table is more normalized but too heavy for
+the current hand-curated product image workflow.
+
+---
+
+## 2026-06-17 - Lead checkout with a full-width order review
+
+**Decision:** Make checkout start with a full-width Order Summary before the
+contact form, and let cart items carry optional product descriptions for richer
+checkout/cart review.
+
+**Reason:** High-value estate pieces need more confirmation context than a
+compact sidebar can provide. Showing complete titles, prices, and brief
+descriptions first helps customers review exactly what they are reserving
+before entering contact details.
+
+**Alternatives considered:** Keep the previous two-column checkout with the
+summary in a narrow sidebar. That was compact, but it truncated item context and
+made the customer form visually dominate the review step.
+
+---
+
+## 2026-06-17 - Scope purity filters by selected metal
+
+**Decision:** In shop and Product Admin filters, Silver metal selections expose
+only silver-designated purity options such as `925 Sterling`, while Gold keeps
+karat options.
+
+**Reason:** Karat purity labels do not apply to silver inventory and should not
+be selectable once the Metal filter is explicitly Silver.
+
+**Alternatives considered:** Leave all purity options visible and rely on
+filter results to show no matches for invalid combinations. That made the UI
+less clear and allowed contradictory filter states.
+
+---
+
+## 2026-06-17 - Restrict Silverware / Sterling filters to Silver
+
+**Decision:** When Silverware / Sterling is selected in shop or Product Admin
+filters, the Metal dropdown exposes only Silver.
+
+**Reason:** Silverware / Sterling implies a silver catalog path, so offering
+All Metals or Gold creates invalid filter combinations and unnecessary admin
+cleanup.
+
+**Alternatives considered:** Keep All/Gold visible while auto-selecting Silver.
+That preserved broader manual control, but still allowed contradictory filter
+states after a single extra click.
+
+---
+
+## 2026-06-17 - Treat Silverware as a Silver filter shortcut
+
+**Decision:** When Silverware is selected as the shop Item Type or admin Product
+Type filter, automatically set the broad Metal filter to Silver. In Product
+Admin, also set Metal Type to Silver and clear incompatible gold-only Metal
+Color selections.
+
+**Reason:** Silverware inventory belongs in the silver browsing path, and the
+filter UI should prevent a contradictory Silverware + Gold filter state.
+
+**Alternatives considered:** Leave Silverware independent from Metal and rely on
+admins/shoppers to choose Silver manually. That preserved total flexibility but
+made an obviously implied filter require an extra step.
+
+---
+
+## 2026-06-17 - Keep admin product filters collapsed by default
+
+**Decision:** Hide the full Product Admin table filter system behind a Filters
+button by default, while keeping search, Add Product, and result count visible
+in the toolbar.
+
+**Reason:** The filter system is useful but visually heavy. Collapsing it keeps
+the product table easier to scan during normal admin work while preserving quick
+access and showing an active-filter count when filters are applied.
+
+**Alternatives considered:** Leave the full filter row always visible. That made
+all controls immediately available, but it consumed too much vertical space for
+the common inventory-scanning workflow.
+
+---
+
+## 2026-06-17 - Align admin product filters with shop filtering
+
+**Decision:** Order the main Product Admin table filters around the same
+catalog hierarchy used on the shop: Gender, Product Type, Brand, Metal, Metal
+Type, Metal Color, Purity, then product-type-scoped Link Type and Length/Size,
+with admin-only Status, Location, and Featured controls after the catalog
+filters.
+
+**Reason:** Admins should manage inventory through the same taxonomy shoppers
+use to browse it, while still having operational controls that do not belong on
+the public shop.
+
+**Alternatives considered:** Keep the previous operational-first order with
+Status and Pricing Metal leading the row. That kept admin controls prominent but
+made the filter row less consistent with the public shop and kept Link
+Type/Length visible even when they did not apply.
+
+---
+
+## 2026-06-17 - Store length and size as bare numerics
+
+**Decision:** Normalize Product Admin Length/Size values to bare numeric
+strings, stripping inch-unit text from manual entries, Quick Fill values, and AI
+listing drafts before they are displayed or saved.
+
+**Reason:** The admin product table needs consistent scan-friendly Size values
+such as `7.75`, regardless of whether an entry came in as `7.75 in`, `7.75in`,
+`7.75 inches`, or `7.75"`. Buyer-facing surfaces can still add units when the
+product type needs them.
+
+**Alternatives considered:** Continue storing necklace/bracelet lengths with
+`in` and strip units only in the admin table. Normalizing before save keeps the
+database and tags cleaner and avoids future table/filter inconsistencies.
+
+---
+
+## 2026-06-16 - Isolate AI listing providers behind configuration
+
+**Decision:** Build the integrated product listing assistant through a
+provider-neutral internal API (`generateProductDraft`) and keep all provider
+names, model names, API keys, request construction, response parsing, and
+central prompt text inside `next-app/src/lib/ai-product-provider.ts`.
+
+**Reason:** The store needs freedom to switch between OpenAI, Anthropic,
+Google, or local/self-hosted models based on cost, speed, and accuracy without
+rewriting admin UI, form population, database code, validation, or business
+logic. Environment variables choose the active provider/model.
+
+**Alternatives considered:** Call a specific AI provider directly from the
+admin component or API route. That is faster to wire up initially, but it would
+spread provider assumptions through the app and make future model changes
+riskier than a config-only change.
+
+---
+
+## 2026-06-16 - Store custom image padding colors as hex metadata
+
+**Decision:** Extend `products.image_padding` to accept six-digit hex colors
+such as `#f2efe8` in addition to `none`, `white`, and `black`.
+
+**Reason:** The admin needs to match photo side padding to colors sampled from
+the first image without creating new image files or changing the rendering path.
+Keeping the custom color in the existing display metadata field lets shop
+cards, product detail galleries, and admin thumbnails share one helper.
+
+**Alternatives considered:** Add separate `image_padding_color` and
+`image_padding_mode` columns, or bake sampled colors into generated image
+assets. Separate columns are more verbose for the current need, and baked-in
+assets would make color changes destructive and harder to revise.
+
+---
+
+## 2026-06-16 - Store image padding as product display metadata
+
+**Decision:** Add a per-product `image_padding` display preference with
+`none`, `white`, and `black` values instead of modifying uploaded product image
+files.
+
+**Reason:** Some product photos are vertical and reveal the containing image
+frame on shop cards and detail pages. A metadata setting lets admins choose the
+best frame color per listing without destructively editing or duplicating image
+assets.
+
+**Alternatives considered:** Crop or re-export each photo with baked-in side
+bars. That gives fixed control per file, but it is slower, destructive, and
+harder to change if the same image needs a different presentation later.
+
+---
+
+## 2026-06-16 - Add Product Type and Metal Type additively
+
+**Decision:** Add nullable `products.product_type` and `products.metal_type` as
+the new inventory hierarchy while keeping `jewelry_type`, `category`,
+`metal_variant`, and existing pricing/order fields in place.
+
+**Reason:** The catalog is expanding beyond gold/silver jewelry into watches,
+coins, bullion, loose stones, silverware, estate lots, and future categories.
+An additive migration lets the admin UI move to Product Type first and Metal
+Type second without breaking current shop pages, pricing, orders, invoices, or
+legacy product rows.
+
+**Alternatives considered:** Rename or repurpose `jewelry_type` and `category`
+directly. That would be cleaner eventually, but it risks breaking live pricing
+and product filters because `category` still powers Gold/Silver spot-pricing
+logic.
+
+---
+
+## 2026-06-16 - Keep Quick Fill custom values as direct field values
+
+**Decision:** Add `products.brand` as a real product field, but keep Quick Fill
+custom Brand, Link Type, and Length/Size entries as direct free-text field
+values instead of promoting them into permanent dropdown option lists.
+
+**Reason:** Admins need flexibility to enter a specific maker, style, or
+measurement without letting every one-off value expand the controlled option
+menus and filters.
+
+**Alternatives considered:** Automatically add every new Brand, Link Type, or
+Length/Size value to future chooser lists. That would make repeated values easy
+to select, but the option menus would drift and grow too quickly for a small,
+curated inventory workflow.
+
+---
+
+## 2026-06-15 - Show spot basis on product detail pricing
+
+**Decision:** Item detail pages show the raw scrap/melt value, the current
+site-wide spot value per ounce used for that calculation, and a countdown to
+the next five-minute price refresh.
+
+**Reason:** Buyers can see not only the selling price and melt value, but also
+the exact market baseline behind the calculation and when it will update next.
+
+**Alternatives considered:** Keep showing only the scrap value. That was
+simpler but did not explain which current spot value the item price was based
+on or when the pricing context would refresh.
+
+---
+
+## 2026-06-15 - Separate Jewelry Type from Link Type
+
+**Decision:** Add `products.jewelry_type` for the broad item form and keep the
+existing `products.chain_type` as Link Type, scoped only to necklaces and
+bracelets.
+
+**Reason:** Necklace/bracelet/ring/pendant/earrings are merchandising item
+types, while Cuban/Figaro/Rope/Byzantine/etc. describe link style. Separating
+them prevents values like "Cuban link bracelet" from becoming one ambiguous
+category and lets necklace and bracelet link filters remain distinct.
+
+**Alternatives considered:** Keep using one combined Chain Type/Jewelry Type
+field. That was simpler but kept mixing item form with link style and made
+filtering less precise.
+
+---
+
+## 2026-06-15 - Model metal color/type as a product subtype
+
+**Decision:** Keep `products.category` as the broad pricing category (`Gold` or
+`Silver`) and add `products.metal_variant` for Yellow Gold, White Gold, Rose
+Gold, Tricolor Gold, Bicolor Gold, Silver, and Vermeil. Bicolor Gold is stored
+as a Gold subtype but appears under both broad Gold and Silver shop filters.
+
+**Reason:** Pricing and melt-value logic depend on the broad metal category, but
+admins and shoppers need a finer merchandising/filtering distinction. A subtype
+field preserves current spot-pricing behavior while giving the catalog room to
+separate gold colors and silver/vermeil.
+
+**Alternatives considered:** Add every color/type as a top-level category. That
+would make filters simple but would blur the pricing category and increase the
+risk of breaking gold/silver spot calculations.
+
+---
+
+## 2026-06-15 - Checkout creates unpaid admin-follow-up orders
+
+**Decision:** Public checkout creates an unpaid order, snapshots the cart into
+`order_items`, moves products to `pending_payment`, inserts an admin
+notification, and emails the configured order recipient.
+
+**Reason:** The store does not have live card capture yet, but inventory still
+needs to be held immediately and the owner needs a reliable order trail plus a
+visible admin inbox item.
+
+**Alternatives considered:** Keep checkout as a front-end confirmation only;
+send only an email without writing an order; route directly to payment before
+creating inventory holds. All three options risk missed orders or overselling
+single-piece inventory.
+
+---
+
+## 2026-06-15 - Manual orders drive product lifecycle
+
+**Decision:** Manual admin orders snapshot item details into `order_items` and
+drive product status transitions from the order detail screen.
+
+**Reason:** Sales history needs immutable item details, while the live product
+record can continue changing for merchandising. Product lifecycle transitions
+keep the public shop from selling the same item twice.
+
+**Alternatives considered:** Leave order creation disconnected from product
+status; update only live product records without order item snapshots. Both
+options weaken sales history and inventory safety.
+
+---
+
+## 2026-06-15 - Add sales workflow schema additively
+
+**Decision:** Introduce orders, order item snapshots, invoices, saved items, and
+richer product lifecycle fields through additive Supabase SQL while keeping the
+existing `products` table and admin component.
+
+**Reason:** The store already has live inventory, product admin, checkout/cart,
+and public product pages depending on the current product shape. Additive fields
+let the site gain sales-processing behavior without a risky rewrite or data
+cutover, and order item snapshots preserve the sold item details even if product
+records change later.
+
+**Alternatives considered:** Replace the product schema outright; build a
+separate inventory table. Additive migration is safer for the current live shop
+and keeps public routes compatible during rollout.
+
+---
+
+## 2026-06-15 - Admin users view reads profiles
+
+**Decision:** Build the admin account-users table from Supabase `profiles`
+instead of browser-side Auth admin APIs.
+
+**Reason:** `profiles` is already the app-owned account/contact table, includes
+the fields needed for the dashboard, and can be protected with an authenticated
+admin RLS policy. Auth admin APIs require a service-role key and should not be
+called from client code.
+
+**Alternatives considered:** Add a service-role server client and list
+`auth.users`; expose profile reads through a custom route handler. The profile
+table keeps the feature aligned with existing account and checkout data.
+
 ---
 
 ## 2026-06-13 - Keep Auctions under Shop

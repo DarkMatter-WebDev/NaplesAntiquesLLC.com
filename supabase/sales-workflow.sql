@@ -45,6 +45,7 @@ alter table public.products
   add column if not exists acquisition_source text,
   add column if not exists internal_notes text,
   add column if not exists public_notes text,
+  add column if not exists item_year smallint,
   add column if not exists featured boolean not null default false;
 
 update public.products
@@ -86,6 +87,7 @@ create unique index if not exists products_inventory_number_unique_idx
   where inventory_number is not null;
 create index if not exists products_metal_variant_idx on public.products (metal_variant);
 create index if not exists products_brand_idx on public.products (brand);
+create index if not exists products_item_year_idx on public.products (item_year);
 create index if not exists products_product_type_idx on public.products (product_type);
 create index if not exists products_metal_type_idx on public.products (metal_type);
 create index if not exists products_jewelry_type_idx on public.products (jewelry_type);
@@ -126,6 +128,7 @@ create table if not exists public.order_items (
   product_id text references public.products (id) on delete set null,
   inventory_number text,
   title_snapshot text not null,
+  item_year_snapshot smallint,
   metal_snapshot text,
   purity_snapshot text,
   gram_weight_snapshot numeric(8,2),
@@ -133,6 +136,9 @@ create table if not exists public.order_items (
   image_snapshot text,
   created_at timestamptz not null default now()
 );
+
+alter table public.order_items
+  add column if not exists item_year_snapshot smallint;
 
 create table if not exists public.invoices (
   id uuid primary key default gen_random_uuid(),

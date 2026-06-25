@@ -35,7 +35,7 @@ export default async function SilverServicesPage({ params }: Props) {
         <section className="relative h-[640px] flex items-center overflow-hidden">
           <div className="absolute inset-0 z-0">
             <Image
-              src="/assets/images/pages/silver.jpg"
+              src="/assets/images/pages/silver.webp"
               alt="Silver estate pieces"
               fill
               sizes="100vw"

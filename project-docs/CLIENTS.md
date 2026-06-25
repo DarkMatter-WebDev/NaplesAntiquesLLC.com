@@ -41,7 +41,7 @@
 
 | Service | Use | Account / dashboard owner | Where credentials live |
 |---------|-----|---------------------------|------------------------|
-| **Supabase** | Auth, profiles, products, inquiries, saved state (project ref `evzluixourmsefwdsieu`) | _TBD_ | public anon key in `NEXT_PUBLIC_SUPABASE_ANON_KEY`; **service-role key** (if any) -> store reference only, never in repo |
+| **Supabase** | Auth, Postgres data, products, inquiries, saved state, and Storage bucket `product-images` (project ref `evzluixourmsefwdsieu`) | _TBD_ | public anon key in `NEXT_PUBLIC_SUPABASE_ANON_KEY`; **service-role key** (if any) -> store reference only, never in repo |
 | **gold-api.com** | Live gold spot price (XAU) | _TBD (public endpoint, no key currently)_ | n/a |
 | **Resend** | Inquiry email from the Next app when configured | _TBD_ | `RESEND_API_KEY` in local/Netlify env only |
 | **Domain registrar** | DNS for the domains above | _TBD_ | _TBD_ |

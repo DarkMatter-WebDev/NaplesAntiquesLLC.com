@@ -14,6 +14,8 @@ alter table public.profiles
   add column if not exists postal_code text,
   add column if not exists country text default 'United States',
   add column if not exists marketing_opt_in boolean not null default false;
+alter table public.profiles
+  add column if not exists marketing_opt_out boolean not null default false;
 
 update public.profiles p
 set email = u.email

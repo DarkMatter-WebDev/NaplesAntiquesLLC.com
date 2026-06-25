@@ -1,6 +1,6 @@
 # Integrity Rules & Pre-Publish Checklist
 
-> Current rules for the Next.js app. Last updated: **2026-06-13**.
+> Current rules for the Next.js app. Last updated: **2026-06-20**.
 
 ## Commands
 
@@ -36,11 +36,16 @@ reflected in:
 Product ids are URLs and saved-state keys. Do not rename them casually. Mark an
 item sold/unavailable or add a new product instead.
 
-### 4. Keep local assets in `next-app/public`
+### 4. Keep image storage boundaries clear
 
 Hard-coded paths like `/assets/images/pages/trust.webp` must resolve inside
 `next-app/public/assets`. Supabase Storage URLs are allowed for uploaded product
 images and are covered by `next.config.ts` remote image patterns.
+
+Never store product image bytes as base64/data-URI payloads in `products.images`
+or `products.image_urls`. Those columns are URL/path arrays only. New uploaded
+inventory photos should go to Supabase Storage bucket `product-images`; local
+product photos are legacy or deliberate app-bundled assets.
 
 ### 5. Keep EN/ES routes together
 
@@ -58,6 +63,8 @@ credentials out of commits. Record only where credentials live.
 - [ ] `npm run build` passes from `next-app/`.
 - [ ] `npm run lint` passes or any existing lint debt is documented.
 - [ ] New/changed local images live under `next-app/public/assets`.
+- [ ] New uploaded product images live in Supabase Storage, not as database
+      blobs/base64 strings.
 - [ ] Supabase schema/type/UI changes are kept in sync.
 - [ ] EN and ES routes render for changed user-facing pages.
 - [ ] Root `netlify.toml` still points to `base = "next-app"`.

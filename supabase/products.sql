@@ -7,6 +7,8 @@
 create table if not exists public.products (
   id                   text        primary key,
   category             text        not null default 'Gold',
+  metal_type           text,
+  metal_variant        text        not null default 'yellow_gold',
   title                text        not null,
   title_es             text,
   price_label          text,
@@ -14,9 +16,24 @@ create table if not exists public.products (
   price_mode           text        not null default 'spot-multiplier',
   purity               integer,
   weight_grams         numeric(8,2),
+  inventory_number     integer,
+  sku                  text,
+  slug                 text,
+  metal                text,
+  gram_weight          numeric(8,2),
+  stone_details        text,
+  brand                text,
+  product_type         text,
+  jewelry_type         text        not null default 'Necklace',
+  chain_type           text,
+  length               text,
   pricing_multiplier   numeric(5,3),
-  status               text        not null default 'Available',
+  status               text        not null default 'available',
+  location             text        not null default 'showcase',
   images               jsonb       not null default '[]',
+  image_urls           jsonb       not null default '[]',
+  image_padding        text        not null default 'none',
+  image_padding_by_image jsonb     not null default '{}'::jsonb,
   description          text,
   description_es       text,
   details              jsonb       not null default '[]',
@@ -25,6 +42,18 @@ create table if not exists public.products (
   tags_es              jsonb       not null default '[]',
   private_price_label  text,
   gender               text        not null default 'Unisex',
+  item_year            smallint,
+  cost_basis           numeric(12,2),
+  melt_value           numeric(12,2),
+  asking_price         numeric(12,2),
+  minimum_price        numeric(12,2),
+  live_spot_snapshot   jsonb,
+  acquisition_date     date,
+  acquisition_source   text,
+  internal_notes       text,
+  public_notes         text,
+  public_notes_es      text,
+  featured             boolean     not null default false,
   sort_order           integer     not null default 0,
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now()
@@ -33,7 +62,69 @@ create table if not exists public.products (
 -- ── 1b. Add columns introduced after initial deploy ─────────────────────────
 -- Safe to re-run: IF NOT EXISTS prevents errors on fresh installs.
 alter table public.products
-  add column if not exists gender text not null default 'Unisex';
+  add column if not exists gender text not null default 'Unisex',
+  add column if not exists item_year smallint,
+  add column if not exists metal_type text,
+  add column if not exists metal_variant text not null default 'yellow_gold',
+  add column if not exists inventory_number integer,
+  add column if not exists sku text,
+  add column if not exists slug text,
+  add column if not exists metal text,
+  add column if not exists gram_weight numeric(8,2),
+  add column if not exists stone_details text,
+  add column if not exists brand text,
+  add column if not exists product_type text,
+  add column if not exists jewelry_type text not null default 'Necklace',
+  add column if not exists chain_type text,
+  add column if not exists length text,
+  add column if not exists image_urls jsonb not null default '[]'::jsonb,
+  add column if not exists image_padding text not null default 'none',
+  add column if not exists image_padding_by_image jsonb not null default '{}'::jsonb,
+  add column if not exists cost_basis numeric(12,2),
+  add column if not exists melt_value numeric(12,2),
+  add column if not exists asking_price numeric(12,2),
+  add column if not exists minimum_price numeric(12,2),
+  add column if not exists live_spot_snapshot jsonb,
+  add column if not exists location text not null default 'showcase',
+  add column if not exists acquisition_date date,
+  add column if not exists acquisition_source text,
+  add column if not exists internal_notes text,
+  add column if not exists public_notes text,
+  add column if not exists public_notes_es text,
+  add column if not exists featured boolean not null default false;
+
+update public.products
+set
+  inventory_number = coalesce(inventory_number, null),
+  sku = coalesce(sku, nullif(id, '')),
+  slug = coalesce(slug, nullif(id, '')),
+  metal = coalesce(metal, category),
+  metal_type = coalesce(nullif(metal_type, ''), nullif(category, ''), nullif(metal, ''), 'Gold'),
+  metal_variant = coalesce(
+    nullif(metal_variant, ''),
+    case when category = 'Silver' then 'silver' else 'yellow_gold' end
+  ),
+  gram_weight = coalesce(gram_weight, weight_grams),
+  product_type = coalesce(nullif(product_type, ''), nullif(jewelry_type, ''), 'Other'),
+  jewelry_type = case
+    when jewelry_type is not null and jewelry_type <> '' and jewelry_type <> 'Necklace' then jewelry_type
+    when lower(coalesce(title, '') || ' ' || coalesce(title_es, '') || ' ' || coalesce(chain_type, '')) like '%bracelet%' then 'Bracelet'
+    when lower(coalesce(title, '') || ' ' || coalesce(title_es, '') || ' ' || coalesce(chain_type, '')) like '%ring%' then 'Ring'
+    when lower(coalesce(title, '') || ' ' || coalesce(title_es, '') || ' ' || coalesce(chain_type, '')) like '%pendant%' then 'Pendant'
+    when lower(coalesce(title, '') || ' ' || coalesce(title_es, '') || ' ' || coalesce(chain_type, '')) like '%earring%' then 'Earrings'
+    when lower(coalesce(title, '') || ' ' || coalesce(title_es, '') || ' ' || coalesce(chain_type, '')) like '%watch%'
+      or lower(coalesce(title, '') || ' ' || coalesce(title_es, '') || ' ' || coalesce(chain_type, '')) like '%wristwatch%'
+      or lower(coalesce(title, '') || ' ' || coalesce(title_es, '') || ' ' || coalesce(chain_type, '')) like '%wrist watch%'
+      or lower(coalesce(title, '') || ' ' || coalesce(title_es, '') || ' ' || coalesce(chain_type, '')) like '%timepiece%' then 'Watch'
+    when lower(coalesce(title, '') || ' ' || coalesce(title_es, '') || ' ' || coalesce(chain_type, '')) like '%chain%' then 'Necklace'
+    when lower(coalesce(title, '') || ' ' || coalesce(title_es, '') || ' ' || coalesce(chain_type, '')) like '%necklace%' then 'Necklace'
+    else coalesce(nullif(jewelry_type, ''), 'Other')
+  end,
+  image_urls = case
+    when image_urls = '[]'::jsonb then images
+    else image_urls
+  end
+where true;
 
 -- ── 2. Auto-update updated_at ────────────────────────────────────────────────
 
@@ -47,7 +138,21 @@ create trigger products_updated_at
 
 create index if not exists products_status_idx    on public.products (status);
 create index if not exists products_category_idx  on public.products (category);
+create index if not exists products_metal_type_idx on public.products (metal_type);
+create index if not exists products_metal_variant_idx on public.products (metal_variant);
+create index if not exists products_brand_idx    on public.products (brand);
+create index if not exists products_item_year_idx on public.products (item_year);
+create index if not exists products_product_type_idx on public.products (product_type);
+create index if not exists products_jewelry_type_idx on public.products (jewelry_type);
 create index if not exists products_sort_idx      on public.products (sort_order);
+drop index if exists products_inventory_number_idx;
+create unique index if not exists products_inventory_number_unique_idx
+  on public.products (inventory_number)
+  where inventory_number is not null;
+create index if not exists products_sku_idx       on public.products (sku);
+create index if not exists products_slug_idx      on public.products (slug);
+create index if not exists products_location_idx  on public.products (location);
+create index if not exists products_featured_idx  on public.products (featured);
 
 -- ── 4. Row Level Security ────────────────────────────────────────────────────
 

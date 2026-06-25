@@ -5,8 +5,11 @@ The current site is the Next.js app in `next-app/`. Supabase supports:
 - customer auth
 - profiles
 - product catalog/admin data
+- product image/object storage through Storage bucket `product-images`
 - inquiries
 - wishlist/cart-related state used by the app
+- subscribers, orders, invoices, admin notifications, and marketing tables when
+  the additive SQL migrations are applied
 
 ## 1. Create or Open the Supabase Project
 
@@ -20,6 +23,9 @@ In the Supabase SQL Editor, run the relevant scripts in `supabase/`:
 - `products.sql` - product table and product policies
 - `inquiries.sql` - inquiry table and policies
 - `fix-permissions.sql` - idempotent permission/column repair
+- additive migration scripts such as `sales-workflow.sql`,
+  `homepage-subscribers.sql`, `email-marketing.sql`,
+  `compliance-consent.sql`, and product taxonomy/image migrations as needed
 
 ## 2. Auth URL Configuration
 
@@ -52,7 +58,11 @@ NEXT_PUBLIC_SITE_URL=
 Server-only values, if enabled:
 
 ```bash
+SUPABASE_SERVICE_ROLE_KEY=
 RESEND_API_KEY=
+EMAIL_PROVIDER_API_KEY=
+SITE_URL=
+PROVIDER_WEBHOOK_SECRET=
 ```
 
 Only `NEXT_PUBLIC_*` values are exposed to browser code. Never use a Supabase

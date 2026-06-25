@@ -1,77 +1,141 @@
 # Feature: Online Shop
 
+> Current Next.js/Supabase shop behavior. Last updated: **2026-06-20**.
+
 ## Summary
 
-Browse and view estate jewelry for sale, priced live against the gold spot price.
-Currently ~12 products, all in the **Gold** category (chains, a bracelet, a ring).
+The shop is the public storefront for curated estate inventory. It lives in the
+Next.js app at `/shop` and `/shop/[id]`, with Spanish equivalents under `/es`.
+The catalog is backed by the Supabase `products` table and priced live against
+gold/silver spot data.
+
+There is no active root static `shop.html`, `product.html`, or
+`scripts/shop/shop-products.js` catalog anymore.
 
 ## Key Files
 
-- `shop.html` — listing page (grid of product cards + filters + spot meta).
-- `product.html` — single product detail, read via `?id=<product-id>`.
-- `scripts/shop/shop-products.js` — `window.SHOP_PRODUCTS` static catalog (source
-  of truth for inventory).
-- `scripts/shop/shop-pricing.js` — `window.ShopPricing`: fetches spot, computes
-  prices, updates cards + product page, periodic refresh.
-- `scripts/shop/shop-filters.js` — listing filters.
-- `scripts/shop/product-page.js` — renders the product detail page.
-- `scripts/shop/test-shop-pricing.js` — pricing sanity checks.
+- `next-app/src/app/[locale]/shop/page.tsx` - shop listing route, filtering,
+  sorting, pagination, hero, and server-side product query.
+- `next-app/src/app/[locale]/shop/[id]/page.tsx` - product detail route.
+- `next-app/src/components/shop/ProductCard.tsx` - public product card,
+  image rendering, cart/wishlist affordances.
+- `next-app/src/components/shop/ProductImageGallery.tsx` - product detail
+  image gallery and zoom behavior.
+- `next-app/src/components/shop/ShopFilters.tsx` - public filter controls.
+- `next-app/src/components/admin/AdminShell.tsx` - Product Admin inventory
+  editor, image uploads, crop workflow, product save path.
+- `next-app/src/types/product.ts` - product/status/taxonomy/image-padding
+  contract.
+- `next-app/src/lib/pricing.ts` and `next-app/src/lib/spot-price.ts` - display
+  price and spot-price logic.
+- `supabase/products.sql` plus additive migrations in `supabase/` - database
+  schema and storage policies.
 
-## Product Data Shape
+## Product Data
 
-Each item in `SHOP_PRODUCTS` includes:
+Supabase `products` is the source of truth. Important fields include:
 
-- `id`, `category`, `title`, `description`, `details[]`, `tags[]`, `images[]`
-- `status` (e.g. `"Available"`)
-- Pricing fields: `priceMode` (`"spot-multiplier"`), `purity` (10/14/18k),
-  `weightGrams`, `pricingMultiplier`, plus `priceLabel` / `manualPriceLabel`
-  (display fallback).
-- Optional `privatePriceLabel` for VIP-only pricing.
+- identity/order: `id`, `slug`, `inventory_number`, `sku`, `sort_order`
+- status/location: `status`, `location`, `featured`
+- copy: `title`, `title_es`, `description`, `description_es`, `public_notes`,
+  `internal_notes`
+- catalog taxonomy: `product_type`, `jewelry_type`, `chain_type`, `length`,
+  `brand`, `gender`
+- metal/pricing: `category`, `metal_type`, `metal_variant`, `purity`,
+  `weight_grams`, `gram_weight`, `price_mode`, `pricing_multiplier`,
+  `manual_price_label`, `asking_price`
+- images: `images`, `image_urls`, `image_padding`,
+  `image_padding_by_image`
+- arrays: `tags`, `tags_es`, `details`, `details_es`
+
+`image_urls` is preferred at render time, with `images` kept as compatibility
+fallback. The current admin save path mirrors the same URL/path list into both
+fields.
+
+## Product Images
+
+Image bytes are not stored in product rows.
+
+- New admin uploads are compressed to WebP in the browser and uploaded to the
+  Supabase Storage bucket `product-images`, under the `products/` folder.
+- Product rows store only public Storage URLs or legacy local `/assets/...`
+  paths.
+- Local product/page images live under `next-app/public/assets`.
+- `next-app/next.config.ts` allows the Supabase Storage public object host for
+  optimized `next/image` rendering.
+
+2026-06-20 audit:
+
+- 48 live products.
+- 321 image entries in `products.images` and 321 in `products.image_urls`.
+- 0 `data:`/base64 inline image payloads.
+- 28 products are Supabase Storage-only.
+- 19 products are local-asset-only.
+- 1 product mixes local assets and Storage URLs.
+- All 202 DB-referenced Storage objects exist.
+- The 91 old unreferenced Storage objects found by the audit were archived,
+  deleted with a confirmed GC run, and followed by a dry-run showing 0 orphans
+  and 0 deletable paths.
+- DB-backed local shop PNG paths were migrated to WebP; the 114 repointed shop
+  PNG originals were deleted, and no PNG files remain under
+  `next-app/public/assets`.
 
 ## Pricing Logic
 
-For spot-multiplier items:
+For spot-multiplier products:
 
+```text
+meltValue = spotPerGram * purityRatio * gramWeight
+displayPrice = meltValue * pricingMultiplier
 ```
-spotPerGram24k = goldSpotPerGram24k (from the metal-prices function)
-meltValue      = spotPerGram24k * (purity / 24) * weightGrams
-price          = round2(meltValue * pricingMultiplier)
+
+Gold and silver spot data are fetched server-side by `spot-price.ts` and exposed
+through `/api/metal-prices`. Product detail pages also show melt/scrap context
+and the spot basis used for the calculation. Manual-priced products use
+`manual_price_label`/`asking_price` instead of live multiplier pricing.
+
+## Public Browse Behavior
+
+- `/shop` is the single storefront entry route.
+- The retired `/store` chooser and `/silver-tableware` merchandising route were
+  removed on 2026-06-19.
+- The modern shop page participates in the shared customer-facing loaded-block
+  reveal for its hero/filter surfaces. Product cards keep their dedicated
+  image-aware row-by-row reveal; broad gallery parents are excluded so lazy
+  product images cannot hold the page hidden. Reduced-motion users skip the
+  entrance animation.
+- Filters are URL-backed and include item group/type, metal, metal color,
+  purity, brand, gender, length/size, price range, availability, sort, and
+  pagination.
+- Public gallery excludes unavailable lifecycle states such as
+  `pending_payment`, while sold/unavailable handling remains explicit in the
+  product/card status helpers.
+
+## Admin Workflow
+
+Admins manage inventory from `/admin`.
+
+1. Add/edit a product in Product Admin.
+2. Upload photos through the product drawer. The browser compresses each photo
+   to WebP and uploads it to Supabase Storage.
+3. Save the product. The database stores image URLs/paths and product metadata,
+   not binary image payloads.
+4. Use crop/padding controls when needed. Cropping uploads a replacement image
+   and attempts to remove the old uploaded Storage object when no product still
+   references it.
+5. Product ordering is managed by drag-to-reorder in the admin table.
+
+## Verification
+
+After shop/admin/product code, route, schema-contract, or config changes:
+
+```bash
+cd next-app
+npm run lint
+npm run build
 ```
 
-The displayed "exact gold scrap value" is the melt value; the sale price applies
-the multiplier (typically 1.25x, some at 1.5x). Manual-priced items just show
-`manualPriceLabel`. See `features/live-metal-pricing.md` for the spot source.
-
-### Where each price shows (the display contract)
-
-All price strings are built in **one place** — `shop-pricing.js` — so changing
-what/where prices show is a single-file edit (no per-card HTML changes):
-
-| Surface | Shows |
-|---------|-------|
-| **Gallery card** (`shop.html`, `es/shop.html`) | Sale price (prominent) + **gold scrap value** line (`buildScrapContext`). **No** spot-multiplier text. |
-| **Product detail** (`product.html`, `es/product.html`) | Exact gold scrap value + **Your price** + spot-multiplier context (`buildPriceContext`) + **special trade-in offer**. |
-
-- The gallery `[data-shop-price]` / `[data-shop-price-context]` elements are
-  JS-populated; the static HTML text is only a pre-JS fallback.
-- The **trade-in offer** is a store-credit price on the item =
-  `scrapValue × TRADE_IN_MULTIPLIER` ("get this for $X with store credit"). That
-  multiplier is a single constant at the top of `shop-pricing.js` (currently
-  `1.1`) — change it there to adjust the offer site-wide, EN + ES. Rendered into
-  `#product-trade-in-offer`; copy lives in `applyToProductPage`.
-- `applyProductPrices` exposes per-product `scrapValue`/`scrapValueLabel` and
-  `tradeInValue`/`tradeInValueLabel` for any surface that needs them.
-
-## Adding / Editing Products
-
-1. Edit `scripts/shop/shop-products.js`.
-2. Add images under `assets/images/shop/` and reference them in `images[]`
-   (cache-bust with `?v=...` when replacing an existing filename).
-3. Keep `id` stable — it's used in URLs and in the `favorites` table.
-4. Set pricing fields for live pricing, or use `manualPriceLabel` for a fixed price.
-
-## Notes / Gotchas
-
-- No real checkout/payment yet — buying is contact-driven.
-- `product_id` in Supabase `favorites` must match the `id` here.
-- All current inventory is gold; other categories are backlog (see `TASKS.md`).
+For data-only image/storage audits, verify against live Supabase before deleting
+objects. Destructive Storage cleanup must stay dry-run-first, include the
+reference set in the report, respect the 24-hour safety threshold, and be
+followed by a second dry-run after any confirmed delete.

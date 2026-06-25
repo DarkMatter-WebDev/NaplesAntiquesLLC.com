@@ -14,10 +14,30 @@ export default function ContactForm({ locale, submitted }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [photoName, setPhotoName] = useState('');
   const [additionalNames, setAdditionalNames] = useState<string[]>([]);
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState(submitted);
+  const [err, setErr] = useState('');
 
-  const action = locale === 'es'
-    ? '/es/contact?submitted=1#submit-item'
-    : '/contact?submitted=1#submit-item';
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formEl = e.currentTarget;
+    setSending(true);
+    setErr('');
+    try {
+      const fd = new FormData(formEl);
+      fd.append('source', 'contact');
+      const res = await fetch('/api/inquire', { method: 'POST', body: fd });
+      if (!res.ok) throw new Error(await res.text());
+      dialogRef.current?.close();
+      setDone(true);
+    } catch {
+      setErr(isEs
+        ? 'Error al enviar. Por favor inténtelo de nuevo.'
+        : 'Failed to send. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  }
 
   function openDialog(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -60,7 +80,7 @@ export default function ContactForm({ locale, submitted }: Props) {
               {isEs ? 'Envíe Su Artículo' : 'Submit Your Item'}
             </h2>
 
-            {submitted ? (
+            {done ? (
               <div
                 className="rounded-2xl border px-8 py-16 text-center shadow-[0_18px_54px_rgba(38,28,6,0.07)]"
                 style={{ background: 'rgba(255,255,255,0.82)', borderColor: 'rgba(115, 92, 0, 0.14)' }}
@@ -86,18 +106,15 @@ export default function ContactForm({ locale, submitted }: Props) {
             ) : (
               <form
                 name="submit-item"
-                method="POST"
-                action={action}
-                data-netlify="true"
-                data-netlify-honeypot="bot-field"
+                onSubmit={handleSubmit}
                 encType="multipart/form-data"
                 className="grid gap-4 rounded-2xl border p-5 shadow-[0_18px_54px_rgba(38,28,6,0.07)] md:p-8"
                 style={{ background: 'rgba(255,255,255,0.86)', borderColor: 'rgba(115, 92, 0, 0.14)' }}
               >
-                <input type="hidden" name="form-name" value="submit-item" />
-                <p className="sr-only">
+                <p className="sr-only" aria-hidden="true">
                   <label>
-                    Do not fill this out if you are human: <input name="bot-field" />
+                    Do not fill this out if you are human:{' '}
+                    <input name="bot-field" tabIndex={-1} autoComplete="off" />
                   </label>
                 </p>
 
@@ -343,9 +360,15 @@ export default function ContactForm({ locale, submitted }: Props) {
                     {/* Actions */}
                     <FormPrivacyNotice locale={locale} />
 
+                    {err && (
+                      <p className="text-sm" style={{ color: 'var(--color-error, #b91c1c)' }}>{err}</p>
+                    )}
+
                     <div className="responsive-actions pt-1">
-                      <button type="submit" className="gold-button">
-                        {isEs ? 'Enviar artículo' : 'Send item'}
+                      <button type="submit" className="gold-button" disabled={sending}>
+                        {sending
+                          ? (isEs ? 'Enviando…' : 'Sending…')
+                          : (isEs ? 'Enviar artículo' : 'Send item')}
                       </button>
                       <label
                         htmlFor="item-photo-1"

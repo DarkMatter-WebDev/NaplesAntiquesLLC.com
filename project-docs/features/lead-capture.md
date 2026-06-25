@@ -1,45 +1,90 @@
-# Feature: Lead Capture (Submit Item + Newsletter)
+# Feature: Lead Capture
+
+> Current lead and subscriber capture surfaces. Last updated: **2026-06-20**.
 
 ## Summary
 
-Two ways visitors become leads: the **"Submit Your Item"** form (sellers describe
-an item + contact info and upload photos) and the **newsletter** signup.
+Lead capture now happens inside the Next.js app, not the retired root static
+HTML site. The major paths are:
 
-## Submit Your Item (Netlify Forms)
+- seller/buyer inquiry forms on contact and evaluation surfaces,
+- newsletter/homepage subscriber signup,
+- checkout/order follow-up,
+- click-to-call and appointment CTAs.
 
-- **Live implementation:** static Netlify Forms on `contact.html` and
-  `/es/contact.html`, inside the `#submit-item` section.
-- English form name: `submit-item`; Spanish form name: `submit-item-es`.
-- The forms use `method="POST"`, `data-netlify="true"`,
-  `data-netlify-honeypot="bot-field"`, and
-  `enctype="multipart/form-data"` for photo uploads.
-- Form fields: one required photo, item description, name, required phone, optional email,
-  and location.
-- The photo input is presented as a large square upload target to make the
-  photo-first flow obvious. After one photo is selected from the visitor's
-  computer/camera roll, a native modal opens for the remaining details and final
-  submit.
-- `scripts/forms/submit-item-form.js` is a small enhancement only; it updates the
-  selected-photo label and opens/closes the details modal. It does not control
-  delivery.
-- To change recipients or notifications, configure Netlify Forms notifications in
-  the Netlify site dashboard.
+## Inquiry Forms
 
-## Newsletter
+Current form components:
 
-- MailerLite universal script + embedded form on the homepage
-  (`index.html` -> `#newsletter`, `<div class="ml-embedded" data-form="I6Xvs6">`).
-- Managed entirely in the MailerLite dashboard.
+- `next-app/src/components/contact/ContactForm.tsx`
+- `next-app/src/components/contact/InquiryForm.tsx`
+- `next-app/src/components/free-evaluation/EvalForm.tsx`
 
-## Other CTAs
+Current inquiry APIs:
 
-- Click-to-call `(239) 404-8505` (`tel:` links throughout).
-- Appointment / "Request a Call" anchors (`index.html#appointment`).
+- `next-app/src/app/api/inquire/route.ts`
+- `next-app/src/app/api/inquiries/[id]/route.ts`
 
-## Notes / Gotchas
+Submitted inquiry records live in Supabase `inquiries`. Admin review lives under
+`/admin/inquiries`. Inquiry email delivery uses the Next route handler and
+configured email provider keys when present.
 
-- Submissions and uploaded photos live in Netlify Forms. Netlify supports one
-  uploaded file per field, so this form collects one image. Confirm notifications
-  after deploy and run a real submit test with and without photos.
-- The large square upload target, native details modal, and form fields are
-  styled inline in `contact.html` and `/es/contact.html`.
+The older Jotform and root static Netlify Form instructions are historical.
+`next-app/public/netlify-forms.html` remains only as a static form-detection
+helper if Netlify Forms compatibility is needed; it is not the primary product
+inventory or inquiry source of truth.
+
+## Newsletter / Marketing Audience
+
+Newsletter signup writes to `homepage_subscribers` through `/api/subscribe`.
+Admin subscriber management lives at `/admin/subscribers`.
+
+Marketing email uses:
+
+- `next-app/src/lib/marketing.ts` as the shared audience builder.
+- `/admin/marketing` for campaign composition and history.
+- `/api/admin/marketing/*` for admin-gated sends, tests, settings, audience
+  counts, and campaign-history actions.
+- `/api/unsubscribe` and `/unsubscribe` for opt-out handling.
+- `supabase/email-marketing.sql` and `supabase/homepage-subscribers.sql` for
+  live database support.
+
+Current consent model:
+
+- Newsletter subscribers are explicit opt-in.
+- Account holders are eligible for marketing by default unless
+  `profiles.marketing_opt_out = true`.
+- Marketing sends require the configured physical mailing address and include an
+  unsubscribe link.
+
+## Checkout / Order Leads
+
+Checkout posts to `/api/checkout/order`, creates an unpaid order, snapshots cart
+items, moves products to `pending_payment`, adds an admin notification, and
+sends an order email when Resend/email env is configured.
+
+## Click-To-Call And CTAs
+
+The primary phone/text CTA remains `(239) 404-8505` via `tel:` links throughout
+the app. The owner is mobile and appointment-only; there is no public storefront
+address to present as a walk-in destination.
+
+## Privacy / Compliance Notes
+
+- Forms include privacy disclosures and link to the Privacy Policy.
+- Account signup records Terms/Privacy acceptance in Supabase Auth metadata,
+  with profile persistence supported by `supabase/compliance-consent.sql`.
+- Cookie notice/preferences cover essential cookies and local storage; no
+  behavioral tracking pixels were found in the 2026-06-19 source audit.
+
+## Verification
+
+After form/API/marketing changes:
+
+```bash
+cd next-app
+npm run lint
+npm run build
+```
+
+Then verify at least one public form render and the relevant admin surface.

@@ -5,6 +5,11 @@ session, chat reset, or new contributor can quickly understand the project
 without re-explaining it. Treat documentation quality as part of the
 implementation, not an optional extra.
 
+Project operating rules live in the root `AGENTS.md`. Read it before working:
+this folder is the source-of-truth repo-ready copy, git operations are not part
+of this workflow, and every session must leave the folder clean with current
+docs and evidence-backed verification.
+
 ## Files
 
 | File | Purpose |
@@ -15,6 +20,7 @@ implementation, not an optional extra.
 | `STRUCTURE.md` | Canonical repo map + structural **invariants** that keep the site consistent. |
 | `INTEGRITY.md` | Next.js integrity rules + pre-publish checklist. |
 | `LEGACY_REMOVAL_REPORT.md` | 2026-06-13 audit separating current Next.js app files from legacy static-site cleanup candidates. |
+| `COMPLIANCE_AUDIT.md` | 2026-06-19 website compliance audit and implementation report. |
 | `DECISIONS.md` | Dated log of important technical/design/business decisions + rationale. |
 | `TASKS.md` | Backlog / In Progress / Completed task tracking. |
 | `CHANGELOG.md` | Dated log of meaningful changes. |
@@ -26,10 +32,11 @@ implementation, not an optional extra.
 
 At the start of every session:
 
-1. Read `PROJECT_OVERVIEW.md`, `CURRENT_STATUS.md`, `TASKS.md`, `DECISIONS.md`.
-2. Build an understanding of the project and **summarize current state** before
+1. Read root `AGENTS.md`.
+2. Read `PROJECT_OVERVIEW.md`, `CURRENT_STATUS.md`, `TASKS.md`, `DECISIONS.md`.
+3. Build an understanding of the project and **summarize current state** before
    making changes.
-3. Ask for clarification only if required.
+4. Ask for clarification only if required.
 
 ## Session Shutdown Behavior
 
@@ -41,6 +48,9 @@ Before ending a work session, never leave project state undocumented:
 4. Add significant changes to `CHANGELOG.md`.
 5. Update `ARCHITECTURE.md` if the architecture changed.
 6. Update `CLIENTS.md` / `features/` as relevant.
+7. Record exact verification commands and results.
+8. Leave the source-of-truth folder repo-ready: no stray temp/archive/report
+   files, and ignore rules still cover build output, caches, logs, and secrets.
 
 ## Working Rules
 
@@ -49,6 +59,13 @@ Before ending a work session, never leave project state undocumented:
   ones.
 - If unsure whether something matters, document it.
 - Write for both humans and AI agents.
+- Do not run git operations in this source-of-truth folder; the human handles
+  version control by wholesale copy elsewhere.
+- For destructive work, dry-run/report first, archive or back up when practical,
+  verify the reference set, then re-verify after the action.
+- Keep image/data optimization defaults in mind: DB rows store URL/path strings,
+  uploads use object storage + WebP/downscale/cache headers, and list queries
+  select only needed columns.
 - After app code, route, config, or schema-contract changes, run
   `npm run build` from `next-app/` - see `INTEGRITY.md`.
 - **Never commit secrets.** In `CLIENTS.md`, record only where credentials live,

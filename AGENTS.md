@@ -1,6 +1,36 @@
 # AGENTS.md
 
+> **⛔ THIS FOLDER IS NOT A GIT WORKING COPY. DO NOT USE GIT HERE.**
+>
+> This is the user's single source-of-truth project folder. **Git is not part
+> of the workflow in this folder.** The user updates a *separate* GitHub repo
+> folder manually, by copying this folder's contents into it. There is no
+> branch, commit, push, pull, or PR step for you to run here — ever.
+>
+> - **Never** run `git` commands in this folder (no `commit`, `push`, `pull`,
+>   `branch`, `checkout`, `stash`, `add`, `status`, etc.), and never suggest the
+>   user do so. If a task seems to call for version control, stop and explain
+>   that the user handles that manually elsewhere.
+> - The git metadata you may see is incidental. Do not treat a "current branch",
+>   "uncommitted changes", or "recent commits" as something to act on.
+> - Just edit files in place. The user takes it from there.
+
 This project uses a persistent Markdown memory system in **`project-docs/`**.
+
+## Source-of-truth folder rule
+
+The user periodically wipes a separate GitHub repo folder and copies this folder
+into it wholesale, so this folder must stay repo-ready at all times — but the
+copying and version control happen **outside** this folder and **outside** your
+responsibility (see the no-git banner above).
+
+- Do **not** leave stray archives, temp files, one-off scripts, reports, logs,
+  or generated cleanup artifacts behind.
+- Keep `.gitignore` accurate for dependencies, build output, caches, logs, and
+  secrets/env files — it travels with the wholesale copy, even though you never
+  run git here.
+- Work only inside this project folder unless the user explicitly says
+  otherwise.
 
 ## At the start of every session
 
@@ -34,6 +64,14 @@ npm run build
 Run `npm run lint` as well when touching TypeScript, React components, routing,
 or shared UI behavior.
 
+## During the task
+
+- Keep the folder pristine as you work; clean up scratch files before ending.
+- Cite file:line evidence for factual claims about code, schema, config, and
+  docs.
+- Never mark something done without verification you can cite. If a step was
+  skipped or unverifiable, say so and explain how to verify it.
+
 ## Before ending a session
 
 Keep the memory current - never leave project state undocumented:
@@ -43,6 +81,37 @@ Keep the memory current - never leave project state undocumented:
 - Add meaningful changes to `project-docs/CHANGELOG.md`.
 - Update `project-docs/ARCHITECTURE.md` if architecture changed.
 - Update `project-docs/CLIENTS.md` / `project-docs/features/` as relevant.
+- Record the exact verification commands run and their results
+  (`npx tsc --noEmit`, `npm run lint`, `npm run build`, smoke tests, etc.).
+- Flag pending manual steps loudly, especially SQL migrations to run in
+  Supabase or environment variables to set.
+- Leave the folder repo-ready: no stray files, and ignore rules still correct.
+
+## Destructive-operation safety
+
+For any destructive action, including deleting local files, deleting Storage
+objects, or bulk database updates:
+
+1. Dry-run or report the planned impact first.
+2. Archive/back up when practical.
+3. Verify the reference set or selection criteria.
+4. Act only after confirmation or explicit user request.
+5. Re-verify afterward and report the result.
+
+## Optimization defaults
+
+- Images/files live in object storage or app assets; database rows store URL/path
+  strings only, never base64/blob payloads.
+- New uploads should downscale and encode to WebP with a longest-edge cap near
+  2048px.
+- Uploaded objects should use immutable cache headers where appropriate.
+- Every responsive/fill image should have accurate `sizes`.
+- Remove orphaned objects on remove/replace/delete paths, and keep the Storage
+  GC reference set current. Any new upload destination table must be added to
+  the GC reference scan.
+- List/grid queries should select only needed columns, avoid `select('*')` for
+  heavy views, and push filtering/sorting/pagination to the database where it
+  preserves visible behavior.
 
 ## Hard rules
 

@@ -54,10 +54,12 @@ discretion and a personal relationship over a storefront transaction.
 - **Server/API**: Next route handlers for metal pricing and inquiries, deployed
   on Netlify with `@netlify/plugin-nextjs`.
 - **Hosting**: Netlify (`base = "next-app"`, publish `.next`).
-- **Email / marketing**: Resend-backed inquiry flow in the Next app; older
-  MailerLite/static-form notes may remain in legacy docs.
+- **Email / marketing**: Resend-backed inquiry/order flow plus Supabase-backed
+  subscriber and admin marketing surfaces in the Next app.
 - **Product catalog**: Supabase `products` table, with local image paths under
-  `next-app/public/assets` and newer uploaded images via Supabase Storage.
+  `next-app/public/assets` for legacy/app-bundled assets and newer uploaded
+  images via Supabase Storage. Product rows store image URL/path strings, not
+  binary image payloads.
 - **Legacy note**: the old root static HTML site and vanilla scripts were
   removed on 2026-06-13. See `LEGACY_REMOVAL_REPORT.md`.
 

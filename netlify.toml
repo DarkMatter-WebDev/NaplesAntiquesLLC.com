@@ -10,7 +10,86 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
+# ---------------------------------------------------------------------------
+# Bot / scanner hardening — return 410 Gone for common probe paths so they are
+# not handed to the Next.js server. force = true ensures these win over the
+# framework catch-all. Evaluated before the legacy redirects below.
+# ---------------------------------------------------------------------------
+[[redirects]]
+  from = "/wp-admin/*"
+  to = "/410.html"
+  status = 410
+  force = true
+
+[[redirects]]
+  from = "/wp-login.php"
+  to = "/410.html"
+  status = 410
+  force = true
+
+[[redirects]]
+  from = "/xmlrpc.php"
+  to = "/410.html"
+  status = 410
+  force = true
+
+[[redirects]]
+  from = "/.env*"
+  to = "/410.html"
+  status = 410
+  force = true
+
+[[redirects]]
+  from = "/config.json"
+  to = "/410.html"
+  status = 410
+  force = true
+
+[[redirects]]
+  from = "/.git/*"
+  to = "/410.html"
+  status = 410
+  force = true
+
+# ---------------------------------------------------------------------------
+# Security headers (applied to every response). The Content-Security-Policy is
+# deployed in Report-Only mode first so violations are logged but nothing is
+# blocked; promote it to Content-Security-Policy once the browser console /
+# report endpoint is clean.
+# ---------------------------------------------------------------------------
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+    Content-Security-Policy-Report-Only = "default-src 'self'; img-src 'self' data: https://evzluixourmsefwdsieu.supabase.co; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://evzluixourmsefwdsieu.supabase.co https://api.gold-api.com; frame-ancestors 'none'"
+
+# ---------------------------------------------------------------------------
+# Caching — immutable long cache for fingerprinted/static assets; short,
+# revalidated cache for everything else (HTML). More specific rules first so
+# they take precedence over the /* catch-all for Cache-Control.
+# ---------------------------------------------------------------------------
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# ---------------------------------------------------------------------------
 # Legacy image URLs (assets moved to assets/images/)
+# ---------------------------------------------------------------------------
 [[redirects]]
   from = "/assets/branding/:splat"
   to = "/assets/images/branding/:splat"
@@ -118,11 +197,22 @@
 
 [[redirects]]
   from = "/silver.jpg"
-  to = "/assets/images/pages/silver.jpg"
+  to = "/assets/images/pages/silver.webp"
+  status = 301
+
+# Shop product photos converted JPG→WebP (DB repointed via
+# supabase/shop-new-listing-jpg-to-webp.sql); redirect old paths as a safety net.
+[[redirects]]
+  from = "/assets/images/shop/shop-new-listing-06-04.jpg"
+  to = "/assets/images/shop/shop-new-listing-06-04.webp"
+  status = 301
+
+[[redirects]]
+  from = "/assets/images/shop/shop-new-listing-06-05.jpg"
+  to = "/assets/images/shop/shop-new-listing-06-05.webp"
   status = 301
 
 [[redirects]]
   from = "/watch.jpg"
   to = "/assets/images/pages/watch.jpg"
   status = 301
-

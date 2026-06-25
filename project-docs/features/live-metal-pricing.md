@@ -1,45 +1,79 @@
-# Feature: Live Metal (Gold) Pricing
+# Feature: Live Metal Pricing
+
+> Current pricing flow for gold/silver spot-backed products. Last updated:
+> **2026-06-20**.
 
 ## Summary
 
-Shop prices update automatically against the live gold spot price. A Netlify
-Function fetches and caches the spot price; the client computes each product's
-price from it.
+Shop prices update against server-side spot data in the Next.js app. The old
+root Netlify Function and static `window.ShopPricing` script are retired.
+
+Current surfaces:
+
+- public shop cards,
+- product detail pricing and melt/scrap context,
+- cart, checkout, wishlist, admin pricing previews,
+- `/api/metal-prices` for browser/API consumers.
 
 ## Key Files
 
-- `netlify/functions/metal-prices.js` — serverless price fetch + cache + fallback.
-- `scripts/shop/shop-pricing.js` — `window.ShopPricing` client module.
+- `next-app/src/lib/spot-price.ts` - fetches/caches spot data from
+  `api.gold-api.com` with fallback values.
+- `next-app/src/app/api/metal-prices/route.ts` - Next route handler exposing
+  spot data to the app.
+- `next-app/src/lib/pricing.ts` - product melt value and display price helpers.
+- `next-app/src/types/product.ts` - product pricing fields and status helpers.
+- `next-app/src/app/[locale]/shop/page.tsx` - server-side spot fetch for shop
+  listing pricing.
+- `next-app/src/app/[locale]/shop/[id]/page.tsx` - product detail price context.
+- `next-app/src/components/shop/PriceUpdateTicker.tsx` - visible refresh timing
+  where used.
 
-## Server: `metal-prices.js`
+## Data Shape
 
-- Endpoint: `/.netlify/functions/metal-prices` (GET; OPTIONS for CORS preflight).
-- Source: `https://api.gold-api.com/price/XAU` (no key required currently).
-- Returns: `goldSpotPerTroyOz`, `goldSpotPerGram24k`, `currency`, `source`,
-  `updatedAt`, `nextUpdateAt`, and `marketStatus` (Eastern-time weekend-close
-  detection).
-- Caching: 5-minute in-memory cache (`CACHE_TTL_MS`).
-- Fallback: if the API fails, returns `FALLBACK_GOLD_SPOT_PER_TROY_OZ = 5500`
-  with `source: "fallback"` and a `warning`, so the shop never breaks.
-- `GRAMS_PER_TROY_OZ = 31.1034768`.
+Pricing inputs live on Supabase `products` rows:
 
-## Client: `ShopPricing`
+- `category` - legacy broad pricing category, currently `Gold` or `Silver`.
+- `metal_type` - broader merchandising metal family.
+- `metal_variant` - color/subtype such as yellow gold, white gold, silver,
+  vermeil, platinum.
+- `purity` - karat for gold, sterling/silver value for silver inventory.
+- `weight_grams` / `gram_weight` - product weight used for melt value.
+- `price_mode` - `spot-multiplier` or `manual`.
+- `pricing_multiplier` - multiplier over melt for spot-priced items.
+- `manual_price_label` / `asking_price` - fixed/manual display values.
 
-- Fetches the function, caches the payload 5 min in `sessionStorage`
-  (`naplesGoldSpotCacheV2`), with its own fallback.
-- Price math (per `online-shop.md`): `meltValue × pricingMultiplier`.
-- Updates shop cards (`[data-shop-item]`), the product page, and spot-meta labels.
-- Shows a live countdown to the next update, or a "market closed" message on
-  weekends.
-- Refresh timer re-checks every 15s and force-refreshes spot when due.
-- Public API: `onReady`, `fetchSpot`, `refreshLiveSpot`, `calculatePublicPrice`,
-  `getDisplayPrice`, `applyProductPrices`, `getSpotData`, `init`, etc.
+## Pricing Logic
 
-## Notes / Gotchas
+For spot-multiplier products:
 
-- Only **gold** is wired up today (silver/platinum would need new sources +
-  product fields).
-- The public `gold-api.com` endpoint has unknown rate limits — for higher traffic
-  consider a keyed provider behind the same function (see `TASKS.md`).
-- Fallback spot (5500) is intentionally high so fallback prices never undersell;
-  revisit if it drifts far from market.
+```text
+meltValue = spotPerGram * purityRatio * gramWeight
+displayPrice = meltValue * pricingMultiplier
+```
+
+`pricing.ts` owns the exact helper behavior so shop cards, detail pages, cart,
+checkout, and admin surfaces stay consistent.
+
+Manual-priced products skip the live multiplier math and display the saved
+manual price label/asking price.
+
+## Source And Fallback
+
+`spot-price.ts` currently uses `api.gold-api.com` and keeps a fallback so the
+shop remains usable if the provider is unavailable. If traffic grows or the
+public endpoint becomes unreliable, add a keyed provider behind the same helper
+instead of calling a provider directly from the browser.
+
+## Verification
+
+After pricing code, route, or schema-contract changes:
+
+```bash
+cd next-app
+npm run lint
+npm run build
+```
+
+Also verify `/api/metal-prices`, `/shop`, and at least one `/shop/[id]` product
+detail page in-browser.

@@ -21,6 +21,9 @@ create index if not exists admin_notifications_created_idx
 create index if not exists admin_notifications_unread_idx
   on public.admin_notifications (is_read, created_at desc);
 
+alter table public.order_items
+  add column if not exists item_year_snapshot smallint;
+
 alter table public.admin_notifications enable row level security;
 
 drop policy if exists "Admins read notifications" on public.admin_notifications;
@@ -120,6 +123,7 @@ begin
       product_id,
       inventory_number,
       title_snapshot,
+      item_year_snapshot,
       metal_snapshot,
       purity_snapshot,
       gram_weight_snapshot,
@@ -131,6 +135,7 @@ begin
       item->>'product_id',
       item->>'inventory_number',
       item->>'title_snapshot',
+      nullif(item->>'item_year_snapshot', '')::smallint,
       item->>'metal_snapshot',
       item->>'purity_snapshot',
       nullif(item->>'gram_weight_snapshot', '')::numeric,

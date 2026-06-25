@@ -11,19 +11,35 @@ interface Props {
 export default function EvalForm({ locale, submitted }: Props) {
   const isEs = locale === 'es';
   const [photoCount, setPhotoCount] = useState(0);
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState(submitted);
+  const [err, setErr] = useState('');
 
-  const action = locale === 'es'
-    ? '/es/free-evaluation?submitted=1'
-    : '/free-evaluation?submitted=1';
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formEl = e.currentTarget;
+    setSending(true);
+    setErr('');
+    try {
+      const fd = new FormData(formEl);
+      fd.append('source', 'free-evaluation');
+      const res = await fetch('/api/inquire', { method: 'POST', body: fd });
+      if (!res.ok) throw new Error(await res.text());
+      setDone(true);
+    } catch {
+      setErr(isEs
+        ? 'Error al enviar. Por favor inténtelo de nuevo.'
+        : 'Failed to send. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  }
 
   return (
     <form
       id="fe-eval-form"
       name="free-evaluation-request"
-      method="POST"
-      action={action}
-      data-netlify="true"
-      data-netlify-honeypot="bot-field"
+      onSubmit={handleSubmit}
       encType="multipart/form-data"
       className="grid gap-4 rounded-2xl border p-5 shadow-[0_22px_70px_rgba(38,28,6,0.18)] md:p-6"
       style={{
@@ -32,12 +48,12 @@ export default function EvalForm({ locale, submitted }: Props) {
         maxWidth: 540,
       }}
     >
-      <input type="hidden" name="form-name" value="free-evaluation-request" />
-      <p className="sr-only">
-        <label>Do not fill this out if you are human: <input name="bot-field" /></label>
+      <p className="sr-only" aria-hidden="true">
+        <label>Do not fill this out if you are human:{' '}
+          <input name="bot-field" tabIndex={-1} autoComplete="off" /></label>
       </p>
 
-      {submitted ? (
+      {done ? (
         <div className="text-center py-8 px-4">
           <div
             className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full text-xs font-bold uppercase tracking-[0.12em]"
@@ -206,8 +222,14 @@ export default function EvalForm({ locale, submitted }: Props) {
 
           <FormPrivacyNotice locale={locale} />
 
-          <button type="submit" className="gold-button w-full">
-            {isEs ? 'Enviar para Evaluación Gratuita' : 'Send for Free Evaluation'}
+          {err && (
+            <p className="text-sm" style={{ color: 'var(--color-error, #b91c1c)' }}>{err}</p>
+          )}
+
+          <button type="submit" className="gold-button w-full" disabled={sending}>
+            {sending
+              ? (isEs ? 'Enviando…' : 'Sending…')
+              : (isEs ? 'Enviar para Evaluación Gratuita' : 'Send for Free Evaluation')}
           </button>
         </>
       )}

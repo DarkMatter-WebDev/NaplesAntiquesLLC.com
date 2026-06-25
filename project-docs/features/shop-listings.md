@@ -1,113 +1,107 @@
-# Feature: Shop Listings — Schema & Add-a-Listing Runbook
+# Feature: Shop Listings - Product Runbook
 
-> How a product is defined and the exact steps to add one without breaking
-> anything. Goal: make new listings fast and consistent. Related:
-> `online-shop.md` (shop behavior), `STRUCTURE.md`, `INTEGRITY.md`.
-> Last updated: **2026-06-02**.
+> How to add, edit, audit, and retire listings in the current Next.js/Supabase
+> shop. Last updated: **2026-06-20**.
 
-## Where listings live
+## Source Of Truth
 
-- **Catalog (source of truth):** `scripts/shop/shop-products.js` —
-  `window.SHOP_PRODUCTS` is an array of product objects.
-- **Detail page:** `product.html?id=<id>` renders entirely from the catalog.
-- **Shop grid cards:** hand-authored `<article>` blocks in `shop.html` and
-  `es/shop.html` that mirror the catalog (same ids/order/count).
-- **Images:** `assets/images/shop/`, referenced root-absolute (`/assets/...`).
-- **Pricing math:** `scripts/shop/shop-pricing.js`.
+- Product rows live in Supabase `products`.
+- Product type/status/image contracts live in `next-app/src/types/product.ts`.
+- Product Admin lives at `/admin` and is implemented mainly in
+  `next-app/src/components/admin/AdminShell.tsx`.
+- Public listing/detail rendering lives under
+  `next-app/src/app/[locale]/shop/` and `next-app/src/components/shop/`.
+- Product photos should live in Supabase Storage (`product-images/products`) for
+  new uploads. Some legacy products still reference local
+  `next-app/public/assets/images/shop/*` files.
 
-## Product schema
+Do not reintroduce the retired static `window.SHOP_PRODUCTS` catalog.
 
-```js
-{
-  id: "14k-byzantine-link-chain-necklace-01", // permanent, kebab-case, unique
-  category: "Gold",                            // current catalog is all "Gold"
-  title: "Solid 14K Gold Byzantine Link Chain Necklace",
-  title_es: "Collar de Cadena de Eslabón Bizantino de Oro Sólido de 14K",
+## Listing Fields
 
-  priceMode: "spot-multiplier",   // "spot-multiplier" | "manual"
-  // --- spot-multiplier pricing inputs (required when priceMode is spot) ---
-  purity: 14,                     // karat: 10 | 14 | 18 ...
-  weightGrams: 31.28,
-  pricingMultiplier: 1.25,        // retail markup over melt value
-  priceLabel: "$2,469.89",        // fallback shown before live spot loads
-  manualPriceLabel: "$2,469.89",  // shown when priceMode === "manual"
+Keep these fields especially consistent:
 
-  status: "Available",            // "Available" | "Sold" | "On Hold" ...
-  images: [                       // root-absolute; first image is the card/hero
-    "/assets/images/shop/shop-14k-byzantine-link-chain-01.png",
-    "/assets/images/shop/shop-14k-byzantine-link-chain-02.png"
-  ],
+- `id`: permanent public identifier used in URLs, carts, favorites, orders, and
+  admin references.
+- `inventory_number`: visible inventory number. Fix duplicate live values before
+  enforcing the unique migration.
+- `status`: lifecycle status (`draft`, `available`, `reserved`,
+  `pending_payment`, `sold`, `archived`).
+- `product_type` / `jewelry_type`: broad item form. Admin supports curated
+  options plus concise custom product type strings.
+- `chain_type`: link type, scoped to necklace/bracelet products.
+- `length`: bare numeric/string measurement; buyer-facing code adds units when
+  appropriate.
+- `category`: legacy pricing category (`Gold`/`Silver`).
+- `metal_type`: broader metal family.
+- `metal_variant`: merchandising color/subtype such as yellow gold, white gold,
+  rose gold, silver, vermeil, or platinum.
+- `images` / `image_urls`: URL/path string arrays only. No inline image data.
 
-  description:    "Full English paragraph shown on the detail page.",
-  description_es: "Párrafo completo en español.",
-  details:    ["Category: Gold", "Metal: 14K yellow gold", "Weight: 31.28 g", ...],
-  details_es: ["Categoría: Oro", "Metal: Oro amarillo de 14K", ...],
-  tags:    ["14k", "byzantine link", "yellow gold", "31.28 grams", ...],
-  tags_es: ["14k", "eslabón bizantino", "oro amarillo", ...]
-}
+## Add A Listing
+
+1. Open `/admin` as an admin user.
+2. Choose Add Product.
+3. Fill title, metal/pricing fields, product type, brand, size/length, notes,
+   status, and Spanish copy when available.
+4. Upload photos in the drawer. New files are compressed to WebP and uploaded to
+   Supabase Storage.
+5. Put the intended cover photo first. Drag/reorder images in the drawer if
+   needed.
+6. Use Crop only when necessary. Crop creates a new Storage object and replaces
+   the URL in the form state.
+7. Use image padding controls for product-card/detail frame color when a photo
+   needs a white/black/custom-color background.
+8. Save. The normal save path writes metadata and image URL/path strings to
+   Supabase.
+9. Verify the product on `/shop` and `/shop/[id]`.
+
+## Edit A Listing
+
+- Preserve `id` unless the owner explicitly accepts URL/saved-state breakage.
+- Prefer changing `status` over deleting products with sales/order history.
+- Keep `image_urls` and `images` aligned until the compatibility field strategy
+  changes.
+- When replacing photos, verify the old uploaded Storage object is no longer
+  referenced before deleting it.
+- Run the relevant SQL migrations before relying on newer fields such as
+  product type, brand, metal variants, per-photo padding, and unique inventory
+  numbers in production.
+
+## Retire Or Mark Sold
+
+- Use `sold` for sold inventory.
+- Use `archived` for internal records that should not appear publicly.
+- Use `pending_payment` when checkout/order flow is holding inventory.
+- Avoid hard delete if the product has order, invoice, saved-item, or inquiry
+  history.
+
+## Image Audit Checklist
+
+For a storage cleanup pass:
+
+1. Query `products.images` and `products.image_urls`.
+2. Normalize Storage paths from URLs containing
+   `/storage/v1/object/public/product-images/`.
+3. Compare those paths with objects listed in Supabase Storage bucket
+   `product-images`, folder `products`.
+4. Treat DB-referenced missing objects as broken product images.
+5. Treat unreferenced objects as cleanup candidates only after checking whether
+   they are draft/recovery/recently replaced assets.
+6. Confirm there are no `data:` entries in product image arrays.
+
+2026-06-20 audit found no DB-referenced missing Storage objects and 91
+unreferenced Storage objects.
+
+## Verification
+
+For code/schema changes:
+
+```bash
+cd next-app
+npm run lint
+npm run build
 ```
 
-### Shop grid title rules (card alignment)
-
-Gallery cards use a **fixed two-line title slot** so price, scrap value, and
-trade-in boxes line up across the row. CSS clamps overflow; longer copy belongs
-in `description` / `details` (and on the product detail page).
-
-| Field | Limit | Notes |
-|-------|-------|--------|
-| `title` | **≤ 62 characters** | Must match the `<h3>` on `shop.html` exactly. |
-| `title_es` | **≤ 85 characters** | Must match the `<h3>` on `es/shop.html` exactly. |
-
-`node tools/check-integrity.mjs` enforces character limits and **card ↔ catalog
-title parity**. Put clasp style, stones, and other specifics in the description
-or details bullets—not the grid title (e.g. use “10K Gold Monaco Cuban Link
-Necklace”, not “…with Pavé Diamond Clasp”).
-
-### Field rules
-- `id` — **permanent.** Supabase favorites/carts store it. Never rename; retire
-  with `status` instead. Lowercase, hyphenated, end with `-01` (bump for dupes).
-- `priceMode: "spot-multiplier"` → must have positive `purity`, `weightGrams`,
-  `pricingMultiplier`. Price = melt(`purity`,`weightGrams`,spot) × multiplier.
-- `priceMode: "manual"` → must have `manualPriceLabel`; no live calc.
-- `images[0]` is the gallery hero and the shop-card image.
-- All `*_es` fields are **required** (bilingual rule).
-
-## Add a listing — step by step
-
-1. **Stage photos.** Copy into `assets/images/shop/` named
-   `shop-<id-stem>-01.png`, `-02.png`, … (sequential). Keep originals out of the
-   served tree.
-2. **Add the catalog object** to `scripts/shop/shop-products.js` with every
-   field above, EN **and** ES. Pick the spot multiplier you intend to use.
-3. **Add the shop card** to `shop.html` (English) and `es/shop.html` (Spanish):
-   copy an existing `<article data-shop-item="...">` block, then update
-   `data-shop-item`, `data-filter-*` (metal/purity/chain-type/length),
-   `data-tags`, `data-search`, the image `src`/`alt`, the `<h3>` title (must
-   equal `title` / `title_es` and stay within the limits above), the short
-   description, and the price context. **Match id/order/count** across both
-   files.
-4. **New chain type?** Add the `<option>` to the `shop-chain-type-filter`
-   `<select>` in **both** `shop.html` and `es/shop.html` (localize the label).
-5. **Cache-bust** if you changed any shared script: bump its `?v=` token on all
-   pages that load it (EN + ES).
-6. **Verify:**
-   ```bash
-   node tools/check-integrity.mjs
-   node scripts/shop/test-shop-pricing.js   # if pricing logic touched
-   ```
-   Then open `/shop.html` and `/es/shop.html` and the new `product.html?id=<id>`
-   in a browser; confirm the image loads on the **Spanish** page too.
-7. **Document:** add a line to `project-docs/CHANGELOG.md`; update
-   `CURRENT_STATUS.md` item count if relevant.
-
-## Remove / mark sold
-Set `status` to `"Sold"` (or remove the shop-grid cards but keep the catalog
-object so existing favorites still resolve on the detail page). Do **not** delete
-the `id`.
-
-## Why it's structured this way
-A real build step (Eleventy/Astro) would generate the shop cards from the
-catalog so step 3 disappears. That needs a Node/npm + git environment we don't
-have in the current authoring shell, so for now the cards are mirrored by hand
-and the **integrity checker is the safety net** that fails the build if the
-mirror drifts. See `STRUCTURE.md` → "Known debt / future structure."
+For documentation-only or data-audit sessions, update project memory and record
+the exact audit counts/date.

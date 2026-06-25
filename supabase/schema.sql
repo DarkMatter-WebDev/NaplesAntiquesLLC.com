@@ -21,6 +21,10 @@ create table if not exists public.profiles (
   postal_code text,
   country text default 'United States',
   marketing_opt_in boolean not null default false,
+  marketing_opt_out boolean not null default false,
+  terms_accepted_at timestamptz,
+  privacy_accepted_at timestamptz,
+  policies_accepted_version text,
   interests text[] default '{}',
   budget_range text,
   is_vip boolean not null default false,
@@ -58,6 +62,10 @@ alter table public.profiles
   add column if not exists postal_code text,
   add column if not exists country text default 'United States',
   add column if not exists marketing_opt_in boolean not null default false,
+  add column if not exists marketing_opt_out boolean not null default false,
+  add column if not exists terms_accepted_at timestamptz,
+  add column if not exists privacy_accepted_at timestamptz,
+  add column if not exists policies_accepted_version text,
   add column if not exists is_admin boolean not null default false;
 
 create or replace function public.handle_new_user()
@@ -67,16 +75,33 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id, first_name, last_name, full_name, email, phone)
+  insert into public.profiles (
+    id,
+    first_name,
+    last_name,
+    full_name,
+    email,
+    phone,
+    terms_accepted_at,
+    privacy_accepted_at,
+    policies_accepted_version
+  )
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'first_name', ''),
     coalesce(new.raw_user_meta_data->>'last_name', ''),
     coalesce(new.raw_user_meta_data->>'full_name', ''),
     new.email,
-    coalesce(new.phone, new.raw_user_meta_data->>'phone', '')
+    coalesce(new.phone, new.raw_user_meta_data->>'phone', ''),
+    nullif(new.raw_user_meta_data->>'terms_accepted_at', '')::timestamptz,
+    nullif(new.raw_user_meta_data->>'privacy_accepted_at', '')::timestamptz,
+    nullif(new.raw_user_meta_data->>'policies_accepted_version', '')
   )
-  on conflict (id) do nothing;
+  on conflict (id) do update
+  set
+    terms_accepted_at = coalesce(public.profiles.terms_accepted_at, excluded.terms_accepted_at),
+    privacy_accepted_at = coalesce(public.profiles.privacy_accepted_at, excluded.privacy_accepted_at),
+    policies_accepted_version = coalesce(public.profiles.policies_accepted_version, excluded.policies_accepted_version);
 
   insert into public.customer_carts (user_id, items)
   values (new.id, '[]'::jsonb)
@@ -111,6 +136,20 @@ create trigger customer_carts_updated_at
   before update on public.customer_carts
   for each row execute function public.set_updated_at();
 
+create or replace function public.is_admin_user(user_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = user_id
+      and is_admin = true
+  );
+$$;
+
 alter table public.profiles enable row level security;
 alter table public.customer_carts enable row level security;
 alter table public.favorites enable row level security;
@@ -119,6 +158,11 @@ drop policy if exists "Users read own profile" on public.profiles;
 create policy "Users read own profile"
   on public.profiles for select
   using (auth.uid() = id);
+
+drop policy if exists "Admins read all profiles" on public.profiles;
+create policy "Admins read all profiles"
+  on public.profiles for select
+  using (public.is_admin_user(auth.uid()));
 
 drop policy if exists "Users insert own profile" on public.profiles;
 create policy "Users insert own profile"
