@@ -35,6 +35,62 @@
 
 ## What Was Recently Completed
 
+- **Contact page hero removed (2026-06-25):** The normal `/contact` view no longer
+  has the top hero — it opens directly with the "Message Us Directly" section (now
+  the page `<h1>`), followed by "Submit Your Item". The hero is kept only for the
+  product-inquiry flow (`/contact?item=…`), which needs its heading. Verified in the
+  preview (hero gone, message section is the first `<main>` child at y=64, 0 console
+  errors); build clean.
+- **Unified admin inbox (2026-06-25):** Every inquiry submission (Free Evaluation,
+  Submit Your Item, product inquiry) now also posts an `admin_notifications` row
+  (`type: 'inquiry'`, with photos) via `/api/inquire`, so all incoming submissions
+  surface in `/admin/messages` alongside "Message Us Directly" messages and order
+  notifications (unread badge covers everything). Inquiries still also live in
+  `/admin/inquiries` and still email the owner. New shared `lib/admin-notify.ts`
+  (`createAdminNotification`), reused by `/api/contact-message`. Notification insert
+  is best-effort (never fails the submission). Notification titles are type-aware and
+  human ("Free evaluation request from {name}", "Item submission from {name}",
+  "Inquiry about {product} from {name}", "Message from {name}"), and the message
+  center shows a color-coded type chip (Inquiry / Message / Order). Live test
+  confirmed the `admin_notifications` insert succeeds (service_role already has the
+  grant; `service-role-insert-grants.sql` kept as an idempotent safety net, likely not
+  needed). Build + lint clean.
+- **Fixed lead forms failing with 42501 permission-denied (2026-06-25):** Free
+  Evaluation / Submit Your Item / inquiry submissions were returning 500 because
+  `/api/inquire` inserted via the **service-role** client, which lacks INSERT on
+  `inquiries` (grants are scoped to `anon`/`authenticated`; inserts run as `anon`
+  under the public-insert policy). Once a service key was set for photo uploads the
+  insert switched to `service_role` and failed. Fixed by inserting as the **anon
+  role** (`createPublicClient()`) in both the multipart and JSON paths; the service
+  client is now used only for the Storage upload. Verified live: the exact free-eval
+  path returns 200 (was 500). Also added `supabase/service-role-insert-grants.sql`
+  granting `service_role` INSERT on `admin_notifications` for the "Message Us
+  Directly" form (no anon path) — **pending manual apply**; that form falls back to
+  the email backup until then. Build + lint clean. See DECISIONS (2026-06-25).
+- **Customer photos surfaced in the admin panel (2026-06-25):** `/admin/inquiries`
+  now renders submitted photos (`inquiries.uploaded_image_urls`) as clickable
+  thumbnails in each inquiry's expanded view. The "Message Us Directly" form gained
+  optional multi-photo upload; `/api/contact-message` now takes multipart, uploads
+  to the `product-images` bucket under a `messages/` prefix, and stores URLs in a new
+  `admin_notifications.image_urls` column that `/admin/messages` renders as
+  thumbnails. The new upload destination was added to the Storage GC reference scan.
+  Reads/writes degrade gracefully pre-migration. **Pending manual: run
+  `supabase/admin-notifications-image-urls.sql`** (and ensure
+  `inquiries.uploaded_image_urls` exists via `sales-workflow.sql` for inquiry photos).
+  Verified build clean (205 pages), lint only the 3 known issues, message form renders
+  the photo zone, API validates under multipart. See DECISIONS (2026-06-25).
+- **"Message Us Directly" contact form added (2026-06-25):** New section below the
+  `/contact` hero (above "Submit Your Item") with name, email, optional phone, and a
+  large message textarea. It delivers straight to the admin message center: the new
+  `/api/contact-message` route inserts a `type: 'message'` row into
+  `admin_notifications` via the service-role client (so it shows in `/admin/messages`)
+  and sends a best-effort owner email (reply-to the sender) as backup. New
+  `components/contact/MessageUsForm.tsx` (bilingual, honeypot, privacy notice).
+  Verified: page renders the section under the hero, API validation works
+  (missing/invalid → 400, honeypot dropped), build clean (205 pages), lint only the
+  3 known issues. Depends on `SUPABASE_SERVICE_ROLE_KEY` + the `admin_notifications`
+  table (already used by checkout/messages); if the table is missing the message
+  still emails the owner. See DECISIONS (2026-06-25).
 - **Web performance/security audit fixes (2026-06-25):** Four-phase pass.
   (1) **Contact forms fixed** — `/contact` + `/free-evaluation` were silently
   failing on Netlify Forms (undetectable on client-rendered React); rewired to

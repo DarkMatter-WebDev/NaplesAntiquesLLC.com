@@ -1,12 +1,60 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createPublicClient } from '@/lib/supabase/public';
 import { createServiceClient } from '@/lib/supabase/service';
+import { createAdminNotification } from '@/lib/admin-notify';
 import { PRODUCT_IMAGES_BUCKET } from '@/lib/product-image-storage';
 
 export const runtime = 'nodejs';
 
 const OWNER_EMAIL = 'rcman12589@gmail.com';
 const FROM = 'Naples Estate Jewelry <noreply@naplesestatejewelry.co>';
+
+type InquiryKind = 'free-evaluation' | 'submit-item' | 'product-inquiry';
+
+/** Human, type-aware notification titles for the unified admin inbox. */
+function inquiryNotificationTitle(kind: InquiryKind, name: string, itemTitle: string): string {
+  const who = name.trim() || 'a customer';
+  switch (kind) {
+    case 'free-evaluation':
+      return `Free evaluation request from ${who}`;
+    case 'submit-item':
+      return `Item submission from ${who}`;
+    case 'product-inquiry':
+      return `Inquiry about ${itemTitle} from ${who}`;
+  }
+}
+
+/**
+ * Also drop every inquiry into the admin message center (unified inbox), so lead
+ * submissions show up alongside contact messages and order notifications — with
+ * any uploaded photos attached. Best-effort: requires the service-role client and
+ * its admin_notifications INSERT grant; a failure here never fails the request,
+ * since the inquiry row + owner email already captured the submission.
+ */
+async function notifyAdminOfInquiry(input: {
+  kind: InquiryKind;
+  itemTitle: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  message: string;
+  imageUrls: string[];
+}) {
+  let service;
+  try {
+    service = createServiceClient();
+  } catch {
+    return;
+  }
+  await createAdminNotification(service, {
+    type: 'inquiry',
+    title: inquiryNotificationTitle(input.kind, input.name, input.itemTitle),
+    body: input.phone ? `${input.message}\n\nPhone: ${input.phone}` : input.message,
+    customerName: input.name,
+    customerEmail: input.email,
+    imageUrls: input.imageUrls,
+  });
+}
 
 const MAX_FILES = 10;
 const MAX_BYTES = 15 * 1024 * 1024; // 15 MB per photo
@@ -85,7 +133,9 @@ async function handleJsonInquiry(req: Request) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  // Insert as the anon role, which holds the public-insert grant on inquiries.
+  // (The service role is intentionally not used here — it lacks INSERT on the table.)
+  const supabase = createPublicClient();
   const { error } = await supabase.from('inquiries').insert({
     item_title: item,
     name,
@@ -99,6 +149,7 @@ async function handleJsonInquiry(req: Request) {
     return NextResponse.json({ error: 'Failed to save inquiry' }, { status: 500 });
   }
 
+  await notifyAdminOfInquiry({ kind: 'product-inquiry', itemTitle: item, name, phone, email: email || null, message, imageUrls: [] });
   await sendEmails({ itemTitle: item, name, phone, email: email || null, message, imageUrls: [] });
 
   return NextResponse.json({ success: true });
@@ -176,9 +227,12 @@ async function handleLeadForm(req: Request) {
     }
   }
 
-  // Prefer the service client for the insert (consistent with the upload), fall
-  // back to the anonymous server client (public-insert policy allows it).
-  const db = service ?? (await createClient());
+  // Insert the inquiry as the anon role (it holds the public-insert grant on
+  // inquiries). The service role is used ONLY for the Storage upload above — it
+  // is NOT used for the row insert, because it lacks INSERT on this table, which
+  // is what caused 42501 "permission denied for table inquiries" once a service
+  // key was configured.
+  const db = createPublicClient();
 
   const baseRow = {
     item_title: itemTitle,
@@ -211,6 +265,10 @@ async function handleLeadForm(req: Request) {
     return NextResponse.json({ error: 'Failed to save inquiry' }, { status: 500 });
   }
 
+  await notifyAdminOfInquiry({
+    kind: source === 'free-evaluation' ? 'free-evaluation' : 'submit-item',
+    itemTitle, name, phone, email: email || null, message, imageUrls,
+  });
   await sendEmails({ itemTitle, name, phone, email: email || null, message, imageUrls });
 
   return NextResponse.json({ success: true });

@@ -16,7 +16,9 @@ const ADMIN_NOTIFICATION_COLUMNS = [
   'customer_email',
   'is_read',
   'created_at',
-].join(', ');
+];
+const ADMIN_NOTIFICATION_SELECT = ADMIN_NOTIFICATION_COLUMNS.join(', ');
+const ADMIN_NOTIFICATION_SELECT_WITH_IMAGES = [...ADMIN_NOTIFICATION_COLUMNS, 'image_urls'].join(', ');
 
 interface Props {
   params: Promise<{ locale: string }>;
@@ -44,11 +46,20 @@ export default async function AdminMessagesPage({ params }: Props) {
     redirect(isEs ? '/es/account' : '/account');
   }
 
-  const { data: notifications } = await supabase
+  // Prefer the select that includes customer-attached photos; fall back without it
+  // if the image_urls column isn't present yet (admin-notifications-image-urls.sql).
+  const withImages = await supabase
     .from('admin_notifications')
-    .select(ADMIN_NOTIFICATION_COLUMNS)
+    .select(ADMIN_NOTIFICATION_SELECT_WITH_IMAGES)
     .order('created_at', { ascending: false })
     .limit(100);
+  const notifications = withImages.error
+    ? (await supabase
+        .from('admin_notifications')
+        .select(ADMIN_NOTIFICATION_SELECT)
+        .order('created_at', { ascending: false })
+        .limit(100)).data
+    : withImages.data;
   const unreadMessagesCount = ((notifications ?? []) as unknown as AdminNotification[]).filter((item) => !item.is_read).length;
 
   return (

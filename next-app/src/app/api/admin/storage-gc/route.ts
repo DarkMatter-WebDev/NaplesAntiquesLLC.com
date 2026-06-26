@@ -88,9 +88,10 @@ export async function POST(req: Request) {
   let products: Array<{ images: unknown; image_urls: unknown }>;
   let orderItems: Array<{ image_snapshot: string | null }>;
   let inquiries: Array<{ uploaded_image_urls: unknown }>;
+  let notifications: Array<{ image_urls: unknown }>;
 
   try {
-    [products, orderItems, inquiries] = await Promise.all([
+    [products, orderItems, inquiries, notifications] = await Promise.all([
       maybeSelect<{ images: unknown; image_urls: unknown }>(
         'products.images,image_urls',
         supabase.from('products').select('images, image_urls'),
@@ -102,6 +103,10 @@ export async function POST(req: Request) {
       maybeSelect<{ uploaded_image_urls: unknown }>(
         'inquiries.uploaded_image_urls',
         supabase.from('inquiries').select('uploaded_image_urls'),
+      ),
+      maybeSelect<{ image_urls: unknown }>(
+        'admin_notifications.image_urls',
+        supabase.from('admin_notifications').select('image_urls'),
       ),
     ]);
   } catch (error) {
@@ -115,6 +120,7 @@ export async function POST(req: Request) {
     ...products.flatMap((row) => [...asStringArray(row.images), ...asStringArray(row.image_urls)]),
     ...orderItems.map((row) => row.image_snapshot),
     ...inquiries.flatMap((row) => asStringArray(row.uploaded_image_urls)),
+    ...notifications.flatMap((row) => asStringArray(row.image_urls)),
   ]));
 
   const storage = supabase.storage.from(PRODUCT_IMAGES_BUCKET);

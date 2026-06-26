@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import { formatOrderDate } from '@/types/sales';
 
@@ -16,9 +17,43 @@ export type AdminNotification = {
   order_id: string | null;
   customer_name: string | null;
   customer_email: string | null;
+  image_urls?: string[] | null;
   is_read: boolean;
   created_at: string;
 };
+
+function imageList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+}
+
+const TYPE_META: Record<string, { label: string; color: string }> = {
+  inquiry: { label: 'Inquiry', color: GOLD },
+  message: { label: 'Message', color: '#2563eb' },
+  order: { label: 'Order', color: '#166534' },
+};
+
+function typeMeta(type: string): { label: string; color: string } {
+  if (TYPE_META[type]) return TYPE_META[type];
+  return { label: type ? `${type.charAt(0).toUpperCase()}${type.slice(1)}` : 'Note', color: 'var(--color-on-surface-variant)' };
+}
+
+/** Color-coded chip so a mixed inbox (inquiries / messages / orders) is scannable. */
+function TypeChip({ type }: { type: string }) {
+  const meta = typeMeta(type);
+  return (
+    <span
+      className="shrink-0 px-2 py-0.5 text-[0.55rem] font-bold uppercase tracking-[0.14em] rounded-full"
+      style={{
+        color: meta.color,
+        border: `1px solid color-mix(in srgb, ${meta.color} 45%, transparent)`,
+        background: `color-mix(in srgb, ${meta.color} 8%, white)`,
+      }}
+    >
+      {meta.label}
+    </span>
+  );
+}
 
 export default function MessagesPanel({
   notifications,
@@ -71,6 +106,7 @@ export default function MessagesPanel({
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
+                    <TypeChip type={item.type} />
                     <h2 className="font-bold" style={{ color: 'var(--color-on-surface)', fontFamily: 'var(--font-headline)' }}>
                       {item.title}
                     </h2>
@@ -89,6 +125,29 @@ export default function MessagesPanel({
                     <p className="mt-3 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
                       {item.body}
                     </p>
+                  )}
+                  {imageList(item.image_urls).length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {imageList(item.image_urls).map((url, i) => (
+                        <a
+                          key={url}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block overflow-hidden rounded-md border"
+                          style={{ width: '5rem', height: '5rem', borderColor: BORDER, background: '#faf7f0' }}
+                        >
+                          <Image
+                            src={url}
+                            alt={`${item.title} photo ${i + 1}`}
+                            width={80}
+                            height={80}
+                            unoptimized
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </a>
+                      ))}
+                    </div>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">

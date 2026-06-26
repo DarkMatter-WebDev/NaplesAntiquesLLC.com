@@ -11,9 +11,15 @@ create table if not exists public.admin_notifications (
   order_id uuid references public.orders (id) on delete set null,
   customer_name text,
   customer_email text,
+  image_urls jsonb not null default '[]'::jsonb,
   is_read boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+-- Customer-attached photos for message-center notifications (added after initial
+-- deploy). Stores Storage URL strings only; see admin-notifications-image-urls.sql.
+alter table public.admin_notifications
+  add column if not exists image_urls jsonb not null default '[]'::jsonb;
 
 create index if not exists admin_notifications_created_idx
   on public.admin_notifications (created_at desc);

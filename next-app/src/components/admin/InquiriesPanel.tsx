@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 
 const GOLD = '#735c00';
 const BORDER = 'rgba(115,92,0,0.2)';
@@ -14,6 +15,12 @@ export interface Inquiry {
   message: string;
   status: 'new' | 'read' | 'replied';
   created_at: string;
+  uploaded_image_urls?: string[] | null;
+}
+
+function imageList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
 }
 
 interface Props {
@@ -146,6 +153,34 @@ export default function InquiriesPanel({ inquiries: initial }: Props) {
                 <div style={{ fontSize: '0.8125rem', marginBottom: '0.75rem', whiteSpace: 'pre-wrap', color: '#333' }}>
                   {inq.message}
                 </div>
+                {/* Uploaded photos */}
+                {imageList(inq.uploaded_image_urls).length > 0 && (
+                  <div style={{ marginBottom: '0.75rem' }}>
+                    <span style={{ color: '#999', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                      Photos ({imageList(inq.uploaded_image_urls).length})
+                    </span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.4rem' }}>
+                      {imageList(inq.uploaded_image_urls).map((url, i) => (
+                        <a
+                          key={url}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ display: 'block', width: '5rem', height: '5rem', borderRadius: '4px', overflow: 'hidden', border: `1px solid ${BORDER}`, background: '#faf7f0' }}
+                        >
+                          <Image
+                            src={url}
+                            alt={`${inq.item_title} photo ${i + 1}`}
+                            width={80}
+                            height={80}
+                            unoptimized
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {/* Status actions */}
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   {inq.status !== 'read' && (

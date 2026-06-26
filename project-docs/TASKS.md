@@ -5,6 +5,19 @@
 
 ## Backlog
 
+- **`supabase/service-role-insert-grants.sql` — likely NOT needed (optional safety).**
+  Live testing (2026-06-25) showed `service_role` INSERT into `admin_notifications`
+  already succeeds (the "Message Us Directly" and unified-inbox inquiry notifications
+  land in `/admin/messages` without it). The file is an idempotent safety grant —
+  run only if message-center notifications ever stop appearing with a 42501 error.
+  The lead-form (inquiries) 42501 bug was fixed in code (insert as anon).
+- **Apply `supabase/admin-notifications-image-urls.sql`** in the live Supabase
+  project so the `admin_notifications.image_urls` column exists and photos attached
+  to "Message Us Directly" submissions persist + render in `/admin/messages`. Until
+  then the message still saves and photo links are kept in the notification body
+  text (degraded). Also confirm `inquiries.uploaded_image_urls` exists (from
+  `sales-workflow.sql`) so inquiry/free-eval photos show in `/admin/inquiries`. After
+  applying, submit a message + an inquiry with photos and confirm thumbnails render.
 - **Promote CSP from Report-Only to enforcing.** Root `netlify.toml` ships
   `Content-Security-Policy-Report-Only`. After deploy, watch the browser console
   / a report endpoint across the main pages; once clean, rename the header key to
@@ -195,6 +208,40 @@
 
 ## Completed
 
+- **Unified admin inbox** (2026-06-25): `/api/inquire` now also writes an
+  `admin_notifications` row (`type: 'inquiry'`, photos attached) for every Free
+  Evaluation / Submit Your Item / product inquiry, so all submissions show in
+  `/admin/messages` next to contact messages and order notifications (unread badge
+  covers all). Added shared `lib/admin-notify.ts` (`createAdminNotification`), reused
+  by `/api/contact-message`. Best-effort (never fails the submission). Live test
+  confirmed the notification insert succeeds. Build + lint clean. See DECISIONS
+  (2026-06-25).
+- **Fixed lead forms 42501 permission-denied on insert** (2026-06-25): `/api/inquire`
+  inserted inquiry rows via the service-role client, which lacks INSERT on
+  `inquiries`; switched both the multipart and JSON paths to insert as the anon role
+  (`createPublicClient()`), keeping the service client only for Storage uploads.
+  Verified live (free-eval path returns 200, was 500). Added
+  `supabase/service-role-insert-grants.sql` for the `admin_notifications` equivalent
+  (see Backlog). Build + lint clean. See DECISIONS (2026-06-25).
+- **Customer photos surfaced in the admin panel** (2026-06-25): `/admin/inquiries`
+  renders `inquiries.uploaded_image_urls` as thumbnails; the "Message Us Directly"
+  form gained optional multi-photo upload, `/api/contact-message` now takes multipart
+  and uploads to `product-images` under a `messages/` prefix, storing URLs in a new
+  `admin_notifications.image_urls` column rendered by `/admin/messages`. New upload
+  destination registered with the Storage GC reference scan. Touched
+  `InquiriesPanel.tsx`, `admin/inquiries/page.tsx`, `MessagesPanel.tsx`,
+  `admin/messages/page.tsx`, `MessageUsForm.tsx`, `api/contact-message/route.ts`,
+  `api/admin/storage-gc/route.ts`, `admin-notifications-checkout.sql`, + new
+  `admin-notifications-image-urls.sql`. Build clean (205 pages); lint only the 3
+  known issues. See Backlog for the migration. See DECISIONS (2026-06-25).
+- **"Message Us Directly" contact form added** (2026-06-25): New section below the
+  `/contact` hero with name/email/optional-phone and a large message textarea, posting
+  to the new `/api/contact-message` route, which inserts a `type: 'message'` row into
+  `admin_notifications` (service-role) so it lands in `/admin/messages`, plus a
+  best-effort owner email. New `components/contact/MessageUsForm.tsx`; wired into
+  `contact/page.tsx` above `ContactForm`. Build clean (205 pages); lint only the 3
+  known issues. Depends on existing `SUPABASE_SERVICE_ROLE_KEY` + `admin_notifications`
+  (`admin-notifications-checkout.sql`). See DECISIONS (2026-06-25).
 - **Web performance/security audit fixes (4 phases)** (2026-06-25): Fixed the
   silently-failing `/contact` + `/free-evaluation` forms by rewiring them to the
   existing `/api/inquire` (Resend + Supabase + `/admin/inquiries`) with

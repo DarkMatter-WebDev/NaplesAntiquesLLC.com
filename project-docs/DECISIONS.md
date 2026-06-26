@@ -56,6 +56,111 @@ breaking the icon font / inline JSON-LD / Supabase before real-traffic validatio
 (2) Keep both toml files — rejected: drift risk. (3) Use a `public/_headers` file —
 equivalent, but `[[headers]]` keeps headers, redirects, and caching in one file.
 
+## 2026-06-25 — Unified admin inbox: inquiries also post to the message center
+
+**Decision:** Every inquiry submission (`/api/inquire` — Free Evaluation, Submit
+Your Item, product inquiry) writes an `admin_notifications` row (`type: 'inquiry'`,
+photos attached) in addition to its `inquiries` row, so the message center
+(`/admin/messages`) is a single inbox for all incoming submissions (lead forms,
+"Message Us Directly" messages, and order notifications). Inquiries still also live
+in `/admin/inquiries` (their status workflow) and still email the owner. A shared
+`lib/admin-notify.ts` (`createAdminNotification`) does the insert; it is best-effort
+(a failure never fails the submission) and reused by `/api/contact-message`.
+
+**Reason:** The owner wanted one place to see everything coming in. Layering a
+notification on top of the existing `inquiries` record (rather than moving inquiries
+into `admin_notifications`) keeps the inquiry status workflow intact while giving the
+message center full coverage, including the unread badge.
+
+**Alternatives considered:** (1) Replace the `inquiries` table with
+`admin_notifications` — rejected: loses the inquiry status workflow and the
+`/admin/inquiries` management view. (2) A DB trigger that mirrors inquiries into
+notifications — rejected: harder to attach the already-uploaded photo URLs and to
+keep best-effort/non-blocking semantics; the app-layer helper is simpler and shared
+with the message form.
+
+## 2026-06-25 — Public lead inserts run as anon; service role is for Storage + admin tables only
+
+**Decision:** `/api/inquire` inserts inquiry rows using the **anon** client
+(`createPublicClient()`), not the service-role client. The service-role client is
+reserved for the Storage photo upload (RLS bypass) and for writing RLS-restricted
+admin tables. For `admin_notifications` (no public-insert path), the service role is
+kept but must be granted INSERT explicitly (`service-role-insert-grants.sql`).
+
+**Reason:** `inquiries` is designed for public submission — it has a `with check
+(true)` insert policy and `grant insert … to anon`. The service role bypasses RLS
+but, in Postgres, still needs a table-level INSERT grant, which it didn't have here
+(grants were scoped to anon/authenticated). The route's `db = service ?? createClient()`
+preferred the service role once a service key existed, producing 42501 "permission
+denied for table inquiries". Inserting as anon matches the table's intended access
+and needs no new grant. Using anon (cookie-free) instead of the cookie-based server
+client also avoids the `authenticated` role, which likewise lacks the INSERT grant —
+so logged-in submitters work too.
+
+**Alternatives considered:** (1) `GRANT INSERT ON inquiries TO service_role` and keep
+inserting as service — works, but adds a migration for a table that already supports
+anon insert by design. (2) Keep the cookie-based server client — rejected: a
+logged-in submitter runs as `authenticated`, which has no INSERT grant. For
+`admin_notifications` there is no anon path, so the grant (or a SECURITY DEFINER RPC)
+is unavoidable; chose the grant for simplicity.
+
+## 2026-06-25 — Surface customer photos in the admin panel (inquiries + messages)
+
+**Decision:** Show uploaded customer photos as thumbnails in the admin panel.
+Inquiries already store photo URLs in `inquiries.uploaded_image_urls`, so
+`/admin/inquiries` now selects and renders them. For the "Message Us Directly"
+form, added optional photo upload: the route uploads to the existing
+`product-images` Storage bucket under a new `messages/` prefix and stores the URL
+strings in a new `admin_notifications.image_urls` (jsonb) column, which
+`/admin/messages` renders. Thumbnails use `next/image` with `unoptimized` (admin-
+only, avoids image-domain config and the `no-img-element` lint rule) and link to
+the full-size image.
+
+**Reason:** Photo bytes stay in Storage and rows store only URL strings (the
+project's standard). Reusing the `product-images` bucket avoids a new bucket +
+policies. Because this is a **new upload destination**, the column was added to the
+Storage GC reference scan (`/api/admin/storage-gc`) so message photos are never
+deleted as orphans (per the GC reference-set rule).
+
+**Alternatives considered:** (1) A separate Storage bucket for messages — rejected
+as unnecessary; the prefix is enough. (2) Stuffing photo URLs into the notification
+`body` text — rejected: they wouldn't render as images (kept only as a degraded
+fallback when the `image_urls` column is missing pre-migration). (3) Raw `<img>` —
+rejected: trips the `no-img-element` lint rule.
+
+**Dependency:** run `supabase/admin-notifications-image-urls.sql`. Reads and writes
+degrade gracefully before it's applied (messages page falls back to no-photos; the
+route falls back to keeping photo links in the body text).
+
+## 2026-06-25 — "Message Us Directly" contact form posts to the admin message center
+
+**Decision:** Add a public "Message Us Directly" form below the hero on `/contact`
+(name, email, optional phone, large message) that delivers straight into the admin
+message center. The new `/api/contact-message` route inserts a `type: 'message'`
+row into `admin_notifications` using the **service-role** client (server-side), and
+also sends a best-effort owner email (reply-to the sender) as a backup. The new
+`MessageUsForm` is rendered above the existing "Submit Your Item" (`ContactForm`)
+in the non-inquiry contact view.
+
+**Reason:** `admin_notifications` RLS allows only admins to read/update — there is
+no public insert. The existing contact flow already depends on the service-role
+client (for inquiry photo uploads), so a server-side service-role insert reaches
+the message center with **no new SQL migration**, and keeps the key off the
+browser. The email backup means a message is never lost if the service role or the
+`admin_notifications` table is unavailable.
+
+**Alternatives considered:** (1) A `SECURITY DEFINER` RPC granted to anon (like
+`create_checkout_order`) — architecturally clean and service-role-free, but adds a
+new migration the owner must run; rejected for friction since service-role is
+already required here. (2) Insert into the `inquiries` table and surface it under
+Messages — rejected: the owner specifically wanted it in the message center, and
+inquiries are a separate lead/intake concept. (3) Email only — rejected: the
+request was explicitly to land it in admin messages.
+
+**Dependencies:** `SUPABASE_SERVICE_ROLE_KEY` and the `admin_notifications` table
+(`admin-notifications-checkout.sql`). If the table isn't present, the insert fails
+and only the owner email fires (the form still reports success).
+
 ## 2026-06-25 — Product listing notes are bilingual; "Internal Notes" replaced by "Notes (ES)"
 
 **Decision:** Make the product listing's public notes bilingual, matching the

@@ -20,7 +20,9 @@ const INQUIRY_LIST_COLUMNS = [
   'message',
   'status',
   'created_at',
-].join(', ');
+];
+const INQUIRY_LIST_SELECT = INQUIRY_LIST_COLUMNS.join(', ');
+const INQUIRY_LIST_SELECT_WITH_IMAGES = [...INQUIRY_LIST_COLUMNS, 'uploaded_image_urls'].join(', ');
 
 export default async function AdminInquiriesPage({ params }: Props) {
   const { locale } = await params;
@@ -43,16 +45,24 @@ export default async function AdminInquiriesPage({ params }: Props) {
     redirect(locale === 'es' ? '/es/account' : '/account');
   }
 
-  const [{ data: inquiries }, { count: unreadMessagesCount }] = await Promise.all([
+  // Prefer the select that includes uploaded photo URLs; fall back without it if
+  // the uploaded_image_urls column isn't present yet (sales-workflow.sql not run).
+  const [withImages, { count: unreadMessagesCount }] = await Promise.all([
     supabase
       .from('inquiries')
-      .select(INQUIRY_LIST_COLUMNS)
+      .select(INQUIRY_LIST_SELECT_WITH_IMAGES)
       .order('created_at', { ascending: false }),
     supabase
       .from('admin_notifications')
       .select('id', { count: 'exact', head: true })
       .eq('is_read', false),
   ]);
+  const inquiries = withImages.error
+    ? (await supabase
+        .from('inquiries')
+        .select(INQUIRY_LIST_SELECT)
+        .order('created_at', { ascending: false })).data
+    : withImages.data;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-background, #fafaf8)' }}>

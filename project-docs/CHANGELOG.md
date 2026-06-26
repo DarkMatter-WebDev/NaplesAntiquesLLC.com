@@ -5,6 +5,71 @@
 
 ## 2026-06-25
 
+- **Contact page opens directly with "Message Us Directly" (hero removed).** The
+  normal `/contact` view no longer renders the top hero ("Get in Touch" + CTAs); it
+  now starts with the Message Us Directly section right under the header, followed by
+  "Submit Your Item". The Message Us Directly heading was promoted to the page `<h1>`
+  (responsive-title-lg) so the page keeps a proper top-level heading. The hero is
+  kept **only** for the product-inquiry flow (`/contact?item=…`, reached from a
+  product page), which relies on it for its heading context. Verified: hero copy
+  gone, `#message-us` is the first `<main>` child at y=64, h1 = "Message Us Directly",
+  Submit Your Item below, 0 console errors. Build clean.
+- **Unified admin inbox — every inquiry now also posts to the message center.**
+  `/api/inquire` (Free Evaluation, Submit Your Item, product inquiry) now writes an
+  `admin_notifications` row (`type: 'inquiry'`) alongside the `inquiries` record, so
+  all incoming submissions show in `/admin/messages` next to "Message Us Directly"
+  messages and order notifications — with uploaded photos attached and the unread
+  badge covering everything. Inquiries still also appear in `/admin/inquiries`
+  (status workflow) and still email the owner. New shared helper
+  `lib/admin-notify.ts` (`createAdminNotification`, best-effort, with the image_urls
+  column fallback); `/api/contact-message` refactored to use it. The notification
+  insert is best-effort — a failure never fails the submission (the inquiry row +
+  email already captured it). Notification titles are type-aware and human ("Free
+  evaluation request from {name}", "Item submission from {name}", "Inquiry about
+  {product} from {name}", "Message from {name}"; dropped the redundant "New" since
+  the panel already shows an unread badge), and `MessagesPanel` shows a color-coded
+  type chip (Inquiry / Message / Order) so the mixed inbox is scannable. Live test: a
+  free-eval submission returned 200 and the
+  `admin_notifications` insert succeeded with no error (so `service_role` already has
+  the grant; `service-role-insert-grants.sql` appears unnecessary — kept as an
+  idempotent safety net). Build + lint clean.
+- **Fixed lead forms failing with "permission denied for table inquiries" (42501).**
+  Free Evaluation / Submit Your Item / product inquiry submissions were 500ing:
+  `/api/inquire` inserted the row with the **service-role** client (`db = service ??
+  …`), but `service_role` has no INSERT grant on `inquiries` (grants went to `anon`/
+  `authenticated`; inserts were meant to run as `anon` under the public-insert
+  policy). Configuring the service key for photo uploads silently switched the
+  insert to `service_role`, which then failed. Fix: insert as the **anon role** via
+  `createPublicClient()` (both the multipart and JSON paths); the service client is
+  used only for the Storage upload. Verified live — the exact free-eval path now
+  returns 200 (was 500), no 42501 in logs. Build + lint clean. Also added
+  `supabase/service-role-insert-grants.sql` granting `service_role` INSERT on
+  `admin_notifications` (same latent issue for the "Message Us Directly" form, which
+  has no anon path) — **pending manual apply**; until then that form falls back to
+  the email backup. See DECISIONS (2026-06-25).
+- **Customer photos now surface in the admin panel (inquiries + messages).**
+  `/admin/inquiries` now selects `uploaded_image_urls` and renders submitted photos
+  as clickable thumbnails in each inquiry's expanded view (graceful fallback if the
+  column is absent). The "Message Us Directly" form gained an optional multi-photo
+  upload; `/api/contact-message` now accepts multipart, uploads photos to the
+  `product-images` bucket under a `messages/` prefix, and stores URLs in a new
+  `admin_notifications.image_urls` column that `/admin/messages` renders as
+  thumbnails. Registered the new upload destination with the Storage GC reference
+  scan so message photos aren't GC'd. Thumbnails use `next/image` (unoptimized).
+  **Pending manual:** run `supabase/admin-notifications-image-urls.sql`. Verified
+  build clean (205 pages), lint only the 3 known issues, message form renders the
+  photo zone, API validates under multipart. See DECISIONS (2026-06-25).
+- **"Message Us Directly" form added to the contact page.** New section below the
+  `/contact` hero (above "Submit Your Item") with name, email, optional phone, and
+  a large message textarea. New `components/contact/MessageUsForm.tsx` (bilingual,
+  honeypot, privacy notice) posts JSON to the new `/api/contact-message` route,
+  which inserts a `type: 'message'` row into `admin_notifications` via the
+  service-role client so it appears in `/admin/messages`, plus a best-effort owner
+  email (reply-to the sender) as backup. Validation verified (missing/invalid →
+  400, honeypot → dropped); page renders the section directly under the hero;
+  build clean (205 pages); lint only the 3 known issues. Needs
+  `SUPABASE_SERVICE_ROLE_KEY` + the `admin_notifications` table (already required
+  elsewhere). See DECISIONS (2026-06-25).
 - **Performance/security audit fixes (4 phases).**
   - **Forms now deliver.** `/contact` (submit-item) and `/free-evaluation` were
     silently failing — they used Netlify Forms (`data-netlify`), which Netlify's
