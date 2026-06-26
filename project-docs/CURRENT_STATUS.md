@@ -1,7 +1,16 @@
 # Current Status
 
 > Reflects the present state of development. **Update this at the end of every
-> work session.** Last updated: **2026-06-25**.
+> work session.** Last updated: **2026-06-26**.
+
+## ⚠️ Pending manual SQL (run in Supabase, project `evzluixourmsefwdsieu`)
+
+- **`supabase/admin-notifications-recycle-bin.sql`** — adds
+  `admin_notifications.deleted_at` and the `trash_/restore_/delete_admin_notifications`
+  RPCs that power the Messages Recycle Bin. Until run, "Delete Selected" permanently
+  deletes (legacy behavior) and the Recycle Bin link is hidden. Script self-verifies
+  (returns 3 function rows).
+- Older pending items below still apply (image_urls, public_notes_es, etc.).
 
 ## Current App
 

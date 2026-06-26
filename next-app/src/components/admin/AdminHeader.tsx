@@ -5,13 +5,12 @@ import AdminMessagesLink from './AdminMessagesLink';
 
 const GOLD = '#735c00';
 
-export type AdminSection = 'products' | 'orders' | 'messages' | 'inquiries' | 'subscribers' | 'marketing' | 'users' | 'settings';
+export type AdminSection = 'products' | 'orders' | 'messages' | 'subscribers' | 'marketing' | 'users' | 'settings';
 
 const SECTION_LABELS: Record<AdminSection, string> = {
   products: 'Products',
   orders: 'Orders',
   messages: 'Messages',
-  inquiries: 'Inquiries',
   subscribers: 'Subscribers',
   marketing: 'Email Campaigns',
   users: 'Users',
@@ -232,9 +231,6 @@ export default function AdminHeader({
         active={active === 'messages'}
         style={active === 'messages' ? activeStyle : linkStyle}
       />
-      <AdminNavItem href={`${adminBasePath}/inquiries`} active={active === 'inquiries'}>
-        Inquiries
-      </AdminNavItem>
       <AdminNavItem href={`${adminBasePath}/subscribers`} active={active === 'subscribers'}>
         Subscribers
       </AdminNavItem>

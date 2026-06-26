@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import AdminHeader from '@/components/admin/AdminHeader';
+import DeleteUserButton from '@/components/admin/DeleteUserButton';
 import { formatCurrency } from '@/types/sales';
 
 export const metadata: Metadata = { title: 'Admin - Users' };
@@ -211,11 +212,21 @@ export default async function AdminUsersPage({ params }: Props) {
                     <span className="mt-1 block">{siteUser.orderSummary ? `${siteUser.orderSummary.count} / ${formatCurrency(siteUser.orderSummary.total)}` : 'No'}</span>
                   </div>
                 </div>
-                {siteUser.orderSummary && (
-                  <Link href={`${adminBasePath}/users/${siteUser.id}/invoices`} className="gold-button mt-4 w-full text-xs">
-                    Invoices{siteUser.invoiceCount > 0 ? ` (${siteUser.invoiceCount})` : ''}
-                  </Link>
-                )}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {siteUser.orderSummary && (
+                    <Link href={`${adminBasePath}/users/${siteUser.id}/invoices`} className="gold-button text-xs">
+                      Invoices{siteUser.invoiceCount > 0 ? ` (${siteUser.invoiceCount})` : ''}
+                    </Link>
+                  )}
+                  {siteUser.id !== user.id && (
+                    <DeleteUserButton
+                      userId={siteUser.id}
+                      userName={displayName(siteUser)}
+                      userEmail={siteUser.email}
+                      isAdmin={!!siteUser.is_admin}
+                    />
+                  )}
+                </div>
               </article>
             ))}
           </div>
@@ -224,7 +235,7 @@ export default async function AdminUsersPage({ params }: Props) {
             <table className="w-full min-w-[1150px] text-left text-sm">
               <thead style={{ background: 'var(--color-surface-container-low)' }}>
                 <tr>
-                  {['Name', 'Email', 'Phone', 'Alternate Phone', 'Location', 'Orders', 'Invoices', 'Marketing', 'Flags', 'Created', 'Updated'].map((heading) => (
+                  {['Name', 'Email', 'Phone', 'Alternate Phone', 'Location', 'Orders', 'Invoices', 'Marketing', 'Flags', 'Created', 'Updated', ''].map((heading) => (
                     <th key={heading} className="px-4 py-3 text-[0.68rem] uppercase tracking-widest font-bold"
                       style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
                       {heading}
@@ -289,11 +300,21 @@ export default async function AdminUsersPage({ params }: Props) {
                         <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
                           {formatDate(siteUser.updated_at)}
                         </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {siteUser.id !== user.id && (
+                            <DeleteUserButton
+                              userId={siteUser.id}
+                              userName={displayName(siteUser)}
+                              userEmail={siteUser.email}
+                              isAdmin={!!siteUser.is_admin}
+                            />
+                          )}
+                        </td>
                       </tr>
                 ))}
                 {siteUsers.length === 0 && (
                   <tr>
-                    <td colSpan={11} className="px-4 py-12 text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    <td colSpan={12} className="px-4 py-12 text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
                       No account profiles were found.
                     </td>
                   </tr>

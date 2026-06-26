@@ -68,7 +68,7 @@ export default async function AdminInquiriesPage({ params }: Props) {
     <div style={{ minHeight: '100vh', background: 'var(--color-background, #fafaf8)' }}>
       <AdminHeader
         adminBasePath={adminBasePath}
-        active="inquiries"
+        active="messages"
         unreadMessagesCount={unreadMessagesCount ?? 0}
         userEmail={user.email}
       />

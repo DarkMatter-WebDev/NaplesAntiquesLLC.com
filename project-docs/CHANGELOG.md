@@ -3,6 +3,59 @@
 > Track meaningful changes. Newest at the top. One dated section per day of work;
 > bullet the notable changes. Keep entries short.
 
+## 2026-06-26
+
+- **CRITICAL FIX — Messages panel showed stale lists across view switches.**
+  `MessagesPanel` seeded its list from `useState(notifications)`, which captures the
+  prop only on mount. Next.js soft-navigation between `?view=inbox` and `?view=trash`
+  (and `router.refresh()` after an action) re-renders the component with new props but
+  does NOT remount it, so the list stayed frozen on the first view's data — inbox
+  messages appeared inside the Recycle Bin, and (worst of all) Restore/Delete‑Forever
+  fired against the **stale rows' ids**, so the wrong messages were acted on/deleted.
+  Fixed with React's "reset state when a prop changes" pattern: when the incoming
+  `notifications` array identity changes, reset `items` and clear `selected`. Verified
+  live: inbox↔bin soft-nav now always shows the correct server list in both
+  directions; 0 console errors; lint clean. Note: during the buggy window the message
+  center dropped from 5 notifications to 2 (3 purged); the underlying `orders` /
+  `inquiries` rows are stored in separate tables and are unaffected by notification
+  deletion.
+- **Recycle Bin for admin messages (soft delete).** "Delete Selected" in
+  `/admin/messages` now moves messages to a Recycle Bin (`admin_notifications.deleted_at`)
+  instead of removing them. New `?view=trash` view lists deleted messages where the
+  admin can **Restore** or **Delete Forever** (the latter behind a confirm). Inbox
+  filters `deleted_at is null`; a "Recycle Bin (N)" link shows the bin count. Soft
+  delete also sets `is_read = true` so trashed items drop out of every unread badge
+  (which keys off `is_read = false`) without touching the 9 count call sites. All
+  three mutations go through SECURITY DEFINER RPCs (`trash_admin_notifications`,
+  `restore_admin_notifications`, `delete_admin_notifications`) — same proven pattern
+  as `create_checkout_order`, so no table-grant dependency. Page degrades gracefully
+  pre-migration (bin link hidden, trash empty). **Requires SQL:**
+  `supabase/admin-notifications-recycle-bin.sql`. Lint clean on changed files;
+  verified inbox + trash render with 0 console errors.
+- **Fixed message delete (42501 → SECURITY DEFINER RPC).** Bulk-delete in
+  `/admin/messages` failed with "permission denied for table admin_notifications":
+  `service_role` had INSERT but never DELETE, and a plain `grant delete` did not
+  resolve it in the live DB. Switched the delete path to a SECURITY DEFINER function
+  `delete_admin_notifications(uuid[])` (runs as owner, internal admin check), called
+  with the authenticated admin's session — the same mechanism that makes
+  `create_checkout_order` work. Confirmed working live.
+- **Admin: delete user accounts.** `/admin/users` rows (desktop + mobile) now have a
+  Delete button that opens a confirm modal warning the action is permanent (extra
+  warning if the target is an admin). New `DELETE /api/admin/users/[id]` verifies the
+  caller is admin, blocks self-deletion, removes the Supabase Auth user via service
+  role, and deletes the profile row as a cascade fallback. The logged-in admin's own
+  row has no Delete button.
+- **Admin nav: removed Inquiries.** Every inquiry already surfaces in Messages
+  (unified inbox), so the redundant Inquiries tab was dropped from `AdminHeader`. The
+  `/admin/inquiries` page still exists by direct URL.
+- **Contact form is now the only contact section; phone required, name/email
+  optional.** Removed the "Submit Your Item" (`ContactForm`) section from `/contact`
+  so the page is just "Message Us Directly". Made **phone + message** required and
+  name/email optional, with phone-format validation (10–15 digits) on both client and
+  `/api/contact-message`. Notification title/email fall back to the phone number when
+  no name is given. Shortened the subtext to "Send us a note and attach photos if you
+  like. We'll get back to you as soon as we can."
+
 ## 2026-06-25
 
 - **Contact page opens directly with "Message Us Directly" (hero removed).** The
