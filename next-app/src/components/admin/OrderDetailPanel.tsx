@@ -14,6 +14,19 @@ import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
 
+/** Format a stored address jsonb ({line1,line2,city,state,postal_code,country}) into display lines. */
+function formatOrderAddress(address: unknown): string | null {
+  if (!address || typeof address !== 'object') return null;
+  const a = address as Record<string, unknown>;
+  const get = (key: string) => (typeof a[key] === 'string' ? (a[key] as string).trim() : '');
+  const cityLine = [[get('city'), get('state')].filter(Boolean).join(', '), get('postal_code')]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  const lines = [get('line1'), get('line2'), cityLine, get('country')].filter((line) => line.length > 0);
+  return lines.length > 0 ? lines.join('\n') : null;
+}
+
 interface Invoice {
   id: string;
   invoice_number: string;
@@ -300,10 +313,40 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
                 <Field label="Email" value={order.customer_email} />
                 <Field label="Phone" value={order.customer_phone} />
               </div>
+              {(() => {
+                const shipping = formatOrderAddress(order.shipping_address);
+                const billing = formatOrderAddress(order.billing_address);
+                if (!shipping && !billing) return null;
+                return (
+                  <div className="mt-4 grid gap-4 md:grid-cols-2 text-sm">
+                    {shipping && (
+                      <div>
+                        <span className="mb-1 block text-[0.62rem] font-bold uppercase tracking-widest" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                          Shipping Address
+                        </span>
+                        <p className="whitespace-pre-line" style={{ color: 'var(--color-on-surface)' }}>{shipping}</p>
+                      </div>
+                    )}
+                    {billing && (
+                      <div>
+                        <span className="mb-1 block text-[0.62rem] font-bold uppercase tracking-widest" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                          Billing Address
+                        </span>
+                        <p className="whitespace-pre-line" style={{ color: 'var(--color-on-surface)' }}>{billing}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               {order.customer_notes && (
-                <p className="mt-4 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-                  {order.customer_notes}
-                </p>
+                <div className="mt-4">
+                  <span className="mb-1 block text-[0.62rem] font-bold uppercase tracking-widest" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                    Customer Notes
+                  </span>
+                  <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    {order.customer_notes}
+                  </p>
+                </div>
               )}
             </section>
 

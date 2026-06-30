@@ -1,7 +1,7 @@
 # Structure & Build Integrity
 
 > Canonical map of the current project layout and the invariants that keep the
-> Next.js site consistent. Last updated: **2026-06-20**.
+> Next.js site consistent. Last updated: **2026-06-30**.
 
 ## What kind of site this is
 
@@ -30,6 +30,8 @@ The former root static HTML site has been removed. Do not reintroduce root
 | Product pricing | `next-app/src/lib/pricing.ts` and `next-app/src/lib/spot-price.ts` |
 | Metal price API | `next-app/src/app/api/metal-prices/route.ts` |
 | Inquiry API | `next-app/src/app/api/inquire/route.ts` and `next-app/src/app/api/inquiries/[id]/route.ts` |
+| Online payments (PayPal) | `next-app/src/lib/paypal.ts` + `next-app/src/app/api/paypal/{create-order,capture-order,webhook}/route.ts` + `next-app/src/components/checkout/PayPalCheckoutButton.tsx` |
+| Authoritative checkout totals | `next-app/src/lib/checkout-pricing.ts` (subtotal/tax/shipping/total — never trusted from the client) |
 | Supabase clients | `next-app/src/lib/supabase/client.ts` and `server.ts` |
 | Translations | `next-app/messages/en.json` and `next-app/messages/es.json` |
 | Local static assets | `next-app/public/assets/*` |

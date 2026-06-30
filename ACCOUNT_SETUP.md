@@ -24,8 +24,11 @@ In the Supabase SQL Editor, run the relevant scripts in `supabase/`:
 - `inquiries.sql` - inquiry table and policies
 - `fix-permissions.sql` - idempotent permission/column repair
 - additive migration scripts such as `sales-workflow.sql`,
-  `homepage-subscribers.sql`, `email-marketing.sql`,
-  `compliance-consent.sql`, and product taxonomy/image migrations as needed
+  `admin-notifications-checkout.sql`, `order-item-line-discounts.sql`,
+  `paypal-checkout.sql` (PayPal checkout: order/product reservation columns,
+  `webhook_events`, reserve/capture/release RPCs, `service_role` grants),
+  `homepage-subscribers.sql`, `email-marketing.sql`, `compliance-consent.sql`,
+  and product taxonomy/image migrations as needed
 
 ## 2. Auth URL Configuration
 
@@ -63,6 +66,13 @@ RESEND_API_KEY=
 EMAIL_PROVIDER_API_KEY=
 SITE_URL=
 PROVIDER_WEBHOOK_SECRET=
+# PayPal checkout — credentials MUST match PAYPAL_ENV (sandbox vs live).
+# The client id is public (sent to the browser to load the PayPal JS SDK);
+# the secret + webhook id stay server-side.
+PAYPAL_CLIENT_ID=
+PAYPAL_CLIENT_SECRET=
+PAYPAL_ENV=sandbox
+PAYPAL_WEBHOOK_ID=
 ```
 
 Only `NEXT_PUBLIC_*` values are exposed to browser code. Never use a Supabase

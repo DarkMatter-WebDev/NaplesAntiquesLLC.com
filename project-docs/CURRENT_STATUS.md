@@ -1,10 +1,80 @@
 # Current Status
 
 > Reflects the present state of development. **Update this at the end of every
-> work session.** Last updated: **2026-06-26**.
+> work session.** Last updated: **2026-06-30**.
+
+## 🔴 HANDOFF — PayPal checkout: where testing stands (2026-06-30)
+
+**You are picking up a PayPal checkout integration that is fully built and code-complete,
+verified in SANDBOX up to a successful payment, but NOT yet deployed or fully tested.**
+The build/wiring is done; what remains is finishing sandbox tests on a deployed URL and
+then flipping to live. Full technical runbook: `project-docs/features/paypal-checkout.md`.
+
+### Environment / config state
+- **Code:** complete. Routes `/api/paypal/{create-order,capture-order,webhook}`, `lib/paypal.ts`,
+  `lib/checkout-pricing.ts`, `components/checkout/PayPalCheckoutButton.tsx`, and the
+  checkout/admin-orders UI are all in place. `tsc` clean; `npm run lint` shows only the 3
+  known pre-existing issues.
+- **Credentials:** SANDBOX creds are in `next-app/.env.local` (`PAYPAL_ENV=sandbox`,
+  `PAYPAL_WEBHOOK_ID=64C82950G8312001A`) and verified to authenticate against the sandbox
+  endpoint. (An earlier set of LIVE creds was swapped out — Live creds fail against the
+  sandbox endpoint with `401 invalid_client`.)
+- **Supabase migrations:** `order-item-line-discounts.sql` ✅ applied. `paypal-checkout.sql`
+  ✅ applied **with** the `service_role` grants and the ambiguous-`order_id` fix.
+  ⚠️ **`paypal-checkout.sql` still needs ONE more re-run** to drop the capture→Messages
+  notification insert (that edit was made after the last apply). Until re-run, a real
+  capture still posts a "Paid order" row to `/admin/messages` — harmless; the Orders-tab
+  badge works regardless.
+- **NOT deployed:** all testing so far was on the **local dev server (port 3002)**. The
+  latest changes have **not** been deployed to Netlify, and `npm run build` has not been
+  run since the last batch of checkout/notification changes.
+- **Netlify env vars:** PayPal vars are set locally only — **not confirmed set in Netlify**.
+- **Note:** one orphaned sandbox capture sits in the PayPal sandbox account from an earlier
+  tangled attempt — harmless test funds, no action needed.
+
+### Sandbox test matrix
+| # | Test | Status |
+|---|------|--------|
+| 1 | Successful payment | ✅ **PASSED live** end-to-end (create → approve → capture → `paid`/`completed`, product `sold`, capture idempotent) |
+| 5 | Item already sold before capture | ✅ PASSED (`reserve_paypal_order` returns 409; double-buy blocked) |
+| — | Validation/error paths + webhook signature gate | ✅ PASSED (empty cart, missing contact, bad ids → correct 400/404; unsigned webhook → 401) |
+| 3 | Failed/denied capture | ◐ Partial — graceful 502 + order stays unpaid on an unapproved capture is verified; the `PAYMENT.CAPTURE.DENIED` **webhook** branch is NOT live-tested (needs deploy) |
+| 6 | Amount mismatch | ◐ Logic verified (capture compares amount+currency → flags order `pending` + admin notification, no auto-sell); NOT forced live |
+| 2 | Canceled checkout | ⬜ NOT run live (onCancel handler exists) |
+| 4 | Duplicate webhook | ⬜ NOT run — needs deployed site + PayPal "Resend"/simulator (idempotency is coded via `webhook_events` unique `event_id`) |
+
+### What's left to do, in order
+1. **Re-run `supabase/paypal-checkout.sql`** (idempotent) so paid orders stop posting to the Messages center.
+2. **Set the 4 PayPal env vars in Netlify** (`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_ENV=sandbox`, `PAYPAL_WEBHOOK_ID`).
+3. **Run `npm run build`** from `next-app/` (not run since the latest changes), then **deploy to Netlify**.
+4. **Register the sandbox webhook** in the PayPal Developer dashboard → URL `https://naplesestatejewelry.co/api/paypal/webhook`, events `PAYMENT.CAPTURE.COMPLETED/DENIED/REFUNDED/REVERSED` + `CUSTOMER.DISPUTE.CREATED`; confirm its id matches `PAYPAL_WEBHOOK_ID`.
+5. **Finish the sandbox tests on the deployed site:** Test 2 (cancel), Test 3 (denied capture — sandbox negative testing or the webhook simulator's DENIED event), Test 4 (duplicate webhook via "Resend"). Optionally force Test 6 by editing `orders.total` while the PayPal popup is open.
+6. **Only after sandbox passes → go LIVE:** create a Live PayPal app, swap in live client/secret/webhook id, set `PAYPAL_ENV=live`, redeploy, and run one real low-value order.
+
+### How to verify/clean during testing
+- Test orders/reservations were created and cleaned up via the Supabase service role (PostgREST). To inspect: query `orders` (filter `payment_method=eq.paypal`) and `products` (`status=eq.reserved`). To clean a test order: set its product(s) back to `status='available'` (+ null `reserved_until`/`reserved_order_id`) and delete the order (order_items cascade).
+- A successful sandbox payment marks a REAL product `sold` and creates a real order — revert it after testing unless you want to keep an example.
 
 ## ⚠️ Pending manual SQL (run in Supabase, project `evzluixourmsefwdsieu`)
 
+- **`supabase/paypal-checkout.sql`** — **REQUIRED for PayPal checkout.** Adds the
+  PayPal columns on `orders` (`paypal_order_id`, `paypal_capture_id`,
+  `payment_response`, `paid_at`, `reserved_until`), the reservation columns on
+  `products` (`reserved_until`, `reserved_order_id`), the `webhook_events` table,
+  and the `reserve_paypal_order` / `capture_paypal_order` /
+  `apply_paypal_order_event` / `release_expired_paypal_reservations` RPCs **and the
+  `service_role` table grants** (orders/order_items/products/webhook_events/
+  admin_notifications) that capture + webhook + create-order's direct service-client
+  reads/writes require. Until it is run, the checkout PayPal button renders but
+  `POST /api/paypal/create-order` fails. Run after `sales-workflow.sql` and
+  `admin-notifications-checkout.sql`. **If you ran an earlier copy of this file
+  (before 2026-06-29 grants were added), re-run it** — without the service_role
+  grants the routes hit `42501 permission denied`. **Re-run again after the
+  2026-06-29 update that removed the capture→Messages `admin_notifications` insert**
+  (paid orders now surface on the Orders-tab badge, not the Messages center). Also set the PayPal env vars in
+  Netlify, **using SANDBOX credentials while `PAYPAL_ENV=sandbox`** (Live creds give
+  `401 invalid_client`), and register the webhook (see TASKS /
+  `features/paypal-checkout.md`).
 - **`supabase/admin-notifications-recycle-bin.sql`** — adds
   `admin_notifications.deleted_at` and the `trash_/restore_/delete_admin_notifications`
   RPCs that power the Messages Recycle Bin. Until run, "Delete Selected" permanently
@@ -28,6 +98,16 @@
 - **Online shop** (`/shop`, `/shop/[id]`) backed by Supabase `products`, with
   filters, product detail pages, local/Supabase image support, and live metal
   pricing.
+- **Online checkout + payments via PayPal** on `/checkout` (Orders API v2,
+  **sandbox**): create-order computes authoritative totals + reserves one-of-one
+  inventory, capture verifies amount/currency and marks the order paid + products
+  sold, and a signed idempotent webhook reconciles capture/denied/refund. Reserved
+  items leave the shop gallery promptly; paid orders surface as a badge on the
+  admin **Orders** tab (not Messages); the order detail page + invoice show the
+  shipping address. **Pending go-live steps** (run SQL, set Netlify env, register
+  webhook, run sandbox test matrix) — see the pending-SQL note above and TASKS.
+- **Admin Orders** (`/admin/orders`, `/admin/orders/[id]`) with create/manage,
+  delete (with optional return-to-inventory), and the new Orders-tab badge.
 - **Live metal pricing** via
   `next-app/src/app/api/metal-prices/route.ts`,
   `next-app/src/lib/spot-price.ts`, and `next-app/src/lib/pricing.ts`.
@@ -44,6 +124,53 @@
 
 ## What Was Recently Completed
 
+- **Delete order from the admin Orders table (2026-06-29):** Each row in
+  `/admin/orders` (desktop table + mobile cards) has a Delete action with a
+  confirmation modal (shows order number + line-item count, opt-in default-on
+  "return products to Available inventory"). Deletes the order (order_items
+  cascade), optionally releases its products, updates the list. Verified live by
+  deleting a paid sandbox order — order + items removed, product returned to
+  `available`. See `OrdersPanel.tsx`.
+- **PayPal sandbox Test 1 passed end-to-end (2026-06-29):** A real sandbox payment
+  flowed create-order → approve → capture → "Order Received", marking the order
+  `paid`/`completed`, the product `sold`, and writing the admin notification
+  (idempotent). Surfaced + fixed three issues along the way: amount-breakdown
+  rounding (PayPal 422), an ambiguous `order_id` in `capture_paypal_order`, and
+  missing `service_role` table grants — all now in `supabase/paypal-checkout.sql`.
+  Remaining sandbox tests: cancel (Test 2), and denied/duplicate webhook (Tests 3-4,
+  require the deployed site since PayPal can't reach localhost).
+- **Applied `order-item-line-discounts.sql` (2026-06-29):** This was required for
+  the admin Orders page to render at all — its query embeds `order_items.discount`,
+  and without the column the query errored and the table showed zero orders.
+- **PayPal checkout wired into the existing checkout page (2026-06-29):** Added
+  PayPal as the real payment processor on `/checkout`, replacing the old manual
+  "Submit Order" button. New `components/checkout/PayPalCheckoutButton.tsx` loads
+  the PayPal JS SDK (client id passed from the server checkout page, not a
+  `NEXT_PUBLIC_*` var) and renders the Buttons only when the cart has items and
+  name/email/phone are filled. createOrder → `POST /api/paypal/create-order`,
+  approve → `POST /api/paypal/capture-order`; on success it reuses the existing
+  inline "Order Received" confirmation and clears the cart. **No amounts are sent
+  from the browser** — both routes recompute the authoritative subtotal/tax(7%)/
+  shipping/total server-side via the new shared `lib/checkout-pricing.ts`
+  (`buildOrderDraft`, also now used by the legacy `/api/checkout/order` route so
+  pricing has one source of truth). Backend: `lib/paypal.ts` (OAuth token cache,
+  Orders v2 create/capture, webhook signature verify) + three routes under
+  `/api/paypal/*`. Inventory is reserved at create time and one-of-one items are
+  protected from double-purchase by row-locking in the `reserve_paypal_order` RPC;
+  capture flips products to `sold` and marks the order paid
+  (`payment_status='paid'`, `order_status='completed'`, mirroring admin "Mark
+  Paid"); unpaid reservations auto-expire after 30 min. Webhook verifies the
+  PayPal signature, logs to `webhook_events` (idempotent on `event_id`), and
+  handles captured/denied/refunded/dispute. Capture verifies amount+currency match
+  before fulfilling; a mismatch is flagged for manual review, not auto-sold.
+  Verified: `npx tsc --noEmit` clean, `npm run lint` only the 3 known
+  pre-existing issues, `npm run build` clean (all three `/api/paypal/*` routes
+  registered), and a preview smoke on `/checkout` (PayPal + card buttons render
+  when contact fields are filled, button + iframe unmount when a field is cleared,
+  0 console errors). **Currently sandbox** (`PAYPAL_ENV=sandbox`). **Pending
+  manual:** run `supabase/paypal-checkout.sql`, set the PayPal env vars in Netlify,
+  register the webhook, then run the sandbox test matrix before going live. See
+  `features/paypal-checkout.md` and DECISIONS (2026-06-29).
 - **Contact page hero removed (2026-06-25):** The normal `/contact` view no longer
   has the top hero — it opens directly with the "Message Us Directly" section (now
   the page `<h1>`), followed by "Submit Your Item". The hero is kept only for the

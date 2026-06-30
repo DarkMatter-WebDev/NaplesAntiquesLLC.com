@@ -1,8 +1,9 @@
 # Architecture
 
 > Update whenever significant structural changes occur. Last updated:
-> **2026-06-20** after the documentation cleanup, product image/object storage
-> audit, and customer-facing reveal coordinator addition.
+> **2026-06-30** after the PayPal checkout integration (online payments,
+> one-of-one inventory reservations, signed webhook) and the checkout /
+> admin-orders reorganization.
 
 ## System Design
 
@@ -14,12 +15,14 @@ Browser
   ├── Next localized routes (/ and /es)
   ├── React components and context (cart, wishlist, layout, admin, legal notice)
   ├── Next route handlers (/api/metal-prices, /api/inquire, /api/inquiries/:id,
-  │   /api/checkout/order, /api/subscribe, /api/unsubscribe,
+  │   /api/checkout/order, /api/paypal/create-order, /api/paypal/capture-order,
+  │   /api/paypal/webhook, /api/subscribe, /api/unsubscribe,
   │   /api/admin/marketing/*, /api/webhooks/resend)
   └── Public assets from next-app/public/assets
         │
         ├──> Supabase Auth + Postgres + Storage
         ├──> gold-api.com via server-side spot-price helper
+        ├──> PayPal Orders API v2 (sandbox/live) for online payments
         └──> Resend for inquiry/order and direct marketing email when configured
 ```
 
@@ -145,8 +148,9 @@ Next-generated SEO endpoints:
 - `/sitemap.xml` from `next-app/src/app/sitemap.ts`
 
 Current route handlers include `/api/metal-prices`, `/api/inquire`,
-`/api/inquiries/[id]`, `/api/checkout/order`, `/api/subscribe`, and the
-admin-only `/api/admin/ai-product-fill`.
+`/api/inquiries/[id]`, `/api/checkout/order`, the PayPal trio
+(`/api/paypal/create-order`, `/api/paypal/capture-order`, `/api/paypal/webhook`),
+`/api/subscribe`, and the admin-only `/api/admin/ai-product-fill`.
 
 ## Data Model
 
@@ -161,11 +165,18 @@ Supabase is the source for app data:
   shown on the /es product page), and admin-only cost/acquisition fields. The
   legacy `internal_notes` column is retained for the `details` fold but no longer
   surfaced in the listing form.
-- `orders` - order headers/customer totals/payment/fulfillment state.
-- `order_items` - immutable product snapshots attached to orders.
+- `orders` - order headers/customer totals/payment/fulfillment state, plus PayPal
+  references (`paypal_order_id`, `paypal_capture_id`, `payment_response`, `paid_at`)
+  and a `reserved_until` hold window. `customer_notes` and the `shipping_address`
+  jsonb (line1/line2/city/state/postal_code/country) are shown on the order detail
+  page and the invoice email.
+- `order_items` - immutable product snapshots attached to orders (incl. `discount`).
 - `invoices` - invoice headers/totals/status for order-linked billing.
-- `admin_notifications` - admin message center notifications for checkout
-  orders and future operational alerts.
+- `webhook_events` - idempotent log of PayPal (and future provider) webhook events,
+  unique on `(provider, event_id)`.
+- `admin_notifications` - admin message center notifications for contact messages
+  and inquiries. (PayPal order events no longer write here — paid orders surface on
+  the Orders-tab badge instead.)
 - `homepage_subscribers` - homepage subscriber CTA signups displayed in the
   admin Subscribers tab.
 - `saved_items` - account-linked saved item records for the next account phase.
@@ -224,6 +235,14 @@ using public checkout order submission or `/admin/messages` in production.
 Existing Supabase projects should run `supabase/homepage-subscribers.sql`
 before using the homepage subscriber CTA or `/admin/subscribers` in production.
 
+Existing Supabase projects must run `supabase/order-item-line-discounts.sql`
+(adds `order_items.discount`) — without it the admin Orders list query errors and
+shows no orders — and `supabase/paypal-checkout.sql` (PayPal/reservation columns
+on `orders`/`products`, the `webhook_events` table, the reserve/capture/release/
+event RPCs, and the `service_role` table grants) before using PayPal checkout.
+Re-run `paypal-checkout.sql` if an earlier copy was applied — it is idempotent and
+now also drops the capture→Messages notification insert.
+
 ## Product Images
 
 Products can use:
@@ -257,6 +276,40 @@ Metal pricing is server-side:
   `api.gold-api.com` with a fallback.
 - `next-app/src/app/api/metal-prices/route.ts` exposes the app API.
 - `next-app/src/lib/pricing.ts` computes display pricing.
+
+## Payments (PayPal)
+
+Online payment runs through PayPal on the existing `/checkout` page (the older
+manual unpaid-order flow via `/api/checkout/order` is retained but no longer the
+storefront path; `/payment` stays a disabled placeholder). Full runbook:
+`project-docs/features/paypal-checkout.md`.
+
+- **Frontend:** `next-app/src/components/checkout/PayPalCheckoutButton.tsx` loads
+  the PayPal JS SDK (client id passed from the server checkout page, not a
+  `NEXT_PUBLIC_*` var) and renders the PayPal + card buttons. It validates contact
+  (and, when shipping, address) fields in PayPal's `onClick` before opening the
+  window. The shipping method is chosen on the Order Summary's "Shipping" row; the
+  Shipping Address block sits in the left review column under the summary.
+- **Server lib:** `next-app/src/lib/paypal.ts` (OAuth token cache, Orders v2
+  create/capture, `verifyPayPalWebhook`). `next-app/src/lib/checkout-pricing.ts`
+  is the single source of truth for authoritative subtotal/7%-tax/shipping/total
+  (also used by the legacy checkout route). **No amounts are trusted from the
+  browser.**
+- **Routes:** `POST /api/paypal/create-order` (build authoritative order, reserve
+  inventory atomically, create PayPal order), `POST /api/paypal/capture-order`
+  (capture, verify amount+currency, mark paid + products sold), `POST
+  /api/paypal/webhook` (signature-verified, idempotent via `webhook_events`).
+- **Inventory:** one-of-one items are row-locked and reserved (`reserved` status,
+  30-min `reserved_until`) by the `reserve_paypal_order` RPC; `capture_paypal_order`
+  flips them to `sold` and the order to `payment_status='paid'` /
+  `order_status='completed'`; `release_expired_paypal_reservations` frees lapsed
+  holds. Reserve/capture/release call `revalidateTag('shop-catalog', 'max')` so
+  reserved items leave the shop gallery promptly.
+- **Admin surfacing:** a paid order surfaces as a badge on the admin **Orders** nav
+  (`AdminOrdersLink`, counts paid + pending-fulfillment orders) — NOT in the Messages
+  center.
+- **Env:** `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_ENV`
+  (sandbox/live — creds must match the env), `PAYPAL_WEBHOOK_ID`.
 
 ## Authentication
 

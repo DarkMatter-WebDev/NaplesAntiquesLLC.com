@@ -10,6 +10,87 @@
 > **Alternatives considered:** ...
 > ```
 
+## 2026-06-30 — Paid orders notify on the Orders tab, not the Messages center
+
+**Decision:** A paid PayPal order no longer writes an `admin_notifications` row.
+It surfaces as a count badge on the admin **Orders** nav (`AdminOrdersLink`,
+counting `payment_status='paid'` + `fulfillment_status='pending'` orders), which
+self-clears as orders are fulfilled. The Messages center is reserved for contact
+messages and inquiries. Separately, the customer's shipping address (already
+stored on the order) is now rendered on the order detail page and the invoice email.
+
+**Reason:** The owner wanted incoming orders to appear with the orders, not mixed
+into the message inbox. A derived count (vs. an unread-notification row) needs no
+read-state machinery and reflects real fulfillment work. `capture_paypal_order`
+dropped its notification insert (idempotent migration re-run).
+
+**Alternatives considered:** (1) Keep writing order notifications but filter
+`type='order'` out of Messages and mark-read on Orders view — more moving parts
+(per-page unread counts + read-marking). (2) Email the owner on capture — not done
+yet; could be added alongside the badge.
+
+## 2026-06-30 — Checkout layout: shipping selector on the Order Summary, address under it
+
+**Decision:** The delivery-method picker lives on the Order Summary's "Shipping"
+row as an inline `<select>`; the Shipping Address block sits in the left review
+column directly under the Order Summary (matching its width) and renders only when
+a shipping method is selected. The PayPal/card buttons render up front and validate
+contact (and, when shipping, address) fields in PayPal's `onClick` before opening.
+
+**Reason:** Iterated with the owner toward a conventional, compact layout — three
+radio cards ate too much vertical space, and grouping the shipping method + address
+with the order review reads cleaner than splitting them across columns.
+
+**Alternatives considered:** delivery method as radio cards in the form (rejected:
+too tall); a separate delivery-method field in the form (rejected: redundant with
+the summary's Shipping row).
+
+## 2026-06-29 — PayPal is the checkout payment processor; amounts computed server-side
+
+**Decision:** Wire PayPal (JS SDK on the client, Orders API v2 on the server) into
+the existing `/checkout` page as the final payment step, **replacing** the old
+manual "Submit Order" (unpaid contact-to-buy) button. The browser never sends
+prices: `POST /api/paypal/create-order` recomputes the authoritative subtotal/tax/
+shipping/total from the DB (shared `lib/checkout-pricing.ts`, reused by the legacy
+`/api/checkout/order` route), creates the internal order, reserves inventory, then
+creates the PayPal order. `POST /api/paypal/capture-order` captures server-side,
+verifies the captured amount+currency equal the internal order, then marks the
+order paid (`payment_status='paid'`, `order_status='completed'` — same state as the
+admin "Mark Paid" action) and the products `sold`. A signed PayPal webhook
+(`/api/paypal/webhook`) is the idempotent backstop (logged in `webhook_events`).
+The PayPal client id is read server-side in `checkout/page.tsx` and passed as a
+prop (it ships to the browser inside the SDK URL, but is not a `NEXT_PUBLIC_*`
+var). On success the existing inline "Order Received" confirmation is reused.
+
+**Reason:** Estate pieces are one-of-one, so trusting client amounts or skipping a
+reservation would risk underpayment or double-sale. Recomputing server-side and
+reserving with a row-locking RPC closes both. Mirroring the admin "Mark Paid"
+status keeps the admin orders UI consistent. Reusing the existing order RPC
+pattern, Supabase service client, and the Resend webhook's verify/idempotency
+shape kept the change additive rather than a checkout rebuild.
+
+**Inventory model:** `reserve_paypal_order` (SECURITY DEFINER) `SELECT … FOR UPDATE`
+locks the product rows, releases any expired holds, verifies each item is
+`available`, creates the order + items, and flips products to `reserved` with a
+30-minute `reserved_until`. Concurrent buyers serialize on the lock; the loser
+gets "no longer available". `release_expired_paypal_reservations` frees lapsed
+holds (called inline and exposable to a cron). The public shop already hides
+`reserved` items, so a hold removes the piece from the storefront immediately.
+
+**Amount mismatch:** if a capture's amount/currency doesn't match the order, the
+money is captured but the order is **not** auto-fulfilled — it's set to
+`payment_status='pending'` with an admin notification for manual review.
+
+**Alternatives considered:** (1) Put PayPal on the placeholder `/payment` page —
+rejected: the live checkout is `/checkout`; `/payment` has no order linkage. (2)
+Keep the manual unpaid-order button alongside PayPal — rejected by the owner
+(two order-creation paths on one page invites double orders). (3) Trust the
+client cart total / set products `sold` at order creation — rejected: enables
+underpayment and overselling one-of-one stock. (4) `NEXT_PUBLIC_PAYPAL_CLIENT_ID`
+— avoided; the id is delivered via a server prop instead. (5) Add the
+`@paypal/react-paypal-js` dependency — rejected: the script-tag SDK + fetch
+against the REST API needs no new npm packages.
+
 ## 2026-06-25 — Lead forms post to /api/inquire, not Netlify Forms
 
 **Decision:** Fix the silently-failing `/contact` (submit-item) and

@@ -95,6 +95,7 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
   const intro = `Thank you for your order with Naples Estate Jewelry. Invoice ${invoiceNumber} for ${order.order_number} is ready for review.`;
   const note = 'Please reply to this email or call/text (239) 404-8505 with any questions about payment, pickup, delivery, or shipping.';
   const closing = 'Thank you, Naples Estate Jewelry & Antiques';
+  const shipToLines = formatAddressLines(order.shipping_address);
 
   return {
     subject,
@@ -117,6 +118,7 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
       paymentStatus: orderStatusLabel(order.payment_status),
       fulfillmentStatus: orderStatusLabel(order.fulfillment_status),
       shippingMethod: orderStatusLabel(order.shipping_method),
+      shipTo: shipToLines,
     }),
     text: [
       greeting,
@@ -130,6 +132,7 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
       `Tax: ${totals.tax}`,
       `Shipping: ${totals.shipping}`,
       `Total: ${totals.total}`,
+      ...(shipToLines.length > 0 ? ['', 'Ship to:', ...shipToLines] : []),
       '',
       note,
       closing,
@@ -149,11 +152,13 @@ function buildInvoiceEmailHtml({
   paymentStatus,
   fulfillmentStatus,
   shippingMethod,
+  shipTo,
 }: Omit<InvoiceEmailContent, 'html' | 'text' | 'invoiceNumber'> & {
   orderNumber: string;
   paymentStatus: string;
   fulfillmentStatus: string;
   shippingMethod: string;
+  shipTo: string[];
 }) {
   const itemRows = items.length > 0
     ? items.map((item) => `
@@ -211,6 +216,7 @@ function buildInvoiceEmailHtml({
 
                   <div style="margin:0 0 22px;padding:14px 16px;background:#fbfaf5;border:1px solid #eadfbd;color:#746b5b;font-size:13px;line-height:1.5;">
                     Shipping method: ${escapeHtml(shippingMethod)}
+                    ${shipTo.length > 0 ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #eadfbd;"><strong style="display:block;color:#1d1a14;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Ship to</strong>${shipTo.map(escapeHtml).join('<br/>')}</div>` : ''}
                   </div>
 
                   <p style="margin:0 0 18px;font-size:15px;line-height:1.55;">${escapeHtml(note)}</p>
@@ -232,6 +238,17 @@ function totalRow(label: string, value: string, strong = false) {
       <td align="right" style="padding:${strong ? '12px 0 0' : '5px 0'};${strong ? 'border-top:1px solid #d5c697;' : ''}color:${strong ? '#735c00' : '#1d1a14'};font-size:14px;${strong ? 'font-weight:700;' : ''}">${escapeHtml(value)}</td>
     </tr>
   `;
+}
+
+function formatAddressLines(address: unknown): string[] {
+  if (!address || typeof address !== 'object') return [];
+  const a = address as Record<string, unknown>;
+  const get = (key: string) => (typeof a[key] === 'string' ? (a[key] as string).trim() : '');
+  const cityLine = [[get('city'), get('state')].filter(Boolean).join(', '), get('postal_code')]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  return [get('line1'), get('line2'), cityLine, get('country')].filter((line) => line.length > 0);
 }
 
 function escapeHtml(value: string) {

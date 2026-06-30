@@ -1,0 +1,258 @@
+// Server-side PayPal REST helper (Orders API v2). No SDK dependency — uses fetch
+// against the PayPal REST endpoints. Never import this from client code: it reads
+// PAYPAL_CLIENT_SECRET.
+
+const SANDBOX_BASE = 'https://api-m.sandbox.paypal.com';
+const LIVE_BASE = 'https://api-m.paypal.com';
+
+export function isPayPalSandbox(): boolean {
+  return (process.env.PAYPAL_ENV ?? 'sandbox').toLowerCase() !== 'live';
+}
+
+export function paypalApiBase(): string {
+  return isPayPalSandbox() ? SANDBOX_BASE : LIVE_BASE;
+}
+
+export function paypalConfigured(): boolean {
+  return Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
+}
+
+type TokenCache = { token: string; expiresAt: number };
+let tokenCache: TokenCache | null = null;
+
+async function getAccessToken(): Promise<string> {
+  const clientId = process.env.PAYPAL_CLIENT_ID;
+  const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error('PayPal credentials are not configured.');
+  }
+
+  // Reuse a still-valid token (PayPal tokens last ~9h); refresh 60s early.
+  if (tokenCache && tokenCache.expiresAt > Date.now() + 60_000) {
+    return tokenCache.token;
+  }
+
+  const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+  const res = await fetch(`${paypalApiBase()}/v1/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${auth}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'grant_type=client_credentials',
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`PayPal auth failed (${res.status}): ${detail}`);
+  }
+
+  const data = (await res.json()) as { access_token: string; expires_in: number };
+  tokenCache = {
+    token: data.access_token,
+    expiresAt: Date.now() + data.expires_in * 1000,
+  };
+  return data.access_token;
+}
+
+export type PayPalLineItem = {
+  name: string;
+  quantity: string;
+  unitAmount: number;
+  sku?: string;
+};
+
+export type CreatePayPalOrderInput = {
+  currency: string;
+  subtotal: number;
+  tax: number;
+  shipping: number;
+  total: number;
+  items: PayPalLineItem[];
+  /** Our internal order reference, echoed back on the PayPal order. */
+  referenceId: string;
+  invoiceId?: string;
+  brandName?: string;
+};
+
+function round2(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function money(value: number) {
+  return round2(value).toFixed(2);
+}
+
+export type PayPalOrderResult = {
+  id: string;
+  status: string;
+};
+
+export async function createPayPalOrder(input: CreatePayPalOrderInput): Promise<PayPalOrderResult> {
+  const token = await getAccessToken();
+  const currency = input.currency;
+
+  // PayPal requires item_total + tax_total + shipping to equal amount.value, and
+  // the sum of (unit_amount * quantity) to equal item_total — all as 2-decimal
+  // values. We round every component to cents first and derive value FROM those
+  // rounded parts, so the breakdown always reconciles exactly (independent
+  // rounding of an unrounded total is what triggers PayPal's 422).
+  const lineItems = input.items.map((item) => ({
+    name: item.name.slice(0, 127),
+    quantity: Math.max(1, Math.round(Number(item.quantity || '1'))),
+    unit: round2(item.unitAmount),
+    sku: item.sku,
+  }));
+  const itemTotal = round2(lineItems.reduce((sum, item) => sum + item.unit * item.quantity, 0));
+  const taxTotal = round2(input.tax);
+  const shippingTotal = round2(input.shipping);
+  const value = round2(itemTotal + taxTotal + shippingTotal);
+
+  const amount: Record<string, unknown> = {
+    currency_code: currency,
+    value: money(value),
+    breakdown: {
+      item_total: { currency_code: currency, value: money(itemTotal) },
+      tax_total: { currency_code: currency, value: money(taxTotal) },
+      shipping: { currency_code: currency, value: money(shippingTotal) },
+    },
+  };
+  const purchaseUnit: Record<string, unknown> = {
+    reference_id: input.referenceId,
+    custom_id: input.referenceId,
+    amount,
+    items: lineItems.map((item) => ({
+      name: item.name,
+      quantity: String(item.quantity),
+      unit_amount: { currency_code: currency, value: money(item.unit) },
+      ...(item.sku ? { sku: item.sku.slice(0, 127) } : {}),
+    })),
+  };
+  if (input.invoiceId) purchaseUnit.invoice_id = input.invoiceId;
+
+  const res = await fetch(`${paypalApiBase()}/v2/checkout/orders`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+    body: JSON.stringify({
+      intent: 'CAPTURE',
+      purchase_units: [purchaseUnit],
+      application_context: {
+        brand_name: input.brandName ?? 'Naples Estate Jewelry',
+        shipping_preference: 'NO_SHIPPING',
+        user_action: 'PAY_NOW',
+      },
+    }),
+  });
+
+  const data = (await res.json().catch(() => null)) as
+    | { id?: string; status?: string; message?: string; details?: unknown }
+    | null;
+
+  if (!res.ok || !data?.id) {
+    const detail = data?.details ? ` ${JSON.stringify(data.details)}` : '';
+    throw new Error(`PayPal create order failed (${res.status}): ${data?.message ?? 'unknown error'}${detail}`);
+  }
+
+  return { id: data.id, status: data.status ?? 'CREATED' };
+}
+
+export type PayPalCaptureResult = {
+  status: string;
+  captureId: string | null;
+  capturedAmount: number | null;
+  capturedCurrency: string | null;
+  raw: unknown;
+};
+
+export async function capturePayPalOrder(paypalOrderId: string): Promise<PayPalCaptureResult> {
+  const token = await getAccessToken();
+  const res = await fetch(`${paypalApiBase()}/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}/capture`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      // Idempotency: a retried capture for the same PayPal order returns the
+      // original result instead of erroring or double-charging.
+      'PayPal-Request-Id': `capture-${paypalOrderId}`,
+    },
+    cache: 'no-store',
+  });
+
+  const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+
+  if (!res.ok || !data) {
+    const message = (data?.message as string) ?? `status ${res.status}`;
+    const err = new Error(`PayPal capture failed: ${message}`) as Error & { paypalStatus?: number; raw?: unknown };
+    err.paypalStatus = res.status;
+    err.raw = data;
+    throw err;
+  }
+
+  const purchaseUnits = (data.purchase_units as Array<Record<string, unknown>> | undefined) ?? [];
+  const payments = (purchaseUnits[0]?.payments as Record<string, unknown> | undefined) ?? {};
+  const captures = (payments.captures as Array<Record<string, unknown>> | undefined) ?? [];
+  const capture = captures[0];
+  const captureAmount = capture?.amount as { value?: string; currency_code?: string } | undefined;
+
+  return {
+    status: String(data.status ?? 'UNKNOWN'),
+    captureId: capture?.id ? String(capture.id) : null,
+    capturedAmount: captureAmount?.value != null ? Number(captureAmount.value) : null,
+    capturedCurrency: captureAmount?.currency_code ?? null,
+    raw: data,
+  };
+}
+
+/**
+ * Verify a PayPal webhook signature using the verify-webhook-signature API.
+ * Returns true only when PayPal reports SUCCESS. If PAYPAL_WEBHOOK_ID is unset
+ * we cannot verify, so we reject (fail closed).
+ */
+export async function verifyPayPalWebhook(headers: Headers, rawBody: string): Promise<boolean> {
+  const webhookId = process.env.PAYPAL_WEBHOOK_ID;
+  if (!webhookId) return false;
+
+  const transmissionId = headers.get('paypal-transmission-id');
+  const transmissionTime = headers.get('paypal-transmission-time');
+  const transmissionSig = headers.get('paypal-transmission-sig');
+  const certUrl = headers.get('paypal-cert-url');
+  const authAlgo = headers.get('paypal-auth-algo');
+  if (!transmissionId || !transmissionTime || !transmissionSig || !certUrl || !authAlgo) {
+    return false;
+  }
+
+  let token: string;
+  try {
+    token = await getAccessToken();
+  } catch {
+    return false;
+  }
+
+  const res = await fetch(`${paypalApiBase()}/v1/notifications/verify-webhook-signature`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+    body: JSON.stringify({
+      transmission_id: transmissionId,
+      transmission_time: transmissionTime,
+      transmission_sig: transmissionSig,
+      cert_url: certUrl,
+      auth_algo: authAlgo,
+      webhook_id: webhookId,
+      // webhook_event must be the parsed JSON object, not the raw string.
+      webhook_event: JSON.parse(rawBody || '{}'),
+    }),
+  });
+
+  if (!res.ok) return false;
+  const data = (await res.json().catch(() => null)) as { verification_status?: string } | null;
+  return data?.verification_status === 'SUCCESS';
+}

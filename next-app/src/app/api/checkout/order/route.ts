@@ -1,50 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import type { Product } from '@/types/product';
-import { isProductPurchasable } from '@/types/product';
-import { fetchSpotData } from '@/lib/spot-price';
 import { formatCurrency } from '@/types/sales';
-import { buildAddressObject, generateOrderNumber, getProductImages, getProductMetal, getProductWeight, getSnapshotPrice } from '@/lib/sales';
+import { buildAddressObject, generateOrderNumber } from '@/lib/sales';
+import { buildOrderDraft, isOrderDraftError, shippingMethodForDb } from '@/lib/checkout-pricing';
 
-const FL_TAX_RATE = 0.07;
-const SHIPPING_FEES: Record<string, number> = {
-  'local-pickup': 0,
-  'express-overnight-insured': 75,
-  'priority-insured': 45,
-};
-const CHECKOUT_PRODUCT_COLUMNS = [
-  'id',
-  'category',
-  'metal_type',
-  'metal_variant',
-  'title',
-  'item_year',
-  'price_mode',
-  'purity',
-  'weight_grams',
-  'inventory_number',
-  'sku',
-  'gram_weight',
-  'pricing_multiplier',
-  'status',
-  'images',
-  'image_urls',
-  'manual_price_label',
-  'asking_price',
-].join(', ');
-const CHECKOUT_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR = CHECKOUT_PRODUCT_COLUMNS
-  .split(', ')
-  .filter((column) => column !== 'item_year')
-  .join(', ');
-
-function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
-  return Boolean(error?.message?.toLowerCase().includes('item_year'));
-}
-
-function shippingMethodForDb(value: string) {
-  if (value === 'local-pickup') return 'pickup';
-  return 'shipping';
-}
+export const runtime = 'nodejs';
 
 function escapeHtml(value: string) {
   return value
@@ -60,7 +20,7 @@ export async function POST(req: Request) {
   if (!body) return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
 
   const productIds = Array.isArray(body.productIds)
-    ? Array.from(new Set(body.productIds.map(String).filter(Boolean)))
+    ? Array.from(new Set(body.productIds.map(String).filter(Boolean))) as string[]
     : [];
   const customer = body.customer ?? {};
   const shippingMethod = String(body.shippingMethod ?? 'local-pickup');
@@ -73,51 +33,16 @@ export async function POST(req: Request) {
   }
 
   const supabase = await createClient();
-  const [{ data: { user } }, productResult, spotData] = await Promise.all([
+  const [{ data: { user } }, draft] = await Promise.all([
     supabase.auth.getUser(),
-    supabase.from('products').select(CHECKOUT_PRODUCT_COLUMNS).in('id', productIds),
-    fetchSpotData(),
+    buildOrderDraft(supabase, productIds, shippingMethod),
   ]);
-  let products: unknown[] | null = productResult.data as unknown[] | null;
-  let productsError = productResult.error;
-  if (isMissingItemYearColumnError(productsError)) {
-    const fallback = await supabase.from('products').select(CHECKOUT_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR).in('id', productIds);
-    products = (fallback.data as unknown[] | null)?.map((product) => ({ ...(product as Record<string, unknown>), item_year: null })) ?? null;
-    productsError = fallback.error;
+
+  if (isOrderDraftError(draft)) {
+    return NextResponse.json({ error: draft.error }, { status: draft.status });
   }
 
-  if (productsError) {
-    return NextResponse.json({ error: productsError.message }, { status: 500 });
-  }
-
-  const typedProducts = (products ?? []) as unknown as Product[];
-  if (typedProducts.length !== productIds.length) {
-    return NextResponse.json({ error: 'One or more cart items could not be found' }, { status: 400 });
-  }
-
-  const unavailable = typedProducts.filter((product) => !isProductPurchasable(product.status));
-  if (unavailable.length > 0) {
-    return NextResponse.json({
-      error: `Unavailable item: ${unavailable.map((product) => product.title).join(', ')}`,
-    }, { status: 409 });
-  }
-
-  const items = typedProducts.map((product) => ({
-    product_id: product.id,
-    inventory_number: product.inventory_number != null ? String(product.inventory_number) : product.sku ?? product.id,
-    title_snapshot: product.title,
-    item_year_snapshot: product.item_year,
-    metal_snapshot: getProductMetal(product),
-    purity_snapshot: product.purity ? String(product.purity) : null,
-    gram_weight_snapshot: getProductWeight(product),
-    price_snapshot: getSnapshotPrice(product, spotData),
-    image_snapshot: getProductImages(product)[0] ?? null,
-  }));
-
-  const subtotal = items.reduce((sum, item) => sum + item.price_snapshot, 0);
-  const shippingFee = SHIPPING_FEES[shippingMethod] ?? 0;
-  const tax = subtotal * FL_TAX_RATE;
-  const total = subtotal + tax + shippingFee;
+  const { items, subtotal, tax, shippingFee, total } = draft;
   const orderNumber = generateOrderNumber();
 
   const orderPayload = {

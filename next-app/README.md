@@ -46,8 +46,11 @@ See `../AGENTS.md` and `../project-docs/README.md` for the full agent workflow.
 - Product catalog: Supabase `products`
 - Product uploads: Supabase Storage bucket `product-images`
 - Public assets: `public/assets`
+- Payments: PayPal (JS SDK + Orders API v2) on `/checkout`; see
+  `../project-docs/features/paypal-checkout.md`
 - Hosting: Netlify, configured from the parent `netlify.toml` with
   `base = "next-app"`
 
 Keep secrets in `.env.local` or deployment environment settings only. Do not
-commit service-role keys, email provider keys, or other credentials.
+commit service-role keys, email provider keys, PayPal secrets, or other
+credentials.

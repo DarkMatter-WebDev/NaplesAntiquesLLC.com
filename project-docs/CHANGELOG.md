@@ -3,6 +3,93 @@
 > Track meaningful changes. Newest at the top. One dated section per day of work;
 > bullet the notable changes. Keep entries short.
 
+## 2026-06-29
+
+- **Checkout shipping selector lives on the Order Summary's "Shipping" row.** The
+  delivery-method dropdown was removed from the right form entirely; the Order Summary
+  "Shipping" line is now an inline `<select>` (CheckoutClient passes
+  `onShippingMethodChange` again; OrderSummary renders the editable select inline on
+  the row, options = method names, the Shipping Cost row shows the price). Selecting a
+  method there still reveals the left-column Shipping Address block and updates totals.
+
+- **Checkout layout reorganized.** Delivery method dropdown (was three radio cards
+  that ate vertical space). The Shipping Address block moved out of the right form
+  into a new left "review" column (`.checkout-review`) directly beneath the Order
+  Summary, rendered as a card at the same width as the summary. Verified: address
+  block sits in the review column at identical width to the summary (688px === 688px).
+- **Order pipeline: notify on the Orders tab, not Messages; show the address.** New
+  paid orders now surface as a badge on the admin **Orders** nav (new
+  `AdminOrdersLink`, self-fetching the count of `payment_status='paid'` +
+  `fulfillment_status='pending'` orders; clears as they're fulfilled) instead of the
+  Messages center — `capture_paypal_order` no longer inserts an `admin_notifications`
+  row (requires re-running `supabase/paypal-checkout.sql`). The order detail page
+  (`OrderDetailPanel`) and the invoice email (`order-invoice-email.ts`) now render
+  the customer's **shipping/billing address** (both already stored it but neither
+  displayed it); detail page also labels the Customer Notes block. Verified live: a
+  paid test order showed the "Orders 1" badge (no Messages badge) and the full
+  Naples shipping address on the detail page.
+- **Delivery method picker moved into the checkout form, next to the address.** The
+  shipping method is now a set of radio cards (Local Pickup / Express / Priority,
+  with prices) in the contact form directly above the Shipping Address section, so
+  choosing a shipping method reveals the address right below it — the conventional
+  ecommerce layout. The Order Summary's shipping line is now read-only text
+  reflecting the choice (the editable `<select>` stays only on the placeholder
+  payment page, which still passes `onShippingMethodChange`).
+- **Checkout collects a shipping address + conventional wording.** When the buyer
+  picks a shipping delivery method (anything other than Local Pickup), a required
+  Shipping Address section (street, apt, city, state, ZIP, country) now appears on
+  the checkout form and is sent through to the order (`shipping_address`); payment
+  is gated until it's filled. It stays hidden for pickup. Reworded the panel header
+  from "How should we contact you?" to "Contact information" to match a standard
+  ecommerce checkout. Added `autoComplete` hints on the contact + address fields.
+- **Checkout PayPal/Debit‑Credit buttons always render.** Previously hidden until
+  name/email/phone were filled; now shown immediately. Contact details are validated
+  in PayPal's `onClick` (rejects the popup + prompts if missing), and create‑order
+  still validates server‑side. A gentle helper note appears under the buttons when
+  the form isn't complete. The buttons now initialize once (on SDK load) instead of
+  re‑initializing on every keystroke.
+- **Reserved items leave the shop gallery promptly.** The gallery already excluded
+  `reserved` at query time, but the `/shop` catalog is cached (`unstable_cache`, tag
+  `shop-catalog`, 300s). The PayPal reserve/capture/release paths + denial/refund
+  webhook now call `revalidateTag('shop-catalog', 'max')` (Next 16's two-arg form) so
+  a reserved item drops out within a refresh cycle (~1-2s) instead of up to 5 min.
+  Also trimmed the Orders table Items column to a count ("3 items") — full titles
+  stay on the order details page.
+- **Delete order from the admin Orders table.** Added a Delete action to each row
+  (desktop table + mobile cards) in `OrdersPanel`, with a confirmation modal that
+  shows the order number + line-item count and an opt‑in (default on) to **return
+  the order's products to `available` inventory**. Deletes the order (its
+  `order_items` cascade), optionally releases held/sold products, updates the list,
+  and refreshes. Admin RLS authorizes the delete. Verified live: deleting a paid
+  order removed it + its items and returned the product to `available`.
+- **Found: admin Orders table was blank because `order_items.discount` was never
+  added.** The Orders query embeds `order_items(… discount …)`; without that column
+  the whole query 422'd and *no* orders rendered (Messages were unaffected — different
+  table). Resolved by applying `supabase/order-item-line-discounts.sql`.
+- **PayPal checkout: post‑test fixes.** (1) Amount rounding — round to cents at the
+  source and derive the PayPal `value` from the rounded breakdown parts, so PayPal's
+  breakdown validation can't 422 (proved 0 mismatches across 2M cent values).
+  (2) `capture_paypal_order` ambiguous `order_id` — qualified `order_items.order_id`
+  so capture no longer 500s. (3) `service_role` table grants added to
+  `paypal-checkout.sql` (capture/webhook/create‑order need direct table access).
+  Sandbox Test 1 (successful payment) then passed end‑to‑end (paid/completed,
+  product sold, admin notification, idempotent).
+- **PayPal checkout added to `/checkout`.** Replaced the manual "Submit Order"
+  button with a PayPal JS SDK button (`components/checkout/PayPalCheckoutButton.tsx`)
+  that only renders when the cart is valid and contact fields are filled. New
+  backend: `lib/paypal.ts` (Orders v2 + webhook verify), `lib/checkout-pricing.ts`
+  (server-side authoritative subtotal/tax/shipping/total, also adopted by the
+  legacy `/api/checkout/order` route), and routes `/api/paypal/create-order`,
+  `/api/paypal/capture-order`, `/api/paypal/webhook`. New
+  `supabase/paypal-checkout.sql` adds PayPal/reservation columns, the
+  `webhook_events` table, and the reserve/capture/release/event RPCs. One-of-one
+  items are reserved (row-locked, 30-min expiry); capture verifies amount+currency,
+  marks the order paid + products sold, and notifies admin; the webhook is
+  signature-verified and idempotent. No amounts are trusted from the browser.
+  Sandbox (`PAYPAL_ENV=sandbox`); pending manual: run the SQL, set Netlify env
+  vars, register the webhook, run the sandbox test matrix. tsc/lint/build clean;
+  preview smoke passed. See `features/paypal-checkout.md`.
+
 ## 2026-06-26
 
 - **CRITICAL FIX — Messages panel showed stale lists across view switches.**

@@ -23,8 +23,12 @@ and should be reviewed by the business owner and counsel before relying on it.
   Terms of Service rather than a separate checkbox.
 - **Account profiles:** `/account` uses Supabase `profiles` with contact,
   address, and marketing opt-in fields.
-- **Checkout:** `/checkout` creates unpaid order requests and inventory holds
-  through `/api/checkout/order`; `/payment` remains a disabled placeholder.
+- **Checkout:** `/checkout` takes online payment through **PayPal** (Orders API
+  v2). Card details are entered on PayPal's hosted window and never touch our
+  servers; order totals are computed server-side. Orders and one-of-one inventory
+  reservations are created server-side. The older manual unpaid-order route
+  (`/api/checkout/order`) is retained but no longer the storefront path, and
+  `/payment` remains a disabled placeholder.
 - **Contact/evaluation forms:** Netlify Forms power item submission and free
   evaluation flows; product inquiry uses `/api/inquire` and Supabase.
 - **Newsletter form:** homepage subscriber CTA posts to `/api/subscribe` and the
@@ -68,8 +72,11 @@ and should be reviewed by the business owner and counsel before relying on it.
 - If Google Analytics, Meta Pixel, Clarity, Hotjar, or other non-essential
   tracking is added later, update `/privacy`, `/cookie-preferences`, and the
   cookie UI before enabling it.
-- Add a real payment processor before collecting real card data; keep `/payment`
-  disabled until then.
+- **Done:** PayPal is integrated on `/checkout` (Orders API v2). Card details are
+  collected on PayPal's hosted UI, keeping the site out of PCI card-data scope.
+  Before going live, set `PAYPAL_ENV=live` with live credentials and complete the
+  sandbox test matrix (see `features/paypal-checkout.md`). `/payment` stays a
+  disabled placeholder.
 - Continue accessibility review on product image alt text, modal focus behavior,
   carousel motion, keyboard navigation, and color contrast as new UI ships.
 - Confirm production HTTPS and Supabase Auth redirect URLs in Netlify/Supabase.

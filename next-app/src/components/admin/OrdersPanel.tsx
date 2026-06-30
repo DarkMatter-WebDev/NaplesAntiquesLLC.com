@@ -79,6 +79,9 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Order | null>(null);
+  const [returnToInventory, setReturnToInventory] = useState(true);
+  const [deleting, setDeleting] = useState(false);
 
   const availableProducts = useMemo(
     () => products.filter((product) => isProductPurchasable(product.status)),
@@ -260,6 +263,50 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
     router.refresh();
   }
 
+  async function deleteOrder() {
+    if (!confirmDelete) return;
+    const order = confirmDelete;
+    setDeleting(true);
+    setMessage(null);
+
+    // Optionally return the order's products to sellable inventory before
+    // removing the order. The reservation columns only exist once the PayPal
+    // migration is applied, so fall back to clearing just the status.
+    if (returnToInventory) {
+      const productIds = Array.from(
+        new Set((order.order_items ?? []).map((item) => item.product_id).filter((id): id is string => Boolean(id))),
+      );
+      if (productIds.length > 0) {
+        let { error: productError } = await supabase
+          .from('products')
+          .update({ status: 'available', reserved_until: null, reserved_order_id: null })
+          .in('id', productIds);
+        if (productError && /reserved_until|reserved_order_id|column|schema cache/i.test(productError.message)) {
+          productError = (await supabase.from('products').update({ status: 'available' }).in('id', productIds)).error;
+        }
+        if (productError) {
+          setMessage({ text: `Could not return items to inventory: ${productError.message}`, ok: false });
+          setDeleting(false);
+          return;
+        }
+      }
+    }
+
+    // order_items are removed via the ON DELETE CASCADE foreign key.
+    const { error } = await supabase.from('orders').delete().eq('id', order.id);
+    if (error) {
+      setMessage({ text: `Could not delete order: ${error.message}`, ok: false });
+      setDeleting(false);
+      return;
+    }
+
+    setOrders((current) => current.filter((existing) => existing.id !== order.id));
+    setDeleting(false);
+    setConfirmDelete(null);
+    setMessage({ text: `Order ${order.order_number} deleted.`, ok: true });
+    router.refresh();
+  }
+
   return (
     <main className="px-4 md:px-8 py-6 md:py-8">
       <div className="max-w-[1500px] mx-auto">
@@ -363,8 +410,8 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
                 <p className="text-[0.58rem] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
                   Items
                 </p>
-                <p className="mt-1 line-clamp-2 text-sm leading-relaxed" style={{ color: 'var(--color-on-surface)' }}>
-                  {(order.order_items ?? []).map((item) => item.title_snapshot).join(', ') || '-'}
+                <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--color-on-surface)' }}>
+                  {itemCountLabel(order)}
                 </p>
               </div>
 
@@ -377,6 +424,14 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
               <Link href={`${adminBasePath}/orders/${order.id}`} className="gold-button mt-4 w-full justify-center text-sm">
                 View Order
               </Link>
+              <button
+                type="button"
+                onClick={() => { setReturnToInventory(true); setConfirmDelete(order); }}
+                className="mt-2 w-full rounded-md border py-2 text-xs font-bold uppercase tracking-wide"
+                style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}
+              >
+                Delete Order
+              </button>
             </article>
           ))}
           {filteredOrders.length === 0 && <EmptyOrders />}
@@ -404,17 +459,25 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
                     <div>{order.customer_email || '-'}</div>
                     <div>{order.customer_phone || ''}</div>
                   </td>
-                  <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>
-                    {(order.order_items ?? []).map((item) => item.title_snapshot).join(', ') || '-'}
+                  <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    {itemCountLabel(order)}
                   </td>
                   <td className="px-4 py-3 font-semibold" style={{ color: GOLD }}>{formatCurrency(order.total)}</td>
                   <td className="px-4 py-3"><Badge value={order.payment_status} /></td>
                   <td className="px-4 py-3"><Badge value={order.fulfillment_status} /></td>
                   <td className="px-4 py-3"><Badge value={order.order_status} /></td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 whitespace-nowrap">
                     <Link href={`${adminBasePath}/orders/${order.id}`} className="text-xs font-bold uppercase tracking-wide hover:underline" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
                       View
                     </Link>
+                    <button
+                      type="button"
+                      onClick={() => { setReturnToInventory(true); setConfirmDelete(order); }}
+                      className="ml-4 text-xs font-bold uppercase tracking-wide hover:underline"
+                      style={{ color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -637,6 +700,49 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
           </div>
         </div>
       )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="w-full max-w-md rounded-lg border p-6 shadow-xl" style={{ background: 'white', borderColor: BORDER }}>
+            <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
+              Delete order?
+            </h2>
+            <p className="mt-3 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+              Permanently delete <strong style={{ color: GOLD }}>{confirmDelete.order_number}</strong> and its{' '}
+              {(confirmDelete.order_items ?? []).length} line item(s). This cannot be undone.
+            </p>
+            <label className="mt-4 flex items-start gap-2 text-sm" style={{ color: 'var(--color-on-surface)' }}>
+              <input
+                type="checkbox"
+                checked={returnToInventory}
+                onChange={(e) => setReturnToInventory(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>Return its products to <strong>Available</strong> inventory</span>
+            </label>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(null)}
+                disabled={deleting}
+                className="text-sm font-bold uppercase tracking-wide disabled:opacity-50"
+                style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={deleteOrder}
+                disabled={deleting}
+                className="rounded-md px-4 py-2 text-sm font-bold uppercase tracking-wide text-white disabled:opacity-50"
+                style={{ background: 'var(--color-error)', fontFamily: 'var(--font-label)' }}
+              >
+                {deleting ? 'Deleting...' : 'Delete Order'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -698,6 +804,11 @@ function SummaryRow({ label, value, strong = false }: { label: string; value: st
       <span className={strong ? 'font-bold' : ''}>{value}</span>
     </div>
   );
+}
+
+function itemCountLabel(order: Order): string {
+  const count = order.order_items?.length ?? 0;
+  return `${count} ${count === 1 ? 'item' : 'items'}`;
 }
 
 function clampMoneyDiscount(value: number, max: number) {

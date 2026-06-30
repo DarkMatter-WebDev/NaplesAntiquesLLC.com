@@ -5,6 +5,30 @@
 
 ## Backlog
 
+- **Finish & ship PayPal checkout (sandbox → live).** Code is complete and SANDBOX
+  Test 1 (successful payment) passed. The exact test-matrix status + config state is in
+  the **"HANDOFF — PayPal checkout"** section at the top of `CURRENT_STATUS.md` (read
+  that first). Remaining, in order:
+  1. **Re-run `supabase/paypal-checkout.sql`** — already applied (with the `service_role`
+     grants + the ambiguous-`order_id` fix), but needs one more run to drop the
+     capture→Messages notification insert (paid orders surface on the Orders-tab badge).
+  2. Set the 4 PayPal env vars in **Netlify** (`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`,
+     `PAYPAL_ENV=sandbox`, `PAYPAL_WEBHOOK_ID`) — currently set in `.env.local` only.
+  3. **`npm run build`** from `next-app/` (NOT run since the latest checkout/notification
+     changes) and **deploy to Netlify** — Tests 2/3/4 need a public URL (PayPal can't
+     reach localhost).
+  4. Register the sandbox webhook (PayPal Developer → `…/api/paypal/webhook`, events
+     `PAYMENT.CAPTURE.COMPLETED/DENIED/REFUNDED/REVERSED` + `CUSTOMER.DISPUTE.CREATED`;
+     confirm its id matches `PAYPAL_WEBHOOK_ID`).
+  5. Run the remaining sandbox tests on the deployed site: **Test 2** canceled checkout,
+     **Test 3** failed/denied capture (sandbox negative testing or the DENIED webhook),
+     **Test 4** duplicate webhook (PayPal "Resend" → no-op via `webhook_events`).
+     Optionally force **Test 6** amount-mismatch by editing `orders.total` mid-popup.
+     (Already done: Test 1 success, Test 5 double-buy 409, validation, webhook signature.)
+  6. Optionally schedule `select public.release_expired_paypal_reservations();` (Supabase
+     cron) so abandoned holds free up with no new traffic.
+  7. Only after sandbox passes: create a **live** PayPal app, swap client/secret/webhook
+     id, set `PAYPAL_ENV=live`, redeploy, and re-test once with a real low-value order.
 - **`supabase/service-role-insert-grants.sql` — likely NOT needed (optional safety).**
   Live testing (2026-06-25) showed `service_role` INSERT into `admin_notifications`
   already succeeds (the "Message Us Directly" and unified-inbox inquiry notifications
@@ -196,8 +220,10 @@
   flow.
 - Expand shop beyond gold (silver / diamonds / antiques categories) when
   inventory is ready.
-- Consider real checkout/payments (for example Stripe) vs. the current
-  contact-to-buy flow.
+- **Done (sandbox):** Real online checkout/payments via **PayPal** (Orders API v2)
+  are integrated on `/checkout`, replacing the old contact-to-buy submit. See the
+  "Bring PayPal checkout live (sandbox → production)" backlog item above for the
+  go-live steps and `features/paypal-checkout.md`.
 - Add basic analytics if not already present.
 - Confirm whether a self-hosted metal-price API key/rate limit is needed for
   production traffic.
@@ -208,6 +234,16 @@
 
 ## Completed
 
+- **PayPal checkout wired into `/checkout`** (2026-06-29): PayPal JS SDK button
+  (replacing the manual Submit Order) + `lib/paypal.ts` + three routes
+  (`/api/paypal/create-order`, `/capture-order`, `/webhook`) + shared
+  `lib/checkout-pricing.ts` for server-side authoritative totals + new
+  `supabase/paypal-checkout.sql` (PayPal/reservation columns, `webhook_events`,
+  reserve/capture/release/event RPCs). One-of-one inventory is reserved with
+  row-locking and auto-expires after 30 min; capture verifies amount/currency,
+  marks paid + sold, and notifies admin; webhook is signature-verified +
+  idempotent. tsc clean, lint only the 3 known issues, build clean, preview smoke
+  passed. Sandbox; see Backlog for the go-live checklist and DECISIONS (2026-06-29).
 - **Unified admin inbox** (2026-06-25): `/api/inquire` now also writes an
   `admin_notifications` row (`type: 'inquiry'`, photos attached) for every Free
   Evaluation / Submit Your Item / product inquiry, so all submissions show in

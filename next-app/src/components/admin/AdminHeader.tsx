@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { type ReactNode, useState } from 'react';
 import AdminMessagesLink from './AdminMessagesLink';
+import AdminOrdersLink from './AdminOrdersLink';
 
 const GOLD = '#735c00';
 
@@ -222,9 +223,11 @@ export default function AdminHeader({
       <AdminNavItem href={adminBasePath} active={active === 'products'} products>
         Products
       </AdminNavItem>
-      <AdminNavItem href={`${adminBasePath}/orders`} active={active === 'orders'}>
-        Orders
-      </AdminNavItem>
+      <AdminOrdersLink
+        href={`${adminBasePath}/orders`}
+        active={active === 'orders'}
+        style={active === 'orders' ? activeStyle : linkStyle}
+      />
       <AdminMessagesLink
         href={`${adminBasePath}/messages`}
         unreadCount={unreadMessagesCount}

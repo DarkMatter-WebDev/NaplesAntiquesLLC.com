@@ -107,9 +107,11 @@ and the spot basis used for the calculation. Manual-priced products use
 - Filters are URL-backed and include item group/type, metal, metal color,
   purity, brand, gender, length/size, price range, availability, sort, and
   pagination.
-- Public gallery excludes unavailable lifecycle states such as
-  `pending_payment`, while sold/unavailable handling remains explicit in the
-  product/card status helpers.
+- Public gallery shows only `available`/`sold`; it excludes `reserved`,
+  `pending_payment`, `draft`, and `archived`. Items reserved during PayPal
+  checkout (`reserved`) drop out of the cached catalog promptly via
+  `revalidateTag('shop-catalog', 'max')` on reserve/capture/release. See
+  `features/paypal-checkout.md`.
 
 ## Admin Workflow
 

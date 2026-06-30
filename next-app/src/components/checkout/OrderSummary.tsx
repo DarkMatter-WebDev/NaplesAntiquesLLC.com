@@ -104,28 +104,37 @@ export default function OrderSummary({
           <span>{isEs ? 'Impuesto FL (7%)' : 'FL Sales Tax (7%)'}</span>
           <span>{subtotal > 0 ? fmt(tax) : '-'}</span>
         </div>
-        <label className="flex flex-col gap-1 pt-2">
-          <span>{isEs ? 'Envío' : 'Shipping'}</span>
-          <select
-            value={selectedShipping.value}
-            onChange={(e) => onShippingMethodChange?.(e.target.value)}
-            disabled={!onShippingMethodChange}
-            className="w-full rounded-xl border px-2 py-2 text-xs font-bold uppercase tracking-wide disabled:opacity-100"
-            style={{
-              borderColor: BORDER,
-              background: 'var(--color-background)',
-              color: 'var(--color-on-surface)',
-              fontFamily: 'var(--font-label)',
-              outline: 'none',
-            }}
-          >
-            {SHIPPING_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {isEs ? option.labelEs : option.labelEn} - {fmt(option.price)}
-              </option>
-            ))}
-          </select>
-        </label>
+        {onShippingMethodChange ? (
+          <div className="flex items-center justify-between gap-2 pt-2">
+            <span>{isEs ? 'Envío' : 'Shipping'}</span>
+            <select
+              value={selectedShipping.value}
+              onChange={(e) => onShippingMethodChange(e.target.value)}
+              aria-label={isEs ? 'Método de envío' : 'Shipping method'}
+              className="max-w-[62%] rounded-md border px-2 py-1 text-xs font-bold"
+              style={{
+                borderColor: BORDER,
+                background: 'var(--color-background)',
+                color: 'var(--color-on-surface)',
+                fontFamily: 'var(--font-label)',
+                outline: 'none',
+              }}
+            >
+              {SHIPPING_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {isEs ? option.labelEs : option.labelEn}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="flex justify-between pt-2">
+            <span>{isEs ? 'Envío' : 'Shipping'}</span>
+            <span style={{ color: 'var(--color-on-surface)' }}>
+              {isEs ? selectedShipping.labelEs : selectedShipping.labelEn}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between">
           <span>{isEs ? 'Costo de envío' : 'Shipping Cost'}</span>
           <span>{fmt(shipping)}</span>

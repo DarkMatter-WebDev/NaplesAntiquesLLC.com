@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useCart, type CartItem } from '@/context/CartContext';
 import OrderSummary, { SHIPPING_OPTIONS } from '@/components/checkout/OrderSummary';
+import PayPalCheckoutButton from '@/components/checkout/PayPalCheckoutButton';
 import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 import { createClient } from '@/lib/supabase/client';
 import { productImagePaddingForImage } from '@/types/product';
@@ -36,18 +37,63 @@ interface CustomerInfo {
   email: string;
   phone: string;
   notes: string;
+  address_line1: string;
+  address_line2: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  country: string;
 }
 
-export default function CheckoutClient({ locale }: { locale: string }) {
+export default function CheckoutClient({ locale, paypalClientId }: { locale: string; paypalClientId?: string | null }) {
   const { items, remove, clear } = useCart();
   const isEs = locale === 'es';
   const prefix = isEs ? '/es' : '';
-  const [customer, setCustomer] = useState<CustomerInfo>({ name: '', email: '', phone: '', notes: '' });
+  const [customer, setCustomer] = useState<CustomerInfo>({
+    name: '', email: '', phone: '', notes: '',
+    address_line1: '', address_line2: '', city: '', state: '', postal_code: '', country: 'United States',
+  });
   const [shippingMethod, setShippingMethod] = useState(SHIPPING_OPTIONS[0].value);
   const [productInfoById, setProductInfoById] = useState<Record<string, CartProductInfo>>({});
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [createdOrder, setCreatedOrder] = useState<{ orderNumber: string; total: number } | null>(null);
+  // Internal order id from the first create-order call, reused if the buyer
+  // cancels the PayPal window and tries again (so we don't double-reserve).
+  const orderIdRef = useRef<string | null>(null);
+
+  const needsShipping = shippingMethod !== 'local-pickup';
+  const contactReady =
+    customer.name.trim() !== '' && customer.email.trim() !== '' && customer.phone.trim() !== '';
+  const shippingAddressReady =
+    !needsShipping ||
+    (customer.address_line1.trim() !== '' &&
+      customer.city.trim() !== '' &&
+      customer.state.trim() !== '' &&
+      customer.postal_code.trim() !== '');
+  const payReady = items.length > 0 && contactReady && shippingAddressReady;
+
+  function buildPayPalPayload() {
+    return {
+      productIds: items.map((item) => item.id),
+      customer: {
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+        notes: customer.notes,
+        ...(needsShipping
+          ? {
+              address_line1: customer.address_line1,
+              address_line2: customer.address_line2,
+              city: customer.city,
+              state: customer.state,
+              postal_code: customer.postal_code,
+              country: customer.country,
+            }
+          : {}),
+      },
+      shippingMethod,
+      orderId: orderIdRef.current,
+    };
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -158,33 +204,6 @@ export default function CheckoutClient({ locale }: { locale: string }) {
     ...productInfoById[item.id],
   }));
 
-  async function handleSubmitOrder(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    setError(null);
-
-    const res = await fetch('/api/checkout/order', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        productIds: items.map((item) => item.id),
-        customer,
-        shippingMethod,
-      }),
-    });
-
-    const data = await res.json().catch(() => null);
-    if (!res.ok || !data?.success) {
-      setError(data?.error ?? (isEs ? 'No se pudo enviar el pedido.' : 'Could not submit order.'));
-      setSubmitting(false);
-      return;
-    }
-
-    clear();
-    setCreatedOrder({ orderNumber: data.orderNumber, total: data.total });
-    setSubmitting(false);
-  }
-
   if (createdOrder) {
     return (
       <div className="max-w-xl mx-auto text-center px-6 py-16">
@@ -238,24 +257,69 @@ export default function CheckoutClient({ locale }: { locale: string }) {
       </section>
 
       <div className="checkout-dashboard">
-        <OrderSummary
-          items={summaryItems}
-          isEs={isEs}
-          prefix={prefix}
-          shippingMethod={shippingMethod}
-          onShippingMethodChange={setShippingMethod}
-          onRemove={remove}
-          variant="expanded"
-        />
+        <div className="checkout-review">
+          <OrderSummary
+            items={summaryItems}
+            isEs={isEs}
+            prefix={prefix}
+            shippingMethod={shippingMethod}
+            onShippingMethodChange={setShippingMethod}
+            onRemove={remove}
+            variant="expanded"
+          />
 
-        <form onSubmit={handleSubmitOrder} className="checkout-contact-panel">
+          {needsShipping && (
+            <div className="checkout-address-block">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                  {isEs ? 'Dirección de envío' : 'Shipping Address'}
+                </p>
+                <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  {isEs
+                    ? 'Necesaria para el método de envío seleccionado.'
+                    : 'Required for the delivery method you selected.'}
+                </p>
+              </div>
+              <div>
+                <label className="form-label">{isEs ? 'Dirección' : 'Street Address'} *</label>
+                <input required className="form-field" autoComplete="address-line1" value={customer.address_line1} onChange={(e) => setCustomer({ ...customer, address_line1: e.target.value })} />
+              </div>
+              <div>
+                <label className="form-label">{isEs ? 'Apartamento, suite, etc. (opcional)' : 'Apartment, suite, etc. (optional)'}</label>
+                <input className="form-field" autoComplete="address-line2" value={customer.address_line2} onChange={(e) => setCustomer({ ...customer, address_line2: e.target.value })} />
+              </div>
+              <div className="responsive-form-grid">
+                <div>
+                  <label className="form-label">{isEs ? 'Ciudad' : 'City'} *</label>
+                  <input required className="form-field" autoComplete="address-level2" value={customer.city} onChange={(e) => setCustomer({ ...customer, city: e.target.value })} />
+                </div>
+                <div>
+                  <label className="form-label">{isEs ? 'Estado' : 'State'} *</label>
+                  <input required className="form-field" autoComplete="address-level1" value={customer.state} onChange={(e) => setCustomer({ ...customer, state: e.target.value })} />
+                </div>
+              </div>
+              <div className="responsive-form-grid">
+                <div>
+                  <label className="form-label">{isEs ? 'Código postal' : 'ZIP / Postal Code'} *</label>
+                  <input required className="form-field" autoComplete="postal-code" value={customer.postal_code} onChange={(e) => setCustomer({ ...customer, postal_code: e.target.value })} />
+                </div>
+                <div>
+                  <label className="form-label">{isEs ? 'País' : 'Country'}</label>
+                  <input className="form-field" autoComplete="country-name" value={customer.country} onChange={(e) => setCustomer({ ...customer, country: e.target.value })} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="checkout-contact-panel">
           <div className="checkout-panel-heading">
             <span className="material-symbols-outlined" aria-hidden="true">person</span>
             <div>
               <p className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
                 {isEs ? 'Datos de contacto' : 'Contact Details'}
               </p>
-              <h2>{isEs ? '¿Cómo podemos contactarte?' : 'How should we contact you?'}</h2>
+              <h2>{isEs ? 'Información de contacto' : 'Contact information'}</h2>
             </div>
           </div>
           <div className="responsive-form-grid">
@@ -270,23 +334,18 @@ export default function CheckoutClient({ locale }: { locale: string }) {
           </div>
           <div>
             <label className="form-label">{isEs ? 'Correo electrónico' : 'Email'} *</label>
-            <input required type="email" className="form-field" value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} />
+            <input required type="email" className="form-field" autoComplete="email" value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} />
           </div>
+
           <div>
             <label className="form-label">{isEs ? 'Notas (opcional)' : 'Notes (optional)'}</label>
             <textarea rows={4} className="form-field resize-none" value={customer.notes} onChange={(e) => setCustomer({ ...customer, notes: e.target.value })} />
           </div>
 
-          {error && (
-            <p className="text-sm" style={{ color: 'var(--color-error)' }}>
-              {error}
-            </p>
-          )}
-
           <FormPrivacyNotice locale={locale} />
 
           <p className="text-xs leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
-            {isEs ? 'Antes de enviar, revise nuestras ' : 'Before submitting, please review our '}
+            {isEs ? 'Antes de pagar, revise nuestras ' : 'Before paying, please review our '}
             <Link href={`${prefix}/returns-refunds`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
               {isEs ? 'Devoluciones' : 'Returns & Refunds'}
             </Link>
@@ -305,12 +364,26 @@ export default function CheckoutClient({ locale }: { locale: string }) {
             .
           </p>
 
-          <button type="submit" disabled={submitting} className="gold-button justify-center disabled:opacity-60" style={{ width: '100%' }}>
-            {submitting
-              ? (isEs ? 'Enviando...' : 'Submitting...')
-              : (isEs ? 'Enviar pedido' : 'Submit Order')}
-          </button>
-        </form>
+          {paypalClientId ? (
+            <PayPalCheckoutButton
+              clientId={paypalClientId}
+              ready={payReady}
+              isEs={isEs}
+              getPayload={buildPayPalPayload}
+              onOrderId={(id) => { orderIdRef.current = id; }}
+              onSuccess={({ orderNumber }) => {
+                clear();
+                setCreatedOrder({ orderNumber, total: 0 });
+              }}
+            />
+          ) : (
+            <p className="text-sm" style={{ color: 'var(--color-error)' }}>
+              {isEs
+                ? 'El pago en línea no está disponible en este momento. Llámenos al (239) 404-8505.'
+                : 'Online payment is unavailable right now. Please call us at (239) 404-8505.'}
+            </p>
+          )}
+        </div>
       </div>
       </div>
 
@@ -340,6 +413,21 @@ export default function CheckoutClient({ locale }: { locale: string }) {
           grid-template-columns: minmax(0, 1fr);
           gap: 1.5rem;
         }
+        .checkout-review {
+          display: flex;
+          flex-direction: column;
+          gap: 1.5rem;
+          min-width: 0;
+        }
+        .checkout-address-block {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+          padding: clamp(1.25rem, 3vw, 1.75rem);
+          border: 1px solid rgba(216, 208, 194, 0.94);
+          background: rgba(255, 255, 255, 0.86);
+          box-shadow: 0 14px 36px rgba(75, 60, 24, 0.07);
+        }
         .checkout-contact-panel {
           display: flex;
           flex-direction: column;
@@ -359,12 +447,6 @@ export default function CheckoutClient({ locale }: { locale: string }) {
           .checkout-dashboard {
             grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem);
             align-items: start;
-          }
-          .checkout-dashboard > :first-child {
-            order: 2;
-          }
-          .checkout-dashboard > :last-child {
-            order: 1;
           }
         }
         .checkout-panel-heading > .material-symbols-outlined {

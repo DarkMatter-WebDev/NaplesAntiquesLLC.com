@@ -51,8 +51,11 @@ discretion and a personal relationship over a storefront transaction.
 - **Auth + data**: Supabase (Postgres + Auth) for customer accounts, profiles,
   favorites/wishlist behavior, inquiries, admin data, and products. Project ref:
   `evzluixourmsefwdsieu`.
-- **Server/API**: Next route handlers for metal pricing and inquiries, deployed
-  on Netlify with `@netlify/plugin-nextjs`.
+- **Server/API**: Next route handlers for metal pricing, inquiries, and checkout,
+  deployed on Netlify with `@netlify/plugin-nextjs`.
+- **Payments**: PayPal (JS SDK on the client, Orders API v2 on the server) wired
+  into `/checkout`. No card data touches our servers; totals are computed
+  server-side. Currently sandbox (`PAYPAL_ENV=sandbox`).
 - **Hosting**: Netlify (`base = "next-app"`, publish `.next`).
 - **Email / marketing**: Resend-backed inquiry/order flow plus Supabase-backed
   subscriber and admin marketing surfaces in the Next app.
@@ -82,8 +85,11 @@ pages are marketing/trust content. The dynamic surfaces are:
 
 - the **shop** (`/shop`, `/shop/[id]`) backed by Supabase products and priced
   live against metal spot,
+- **online checkout + payments** (`/checkout`) via PayPal (Orders API v2) —
+  creates the order, reserves one-of-one inventory, and captures payment
+  server-side; see `features/paypal-checkout.md`,
 - **customer accounts** backed by Supabase,
-- **admin and inquiries** backed by Supabase/Next route handlers,
+- **admin, orders, and inquiries** backed by Supabase/Next route handlers,
 - localized EN/ES routes powered by `next-intl`.
 
 The site is built and maintained by **Dark Matter Web Services**
