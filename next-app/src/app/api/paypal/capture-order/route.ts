@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { capturePayPalOrder, paypalConfigured } from '@/lib/paypal';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 const CURRENCY = 'USD';
 const AMOUNT_TOLERANCE = 0.01;

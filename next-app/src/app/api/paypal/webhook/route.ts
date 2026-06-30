@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { verifyPayPalWebhook } from '@/lib/paypal';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 type PayPalWebhookEvent = {
   id?: string;
