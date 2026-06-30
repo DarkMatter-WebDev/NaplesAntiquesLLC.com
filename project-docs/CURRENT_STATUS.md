@@ -5,10 +5,44 @@
 
 ## 🔴 HANDOFF — PayPal checkout: where testing stands (2026-06-30)
 
-**You are picking up a PayPal checkout integration that is fully built and code-complete,
-verified in SANDBOX up to a successful payment, but NOT yet deployed or fully tested.**
-The build/wiring is done; what remains is finishing sandbox tests on a deployed URL and
-then flipping to live. Full technical runbook: `project-docs/features/paypal-checkout.md`.
+**The site is deployed and the checkout page renders, but PayPal checkout fails on the
+deployed site with "Something went wrong with PayPal. Please try again." Root cause
+identified — see the Netlify env-var fix below.** Code is complete and verified on the
+local dev server. Full technical runbook: `project-docs/features/paypal-checkout.md`.
+
+### 🚨 BLOCKER: Netlify has the wrong PayPal app credentials
+
+The deployed site serves `PAYPAL_CLIENT_ID = AcSsWn15M34eZNC-2OksAzaKof6Uj4dC6p-TgwSUVlr0AKKwvRcowHnFIJts92cKrA9qaL_73xtNhR5g`
+(extracted from live checkout HTML), but the verified working sandbox app in
+`next-app/.env.local` has `PAYPAL_CLIENT_ID = AbscNftOUogWVeuutMWwSWjnjtmqn5k3r9F3AXGl5PW27mR4Tx1xd-hzUHX5qbcvnZZtYF3mD_eo0eMm`.
+**These are different PayPal apps.** The server's `getAccessToken()` call (Basic
+auth with the Netlify-set id+secret) receives `401 invalid_client` from PayPal
+→ `createPayPalOrder` throws → route returns 502 → the client shows the error.
+
+**Fix (requires Netlify dashboard access):** Update all 4 PayPal env vars to the
+working sandbox set from `next-app/.env.local`, then trigger a redeploy:
+- `PAYPAL_CLIENT_ID` = `AbscNftOUogWVeuutMWwSWjnjtmqn5k3r9F3AXGl5PW27mR4Tx1xd-hzUHX5qbcvnZZtYF3mD_eo0eMm`
+- `PAYPAL_CLIENT_SECRET` = the `EG0py…` value from `next-app/.env.local`
+- `PAYPAL_ENV` = `sandbox`
+- `PAYPAL_WEBHOOK_ID` = `64C82950G8312001A`
+
+⚠️ **All 4 must belong to the same PayPal app and environment.** Mixing id/secret
+from different apps, or setting `PAYPAL_ENV=live` with sandbox creds (or vice versa),
+causes the same `401 → 502`. See DECISIONS (2026-06-30, PayPal credential-set rule).
+
+**Diagnostic confirmation:** `reserve_paypal_order` RPC and all Supabase grants are
+confirmed working on the live DB (probe returned 502, not 503 — the RPC succeeded;
+the failure was the downstream PayPal API call). The bracelet reservation was
+automatically rolled back. One leftover `cancelled` diagnostic order row remains in
+the `orders` table (created 2026-06-30, `payment_method='paypal'`); clean it up in
+Supabase with:
+```sql
+DELETE FROM orders
+WHERE payment_method = 'paypal'
+  AND payment_status = 'cancelled'
+  AND created_at::date = '2026-06-30';
+```
+`order_items` cascades; products are already back to `available`.
 
 ### Environment / config state
 - **Code:** complete. Routes `/api/paypal/{create-order,capture-order,webhook}`, `lib/paypal.ts`,
@@ -18,24 +52,24 @@ then flipping to live. Full technical runbook: `project-docs/features/paypal-che
 - **Credentials:** SANDBOX creds are in `next-app/.env.local` (`PAYPAL_ENV=sandbox`,
   `PAYPAL_WEBHOOK_ID=64C82950G8312001A`) and verified to authenticate against the sandbox
   endpoint. (An earlier set of LIVE creds was swapped out — Live creds fail against the
-  sandbox endpoint with `401 invalid_client`.)
+  sandbox endpoint with `401 invalid_client`.) **Netlify has a DIFFERENT set** — see blocker above.
 - **Supabase migrations:** `order-item-line-discounts.sql` ✅ applied. `paypal-checkout.sql`
   ✅ applied **with** the `service_role` grants and the ambiguous-`order_id` fix.
   ⚠️ **`paypal-checkout.sql` still needs ONE more re-run** to drop the capture→Messages
   notification insert (that edit was made after the last apply). Until re-run, a real
   capture still posts a "Paid order" row to `/admin/messages` — harmless; the Orders-tab
   badge works regardless.
-- **NOT deployed:** all testing so far was on the **local dev server (port 3002)**. The
-  latest changes have **not** been deployed to Netlify, and `npm run build` has not been
-  run since the last batch of checkout/notification changes.
-- **Netlify env vars:** PayPal vars are set locally only — **not confirmed set in Netlify**.
+- **Deployed:** the app is live on Netlify. The Netlify secrets-scan issue was fixed
+  (added `PAYPAL_CLIENT_ID` to `SECRETS_SCAN_OMIT_KEYS` in root `netlify.toml` — it is
+  intentionally public per PayPal's design). PayPal checkout is broken only because of the
+  credential mismatch; all other site features work.
 - **Note:** one orphaned sandbox capture sits in the PayPal sandbox account from an earlier
   tangled attempt — harmless test funds, no action needed.
 
 ### Sandbox test matrix
 | # | Test | Status |
 |---|------|--------|
-| 1 | Successful payment | ✅ **PASSED live** end-to-end (create → approve → capture → `paid`/`completed`, product `sold`, capture idempotent) |
+| 1 | Successful payment | ✅ **PASSED live (local dev)** end-to-end (create → approve → capture → `paid`/`completed`, product `sold`, capture idempotent) |
 | 5 | Item already sold before capture | ✅ PASSED (`reserve_paypal_order` returns 409; double-buy blocked) |
 | — | Validation/error paths + webhook signature gate | ✅ PASSED (empty cart, missing contact, bad ids → correct 400/404; unsigned webhook → 401) |
 | 3 | Failed/denied capture | ◐ Partial — graceful 502 + order stays unpaid on an unapproved capture is verified; the `PAYMENT.CAPTURE.DENIED` **webhook** branch is NOT live-tested (needs deploy) |
@@ -44,12 +78,23 @@ then flipping to live. Full technical runbook: `project-docs/features/paypal-che
 | 4 | Duplicate webhook | ⬜ NOT run — needs deployed site + PayPal "Resend"/simulator (idempotency is coded via `webhook_events` unique `event_id`) |
 
 ### What's left to do, in order
-1. **Re-run `supabase/paypal-checkout.sql`** (idempotent) so paid orders stop posting to the Messages center.
-2. **Set the 4 PayPal env vars in Netlify** (`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_ENV=sandbox`, `PAYPAL_WEBHOOK_ID`).
-3. **Run `npm run build`** from `next-app/` (not run since the latest changes), then **deploy to Netlify**.
-4. **Register the sandbox webhook** in the PayPal Developer dashboard → URL `https://naplesestatejewelry.co/api/paypal/webhook`, events `PAYMENT.CAPTURE.COMPLETED/DENIED/REFUNDED/REVERSED` + `CUSTOMER.DISPUTE.CREATED`; confirm its id matches `PAYPAL_WEBHOOK_ID`.
-5. **Finish the sandbox tests on the deployed site:** Test 2 (cancel), Test 3 (denied capture — sandbox negative testing or the webhook simulator's DENIED event), Test 4 (duplicate webhook via "Resend"). Optionally force Test 6 by editing `orders.total` while the PayPal popup is open.
-6. **Only after sandbox passes → go LIVE:** create a Live PayPal app, swap in live client/secret/webhook id, set `PAYPAL_ENV=live`, redeploy, and run one real low-value order.
+1. **Fix the Netlify credential mismatch** (see BLOCKER above): update the 4 PayPal vars in
+   the Netlify dashboard to the verified sandbox set, then redeploy (env-var changes only take
+   effect on a new deploy).
+2. **Re-run `supabase/paypal-checkout.sql`** (idempotent) so paid orders stop posting to the Messages center.
+3. **Register the sandbox webhook** in the PayPal Developer dashboard → URL `https://naplesestatejewelry.co/api/paypal/webhook`, events `PAYMENT.CAPTURE.COMPLETED/DENIED/REFUNDED/REVERSED` + `CUSTOMER.DISPUTE.CREATED`; confirm its id matches `PAYPAL_WEBHOOK_ID`.
+4. **Finish the sandbox tests on the deployed site:** Test 2 (cancel), Test 3 (denied capture — sandbox negative testing or the webhook simulator's DENIED event), Test 4 (duplicate webhook via "Resend"). Optionally force Test 6 by editing `orders.total` while the PayPal popup is open.
+5. **Only after sandbox passes → go LIVE:** create a Live PayPal app, swap in live client/secret/webhook id, set `PAYPAL_ENV=live`, redeploy, and run one real low-value order.
+
+### How to verify the fix without touching the UI
+After updating Netlify env vars and redeploying, run this probe — a working config
+returns a `paypalOrderId` (the reservation self-cleans on rollback):
+```bash
+curl -s -i -X POST https://naplesestatejewelry.co/api/paypal/create-order \
+  -H "Content-Type: application/json" \
+  -d '{"productIds":["italian-milor-14k-rose-gold-semi-solid-fancy-link-bracelet-24"],"shippingMethod":"local-pickup","customer":{"name":"Diag Test","email":"diag@example.com","phone":"2390000000"}}'
+```
+A 200 with `paypalOrderId` = credentials are correct. A 502 = still wrong credentials.
 
 ### How to verify/clean during testing
 - Test orders/reservations were created and cleaned up via the Supabase service role (PostgREST). To inspect: query `orders` (filter `payment_method=eq.paypal`) and `products` (`status=eq.reserved`). To clean a test order: set its product(s) back to `status='available'` (+ null `reserved_until`/`reserved_order_id`) and delete the order (order_items cascade).

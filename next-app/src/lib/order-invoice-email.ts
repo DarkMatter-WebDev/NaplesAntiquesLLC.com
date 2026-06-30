@@ -61,7 +61,7 @@ export function withInvoiceLineDiscounts(order: InvoiceEmailOrder, itemDiscounts
 
 export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoiceNumber?: string | null): InvoiceEmailContent {
   const invoiceNumber = invoiceNumberForOrder(order, fallbackInvoiceNumber);
-  const subject = `Invoice ${invoiceNumber} from Naples Estate Jewelry`;
+  const subject = `Invoice ${invoiceNumber} from Naples Estate Jewelry Co`;
   const customerName = order.customer_name || 'there';
   const items = order.order_items.map((item) => {
     const discount = clampDiscount(Number(item.discount ?? 0), item.price_snapshot);
@@ -92,9 +92,9 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
     total: formatCurrency(order.total),
   };
   const greeting = `Hi ${customerName},`;
-  const intro = `Thank you for your order with Naples Estate Jewelry. Invoice ${invoiceNumber} for ${order.order_number} is ready for review.`;
+  const intro = `Thank you for your order with Naples Estate Jewelry Co. Invoice ${invoiceNumber} for ${order.order_number} is ready for review.`;
   const note = 'Please reply to this email or call/text (239) 404-8505 with any questions about payment, pickup, delivery, or shipping.';
-  const closing = 'Thank you, Naples Estate Jewelry & Antiques';
+  const closing = 'Thank you, Naples Estate Jewelry Co';
   const shipToLines = formatAddressLines(order.shipping_address);
 
   return {
@@ -192,7 +192,7 @@ function buildInvoiceEmailHtml({
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;background:#ffffff;border:1px solid #d5c697;">
               <tr>
                 <td style="padding:28px 30px 18px;border-bottom:1px solid #d5c697;">
-                  <div style="color:#735c00;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;">Naples Estate Jewelry</div>
+                  <div style="color:#735c00;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;">Naples Estate Jewelry Co</div>
                   <h1 style="margin:10px 0 0;color:#1d1a14;font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:1.2;">${escapeHtml(subject)}</h1>
                   <p style="margin:8px 0 0;color:#746b5b;font-size:13px;">Order ${escapeHtml(orderNumber)} - ${escapeHtml(paymentStatus)} - ${escapeHtml(fulfillmentStatus)}</p>
                 </td>

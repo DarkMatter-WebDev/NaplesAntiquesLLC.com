@@ -29,14 +29,21 @@ const ORDER_DETAIL_COLUMNS = [
   'billing_address',
   'internal_notes',
   'customer_notes',
+  'refund_amount',
   'created_at',
   'updated_at',
   'order_items(id, order_id, product_id, inventory_number, title_snapshot, item_year_snapshot, metal_snapshot, purity_snapshot, gram_weight_snapshot, price_snapshot, discount, image_snapshot, created_at)',
 ].join(', ');
 const ORDER_DETAIL_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT = ORDER_DETAIL_COLUMNS.replace('item_year_snapshot, ', '');
+const ORDER_DETAIL_COLUMNS_WITHOUT_REFUND_AMOUNT = ORDER_DETAIL_COLUMNS.replace('refund_amount, ', '');
+const ORDER_DETAIL_COLUMNS_WITHOUT_BOTH = ORDER_DETAIL_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT.replace('refund_amount, ', '');
 
 function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
   return Boolean(error?.message?.toLowerCase().includes('item_year'));
+}
+
+function isMissingRefundAmountError(error: { message?: string | null } | null | undefined) {
+  return Boolean(error?.message?.toLowerCase().includes('refund_amount'));
 }
 
 interface Props {
@@ -94,6 +101,21 @@ export default async function AdminOrderDetailPage({ params }: Props) {
     const fallback = await supabase
       .from('orders')
       .select(ORDER_DETAIL_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT)
+      .eq('id', id)
+      .single();
+    order = fallback.data;
+    if (isMissingRefundAmountError(fallback.error)) {
+      const fallback2 = await supabase
+        .from('orders')
+        .select(ORDER_DETAIL_COLUMNS_WITHOUT_BOTH)
+        .eq('id', id)
+        .single();
+      order = fallback2.data;
+    }
+  } else if (isMissingRefundAmountError(orderResult.error)) {
+    const fallback = await supabase
+      .from('orders')
+      .select(ORDER_DETAIL_COLUMNS_WITHOUT_REFUND_AMOUNT)
       .eq('id', id)
       .single();
     order = fallback.data;

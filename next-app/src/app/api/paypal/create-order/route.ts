@@ -152,6 +152,11 @@ export async function POST(req: Request) {
     customer_notes: customer.notes ? String(customer.notes).trim() : null,
   };
 
+  // Every item must carry a product_id or the capture RPC will silently update 0 rows.
+  if (draft.items.some((item) => !item.product_id)) {
+    return NextResponse.json({ error: 'Cart item is missing a product reference. Please refresh and try again.' }, { status: 500 });
+  }
+
   // Atomic reserve + order creation (row-locks the products against concurrent buyers).
   const { data: rpcData, error: rpcError } = await supabase.rpc('reserve_paypal_order', {
     order_payload: orderPayload,

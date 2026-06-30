@@ -10,6 +10,38 @@
 > **Alternatives considered:** ...
 > ```
 
+## 2026-06-30 — PayPal: id, secret, and PAYPAL_ENV must form one consistent set
+
+**Decision:** The three PayPal credential variables (`PAYPAL_CLIENT_ID`,
+`PAYPAL_CLIENT_SECRET`, `PAYPAL_ENV`) must always come from the **same PayPal app and
+environment** — mixing them (id from app A, secret from app B, or `PAYPAL_ENV=sandbox`
+with live creds) causes `401 invalid_client` from PayPal's token endpoint. The server
+route catches this and returns 502, which the client surfaces as "Something went wrong
+with PayPal. Please try again." The symptom gives no hint that credentials are mismatched.
+
+**Root-cause incident (2026-06-30):** After the first successful Netlify deploy (fixing
+the secrets-scan issue), PayPal checkout failed on the live site with the above error.
+Diagnosis: the live checkout page served `PAYPAL_CLIENT_ID = AcSsWn15M34…` (Netlify's
+stored value), but the verified working sandbox creds in `.env.local` use
+`PAYPAL_CLIENT_ID = AbscNftOUog…`. These are **different PayPal apps.** Netlify's
+`PAYPAL_CLIENT_SECRET` was the secret for the `AcSsWn15M34` app; the server was trying
+to authenticate as that app, which the sandbox rejected. The DB side (inventory reserve
+RPC) succeeded; only the PayPal API call failed.
+
+**Rule for go-live (and any future credential rotation):** change all 4 PayPal vars
+together in one Netlify update — never update id without updating secret (and vice
+versa), and always match `PAYPAL_ENV` to the app's environment:
+- Sandbox: `PAYPAL_ENV=sandbox` + sandbox id + sandbox secret + sandbox `PAYPAL_WEBHOOK_ID`
+- Live: `PAYPAL_ENV=live` + live id + live secret + live `PAYPAL_WEBHOOK_ID`
+
+**Reason:** `lib/paypal.ts → getAccessToken()` uses Basic auth `clientId:clientSecret` —
+if those two belong to different apps, PayPal returns 401 regardless of which endpoint
+is hit. There is no way to detect this from the client-side error.
+
+**Alternatives considered:** Check the id/secret pairing at server startup — impractical;
+we'd need to call the token endpoint on cold boot. Add a `/api/paypal/check-config` admin
+probe — useful but optional; the diagnostic curl in CURRENT_STATUS.md does the same.
+
 ## 2026-06-30 — Netlify secrets scan: omit PAYPAL_CLIENT_ID (public by design)
 
 **Decision:** Add `PAYPAL_CLIENT_ID` to `SECRETS_SCAN_OMIT_KEYS` in root

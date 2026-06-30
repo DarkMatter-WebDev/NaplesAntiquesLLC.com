@@ -56,6 +56,11 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
   const [shippingMethod, setShippingMethod] = useState(SHIPPING_OPTIONS[0].value);
   const [productInfoById, setProductInfoById] = useState<Record<string, CartProductInfo>>({});
   const [createdOrder, setCreatedOrder] = useState<{ orderNumber: string; total: number } | null>(null);
+  // Set after PayPal approves — holds the PayPal order ID while we show the
+  // review screen. Cleared when the user confirms or goes back.
+  const [pendingPaypalOrderId, setPendingPaypalOrderId] = useState<string | null>(null);
+  const [capturing, setCapturing] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
   // Internal order id from the first create-order call, reused if the buyer
   // cancels the PayPal window and tries again (so we don't double-reserve).
   const orderIdRef = useRef<string | null>(null);
@@ -203,6 +208,86 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     ...item,
     ...productInfoById[item.id],
   }));
+
+  async function confirmOrder() {
+    if (!pendingPaypalOrderId) return;
+    setCapturing(true);
+    setCaptureError(null);
+    try {
+      const res = await fetch('/api/paypal/capture-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paypalOrderId: pendingPaypalOrderId }),
+      });
+      const result = await res.json().catch(() => null);
+      if (!res.ok || !result?.success) {
+        throw new Error(result?.error ?? (isEs ? 'No se pudo confirmar el pago.' : 'Payment could not be confirmed.'));
+      }
+      clear();
+      setCreatedOrder({ orderNumber: result.orderNumber, total: 0 });
+    } catch (err) {
+      setCaptureError(
+        err instanceof Error
+          ? err.message
+          : (isEs
+              ? 'No pudimos confirmar su pago. Si se le cobró, contáctenos.'
+              : 'We could not confirm your payment. If you were charged, please contact us.'),
+      );
+      setCapturing(false);
+    }
+  }
+
+  if (pendingPaypalOrderId) {
+    return (
+      <div style={{ minHeight: '100vh', padding: '3rem 0 4rem', background: 'linear-gradient(180deg, rgba(255,253,248,0.94) 0%, rgba(249,247,239,0.98) 46%, #f9f7ef 100%)' }}>
+        <div style={{ width: '100%', maxWidth: '640px', margin: '0 auto', paddingInline: 'clamp(1rem, 4vw, 2rem)' }}>
+          <section style={{ marginBottom: '1.5rem', padding: 'clamp(1.25rem, 3vw, 2rem)', border: '1px solid rgba(216,208,194,0.86)', background: 'rgba(255,255,255,0.82)', boxShadow: '0 18px 48px rgba(75,60,24,0.08)' }}>
+            <h1 className="text-3xl md:text-4xl font-bold mt-1 mb-3" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
+              {isEs ? 'Confirma tu pedido' : 'Confirm Your Order'}
+            </h1>
+            <p style={{ color: 'var(--color-on-surface-variant)' }}>
+              {isEs
+                ? 'Tu pago con PayPal está autorizado. Revisa los detalles y confirma para completar la compra.'
+                : 'Your PayPal payment is authorized. Review your order below and click Confirm to complete your purchase.'}
+            </p>
+          </section>
+
+          <OrderSummary
+            items={summaryItems}
+            isEs={isEs}
+            prefix={prefix}
+            shippingMethod={shippingMethod}
+            variant="compact"
+          />
+
+          <div style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {captureError && (
+              <p className="text-sm" style={{ color: 'var(--color-error)' }}>{captureError}</p>
+            )}
+            <button
+              type="button"
+              onClick={confirmOrder}
+              disabled={capturing}
+              className="gold-button justify-center disabled:opacity-50"
+              style={{ width: '100%' }}
+            >
+              {capturing
+                ? (isEs ? 'Procesando…' : 'Confirming…')
+                : (isEs ? 'Confirmar pedido' : 'Confirm Order')}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setPendingPaypalOrderId(null); setCaptureError(null); }}
+              disabled={capturing}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-on-surface-variant)', fontSize: '0.875rem', textDecoration: 'underline', textUnderlineOffset: '3px', padding: '0.25rem 0', textAlign: 'center' }}
+            >
+              {isEs ? '← Volver al formulario' : '← Back to checkout'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (createdOrder) {
     return (
@@ -371,6 +456,10 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
               isEs={isEs}
               getPayload={buildPayPalPayload}
               onOrderId={(id) => { orderIdRef.current = id; }}
+              onApproved={(paypalOrderId) => {
+                setCaptureError(null);
+                setPendingPaypalOrderId(paypalOrderId);
+              }}
               onSuccess={({ orderNumber }) => {
                 clear();
                 setCreatedOrder({ orderNumber, total: 0 });

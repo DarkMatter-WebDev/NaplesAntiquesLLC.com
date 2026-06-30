@@ -900,7 +900,14 @@ export default async function AccountPage({ params }: Props) {
           background: rgba(212, 175, 55, 0.11);
           font-size: 1.35rem;
         }
-        @media (max-width: 700px) {
+        .account-order-print-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          flex-shrink: 0;
+          margin-top: 0.5rem;
+        }
+@media (max-width: 700px) {
           .account-hero {
             min-height: 17rem;
           }

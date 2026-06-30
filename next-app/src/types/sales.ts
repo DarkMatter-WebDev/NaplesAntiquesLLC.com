@@ -55,6 +55,7 @@ export interface Order {
   billing_address: Record<string, unknown> | null;
   internal_notes: string | null;
   customer_notes: string | null;
+  refund_amount: number | null;
   created_at: string;
   updated_at: string;
   order_items?: OrderItem[];

@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import AccountProfileForm, { type CustomerProfile } from '@/components/account/AccountProfileForm';
 import SignOutButton from '@/components/account/SignOutButton';
@@ -326,6 +326,8 @@ function OrdersTab({ orders, locale }: { orders: Order[]; locale: string }) {
   );
 }
 
+type DialogInvoice = { id: string; invoice_number: string; status: string; total: number };
+
 function OrderDetailsDialog({
   order,
   locale,
@@ -338,8 +340,26 @@ function OrderDetailsDialog({
   const isEs = locale === 'es';
   const itemCount = order.order_items?.length ?? 0;
   const accountOrdersHref = isEs ? '/es/account?tab=orders' : '/account?tab=orders';
+  const supabase = createClient();
+  const [invoices, setInvoices] = useState<DialogInvoice[]>([]);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from('invoices')
+      .select('id, invoice_number, status, total, created_at')
+      .eq('order_id', order.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (!cancelled && data) setInvoices(data as DialogInvoice[]);
+      });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order.id]);
 
   return (
+    <>
     <div className="account-order-dialog-backdrop" role="dialog" aria-modal="true" aria-label={isEs ? 'Detalles del pedido' : 'Order details'}>
       <div className="account-order-dialog">
         <button type="button" className="account-order-dialog-close" onClick={onClose} aria-label={isEs ? 'Cerrar detalles del pedido' : 'Close order details'}>
@@ -347,9 +367,24 @@ function OrderDetailsDialog({
         </button>
 
         <div className="account-order-dialog-header">
-          <p className="account-tab-eyebrow">{isEs ? 'Pedido' : 'Order'}</p>
-          <h2>{order.order_number}</h2>
-          <span>{formatOrderDate(order.created_at)}</span>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
+            <div>
+              <p className="account-tab-eyebrow">{isEs ? 'Pedido' : 'Order'}</p>
+              <h2>{order.order_number}</h2>
+              <span style={{ display: 'block', marginTop: '0.25rem', color: 'var(--color-on-surface-variant)', fontSize: '0.88rem' }}>
+                {formatOrderDate(order.created_at)}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="account-order-print-btn outline-button text-sm"
+              onClick={() => setShowPrintPreview(true)}
+              aria-label={isEs ? 'Imprimir pedido' : 'Print order'}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '1rem', lineHeight: 1 }}>print</span>
+              {isEs ? 'Imprimir' : 'Print'}
+            </button>
+          </div>
         </div>
 
         <div className="account-order-detail-grid">
@@ -440,7 +475,220 @@ function OrderDetailsDialog({
             <OrderDetailLine label={isEs ? 'Dirección de facturación' : 'Billing address'} value={formatAddress(order.billing_address)} />
           </div>
         )}
+
+        {invoices.length > 0 && (
+          <div className="account-order-dialog-section">
+            <h3>{isEs ? 'Factura' : 'Invoice'}</h3>
+            {invoices.map((invoice) => (
+              <div key={invoice.id} className="account-order-detail-line">
+                <span style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)', fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                  {invoice.invoice_number}
+                </span>
+                <strong style={{ color: 'var(--color-on-surface)', fontSize: '0.88rem' }}>
+                  {orderStatusLabel(invoice.status)}
+                </strong>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
+    </div>
+
+    {/* Print preview overlay — sits above the dialog */}
+    {showPrintPreview && (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 90,
+          background: '#2b2519',
+          display: 'flex',
+          flexDirection: 'column',
+          overflowY: 'auto',
+        }}
+      >
+        {/* Toolbar — hidden on print */}
+        <div
+          className="order-print-toolbar"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            padding: '0.75rem 1.25rem',
+            background: '#1e1b15',
+            borderBottom: '1px solid #3d3522',
+            position: 'sticky',
+            top: 0,
+            zIndex: 1,
+            fontFamily: 'Arial, Helvetica, sans-serif',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setShowPrintPreview(false)}
+            style={{ fontSize: '0.82rem', color: '#e5d48a', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          >
+            {isEs ? '← Volver' : '← Back'}
+          </button>
+          <span style={{ color: '#55493a', fontSize: '0.82rem' }}>|</span>
+          <span style={{ fontSize: '0.82rem', color: '#c8b264', fontWeight: 700 }}>
+            {isEs ? 'Vista previa de impresión' : 'Print Preview'} — {order.order_number}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              const paper = document.querySelector<HTMLElement>('.order-print-paper');
+              if (!paper) return;
+              const win = window.open('', '_blank');
+              if (!win) return;
+              win.document.write(
+                '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+                `<title>${order.order_number}</title>` +
+                '<style>' +
+                '*{box-sizing:border-box;margin:0;padding:0;}' +
+                'body{font-family:Arial,Helvetica,sans-serif;color:#1d1a14;}' +
+                '@page{size:letter;margin:0.75in;}' +
+                'table{width:100%;border-collapse:collapse;}' +
+                '</style>' +
+                `</head><body>${paper.innerHTML}</body></html>`,
+              );
+              win.document.close();
+              win.onafterprint = () => win.close();
+              win.print();
+            }}
+            style={{
+              marginLeft: 'auto',
+              padding: '0.5rem 1.4rem',
+              background: 'linear-gradient(135deg, #dcb336, #b5890c)',
+              color: '#ffffff',
+              fontWeight: 700,
+              fontSize: '0.82rem',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
+          >
+            {isEs ? 'Imprimir ahora' : 'Print Now'}
+          </button>
+        </div>
+
+        {/* Paper — the only thing that prints */}
+        <div
+          className="order-print-paper"
+          style={{
+            width: 'min(680px, calc(100% - 2rem))',
+            margin: '1.5rem auto 3rem',
+            background: '#ffffff',
+            padding: '3rem 2.5rem',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.45)',
+            fontFamily: 'Arial, Helvetica, sans-serif',
+            color: '#1d1a14',
+          }}
+        >
+          {/* Receipt header */}
+          <div style={{ textAlign: 'center', marginBottom: '2rem', paddingBottom: '1.5rem', borderBottom: '2px solid #d5c697' }}>
+            <p style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.35em', textTransform: 'uppercase', color: '#735c00', marginBottom: '0.4rem' }}>
+              Naples Estate Jewelry Co
+            </p>
+            <p style={{ fontSize: '0.78rem', color: '#746b5b' }}>Naples, Florida · (239) 404-8505</p>
+          </div>
+
+          {/* Order number + invoice + date */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+            <div>
+              {invoices[0] && (
+                <p style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#735c00', marginBottom: '0.25rem' }}>
+                  {isEs ? 'Factura #:' : 'Invoice #:'} {invoices[0].invoice_number}
+                </p>
+              )}
+              <p style={{ fontSize: '1rem', fontWeight: 700 }}>{order.order_number}</p>
+              <p style={{ fontSize: '0.78rem', color: '#746b5b', marginTop: '0.2rem' }}>{formatOrderDate(order.created_at)}</p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#735c00' }}>
+                {isEs ? 'Pago' : 'Payment'}
+              </p>
+              <p style={{ fontSize: '0.88rem', marginTop: '0.2rem' }}>{orderStatusLabel(order.payment_status)}</p>
+            </div>
+          </div>
+
+          {/* Customer */}
+          {(order.customer_name || order.customer_email || order.customer_phone) && (
+            <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: '1px solid #eadfbd' }}>
+              <p style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#735c00', marginBottom: '0.5rem' }}>
+                {isEs ? 'Cliente' : 'Customer'}
+              </p>
+              {order.customer_name && <p style={{ fontSize: '0.88rem', fontWeight: 600 }}>{order.customer_name}</p>}
+              {order.customer_email && <p style={{ fontSize: '0.8rem', color: '#746b5b', marginTop: '0.15rem' }}>{order.customer_email}</p>}
+              {order.customer_phone && <p style={{ fontSize: '0.8rem', color: '#746b5b', marginTop: '0.15rem' }}>{order.customer_phone}</p>}
+            </div>
+          )}
+
+          {/* Items */}
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1.25rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #d5c697' }}>
+                <th style={{ textAlign: 'left', padding: '0.4rem 0', fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#735c00' }}>
+                  {isEs ? 'Artículo' : 'Item'}
+                </th>
+                <th style={{ textAlign: 'right', padding: '0.4rem 0', fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#735c00' }}>
+                  {isEs ? 'Precio' : 'Price'}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {(order.order_items ?? []).map((item) => {
+                const purityLabel = formatPublicPurity(item.purity_snapshot);
+                const details = [item.metal_snapshot, purityLabel, item.gram_weight_snapshot ? `${item.gram_weight_snapshot}g` : null].filter(Boolean).join(' · ');
+                return (
+                  <tr key={item.id} style={{ borderBottom: '1px solid #eadfbd' }}>
+                    <td style={{ padding: '0.85rem 0.5rem 0.85rem 0', verticalAlign: 'top' }}>
+                      <p style={{ fontSize: '0.9rem', fontWeight: 700 }}>{item.title_snapshot}</p>
+                      {item.inventory_number && (
+                        <p style={{ fontSize: '0.72rem', color: '#735c00', marginTop: '0.2rem' }}>#{item.inventory_number}</p>
+                      )}
+                      {details && <p style={{ fontSize: '0.75rem', color: '#746b5b', marginTop: '0.15rem' }}>{details}</p>}
+                    </td>
+                    <td style={{ padding: '0.85rem 0', textAlign: 'right', fontWeight: 700, color: '#735c00', fontSize: '0.9rem', whiteSpace: 'nowrap', verticalAlign: 'top' }}>
+                      {formatCurrency(item.price_snapshot)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Totals */}
+          <div style={{ marginLeft: 'auto', width: 'min(16rem, 100%)' }}>
+            <PrintTotalLine label={isEs ? 'Subtotal' : 'Subtotal'} value={formatCurrency(order.subtotal)} />
+            {order.discount > 0 && <PrintTotalLine label={isEs ? 'Descuento' : 'Discount'} value={`-${formatCurrency(order.discount)}`} />}
+            <PrintTotalLine label={isEs ? 'Impuesto' : 'Tax'} value={formatCurrency(order.tax)} />
+            {order.shipping_fee > 0 && <PrintTotalLine label={isEs ? 'Envío' : 'Shipping'} value={formatCurrency(order.shipping_fee)} />}
+            <div style={{ borderTop: '1.5px solid #d5c697', marginTop: '0.4rem', paddingTop: '0.5rem' }}>
+              <PrintTotalLine label={isEs ? 'Total' : 'Total'} value={formatCurrency(order.total)} strong />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div style={{ marginTop: '2.5rem', paddingTop: '1.25rem', borderTop: '1px solid #eadfbd', textAlign: 'center' }}>
+            <p style={{ fontSize: '0.75rem', color: '#746b5b' }}>
+              {isEs
+                ? 'Gracias por su compra. Para cualquier pregunta, llame o envíe un mensaje al (239) 404-8505.'
+                : 'Thank you for your purchase. For questions, call or text (239) 404-8505.'}
+            </p>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
+  );
+}
+
+function PrintTotalLine({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', padding: '0.2rem 0' }}>
+      <span style={{ fontSize: '0.82rem', color: strong ? '#1d1a14' : '#746b5b', fontWeight: strong ? 700 : 400, fontFamily: 'Arial, Helvetica, sans-serif' }}>{label}</span>
+      <span style={{ fontSize: '0.82rem', color: strong ? '#735c00' : '#1d1a14', fontWeight: strong ? 700 : 400, fontFamily: 'Arial, Helvetica, sans-serif' }}>{value}</span>
     </div>
   );
 }

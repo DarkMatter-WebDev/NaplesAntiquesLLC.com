@@ -69,6 +69,7 @@ export default function PayPalCheckoutButton({
   isEs,
   getPayload,
   onOrderId,
+  onApproved,
   onSuccess,
 }: {
   clientId: string;
@@ -77,6 +78,9 @@ export default function PayPalCheckoutButton({
   isEs: boolean;
   getPayload: () => PayPalPayload;
   onOrderId: (orderId: string) => void;
+  /** When provided, called with the PayPal order ID after buyer approves in PayPal,
+   *  instead of auto-capturing. The parent is responsible for calling capture. */
+  onApproved?: (paypalOrderId: string) => void;
   onSuccess: (result: { orderId: string; orderNumber: string }) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -89,12 +93,14 @@ export default function PayPalCheckoutButton({
   // (initialized once) always reads current cart + contact state.
   const getPayloadRef = useRef(getPayload);
   const onOrderIdRef = useRef(onOrderId);
+  const onApprovedRef = useRef(onApproved);
   const onSuccessRef = useRef(onSuccess);
   const isEsRef = useRef(isEs);
   const readyRef = useRef(ready);
   useEffect(() => {
     getPayloadRef.current = getPayload;
     onOrderIdRef.current = onOrderId;
+    onApprovedRef.current = onApproved;
     onSuccessRef.current = onSuccess;
     isEsRef.current = isEs;
     readyRef.current = ready;
@@ -155,6 +161,14 @@ export default function PayPalCheckoutButton({
         }
       },
       onApprove: async (data) => {
+        // If the parent wants to show a review step before capturing, hand off
+        // the approved PayPal order ID and let the parent trigger capture.
+        if (onApprovedRef.current) {
+          setProcessing(false);
+          onApprovedRef.current(data.orderID);
+          return;
+        }
+        // Default: capture immediately.
         try {
           const res = await fetch('/api/paypal/capture-order', {
             method: 'POST',

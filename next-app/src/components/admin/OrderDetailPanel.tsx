@@ -52,6 +52,12 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
   const [internalNotes, setInternalNotes] = useState(order.internal_notes ?? '');
   const [saving, setSaving] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showPartialRefund, setShowPartialRefund] = useState(false);
+  const [partialRefundAmount, setPartialRefundAmount] = useState(
+    order.refund_amount != null ? String(order.refund_amount) : '',
+  );
   const [showEmailInvoice, setShowEmailInvoice] = useState(false);
   const [emailRecipient, setEmailRecipient] = useState(order.customer_email ?? '');
   const [emailSending, setEmailSending] = useState(false);
@@ -123,6 +129,24 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
     }
   }
 
+  async function markPartiallyRefunded() {
+    const amount = parseFloat(partialRefundAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setMessage({ text: 'Enter a valid refund amount greater than zero.', ok: false });
+      return;
+    }
+    if (amount > order.total) {
+      setMessage({ text: `Refund amount cannot exceed the order total (${formatCurrency(order.total)}).`, ok: false });
+      return;
+    }
+    const ok = await updateOrder({ payment_status: 'partially_refunded', refund_amount: amount }, 'partial-refund');
+    if (ok) {
+      setPartialRefundAmount(String(amount));
+      setShowPartialRefund(false);
+      setMessage({ text: `Order marked partially refunded — ${formatCurrency(amount)} refunded.`, ok: true });
+    }
+  }
+
   async function updateFulfillment(status: FulfillmentStatus) {
     const ok = await updateOrder({ fulfillment_status: status }, status);
     if (ok) setMessage({ text: `Fulfillment marked ${orderStatusLabel(status)}.`, ok: true });
@@ -157,6 +181,18 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
         setMessage({ text: 'Order reopened. Paid products were left sold for review.', ok: true });
       }
     }
+  }
+
+  async function deleteOrder() {
+    setSaving('delete');
+    setMessage(null);
+    const { error } = await supabase.from('orders').delete().eq('id', order.id);
+    if (error) {
+      setMessage({ text: error.message, ok: false });
+      setSaving(null);
+      return;
+    }
+    router.push(`${adminBasePath}/orders`);
   }
 
   async function saveNotes() {
@@ -201,6 +237,10 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
   }
 
   async function generateInvoice() {
+    if (invoices.length > 0) {
+      setMessage({ text: 'An invoice already exists for this order. Delete it first if you need to regenerate.', ok: false });
+      return;
+    }
     setSaving('invoice');
     setMessage(null);
     const invoiceNumber = `INV-${order.order_number.replace(/^NEJ-/, '')}`;
@@ -291,15 +331,121 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
               Created {formatOrderDate(order.created_at)}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => setShowEmailInvoice(true)} className="outline-button text-sm">Email Invoice</button>
-            <button type="button" onClick={markPaid} disabled={saving === 'paid'} className="gold-button text-sm disabled:opacity-50">Mark Paid</button>
-            <button type="button" onClick={markUnpaid} disabled={saving === 'unpaid'} className="outline-button text-sm disabled:opacity-50">Mark Unpaid</button>
-            <button type="button" onClick={markRefunded} disabled={saving === 'refunded'} className="outline-button text-sm disabled:opacity-50">Mark Refunded</button>
-            {order.order_status === 'cancelled' || order.fulfillment_status === 'cancelled' ? (
-              <button type="button" onClick={reopenOrder} disabled={saving === 'reopen'} className="outline-button text-sm disabled:opacity-50">Reopen Order</button>
-            ) : (
-              <button type="button" onClick={cancelOrder} disabled={saving === 'cancelled'} className="outline-button text-sm disabled:opacity-50">Cancel Order</button>
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setShowEmailInvoice(true)} className="outline-button text-sm">Email Invoice</button>
+              <button type="button" onClick={markPaid} disabled={saving === 'paid' || order.payment_status === 'paid'} className="gold-button text-sm disabled:opacity-50">Mark Paid</button>
+              <button type="button" onClick={markUnpaid} disabled={saving === 'unpaid' || order.payment_status === 'unpaid'} className="outline-button text-sm disabled:opacity-50">Mark Unpaid</button>
+              <button type="button" onClick={markRefunded} disabled={saving === 'refunded' || order.payment_status === 'refunded'} className="outline-button text-sm disabled:opacity-50">Mark Refunded</button>
+              <button
+                type="button"
+                onClick={() => { setShowPartialRefund((v) => !v); setMessage(null); }}
+                disabled={saving === 'partial-refund'}
+                className="outline-button text-sm disabled:opacity-50"
+              >
+                Mark Partially Refunded
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowCancelConfirm(true); setShowDeleteConfirm(false); setMessage(null); }}
+                disabled={saving === 'cancelled' || order.order_status === 'cancelled' || order.fulfillment_status === 'cancelled'}
+                className="outline-button text-sm disabled:opacity-50"
+              >
+                Cancel Order
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowDeleteConfirm(true); setShowCancelConfirm(false); setMessage(null); }}
+                disabled={saving === 'delete'}
+                className="outline-button text-sm disabled:opacity-50"
+                style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}
+              >
+                Delete Order
+              </button>
+            </div>
+            {showCancelConfirm && (
+              <div className="flex flex-wrap items-center gap-3 border px-4 py-3" style={{ borderColor: 'var(--color-error)', background: 'white' }}>
+                <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>
+                  Cancel this order? This cannot be undone.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => { setShowCancelConfirm(false); cancelOrder(); }}
+                  disabled={saving === 'cancelled'}
+                  className="outline-button text-sm disabled:opacity-50"
+                  style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}
+                >
+                  {saving === 'cancelled' ? 'Cancelling…' : 'Yes, Cancel Order'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCancelConfirm(false)}
+                  className="outline-button text-sm"
+                >
+                  Keep Order
+                </button>
+              </div>
+            )}
+            {showDeleteConfirm && (
+              <div className="flex flex-wrap items-center gap-3 border px-4 py-3" style={{ borderColor: 'var(--color-error)', background: 'white' }}>
+                <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>
+                  Permanently delete this order? It will be removed from the database and cannot be recovered.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => { setShowDeleteConfirm(false); deleteOrder(); }}
+                  disabled={saving === 'delete'}
+                  className="outline-button text-sm disabled:opacity-50"
+                  style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}
+                >
+                  {saving === 'delete' ? 'Deleting…' : 'Yes, Delete Order'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="outline-button text-sm"
+                >
+                  Keep Order
+                </button>
+              </div>
+            )}
+            {showPartialRefund && (
+              <div className="flex flex-wrap items-center gap-3 border px-4 py-3" style={{ borderColor: BORDER, background: 'white' }}>
+                <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  Refund amount
+                  <input
+                    // eslint-disable-next-line jsx-a11y/no-autofocus
+                    autoFocus
+                    type="number"
+                    className="form-field text-sm"
+                    style={{ width: '7rem' }}
+                    min="0.01"
+                    max={order.total}
+                    step="0.01"
+                    value={partialRefundAmount}
+                    onChange={(e) => setPartialRefundAmount(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </label>
+                <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  max {formatCurrency(order.total)}
+                </span>
+                <button
+                  type="button"
+                  onClick={markPartiallyRefunded}
+                  disabled={saving === 'partial-refund'}
+                  className="gold-button text-sm disabled:opacity-50"
+                >
+                  {saving === 'partial-refund' ? 'Saving…' : 'Confirm'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPartialRefund(false)}
+                  className="outline-button text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -427,7 +573,7 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
             <section className="border p-5" style={{ borderColor: BORDER, background: 'white' }}>
               <div className="flex items-center justify-between gap-4 mb-4">
                 <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>Invoices</h2>
-                <button type="button" onClick={generateInvoice} disabled={saving === 'invoice'} className="outline-button text-sm disabled:opacity-50">
+                <button type="button" onClick={generateInvoice} disabled={saving === 'invoice' || invoices.length > 0} className="outline-button text-sm disabled:opacity-50">
                   Generate Invoice
                 </button>
               </div>
@@ -435,8 +581,16 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
                 <div className="flex flex-col gap-2">
                   {invoices.map((invoice) => (
                     <div key={invoice.id} className="flex items-center justify-between border px-3 py-2 text-sm" style={{ borderColor: BORDER }}>
-                      <span className="font-semibold" style={{ color: 'var(--color-on-surface)' }}>{invoice.invoice_number}</span>
-                      <span style={{ color: 'var(--color-on-surface-variant)' }}>{orderStatusLabel(invoice.status)} - {formatCurrency(invoice.total)}</span>
+                      <Link
+                        href={`${adminBasePath}/orders/${order.id}/invoice`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold underline underline-offset-2"
+                        style={{ color: 'var(--color-on-surface)' }}
+                      >
+                        {invoice.invoice_number}
+                      </Link>
+                      <span style={{ color: 'var(--color-on-surface-variant)' }}>{orderStatusLabel(invoice.status)} — {formatCurrency(invoice.total)}</span>
                     </div>
                   ))}
                 </div>
@@ -467,6 +621,11 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
               <div className="border-t mt-3 pt-3" style={{ borderColor: BORDER }}>
                 <MoneyRow label="Total" value={order.total} strong />
               </div>
+              {order.refund_amount != null && order.refund_amount > 0 && (
+                <div className="border-t mt-3 pt-3" style={{ borderColor: BORDER }}>
+                  <MoneyRow label="Refunded" value={-order.refund_amount} />
+                </div>
+              )}
             </div>
             <div className="border-t mt-4 pt-4 text-sm" style={{ borderColor: BORDER, color: 'var(--color-on-surface-variant)' }}>
               <div>Payment method: {order.payment_method || '-'}</div>
