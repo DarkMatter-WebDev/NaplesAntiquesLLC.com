@@ -10,6 +10,29 @@
 > **Alternatives considered:** ...
 > ```
 
+## 2026-06-30 — Netlify secrets scan: omit PAYPAL_CLIENT_ID (public by design)
+
+**Decision:** Add `PAYPAL_CLIENT_ID` to `SECRETS_SCAN_OMIT_KEYS` in root
+`netlify.toml` (alongside the `NEXT_PUBLIC_*` keys). The PayPal **client id** is a
+public identifier — it ships to the browser inside the PayPal JS SDK URL, so it
+necessarily appears in the built `checkout.html`/`.rsc` output. Netlify's secrets
+scanner flagged it and failed the deploy; omitting the key tells the scanner it is
+intentionally public. `PAYPAL_CLIENT_SECRET` is **not** omitted and was not found
+in build output (it stays server-side); it must never be added to this list.
+
+**Reason:** The deploy failed with "Secret env var PAYPAL_CLIENT_ID's value
+detected" across the checkout HTML/RSC. The client id is public per PayPal's design
+(it's how the browser SDK is initialized), so the correct fix is to whitelist that
+one key in the scanner, not to remove it from the build. This mirrors how the
+project already handles the public Supabase URL/anon key and site URL.
+
+**Alternatives considered:** (1) `SECRETS_SCAN_OMIT_PATHS` to exclude the checkout
+build files — rejected: broader than needed and would suppress scanning of other
+secrets in those files. (2) `SECRETS_SCAN_ENABLED=false` — rejected: disables the
+safety net entirely. (3) Rename it `NEXT_PUBLIC_PAYPAL_CLIENT_ID` — rejected: the
+project deliberately delivers the id via a server prop (see the 2026-06-29 PayPal
+decision); the omit-key is the targeted fix without changing that contract.
+
 ## 2026-06-30 — Paid orders notify on the Orders tab, not the Messages center
 
 **Decision:** A paid PayPal order no longer writes an `admin_notifications` row.
