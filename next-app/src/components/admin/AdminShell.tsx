@@ -1,5 +1,6 @@
 'use client';
 
+import { adminUpdateProductStatus, adminRevalidateProduct } from '@/app/actions/admin-products';
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -2113,13 +2114,13 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   }
 
   async function updateProductStatus(product: Product, status: ProductStatus) {
-    const { error } = await supabase.from('products').update({ status }).eq('id', product.id);
-    if (!error) {
+    const result = await adminUpdateProductStatus(product.id, status);
+    if (!result.error) {
       setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, status } : p));
       flash(`${product.title} marked ${getStatusLabel(status)}`);
       return;
     }
-    flash(error.message, false);
+    flash(result.error, false);
   }
 
   async function updateProductImagePadding(product: Product, imagePadding: ProductImagePadding | string, imageIndex = imagePaddingTargetIndex) {
@@ -2336,6 +2337,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setFormErrors([]);
 
     let nextProducts = products;
+    let savedId: string | undefined;
 
     if (isNew) {
       let { data, error } = await supabase.from('products').insert(payload).select().single();
@@ -2346,6 +2348,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       }
       if (error) { flash(error.message, false); setSaving(false); return; }
       const savedProduct = (data ?? payload) as unknown as Product;
+      savedId = savedProduct.id;
       nextProducts = [savedProduct, ...products];
       setProducts(nextProducts);
     } else {
@@ -2364,6 +2367,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         error = retry.error;
       }
       if (error) { flash(error.message, false); setSaving(false); return; }
+      savedId = originalProductId;
       nextProducts = products.map((p) => p.id === originalProductId ? (payload as unknown as Product) : p);
       setProducts(nextProducts);
     }
@@ -2385,6 +2389,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
     flash(isNew ? 'Product added' : 'Product saved');
     setSaving(false);
+    if (savedId) void adminRevalidateProduct(savedId);
 
     if (afterSave === 'close') {
       closeModal();

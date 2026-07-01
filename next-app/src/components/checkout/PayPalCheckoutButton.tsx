@@ -193,8 +193,8 @@ export default function PayPalCheckoutButton({
         setProcessing(false);
         setMessage(
           isEsRef.current
-            ? 'Pago cancelado. Sus artículos siguen reservados por poco tiempo.'
-            : 'Payment canceled. Your items are still reserved for a short time.',
+            ? 'Pago cancelado. Puede intentarlo de nuevo cuando esté listo.'
+            : 'Payment canceled. You can try again whenever you are ready.',
         );
       },
       onError: () => {
@@ -249,7 +249,9 @@ export default function PayPalCheckoutButton({
       )}
       {processing && (
         <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-          {isEs ? 'Procesando su pago…' : 'Processing your payment…'}
+          {isEs
+            ? 'Procesando su pago… Para cancelar, cierre la ventana de PayPal con la × en la esquina.'
+            : 'Processing your payment… To cancel, close the PayPal window using the × in the corner.'}
         </p>
       )}
       {message && (

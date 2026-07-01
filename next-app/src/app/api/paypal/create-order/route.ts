@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { revalidateTag } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { buildAddressObject, generateOrderNumber } from '@/lib/sales';
@@ -9,7 +8,6 @@ import { createPayPalOrder, paypalConfigured, type PayPalLineItem } from '@/lib/
 export const runtime = 'nodejs';
 
 const CURRENCY = 'USD';
-const RESERVE_MINUTES = 30;
 
 function lineItems(items: { title_snapshot: string; price_snapshot: number; inventory_number: string }[]): PayPalLineItem[] {
   return items.map((item) => ({
@@ -64,34 +62,6 @@ export async function POST(req: Request) {
       inventory_number: item.inventory_number ?? '',
     }));
 
-    // Re-assert the hold on this order's products (same buyer/order only).
-    const reuseProductIds = (orderItems ?? [])
-      .map((item) => item.product_id)
-      .filter((id): id is string => Boolean(id));
-    const holdUntil = new Date(Date.now() + RESERVE_MINUTES * 60_000).toISOString();
-    if (reuseProductIds.length > 0) {
-      const { data: products } = await service
-        .from('products')
-        .select('id, status, reserved_order_id, title')
-        .in('id', reuseProductIds);
-      const blocked = (products ?? []).filter((p) => {
-        const normalized = String(p.status ?? '').toLowerCase().replace(/\s+/g, '_');
-        const heldByThisOrder = p.reserved_order_id === reuseOrderId;
-        return normalized !== 'available' && !heldByThisOrder;
-      });
-      if (blocked.length > 0) {
-        return NextResponse.json(
-          { error: `Unavailable item: ${blocked.map((p) => p.title).join(', ')}` },
-          { status: 409 },
-        );
-      }
-      await service
-        .from('products')
-        .update({ status: 'reserved', reserved_until: holdUntil, reserved_order_id: reuseOrderId })
-        .in('id', reuseProductIds);
-      await service.from('orders').update({ reserved_until: holdUntil }).eq('id', reuseOrderId);
-    }
-
     try {
       const paypalOrder = await createPayPalOrder({
         currency: CURRENCY,
@@ -103,7 +73,6 @@ export async function POST(req: Request) {
         referenceId: order.id,
       });
       await service.from('orders').update({ paypal_order_id: paypalOrder.id }).eq('id', order.id);
-      revalidateTag('shop-catalog', 'max'); // reserved items drop out of the shop gallery now
       return NextResponse.json({ paypalOrderId: paypalOrder.id, orderId: order.id });
     } catch (err) {
       console.error('PayPal create-order (reuse) error:', err);
@@ -148,7 +117,7 @@ export async function POST(req: Request) {
       country: customer.country,
     }),
     billing_address: null,
-    internal_notes: 'PayPal checkout — awaiting payment capture.',
+    internal_notes: null,
     customer_notes: customer.notes ? String(customer.notes).trim() : null,
   };
 
@@ -157,16 +126,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Cart item is missing a product reference. Please refresh and try again.' }, { status: 500 });
   }
 
-  // Atomic reserve + order creation (row-locks the products against concurrent buyers).
-  const { data: rpcData, error: rpcError } = await supabase.rpc('reserve_paypal_order', {
+  // Create order + order_items without reserving products. Items remain 'available'
+  // so concurrent buyers can proceed; the capture RPC resolves any race atomically.
+  const { data: rpcData, error: rpcError } = await service.rpc('create_paypal_order', {
     order_payload: orderPayload,
     items_payload: draft.items,
-    reserve_minutes: RESERVE_MINUTES,
   });
 
   if (rpcError) {
-    // The reserve RPC raises a clear message when an item is no longer available.
-    const message = rpcError.message ?? 'Could not reserve items.';
+    const message = rpcError.message ?? 'Could not create order.';
     const status = /no longer available|not available/i.test(message) ? 409 : 500;
     return NextResponse.json({ error: message }, { status });
   }
@@ -190,20 +158,14 @@ export async function POST(req: Request) {
 
     await service.from('orders').update({ paypal_order_id: paypalOrder.id }).eq('id', orderId);
 
-    revalidateTag('shop-catalog', 'max'); // reserved items drop out of the shop gallery now
     return NextResponse.json({ paypalOrderId: paypalOrder.id, orderId });
   } catch (err) {
     console.error('PayPal create-order error:', err);
-    // Release the hold we just took so the items return to the shop immediately.
-    await service
-      .from('products')
-      .update({ status: 'available', reserved_until: null, reserved_order_id: null })
-      .eq('reserved_order_id', orderId);
+    // Cancel the order record so it does not appear as an open, orderless entry.
     await service
       .from('orders')
-      .update({ order_status: 'cancelled', reserved_until: null })
+      .update({ order_status: 'cancelled' })
       .eq('id', orderId);
-    revalidateTag('shop-catalog', 'max'); // released items return to the gallery
     return NextResponse.json({ error: 'Could not start PayPal checkout.' }, { status: 502 });
   }
 }

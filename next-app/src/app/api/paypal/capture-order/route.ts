@@ -88,7 +88,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Payment amount did not match the order. Our team will follow up.' }, { status: 409 });
   }
 
-  // All good — mark paid, sell the items, notify admin (atomic + idempotent).
+  // Mark paid and sell the items (atomic + idempotent). The RPC also locks product
+  // rows so concurrent captures for the same item serialize here — the second caller
+  // sees item_conflict=true if the first already sold the item.
   const { data: rpcData, error: rpcError } = await service.rpc('capture_paypal_order', {
     p_order_id: order.id,
     p_capture_id: capture.captureId,
@@ -100,9 +102,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Payment captured but order update failed. Our team will follow up.' }, { status: 500 });
   }
 
+  const result = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+
+  if (result?.item_conflict) {
+    // Another buyer completed payment first. The order is flagged in the DB for
+    // manual refund — surface a clear message to this buyer.
+    return NextResponse.json(
+      { error: 'Sorry, one or more items in your order were just purchased by another buyer. Our team will contact you to process a full refund.' },
+      { status: 409 },
+    );
+  }
+
   revalidateTag('shop-catalog', 'max'); // purchased items are now 'sold' in the gallery
 
-  const result = Array.isArray(rpcData) ? rpcData[0] : rpcData;
   return NextResponse.json({
     success: true,
     orderId: order.id,
