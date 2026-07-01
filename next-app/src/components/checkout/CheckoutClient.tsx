@@ -224,6 +224,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
         throw new Error(result?.error ?? (isEs ? 'No se pudo confirmar el pago.' : 'Payment could not be confirmed.'));
       }
       clear();
+      setPendingPaypalOrderId(null);
       setCreatedOrder({ orderNumber: result.orderNumber, total: 0 });
     } catch (err) {
       setCaptureError(

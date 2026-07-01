@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -14,6 +14,12 @@ export default function SignInPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nextUrl, setNextUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get('next');
+    if (p && p.startsWith('/') && !p.startsWith('//')) setNextUrl(p);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,7 +35,7 @@ export default function SignInPage() {
       return;
     }
 
-    router.push('/account');
+    router.push(nextUrl ?? `${prefix}/account`);
     router.refresh();
   }
 

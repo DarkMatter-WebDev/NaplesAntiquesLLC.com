@@ -22,14 +22,14 @@ declare
   inserted_order_id uuid;
   inserted_order_number text;
   item jsonb;
-  product_ids uuid[];
+  product_ids text[];
   unavailable_titles text;
 begin
   if jsonb_typeof(items_payload) <> 'array' or jsonb_array_length(items_payload) = 0 then
     raise exception 'Order must include at least one item.';
   end if;
 
-  select array_agg((value->>'product_id')::uuid)
+  select array_agg(value->>'product_id')
   into product_ids
   from jsonb_array_elements(items_payload)
   where value->>'product_id' is not null;
