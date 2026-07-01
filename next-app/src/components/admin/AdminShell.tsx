@@ -2258,7 +2258,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     const needTitleEs = !!editing.title?.trim() && !editing.title_es?.trim();
     const needDescriptionEs = !!editing.description?.trim() && !editing.description_es?.trim();
     const needNotesEs = !!editing.public_notes?.trim() && !editing.public_notes_es?.trim();
-    if (needTitleEs || needDescriptionEs || needNotesEs) {
+    if (isNew && (needTitleEs || needDescriptionEs || needNotesEs)) {
       try {
         const res = await fetch('/api/admin/translate', {
           method: 'POST',

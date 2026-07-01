@@ -134,6 +134,7 @@ export async function POST(req: Request) {
   });
 
   if (rpcError) {
+    console.error('create_paypal_order RPC error:', rpcError);
     const message = rpcError.message ?? 'Could not create order.';
     const status = /no longer available|not available/i.test(message) ? 409 : 500;
     return NextResponse.json({ error: message }, { status });
