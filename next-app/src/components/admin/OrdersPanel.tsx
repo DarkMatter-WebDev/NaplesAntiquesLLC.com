@@ -686,7 +686,7 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
                 </h3>
                 <SummaryRow label="Subtotal" value={formatCurrency(subtotal)} />
                 {lineDiscount > 0 && <SummaryRow label="Line Discounts" value={`-${formatCurrency(lineDiscount)}`} />}
-                <SummaryRow label="Total Discount" value={`-${formatCurrency(discount)}`} />
+                {discount > 0 && <SummaryRow label="Total Discount" value={`-${formatCurrency(discount)}`} />}
                 <SummaryRow label="Tax" value={formatCurrency(tax)} />
                 <SummaryRow label="Shipping" value={formatCurrency(shippingFee)} />
                 <div className="border-t mt-3 pt-3" style={{ borderColor: BORDER }}>

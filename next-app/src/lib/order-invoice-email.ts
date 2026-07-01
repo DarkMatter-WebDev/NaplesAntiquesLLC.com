@@ -21,7 +21,7 @@ export interface InvoiceEmailContent {
   }[];
   totals: {
     subtotal: string;
-    discount: string;
+    discount: string | null;
     tax: string;
     shipping: string;
     total: string;
@@ -86,7 +86,7 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
   });
   const totals = {
     subtotal: formatCurrency(order.subtotal),
-    discount: `-${formatCurrency(order.discount)}`,
+    discount: order.discount > 0 ? `-${formatCurrency(order.discount)}` : null,
     tax: formatCurrency(order.tax),
     shipping: formatCurrency(order.shipping_fee),
     total: formatCurrency(order.total),
@@ -128,7 +128,7 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
       ...(items.length > 0 ? items.map((item) => `- ${item.title} (${item.inventory}) - ${item.discount ? `${item.originalPrice}, line discount ${item.discount}, total ${item.price}` : item.price}`) : ['- No item details were attached.']),
       '',
       `Subtotal: ${totals.subtotal}`,
-      `Discount: ${totals.discount}`,
+      ...(totals.discount ? [`Discount: ${totals.discount}`] : []),
       `Tax: ${totals.tax}`,
       `Shipping: ${totals.shipping}`,
       `Total: ${totals.total}`,
@@ -208,7 +208,7 @@ function buildInvoiceEmailHtml({
 
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 22px;">
                     ${totalRow('Subtotal', totals.subtotal)}
-                    ${totalRow('Discount', totals.discount)}
+                    ${totals.discount ? totalRow('Discount', totals.discount) : ''}
                     ${totalRow('Tax', totals.tax)}
                     ${totalRow('Shipping', totals.shipping)}
                     ${totalRow('Total', totals.total, true)}

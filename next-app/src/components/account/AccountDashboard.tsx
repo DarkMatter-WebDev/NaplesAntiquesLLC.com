@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { FormEvent, ReactNode } from 'react';
 import AccountProfileForm, { type CustomerProfile } from '@/components/account/AccountProfileForm';
 import SignOutButton from '@/components/account/SignOutButton';
@@ -33,11 +34,12 @@ export default function AccountDashboard({
   orders,
 }: Props) {
   const isEs = locale === 'es';
-  const [activeTab, setActiveTab] = useState<AccountTab>(() => {
-    if (typeof window === 'undefined') return 'overview';
+  const [activeTab, setActiveTab] = useState<AccountTab>('overview');
+
+  useEffect(() => {
     const tab = new URLSearchParams(window.location.search).get('tab');
-    return tab === 'orders' || tab === 'wishlist' ? tab : 'overview';
-  });
+    if (tab === 'orders' || tab === 'wishlist') setActiveTab(tab);
+  }, []);
 
   function selectTab(tab: AccountTab) {
     setActiveTab(tab);
@@ -343,6 +345,7 @@ function OrderDetailsDialog({
   const supabase = createClient();
   const [invoices, setInvoices] = useState<DialogInvoice[]>([]);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -358,7 +361,11 @@ function OrderDetailsDialog({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.id]);
 
-  return (
+  useEffect(() => { setMounted(true); }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(
     <>
     <div className="account-order-dialog-backdrop" role="dialog" aria-modal="true" aria-label={isEs ? 'Detalles del pedido' : 'Order details'}>
       <div className="account-order-dialog">
@@ -576,7 +583,7 @@ function OrderDetailsDialog({
         <div
           className="order-print-paper"
           style={{
-            width: 'min(680px, calc(100% - 2rem))',
+            width: 'min(816px, calc(100% - 2rem))',
             margin: '1.5rem auto 3rem',
             background: '#ffffff',
             padding: '3rem 2.5rem',
@@ -621,6 +628,16 @@ function OrderDetailsDialog({
               {order.customer_name && <p style={{ fontSize: '0.88rem', fontWeight: 600 }}>{order.customer_name}</p>}
               {order.customer_email && <p style={{ fontSize: '0.8rem', color: '#746b5b', marginTop: '0.15rem' }}>{order.customer_email}</p>}
               {order.customer_phone && <p style={{ fontSize: '0.8rem', color: '#746b5b', marginTop: '0.15rem' }}>{order.customer_phone}</p>}
+            </div>
+          )}
+
+          {/* Delivery method */}
+          {order.shipping_method && (
+            <div style={{ marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: '1px solid #eadfbd' }}>
+              <p style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#735c00', marginBottom: '0.35rem' }}>
+                {isEs ? 'Método de entrega' : 'Delivery Method'}
+              </p>
+              <p style={{ fontSize: '0.88rem' }}>{orderStatusLabel(order.shipping_method)}</p>
             </div>
           )}
 
@@ -680,8 +697,7 @@ function OrderDetailsDialog({
         </div>
       </div>
     )}
-    </>
-  );
+    </>, document.body);
 }
 
 function PrintTotalLine({ label, value, strong }: { label: string; value: string; strong?: boolean }) {

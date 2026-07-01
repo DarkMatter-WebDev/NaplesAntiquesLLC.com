@@ -85,6 +85,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Name, email, and phone are required' }, { status: 400 });
   }
 
+  const needsShipping = shippingMethod !== 'local-pickup';
+  if (needsShipping && (
+    !String(customer.address_line1 ?? '').trim() ||
+    !String(customer.city ?? '').trim() ||
+    !String(customer.state ?? '').trim() ||
+    !String(customer.postal_code ?? '').trim()
+  )) {
+    return NextResponse.json(
+      { error: 'A complete shipping address (street, city, state, and ZIP) is required for the selected delivery method.' },
+      { status: 400 },
+    );
+  }
+
   const draft = await buildOrderDraft(supabase, productIds, shippingMethod);
   if (isOrderDraftError(draft)) {
     return NextResponse.json({ error: draft.error }, { status: draft.status });

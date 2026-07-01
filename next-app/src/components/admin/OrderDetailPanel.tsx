@@ -236,43 +236,6 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
     }
   }
 
-  async function generateInvoice() {
-    if (invoices.length > 0) {
-      setMessage({ text: 'An invoice already exists for this order. Delete it first if you need to regenerate.', ok: false });
-      return;
-    }
-    setSaving('invoice');
-    setMessage(null);
-    const invoiceNumber = `INV-${order.order_number.replace(/^NEJ-/, '')}`;
-    const { data, error } = await supabase
-      .from('invoices')
-      .insert({
-        invoice_number: invoiceNumber,
-        order_id: order.id,
-        user_id: order.user_id,
-        customer_name: order.customer_name,
-        customer_email: order.customer_email,
-        subtotal: order.subtotal,
-        tax: order.tax,
-        shipping_fee: order.shipping_fee,
-        discount: order.discount,
-        total: order.total,
-        status: order.payment_status === 'paid' ? 'paid' : 'draft',
-      })
-      .select()
-      .single();
-
-    if (error) {
-      setMessage({ text: error.message, ok: false });
-      setSaving(null);
-      return;
-    }
-
-    setInvoices((current) => [data as Invoice, ...current]);
-    setMessage({ text: 'Invoice record generated. Printable invoice comes in the next invoice chunk.', ok: true });
-    setSaving(null);
-    router.refresh();
-  }
 
   async function sendInvoiceEmail() {
     setEmailMessage(null);
@@ -573,9 +536,6 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
             <section className="border p-5" style={{ borderColor: BORDER, background: 'white' }}>
               <div className="flex items-center justify-between gap-4 mb-4">
                 <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>Invoices</h2>
-                <button type="button" onClick={generateInvoice} disabled={saving === 'invoice' || invoices.length > 0} className="outline-button text-sm disabled:opacity-50">
-                  Generate Invoice
-                </button>
               </div>
               {invoices.length > 0 ? (
                 <div className="flex flex-col gap-2">
@@ -615,7 +575,7 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
             <StatusRow label="Order" value={order.order_status} />
             <div className="border-t mt-4 pt-4" style={{ borderColor: BORDER }}>
               <MoneyRow label="Subtotal" value={order.subtotal} />
-              <MoneyRow label="Discount" value={-order.discount} />
+              {order.discount > 0 && <MoneyRow label="Discount" value={-order.discount} />}
               <MoneyRow label="Tax" value={order.tax} />
               <MoneyRow label="Shipping" value={order.shipping_fee} />
               <div className="border-t mt-3 pt-3" style={{ borderColor: BORDER }}>
@@ -735,7 +695,7 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
                   </div>
                   <div className="mt-5 border px-4 py-3" style={{ borderColor: BORDER, background: 'var(--color-surface-container-low)' }}>
                     <EmailTotalRow label="Subtotal" value={emailContent.totals.subtotal} />
-                    <EmailTotalRow label="Discount" value={emailContent.totals.discount} />
+                    {emailContent.totals.discount && <EmailTotalRow label="Discount" value={emailContent.totals.discount} />}
                     <EmailTotalRow label="Tax" value={emailContent.totals.tax} />
                     <EmailTotalRow label="Shipping" value={emailContent.totals.shipping} />
                     <div className="mt-2 border-t pt-2" style={{ borderColor: BORDER }}>

@@ -438,10 +438,10 @@ export default async function AccountPage({ params }: Props) {
         }
         .account-order-dialog {
           position: relative;
-          width: min(54rem, 100%);
-          max-height: min(42rem, calc(100vh - 2.5rem));
+          width: min(72rem, calc(100vw - 4rem));
+          max-height: min(96vh, calc(100vh - 1rem));
           overflow: auto;
-          padding: 4.25rem 2rem 2rem;
+          padding: 4.25rem 2.5rem 2.5rem;
           border: 1px solid rgba(115, 92, 0, 0.16);
           border-radius: var(--radius-xl);
           background: rgba(255, 255, 255, 0.98);

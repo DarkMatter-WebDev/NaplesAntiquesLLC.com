@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   // Find the internal order this PayPal order belongs to.
   const { data: order, error: orderError } = await service
     .from('orders')
-    .select('id, order_number, total, payment_status, paypal_capture_id')
+    .select('id, order_number, total, payment_status, paypal_capture_id, user_id, customer_name, customer_email, subtotal, tax, shipping_fee, discount')
     .eq('paypal_order_id', paypalOrderId)
     .maybeSingle();
 
@@ -114,6 +114,26 @@ export async function POST(req: Request) {
   }
 
   revalidateTag('shop-catalog', 'max'); // purchased items are now 'sold' in the gallery
+
+  // Auto-generate invoice on payment completion. ON CONFLICT DO NOTHING so a
+  // double-capture or admin retry never creates a duplicate.
+  const invoiceNumber = `INV-${((result?.order_number as string | undefined) ?? order.order_number).replace(/^NEJ-/, '')}`;
+  await service.from('invoices').upsert(
+    {
+      invoice_number: invoiceNumber,
+      order_id: order.id,
+      user_id: order.user_id ?? null,
+      customer_name: order.customer_name,
+      customer_email: order.customer_email,
+      subtotal: order.subtotal,
+      tax: order.tax,
+      shipping_fee: order.shipping_fee,
+      discount: order.discount,
+      total: order.total,
+      status: 'paid',
+    },
+    { onConflict: 'invoice_number', ignoreDuplicates: true },
+  );
 
   return NextResponse.json({
     success: true,
