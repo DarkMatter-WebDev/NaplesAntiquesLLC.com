@@ -59,6 +59,9 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
   // Set after PayPal approves — holds the PayPal order ID while we show the
   // review screen. Cleared when the user confirms or goes back.
   const [pendingPaypalOrderId, setPendingPaypalOrderId] = useState<string | null>(null);
+  // The PayPal account email, if PayPal returned one, shown on the review
+  // screen so the buyer sees confirmation that authorization succeeded.
+  const [payerEmail, setPayerEmail] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
   // Internal order id from the first create-order call, reused if the buyer
@@ -75,6 +78,16 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
       customer.state.trim() !== '' &&
       customer.postal_code.trim() !== '');
   const payReady = items.length > 0 && contactReady && shippingAddressReady;
+
+  const missingFieldLabels = [
+    needsShipping && customer.address_line1.trim() === '' ? (isEs ? 'Dirección' : 'Street Address') : null,
+    needsShipping && customer.city.trim() === '' ? (isEs ? 'Ciudad' : 'City') : null,
+    needsShipping && customer.state.trim() === '' ? (isEs ? 'Estado' : 'State') : null,
+    needsShipping && customer.postal_code.trim() === '' ? (isEs ? 'Código postal' : 'ZIP / Postal Code') : null,
+    customer.name.trim() === '' ? (isEs ? 'Nombre completo' : 'Full Name') : null,
+    customer.phone.trim() === '' ? (isEs ? 'Teléfono' : 'Phone') : null,
+    customer.email.trim() === '' ? (isEs ? 'Correo electrónico' : 'Email') : null,
+  ].filter((label): label is string => Boolean(label));
 
   function buildPayPalPayload() {
     return {
@@ -209,6 +222,16 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     ...productInfoById[item.id],
   }));
 
+  // The PayPal approval round-trip swaps this page's content (full form -> short
+  // confirm screen, then -> success screen) without a real navigation, so the
+  // browser keeps whatever scroll position the buyer had before leaving for
+  // PayPal. Reset to the top whenever either screen takes over.
+  useEffect(() => {
+    if (pendingPaypalOrderId || createdOrder) {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+  }, [pendingPaypalOrderId, createdOrder]);
+
   async function confirmOrder() {
     if (!pendingPaypalOrderId) return;
     setCapturing(true);
@@ -251,6 +274,26 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
                 ? 'Tu pago con PayPal está autorizado. Revisa los detalles y confirma para completar la compra.'
                 : 'Your PayPal payment is authorized. Review your order below and click Confirm to complete your purchase.'}
             </p>
+
+            <div style={{ marginTop: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '1rem 1.25rem', border: '1px solid rgba(216,208,194,0.86)', borderRadius: 'var(--radius-lg)', background: '#ffffff' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
+                <span style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontWeight: 800, fontStyle: 'italic', fontSize: '1.15rem', letterSpacing: '-0.02em', color: '#003087', flexShrink: 0 }}>
+                  Pay<span style={{ color: '#009cde' }}>Pal</span>
+                </span>
+                {payerEmail && (
+                  <span style={{ color: 'var(--color-on-surface)', fontSize: '0.92rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {payerEmail}
+                  </span>
+                )}
+              </div>
+              <span
+                className="material-symbols-outlined"
+                aria-label={isEs ? 'Pago autorizado' : 'Payment authorized'}
+                style={{ color: '#2e7d32', fontSize: '1.5rem', flexShrink: 0 }}
+              >
+                check_circle
+              </span>
+            </div>
           </section>
 
           <OrderSummary
@@ -278,7 +321,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
             </button>
             <button
               type="button"
-              onClick={() => { setPendingPaypalOrderId(null); setCaptureError(null); }}
+              onClick={() => { setPendingPaypalOrderId(null); setPayerEmail(null); setCaptureError(null); }}
               disabled={capturing}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-on-surface-variant)', fontSize: '0.875rem', textDecoration: 'underline', textUnderlineOffset: '3px', padding: '0.25rem 0', textAlign: 'center' }}
             >
@@ -303,9 +346,12 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
         <p className="mb-8 text-sm font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
           {createdOrder.orderNumber}
         </p>
-        <Link href={`${prefix}/shop`} className="gold-button">
+        {/* Plain anchor (not Link) forces a full navigation, so the shop grid is
+            guaranteed to reflect the item(s) just purchased as sold rather than
+            serving a router-cached page from before the purchase completed. */}
+        <a href={`${prefix}/shop`} className="gold-button">
           {isEs ? 'Volver a la tienda' : 'Back to Shop'}
-        </Link>
+        </a>
       </div>
     );
   }
@@ -455,10 +501,12 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
               clientId={paypalClientId}
               ready={payReady}
               isEs={isEs}
+              missingFields={missingFieldLabels}
               getPayload={buildPayPalPayload}
               onOrderId={(id) => { orderIdRef.current = id; }}
-              onApproved={(paypalOrderId) => {
+              onApproved={(paypalOrderId, email) => {
                 setCaptureError(null);
+                setPayerEmail(email ?? null);
                 setPendingPaypalOrderId(paypalOrderId);
               }}
               onSuccess={({ orderNumber }) => {

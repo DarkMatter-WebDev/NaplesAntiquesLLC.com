@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import AdminMessagesLink from './AdminMessagesLink';
 import AdminOrdersLink from './AdminOrdersLink';
 
@@ -81,13 +81,18 @@ export default function AdminHeader({
   rightContent?: ReactNode;
 }) {
   const homeHref = adminBasePath.startsWith('/es') ? '/es' : '/';
-  const [collapsed, setCollapsed] = useState(() => {
+  // Always starts expanded to match SSR (no window/localStorage on the server);
+  // the persisted preference is applied after mount, client-side only, to avoid
+  // a hydration mismatch when the admin previously collapsed the menu.
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
     try {
-      return typeof window !== 'undefined' && localStorage.getItem(STORAGE_KEY) === 'true';
+      if (localStorage.getItem(STORAGE_KEY) === 'true') setCollapsed(true);
     } catch {
-      return false;
+      // ignore
     }
-  });
+  }, []);
 
   const toggle = () => {
     setCollapsed((prev) => {

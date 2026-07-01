@@ -26,7 +26,9 @@ export async function adminUpdateProductStatus(
  * admin write that should be immediately visible in the public-facing shop.
  */
 export async function adminRevalidateProduct(id: string): Promise<void> {
-  revalidateTag('shop-catalog', 'max');
+  // { expire: 0 } forces immediate expiration — 'max' uses stale-while-revalidate,
+  // which would show the old status once more before ever refreshing.
+  revalidateTag('shop-catalog', { expire: 0 });
   // localePrefix is 'as-needed': default locale (en) has no prefix.
   revalidatePath(`/shop/${id}`);
   revalidatePath(`/es/shop/${id}`);

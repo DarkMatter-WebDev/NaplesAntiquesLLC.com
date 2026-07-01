@@ -113,7 +113,10 @@ export async function POST(req: Request) {
     );
   }
 
-  revalidateTag('shop-catalog', 'max'); // purchased items are now 'sold' in the gallery
+  // { expire: 0 } forces immediate expiration — 'max' uses stale-while-revalidate,
+  // which would serve the buyer their own just-sold item as available on the very
+  // next /shop visit (only revalidating in the background for the visit after that).
+  revalidateTag('shop-catalog', { expire: 0 }); // purchased items are now 'sold' in the gallery
 
   // Auto-generate invoice on payment completion. ON CONFLICT DO NOTHING so a
   // double-capture or admin retry never creates a duplicate.

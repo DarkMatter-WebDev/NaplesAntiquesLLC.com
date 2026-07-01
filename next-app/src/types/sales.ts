@@ -85,3 +85,15 @@ export function orderStatusLabel(value: string | null | undefined): string {
   if (!value) return '-';
   return value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
+
+/** Formats a stored purity snapshot for display — appends "K" for karat gold values
+ *  (1-24); leaves other values (e.g. silver fineness like 925) unchanged. */
+export function formatPublicPurity(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  const normalized = String(value).trim();
+  const numeric = Number(normalized);
+  if (Number.isFinite(numeric) && numeric > 0 && numeric <= 24) {
+    return `${numeric}K`;
+  }
+  return normalized;
+}

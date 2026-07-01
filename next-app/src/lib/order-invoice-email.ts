@@ -1,5 +1,5 @@
 import type { Order, OrderItem } from '@/types/sales';
-import { formatCurrency, orderStatusLabel } from '@/types/sales';
+import { formatCurrency, formatPublicPurity, orderStatusLabel } from '@/types/sales';
 import { formatProductItemYear } from '@/types/product';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 
@@ -70,7 +70,7 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
     const details = [
       circa ? `Ca. ${circa}` : null,
       item.metal_snapshot,
-      item.purity_snapshot ? `${item.purity_snapshot} purity` : null,
+      item.purity_snapshot ? `${formatPublicPurity(item.purity_snapshot)} purity` : null,
       item.gram_weight_snapshot ? `${item.gram_weight_snapshot}g` : null,
     ].filter(Boolean).join(' - ');
 

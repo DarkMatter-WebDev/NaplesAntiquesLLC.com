@@ -6,13 +6,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Order, OrderItem, FulfillmentStatus, OrderStatus } from '@/types/sales';
-import { formatCurrency, formatOrderDate, orderStatusLabel } from '@/types/sales';
+import { formatCurrency, formatOrderDate, formatPublicPurity, orderStatusLabel } from '@/types/sales';
 import { formatProductItemYear } from '@/types/product';
 import { buildInvoiceEmailContent, invoiceNumberForOrder, withInvoiceLineDiscounts } from '@/lib/order-invoice-email';
+import { buildFulfillmentUpdateEmailContent } from '@/lib/order-fulfillment-email';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
+const FULFILLMENT_MARK_STATUSES: FulfillmentStatus[] = ['packed', 'shipped', 'picked_up'];
 
 /** Format a stored address jsonb ({line1,line2,city,state,postal_code,country}) into display lines. */
 function formatOrderAddress(address: unknown): string | null {
@@ -62,6 +64,13 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
   const [emailRecipient, setEmailRecipient] = useState(order.customer_email ?? '');
   const [emailSending, setEmailSending] = useState(false);
   const [emailMessage, setEmailMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [pendingFulfillmentStatus, setPendingFulfillmentStatus] = useState<FulfillmentStatus | null>(null);
+  const [notifyCustomerOnFulfillment, setNotifyCustomerOnFulfillment] = useState(true);
+  const [showEmailUpdate, setShowEmailUpdate] = useState(false);
+  const [emailUpdateStatus, setEmailUpdateStatus] = useState<FulfillmentStatus | null>(null);
+  const [emailUpdateRecipient, setEmailUpdateRecipient] = useState(order.customer_email ?? '');
+  const [emailUpdateSending, setEmailUpdateSending] = useState(false);
+  const [emailUpdateMessage, setEmailUpdateMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [itemDiscounts, setItemDiscounts] = useState<Record<string, string>>(() =>
     Object.fromEntries(initialOrder.order_items.map((item) => [item.id, String(item.discount ?? 0)])),
   );
@@ -72,6 +81,7 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
   const numericItemDiscounts = Object.fromEntries(Object.entries(itemDiscounts).map(([id, value]) => [id, Number(value) || 0]));
   const emailOrder = withInvoiceLineDiscounts(order, numericItemDiscounts);
   const emailContent = buildInvoiceEmailContent(emailOrder, invoiceNumber);
+  const emailUpdateContent = emailUpdateStatus ? buildFulfillmentUpdateEmailContent(order, emailUpdateStatus) : null;
   const persistedLineDiscount = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(item.discount ?? 0), item.price_snapshot), 0);
   const editedLineDiscount = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[item.id]) || 0, item.price_snapshot), 0);
   const orderLevelDiscount = Math.max(order.discount - persistedLineDiscount, 0);
@@ -150,6 +160,47 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
   async function updateFulfillment(status: FulfillmentStatus) {
     const ok = await updateOrder({ fulfillment_status: status }, status);
     if (ok) setMessage({ text: `Fulfillment marked ${orderStatusLabel(status)}.`, ok: true });
+    return ok;
+  }
+
+  async function confirmFulfillmentUpdate() {
+    if (!pendingFulfillmentStatus) return;
+    const status = pendingFulfillmentStatus;
+    const shouldNotify = notifyCustomerOnFulfillment;
+    const ok = await updateFulfillment(status);
+    setPendingFulfillmentStatus(null);
+    if (ok && shouldNotify) {
+      setEmailUpdateStatus(status);
+      setEmailUpdateRecipient(order.customer_email ?? '');
+      setEmailUpdateMessage(null);
+      setShowEmailUpdate(true);
+    }
+  }
+
+  async function sendFulfillmentUpdateEmail() {
+    if (!emailUpdateStatus) return;
+    setEmailUpdateMessage(null);
+    const recipient = emailUpdateRecipient.trim();
+    if (!recipient) {
+      setEmailUpdateMessage({ text: 'Enter a recipient email address before sending.', ok: false });
+      return;
+    }
+
+    setEmailUpdateSending(true);
+    const response = await fetch(`/api/admin/orders/${order.id}/email-update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipient, status: emailUpdateStatus }),
+    });
+    const result = await response.json().catch(() => null);
+    setEmailUpdateSending(false);
+
+    if (!response.ok) {
+      setEmailUpdateMessage({ text: result?.error ?? 'Could not send update email.', ok: false });
+      return;
+    }
+
+    setEmailUpdateMessage({ text: `Update email sent to ${recipient}.`, ok: true });
   }
 
   async function cancelOrder() {
@@ -481,7 +532,7 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
                         <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>{formatProductItemYear(item.item_year_snapshot) ?? '-'}</td>
                         <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>{item.inventory_number || '-'}</td>
                         <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>{item.metal_snapshot || '-'}</td>
-                        <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>{item.purity_snapshot || '-'}</td>
+                        <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>{formatPublicPurity(item.purity_snapshot) ?? '-'}</td>
                         <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>{item.gram_weight_snapshot ? `${item.gram_weight_snapshot}g` : '-'}</td>
                         <td className="px-4 py-3 font-semibold" style={{ color: GOLD }}>{formatCurrency(item.price_snapshot)}</td>
                         <td className="px-4 py-3">
@@ -525,12 +576,59 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
             <section className="border p-5" style={{ borderColor: BORDER, background: 'white' }}>
               <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>Fulfillment</h2>
               <div className="flex flex-wrap gap-2">
-                {(['packed', 'shipped', 'picked_up'] as FulfillmentStatus[]).map((status) => (
-                  <button key={status} type="button" onClick={() => updateFulfillment(status)} disabled={saving === status} className="outline-button text-sm disabled:opacity-50">
-                    Mark {orderStatusLabel(status)}
+                {FULFILLMENT_MARK_STATUSES.includes(order.fulfillment_status) ? (
+                  <button
+                    type="button"
+                    onClick={() => updateFulfillment('pending')}
+                    disabled={saving === 'pending'}
+                    className="outline-button text-sm disabled:opacity-50"
+                  >
+                    Unmark {orderStatusLabel(order.fulfillment_status)}
                   </button>
-                ))}
+                ) : (
+                  FULFILLMENT_MARK_STATUSES.map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => { setPendingFulfillmentStatus(status); setNotifyCustomerOnFulfillment(true); setMessage(null); }}
+                      disabled={saving === status}
+                      className="outline-button text-sm disabled:opacity-50"
+                    >
+                      Mark {orderStatusLabel(status)}
+                    </button>
+                  ))
+                )}
               </div>
+              {pendingFulfillmentStatus && (
+                <div className="mt-3 flex flex-wrap items-center gap-3 border px-4 py-3" style={{ borderColor: BORDER, background: 'var(--color-surface-container-low)' }}>
+                  <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>
+                    Mark this order as {orderStatusLabel(pendingFulfillmentStatus)}?
+                  </span>
+                  <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    <input
+                      type="checkbox"
+                      checked={notifyCustomerOnFulfillment}
+                      onChange={(event) => setNotifyCustomerOnFulfillment(event.target.checked)}
+                    />
+                    Update customer via email
+                  </label>
+                  <button
+                    type="button"
+                    onClick={confirmFulfillmentUpdate}
+                    disabled={saving === pendingFulfillmentStatus}
+                    className="gold-button text-sm disabled:opacity-50"
+                  >
+                    {saving === pendingFulfillmentStatus ? 'Saving…' : 'OK'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingFulfillmentStatus(null)}
+                    className="outline-button text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </section>
 
             <section className="border p-5" style={{ borderColor: BORDER, background: 'white' }}>
@@ -719,6 +817,77 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
                 </button>
                 <button type="button" onClick={sendInvoiceEmail} disabled={emailSending} className="gold-button justify-center text-sm disabled:opacity-50">
                   {emailSending ? 'Sending...' : 'Send Invoice Email'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEmailUpdate && emailUpdateContent && (
+        <div className="fixed inset-0 z-50 overflow-y-auto px-4 py-6" style={{ background: 'rgba(0, 0, 0, 0.42)' }}>
+          <div className="relative mx-auto w-full max-w-lg border bg-white shadow-2xl" style={{ borderColor: BORDER }}>
+            <button
+              type="button"
+              onClick={() => setShowEmailUpdate(false)}
+              className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full border bg-white"
+              style={{ borderColor: 'rgba(115, 92, 0, 0.18)', color: GOLD }}
+              aria-label="Close email update preview"
+            >
+              <span className="material-symbols-outlined text-[1.2rem]" aria-hidden="true">close</span>
+            </button>
+
+            <div className="border-b px-5 py-5 pr-16 md:px-7" style={{ borderColor: BORDER }}>
+              <p className="text-[0.65rem] font-bold uppercase tracking-[0.28em]" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                Email Update
+              </p>
+              <h2 className="mt-2 text-2xl font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
+                Notify Customer{emailUpdateStatus ? `: ${orderStatusLabel(emailUpdateStatus)}` : ''}
+              </h2>
+            </div>
+
+            <div className="grid gap-5 p-5 md:p-7">
+              <label className="grid gap-1">
+                <span className="form-label">Customer Email</span>
+                <input
+                  className="form-field"
+                  type="email"
+                  value={emailUpdateRecipient}
+                  onChange={(event) => setEmailUpdateRecipient(event.target.value)}
+                  placeholder="customer@example.com"
+                />
+              </label>
+
+              <div className="grid gap-1">
+                <span className="form-label">Subject</span>
+                <div className="border bg-white px-3 py-3 text-sm" style={{ borderColor: BORDER, color: 'var(--color-on-surface)' }}>
+                  {emailUpdateContent.subject}
+                </div>
+              </div>
+
+              <section className="border bg-white" style={{ borderColor: BORDER }}>
+                <div className="border-b px-4 py-3" style={{ borderColor: BORDER }}>
+                  <h3 className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                    Email Preview
+                  </h3>
+                </div>
+                <div className="whitespace-pre-line px-4 py-4 text-sm leading-relaxed" style={{ color: 'var(--color-on-surface)' }}>
+                  {emailUpdateContent.text}
+                </div>
+              </section>
+
+              {emailUpdateMessage && (
+                <p className="text-sm font-bold" style={{ color: emailUpdateMessage.ok ? GOLD : 'var(--color-error)' }}>
+                  {emailUpdateMessage.text}
+                </p>
+              )}
+
+              <div className="flex flex-col-reverse gap-2 border-t pt-4 md:flex-row md:justify-end" style={{ borderColor: BORDER }}>
+                <button type="button" onClick={() => setShowEmailUpdate(false)} className="outline-button justify-center text-sm">
+                  Close
+                </button>
+                <button type="button" onClick={sendFulfillmentUpdateEmail} disabled={emailUpdateSending} className="gold-button justify-center text-sm disabled:opacity-50">
+                  {emailUpdateSending ? 'Sending...' : 'Send Update Email'}
                 </button>
               </div>
             </div>

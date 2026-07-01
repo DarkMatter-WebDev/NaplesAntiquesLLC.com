@@ -9,7 +9,7 @@ import AccountProfileForm, { type CustomerProfile } from '@/components/account/A
 import SignOutButton from '@/components/account/SignOutButton';
 import { createClient } from '@/lib/supabase/client';
 import { useWishlist } from '@/context/WishlistContext';
-import { formatCurrency, formatOrderDate, orderStatusLabel, type Order } from '@/types/sales';
+import { formatCurrency, formatOrderDate, formatPublicPurity, orderStatusLabel, type Order } from '@/types/sales';
 import { productImagePaddingBackground } from '@/types/product';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 
@@ -722,16 +722,6 @@ function formatPublicInventoryNumber(value: string | number | null | undefined):
   if (value === null || value === undefined) return null;
   const normalized = String(value).trim().replace(/^#\s*/, '');
   return /^\d+$/.test(normalized) ? `Inv #${normalized}` : null;
-}
-
-function formatPublicPurity(value: string | number | null | undefined): string | null {
-  if (value === null || value === undefined || value === '') return null;
-  const normalized = String(value).trim();
-  const numeric = Number(normalized);
-  if (Number.isFinite(numeric) && numeric > 0 && numeric <= 24) {
-    return `${numeric}K`;
-  }
-  return normalized;
 }
 
 function OrderDetailLine({

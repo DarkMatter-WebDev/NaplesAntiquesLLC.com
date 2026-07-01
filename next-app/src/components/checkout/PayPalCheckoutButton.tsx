@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 
 type PayPalButtonsActions = { resolve: () => Promise<void>; reject: () => Promise<void> };
+type PayPalOrderDetails = { payer?: { email_address?: string } };
+type PayPalOnApproveActions = { order: { get: () => Promise<PayPalOrderDetails> } };
 type PayPalButtonsConfig = {
   style?: Record<string, unknown>;
   onClick?: (data: Record<string, unknown>, actions: PayPalButtonsActions) => Promise<void> | void;
   createOrder: () => Promise<string>;
-  onApprove: (data: { orderID: string }) => Promise<void>;
+  onApprove: (data: { orderID: string }, actions: PayPalOnApproveActions) => Promise<void>;
   onCancel?: () => void;
   onError?: (err: unknown) => void;
 };
@@ -67,6 +69,7 @@ export default function PayPalCheckoutButton({
   currency = 'USD',
   ready,
   isEs,
+  missingFields,
   getPayload,
   onOrderId,
   onApproved,
@@ -76,11 +79,15 @@ export default function PayPalCheckoutButton({
   currency?: string;
   ready: boolean;
   isEs: boolean;
+  /** Labels of required fields that are currently empty, in form order — shown
+   *  in the required-fields modal so the buyer knows exactly what to fill in. */
+  missingFields: string[];
   getPayload: () => PayPalPayload;
   onOrderId: (orderId: string) => void;
-  /** When provided, called with the PayPal order ID after buyer approves in PayPal,
-   *  instead of auto-capturing. The parent is responsible for calling capture. */
-  onApproved?: (paypalOrderId: string) => void;
+  /** When provided, called with the PayPal order ID (and payer email, if PayPal
+   *  returned one) after buyer approves in PayPal, instead of auto-capturing.
+   *  The parent is responsible for calling capture. */
+  onApproved?: (paypalOrderId: string, payerEmail?: string) => void;
   onSuccess: (result: { orderId: string; orderNumber: string }) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -88,6 +95,7 @@ export default function PayPalCheckoutButton({
   const [sdkError, setSdkError] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [showRequiredFieldsModal, setShowRequiredFieldsModal] = useState(false);
 
   // Keep the latest callbacks/getters in refs so the PayPal Buttons instance
   // (initialized once) always reads current cart + contact state.
@@ -125,11 +133,7 @@ export default function PayPalCheckoutButton({
       // always visible; if the form isn't filled, reject the click and prompt.
       onClick: (_data, actions) => {
         if (!readyRef.current) {
-          setMessage(
-            isEsRef.current
-              ? 'Complete los campos requeridos arriba antes de pagar.'
-              : 'Please complete the required fields above before paying.',
-          );
+          setShowRequiredFieldsModal(true);
           return actions.reject();
         }
         setMessage(null);
@@ -160,12 +164,19 @@ export default function PayPalCheckoutButton({
           throw err;
         }
       },
-      onApprove: async (data) => {
+      onApprove: async (data, actions) => {
         // If the parent wants to show a review step before capturing, hand off
         // the approved PayPal order ID and let the parent trigger capture.
         if (onApprovedRef.current) {
           setProcessing(false);
-          onApprovedRef.current(data.orderID);
+          let payerEmail: string | undefined;
+          try {
+            const orderDetails = await actions.order.get();
+            payerEmail = orderDetails?.payer?.email_address;
+          } catch {
+            // Non-critical — the confirm screen just won't show the payer email.
+          }
+          onApprovedRef.current(data.orderID, payerEmail);
           return;
         }
         // Default: capture immediately.
@@ -243,8 +254,8 @@ export default function PayPalCheckoutButton({
       {sdkReady && !ready && (
         <p className="mt-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
           {isEs
-            ? 'Complete los datos requeridos arriba para continuar al pago.'
-            : 'Complete the required details above to continue to payment.'}
+            ? 'Complete los datos requeridos para continuar al pago.'
+            : 'Complete the required details to continue to payment.'}
         </p>
       )}
       {processing && (
@@ -258,6 +269,60 @@ export default function PayPalCheckoutButton({
         <p className="mt-2 text-sm" style={{ color: 'var(--color-error)' }}>
           {message}
         </p>
+      )}
+
+      {showRequiredFieldsModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={isEs ? 'Campos requeridos' : 'Required fields'}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            display: 'grid',
+            placeItems: 'center',
+            padding: '1.25rem',
+            background: 'rgba(20, 18, 14, 0.45)',
+            backdropFilter: 'blur(3px)',
+          }}
+        >
+          <div
+            style={{
+              width: 'min(26rem, 100%)',
+              background: '#ffffff',
+              borderRadius: 'var(--radius-xl)',
+              border: '1px solid rgba(115, 92, 0, 0.16)',
+              boxShadow: '0 28px 80px rgba(20, 18, 14, 0.24)',
+              padding: '2rem',
+              textAlign: 'center',
+            }}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '2rem', color: 'var(--color-error)' }}>
+              error
+            </span>
+            <p style={{ marginTop: '0.75rem', fontSize: '0.95rem', color: 'var(--color-on-surface)' }}>
+              {isEs
+                ? 'Complete los siguientes campos requeridos antes de pagar:'
+                : 'Please complete the following required fields before paying:'}
+            </p>
+            {missingFields.length > 0 && (
+              <ul style={{ marginTop: '0.75rem', textAlign: 'left', display: 'inline-block', fontSize: '0.9rem', color: 'var(--color-on-surface)' }}>
+                {missingFields.map((field) => (
+                  <li key={field} style={{ padding: '0.15rem 0' }}>{field}</li>
+                ))}
+              </ul>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowRequiredFieldsModal(false)}
+              className="gold-button justify-center text-sm"
+              style={{ marginTop: '1.25rem', width: '100%' }}
+            >
+              {isEs ? 'Cerrar' : 'Close'}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

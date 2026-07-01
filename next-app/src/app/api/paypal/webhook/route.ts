@@ -110,8 +110,10 @@ export async function POST(req: Request) {
   }
 
   // Capture/denial/refund all change product availability — refresh the gallery.
+  // { expire: 0 } forces immediate expiration (see capture-order/route.ts for why
+  // 'max' stale-while-revalidate semantics leave the sold item visible once more).
   if (eventType.startsWith('PAYMENT.CAPTURE')) {
-    revalidateTag('shop-catalog', 'max');
+    revalidateTag('shop-catalog', { expire: 0 });
   }
 
   await service

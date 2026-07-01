@@ -1,0 +1,78 @@
+import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import type { FulfillmentStatus } from '@/types/sales';
+import { buildFulfillmentUpdateEmailContent } from '@/lib/order-fulfillment-email';
+
+interface Props {
+  params: Promise<{ id: string }>;
+}
+
+const VALID_STATUSES: FulfillmentStatus[] = ['pending', 'packed', 'shipped', 'picked_up', 'cancelled'];
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+export async function POST(req: Request, { params }: Props) {
+  const { id } = await params;
+  const body = await req.json().catch(() => null);
+  const recipient = String(body?.recipient ?? '').trim();
+  const status = body?.status as FulfillmentStatus | undefined;
+
+  if (!recipient || !isValidEmail(recipient)) {
+    return NextResponse.json({ error: 'A valid recipient email is required.' }, { status: 400 });
+  }
+  if (!status || !VALID_STATUSES.includes(status)) {
+    return NextResponse.json({ error: 'A valid fulfillment status is required.' }, { status: 400 });
+  }
+
+  const resendKey = process.env.RESEND_API_KEY;
+  if (!resendKey) {
+    return NextResponse.json({ error: 'Email sending is not configured. Missing RESEND_API_KEY.' }, { status: 500 });
+  }
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single();
+
+  if (!profile?.is_admin) {
+    return NextResponse.json({ error: 'Admin access required.' }, { status: 403 });
+  }
+
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .select('order_number, customer_name')
+    .eq('id', id)
+    .single();
+
+  if (orderError || !order) {
+    return NextResponse.json({ error: orderError?.message ?? 'Order not found.' }, { status: 404 });
+  }
+
+  const content = buildFulfillmentUpdateEmailContent(order, status);
+
+  try {
+    const { Resend } = await import('resend');
+    const resend = new Resend(resendKey);
+    await resend.emails.send({
+      from: 'Naples Estate Jewelry <noreply@naplesestatejewelry.co>',
+      to: recipient,
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+    });
+  } catch (error) {
+    console.error('Fulfillment update email error:', error);
+    return NextResponse.json({ error: 'Could not send update email.' }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}
