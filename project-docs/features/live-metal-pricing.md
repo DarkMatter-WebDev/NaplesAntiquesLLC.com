@@ -18,10 +18,15 @@ Current surfaces:
 ## Key Files
 
 - `next-app/src/lib/spot-price.ts` - fetches/caches spot data from
-  `api.gold-api.com` with fallback values.
+  `api.gold-api.com`; defines its own `FALLBACK_GOLD_SPOT` used only if the
+  upstream API call fails.
 - `next-app/src/app/api/metal-prices/route.ts` - Next route handler exposing
   spot data to the app.
-- `next-app/src/lib/pricing.ts` - product melt value and display price helpers.
+- `next-app/src/lib/pricing.ts` - product melt value and display price
+  helpers; defines a separate `FALLBACK_GOLD_SPOT` of its own (different
+  value, different purpose — a display-time fallback for price computation,
+  not the spot-fetch fallback above). Don't assume the two constants are the
+  same value or kept in sync.
 - `next-app/src/types/product.ts` - product pricing fields and status helpers.
 - `next-app/src/app/[locale]/shop/page.tsx` - server-side spot fetch for shop
   listing pricing.

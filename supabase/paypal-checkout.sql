@@ -1,9 +1,17 @@
--- PayPal checkout: order/payment columns, product reservations, webhook events,
--- and the reserve/capture/release RPCs that keep one-of-one estate inventory safe
--- under concurrent buyers.
+-- PayPal checkout: order/payment columns, webhook events, and the capture RPC.
+--
+-- ⚠️ RESERVATION MODEL SUPERSEDED. This file still DEFINES the old 30-minute
+-- reservation functions (reserve_paypal_order + release_expired_paypal_reservations)
+-- for historical completeness, but they are NO LONGER USED. The current inventory
+-- model is "whoever pays first gets the item" — see no-reservation-checkout.sql,
+-- which replaces the create/capture RPCs and DROPS the two reservation functions.
+-- Always run no-reservation-checkout.sql AFTER this file. If you re-run this file
+-- (it is idempotent and recreates the reservation functions), re-run
+-- no-reservation-checkout.sql afterward to drop them again.
 --
 -- Run in the Supabase SQL Editor AFTER sales-workflow.sql and
--- admin-notifications-checkout.sql. Safe to re-run (idempotent).
+-- admin-notifications-checkout.sql, then run no-reservation-checkout.sql.
+-- Safe to re-run (idempotent).
 
 create extension if not exists "pgcrypto";
 
@@ -226,7 +234,14 @@ $$;
 -- payment_status='paid', order_status='completed'), record PayPal references,
 -- and flip the held products to 'sold'. Idempotent — a repeat capture for an
 -- already-paid order is a no-op and reports already_paid=true.
+--
+-- If no-reservation-checkout.sql has been applied, the live function has a
+-- DIFFERENT return type (adds item_conflict), and CREATE OR REPLACE cannot
+-- change a return type (error 42P13) — so drop first. ⚠️ This recreates the
+-- OLD 3-column reservation-era version; ALWAYS re-run no-reservation-checkout.sql
+-- after this file to restore the current no-reservation capture function.
 -- ---------------------------------------------------------------------------
+drop function if exists public.capture_paypal_order(uuid, text, jsonb);
 create or replace function public.capture_paypal_order(
   p_order_id uuid,
   p_capture_id text,

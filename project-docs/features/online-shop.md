@@ -108,9 +108,15 @@ and the spot basis used for the calculation. Manual-priced products use
   purity, brand, gender, length/size, price range, availability, sort, and
   pagination.
 - Public gallery shows only `available`/`sold`; it excludes `reserved`,
-  `pending_payment`, `draft`, and `archived`. Items reserved during PayPal
-  checkout (`reserved`) drop out of the cached catalog promptly via
-  `revalidateTag('shop-catalog', 'max')` on reserve/capture/release. See
+  `pending_payment`, `draft`, and `archived` (`reserved`/`pending_payment` now come
+  only from the manual admin status / admin-created orders — PayPal checkout no
+  longer reserves inventory; see the no-reservation model in
+  `features/paypal-checkout.md`). A sold item drops out of the cached catalog
+  promptly via `revalidateTag('shop-catalog', { expire: 0 })` on capture.
+  Every admin order-flow write to `products` (cancel/reopen/mark-paid,
+  delete-order return-to-inventory, archive/delete) calls the same tag
+  through `adminRevalidateProduct(s)` in
+  `next-app/src/app/actions/admin-products.ts` — see
   `features/paypal-checkout.md`.
 
 ## Admin Workflow

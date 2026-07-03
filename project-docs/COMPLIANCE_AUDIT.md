@@ -1,9 +1,10 @@
 # Compliance Audit
 
-> Audit date: **2026-06-19**. Scope: current Next.js app in `next-app/`,
-> public routes, account registration, checkout, contact/evaluation forms,
-> newsletter signup, footer, cookies/storage, Supabase-backed data flows, and
-> policy pages.
+> Audit date: **2026-06-19**, lightly refreshed **2026-07-02** for two factual
+> drifts noted below (checkout payment processor, lead-form backend). Scope:
+> current Next.js app in `next-app/`, public routes, account registration,
+> checkout, contact/evaluation forms, newsletter signup, footer,
+> cookies/storage, Supabase-backed data flows, and policy pages.
 
 ## Summary
 
@@ -25,12 +26,16 @@ and should be reviewed by the business owner and counsel before relying on it.
   address, and marketing opt-in fields.
 - **Checkout:** `/checkout` takes online payment through **PayPal** (Orders API
   v2). Card details are entered on PayPal's hosted window and never touch our
-  servers; order totals are computed server-side. Orders and one-of-one inventory
-  reservations are created server-side. The older manual unpaid-order route
+  servers; order totals are computed server-side. Orders are created server-side;
+  one-of-one inventory is **not** reserved during checkout — the item is sold to
+  whoever's payment captures first. The older manual unpaid-order route
   (`/api/checkout/order`) is retained but no longer the storefront path, and
   `/payment` remains a disabled placeholder.
-- **Contact/evaluation forms:** Netlify Forms power item submission and free
-  evaluation flows; product inquiry uses `/api/inquire` and Supabase.
+- **Contact/evaluation forms:** item submission, free evaluation, product
+  inquiry, and the "Message Us Directly" form all post to `/api/inquire` /
+  `/api/contact-message` (Supabase + Resend) — **not** Netlify Forms. Netlify
+  Forms was replaced on 2026-06-25 after it was found to silently fail on
+  this client-rendered React app (see DECISIONS 2026-06-25).
 - **Newsletter form:** homepage subscriber CTA posts to `/api/subscribe` and the
   `subscribe_homepage` RPC.
 - **Analytics/tracking:** source audit found no Google Analytics, Google Tag

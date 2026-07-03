@@ -86,8 +86,8 @@ pages are marketing/trust content. The dynamic surfaces are:
 - the **shop** (`/shop`, `/shop/[id]`) backed by Supabase products and priced
   live against metal spot,
 - **online checkout + payments** (`/checkout`) via PayPal (Orders API v2) —
-  creates the order, reserves one-of-one inventory, and captures payment
-  server-side; see `features/paypal-checkout.md`,
+  creates the order and captures payment server-side, with no inventory hold
+  (whoever pays first gets the one-of-one item); see `features/paypal-checkout.md`,
 - **customer accounts** backed by Supabase,
 - **admin, orders, and inquiries** backed by Supabase/Next route handlers,
 - localized EN/ES routes powered by `next-intl`.

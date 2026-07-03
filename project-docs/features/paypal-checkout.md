@@ -18,91 +18,113 @@ go-live checklist below and the Backlog item in `TASKS.md`.
    PayPal + card; PayLater/credit disabled) and wires the Buttons callbacks. It never
    sends prices.
    - `createOrder` → `POST /api/paypal/create-order` with `{ productIds, customer,
-     shippingMethod, orderId }`. Stores the returned internal `orderId` (reused if the
-     buyer cancels and retries, so we don't double-reserve). Returns the PayPal order id.
-   - `onApprove` → `POST /api/paypal/capture-order` with `{ paypalOrderId }`.
+     shippingMethod, orderId }`. Stores the returned internal `orderId` in an in-memory
+     ref (reused if the buyer cancels and retries in the same tab, so we don't
+     double-reserve; invalidated if the cart/shipping changes after cancel). Returns
+     the PayPal order id.
+   - `onApprove` (fires when the buyer hits **Pay Now** in the PayPal window) →
+     `POST /api/paypal/capture-order` with `{ paypalOrderId }`. The sale is captured
+     here — there is no separate confirm-on-return step.
    - `onSuccess` → `CheckoutClient` clears the cart and shows the existing inline
      "Order Received" confirmation (order number).
-   - `onCancel`/`onError` → clean message; the order stays unpaid and items stay
-     reserved until the hold expires.
-4. **Reload/eviction resume (2026-07-02).** The approval round-trip happens in a
-   separate PayPal window (or the PayPal app on mobile), and mobile OSes may evict
-   the suspended checkout tab meanwhile — which used to lose the React-only
-   post-approval state (`onApprove` never fires on the reloaded page; the buyer who
-   just tapped "Pay Now" landed on a blank form and the approved order was never
-   captured). `CheckoutClient` now persists a hand-off record in sessionStorage
-   (`nej-paypal-pending`: `{ orderId, payerEmail? }`) when create-order returns and
-   again at approval. On mount it calls `GET /api/paypal/order-status?orderId=…` and
-   resumes: `approved` → restore the Confirm screen (payer email re-fetched from
-   PayPal), `paid`/`COMPLETED` → success screen, `pending` → keep the record +
-   reusable order id, `none` → clear the record. Cleared on capture success and on
-   "← Back to checkout" (explicit back-out). sessionStorage is deliberate: per-tab
-   (no cross-tab bleed), survives reload/eviction-restore.
+   - `onCancel`/`onError` → clean message; the order stays unpaid. Nothing is held
+     (no reservation), so the item simply remains available to any buyer.
+
+   **Capture-on-approve (2026-07-03).** The sale completes when the buyer clicks Pay
+   Now in the PayPal window; on return to our tab they land directly on the "Order
+   Received" screen. There is no intermediate "Confirm Your Order" review screen and
+   no client-side capture-on-confirm. This replaced the 2026-07-02 approach (a
+   review/confirm screen plus a sessionStorage hand-off + `GET /api/paypal/order-status`
+   resume route to restore that screen after a mobile tab eviction) — see DECISIONS
+   2026-07-03. If a tab is evicted after approval but before the capture fetch
+   finishes, nothing is captured and — since there is no reservation — the item just
+   stays available (the buyer can retry, or another buyer can purchase it); the
+   `PAYMENT.CAPTURE.COMPLETED` webhook still reconciles any capture that did land.
 
 ## Routes (`src/app/api/paypal/*`)
 
 - **`create-order`** (server/cookie client): builds the authoritative order via
   `lib/checkout-pricing.ts#buildOrderDraft` (loads products, verifies all are
   purchasable, computes subtotal + 7% FL tax + shipping snapshot prices), calls the
-  `reserve_paypal_order` RPC (atomic order create + inventory hold), creates the
-  PayPal order with line items, saves `paypal_order_id`, and returns it. On a PayPal
-  API failure it releases the hold it just took. A `orderId` in the body takes a
-  retry path that re-asserts the hold and recreates the PayPal order for the existing
-  unpaid order.
+  `create_paypal_order` RPC (creates the order + items — **no inventory hold**; the
+  products stay `available`), creates the PayPal order with line items, saves
+  `paypal_order_id`, and returns it. On a PayPal API failure it cancels the order
+  record it just created. A `orderId` in the body takes a retry path that recreates
+  the PayPal order for the existing unpaid order.
 - **`capture-order`** (service-role client): finds the internal order by
   `paypal_order_id` (idempotent if already paid), captures via the PayPal API,
   verifies `COMPLETED` + amount within 1¢ + currency `USD`, then calls
   `capture_paypal_order`. On amount/currency mismatch it records the capture, sets
   `payment_status='pending'`, posts an admin notification, and does **not** auto-sell.
-- **`order-status`** (service-role client, GET `?orderId=<internal id>`): resume
-  support for the popup round-trip (see Flow §4). Looks up the order row; returns
-  `{state:'paid', orderNumber}` if already captured, else queries PayPal
-  (`getPayPalOrder`) and maps `APPROVED` → `{state:'approved', paypalOrderId,
-  payerEmail}`, `COMPLETED` → `paid`, `CREATED`/`PAYER_ACTION_REQUIRED` → `pending`,
-  anything else/errors → `none`. No auth gate beyond knowing the order UUID
-  (which only the buyer's browser holds).
+  If the RPC returns `item_conflict` (another buyer's capture sold the item first),
+  the order is flagged `failed` for a manual refund and the buyer gets a clear 409
+  "just purchased by another buyer" message.
 - **`webhook`** (service-role client): `verifyPayPalWebhook` (calls PayPal's
   verify-webhook-signature with `PAYPAL_WEBHOOK_ID`; fails closed if unset), logs to
   `webhook_events` (unique `(provider, event_id)` → duplicates are a no-op), then
-  applies `PAYMENT.CAPTURE.COMPLETED` (backstop capture), `.DENIED` (release + fail),
+  applies `PAYMENT.CAPTURE.COMPLETED` (backstop capture), `.DENIED` (mark failed),
   `.REFUNDED`/`.REVERSED` (refund), and `CUSTOMER.DISPUTE.*` (note).
 
 ## Server library — `src/lib/paypal.ts`
 
-OAuth token (cached ~9h), `createPayPalOrder`, `getPayPalOrder` (status + payer
-email, for resume), `capturePayPalOrder` (sends
+OAuth token (cached ~9h), `createPayPalOrder`, `capturePayPalOrder` (sends
 `PayPal-Request-Id` for idempotency), `verifyPayPalWebhook`. Base URL switches on
 `PAYPAL_ENV` (`sandbox` → `api-m.sandbox.paypal.com`, else live). Server-only.
 
-## Inventory / concurrency
+## Inventory / concurrency — whoever pays first gets the item (2026-07-03)
 
-Items can be one-of-one, so `reserve_paypal_order` (SECURITY DEFINER) `SELECT … FOR
-UPDATE` row-locks the products, releases expired holds, requires each to be
-`available`, creates the order (`unpaid`/`pending`/`open`) + items, and flips
-products to `reserved` with a 30-minute `reserved_until` + `reserved_order_id`.
-Concurrent buyers serialize on the lock; the loser gets a 409. The public shop
-already hides `reserved` items. `capture_paypal_order` flips them to `sold` and the
-order to `payment_status='paid'` + `order_status='completed'` (mirrors admin "Mark
-Paid"). `release_expired_paypal_reservations()` frees lapsed holds (run inline by
-reserve; can also be scheduled).
+**There is no inventory reservation.** Estate pieces are one-of-one, but checkout
+does **not** hold them — items stay `available` all the way through the PayPal
+window, so any number of buyers can be in checkout for the same piece at once. The
+sale is decided at **capture**: whoever's payment captures first gets it.
 
-The public shop only shows `available`/`sold` (`isProductVisibleInShop`), so a
-`reserved` item is excluded at query time. The `/shop` catalog read is wrapped in
-`unstable_cache` (tag `shop-catalog`, `revalidate: 300`), so reserve/capture/release
-and the denial/refund webhook call `revalidateTag('shop-catalog', 'max')` (Next 16
-two-arg form) to refresh the gallery promptly instead of waiting out the 300s TTL —
-stale-while-revalidate, so it clears within a refresh cycle (~1-2s). Note: the
-admin "Delete order → return to inventory" path is a client-side write and does not
-bust the cache, so a released item reappears within the normal 300s window.
+`create_paypal_order` (SECURITY DEFINER) does a snapshot availability check (no
+lock) and creates the order (`unpaid`/`pending`/`open`) + items, leaving the
+products `available`. `capture_paypal_order` is where the race is resolved: it
+`SELECT … FOR UPDATE` row-locks the product rows so concurrent captures for the
+same item serialize, then — if the item is already `sold` to a different order —
+returns `item_conflict=true`, flags this order `failed` with a "manual PayPal
+refund required" note, and does **not** sell. The winning capture flips the products
+to `sold` and the order to `payment_status='paid'` + `order_status='completed'`
+(mirrors admin "Mark Paid"). This is a rare edge (two buyers paying for the same
+one-of-one within seconds); the loser's money is captured and refunded manually.
+
+The old 30-minute `reserve_paypal_order` hold + `release_expired_paypal_reservations`
+sweep were removed (`supabase/no-reservation-checkout.sql`); the vestigial
+`reserved_until`/`reserved_order_id` columns are left in place (always null) to avoid
+a destructive schema change. The admin **Reserved** product status is unrelated — it
+is a manual, indefinite merchandising status the owner can set, not a checkout hold.
+
+The public shop only shows `available`/`sold` (`isProductVisibleInShop`), so an
+item stays visible until its capture sells it. The `/shop` catalog read is wrapped in
+`unstable_cache` (tag `shop-catalog`, `revalidate: 300`), so capture and the
+denial/refund webhook call `revalidateTag('shop-catalog', { expire: 0 })`
+(Next 16 two-arg form, immediate expiration) to refresh the gallery promptly
+instead of waiting out the 300s TTL. **As of 2026-07-02, every admin order-flow
+write to `products` also busts this cache** — cancel/reopen/mark-paid/unpaid,
+delete-order return-to-inventory, create-order, and archive/hard-delete
+all call `adminRevalidateProduct(s)` from
+`next-app/src/app/actions/admin-products.ts` right after the write (those are
+client-side Supabase writes, which otherwise can't reach a server cache).
+See `project-docs/DECISIONS.md`/`CHANGELOG.md` 2026-07-02 for the bug this fixed
+(items stayed "sold" in the public gallery after being returned to available in
+admin).
 
 ## Database — `supabase/paypal-checkout.sql`
 
 `orders`: `paypal_order_id` (unique), `paypal_capture_id`, `payment_response`,
-`paid_at`, `reserved_until`. `products`: `reserved_until`, `reserved_order_id`. New
-`webhook_events` table (admins read; service role writes). RPCs:
-`reserve_paypal_order`, `capture_paypal_order`, `apply_paypal_order_event`,
-`release_expired_paypal_reservations`. Run after `sales-workflow.sql` and
-`admin-notifications-checkout.sql`. Idempotent / safe to re-run.
+`paid_at`, `reserved_until` (vestigial). `products`: `reserved_until`,
+`reserved_order_id` (both vestigial — always null now). New `webhook_events` table
+(admins read; service role writes).
+
+**Run order:** `paypal-checkout.sql` (after `sales-workflow.sql` and
+`admin-notifications-checkout.sql`), **then `supabase/no-reservation-checkout.sql`.**
+The second file is the current inventory model: it adds `create_paypal_order`,
+replaces `capture_paypal_order` (adds the `item_conflict` return) and
+`apply_paypal_order_event`, and **drops** the old `reserve_paypal_order` +
+`release_expired_paypal_reservations` reservation functions. Both are idempotent;
+if you ever re-run `paypal-checkout.sql` (which recreates the reservation
+functions), re-run `no-reservation-checkout.sql` afterward to drop them again.
 
 ## Environment variables
 
@@ -135,18 +157,19 @@ dev server (env is read at boot).
 - **`401 invalid_client` / create-order 502** — credential/env mismatch (see above).
 - **`42501 permission denied for table orders/products/webhook_events`** — the
   service_role table grants at the bottom of `paypal-checkout.sql` weren't applied.
-  Re-run the migration (idempotent). Without them, capture/webhook fail and a
-  failed create-order can leave a product stuck `reserved` (its hold still expires
-  after 30 min, or run `select release_expired_paypal_reservations();` once the
-  hold lapses).
+  Re-run the migration (idempotent), then re-run `no-reservation-checkout.sql`.
+- **`function create_paypal_order(...) does not exist` / create-order 500** —
+  `supabase/no-reservation-checkout.sql` hasn't been applied. Run it (after
+  `paypal-checkout.sql`).
 
 ## Go-live checklist
 
-1. Run `supabase/paypal-checkout.sql`.
+1. Run `supabase/paypal-checkout.sql`, then `supabase/no-reservation-checkout.sql`.
 2. Set the four env vars in Netlify.
 3. Register the webhook at `https://naplesestatejewelry.co/api/paypal/webhook`
    (capture completed/denied/refunded/reversed + dispute created); match
    `PAYPAL_WEBHOOK_ID`.
 4. Sandbox test matrix: success, cancel, denied capture, duplicate webhook,
-   item-already-sold (409 on reserve), amount mismatch (flagged, not sold).
+   concurrent-buyers race (two captures for the same item → second gets
+   `item_conflict` 409, flagged for refund), amount mismatch (flagged, not sold).
 5. Swap to a live PayPal app, set `PAYPAL_ENV=live`, redeploy, re-test once.

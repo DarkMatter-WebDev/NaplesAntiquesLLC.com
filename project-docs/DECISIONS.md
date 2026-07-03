@@ -10,6 +10,117 @@
 > **Alternatives considered:** ...
 > ```
 
+## 2026-07-03 — Checkout inventory: no reservation, whoever pays first gets the item
+
+**Decision:** Remove the 30-minute inventory reservation from PayPal checkout
+entirely. Products stay `available` all the way through the PayPal window — no hold,
+no `reserved` status set by checkout — so any number of buyers can check out the
+same one-of-one piece at once. The sale is decided at **capture**:
+`capture_paypal_order` row-locks the product rows and, if the item was already
+`sold` by a first buyer, returns `item_conflict=true`, flags the losing order
+`failed` with a "manual PayPal refund required" note, and does not sell; the winning
+capture flips the products to `sold`. `create_paypal_order` replaces
+`reserve_paypal_order` in the create path (order + items, no hold). The old
+`reserve_paypal_order` hold and `release_expired_paypal_reservations` sweep are
+dropped (`supabase/no-reservation-checkout.sql`), and `apply_paypal_order_event`'s
+`denied` branch no longer releases a reservation. The vestigial
+`reserved_until`/`reserved_order_id` columns are left in place (always null) to
+avoid a destructive schema change.
+
+**Reason:** The owner wants the simplest possible model — first to complete checkout
+gets the item — with no timed holds that take a piece off the market for someone who
+may never pay. Reservations added real complexity (a hold RPC, an expiry sweep, a
+`reserved` lifecycle state, cache-busting on release) to defend against a rare
+double-sale; recomputing the winner at capture with a row lock defends the same case
+without holding inventory. The trade-off is that two buyers can occasionally both pay
+for the same one-of-one within seconds — the loser is captured and refunded manually,
+which the owner accepts as rare and cheaper than the reservation machinery.
+
+**Scope:** This is the automatic **checkout** reservation only. The manual admin
+**Reserved** product status (an indefinite merchandising hold the owner sets by hand)
+is unrelated and unchanged, as is the admin-created-order flow that moves products to
+`pending_payment`.
+
+**Alternatives considered:** (1) Keep the 30-min hold — rejected by the owner as
+taking items off the market and adding complexity. (2) Reserve only for a very short
+window — still a hold + expiry sweep; same category of complexity. (3) Auto-refund
+the losing buyer on `item_conflict` instead of flagging for manual refund — deferred;
+the conflict is rare and a human refund is safer than an automatic money movement for
+now (could be automated later).
+
+**Supersedes:** the "Inventory model" portion of the 2026-06-29 "PayPal is the
+checkout payment processor" decision below (the server-side authoritative-pricing and
+capture-verification portions of that decision still stand).
+
+## 2026-07-03 — PayPal: capture on approve, drop the confirm-on-return + resume flow
+
+**Decision:** Capture the PayPal payment in the Buttons `onApprove` callback (the
+moment the buyer hits **Pay Now** in the PayPal window), and on return to our tab
+send the buyer straight to the existing "Order Received" confirmation. Removed the
+2026-07-02 machinery that split approval from capture: the intermediate "Confirm
+Your Order" review screen, the client-side capture-on-confirm button, the
+sessionStorage hand-off record (`nej-paypal-pending`), the
+`GET /api/paypal/order-status` resume route, and `getPayPalOrder()` in
+`lib/paypal.ts`. `PayPalCheckoutButton` lost its `onApproved` hand-off prop and now
+always captures in `onApprove`. The in-memory order-id reuse (cancel-then-retry
+without double-reserving, in the same tab) is kept.
+
+**Reason:** The owner wanted the standard, simplest PayPal UX — the sale finalizes
+in the PayPal window and the customer just sees a confirmation when they come back,
+with no extra "confirm to complete" step on our site. The 2026-07-02 confirm screen
+existed to let a mobile tab-eviction be resumed, but it added a second click to
+complete every purchase and a fair amount of state/route surface; the owner judged
+the extra step worse than the rare eviction edge case.
+
+**Trade-off / backstops:** If a mobile OS evicts the tab after approval but before
+the `onApprove` capture fetch completes, the client can no longer resume and finish
+the capture. Because nothing is reserved (see the 2026-07-03 no-reservation
+decision above), that just leaves the item available — the buyer can retry or
+another buyer can purchase it — and the `PAYMENT.CAPTURE.COMPLETED` webhook still
+reconciles any capture that did land. An approved-but-uncaptured PayPal order also
+voids on its own.
+
+**Alternatives considered:** (1) Keep the confirm screen but auto-click it on
+return — still leaves the resume route + sessionStorage surface and a UI flash; the
+owner wanted it gone. (2) Keep the resume route as a silent reconciliation on mount
+(no visible confirm screen) — rejected as unneeded now that the webhook already
+reconciles capture server-side. (3) Leave `onApproved` on the button as an unused
+option — rejected to avoid dead reachable code (AGENTS.md: no stray/dead artifacts).
+
+**Supersedes:** the 2026-07-02 "PayPal approval-return hardening (reload/eviction
+resume)" work (the stale-total reuse fix from that same day still stands).
+
+## 2026-07-02 — Project-docs cleanup: CHANGELOG.md is the one full-history log
+
+**Decision:** `CURRENT_STATUS.md`'s "What Was Recently Completed" section and
+`TASKS.md`'s "Completed" section were trimmed from a near-complete duplicate
+of the entire project history (both had grown to 1700-2300+ lines, mirroring
+`CHANGELOG.md` back to 2026-06-13) down to a handful of recent highlights
+plus a pointer to `CHANGELOG.md`. `TASKS.md`'s Backlog also had its full
+PayPal go-live checklist replaced with a pointer to the 🔴 HANDOFF section in
+`CURRENT_STATUS.md` (the single more-detailed, more-current copy), and ~15
+"apply supabase/X.sql" items for 2026-06-15→06-20 migrations were removed
+where the corresponding features are confirmed live (see the note left in
+`TASKS.md` Backlog for the list and how to re-add one if it turns out wrong).
+Several `DECISIONS.md` entries describing now-replaced approaches (static
+site, Jotform/Netlify Forms, code-based catalog, `/es/` static pages,
+`item_date`) were annotated **⚠️ Superseded** with a pointer to the
+superseding entry, rather than deleted — this is a decisions *log*, so
+history stays but a reader no longer mistakes it for current guidance.
+
+**Reason:** Requested project-wide documentation refresh. Three files
+carrying the same history meant every session paid the cost of reading (or
+skipping) thousands of duplicate lines, and the duplication had already
+drifted — e.g. `TASKS.md`'s PayPal checklist still described "set the 4 env
+vars" as an open investigation after `CURRENT_STATUS.md` had already
+diagnosed the exact credential-mismatch root cause on 2026-06-30.
+
+**Alternatives considered:** Leave the duplication and just append new
+entries each session (status quo — guarantees the copies re-diverge); delete
+history outright instead of trimming-with-pointer (loses the record;
+`CHANGELOG.md` is deliberately kept as the single canonical full history so
+nothing is actually lost).
+
 ## 2026-06-30 — PayPal: id, secret, and PAYPAL_ENV must form one consistent set
 
 **Decision:** The three PayPal credential variables (`PAYPAL_CLIENT_ID`,
@@ -124,13 +235,16 @@ status keeps the admin orders UI consistent. Reusing the existing order RPC
 pattern, Supabase service client, and the Resend webhook's verify/idempotency
 shape kept the change additive rather than a checkout rebuild.
 
-**Inventory model:** `reserve_paypal_order` (SECURITY DEFINER) `SELECT … FOR UPDATE`
-locks the product rows, releases any expired holds, verifies each item is
-`available`, creates the order + items, and flips products to `reserved` with a
-30-minute `reserved_until`. Concurrent buyers serialize on the lock; the loser
-gets "no longer available". `release_expired_paypal_reservations` frees lapsed
-holds (called inline and exposable to a cron). The public shop already hides
-`reserved` items, so a hold removes the piece from the storefront immediately.
+**Inventory model:** ⚠️ **Superseded 2026-07-03** — see "Checkout inventory: no
+reservation, whoever pays first gets the item" at the top of this log. Reservation
+was removed; the description below is the original 30-minute-hold design, kept as
+history. *`reserve_paypal_order` (SECURITY DEFINER) `SELECT … FOR UPDATE` locks the
+product rows, releases any expired holds, verifies each item is `available`, creates
+the order + items, and flips products to `reserved` with a 30-minute `reserved_until`.
+Concurrent buyers serialize on the lock; the loser gets "no longer available".
+`release_expired_paypal_reservations` frees lapsed holds (called inline and exposable
+to a cron). The public shop already hides `reserved` items, so a hold removes the
+piece from the storefront immediately.*
 
 **Amount mismatch:** if a capture's amount/currency doesn't match the order, the
 money is captured but the order is **not** auto-fulfilled — it's set to
@@ -601,6 +715,10 @@ flexible but unsortable and unvalidated; year + "circa" flag — more structure
 than needed right now. Owner chose year-only.
 
 ## 2026-06-20 - Store item Date separately from audit/acquisition dates
+
+> ⚠️ **Superseded later the same day** by "Item Date is a year (`item_year`),
+> not a calendar date" above — `item_date` was replaced by `item_year`. The
+> separate-from-audit-dates reasoning below still holds.
 
 **Decision:** Add nullable `products.item_date` for the item's Date, meaning
 the date the piece was created, and snapshot it as
@@ -1398,6 +1516,10 @@ happen as a separate, deliberate move after legacy deletion is reviewed.
 
 ## 2026-06-12 — Lead form uses Netlify Forms
 
+> ⚠️ **Superseded 2026-06-25** — Netlify Forms was found to silently fail on
+> this client-rendered React app and was replaced by `/api/inquire`. See the
+> 2026-06-25 "Lead forms post to /api/inquire, not Netlify Forms" entry above.
+
 **Decision:** Replace the Jotform embed with static Netlify Forms on the English
 and Spanish contact pages. Keep the `#submit-item` destination, use a large
 square photo-upload target, open a details modal after photo selection, and let
@@ -1442,6 +1564,12 @@ keep the old poster and fade it out with JavaScript.
 
 ## 2026-06-01 — Spanish translation via separate `/es/` pages
 
+> ⚠️ **Superseded by the Next.js rebuild (2026-06-13)** — there is no `/es/`
+> static folder anymore; localization is `next-intl` App Router routes
+> (`localePrefix: 'as-needed'`) under `next-app/src/app/[locale]`. The
+> single-source-catalog and native-review intent below still holds. See
+> `features/spanish-translation.md` for the current model.
+
 **Decision:** Add a full Spanish version of the site as separate pages in a
 `/es/` subdirectory, paired with English via `hreflang`, with a one-click EN/ES
 header toggle. Spanish copy will be AI-drafted and reviewed by a native speaker
@@ -1459,6 +1587,9 @@ auto-translate (inaccurate, unprofessional, no SEO value).
 ---
 
 ## 2026-06-01 — Lead form uses Jotform (recorded for the record)
+
+> ⚠️ **Superseded 2026-06-12** by static Netlify Forms, itself **superseded
+> 2026-06-25** by `/api/inquire`. See that entry above for the current model.
 
 **Decision:** The "Submit Your Item" lead form is an embedded Jotform (form id
 `261379265677068`) on `contact.html`. This was **already implemented and working
@@ -1516,6 +1647,10 @@ URLs.
 
 ## (Earlier) — Keep the product catalog in code, not a database
 
+> ⚠️ **Superseded by the Next.js rebuild (2026-06-13)** — the catalog moved
+> to the Supabase `products` table (see `STRUCTURE.md` "Single sources of
+> truth"). `window.SHOP_PRODUCTS` no longer exists.
+
 **Decision:** Store products as a static `window.SHOP_PRODUCTS` array in
 `scripts/shop/shop-products.js`. Supabase holds only customer-account data
 (profiles, favorites, carts).
@@ -1530,6 +1665,11 @@ a headless CMS.
 ---
 
 ## (Earlier) — Live gold-spot pricing via a Netlify Function
+
+> ⚠️ **Superseded by the Next.js rebuild (2026-06-13)** — the fetch/cache
+> logic moved to `next-app/src/lib/spot-price.ts`, exposed via
+> `next-app/src/app/api/metal-prices/route.ts`. The design intent (server-side
+> fetch, 5-min cache, fallback) carried over unchanged.
 
 **Decision:** Compute shop prices from live gold spot. A Netlify Function
 (`metal-prices.js`) fetches XAU from `gold-api.com`, caches 5 min, adds CORS and a
@@ -1559,6 +1699,11 @@ static site without running our own server.
 ---
 
 ## (Earlier) — Static multi-page site with Tailwind CDN + PowerShell sync
+
+> ⚠️ **Superseded 2026-06-13** — the site was rebuilt as the Next.js app in
+> `next-app/` (React/TypeScript, Tailwind via PostCSS build, shared layout
+> components instead of PowerShell sync). See `project-docs/LEGACY_REMOVAL_REPORT.md`
+> and the "Docs updated for Next cleanup" changelog entry.
 
 **Decision:** Build as plain HTML pages styled with Tailwind (CDN) + custom
 editorial CSS, and keep shared header/theme consistent using PowerShell sync

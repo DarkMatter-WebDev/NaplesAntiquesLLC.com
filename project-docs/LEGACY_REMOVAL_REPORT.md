@@ -3,6 +3,15 @@
 > Generated 2026-06-13. Updated after cleanup on 2026-06-13. Scope: identify
 > what appears to be required by the current Next.js site versus what belonged
 > to the older static HTML site.
+>
+> **Status as of 2026-07-02: purely historical — the removal described below
+> is complete and confirmed.** The site has since been deployed on Netlify
+> (see `CURRENT_STATUS.md`), and `project-docs/features/*` has been swept
+> multiple times since (2026-06-20, 2026-06-25) to describe the current
+> Next.js/Supabase app, not the retired static site. The two open items below
+> ("Remaining: deploy a preview and test…" and "Continue pruning…") are
+> resolved; kept in place rather than deleted since this file is an audit
+> record, not a live checklist.
 
 ## Executive Summary
 

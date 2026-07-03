@@ -2,7 +2,16 @@
 -- Items stay 'available' until payment is actually captured.
 -- "Whoever pays first gets the item."
 --
+-- This migration is the canonical inventory model for PayPal checkout. It
+-- supersedes the 30-minute-hold model from paypal-checkout.sql: it adds the
+-- no-reservation create/capture RPCs AND tears down the old reservation
+-- machinery (the reserve_paypal_order hold + the release-expired sweep), so no
+-- 30-minute inventory reservation can be created anymore.
+--
 -- Run in the Supabase SQL Editor AFTER paypal-checkout.sql. Safe to re-run.
+-- NOTE: paypal-checkout.sql is marked "safe to re-run" and RECREATES
+-- reserve_paypal_order / release_expired_paypal_reservations. If you ever re-run
+-- paypal-checkout.sql, re-run THIS file afterward to drop them again.
 
 -- ---------------------------------------------------------------------------
 -- create_paypal_order: create order + order_items without reserving products.
@@ -203,3 +212,62 @@ grant execute on function public.create_paypal_order(jsonb, jsonb) to service_ro
 -- capture_paypal_order already has a service_role grant from paypal-checkout.sql.
 -- Re-grant to be safe after the replace.
 grant execute on function public.capture_paypal_order(uuid, text, jsonb) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- apply_paypal_order_event (updated): drop the reservation-release step from the
+-- 'denied' branch. Nothing is reserved anymore, so a denied capture simply marks
+-- the order failed — there is no held product to return to the shop (a product
+-- only ever leaves 'available' via a successful capture, which sets it 'sold').
+-- ---------------------------------------------------------------------------
+create or replace function public.apply_paypal_order_event(
+  p_order_id uuid,
+  p_event text,
+  p_payment_response jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if p_order_id is null then
+    return;
+  end if;
+
+  if p_event = 'denied' then
+    update public.orders
+    set payment_status = 'failed',
+        payment_response = coalesce(p_payment_response, payment_response)
+    where id = p_order_id and payment_status <> 'paid';
+
+  elsif p_event = 'refunded' then
+    update public.orders
+    set payment_status = 'refunded',
+        order_status = 'refunded',
+        payment_response = coalesce(p_payment_response, payment_response)
+    where id = p_order_id;
+
+  elsif p_event = 'dispute' then
+    update public.orders
+    set internal_notes = coalesce(internal_notes || ' | ', '') || 'PayPal dispute opened.',
+        payment_response = coalesce(p_payment_response, payment_response)
+    where id = p_order_id;
+  end if;
+end;
+$$;
+
+grant execute on function public.apply_paypal_order_event(uuid, text, jsonb) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Tear down the old 30-minute reservation machinery so no reservation can be
+-- created. These functions are no longer called by any app route (create-order
+-- uses create_paypal_order above). Dropping them also drops their grants.
+--
+-- The vestigial products.reserved_until / products.reserved_order_id /
+-- orders.reserved_until columns are intentionally LEFT in place (always null now)
+-- to avoid a destructive schema change; the capture RPC still null-clears them
+-- harmlessly and the admin delete-order path tolerates them. Drop them later if
+-- you want a fully clean schema.
+-- ---------------------------------------------------------------------------
+drop function if exists public.reserve_paypal_order(jsonb, jsonb, integer);
+drop function if exists public.release_expired_paypal_reservations();

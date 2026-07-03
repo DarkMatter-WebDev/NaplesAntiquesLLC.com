@@ -148,9 +148,15 @@ Next-generated SEO endpoints:
 - `/sitemap.xml` from `next-app/src/app/sitemap.ts`
 
 Current route handlers include `/api/metal-prices`, `/api/inquire`,
-`/api/inquiries/[id]`, `/api/checkout/order`, the PayPal trio
-(`/api/paypal/create-order`, `/api/paypal/capture-order`, `/api/paypal/webhook`),
-`/api/subscribe`, and the admin-only `/api/admin/ai-product-fill`.
+`/api/inquiries/[id]`, `/api/checkout/order`, `/api/contact-message`,
+`/api/subscribe`, `/api/unsubscribe`, the PayPal family
+(`/api/paypal/create-order`, `/api/paypal/capture-order`,
+`/api/paypal/webhook`), and admin-only routes
+under `/api/admin/*` (`ai-product-fill`, `ai-settings`, `messages`,
+`subscribers`, `translate`, `storage-gc`, `users/[id]`,
+`orders/[id]/email-invoice`, `orders/[id]/email-update`, `marketing/*`). This
+list is representative, not exhaustive — see `next-app/src/app/api/` for the
+full route tree.
 
 ## Data Model
 
@@ -295,21 +301,51 @@ storefront path; `/payment` stays a disabled placeholder). Full runbook:
   is the single source of truth for authoritative subtotal/7%-tax/shipping/total
   (also used by the legacy checkout route). **No amounts are trusted from the
   browser.**
-- **Routes:** `POST /api/paypal/create-order` (build authoritative order, reserve
-  inventory atomically, create PayPal order), `POST /api/paypal/capture-order`
-  (capture, verify amount+currency, mark paid + products sold), `POST
-  /api/paypal/webhook` (signature-verified, idempotent via `webhook_events`).
-- **Inventory:** one-of-one items are row-locked and reserved (`reserved` status,
-  30-min `reserved_until`) by the `reserve_paypal_order` RPC; `capture_paypal_order`
-  flips them to `sold` and the order to `payment_status='paid'` /
-  `order_status='completed'`; `release_expired_paypal_reservations` frees lapsed
-  holds. Reserve/capture/release call `revalidateTag('shop-catalog', 'max')` so
-  reserved items leave the shop gallery promptly.
+- **Routes:** `POST /api/paypal/create-order` (build authoritative order, create
+  PayPal order — no inventory hold), `POST /api/paypal/capture-order`
+  (capture, verify amount+currency, mark paid + products sold, resolve the
+  concurrent-buyer race), `POST /api/paypal/webhook` (signature-verified,
+  idempotent via `webhook_events`).
+- **Capture-on-approve (2026-07-03):** the sale is captured in the PayPal
+  Buttons `onApprove` callback the moment the buyer hits **Pay Now** in the
+  PayPal window; on return to our tab they land directly on the "Order Received"
+  confirmation. There is no confirm-on-return review screen and no sessionStorage
+  resume machinery (both removed — the earlier 2026-07-02 reload/eviction-resume
+  approach with `GET /api/paypal/order-status` was reverted). Since nothing is
+  reserved, a tab evicted after approval but before capture simply leaves the item
+  available (buyer can retry / another buyer can purchase); the
+  `PAYMENT.CAPTURE.COMPLETED` webhook still reconciles any capture that landed.
+  Detail: `features/paypal-checkout.md`.
+- **Inventory — whoever pays first gets the item (2026-07-03):** there is **no
+  reservation**. `create_paypal_order` creates the order and leaves the one-of-one
+  products `available`, so multiple buyers can check out the same piece at once.
+  `capture_paypal_order` resolves the race: it row-locks the product rows, and if
+  the item was already `sold` by a first buyer's capture it returns `item_conflict`
+  (this order is flagged `failed` for a manual refund); otherwise it flips the
+  products to `sold` and the order to `payment_status='paid'` /
+  `order_status='completed'`. Capture + denial/refund webhook call
+  `revalidateTag('shop-catalog', { expire: 0 })` so sold items leave the gallery
+  promptly. The old 30-min `reserve_paypal_order` hold + expiry sweep were removed
+  (`no-reservation-checkout.sql`). The manual admin **Reserved** product status is a
+  separate, indefinite merchandising status — not a checkout hold.
 - **Admin surfacing:** a paid order surfaces as a badge on the admin **Orders** nav
   (`AdminOrdersLink`, counts paid + pending-fulfillment orders) — NOT in the Messages
   center.
 - **Env:** `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_ENV`
   (sandbox/live — creds must match the env), `PAYPAL_WEBHOOK_ID`.
+
+## Public-shop cache invalidation (2026-07-02)
+
+`/shop` is server-cached (`unstable_cache`, tag `shop-catalog`, `revalidate: 300`).
+Any write to `products` from a **browser** Supabase client (admin order
+cancel/reopen/mark-paid, delete-order return-to-inventory, archive/delete)
+cannot itself purge that cache, so the gallery would keep serving a stale
+status for up to 5 minutes. `next-app/src/app/actions/admin-products.ts`
+exports `adminRevalidateProduct(id)` / `adminRevalidateProducts(ids)` (both
+call `revalidateTag('shop-catalog', { expire: 0 })` + revalidate the EN/ES
+product detail paths) — call one of these after every client-side `products`
+write. Server-side writes (PayPal reserve/capture/webhook,
+`adminUpdateProductStatus`) already revalidate inline.
 
 ## Authentication
 

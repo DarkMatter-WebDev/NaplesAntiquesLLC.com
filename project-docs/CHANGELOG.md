@@ -3,6 +3,60 @@
 > Track meaningful changes. Newest at the top. One dated section per day of work;
 > bullet the notable changes. Keep entries short.
 
+## 2026-07-03
+
+- **Checkout inventory: 30-minute reservation removed — whoever pays first gets
+  the item.** Items stay `available` through the PayPal window (no hold), so
+  multiple buyers can check out the same one-of-one piece at once; the sale is
+  decided at capture. The app code was already on this model (`create-order` →
+  `create_paypal_order` with no hold; `capture-order` handles the `item_conflict`
+  race). This change tears down the leftover reservation machinery and fixes the
+  docs: `supabase/no-reservation-checkout.sql` now also **drops**
+  `reserve_paypal_order` + `release_expired_paypal_reservations` and rewrites
+  `apply_paypal_order_event`'s `denied` branch (no reservation release);
+  `paypal-checkout.sql` got a header pointing to it. Checkout subtitle copy changed
+  from "reserve the items" to "check out the items"; a stale "double-reserve"
+  comment corrected. Vestigial `reserved_until`/`reserved_order_id` columns left in
+  place (always null). The manual admin **Reserved** product status is unrelated and
+  unchanged. `tsc` clean, `npm run build` passes. **Manual step: run the current
+  `no-reservation-checkout.sql` in Supabase, by itself.** Follow-up the same day: an
+  owner attempt to re-run `paypal-checkout.sql` failed with `42P13` (cannot change
+  return type of `capture_paypal_order`) — which confirmed the live DB already holds
+  the no-reservation `item_conflict` capture function from an earlier apply; added a
+  `drop function if exists` guard before that definition in `paypal-checkout.sql`
+  (with a warning that re-running it downgrades capture and requires
+  no-reservation-checkout.sql again). See DECISIONS 2026-07-03.
+
+- **PayPal checkout: capture-on-approve; confirm-on-return flow removed.** The
+  sale now completes when the buyer hits Pay Now in the PayPal window (capture
+  runs in the Buttons `onApprove` callback) and they land directly on the "Order
+  Received" confirmation on return. Removed the intermediate "Confirm Your Order"
+  review screen + client-side capture-on-confirm, and the sessionStorage hand-off
+  (`nej-paypal-pending`) + `GET /api/paypal/order-status` resume route +
+  `getPayPalOrder()` in `lib/paypal.ts` that supported it. `PayPalCheckoutButton`
+  dropped its `onApproved` hand-off prop (now always captures in `onApprove`).
+  In-tab order-id reuse for cancel-then-retry is kept; with no reservation (see the
+  no-reservation entry above), a tab evicted mid-capture just leaves the item
+  available and the `PAYMENT.CAPTURE.COMPLETED` webhook reconciles any capture that
+  landed. Verified: `rm -rf .next && npm run build` passes (order-status
+  route gone), `tsc --noEmit` clean, changed files lint clean. Not exercised in
+  the browser (checkout is auth-gated; capture needs a PayPal sandbox approval).
+  See DECISIONS 2026-07-03. Reverts the 2026-07-02 reload/eviction-resume work
+  (the stale-total reuse fix from that day stands).
+
+- **Docs: all previously pending Supabase SQL migrations recorded as applied.**
+  Owner confirmed running `paypal-checkout.sql` (final re-run dropping the
+  capture-to-Messages notification insert), `admin-notifications-recycle-bin.sql`,
+  `admin-notifications-image-urls.sql`, `product-public-notes-es.sql`,
+  `product-item-year.sql` (with the `admin-notifications-checkout.sql` re-run),
+  and `shop-new-listing-jpg-to-webp.sql` on the live Supabase project. Updated
+  `CURRENT_STATUS.md` (new dated entry, replaced the "Pending manual SQL"
+  section, updated the PayPal HANDOFF migration notes) and `TASKS.md`
+  (converted the "Apply supabase/X.sql" backlog items into app-level
+  verification tasks, since the SQL itself is no longer outstanding). The
+  PayPal go-live blocker is unchanged — it is a Netlify env-var mismatch, not
+  a migration.
+
 ## 2026-07-02 (later)
 
 - **Fixed: shop gallery stayed stale (e.g. "sold") after admin order actions.**

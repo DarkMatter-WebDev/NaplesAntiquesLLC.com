@@ -3,13 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 
 type PayPalButtonsActions = { resolve: () => Promise<void>; reject: () => Promise<void> };
-type PayPalOrderDetails = { payer?: { email_address?: string } };
-type PayPalOnApproveActions = { order: { get: () => Promise<PayPalOrderDetails> } };
 type PayPalButtonsConfig = {
   style?: Record<string, unknown>;
   onClick?: (data: Record<string, unknown>, actions: PayPalButtonsActions) => Promise<void> | void;
   createOrder: () => Promise<string>;
-  onApprove: (data: { orderID: string }, actions: PayPalOnApproveActions) => Promise<void>;
+  onApprove: (data: { orderID: string }) => Promise<void>;
   onCancel?: () => void;
   onError?: (err: unknown) => void;
 };
@@ -72,7 +70,6 @@ export default function PayPalCheckoutButton({
   missingFields,
   getPayload,
   onOrderId,
-  onApproved,
   onSuccess,
 }: {
   clientId: string;
@@ -84,10 +81,6 @@ export default function PayPalCheckoutButton({
   missingFields: string[];
   getPayload: () => PayPalPayload;
   onOrderId: (orderId: string) => void;
-  /** When provided, called with the PayPal order ID (and payer email, if PayPal
-   *  returned one) after buyer approves in PayPal, instead of auto-capturing.
-   *  The parent is responsible for calling capture. */
-  onApproved?: (paypalOrderId: string, payerEmail?: string) => void;
   onSuccess: (result: { orderId: string; orderNumber: string }) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -101,14 +94,12 @@ export default function PayPalCheckoutButton({
   // (initialized once) always reads current cart + contact state.
   const getPayloadRef = useRef(getPayload);
   const onOrderIdRef = useRef(onOrderId);
-  const onApprovedRef = useRef(onApproved);
   const onSuccessRef = useRef(onSuccess);
   const isEsRef = useRef(isEs);
   const readyRef = useRef(ready);
   useEffect(() => {
     getPayloadRef.current = getPayload;
     onOrderIdRef.current = onOrderId;
-    onApprovedRef.current = onApproved;
     onSuccessRef.current = onSuccess;
     isEsRef.current = isEs;
     readyRef.current = ready;
@@ -164,22 +155,10 @@ export default function PayPalCheckoutButton({
           throw err;
         }
       },
-      onApprove: async (data, actions) => {
-        // If the parent wants to show a review step before capturing, hand off
-        // the approved PayPal order ID and let the parent trigger capture.
-        if (onApprovedRef.current) {
-          setProcessing(false);
-          let payerEmail: string | undefined;
-          try {
-            const orderDetails = await actions.order.get();
-            payerEmail = orderDetails?.payer?.email_address;
-          } catch {
-            // Non-critical — the confirm screen just won't show the payer email.
-          }
-          onApprovedRef.current(data.orderID, payerEmail);
-          return;
-        }
-        // Default: capture immediately.
+      onApprove: async (data) => {
+        // The buyer approved (hit Pay Now) in the PayPal window — capture the
+        // payment now so the sale completes here, then the parent shows the
+        // order confirmation screen.
         try {
           const res = await fetch('/api/paypal/capture-order', {
             method: 'POST',

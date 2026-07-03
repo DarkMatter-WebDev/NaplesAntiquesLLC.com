@@ -32,6 +32,7 @@ The former root static HTML site has been removed. Do not reintroduce root
 | Inquiry API | `next-app/src/app/api/inquire/route.ts` and `next-app/src/app/api/inquiries/[id]/route.ts` |
 | Online payments (PayPal) | `next-app/src/lib/paypal.ts` + `next-app/src/app/api/paypal/{create-order,capture-order,webhook}/route.ts` + `next-app/src/components/checkout/PayPalCheckoutButton.tsx` |
 | Authoritative checkout totals | `next-app/src/lib/checkout-pricing.ts` (subtotal/tax/shipping/total — never trusted from the client) |
+| Public-shop cache invalidation | `next-app/src/app/actions/admin-products.ts` (`adminRevalidateProduct`/`adminRevalidateProducts`) — every write to `products` that should be visible in `/shop` immediately, from any client (browser or server), must call one of these after the write |
 | Supabase clients | `next-app/src/lib/supabase/client.ts` and `server.ts` |
 | Translations | `next-app/messages/en.json` and `next-app/messages/es.json` |
 | Local static assets | `next-app/public/assets/*` |
