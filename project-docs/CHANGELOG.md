@@ -3,6 +3,58 @@
 > Track meaningful changes. Newest at the top. One dated section per day of work;
 > bullet the notable changes. Keep entries short.
 
+## 2026-07-02 (later)
+
+- **Fixed: shop gallery stayed stale (e.g. "sold") after admin order actions.**
+  The admin Products tab purged the `shop-catalog` cache via the
+  `adminUpdateProductStatus` server action, but every order-flow product write
+  went straight through the browser Supabase client with no revalidation, so the
+  public gallery served its cached page (revalidate: 300) for up to 5 minutes.
+  Added bulk `adminRevalidateProducts(ids)` to `app/actions/admin-products.ts`
+  and call it after each client-side write: `OrderDetailPanel.updateProducts`
+  (cancel/reopen/mark-paid/mark-unpaid), `OrdersPanel` delete-order
+  return-to-inventory and create-order reserve, and `AdminShell` archive +
+  hard-delete. Verified live signed-in: Mark Paid removed the bracelet from
+  /shop within ~3s; Cancel Order returned it within ~3s. `tsc` clean, changed
+  files carry only pre-existing lint issues, `npm run build` passes.
+  **Convention going forward: any client-side `products` write must be followed
+  by `adminRevalidateProduct(s)`.**
+
+## 2026-07-02
+
+- **PayPal checkout now survives a reload/tab-eviction during the approval
+  round-trip.** Mobile OSes can evict the checkout tab while the buyer is off in
+  the PayPal window/app; previously the post-approval state (`pendingPaypalOrderId`,
+  `payerEmail`, `orderIdRef`) lived only in React state, so the buyer returned to a
+  blank form after tapping "Pay Now" and the approved order was silently never
+  captured. Now `CheckoutClient` persists a hand-off record (`nej-paypal-pending`,
+  sessionStorage) at create/approve and, on mount, asks the new
+  `GET /api/paypal/order-status?orderId=…` route (backed by `getPayPalOrder()` in
+  `lib/paypal.ts`, PayPal `GET /v2/checkout/orders/{id}`) where the payment stands:
+  `approved` → restores the Confirm screen, `paid` → success screen, `pending` →
+  keeps the reusable order id, `none` → clears the record. Record is cleared on
+  capture success and on "Back to checkout". Verified: `tsc` clean, changed files
+  lint clean, `npm run build` passes, endpoint behavior verified live on the dev
+  server (400 without orderId; `{state:'none'}` for unknown order → record cleared).
+  Full resume path (approve in sandbox → reload → Confirm screen restored) still
+  needs a signed-in sandbox run — added to the test matrix in CURRENT_STATUS.
+- **Fixed: PayPal retry could charge stale totals.** If the buyer cancelled the
+  PayPal window, edited the cart or switched shipping method, and paid again, the
+  create-order reuse path rebuilt the PayPal order from the ORIGINAL order rows
+  (old items/totals). Now the reuse path recomputes the draft from the submitted
+  payload and only reuses when the product set and subtotal/shipping/total still
+  match; otherwise it cancels the stale order and creates a fresh one. Client side,
+  `CheckoutClient` fingerprints the cart+shipping the order was created for
+  (`payloadKey`, persisted in the `nej-paypal-pending` record) and forgets the
+  reusable order id as soon as the payload diverges. Verified live (signed-in dev
+  session): same-payload retry reuses the same order id; changed-shipping retry
+  returns a fresh order id; unapproved order → order-status `pending`; fake
+  order id → `none` + record self-clears.
+- Diagnosed the "returned to a random other tab after PayPal" report: mobile
+  OS/browser tab-focus behavior on app hand-off, not app code (no return_url,
+  window.open, or tab logic exists in the checkout). The eviction-resume above is
+  the actionable defect that fell out of the investigation.
+
 ## 2026-06-29
 
 - **Checkout shipping selector lives on the Order Summary's "Shipping" row.** The

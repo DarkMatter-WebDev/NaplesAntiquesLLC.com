@@ -2422,6 +2422,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     if ((count ?? 0) > 0) {
       const { error } = await supabase.from('products').update({ status: 'archived' }).eq('id', deleteTarget.id);
       if (error) { flash(error.message, false); return; }
+      void adminRevalidateProduct(deleteTarget.id);
       setProducts((prev) => prev.map((p) => p.id === deleteTarget.id ? { ...p, status: 'archived' } : p));
       flash('Product has order history, so it was archived instead of deleted.');
       setDeleteTarget(null);
@@ -2431,6 +2432,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     const deleteImageUrls = [...(deleteTarget.images ?? []), ...(deleteTarget.image_urls ?? [])];
     const { error } = await supabase.from('products').delete().eq('id', deleteTarget.id);
     if (error) { flash(error.message, false); return; }
+    void adminRevalidateProduct(deleteTarget.id);
     const nextProducts = products.filter((p) => p.id !== deleteTarget.id);
     setProducts(nextProducts);
     await deleteProductImagesIfUnused(deleteImageUrls, deleteTarget.id, nextProducts);

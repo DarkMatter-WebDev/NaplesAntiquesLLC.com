@@ -25,6 +25,19 @@ go-live checklist below and the Backlog item in `TASKS.md`.
      "Order Received" confirmation (order number).
    - `onCancel`/`onError` → clean message; the order stays unpaid and items stay
      reserved until the hold expires.
+4. **Reload/eviction resume (2026-07-02).** The approval round-trip happens in a
+   separate PayPal window (or the PayPal app on mobile), and mobile OSes may evict
+   the suspended checkout tab meanwhile — which used to lose the React-only
+   post-approval state (`onApprove` never fires on the reloaded page; the buyer who
+   just tapped "Pay Now" landed on a blank form and the approved order was never
+   captured). `CheckoutClient` now persists a hand-off record in sessionStorage
+   (`nej-paypal-pending`: `{ orderId, payerEmail? }`) when create-order returns and
+   again at approval. On mount it calls `GET /api/paypal/order-status?orderId=…` and
+   resumes: `approved` → restore the Confirm screen (payer email re-fetched from
+   PayPal), `paid`/`COMPLETED` → success screen, `pending` → keep the record +
+   reusable order id, `none` → clear the record. Cleared on capture success and on
+   "← Back to checkout" (explicit back-out). sessionStorage is deliberate: per-tab
+   (no cross-tab bleed), survives reload/eviction-restore.
 
 ## Routes (`src/app/api/paypal/*`)
 
@@ -41,6 +54,13 @@ go-live checklist below and the Backlog item in `TASKS.md`.
   verifies `COMPLETED` + amount within 1¢ + currency `USD`, then calls
   `capture_paypal_order`. On amount/currency mismatch it records the capture, sets
   `payment_status='pending'`, posts an admin notification, and does **not** auto-sell.
+- **`order-status`** (service-role client, GET `?orderId=<internal id>`): resume
+  support for the popup round-trip (see Flow §4). Looks up the order row; returns
+  `{state:'paid', orderNumber}` if already captured, else queries PayPal
+  (`getPayPalOrder`) and maps `APPROVED` → `{state:'approved', paypalOrderId,
+  payerEmail}`, `COMPLETED` → `paid`, `CREATED`/`PAYER_ACTION_REQUIRED` → `pending`,
+  anything else/errors → `none`. No auth gate beyond knowing the order UUID
+  (which only the buyer's browser holds).
 - **`webhook`** (service-role client): `verifyPayPalWebhook` (calls PayPal's
   verify-webhook-signature with `PAYPAL_WEBHOOK_ID`; fails closed if unset), logs to
   `webhook_events` (unique `(provider, event_id)` → duplicates are a no-op), then
@@ -49,7 +69,8 @@ go-live checklist below and the Backlog item in `TASKS.md`.
 
 ## Server library — `src/lib/paypal.ts`
 
-OAuth token (cached ~9h), `createPayPalOrder`, `capturePayPalOrder` (sends
+OAuth token (cached ~9h), `createPayPalOrder`, `getPayPalOrder` (status + payer
+email, for resume), `capturePayPalOrder` (sends
 `PayPal-Request-Id` for idempotency), `verifyPayPalWebhook`. Base URL switches on
 `PAYPAL_ENV` (`sandbox` → `api-m.sandbox.paypal.com`, else live). Server-only.
 

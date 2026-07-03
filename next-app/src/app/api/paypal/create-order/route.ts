@@ -37,6 +37,11 @@ export async function POST(req: Request) {
   const service = createServiceClient();
 
   // ---- Retry path: reuse an existing unpaid order, re-create its PayPal order.
+  // Only reuse when the stored order still matches what the buyer is paying for
+  // NOW — same product set and same recomputed totals. The buyer may have edited
+  // the cart or switched shipping method after cancelling the PayPal window;
+  // reusing the old rows then would charge the wrong amount. On any mismatch the
+  // stale order is cancelled and we fall through to the new-order path below.
   if (reuseOrderId) {
     const { data: order, error } = await service
       .from('orders')
@@ -56,28 +61,51 @@ export async function POST(req: Request) {
       .select('product_id, title_snapshot, price_snapshot, inventory_number')
       .eq('order_id', reuseOrderId);
 
-    const items = (orderItems ?? []).map((item) => ({
-      title_snapshot: item.title_snapshot,
-      price_snapshot: Number(item.price_snapshot),
-      inventory_number: item.inventory_number ?? '',
-    }));
+    const storedProductIds = new Set((orderItems ?? []).map((item) => String(item.product_id)));
+    const sameProducts =
+      productIds.length > 0 &&
+      productIds.length === storedProductIds.size &&
+      productIds.every((id) => storedProductIds.has(id));
 
-    try {
-      const paypalOrder = await createPayPalOrder({
-        currency: CURRENCY,
-        subtotal: Number(order.subtotal),
-        tax: Number(order.tax),
-        shipping: Number(order.shipping_fee),
-        total: Number(order.total),
-        items: lineItems(items),
-        referenceId: order.id,
-      });
-      await service.from('orders').update({ paypal_order_id: paypalOrder.id }).eq('id', order.id);
-      return NextResponse.json({ paypalOrderId: paypalOrder.id, orderId: order.id });
-    } catch (err) {
-      console.error('PayPal create-order (reuse) error:', err);
-      return NextResponse.json({ error: 'Could not start PayPal checkout.' }, { status: 502 });
+    let sameTotals = false;
+    if (sameProducts) {
+      // Recompute totals from the live cart payload; catches shipping-method
+      // switches (express vs priority both store as 'shipping') and price drift.
+      const draft = await buildOrderDraft(supabase, productIds, shippingMethod);
+      sameTotals =
+        !isOrderDraftError(draft) &&
+        draft.subtotal === Number(order.subtotal) &&
+        draft.shippingFee === Number(order.shipping_fee) &&
+        draft.total === Number(order.total);
     }
+
+    if (sameProducts && sameTotals) {
+      const items = (orderItems ?? []).map((item) => ({
+        title_snapshot: item.title_snapshot,
+        price_snapshot: Number(item.price_snapshot),
+        inventory_number: item.inventory_number ?? '',
+      }));
+
+      try {
+        const paypalOrder = await createPayPalOrder({
+          currency: CURRENCY,
+          subtotal: Number(order.subtotal),
+          tax: Number(order.tax),
+          shipping: Number(order.shipping_fee),
+          total: Number(order.total),
+          items: lineItems(items),
+          referenceId: order.id,
+        });
+        await service.from('orders').update({ paypal_order_id: paypalOrder.id }).eq('id', order.id);
+        return NextResponse.json({ paypalOrderId: paypalOrder.id, orderId: order.id });
+      } catch (err) {
+        console.error('PayPal create-order (reuse) error:', err);
+        return NextResponse.json({ error: 'Could not start PayPal checkout.' }, { status: 502 });
+      }
+    }
+
+    // Stale order — cancel it and create a fresh one from the current payload.
+    await service.from('orders').update({ order_status: 'cancelled' }).eq('id', order.id);
   }
 
   // ---- New order path.

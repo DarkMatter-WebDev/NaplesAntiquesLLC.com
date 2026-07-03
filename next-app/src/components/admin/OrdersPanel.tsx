@@ -10,6 +10,7 @@ import type { Order, PaymentStatus, FulfillmentStatus, OrderStatus, ShippingMeth
 import { formatCurrency, formatOrderDate, orderStatusLabel } from '@/types/sales';
 import type { SpotData } from '@/types/product';
 import { buildAddressObject, generateOrderNumber, getProductImages, getProductMetal, getProductWeight, getSnapshotPrice } from '@/lib/sales';
+import { adminRevalidateProducts } from '@/app/actions/admin-products';
 
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
@@ -251,6 +252,10 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
       return;
     }
 
+    // Browser-client write — purge the shop cache so reserved items leave the
+    // public gallery immediately.
+    await adminRevalidateProducts(selectedProductIds);
+
     setOrders((current) => [{ ...(order as Order), order_items: itemPayloads as never }, ...current]);
     setSaving(false);
     setShowCreate(false);
@@ -289,6 +294,9 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
           setDeleting(false);
           return;
         }
+        // Browser-client write — purge the shop cache so the returned items
+        // show as available in the public gallery immediately.
+        await adminRevalidateProducts(productIds);
       }
     }
 

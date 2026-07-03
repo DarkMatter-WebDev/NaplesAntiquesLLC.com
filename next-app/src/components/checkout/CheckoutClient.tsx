@@ -10,6 +10,34 @@ import { createClient } from '@/lib/supabase/client';
 import { productImagePaddingForImage } from '@/types/product';
 
 const GOLD = '#735c00';
+
+// The PayPal approval round-trip happens in a separate window (or the PayPal
+// app on mobile), and the OS may reload or evict this tab in the meantime —
+// losing the React state that the SDK's onApprove callback would have set.
+// Persist the hand-off in sessionStorage (per-tab, survives reload) so the
+// page can resume the right screen by asking /api/paypal/order-status.
+const PENDING_KEY = 'nej-paypal-pending';
+
+type PendingPayPalRecord = { orderId: string; payerEmail?: string; payloadKey?: string };
+
+function readPendingRecord(): PendingPayPalRecord | null {
+  try {
+    const raw = sessionStorage.getItem(PENDING_KEY);
+    const record = raw ? (JSON.parse(raw) as PendingPayPalRecord) : null;
+    return record?.orderId ? record : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePendingRecord(record: PendingPayPalRecord | null) {
+  try {
+    if (record) sessionStorage.setItem(PENDING_KEY, JSON.stringify(record));
+    else sessionStorage.removeItem(PENDING_KEY);
+  } catch {
+    /* storage unavailable — degrade to the old in-memory-only behavior */
+  }
+}
 type CartProductInfo = Pick<
   CartItem,
   | 'description'
@@ -67,6 +95,23 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
   // Internal order id from the first create-order call, reused if the buyer
   // cancels the PayPal window and tries again (so we don't double-reserve).
   const orderIdRef = useRef<string | null>(null);
+  // Cart+shipping fingerprint the order was created for. If the buyer edits the
+  // cart or switches shipping after cancelling PayPal, the old order's totals no
+  // longer apply — forget it so the retry creates a fresh order. (The server
+  // re-validates this too; clearing here just avoids a doomed reuse attempt.)
+  const orderPayloadKeyRef = useRef<string | null>(null);
+
+  const cartPayloadKey = `${items.map((item) => item.id).sort().join(',')}|${shippingMethod}`;
+
+  // Invalidate the reusable order id when the cart or shipping method changes
+  // after the order was created (buyer cancelled PayPal, then edited things).
+  useEffect(() => {
+    if (orderIdRef.current && orderPayloadKeyRef.current !== cartPayloadKey && !pendingPaypalOrderId) {
+      orderIdRef.current = null;
+      orderPayloadKeyRef.current = null;
+      writePendingRecord(null);
+    }
+  }, [cartPayloadKey, pendingPaypalOrderId]);
 
   const needsShipping = shippingMethod !== 'local-pickup';
   const contactReady =
@@ -147,6 +192,42 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // Resume an in-flight PayPal payment after a reload/tab-eviction. Runs once:
+  // if a hand-off record exists, ask the server where the payment stands and
+  // restore the confirm screen (approved) or success screen (already captured).
+  useEffect(() => {
+    const record = readPendingRecord();
+    if (!record) return;
+    orderIdRef.current = record.orderId;
+    orderPayloadKeyRef.current = record.payloadKey ?? null;
+
+    let cancelled = false;
+    (async () => {
+      const res = await fetch(`/api/paypal/order-status?orderId=${encodeURIComponent(record.orderId)}`)
+        .catch(() => null);
+      const data = res ? await res.json().catch(() => null) : null;
+      if (cancelled || !data?.state) return;
+
+      if (data.state === 'approved' && data.paypalOrderId) {
+        setPayerEmail(data.payerEmail ?? record.payerEmail ?? null);
+        setPendingPaypalOrderId(data.paypalOrderId);
+      } else if (data.state === 'paid' && data.orderNumber) {
+        writePendingRecord(null);
+        clear();
+        setCreatedOrder({ orderNumber: data.orderNumber, total: 0 });
+      } else if (data.state === 'none') {
+        writePendingRecord(null);
+        orderIdRef.current = null;
+      }
+      // state === 'pending': order created but not approved — keep the record
+      // and orderIdRef so a retry reuses the same order.
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -246,6 +327,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
       if (!res.ok || !result?.success) {
         throw new Error(result?.error ?? (isEs ? 'No se pudo confirmar el pago.' : 'Payment could not be confirmed.'));
       }
+      writePendingRecord(null);
       clear();
       setPendingPaypalOrderId(null);
       setCreatedOrder({ orderNumber: result.orderNumber, total: 0 });
@@ -321,7 +403,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
             </button>
             <button
               type="button"
-              onClick={() => { setPendingPaypalOrderId(null); setPayerEmail(null); setCaptureError(null); }}
+              onClick={() => { writePendingRecord(null); setPendingPaypalOrderId(null); setPayerEmail(null); setCaptureError(null); }}
               disabled={capturing}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-on-surface-variant)', fontSize: '0.875rem', textDecoration: 'underline', textUnderlineOffset: '3px', padding: '0.25rem 0', textAlign: 'center' }}
             >
@@ -503,13 +585,25 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
               isEs={isEs}
               missingFields={missingFieldLabels}
               getPayload={buildPayPalPayload}
-              onOrderId={(id) => { orderIdRef.current = id; }}
+              onOrderId={(id) => {
+                orderIdRef.current = id;
+                orderPayloadKeyRef.current = cartPayloadKey;
+                writePendingRecord({ orderId: id, payloadKey: cartPayloadKey });
+              }}
               onApproved={(paypalOrderId, email) => {
                 setCaptureError(null);
                 setPayerEmail(email ?? null);
                 setPendingPaypalOrderId(paypalOrderId);
+                if (orderIdRef.current) {
+                  writePendingRecord({
+                    orderId: orderIdRef.current,
+                    payerEmail: email,
+                    payloadKey: orderPayloadKeyRef.current ?? cartPayloadKey,
+                  });
+                }
               }}
               onSuccess={({ orderNumber }) => {
+                writePendingRecord(null);
                 clear();
                 setCreatedOrder({ orderNumber, total: 0 });
               }}

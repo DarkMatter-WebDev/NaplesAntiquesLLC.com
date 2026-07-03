@@ -161,6 +161,35 @@ export async function createPayPalOrder(input: CreatePayPalOrderInput): Promise<
   return { id: data.id, status: data.status ?? 'CREATED' };
 }
 
+export type PayPalOrderDetails = {
+  status: string;
+  payerEmail: string | null;
+};
+
+/**
+ * Fetch a PayPal order's current status (CREATED / APPROVED / COMPLETED / VOIDED…).
+ * Used to resume checkout after the buyer's tab was reloaded or evicted while
+ * they were off approving in the PayPal window — client state is gone, but
+ * PayPal still knows whether the order was approved.
+ */
+export async function getPayPalOrder(paypalOrderId: string): Promise<PayPalOrderDetails> {
+  const token = await getAccessToken();
+  const res = await fetch(`${paypalApiBase()}/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+
+  const data = (await res.json().catch(() => null)) as
+    | { status?: string; payer?: { email_address?: string }; message?: string }
+    | null;
+
+  if (!res.ok || !data?.status) {
+    throw new Error(`PayPal get order failed (${res.status}): ${data?.message ?? 'unknown error'}`);
+  }
+
+  return { status: data.status, payerEmail: data.payer?.email_address ?? null };
+}
+
 export type PayPalCaptureResult = {
   status: string;
   captureId: string | null;

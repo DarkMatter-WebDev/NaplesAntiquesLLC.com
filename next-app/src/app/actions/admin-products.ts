@@ -25,6 +25,17 @@ export async function adminUpdateProductStatus(
  * both locale variants of the individual product page (path). Call this after any
  * admin write that should be immediately visible in the public-facing shop.
  */
+/** Bulk variant of adminRevalidateProduct for order flows that flip several
+ *  products at once (cancel/reopen/mark-paid/delete-order). One tag purge
+ *  refreshes the gallery; per-product paths refresh the detail pages. */
+export async function adminRevalidateProducts(ids: string[]): Promise<void> {
+  revalidateTag('shop-catalog', { expire: 0 });
+  for (const id of ids) {
+    revalidatePath(`/shop/${id}`);
+    revalidatePath(`/es/shop/${id}`);
+  }
+}
+
 export async function adminRevalidateProduct(id: string): Promise<void> {
   // { expire: 0 } forces immediate expiration — 'max' uses stale-while-revalidate,
   // which would show the old status once more before ever refreshing.

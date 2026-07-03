@@ -11,6 +11,7 @@ import { formatProductItemYear } from '@/types/product';
 import { buildInvoiceEmailContent, invoiceNumberForOrder, withInvoiceLineDiscounts } from '@/lib/order-invoice-email';
 import { buildFulfillmentUpdateEmailContent } from '@/lib/order-fulfillment-email';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
+import { adminRevalidateProducts } from '@/app/actions/admin-products';
 
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
@@ -113,6 +114,10 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
       setMessage({ text: error.message, ok: false });
       return false;
     }
+    // Purge the shop-gallery cache — this write happens via the browser client,
+    // so no server route revalidates the tag for us. Without it the public
+    // gallery keeps the old status for up to 5 minutes.
+    await adminRevalidateProducts(productIds);
     return true;
   }
 

@@ -1,7 +1,66 @@
 # Current Status
 
 > Reflects the present state of development. **Update this at the end of every
-> work session.** Last updated: **2026-06-30**.
+> work session.** Last updated: **2026-07-02**.
+
+## 2026-07-02 (later) — shop-gallery cache now purged by admin order actions
+
+Fixed the report "cancelled order items show available in admin but stay sold in
+the public gallery": order-flow product writes (cancel/reopen/mark-paid,
+delete-order return-to-inventory, create-order reserve, archive/hard-delete)
+happened via the browser Supabase client and never revalidated the `shop-catalog`
+tag, so the gallery stayed stale up to 5 min. All now call the new bulk
+`adminRevalidateProducts()` server action. Verified live on dev (signed-in):
+Mark Paid → bracelet left /shop in ~3s; Cancel → back in ~3s. Convention: any
+client-side `products` write must be followed by `adminRevalidateProduct(s)`.
+Note: the Test 7 leftover order `a565d7f4…` is now `cancelled` (used for this
+verification); the cleanup SQL below still applies.
+
+## 2026-07-02 — PayPal approval-return hardening (reload/eviction resume)
+
+Investigated the report "after PayPal authorization the user lands on a random
+other tab" (mobile). Conclusion: the tab-focus behavior is the mobile OS/browser's
+app hand-off quirk, not app code (checkout has no `return_url`, `window.open`, or
+tab logic — the PayPal JS SDK owns the whole round-trip). But the audit surfaced a
+real defect: all post-approval state was React-only, so a mobile tab eviction or
+reload during/after approval silently dropped an APPROVED-but-never-captured
+payment (buyer taps "Pay Now", returns to a blank form).
+
+**Shipped:** sessionStorage hand-off record (`nej-paypal-pending`) + new
+`GET /api/paypal/order-status` resume route + `getPayPalOrder()` in `lib/paypal.ts`.
+Details in `features/paypal-checkout.md` (Flow §4).
+**Verified:** `npx tsc --noEmit` clean; changed files eslint-clean (5 pre-existing
+errors elsewhere: `react-hooks/set-state-in-effect` in an admin editor,
+unused-vars in `OrderDetailPanel`/`ShopFilters`); `npm run build` passes with the
+route registered; endpoint probed live on dev :3002 (no param → 400; unknown
+order → `{state:'none'}`).
+**Test 7 (approved-branch resume) PASSED live** the same day: owner approved in
+the sandbox window, a full reload of /checkout restored the Confirm screen with
+the payer email re-fetched from PayPal and no console errors. The unfinished
+approval left order `858bbf06-358a-4ba6-8a10-d3505521ca11` (unpaid, approved at
+PayPal — expires on its own if never captured); included in the cleanup below.
+
+**Also fixed same day: stale-total reuse bug.** The create-order reuse path used
+to rebuild the PayPal order from the original order rows even if the buyer had
+edited the cart/shipping after cancelling — wrong charge. Now it recomputes the
+draft and reuses only on an exact product-set + totals match, else cancels the
+stale order and falls through to a fresh one; the client also drops the reusable
+order id when the cart/shipping fingerprint (`payloadKey` in `nej-paypal-pending`)
+diverges. **Verified live signed-in on dev :3002:** resume 'none' branch clears the
+record on /checkout mount; create → order-status `pending`; same-payload retry
+reuses the order id; changed-shipping retry returns a fresh order id.
+
+⚠️ **Leftover test rows from this verification** (products were never reserved —
+create no longer holds inventory before capture): orders
+`cc3c6996-6853-421d-ac13-91e3777b1b67` (cancelled) and
+`a565d7f4-7f49-4f56-adbb-b80593210409` (unpaid), both `payment_method='paypal'`,
+`customer_email='resume-test@example.com'`, plus the Test 7 order
+`858bbf06-358a-4ba6-8a10-d3505521ca11` (unpaid, approved-never-captured), all
+created 2026-07-02. Clean up in Supabase:
+```sql
+DELETE FROM orders WHERE customer_email = 'resume-test@example.com';
+DELETE FROM orders WHERE id = '858bbf06-358a-4ba6-8a10-d3505521ca11';
+```
 
 ## 🔴 HANDOFF — PayPal checkout: where testing stands (2026-06-30)
 
@@ -76,6 +135,7 @@ WHERE payment_method = 'paypal'
 | 6 | Amount mismatch | ◐ Logic verified (capture compares amount+currency → flags order `pending` + admin notification, no auto-sell); NOT forced live |
 | 2 | Canceled checkout | ⬜ NOT run live (onCancel handler exists) |
 | 4 | Duplicate webhook | ⬜ NOT run — needs deployed site + PayPal "Resend"/simulator (idempotency is coded via `webhook_events` unique `event_id`) |
+| 7 | Reload-during-approval resume (2026-07-02) | ✅ **PASSED live (local dev, signed-in)** — approved in the sandbox window, full page reload on the Confirm screen → Confirm screen restored with payer email re-fetched from PayPal, no console errors |
 
 ### What's left to do, in order
 1. **Fix the Netlify credential mismatch** (see BLOCKER above): update the 4 PayPal vars in
