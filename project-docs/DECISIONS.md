@@ -195,7 +195,32 @@ dropped its notification insert (idempotent migration re-run).
 (per-page unread counts + read-marking). (2) Email the owner on capture — not done
 yet; could be added alongside the badge.
 
+## 2026-07-03 — Checkout: address always shown in Contact Details, required only for shipping
+
+**Decision:** The buyer's address fields (street, apt, city, state, ZIP, country)
+now always render inside the **Contact Details** panel, directly under Email —
+regardless of the delivery method. They are **required/enforced only when a shipping
+method other than local pickup is selected** (`needsShipping`): when shipping, the
+labels show `*`, the inputs are `required`, and `payReady`/`missingFieldLabels` block
+payment until street+city+state+ZIP are filled; for local pickup the same fields are
+shown with an "Optional for local pickup" hint, no `*`, and never block payment. The
+address the buyer types is **always** sent in the create-order payload (captured as a
+contact record on the order via `buildAddressObject`); the server still only
+*requires* a complete address when the shipping method needs one.
+
+**Reason:** The owner wants to collect the customer's address as part of their
+contact information on every order (useful contact/record data), while only forcing a
+complete address when it's actually needed for delivery.
+
+**Supersedes** the 2026-06-30 decision below (address block in the left review
+column, rendered only when shipping is selected).
+
 ## 2026-06-30 — Checkout layout: shipping selector on the Order Summary, address under it
+
+> ⚠️ **Superseded 2026-07-03** — the address now lives in the Contact Details panel
+> and is always shown (required only for shipping); see the entry above. The
+> delivery-method `<select>` staying on the Order Summary's "Shipping" row still
+> holds.
 
 **Decision:** The delivery-method picker lives on the Order Summary's "Shipping"
 row as an inline `<select>`; the Shipping Address block sits in the left review

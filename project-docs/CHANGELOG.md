@@ -5,6 +5,108 @@
 
 ## 2026-07-03
 
+- **Removed the "Optional for local pickup" address hint on checkout.** The
+  address section's helper line now only renders when a shipping method is
+  selected (`needsShipping`) — showing "Required for the delivery method you
+  selected." For local pickup no hint shows at all. Verified live both ways.
+  `tsc`/`eslint` clean.
+
+- **Tightened the checkout page hero on mobile further.** Hid the
+  "Complete your details to check out the items in your cart." subtitle on
+  mobile (`hidden md:block` — still shown on desktop) and dropped the `<h1>`
+  bottom margin to 0 on mobile (`mb-1.5`→`mb-0`, `mt-2`→`mt-1`) plus trimmed
+  `.checkout-hero` mobile padding/margin (`1rem 1.1rem`→`0.75rem 1.1rem`,
+  margin-bottom `1rem`→`0.85rem`). The mobile hero is now just the back link +
+  "Checkout" in a compact box. Verified live at 375px (subtitle `display:none`,
+  still in DOM for `md:`). `tsc`/`eslint` clean.
+
+- **Tightened the checkout Order Summary further.** In `OrderSummary.tsx`'s
+  `expanded` variant: moved the "N item(s)" count onto the same row as the
+  "Order Summary" heading (right-aligned, `flex-row` at all widths instead of
+  stacking below on mobile); shrank the item title (`text-sm md:text-base` →
+  `text-[0.8rem] md:text-sm`); and compacted spacing overall — aside padding
+  `p-5 md:p-7`→`p-4 md:p-6`, header margin `mb-5`→`mb-3`, item grid gap/margin
+  `gap-4 mb-5`→`gap-3 mb-4`, item-row padding `p-2.5 md:p-3`→`p-2 md:p-2.5`,
+  thumbnail `20/24`→`16/20` (rem-scale), and the totals block
+  `px-4 py-4 pt-4`→`px-3.5 py-3 pt-3`. Verified live at 375px: count is
+  right-of-heading on one row, title is 12.8px, and the block is noticeably
+  shorter. `tsc`/`eslint` clean.
+
+- **Checkout: address always collected in Contact Details; required only for
+  shipping.** Moved the address fields out of the left review column (where they
+  only appeared when a shipping method was selected) into the **Contact Details**
+  panel under Email, always rendered. When the delivery method is local pickup the
+  fields show an "Optional for local pickup" hint, no `*`, `required={false}`, and
+  never block payment; when a shipping method is chosen they show `*`,
+  `required`, and the existing `payReady`/`missingFieldLabels` gate blocks payment
+  until street+city+state+ZIP are filled (unchanged logic). `buildPayPalPayload`
+  now always sends the address (server still only requires a complete one for
+  shipping — `buildAddressObject` tolerates blanks). Removed the now-unused
+  `.checkout-address-block` styles. Verified live: pickup → optional/no-asterisk,
+  payment allowed with blank address; shipping → required/asterisks, payment gated
+  until complete. `tsc`/`eslint` clean. Supersedes the 2026-06-30 checkout-layout
+  decision (see DECISIONS).
+
+- **Compacted the checkout page header on mobile.** The `< Back to shop` /
+  "Checkout" heading / subtitle block (`checkout-hero`) used the same padding,
+  heading size, and margins at every width — on mobile (`≤640px`) that meant
+  ~48px of page top-padding, a 30px heading, and generous margins before the
+  Order Summary even started, pushing it and the payment form well below the
+  fold. Added a `max-width: 640px` rule that tightens `.checkout-page`'s top
+  padding (3rem→1.25rem) and `.checkout-hero`'s padding/margin, and shrunk the
+  `<h1>`/subtitle to smaller mobile-first Tailwind sizes (`text-2xl`/`text-sm`,
+  tighter `mt`/`mb`) that scale back up at `sm:`/`md:`. Desktop/tablet (`md:`
+  classes) untouched. Verified live at 375px — the same viewport height that
+  previously showed only the hero now also fits the entire Order Summary box
+  and the start of Contact Details. `tsc`/`eslint` clean.
+
+- **Compacted checkout Order Summary item rows; removed the description.**
+  `OrderSummary.tsx`'s `expanded` variant (used on `/checkout`) gave each cart
+  item a separate bordered "PRICE" panel (label + large price text) in a
+  `md:grid-cols-[...]` right column — on mobile that column drops below the
+  item info as a large, nearly full-width box, and each row also showed a
+  product description line, making the list tall. Replaced the boxed price
+  panel with the same small inline bold price line the `compact` variant
+  (cart drawer) already used, right under the title, and removed the
+  description line entirely (kept the Ca./purity/metal/length "specs" line —
+  only the description was requested removed). Removed the now-dead
+  `description` variable in `SummaryRow`. Verified live at 375px and desktop
+  widths — item rows are now a fraction of their prior height. `tsc`/`eslint`
+  clean.
+
+- **Checkout requires a "confirm your information" checkbox before paying.**
+  Added a required checkbox in a bordered box directly above the PayPal /
+  Debit-or-Credit-Card buttons on `/checkout` ("I confirm that I have reviewed
+  my order and that my contact details, shipping address, and other information
+  above are correct before proceeding to payment."). Wired into the existing
+  `payReady` gate (`CheckoutClient.tsx`) alongside the contact/shipping checks,
+  so `PayPalCheckoutButton`'s `onClick` guard rejects the PayPal window and shows
+  the existing "required fields" modal (now listing this item too) until it's
+  checked. EN/ES copy. Verified live, signed in: unchecked → PayPal blocked +
+  "Complete the required details…" message shown; checked → message clears and
+  the PayPal/card buttons unlock; unchecking again re-locks. `tsc`/`eslint` clean.
+
+- **Enlarged the mobile shop-card cart and favorite icon buttons.** On the
+  gallery cards' mobile view (`≤640px`), the top-left Add-to-Cart icon and
+  top-right favorite (wishlist) icon were `1.35rem` — noticeably smaller than
+  their `1.75rem` desktop/tablet button-variant size and easy to mis-tap.
+  Increased both to `1.8rem` (icon glyphs 11px→14px cart, 12px→15px wishlist);
+  corner positions unchanged. Styles live once in `ProductCard.tsx`'s
+  deduplicated `<style>` block (rendered by the first card only, applies
+  globally via class selectors). Verified live at a 375px viewport: both
+  buttons measure ~28.8px (up from ~21.6px). `tsc`/`eslint` clean.
+
+- **Add to Cart no longer opens the cart drawer.** `CartButton`'s `detail`/`icon`
+  variants (product detail page, list-view rows) previously called both
+  `notifyAdded()` (the "Item added" mini popup anchored under the header cart
+  icon) and `openDrawer()` (the full slide-in cart panel) on every add. Removed
+  the `openDrawer()` call — adding an item now only shows the mini popup (with
+  its existing "Go to cart" / "Clear Cart" actions), matching the shop-grid
+  `card` variant's existing inline-confirmation-only behavior. Verified live:
+  popup renders with correct copy/actions, cart drawer stays `aria-hidden`,
+  translated off-screen, and its backdrop never mounts. `tsc`/`eslint` clean on
+  `CartButton.tsx`.
+
 - **Checkout inventory: 30-minute reservation removed — whoever pays first gets
   the item.** Items stay `available` through the PayPal window (no hold), so
   multiple buyers can check out the same one-of-one piece at once; the sale is

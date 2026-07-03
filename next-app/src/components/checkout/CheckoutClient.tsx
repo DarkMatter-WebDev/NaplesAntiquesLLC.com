@@ -55,6 +55,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     address_line1: '', address_line2: '', city: '', state: '', postal_code: '', country: 'United States',
   });
   const [shippingMethod, setShippingMethod] = useState(SHIPPING_OPTIONS[0].value);
+  const [infoConfirmed, setInfoConfirmed] = useState(false);
   const [productInfoById, setProductInfoById] = useState<Record<string, CartProductInfo>>({});
   const [createdOrder, setCreatedOrder] = useState<{ orderNumber: string; total: number } | null>(null);
   // Internal order id from the first create-order call, reused if the buyer
@@ -86,7 +87,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
       customer.city.trim() !== '' &&
       customer.state.trim() !== '' &&
       customer.postal_code.trim() !== '');
-  const payReady = items.length > 0 && contactReady && shippingAddressReady;
+  const payReady = items.length > 0 && contactReady && shippingAddressReady && infoConfirmed;
 
   const missingFieldLabels = [
     needsShipping && customer.address_line1.trim() === '' ? (isEs ? 'Dirección' : 'Street Address') : null,
@@ -96,6 +97,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     customer.name.trim() === '' ? (isEs ? 'Nombre completo' : 'Full Name') : null,
     customer.phone.trim() === '' ? (isEs ? 'Teléfono' : 'Phone') : null,
     customer.email.trim() === '' ? (isEs ? 'Correo electrónico' : 'Email') : null,
+    !infoConfirmed ? (isEs ? 'Confirme que su información es correcta' : 'Confirm your information is correct') : null,
   ].filter((label): label is string => Boolean(label));
 
   function buildPayPalPayload() {
@@ -106,16 +108,15 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
         email: customer.email,
         phone: customer.phone,
         notes: customer.notes,
-        ...(needsShipping
-          ? {
-              address_line1: customer.address_line1,
-              address_line2: customer.address_line2,
-              city: customer.city,
-              state: customer.state,
-              postal_code: customer.postal_code,
-              country: customer.country,
-            }
-          : {}),
+        // Always send the address the buyer entered (captured as a contact record
+        // on the order). The server only *requires* a complete address when the
+        // shipping method needs one — see `needsShipping` on the route.
+        address_line1: customer.address_line1,
+        address_line2: customer.address_line2,
+        city: customer.city,
+        state: customer.state,
+        postal_code: customer.postal_code,
+        country: customer.country,
       },
       shippingMethod,
       orderId: orderIdRef.current,
@@ -288,10 +289,10 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
         <Link href={`${prefix}/shop`} className="text-xs font-bold uppercase tracking-widest hover:underline" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
           {isEs ? '< Volver a la tienda' : '< Back to shop'}
         </Link>
-        <h1 className="text-3xl md:text-5xl font-bold mt-4 mb-3" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
+        <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold mt-1 mb-0 md:mt-4 md:mb-3" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
           {isEs ? 'Checkout' : 'Checkout'}
         </h1>
-        <p style={{ color: 'var(--color-on-surface-variant)' }}>
+        <p className="hidden md:block text-sm md:text-base" style={{ color: 'var(--color-on-surface-variant)' }}>
           {isEs ? 'Complete sus datos para finalizar la compra de los artículos de su carrito.' : 'Complete your details to check out the items in your cart.'}
         </p>
       </section>
@@ -307,49 +308,6 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
             onRemove={remove}
             variant="expanded"
           />
-
-          {needsShipping && (
-            <div className="checkout-address-block">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-                  {isEs ? 'Dirección de envío' : 'Shipping Address'}
-                </p>
-                <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                  {isEs
-                    ? 'Necesaria para el método de envío seleccionado.'
-                    : 'Required for the delivery method you selected.'}
-                </p>
-              </div>
-              <div>
-                <label className="form-label">{isEs ? 'Dirección' : 'Street Address'} *</label>
-                <input required className="form-field" autoComplete="address-line1" value={customer.address_line1} onChange={(e) => setCustomer({ ...customer, address_line1: e.target.value })} />
-              </div>
-              <div>
-                <label className="form-label">{isEs ? 'Apartamento, suite, etc. (opcional)' : 'Apartment, suite, etc. (optional)'}</label>
-                <input className="form-field" autoComplete="address-line2" value={customer.address_line2} onChange={(e) => setCustomer({ ...customer, address_line2: e.target.value })} />
-              </div>
-              <div className="responsive-form-grid">
-                <div>
-                  <label className="form-label">{isEs ? 'Ciudad' : 'City'} *</label>
-                  <input required className="form-field" autoComplete="address-level2" value={customer.city} onChange={(e) => setCustomer({ ...customer, city: e.target.value })} />
-                </div>
-                <div>
-                  <label className="form-label">{isEs ? 'Estado' : 'State'} *</label>
-                  <input required className="form-field" autoComplete="address-level1" value={customer.state} onChange={(e) => setCustomer({ ...customer, state: e.target.value })} />
-                </div>
-              </div>
-              <div className="responsive-form-grid">
-                <div>
-                  <label className="form-label">{isEs ? 'Código postal' : 'ZIP / Postal Code'} *</label>
-                  <input required className="form-field" autoComplete="postal-code" value={customer.postal_code} onChange={(e) => setCustomer({ ...customer, postal_code: e.target.value })} />
-                </div>
-                <div>
-                  <label className="form-label">{isEs ? 'País' : 'Country'}</label>
-                  <input className="form-field" autoComplete="country-name" value={customer.country} onChange={(e) => setCustomer({ ...customer, country: e.target.value })} />
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="checkout-contact-panel">
@@ -375,6 +333,47 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
           <div>
             <label className="form-label">{isEs ? 'Correo electrónico' : 'Email'} *</label>
             <input required type="email" className="form-field" autoComplete="email" value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} />
+          </div>
+
+          <div className="checkout-address-fields">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                {isEs ? 'Dirección' : 'Address'}
+              </p>
+              {needsShipping && (
+                <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  {isEs ? 'Necesaria para el método de envío seleccionado.' : 'Required for the delivery method you selected.'}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="form-label">{isEs ? 'Dirección' : 'Street Address'}{needsShipping ? ' *' : ''}</label>
+              <input required={needsShipping} className="form-field" autoComplete="address-line1" value={customer.address_line1} onChange={(e) => setCustomer({ ...customer, address_line1: e.target.value })} />
+            </div>
+            <div>
+              <label className="form-label">{isEs ? 'Apartamento, suite, etc. (opcional)' : 'Apartment, suite, etc. (optional)'}</label>
+              <input className="form-field" autoComplete="address-line2" value={customer.address_line2} onChange={(e) => setCustomer({ ...customer, address_line2: e.target.value })} />
+            </div>
+            <div className="responsive-form-grid">
+              <div>
+                <label className="form-label">{isEs ? 'Ciudad' : 'City'}{needsShipping ? ' *' : ''}</label>
+                <input required={needsShipping} className="form-field" autoComplete="address-level2" value={customer.city} onChange={(e) => setCustomer({ ...customer, city: e.target.value })} />
+              </div>
+              <div>
+                <label className="form-label">{isEs ? 'Estado' : 'State'}{needsShipping ? ' *' : ''}</label>
+                <input required={needsShipping} className="form-field" autoComplete="address-level1" value={customer.state} onChange={(e) => setCustomer({ ...customer, state: e.target.value })} />
+              </div>
+            </div>
+            <div className="responsive-form-grid">
+              <div>
+                <label className="form-label">{isEs ? 'Código postal' : 'ZIP / Postal Code'}{needsShipping ? ' *' : ''}</label>
+                <input required={needsShipping} className="form-field" autoComplete="postal-code" value={customer.postal_code} onChange={(e) => setCustomer({ ...customer, postal_code: e.target.value })} />
+              </div>
+              <div>
+                <label className="form-label">{isEs ? 'País' : 'Country'}</label>
+                <input className="form-field" autoComplete="country-name" value={customer.country} onChange={(e) => setCustomer({ ...customer, country: e.target.value })} />
+              </div>
+            </div>
           </div>
 
           <div>
@@ -403,6 +402,37 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
             </Link>
             .
           </p>
+
+          <div
+            className="checkout-confirm-box"
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '0.75rem',
+              padding: '1rem 1.1rem',
+              border: '1px solid rgba(216, 208, 194, 0.94)',
+              borderRadius: 'var(--radius-lg)',
+              background: 'rgba(255, 253, 248, 0.9)',
+            }}
+          >
+            <input
+              type="checkbox"
+              id="checkout-confirm-info"
+              checked={infoConfirmed}
+              onChange={(e) => setInfoConfirmed(e.target.checked)}
+              className="mt-1"
+              style={{ accentColor: GOLD, width: '1.05rem', height: '1.05rem', flexShrink: 0, cursor: 'pointer' }}
+            />
+            <label
+              htmlFor="checkout-confirm-info"
+              className="text-sm leading-relaxed"
+              style={{ color: 'var(--color-on-surface)', cursor: 'pointer' }}
+            >
+              {isEs
+                ? 'Confirmo que he revisado mi pedido y que mis datos de contacto, dirección de envío y demás información anterior son correctos antes de proceder al pago.'
+                : 'I confirm that I have reviewed my order and that my contact details, shipping address, and other information above are correct before proceeding to payment.'}
+            </label>
+          </div>
 
           {paypalClientId ? (
             <PayPalCheckoutButton
@@ -452,6 +482,15 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
           background: rgba(255, 255, 255, 0.82);
           box-shadow: 0 18px 48px rgba(75, 60, 24, 0.08);
         }
+        @media (max-width: 640px) {
+          .checkout-page {
+            padding: 1.25rem 0 3rem;
+          }
+          .checkout-hero {
+            margin-bottom: 0.85rem;
+            padding: 0.75rem 1.1rem;
+          }
+        }
         .checkout-dashboard {
           display: grid;
           grid-template-columns: minmax(0, 1fr);
@@ -463,14 +502,10 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
           gap: 1.5rem;
           min-width: 0;
         }
-        .checkout-address-block {
+        .checkout-address-fields {
           display: flex;
           flex-direction: column;
           gap: 1rem;
-          padding: clamp(1.25rem, 3vw, 1.75rem);
-          border: 1px solid rgba(216, 208, 194, 0.94);
-          background: rgba(255, 255, 255, 0.86);
-          box-shadow: 0 14px 36px rgba(75, 60, 24, 0.07);
         }
         .checkout-contact-panel {
           display: flex;

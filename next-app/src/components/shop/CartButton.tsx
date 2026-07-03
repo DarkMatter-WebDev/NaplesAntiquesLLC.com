@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default function CartButton({ item, variant = 'card', locale = 'en', includeCardStyles = true }: Props) {
-  const { isIn, add, remove, openDrawer, notifyAdded } = useCart();
+  const { isIn, add, remove, notifyAdded } = useCart();
   const inCart = isIn(item.id);
   const isEs = locale === 'es';
   const canPurchase = isProductPurchasable(item.status);
@@ -41,7 +41,6 @@ export default function CartButton({ item, variant = 'card', locale = 'en', incl
         confirmationTimer.current = setTimeout(() => setShowCardConfirmation(false), 1800);
       } else {
         notifyAdded(item.title);
-        openDrawer();
       }
     }
   }

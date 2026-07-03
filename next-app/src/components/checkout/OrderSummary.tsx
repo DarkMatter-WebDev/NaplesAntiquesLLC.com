@@ -66,24 +66,24 @@ export default function OrderSummary({
 
   return (
     <aside
-      className={`border ${expanded ? 'p-5 md:p-7' : 'p-4 md:p-5 lg:sticky lg:top-24'}`}
+      className={`border ${expanded ? 'p-4 md:p-6' : 'p-4 md:p-5 lg:sticky lg:top-24'}`}
       style={{
         borderColor: BORDER,
         background: expanded ? 'rgba(255, 255, 255, 0.9)' : 'var(--color-surface-container-lowest)',
         boxShadow: expanded ? '0 16px 42px rgba(75, 60, 24, 0.08)' : undefined,
       }}
     >
-      <div className={expanded ? 'mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between' : ''}>
+      <div className={expanded ? 'mb-3 flex flex-row items-baseline justify-between gap-2' : ''}>
         <h2 className={`${expanded ? 'text-base' : 'text-sm'} font-bold uppercase tracking-widest ${expanded ? '' : 'mb-4'}`} style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
           {isEs ? 'Resumen' : 'Order Summary'}
         </h2>
         {expanded && (
-          <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+          <p className="text-xs flex-shrink-0" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
             {items.length} {isEs ? 'artículo(s)' : 'item(s)'}
           </p>
         )}
       </div>
-      <div className={`${expanded ? 'grid gap-4' : 'flex flex-col gap-3'} mb-5`}>
+      <div className={`${expanded ? 'grid gap-3 mb-4' : 'flex flex-col gap-3 mb-5'}`}>
         {items.map((item) => (
           <SummaryRow
             key={item.id}
@@ -95,7 +95,7 @@ export default function OrderSummary({
           />
         ))}
       </div>
-      <div className={`${expanded ? 'ml-auto max-w-md rounded-2xl bg-[rgba(255,253,248,0.78)] px-4 py-4 shadow-[0_12px_34px_rgba(38,28,6,0.05)]' : ''} flex flex-col gap-1 text-xs border-t pt-4`} style={{ borderColor: BORDER, fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}>
+      <div className={`${expanded ? 'ml-auto max-w-md rounded-2xl bg-[rgba(255,253,248,0.78)] px-3.5 py-3 shadow-[0_12px_34px_rgba(38,28,6,0.05)]' : ''} flex flex-col gap-1 text-xs border-t pt-3`} style={{ borderColor: BORDER, fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}>
         <div className="flex justify-between">
           <span>Subtotal</span>
           <span>{subtotal > 0 ? fmt(subtotal) : '-'}{hasUnknown ? '*' : ''}</span>
@@ -162,61 +162,41 @@ function SummaryRow({
   expanded?: boolean;
 }) {
   const title = isEs && item.title_es ? item.title_es : item.title;
-  const description = (isEs && item.description_es ? item.description_es : item.description) ?? item.public_notes ?? null;
   const circa = formatProductItemYear(item.item_year);
   const specs = buildSpecLine(item, isEs);
   const imageFrameBackground = productImagePaddingBackground(item.image_padding);
   const image = normalizeLegacyLocalImageUrl(item.image);
   return (
-    <div className={`flex gap-3 items-start ${expanded ? 'rounded-2xl border p-2.5 md:gap-3 md:p-3' : ''}`} style={expanded ? { borderColor: BORDER, background: 'rgba(255, 253, 248, 0.76)' } : undefined}>
+    <div className={`flex gap-3 items-start ${expanded ? 'rounded-2xl border p-2 md:gap-3 md:p-2.5' : ''}`} style={expanded ? { borderColor: BORDER, background: 'rgba(255, 253, 248, 0.76)' } : undefined}>
       <Link
         href={`${prefix}/shop/${item.id}`}
-        className={`relative flex-shrink-0 overflow-hidden rounded-xl ${expanded ? 'h-20 w-20 md:h-24 md:w-24' : 'w-14 h-14'}`}
+        className={`relative flex-shrink-0 overflow-hidden rounded-xl ${expanded ? 'h-16 w-16 md:h-20 md:w-20' : 'w-14 h-14'}`}
         style={{ background: imageFrameBackground }}
       >
         {image
-          ? <Image src={image} alt={title} fill sizes={expanded ? '(max-width: 768px) 80px, 96px' : '56px'} className="object-contain" unoptimized={image.startsWith('/assets/')} />
+          ? <Image src={image} alt={title} fill sizes={expanded ? '(max-width: 768px) 64px, 80px' : '56px'} className="object-contain" unoptimized={image.startsWith('/assets/')} />
           : <div className="w-full h-full flex items-center justify-center text-xs opacity-40">Photo</div>}
       </Link>
-      <div className={`min-w-0 flex-1 ${expanded ? 'grid gap-2 md:grid-cols-[minmax(0,1fr)_7.75rem] md:gap-3' : ''}`}>
+      <div className="min-w-0 flex-1">
         <div className="min-w-0">
           <Link
             href={`${prefix}/shop/${item.id}`}
-            className={`${expanded ? 'text-sm md:text-base line-clamp-2' : 'text-xs line-clamp-2'} font-bold leading-snug hover:underline`}
+            className={`${expanded ? 'text-[0.8rem] md:text-sm line-clamp-2' : 'text-xs line-clamp-2'} font-bold leading-snug hover:underline`}
             style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
           >
             {title}
           </Link>
-          {!expanded && (
-            <p className="text-[0.68rem] flex-shrink-0 font-bold" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-              {item.priceLabel}
-            </p>
-          )}
+          <p className={`${expanded ? 'text-xs' : 'text-[0.68rem]'} flex-shrink-0 font-bold`} style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+            {item.priceLabel}
+          </p>
           {expanded && (circa || specs) && (
-            <p className="mt-1 truncate text-[0.7rem] font-bold uppercase tracking-wide" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+            <p className="mt-0.5 truncate text-[0.7rem] font-bold uppercase tracking-wide" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
               {circa && <span className="normal-case">Ca. {circa}</span>}
               {circa && specs && ' · '}
               {specs}
             </p>
           )}
-          {expanded && description && (
-            <p className="mt-1 line-clamp-1 text-xs leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
-              {description}
-            </p>
-          )}
         </div>
-        {expanded && (
-          <div className="flex min-h-full items-center justify-center border-l pl-3" style={{ borderColor: BORDER }}>
-            <div className="w-full rounded-xl border px-2.5 py-2.5 text-center" style={{ borderColor: 'rgba(115, 92, 0, 0.18)', background: 'rgba(255, 255, 255, 0.72)' }}>
-              <span className="block text-[0.62rem] font-bold uppercase tracking-widest" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-                {isEs ? 'Precio' : 'Price'}
-              </span>
-              <p className="mt-1 text-base font-bold leading-none md:text-lg" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-                {item.priceLabel}
-              </p>
-            </div>
-          </div>
-        )}
       </div>
       {onRemove && (
         <button

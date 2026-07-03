@@ -577,12 +577,12 @@ export default function ProductCard({
               right: 0.32rem !important;
             }
             .shop-card-wishlist-button {
-              width: 1.35rem !important;
-              height: 1.35rem !important;
-              box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+              width: 1.8rem !important;
+              height: 1.8rem !important;
+              box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12) !important;
             }
             .shop-card-wishlist-button [data-wishlist-icon="true"] {
-              font-size: 12px !important;
+              font-size: 15px !important;
             }
             .shop-card-image-arrow {
               width: 1.15rem !important;
@@ -669,12 +669,12 @@ export default function ProductCard({
               display: flex;
             }
             .shop-card-cart-icon-button {
-              width: 1.35rem !important;
-              height: 1.35rem !important;
-              box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+              width: 1.8rem !important;
+              height: 1.8rem !important;
+              box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12) !important;
             }
             .shop-card-cart-icon-button [data-cart-icon="true"] {
-              font-size: 11px !important;
+              font-size: 14px !important;
             }
           }
           /* Cart icon button — hidden on tablet/desktop, visible on mobile */
