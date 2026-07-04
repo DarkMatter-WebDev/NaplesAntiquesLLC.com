@@ -5,6 +5,35 @@
 
 ## 2026-07-04
 
+- **Security hardening from the full-site audit (⚠️ one manual SQL step pending).**
+  Fixed three confirmed holes. Code (built + tsc/eslint clean): `/api/checkout/order`
+  now calls `create_checkout_order` via the **service-role** client (and returns a
+  generic error instead of the raw DB message); `buildOrderDraft` in
+  `lib/checkout-pricing.ts` now **rejects any $0/negative line item** (409) so a
+  "Contact for price"/incomplete product can never be sold online for nothing —
+  covers both manual checkout and PayPal. **Pending manual step: run
+  `supabase/security-hardening-2026-07.sql` in Supabase** — it (1) revokes the blanket
+  `profiles` INSERT/UPDATE grant from `authenticated` and re-grants all columns except
+  `is_admin`/`is_vip`/`account_type`/`internal_notes` (closes admin self-promotion,
+  CODE-S01), (2) revokes `create_checkout_order` EXECUTE from anon/authenticated →
+  service_role only (CODE-S02; the route change above is required for this), (3)
+  revokes anon SELECT on internal `products` columns (cost_basis/minimum_price/
+  internal_notes/acquisition_*/private_price_label/live_spot_snapshot) via a
+  column-level grant (CODE-D04), and (4) adds NOT-VALID CHECK constraints on
+  products status/price_mode/non-negative amounts (CODE-D07). Residual on CODE-D04:
+  logged-in `authenticated` users can still read those columns (admin editor reads
+  them from the browser) — needs admin reads moved to service role in a later pass.
+- **Checkout: clicking pay before ready no longer flashes/jolts the PayPal flow.**
+  Previously the PayPal Buttons `onClick` returned `actions.reject()` when the buyer
+  wasn't ready, which let PayPal begin opening (spinner/popup flash) before bouncing
+  back — a hard visual jolt. Now, while `!ready`, an invisible click-swallowing
+  overlay sits over the (dimmed, opacity 0.5) PayPal button in `PayPalCheckoutButton`
+  so the click never reaches PayPal — it just shows the red reminder. The overlay is
+  removed once ready, so real clicks pass through normally; the `onClick` reject is
+  kept only as a keyboard-activation fallback. `tsc`/`eslint` clean. **Verified working
+  by the owner 2026-07-04** — no more jolt; this also confirms the inline reminder's
+  new position/wording and the required checkbox gate (below).
+
 - **No-reply customer emails no longer invite a reply.** The receipt/invoice email
   (`order-invoice-email.ts`, paid + unpaid notes) and the fulfillment-update email
   (`order-fulfillment-email.ts`) are sent from `noreply@naplesestatejewelry.co` but
@@ -26,8 +55,8 @@
   `needsInfoConfirmation` prop (the checkbox is no longer folded into `missingFields`)
   and a `missingHint` `{ fields, needsConfirm }` state; the reminder auto-hides once
   ready (render gated on `!ready`, no set-state-in-effect). EN/ES. `tsc`/`eslint`
-  clean. Not live-tested (checkout is auth-gated; session lapsed) — verified by
-  type-check + flow review.
+  clean. **Verified working by the owner 2026-07-04** (exercised alongside the jolt fix
+  above).
 
 - **Shop list view: status flag moved off the thumbnail, next to the metal label.**
   In `ProductListRow`, the Available/Sold flag was absolutely positioned on the

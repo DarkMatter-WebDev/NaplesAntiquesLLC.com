@@ -275,7 +275,38 @@ export default function PayPalCheckoutButton({
           <span>{reminderMessage(missingHint)}</span>
         </div>
       )}
-      <div ref={containerRef} aria-busy={processing} />
+      <div style={{ position: 'relative' }}>
+        <div
+          ref={containerRef}
+          aria-busy={processing}
+          style={{
+            opacity: sdkReady && !ready ? 0.5 : 1,
+            transition: 'opacity 150ms ease',
+          }}
+        />
+        {/* Until the buyer is ready, an invisible overlay swallows the click so
+            the PayPal flow never starts (no popup flash / jolt) — it just shows
+            the reminder. Removed once ready, so real clicks reach the button. */}
+        {sdkReady && !ready && (
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label={isEs ? 'Complete los datos requeridos para pagar' : 'Complete the required details before paying'}
+            onClick={() => setMissingHint({ fields: missingFields, needsConfirm: needsInfoConfirmation })}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              cursor: 'not-allowed',
+              zIndex: 5,
+            }}
+          />
+        )}
+      </div>
       {!sdkReady && (
         <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
           {isEs ? 'Cargando PayPal…' : 'Loading PayPal…'}

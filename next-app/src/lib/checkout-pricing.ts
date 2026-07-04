@@ -145,6 +145,20 @@ export async function buildOrderDraft(
     image_snapshot: getProductImages(product)[0] ?? null,
   }));
 
+  // Never let a $0 (or negative) line item reach checkout. A snapshot price of 0
+  // means the item has no usable price — an unparsable manual label ("Contact
+  // for price"), a spot item missing weight/purity, or asking_price = 0. These
+  // must be handled by a phone call, not sold online for nothing. (CODE-D01)
+  const invalidPriced = items.filter((item) => !(item.price_snapshot > 0));
+  if (invalidPriced.length > 0) {
+    return {
+      error: `This item isn't available for online purchase yet: ${invalidPriced
+        .map((item) => item.title_snapshot)
+        .join(', ')}. Please call (239) 404-8505 to buy it.`,
+      status: 409,
+    };
+  }
+
   const subtotal = round2(items.reduce((sum, item) => sum + item.price_snapshot, 0));
   const shippingFee = SHIPPING_FEES[shippingMethod] ?? 0;
   const tax = round2(subtotal * FL_TAX_RATE);

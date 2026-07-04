@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { formatCurrency } from '@/types/sales';
 import { buildAddressObject, generateOrderNumber } from '@/lib/sales';
 import { buildOrderDraft, isOrderDraftError, shippingMethodForDb } from '@/lib/checkout-pricing';
@@ -74,13 +75,18 @@ export async function POST(req: Request) {
     customer_notes: customer.notes ? String(customer.notes).trim() : null,
   };
 
-  const { data: rpcData, error: rpcError } = await supabase.rpc('create_checkout_order', {
+  // create_checkout_order is SECURITY DEFINER and (post-2026-07 hardening) only
+  // executable by the service role, so anonymous callers can't invoke it
+  // directly to hide inventory or forge paid orders. Totals were already
+  // computed server-side in buildOrderDraft above, so nothing is trusted here.
+  const service = createServiceClient();
+  const { data: rpcData, error: rpcError } = await service.rpc('create_checkout_order', {
     order_payload: orderPayload,
     items_payload: items,
   });
 
   if (rpcError) {
-    return NextResponse.json({ error: rpcError.message }, { status: 500 });
+    return NextResponse.json({ error: 'Could not create the order. Please try again.' }, { status: 500 });
   }
 
   const result = Array.isArray(rpcData) ? rpcData[0] : rpcData;

@@ -1,7 +1,52 @@
 ﻿# Current Status
 
 > Reflects the present state of development. **Update this at the end of every
-> work session.** Last updated: **2026-07-03**.
+> work session.** Last updated: **2026-07-04**.
+
+## 2026-07-04 -- 🔒 Security hardening from full-site audit (⚠️ SQL migration pending)
+
+A three-pass audit (live site, admin flow, codebase) confirmed several issues via
+live-DB probes. Remediation landed for the top server-side holes:
+
+- **Code shipped** (build + `tsc`/`eslint` clean, not yet exercised live):
+  `/api/checkout/order` calls `create_checkout_order` through the **service-role**
+  client; `lib/checkout-pricing.ts#buildOrderDraft` rejects any **$0/negative line
+  item** (409) for both manual + PayPal checkout.
+- **⚠️ MANUAL STEP — run `supabase/security-hardening-2026-07.sql` in Supabase.**
+  Until it runs, the holes are still open (e.g. any logged-in customer can
+  self-promote to admin, CODE-S01 Critical). **Deploy-order matters: ship the code
+  first, then run the SQL.** The route now calls the RPC via the service-role client,
+  which works before *and* after the revoke — but if the SQL runs while the old
+  code is still live, the old cookie-client RPC call hits permission-denied and
+  manual checkout breaks. The file is idempotent + has a rollback block.
+- **Confirmed by live SQL probes:** CODE-S01 (is_admin self-writable), CODE-S02/D03
+  (create_checkout_order granted to anon), CODE-D04 (anon reads cost_basis/
+  minimum_price/internal_notes), CODE-D07 (only 3 CHECK constraints). No-reservation
+  migration confirmed applied (reserve fns dropped). No live $0/pending_payment/
+  fake-paid data found.
+- **Residual (follow-up):** authenticated (any signed-up) users can still read
+  internal product columns — admin editor reads them from the browser; needs those
+  reads moved to the service role or the columns split to an admin-only table.
+- **Owner answers folded in:** no trade-in/store-credit build (phone-only); brand
+  standardized to "Naples Estate Jewelry"; `naplesestatejewelry.com` not owned
+  (can't 301); no license to display; Resend webhook secret is set.
+
+## 2026-07-04 -- Checkout UX polish (owner-verified) + no-reply email wording
+
+- **Pay-button validation is graceful now (owner-tested, works).** Clicking pay
+  before the required "confirm your information" checkbox is checked no longer
+  jolts/flashes the PayPal window. `PayPalCheckoutButton` dims the button and puts an
+  invisible click-swallowing overlay over it while `!ready`, so PayPal is never
+  invoked — it just shows an **inline red reminder above the button** that explicitly
+  says to check the box (replaced the old full-screen modal; the checkbox is tracked
+  via a `needsInfoConfirmation` prop). Owner confirmed the whole flow works
+  2026-07-04.
+- **No-reply customer emails no longer invite a reply.** The receipt/invoice and
+  fulfillment-update emails (sent from `noreply@…`) said "reply to this email"; now
+  they say "Call or text (239) 404-8505" only.
+
+Both `tsc`/`eslint` clean. Other no-reply customer emails checked — none invite
+replies. See CHANGELOG 2026-07-04.
 
 ## 2026-07-03 -- Auto-receipt on payment + paid-aware invoice/receipt email
 
