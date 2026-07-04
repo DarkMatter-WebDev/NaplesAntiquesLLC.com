@@ -112,7 +112,7 @@ async function sendEmails({ itemTitle, name, phone, email, message, imageUrls }:
         html: `<p>Hi ${esc(name)},</p>
                <p>Thank you for your interest in <strong>${esc(itemTitle)}</strong>. We will be in touch with you shortly.</p>
                <p>For urgent questions, call us at <a href="tel:2394048505">(239) 404-8505</a>.</p>
-               <p>— Naples Estate Jewelry Co</p>`,
+               <p>— Naples Estate Jewelry</p>`,
       });
     }
   } catch (emailErr) {

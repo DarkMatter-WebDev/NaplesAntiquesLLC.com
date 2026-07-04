@@ -68,8 +68,8 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
   const paid = isOrderPaid(order);
   // A paid order gets a "receipt"; an unpaid order gets an "invoice".
   const subject = paid
-    ? `Receipt for order ${order.order_number} from Naples Estate Jewelry Co`
-    : `Invoice ${invoiceNumber} from Naples Estate Jewelry Co`;
+    ? `Receipt for order ${order.order_number} from Naples Estate Jewelry`
+    : `Invoice ${invoiceNumber} from Naples Estate Jewelry`;
   const customerName = order.customer_name || 'there';
   const items = order.order_items.map((item) => {
     const discount = clampDiscount(Number(item.discount ?? 0), item.price_snapshot);
@@ -101,13 +101,13 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
   };
   const greeting = `Hi ${customerName},`;
   const intro = paid
-    ? `Thank you for your order with Naples Estate Jewelry Co. Your payment has been received — here is your receipt for order ${order.order_number}.`
-    : `Thank you for your order with Naples Estate Jewelry Co. Invoice ${invoiceNumber} for ${order.order_number} is ready for review.`;
+    ? `Thank you for your order with Naples Estate Jewelry. Your payment has been received — here is your receipt for order ${order.order_number}.`
+    : `Thank you for your order with Naples Estate Jewelry. Invoice ${invoiceNumber} for ${order.order_number} is ready for review.`;
   // Sent from a no-reply address, so don't invite replies — direct to phone/text.
   const note = paid
     ? 'Your payment has been received in full — thank you. Call or text us at (239) 404-8505 with any questions about pickup, delivery, or shipping.'
     : 'Call or text us at (239) 404-8505 with any questions about payment, pickup, delivery, or shipping.';
-  const closing = 'Thank you, Naples Estate Jewelry Co';
+  const closing = 'Thank you, Naples Estate Jewelry';
   const shipToLines = formatAddressLines(order.shipping_address);
 
   return {
@@ -209,7 +209,7 @@ function buildInvoiceEmailHtml({
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;background:#ffffff;border:1px solid #d5c697;">
               <tr>
                 <td style="padding:28px 30px 18px;border-bottom:1px solid #d5c697;">
-                  <div style="color:#735c00;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;">Naples Estate Jewelry Co</div>
+                  <div style="color:#735c00;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;">Naples Estate Jewelry</div>
                   <h1 style="margin:10px 0 0;color:#1d1a14;font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:1.2;">${escapeHtml(subject)}</h1>
                   ${paid ? '<div style="display:inline-block;margin:12px 0 0;padding:5px 12px;background:#0f7a4f;color:#ffffff;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border-radius:3px;">Paid in full</div>' : ''}
                   <p style="margin:8px 0 0;color:#746b5b;font-size:13px;">Order ${escapeHtml(orderNumber)} - ${escapeHtml(paymentStatus)} - ${escapeHtml(fulfillmentStatus)}</p>

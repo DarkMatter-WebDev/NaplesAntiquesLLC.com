@@ -595,7 +595,7 @@ function OrderDetailsDialog({
           {/* Receipt header */}
           <div style={{ textAlign: 'center', marginBottom: '2rem', paddingBottom: '1.5rem', borderBottom: '2px solid #d5c697' }}>
             <p style={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.35em', textTransform: 'uppercase', color: '#735c00', marginBottom: '0.4rem' }}>
-              Naples Estate Jewelry Co
+              Naples Estate Jewelry
             </p>
             <p style={{ fontSize: '0.78rem', color: '#746b5b' }}>Naples, Florida · (239) 404-8505</p>
           </div>

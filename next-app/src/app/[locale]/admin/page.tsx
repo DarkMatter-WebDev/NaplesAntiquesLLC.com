@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import type { Product } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
 import AdminShell from '@/components/admin/AdminShell';
@@ -31,8 +32,14 @@ export default async function AdminPage({ params }: Props) {
     redirect(locale === 'es' ? '/es/account' : '/account');
   }
 
+  // Read products with the service role (not the admin's authenticated session).
+  // This is gated behind the is_admin check above, and it lets us revoke SELECT
+  // on internal product columns (cost_basis, minimum_price, internal_notes, etc.)
+  // from the `authenticated` role so signed-up non-admins can't read them — the
+  // admin editor still gets every column here. (CODE-D04 residual)
+  const service = createServiceClient();
   const [{ data: products }, spotData, { count: unreadMessagesCount }] = await Promise.all([
-    supabase.from('products').select('*').order('sort_order', { ascending: true }),
+    service.from('products').select('*').order('sort_order', { ascending: true }),
     fetchSpotData(),
     supabase
       .from('admin_notifications')

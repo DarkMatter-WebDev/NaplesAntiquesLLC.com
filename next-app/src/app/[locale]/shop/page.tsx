@@ -636,8 +636,8 @@ export async function renderShopPage({
             icon: 'auto_awesome',
             label: isEs ? 'En cada página' : 'On every product page',
             copy: isEs
-              ? 'Ve el multiplicador spot detrás del precio, más una oferta especial de intercambio para tu propio oro.'
-              : 'See the spot multiplier behind the price, plus a special trade-in offer for your own gold or silver.',
+              ? 'Ve el multiplicador spot detrás de cada precio — y pregunta cómo cambiar tu propio oro o plata puede reducirlo.'
+              : 'See the spot multiplier behind every price — and ask how trading in your own gold or silver can lower it.',
           },
         ],
       };

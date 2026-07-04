@@ -19,7 +19,7 @@ export default async function AccessibilityPage({ params }: Props) {
       locale={locale}
       title="Accessibility Statement"
       intro={[
-        'Naples Estate Jewelry & Antiques wants its website to be usable by customers, sellers, and visitors with disabilities. Accessibility is an ongoing effort, especially as inventory, images, admin tools, and ecommerce features change.',
+        'Naples Estate Jewelry wants its website to be usable by customers, sellers, and visitors with disabilities. Accessibility is an ongoing effort, especially as inventory, images, admin tools, and ecommerce features change.',
       ]}
       sections={[
         {

@@ -24,9 +24,12 @@ live-DB probes. Remediation landed for the top server-side holes:
   minimum_price/internal_notes), CODE-D07 (only 3 CHECK constraints). No-reservation
   migration confirmed applied (reserve fns dropped). No live $0/pending_payment/
   fake-paid data found.
-- **Residual (follow-up):** authenticated (any signed-up) users can still read
-  internal product columns — admin editor reads them from the browser; needs those
-  reads moved to the service role or the columns split to an admin-only table.
+- **CODE-D04 residual — now fixed in code (⚠️ 2nd SQL pending).** Admin product
+  read moved to the service role (`admin/page.tsx`) and the `AdminShell` insert no
+  longer `.select()`s, so `authenticated` no longer needs SELECT on the internal
+  columns. **Run `supabase/products-internal-columns-authenticated-2026-07.sql`**
+  (after the code deploys — same code-first ordering) to revoke those columns from
+  `authenticated`. Verified on dev: admin table loads all 59 rows via service role.
 - **Owner answers folded in:** no trade-in/store-credit build (phone-only); brand
   standardized to "Naples Estate Jewelry"; `naplesestatejewelry.com` not owned
   (can't 301); no license to display; Resend webhook secret is set.

@@ -5,6 +5,35 @@
 
 ## 2026-07-04
 
+- **CODE-D04 residual closed (⚠️ second manual SQL step pending).** Signed-up
+  (`authenticated`) users could still read internal product columns because the
+  admin editor read them from the browser under that role. Fixed by moving the
+  admin product read to the **service role**: `admin/page.tsx` now loads products
+  via `createServiceClient()` (behind the existing `is_admin` gate), and
+  `AdminShell` new-product insert no longer chains `.select()` (uses the optimistic
+  `payload`, which already holds the generated id + all fields — mirrors the update
+  path). Admin writes are unchanged (RLS still admin-gates them). **Pending manual
+  step: run `supabase/products-internal-columns-authenticated-2026-07.sql`** (after
+  deploying the code) — it revokes SELECT on cost_basis/minimum_price/internal_notes/
+  acquisition_*/private_price_label/live_spot_snapshot from `authenticated`. Verified
+  on dev signed-in: admin table loads all 59 rows via the service role with no
+  permission error. Build + tsc clean (only the pre-existing AdminShell:915
+  set-state-in-effect lint error).
+- **Messaging fixes from the audit (copy-only, build + tsc clean).** (1) Killed the
+  "walk-in" contradiction: footer, homepage "We Buy Gold", and the JewelryStore schema
+  description now say on-the-spot / by-appointment / "we come to you" (matches the
+  mobile appointment-only model; Spanish already said "en el acto"). (2) Standardized
+  the public brand to **"Naples Estate Jewelry"** everywhere — dropped "Co" from the
+  footer, product JSON-LD `brand` (fixes the Product-vs-JewelryStore name mismatch),
+  order invoice/receipt + fulfillment emails, marketing email footer, inquiry
+  auto-reply, and the account receipt header; dropped "& Antiques" from Terms/Privacy/
+  Accessibility while keeping "operated by Naples Antiques LLC" for legal validity.
+  (3) Reworded the trade-in copy to phone-driven (owner: no online mechanism) — the
+  product-page line and shop banner now invite a call ((239) 404-8505) instead of
+  implying an automatic online trade-in. (4) JewelryStore `paymentAccepted` now
+  includes PayPal + Credit/Debit (was Cash/Check/Wire only). Note left: the schema
+  still carries fixed Mon–Sat 10–17 hours — defensible as appointment availability,
+  flagged for the owner to confirm vs the mobile model.
 - **Security hardening from the full-site audit (⚠️ one manual SQL step pending).**
   Fixed three confirmed holes. Code (built + tsc/eslint clean): `/api/checkout/order`
   now calls `create_checkout_order` via the **service-role** client (and returns a

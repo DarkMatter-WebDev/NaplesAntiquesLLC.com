@@ -35,7 +35,7 @@ const jsonLd = {
   telephone: '+12394048505',
   image: 'https://naplesestatejewelry.co/assets/images/pages/trust.webp',
   description:
-    'Naples, FL estate jeweler buying and selling fine gold chains, estate pieces, designer jewelry, and bullion. Free in-store and on-site evaluations.',
+    'Naples, FL estate jeweler buying and selling fine gold chains, estate pieces, designer jewelry, and bullion. Free on-site evaluations by appointment across Southwest Florida.',
   address: {
     '@type': 'PostalAddress',
     addressLocality: 'Naples',
@@ -57,7 +57,7 @@ const jsonLd = {
   ],
   priceRange: '$$',
   currenciesAccepted: 'USD',
-  paymentAccepted: 'Cash, Check, Wire Transfer',
+  paymentAccepted: 'Cash, Check, Wire Transfer, PayPal, Credit Card, Debit Card',
   areaServed: ['Naples', 'Marco Island', 'Bonita Springs', 'Fort Myers'],
 };
 

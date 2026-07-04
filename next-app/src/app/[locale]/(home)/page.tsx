@@ -58,7 +58,7 @@ export default async function HomePage({ params }: Props) {
                 title: isEs ? 'Compramos Oro' : 'We Buy Gold',
                 body: isEs
                   ? 'Evaluaciones gratuitas en el acto para todas las piezas de oro.'
-                  : 'Free walk-in appraisals on all gold jewelry, coins, and bullion.',
+                  : 'Free appraisals on all gold jewelry, coins, and bullion — we come to you.',
                 href: evalHref,
                 cta: isEs ? 'Evaluación gratuita →' : 'Free evaluation →',
               },

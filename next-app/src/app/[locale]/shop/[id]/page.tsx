@@ -140,7 +140,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title: data.title,
-    description: data.description ?? `${data.title} — Naples Estate Jewelry Co`,
+    description: data.description ?? `${data.title} — Naples Estate Jewelry`,
     openGraph: {
       images: image ? [{ url: image }] : [],
     },
@@ -371,7 +371,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
     ...(inventoryReference ? { sku: inventoryReference } : {}),
     ...(description ? { description } : {}),
     ...(productImages[0] ? { image: productImages[0] } : {}),
-    brand: { '@type': 'Organization', name: 'Naples Estate Jewelry Co' },
+    brand: { '@type': 'Organization', name: 'Naples Estate Jewelry' },
     offers: {
       '@type': 'Offer',
       url: `https://naplesestatejewelry.co${locale === 'es' ? '/es' : ''}/shop/${p.id}`,
@@ -567,9 +567,9 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                   <span style={{ fontSize: '1rem', lineHeight: 1, flexShrink: 0 }}>⬡</span>
                   <p style={{ fontSize: '0.8125rem', color: '#374151', margin: 0, lineHeight: 1.4 }}>
                     {isEs ? (
-                      <>Llévalo por <strong style={{ color: '#735c00' }}>{scrapValue}</strong> cuando aplicas tu valor de intercambio</>
+                      <>¿Tienes oro o plata? Aplícalo a esta pieza y paga desde <strong style={{ color: '#735c00' }}>{scrapValue}</strong> — llama al (239) 404-8505.</>
                     ) : (
-                      <>Get this item for <strong style={{ color: '#735c00' }}>{scrapValue}</strong> when you apply your trade-in value</>
+                      <>Own gold or silver? Put it toward this piece and pay as little as <strong style={{ color: '#735c00' }}>{scrapValue}</strong> — call (239) 404-8505.</>
                     )}
                   </p>
                 </div>

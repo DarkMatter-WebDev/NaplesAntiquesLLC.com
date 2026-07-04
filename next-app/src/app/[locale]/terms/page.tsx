@@ -20,7 +20,7 @@ export default async function TermsPage({ params }: Props) {
       locale={locale}
       title={isEs ? 'Términos de Servicio' : 'Terms of Service'}
       intro={[
-        'These Terms of Service apply to naplesestatejewelry.co and related services provided by Naples Estate Jewelry & Antiques, operated by Naples Antiques LLC. By using the website, creating an account, submitting information, or placing an order, you agree to these terms.',
+        'These Terms of Service apply to naplesestatejewelry.co and related services provided by Naples Estate Jewelry, operated by Naples Antiques LLC. By using the website, creating an account, submitting information, or placing an order, you agree to these terms.',
       ]}
       sections={[
         {
@@ -104,7 +104,7 @@ export default async function TermsPage({ params }: Props) {
         {
           title: 'Contact',
           body: [
-            'Questions about these terms may be directed to Naples Estate Jewelry & Antiques, Naples Antiques LLC, by calling or texting (239) 404-8505 or using the Contact Us page.',
+            'Questions about these terms may be directed to Naples Estate Jewelry, operated by Naples Antiques LLC, by calling or texting (239) 404-8505 or using the Contact Us page.',
           ],
         },
       ]}

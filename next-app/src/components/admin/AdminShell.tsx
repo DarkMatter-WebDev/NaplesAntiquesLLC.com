@@ -2358,14 +2358,18 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     let savedId: string | undefined;
 
     if (isNew) {
-      let { data, error } = await supabase.from('products').insert(payload).select().single();
+      // Don't use .select() on insert — `authenticated` no longer has SELECT on
+      // internal product columns (cost_basis, minimum_price, internal_notes, …),
+      // so returning the row would fail. `payload` already holds everything the
+      // form entered, including the generated id, so use it optimistically (the
+      // full row reloads via the service role on the next page load). (CODE-D04)
+      let { error } = await supabase.from('products').insert(payload);
       if (isMissingOptionalColumnError(error)) {
-        const retry = await supabase.from('products').insert(withoutOptionalColumns(payload)).select().single();
-        data = retry.data;
+        const retry = await supabase.from('products').insert(withoutOptionalColumns(payload));
         error = retry.error;
       }
       if (error) { flash(error.message, false); setSaving(false); return; }
-      const savedProduct = (data ?? payload) as unknown as Product;
+      const savedProduct = payload as unknown as Product;
       savedId = savedProduct.id;
       nextProducts = [savedProduct, ...products];
       setProducts(nextProducts);

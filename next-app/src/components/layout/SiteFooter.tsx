@@ -47,12 +47,12 @@ export default function SiteFooter({ locale = 'en' }: Props) {
               className="text-[0.68rem] font-bold uppercase tracking-[0.18em] md:text-sm md:tracking-widest"
               style={{ fontFamily: 'var(--font-label)', color: 'var(--color-primary)' }}
             >
-              Naples Estate Jewelry Co
+              Naples Estate Jewelry
             </p>
             <p className="max-w-[20rem] text-xs leading-snug md:text-sm md:leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
               {isEs
                 ? 'Compramos y vendemos joyería de patrimonio fina en Naples, Florida. Evaluaciones gratuitas.'
-                : 'Buying and selling fine estate jewelry in Naples, Florida. Free walk-in appraisals.'}
+                : 'Buying and selling fine estate jewelry in Naples, Florida. Free, on-the-spot appraisals — we come to you.'}
             </p>
             <a
               href="tel:2394048505"
@@ -133,7 +133,7 @@ export default function SiteFooter({ locale = 'en' }: Props) {
             className="max-w-[22rem] text-[0.6rem] leading-snug md:max-w-none md:text-xs md:leading-relaxed"
             style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
           >
-            © {year} Naples Estate Jewelry Co · Naples, FL · {isEs ? 'Todos los derechos reservados' : 'All rights reserved'}
+            © {year} Naples Estate Jewelry · Naples, FL · {isEs ? 'Todos los derechos reservados' : 'All rights reserved'}
           </p>
           <p
             className="text-[0.6rem] leading-snug md:text-xs md:leading-relaxed"

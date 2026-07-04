@@ -21,8 +21,8 @@ export default async function PrivacyPage({ params }: Props) {
       title={isEs ? 'Política de Privacidad' : 'Privacy Policy'}
       intro={[
         isEs
-          ? 'Naples Estate Jewelry & Antiques, operated by Naples Antiques LLC, respects your privacy. This policy explains how we collect and use information when you visit our website, create an account, submit an item, make an inquiry, subscribe for updates, or place an online order.'
-          : 'Naples Estate Jewelry & Antiques, operated by Naples Antiques LLC, respects your privacy. This policy explains how we collect and use information when you visit our website, create an account, submit an item, make an inquiry, subscribe for updates, or place an online order.',
+          ? 'Naples Estate Jewelry, operated by Naples Antiques LLC, respects your privacy. This policy explains how we collect and use information when you visit our website, create an account, submit an item, make an inquiry, subscribe for updates, or place an online order.'
+          : 'Naples Estate Jewelry, operated by Naples Antiques LLC, respects your privacy. This policy explains how we collect and use information when you visit our website, create an account, submit an item, make an inquiry, subscribe for updates, or place an online order.',
         isEs
           ? 'This policy is written for our current small-business website. It does not claim compliance with any certification or privacy framework that we have not separately obtained.'
           : 'This policy is written for our current small-business website. It does not claim compliance with any certification or privacy framework that we have not separately obtained.',
@@ -107,7 +107,7 @@ export default async function PrivacyPage({ params }: Props) {
         {
           title: isEs ? 'Contacto' : 'Contact',
           body: [
-            'Privacy questions or requests may be directed to Naples Estate Jewelry & Antiques, Naples Antiques LLC, by calling or texting (239) 404-8505 or using the Contact Us page.',
+            'Privacy questions or requests may be directed to Naples Estate Jewelry, operated by Naples Antiques LLC, by calling or texting (239) 404-8505 or using the Contact Us page.',
           ],
         },
       ]}

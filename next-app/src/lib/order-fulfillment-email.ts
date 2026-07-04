@@ -21,12 +21,12 @@ export function buildFulfillmentUpdateEmailContent(
 ): FulfillmentUpdateEmailContent {
   const customerName = order.customer_name || 'there';
   const statusLabel = orderStatusLabel(status);
-  const subject = `Update on your order ${order.order_number} from Naples Estate Jewelry Co`;
+  const subject = `Update on your order ${order.order_number} from Naples Estate Jewelry`;
   const greeting = `Hi ${customerName},`;
   const message = STATUS_MESSAGES[status] ?? `Your order status has been updated to ${statusLabel}.`;
   // Sent from a no-reply address, so don't invite replies — direct to phone/text.
   const note = 'Call or text us at (239) 404-8505 with any questions.';
-  const closing = 'Thank you, Naples Estate Jewelry Co';
+  const closing = 'Thank you, Naples Estate Jewelry';
 
   const text = [
     greeting,
@@ -48,7 +48,7 @@ export function buildFulfillmentUpdateEmailContent(
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid #d5c697;">
               <tr>
                 <td style="padding:28px 30px 18px;border-bottom:1px solid #d5c697;">
-                  <div style="color:#735c00;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;">Naples Estate Jewelry Co</div>
+                  <div style="color:#735c00;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;">Naples Estate Jewelry</div>
                   <h1 style="margin:10px 0 0;color:#1d1a14;font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1.2;">Order Update</h1>
                   <p style="margin:8px 0 0;color:#746b5b;font-size:13px;">Order ${escapeHtml(order.order_number)} - ${escapeHtml(statusLabel)}</p>
                 </td>
