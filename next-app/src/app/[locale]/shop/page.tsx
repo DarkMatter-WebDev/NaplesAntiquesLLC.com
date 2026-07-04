@@ -4,6 +4,7 @@ import { createPublicClient } from '@/lib/supabase/public';
 import {
   PRODUCT_METAL_VARIANTS,
   PUBLIC_SHOP_PRODUCT_STATUSES,
+  AVAILABLE_ONLY_SHOP_PRODUCT_STATUSES,
   inferProductJewelryType,
   isProductPurchasable,
   isProductVisibleInShop,
@@ -16,6 +17,7 @@ import {
   type ProductStatus,
 } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
+import { fetchShowSoldItems } from '@/lib/shop-settings';
 import { calcSpotPriceValue } from '@/lib/pricing';
 import ShopProductGrid from '@/components/shop/ShopProductGrid';
 import ShopFilters from '@/components/shop/ShopFilters';
@@ -291,11 +293,21 @@ type ShopCatalogFilterKey = {
 
 async function queryShopCatalog(filterKey: ShopCatalogFilterKey) {
   const supabase = createPublicClient();
+
+  // Admin-controlled: when "show sold items" is off, the gallery lists available
+  // pieces only. Defaults to showing sold (fetchShowSoldItems degrades to true if
+  // the setting/table is missing). This read is inside the cached function; the
+  // admin toggle busts the `shop-catalog` tag so a change takes effect promptly.
+  const showSoldItems = await fetchShowSoldItems(supabase);
+  const visibleStatuses = showSoldItems
+    ? [...PUBLIC_SHOP_PRODUCT_STATUSES]
+    : [...AVAILABLE_ONLY_SHOP_PRODUCT_STATUSES];
+
   const buildProductQuery = (columns: string) => {
     let query = supabase
       .from('products')
       .select(columns)
-      .in('status', [...PUBLIC_SHOP_PRODUCT_STATUSES])
+      .in('status', visibleStatuses)
       .order('sort_order', { ascending: true });
     if (filterKey.status) {
       query = query.eq('status', normalizeProductStatus(filterKey.status as ProductStatus));
@@ -322,7 +334,7 @@ async function queryShopCatalog(filterKey: ShopCatalogFilterKey) {
     supabase
       .from('products')
       .select('id', { count: 'exact', head: true })
-      .in('status', [...PUBLIC_SHOP_PRODUCT_STATUSES]),
+      .in('status', visibleStatuses),
   ]);
 
   let products = productResult.data as unknown[] | null;

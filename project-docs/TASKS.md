@@ -10,6 +10,16 @@
   of `CURRENT_STATUS.md` — read that first, not this file, for the current
   blocker and ordered go-live steps. (Do not duplicate the checklist here; it
   goes stale the moment the two copies diverge — see DECISIONS 2026-07-02.)
+- **Run `supabase/order-emails.sql` in the live Supabase project** to enable the
+  per-order email history on `/admin/orders/[id]` (new **Email History** card under
+  the Summary) and the logging of auto-sent receipts. Until run, history reads empty
+  and the logging insert no-ops — **emails still send** (including the new
+  auto-receipt on payment). Idempotent. After applying, verify: (a) complete a PayPal
+  sandbox order and confirm the buyer gets a paid **Receipt** email automatically and
+  a "Receipt … Sent automatically" row appears in Email History; (b) from an order,
+  use **Email Receipt/Invoice** (paid → Receipt wording + "Paid in full") and a
+  fulfillment-update email, and confirm both log to the history. See
+  `CURRENT_STATUS.md` 2026-07-03 + DECISIONS 2026-07-03.
 - **Verify Messages Recycle Bin behavior post-migration.**
   `supabase/admin-notifications-recycle-bin.sql` has been applied (owner
   confirmed 2026-07-03), adding `admin_notifications.deleted_at` and the

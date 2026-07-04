@@ -3,7 +3,161 @@
 > Track meaningful changes. Newest at the top. One dated section per day of work;
 > bullet the notable changes. Keep entries short.
 
+## 2026-07-04
+
+- **No-reply customer emails no longer invite a reply.** The receipt/invoice email
+  (`order-invoice-email.ts`, paid + unpaid notes) and the fulfillment-update email
+  (`order-fulfillment-email.ts`) are sent from `noreply@naplesestatejewelry.co` but
+  told buyers to "reply to this email." Dropped the reply invite; the notes now read
+  "Call or text us at (239) 404-8505 with any questions…". Checked the other
+  no-reply customer emails (legacy `/api/checkout/order`, inquiry confirmation) —
+  they don't invite replies, so no change. Owner-facing notifications that set a
+  real reply-to (contact-message, marketing "Chris" sender) are unaffected. `tsc`/
+  `eslint` clean.
+
+- **Checkout: required-fields prompt is now an inline red reminder, not a modal —
+  placed above the pay button and explicit about the checkbox.** When the buyer
+  clicks PayPal/card before they're ready, `PayPalCheckoutButton` shows a compact
+  red inline alert **above** the pay button (was a full-screen modal). The wording
+  now spells out the confirmation checkbox — e.g. "Before you can pay, please check
+  the box above to confirm your information is correct" (and appends "; and complete:
+  …" for any empty form fields) — so a buyer who's visually confident their info is
+  right still understands there's a box to tick. Implemented via a new
+  `needsInfoConfirmation` prop (the checkbox is no longer folded into `missingFields`)
+  and a `missingHint` `{ fields, needsConfirm }` state; the reminder auto-hides once
+  ready (render gated on `!ready`, no set-state-in-effect). EN/ES. `tsc`/`eslint`
+  clean. Not live-tested (checkout is auth-gated; session lapsed) — verified by
+  type-check + flow review.
+
+- **Shop list view: status flag moved off the thumbnail, next to the metal label.**
+  In `ProductListRow`, the Available/Sold flag was absolutely positioned on the
+  image; it now renders inline as the first item of a new `.shop-list-metal-row` in
+  the details column — so the row reads **[Available] [Yellow Gold]** with the flag
+  where the metal label used to be and the metal label to its right. Same on desktop
+  and mobile. `.shop-list-status` CSS changed from absolute-on-image to an inline
+  badge (0.52rem); added `.shop-list-metal-row` (flex) and gave `.shop-list-metal`
+  ellipsis. Verified live at desktop + 375px: flag off the image, left of the metal
+  label, same line, correct colors. `tsc`/`eslint` clean.
+
 ## 2026-07-03
+
+- **Auto-send the buyer a receipt when their order is paid; invoice email is now
+  paid-aware.** On a successful PayPal capture (the moment the order becomes paid),
+  `capture-order` now automatically emails the buyer — best-effort, so an email
+  failure never fails the capture, and it only runs on the fresh capture (an
+  already-paid order returns earlier → no duplicate). `buildInvoiceEmailContent`
+  is now paid-aware: a **paid** order reads as a **Receipt** (subject/header
+  "Receipt for order NEJ-…", a green "PAID IN FULL" badge, "Total Paid", and
+  paid-wording intro/note); an unpaid order stays an **Invoice**. Extracted a
+  shared `lib/order-invoice-mailer.ts` (`sendOrderInvoiceEmail`: fetch order →
+  build paid-aware content → Resend → log to `order_emails`) used by both the
+  admin `email-invoice` route and the capture auto-send. The admin panel's
+  button/modal now say **Email Receipt** / **Send Receipt Email** for paid orders
+  (Invoice otherwise), and the email-history card labels auto-sent rows "Receipt …
+  Sent automatically". The auto-receipt email sends even before the `order_emails`
+  migration (it just isn't logged until then). `npm run build` passes, `tsc` clean,
+  `eslint` clean (only pre-existing OrderDetailPanel warnings). Not exercised live
+  (needs a PayPal sandbox capture + admin view + the `order-emails.sql` migration).
+  See DECISIONS 2026-07-03.
+  - **Note on unpaid orders (answered a question):** unpaid orders are normal, not
+    DB edits — `create_paypal_order` inserts the order as `unpaid` when the PayPal
+    window opens (before capture; abandoned/failed checkouts stay unpaid), admin
+    order-create inserts `unpaid`, and the legacy `/api/checkout/order` route does too.
+
+- **Order detail page now records + shows an email history.** Every email an admin
+  sends from `/admin/orders/[id]` (invoice emails and fulfillment-update emails) is
+  logged and displayed in a new **Email History** card **under the Summary block** on
+  the right. New table `order_emails` (`supabase/order-emails.sql`: order_id, type,
+  recipient, subject, status, sent_by/sent_by_email, created_at; admin RLS via
+  `is_admin_user`). Both `email-invoice`/`email-update` routes best-effort insert a
+  row after a successful send (never blocks the email) and return the record; the
+  order page loads history and passes it + the admin email to `OrderDetailPanel`,
+  which prepends each just-sent email optimistically. Degrades gracefully pre-migration
+  (missing table → empty history, emails still send). **Manual step: run
+  `supabase/order-emails.sql`.** `npm run build` passes, `tsc` clean, `eslint` clean
+  (only pre-existing OrderDetailPanel warnings). Not exercised live — admin session
+  had lapsed (won't type owner credentials) and the table isn't migrated yet. See
+  DECISIONS 2026-07-03.
+
+- **New photo uploads default to white image padding (new + existing products).**
+  Two changes in `AdminShell.tsx`: (1) `emptyProduct()` seeds `image_padding:
+  'white'` (was `'none'`), so a new listing's photos are white-padded by default;
+  (2) `handleImageUpload` now gives each freshly uploaded photo a per-photo white
+  entry in `image_padding_by_image` when the product's product-level padding isn't
+  already white — so uploading a new photo to an **existing** product (which may use
+  another padding) defaults that photo to white without touching the product's other
+  photos. New products stay clean (product-level white → no per-photo pins). The
+  per-photo chooser (white / black / none / custom) is unchanged, so the admin can
+  still change any photo. Existing photos are never retroactively re-padded. `tsc`
+  clean; the only AdminShell eslint error is the pre-existing `set-state-in-effect`
+  at L915 (unrelated). Not exercised via a signed-in upload (admin session had
+  lapsed; avoided creating junk inventory) — verified by type-check + the save/render
+  path the chooser already uses.
+
+- **Shop Visibility toggle: migration applied + verified end-to-end.**
+  `supabase/shop-settings.sql` was run. Verified live (admin): toggle ON → `/shop`
+  59/59 with 7 sold shown; OFF → 52/52, `?status=sold` empty (sold removed from
+  results, total, and facets); back ON → 59/59. Setting restored to `true` after
+  testing. (Feature added earlier same day — see below.)
+
+- **Admin can show/hide sold items in the shop gallery.** New **Shop Visibility**
+  section in `/admin/settings` with a "Show sold items in the shop gallery"
+  checkbox. New single-row `shop_settings` table (`show_sold_items`), new
+  admin-gated `/api/admin/shop-settings` (GET/PUT, service-role writes, PUT busts
+  the `shop-catalog` cache tag), new `src/lib/shop-settings.ts` store (defaults to
+  `true`/graceful), new `AdminShopVisibilityPanel` rendered by `AdminSettingsPanel`,
+  and `shop/page.tsx#queryShopCatalog` now filters to available-only
+  (`AVAILABLE_ONLY_SHOP_PRODUCT_STATUSES`, new export in `types/product.ts`) when the
+  toggle is off. Available items are always shown; the detail page still renders sold
+  items. **Manual step: run `supabase/shop-settings.sql`.** Pre-migration it defaults
+  to showing sold (no behavior change) and Save returns a graceful 500. `npm run
+  build` passes, `tsc`/`eslint` clean; verified live (panel renders, GET ok, PUT
+  graceful 500, `/shop` unchanged). See DECISIONS 2026-07-03.
+
+- **Shop list view: Add-to-Cart is now a labeled rectangular button.** Added a
+  new `list` variant to `CartButton` — a rectangular (6px radius) gold button
+  reading "Add to Cart" (→ "In Cart" once added, gold-outline), replacing the
+  circular cart icon in `ProductListRow`'s actions. The favorite/wishlist button
+  stays a circular icon next to it. The new variant reuses the existing
+  add/remove `handleClick`; labels are EN/ES ("Add to Cart"/"Agregar",
+  "In Cart"/"En carrito"). Verified live at 375px: rectangular 124×33px button,
+  wishlist still a 28px circle, clicking adds to cart (badge 1→2, label →
+  "In Cart"). Gallery cards' Add button is unchanged. `tsc`/`eslint` clean.
+
+- **Shrank the Available/Sold status flag in the shop list view.**
+  `.shop-list-status` (in `ShopProductGrid.tsx`'s list-branch styles) went from
+  `font-size: 0.5rem` / `padding: 0.1rem 0.34rem` / `letter-spacing: 0.08em` to
+  `0.4rem` / `0.07rem 0.26rem` / `0.06em`. Both the Available and Sold flags share
+  this class (Sold only differs by background via `[data-sold]`), so both shrink.
+  Verified live at 375px: Available flag now 6.4px (was 8px). `tsc`/`eslint` clean.
+
+- **Ring size chip on shop gallery + list views now shows a "Sz" prefix.**
+  `formatLengthChip` (duplicated in both `ProductCard.tsx` and
+  `ProductListRow.tsx`) extracted the bare number from a `"Size: N"` value (so the
+  spec chip read e.g. "6"); it now returns `"Sz N"` (e.g. "Sz 6", "Sz 7.5") in
+  both. Non-ring length chips (inches, e.g. "18in") are unchanged. The product
+  detail page was intentionally left as-is. Verified live at 375px on
+  `?itemType=ring` (gallery) and `?itemType=ring&view=list`. `tsc`/`eslint` clean.
+
+- **Slightly enlarged the mobile shop-card link-type/brand flag.** Bumped the
+  bottom-left flag's mobile (`≤640px`) font size in `ProductCard.tsx`:
+  `.shop-card-brand-tag-link` and `.shop-card-brand-tag-brand` 0.4rem→0.46rem,
+  `.shop-card-brand-tag-fit-medium` 0.36rem→0.42rem,
+  `.shop-card-brand-tag-fit-long` 0.32rem→0.38rem. Verified live at 375px:
+  "CUBAN LINK" etc. now render at 7.36px (was 6.4px), long labels at 6.08px —
+  more legible, still fit the card. `tsc`/`eslint` clean.
+
+- **Enlarged the mobile shop-card icon buttons' tap targets (not their size).**
+  Users reported the cart / favorite corner icons on gallery cards took 2–3 taps
+  to hit on mobile. Added a transparent `::before` overlay (`inset: -0.85rem`,
+  `≤640px` only) to `.shop-card-cart-icon-button` / `.shop-card-wishlist-button`
+  in `ProductCard.tsx`, extending each button's clickable area to ~49px from the
+  ~29px visible icon while leaving the icon's appearance unchanged. The overlay
+  reaches past the card corner (clipped by the image container's rounded
+  `overflow:hidden`), so tapping the corner now reliably hits the button.
+  Verified live at 375px: visible icon still 29px; hit area ~49px and registers
+  1–2px from the corner; a tap in the extended zone toggles the cart; the two
+  buttons' hit areas stay ~74px apart (no overlap). `tsc`/`eslint` clean.
 
 - **Removed the "Optional for local pickup" address hint on checkout.** The
   address section's helper line now only renders when a shipping method is

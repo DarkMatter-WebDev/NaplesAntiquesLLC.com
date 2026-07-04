@@ -97,7 +97,8 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     customer.name.trim() === '' ? (isEs ? 'Nombre completo' : 'Full Name') : null,
     customer.phone.trim() === '' ? (isEs ? 'Teléfono' : 'Phone') : null,
     customer.email.trim() === '' ? (isEs ? 'Correo electrónico' : 'Email') : null,
-    !infoConfirmed ? (isEs ? 'Confirme que su información es correcta' : 'Confirm your information is correct') : null,
+    // The confirmation checkbox is surfaced separately (needsInfoConfirmation) so
+    // the pay reminder can spell out "check the box" clearly.
   ].filter((label): label is string => Boolean(label));
 
   function buildPayPalPayload() {
@@ -440,6 +441,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
               ready={payReady}
               isEs={isEs}
               missingFields={missingFieldLabels}
+              needsInfoConfirmation={!infoConfirmed}
               getPayload={buildPayPalPayload}
               onOrderId={(id) => {
                 orderIdRef.current = id;

@@ -118,21 +118,23 @@ export default function ProductListRow({ product, spotData, locale, prioritizeIm
             image
           </span>
         )}
-        <span
-          className="shop-list-status"
-          data-sold={isSold || undefined}
-          data-pending={!isSold && !isPurchasable || undefined}
-        >
-          {isSold
-            ? (isEs ? 'Vendido' : 'Sold')
-            : isPurchasable
-              ? (isEs ? 'Disponible' : 'Available')
-              : productStatusLabel(product.status)}
-        </span>
       </Link>
 
       <div className="shop-list-main">
-        <span className="shop-list-metal">{metalLabel}</span>
+        <div className="shop-list-metal-row">
+          <span
+            className="shop-list-status"
+            data-sold={isSold || undefined}
+            data-pending={!isSold && !isPurchasable || undefined}
+          >
+            {isSold
+              ? (isEs ? 'Vendido' : 'Sold')
+              : isPurchasable
+                ? (isEs ? 'Disponible' : 'Available')
+                : productStatusLabel(product.status)}
+          </span>
+          <span className="shop-list-metal">{metalLabel}</span>
+        </div>
         <Link href={href} prefetch={false} className="shop-list-title-link">
           <h3 className="shop-list-title">{title}</h3>
         </Link>
@@ -177,7 +179,7 @@ export default function ProductListRow({ product, spotData, locale, prioritizeIm
         </div>
         <div className="shop-list-actions">
           <WishlistButton item={wishlistItem} variant="icon" locale={locale} />
-          <CartButton item={cartItem} variant="icon" locale={locale} />
+          <CartButton item={cartItem} variant="list" locale={locale} />
         </div>
       </div>
     </article>
@@ -231,7 +233,7 @@ function formatWeight(weight: number | null): string {
 function formatLengthChip(value: string | null): string | null {
   if (!value) return null;
   const ringSize = value.match(/^Size:\s*(.+)$/i);
-  if (ringSize) return ringSize[1];
+  if (ringSize) return `Sz ${ringSize[1]}`;
 
   const inchValue = value.match(/^(\d+(?:\.\d+)?)\s*in$/i);
   if (!inchValue) return value;

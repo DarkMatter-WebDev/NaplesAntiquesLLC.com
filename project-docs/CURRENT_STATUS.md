@@ -3,6 +3,66 @@
 > Reflects the present state of development. **Update this at the end of every
 > work session.** Last updated: **2026-07-03**.
 
+## 2026-07-03 -- Auto-receipt on payment + paid-aware invoice/receipt email
+
+On a successful PayPal capture, `capture-order` now **auto-emails the buyer their
+receipt** (best-effort; only on the fresh capture, so no duplicates; never fails the
+capture). The invoice email content is **paid-aware** (`buildInvoiceEmailContent`):
+paid → **Receipt** wording + "PAID IN FULL" badge + "Total Paid"; unpaid → **Invoice**.
+A shared `lib/order-invoice-mailer.ts#sendOrderInvoiceEmail` (fetch → build → send →
+log to `order_emails`) backs both the admin *Email Invoice/Receipt* button and the
+auto-send. The admin button/modal relabel to Receipt for paid orders.
+
+The auto-receipt **email sends regardless of the `order_emails` migration**; it's just
+not logged to the Email History card until `supabase/order-emails.sql` is run (see the
+per-order-email entry below — same pending migration). **Verified:** `npm run build`
+passes, `tsc`/`eslint` clean. Not exercised live (needs a PayPal sandbox capture +
+admin view + the migration). See DECISIONS 2026-07-03.
+
+## 2026-07-03 -- Order detail: per-order email history
+
+The admin order detail page (`/admin/orders/[id]`) now records every email sent from
+it (invoice + fulfillment-update) and shows them in a new **Email History** card
+under the Summary block on the right. New table `order_emails`
+(`supabase/order-emails.sql`); the two email routes best-effort insert a row after a
+successful send; the page loads the history and `OrderDetailPanel` prepends each
+just-sent email optimistically.
+
+⚠️ **Manual step: run `supabase/order-emails.sql` in Supabase.** Until then the table
+is missing → history reads empty and the routes' logging insert no-ops (emails still
+send fine — graceful). **Verified:** `npm run build` passes, `tsc`/`eslint` clean
+(only pre-existing OrderDetailPanel warnings). Not exercised live (admin session had
+lapsed; owner credentials not entered; table not yet migrated). After running the SQL,
+verify by sending an invoice + a fulfillment-update email from an order and confirming
+both appear in the Email History card. See DECISIONS 2026-07-03.
+
+## 2026-07-03 -- Admin toggle: show/hide sold items in the shop gallery
+
+Added an admin setting (in `/admin/settings` → new **Shop Visibility** section) to
+choose whether SOLD products appear in the public shop gallery. Available items are
+always shown. Implementation follows the app's single-row-settings + admin-gated-API
+pattern:
+- **New table `shop_settings`** (`supabase/shop-settings.sql`) — single row, column
+  `show_sold_items boolean default true`. Anon/authenticated SELECT (storefront
+  reads it), writes only via the admin API's service-role client.
+- **New API `/api/admin/shop-settings`** (GET/PUT, `requireAdmin`-gated, service-role
+  read/write). PUT busts the `shop-catalog` cache tag so the change shows immediately.
+- **New store lib** `src/lib/shop-settings.ts` (`fetchShowSoldItems` degrades to
+  `true` on any error incl. missing table; `saveShowSoldItems`).
+- **Admin UI** `src/components/admin/AdminShopVisibilityPanel.tsx` (checkbox),
+  rendered by `AdminSettingsPanel`.
+- **Shop query** (`shop/page.tsx#queryShopCatalog`) reads the setting and filters to
+  `AVAILABLE_ONLY_SHOP_PRODUCT_STATUSES` (new export in `types/product.ts`) when the
+  toggle is off, else the existing available+sold set.
+
+✅ **Migration applied + feature verified end-to-end (2026-07-03).** `supabase/shop-settings.sql`
+was run in Supabase. Verified live signed-in as admin: with the toggle ON `/shop`
+showed 59/59 (7 sold visible); toggling OFF (PUT → 200) dropped it to 52/52 with
+`?status=sold` empty (the 7 sold hidden from results + total + facets); toggling back
+ON restored 59/59. The setting was **restored to `true`** (its default) after testing
+so production shows sold as before. `npm run build` passes, `tsc`/`eslint` clean. See
+DECISIONS 2026-07-03.
+
 ## 2026-07-03 -- Checkout inventory: no reservation (whoever pays first gets the item)
 
 Removed the 30-minute inventory reservation from PayPal checkout. Items now stay

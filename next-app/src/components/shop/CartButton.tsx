@@ -6,7 +6,7 @@ import { isProductPurchasable } from '@/types/product';
 
 interface Props {
   item: CartItem;
-  variant?: 'card' | 'detail' | 'icon';
+  variant?: 'card' | 'detail' | 'icon' | 'list';
   locale?: string;
   includeCardStyles?: boolean;
 }
@@ -61,6 +61,47 @@ export default function CartButton({ item, variant = 'card', locale = 'en', incl
         {inCart
           ? (isEs ? 'En el carrito' : 'In Cart')
           : canPurchase ? (isEs ? 'Agregar al carrito' : 'Add to Cart') : (isEs ? 'No disponible' : 'Unavailable')}
+      </button>
+    );
+  }
+
+  if (variant === 'list') {
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={!canPurchase && !inCart}
+        aria-pressed={inCart}
+        className="flex items-center justify-center gap-1.5"
+        style={{
+          borderRadius: '6px',
+          padding: '0.5rem 0.85rem',
+          fontFamily: 'var(--font-label)',
+          fontSize: '0.62rem',
+          fontWeight: 800,
+          letterSpacing: '0.09em',
+          textTransform: 'uppercase',
+          whiteSpace: 'nowrap',
+          cursor: canPurchase || inCart ? 'pointer' : 'not-allowed',
+          border: `1px solid ${inCart ? 'rgba(181, 137, 12, 0.5)' : 'transparent'}`,
+          background: inCart
+            ? 'rgba(255, 253, 248, 0.9)'
+            : canPurchase
+              ? 'linear-gradient(135deg, #dcb336, #b5890c)'
+              : 'rgba(115, 92, 0, 0.12)',
+          color: inCart ? GOLD : canPurchase ? '#fffdf7' : 'var(--color-on-surface-variant)',
+          boxShadow: inCart || !canPurchase ? 'none' : '0 6px 14px rgba(181, 137, 12, 0.18)',
+          opacity: !canPurchase && !inCart ? 0.6 : 1,
+        }}
+      >
+        <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '15px', lineHeight: 1 }}>
+          {inCart ? 'remove_shopping_cart' : 'add_shopping_cart'}
+        </span>
+        <span>
+          {inCart
+            ? (isEs ? 'En carrito' : 'In Cart')
+            : canPurchase ? (isEs ? 'Agregar' : 'Add to Cart') : (isEs ? 'No disponible' : 'Unavailable')}
+        </span>
       </button>
     );
   }

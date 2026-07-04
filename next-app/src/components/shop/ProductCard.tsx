@@ -611,16 +611,16 @@ export default function ProductCard({
               bottom: 0.28rem !important;
               left: 0.28rem !important;
               padding: 0.1rem 0.28rem !important;
-              font-size: 0.4rem !important;
+              font-size: 0.46rem !important;
               letter-spacing: 0.05em !important;
               border-radius: 2px !important;
             }
             .shop-card-brand-tag-fit-medium {
-              font-size: 0.36rem !important;
+              font-size: 0.42rem !important;
               letter-spacing: 0.03em !important;
             }
             .shop-card-brand-tag-fit-long {
-              font-size: 0.32rem !important;
+              font-size: 0.38rem !important;
               letter-spacing: 0.01em !important;
               padding-left: 0.22rem !important;
               padding-right: 0.22rem !important;
@@ -632,7 +632,7 @@ export default function ProductCard({
               left: 0.28rem !important;
               max-width: 62% !important;
               padding: 0.1rem 0.28rem !important;
-              font-size: 0.4rem !important;
+              font-size: 0.46rem !important;
               line-height: 1 !important;
               letter-spacing: 0.05em !important;
               border-radius: 2px !important;
@@ -675,6 +675,22 @@ export default function ProductCard({
             }
             .shop-card-cart-icon-button [data-cart-icon="true"] {
               font-size: 14px !important;
+            }
+            /* Expand the mobile tap target for the two corner icon buttons
+               without enlarging the visible icon. A transparent overlay grows
+               the clickable area to ~44px (from ~28px) and, because it extends
+               past the card corner where the image container clips it, the
+               entire corner of the card image reliably taps the button. */
+            .shop-card-cart-icon-button,
+            .shop-card-wishlist-button {
+              position: relative;
+            }
+            .shop-card-cart-icon-button::before,
+            .shop-card-wishlist-button::before {
+              content: '';
+              position: absolute;
+              inset: -0.85rem;
+              border-radius: 999px;
             }
           }
           /* Cart icon button — hidden on tablet/desktop, visible on mobile */
@@ -780,7 +796,7 @@ function formatWeight(weight: number | null): string {
 function formatLengthChip(value: string | null): string | null {
   if (!value) return null;
   const ringSize = value.match(/^Size:\s*(.+)$/i);
-  if (ringSize) return ringSize[1];
+  if (ringSize) return `Sz ${ringSize[1]}`;
 
   const inchValue = value.match(/^(\d+(?:\.\d+)?)\s*in$/i);
   if (!inchValue) return value;

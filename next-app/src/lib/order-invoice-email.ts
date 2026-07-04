@@ -59,9 +59,17 @@ export function withInvoiceLineDiscounts(order: InvoiceEmailOrder, itemDiscounts
   };
 }
 
+export function isOrderPaid(order: Pick<Order, 'payment_status'>): boolean {
+  return String(order.payment_status ?? '').trim().toLowerCase() === 'paid';
+}
+
 export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoiceNumber?: string | null): InvoiceEmailContent {
   const invoiceNumber = invoiceNumberForOrder(order, fallbackInvoiceNumber);
-  const subject = `Invoice ${invoiceNumber} from Naples Estate Jewelry Co`;
+  const paid = isOrderPaid(order);
+  // A paid order gets a "receipt"; an unpaid order gets an "invoice".
+  const subject = paid
+    ? `Receipt for order ${order.order_number} from Naples Estate Jewelry Co`
+    : `Invoice ${invoiceNumber} from Naples Estate Jewelry Co`;
   const customerName = order.customer_name || 'there';
   const items = order.order_items.map((item) => {
     const discount = clampDiscount(Number(item.discount ?? 0), item.price_snapshot);
@@ -92,8 +100,13 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
     total: formatCurrency(order.total),
   };
   const greeting = `Hi ${customerName},`;
-  const intro = `Thank you for your order with Naples Estate Jewelry Co. Invoice ${invoiceNumber} for ${order.order_number} is ready for review.`;
-  const note = 'Please reply to this email or call/text (239) 404-8505 with any questions about payment, pickup, delivery, or shipping.';
+  const intro = paid
+    ? `Thank you for your order with Naples Estate Jewelry Co. Your payment has been received — here is your receipt for order ${order.order_number}.`
+    : `Thank you for your order with Naples Estate Jewelry Co. Invoice ${invoiceNumber} for ${order.order_number} is ready for review.`;
+  // Sent from a no-reply address, so don't invite replies — direct to phone/text.
+  const note = paid
+    ? 'Your payment has been received in full — thank you. Call or text us at (239) 404-8505 with any questions about pickup, delivery, or shipping.'
+    : 'Call or text us at (239) 404-8505 with any questions about payment, pickup, delivery, or shipping.';
   const closing = 'Thank you, Naples Estate Jewelry Co';
   const shipToLines = formatAddressLines(order.shipping_address);
 
@@ -115,6 +128,7 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
       totals,
       note,
       closing,
+      paid,
       paymentStatus: orderStatusLabel(order.payment_status),
       fulfillmentStatus: orderStatusLabel(order.fulfillment_status),
       shippingMethod: orderStatusLabel(order.shipping_method),
@@ -123,6 +137,7 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
     text: [
       greeting,
       intro,
+      ...(paid ? ['', 'PAYMENT RECEIVED — PAID IN FULL'] : []),
       '',
       'Items:',
       ...(items.length > 0 ? items.map((item) => `- ${item.title} (${item.inventory}) - ${item.discount ? `${item.originalPrice}, line discount ${item.discount}, total ${item.price}` : item.price}`) : ['- No item details were attached.']),
@@ -149,12 +164,14 @@ function buildInvoiceEmailHtml({
   totals,
   note,
   closing,
+  paid,
   paymentStatus,
   fulfillmentStatus,
   shippingMethod,
   shipTo,
 }: Omit<InvoiceEmailContent, 'html' | 'text' | 'invoiceNumber'> & {
   orderNumber: string;
+  paid: boolean;
   paymentStatus: string;
   fulfillmentStatus: string;
   shippingMethod: string;
@@ -194,6 +211,7 @@ function buildInvoiceEmailHtml({
                 <td style="padding:28px 30px 18px;border-bottom:1px solid #d5c697;">
                   <div style="color:#735c00;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;">Naples Estate Jewelry Co</div>
                   <h1 style="margin:10px 0 0;color:#1d1a14;font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:1.2;">${escapeHtml(subject)}</h1>
+                  ${paid ? '<div style="display:inline-block;margin:12px 0 0;padding:5px 12px;background:#0f7a4f;color:#ffffff;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border-radius:3px;">Paid in full</div>' : ''}
                   <p style="margin:8px 0 0;color:#746b5b;font-size:13px;">Order ${escapeHtml(orderNumber)} - ${escapeHtml(paymentStatus)} - ${escapeHtml(fulfillmentStatus)}</p>
                 </td>
               </tr>
@@ -211,7 +229,7 @@ function buildInvoiceEmailHtml({
                     ${totals.discount ? totalRow('Discount', totals.discount) : ''}
                     ${totalRow('Tax', totals.tax)}
                     ${totalRow('Shipping', totals.shipping)}
-                    ${totalRow('Total', totals.total, true)}
+                    ${totalRow(paid ? 'Total Paid' : 'Total', totals.total, true)}
                   </table>
 
                   <div style="margin:0 0 22px;padding:14px 16px;background:#fbfaf5;border:1px solid #eadfbd;color:#746b5b;font-size:13px;line-height:1.5;">

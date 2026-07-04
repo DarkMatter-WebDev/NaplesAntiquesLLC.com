@@ -68,6 +68,7 @@ export default function PayPalCheckoutButton({
   ready,
   isEs,
   missingFields,
+  needsInfoConfirmation,
   getPayload,
   onOrderId,
   onSuccess,
@@ -76,9 +77,11 @@ export default function PayPalCheckoutButton({
   currency?: string;
   ready: boolean;
   isEs: boolean;
-  /** Labels of required fields that are currently empty, in form order — shown
-   *  in the required-fields modal so the buyer knows exactly what to fill in. */
+  /** Labels of required *form fields* that are currently empty, in form order
+   *  (the confirmation checkbox is tracked separately via needsInfoConfirmation). */
   missingFields: string[];
+  /** True when the "confirm my information" checkbox is not yet checked. */
+  needsInfoConfirmation: boolean;
   getPayload: () => PayPalPayload;
   onOrderId: (orderId: string) => void;
   onSuccess: (result: { orderId: string; orderNumber: string }) => void;
@@ -88,7 +91,9 @@ export default function PayPalCheckoutButton({
   const [sdkError, setSdkError] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
-  const [showRequiredFieldsModal, setShowRequiredFieldsModal] = useState(false);
+  // Inline red reminder shown when the buyer clicks pay before completing the
+  // required fields / confirmation checkbox (replaces the old full-screen modal).
+  const [missingHint, setMissingHint] = useState<{ fields: string[]; needsConfirm: boolean } | null>(null);
 
   // Keep the latest callbacks/getters in refs so the PayPal Buttons instance
   // (initialized once) always reads current cart + contact state.
@@ -97,12 +102,16 @@ export default function PayPalCheckoutButton({
   const onSuccessRef = useRef(onSuccess);
   const isEsRef = useRef(isEs);
   const readyRef = useRef(ready);
+  const missingFieldsRef = useRef(missingFields);
+  const needsInfoConfirmationRef = useRef(needsInfoConfirmation);
   useEffect(() => {
     getPayloadRef.current = getPayload;
     onOrderIdRef.current = onOrderId;
     onSuccessRef.current = onSuccess;
     isEsRef.current = isEs;
     readyRef.current = ready;
+    missingFieldsRef.current = missingFields;
+    needsInfoConfirmationRef.current = needsInfoConfirmation;
   });
 
   useEffect(() => {
@@ -124,9 +133,10 @@ export default function PayPalCheckoutButton({
       // always visible; if the form isn't filled, reject the click and prompt.
       onClick: (_data, actions) => {
         if (!readyRef.current) {
-          setShowRequiredFieldsModal(true);
+          setMissingHint({ fields: missingFieldsRef.current, needsConfirm: needsInfoConfirmationRef.current });
           return actions.reject();
         }
+        setMissingHint(null);
         setMessage(null);
         return actions.resolve();
       },
@@ -222,8 +232,49 @@ export default function PayPalCheckoutButton({
     );
   }
 
+  // Compose the reminder shown when the buyer tries to pay before they're ready —
+  // leads with the confirmation checkbox (the most-missed step) and lists any empty
+  // form fields.
+  function reminderMessage(hint: { fields: string[]; needsConfirm: boolean }): string {
+    const parts: string[] = [];
+    if (hint.needsConfirm) {
+      parts.push(isEs
+        ? 'marque la casilla de arriba para confirmar que su información es correcta'
+        : 'check the box above to confirm your information is correct');
+    }
+    if (hint.fields.length > 0) {
+      parts.push(isEs
+        ? `complete: ${hint.fields.join(', ')}`
+        : `complete: ${hint.fields.join(', ')}`);
+    }
+    if (parts.length === 0) {
+      return isEs ? 'Complete los datos requeridos para pagar.' : 'Complete the required details to pay.';
+    }
+    const joined = parts.join(isEs ? '; y ' : '; and ');
+    return isEs ? `Antes de pagar, ${joined}.` : `Before you can pay, please ${joined}.`;
+  }
+
   return (
     <div>
+      {missingHint && !ready && (
+        <div
+          role="alert"
+          className="mb-2 flex items-start gap-2 text-sm"
+          style={{
+            padding: '0.6rem 0.75rem',
+            border: '1px solid color-mix(in srgb, var(--color-error) 40%, transparent)',
+            background: 'color-mix(in srgb, var(--color-error) 9%, transparent)',
+            borderRadius: 'var(--radius-lg)',
+            color: 'var(--color-error)',
+            fontWeight: 600,
+          }}
+        >
+          <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '1.15rem', lineHeight: 1.25, flexShrink: 0 }}>
+            error
+          </span>
+          <span>{reminderMessage(missingHint)}</span>
+        </div>
+      )}
       <div ref={containerRef} aria-busy={processing} />
       {!sdkReady && (
         <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
@@ -248,60 +299,6 @@ export default function PayPalCheckoutButton({
         <p className="mt-2 text-sm" style={{ color: 'var(--color-error)' }}>
           {message}
         </p>
-      )}
-
-      {showRequiredFieldsModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={isEs ? 'Campos requeridos' : 'Required fields'}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 100,
-            display: 'grid',
-            placeItems: 'center',
-            padding: '1.25rem',
-            background: 'rgba(20, 18, 14, 0.45)',
-            backdropFilter: 'blur(3px)',
-          }}
-        >
-          <div
-            style={{
-              width: 'min(26rem, 100%)',
-              background: '#ffffff',
-              borderRadius: 'var(--radius-xl)',
-              border: '1px solid rgba(115, 92, 0, 0.16)',
-              boxShadow: '0 28px 80px rgba(20, 18, 14, 0.24)',
-              padding: '2rem',
-              textAlign: 'center',
-            }}
-          >
-            <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '2rem', color: 'var(--color-error)' }}>
-              error
-            </span>
-            <p style={{ marginTop: '0.75rem', fontSize: '0.95rem', color: 'var(--color-on-surface)' }}>
-              {isEs
-                ? 'Complete los siguientes campos requeridos antes de pagar:'
-                : 'Please complete the following required fields before paying:'}
-            </p>
-            {missingFields.length > 0 && (
-              <ul style={{ marginTop: '0.75rem', textAlign: 'left', display: 'inline-block', fontSize: '0.9rem', color: 'var(--color-on-surface)' }}>
-                {missingFields.map((field) => (
-                  <li key={field} style={{ padding: '0.15rem 0' }}>{field}</li>
-                ))}
-              </ul>
-            )}
-            <button
-              type="button"
-              onClick={() => setShowRequiredFieldsModal(false)}
-              className="gold-button justify-center text-sm"
-              style={{ marginTop: '1.25rem', width: '100%' }}
-            >
-              {isEs ? 'Cerrar' : 'Close'}
-            </button>
-          </div>
-        </div>
       )}
     </div>
   );

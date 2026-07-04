@@ -10,6 +10,101 @@
 > **Alternatives considered:** ...
 > ```
 
+## 2026-07-03 — Auto-send receipt on payment; one paid-aware invoice/receipt email
+
+**Decision:** When a PayPal order is captured (becomes paid), automatically email the
+buyer their **receipt** from the `capture-order` route — best-effort (a send/log
+failure never fails the capture) and only on the fresh capture (an already-paid order
+short-circuits earlier in the route, so no duplicate receipt). Use **one** email
+builder (`buildInvoiceEmailContent`) that is **paid-aware**: a paid order renders as a
+"Receipt" (subject/header wording, a "PAID IN FULL" badge, "Total Paid", paid intro/
+note); an unpaid order renders as an "Invoice". Both the admin *Email Invoice/Receipt*
+button and the auto-send go through a shared `lib/order-invoice-mailer.ts`
+(`sendOrderInvoiceEmail`: fetch order+items → build content → Resend → log to
+`order_emails` with `email_type` `'receipt'|'invoice'`). Auto-sends record with a null
+`sent_by` (the history shows "Sent automatically"); admin sends record the admin.
+
+**Reason:** The customer's "order placed" moment online is the capture (payment
+succeeds), so that's the natural trigger and it's always a paid receipt there. A single
+paid-aware builder keeps one source of truth for the document and means the admin
+"resend" button automatically produces the right wording. Best-effort send/log keeps
+the payment path reliable — the money is already captured, so nothing about the email
+may block it. The shared mailer removes the duplicated fetch/build/send/log that
+otherwise lived in the admin route.
+
+**Terminology:** paid = "Receipt", unpaid = "Invoice" (the owner was fine calling it a
+receipt when paid). The stored `invoices` row + INV-number are unchanged; only the
+customer-facing email wording switches on payment status.
+
+**Alternatives considered:** (1) Send on order *creation* (`create_paypal_order`) —
+rejected: the order is unpaid then (it'd be an invoice for a not-yet-paid order and
+could fire on abandoned checkouts). (2) Also send from the webhook backstop capture —
+deferred: the client capture covers the normal path; adding webhook send needs the
+same idempotency guard and can be added later if backstop-only captures need it.
+(3) Two separate builders (invoice vs receipt) — rejected: one paid-aware builder is
+less to maintain and keeps the admin preview and the sent email identical.
+
+## 2026-07-03 — Per-order email history: dedicated `order_emails` table, best-effort logging
+
+**Decision:** Record every admin-sent email from the order detail page (invoice +
+fulfillment-update) in a new **`order_emails`** table (order_id FK, email_type,
+recipient, subject, status, sent_by/sent_by_email, created_at) and render it in an
+**Email History** card under the Summary block on `/admin/orders/[id]`. The two email
+routes insert the row **after** a successful Resend send, **best-effort** — a logging
+failure (including the table not being migrated) is caught and never fails the email
+or the request. Reads/writes run as the authenticated admin (cookie server client)
+gated by RLS via the existing `is_admin_user()` helper. The client panel prepends each
+just-sent email optimistically so the history updates without a reload; the server
+record is the source of truth on next load.
+
+**Reason:** A dedicated table matches the app's one-table-per-concern convention and
+keeps email history queryable per order (indexed on `(order_id, created_at)`) without
+overloading `admin_notifications` (the message center) or stuffing a JSON blob on
+`orders`. Best-effort logging keeps the primary action (sending the email) reliable
+and makes the feature safe to ship before the migration is applied. Attributing the
+insert to the authenticated admin (not service role) gives a natural `sent_by` and
+needs only a simple admin RLS policy.
+
+**Alternatives considered:** (1) A `jsonb` column on `orders` — simpler migration but
+unqueryable, races on concurrent writes, and bloats the order row. (2) Reuse
+`admin_notifications` — wrong surface (that's the message inbox) and mixes concerns.
+(3) Fail the request if logging fails — rejected: the email already went out, so the
+send must report success regardless. (4) Service-role insert — avoids an RLS policy
+but loses easy `sent_by` attribution; the admin cookie client already runs these
+routes.
+
+## 2026-07-03 — Admin "show sold items in shop" toggle: own single-row table + service-role writes
+
+**Decision:** Add an admin setting to show/hide SOLD products in the public shop
+gallery, stored in a **new single-row `shop_settings` table** (`show_sold_items
+boolean default true`) rather than reusing an existing settings table. Public shop
+reads it with the cookie-free anon client (RLS `select using(true)` + anon grant);
+writes go **only** through the admin API route (`/api/admin/shop-settings`,
+`requireAdmin`-gated) using the **service-role client**, so no admin RLS write policy
+/ `is_app_admin()` dependency is needed. The shop's cached catalog read
+(`unstable_cache`, tag `shop-catalog`) reads the setting inside the cached function;
+the PUT route busts the `shop-catalog` tag so a toggle takes effect promptly.
+Available items are always shown; only `sold` is gated. Default and all failure paths
+degrade to **showing** sold (historical behavior), so the site is unchanged until the
+migration is applied and the admin opts to hide.
+
+**Reason:** Matches the app's established one-table-per-concern settings pattern
+(`ai_settings`, `carousel_settings`, `marketing_settings`) and its "service-role write
+behind a `requireAdmin` gate" convention (used by marketing/contact routes), which
+avoids adding an RLS write policy. Reading inside the cached function keeps the shop's
+single-DB-round-trip caching intact; tag invalidation on write is the same mechanism
+product writes already use. Defaulting to show-sold means the feature is additive and
+safe pre-migration.
+
+**Alternatives considered:** (1) Add a column to `carousel_settings` — rejected:
+semantically unrelated, and its admin-write policy is email-based (`is_carousel_admin`).
+(2) Read the setting outside the cache and key the cache by it — cleaner cache
+correctness but adds an uncached per-request DB read on a cached public page; the
+tag-bust approach avoids that. (3) A client-side filter only — rejected: sold rows
+would still ship to the browser and appear in facet counts; filtering at the query is
+correct. (4) Drop `sold` from `PUBLIC_SHOP_PRODUCT_STATUSES` globally — rejected: the
+product **detail** page and admin previews still legitimately render sold items.
+
 ## 2026-07-03 — Checkout inventory: no reservation, whoever pays first gets the item
 
 **Decision:** Remove the 30-minute inventory reservation from PayPal checkout

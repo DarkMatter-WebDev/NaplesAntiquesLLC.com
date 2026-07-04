@@ -138,6 +138,26 @@ export async function POST(req: Request) {
     { onConflict: 'invoice_number', ignoreDuplicates: true },
   );
 
+  // Automatically email the buyer their receipt now that the order is paid.
+  // Best-effort: the payment already succeeded, so an email failure must not fail
+  // the capture. Only runs on this fresh capture (an already-paid order returns
+  // earlier, so no duplicate receipt).
+  const resendKey = process.env.RESEND_API_KEY;
+  if (resendKey && order.customer_email) {
+    try {
+      const { sendOrderInvoiceEmail } = await import('@/lib/order-invoice-mailer');
+      await sendOrderInvoiceEmail({
+        supabase: service,
+        resendKey,
+        orderId: order.id,
+        recipient: order.customer_email,
+        sentBy: { id: null, email: 'Automatic — order confirmation' },
+      });
+    } catch (err) {
+      console.error('Auto receipt email error:', err);
+    }
+  }
+
   return NextResponse.json({
     success: true,
     orderId: order.id,

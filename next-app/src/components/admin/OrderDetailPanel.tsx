@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import type { Order, OrderItem, FulfillmentStatus, OrderStatus } from '@/types/sales';
 import { formatCurrency, formatOrderDate, formatPublicPurity, orderStatusLabel } from '@/types/sales';
 import { formatProductItemYear } from '@/types/product';
-import { buildInvoiceEmailContent, invoiceNumberForOrder, withInvoiceLineDiscounts } from '@/lib/order-invoice-email';
+import { buildInvoiceEmailContent, invoiceNumberForOrder, isOrderPaid, withInvoiceLineDiscounts } from '@/lib/order-invoice-email';
 import { buildFulfillmentUpdateEmailContent } from '@/lib/order-fulfillment-email';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 import { adminRevalidateProducts } from '@/app/actions/admin-products';
@@ -38,13 +38,25 @@ interface Invoice {
   created_at: string;
 }
 
+interface OrderEmail {
+  id: string;
+  email_type: string;
+  recipient: string;
+  subject: string | null;
+  status: string | null;
+  sent_by_email: string | null;
+  created_at: string;
+}
+
 interface Props {
   initialOrder: Order & { order_items: OrderItem[] };
   initialInvoices: Invoice[];
+  initialOrderEmails: OrderEmail[];
+  adminEmail: string | null;
   locale: string;
 }
 
-export default function OrderDetailPanel({ initialOrder, initialInvoices, locale }: Props) {
+export default function OrderDetailPanel({ initialOrder, initialInvoices, initialOrderEmails, adminEmail, locale }: Props) {
   const router = useRouter();
   const supabase = createClient();
   const adminBasePath = locale === 'es' ? '/es/admin' : '/admin';
@@ -52,6 +64,7 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
   const orderReturnPath = `${adminBasePath}/orders/${initialOrder.id}`;
   const [order, setOrder] = useState(initialOrder);
   const [invoices, setInvoices] = useState(initialInvoices);
+  const [orderEmails, setOrderEmails] = useState<OrderEmail[]>(initialOrderEmails);
   const [internalNotes, setInternalNotes] = useState(order.internal_notes ?? '');
   const [saving, setSaving] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
@@ -76,6 +89,8 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
     Object.fromEntries(initialOrder.order_items.map((item) => [item.id, String(item.discount ?? 0)])),
   );
 
+  const orderIsPaid = isOrderPaid(order);
+  const invoiceDocLabel = orderIsPaid ? 'Receipt' : 'Invoice';
   const productIds = order.order_items.map((item) => item.product_id).filter(Boolean) as string[];
   const latestInvoice = invoices[0] ?? null;
   const invoiceNumber = invoiceNumberForOrder(order, latestInvoice?.invoice_number);
@@ -205,6 +220,12 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
       return;
     }
 
+    recordSentEmail({
+      email_type: 'fulfillment_update',
+      recipient,
+      subject: emailUpdateContent?.subject ?? null,
+      status: emailUpdateStatus,
+    });
     setEmailUpdateMessage({ text: `Update email sent to ${recipient}.`, ok: true });
   }
 
@@ -293,6 +314,23 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
   }
 
 
+  // Prepend a just-sent email to the on-page history so it shows immediately.
+  // (The server also persists it; a reload reflects the stored record.)
+  function recordSentEmail(entry: { email_type: string; recipient: string; subject: string | null; status: string | null }) {
+    setOrderEmails((prev) => [
+      {
+        id: `local-${Date.now()}`,
+        email_type: entry.email_type,
+        recipient: entry.recipient,
+        subject: entry.subject,
+        status: entry.status,
+        sent_by_email: adminEmail,
+        created_at: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+  }
+
   async function sendInvoiceEmail() {
     setEmailMessage(null);
     const recipient = emailRecipient.trim();
@@ -315,7 +353,9 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
       return;
     }
 
-    setEmailMessage({ text: `Invoice email sent to ${recipient}.`, ok: true });
+    const documentLabel = orderIsPaid ? 'Receipt' : 'Invoice';
+    recordSentEmail({ email_type: orderIsPaid ? 'receipt' : 'invoice', recipient, subject: emailContent.subject, status: null });
+    setEmailMessage({ text: `${documentLabel} email sent to ${recipient}.`, ok: true });
   }
 
   return (
@@ -352,7 +392,7 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
           </div>
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => setShowEmailInvoice(true)} className="outline-button text-sm">Email Invoice</button>
+              <button type="button" onClick={() => setShowEmailInvoice(true)} className="outline-button text-sm">Email {invoiceDocLabel}</button>
               <button type="button" onClick={markPaid} disabled={saving === 'paid' || order.payment_status === 'paid'} className="gold-button text-sm disabled:opacity-50">Mark Paid</button>
               <button type="button" onClick={markUnpaid} disabled={saving === 'unpaid' || order.payment_status === 'unpaid'} className="outline-button text-sm disabled:opacity-50">Mark Unpaid</button>
               <button type="button" onClick={markRefunded} disabled={saving === 'refunded' || order.payment_status === 'refunded'} className="outline-button text-sm disabled:opacity-50">Mark Refunded</button>
@@ -671,7 +711,8 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
             </section>
           </div>
 
-          <aside className="border p-5 h-fit" style={{ borderColor: BORDER, background: 'white' }}>
+          <div className="flex flex-col gap-6 h-fit">
+          <aside className="border p-5" style={{ borderColor: BORDER, background: 'white' }}>
             <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>Summary</h2>
             <StatusRow label="Payment" value={order.payment_status} />
             <StatusRow label="Fulfillment" value={order.fulfillment_status} />
@@ -696,6 +737,40 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
               <div>Shipping: {orderStatusLabel(order.shipping_method)}</div>
             </div>
           </aside>
+
+          <section className="border p-5" style={{ borderColor: BORDER, background: 'white' }}>
+            <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>Email History</h2>
+            {orderEmails.length > 0 ? (
+              <ul className="flex flex-col gap-3">
+                {orderEmails.map((email) => (
+                  <li key={email.id} className="border-b pb-3 last:border-b-0 last:pb-0" style={{ borderColor: BORDER }}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[0.7rem] font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                        {emailTypeLabel(email)}
+                      </span>
+                      <span className="text-[0.7rem] whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
+                        {formatOrderDate(email.created_at)}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm break-words" style={{ color: 'var(--color-on-surface)' }}>
+                      To {email.recipient}
+                    </p>
+                    {email.subject && (
+                      <p className="mt-0.5 text-xs break-words" style={{ color: 'var(--color-on-surface-variant)' }}>
+                        {email.subject}
+                      </p>
+                    )}
+                    <p className="mt-0.5 text-[0.68rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      {email.sent_by_email ? `Sent by ${email.sent_by_email}` : 'Sent automatically'}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>No emails sent from this page yet.</p>
+            )}
+          </section>
+          </div>
         </div>
       </div>
 
@@ -714,7 +789,7 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
 
             <div className="border-b px-5 py-5 pr-16 md:px-7" style={{ borderColor: BORDER }}>
               <p className="text-[0.65rem] font-bold uppercase tracking-[0.28em]" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-                Email Invoice
+                Email {invoiceDocLabel}
               </p>
               <h2 className="mt-2 text-2xl font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
                 Preview and Recipient
@@ -821,7 +896,7 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, locale
                   Close
                 </button>
                 <button type="button" onClick={sendInvoiceEmail} disabled={emailSending} className="gold-button justify-center text-sm disabled:opacity-50">
-                  {emailSending ? 'Sending...' : 'Send Invoice Email'}
+                  {emailSending ? 'Sending...' : `Send ${invoiceDocLabel} Email`}
                 </button>
               </div>
             </div>
@@ -942,4 +1017,13 @@ function MoneyRow({ label, value, strong = false }: { label: string; value: numb
 function clampMoneyDiscount(value: number, max: number) {
   if (!Number.isFinite(value)) return 0;
   return Math.min(Math.max(value, 0), Math.max(max, 0));
+}
+
+function emailTypeLabel(email: { email_type: string; status: string | null }): string {
+  if (email.email_type === 'invoice') return 'Invoice';
+  if (email.email_type === 'receipt') return 'Receipt';
+  if (email.email_type === 'fulfillment_update') {
+    return email.status ? `Update — ${orderStatusLabel(email.status)}` : 'Fulfillment Update';
+  }
+  return email.email_type;
 }

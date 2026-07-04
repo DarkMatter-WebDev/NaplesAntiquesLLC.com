@@ -74,5 +74,28 @@ export async function POST(req: Request, { params }: Props) {
     return NextResponse.json({ error: 'Could not send update email.' }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true });
+  // Record the sent email for the order's history (best-effort — see email-invoice).
+  const sentAt = new Date().toISOString();
+  const { error: logError } = await supabase.from('order_emails').insert({
+    order_id: id,
+    email_type: 'fulfillment_update',
+    recipient,
+    subject: content.subject,
+    status,
+    sent_by: user.id,
+    sent_by_email: user.email ?? null,
+  });
+  if (logError) console.error('order_emails insert (update) failed:', logError.message);
+
+  return NextResponse.json({
+    success: true,
+    email: {
+      email_type: 'fulfillment_update',
+      recipient,
+      subject: content.subject,
+      status,
+      sent_by_email: user.email ?? null,
+      created_at: sentAt,
+    },
+  });
 }

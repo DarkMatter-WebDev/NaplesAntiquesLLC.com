@@ -24,7 +24,8 @@ export function buildFulfillmentUpdateEmailContent(
   const subject = `Update on your order ${order.order_number} from Naples Estate Jewelry Co`;
   const greeting = `Hi ${customerName},`;
   const message = STATUS_MESSAGES[status] ?? `Your order status has been updated to ${statusLabel}.`;
-  const note = 'Please reply to this email or call/text (239) 404-8505 with any questions.';
+  // Sent from a no-reply address, so don't invite replies — direct to phone/text.
+  const note = 'Call or text us at (239) 404-8505 with any questions.';
   const closing = 'Thank you, Naples Estate Jewelry Co';
 
   const text = [

@@ -94,21 +94,26 @@ export default function ShopProductGrid({ products, spotData, locale, variant = 
             color: rgba(115, 92, 0, 0.35);
             font-size: 1.6rem;
           }
+          .shop-list-metal-row {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            min-width: 0;
+          }
           .shop-list-status {
-            position: absolute;
-            top: 0.3rem;
-            left: 0.3rem;
-            z-index: 2;
-            padding: 0.1rem 0.34rem;
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            padding: 0.12rem 0.4rem;
             border-radius: 3px;
             font-family: var(--font-label);
-            font-size: 0.5rem;
+            font-size: 0.52rem;
             font-weight: 800;
             letter-spacing: 0.08em;
             text-transform: uppercase;
             color: #fffdf7;
             background: linear-gradient(135deg, #d5a820, #ad8507);
-            box-shadow: 0 4px 10px rgba(115, 92, 0, 0.16);
+            box-shadow: 0 2px 6px rgba(115, 92, 0, 0.14);
           }
           .shop-list-status[data-sold] {
             background: #1f2321;
@@ -123,6 +128,10 @@ export default function ShopProductGrid({ products, spotData, locale, variant = 
             gap: 0.28rem;
           }
           .shop-list-metal {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
             font-family: var(--font-label);
             font-size: 0.6rem;
             font-weight: 800;

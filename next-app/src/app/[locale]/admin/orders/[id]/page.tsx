@@ -58,6 +58,16 @@ type Invoice = {
   created_at: string;
 };
 
+type OrderEmail = {
+  id: string;
+  email_type: string;
+  recipient: string;
+  subject: string | null;
+  status: string | null;
+  sent_by_email: string | null;
+  created_at: string;
+};
+
 export default async function AdminOrderDetailPage({ params }: Props) {
   const { locale, id } = await params;
   const isEs = locale === 'es';
@@ -80,7 +90,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
     redirect(isEs ? '/es/account' : '/account');
   }
 
-  const [orderResult, { data: invoices }, { count: unreadMessagesCount }] = await Promise.all([
+  const [orderResult, { data: invoices }, { count: unreadMessagesCount }, orderEmailsResult] = await Promise.all([
     supabase
       .from('orders')
       .select(ORDER_DETAIL_COLUMNS)
@@ -95,7 +105,14 @@ export default async function AdminOrderDetailPage({ params }: Props) {
       .from('admin_notifications')
       .select('id', { count: 'exact', head: true })
       .eq('is_read', false),
+    // Email history for this order. Degrades to [] if the table isn't migrated yet.
+    supabase
+      .from('order_emails')
+      .select('id, email_type, recipient, subject, status, sent_by_email, created_at')
+      .eq('order_id', id)
+      .order('created_at', { ascending: false }),
   ]);
+  const orderEmails = (orderEmailsResult?.data ?? []) as OrderEmail[];
   let order = orderResult.data;
   if (isMissingItemYearColumnError(orderResult.error)) {
     const fallback = await supabase
@@ -135,6 +152,8 @@ export default async function AdminOrderDetailPage({ params }: Props) {
       <OrderDetailPanel
         initialOrder={order as unknown as Order & { order_items: OrderItem[] }}
         initialInvoices={(invoices ?? []) as Invoice[]}
+        initialOrderEmails={orderEmails}
+        adminEmail={user.email ?? null}
         locale={locale}
       />
     </div>

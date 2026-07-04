@@ -219,6 +219,9 @@ export function isProductPurchasable(status: ProductStatus | null | undefined): 
 
 export const PUBLIC_SHOP_PRODUCT_STATUSES = ['available', 'sold', 'Available', 'Sold'] as const;
 
+// Statuses shown when the admin has turned OFF "show sold items" — available only.
+export const AVAILABLE_ONLY_SHOP_PRODUCT_STATUSES = ['available', 'Available'] as const;
+
 export function isProductVisibleInShop(status: ProductStatus | null | undefined): boolean {
   const normalized = normalizeProductStatus(status);
   return normalized === 'available' || normalized === 'sold';

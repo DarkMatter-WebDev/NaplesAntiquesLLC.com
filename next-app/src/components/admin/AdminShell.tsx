@@ -568,7 +568,9 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
     location: 'showcase',
     images: [],
     image_urls: [],
-    image_padding: 'none',
+    // New listings default to white side padding; the admin can change it
+    // per-photo (or product-wide) from the image padding chooser.
+    image_padding: 'white',
     image_padding_by_image: {},
     description: '',
     description_es: '',
@@ -1943,13 +1945,29 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
     let successCount = 0;
 
+    // Add a freshly-uploaded photo to the editor, defaulting it to WHITE side
+    // padding. New products already default their product-level padding to white
+    // (nothing to pin). Existing products may use a different padding, so the new
+    // photo gets a per-photo white entry — the new upload defaults to white without
+    // changing the product's other photos. The admin can still change it after.
+    const addUploadedImage = (prev: NonNullable<typeof editing>, url: string) => {
+      const productLevelIsWhite = normalizeProductImagePaddingValue(prev.image_padding) === 'white';
+      return {
+        ...prev,
+        images: [...prev.images, url],
+        image_padding_by_image: productLevelIsWhite
+          ? prev.image_padding_by_image
+          : { ...(prev.image_padding_by_image ?? {}), [url]: 'white' as const },
+      };
+    };
+
     // Upload the first photo and add it to state immediately so the AI assistant
     // becomes available while the remaining photos continue uploading in the background.
     const firstUrl = await processAndUpload(firstFile);
     if (firstUrl) {
       successCount++;
       setSessionUploadedImageUrls((current) => new Set(current).add(firstUrl));
-      setEditing((prev) => prev ? { ...prev, images: [...prev.images, firstUrl] } : prev);
+      setEditing((prev) => prev ? addUploadedImage(prev, firstUrl) : prev);
     }
 
     for (const file of restFiles) {
@@ -1957,7 +1975,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       if (url) {
         successCount++;
         setSessionUploadedImageUrls((current) => new Set(current).add(url));
-        setEditing((prev) => prev ? { ...prev, images: [...prev.images, url] } : prev);
+        setEditing((prev) => prev ? addUploadedImage(prev, url) : prev);
       }
     }
 

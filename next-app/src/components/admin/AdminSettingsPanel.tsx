@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import AdminCarouselSettingsPanel from './AdminCarouselSettingsPanel';
+import AdminShopVisibilityPanel from './AdminShopVisibilityPanel';
 import MarketingSettingsPanel from './MarketingSettingsPanel';
 
 type AiSettingsResponse = {
@@ -307,6 +308,7 @@ export default function AdminSettingsPanel() {
             )}
           </div>
         </section>
+        <AdminShopVisibilityPanel />
         <MarketingSettingsPanel />
       </div>
 
