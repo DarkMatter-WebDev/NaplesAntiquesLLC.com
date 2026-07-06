@@ -1,5 +1,6 @@
 import type { FulfillmentStatus, Order } from '@/types/sales';
 import { orderStatusLabel } from '@/types/sales';
+import { buildOrderEmailFooterHtml, buildOrderEmailFooterTextLines } from '@/lib/order-email-branding';
 
 export interface FulfillmentUpdateEmailContent {
   subject: string;
@@ -26,7 +27,7 @@ export function buildFulfillmentUpdateEmailContent(
   const message = STATUS_MESSAGES[status] ?? `Your order status has been updated to ${statusLabel}.`;
   // Sent from a no-reply address, so don't invite replies — direct to phone/text.
   const note = 'Call or text us at (239) 404-8505 with any questions.';
-  const closing = 'Thank you, Naples Estate Jewelry';
+  const closing = 'Thank you, NaplesEstateJewelry.co';
 
   const text = [
     greeting,
@@ -38,6 +39,8 @@ export function buildFulfillmentUpdateEmailContent(
     '',
     note,
     closing,
+    '',
+    ...buildOrderEmailFooterTextLines(),
   ].join('\n');
 
   const html = `
@@ -48,7 +51,7 @@ export function buildFulfillmentUpdateEmailContent(
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid #d5c697;">
               <tr>
                 <td style="padding:28px 30px 18px;border-bottom:1px solid #d5c697;">
-                  <div style="color:#735c00;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;">Naples Estate Jewelry</div>
+                  <div style="color:#735c00;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;">NaplesEstateJewelry.co</div>
                   <h1 style="margin:10px 0 0;color:#1d1a14;font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1.2;">Order Update</h1>
                   <p style="margin:8px 0 0;color:#746b5b;font-size:13px;">Order ${escapeHtml(order.order_number)} - ${escapeHtml(statusLabel)}</p>
                 </td>
@@ -59,6 +62,7 @@ export function buildFulfillmentUpdateEmailContent(
                   <p style="margin:0 0 20px;font-size:15px;line-height:1.55;">${escapeHtml(message)}</p>
                   <p style="margin:0 0 18px;font-size:15px;line-height:1.55;">${escapeHtml(note)}</p>
                   <p style="margin:0;font-size:15px;line-height:1.55;">${escapeHtml(closing)}</p>
+                  ${buildOrderEmailFooterHtml()}
                 </td>
               </tr>
             </table>

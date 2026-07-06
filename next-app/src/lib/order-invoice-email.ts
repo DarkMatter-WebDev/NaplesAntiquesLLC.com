@@ -2,6 +2,7 @@ import type { Order, OrderItem } from '@/types/sales';
 import { formatCurrency, formatPublicPurity, orderStatusLabel } from '@/types/sales';
 import { formatProductItemYear } from '@/types/product';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
+import { buildOrderEmailFooterHtml, buildOrderEmailFooterTextLines } from '@/lib/order-email-branding';
 
 export type InvoiceEmailOrder = Order & { order_items: OrderItem[] };
 
@@ -107,7 +108,7 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
   const note = paid
     ? 'Your payment has been received in full — thank you. Call or text us at (239) 404-8505 with any questions about pickup, delivery, or shipping.'
     : 'Call or text us at (239) 404-8505 with any questions about payment, pickup, delivery, or shipping.';
-  const closing = 'Thank you, Naples Estate Jewelry';
+  const closing = 'Thank you, NaplesEstateJewelry.co';
   const shipToLines = formatAddressLines(order.shipping_address);
 
   return {
@@ -151,6 +152,8 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
       '',
       note,
       closing,
+      '',
+      ...buildOrderEmailFooterTextLines(),
     ].join('\n'),
   };
 }
@@ -209,7 +212,7 @@ function buildInvoiceEmailHtml({
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;background:#ffffff;border:1px solid #d5c697;">
               <tr>
                 <td style="padding:28px 30px 18px;border-bottom:1px solid #d5c697;">
-                  <div style="color:#735c00;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;">Naples Estate Jewelry</div>
+                  <div style="color:#735c00;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;">NaplesEstateJewelry.co</div>
                   <h1 style="margin:10px 0 0;color:#1d1a14;font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:1.2;">${escapeHtml(subject)}</h1>
                   ${paid ? '<div style="display:inline-block;margin:12px 0 0;padding:5px 12px;background:#0f7a4f;color:#ffffff;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border-radius:3px;">Paid in full</div>' : ''}
                   <p style="margin:8px 0 0;color:#746b5b;font-size:13px;">Order ${escapeHtml(orderNumber)} - ${escapeHtml(paymentStatus)} - ${escapeHtml(fulfillmentStatus)}</p>
@@ -239,6 +242,7 @@ function buildInvoiceEmailHtml({
 
                   <p style="margin:0 0 18px;font-size:15px;line-height:1.55;">${escapeHtml(note)}</p>
                   <p style="margin:0;font-size:15px;line-height:1.55;">${escapeHtml(closing)}</p>
+                  ${buildOrderEmailFooterHtml()}
                 </td>
               </tr>
             </table>
