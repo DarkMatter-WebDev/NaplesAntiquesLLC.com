@@ -54,9 +54,17 @@ interface Props {
   initialOrderEmails: OrderEmail[];
   adminEmail: string | null;
   locale: string;
+  recycleBinSupported?: boolean;
 }
 
-export default function OrderDetailPanel({ initialOrder, initialInvoices, initialOrderEmails, adminEmail, locale }: Props) {
+export default function OrderDetailPanel({
+  initialOrder,
+  initialInvoices,
+  initialOrderEmails,
+  adminEmail,
+  locale,
+  recycleBinSupported = true,
+}: Props) {
   const router = useRouter();
   const supabase = createClient();
   const adminBasePath = locale === 'es' ? '/es/admin' : '/admin';
@@ -136,15 +144,38 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, initia
     return true;
   }
 
+  async function restoreProductsToInventory() {
+    setSaving('restore-inventory');
+    setMessage(null);
+    const ok = await updateProducts('available');
+    setSaving(null);
+    if (ok) {
+      setMessage({
+        text: 'Order item products restored to available inventory. The order status and payment record were left unchanged.',
+        ok: true,
+      });
+    }
+  }
+
   async function markPaid() {
     const ok = await updateOrder({ payment_status: 'paid', order_status: 'completed' }, 'paid');
     if (ok) {
       await updateProducts('sold');
+      await generateInvoiceRecord({ silent: true });
       setMessage({ text: 'Order marked paid and products marked sold.', ok: true });
     }
   }
 
   async function markUnpaid() {
+    // A PayPal-captured payment can't just be "marked unpaid" — the money is real.
+    // Refund it (which is the correct state change) instead of desyncing the record.
+    if (order.payment_method === 'paypal' && order.payment_status === 'paid') {
+      setMessage({
+        text: 'This PayPal order was actually paid. Use Refund (or Partial refund) instead of Mark Unpaid so the record matches the captured payment.',
+        ok: false,
+      });
+      return;
+    }
     const ok = await updateOrder({ payment_status: 'unpaid', order_status: 'open' }, 'unpaid');
     if (ok) {
       await updateProducts('pending_payment');
@@ -252,6 +283,8 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, initia
     }, 'reopen');
     if (ok) {
       if (order.payment_status !== 'paid') {
+        // Cancelling an unpaid order returned its products to 'available'; reopening
+        // puts them back on hold so they leave the public gallery again.
         await updateProducts('pending_payment');
         setMessage({ text: 'Order reopened and unpaid products returned to pending payment.', ok: true });
       } else {
@@ -260,10 +293,27 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, initia
     }
   }
 
-  async function deleteOrder() {
+  async function deleteOrder(options: { returnToInventory?: boolean } = {}) {
+    // Recycle Bin deletion is record-only unless the admin chooses return-to-inventory.
+    if (!recycleBinSupported) {
+      setMessage({ text: 'Run supabase/orders-recycle-bin.sql before using the orders Recycle Bin.', ok: false });
+      return;
+    }
     setSaving('delete');
     setMessage(null);
-    const { error } = await supabase.from('orders').delete().eq('id', order.id);
+
+    if (options.returnToInventory && productIds.length > 0) {
+      const restored = await updateProducts('available');
+      if (!restored) {
+        setSaving(null);
+        return;
+      }
+    }
+
+    const { error } = await supabase
+      .from('orders')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', order.id);
     if (error) {
       setMessage({ text: error.message, ok: false });
       setSaving(null);
@@ -278,6 +328,15 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, initia
   }
 
   async function saveLineDiscounts() {
+    // Editing discounts recomputes the order total. On a paid order that would make
+    // the stored total disagree with the amount actually captured at PayPal.
+    if (order.payment_status === 'paid') {
+      setMessage({
+        text: 'This order is already paid — its total must match the captured payment. Issue a refund for any post-payment adjustment instead of editing line discounts.',
+        ok: false,
+      });
+      return;
+    }
     setSaving('line-discounts');
     setMessage(null);
 
@@ -358,6 +417,50 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, initia
     setEmailMessage({ text: `${documentLabel} email sent to ${recipient}.`, ok: true });
   }
 
+  async function generateInvoiceRecord(options: { silent?: boolean } = {}) {
+    setSaving('invoice');
+    if (!options.silent) setMessage(null);
+    const response = await fetch(`/api/admin/orders/${order.id}/invoice`, { method: 'POST' });
+    const result = await response.json().catch(() => null);
+    setSaving(null);
+
+    if (!response.ok || !result?.invoice) {
+      if (!options.silent) {
+        setMessage({ text: result?.error ?? 'Could not generate invoice.', ok: false });
+      }
+      return null;
+    }
+
+    setInvoices((current) => {
+      const nextInvoice = result.invoice as Invoice;
+      const existing = current.some((invoice) => invoice.id === nextInvoice.id || invoice.invoice_number === nextInvoice.invoice_number);
+      return existing
+        ? current.map((invoice) => (
+            invoice.id === nextInvoice.id || invoice.invoice_number === nextInvoice.invoice_number
+              ? { ...invoice, ...nextInvoice }
+              : invoice
+          ))
+        : [nextInvoice, ...current];
+    });
+    if (!options.silent) {
+      setMessage({ text: `Invoice ${result.invoice.invoice_number} generated.`, ok: true });
+    }
+    return result.invoice as Invoice;
+  }
+
+  function openOrderPrintPreview() {
+    const previewWindow = window.open(
+      `${adminBasePath}/orders/${order.id}/print`,
+      `order-print-${order.id}`,
+      'popup=yes,width=980,height=900,scrollbars=yes,resizable=yes',
+    );
+    if (!previewWindow) {
+      setMessage({ text: 'Pop-ups are blocked. Allow pop-ups for this site to preview and print the order.', ok: false });
+      return;
+    }
+    previewWindow.focus();
+  }
+
   return (
     <main className="px-4 md:px-8 py-8">
       <div className="max-w-[1300px] mx-auto">
@@ -393,6 +496,15 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, initia
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => setShowEmailInvoice(true)} className="outline-button text-sm">Email {invoiceDocLabel}</button>
+              <button type="button" onClick={openOrderPrintPreview} className="outline-button text-sm">Print Order</button>
+              <button
+                type="button"
+                onClick={restoreProductsToInventory}
+                disabled={saving === 'restore-inventory' || productIds.length === 0}
+                className="outline-button text-sm disabled:opacity-50"
+              >
+                {saving === 'restore-inventory' ? 'Restoring...' : 'Restore item to inventory'}
+              </button>
               <button type="button" onClick={markPaid} disabled={saving === 'paid' || order.payment_status === 'paid'} className="gold-button text-sm disabled:opacity-50">Mark Paid</button>
               <button type="button" onClick={markUnpaid} disabled={saving === 'unpaid' || order.payment_status === 'unpaid'} className="outline-button text-sm disabled:opacity-50">Mark Unpaid</button>
               <button type="button" onClick={markRefunded} disabled={saving === 'refunded' || order.payment_status === 'refunded'} className="outline-button text-sm disabled:opacity-50">Mark Refunded</button>
@@ -404,6 +516,17 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, initia
               >
                 Mark Partially Refunded
               </button>
+              {order.order_status === 'cancelled' && (
+                <button
+                  type="button"
+                  onClick={() => { setShowCancelConfirm(false); setShowDeleteConfirm(false); reopenOrder(); }}
+                  disabled={saving === 'reopen'}
+                  className="outline-button text-sm disabled:opacity-50"
+                  style={{ borderColor: GOLD, color: GOLD }}
+                >
+                  {saving === 'reopen' ? 'Reopening…' : 'Reopen Order'}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => { setShowCancelConfirm(true); setShowDeleteConfirm(false); setMessage(null); }}
@@ -448,7 +571,7 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, initia
             {showDeleteConfirm && (
               <div className="flex flex-wrap items-center gap-3 border px-4 py-3" style={{ borderColor: 'var(--color-error)', background: 'white' }}>
                 <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>
-                  Permanently delete this order? It will be removed from the database and cannot be recovered.
+                  Move this order to the Recycle Bin? You can restore the order later.
                 </span>
                 <button
                   type="button"
@@ -457,7 +580,16 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, initia
                   className="outline-button text-sm disabled:opacity-50"
                   style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}
                 >
-                  {saving === 'delete' ? 'Deleting…' : 'Yes, Delete Order'}
+                  {saving === 'delete' ? 'Deleting…' : 'Yes, Move to Recycle Bin'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowDeleteConfirm(false); deleteOrder({ returnToInventory: true }); }}
+                  disabled={saving === 'delete' || productIds.length === 0}
+                  className="outline-button text-sm disabled:opacity-50"
+                  style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}
+                >
+                  {saving === 'delete' ? 'Deleting…' : 'Move to Recycle Bin and return to inventory'}
                 </button>
                 <button
                   type="button"
@@ -473,7 +605,6 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, initia
                 <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
                   Refund amount
                   <input
-                    // eslint-disable-next-line jsx-a11y/no-autofocus
                     autoFocus
                     type="number"
                     className="form-field text-sm"
@@ -679,6 +810,14 @@ export default function OrderDetailPanel({ initialOrder, initialInvoices, initia
             <section className="border p-5" style={{ borderColor: BORDER, background: 'white' }}>
               <div className="flex items-center justify-between gap-4 mb-4">
                 <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>Invoices</h2>
+                <button
+                  type="button"
+                  onClick={() => generateInvoiceRecord()}
+                  disabled={saving === 'invoice'}
+                  className="outline-button text-xs disabled:opacity-50"
+                >
+                  {saving === 'invoice' ? 'Generating...' : invoices.length > 0 ? 'Refresh Invoice' : 'Generate Invoice'}
+                </button>
               </div>
               {invoices.length > 0 ? (
                 <div className="flex flex-col gap-2">

@@ -37,7 +37,12 @@ export default function AccountDashboard({
   const [activeTab, setActiveTab] = useState<AccountTab>('overview');
 
   useEffect(() => {
+    // Apply the ?tab deep-link once, post-hydration. Deliberately NOT a lazy
+    // useState initializer: SSR and the first client render must both show
+    // 'overview' or React logs a hydration mismatch. Updating here after mount is
+    // the intended pattern, so the set-state-in-effect flag is a false positive.
     const tab = new URLSearchParams(window.location.search).get('tab');
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (tab === 'orders' || tab === 'wishlist') setActiveTab(tab);
   }, []);
 
@@ -361,6 +366,10 @@ function OrderDetailsDialog({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.id]);
 
+  // The dialog renders through a portal into document.body, which only exists on
+  // the client — gate it on a mount flag. setState-in-effect is the standard,
+  // intended pattern here, so the lint flag is a false positive.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMounted(true); }, []);
 
   if (!mounted) return null;

@@ -1,6 +1,6 @@
-# Feature: Online Shop
+﻿# Feature: Online Shop
 
-> Current Next.js/Supabase shop behavior. Last updated: **2026-06-20**.
+> Current Next.js/Supabase shop behavior. Last updated: **2026-07-06**.
 
 ## Summary
 
@@ -43,7 +43,7 @@ Supabase `products` is the source of truth. Important fields include:
   `brand`, `gender`
 - metal/pricing: `category`, `metal_type`, `metal_variant`, `purity`,
   `weight_grams`, `gram_weight`, `price_mode`, `pricing_multiplier`,
-  `manual_price_label`, `asking_price`
+  `manual_price_label` (`asking_price` remains a legacy DB fallback only)
 - images: `images`, `image_urls`, `image_padding`,
   `image_padding_by_image`
 - arrays: `tags`, `tags_es`, `details`, `details_es`
@@ -92,7 +92,13 @@ displayPrice = meltValue * pricingMultiplier
 Gold and silver spot data are fetched server-side by `spot-price.ts` and exposed
 through `/api/metal-prices`. Product detail pages also show melt/scrap context
 and the spot basis used for the calculation. Manual-priced products use
-`manual_price_label`/`asking_price` instead of live multiplier pricing.
+`manual_price_label` instead of live multiplier pricing; checkout still keeps a
+legacy `asking_price` fallback for older rows that have no label.
+Bare numeric manual labels are normalized by `pricing.ts` (`1` -> `$1`,
+`1200` -> `$1,200`) and parsed by the same helper in shop display, cart,
+checkout, and order snapshots. New Item's **Quick add** mode sets manual fixed
+pricing and skips spot-pricing requirements, supporting a basic title + price
+listing without purity/weight/multiplier inputs.
 
 ## Public Browse Behavior
 
@@ -107,16 +113,15 @@ and the spot basis used for the calculation. Manual-priced products use
 - Filters are URL-backed and include item group/type, metal, metal color,
   purity, brand, gender, length/size, price range, availability, sort, and
   pagination.
-- Public gallery shows only `available`/`sold`; it excludes `reserved`,
-  `pending_payment`, `draft`, and `archived` (`reserved`/`pending_payment` now come
-  only from the manual admin status / admin-created orders — PayPal checkout no
-  longer reserves inventory; see the no-reservation model in
+- Public gallery shows only `available`/`sold`; it excludes `pending_payment`,
+  `draft`, and `archived` (`pending_payment` comes from admin-created unpaid orders;
+  PayPal checkout no longer holds inventory; see the no-hold model in
   `features/paypal-checkout.md`). A sold item drops out of the cached catalog
   promptly via `revalidateTag('shop-catalog', { expire: 0 })` on capture.
   Every admin order-flow write to `products` (cancel/reopen/mark-paid,
   delete-order return-to-inventory, archive/delete) calls the same tag
   through `adminRevalidateProduct(s)` in
-  `next-app/src/app/actions/admin-products.ts` — see
+  `next-app/src/app/actions/admin-products.ts` â€” see
   `features/paypal-checkout.md`.
 
 ## Admin Workflow
@@ -132,6 +137,10 @@ Admins manage inventory from `/admin`.
    and attempts to remove the old uploaded Storage object when no product still
    references it.
 5. Product ordering is managed by drag-to-reorder in the admin table.
+
+For quick fixed-price listings, admins can check **Quick add** on New Item, enter a
+title and price label, and save without entering spot-pricing fields. The save path
+normalizes the manual price label and stores `price_mode='manual'`.
 
 ## Verification
 

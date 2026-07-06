@@ -320,6 +320,18 @@ export default function SiteHeader() {
             {locale === 'en' ? 'ES' : 'EN'}
           </Link>
 
+          {/* Tap-to-call — mobile/tablet only (desktop has the CALL NOW nav button) */}
+          <a
+            href="tel:2394048505"
+            className="flex xl:hidden items-center justify-center w-8 h-8"
+            style={{ color: GOLD }}
+            aria-label="Call (239) 404-8505"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '20px', lineHeight: 1 }}>
+              call
+            </span>
+          </a>
+
           {/* Wishlist heart — desktop only */}
           <button
             type="button"

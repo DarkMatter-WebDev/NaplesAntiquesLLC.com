@@ -1,15 +1,20 @@
 ﻿import type { Metadata } from 'next';
+import { alternatesFor } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import { PageContainer, Section } from '@/components/layout/ResponsiveLayout';
 
-export const metadata: Metadata = {
-  title: 'About Chris | Naples Estate Jewelry',
-  description:
-    'Meet Chris, Naples estate jewelry and antiques specialist with 15+ years experience serving Southwest Florida. Private, mobile, appointment-only service.',
-};
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  return {
+    title: 'About Chris — Naples Estate Jewelry Buyer',
+    description:
+      'Meet Chris, Naples estate jewelry and antiques specialist with 15+ years experience serving Southwest Florida. Private, mobile, appointment-only service.',
+    alternates: alternatesFor('/about', locale),
+  };
+}
 
 interface Props {
   params: Promise<{ locale: string }>;

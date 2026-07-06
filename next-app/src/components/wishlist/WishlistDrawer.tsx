@@ -1,9 +1,13 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useWishlist, type WishlistItem } from '@/context/WishlistContext';
-import { isProductSold, productImagePaddingBackground } from '@/types/product';
+import type { CartItem } from '@/context/CartContext';
+import CartButton from '@/components/shop/CartButton';
+import { isProductSold, productImagePaddingBackground, type Product, type SpotData } from '@/types/product';
+import { calcSpotPriceValue, formatUsdPrice } from '@/lib/pricing';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 
 const GOLD = '#735c00';
@@ -13,6 +17,21 @@ export default function WishlistDrawer({ locale }: { locale: string }) {
   const { items, drawerOpen, closeDrawer } = useWishlist();
   const isEs = locale === 'es';
   const prefix = isEs ? '/es' : '';
+
+  // Live spot data for computing saved-item prices. Fetched lazily the first time
+  // the drawer opens with at least one spot-linked item, so the saved list shows
+  // a real price instead of just a "Live gold price" label.
+  const [spot, setSpot] = useState<SpotData | null>(null);
+  useEffect(() => {
+    if (!drawerOpen || spot) return;
+    if (!items.some((item) => item.price_mode === 'spot-multiplier')) return;
+    let cancelled = false;
+    fetch('/api/metal-prices')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (!cancelled && data) setSpot(data as SpotData); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [drawerOpen, spot, items]);
 
   return (
     <>
@@ -86,7 +105,7 @@ export default function WishlistDrawer({ locale }: { locale: string }) {
             </div>
           ) : (
             items.map((item) => (
-              <DrawerItem key={item.id} item={item} isEs={isEs} prefix={prefix} />
+              <DrawerItem key={item.id} item={item} isEs={isEs} prefix={prefix} spot={spot} />
             ))
           )}
         </div>
@@ -123,10 +142,12 @@ function DrawerItem({
   item,
   isEs,
   prefix,
+  spot,
 }: {
   item: WishlistItem;
   isEs: boolean;
   prefix: string;
+  spot: SpotData | null;
 }) {
   const { remove } = useWishlist();
   const title = isEs && item.title_es ? item.title_es : item.title;
@@ -134,12 +155,47 @@ function DrawerItem({
   const imageFrameBackground = productImagePaddingBackground(item.image_padding);
   const image = normalizeLegacyLocalImageUrl(item.image);
 
+  // Compute the live spot-linked price from the fields saved with the item. Gold
+  // purity is stored as karat (<=24); silver as fineness (>24), matching the rest
+  // of the app. Falls back to the "live price" label until spot loads or if the
+  // item is missing weight/purity.
+  const spotPrice = item.price_mode === 'spot-multiplier'
+    ? calcSpotPriceValue(
+        {
+          price_mode: item.price_mode,
+          pricing_multiplier: item.pricing_multiplier,
+          weight_grams: item.weight_grams,
+          gram_weight: item.weight_grams,
+          purity: item.purity,
+          category: item.purity != null && item.purity > 24 ? 'Silver' : 'Gold',
+        } as unknown as Product,
+        spot,
+      )
+    : null;
+
   const priceLabel =
     item.price_mode === 'manual'
       ? (item.manual_price_label ?? (isEs ? 'Consultar precio' : 'Ask for price'))
-      : isEs
-        ? 'Precio según oro en vivo'
-        : 'Live gold price';
+      : spotPrice != null
+        ? formatUsdPrice(spotPrice)
+        : isEs
+          ? 'Precio según oro en vivo'
+          : 'Live gold price';
+
+  // Minimal CartItem from what the wishlist stores. CheckoutClient backfills the
+  // richer product fields (description, metal, length, etc.) it's missing before
+  // rendering the order summary — same as any other partially-populated cart item.
+  const cartItem: CartItem = {
+    id: item.id,
+    title: item.title,
+    title_es: item.title_es,
+    image: item.image,
+    image_padding: item.image_padding,
+    status: item.status,
+    priceLabel,
+    purity: item.purity,
+    weight_grams: item.weight_grams,
+  };
 
   return (
     <div className="flex gap-3 items-start pb-3 border-b" style={{ borderColor: BORDER }}>
@@ -194,16 +250,19 @@ function DrawerItem({
         </p>
       </div>
 
-      {/* Remove */}
-      <button
-        type="button"
-        onClick={() => remove(item.id)}
-        className="flex-shrink-0 p-1 text-xs transition-colors hover:text-[color:var(--color-error)]"
-        style={{ color: 'var(--color-on-surface-variant)' }}
-        aria-label={isEs ? 'Eliminar' : 'Remove'}
-      >
-        ✕
-      </button>
+      {/* Actions: add to cart + remove */}
+      <div className="flex flex-shrink-0 flex-col items-center gap-1.5">
+        <CartButton item={cartItem} variant="icon" locale={isEs ? 'es' : 'en'} />
+        <button
+          type="button"
+          onClick={() => remove(item.id)}
+          className="p-1 text-xs transition-colors hover:text-[color:var(--color-error)]"
+          style={{ color: 'var(--color-on-surface-variant)' }}
+          aria-label={isEs ? 'Eliminar' : 'Remove'}
+        >
+          ✕
+        </button>
+      </div>
     </div>
   );
 }

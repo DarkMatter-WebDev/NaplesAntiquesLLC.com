@@ -19,43 +19,37 @@ export default async function ReturnsRefundsPage({ params }: Props) {
       locale={locale}
       title="Returns & Refunds"
       intro={[
-        'Estate jewelry, antiques, coins, watches, and precious-metal items are often one-of-a-kind. Please review photos, descriptions, measurements, condition notes, and pricing before purchase and contact us with questions before final payment.',
+        'Our inventory is one-of-a-kind estate merchandise priced against the live gold, silver, and platinum markets — prices that move constantly. Please review the photos, descriptions, measurements, condition notes, and pricing carefully, and contact us with any questions before you complete payment.',
       ]}
       sections={[
         {
-          title: 'Before Final Sale',
+          title: 'All Sales Are Final',
           body: [
-            'Checkout on this website currently creates an order request or inventory hold for admin follow-up. If you change your mind before payment or pickup/shipment confirmation, contact us as soon as possible so we can cancel the pending order and release the item.',
+            'Because our pieces are pre-owned, estate in nature, and priced against precious-metal markets that change by the minute, all sales are final once payment is completed. A change in the gold or silver market after your purchase is not, by itself, a reason for a return, refund, or price adjustment.',
           ],
         },
         {
-          title: 'Returns',
+          title: 'If an Item Is Misrepresented (5-Day Guarantee)',
           body: [
-            'Returns are handled case by case. Because inventory is pre-owned, estate, antique, precious-metal, or market-priced, some sales may be final once payment is completed. If a return is approved, the item must be returned in the same condition, with all included packaging, documentation, tags, and accessories.',
-          ],
-        },
-        {
-          title: 'Refunds',
-          body: [
-            'Approved refunds are issued to the original payment method when practical. Shipping, insurance, appraisal, sizing, repair, payment-processing, or special-order costs may be non-refundable unless we made an error or applicable law requires otherwise.',
+            'The one exception: if an item you receive is materially misrepresented — meaningfully different from its listed description, metal, purity, weight, or condition — we will make it right. Call or text us at (239) 404-8505 within five (5) days of receiving the item, and we will arrange a full refund once the piece is returned in the same condition with all original packaging, documentation, and accessories.',
           ],
         },
         {
           title: 'Damaged or Incorrect Items',
           body: [
-            'If an item arrives damaged or materially different from what was confirmed, contact us immediately at (239) 404-8505. Keep the packaging and take photos so we can review the issue and any shipping-insurance claim.',
+            'If an item arrives damaged in transit, or you received the wrong piece, contact us immediately at (239) 404-8505. Keep all packaging and take photos so we can review the issue and file any shipping-insurance claim.',
           ],
         },
         {
-          title: 'Market-Priced Items',
+          title: 'How Refunds Are Issued',
           body: [
-            'Items priced with reference to gold, silver, platinum, or other market prices may change with the market. Price changes after purchase are not, by themselves, a reason for a refund or price adjustment.',
+            'Approved refunds — for misrepresented, damaged, or incorrect items — are issued to the original payment method once the returned item is received and inspected. Please do not ship anything back before calling us; return shipping for an approved claim is arranged with us in advance.',
           ],
         },
         {
           title: 'Contact',
           body: [
-            'For return or refund questions, call or text (239) 404-8505 before shipping anything back.',
+            'For any return or refund question, call or text (239) 404-8505 before shipping anything back.',
           ],
         },
       ]}

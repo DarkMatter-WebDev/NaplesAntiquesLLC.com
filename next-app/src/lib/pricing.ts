@@ -26,6 +26,34 @@ export function formatUsdPrice(price: number): string {
   }).format(price);
 }
 
+export function formatManualPriceAmount(price: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: Number.isInteger(price) ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(price);
+}
+
+export function parseManualPriceLabelValue(label: string | null | undefined): number | null {
+  const value = (label ?? '').trim();
+  if (!value) return null;
+
+  const match = value.match(/^\$?\s*([0-9][0-9,]*(?:\.\d{1,2})?)\s*$/);
+  if (!match) return null;
+
+  const parsed = Number(match[1].replace(/,/g, ''));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function normalizeManualPriceLabel(label: string | null | undefined): string | null {
+  const value = (label ?? '').trim();
+  if (!value) return null;
+
+  const parsed = parseManualPriceLabelValue(value);
+  return parsed == null ? value : formatManualPriceAmount(parsed);
+}
+
 export function calcSpotPriceValue(product: Product, spotData: SpotData | null): number | null {
   if (product.price_mode !== 'spot-multiplier') return null;
   const { pricing_multiplier } = product;
@@ -53,7 +81,7 @@ export function getSpotMeltDisplayPrice(product: Product, spotData: SpotData | n
 
 export function getDisplayPrice(product: Product, spotData: SpotData | null): string {
   if (product.price_mode === 'manual') {
-    return product.manual_price_label ?? 'Contact for price';
+    return normalizeManualPriceLabel(product.manual_price_label) ?? 'Contact for price';
   }
   return calcSpotPrice(product, spotData) ?? 'Contact for price';
 }

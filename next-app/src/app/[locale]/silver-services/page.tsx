@@ -1,15 +1,21 @@
 import type { Metadata } from 'next';
+import { alternatesFor } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import TradingViewMini from '@/components/trading/TradingViewMini';
+import { fetchSpotData } from '@/lib/spot-price';
 
-export const metadata: Metadata = {
-  title: 'Silver Services | Naples Estate Jewelry',
-  description:
-    'Private silver estate services in Naples FL. Expert evaluation of sterling silver flatware, hollowware, coins, and bullion with clear testing and immediate payment.',
-};
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  return {
+    title: 'Sell Silver in Naples, FL — Silver Buyer',
+    description:
+      'Private silver estate services in Naples FL. Expert evaluation of sterling silver flatware, hollowware, coins, and bullion with clear testing and immediate payment.',
+    alternates: alternatesFor('/silver-services', locale),
+  };
+}
 
 interface Props {
   params: Promise<{ locale: string }>;
@@ -25,6 +31,8 @@ const GALLERY_ITEMS = [
 export default async function SilverServicesPage({ params }: Props) {
   const { locale } = await params;
   const isEs = locale === 'es';
+  const spot = await fetchSpotData();
+  const silverSpot = spot.silverPerTroyOz ? spot.silverPerTroyOz.toFixed(2) : null;
 
   return (
     <>
@@ -98,7 +106,14 @@ export default async function SilverServicesPage({ params }: Props) {
                 <div className="overflow-hidden rounded-2xl border border-[#d0c5af] bg-white shadow-[0_18px_54px_rgba(38,28,6,0.07)]">
                   <div className="px-5 pt-4 pb-2 flex items-center justify-between">
                     <h3 className="font-[family-name:var(--font-headline)] text-xl font-bold text-[#735c00]">Silver</h3>
-                    <span className="text-xs text-[#4d4635] uppercase tracking-wider">Spot</span>
+                    {silverSpot ? (
+                      <span className="text-sm font-bold text-[#1a1c1c]">
+                        ${silverSpot}
+                        <span className="text-xs font-normal text-[#4d4635] uppercase tracking-wider"> /oz</span>
+                      </span>
+                    ) : (
+                      <span className="text-xs text-[#4d4635] uppercase tracking-wider">Spot</span>
+                    )}
                   </div>
                   <div className="px-2 pb-2">
                     <TradingViewMini symbol="OANDA:XAGUSD" height={220} transparent />

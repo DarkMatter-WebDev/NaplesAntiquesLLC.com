@@ -44,7 +44,7 @@ export default async function PrivacyPage({ params }: Props) {
           bullets: [
             'Create and manage customer accounts, profiles, carts, favorites, and account security.',
             'Respond to calls, texts, item submissions, product inquiries, contact requests, and customer-support messages.',
-            'Process orders, reserve one-of-a-kind inventory, prepare invoices, arrange pickup or shipping, and maintain purchase records.',
+            'Process orders, prepare invoices, arrange pickup or shipping, and maintain purchase records.',
             'Support auction, vendor, or marketplace workflows if those services are separately made available.',
             'Prevent fraud, protect inventory, secure the website, troubleshoot errors, enforce our terms, and comply with legal obligations.',
             'Send service messages, order communications, and marketing updates where you have opted in or where permitted by law.',

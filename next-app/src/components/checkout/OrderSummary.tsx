@@ -4,6 +4,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { CartItem } from '@/context/CartContext';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
+import { chargesFlSalesTax, FL_TAX_RATE, FL_TAX_RATE_LABEL } from '@/lib/checkout-pricing';
+import { parseManualPriceLabelValue } from '@/lib/pricing';
 import {
   inferProductJewelryType,
   formatProductItemYear,
@@ -15,7 +17,6 @@ import {
 
 const GOLD = '#735c00';
 const BORDER = '#d8d0c2';
-const FL_TAX = 0.07;
 
 export const SHIPPING_OPTIONS = [
   { value: 'local-pickup', labelEn: 'Local Pickup', labelEs: 'Recogida local', price: 0 },
@@ -24,8 +25,7 @@ export const SHIPPING_OPTIONS = [
 ];
 
 function parsePrice(label: string): number | null {
-  const m = label.replace(/,/g, '').match(/\$([\d.]+)/);
-  return m ? parseFloat(m[1]) : null;
+  return parseManualPriceLabelValue(label);
 }
 
 function fmt(n: number) {
@@ -41,6 +41,7 @@ export default function OrderSummary({
   isEs,
   prefix,
   shippingMethod,
+  shippingState,
   onShippingMethodChange,
   onRemove,
   variant = 'compact',
@@ -49,6 +50,10 @@ export default function OrderSummary({
   isEs: boolean;
   prefix: string;
   shippingMethod: string;
+  /** Buyer's entered shipping-address state, if collected — used so the estimate
+   *  matches the authoritative server tax calc (FL tax only for pickup or an
+   *  in-state address; out-of-state shipments aren't taxed). */
+  shippingState?: string;
   onShippingMethodChange?: (value: string) => void;
   onRemove?: (id: string) => void;
   variant?: 'compact' | 'expanded';
@@ -57,7 +62,7 @@ export default function OrderSummary({
   const knownPrices = prices.filter((p): p is number => p !== null);
   const hasUnknown = knownPrices.length < prices.length;
   const subtotal = knownPrices.reduce((a, b) => a + b, 0);
-  const tax = subtotal * FL_TAX;
+  const tax = chargesFlSalesTax(shippingMethod, shippingState) ? subtotal * FL_TAX_RATE : 0;
   const selectedShipping = SHIPPING_OPTIONS.find((option) => option.value === shippingMethod) ?? SHIPPING_OPTIONS[0];
   const shipping = selectedShipping.price;
   const total = subtotal + tax + shipping;
@@ -79,7 +84,7 @@ export default function OrderSummary({
         </h2>
         {expanded && (
           <p className="text-xs flex-shrink-0" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-            {items.length} {isEs ? 'artículo(s)' : 'item(s)'}
+            {items.length} {isEs ? (items.length === 1 ? 'artículo' : 'artículos') : (items.length === 1 ? 'item' : 'items')}
           </p>
         )}
       </div>
@@ -101,7 +106,11 @@ export default function OrderSummary({
           <span>{subtotal > 0 ? fmt(subtotal) : '-'}{hasUnknown ? '*' : ''}</span>
         </div>
         <div className="flex justify-between">
-          <span>{isEs ? 'Impuesto FL (7%)' : 'FL Sales Tax (7%)'}</span>
+          <span>
+            {tax > 0
+              ? (isEs ? `Impuesto FL (${FL_TAX_RATE_LABEL})` : `FL Sales Tax (${FL_TAX_RATE_LABEL})`)
+              : (isEs ? 'Impuesto FL' : 'FL Sales Tax')}
+          </span>
           <span>{subtotal > 0 ? fmt(tax) : '-'}</span>
         </div>
         {onShippingMethodChange ? (

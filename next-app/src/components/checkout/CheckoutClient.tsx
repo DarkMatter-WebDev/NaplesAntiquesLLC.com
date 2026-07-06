@@ -7,6 +7,7 @@ import OrderSummary, { SHIPPING_OPTIONS } from '@/components/checkout/OrderSumma
 import PayPalCheckoutButton from '@/components/checkout/PayPalCheckoutButton';
 import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 import { createClient } from '@/lib/supabase/client';
+import { normalizeManualPriceLabel, parseManualPriceLabelValue } from '@/lib/pricing';
 import { productImagePaddingForImage } from '@/types/product';
 
 const GOLD = '#735c00';
@@ -14,6 +15,7 @@ const GOLD = '#735c00';
 type CartProductInfo = Pick<
   CartItem,
   | 'description'
+  | 'priceLabel'
   | 'description_es'
   | 'public_notes'
   | 'image_padding'
@@ -57,7 +59,16 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
   const [shippingMethod, setShippingMethod] = useState(SHIPPING_OPTIONS[0].value);
   const [infoConfirmed, setInfoConfirmed] = useState(false);
   const [productInfoById, setProductInfoById] = useState<Record<string, CartProductInfo>>({});
-  const [createdOrder, setCreatedOrder] = useState<{ orderNumber: string; total: number } | null>(null);
+  // On a successful capture we snapshot the order (items + shipping + contact) so
+  // the confirmation screen can render a complete, printable summary — the cart is
+  // cleared right after, and a guest has no account to look the order up in later.
+  const [createdOrder, setCreatedOrder] = useState<{
+    orderNumber: string;
+    items: CartItem[];
+    shippingMethod: string;
+    customer: CustomerInfo;
+  } | null>(null);
+  const [showOrderDetails, setShowOrderDetails] = useState(false);
   // Internal order id from the first create-order call, reused if the buyer
   // cancels the PayPal window and tries again (so we don't create a duplicate order).
   const orderIdRef = useRef<string | null>(null);
@@ -66,6 +77,13 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
   // longer apply — forget it so the retry creates a fresh order. (The server
   // re-validates this too; clearing here just avoids a doomed reuse attempt.)
   const orderPayloadKeyRef = useRef<string | null>(null);
+
+  // Guest checkout: no account required. Offer an optional sign-in only to
+  // visitors who aren't already signed in.
+  const [isGuest, setIsGuest] = useState(false);
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data }) => setIsGuest(!data.user)).catch(() => {});
+  }, []);
 
   const cartPayloadKey = `${items.map((item) => item.id).sort().join(',')}|${shippingMethod}`;
 
@@ -164,6 +182,8 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     let cancelled = false;
     const missingProductInfoIds = items
       .filter((item) => (
+        parseManualPriceLabelValue(item.priceLabel) == null
+      ) || (
         !item.description &&
         !item.description_es &&
         !item.public_notes
@@ -186,7 +206,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
       const supabase = createClient();
       const { data } = await supabase
         .from('products')
-        .select('id, description, description_es, public_notes, image_padding, image_padding_by_image, category, metal_type, metal_variant, purity, weight_grams, gram_weight, product_type, jewelry_type, chain_type, length, brand, tags, tags_es, gender')
+        .select('id, description, description_es, public_notes, image_padding, image_padding_by_image, category, metal_type, metal_variant, purity, weight_grams, gram_weight, product_type, jewelry_type, chain_type, length, brand, tags, tags_es, gender, price_mode, manual_price_label')
         .in('id', missingProductInfoIds);
 
       if (cancelled || !data) return;
@@ -198,6 +218,10 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
             product.id,
             {
             description: product.description,
+            priceLabel:
+              product.price_mode === 'manual'
+                ? (normalizeManualPriceLabel(product.manual_price_label) ?? cartItem?.priceLabel ?? '')
+                : (cartItem?.priceLabel ?? ''),
             description_es: product.description_es,
             public_notes: product.public_notes,
             image_padding: productImagePaddingForImage(product.image_padding, product.image_padding_by_image, cartItem?.image, 0),
@@ -244,24 +268,98 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
   }, [createdOrder]);
 
   if (createdOrder) {
+    const needsShippingReceipt = createdOrder.shippingMethod !== 'local-pickup';
+    const c = createdOrder.customer;
     return (
-      <div className="max-w-xl mx-auto text-center px-6 py-16">
-        <span className="material-symbols-outlined" style={{ fontSize: '44px', color: GOLD }}>check_circle</span>
-        <h1 className="text-3xl md:text-4xl font-bold mt-4 mb-4" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-          {isEs ? 'Pedido recibido' : 'Order Received'}
-        </h1>
-        <p className="mb-2" style={{ color: 'var(--color-on-surface-variant)' }}>
-          {isEs ? 'Su pedido fue enviado correctamente.' : 'Your order was submitted successfully.'}
-        </p>
-        <p className="mb-8 text-sm font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-          {createdOrder.orderNumber}
-        </p>
-        {/* Plain anchor (not Link) forces a full navigation, so the shop grid is
-            guaranteed to reflect the item(s) just purchased as sold rather than
-            serving a router-cached page from before the purchase completed. */}
-        <a href={`${prefix}/shop`} className="gold-button">
-          {isEs ? 'Volver a la tienda' : 'Back to Shop'}
-        </a>
+      <div className="max-w-2xl mx-auto px-6 py-16">
+        <div className="text-center">
+          <span className="material-symbols-outlined" style={{ fontSize: '44px', color: GOLD }}>check_circle</span>
+          <h1 className="text-3xl md:text-4xl font-bold mt-4 mb-4" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
+            {isEs ? 'Pedido recibido' : 'Order Received'}
+          </h1>
+          <p className="mb-2" style={{ color: 'var(--color-on-surface-variant)' }}>
+            {isEs ? 'Su pedido fue enviado correctamente.' : 'Your order was submitted successfully.'}
+          </p>
+          <p className="mb-6 text-sm font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+            {createdOrder.orderNumber}
+          </p>
+        </div>
+
+        <div className="no-print flex flex-wrap justify-center gap-3">
+          {/* Plain anchor (not Link) forces a full navigation, so the shop grid is
+              guaranteed to reflect the item(s) just purchased as sold rather than
+              serving a router-cached page from before the purchase completed. */}
+          <a href={`${prefix}/shop`} className="gold-button">
+            {isEs ? 'Volver a la tienda' : 'Back to Shop'}
+          </a>
+          <button type="button" className="outline-button" onClick={() => setShowOrderDetails((v) => !v)}>
+            {isGuest
+              ? (isEs ? 'Ver e imprimir detalles' : 'View & Print Order Details')
+              : (isEs ? 'Ver detalles del pedido' : 'View Order Details')}
+          </button>
+        </div>
+
+        {showOrderDetails && (
+          <div className="mt-10">
+            <div className="checkout-receipt-print">
+              <div className="mb-5 border-b pb-4" style={{ borderColor: 'var(--color-outline-variant)' }}>
+                <p className="text-sm font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                  Naples Estate Jewelry
+                </p>
+                <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  (239) 404-8505 · naplesestatejewelry.co
+                </p>
+                <p className="mt-3 text-sm" style={{ color: 'var(--color-on-surface)' }}>
+                  <strong>{isEs ? 'Pedido' : 'Order'}:</strong> {createdOrder.orderNumber}
+                </p>
+              </div>
+
+              <OrderSummary
+                items={createdOrder.items}
+                isEs={isEs}
+                prefix={prefix}
+                shippingMethod={createdOrder.shippingMethod}
+                shippingState={c.state}
+                variant="expanded"
+              />
+
+              <div className="mt-5 grid gap-4 sm:grid-cols-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                    {isEs ? 'Contacto' : 'Contact'}
+                  </p>
+                  <p style={{ color: 'var(--color-on-surface)' }}>{c.name}</p>
+                  <p>{c.email}</p>
+                  <p>{c.phone}</p>
+                </div>
+                {needsShippingReceipt && (
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                      {isEs ? 'Envío a' : 'Ship To'}
+                    </p>
+                    <p style={{ color: 'var(--color-on-surface)' }}>{c.address_line1}</p>
+                    {c.address_line2 && <p>{c.address_line2}</p>}
+                    <p>{[c.city, c.state, c.postal_code].filter(Boolean).join(', ')}</p>
+                    <p>{c.country}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="no-print mt-6 flex justify-center">
+              <button type="button" className="gold-button" onClick={() => window.print()}>
+                <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '17px', lineHeight: 1 }}>print</span>
+                {isEs ? 'Imprimir' : 'Print'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        <style>{`
+          @media print {
+            header, footer, .no-print { display: none !important; }
+          }
+        `}</style>
       </div>
     );
   }
@@ -305,6 +403,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
             isEs={isEs}
             prefix={prefix}
             shippingMethod={shippingMethod}
+            shippingState={customer.state}
             onShippingMethodChange={setShippingMethod}
             onRemove={remove}
             variant="expanded"
@@ -321,6 +420,18 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
               <h2>{isEs ? 'Información de contacto' : 'Contact information'}</h2>
             </div>
           </div>
+          {isGuest && (
+            <p className="text-xs mb-3" style={{ color: 'var(--color-on-surface-variant)' }}>
+              {isEs ? '¿Ya tiene cuenta? ' : 'Have an account? '}
+              <Link
+                href={`${prefix}/account/sign-in?next=${prefix}/checkout`}
+                style={{ color: GOLD, fontWeight: 700 }}
+              >
+                {isEs ? 'Inicie sesión' : 'Sign in'}
+              </Link>
+              {isEs ? ' para un pago más rápido — opcional.' : ' for faster checkout — optional.'}
+            </p>
+          )}
           <div className="responsive-form-grid">
             <div>
               <label className="form-label">{isEs ? 'Nombre completo' : 'Full Name'} *</label>
@@ -448,8 +559,10 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
                 orderPayloadKeyRef.current = cartPayloadKey;
               }}
               onSuccess={({ orderNumber }) => {
+                // Snapshot the order for the printable confirmation, THEN clear the
+                // cart (clearing empties `items`, so capture the summary first).
+                setCreatedOrder({ orderNumber, items: summaryItems, shippingMethod, customer });
                 clear();
-                setCreatedOrder({ orderNumber, total: 0 });
               }}
             />
           ) : (

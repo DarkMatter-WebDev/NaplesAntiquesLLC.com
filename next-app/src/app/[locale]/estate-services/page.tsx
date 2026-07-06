@@ -1,14 +1,19 @@
 import type { Metadata } from 'next';
+import { alternatesFor } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 
-export const metadata: Metadata = {
-  title: 'Estate Liquidation Services | Naples Estate Jewelry',
-  description:
-    'Estate services in Naples, Marco Island, and Fort Myers FL for entire estates, single heirlooms, and inherited collections. Confidential on-site evaluation, same-day payment, and discreet work with families, attorneys, and trustees throughout Southwest Florida.',
-};
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  return {
+    title: 'Estate Liquidation Services in Naples, FL',
+    description:
+      'Estate services in Naples, Marco Island, and Fort Myers FL for entire estates, single heirlooms, and inherited collections. Confidential on-site evaluation, same-day payment, and discreet work with families, attorneys, and trustees throughout Southwest Florida.',
+    alternates: alternatesFor('/estate-services', locale),
+  };
+}
 
 interface Props {
   params: Promise<{ locale: string }>;

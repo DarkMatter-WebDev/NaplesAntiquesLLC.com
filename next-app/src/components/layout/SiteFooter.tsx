@@ -65,6 +65,13 @@ export default function SiteFooter({ locale = 'en' }: Props) {
             >
               (239) 404-8505
             </a>
+            <a
+              href="mailto:info@naplesestatejewelry.co"
+              className="text-xs md:text-sm md:mt-1"
+              style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+            >
+              info@naplesestatejewelry.co
+            </a>
           </div>
 
           <nav className="hidden md:flex md:flex-col md:gap-3" aria-label={isEs ? 'Enlaces de tienda' : 'Shop links'}>

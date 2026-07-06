@@ -27,20 +27,20 @@ const STATIC_PAGES = [
   { path: '/vendor-terms', priority: 0.1, changeFrequency: 'yearly' },
 ] as const;
 
+// One entry per page carrying en/es hreflang alternates (Google reads the
+// alternates rather than needing a separate /es row), plus a lastModified so the
+// shop and products get recrawled when they change.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const now = new Date();
   const entries: MetadataRoute.Sitemap = [];
 
-  // Static pages — EN (no prefix) + ES (/es prefix)
   for (const { path, priority, changeFrequency } of STATIC_PAGES) {
     entries.push({
       url: `${BASE}${path}`,
+      lastModified: now,
       priority,
       changeFrequency,
-    });
-    entries.push({
-      url: `${BASE}/es${path}`,
-      priority: priority * 0.9,
-      changeFrequency,
+      alternates: { languages: { en: `${BASE}${path}`, es: `${BASE}/es${path}` } },
     });
   }
 
@@ -52,13 +52,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     );
     const { data: products } = await supabase
       .from('products')
-      .select('id, status')
+      .select('id, status, updated_at')
       .in('status', ['available', 'Available']);
 
     if (products) {
-      for (const { id } of products) {
-        entries.push({ url: `${BASE}/shop/${id}`, priority: 0.6, changeFrequency: 'weekly' });
-        entries.push({ url: `${BASE}/es/shop/${id}`, priority: 0.5, changeFrequency: 'weekly' });
+      for (const { id, updated_at } of products) {
+        entries.push({
+          url: `${BASE}/shop/${id}`,
+          lastModified: updated_at ? new Date(updated_at as string) : now,
+          priority: 0.6,
+          changeFrequency: 'weekly',
+          alternates: { languages: { en: `${BASE}/shop/${id}`, es: `${BASE}/es/shop/${id}` } },
+        });
       }
     }
   } catch {

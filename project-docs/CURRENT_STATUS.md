@@ -1,9 +1,266 @@
 ﻿# Current Status
 
 > Reflects the present state of development. **Update this at the end of every
-> work session.** Last updated: **2026-07-04**.
+> work session.** Last updated: **2026-07-06**.
 
-## 2026-07-04 -- 🔒 Security hardening from full-site audit (⚠️ SQL migration pending)
+## 2026-07-06 -- Manual Reserved item status removed
+
+Removed the manual **Reserved** product lifecycle from the active admin app. Product
+Admin no longer shows a Reserved metric card, status dropdown option, row action, or
+quick-fill status token; the AI listing prompt no longer suggests Reserved as an
+allowed status; and legacy stored `reserved` values normalize to `available` in the app
+layer so old data does not keep a hidden hold state alive. Public shop visibility
+continues to use available/sold only, with `pending_payment` used for unpaid admin
+order holds. No destructive database cleanup was run; removing old vestigial columns or
+rewriting historical SQL install scripts should be handled as a separate confirmed
+Supabase cleanup. Verification: `npm run lint` and `npm run build` from `next-app/`
+both pass; browser preview confirmed the admin Products page shows Total/Available/Sold
+only, row actions do not include Reserve, and the New Item status dropdown has Draft,
+Available, Pending Payment, Sold, and Archived only.
+
+## 2026-07-06 -- ? Manual fixed pricing uses Price Label only + Quick Add
+
+Removed the visible **Asking Price** input from the shared New Item/Edit Item admin
+product form. Manual/fixed pricing now uses **Price Label** as the entered value:
+quick-fill aliases such as "price", "manual price", and the old "asking price" label
+map into `manual_price_label`; AI values that arrive as `asking_price` are formatted
+into `manual_price_label`; and admin product saves clear `asking_price` to `null` so a
+hidden stale value cannot override the visible label. Bare numeric manual price labels
+are normalized centrally (`1` -> `$1`, `1200` -> `$1,200`) across admin entry, shop
+display, cart, checkout totals, and order snapshots. New Item also has a **Quick add**
+checkbox that switches the product to manual fixed pricing and bypasses spot-pricing
+requirements (purity/weight/multiplier) while still requiring a title, inventory
+number, and price label. Checkout now hydrates stale cart rows from the live product row
+when the stored cart price is unparseable, preventing manual-priced items from turning
+into dash totals after a product is corrected. Verification: `npm run lint` and
+`npm run build` from `next-app/` both pass.
+
+## 2026-07-06 -- ? Orders badge now means unseen active orders
+
+Changed the admin **Orders** nav badge from a paid/pending-fulfillment counter to a
+notification-style unseen-order counter. It now counts active orders (`deleted_at is
+null`) created after the current admin/browser last viewed the active Orders area, and
+viewing `/admin/orders` or an order detail page records a last-seen timestamp and clears
+the badge. Recycle Bin orders do not count. Verification: `npm run lint` and
+`npm run build` pass from `next-app/`; browser preview confirmed `/admin/orders`
+clears the old "Orders 8" badge and it remains cleared after navigating back to
+`/admin`.
+
+## 2026-07-05 -- ?? Full UX walkthrough audit (browser-driven, no code changed)
+
+Walked every major public user path on the dev server (:3002) with browser
+control: home, nav, /auctions, shop (filters/sort/search/sold view), product
+detail (EN+ES), add-to-cart ? cart drawer ? guest checkout (shipping switch,
+required-field gate, PayPal button enable — **not** clicked, no orders created),
+free-evaluation form, contact + INQUIRE prefill, sign-in/sign-up/reset-password,
+saved-items drawer, FAQ accordions, admin gating, all legal pages, redirects,
+mobile viewport (no horizontal overflow; hamburger + call button work). Verified
+`/api/metal-prices` healthy (`source: "api"`). Findings (full report delivered in
+session; top items added to TASKS Backlog):
+
+- **? 2026-07-05 (orders recycle bin) — build-shipped, SQL applied.** Admin Orders now
+  uses soft delete: active deletes set `orders.deleted_at`, `/admin/orders?view=trash`
+  shows a Recycle Bin with Restore and Delete Forever, and order-detail delete was
+  switched to the same soft-delete path. Added `supabase/orders-recycle-bin.sql`
+  (idempotent; adds `orders.deleted_at` + active/trash indexes). Owner ran the SQL in
+  Supabase and the verify query returned `deleted_at` / `timestamp with time zone`;
+  non-destructive route verification now shows `/admin/orders` and
+  `/admin/orders?view=trash` return 200 with the migration notice gone. Also fixed the
+  paid-order return-to-inventory warning so the delete modal closes before the alert is
+  shown. Verification: `npm run lint`, `npx tsc --noEmit`, `npm run build`; browser/
+  HTTP preview checked `/admin/orders` + `/admin/orders?view=trash`. Remaining: test
+  delete/restore/delete-forever with a deliberate unpaid test order.
+- **? 2026-07-05 (invoice generation) — build-shipped.** Orders now generate an
+  idempotent invoice row through `upsertOrderInvoice`: new PayPal checkout orders get a
+  draft invoice during create-order, paid capture upgrades it to `paid`, and new manual
+  admin orders call the same admin invoice endpoint after creation. Order detail now has
+  a **Generate Invoice / Refresh Invoice** button for legacy/test orders that are missing
+  an invoice row. Verification: `npm run lint`, `npx tsc --noEmit`, `npm run build`;
+  preview confirmed the paid test order `NEJ-20260704-VPBG0` shows "No invoice generated
+  yet" plus the new **Generate Invoice** button. The button was not clicked because it
+  writes to the live database.
+- **? 2026-07-05 (admin order print preview) — build-shipped.** Order detail now has a
+  **Print Order** action that opens `/admin/orders/[id]/print` in a popup/tab. The route
+  is admin-authenticated and shows a paper-style preview with order statuses, customer/
+  address data, item snapshots, discounts, totals, notes, and a Print toolbar button.
+  Print CSS hides the toolbar and shared cookie/cart/wishlist chrome. Verification:
+  `npm run lint`, `npx tsc --noEmit`, `npm run build`; browser preview confirmed
+  `NEJ-20260704-VPBG0` opens the preview route with the paper and Print button visible.
+- **? 2026-07-05 (admin inventory restore override) — build-shipped.** Order detail now
+  has a **Restore item to inventory** action that marks linked products `available`
+  without changing order/payment state, even for completed paid sales. Delete confirmation
+  now has two choices: Recycle Bin only, or Recycle Bin + return linked products to
+  inventory. Paid orders are no longer blocked from the Recycle Bin path. Verification:
+  `npm run lint`, `npx tsc --noEmit`, `npm run build`; browser UI verification was
+  blocked by admin sign-in redirect in the in-app browser, so exercise on a deliberate
+  test order while signed in.
+- **? FIXED 2026-07-05 — E04 product soft-404.** Root cause was the
+  `shop/loading.tsx` **ancestor** streaming boundary wrapping `[id]` (not just
+  `[id]/loading.tsx`). Fixed by moving the shop-list page + skeleton into a
+  `shop/(list)/` route group (scopes the loading boundary to `/shop` only, off
+  `[id]`), removing `shop/[id]/loading.tsx`, and adding an early `notFound()` in
+  the product `generateMetadata`. Unknown/hidden product URLs now return a real
+  404 (EN+ES); `/shop` keeps its skeleton; `npm run build` passes. See CHANGELOG.
+- **? FIXED 2026-07-05 — sold product detail page.** No longer shows the live
+  price captioned "? This is your price"; sold items now show a "Sold — one of a
+  kind" caption and keep an Inquire/Call CTA (no Add to Cart). See CHANGELOG.
+- **? FIXED 2026-07-05 — UX-friction batch.** Free-evaluation photos now optional
+  (photo-or-description guard); sign-in shows friendly localized errors instead of
+  raw Supabase strings; saved-items drawer now shows the live computed price;
+  ES nav "Tienda / Tienda" ? "Tienda ? Catálogo / Subastas"; cart/checkout
+  "1 item(s)" ? proper singular/plural. Checkout address `*` + missing-field
+  naming turned out to be **already handled** (dynamic `*` + click-to-reveal alert;
+  the audit's DOM query missed the asterisks) — left the owner-verified pay-gate
+  as-is. Open business/legal question: 7% FL sales tax on out-of-state orders. See
+  CHANGELOG.
+- **? 2026-07-05 (checkout UX) — guest sign-in gate + printable order confirmation.**
+  "Proceed to Checkout" now shows signed-out shoppers a **Log In / Create Account /
+  Continue as Guest** modal (signed-in users go straight through) — verified live. The
+  post-PayPal confirmation keeps what it showed and adds a **View & Print Order Details**
+  button (guest) revealing a printable receipt (items/totals via read-only `OrderSummary`
+  + contact/ship-to + Print button; snapshotted client-side before the cart clears so
+  guests can print). Built + build-verified; the live PayPal?print round-trip needs a
+  sandbox buyer login (owner to run). Also verified live signed in as admin: the
+  Create-Order tax (FL 6% / CA $0) and that the Reopen button renders conditionally
+  (absent on open orders; no cancelled orders existed to click-test). See CHANGELOG + TASKS.
+- **? 2026-07-05 (final batch) — tax?6%, Reopen button, lint?0, query dedup + env note.**
+  Owner-directed: FL sales tax is now **6% everywhere when taxable** (was 7%/6.5% —
+  centralized into a single `FL_TAX_RATE` in `checkout-pricing.ts`, imported by
+  cart/checkout/admin); the out-of-state exemption still applies (verified live: FL 6%,
+  CA $0). Added an admin **Reopen Order** button (`OrderDetailPanel`, shows on cancelled
+  orders; build-verified, needs owner admin login to exercise). **Lint is now at 0
+  problems** (5 hook errors + 1 font warning resolved: sign-in `nextUrl`?ref, the other
+  4 are documented intentional patterns given scoped suppressions). Product page double
+  DB query deduped via `React.cache`. **Owner env note:** all working env is in Netlify
+  (PayPal sandbox, AI, etc.); `.env.local` is **stale**; remaining testing is live-post-
+  deploy and owner-owned — this likely clears the old PayPal Netlify-credential blocker.
+  `chris@naplesestatejewelry.co` confirmed real. Bigger shop-perf refactors + image
+  re-encodes deliberately left for a focused pass (need live/visual verification). See
+  CHANGELOG + TASKS.
+- **? 2026-07-05 (later still) — Lint cleanup.** Cleared the 6 dead-code /
+  stale-directive lint warnings (unused `setInvoices`/`hasDrawerFilters`/`LOCALES`, two
+  stale `eslint-disable` comments, and the unused/never-wired `reopenOrder()` admin
+  function). Lint now reports only the 5 `react-hooks/set-state-in-effect` **errors** +
+  1 `google-font-display` warning, all deferred as a tracked follow-up (none block the
+  build). tsc/build clean; `/shop` filters re-verified live. See TASKS + CHANGELOG.
+- **? FIXED 2026-07-05 (later still) — Saved Items drawer gets an Add to Cart
+  button, plus a real crash bug found and fixed along the way.** Owner clarified the
+  earlier "add-to-cart affordance for the saved drawer" note and asked for it. Reused
+  `CartButton` (`variant="icon"`) fed a minimal `CartItem` from what the wishlist
+  stores; checkout's existing field-backfill effect fills in the rest. **While
+  verifying this, found a real bug:** `[locale]/layout.tsx` nested
+  `WishlistProvider` around `CartProvider`, but `WishlistProvider` renders
+  `<WishlistDrawer>` as a *sibling* to its children, not inside them — so
+  `WishlistDrawer` sat outside the `CartContext` tree entirely. The new
+  in-drawer `CartButton` (which calls `useCart()`) crashed the whole app to a blank
+  "page couldn't load" screen the instant a saved item rendered. Fixed by swapping the
+  provider order (`CartProvider` now wraps `WishlistProvider`; confirmed no reverse
+  dependency — `CartDrawer` never calls `useWishlist()`). Re-verified live: save ?
+  open drawer ? Add to Cart works, item stays saved, cart badge updates, checkout
+  renders the full spec line for the item, no console errors, and a full EN+ES route
+  sweep still returns 200. `tsc`/build clean.
+- **? FIXED 2026-07-05 (later) — FL sales tax no longer charged on out-of-state
+  shipments (owner decision).** Authoritative fix in `lib/checkout-pricing.ts`
+  (`buildOrderDraft` + new `isFloridaState`/`chargesFlSalesTax` helpers): tax now
+  applies only for local pickup or a Florida shipping address; out-of-state shipments
+  are untaxed. Threaded through `/api/paypal/create-order` (both the fresh-order and
+  reuse-recompute paths) and the checkout page's own live estimate (`OrderSummary` +
+  `CheckoutClient`), so the displayed total matches what's actually charged. The admin
+  manual-order form (`OrdersPanel.tsx`) got the same exemption logic (its separate,
+  pre-existing 6.5% rate was left as-is — untouched by this fix, not verified live,
+  see TASKS). The header mini-cart (`CartDrawer.tsx`) intentionally keeps its flat 7%
+  pre-checkout estimate — it has no address input, so it can't know the destination.
+  Verified live on dev: CA address ? $0 tax / correct total; FL ? 7% tax restored;
+  Local Pickup ? always taxed regardless of state field. No orders were created during
+  testing (confirmed via network log — the PayPal button's `createOrder` only fires on
+  an actual click, which wasn't triggered). `tsc`/build clean.
+- **? FOLLOW-UP 2026-07-05 — account auth pages localized.** `/es/account/sign-in`,
+  `sign-up`, and `reset-password` were fully English; now bilingual (labels, buttons,
+  placeholders, validation, success screens). Fixed a latent missing-`/es` prefix on
+  the sign-in "Create one" link. A **final full EN+ES walkthrough passed** (all routes
+  200, garbage product 404, redirects + metal feed live, shop/cart/checkout/sold/saved
+  flows and localized auth all confirmed, no console errors, `npm run build` clean).
+- **Dev-infra:** Turbopack JSON cache corruption produced sticky 500s across
+  routes mid-session (fixed by deleting `.next`); OneDrive sync is a plausible
+  aggravator — see the walkthrough report / dev-server-gotchas memory.
+
+## 2026-07-04 (later) -- ?? Pre-launch security audit round 2 (code shipped, ?? 4 SQL files pending)
+
+A five-agent pre-launch audit (API routes, DB/RLS, payments/lifecycle, perf/cost,
+client/secrets) surfaced a new **CRITICAL** and several HIGHs on top of the earlier
+2026-07-04 findings. **Code fixes are shipped and verified (`tsc`/`eslint` clean,
+`npm run build` passes).** Deploy the code, then run the SQL below.
+
+- **?? CRITICAL (SQL only) — PUBLIC execute on payment RPCs.** Postgres grants
+  EXECUTE to `PUBLIC` by default; the hardening file only revoked from
+  `anon,authenticated`, so anon may still call `capture_paypal_order` /
+  `apply_paypal_order_event` / `create_paypal_order` / `create_checkout_order` via
+  PostgREST — i.e. mark orders paid + products sold without paying. **Fix: run
+  `supabase/revoke-public-execute-2026-07.sql`** (revokes PUBLIC execute + default
+  privileges; includes a `pg_proc.proacl` verification probe). No code change needed.
+- **Code shipped this round:**
+  - Deleted the dead, anonymous `/api/checkout/order` order-creation path ? now a
+    410 stub (it let anyone flip the whole catalog to `pending_payment`).
+  - `webhooks/resend` now **fails closed** when the signing secret is unset (was
+    fail-open ? arbitrary unsubscribe).
+  - PayPal **webhook** now verifies captured amount+currency before marking paid
+    (mirrors capture-order; mismatch ? `pending` + admin notification).
+  - Checkout now **rejects spot-linked items when the metal feed is on fallback**
+    (`buildOrderDraft`, source==='fallback' ? 503 "call us") — no more selling gold
+    off the hardcoded $3300 fallback during an API outage.
+  - **Shipping method whitelisted** in `buildOrderDraft` (unknown method was $0 =
+    free insured shipping).
+  - **JSON-LD `</script>` breakout escaped** via new `lib/json-ld.ts#jsonLdHtml`
+    (shop/[id], [locale]/layout, faq).
+  - **IP rate limiting** on `/api/inquire`, `/api/contact-message`, `/api/subscribe`,
+    `/api/unsubscribe`, `/api/paypal/create-order` via new `lib/rate-limit.ts`
+    (**fails open until `supabase/rate-limiting-2026-07.sql` is run**). Honeypot +
+    length caps added to the inquire JSON path; `productIds` capped at 50.
+  - `/api/inquiries/[id]` PATCH now `requireAdmin()` (was any-signed-in-user).
+  - `adminRevalidateProduct(s)` server actions now `requireAdmin()` (their action
+    ids ship in public JS).
+  - `server-only` import added to `lib/supabase/service.ts` + `lib/paypal.ts`
+    (added the `server-only` dep) so a future client import fails the build.
+  - Shop catalog **cache-key hardened**: free-text `?brand=` capped to 60 chars and
+    `metal` constrained to gold/silver so junk querystrings can't spawn unbounded
+    cache entries / DB reads.
+- **Round 2b — the earlier "not yet coded" items are now DONE (code, build-verified):**
+  - `item_conflict` race loser now raises a de-duped admin notification (refund
+    reminder) from both capture paths — new `lib/order-finalize.ts#notifyItemConflict`.
+  - Invoice + auto-receipt now fire on the **webhook-backstop** capture too (browser
+    death after approval) — factored into `lib/order-finalize.ts#finalizePaidOrder`,
+    called from both `capture-order` and the webhook.
+  - Admin paid-order guards: `OrderDetailPanel` blocks delete / line-discount edits /
+    mark-unpaid on paid orders (and delete now returns only held pending_payment
+    products to available, never un-sells a sold item); `OrdersPanel`
+    return-to-inventory refuses paid orders.
+  - Partial-refund handling: `apply_paypal_order_event` now accumulates
+    `refund_amount` and only marks fully `refunded` when cumulative = total, else
+    `partially_refunded` (**SQL** — see manual steps; also folded into
+    no-reservation-checkout.sql canonical).
+  - profiles `internal_notes`/`account_type` SELECT restriction (**SQL**).
+  - profiles.email **write-restriction (M3)** — the account form no longer writes
+    `email` (now read-only, set from auth at signup) + column revoke (**SQL**).
+- **?? MANUAL STEPS — run in Supabase, in this order (code-first, already deployed here):**
+  1. `supabase/security-hardening-2026-07.sql` *(still pending from round 1)*
+  2. `supabase/products-internal-columns-authenticated-2026-07.sql` *(round 1)*
+  3. **`supabase/revoke-public-execute-2026-07.sql`** *(the CRITICAL)*
+  4. **`supabase/rate-limiting-2026-07.sql`** *(enables rate limits; no-op until run)*
+  5. **`supabase/profiles-column-restrictions-2026-07.sql`** *(M1 — internal_notes read)*
+  6. **`supabase/orders-partial-refund-2026-07.sql`** *(M4 — partial refunds; needs
+     orders-refund-amount.sql already applied)*
+  7. **`supabase/profiles-email-write-restriction-2026-07.sql`** *(M3 — deploy the
+     account-form change first)*
+  Then the deferred `VALIDATE CONSTRAINT` lines in security-hardening-2026-07.sql.
+- **Still open (deferred by choice):** env vars set in Netlify
+  (`RESEND_WEBHOOK_SECRET`, `PAYPAL_WEBHOOK_ID`); verify CSP/HSTS reach SSR pages
+  post-deploy. Perf quick-wins: ProductCard renders all images, product-detail
+  double-query + `React.cache`, drop `unoptimized` on `/assets/` images, Material
+  Symbols subset.
+- **Dependency added:** `server-only` (npm) — guards `lib/supabase/service.ts` +
+  `lib/paypal.ts` against client import.
+
+## 2026-07-04 -- ?? Security hardening from full-site audit (?? SQL migration pending)
 
 A three-pass audit (live site, admin flow, codebase) confirmed several issues via
 live-DB probes. Remediation landed for the top server-side holes:
@@ -12,7 +269,7 @@ live-DB probes. Remediation landed for the top server-side holes:
   `/api/checkout/order` calls `create_checkout_order` through the **service-role**
   client; `lib/checkout-pricing.ts#buildOrderDraft` rejects any **$0/negative line
   item** (409) for both manual + PayPal checkout.
-- **⚠️ MANUAL STEP — run `supabase/security-hardening-2026-07.sql` in Supabase.**
+- **?? MANUAL STEP — run `supabase/security-hardening-2026-07.sql` in Supabase.**
   Until it runs, the holes are still open (e.g. any logged-in customer can
   self-promote to admin, CODE-S01 Critical). **Deploy-order matters: ship the code
   first, then run the SQL.** The route now calls the RPC via the service-role client,
@@ -24,7 +281,7 @@ live-DB probes. Remediation landed for the top server-side holes:
   minimum_price/internal_notes), CODE-D07 (only 3 CHECK constraints). No-reservation
   migration confirmed applied (reserve fns dropped). No live $0/pending_payment/
   fake-paid data found.
-- **CODE-D04 residual — now fixed in code (⚠️ 2nd SQL pending).** Admin product
+- **CODE-D04 residual — now fixed in code (?? 2nd SQL pending).** Admin product
   read moved to the service role (`admin/page.tsx`) and the `AdminShell` insert no
   longer `.select()`s, so `authenticated` no longer needs SELECT on the internal
   columns. **Run `supabase/products-internal-columns-authenticated-2026-07.sql`**
@@ -33,6 +290,31 @@ live-DB probes. Remediation landed for the top server-side holes:
 - **Owner answers folded in:** no trade-in/store-credit build (phone-only); brand
   standardized to "Naples Estate Jewelry"; `naplesestatejewelry.com` not owned
   (can't 301); no license to display; Resend webhook secret is set.
+- **SEO + technical batch shipped (code-only, build/tsc clean, verified on dev).**
+  Canonical + hreflang on all content + product pages (`lib/seo.ts`), `html lang="en"`,
+  de-doubled/seller-intent titles, product Breadcrumb/priceValidUntil/absolute-image/
+  seller + locale-aware meta, FAQPage schema, global OG, sitemap hreflang+lastmod,
+  robots hardening + `/shop-modern` noindex, `/sell`?`/free-evaluation` & `/cart`?`/shop`
+  redirects, footer email, `error.tsx`, Netlify `/assets` cache fix. See CHANGELOG.
+  **Deferred items — now all DONE** (see CHANGELOG 2026-07-04 final batch): real Google
+  reviews swapped in; per-locale `<html lang>` shipped (html moved to `[locale]/layout`,
+  root not-found self-contained, fonts in `lib/fonts.ts`); returns policy rewritten
+  (all-sales-final + 5-day misrepresentation refund); "100%" badge replaced; H1 hygiene;
+  mobile call button; CSP **enforced**; server-rendered spot price on gold/silver-services;
+  new-listing re-slug (redirects + SQL). Auctions/Store nav left as-is (owner explained
+  they may be real services — pending owner decision on copy, not removed).
+  **?? Two new manual steps:** (1) run `supabase/reslug-new-listing-products-2026-07.sql`
+  and deploy together with the next.config redirects; (2) after deploy, verify the
+  enforced CSP on the live site (home, /gold-services TradingView chart, /checkout) —
+  one-line rollback to Report-Only is commented in `netlify.toml`.
+- **Guest checkout + remaining ecommerce-flow (PUB-E) items — DONE** (see CHANGELOG):
+  `/checkout` no longer requires an account (guest checkout; optional sign-in nudge);
+  shop counter reworded ("59 pieces"); `/wishlist`,`/saved` redirects; sign-up benefit
+  line (password stays min-6); product-page trust line + rewritten Shipping policy.
+  **The "signature required" shipping claim was removed** (owner: not always applicable)
+  — product trust line now reads "Ships fully insured · Authenticity guaranteed" and the
+  Shipping policy no longer promises signature-on-delivery. Only open PUB-E item is E04
+  (garbage-product-URL soft-404: returns 404 on dev; verify on the live Netlify deploy).
 
 ## 2026-07-04 -- Checkout UX polish (owner-verified) + no-reply email wording
 
@@ -56,8 +338,8 @@ replies. See CHANGELOG 2026-07-04.
 On a successful PayPal capture, `capture-order` now **auto-emails the buyer their
 receipt** (best-effort; only on the fresh capture, so no duplicates; never fails the
 capture). The invoice email content is **paid-aware** (`buildInvoiceEmailContent`):
-paid → **Receipt** wording + "PAID IN FULL" badge + "Total Paid"; unpaid → **Invoice**.
-A shared `lib/order-invoice-mailer.ts#sendOrderInvoiceEmail` (fetch → build → send →
+paid ? **Receipt** wording + "PAID IN FULL" badge + "Total Paid"; unpaid ? **Invoice**.
+A shared `lib/order-invoice-mailer.ts#sendOrderInvoiceEmail` (fetch ? build ? send ?
 log to `order_emails`) backs both the admin *Email Invoice/Receipt* button and the
 auto-send. The admin button/modal relabel to Receipt for paid orders.
 
@@ -76,8 +358,8 @@ under the Summary block on the right. New table `order_emails`
 successful send; the page loads the history and `OrderDetailPanel` prepends each
 just-sent email optimistically.
 
-⚠️ **Manual step: run `supabase/order-emails.sql` in Supabase.** Until then the table
-is missing → history reads empty and the routes' logging insert no-ops (emails still
+?? **Manual step: run `supabase/order-emails.sql` in Supabase.** Until then the table
+is missing ? history reads empty and the routes' logging insert no-ops (emails still
 send fine — graceful). **Verified:** `npm run build` passes, `tsc`/`eslint` clean
 (only pre-existing OrderDetailPanel warnings). Not exercised live (admin session had
 lapsed; owner credentials not entered; table not yet migrated). After running the SQL,
@@ -86,7 +368,7 @@ both appear in the Email History card. See DECISIONS 2026-07-03.
 
 ## 2026-07-03 -- Admin toggle: show/hide sold items in the shop gallery
 
-Added an admin setting (in `/admin/settings` → new **Shop Visibility** section) to
+Added an admin setting (in `/admin/settings` ? new **Shop Visibility** section) to
 choose whether SOLD products appear in the public shop gallery. Available items are
 always shown. Implementation follows the app's single-row-settings + admin-gated-API
 pattern:
@@ -103,9 +385,9 @@ pattern:
   `AVAILABLE_ONLY_SHOP_PRODUCT_STATUSES` (new export in `types/product.ts`) when the
   toggle is off, else the existing available+sold set.
 
-✅ **Migration applied + feature verified end-to-end (2026-07-03).** `supabase/shop-settings.sql`
+? **Migration applied + feature verified end-to-end (2026-07-03).** `supabase/shop-settings.sql`
 was run in Supabase. Verified live signed-in as admin: with the toggle ON `/shop`
-showed 59/59 (7 sold visible); toggling OFF (PUT → 200) dropped it to 52/52 with
+showed 59/59 (7 sold visible); toggling OFF (PUT ? 200) dropped it to 52/52 with
 `?status=sold` empty (the 7 sold hidden from results + total + facets); toggling back
 ON restored 59/59. The setting was **restored to `true`** (its default) after testing
 so production shows sold as before. `npm run build` passes, `tsc`/`eslint` clean. See
@@ -125,13 +407,13 @@ reservation machinery and correcting the docs:
   `apply_paypal_order_event`'s `denied` branch to not release a reservation.
   `supabase/paypal-checkout.sql` got a header pointing to it (that file still
   defines the reservation functions for a re-run, so no-reservation must be run
-  after it). **⚠️ Manual step: run `no-reservation-checkout.sql` in Supabase**
+  after it). **?? Manual step: run `no-reservation-checkout.sql` in Supabase**
   (after `paypal-checkout.sql`) — see the SQL-migrations section below.
 - **App copy:** the checkout subtitle no longer says "reserve the items" (now
   "check out the items"); a stale "double-reserve" comment was corrected.
 - Vestigial `reserved_until`/`reserved_order_id` columns are left in place (always
   null) to avoid a destructive schema change. The manual admin **Reserved** product
-  status is unrelated and unchanged.
+  status has since been removed from the active app (2026-07-06).
 
 **Verified:** `npx tsc --noEmit` clean and `npm run build` passes (app copy change
 only — no route/type change); the SQL is not exercisable from here (needs a Supabase
@@ -176,18 +458,18 @@ done; tracked in `TASKS.md`.
 
 Fixed the report "cancelled order items show available in admin but stay sold in
 the public gallery": order-flow product writes (cancel/reopen/mark-paid,
-delete-order return-to-inventory, create-order reserve, archive/hard-delete)
+delete-order return-to-inventory, create-order status updates, archive/hard-delete)
 happened via the browser Supabase client and never revalidated the `shop-catalog`
 tag, so the gallery stayed stale up to 5 min. All now call the new bulk
 `adminRevalidateProducts()` server action. Verified live on dev (signed-in):
-Mark Paid → bracelet left /shop in ~3s; Cancel → back in ~3s. Convention: any
+Mark Paid ? bracelet left /shop in ~3s; Cancel ? back in ~3s. Convention: any
 client-side `products` write must be followed by `adminRevalidateProduct(s)`.
 Note: the Test 7 leftover order `a565d7f4…` is now `cancelled` (used for this
 verification); the cleanup SQL below still applies.
 
 ## 2026-07-02 — PayPal approval-return hardening (reload/eviction resume)
 
-> ⚠️ **Superseded 2026-07-03.** The confirm-on-return screen and the
+> ?? **Superseded 2026-07-03.** The confirm-on-return screen and the
 > sessionStorage + `order-status` resume machinery described below were removed in
 > favor of capture-on-approve (see the 2026-07-03 entry above). The **stale-total
 > reuse fix** further down in this entry still stands. Kept as a record.
@@ -206,8 +488,8 @@ Details in `features/paypal-checkout.md` (Flow §4).
 **Verified:** `npx tsc --noEmit` clean; changed files eslint-clean (5 pre-existing
 errors elsewhere: `react-hooks/set-state-in-effect` in an admin editor,
 unused-vars in `OrderDetailPanel`/`ShopFilters`); `npm run build` passes with the
-route registered; endpoint probed live on dev :3002 (no param → 400; unknown
-order → `{state:'none'}`).
+route registered; endpoint probed live on dev :3002 (no param ? 400; unknown
+order ? `{state:'none'}`).
 **Test 7 (approved-branch resume) PASSED live** the same day: owner approved in
 the sandbox window, a full reload of /checkout restored the Confirm screen with
 the payer email re-fetched from PayPal and no console errors. The unfinished
@@ -221,10 +503,10 @@ draft and reuses only on an exact product-set + totals match, else cancels the
 stale order and falls through to a fresh one; the client also drops the reusable
 order id when the cart/shipping fingerprint (`payloadKey` in `nej-paypal-pending`)
 diverges. **Verified live signed-in on dev :3002:** resume 'none' branch clears the
-record on /checkout mount; create → order-status `pending`; same-payload retry
+record on /checkout mount; create ? order-status `pending`; same-payload retry
 reuses the order id; changed-shipping retry returns a fresh order id.
 
-⚠️ **Leftover test rows from this verification** (products were never reserved —
+?? **Leftover test rows from this verification** (products were never reserved —
 create no longer holds inventory before capture): orders
 `cc3c6996-6853-421d-ac13-91e3777b1b67` (cancelled) and
 `a565d7f4-7f49-4f56-adbb-b80593210409` (unpaid), both `payment_method='paypal'`,
@@ -236,21 +518,21 @@ DELETE FROM orders WHERE customer_email = 'resume-test@example.com';
 DELETE FROM orders WHERE id = '858bbf06-358a-4ba6-8a10-d3505521ca11';
 ```
 
-## 🔴 HANDOFF — PayPal checkout: where testing stands (2026-06-30)
+## ?? HANDOFF — PayPal checkout: where testing stands (2026-06-30)
 
 **The site is deployed and the checkout page renders, but PayPal checkout fails on the
 deployed site with "Something went wrong with PayPal. Please try again." Root cause
 identified — see the Netlify env-var fix below.** Code is complete and verified on the
 local dev server. Full technical runbook: `project-docs/features/paypal-checkout.md`.
 
-### 🚨 BLOCKER: Netlify has the wrong PayPal app credentials
+### ?? BLOCKER: Netlify has the wrong PayPal app credentials
 
 The deployed site serves `PAYPAL_CLIENT_ID = AcSsWn15M34eZNC-2OksAzaKof6Uj4dC6p-TgwSUVlr0AKKwvRcowHnFIJts92cKrA9qaL_73xtNhR5g`
 (extracted from live checkout HTML), but the verified working sandbox app in
 `next-app/.env.local` has `PAYPAL_CLIENT_ID = AbscNftOUogWVeuutMWwSWjnjtmqn5k3r9F3AXGl5PW27mR4Tx1xd-hzUHX5qbcvnZZtYF3mD_eo0eMm`.
 **These are different PayPal apps.** The server's `getAccessToken()` call (Basic
 auth with the Netlify-set id+secret) receives `401 invalid_client` from PayPal
-→ `createPayPalOrder` throws → route returns 502 → the client shows the error.
+? `createPayPalOrder` throws ? route returns 502 ? the client shows the error.
 
 **Fix (requires Netlify dashboard access):** Update all 4 PayPal env vars to the
 working sandbox set from `next-app/.env.local`, then trigger a redeploy:
@@ -259,9 +541,9 @@ working sandbox set from `next-app/.env.local`, then trigger a redeploy:
 - `PAYPAL_ENV` = `sandbox`
 - `PAYPAL_WEBHOOK_ID` = `64C82950G8312001A`
 
-⚠️ **All 4 must belong to the same PayPal app and environment.** Mixing id/secret
+?? **All 4 must belong to the same PayPal app and environment.** Mixing id/secret
 from different apps, or setting `PAYPAL_ENV=live` with sandbox creds (or vice versa),
-causes the same `401 → 502`. See DECISIONS (2026-06-30, PayPal credential-set rule).
+causes the same `401 ? 502`. See DECISIONS (2026-06-30, PayPal credential-set rule).
 
 **Diagnostic confirmation:** `reserve_paypal_order` RPC and all Supabase grants are
 confirmed working on the live DB (probe returned 502, not 503 — the RPC succeeded;
@@ -301,14 +583,14 @@ WHERE payment_method = 'paypal'
 ### Sandbox test matrix
 | # | Test | Status |
 |---|------|--------|
-| 1 | Successful payment | ✅ **PASSED live (local dev)** end-to-end (create → approve → capture → `paid`/`completed`, product `sold`, capture idempotent) — predates the no-reservation change; re-run recommended |
-| 5 | Concurrent-buyers race (no reservation) | ⬜ **NOT run** — new model (2026-07-03): two buyers both approve the same one-of-one, both capture; first wins (`sold`), second gets `item_conflict` → order flagged `failed` for manual refund + 409 message. Needs the `no-reservation-checkout.sql` migration + two sandbox approvals. (Replaces the old "reserve returns 409" test.) |
-| — | Validation/error paths + webhook signature gate | ✅ PASSED (empty cart, missing contact, bad ids → correct 400/404; unsigned webhook → 401) |
-| 3 | Failed/denied capture | ◐ Partial — graceful 502 + order stays unpaid on an unapproved capture is verified; the `PAYMENT.CAPTURE.DENIED` **webhook** branch is NOT live-tested (needs deploy) |
-| 6 | Amount mismatch | ◐ Logic verified (capture compares amount+currency → flags order `pending` + admin notification, no auto-sell); NOT forced live |
-| 2 | Canceled checkout | ⬜ NOT run live (onCancel handler exists) |
-| 4 | Duplicate webhook | ⬜ NOT run — needs deployed site + PayPal "Resend"/simulator (idempotency is coded via `webhook_events` unique `event_id`) |
-| 7 | Reload-during-approval resume | ⬜ **N/A — feature removed 2026-07-03.** The confirm-on-return screen + sessionStorage resume route were reverted in favor of capture-on-approve; there is no longer a client screen to restore across a reload. With no reservation, a tab evicted mid-capture just leaves the item available. |
+| 1 | Successful payment | ? **PASSED live (local dev)** end-to-end (create ? approve ? capture ? `paid`/`completed`, product `sold`, capture idempotent) — predates the no-reservation change; re-run recommended |
+| 5 | Concurrent-buyers race (no reservation) | ? **NOT run** — new model (2026-07-03): two buyers both approve the same one-of-one, both capture; first wins (`sold`), second gets `item_conflict` ? order flagged `failed` for manual refund + 409 message. Needs the `no-reservation-checkout.sql` migration + two sandbox approvals. (Replaces the old "reserve returns 409" test.) |
+| — | Validation/error paths + webhook signature gate | ? PASSED (empty cart, missing contact, bad ids ? correct 400/404; unsigned webhook ? 401) |
+| 3 | Failed/denied capture | ? Partial — graceful 502 + order stays unpaid on an unapproved capture is verified; the `PAYMENT.CAPTURE.DENIED` **webhook** branch is NOT live-tested (needs deploy) |
+| 6 | Amount mismatch | ? Logic verified (capture compares amount+currency ? flags order `pending` + admin notification, no auto-sell); NOT forced live |
+| 2 | Canceled checkout | ? NOT run live (onCancel handler exists) |
+| 4 | Duplicate webhook | ? NOT run — needs deployed site + PayPal "Resend"/simulator (idempotency is coded via `webhook_events` unique `event_id`) |
+| 7 | Reload-during-approval resume | ? **N/A — feature removed 2026-07-03.** The confirm-on-return screen + sessionStorage resume route were reverted in favor of capture-on-approve; there is no longer a client screen to restore across a reload. With no reservation, a tab evicted mid-capture just leaves the item available. |
 
 ### What's left to do, in order
 1. **Fix the Netlify credential mismatch** (see BLOCKER above): update the 4 PayPal vars in
@@ -316,9 +598,9 @@ WHERE payment_method = 'paypal'
    effect on a new deploy).
 2. ~~Re-run `supabase/paypal-checkout.sql`~~ Done -- owner confirmed re-run 2026-07-03;
    paid orders no longer post to the Messages center.
-3. **Register the sandbox webhook** in the PayPal Developer dashboard → URL `https://naplesestatejewelry.co/api/paypal/webhook`, events `PAYMENT.CAPTURE.COMPLETED/DENIED/REFUNDED/REVERSED` + `CUSTOMER.DISPUTE.CREATED`; confirm its id matches `PAYPAL_WEBHOOK_ID`.
+3. **Register the sandbox webhook** in the PayPal Developer dashboard ? URL `https://naplesestatejewelry.co/api/paypal/webhook`, events `PAYMENT.CAPTURE.COMPLETED/DENIED/REFUNDED/REVERSED` + `CUSTOMER.DISPUTE.CREATED`; confirm its id matches `PAYPAL_WEBHOOK_ID`.
 4. **Finish the sandbox tests on the deployed site:** Test 2 (cancel), Test 3 (denied capture — sandbox negative testing or the webhook simulator's DENIED event), Test 4 (duplicate webhook via "Resend"). Optionally force Test 6 by editing `orders.total` while the PayPal popup is open.
-5. **Only after sandbox passes → go LIVE:** create a Live PayPal app, swap in live client/secret/webhook id, set `PAYPAL_ENV=live`, redeploy, and run one real low-value order.
+5. **Only after sandbox passes ? go LIVE:** create a Live PayPal app, swap in live client/secret/webhook id, set `PAYPAL_ENV=live`, redeploy, and run one real low-value order.
 
 ### How to verify the fix without touching the UI
 After updating Netlify env vars and redeploying, run this probe — a working config
@@ -331,7 +613,7 @@ curl -s -i -X POST https://naplesestatejewelry.co/api/paypal/create-order \
 A 200 with `paypalOrderId` = credentials are correct. A 502 = still wrong credentials.
 
 ### How to verify/clean during testing
-- Test orders/reservations were created and cleaned up via the Supabase service role (PostgREST). To inspect: query `orders` (filter `payment_method=eq.paypal`) and `products` (`status=eq.reserved`). To clean a test order: set its product(s) back to `status='available'` (+ null `reserved_until`/`reserved_order_id`) and delete the order (order_items cascade).
+- Test orders/reservations were created and cleaned up via the Supabase service role (PostgREST). To inspect old tests: query `orders` (filter `payment_method=eq.paypal`) and products linked through `order_items`. To clean a test order: set its unpaid product(s) back to `status='available'` (+ null `reserved_until`/`reserved_order_id` if present) and delete the order (order_items cascade).
 - A successful sandbox payment marks a REAL product `sold` and creates a real order — revert it after testing unless you want to keep an example.
 
 ## Supabase SQL migrations -- all applied (confirmed by owner 2026-07-03)
@@ -347,7 +629,7 @@ All previously pending migrations have been run in the live Supabase project
 - `supabase/product-item-year.sql` and the `admin-notifications-checkout.sql` re-run
 - `supabase/shop-new-listing-jpg-to-webp.sql`
 
-⚠️ **One SQL migration is outstanding as of 2026-07-03:**
+?? **One SQL migration is outstanding as of 2026-07-03:**
 `supabase/no-reservation-checkout.sql` — the no-reservation checkout model. An
 earlier copy of it **is confirmed applied on the live DB**: a 2026-07-03 attempt to
 re-run `paypal-checkout.sql` failed with `42P13: cannot change return type of
@@ -390,13 +672,13 @@ rendering, ES notes, item-year persistence) is tracked separately in `TASKS.md`.
   sold, and resolves the concurrent-buyer race so the first payment wins), and a
   signed idempotent webhook reconciles capture/denied/refund. On return the buyer
   lands directly on the "Order Received" confirmation — no confirm-on-return step.
-  Sold items leave the shop gallery promptly; paid orders surface as a badge on the
-  admin **Orders** tab (not Messages); the order detail page + invoice show the
+  Sold items leave the shop gallery promptly; new/unseen active orders surface as a
+  badge on the admin **Orders** tab (not Messages); the order detail page + invoice show the
   shipping address. **Pending go-live steps** (run `no-reservation-checkout.sql`, set
   Netlify env, register webhook, run sandbox test matrix) — see the HANDOFF section
   above and TASKS.
 - **Admin Orders** (`/admin/orders`, `/admin/orders/[id]`) with create/manage,
-  delete (with optional return-to-inventory), and the new Orders-tab badge.
+  delete (with optional return-to-inventory), and an unseen active-orders nav badge.
 - **Live metal pricing** via
   `next-app/src/app/api/metal-prices/route.ts`,
   `next-app/src/lib/spot-price.ts`, and `next-app/src/lib/pricing.ts`.
@@ -418,7 +700,7 @@ rendering, ES notes, item-year persistence) is tracked separately in `TASKS.md`.
 
 - **2026-07-02 (later):** Shop-gallery cache now purged after every admin
   order-flow product write (cancel/reopen/mark-paid, delete-order
-  return-to-inventory, create-order reserve, archive/hard-delete) via the new
+  return-to-inventory, create-order status updates, archive/hard-delete) via the new
   `adminRevalidateProducts()` action — fixes items staying "sold" in the public
   gallery after being returned to available in admin.
 - **2026-07-02:** PayPal checkout hardened against mobile tab eviction during
@@ -439,7 +721,7 @@ rendering, ES notes, item-year persistence) is tracked separately in `TASKS.md`.
   inquiries/messages/orders, added the "Message Us Directly" contact form,
   bilingual product notes, a full Spanish orthography sweep, create-account
   duplicate-email handling, and a shop gallery/list view toggle.
-- **2026-06-13 → 2026-06-24:** The legacy static HTML site was fully removed
+- **2026-06-13 ? 2026-06-24:** The legacy static HTML site was fully removed
   and the Next.js/Supabase app (`next-app/`) became the sole deploy target;
   sales workflow (orders/invoices/lifecycle statuses), the AI listing
   assistant, compliance/legal pages, and a broad shop/responsive/performance
@@ -447,7 +729,7 @@ rendering, ES notes, item-year persistence) is tracked separately in `TASKS.md`.
 
 ## Current Priorities
 
-1. **Bring PayPal checkout live** — see the 🔴 HANDOFF section above for the
+1. **Bring PayPal checkout live** — see the ?? HANDOFF section above for the
    exact blocker (Netlify credential mismatch) and ordered steps. This is the
    top priority; everything else in `TASKS.md` Backlog is secondary to it.
 2. ~~Apply the pending Supabase SQL migrations~~ Done -- all confirmed applied
@@ -464,7 +746,7 @@ rendering, ES notes, item-year persistence) is tracked separately in `TASKS.md`.
 
 - **PayPal checkout cannot process real payments on the deployed site** until
   the Netlify PayPal env vars are corrected to match the verified sandbox
-  credentials — see the 🔴 HANDOFF section above.
+  credentials — see the ?? HANDOFF section above.
 - No CI beyond Netlify's `npm run build` on deploy.
 
 ## Verification

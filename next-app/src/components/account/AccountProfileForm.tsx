@@ -110,7 +110,10 @@ export default function AccountProfileForm({
       first_name: form.first_name.trim() || null,
       last_name: form.last_name.trim() || null,
       full_name: form.full_name.trim() || null,
-      email: form.email.trim() || null,
+      // email is intentionally NOT written here — it is the account email, set at
+      // signup from auth.users and shown read-only below. Letting the browser write
+      // it allowed setting an arbitrary (e.g. someone else's) address on this row,
+      // which the marketing audience keys on. (audit M3)
       phone: form.phone.trim() || null,
       alternate_phone: form.alternate_phone.trim() || null,
       address_line1: form.address_line1.trim() || null,
@@ -217,7 +220,20 @@ export default function AccountProfileForm({
         </label>
         <label>
           <span className="form-label">{isEs ? 'Correo de contacto' : 'Contact Email'}</span>
-          <input className={inputStyle} type="email" autoComplete="email" value={form.email} onChange={(e) => updateField('email', e.target.value)} />
+          <input
+            className={inputStyle}
+            type="email"
+            autoComplete="email"
+            value={form.email}
+            readOnly
+            aria-readonly="true"
+            style={{ opacity: 0.7, cursor: 'not-allowed' }}
+          />
+          <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+            {isEs
+              ? 'Vinculado a tu cuenta. Para cambiarlo, actualiza el correo de tu cuenta.'
+              : 'Tied to your account. To change it, update your account email.'}
+          </span>
         </label>
         <label>
           <span className="form-label">{isEs ? 'Teléfono' : 'Phone'}</span>

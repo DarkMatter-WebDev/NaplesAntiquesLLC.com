@@ -5,6 +5,7 @@ import CartDrawer from '@/components/cart/CartDrawer';
 import { productImagePaddingForImage, type Product, type ProductStatus } from '@/types/product';
 import { createClient } from '@/lib/supabase/client';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
+import { normalizeManualPriceLabel } from '@/lib/pricing';
 
 export interface CartItem {
   id: string;
@@ -54,7 +55,11 @@ const CartContext = createContext<CartContextValue | null>(null);
 const LS_KEY = 'nej-cart';
 
 function normalizeCartItem(item: CartItem): CartItem {
-  return { ...item, image: normalizeLegacyLocalImageUrl(item.image) };
+  return {
+    ...item,
+    image: normalizeLegacyLocalImageUrl(item.image),
+    priceLabel: normalizeManualPriceLabel(item.priceLabel) ?? item.priceLabel,
+  };
 }
 
 function loadFromStorage(): CartItem[] {

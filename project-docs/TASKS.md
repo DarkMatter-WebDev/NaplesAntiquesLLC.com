@@ -5,6 +5,50 @@
 
 ## Backlog
 
+> **Standing note (owner, 2026-07-05):** all working env is in **Netlify** (PayPal
+> sandbox, AI assistant, service role, webhook secrets, etc.). `next-app/.env.local`
+> is **stale — do not rely on it** for credentials. Remaining testing is done **live
+> after deployment**, and the **owner owns that testing** (don't attempt live
+> PayPal/AI/email tests from here). This likely clears the old PayPal "Netlify has the
+> wrong credentials" blocker — confirm on the next deploy.
+
+- **Verify live invoice row creation on deliberate test orders.** Code now creates
+  invoices idempotently at order creation and can recover missing legacy invoices from
+  order detail. Next deliberate tests: on the paid test order `NEJ-20260704-VPBG0`,
+  click **Generate Invoice** and confirm an invoice row appears/link opens; create one
+  new manual admin order and confirm it gets a draft invoice automatically; run one
+  PayPal sandbox order after deploy and confirm create-order makes a draft invoice and
+  capture upgrades it to `paid`.
+- **Verify the explicit order-detail inventory restore controls while signed in.**
+  The code is build-verified, but browser UI verification redirected to sign-in in this
+  session. On a deliberate test order, confirm **Restore item to inventory** marks linked
+  product rows `available` without changing order/payment state; then test Delete Order
+  -> **Yes, Move to Recycle Bin** leaves inventory alone, while **Move to Recycle Bin and
+  return to inventory** marks linked products `available` before soft-delete.
+- **Verify Orders Recycle Bin behavior post-migration.** `supabase/orders-recycle-bin.sql`
+  is applied (owner screenshot 2026-07-05; verify query returned `deleted_at` /
+  `timestamp with time zone`) and `/admin/orders` + `/admin/orders?view=trash` now
+  return 200 with no migration notice. Next deliberate test: delete an unpaid test
+  order from `/admin/orders` → it disappears from active Orders and appears in
+  `/admin/orders?view=trash`; Restore returns it to active Orders without changing
+  product inventory statuses; Delete Forever permanently removes it after confirmation.
+  Also re-test a paid order with "Return its products to Available inventory" checked:
+  the modal should close before the warning appears.
+- **Verify the guest checkout → PayPal → printable confirmation round-trip live.** The
+  post-payment "Order Received" screen now has a **View & Print Order Details** button
+  (guest) / **View Order Details** (signed in) that reveals a printable receipt with a
+  Print button. Built + build-verified, but the full round-trip needs a **PayPal
+  sandbox buyer login** (not available in this environment). Run one sandbox order as a
+  guest, click View & Print, and confirm the receipt shows the right items/totals/
+  contact and prints cleanly (header/footer/buttons hidden). *(The guest sign-in gate
+  before checkout is already verified live — see CHANGELOG.)*
+- **Verify the admin Reopen Order button click live.** The 6% / out-of-state tax on the
+  admin Create-Order form is now **verified live** (FL → 6%, CA → $0). The **Reopen
+  Order** button on `OrderDetailPanel` is verified to render conditionally (absent on
+  open orders); its click wasn't exercised because there were **no cancelled orders** to
+  test on. Next time: cancel any order → the Reopen button should appear → click it →
+  order returns to `open`/`pending` and unpaid products to `pending_payment` (leaving
+  the public gallery again).
 - **Bring PayPal checkout live (sandbox → production).** Canonical, up-to-date
   status/steps live in the **🔴 HANDOFF — PayPal checkout** section at the top
   of `CURRENT_STATUS.md` — read that first, not this file, for the current
@@ -119,23 +163,29 @@
      (~882 KB), and regenerate the brand `logo.webp` source (491 KB) smaller.
   5. Consider self-hosting/subsetting the Material Symbols icon glyphs
      actually used (~12) to drop the third-party render-blocking font
-     stylesheet entirely and clear the `google-font-display` lint warning.
+     stylesheet entirely. (The `google-font-display` lint warning it used to
+     cause is already resolved — a scoped suppression on the `<link>` explains
+     that `display=block` is intentional for an icon font; this item is now a
+     pure perf optimization, no longer a lint fix.)
+  6. **Done 2026-07-05:** product-detail double DB query deduped via `React.cache`
+     on `fetchPublicProduct` (generateMetadata + page now share one query).
 - Migrate the remaining legacy local-only product photos to Supabase Storage
   so product image bytes live consistently outside the app bundle. Current
   audit: 19 local-only products plus 1 mixed product still reference local
   `/assets/...` product images, now as optimized WebP paths where applicable.
-- Confirm `chris@naplesestatejewelry.co` is a real receiving mailbox or
-  alias, and confirm Resend allows sending from that address/domain.
-  Optionally set `MARKETING_CHRIS_FROM`, `MARKETING_CHRIS_REPLY_TO`, and
-  `MARKETING_NOREPLY_FROM` in deployment if the default sender labels should
-  differ.
+- `chris@naplesestatejewelry.co` is confirmed a real mailbox (owner, 2026-07-05).
+  Still worth confirming **Resend allows sending FROM** that address/domain (SPF/DKIM
+  verified in Resend) if any mail is sent from it. Optionally set `MARKETING_CHRIS_FROM`,
+  `MARKETING_CHRIS_REPLY_TO`, and `MARKETING_NOREPLY_FROM` if the default sender labels
+  should differ.
 - Have business owner/counsel review the new Privacy Policy, Terms of
   Service, Returns & Refunds, Shipping Policy, Auction Terms, Vendor Terms,
   and Accessibility Statement before relying on them in production.
-- Configure AI assistant environment variables before using live generation:
-  `AI_PROVIDER`, `AI_MODEL`, the matching provider API key or local endpoint,
-  and optional controls such as `AI_MODEL_FAST`, `AI_MAX_IMAGES`,
-  `AI_RATE_LIMIT_HOURLY`, and `AI_RATE_LIMIT_DAILY`.
+- AI assistant environment variables are set in Netlify (owner, 2026-07-05:
+  "all working env in Netlify … includes sandbox, ai assistant, etc."). Verify live
+  generation works after deploy. Vars: `AI_PROVIDER`, `AI_MODEL`, the provider API key
+  / local endpoint, and optional `AI_MODEL_FAST`, `AI_MAX_IMAGES`, `AI_RATE_LIMIT_HOURLY`,
+  `AI_RATE_LIMIT_DAILY`.
 - Correct the current duplicate live inventory `#21` product row if it's
   still present (flagged 2026-06-15).
 - Verify Supabase **Auth → URL configuration** redirect URLs include
@@ -170,6 +220,67 @@
 > start) — this section is intentionally just a short pointer, not a mirror
 > of it.
 
+- **2026-07-06:** Removed the admin product form's **Asking Price** input from New Item
+  and Edit Item. Manual fixed pricing now uses **Price Label** as the visible source of
+  truth; quick-fill/AI asking-price values fold into `manual_price_label`, product
+  saves clear `asking_price`, bare numeric labels normalize centrally (`1` -> `$1`),
+  cart/checkout/order snapshots parse the same helper, and New Item has a **Quick add**
+  checkbox for title + fixed-price listings without spot-pricing requirements. `npm run
+  lint` and `npm run build` pass.
+- **2026-07-06:** Removed the manual **Reserved** product status from Product Admin:
+  no Reserved metric card, status option, row action, or quick-fill token. Legacy stored
+  `reserved` values normalize to `available`, and docs/AI prompt/current SQL constraint
+  were updated to the active status lifecycle. `npm run lint`, `npm run build`, and
+  browser preview verification passed.
+- **2026-07-06:** Changed the admin **Orders** nav badge to count unseen active orders,
+  not paid/pending-fulfillment orders. It ignores Recycle Bin rows and clears when the
+  active Orders area or an order detail page is viewed. `npm run lint`, `npm run build`,
+  and browser preview verification passed.
+- **2026-07-05 (invoice generation):** Added idempotent invoice generation for PayPal
+  create-order, paid capture, and manual admin order creation; added
+  `POST /api/admin/orders/[id]/invoice`; and added the order-detail **Generate Invoice /
+  Refresh Invoice** recovery button for older orders with no invoice row. Lint/tsc/build
+  clean; preview confirmed the missing-invoice paid test order shows the new button.
+- **2026-07-05 (admin order print preview):** Added a direct **Print Order** action on
+  order detail, backed by `/admin/orders/[id]/print`, with an admin-authenticated
+  paper-style preview window and a Print toolbar button. Lint/tsc/build clean; browser
+  preview confirmed the route opens and layout chrome is hidden from the preview.
+- **2026-07-05 (admin inventory restore override):** Added **Restore item to inventory**
+  on order detail, changed delete confirmation to include **Move to Recycle Bin and
+  return to inventory**, and allowed paid/completed orders through the soft-delete path.
+  Lint/tsc/build clean; UI click verification remains in Backlog because admin preview
+  redirected to sign-in.
+- **2026-07-05 (orders recycle bin):** Added soft-delete Orders Recycle Bin UI and SQL
+  migration, switched list/detail deletes to `orders.deleted_at`, and fixed the paid
+  return-to-inventory warning so it is no longer shown behind the modal overlay. Code
+  is lint/tsc/build clean; owner applied the SQL and non-destructive route verification
+  passed. Behavior verification with a deliberate test order remains in Backlog.
+- **2026-07-05:** Fixed two shop bugs + a batch of UX-friction items from the UX
+  walkthrough. Bugs: (1) product soft-404 (unknown `/shop/[id]` now returns a real
+  404 via a `shop/(list)/` route group that scopes the loading boundary off `[id]`
+  + an early `notFound()` in product `generateMetadata`); (2) sold product pages no
+  longer show "This is your price" and now keep an Inquire/Call CTA. UX friction:
+  free-evaluation photos now optional (photo-or-description guard); sign-in shows
+  friendly localized errors; saved-items drawer shows the live computed price;
+  ES nav "Tienda/Tienda" → "Tienda ▸ Catálogo"; cart/checkout item pluralization;
+  and (follow-up) the account auth pages (sign-in/sign-up/reset-password) are now
+  fully localized for /es. A final full EN+ES walkthrough passed with no console
+  errors. Build/tsc clean. See `CHANGELOG.md` 2026-07-05.
+- **2026-07-05 (later):** FL sales tax no longer charged on out-of-state shipments
+  (owner decision) — fixed in `checkout-pricing.ts` (authoritative), threaded through
+  `/api/paypal/create-order` and the checkout page's live estimate, plus the admin
+  manual-order form. Added an Add to Cart button to the Saved Items drawer, and fixed
+  a real crash bug found while verifying it (provider nesting had `WishlistDrawer`
+  outside the `CartContext` tree). See `CHANGELOG.md` 2026-07-05 (later) entries.
+- **2026-07-05 (final batch):** FL tax standardized to **6% everywhere** (centralized
+  `FL_TAX_RATE`); admin **Reopen Order** button added; **lint driven to 0 problems**
+  (was 12); product-page double query deduped via `React.cache`. See `CHANGELOG.md`
+  2026-07-05 (final batch).
+- **2026-07-05 (checkout UX):** Signed-out shoppers now get a **Log In / Create Account
+  / Continue as Guest** gate when they click Proceed to Checkout (verified live); the
+  post-PayPal confirmation gained a **View & Print Order Details** printable receipt for
+  guests (build-verified; live round-trip needs a PayPal sandbox buyer). Admin
+  out-of-state/6% tax verified live. See `CHANGELOG.md` 2026-07-05 (checkout UX).
 - **2026-07-02:** PayPal checkout hardened (reload/eviction resume, stale-total
   retry fix) + shop-gallery cache now purged after every admin order-flow
   product write. See `CHANGELOG.md` 2026-07-02 entries.

@@ -53,7 +53,7 @@ export default async function TermsPage({ params }: Props) {
         {
           title: 'Orders, Pricing, and Payments',
           body: [
-            'Product availability, descriptions, metal prices, and pricing may change. Estate jewelry and antiques are usually one-of-a-kind and may sell, be reserved, or become unavailable. Submitting checkout information creates an order request or inventory hold; it does not guarantee final sale until payment, identity, availability, and fulfillment details are confirmed.',
+            'Product availability, descriptions, metal prices, and pricing may change. Estate jewelry and antiques are usually one-of-a-kind and may sell or become unavailable. Submitting checkout information creates an order request; it does not guarantee final sale until payment, identity, availability, and fulfillment details are confirmed.',
             'If online payments are enabled, payment processing may be provided by a third-party payment processor. You agree to provide accurate payment information and authorize applicable charges for confirmed purchases.',
           ],
         },

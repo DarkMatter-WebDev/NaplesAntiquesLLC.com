@@ -1,14 +1,19 @@
 import type { Metadata } from 'next';
+import { alternatesFor } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 
-export const metadata: Metadata = {
-  title: 'Estate Jewelry Evaluation | Naples Estate Jewelry',
-  description:
-    'Private estate jewelry evaluations in Naples, FL. Onsite acid testing, XRF analysis, and GIA coordination. Immediate payment upon agreement.',
-};
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  return {
+    title: 'Estate Jewelry Buyer in Naples, FL',
+    description:
+      'Private estate jewelry evaluations in Naples, FL. Onsite acid testing, XRF analysis, and GIA coordination. Immediate payment upon agreement.',
+    alternates: alternatesFor('/estate-jewelry', locale),
+  };
+}
 
 interface Props {
   params: Promise<{ locale: string }>;

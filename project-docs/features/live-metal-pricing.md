@@ -1,7 +1,7 @@
 # Feature: Live Metal Pricing
 
 > Current pricing flow for gold/silver spot-backed products. Last updated:
-> **2026-06-20**.
+> **2026-07-06**.
 
 ## Summary
 
@@ -46,7 +46,8 @@ Pricing inputs live on Supabase `products` rows:
 - `weight_grams` / `gram_weight` - product weight used for melt value.
 - `price_mode` - `spot-multiplier` or `manual`.
 - `pricing_multiplier` - multiplier over melt for spot-priced items.
-- `manual_price_label` / `asking_price` - fixed/manual display values.
+- `manual_price_label` - fixed/manual display value; `asking_price` is legacy DB
+  fallback only and is cleared by current admin product saves.
 
 ## Pricing Logic
 
@@ -61,7 +62,10 @@ displayPrice = meltValue * pricingMultiplier
 checkout, and admin surfaces stay consistent.
 
 Manual-priced products skip the live multiplier math and display the saved
-manual price label/asking price.
+manual price label. Bare numeric labels are normalized by the shared helper
+(`1` -> `$1`, `1200` -> `$1,200`), and the same parser is used by cart,
+checkout, and order snapshot pricing so fixed-price items do not fall back to
+dash totals when entered as a plain number.
 
 ## Source And Fallback
 

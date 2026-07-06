@@ -1,10 +1,449 @@
 # Changelog
 
+## 2026-07-06 (admin products) - Manual Reserved status removed
+
+- Removed the manual **Reserved** product status from the active admin app:
+  no top-of-table Reserved count, no status dropdown option, no row **Reserve** action,
+  and no quick-fill status token.
+- Legacy database values of `reserved` now normalize to `available` in the app layer
+  so old rows do not keep a hidden reservable state alive.
+- Updated the AI listing prompt, current architecture/shop/PayPal docs, and the pending
+  security-hardening status constraint so the current lifecycle is `draft`,
+  `available`, `pending_payment`, `sold`, and `archived`.
+- No destructive Supabase cleanup was run; vestigial reservation columns/functions in
+  old migration history remain a separate confirmed database cleanup if desired.
+- Verification: `npm run lint` and `npm run build` pass from `next-app/`; browser
+  preview confirmed Product Admin shows Total/Available/Sold only, the row action menu
+  does not include Reserve, and the New Item status dropdown excludes Reserved.
+
+## 2026-07-06 (admin orders) - Orders badge tracks unseen active orders
+
+- Changed `AdminOrdersLink` from a paid/pending-fulfillment count to a
+  notification-style unseen-order count.
+- The badge now counts only active orders (`orders.deleted_at is null`) created after
+  the current admin/browser last viewed the active Orders area.
+- Visiting active `/admin/orders` or an order detail page stores the last-seen timestamp
+  and clears the badge immediately; visiting the Recycle Bin does not make trashed
+  orders count as new.
+- Verification: `npm run lint` and `npm run build` pass from `next-app/`; browser
+  preview confirmed the old **Orders 8** badge clears on `/admin/orders` and remains
+  cleared on `/admin`.
+
+## 2026-07-06 (admin products) - Manual pricing consolidated into Price Label
+
+- Removed the **Asking Price** field from the shared New Item/Edit Item product form.
+  Manual fixed pricing now relies on the existing **Price Label** field.
+- Folded old asking-price flows into the label path: quick-fill accepts "price",
+  "manual price", "price label", and legacy "asking price" aliases as Price Label;
+  AI `asking_price` values are formatted into `manual_price_label`; product saves clear
+  `asking_price` to `null` so hidden stale values cannot override the visible label.
+- Added shared manual-price parsing/normalization: bare numeric entries like `1` and
+  `1200` now become `$1` and `$1,200`, and the same parser is used by shop display,
+  cart totals, checkout totals, and order snapshot pricing.
+- Added a **Quick add** checkbox on New Item. It switches the listing to manual fixed
+  pricing and bypasses the spot-pricing gates (purity/weight/multiplier), while still
+  requiring the basic title, inventory number, and price label needed for a sellable
+  product.
+- Checkout now treats unparseable cart price labels as stale product info and hydrates
+  the current product row; if the product is manual-priced, it uses the normalized live
+  `manual_price_label` instead of leaving the checkout subtotal as `-`.
+- Checkout snapshot pricing now uses `manual_price_label` first for manual-price items,
+  retaining `asking_price` only as a legacy fallback for old rows missing a label.
+- Verification: `npm run lint` and `npm run build` pass from `next-app/`.
+
+## 2026-07-05 (admin order inventory restore) - Explicit inventory return controls
+
+- Added a **Restore item to inventory** button on `/admin/orders/[id]`. It marks the
+  order's linked product rows `available` without changing the order status or payment
+  record, so admins can intentionally re-list inventory even when an order is already
+  paid/completed.
+- Changed order-detail delete confirmation into two explicit paths: **Yes, Move to
+  Recycle Bin** soft-deletes only the order record; **Move to Recycle Bin and return to
+  inventory** first marks the linked products `available`, then soft-deletes the order.
+  Paid orders are no longer blocked from the Recycle Bin flow.
+- Verification: `npm run lint`, `npx tsc --noEmit`, and `npm run build` pass. Browser
+  UI verification was blocked by the in-app browser redirecting to sign-in for admin;
+  the code path and build are verified.
+
+## 2026-07-05 (admin order print preview) - Direct print from order detail
+
+- Added a **Print Order** action to `/admin/orders/[id]`. It opens a dedicated
+  `/admin/orders/[id]/print` preview window/tab instead of sending straight to the
+  browser print dialog.
+- Added the admin-authenticated print preview route with a paper-style order detail:
+  order number/invoice number, created/printed dates, payment/fulfillment/order status,
+  customer/contact details, shipping/billing addresses, item snapshots, discounts,
+  totals/refund amount, customer notes, and internal notes.
+- The preview toolbar has **Close Preview**, **Back to Order**, and **Print**. Print
+  CSS hides the toolbar and shared layout chrome so only the paper preview prints.
+- Verification: `npm run lint`, `npx tsc --noEmit`, and `npm run build` all pass.
+  Browser preview confirmed `Print Order` opens
+  `/admin/orders/31cfb202-fe5e-41db-8264-a9dfa32c62fd/print`, shows the printable order
+  paper and Print button, and hides cookie/cart/wishlist chrome from the preview.
+
+## 2026-07-05 (invoice generation) - Draft invoices at order creation + admin recovery button
+
+- Added a shared server helper, `upsertOrderInvoice`, so order-linked invoice rows are
+  generated idempotently from the order header/totals instead of being duplicated across
+  payment/admin paths.
+- New PayPal checkout orders now create a draft invoice row during
+  `/api/paypal/create-order`; the paid capture finalization path reuses the same helper
+  and upgrades the invoice to `paid` when payment succeeds.
+- New manual admin orders now call the admin invoice endpoint after order creation, so
+  admin-created orders get a draft invoice record without a separate follow-up step.
+- Added `POST /api/admin/orders/[id]/invoice` and an order-detail **Generate Invoice /
+  Refresh Invoice** button. This covers older/test orders that were created before the
+  auto-generation fix and currently show "No invoice generated yet."
+- Verification: `npm run lint`, `npx tsc --noEmit`, and `npm run build` all pass.
+  Browser preview on `http://localhost:3002/admin/orders/31cfb202-fe5e-41db-8264-a9dfa32c62fd`
+  confirmed the missing-invoice paid test order now exposes **Generate Invoice**. The
+  button was not clicked because it writes to the live database.
+
 > Track meaningful changes. Newest at the top. One dated section per day of work;
 > bullet the notable changes. Keep entries short.
 
+## 2026-07-05 (orders recycle bin) — Soft-delete admin orders + modal warning fix
+
+- Added an Orders Recycle Bin on `/admin/orders?view=trash`. Active order deletes now
+  set `orders.deleted_at` instead of hard-deleting; the bin can restore an order record
+  or permanently delete it after a browser confirmation. Restoring does **not** change
+  product inventory statuses automatically.
+- Added `supabase/orders-recycle-bin.sql` (idempotent) to add `orders.deleted_at` plus
+  active/trash indexes. Until it is run, the admin Orders page shows a clear migration
+  notice and blocks recycle-bin delete/restore actions.
+- Fixed the paid-order "return to inventory" warning from the Orders list modal: the
+  delete dialog now closes before the warning is shown, so it no longer appears behind
+  the grayed overlay.
+- Verification: `npm run lint`, `npx tsc --noEmit`, and `npm run build` all pass.
+  Browser preview verified `/admin/orders` and `/admin/orders?view=trash` render the
+  Recycle Bin entry point, pending-SQL notice, empty trash view, and Back to Orders link.
+- Follow-up: owner ran `supabase/orders-recycle-bin.sql`; the Supabase verify query
+  returned `deleted_at` / `timestamp with time zone`, and HTTP checks now show
+  `/admin/orders` + `/admin/orders?view=trash` return 200 with the migration notice gone.
+
+## 2026-07-05 (checkout UX) — Guest checkout gate + printable order confirmation
+
+Two owner-requested checkout features (tsc/lint/build clean; guest gate verified live;
+admin tax + order-detail render verified live signed in as admin):
+
+- **Sign-in / guest gate before checkout.** "Proceed to Checkout" in the cart drawer is
+  now a button (was a direct link). Signed-in shoppers still go straight to `/checkout`;
+  **signed-out** shoppers get a modal (`CheckoutGate` in `CartDrawer.tsx`) offering
+  **Log In** (→ `/account/sign-in?next=/checkout`), **Create Account** (→ `/account/sign-up`),
+  or **Continue as Guest** (→ `/checkout`). Auth is resolved via a cookie-session
+  `getUser()` check when the drawer opens (with an on-click fallback). **Verified live:**
+  signed-in → straight to checkout (gate skipped); signed-out → gate shows all three
+  options; Guest → `/checkout`; Log In → sign-in with the `?next` back to checkout.
+- **Printable order confirmation.** The post-PayPal "Order Received" screen
+  (`CheckoutClient.tsx`) keeps everything it showed before and adds a **View Order
+  Details** button (guests: **View & Print Order Details**). It reveals a complete,
+  printable receipt — business header + order number, the full item list & totals
+  (reusing `OrderSummary` read-only, so tax/shipping match exactly), and the
+  contact/ship-to block — plus a **Print** button (`window.print()`). The order is
+  snapshotted client-side at capture success **before** the cart is cleared, so a guest
+  (no account to look it up later) can still print. Print CSS hides the header/footer/
+  buttons (`@media print { header, footer, .no-print { display:none } }`).
+  **Verified by build + code review;** the live PayPal→confirmation→print round-trip
+  needs a sandbox buyer login (owner to run — I have the app creds but not a PayPal
+  sandbox *buyer* account).
+- **Also verified live this session (were build-only before):** admin manual-order tax
+  on the Create-Order form — FL+shipping → **6%** ($368.07 on a ~$6,135 piece), non-FL
+  → **$0** (checked without saving); and the **Reopen Order** button renders
+  conditionally (correctly *absent* on an open order — no cancelled orders exist to
+  exercise the click, which the owner can confirm by cancelling any order).
+
+## 2026-07-05 (final batch) — Tax → 6%, Reopen-order button, lint to zero, product-page query dedup
+
+Owner-directed batch (all `tsc`/`lint`/`build` clean; customer-facing bits verified live
+on dev; admin bits verified by build only — see notes):
+
+- **FL sales tax is now 6% everywhere when taxable** (was 7% checkout / 6.5% admin —
+  they had drifted). Centralized the rate: `FL_TAX_RATE` (+ new `FL_TAX_RATE_LABEL`)
+  in `lib/checkout-pricing.ts` is now the **single source of truth**, imported by
+  `CartDrawer`, `OrderSummary`, and admin `OrdersPanel` (each had its own copy). The
+  out-of-state exemption from earlier today still applies. **Verified live:** cart
+  "FL Sales Tax (6%) $52"; checkout FL+overnight → 6% $52 / total $998; CA → "FL Sales
+  Tax $0" / total $946. (Existing orders keep their originally-charged rate — the admin
+  order-edit recalculation derives the rate from the stored order, not the constant.)
+- **Admin "Reopen Order" button** added to `OrderDetailPanel` — appears only when an
+  order is `cancelled`, calls the restored `reopenOrder()` (sets status `open` /
+  fulfillment `pending`; returns unpaid products to `pending_payment` with a shop-cache
+  revalidation; leaves paid products `sold` for review). Mirrors the wired
+  cancel/delete pattern. **Build-verified only** — admin surface needs an owner login
+  to exercise live.
+- **Lint is now at ZERO problems** (was 12 at session start). Fixed the 5
+  `react-hooks/set-state-in-effect` errors: sign-in's `nextUrl` became a `useRef`
+  (it's only read on submit, never rendered — a real fix, no re-render); the other 4
+  (AccountDashboard ×2, AdminHeader, AdminShell) are **intentional** hydration-safe /
+  derived-state patterns the code already documents, so each got a scoped
+  `eslint-disable-next-line` **with a reason** rather than a "fix" that would reintroduce
+  a hydration mismatch. The `google-font-display` warning was folded into the existing
+  suppression on the Material Symbols `<link>` (block is intentional for an icon font).
+- **Perf: product-page query dedup.** `fetchPublicProduct` in `shop/[id]/page.tsx` is
+  now wrapped in `React.cache`, so `generateMetadata()` and the page component share one
+  DB query per request instead of two (the second query was introduced earlier today by
+  the 404 `notFound()` in `generateMetadata`). Verified the product page still renders.
+- **Not done, deliberately (need verification the owner reserved for live/prod):** the
+  bigger shop-perf refactors — DB-side pagination/faceting, making bare `/shop`
+  static/ISR, server-rendering `ProductCard` — and re-encoding the oversized `/public`
+  images (visual quality check). Shipping those blind to a near-live store is the wrong
+  call; left in TASKS as a focused follow-up.
+- **Env note (owner):** all working env is set in **Netlify** (PayPal sandbox, AI
+  assistant, service role, webhook secrets, etc.); `next-app/.env.local` is **stale** and
+  must not be relied on. Only final testing remains, done **live after deployment** — the
+  owner owns that testing. `chris@naplesestatejewelry.co` confirmed a real mailbox.
+
+## 2026-07-05 (later still) — Lint cleanup: cleared the 6 dead-code / stale-directive warnings
+
+Cleared the 6 pre-existing lint warnings that were pure code hygiene (tsc + build stay
+clean; verified `/shop` filters still work live with no console errors):
+- `OrderDetailPanel.tsx`: dropped the unused `setInvoices` setter (`invoices` is
+  read-only) and **removed the unused `reopenOrder()` function** — a fully-implemented
+  "reopen a cancelled order" admin action that was never wired to any button (its
+  sibling cancel/delete actions are wired; reopen wasn't). Also removed a stale
+  `eslint-disable jsx-a11y/no-autofocus` directive that no longer suppressed anything.
+- `PrintInvoiceClient.tsx`: removed a stale `eslint-disable react/no-danger` directive.
+- `ShopFilters.tsx`: removed the unused `hasDrawerFilters` computed value.
+- `lib/seo.ts`: inlined the runtime `LOCALES` const into the `AppLocale` type
+  (`'en' | 'es'`) since it was only ever consumed by `typeof`.
+
+**Left as a tracked follow-up (see TASKS):** the 5 `react-hooks/set-state-in-effect`
+**errors** (sign-in, AccountDashboard ×2, AdminHeader, AdminShell — all the same
+read-URL/localStorage-once-in-useEffect pattern) and the 1 `google-font-display`
+warning. Each needs a different, individually-verified fix and two live in admin/
+account surfaces not exercisable without credentials this session; none block the
+build. **Also flagged:** decide whether to rebuild+wire an admin "Reopen order" button
+(the removed `reopenOrder` was the implementation).
+
+## 2026-07-05 (later still) — Saved-items drawer: Add to Cart button + a provider-nesting bug fix
+
+Added an "Add to Cart" icon button to each row in the Saved Items (wishlist) drawer,
+next to the existing Remove (✕) button — owner asked for this after the earlier
+walkthrough flagged that saved items could only be reached by clicking through to the
+product page. `CartButton` (the same component used on shop cards/product pages) is
+reused with `variant="icon"`, fed a minimal `CartItem` built from what the wishlist
+already stores (id, title, image, status, the live price computed for display, purity,
+weight). Saving the item to cart does **not** remove it from the wishlist. Checkout's
+existing "backfill missing product fields" effect (`CheckoutClient.tsx`) fills in the
+richer fields (metal, chain type, length, brand…) automatically — verified live: the
+checkout page rendered the full spec line ("10K · YELLOW GOLD · NECKLACE · CUBAN LINK
+· 20.5 IN · 12.45G · MONACO") for an item added this way.
+
+**Found and fixed a real crash while verifying this.** `src/app/[locale]/layout.tsx`
+nested `<WishlistProvider><CartProvider>{children}</CartProvider></WishlistProvider>`.
+`WishlistProvider` renders `<WishlistDrawer>` as a **sibling** to `{children}`, not
+inside it — so `WishlistDrawer` sat entirely outside the `CartContext.Provider` tree.
+The moment a saved item's row rendered the new `CartButton` (which calls `useCart()`),
+it threw `useCart must be used within CartProvider`, crashing the whole app to a blank
+"page couldn't load" state (reproduced live, confirmed via the dev-server log showing
+no failing request — it was a client-side render crash, not a server error). **Fixed**
+by swapping the nesting so `CartProvider` wraps `WishlistProvider`
+(`CartDrawer` has no reverse dependency on `WishlistContext`, confirmed by grep, so
+this order is safe both ways). Re-verified: saving an item, opening the drawer, and
+clicking Add to Cart all work with no crash and no console errors; a full route sweep
+(home, shop, product, checkout, account, contact, free-eval, EN+ES) still returns 200;
+the ordinary product-page → cart-drawer flow (unaffected by the reorder) still works.
+`tsc`/build clean; lint unchanged at the 12 pre-existing problems.
+
+## 2026-07-05 (later) — FL sales tax no longer charged on out-of-state shipments
+
+Owner decision: FL sales tax should not apply to orders shipped out of state. Fixed
+at the authoritative source and every place tax is displayed (build/tsc clean;
+verified on dev — no orders were created during testing, confirmed via network log).
+
+- **`lib/checkout-pricing.ts` (authoritative — used for the real PayPal charge).**
+  New `isFloridaState()` (matches "FL"/"Fla"/"Florida", any case/whitespace/trailing
+  period) and `chargesFlSalesTax(shippingMethod, shippingState)`: tax applies for
+  **local pickup** (always completed in Naples, FL) or when the **shipping address
+  state is FL**; any other shipping destination is untaxed. `buildOrderDraft` gained
+  an optional `shippingState` param and now computes `tax` conditionally instead of
+  unconditionally applying 7%.
+- **`/api/paypal/create-order`** now passes `customer.state` to both `buildOrderDraft`
+  calls (the fresh-order path and the stale-order-reuse recompute), so a buyer who
+  edited their shipping address after cancelling PayPal gets the correct tax on retry
+  too.
+- **Checkout page estimate (`OrderSummary.tsx` + `CheckoutClient.tsx`)** now matches
+  the authoritative calc — `OrderSummary` takes a `shippingState` prop and only adds
+  tax when `chargesFlSalesTax` is true; the row label drops "(7%)" when tax is $0 so
+  it doesn't read as a bug. Verified live: CA address → "FL Sales Tax $0" / Est. Total
+  $946; switching back to FL → "FL Sales Tax (7%) $61" / $1,007; Local Pickup with a
+  non-FL state still charges the $61 (pickup always happens in Naples).
+- **Admin manual-order form (`OrdersPanel.tsx`)** — tax there is auto-computed with no
+  editable override, so the same rule now applies: charges its (separate, pre-existing,
+  unchanged) 6.5% rate unless `shipping_method === 'shipping'` to a non-FL `state`.
+  Note the admin rate (6.5%) has always differed from checkout's (7%) — that
+  discrepancy predates this change and was left alone; only the out-of-state
+  exemption was added. Not exercised live (no admin session in this environment) —
+  covered by `tsc`/build only.
+- **`CartDrawer.tsx` (the header mini-cart) intentionally left unchanged.** It has no
+  address input at all, so it can't know the destination; it keeps the flat 7%
+  pre-checkout estimate under its existing "Tax is an estimate" disclaimer. The
+  checkout page (which does collect the address) is the one that must match the real
+  charge, and now does.
+
+## 2026-07-05
+
+- **UX-friction fixes from the walkthrough (build/tsc clean; lint unchanged at the
+  12 pre-existing problems; each verified live on dev :3002).**
+  - **Free evaluation no longer forces photos.** The photo input was `required`,
+    blocking description-only sellers despite copy promising "a quick description or a
+    few photos". Photos are now optional (`EvalForm.tsx`), the label reads "Photos —
+    optional but helpful", and a client guard requires at least a photo **or** a short
+    description so the lead isn't empty. Success copy generalized from "review your
+    photos" to "review your submission".
+  - **Sign-in shows friendly copy.** Raw Supabase strings (e.g. "Invalid login
+    credentials") are mapped to human, locale-aware messages ("The email or password
+    you entered is incorrect.", plus email-not-confirmed and rate-limit cases) via a
+    new `friendlyAuthError()` in the sign-in page.
+  - **Saved-items drawer shows the live price.** Spot-linked saves showed only a "Live
+    gold price" label. The drawer now lazily fetches `/api/metal-prices` on open and
+    computes each item's price with `calcSpotPriceValue` (category inferred from
+    purity: gold ≤24 karat, silver >24), falling back to the label if spot is
+    unavailable or fields are missing. Verified: a saved 10K necklace shows "$871".
+  - **ES nav "Tienda / Tienda" fixed.** Both `nav.shop` and `nav.store` translated to
+    "Tienda". Renamed the store entry to **Catalog / Catálogo** (en+es messages) so the
+    Shop dropdown reads "Tienda ▸ Catálogo / Subastas".
+  - **Cart/checkout pluralization.** "1 item(s)" → "1 item" / "2 items" (and ES
+    "artículo/artículos") in `CartDrawer` and `OrderSummary`.
+  - **Follow-up: account auth pages fully localized.** `/es/account/sign-in`,
+    `sign-up`, and `reset-password` rendered entirely in English (labels, buttons,
+    placeholders, validation errors, success screens). All user-visible strings are
+    now bilingual via inline `isEs ? … : …`. Also fixed a latent bug: the sign-in
+    "Create one" link was missing the `/es` locale prefix. Verified: ES pages render
+    Spanish (Iniciar Sesión / Crear Cuenta / Restablecer Contraseña / Mi Cuenta …),
+    EN unchanged. (The account-dashboard `<title>` metadata stays "My Account" — a
+    static export, negligible.)
+  - **Final full walkthrough passed** (fresh dev server): every major route 200 in
+    EN+ES, garbage `/shop/[id]` → 404, redirects (`/sell`,`/cart`,`/wishlist`,
+    `/saved`) intact, `/api/metal-prices` live, shop sort+search, add-to-cart →
+    "1 item" drawer, sold-page caption/CTA, and localized auth pages all confirmed;
+    no console errors; `npm run build` clean.
+  - **Not changed (by design):** checkout address `*` + missing-field naming were
+    already handled (dynamic `*` when a ship method is selected; clicking the dimmed
+    pay button surfaces a red alert listing the exact missing fields) — the audit's
+    DOM query had missed the asterisks. Left the owner-verified pay-gate as-is. The 7%
+    FL sales tax on out-of-state shipping addresses is a business/legal decision, left
+    for the owner.
+
+- **Fixed two shop bugs found in the UX walkthrough (build/tsc/eslint clean on the
+  changed files; verified end-to-end on dev :3002).**
+  - **Product soft-404 → real 404 (E04).** Unknown `/shop/[id]` URLs returned HTTP 200
+    with the "Product Not Found" UI because a `loading.tsx` streaming boundary committed
+    a 200 shell before the page's `notFound()` ran. Root cause was the **`shop/loading.tsx`
+    ancestor boundary** wrapping `[id]` (removing only `[id]/loading.tsx` wasn't enough).
+    Fix: moved the shop-list page + its loading skeleton into a **`shop/(list)/` route
+    group** so the loading boundary is scoped to `/shop` only and no longer wraps
+    `shop/[id]`; removed `shop/[id]/loading.tsx`; and added an early `notFound()` in the
+    product `generateMetadata` (before the stream) as the first line of defense. Now
+    `/shop` keeps its skeleton, valid products render, and garbage/hidden product URLs
+    return a genuine 404 (verified: `/shop` 200, `/shop/[valid]` 200, `/shop/[garbage]`
+    404 in EN+ES, `/shop-modern` 200, `npm run build` passes). Note: the product-detail
+    page no longer has its own loading skeleton (removing it was required for the 404);
+    client-side nav keeps the prior page visible until ready, so no blank flash.
+    `shop-modern/page.tsx` import updated to `@/app/[locale]/shop/(list)/page`.
+  - **Sold product detail page no longer claims it's for sale.** A sold item still
+    rendered its live price captioned "✓ This is your price" and hid every CTA. Now
+    non-purchasable items show a "Sold — one of a kind" caption (localized "Vendido —
+    pieza única") in place of "This is your price", and keep an **Inquire about a similar
+    piece** + **Call** CTA (no Add to Cart). Available items are unchanged. JSON-LD
+    availability already reflected SoldOut.
+
 ## 2026-07-04
 
+- **Guest checkout + the remaining ecommerce-flow (PUB-E) items (build/tsc/eslint clean, verified on dev).**
+  - **Guest checkout (E01):** removed the sign-in wall on `/checkout` (page no longer
+    redirects anonymous visitors). Backend already supported guest orders (`user_id`
+    null). Added an optional "Have an account? Sign in for faster checkout — optional"
+    nudge, shown only to signed-out visitors (client-side `getUser` check). Verified:
+    `/checkout` returns 200 for guests (was 307→sign-in).
+  - **E05 shop count:** the "Showing 59 of 59 pieces" filter summary (ShopFilters) was
+    misleading next to a 48/page grid; reworded to "59 pieces" (unfiltered) / "N of M
+    pieces" (filtered). The paginated `ShopPagination` still shows the true "1–48 of 59".
+  - **E10 wishlist/saved:** wishlist is localStorage (anonymous save already works via
+    the drawer); added `/wishlist`, `/saved`, `/account/saved` → `/shop` redirects so
+    those URLs stop 404-ing (like `/cart`).
+  - **E11 authenticity/shipping trust copy:** product pages now show "Ships fully
+    insured · Authenticity guaranteed" on purchasable items; rewrote the Shipping
+    policy from hedge-everything ("may…") to concrete commitments (fully insured,
+    discreet packaging, authenticity guarantee tied to the 5-day return). (The
+    "signature required" claim was removed at owner's request — not always applicable.)
+  - **E15 sign-up:** added an account-benefit line ("Track your orders, save favorites,
+    check out faster… an account isn't required — you can check out as a guest").
+    Password rule left at the existing `minLength={6}` per owner (no complex rules).
+  - Also fixed a `Date.now()` `react-hooks/purity` lint error on the product page
+    (priceValidUntil now derives from `spotData.fetchedAt`).
+- **Final audit batch — real reviews + the four deferred items (build/tsc clean, verified on dev).**
+  - **Real Google reviews** swapped into the homepage testimonials (Nolan Olivier,
+    Onur, Yisel Perez), EN + ES; removed the placeholder warning.
+  - **Per-locale `<html lang>` (item c):** moved the `<html>/<head>/<body>` shell into
+    `[locale]/layout.tsx` (`lang={locale}`), made root `layout.tsx` a passthrough
+    (metadata + globals only), extracted fonts to `lib/fonts.ts`, and gave root
+    `not-found.tsx` its own `<html>`. Verified: `/` → `lang="en"`, `/es` → `lang="es"`,
+    jsonLd intact, 404 renders. Next 16 accepts the passthrough root layout.
+  - **CSP enforced (item a):** `netlify.toml` CSP flipped from Report-Only to enforcing
+    with a full allowlist for Supabase, gold-api, Google Fonts, **TradingView**
+    (s3.tradingview.com script + *.tradingview.com/*.tradingview-widget.com frame/
+    connect) and **PayPal** (www.paypal.com script + *.paypal.com/*.paypalobjects.com),
+    plus `worker-src blob:` and `base-uri 'self'`. The Report-Only line is kept
+    commented for one-line rollback. ⚠️ Netlify headers can't be tested by `next dev`
+    — verify on the deployed site (home, /gold-services chart, /checkout once PayPal
+    creds are fixed); rollback instructions are in the file.
+  - **Server-rendered spot price (item d):** gold-services and silver-services now
+    render "Gold $4,176/oz" / silver server-side via `fetchSpotData()` next to the
+    TradingView chart, so the price shows even with JS blocked. Verified live.
+  - **Re-slug new-listing products (item b):** `next.config.ts` 301s from
+    `/shop/new-listing-0X` → keyword slugs, paired with
+    `supabase/reslug-new-listing-products-2026-07.sql` (renames the six product ids;
+    guarded transaction — run it and deploy the redirects together). Deliberate,
+    documented exception to the permanent-id invariant (old ids were auto-junk).
+- **Trust/content batch from the audit (code-only, build + tsc/eslint clean, verified on dev).**
+  - **Returns policy rewritten** to the owner's terms: all sales final (volatile
+    metal prices), with a **5-day misrepresentation refund** exception; removed the
+    stale "order request / inventory hold" language that contradicted the live
+    PayPal capture flow.
+  - **Homepage testimonials section** added ("Trusted Across Southwest Florida", 3
+    cards). ⚠️ **The quotes are PLACEHOLDERS** (owner's request) — a code comment
+    flags that fabricated reviews violate Google/FTC rules and must be swapped for
+    real Google reviews before relying on them.
+  - **"100% Accuracy — GUARANTEED VALUATION" badge** on gold-services replaced with
+    "Live-Market Pricing — Tested In Front Of You" (credible, non-puffery).
+  - **Shop H1**: added an sr-only `<h1>` "Shop Estate Jewelry in Naples, FL" (page
+    had none; visual design unchanged).
+  - **Mobile tap-to-call**: gold phone icon in the header on mobile/tablet (the
+    CALL NOW button is desktop-only) — the #1 conversion CTA is now tap-visible.
+  - Homepage call CTA now says "Mon–Sat · By appointment".
+- **SEO + technical batch from the audit (code-only, build + tsc clean, verified on dev).**
+  - **Canonical + hreflang everywhere:** new `lib/seo.ts#alternatesFor`; all 13 content
+    pages (home, shop, service pages, about, contact, free-evaluation, faq, auctions)
+    converted from static `metadata` to `generateMetadata` with self-canonical +
+    en/es/x-default alternates; product pages too. Verified: `/faq` → canonical
+    `/faq` + hreflang en/es/x-default; `/es/free-evaluation` → `/es/...` canonical.
+  - **`<html lang="en">`** set on the root (was missing entirely). Per-locale lang for
+    the `/es` tree is deferred — it needs moving `<html>` into `[locale]/layout.tsx`,
+    which would break the root `not-found.tsx` (depends on the root layout for fonts/
+    html), so it's a scoped follow-up.
+  - **Titles:** removed the doubled brand suffix (template appends it once) and gave
+    service pages seller-intent titles ("Sell Gold in Naples, FL", "Estate Jewelry
+    Buyer in Naples, FL", etc.). Home uses `title.absolute`.
+  - **Product schema/OG (`shop/[id]`):** locale-aware title/description (uses
+    `title_es`/`description_es` on /es), canonical + hreflang, full OG + twitter,
+    **absolute** schema image URL, `priceValidUntil` (today+2, verified 2026-07-06),
+    `offers.seller`, and a **BreadcrumbList**. Not-found returns `robots:noindex`.
+  - **FAQPage JSON-LD** emitted from the existing `FAQ_ITEMS` (locale-aware) — verified
+    8 Question/Answer nodes.
+  - **Global OG/Twitter** defaults added in the root layout metadata (was product-only).
+  - **Sitemap:** one entry per page with `alternates.languages` (en/es hreflang) +
+    `lastModified` (products use `updated_at`).
+  - **robots.ts:** added `/checkout`, `/payment`, `/shop-modern`, and the `/en/*`
+    admin/account/checkout/payment prefixes. **`/shop-modern`** now `robots:noindex`.
+  - **Quick wins:** `/sell`→`/free-evaluation` and `/cart`→`/shop` redirects
+    (`next.config.ts`); `info@naplesestatejewelry.co` added to the footer; branded
+    `[locale]/error.tsx` boundary; removed empty `store/` + `silver-tableware/` route
+    dirs; **fixed the Netlify `/assets` caching** (the `/*` `max-age=0` catch-all was
+    ordered after the immutable `/assets/*` rule and clobbered it — moved it first so
+    the immutable rule wins). JewelryStore `paymentAccepted` now lists PayPal + cards;
+    schema hours kept as appointment availability (schema.org has no by-appointment
+    flag; the "by appointment" wording carries it).
 - **CODE-D04 residual closed (⚠️ second manual SQL step pending).** Signed-up
   (`authenticated`) users could still read internal product columns because the
   admin editor read them from the browser under that role. Fixed by moving the

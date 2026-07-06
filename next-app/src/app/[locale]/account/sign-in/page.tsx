@@ -1,24 +1,52 @@
 ﻿'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import { createClient } from '@/lib/supabase/client';
 
+// Map raw Supabase auth errors to friendly, human copy so shoppers never see
+// developer-facing strings like "Invalid login credentials".
+function friendlyAuthError(message: string, isEs: boolean): string {
+  const m = (message || '').toLowerCase();
+  if (m.includes('invalid login credentials')) {
+    return isEs
+      ? 'El correo o la contraseña son incorrectos.'
+      : 'The email or password you entered is incorrect.';
+  }
+  if (m.includes('email not confirmed')) {
+    return isEs
+      ? 'Confirme su correo primero — revise su bandeja de entrada para el enlace de confirmación.'
+      : 'Please confirm your email first — check your inbox for the confirmation link.';
+  }
+  if (m.includes('rate limit') || m.includes('too many')) {
+    return isEs
+      ? 'Demasiados intentos. Espere un momento e intente de nuevo.'
+      : 'Too many attempts. Please wait a moment and try again.';
+  }
+  return isEs
+    ? 'No pudimos iniciar sesión. Verifique sus datos e intente de nuevo.'
+    : "We couldn't sign you in. Please check your details and try again.";
+}
+
 export default function SignInPage() {
   const router = useRouter();
   const params = useParams<{ locale?: string }>();
-  const prefix = params?.locale === 'es' ? '/es' : '';
+  const isEs = params?.locale === 'es';
+  const prefix = isEs ? '/es' : '';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [nextUrl, setNextUrl] = useState<string | null>(null);
+  // Held in a ref, not state: it's only read on submit (never rendered), so it
+  // shouldn't trigger a re-render — and reading it in an effect keeps it off the
+  // server (no window there) without a hydration mismatch.
+  const nextUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search).get('next');
-    if (p && p.startsWith('/') && !p.startsWith('//')) setNextUrl(p);
+    if (p && p.startsWith('/') && !p.startsWith('//')) nextUrlRef.current = p;
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -30,12 +58,12 @@ export default function SignInPage() {
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
     if (authError) {
-      setError(authError.message);
+      setError(friendlyAuthError(authError.message, isEs));
       setLoading(false);
       return;
     }
 
-    router.push(nextUrl ?? `${prefix}/account`);
+    router.push(nextUrlRef.current ?? `${prefix}/account`);
     router.refresh();
   }
 
@@ -52,17 +80,17 @@ export default function SignInPage() {
           <div className="mb-7">
             <p className="text-[0.65rem] font-bold uppercase tracking-[0.35em] mb-3"
               style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-              My Account
+              {isEs ? 'Mi Cuenta' : 'My Account'}
             </p>
             <h1 className="text-3xl font-bold tracking-tight"
               style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-              Sign In
+              {isEs ? 'Iniciar Sesión' : 'Sign In'}
             </h1>
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div>
-              <label className="form-label" htmlFor="email">Email</label>
+              <label className="form-label" htmlFor="email">{isEs ? 'Correo electrónico' : 'Email'}</label>
               <input
                 id="email"
                 type="email"
@@ -76,7 +104,7 @@ export default function SignInPage() {
             </div>
 
             <div>
-              <label className="form-label" htmlFor="password">Password</label>
+              <label className="form-label" htmlFor="password">{isEs ? 'Contraseña' : 'Password'}</label>
               <input
                 id="password"
                 type="password"
@@ -85,7 +113,7 @@ export default function SignInPage() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 className="form-field w-full"
-                placeholder="Enter your password"
+                placeholder={isEs ? 'Ingrese su contraseña' : 'Enter your password'}
               />
               <div className="mt-2 text-right">
                 <Link
@@ -93,7 +121,7 @@ export default function SignInPage() {
                   className="text-xs font-bold hover:underline underline-offset-2"
                   style={{ color: 'var(--color-primary)' }}
                 >
-                  Forgot password?
+                  {isEs ? '¿Olvidó su contraseña?' : 'Forgot password?'}
                 </Link>
               </div>
             </div>
@@ -107,16 +135,16 @@ export default function SignInPage() {
               disabled={loading}
               className="modern-auth-submit mt-2 disabled:opacity-60"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? (isEs ? 'Iniciando sesión…' : 'Signing in…') : (isEs ? 'Iniciar Sesión' : 'Sign In')}
             </button>
           </form>
 
           <p className="mt-7 text-sm text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
-            Don&apos;t have an account?{' '}
-            <Link href="/account/sign-up"
+            {isEs ? '¿No tiene una cuenta? ' : "Don't have an account? "}
+            <Link href={`${prefix}/account/sign-up`}
               className="font-bold hover:underline underline-offset-2"
               style={{ color: 'var(--color-primary)' }}>
-              Create one
+              {isEs ? 'Cree una' : 'Create one'}
             </Link>
           </p>
 

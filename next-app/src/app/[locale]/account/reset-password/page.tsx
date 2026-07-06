@@ -126,7 +126,8 @@ function hasRecoveryParamsInUrl(): boolean {
 
 export default function ResetPasswordPage() {
   const params = useParams<{ locale?: string }>();
-  const prefix = params?.locale === 'es' ? '/es' : '';
+  const isEs = params?.locale === 'es';
+  const prefix = isEs ? '/es' : '';
 
   const [ready, setReady] = useState(false);
   // 'request' = ask for the reset email; 'update' = a recovery session is active,
@@ -200,7 +201,7 @@ export default function ResetPasswordPage() {
     setError(null);
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError(isEs ? 'Las contraseñas no coinciden.' : 'Passwords do not match.');
       return;
     }
 
@@ -222,7 +223,7 @@ export default function ResetPasswordPage() {
           <span className="material-symbols-outlined modern-auth-icon" style={{ marginInline: 'auto' }} aria-hidden="true">
             lock_reset
           </span>
-          <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>Loading…</p>
+          <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>{isEs ? 'Cargando…' : 'Loading…'}</p>
         </div>
       );
     }
@@ -234,13 +235,15 @@ export default function ResetPasswordPage() {
             check_circle
           </span>
           <h1 className="text-2xl font-bold mb-3 tracking-tight" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-            Password updated
+            {isEs ? 'Contraseña actualizada' : 'Password updated'}
           </h1>
           <p className="text-sm mb-7" style={{ color: 'var(--color-on-surface-variant)' }}>
-            Your password has been changed. You can now sign in with your new password.
+            {isEs
+              ? 'Su contraseña ha sido cambiada. Ahora puede iniciar sesión con su nueva contraseña.'
+              : 'Your password has been changed. You can now sign in with your new password.'}
           </p>
           <Link href={`${prefix}/account/sign-in`} className="modern-auth-submit">
-            Go to Sign In
+            {isEs ? 'Ir a Iniciar Sesión' : 'Go to Sign In'}
           </Link>
         </div>
       );
@@ -252,16 +255,16 @@ export default function ResetPasswordPage() {
           <span className="material-symbols-outlined modern-auth-icon" aria-hidden="true">lock_reset</span>
           <div className="mb-7">
             <p className="text-[0.65rem] font-bold uppercase tracking-[0.35em] mb-3" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-              My Account
+              {isEs ? 'Mi Cuenta' : 'My Account'}
             </p>
             <h1 className="text-3xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-              Set a New Password
+              {isEs ? 'Establecer Nueva Contraseña' : 'Set a New Password'}
             </h1>
           </div>
 
           <form onSubmit={handleUpdate} className="flex flex-col gap-4">
             <div>
-              <label className="form-label" htmlFor="password">New Password</label>
+              <label className="form-label" htmlFor="password">{isEs ? 'Nueva contraseña' : 'New Password'}</label>
               <div className="modern-password-field">
                 <input
                   id="password"
@@ -272,22 +275,22 @@ export default function ResetPasswordPage() {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   className="modern-password-input"
-                  placeholder="Min. 6 characters"
+                  placeholder={isEs ? 'Mín. 6 caracteres' : 'Min. 6 characters'}
                 />
                 <button
                   type="button"
                   className="modern-password-toggle"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? (isEs ? 'Ocultar contraseña' : 'Hide password') : (isEs ? 'Mostrar contraseña' : 'Show password')}
                   aria-pressed={showPassword}
                   onClick={() => setShowPassword((current) => !current)}
                 >
-                  {showPassword ? 'Hide' : 'Show'}
+                  {showPassword ? (isEs ? 'Ocultar' : 'Hide') : (isEs ? 'Mostrar' : 'Show')}
                 </button>
               </div>
             </div>
 
             <div>
-              <label className="form-label" htmlFor="confirmPassword">Confirm Password</label>
+              <label className="form-label" htmlFor="confirmPassword">{isEs ? 'Confirmar contraseña' : 'Confirm Password'}</label>
               <div className="modern-password-field">
                 <input
                   id="confirmPassword"
@@ -298,16 +301,16 @@ export default function ResetPasswordPage() {
                   value={confirmPassword}
                   onChange={e => setConfirmPassword(e.target.value)}
                   className="modern-password-input"
-                  placeholder="Re-enter password"
+                  placeholder={isEs ? 'Reingrese la contraseña' : 'Re-enter password'}
                 />
                 <button
                   type="button"
                   className="modern-password-toggle"
-                  aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                  aria-label={showConfirmPassword ? (isEs ? 'Ocultar confirmación' : 'Hide confirm password') : (isEs ? 'Mostrar confirmación' : 'Show confirm password')}
                   aria-pressed={showConfirmPassword}
                   onClick={() => setShowConfirmPassword((current) => !current)}
                 >
-                  {showConfirmPassword ? 'Hide' : 'Show'}
+                  {showConfirmPassword ? (isEs ? 'Ocultar' : 'Hide') : (isEs ? 'Mostrar' : 'Show')}
                 </button>
               </div>
             </div>
@@ -317,7 +320,7 @@ export default function ResetPasswordPage() {
             )}
 
             <button type="submit" disabled={loading} className="modern-auth-submit mt-2 disabled:opacity-60">
-              {loading ? 'Updating...' : 'Update Password'}
+              {loading ? (isEs ? 'Actualizando…' : 'Updating...') : (isEs ? 'Actualizar Contraseña' : 'Update Password')}
             </button>
           </form>
         </div>
@@ -331,13 +334,15 @@ export default function ResetPasswordPage() {
             mark_email_unread
           </span>
           <h1 className="text-2xl font-bold mb-3 tracking-tight" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-            Check your email
+            {isEs ? 'Revise su correo' : 'Check your email'}
           </h1>
           <p className="text-sm mb-7" style={{ color: 'var(--color-on-surface-variant)' }}>
-            If an account exists for <strong>{email}</strong>, we&apos;ve sent a password reset link. Click it to choose a new password.
+            {isEs
+              ? <>Si existe una cuenta para <strong>{email}</strong>, le hemos enviado un enlace para restablecer la contraseña. Haga clic para elegir una nueva.</>
+              : <>If an account exists for <strong>{email}</strong>, we&apos;ve sent a password reset link. Click it to choose a new password.</>}
           </p>
           <Link href={`${prefix}/account/sign-in`} className="modern-auth-submit">
-            Back to Sign In
+            {isEs ? 'Volver a Iniciar Sesión' : 'Back to Sign In'}
           </Link>
         </div>
       );
@@ -348,19 +353,21 @@ export default function ResetPasswordPage() {
         <span className="material-symbols-outlined modern-auth-icon" aria-hidden="true">lock_reset</span>
         <div className="mb-7">
           <p className="text-[0.65rem] font-bold uppercase tracking-[0.35em] mb-3" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-            My Account
+            {isEs ? 'Mi Cuenta' : 'My Account'}
           </p>
           <h1 className="text-3xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-            Reset Password
+            {isEs ? 'Restablecer Contraseña' : 'Reset Password'}
           </h1>
           <p className="mt-3 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-            Enter your account email and we&apos;ll send you a link to set a new password.
+            {isEs
+              ? 'Ingrese el correo de su cuenta y le enviaremos un enlace para establecer una nueva contraseña.'
+              : "Enter your account email and we'll send you a link to set a new password."}
           </p>
         </div>
 
         <form onSubmit={handleRequest} className="flex flex-col gap-4">
           <div>
-            <label className="form-label" htmlFor="email">Email</label>
+            <label className="form-label" htmlFor="email">{isEs ? 'Correo electrónico' : 'Email'}</label>
             <input
               id="email"
               type="email"
@@ -378,14 +385,14 @@ export default function ResetPasswordPage() {
           )}
 
           <button type="submit" disabled={loading} className="modern-auth-submit mt-2 disabled:opacity-60">
-            {loading ? 'Sending reset link...' : 'Send Reset Link'}
+            {loading ? (isEs ? 'Enviando enlace…' : 'Sending reset link...') : (isEs ? 'Enviar Enlace' : 'Send Reset Link')}
           </button>
         </form>
 
         <p className="mt-7 text-sm text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
-          Remembered it?{' '}
+          {isEs ? '¿La recordó? ' : 'Remembered it? '}
           <Link href={`${prefix}/account/sign-in`} className="font-bold hover:underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>
-            Sign in
+            {isEs ? 'Inicie sesión' : 'Sign in'}
           </Link>
         </p>
       </div>

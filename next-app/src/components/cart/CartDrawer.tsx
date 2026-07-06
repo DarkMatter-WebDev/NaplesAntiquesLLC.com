@@ -1,18 +1,21 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCart, type CartItem } from '@/context/CartContext';
 import { formatProductItemYear, isProductPurchasable, productImagePaddingBackground, productStatusLabel } from '@/types/product';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
+import { FL_TAX_RATE, FL_TAX_RATE_LABEL } from '@/lib/checkout-pricing';
+import { parseManualPriceLabelValue } from '@/lib/pricing';
+import { createClient } from '@/lib/supabase/client';
 
 const GOLD = '#735c00';
 const BORDER = '#d8d0c2';
-const FL_TAX = 0.07;
 
 function parsePrice(label: string): number | null {
-  const m = label.replace(/,/g, '').match(/\$([\d.]+)/);
-  return m ? parseFloat(m[1]) : null;
+  return parseManualPriceLabelValue(label);
 }
 
 function fmt(n: number) {
@@ -25,8 +28,47 @@ function fmt(n: number) {
 
 export default function CartDrawer({ locale }: { locale: string }) {
   const { items, remove, clear, drawerOpen, closeDrawer } = useCart();
+  const router = useRouter();
   const isEs = locale === 'es';
   const prefix = isEs ? '/es' : '';
+  const checkoutHref = `${prefix}/checkout`;
+
+  // Auth state, resolved when the drawer opens, so "Proceed to Checkout" knows
+  // whether to go straight through (signed in) or offer the sign-in / guest gate.
+  // null = not yet known.
+  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  const [showCheckoutGate, setShowCheckoutGate] = useState(false);
+
+  useEffect(() => {
+    if (!drawerOpen || loggedIn !== null) return;
+    let cancelled = false;
+    createClient().auth.getUser()
+      .then(({ data }) => { if (!cancelled) setLoggedIn(!!data.user); })
+      .catch(() => { if (!cancelled) setLoggedIn(false); });
+    return () => { cancelled = true; };
+  }, [drawerOpen, loggedIn]);
+
+  async function handleProceedToCheckout() {
+    // Resolve auth on the spot if the drawer was clicked before the effect settled.
+    let isLoggedIn = loggedIn;
+    if (isLoggedIn === null) {
+      try {
+        const { data } = await createClient().auth.getUser();
+        isLoggedIn = !!data.user;
+        setLoggedIn(isLoggedIn);
+      } catch {
+        isLoggedIn = false;
+      }
+    }
+    if (isLoggedIn) {
+      closeDrawer();
+      router.push(checkoutHref);
+    } else {
+      // Signed-out shoppers get the choice to log in, create an account, or
+      // continue as a guest before landing on checkout.
+      setShowCheckoutGate(true);
+    }
+  }
 
   function handleClose() {
     closeDrawer();
@@ -91,7 +133,7 @@ export default function CartDrawer({ locale }: { locale: string }) {
               </h2>
               <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
                 {items.length > 0
-                  ? `${items.length} ${isEs ? 'artículo(s)' : 'item(s)'}`
+                  ? `${items.length} ${isEs ? (items.length === 1 ? 'artículo' : 'artículos') : (items.length === 1 ? 'item' : 'items')}`
                   : (isEs ? 'Sin artículos' : 'No items yet')}
               </p>
             </div>
@@ -108,10 +150,101 @@ export default function CartDrawer({ locale }: { locale: string }) {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <CartView items={items} isEs={isEs} prefix={prefix} onRemove={remove} onClear={clear} onClose={handleClose} />
+          <CartView items={items} isEs={isEs} prefix={prefix} onRemove={remove} onClear={clear} onClose={handleClose} onCheckout={handleProceedToCheckout} />
         </div>
       </div>
+
+      {showCheckoutGate && (
+        <CheckoutGate
+          isEs={isEs}
+          prefix={prefix}
+          checkoutHref={checkoutHref}
+          onClose={() => setShowCheckoutGate(false)}
+          onGuest={() => { setShowCheckoutGate(false); closeDrawer(); router.push(checkoutHref); }}
+          onNavigate={(href) => { setShowCheckoutGate(false); closeDrawer(); router.push(href); }}
+        />
+      )}
     </>
+  );
+}
+
+function CheckoutGate({
+  isEs,
+  prefix,
+  checkoutHref,
+  onClose,
+  onGuest,
+  onNavigate,
+}: {
+  isEs: boolean;
+  prefix: string;
+  checkoutHref: string;
+  onClose: () => void;
+  onGuest: () => void;
+  onNavigate: (href: string) => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center px-4"
+      style={{ background: 'rgba(0,0,0,0.5)' }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={isEs ? 'Opciones de pago' : 'Checkout options'}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl p-6 shadow-2xl"
+        style={{ background: 'var(--color-background)', border: `1px solid ${BORDER}` }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-5 text-center">
+          <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
+            {isEs ? '¿Cómo desea continuar?' : 'How would you like to continue?'}
+          </h2>
+          <p className="mt-1.5 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+            {isEs
+              ? 'Inicie sesión para un pago más rápido, o continúe como invitado — no se requiere cuenta.'
+              : 'Sign in for a faster checkout, or continue as a guest — no account required.'}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2.5">
+          <button
+            type="button"
+            onClick={() => onNavigate(`${prefix}/account/sign-in?next=${encodeURIComponent(checkoutHref)}`)}
+            className="gold-button justify-center"
+            style={{ width: '100%' }}
+          >
+            {isEs ? 'Iniciar sesión' : 'Log In'}
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate(`${prefix}/account/sign-up`)}
+            className="outline-button justify-center"
+            style={{ width: '100%' }}
+          >
+            {isEs ? 'Crear cuenta' : 'Create Account'}
+          </button>
+          <button
+            type="button"
+            onClick={onGuest}
+            className="outline-button justify-center"
+            style={{ width: '100%' }}
+          >
+            {isEs ? 'Continuar como invitado' : 'Continue as Guest'}
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-4 w-full text-center text-xs font-bold uppercase tracking-widest transition-colors hover:text-[#735c00]"
+          style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+        >
+          {isEs ? 'Cancelar' : 'Cancel'}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -122,6 +255,7 @@ function CartView({
   onRemove,
   onClear,
   onClose,
+  onCheckout,
 }: {
   items: CartItem[];
   isEs: boolean;
@@ -129,6 +263,7 @@ function CartView({
   onRemove: (id: string) => void;
   onClear: () => void;
   onClose: () => void;
+  onCheckout: () => void;
 }) {
   if (items.length === 0) {
     return (
@@ -148,7 +283,7 @@ function CartView({
   const knownPrices = prices.filter((p): p is number => p !== null);
   const hasUnknown = knownPrices.length < prices.length;
   const subtotal = knownPrices.reduce((a, b) => a + b, 0);
-  const tax = subtotal * FL_TAX;
+  const tax = subtotal * FL_TAX_RATE;
   const total = subtotal + tax;
 
   return (
@@ -166,7 +301,7 @@ function CartView({
             <span>{subtotal > 0 ? fmt(subtotal) : '-'}{hasUnknown ? '*' : ''}</span>
           </div>
           <div className="flex justify-between">
-            <span>{isEs ? 'Impuesto FL (7%)' : 'FL Sales Tax (7%)'}</span>
+            <span>{isEs ? `Impuesto FL (${FL_TAX_RATE_LABEL})` : `FL Sales Tax (${FL_TAX_RATE_LABEL})`}</span>
             <span>{subtotal > 0 ? fmt(tax) : '-'}</span>
           </div>
           <div
@@ -188,10 +323,10 @@ function CartView({
       </div>
 
       <div className="px-4 py-4 flex flex-col gap-2 flex-shrink-0">
-        <Link href={`${prefix}/checkout`} onClick={onClose} className="gold-button justify-center" style={{ width: '100%' }}>
+        <button type="button" onClick={onCheckout} className="gold-button justify-center" style={{ width: '100%' }}>
           {isEs ? 'Proceder al pago' : 'Proceed to Checkout'}
           <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '17px', lineHeight: 1 }}>chevron_right</span>
-        </Link>
+        </button>
         <button
           type="button"
           onClick={onClear}

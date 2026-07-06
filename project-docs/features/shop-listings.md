@@ -25,8 +25,8 @@ Keep these fields especially consistent:
   admin references.
 - `inventory_number`: visible inventory number. Fix duplicate live values before
   enforcing the unique migration.
-- `status`: lifecycle status (`draft`, `available`, `reserved`,
-  `pending_payment`, `sold`, `archived`).
+- `status`: lifecycle status (`draft`, `available`, `pending_payment`, `sold`,
+  `archived`).
 - `product_type` / `jewelry_type`: broad item form. Admin supports curated
   options plus concise custom product type strings.
 - `chain_type`: link type, scoped to necklace/bracelet products.

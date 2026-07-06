@@ -160,7 +160,8 @@ const MODERN_AUTH_STYLES = `
 
 export default function SignUpPage() {
   const params = useParams<{ locale?: string }>();
-  const prefix = params?.locale === 'es' ? '/es' : '';
+  const isEs = params?.locale === 'es';
+  const prefix = isEs ? '/es' : '';
   const policyVersion = '2026-06-19';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -191,13 +192,15 @@ export default function SignUpPage() {
     setResetSent(false);
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError(isEs ? 'Las contraseñas no coinciden.' : 'Passwords do not match.');
       setLoading(false);
       return;
     }
 
     if (!acceptedPolicies) {
-      setError('Please agree to the Terms of Service and Privacy Policy.');
+      setError(isEs
+        ? 'Debe aceptar los Términos de Servicio y la Política de Privacidad.'
+        : 'Please agree to the Terms of Service and Privacy Policy.');
       setLoading(false);
       return;
     }
@@ -275,13 +278,13 @@ export default function SignUpPage() {
             </span>
             <h1 className="text-2xl font-bold mb-3 tracking-tight"
               style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-              Check your email
+              {isEs ? 'Revise su correo' : 'Check your email'}
             </h1>
             <p className="text-sm mb-7" style={{ color: 'var(--color-on-surface-variant)' }}>
-              We sent a confirmation link to <strong>{email}</strong>. Click it to activate your account.
+              {isEs ? <>Enviamos un enlace de confirmación a <strong>{email}</strong>. Haga clic para activar su cuenta.</> : <>We sent a confirmation link to <strong>{email}</strong>. Click it to activate your account.</>}
             </p>
             <Link href={`${prefix}/account/sign-in`} className="modern-auth-submit">
-              Back to Sign In
+              {isEs ? 'Volver a Iniciar Sesión' : 'Back to Sign In'}
             </Link>
           </div>
           <style>{MODERN_AUTH_STYLES}</style>
@@ -303,17 +306,22 @@ export default function SignUpPage() {
           <div className="mb-7">
             <p className="text-[0.65rem] font-bold uppercase tracking-[0.35em] mb-3"
               style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-              My Account
+              {isEs ? 'Mi Cuenta' : 'My Account'}
             </p>
             <h1 className="text-3xl font-bold tracking-tight"
               style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-              Create Account
+              {isEs ? 'Crear Cuenta' : 'Create Account'}
             </h1>
+            <p className="mt-3 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+              {isEs
+                ? 'Siga sus pedidos, guarde sus piezas favoritas y pague más rápido. Recibirá un correo de confirmación para activar su cuenta. No se requiere cuenta para comprar — siempre puede pagar como invitado.'
+                : "Track your orders, save your favorite pieces, and check out faster. You'll get a confirmation email to activate your account. An account isn't required to buy — you can always check out as a guest."}
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div>
-              <label className="form-label" htmlFor="fullName">Full Name</label>
+              <label className="form-label" htmlFor="fullName">{isEs ? 'Nombre completo' : 'Full Name'}</label>
               <input
                 id="fullName"
                 type="text"
@@ -321,12 +329,12 @@ export default function SignUpPage() {
                 value={fullName}
                 onChange={e => setFullName(e.target.value)}
                 className="form-field w-full"
-                placeholder="Jane Smith"
+                placeholder={isEs ? 'Juan Pérez' : 'Jane Smith'}
               />
             </div>
 
             <div>
-              <label className="form-label" htmlFor="email">Email</label>
+              <label className="form-label" htmlFor="email">{isEs ? 'Correo electrónico' : 'Email'}</label>
               <input
                 id="email"
                 type="email"
@@ -340,7 +348,7 @@ export default function SignUpPage() {
             </div>
 
             <div>
-              <label className="form-label" htmlFor="password">Password</label>
+              <label className="form-label" htmlFor="password">{isEs ? 'Contraseña' : 'Password'}</label>
               <div className="modern-password-field">
                 <input
                   id="password"
@@ -351,22 +359,22 @@ export default function SignUpPage() {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   className="modern-password-input"
-                  placeholder="Min. 6 characters"
+                  placeholder={isEs ? 'Mín. 6 caracteres' : 'Min. 6 characters'}
                 />
                 <button
                   type="button"
                   className="modern-password-toggle"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? (isEs ? 'Ocultar contraseña' : 'Hide password') : (isEs ? 'Mostrar contraseña' : 'Show password')}
                   aria-pressed={showPassword}
                   onClick={() => setShowPassword((current) => !current)}
                 >
-                  {showPassword ? 'Hide' : 'Show'}
+                  {showPassword ? (isEs ? 'Ocultar' : 'Hide') : (isEs ? 'Mostrar' : 'Show')}
                 </button>
               </div>
             </div>
 
             <div>
-              <label className="form-label" htmlFor="confirmPassword">Confirm Password</label>
+              <label className="form-label" htmlFor="confirmPassword">{isEs ? 'Confirmar contraseña' : 'Confirm Password'}</label>
               <div className="modern-password-field">
                 <input
                   id="confirmPassword"
@@ -377,16 +385,16 @@ export default function SignUpPage() {
                   value={confirmPassword}
                   onChange={e => setConfirmPassword(e.target.value)}
                   className="modern-password-input"
-                  placeholder="Re-enter password"
+                  placeholder={isEs ? 'Reingrese la contraseña' : 'Re-enter password'}
                 />
                 <button
                   type="button"
                   className="modern-password-toggle"
-                  aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                  aria-label={showConfirmPassword ? (isEs ? 'Ocultar confirmación' : 'Hide confirm password') : (isEs ? 'Mostrar confirmación' : 'Show confirm password')}
                   aria-pressed={showConfirmPassword}
                   onClick={() => setShowConfirmPassword((current) => !current)}
                 >
-                  {showConfirmPassword ? 'Hide' : 'Show'}
+                  {showConfirmPassword ? (isEs ? 'Ocultar' : 'Hide') : (isEs ? 'Mostrar' : 'Show')}
                 </button>
               </div>
             </div>
@@ -401,13 +409,13 @@ export default function SignUpPage() {
                 style={{ accentColor: '#a98208' }}
               />
               <span>
-                I agree to the{' '}
+                {isEs ? 'Acepto los ' : 'I agree to the '}
                 <Link href={`${prefix}/terms`} target="_blank" rel="noopener noreferrer" className="font-bold hover:underline" style={{ color: 'var(--color-primary)' }}>
-                  Terms of Service
+                  {isEs ? 'Términos de Servicio' : 'Terms of Service'}
                 </Link>{' '}
-                and{' '}
+                {isEs ? 'y la ' : 'and '}
                 <Link href={`${prefix}/privacy`} target="_blank" rel="noopener noreferrer" className="font-bold hover:underline" style={{ color: 'var(--color-primary)' }}>
-                  Privacy Policy
+                  {isEs ? 'Política de Privacidad' : 'Privacy Policy'}
                 </Link>
                 .
               </span>
@@ -417,15 +425,18 @@ export default function SignUpPage() {
               <div className="modern-auth-alert" role="alert">
                 <p className="modern-auth-alert-title">
                   <span className="material-symbols-outlined" aria-hidden="true">info</span>
-                  This email already has an account
+                  {isEs ? 'Este correo ya tiene una cuenta' : 'This email already has an account'}
                 </p>
                 <p>
-                  An account with <strong>{existingEmail}</strong> already exists. If it&apos;s
-                  yours, reset your password to get back in — or sign in if you remember it.
+                  {isEs
+                    ? <>Ya existe una cuenta con <strong>{existingEmail}</strong>. Si es suya, restablezca su contraseña para volver a entrar — o inicie sesión si la recuerda.</>
+                    : <>An account with <strong>{existingEmail}</strong> already exists. If it&apos;s yours, reset your password to get back in — or sign in if you remember it.</>}
                 </p>
                 {resetSent ? (
                   <p className="modern-auth-alert-success">
-                    Password reset link sent to {existingEmail}. Check your inbox.
+                    {isEs
+                      ? `Enlace de restablecimiento enviado a ${existingEmail}. Revise su bandeja de entrada.`
+                      : `Password reset link sent to ${existingEmail}. Check your inbox.`}
                   </p>
                 ) : (
                   <button
@@ -434,11 +445,11 @@ export default function SignUpPage() {
                     disabled={resetLoading}
                     className="modern-auth-submit disabled:opacity-60"
                   >
-                    {resetLoading ? 'Sending reset link...' : 'Reset Password'}
+                    {resetLoading ? (isEs ? 'Enviando enlace…' : 'Sending reset link...') : (isEs ? 'Restablecer Contraseña' : 'Reset Password')}
                   </button>
                 )}
                 <Link href={`${prefix}/account/sign-in`} className="modern-auth-alert-link">
-                  Go to Sign In
+                  {isEs ? 'Ir a Iniciar Sesión' : 'Go to Sign In'}
                 </Link>
               </div>
             )}
@@ -452,16 +463,16 @@ export default function SignUpPage() {
               disabled={loading}
               className="modern-auth-submit mt-2 disabled:opacity-60"
             >
-              {loading ? 'Creating account...' : 'Create Account'}
+              {loading ? (isEs ? 'Creando cuenta…' : 'Creating account...') : (isEs ? 'Crear Cuenta' : 'Create Account')}
             </button>
           </form>
 
           <p className="mt-7 text-sm text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
-            Already have an account?{' '}
+            {isEs ? '¿Ya tiene una cuenta? ' : 'Already have an account? '}
             <Link href={`${prefix}/account/sign-in`}
               className="font-bold hover:underline underline-offset-2"
               style={{ color: 'var(--color-primary)' }}>
-              Sign in
+              {isEs ? 'Inicie sesión' : 'Sign in'}
             </Link>
           </p>
 

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { alternatesFor } from '@/lib/seo';
 import { unstable_cache } from 'next/cache';
 import { createPublicClient } from '@/lib/supabase/public';
 import {
@@ -29,10 +30,14 @@ import { JEWELRY_ERA_MIN_YEAR, jewelryEraMaxYear, parseYearFilter } from '@/lib/
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 
-export const metadata: Metadata = {
-  title: 'Shop',
-  description: 'Browse estate gold jewelry, chains, bracelets, and rings with live pricing.',
-};
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  return {
+    title: 'Shop Estate Jewelry in Naples, FL',
+    description: 'Browse estate gold jewelry, chains, bracelets, and rings with live gold-spot pricing on every piece.',
+    alternates: alternatesFor('/shop', locale),
+  };
+}
 
 export const revalidate = 300;
 
@@ -401,12 +406,23 @@ export async function renderShopPage({
   // keyed by exactly these values, so a bare /shop and each filtered view get
   // their own shared-across-visitors cache entry. The spot-price fetch (its own
   // 300s fetch cache) runs concurrently and is intentionally NOT part of the key.
+  // Sanitize free-text filters BEFORE they become part of the cache key. `brand`
+  // is user-supplied free text; left raw, `?brand=<random>` produces an unbounded
+  // number of distinct cache entries (each a fresh DB read), turning the shared
+  // catalog cache into per-request load. Bound its length and constrain `metal`
+  // to the two real values so junk querystrings collapse to the unfiltered key.
+  const safeBrand = (() => {
+    const v = (filters.brand ?? '').trim().slice(0, 60);
+    return v || null;
+  })();
+  const safeMetal = filters.metal === 'gold' || filters.metal === 'silver' ? filters.metal : null;
+
   const catalogFilterKey: ShopCatalogFilterKey = {
     status: filters.status ?? null,
     purity: filters.purity ?? null,
     metalColor: selectedMetalColor || null,
-    metal: filters.metal ?? null,
-    brand: filters.brand ?? null,
+    metal: safeMetal,
+    brand: safeBrand,
   };
 
   const [catalog, spotData] = await Promise.all([
@@ -662,6 +678,9 @@ export async function renderShopPage({
     <>
       <SiteHeader />
       <main className={isModern ? 'modern-shop-page pt-20 md:pt-28 pb-20' : 'pt-20 md:pt-32 pb-20'}>
+        <h1 className="sr-only">
+          {locale === 'es' ? 'Comprar Joyería de Patrimonio en Naples, FL' : 'Shop Estate Jewelry in Naples, FL'}
+        </h1>
         <div className="mx-auto w-full max-w-[2400px] px-[clamp(1rem,3vw,3rem)]">
 
           {/* Investment transparency note */}

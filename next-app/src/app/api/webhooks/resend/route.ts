@@ -7,7 +7,10 @@ export const runtime = 'nodejs';
 
 function verifySvixSignature(body: string, headers: Headers) {
   const secret = process.env.PROVIDER_WEBHOOK_SECRET || process.env.RESEND_WEBHOOK_SECRET;
-  if (!secret) return true;
+  // Fail CLOSED: with no configured secret we cannot verify the sender, so reject
+  // rather than trust an unauthenticated POST. (An unverified webhook here can flip
+  // arbitrary addresses to unsubscribed/suppressed via suppressMarketingEmail.)
+  if (!secret) return false;
 
   const id = headers.get('svix-id');
   const timestamp = headers.get('svix-timestamp');

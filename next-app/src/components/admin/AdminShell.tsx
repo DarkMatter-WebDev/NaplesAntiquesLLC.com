@@ -42,7 +42,7 @@ import {
   type ProductStatus,
   type SpotData,
 } from '@/types/product';
-import { calcSpotMeltValue, getDisplayPrice, getSpotMeltDisplayPrice } from '@/lib/pricing';
+import { calcSpotMeltValue, getDisplayPrice, getSpotMeltDisplayPrice, normalizeManualPriceLabel } from '@/lib/pricing';
 import ComboboxInput from './ComboboxInput';
 import AdminHeader from './AdminHeader';
 import {
@@ -68,7 +68,6 @@ interface Props {
 const STATUSES: { value: ProductStatus; label: string }[] = [
   { value: 'draft', label: 'Draft' },
   { value: 'available', label: 'Available' },
-  { value: 'reserved', label: 'Reserved' },
   { value: 'pending_payment', label: 'Pending Payment' },
   { value: 'sold', label: 'Sold' },
   { value: 'archived', label: 'Archived' },
@@ -189,7 +188,6 @@ function normalizeProductStatus(status: Product['status'] | null | undefined): P
   if (value === 'available') return 'available';
   if (value === 'sold') return 'sold';
   if (value === 'draft') return 'draft';
-  if (value === 'reserved') return 'reserved';
   if (value === 'pending_payment') return 'pending_payment';
   if (value === 'archived') return 'archived';
   return 'available';
@@ -204,7 +202,7 @@ function getStatusTone(status: Product['status'] | null | undefined) {
   const normalized = normalizeProductStatus(status);
   if (normalized === 'available') return { bg: 'var(--color-primary)', fg: 'var(--color-on-primary)' };
   if (normalized === 'sold') return { bg: 'var(--color-on-surface)', fg: 'var(--color-surface)' };
-  if (normalized === 'reserved' || normalized === 'pending_payment') return { bg: '#8a5a00', fg: '#fff' };
+  if (normalized === 'pending_payment') return { bg: '#8a5a00', fg: '#fff' };
   if (normalized === 'archived') return { bg: '#6b7280', fg: '#fff' };
   return { bg: 'var(--color-surface-container-high)', fg: 'var(--color-on-surface)' };
 }
@@ -213,11 +211,10 @@ function getStatusRank(status: Product['status'] | null | undefined): number {
   const normalized = normalizeProductStatus(status);
   const ranks: Record<string, number> = {
     available: 0,
-    reserved: 1,
-    pending_payment: 2,
-    draft: 3,
-    sold: 4,
-    archived: 5,
+    pending_payment: 1,
+    draft: 2,
+    sold: 3,
+    archived: 4,
   };
   return ranks[normalized] ?? 0;
 }
@@ -454,7 +451,7 @@ type QuickFillField =
   | 'itemYear'
   | 'location'
   | 'priceMode'
-  | 'askingPrice'
+  | 'priceLabel'
   | 'purity'
   | 'weight'
   | 'gender'
@@ -478,7 +475,7 @@ const QUICK_FILL_FORM_ORDER: QuickFillField[] = [
   'itemYear',
   'priceMode',
   'multiplier',
-  'askingPrice',
+  'priceLabel',
   'location',
   'status',
   'gender',
@@ -502,7 +499,7 @@ const AI_PRODUCT_FIELD_LABELS: Record<keyof ProductAutofillFields, string> = {
   weight_grams: 'Weight (g)',
   item_year: 'Date (Year Made)',
   pricing_multiplier: 'Multiplier',
-  asking_price: 'Asking Price',
+  asking_price: 'Price Label',
   manual_price_label: 'Price Label',
   description: 'Description (EN)',
   public_notes: 'Notes (EN)',
@@ -724,7 +721,14 @@ function normalizeQuickFillFieldName(value: string): QuickFillField | null {
   if (normalized === 'year' || normalized === 'year made' || normalized === 'date made' || normalized === 'made' || normalized === 'circa' || normalized === 'date' || normalized === 'item year' || normalized === 'item date') return 'itemYear';
   if (normalized === 'location') return 'location';
   if (normalized === 'price mode' || normalized === 'pricing mode' || normalized === 'mode') return 'priceMode';
-  if (normalized === 'asking price' || normalized === 'ask price' || normalized === 'price' || normalized === 'manual price') return 'askingPrice';
+  if (
+    normalized === 'asking price' ||
+    normalized === 'ask price' ||
+    normalized === 'price' ||
+    normalized === 'manual price' ||
+    normalized === 'price label' ||
+    normalized === 'manual price label'
+  ) return 'priceLabel';
   if (normalized === 'purity' || normalized === 'karat' || normalized === 'karats') return 'purity';
   if (normalized === 'weight' || normalized === 'weight g' || normalized === 'grams' || normalized === 'gram weight') return 'weight';
   if (normalized === 'gender') return 'gender';
@@ -767,6 +771,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<ReturnType<typeof emptyProduct> | null>(null);
   const [isNew, setIsNew] = useState(false);
+  const [quickAddMode, setQuickAddMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
@@ -912,6 +917,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       undoStackRef.current = [];
       lastEditorSnapshotRef.current = null;
       lastUndoCaptureAtRef.current = 0;
+      // Reset the (rendered) undo-availability flag when the editor closes. This
+      // effect synchronizes derived undo state with the editor inputs, so the
+      // set-state-in-effect flag is a false positive.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCanUndoEdit(false);
       return;
     }
@@ -1057,6 +1066,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setLengthInput('');
     setQuickEntry('');
     setQuickFillNotice(null);
+    setQuickAddMode(false);
     setShowAdvancedIds(false);
     setOpenEditorSections({ photos: false, ai: false, details: false });
     // Reset the Smart Listing Assistant so the next item starts completely fresh
@@ -1114,6 +1124,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setFormErrors([]);
     setQuickEntry('');
     setQuickFillNotice(null);
+    setQuickAddMode(false);
     setShowAdvancedIds(false);
     setOpenEditorSections({ photos: false, ai: false, details: false });
     setInventoryNumberManual(false);
@@ -1175,10 +1186,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       if (field === 'chainType') { newChainType = ''; applied.push('Link Type'); return true; }
       if (field === 'length') { newLength = ''; applied.push(getLengthSizeLabel(newJewelryType)); return true; }
       if (field === 'itemYear') { updates.item_year = null; applied.push('Date'); return true; }
-      if (field === 'askingPrice') {
+      if (field === 'priceLabel') {
         updates.asking_price = null;
         updates.manual_price_label = null;
-        applied.push('Asking Price');
+        applied.push('Price Label');
         return true;
       }
       if (field === 'purity') {
@@ -1356,7 +1367,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       if (!field || field === 'status') {
         if (lower === 'draft') { updates.status = 'draft'; applied.push('Status'); return true; }
         if (lower === 'available') { updates.status = 'available'; applied.push('Status'); return true; }
-        if (lower === 'reserved') { updates.status = 'reserved'; applied.push('Status'); return true; }
         if (lower === 'pending payment' || lower === 'pending_payment') { updates.status = 'pending_payment'; applied.push('Status'); return true; }
         if (lower === 'sold') { updates.status = 'sold'; applied.push('Status'); return true; }
         if (lower === 'archived') { updates.status = 'archived'; applied.push('Status'); return true; }
@@ -1383,14 +1393,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         }
       }
 
-      if (field === 'askingPrice' || (!field && /^\$\s*\d/.test(value))) {
-        const numericPrice = Number(value.replace(/[$,\s]/g, ''));
-        if (Number.isFinite(numericPrice) && numericPrice >= 0) {
-          updates.asking_price = numericPrice;
-          updates.manual_price_label = `$${numericPrice.toLocaleString()}`;
-          applied.push('Asking Price');
-          return true;
-        }
+      if (field === 'priceLabel' || (!field && /^\$\s*\d/.test(value))) {
+        updates.price_mode = 'manual';
+        updates.asking_price = null;
+        updates.manual_price_label = normalizeManualPriceLabel(value) ?? value;
+        applied.push('Price Label');
+        return true;
       }
 
       const purityMatch = lower.match(/^(\d+)\s*k?$/);
@@ -1750,11 +1758,16 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setField('weight_grams', 'Weight', (value) => { nextEditing.weight_grams = value; });
     setField('item_year', 'Date (Year Made)', (value) => { nextEditing.item_year = value; });
     setField('pricing_multiplier', 'Multiplier', (value) => { nextEditing.pricing_multiplier = value; });
-    setField('asking_price', 'Asking Price', (value) => {
-      nextEditing.asking_price = value;
-      nextEditing.manual_price_label = nextEditing.manual_price_label ?? `$${value.toLocaleString()}`;
+    setField('asking_price', 'Price Label', (value) => {
+      nextEditing.asking_price = null;
+      nextEditing.price_mode = 'manual';
+      nextEditing.manual_price_label = nextEditing.manual_price_label ?? normalizeManualPriceLabel(String(value));
     });
-    setField('manual_price_label', 'Price Label', (value) => { nextEditing.manual_price_label = value; });
+    setField('manual_price_label', 'Price Label', (value) => {
+      nextEditing.asking_price = null;
+      nextEditing.price_mode = 'manual';
+      nextEditing.manual_price_label = normalizeManualPriceLabel(value);
+    });
     setField('metal_type', 'Metal Type', (value) => {
       const nextCategory = getLegacyCategoryForMetalType(value, nextEditing.category);
       nextEditing.metal_type = value;
@@ -1813,6 +1826,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setEditorConfirm(null);
     setShowMicPrompt(false);
     setEditing(null);
+    setQuickAddMode(false);
     setSessionUploadedImageUrls(new Set());
     setPreviewImg(null);
     setCropTarget(null);
@@ -2252,6 +2266,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     originalRef.current = null;
     setFormErrors([]);
     setQuickEntry('');
+    setQuickAddMode(false);
     setShowAdvancedIds(false);
     setOpenEditorSections({ photos: false, ai: false, details: false });
     setInventoryNumberManual(false);
@@ -2312,6 +2327,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     const withJewelryType = normalizedJewelryType ? [...baseTags, `jt:${normalizedJewelryType}`] : baseTags;
     const withChain = normalizedLinkType ? [...withJewelryType, `ct:${normalizedLinkType}`] : withJewelryType;
     const finalTags = normalizedLength ? [...withChain, `len:${normalizedLength}`] : withChain;
+    const normalizedManualPriceLabel = normalizeManualPriceLabel(editing.manual_price_label);
+    const effectivePriceMode: Product['price_mode'] =
+      quickAddMode || editing.price_mode === 'manual' || normalizedManualPriceLabel
+        ? 'manual'
+        : 'spot-multiplier';
 
     const payload = {
       ...editing,
@@ -2331,7 +2351,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       jewelry_type: normalizedJewelryType,
       chain_type: normalizedLinkType || null,
       length: normalizedLength || null,
-      pricing_multiplier: editing.pricing_multiplier ?? null,
+      price_mode: effectivePriceMode,
+      pricing_multiplier: effectivePriceMode === 'manual' ? null : editing.pricing_multiplier ?? null,
+      manual_price_label: effectivePriceMode === 'manual' ? normalizedManualPriceLabel : null,
+      asking_price: null,
       status: normalizeProductStatus(editing.status),
       location: editing.location || 'showcase',
       item_year: normalizeProductItemYear(editing.item_year),
@@ -2683,7 +2706,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
   const total = products.length;
   const available = products.filter((p) => normalizeProductStatus(p.status) === 'available').length;
-  const reserved = products.filter((p) => normalizeProductStatus(p.status) === 'reserved').length;
   const sold = products.filter((p) => normalizeProductStatus(p.status) === 'sold').length;
   const existingBrandOptions = Array.from(new Set(products.map((product) => product.brand?.trim()).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b));
 
@@ -2741,11 +2763,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         )}
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
           {[
             { label: 'Total', value: total },
             { label: 'Available', value: available },
-            { label: 'Reserved', value: reserved },
             { label: 'Sold', value: sold },
           ].map(({ label, value }) => (
             <div key={label}
@@ -3222,13 +3243,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                                   Available
                                 </button>
                               )}
-                              {normalizeProductStatus(p.status) !== 'reserved' && (
-                                <button type="button" onClick={() => { setActionMenuId(null); updateProductStatus(p, 'reserved'); }}
-                                  className={ROW_ACTION_MENU_ITEM_CLASS}
-                                  style={{ color: '#8a5a00', fontFamily: 'var(--font-label)' }}>
-                                  Reserve
-                                </button>
-                              )}
                               {normalizeProductStatus(p.status) !== 'sold' && (
                                 <button type="button" onClick={() => { setActionMenuId(null); updateProductStatus(p, 'sold'); }}
                                   className={ROW_ACTION_MENU_ITEM_CLASS}
@@ -3676,14 +3690,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 </div>
                 <p className="text-[0.6rem] leading-relaxed hidden" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
                   Paste comma values, Field:Value pairs, or a two-line CSV header/value list. Labeled fields can be in any order; unlabeled CSV rows use the form order. Only include what differs from the defaults.
-                  Recognized tokens: <strong>Category</strong> (Gold / Silver) · <strong>Status</strong> (Draft / Available / Reserved / Pending Payment / Sold / Archived) ·&nbsp;
+                  Recognized tokens: <strong>Category</strong> (Gold / Silver) · <strong>Status</strong> (Draft / Available / Pending Payment / Sold / Archived) ·&nbsp;
                   <strong>Jewelry Type</strong> (Necklace / Bracelet / Ring / Pendant / Earrings / Watch) ·&nbsp;
                   <strong>Link Type</strong> (Cuban link / Figaro link / Rope chain / etc.) ·&nbsp;
                   <strong>Length/Size</strong> (22in / 7.5in / ring size 7) ·&nbsp;
                   <strong>Price Mode</strong> (Spot / Manual) ·&nbsp;
                   <strong>Purity</strong> (18k / 14k / 10k / 925) ·&nbsp;
                   <strong>Weight</strong> (25.3g) ·&nbsp;
-                  <strong>Multiplier</strong> (1.25x). Field labels can also target Title English, Title Spanish, Location, Asking Price, Description English, Description Spanish, Notes (EN), and Notes (ES).
+                  <strong>Multiplier</strong> (1.25x). Field labels can also target Title English, Title Spanish, Location, Price Label, Description English, Description Spanish, Notes (EN), and Notes (ES).
                 </p>
               </div>
               )}
@@ -4115,6 +4129,28 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 })()}
               </div>
 
+              {isNew && (
+                <label className="inline-flex w-fit items-center gap-2 text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                  <input
+                    type="checkbox"
+                    checked={quickAddMode}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      setQuickAddMode(checked);
+                      if (checked) {
+                        setEditing({
+                          ...editing,
+                          price_mode: 'manual',
+                          pricing_multiplier: null,
+                          asking_price: null,
+                        });
+                      }
+                    }}
+                  />
+                  Quick add
+                </label>
+              )}
+
               {/* Pricing — Mode · Purity · Weight · Multiplier/Price Label (2-up on mobile, 4-up on desktop) */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
@@ -4124,7 +4160,15 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     show={editing.price_mode !== 'spot-multiplier'}
                   >
                     <select className="form-field w-full" value={editing.price_mode}
-                      onChange={(e) => setEditing({ ...editing, price_mode: e.target.value as 'spot-multiplier' | 'manual' })}>
+                      onChange={(e) => {
+                        const nextMode = e.target.value as 'spot-multiplier' | 'manual';
+                        setQuickAddMode(false);
+                        setEditing({
+                          ...editing,
+                          price_mode: nextMode,
+                          ...(nextMode === 'spot-multiplier' ? { manual_price_label: null, asking_price: null } : {}),
+                        });
+                      }}>
                       {PRICE_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                     </select>
                   </ClearableField>
@@ -4185,34 +4229,30 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   ) : (
                     <>
                       <label className="form-label">Price Label</label>
-                      <ClearableField onClear={() => setEditing({ ...editing, manual_price_label: '' })} show={!!editing.manual_price_label}>
+                      <ClearableField onClear={() => setEditing({ ...editing, asking_price: null, manual_price_label: '' })} show={!!editing.manual_price_label}>
                       <input className="form-field w-full" placeholder="$1,200"
                         value={editing.manual_price_label ?? ''}
-                        onChange={(e) => setEditing({ ...editing, manual_price_label: e.target.value })} />
+                        onChange={(e) => {
+                          const nextValue = e.target.value;
+                          setEditing((current) => current ? ({
+                            ...current,
+                            asking_price: null,
+                            price_mode: 'manual',
+                            manual_price_label: normalizeManualPriceLabel(nextValue),
+                          }) : current);
+                        }}
+                        onBlur={(e) => {
+                          const normalized = normalizeManualPriceLabel(e.currentTarget.value);
+                          setEditing((current) => current ? ({
+                            ...current,
+                            asking_price: null,
+                            price_mode: 'manual',
+                            manual_price_label: normalized,
+                          }) : current);
+                        }} />
                       </ClearableField>
                     </>
                   )}
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-4 gap-4">
-                <div>
-                  <label className="form-label">Asking Price</label>
-                  <ClearableField
-                    onClear={() => setEditing({ ...editing, asking_price: null })}
-                    show={editing.price_mode === 'manual' && !!editing.asking_price}
-                    disabled={editing.price_mode !== 'manual'}
-                  >
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-field w-full"
-                    disabled={editing.price_mode !== 'manual'}
-                    value={editing.asking_price ?? ''}
-                    onChange={(e) => setEditing({ ...editing, asking_price: e.target.value ? Number(e.target.value) : null })}
-                    style={editing.price_mode !== 'manual' ? { background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface-variant)' } : undefined}
-                  />
-                  </ClearableField>
                 </div>
               </div>
 
@@ -4342,6 +4382,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     originalRef.current = null;
                     setFormErrors([]);
                     setQuickEntry('');
+                    setQuickAddMode(false);
                     setInventoryNumberManual(false);
                     setLengthInput(getProductLength(editing as Product));
                     setEditing(clone);

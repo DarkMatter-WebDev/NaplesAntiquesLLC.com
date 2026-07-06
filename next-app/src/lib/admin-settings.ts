@@ -54,7 +54,7 @@ Bicolor Gold is a gold metal color, but the shop treats it as a crossover item t
 
 ${QUICK_FILL_PRODUCT_HIERARCHY_RULES_ADDENDUM}
 
-Use Status as Draft, Available, Reserved, Pending Payment, Sold, or Archived.
+Use Status as Draft, Available, Pending Payment, Sold, or Archived.
 
 Use Price Mode as Manual or Spot.
 

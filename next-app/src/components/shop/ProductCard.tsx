@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { formatProductItemYear, inferProductJewelryType, isProductPurchasable, isProductSold, productImagePaddingBackground, productImagePaddingForImage, productLengthSizeDisplay, productMetalVariantLabel, productStatusLabel, productSupportsLinkType, type Product, type SpotData } from '@/types/product';
+import { formatProductItemYear, inferProductJewelryType, isProductPurchasable, isProductSold, normalizeProductStatus, productImagePaddingBackground, productImagePaddingForImage, productLengthSizeDisplay, productMetalVariantLabel, productStatusLabel, productSupportsLinkType, type Product, type SpotData } from '@/types/product';
 import { getDisplayPrice } from '@/lib/pricing';
 import WishlistButton from '@/components/shop/WishlistButton';
 import type { WishlistItem } from '@/context/WishlistContext';
@@ -63,6 +63,7 @@ export default function ProductCard({
   const imageFrameBackground = productImagePaddingBackground(productImagePaddingForImage(product.image_padding, product.image_padding_by_image, activeImage, safeActiveImageIndex));
   const thumbPadding = productImagePaddingForImage(product.image_padding, product.image_padding_by_image, thumb, 0);
   const href = locale === 'es' ? `/es/shop/${product.id}` : `/shop/${product.id}`;
+  const normalizedStatus = normalizeProductStatus(product.status);
   const isSold = isProductSold(product.status);
   const isPurchasable = isProductPurchasable(product.status);
   const isModern = variant === 'modern';
@@ -89,7 +90,7 @@ export default function ProductCard({
     public_notes: product.public_notes,
     image: thumb,
     image_padding: thumbPadding,
-    status: product.status,
+    status: normalizedStatus,
     priceLabel: price,
     category: product.category,
     metal_type: product.metal_type,
@@ -114,7 +115,7 @@ export default function ProductCard({
     title_es: product.title_es,
     image: thumb,
     image_padding: thumbPadding,
-    status: product.status,
+    status: normalizedStatus,
     price_mode: product.price_mode,
     purity: product.purity,
     weight_grams: product.weight_grams,

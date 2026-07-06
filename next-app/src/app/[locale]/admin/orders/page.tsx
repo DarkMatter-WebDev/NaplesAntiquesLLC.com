@@ -31,11 +31,14 @@ const ORDER_LIST_COLUMNS = [
   'billing_address',
   'internal_notes',
   'customer_notes',
+  'deleted_at',
   'created_at',
   'updated_at',
   'order_items(id, order_id, product_id, inventory_number, title_snapshot, item_year_snapshot, metal_snapshot, purity_snapshot, gram_weight_snapshot, price_snapshot, discount, image_snapshot, created_at)',
 ].join(', ');
 const ORDER_LIST_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT = ORDER_LIST_COLUMNS.replace('item_year_snapshot, ', '');
+const ORDER_LIST_COLUMNS_WITHOUT_DELETED_AT = ORDER_LIST_COLUMNS.replace('deleted_at, ', '');
+const ORDER_LIST_COLUMNS_WITHOUT_BOTH = ORDER_LIST_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT.replace('deleted_at, ', '');
 
 const ORDER_PRODUCT_COLUMNS = [
   'id',
@@ -67,12 +70,19 @@ function isMissingItemYearColumnError(error: { message?: string | null } | null 
   return Boolean(error?.message?.toLowerCase().includes('item_year'));
 }
 
-interface Props {
-  params: Promise<{ locale: string }>;
+function isMissingDeletedAtColumnError(error: { message?: string | null } | null | undefined) {
+  return Boolean(error?.message?.toLowerCase().includes('deleted_at'));
 }
 
-export default async function AdminOrdersPage({ params }: Props) {
+interface Props {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<{ view?: string }>;
+}
+
+export default async function AdminOrdersPage({ params, searchParams }: Props) {
   const { locale } = await params;
+  const { view } = await searchParams;
+  const isTrash = view === 'trash';
   const isEs = locale === 'es';
   const adminBasePath = isEs ? '/es/admin' : '/admin';
 
@@ -93,11 +103,16 @@ export default async function AdminOrdersPage({ params }: Props) {
     redirect(isEs ? '/es/account' : '/account');
   }
 
+  const ordersQuery = supabase
+    .from('orders')
+    .select(ORDER_LIST_COLUMNS)
+    .order('created_at', { ascending: false });
+  const filteredOrdersQuery = isTrash
+    ? ordersQuery.not('deleted_at', 'is', null)
+    : ordersQuery.is('deleted_at', null);
+
   const [ordersResult, productsResult, spotData, { count: unreadMessagesCount }] = await Promise.all([
-    supabase
-      .from('orders')
-      .select(ORDER_LIST_COLUMNS)
-      .order('created_at', { ascending: false }),
+    filteredOrdersQuery,
     supabase
       .from('products')
       .select(ORDER_PRODUCT_COLUMNS)
@@ -109,13 +124,32 @@ export default async function AdminOrdersPage({ params }: Props) {
       .eq('is_read', false),
   ]);
   let orders = ordersResult.data;
+  let recycleBinSupported = !ordersResult.error;
   let products: unknown[] | null = productsResult.data as unknown[] | null;
-  if (isMissingItemYearColumnError(ordersResult.error)) {
-    const fallback = await supabase
-      .from('orders')
-      .select(ORDER_LIST_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT)
-      .order('created_at', { ascending: false });
-    orders = fallback.data;
+  if (ordersResult.error) {
+    recycleBinSupported = !isMissingDeletedAtColumnError(ordersResult.error);
+    if (isMissingItemYearColumnError(ordersResult.error) && recycleBinSupported) {
+      const fallbackQuery = supabase
+        .from('orders')
+        .select(ORDER_LIST_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT)
+        .order('created_at', { ascending: false });
+      const fallback = await (isTrash
+        ? fallbackQuery.not('deleted_at', 'is', null)
+        : fallbackQuery.is('deleted_at', null));
+      orders = fallback.data;
+      recycleBinSupported = !fallback.error;
+    } else if (isMissingDeletedAtColumnError(ordersResult.error)) {
+      recycleBinSupported = false;
+      if (isTrash) {
+        orders = [];
+      } else {
+        const fallback = await supabase
+          .from('orders')
+          .select(isMissingItemYearColumnError(ordersResult.error) ? ORDER_LIST_COLUMNS_WITHOUT_BOTH : ORDER_LIST_COLUMNS_WITHOUT_DELETED_AT)
+          .order('created_at', { ascending: false });
+        orders = fallback.data;
+      }
+    }
   }
   if (isMissingItemYearColumnError(productsResult.error)) {
     const fallback = await supabase
@@ -123,6 +157,14 @@ export default async function AdminOrdersPage({ params }: Props) {
       .select(ORDER_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR)
       .order('sort_order', { ascending: true });
     products = (fallback.data as unknown[] | null)?.map((product) => ({ ...(product as Record<string, unknown>), item_year: null })) ?? null;
+  }
+  let trashCount = 0;
+  if (recycleBinSupported) {
+    const { count } = await supabase
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .not('deleted_at', 'is', null);
+    trashCount = count ?? 0;
   }
 
   return (
@@ -139,6 +181,9 @@ export default async function AdminOrdersPage({ params }: Props) {
         products={(products ?? []) as unknown as Product[]}
         spotData={spotData}
         locale={locale}
+        view={isTrash ? 'trash' : 'active'}
+        trashCount={trashCount}
+        recycleBinSupported={recycleBinSupported}
       />
     </div>
   );

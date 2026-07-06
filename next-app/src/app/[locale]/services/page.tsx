@@ -1,13 +1,18 @@
 import type { Metadata } from 'next';
+import { alternatesFor } from '@/lib/seo';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 
-export const metadata: Metadata = {
-  title: 'Other Services | Naples Estate Jewelry',
-  description:
-    'Choose a free jewelry evaluation or estate services with Naples Estate Jewelry. Private, appointment-only service throughout Southwest Florida.',
-};
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  return {
+    title: 'Our Services',
+    description:
+      'Choose a free jewelry evaluation or estate services with Naples Estate Jewelry. Private, appointment-only service throughout Southwest Florida.',
+    alternates: alternatesFor('/services', locale),
+  };
+}
 
 interface Props {
   params: Promise<{ locale: string }>;

@@ -68,13 +68,28 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
     Permissions-Policy = "geolocation=(), microphone=(), camera=()"
-    Content-Security-Policy-Report-Only = "default-src 'self'; img-src 'self' data: https://evzluixourmsefwdsieu.supabase.co; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://evzluixourmsefwdsieu.supabase.co https://api.gold-api.com; frame-ancestors 'none'"
+    # Enforcing CSP. Allowlist covers all third parties in use: Supabase (data/images),
+    # gold-api.com (spot prices), Google Fonts, TradingView embed widgets (service-page
+    # price charts), and PayPal (checkout SDK/iframe). ⚠️ If a page breaks after deploy,
+    # roll back instantly by re-commenting this line and uncommenting the Report-Only
+    # line below. Verify after deploy: home, /gold-services (TradingView chart), and
+    # /checkout (PayPal — once its Netlify creds are fixed).
+    Content-Security-Policy = "default-src 'self'; base-uri 'self'; img-src 'self' data: blob: https://evzluixourmsefwdsieu.supabase.co https://s3.tradingview.com https://*.tradingview.com https://*.paypal.com https://*.paypalobjects.com; script-src 'self' 'unsafe-inline' https://s3.tradingview.com https://www.paypal.com https://*.paypalobjects.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://evzluixourmsefwdsieu.supabase.co https://api.gold-api.com https://s3.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com https://*.paypal.com; frame-src https://*.tradingview.com https://*.tradingview-widget.com https://*.paypal.com; worker-src 'self' blob:; frame-ancestors 'none'"
+    # Rollback line (uncomment this and comment the line above to revert to report-only):
+    # Content-Security-Policy-Report-Only = "default-src 'self'; img-src 'self' data: https://evzluixourmsefwdsieu.supabase.co; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://evzluixourmsefwdsieu.supabase.co https://api.gold-api.com; frame-ancestors 'none'"
 
 # ---------------------------------------------------------------------------
-# Caching — immutable long cache for fingerprinted/static assets; short,
-# revalidated cache for everything else (HTML). More specific rules first so
-# they take precedence over the /* catch-all for Cache-Control.
+# Caching — short, revalidated cache for HTML; immutable long cache for
+# fingerprinted/static assets. Netlify applies LATER matching rules with
+# precedence, so the /* catch-all must come FIRST and the specific asset rules
+# after it — otherwise the catch-all's max-age=0 clobbers the immutable rules
+# on /assets/* and /_next/static/*.
 # ---------------------------------------------------------------------------
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
 [[headers]]
   for = "/_next/static/*"
   [headers.values]
@@ -84,11 +99,6 @@
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
-
-[[headers]]
-  for = "/*"
-  [headers.values]
-    Cache-Control = "public, max-age=0, must-revalidate"
 
 # ---------------------------------------------------------------------------
 # Legacy image URLs (assets moved to assets/images/)

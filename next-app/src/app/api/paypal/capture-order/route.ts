@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/service';
 import { capturePayPalOrder, paypalConfigured } from '@/lib/paypal';
+import { finalizePaidOrder, notifyItemConflict } from '@/lib/order-finalize';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -106,7 +107,12 @@ export async function POST(req: Request) {
 
   if (result?.item_conflict) {
     // Another buyer completed payment first. The order is flagged in the DB for
-    // manual refund — surface a clear message to this buyer.
+    // manual refund — alert an admin (the buyer's money was captured) and surface
+    // a clear message to this buyer.
+    await notifyItemConflict(service, {
+      id: order.id,
+      orderNumber: (result?.order_number as string | undefined) ?? order.order_number,
+    });
     return NextResponse.json(
       { error: 'Sorry, one or more items in your order were just purchased by another buyer. Our team will contact you to process a full refund.' },
       { status: 409 },
@@ -118,45 +124,11 @@ export async function POST(req: Request) {
   // next /shop visit (only revalidating in the background for the visit after that).
   revalidateTag('shop-catalog', { expire: 0 }); // purchased items are now 'sold' in the gallery
 
-  // Auto-generate invoice on payment completion. ON CONFLICT DO NOTHING so a
-  // double-capture or admin retry never creates a duplicate.
-  const invoiceNumber = `INV-${((result?.order_number as string | undefined) ?? order.order_number).replace(/^NEJ-/, '')}`;
-  await service.from('invoices').upsert(
-    {
-      invoice_number: invoiceNumber,
-      order_id: order.id,
-      user_id: order.user_id ?? null,
-      customer_name: order.customer_name,
-      customer_email: order.customer_email,
-      subtotal: order.subtotal,
-      tax: order.tax,
-      shipping_fee: order.shipping_fee,
-      discount: order.discount,
-      total: order.total,
-      status: 'paid',
-    },
-    { onConflict: 'invoice_number', ignoreDuplicates: true },
-  );
-
-  // Automatically email the buyer their receipt now that the order is paid.
-  // Best-effort: the payment already succeeded, so an email failure must not fail
-  // the capture. Only runs on this fresh capture (an already-paid order returns
-  // earlier, so no duplicate receipt).
-  const resendKey = process.env.RESEND_API_KEY;
-  if (resendKey && order.customer_email) {
-    try {
-      const { sendOrderInvoiceEmail } = await import('@/lib/order-invoice-mailer');
-      await sendOrderInvoiceEmail({
-        supabase: service,
-        resendKey,
-        orderId: order.id,
-        recipient: order.customer_email,
-        sentBy: { id: null, email: 'Automatic — order confirmation' },
-      });
-    } catch (err) {
-      console.error('Auto receipt email error:', err);
-    }
-  }
+  // Invoice upsert (idempotent) + auto receipt email. Shared with the webhook
+  // backstop so a browser-death capture still produces both. Best-effort — the
+  // payment already succeeded, so a failure here must not fail the capture. Only
+  // runs on this fresh capture (an already-paid order returns earlier).
+  await finalizePaidOrder(service, order.id);
 
   return NextResponse.json({
     success: true,

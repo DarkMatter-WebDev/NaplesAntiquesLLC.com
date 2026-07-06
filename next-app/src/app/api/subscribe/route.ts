@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 function normalizeEmail(value: unknown) {
   return String(value ?? '').trim().toLowerCase();
@@ -10,11 +11,16 @@ function isValidEmail(value: string) {
 }
 
 export async function POST(req: Request) {
+  const ip = getClientIp(req);
+  if (!(await checkRateLimit(`subscribe:${ip}`, 10, 3600))) {
+    return NextResponse.json({ error: 'Too many requests. Please try again in a bit.' }, { status: 429 });
+  }
+
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
 
   const email = normalizeEmail(body.email);
-  const fullName = String(body.fullName ?? '').trim();
+  const fullName = String(body.fullName ?? '').trim().slice(0, 200);
   const locale = String(body.locale ?? 'en') === 'es' ? 'es' : 'en';
 
   if (!isValidEmail(email)) {

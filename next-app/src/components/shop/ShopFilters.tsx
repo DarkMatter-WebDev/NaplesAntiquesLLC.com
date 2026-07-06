@@ -185,20 +185,6 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
   const currentItemGroup = currentFilters.itemGroup ?? getItemGroupForItemType(currentFilters.itemType);
   const showMetalFilter = currentItemGroup !== 'everything-else';
   const showGenderFilter = currentItemGroup !== 'everything-else';
-  const hasDrawerFilters = !!(
-    currentFilters.metal ||
-    visibleMetalColor ||
-    currentFilters.purity ||
-    currentFilters.status ||
-    currentFilters.itemType ||
-    (showLinkTypeFilter && currentFilters.chainType) ||
-    visibleSelectedLengths.length > 0 ||
-    currentFilters.gender ||
-    currentFilters.brand ||
-    priceFilterActive ||
-    currentFilters.sort ||
-    currentFilters.itemGroup
-  );
   const [filtersOpen, setFiltersOpen] = useState(false);
   const selectedPriceSource = `${selectedPriceMin}:${selectedPriceMax}`;
   const [draftPrice, setDraftPrice] = useState({
@@ -1009,8 +995,8 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
       >
         <span>
           {isEs
-            ? `Mostrando ${filteredCount} de ${allCount} piezas`
-            : `Showing ${filteredCount} of ${allCount} pieces`}
+            ? (filteredCount === allCount ? `${allCount} piezas` : `${filteredCount} de ${allCount} piezas`)
+            : (filteredCount === allCount ? `${allCount} pieces` : `${filteredCount} of ${allCount} pieces`)}
         </span>
         {hasFilters && (
           <button

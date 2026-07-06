@@ -18,10 +18,19 @@ export default function EvalForm({ locale, submitted }: Props) {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formEl = e.currentTarget;
+    const fd = new FormData(formEl);
+    // Photos are optional, but a submission needs *something* to act on — require
+    // at least one photo or a short description so the lead isn't empty.
+    const description = (fd.get('description') as string | null)?.trim() ?? '';
+    if (photoCount === 0 && description === '') {
+      setErr(isEs
+        ? 'Añada al menos una foto o una breve descripción de lo que tiene.'
+        : 'Please add at least one photo or a short description of what you have.');
+      return;
+    }
     setSending(true);
     setErr('');
     try {
-      const fd = new FormData(formEl);
       fd.append('source', 'free-evaluation');
       const res = await fetch('/api/inquire', { method: 'POST', body: fd });
       if (!res.ok) throw new Error(await res.text());
@@ -69,8 +78,8 @@ export default function EvalForm({ locale, submitted }: Props) {
           </p>
           <p className="text-sm" style={{ color: '#5e5e5d' }}>
             {isEs
-              ? 'Revisaremos sus fotos y nos comunicaremos con usted pronto.'
-              : "We'll review your photos and be in touch soon."}
+              ? 'Revisaremos su información y nos comunicaremos con usted pronto.'
+              : "We'll review your submission and be in touch soon."}
           </p>
         </div>
       ) : (
@@ -81,7 +90,7 @@ export default function EvalForm({ locale, submitted }: Props) {
               className="text-[0.7rem] font-bold uppercase tracking-[0.14em]"
               style={{ color: '#5e5e5d', fontFamily: 'var(--font-label)' }}
             >
-              {isEs ? 'Fotos — seleccione una o más' : 'Photos — select one or more'}
+              {isEs ? 'Fotos — opcionales, pero ayudan' : 'Photos — optional but helpful'}
             </span>
             <label
               className="flex flex-col items-center justify-center rounded-2xl text-center cursor-pointer transition-colors"
@@ -107,7 +116,6 @@ export default function EvalForm({ locale, submitted }: Props) {
                 name="photos"
                 accept="image/*"
                 multiple
-                required
                 className="sr-only"
                 onChange={(e) => setPhotoCount(e.target.files?.length ?? 0)}
               />

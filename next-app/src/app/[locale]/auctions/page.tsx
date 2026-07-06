@@ -1,13 +1,18 @@
 import type { Metadata } from 'next';
+import { alternatesFor } from '@/lib/seo';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 
-export const metadata: Metadata = {
-  title: 'Auctions | Naples Estate Jewelry',
-  description:
-    'Auction guidance for estate jewelry, antiques, coins, watches, art, and high-value collections in Naples and Southwest Florida.',
-};
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  return {
+    title: 'Consignment & Auctions',
+    description:
+      'Auction guidance for estate jewelry, antiques, coins, watches, art, and high-value collections in Naples and Southwest Florida.',
+    alternates: alternatesFor('/auctions', locale),
+  };
+}
 
 interface Props {
   params: Promise<{ locale: string }>;

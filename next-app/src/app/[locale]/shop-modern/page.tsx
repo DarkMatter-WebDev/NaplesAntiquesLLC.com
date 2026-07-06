@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { renderShopPage } from '@/app/[locale]/shop/page';
+import { renderShopPage } from '@/app/[locale]/shop/(list)/page';
 
 interface Props {
   params: Promise<{ locale: string }>;
@@ -25,6 +25,8 @@ interface Props {
 export const metadata: Metadata = {
   title: 'Shop Modern Preview',
   description: 'Preview a modernized Naples Estate Jewelry shop layout with live product data.',
+  // Internal preview route — never index it as a duplicate of /shop.
+  robots: { index: false, follow: false },
 };
 
 export default async function ShopModernPage({ params, searchParams }: Props) {

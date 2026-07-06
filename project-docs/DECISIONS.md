@@ -1,5 +1,110 @@
 # Decisions Log
 
+## 2026-07-06 - Remove manual Reserved item status
+
+**Decision:** Remove the manual **Reserved** product status from the active app. Product
+Admin no longer shows a Reserved metric, status option, quick-fill token, or row action.
+Legacy stored `reserved` values normalize to `available` in the app layer. Manual
+admin-created unpaid orders continue to move products to `pending_payment`; sold,
+archived, draft, and available remain as the active product lifecycle statuses.
+
+**Reason:** The owner wants the reservation feature gone from item management. The
+remaining lifecycle states cover the actual workflows without exposing a separate
+manual hold status.
+
+**Alternatives considered:** (1) Keep `reserved` as a hidden/internal status - rejected
+because it leaves behavior and copy around the removed feature. (2) Add a destructive DB
+migration to rewrite/drop old reservation columns immediately - deferred because the
+request is satisfied in app behavior and destructive live data/schema changes should be
+handled as an explicit SQL step if later needed.
+
+## 2026-07-06 - Orders badge tracks unseen active orders
+
+**Decision:** The admin **Orders** nav badge now counts active order rows created after
+the current admin/browser last viewed the active Orders area. Viewing `/admin/orders`
+or an order detail page stores a local last-seen timestamp and clears the badge. Orders
+in the Recycle Bin (`orders.deleted_at is not null`) do not count toward the badge.
+
+**Reason:** The prior badge counted `payment_status='paid'` +
+`fulfillment_status='pending'`, so it behaved like a fulfillment workload counter and
+could show stale numbers unrelated to visible active orders, especially after the
+Orders Recycle Bin was added. The owner wants the tab label to work like a notification:
+show new orders that have not been seen, then disappear once they are seen.
+
+**Alternatives considered:** (1) Keep the old fulfillment count - rejected because it
+does not answer "new/unseen" and can disagree with the active Orders list. (2) Add a
+new database read-state column/table - deferred as heavier than needed for the current
+single-admin workflow. (3) Put orders back into the Messages unread system - rejected
+because prior project direction separated order awareness from the Messages inbox.
+
+## 2026-07-06 - Manual fixed price entry uses Price Label, not Asking Price
+
+**Decision:** The admin New Item/Edit Item form no longer exposes an **Asking Price**
+field. For `price_mode='manual'`, the single visible source of truth is
+`manual_price_label` ("Price Label"). Admin saves clear `asking_price` to `null`; quick
+fill and AI values that previously targeted asking price now populate the price label.
+Bare numeric labels are accepted and normalized by shared pricing helpers (`1` -> `$1`,
+`1200` -> `$1,200`) so shop display, cart, checkout, and order snapshots parse the same
+value. New Item also has a **Quick add** checkbox that sets manual fixed pricing and
+lets admins create a minimum viable listing with title + price without entering
+spot-pricing inputs. Checkout snapshot pricing parses the price label first, with
+`asking_price` retained only as a legacy fallback for older rows that have no label.
+
+**Reason:** Maintaining both fields created duplicated manual-price entry and allowed a
+hidden stale asking price to override the visible label. The owner wants manual fixed
+pricing to be controlled by the label the admin actually sees. Admins also need to list
+a simple fixed-price item quickly without accidentally creating an unpriceable
+spot-multiplier product.
+
+**Alternatives considered:** (1) Keep both fields but disable asking price - rejected
+because it still leaves two concepts in the form. (2) Drop all legacy `asking_price`
+handling immediately - rejected because older rows may still rely on it until edited.
+The chosen path consolidates new/edit flows while preserving old data safely. (3) Let
+Quick add save items with no price - rejected because those products would still
+produce dash totals in cart/checkout; Quick add skips spot gates, not the price itself.
+
+## 2026-07-05 - Admins may explicitly restore inventory from completed orders
+
+**Decision:** Order detail has an explicit **Restore item to inventory** action that
+marks the linked product rows `available` without changing the order's payment/order
+status. The Recycle Bin delete confirmation also offers a second explicit path,
+**Move to Recycle Bin and return to inventory**, which restores linked products before
+soft-deleting the order. Paid/completed orders are allowed through these explicit admin
+paths.
+
+**Reason:** The business may have more than one of the same item or may need to re-list
+inventory even though a previous order remains a valid completed sale record. Inventory
+state and sales/payment history are related but not always identical; the admin needs a
+deliberate override that preserves the order record while re-opening the item for sale.
+
+**Alternatives considered:** (1) Continue blocking paid orders from inventory return -
+rejected because it prevents legitimate re-listing when another matching item exists.
+(2) Automatically return inventory whenever an order is deleted - rejected because it
+can unintentionally re-list sold inventory. The chosen design makes record deletion and
+inventory return two separate, visible choices.
+
+## 2026-07-05 - Generate invoice rows at order creation; update status on payment
+
+**Decision:** Create an `invoices` row as soon as an order is placed, even before
+payment is captured. New PayPal checkout orders and new manual admin orders generate a
+draft invoice through the shared idempotent `upsertOrderInvoice` helper. When a PayPal
+capture succeeds, the same helper updates the existing invoice to `paid` instead of
+creating a duplicate. Admin order detail exposes a Generate/Refresh Invoice action for
+older orders that predate this rule or otherwise lack an invoice row.
+
+**Reason:** An order can exist before payment, but the admin still needs a stable
+invoice document/number immediately and a recovery path for legacy gaps. Idempotent
+upsert keeps PayPal retries, webhook/capture backstops, and manual refreshes safe.
+Updating the existing row on payment avoids the bug where a pre-created draft invoice
+would prevent the later paid invoice status from being written.
+
+**Alternatives considered:** (1) Generate invoices only on paid capture - rejected
+because unpaid/manual orders and abandoned-but-valid order records have no invoice for
+admin follow-up. (2) Generate only from the admin detail page - rejected because normal
+orders should not require a manual second step. (3) Insert a new paid invoice on capture
+with a different number - rejected because one order should have one stable invoice
+number.
+
 > Running log of important technical, design, and business decisions. Newest at
 > the top. Use the format below for every entry.
 >
@@ -9,6 +114,53 @@
 > **Reason:** ...
 > **Alternatives considered:** ...
 > ```
+
+## 2026-07-05 — Orders delete to a Recycle Bin via `orders.deleted_at`
+
+**Decision:** Add a soft-delete Recycle Bin for admin orders using a nullable
+`orders.deleted_at` column. `/admin/orders` shows only active rows (`deleted_at is
+null`), `/admin/orders?view=trash` shows deleted rows, Restore clears `deleted_at`, and
+Delete Forever still hard-deletes from the bin after confirmation. Restoring an order
+record does not automatically change product inventory statuses.
+
+**Reason:** Order records are sales/accounting history, so accidental hard deletes are
+too costly. A simple timestamp keeps recovery cheap, preserves order items and email
+history, and matches the existing admin Messages recycle-bin mental model while avoiding
+inventory surprises on restore.
+
+**Alternatives considered:** (1) Keep hard delete and rely on caution — rejected because
+the owner explicitly wants recovery. (2) Use `order_status='cancelled'` as the bin —
+rejected because cancelled is a real business state, not a deletion marker. (3) Auto-
+restore inventory statuses when restoring an order — rejected for now because inventory
+may have changed after deletion; the app restores the record only and leaves inventory
+review to the admin.
+
+## 2026-07-05 — `shop/(list)/` route group to give product pages a real 404
+
+**Decision:** Put the shop-list page and its loading skeleton in a `shop/(list)/`
+route group, keep `shop/[id]/page.tsx` with **no** `loading.tsx`, and add an early
+`notFound()` in the product `generateMetadata`. This makes unknown/hidden
+`/shop/[id]` URLs return a genuine HTTP 404 while `/shop` keeps its streamed
+loading skeleton.
+
+**Reason:** A `loading.tsx` creates a Suspense/streaming boundary that commits a
+200 shell before the page body's `notFound()` runs, so bad product URLs were
+soft-404s (200). The boundary that mattered was the **ancestor** `shop/loading.tsx`
+(it wraps `[id]` too), so removing only `shop/[id]/loading.tsx` didn't help — both
+had to leave `[id]`'s ancestry. A route group `()` doesn't change the URL but scopes
+`(list)/loading.tsx` to the list segment only, so it no longer wraps `[id]`. Verified
+empirically in this Next 16 (Turbopack) setup: `notFound()` in `generateMetadata`
+alone did **not** flip the status while a boundary was present; removing the boundary
+did.
+
+**Alternatives considered:** (1) Remove both loading files — works but loses the
+shop-list skeleton on the main commerce page. (2) `dynamicParams = false` — gives a
+clean 404 but a newly-added product would 404 until a rebuild, breaking the live
+admin→shop workflow. (3) Keep the soft-404 as a `noindex` 200 (the prior behavior) —
+SEO-safe but not a real 404. The route group keeps the skeleton, real 404s, and live
+inventory. Cost: the product-detail page loses its own loading skeleton (acceptable;
+client nav shows the prior page until ready). A future option is an in-page `<Suspense>`
+on the product page (existence check before the boundary) to restore that skeleton.
 
 ## 2026-07-03 — Auto-send receipt on payment; one paid-aware invoice/receipt email
 
@@ -272,6 +424,10 @@ project deliberately delivers the id via a server prop (see the 2026-06-29 PayPa
 decision); the omit-key is the targeted fix without changing that contract.
 
 ## 2026-06-30 — Paid orders notify on the Orders tab, not the Messages center
+
+> **Superseded 2026-07-06 for badge count semantics.** Paid orders still surface with
+> Orders rather than Messages, but the nav badge now counts unseen active orders since
+> the admin last viewed Orders, not paid/pending-fulfillment orders.
 
 **Decision:** A paid PayPal order no longer writes an `admin_notifications` row.
 It surfaces as a count badge on the admin **Orders** nav (`AdminOrdersLink`,

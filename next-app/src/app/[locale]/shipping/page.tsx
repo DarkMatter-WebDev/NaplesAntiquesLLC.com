@@ -22,33 +22,40 @@ export default async function ShippingPage({ params }: Props) {
         {
           title: 'Fulfillment Options',
           bullets: [
-            'Local pickup may be available by appointment.',
-            'Priority insured shipping may be available for eligible items.',
-            'Express overnight insured shipping may be available for eligible items.',
+            'Local pickup by appointment in the Naples / Southwest Florida area.',
+            'Priority insured and express overnight insured shipping for eligible items.',
+            'Every shipped order is fully insured for its purchase price.',
+            'Items ship in discreet, unbranded packaging for your privacy and security.',
+          ],
+        },
+        {
+          title: 'Authenticity Guarantee',
+          body: [
+            'Every piece is guaranteed authentic and as described. If an item is ever materially misrepresented, our 5-day return guarantee applies — see the Returns & Refunds policy.',
           ],
         },
         {
           title: 'Address and Identity Review',
           body: [
-            'High-value jewelry and precious-metal orders may require manual review, identity confirmation, signature delivery, insurance limits, or alternate fulfillment arrangements before shipment.',
+            'For high-value orders we may confirm your identity and shipping address before dispatch. This protects both you and us against fraud and the misdelivery of valuable items.',
           ],
         },
         {
-          title: 'Shipping Costs',
+          title: 'Shipping Costs & Timing',
           body: [
-            'Shipping costs shown at checkout are estimates or current flat options. We may contact you if the item value, destination, carrier requirements, or insurance limits require a different shipping arrangement.',
+            'Shipping options and costs are shown at checkout. A high-value order may need a specific insured-carrier arrangement; if so, we will contact you before shipping. We aim to dispatch confirmed orders promptly and share tracking once your item is on its way.',
           ],
         },
         {
           title: 'Risk of Loss',
           body: [
-            'Risk of loss transfers according to the confirmed pickup, delivery, or carrier arrangement. For shipped orders, please inspect packaging promptly and notify us immediately if there is damage or a delivery problem.',
+            'Because shipped orders are fully insured, a lost or damaged parcel is covered. Please inspect the packaging promptly on arrival and contact us immediately at (239) 404-8505 if there is any damage or delivery problem so we can file the claim.',
           ],
         },
         {
           title: 'Restricted Destinations',
           body: [
-            'We may decline or cancel shipment to destinations where delivery, insurance, fraud risk, legal restrictions, or carrier limitations make fulfillment impractical.',
+            'We may decline or cancel shipment to destinations where delivery, insurance, legal restrictions, or carrier limitations make safe fulfillment impractical.',
           ],
         },
       ]}

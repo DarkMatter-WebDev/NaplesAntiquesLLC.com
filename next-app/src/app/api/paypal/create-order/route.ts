@@ -4,10 +4,13 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { buildAddressObject, generateOrderNumber } from '@/lib/sales';
 import { buildOrderDraft, isOrderDraftError, shippingMethodForDb } from '@/lib/checkout-pricing';
 import { createPayPalOrder, paypalConfigured, type PayPalLineItem } from '@/lib/paypal';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { upsertOrderInvoice } from '@/lib/order-invoices';
 
 export const runtime = 'nodejs';
 
 const CURRENCY = 'USD';
+const MAX_CART_ITEMS = 50;
 
 function lineItems(items: { title_snapshot: string; price_snapshot: number; inventory_number: string }[]): PayPalLineItem[] {
   return items.map((item) => ({
@@ -23,12 +26,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'PayPal is not configured.' }, { status: 503 });
   }
 
+  const ip = getClientIp(req);
+  if (!(await checkRateLimit(`create-order:${ip}`, 30, 3600))) {
+    return NextResponse.json({ error: 'Too many requests. Please try again in a bit.' }, { status: 429 });
+  }
+
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
 
   const reuseOrderId = typeof body.orderId === 'string' && body.orderId ? body.orderId : null;
   const productIds = Array.isArray(body.productIds)
-    ? (Array.from(new Set(body.productIds.map(String).filter(Boolean))) as string[])
+    ? (Array.from(new Set(body.productIds.map(String).filter(Boolean))) as string[]).slice(0, MAX_CART_ITEMS)
     : [];
   const customer = body.customer ?? {};
   const shippingMethod = String(body.shippingMethod ?? 'local-pickup');
@@ -71,7 +79,7 @@ export async function POST(req: Request) {
     if (sameProducts) {
       // Recompute totals from the live cart payload; catches shipping-method
       // switches (express vs priority both store as 'shipping') and price drift.
-      const draft = await buildOrderDraft(supabase, productIds, shippingMethod);
+      const draft = await buildOrderDraft(supabase, productIds, shippingMethod, customer.state);
       sameTotals =
         !isOrderDraftError(draft) &&
         draft.subtotal === Number(order.subtotal) &&
@@ -126,7 +134,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const draft = await buildOrderDraft(supabase, productIds, shippingMethod);
+  const draft = await buildOrderDraft(supabase, productIds, shippingMethod, customer.state);
   if (isOrderDraftError(draft)) {
     return NextResponse.json({ error: draft.error }, { status: draft.status });
   }
@@ -199,6 +207,7 @@ export async function POST(req: Request) {
     });
 
     await service.from('orders').update({ paypal_order_id: paypalOrder.id }).eq('id', orderId);
+    await upsertOrderInvoice(service, orderId);
 
     return NextResponse.json({ paypalOrderId: paypalOrder.id, orderId });
   } catch (err) {

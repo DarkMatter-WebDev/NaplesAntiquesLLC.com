@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { alternatesFor } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -6,11 +7,15 @@ import SiteFooter from '@/components/layout/SiteFooter';
 import TradingViewMini from '@/components/trading/TradingViewMini';
 import TradingViewTicker from '@/components/trading/TradingViewTicker';
 
-export const metadata: Metadata = {
-  title: 'Sell Bullion, Gold & Silver Coins | Naples Estate Jewelry',
-  description:
-    'Sell gold and silver bullion, coins, sterling, platinum, palladium, and scrap precious metals in Naples FL. Fair live-market offers, clear testing, private appointments, and same-day payment throughout Southwest Florida.',
-};
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  return {
+    title: 'Sell Bullion, Gold & Silver Coins',
+    description:
+      'Sell gold and silver bullion, coins, sterling, platinum, palladium, and scrap precious metals in Naples FL. Fair live-market offers, clear testing, private appointments, and same-day payment throughout Southwest Florida.',
+    alternates: alternatesFor('/bullion', locale),
+  };
+}
 
 interface Props {
   params: Promise<{ locale: string }>;

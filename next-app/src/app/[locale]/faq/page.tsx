@@ -1,13 +1,19 @@
 import type { Metadata } from 'next';
+import { alternatesFor } from '@/lib/seo';
+import { jsonLdHtml } from '@/lib/json-ld';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 
-export const metadata: Metadata = {
-  title: 'FAQ | Selling Estate Jewelry, Gold & Antiques | Naples Estate Jewelry',
-  description:
-    'Answers to common questions about selling estate jewelry, gold, silver, and antiques in Naples FL. Free consultations, immediate cash payment, confidential mobile service throughout Southwest Florida.',
-};
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  return {
+    title: 'FAQ — Selling Estate Jewelry, Gold & Antiques',
+    description:
+      'Answers to common questions about selling estate jewelry, gold, silver, and antiques in Naples FL. Free consultations, immediate cash payment, confidential mobile service throughout Southwest Florida.',
+    alternates: alternatesFor('/faq', locale),
+  };
+}
 
 interface Props {
   params: Promise<{ locale: string }>;
@@ -68,8 +74,19 @@ export default async function FaqPage({ params }: Props) {
   const { locale } = await params;
   const isEs = locale === 'es';
 
+  const faqLd = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: FAQ_ITEMS.map(({ questionEn, questionEs, answerEn, answerEs }) => ({
+      '@type': 'Question',
+      name: isEs ? questionEs : questionEn,
+      acceptedAnswer: { '@type': 'Answer', text: isEs ? answerEs : answerEn },
+    })),
+  };
+
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(faqLd) }} />
       <SiteHeader />
       <main className="pt-16">
 

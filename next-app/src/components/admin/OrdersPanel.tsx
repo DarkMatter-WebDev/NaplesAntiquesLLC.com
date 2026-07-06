@@ -10,6 +10,7 @@ import type { Order, PaymentStatus, FulfillmentStatus, OrderStatus, ShippingMeth
 import { formatCurrency, formatOrderDate, orderStatusLabel } from '@/types/sales';
 import type { SpotData } from '@/types/product';
 import { buildAddressObject, generateOrderNumber, getProductImages, getProductMetal, getProductWeight, getSnapshotPrice } from '@/lib/sales';
+import { isFloridaState, FL_TAX_RATE } from '@/lib/checkout-pricing';
 import { adminRevalidateProducts } from '@/app/actions/admin-products';
 
 const GOLD = '#735c00';
@@ -18,14 +19,18 @@ const BORDER = 'var(--color-outline-variant)';
 function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
   return Boolean(error?.message?.toLowerCase().includes('item_year'));
 }
-const FL_TAX_RATE = 0.065;
 
 interface Props {
   initialOrders: Order[];
   products: Product[];
   spotData: SpotData | null;
   locale: string;
+  view?: OrdersView;
+  trashCount?: number;
+  recycleBinSupported?: boolean;
 }
+
+type OrdersView = 'active' | 'trash';
 
 type FormState = {
   customer_name: string;
@@ -63,11 +68,22 @@ const emptyForm: FormState = {
   country: 'United States',
 };
 
-export default function OrdersPanel({ initialOrders, products, spotData, locale }: Props) {
+export default function OrdersPanel({
+  initialOrders,
+  products,
+  spotData,
+  locale,
+  view = 'active',
+  trashCount = 0,
+  recycleBinSupported = true,
+}: Props) {
   const router = useRouter();
   const supabase = createClient();
   const adminBasePath = locale === 'es' ? '/es/admin' : '/admin';
+  const ordersPath = `${adminBasePath}/orders`;
+  const isTrash = view === 'trash';
   const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [syncedFrom, setSyncedFrom] = useState(initialOrders);
   const [search, setSearch] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('');
   const [fulfillmentFilter, setFulfillmentFilter] = useState('');
@@ -83,6 +99,14 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
   const [confirmDelete, setConfirmDelete] = useState<Order | null>(null);
   const [returnToInventory, setReturnToInventory] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [actingOrderId, setActingOrderId] = useState<string | null>(null);
+
+  if (initialOrders !== syncedFrom) {
+    setSyncedFrom(initialOrders);
+    setOrders(initialOrders);
+    setConfirmDelete(null);
+    setActingOrderId(null);
+  }
 
   const availableProducts = useMemo(
     () => products.filter((product) => isProductPurchasable(product.status)),
@@ -123,7 +147,10 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
   );
   const discount = (Number(form.discount) || 0) + lineDiscount;
   const shippingFee = Number(form.shipping_fee) || 0;
-  const tax = Math.max(subtotal - discount, 0) * FL_TAX_RATE;
+  // Pickup and local delivery are always completed in Florida; a shipped order
+  // only owes FL tax when the destination address is also in Florida.
+  const chargesTax = form.shipping_method !== 'shipping' || isFloridaState(form.state);
+  const tax = chargesTax ? Math.max(subtotal - discount, 0) * FL_TAX_RATE : 0;
   const total = Math.max(subtotal - discount, 0) + tax + shippingFee;
 
   const filteredOrders = orders.filter((order) => {
@@ -247,14 +274,15 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
       .in('id', selectedProductIds);
 
     if (productError) {
-      setMessage({ text: `Order created, but products were not reserved: ${productError.message}`, ok: false });
+      setMessage({ text: `Order created, but product statuses were not updated: ${productError.message}`, ok: false });
       setSaving(false);
       return;
     }
 
-    // Browser-client write — purge the shop cache so reserved items leave the
-    // public gallery immediately.
+    // Browser-client write: purge the shop cache so pending-payment items leave
+    // the public gallery immediately.
     await adminRevalidateProducts(selectedProductIds);
+    await fetch(`/api/admin/orders/${order.id}/invoice`, { method: 'POST' });
 
     setOrders((current) => [{ ...(order as Order), order_items: itemPayloads as never }, ...current]);
     setSaving(false);
@@ -273,23 +301,39 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
     const order = confirmDelete;
     setDeleting(true);
     setMessage(null);
+    if (!recycleBinSupported) {
+      setConfirmDelete(null);
+      setMessage({ text: 'Run supabase/orders-recycle-bin.sql before using the orders Recycle Bin.', ok: false });
+      setDeleting(false);
+      return;
+    }
 
     // Optionally return the order's products to sellable inventory before
     // removing the order. The reservation columns only exist once the PayPal
     // migration is applied, so fall back to clearing just the status.
     if (returnToInventory) {
+      // A paid order's items are 'sold'. Returning them to available here would
+      // re-list a sold piece while destroying its payment record. Refund/cancel
+      // the order to resolve inventory instead.
+      if (order.payment_status === 'paid') {
+        setConfirmDelete(null);
+        setMessage({
+          text: 'This order is paid — its items are sold. Refund or cancel it to resolve inventory instead of returning sold items to stock.',
+          ok: false,
+        });
+        setDeleting(false);
+        return;
+      }
       const productIds = Array.from(
         new Set((order.order_items ?? []).map((item) => item.product_id).filter((id): id is string => Boolean(id))),
       );
       if (productIds.length > 0) {
-        let { error: productError } = await supabase
+        const { error: productError } = await supabase
           .from('products')
-          .update({ status: 'available', reserved_until: null, reserved_order_id: null })
+          .update({ status: 'available' })
           .in('id', productIds);
-        if (productError && /reserved_until|reserved_order_id|column|schema cache/i.test(productError.message)) {
-          productError = (await supabase.from('products').update({ status: 'available' }).in('id', productIds)).error;
-        }
         if (productError) {
+          setConfirmDelete(null);
           setMessage({ text: `Could not return items to inventory: ${productError.message}`, ok: false });
           setDeleting(false);
           return;
@@ -300,9 +344,12 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
       }
     }
 
-    // order_items are removed via the ON DELETE CASCADE foreign key.
-    const { error } = await supabase.from('orders').delete().eq('id', order.id);
+    const { error } = await supabase
+      .from('orders')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', order.id);
     if (error) {
+      setConfirmDelete(null);
       setMessage({ text: `Could not delete order: ${error.message}`, ok: false });
       setDeleting(false);
       return;
@@ -311,7 +358,39 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
     setOrders((current) => current.filter((existing) => existing.id !== order.id));
     setDeleting(false);
     setConfirmDelete(null);
-    setMessage({ text: `Order ${order.order_number} deleted.`, ok: true });
+    setMessage({ text: `Order ${order.order_number} moved to the Recycle Bin.`, ok: true });
+    router.refresh();
+  }
+
+  async function restoreOrder(order: Order) {
+    setActingOrderId(order.id);
+    setMessage(null);
+    const { error } = await supabase
+      .from('orders')
+      .update({ deleted_at: null })
+      .eq('id', order.id);
+    setActingOrderId(null);
+    if (error) {
+      setMessage({ text: `Could not restore order: ${error.message}`, ok: false });
+      return;
+    }
+    setOrders((current) => current.filter((existing) => existing.id !== order.id));
+    setMessage({ text: `Order ${order.order_number} restored. Inventory statuses were not changed.`, ok: true });
+    router.refresh();
+  }
+
+  async function purgeOrder(order: Order) {
+    if (!window.confirm(`Permanently delete ${order.order_number}? This cannot be undone.`)) return;
+    setActingOrderId(order.id);
+    setMessage(null);
+    const { error } = await supabase.from('orders').delete().eq('id', order.id);
+    setActingOrderId(null);
+    if (error) {
+      setMessage({ text: `Could not permanently delete order: ${error.message}`, ok: false });
+      return;
+    }
+    setOrders((current) => current.filter((existing) => existing.id !== order.id));
+    setMessage({ text: `Order ${order.order_number} permanently deleted.`, ok: true });
     router.refresh();
   }
 
@@ -326,12 +405,31 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
             </p>
             <h1 className="text-3xl md:text-4xl font-bold"
               style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-              Orders
+              {isTrash ? 'Orders Recycle Bin' : 'Orders'}
             </h1>
+            {isTrash && (
+              <p className="mt-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                Deleted orders stay here until restored or permanently deleted.
+              </p>
+            )}
           </div>
-          <button type="button" onClick={() => setShowCreate(true)} className="gold-button w-full justify-center text-sm md:w-auto">
-            Create Manual Order
-          </button>
+          <div className="flex flex-col gap-2 md:flex-row md:items-center">
+            {isTrash ? (
+              <Link href={ordersPath} className="outline-button w-full justify-center text-sm md:w-auto">
+                Back to Orders
+              </Link>
+            ) : (
+              <>
+                <Link href={`${ordersPath}?view=trash`} className="outline-button w-full justify-center gap-1.5 text-sm md:w-auto">
+                  <span className="material-symbols-outlined text-[1.1rem]" aria-hidden="true">delete</span>
+                  Recycle Bin{recycleBinSupported && trashCount > 0 ? ` (${trashCount})` : ''}
+                </Link>
+                <button type="button" onClick={() => setShowCreate(true)} className="gold-button w-full justify-center text-sm md:w-auto">
+                  Create Manual Order
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {message && (
@@ -342,6 +440,17 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
               background: 'white',
             }}>
             {message.text}
+          </div>
+        )}
+
+        {!recycleBinSupported && (
+          <div className="mb-6 border px-4 py-3 text-sm"
+            style={{
+              borderColor: 'var(--color-error)',
+              color: 'var(--color-error)',
+              background: 'white',
+            }}>
+            Order Recycle Bin is pending its database migration. Run <code>supabase/orders-recycle-bin.sql</code> before using delete, restore, or delete forever.
           </div>
         )}
 
@@ -372,7 +481,7 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
 
         <div className="mb-3 flex items-center justify-between text-xs md:hidden" style={{ color: 'var(--color-on-surface-variant)' }}>
           <span>{filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}</span>
-          <span>Tap View for details</span>
+          <span>{isTrash ? 'Restore or delete forever' : 'Tap View for details'}</span>
         </div>
 
         <div className="grid gap-3 md:hidden">
@@ -429,20 +538,44 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
                 <StatusBlock label="Status" value={order.order_status} />
               </div>
 
-              <Link href={`${adminBasePath}/orders/${order.id}`} className="gold-button mt-4 w-full justify-center text-sm">
-                View Order
-              </Link>
-              <button
-                type="button"
-                onClick={() => { setReturnToInventory(true); setConfirmDelete(order); }}
-                className="mt-2 w-full rounded-md border py-2 text-xs font-bold uppercase tracking-wide"
-                style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}
-              >
-                Delete Order
-              </button>
+              {isTrash ? (
+                <div className="mt-4 grid gap-2">
+                  <button
+                    type="button"
+                    onClick={() => restoreOrder(order)}
+                    disabled={actingOrderId === order.id}
+                    className="gold-button w-full justify-center text-sm disabled:opacity-50"
+                  >
+                    {actingOrderId === order.id ? 'Working...' : 'Restore Order'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => purgeOrder(order)}
+                    disabled={actingOrderId === order.id}
+                    className="w-full rounded-md border py-2 text-xs font-bold uppercase tracking-wide disabled:opacity-50"
+                    style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}
+                  >
+                    Delete Forever
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <Link href={`${adminBasePath}/orders/${order.id}`} className="gold-button mt-4 w-full justify-center text-sm">
+                    View Order
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => { setReturnToInventory(true); setConfirmDelete(order); }}
+                    className="mt-2 w-full rounded-md border py-2 text-xs font-bold uppercase tracking-wide"
+                    style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}
+                  >
+                    Delete Order
+                  </button>
+                </>
+              )}
             </article>
           ))}
-          {filteredOrders.length === 0 && <EmptyOrders />}
+          {filteredOrders.length === 0 && <EmptyOrders isTrash={isTrash} />}
         </div>
 
         <div className="hidden overflow-x-auto border md:block" style={{ borderColor: BORDER, background: 'white' }}>
@@ -475,17 +608,43 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
                   <td className="px-4 py-3"><Badge value={order.fulfillment_status} /></td>
                   <td className="px-4 py-3"><Badge value={order.order_status} /></td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <Link href={`${adminBasePath}/orders/${order.id}`} className="text-xs font-bold uppercase tracking-wide hover:underline" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-                      View
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => { setReturnToInventory(true); setConfirmDelete(order); }}
-                      className="ml-4 text-xs font-bold uppercase tracking-wide hover:underline"
-                      style={{ color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}
-                    >
-                      Delete
-                    </button>
+                    {isTrash ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => restoreOrder(order)}
+                          disabled={actingOrderId === order.id}
+                          className="text-xs font-bold uppercase tracking-wide hover:underline disabled:opacity-50"
+                          style={{ color: GOLD, fontFamily: 'var(--font-label)' }}
+                        >
+                          Restore
+                        </button>
+                        <span className="opacity-30">|</span>
+                        <button
+                          type="button"
+                          onClick={() => purgeOrder(order)}
+                          disabled={actingOrderId === order.id}
+                          className="text-xs font-bold uppercase tracking-wide hover:underline disabled:opacity-50"
+                          style={{ color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}
+                        >
+                          Delete Forever
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <Link href={`${adminBasePath}/orders/${order.id}`} className="text-xs font-bold uppercase tracking-wide hover:underline" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                          View
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => { setReturnToInventory(true); setConfirmDelete(order); }}
+                          className="ml-4 text-xs font-bold uppercase tracking-wide hover:underline"
+                          style={{ color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -716,8 +875,8 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
               Delete order?
             </h2>
             <p className="mt-3 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-              Permanently delete <strong style={{ color: GOLD }}>{confirmDelete.order_number}</strong> and its{' '}
-              {(confirmDelete.order_items ?? []).length} line item(s). This cannot be undone.
+              Move <strong style={{ color: GOLD }}>{confirmDelete.order_number}</strong> and its{' '}
+              {(confirmDelete.order_items ?? []).length} line item(s) to the Recycle Bin. You can restore the order later.
             </p>
             <label className="mt-4 flex items-start gap-2 text-sm" style={{ color: 'var(--color-on-surface)' }}>
               <input
@@ -745,7 +904,7 @@ export default function OrdersPanel({ initialOrders, products, spotData, locale 
                 className="rounded-md px-4 py-2 text-sm font-bold uppercase tracking-wide text-white disabled:opacity-50"
                 style={{ background: 'var(--color-error)', fontFamily: 'var(--font-label)' }}
               >
-                {deleting ? 'Deleting...' : 'Delete Order'}
+                {deleting ? 'Deleting...' : 'Move to Recycle Bin'}
               </button>
             </div>
           </div>
@@ -789,17 +948,17 @@ function StatusBlock({ label, value }: { label: string; value: string }) {
   );
 }
 
-function EmptyOrders() {
+function EmptyOrders({ isTrash = false }: { isTrash?: boolean }) {
   return (
     <div className="rounded-lg border bg-white px-4 py-10 text-center shadow-sm" style={{ borderColor: BORDER }}>
       <span className="material-symbols-outlined mx-auto block text-4xl" aria-hidden="true" style={{ color: 'rgba(115, 92, 0, 0.32)' }}>
         receipt_long
       </span>
       <strong className="mt-3 block" style={{ color: 'var(--color-on-surface)' }}>
-        No orders found.
+        {isTrash ? 'The recycle bin is empty.' : 'No orders found.'}
       </strong>
       <p className="mt-1 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-        Try clearing filters or creating a manual order.
+        {isTrash ? 'Deleted orders will appear here.' : 'Try clearing filters or creating a manual order.'}
       </p>
     </div>
   );

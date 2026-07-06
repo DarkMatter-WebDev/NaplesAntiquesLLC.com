@@ -1,6 +1,8 @@
 // Server-side PayPal REST helper (Orders API v2). No SDK dependency — uses fetch
 // against the PayPal REST endpoints. Never import this from client code: it reads
-// PAYPAL_CLIENT_SECRET.
+// PAYPAL_CLIENT_SECRET. The `server-only` import turns any client import into a
+// build error rather than a silent secret leak.
+import 'server-only';
 
 const SANDBOX_BASE = 'https://api-m.sandbox.paypal.com';
 const LIVE_BASE = 'https://api-m.paypal.com';

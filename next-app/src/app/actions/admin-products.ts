@@ -29,6 +29,11 @@ export async function adminUpdateProductStatus(
  *  products at once (cancel/reopen/mark-paid/delete-order). One tag purge
  *  refreshes the gallery; per-product paths refresh the detail pages. */
 export async function adminRevalidateProducts(ids: string[]): Promise<void> {
+  // Gate: these are 'use server' actions whose ids ship in public JS bundles, so
+  // any visitor could POST them to thrash the shop cache. Fail silently for non-admins.
+  const { error: authError } = await requireAdmin();
+  if (authError) return;
+
   revalidateTag('shop-catalog', { expire: 0 });
   for (const id of ids) {
     revalidatePath(`/shop/${id}`);
@@ -37,6 +42,9 @@ export async function adminRevalidateProducts(ids: string[]): Promise<void> {
 }
 
 export async function adminRevalidateProduct(id: string): Promise<void> {
+  const { error: authError } = await requireAdmin();
+  if (authError) return;
+
   // { expire: 0 } forces immediate expiration — 'max' uses stale-while-revalidate,
   // which would show the old status once more before ever refreshing.
   revalidateTag('shop-catalog', { expire: 0 });

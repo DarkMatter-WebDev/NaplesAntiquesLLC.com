@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/admin-auth';
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -15,17 +15,18 @@ export async function PATCH(req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  // Admin-only, matching every other admin write. Previously this checked only
+  // that *some* user was signed in and relied on RLS to filter the update — which
+  // silently returned success even when 0 rows were affected. Gate explicitly.
+  const auth = await requireAdmin();
+  if (auth.error) return auth.error;
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const { error } = await supabase
+  const { error } = await auth.supabase
     .from('inquiries')
     .update({ status })
     .eq('id', id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: 'Could not update inquiry.' }, { status: 500 });
 
   return NextResponse.json({ success: true });
 }

@@ -1,7 +1,6 @@
 export type ProductStatus =
   | 'draft'
   | 'available'
-  | 'reserved'
   | 'pending_payment'
   | 'sold'
   | 'archived'
@@ -77,7 +76,7 @@ export interface Product {
   chain_type: string | null;
   length: string | null;
   pricing_multiplier: number | null;
-  status: ProductStatus;
+  status: ProductStatus | string;
   location: ProductLocation | string | null;
   images: string[];
   image_urls: string[];
@@ -199,21 +198,20 @@ export function formatProductItemYear(value: string | number | null | undefined)
   return normalized === null ? null : String(normalized);
 }
 
-export function normalizeProductStatus(status: ProductStatus | null | undefined): ProductStatus {
+export function normalizeProductStatus(status: ProductStatus | string | null | undefined): ProductStatus {
   const value = String(status ?? 'available').toLowerCase().replace(/\s+/g, '_');
   if (value === 'draft') return 'draft';
-  if (value === 'reserved') return 'reserved';
   if (value === 'pending_payment') return 'pending_payment';
   if (value === 'sold') return 'sold';
   if (value === 'archived') return 'archived';
   return 'available';
 }
 
-export function isProductSold(status: ProductStatus | null | undefined): boolean {
+export function isProductSold(status: ProductStatus | string | null | undefined): boolean {
   return normalizeProductStatus(status) === 'sold';
 }
 
-export function isProductPurchasable(status: ProductStatus | null | undefined): boolean {
+export function isProductPurchasable(status: ProductStatus | string | null | undefined): boolean {
   return normalizeProductStatus(status) === 'available';
 }
 
@@ -222,12 +220,12 @@ export const PUBLIC_SHOP_PRODUCT_STATUSES = ['available', 'sold', 'Available', '
 // Statuses shown when the admin has turned OFF "show sold items" — available only.
 export const AVAILABLE_ONLY_SHOP_PRODUCT_STATUSES = ['available', 'Available'] as const;
 
-export function isProductVisibleInShop(status: ProductStatus | null | undefined): boolean {
+export function isProductVisibleInShop(status: ProductStatus | string | null | undefined): boolean {
   const normalized = normalizeProductStatus(status);
   return normalized === 'available' || normalized === 'sold';
 }
 
-export function productStatusLabel(status: ProductStatus | null | undefined): string {
+export function productStatusLabel(status: ProductStatus | string | null | undefined): string {
   const normalized = normalizeProductStatus(status);
   if (normalized === 'pending_payment') return 'Pending Payment';
   return normalized.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());

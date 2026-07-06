@@ -1,15 +1,20 @@
 import type { Metadata } from 'next';
+import { alternatesFor } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import EvalForm from '@/components/free-evaluation/EvalForm';
 
-export const metadata: Metadata = {
-  title: 'Free Jewelry & Gold Evaluation | Naples Estate Jewelry',
-  description:
-    'Free, no-obligation evaluation of your jewelry, gold, silver, diamonds, watches, and coins in Naples, Marco Island, Bonita Springs, and Fort Myers FL. Live gold pricing and same-day cash offers.',
-};
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  return {
+    title: 'Free Jewelry & Gold Evaluation',
+    description:
+      'Free, no-obligation evaluation of your jewelry, gold, silver, diamonds, watches, and coins in Naples, Marco Island, Bonita Springs, and Fort Myers FL. Live gold pricing and same-day cash offers.',
+    alternates: alternatesFor('/free-evaluation', locale),
+  };
+}
 
 interface Props {
   params: Promise<{ locale: string }>;

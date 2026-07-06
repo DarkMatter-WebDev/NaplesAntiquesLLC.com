@@ -1,15 +1,20 @@
 import type { Metadata } from 'next';
+import { alternatesFor } from '@/lib/seo';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import { HeroSection, PageContainer } from '@/components/layout/ResponsiveLayout';
 import InquiryForm from '@/components/contact/InquiryForm';
 import MessageUsForm from '@/components/contact/MessageUsForm';
 
-export const metadata: Metadata = {
-  title: 'Contact Us | Submit Your Item | Naples Estate Jewelry',
-  description:
-    'Contact Naples Estate Jewelry to submit photos and details about estate jewelry, gold, silver, watches, coins, or antiques. Mobile, private evaluations throughout Southwest Florida. Call or text (239) 404-8505.',
-};
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  return {
+    title: 'Contact Us — Submit Your Item',
+    description:
+      'Contact Naples Estate Jewelry to submit photos and details about estate jewelry, gold, silver, watches, coins, or antiques. Mobile, private evaluations throughout Southwest Florida. Call or text (239) 404-8505.',
+    alternates: alternatesFor('/contact', locale),
+  };
+}
 
 interface Props {
   params: Promise<{ locale: string }>;

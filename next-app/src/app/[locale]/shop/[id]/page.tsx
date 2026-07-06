@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import type { CSSProperties } from 'react';
+import { cache, type CSSProperties } from 'react';
+import { alternatesFor } from '@/lib/seo';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createPublicClient } from '@/lib/supabase/public';
@@ -9,6 +10,7 @@ import {
   isProductPurchasable,
   isProductSold,
   isProductVisibleInShop,
+  normalizeProductStatus,
   productJewelryTypeLabel,
   productImagePaddingBackground,
   productImagePaddingForImage,
@@ -19,6 +21,7 @@ import {
   type Product,
 } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
+import { jsonLdHtml } from '@/lib/json-ld';
 import { calcSpotMeltValue, formatUsdPrice, getDisplayPrice, purityToFraction } from '@/lib/pricing';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
@@ -88,7 +91,10 @@ function isMissingOptionalColumnError(error: { message?: string | null } | null 
   return OPTIONAL_PRODUCT_DETAIL_COLUMNS.some((column) => message.includes(column));
 }
 
-async function fetchPublicProduct(id: string) {
+// Wrapped in React.cache so generateMetadata() and the page component share a
+// single DB query per request instead of each firing their own (this route calls
+// it in both places to resolve the product + the 404 decision).
+const fetchPublicProduct = cache(async (id: string) => {
   const supabase = createPublicClient();
   const result = await supabase
     .from('products')
@@ -114,7 +120,7 @@ async function fetchPublicProduct(id: string) {
     data: result.data as unknown as Product | null,
     error: result.error,
   };
-}
+});
 
 export async function generateStaticParams() {
   const supabase = createPublicClient();
@@ -130,20 +136,44 @@ export async function generateStaticParams() {
   ]);
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { id } = await params;
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+  const { locale, id } = await params;
+  const query = searchParams ? await searchParams : {};
   const { data } = await fetchPublicProduct(id);
 
-  if (!data || !isProductVisibleInShop(data.status)) return { title: 'Product Not Found' };
+  // Throw notFound() here — before the streaming boundary (loading.tsx) commits a
+  // 200 shell — so unknown/hidden product URLs return a real 404 instead of a
+  // soft-404. (A notFound() in the page body below would already be too late.)
+  if (!data) notFound();
 
-  const image = data.image_urls?.[0] ?? data.images?.[0];
+  const returnHref = safeReturnHref(query.returnTo, locale);
+  const visible = isProductVisibleInShop(data.status);
+  if (!visible && !returnHref) notFound();
+
+  const isEs = locale === 'es';
+  const title = (isEs && data.title_es) ? data.title_es : data.title;
+  const description =
+    (isEs && data.description_es ? data.description_es : data.description) ?? `${title} — Naples Estate Jewelry`;
+  const rawImage = data.image_urls?.[0] ?? data.images?.[0];
+  const image = rawImage
+    ? (rawImage.startsWith('http') ? rawImage : `https://naplesestatejewelry.co${rawImage}`)
+    : undefined;
 
   return {
-    title: data.title,
-    description: data.description ?? `${data.title} — Naples Estate Jewelry`,
+    title,
+    description,
+    // A hidden product reachable only via an admin/account return link must stay
+    // out of the index even though we render full metadata for the preview.
+    ...(visible ? {} : { robots: { index: false, follow: false } }),
+    alternates: alternatesFor(`/shop/${id}`, locale),
     openGraph: {
+      type: 'website',
+      url: `https://naplesestatejewelry.co${isEs ? '/es' : ''}/shop/${id}`,
+      title,
+      description,
       images: image ? [{ url: image }] : [],
     },
+    twitter: { card: 'summary_large_image', title, description, images: image ? [image] : [] },
   };
 }
 
@@ -320,6 +350,8 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   // empty space beside it (e.g. "For" with no gender set).
   const visibleSpecs = specs.filter((spec) => spec.value != null && String(spec.value).trim() !== '');
 
+  const normalizedStatus = normalizeProductStatus(p.status);
+
   const cartItem: CartItem = {
     id: p.id,
     title: p.title,
@@ -329,7 +361,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
     public_notes: p.public_notes,
     image: productImages[0] ?? null,
     image_padding: firstImagePadding,
-    status: p.status,
+    status: normalizedStatus,
     priceLabel: price,
     category: p.category,
     metal_type: p.metal_type,
@@ -354,7 +386,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
     title_es: p.title_es,
     image: productImages[0] ?? null,
     image_padding: firstImagePadding,
-    status: p.status,
+    status: normalizedStatus,
     price_mode: p.price_mode,
     purity: p.purity,
     weight_grams: p.weight_grams,
@@ -364,27 +396,48 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
 
 
   const priceNumeric = price.replace(/[$,]/g, '').trim();
+  const isNumericPrice = /^\d+(\.\d+)?$/.test(priceNumeric);
+  const localePrefix = locale === 'es' ? '/es' : '';
+  const canonicalProductUrl = `https://naplesestatejewelry.co${localePrefix}/shop/${p.id}`;
+  const schemaImage = productImages[0]
+    ? (productImages[0].startsWith('http') ? productImages[0] : `https://naplesestatejewelry.co${productImages[0]}`)
+    : undefined;
+  // Spot-linked prices change frequently; give a short validity window so the
+  // merchant-listing rich result doesn't warn about a missing priceValidUntil.
+  // Derive from the spot fetch timestamp (avoids an impure Date.now() in render).
+  const priceValidUntil = new Date(spotData.fetchedAt + 2 * 86_400_000).toISOString().slice(0, 10);
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: title,
     ...(inventoryReference ? { sku: inventoryReference } : {}),
     ...(description ? { description } : {}),
-    ...(productImages[0] ? { image: productImages[0] } : {}),
+    ...(schemaImage ? { image: schemaImage } : {}),
     brand: { '@type': 'Organization', name: 'Naples Estate Jewelry' },
     offers: {
       '@type': 'Offer',
-      url: `https://naplesestatejewelry.co${locale === 'es' ? '/es' : ''}/shop/${p.id}`,
+      url: canonicalProductUrl,
       priceCurrency: 'USD',
-      ...(/^\d+(\.\d+)?$/.test(priceNumeric) ? { price: priceNumeric } : {}),
+      ...(isNumericPrice ? { price: priceNumeric, priceValidUntil } : {}),
       availability: isPurchasable ? 'https://schema.org/InStock' : 'https://schema.org/SoldOut',
       itemCondition: 'https://schema.org/UsedCondition',
+      seller: { '@type': 'Organization', name: 'Naples Estate Jewelry' },
     },
+  };
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `https://naplesestatejewelry.co${localePrefix}` },
+      { '@type': 'ListItem', position: 2, name: 'Shop', item: `https://naplesestatejewelry.co${localePrefix}/shop` },
+      { '@type': 'ListItem', position: 3, name: title, item: canonicalProductUrl },
+    ],
   };
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(breadcrumbLd) }} />
       <SiteHeader />
       <main className={`pt-24 md:pt-28 pb-20${isDarkPage ? ' product-page-dark' : ''}`} style={mainStyle}>
 
@@ -466,16 +519,25 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                 >
                   {price}
                 </p>
-                <p
-                  className="flex items-center gap-1 mt-1.5"
-                  style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
-                >
-                  <span className="material-symbols-outlined text-sm" style={{ color: 'var(--color-primary)', fontVariationSettings: "'FILL' 1" }} aria-hidden="true">
-                    check_circle
-                  </span>
-                  {isEs ? 'Este es su precio' : 'This is your price'}
-                </p>
-                {isPurchasable && (
+                {isPurchasable ? (
+                  <p
+                    className="flex items-center gap-1 mt-1.5"
+                    style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                  >
+                    <span className="material-symbols-outlined text-sm" style={{ color: 'var(--color-primary)', fontVariationSettings: "'FILL' 1" }} aria-hidden="true">
+                      check_circle
+                    </span>
+                    {isEs ? 'Este es su precio' : 'This is your price'}
+                  </p>
+                ) : (
+                  <p
+                    className="mt-1.5"
+                    style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                  >
+                    {isSold ? (isEs ? 'Vendido — pieza única' : 'Sold — one of a kind') : productStatusLabel(p.status)}
+                  </p>
+                )}
+                {isPurchasable ? (
                   <div className="flex flex-wrap gap-3 pt-3">
                     <CartButton item={cartItem} variant="detail" locale={locale} />
                     <WishlistButton item={wishlistItem} variant="button" locale={locale} />
@@ -486,6 +548,21 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                       {isEs ? 'Llamar' : 'Call'}
                     </a>
                   </div>
+                ) : (
+                  <div className="flex flex-wrap gap-3 pt-3">
+                    <Link href={`${contactHref}?item=${encodeURIComponent(p.title)}`} className="outline-button">
+                      {isEs ? 'Consultar pieza similar' : 'Inquire about a similar piece'}
+                    </Link>
+                    <a href="tel:2394048505" className="outline-button">
+                      {isEs ? 'Llamar' : 'Call'}
+                    </a>
+                  </div>
+                )}
+                {isPurchasable && (
+                  <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    <span>✓ {isEs ? 'Envío asegurado' : 'Ships fully insured'}</span>
+                    <span>✓ {isEs ? 'Autenticidad garantizada' : 'Authenticity guaranteed'}</span>
+                  </p>
                 )}
                 {scrapValue && (
                   <div

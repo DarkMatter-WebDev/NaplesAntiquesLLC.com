@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { isValidEmail, normalizeEmail, suppressMarketingEmail } from '@/lib/marketing';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 export async function POST(req: Request) {
+  // Token unsubscribes (from email links) are self-authenticating; the bare-email
+  // path is not, so rate-limit by IP to blunt mass unsubscribe-anyone griefing.
+  const ip = getClientIp(req);
+  if (!(await checkRateLimit(`unsubscribe:${ip}`, 10, 3600))) {
+    return NextResponse.json({ error: 'Too many requests. Please try again in a bit.' }, { status: 429 });
+  }
+
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
 

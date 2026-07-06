@@ -8,6 +8,7 @@ import {
   inferProductJewelryType,
   isProductPurchasable,
   isProductSold,
+  normalizeProductStatus,
   productImagePaddingBackground,
   productImagePaddingForImage,
   productLengthSizeDisplay,
@@ -52,6 +53,7 @@ export default function ProductListRow({ product, spotData, locale, prioritizeIm
   const thumbPadding = productImagePaddingForImage(product.image_padding, product.image_padding_by_image, thumb, 0);
   const imageFrameBackground = productImagePaddingBackground(thumbPadding);
   const href = locale === 'es' ? `/es/shop/${product.id}` : `/shop/${product.id}`;
+  const normalizedStatus = normalizeProductStatus(product.status);
   const isSold = isProductSold(product.status);
   const isPurchasable = isProductPurchasable(product.status);
   const brand = product.brand?.trim() ?? '';
@@ -66,7 +68,7 @@ export default function ProductListRow({ product, spotData, locale, prioritizeIm
     public_notes: product.public_notes,
     image: thumb,
     image_padding: thumbPadding,
-    status: product.status,
+    status: normalizedStatus,
     priceLabel: price,
     category: product.category,
     metal_type: product.metal_type,
@@ -91,7 +93,7 @@ export default function ProductListRow({ product, spotData, locale, prioritizeIm
     title_es: product.title_es,
     image: thumb,
     image_padding: thumbPadding,
-    status: product.status,
+    status: normalizedStatus,
     price_mode: product.price_mode,
     purity: product.purity,
     weight_grams: product.weight_grams,

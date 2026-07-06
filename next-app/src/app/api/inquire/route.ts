@@ -3,8 +3,17 @@ import { createPublicClient } from '@/lib/supabase/public';
 import { createServiceClient } from '@/lib/supabase/service';
 import { createAdminNotification } from '@/lib/admin-notify';
 import { PRODUCT_IMAGES_BUCKET } from '@/lib/product-image-storage';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
+
+// Field length caps for the public JSON (product-inquiry) path — parity with the
+// multipart lead-form path's DB hygiene and a brake on abusive payload sizes.
+const MAX_ITEM = 200;
+const MAX_NAME = 200;
+const MAX_PHONE = 60;
+const MAX_EMAIL = 320;
+const MAX_MESSAGE = 5000;
 
 const OWNER_EMAIL = 'rcman12589@gmail.com';
 const FROM = 'Naples Estate Jewelry <noreply@naplesestatejewelry.co>';
@@ -128,7 +137,17 @@ async function handleJsonInquiry(req: Request) {
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
 
-  const { item, name, phone, email, message } = body as Record<string, string>;
+  // Honeypot — silently accept and drop obvious bots (parity with the lead-form path).
+  if (String((body as Record<string, unknown>)['bot-field'] ?? '').trim()) {
+    return NextResponse.json({ success: true });
+  }
+
+  const raw = body as Record<string, string>;
+  const item = String(raw.item ?? '').trim().slice(0, MAX_ITEM);
+  const name = String(raw.name ?? '').trim().slice(0, MAX_NAME);
+  const phone = String(raw.phone ?? '').trim().slice(0, MAX_PHONE);
+  const email = String(raw.email ?? '').trim().slice(0, MAX_EMAIL);
+  const message = String(raw.message ?? '').trim().slice(0, MAX_MESSAGE);
   if (!item || !name || !phone || !message) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
@@ -275,6 +294,14 @@ async function handleLeadForm(req: Request) {
 }
 
 export async function POST(req: Request) {
+  // Per-IP abuse brake: each inquiry sends up to two Resend emails (owner + a
+  // confirmation to the submitted address) and, on the lead-form path, uploads
+  // photos. Cap submissions so the endpoint can't be used as an email/upload relay.
+  const ip = getClientIp(req);
+  if (!(await checkRateLimit(`inquire:${ip}`, 5, 3600))) {
+    return NextResponse.json({ error: 'Too many requests. Please try again in a bit.' }, { status: 429 });
+  }
+
   const contentType = req.headers.get('content-type') ?? '';
   if (contentType.includes('multipart/form-data')) {
     return handleLeadForm(req);

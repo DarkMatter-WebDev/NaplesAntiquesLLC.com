@@ -1,9 +1,8 @@
-# Architecture
+﻿# Architecture
 
 > Update whenever significant structural changes occur. Last updated:
-> **2026-06-30** after the PayPal checkout integration (online payments,
-> one-of-one inventory reservations, signed webhook) and the checkout /
-> admin-orders reorganization.
+> **2026-07-05** after the Orders Recycle Bin and invoice-generation updates
+> to the admin/orders lifecycle.
 
 ## System Design
 
@@ -12,18 +11,18 @@ Netlify with `@netlify/plugin-nextjs`.
 
 ```text
 Browser
-  ├── Next localized routes (/ and /es)
-  ├── React components and context (cart, wishlist, layout, admin, legal notice)
-  ├── Next route handlers (/api/metal-prices, /api/inquire, /api/inquiries/:id,
-  │   /api/checkout/order, /api/paypal/create-order, /api/paypal/capture-order,
-  │   /api/paypal/webhook, /api/subscribe, /api/unsubscribe,
-  │   /api/admin/marketing/*, /api/webhooks/resend)
-  └── Public assets from next-app/public/assets
-        │
-        ├──> Supabase Auth + Postgres + Storage
-        ├──> gold-api.com via server-side spot-price helper
-        ├──> PayPal Orders API v2 (sandbox/live) for online payments
-        └──> Resend for inquiry/order and direct marketing email when configured
+  â”œâ”€â”€ Next localized routes (/ and /es)
+  â”œâ”€â”€ React components and context (cart, wishlist, layout, admin, legal notice)
+  â”œâ”€â”€ Next route handlers (/api/metal-prices, /api/inquire, /api/inquiries/:id,
+  â”‚   /api/checkout/order, /api/paypal/create-order, /api/paypal/capture-order,
+  â”‚   /api/paypal/webhook, /api/subscribe, /api/unsubscribe,
+  â”‚   /api/admin/marketing/*, /api/webhooks/resend)
+  â””â”€â”€ Public assets from next-app/public/assets
+        â”‚
+        â”œâ”€â”€> Supabase Auth + Postgres + Storage
+        â”œâ”€â”€> gold-api.com via server-side spot-price helper
+        â”œâ”€â”€> PayPal Orders API v2 (sandbox/live) for online payments
+        â””â”€â”€> Resend for inquiry/order and direct marketing email when configured
 ```
 
 The old root `*.html`, `es/`, `scripts/`, root `assets/`, and
@@ -33,28 +32,28 @@ The old root `*.html`, `es/`, `scripts/`, root `assets/`, and
 
 ```text
 NaplesEstateJewelry.co/
-├── AGENTS.md
-├── ACCOUNT_SETUP.md
-├── netlify.toml                 # Netlify parent config: base = next-app
-├── .gitignore
-├── project-docs/                # project memory
-├── supabase/                    # SQL schema/policy scripts
-└── next-app/
-    ├── package.json
-    ├── package-lock.json
-    ├── netlify.toml             # app-local Netlify config
-    ├── next.config.ts
-    ├── messages/                # next-intl messages
-    ├── public/
-    │   ├── assets/              # local images/video
-    │   └── netlify-forms.html
-    └── src/
-        ├── app/                 # routes, metadata, APIs
-        ├── components/          # layout/shop/admin/account/contact UI
-        ├── context/             # cart + wishlist context
-        ├── i18n/                # next-intl routing/request config
-        ├── lib/                 # pricing, spot price, Supabase clients
-        └── types/               # shared TypeScript contracts
+â”œâ”€â”€ AGENTS.md
+â”œâ”€â”€ ACCOUNT_SETUP.md
+â”œâ”€â”€ netlify.toml                 # Netlify parent config: base = next-app
+â”œâ”€â”€ .gitignore
+â”œâ”€â”€ project-docs/                # project memory
+â”œâ”€â”€ supabase/                    # SQL schema/policy scripts
+â””â”€â”€ next-app/
+    â”œâ”€â”€ package.json
+    â”œâ”€â”€ package-lock.json
+    â”œâ”€â”€ netlify.toml             # app-local Netlify config
+    â”œâ”€â”€ next.config.ts
+    â”œâ”€â”€ messages/                # next-intl messages
+    â”œâ”€â”€ public/
+    â”‚   â”œâ”€â”€ assets/              # local images/video
+    â”‚   â””â”€â”€ netlify-forms.html
+    â””â”€â”€ src/
+        â”œâ”€â”€ app/                 # routes, metadata, APIs
+        â”œâ”€â”€ components/          # layout/shop/admin/account/contact UI
+        â”œâ”€â”€ context/             # cart + wishlist context
+        â”œâ”€â”€ i18n/                # next-intl routing/request config
+        â”œâ”€â”€ lib/                 # pricing, spot price, Supabase clients
+        â””â”€â”€ types/               # shared TypeScript contracts
 ```
 
 ## Routing
@@ -75,8 +74,8 @@ Current route families include:
 - `/account`, `/account/sign-in`, `/account/sign-up`
 - `/admin`, `/admin/orders`, `/admin/orders/[id]`, `/admin/messages`,
   `/admin/inquiries`, `/admin/subscribers`, `/admin/marketing`,
-  `/admin/settings`, `/admin/users`, and
-  `/admin/users/[id]/invoices`
+  `/admin/settings`, `/admin/users`, `/admin/users/[id]/invoices`,
+  `/admin/orders/[id]/invoice`, and `/admin/orders/[id]/print`
 
 ## Compliance Foundation
 
@@ -115,7 +114,7 @@ The ring is **windowed/infinite** (only an admin-set number of cards exist at
 once; the curated list cycles through), photos carry a per-photo **White/Black
 group** that drives a **swept** hero background, images go through `next/image`
 with an off-screen preloader, and an `IntersectionObserver` pauses it offscreen.
-Admin curation is at `/admin/settings` → `Store Carousel Hero`, backed by
+Admin curation is at `/admin/settings` â†’ `Store Carousel Hero`, backed by
 `next-app/carousel/lib/carouselData.ts`. The
 hero reads `carousel_selection` + `carousel_settings` on the client and falls back
 to hardcoded items if the tables are absent/empty. Setup SQL: `next-app/carousel/
@@ -154,8 +153,9 @@ Current route handlers include `/api/metal-prices`, `/api/inquire`,
 `/api/paypal/webhook`), and admin-only routes
 under `/api/admin/*` (`ai-product-fill`, `ai-settings`, `messages`,
 `subscribers`, `translate`, `storage-gc`, `users/[id]`,
-`orders/[id]/email-invoice`, `orders/[id]/email-update`, `marketing/*`). This
-list is representative, not exhaustive — see `next-app/src/app/api/` for the
+`orders/[id]/invoice`, `orders/[id]/email-invoice`,
+`orders/[id]/email-update`, `marketing/*`). This
+list is representative, not exhaustive â€” see `next-app/src/app/api/` for the
 full route tree.
 
 ## Data Model
@@ -173,15 +173,19 @@ Supabase is the source for app data:
   surfaced in the listing form.
 - `orders` - order headers/customer totals/payment/fulfillment state, plus PayPal
   references (`paypal_order_id`, `paypal_capture_id`, `payment_response`, `paid_at`)
-  and a `reserved_until` hold window. `customer_notes` and the `shipping_address`
-  jsonb (line1/line2/city/state/postal_code/country) are shown on the order detail
-  page and the invoice email.
+  and legacy `reserved_until` compatibility data. `deleted_at` powers the admin Orders
+  Recycle Bin (`/admin/orders?view=trash`). `customer_notes` and the `shipping_address` jsonb
+  (line1/line2/city/state/postal_code/country) are shown on the order detail page and
+  the invoice email.
 - `order_items` - immutable product snapshots attached to orders (incl. `discount`).
-- `invoices` - invoice headers/totals/status for order-linked billing.
+- `invoices` - invoice headers/totals/status for order-linked billing. New
+  PayPal and manual admin orders generate a draft invoice row at order creation;
+  paid capture updates the same row to `paid`; the order detail page can
+  generate/refresh the row for older orders.
 - `webhook_events` - idempotent log of PayPal (and future provider) webhook events,
   unique on `(provider, event_id)`.
 - `admin_notifications` - admin message center notifications for contact messages
-  and inquiries. (PayPal order events no longer write here — paid orders surface on
+  and inquiries. (PayPal order events no longer write here â€” paid orders surface on
   the Orders-tab badge instead.)
 - `homepage_subscribers` - homepage subscriber CTA signups displayed in the
   admin Subscribers tab.
@@ -242,12 +246,15 @@ Existing Supabase projects should run `supabase/homepage-subscribers.sql`
 before using the homepage subscriber CTA or `/admin/subscribers` in production.
 
 Existing Supabase projects must run `supabase/order-item-line-discounts.sql`
-(adds `order_items.discount`) — without it the admin Orders list query errors and
-shows no orders — and `supabase/paypal-checkout.sql` (PayPal/reservation columns
-on `orders`/`products`, the `webhook_events` table, the reserve/capture/release/
-event RPCs, and the `service_role` table grants) before using PayPal checkout.
-Re-run `paypal-checkout.sql` if an earlier copy was applied — it is idempotent and
-now also drops the capture→Messages notification insert.
+(adds `order_items.discount`) â€” without it the admin Orders list query errors and
+shows no orders â€” and the PayPal SQL runbook (`supabase/paypal-checkout.sql`, then
+`supabase/no-reservation-checkout.sql`) before using PayPal checkout. Those scripts add
+PayPal columns, the `webhook_events` table, current create/capture/event RPCs, and the
+`service_role` table grants.
+
+Existing Supabase projects should run `supabase/orders-recycle-bin.sql` before using
+admin order deletion. Until `orders.deleted_at` exists, the app shows a migration notice
+and blocks the Orders Recycle Bin delete/restore actions.
 
 ## Product Images
 
@@ -302,21 +309,25 @@ storefront path; `/payment` stays a disabled placeholder). Full runbook:
   (also used by the legacy checkout route). **No amounts are trusted from the
   browser.**
 - **Routes:** `POST /api/paypal/create-order` (build authoritative order, create
-  PayPal order — no inventory hold), `POST /api/paypal/capture-order`
+  PayPal order â€” no inventory hold), `POST /api/paypal/capture-order`
   (capture, verify amount+currency, mark paid + products sold, resolve the
   concurrent-buyer race), `POST /api/paypal/webhook` (signature-verified,
   idempotent via `webhook_events`).
+- **Invoices:** PayPal create-order and manual admin order creation generate a
+  draft invoice row with `upsertOrderInvoice`; paid capture calls the same helper
+  so the existing row becomes `paid` instead of creating a duplicate. Admin order
+  detail can generate/refresh this row for older orders.
 - **Capture-on-approve (2026-07-03):** the sale is captured in the PayPal
   Buttons `onApprove` callback the moment the buyer hits **Pay Now** in the
   PayPal window; on return to our tab they land directly on the "Order Received"
   confirmation. There is no confirm-on-return review screen and no sessionStorage
-  resume machinery (both removed — the earlier 2026-07-02 reload/eviction-resume
+  resume machinery (both removed â€” the earlier 2026-07-02 reload/eviction-resume
   approach with `GET /api/paypal/order-status` was reverted). Since nothing is
   reserved, a tab evicted after approval but before capture simply leaves the item
   available (buyer can retry / another buyer can purchase); the
   `PAYMENT.CAPTURE.COMPLETED` webhook still reconciles any capture that landed.
   Detail: `features/paypal-checkout.md`.
-- **Inventory — whoever pays first gets the item (2026-07-03):** there is **no
+- **Inventory â€” whoever pays first gets the item (2026-07-03):** there is **no
   reservation**. `create_paypal_order` creates the order and leaves the one-of-one
   products `available`, so multiple buyers can check out the same piece at once.
   `capture_paypal_order` resolves the race: it row-locks the product rows, and if
@@ -326,13 +337,13 @@ storefront path; `/payment` stays a disabled placeholder). Full runbook:
   `order_status='completed'`. Capture + denial/refund webhook call
   `revalidateTag('shop-catalog', { expire: 0 })` so sold items leave the gallery
   promptly. The old 30-min `reserve_paypal_order` hold + expiry sweep were removed
-  (`no-reservation-checkout.sql`). The manual admin **Reserved** product status is a
-  separate, indefinite merchandising status — not a checkout hold.
-- **Admin surfacing:** a paid order surfaces as a badge on the admin **Orders** nav
-  (`AdminOrdersLink`, counts paid + pending-fulfillment orders) — NOT in the Messages
-  center.
+  (`no-reservation-checkout.sql`). The active app has no manual admin **Reserved**
+  product status.
+- **Admin surfacing:** the admin **Orders** nav badge (`AdminOrdersLink`) counts active
+  orders created after that admin/browser last viewed Orders; paid orders no longer
+  surface in the Messages center.
 - **Env:** `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_ENV`
-  (sandbox/live — creds must match the env), `PAYPAL_WEBHOOK_ID`.
+  (sandbox/live â€” creds must match the env), `PAYPAL_WEBHOOK_ID`.
 
 ## Public-shop cache invalidation (2026-07-02)
 
@@ -343,8 +354,8 @@ cannot itself purge that cache, so the gallery would keep serving a stale
 status for up to 5 minutes. `next-app/src/app/actions/admin-products.ts`
 exports `adminRevalidateProduct(id)` / `adminRevalidateProducts(ids)` (both
 call `revalidateTag('shop-catalog', { expire: 0 })` + revalidate the EN/ES
-product detail paths) — call one of these after every client-side `products`
-write. Server-side writes (PayPal reserve/capture/webhook,
+product detail paths) â€” call one of these after every client-side `products`
+write. Server-side writes (PayPal capture/webhook,
 `adminUpdateProductStatus`) already revalidate inline.
 
 ## Authentication

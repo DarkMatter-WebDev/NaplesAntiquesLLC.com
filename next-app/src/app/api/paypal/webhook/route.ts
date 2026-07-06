@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/service';
 import { verifyPayPalWebhook } from '@/lib/paypal';
+import { finalizePaidOrder, notifyItemConflict } from '@/lib/order-finalize';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -79,11 +80,60 @@ export async function POST(req: Request) {
   // the rest cover out-of-band money movement.
   try {
     if (eventType === 'PAYMENT.CAPTURE.COMPLETED' && internalOrderId && captureId) {
-      await service.rpc('capture_paypal_order', {
-        p_order_id: internalOrderId,
-        p_capture_id: captureId,
-        p_payment_response: event as object,
-      });
+      // Verify the captured amount + currency against our authoritative order total
+      // BEFORE marking anything paid. The client capture path (capture-order) does
+      // this and quarantines mismatches for manual review; without the same guard
+      // here, a mismatched capture that the client correctly held back would be
+      // silently marked paid + products sold when its webhook lands.
+      const amount = resource.amount as { value?: string; currency_code?: string } | undefined;
+      const { data: orderRow } = await service
+        .from('orders')
+        .select('order_number, total, payment_status')
+        .eq('id', internalOrderId)
+        .maybeSingle();
+
+      const capturedAmount = amount?.value != null ? Number(amount.value) : NaN;
+      const expectedTotal = orderRow ? Number(orderRow.total) : NaN;
+      const amountOk =
+        Number.isFinite(capturedAmount) &&
+        Number.isFinite(expectedTotal) &&
+        Math.abs(capturedAmount - expectedTotal) <= 0.01;
+      const currencyOk = amount?.currency_code === 'USD';
+
+      if (orderRow && orderRow.payment_status !== 'paid' && (!amountOk || !currencyOk)) {
+        await service
+          .from('orders')
+          .update({
+            payment_status: 'pending',
+            internal_notes:
+              `PayPal webhook amount/currency mismatch — captured ${amount?.value} ${amount?.currency_code}, ` +
+              `expected ${expectedTotal} USD. Manual review required.`,
+          })
+          .eq('id', internalOrderId);
+        await service.from('admin_notifications').insert({
+          type: 'order',
+          title: `PayPal amount mismatch on ${orderRow.order_number ?? internalOrderId}`,
+          body: `Webhook capture ${captureId}: captured ${amount?.value} ${amount?.currency_code}, expected ${expectedTotal} USD. Review before fulfilling.`,
+          order_id: internalOrderId,
+        });
+      } else {
+        const { data: capData } = await service.rpc('capture_paypal_order', {
+          p_order_id: internalOrderId,
+          p_capture_id: captureId,
+          p_payment_response: event as object,
+        });
+        const capResult = Array.isArray(capData) ? capData[0] : capData;
+        if (capResult?.item_conflict) {
+          // Losing capture of a one-of-one race — alert an admin for the refund.
+          await notifyItemConflict(service, {
+            id: internalOrderId,
+            orderNumber: (capResult?.order_number as string | undefined) ?? internalOrderId,
+          });
+        } else if (!capResult?.already_paid) {
+          // This webhook (not the client) completed the sale — invoice + receipt.
+          await finalizePaidOrder(service, internalOrderId);
+        }
+      }
     } else if (eventType === 'PAYMENT.CAPTURE.DENIED') {
       await service.rpc('apply_paypal_order_event', {
         p_order_id: internalOrderId,

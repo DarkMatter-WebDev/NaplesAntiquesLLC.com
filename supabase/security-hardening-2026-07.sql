@@ -99,7 +99,7 @@ alter table public.products add  constraint products_price_mode_check
 
 alter table public.products drop constraint if exists products_status_check;
 alter table public.products add  constraint products_status_check
-      check (status in ('draft','available','reserved','pending_payment','sold','archived','Available','Sold')) not valid;
+      check (status in ('draft','available','pending_payment','sold','archived','Available','Sold')) not valid;
 
 alter table public.products drop constraint if exists products_nonneg_amounts_check;
 alter table public.products add  constraint products_nonneg_amounts_check

@@ -6,7 +6,12 @@ import { getProductImages, getProductMetal, getProductWeight, getSnapshotPrice }
 
 // Authoritative checkout pricing. This is the single source of truth for tax,
 // shipping, and the per-item snapshot prices — the frontend never sends amounts.
-export const FL_TAX_RATE = 0.07;
+// FL_TAX_RATE is THE one source of truth for the rate — cart/checkout/admin all
+// import it so the displayed and charged rate can never drift apart again (they
+// previously diverged: 7% checkout vs 6.5% admin).
+export const FL_TAX_RATE = 0.06;
+// Human label for the rate, kept next to it so the two never disagree.
+export const FL_TAX_RATE_LABEL = '6%';
 
 export const SHIPPING_FEES: Record<string, number> = {
   'local-pickup': 0,
@@ -16,6 +21,21 @@ export const SHIPPING_FEES: Record<string, number> = {
 
 export function shippingMethodForDb(value: string): string {
   return value === 'local-pickup' ? 'pickup' : 'shipping';
+}
+
+// FL sales tax nexus: we only collect it when the sale is completed in Florida —
+// local pickup (always happens here in Naples) or a shipping address within FL.
+// Out-of-state shipments are not taxed. Matches common free-text entries for the
+// state field ("FL", "Fla", "Florida", any case/whitespace).
+export function isFloridaState(state: string | null | undefined): boolean {
+  const normalized = (state ?? '').trim().toLowerCase().replace(/\.$/, '');
+  return normalized === 'fl' || normalized === 'fla' || normalized === 'florida';
+}
+
+// `shippingMethod` here is the raw checkout value ('local-pickup' | 'express-…' |
+// 'priority-…'), not the DB-normalized `orders.shipping_method` column value.
+export function chargesFlSalesTax(shippingMethod: string, shippingState: string | null | undefined): boolean {
+  return shippingMethod === 'local-pickup' || isFloridaState(shippingState);
 }
 
 /** Round to whole cents. Used so order amounts and the PayPal breakdown agree. */
@@ -88,9 +108,17 @@ export async function buildOrderDraft(
   supabase: SupabaseClient,
   productIds: string[],
   shippingMethod: string,
+  shippingState?: string | null,
 ): Promise<OrderDraft | OrderDraftError> {
   if (productIds.length === 0) {
     return { error: 'Cart is empty', status: 400 };
+  }
+
+  // Whitelist the shipping method. An unknown value used to silently resolve to a
+  // $0 fee (SHIPPING_FEES[x] ?? 0) while still being recorded as a shipped order —
+  // i.e. free insured shipping via a tampered request.
+  if (!(shippingMethod in SHIPPING_FEES)) {
+    return { error: 'Invalid shipping method.', status: 400 };
   }
 
   const [productResult, spotData] = await Promise.all([
@@ -129,6 +157,26 @@ export async function buildOrderDraft(
     };
   }
 
+  // If the live metal feed is down, fetchSpotData() returns a hardcoded fallback
+  // spot (spot-price.ts). That is fine for *display*, but must never set the
+  // chargeable price of a spot-linked item — the fallback can diverge sharply from
+  // the real market and would let a buyer lock in an off-market price during an
+  // outage. Manual fixed-price items are unaffected because their chargeable
+  // amount comes from the saved Price Label.
+  if (spotData.source === 'fallback') {
+    const spotLinked = typedProducts.filter(
+      (product) => product.price_mode !== 'manual',
+    );
+    if (spotLinked.length > 0) {
+      return {
+        error: `Live metal pricing is temporarily unavailable, so these items can't be purchased online right now: ${spotLinked
+          .map((product) => product.title)
+          .join(', ')}. Please call (239) 404-8505 to complete your purchase.`,
+        status: 503,
+      };
+    }
+  }
+
   const items: CheckoutOrderItem[] = typedProducts.map((product) => ({
     product_id: product.id,
     inventory_number:
@@ -147,7 +195,7 @@ export async function buildOrderDraft(
 
   // Never let a $0 (or negative) line item reach checkout. A snapshot price of 0
   // means the item has no usable price — an unparsable manual label ("Contact
-  // for price"), a spot item missing weight/purity, or asking_price = 0. These
+  // for price") or a spot item missing weight/purity. These
   // must be handled by a phone call, not sold online for nothing. (CODE-D01)
   const invalidPriced = items.filter((item) => !(item.price_snapshot > 0));
   if (invalidPriced.length > 0) {
@@ -161,7 +209,7 @@ export async function buildOrderDraft(
 
   const subtotal = round2(items.reduce((sum, item) => sum + item.price_snapshot, 0));
   const shippingFee = SHIPPING_FEES[shippingMethod] ?? 0;
-  const tax = round2(subtotal * FL_TAX_RATE);
+  const tax = chargesFlSalesTax(shippingMethod, shippingState) ? round2(subtotal * FL_TAX_RATE) : 0;
   const total = round2(subtotal + tax + shippingFee);
 
   return { items, subtotal, tax, shippingFee, total };

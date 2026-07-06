@@ -241,9 +241,26 @@ begin
     where id = p_order_id and payment_status <> 'paid';
 
   elsif p_event = 'refunded' then
+    -- Partial-refund aware (see orders-partial-refund-2026-07.sql): accumulate the
+    -- refunded amount and only mark the order fully 'refunded' once cumulative
+    -- refunds reach the total; a smaller refund is 'partially_refunded'.
     update public.orders
-    set payment_status = 'refunded',
-        order_status = 'refunded',
+    set refund_amount = coalesce(refund_amount, 0)
+          + coalesce(nullif(p_payment_response->'resource'->'amount'->>'value', '')::numeric, total),
+        payment_status = case
+            when nullif(p_payment_response->'resource'->'amount'->>'value', '') is null then 'refunded'
+            when coalesce(refund_amount, 0)
+                 + (p_payment_response->'resource'->'amount'->>'value')::numeric >= coalesce(total, 0)
+              then 'refunded'
+            else 'partially_refunded'
+        end,
+        order_status = case
+            when nullif(p_payment_response->'resource'->'amount'->>'value', '') is null then 'refunded'
+            when coalesce(refund_amount, 0)
+                 + (p_payment_response->'resource'->'amount'->>'value')::numeric >= coalesce(total, 0)
+              then 'refunded'
+            else order_status
+        end,
         payment_response = coalesce(p_payment_response, payment_response)
     where id = p_order_id;
 

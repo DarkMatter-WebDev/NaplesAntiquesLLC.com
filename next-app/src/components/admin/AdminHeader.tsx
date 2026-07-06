@@ -87,7 +87,11 @@ export default function AdminHeader({
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
+    // Apply the persisted collapse preference after mount (see the note above the
+    // useState default) — post-hydration on purpose to avoid a mismatch, so the
+    // set-state-in-effect flag is a false positive here.
     try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (localStorage.getItem(STORAGE_KEY) === 'true') setCollapsed(true);
     } catch {
       // ignore
@@ -231,6 +235,7 @@ export default function AdminHeader({
       <AdminOrdersLink
         href={`${adminBasePath}/orders`}
         active={active === 'orders'}
+        userEmail={userEmail}
         style={active === 'orders' ? activeStyle : linkStyle}
       />
       <AdminMessagesLink

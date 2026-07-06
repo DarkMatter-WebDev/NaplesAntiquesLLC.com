@@ -155,7 +155,6 @@ export default function PrintInvoiceClient({
               margin: '1.5rem auto 3rem',
               boxShadow: '0 8px 40px rgba(0,0,0,0.45)',
             }}
-            // eslint-disable-next-line react/no-danger
             dangerouslySetInnerHTML={{ __html: invoiceHtml }}
           />
         </div>
