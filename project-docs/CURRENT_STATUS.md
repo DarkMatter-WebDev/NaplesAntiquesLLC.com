@@ -3,7 +3,37 @@
 > Reflects the present state of development. **Update this at the end of every
 > work session.** Last updated: **2026-07-07**.
 
-## 2026-07-07 (latest) -- Home hero loading spinner + fixed a React 19 console error on /shop
+## 2026-07-07 (latest) -- Admin override for the product-page "customer special pricing" line
+
+- Added a per-item manual override for the "Own gold or silver? Put it toward
+  this piece and pay as little as ___" trade-in line on `/shop/[id]`. That
+  line previously always mirrored the computed scrap/melt value; an admin can
+  now check **"Override customer special pricing"** in the edit product form
+  and enter a custom dollar amount that replaces just that line's number. The
+  **Scrap value / Based on spot box** above it is unaffected either way — it
+  always reflects the real computed value.
+- New columns: `products.special_price_override_enabled` (boolean, default
+  `false`) and `products.special_price_override_amount` (numeric). New
+  helper `getSpecialPriceOverrideAmount()` in `types/product.ts` treats an
+  enabled-but-empty/zero/negative amount as "no override" (falls back to the
+  computed scrap value rather than showing $0). Admin form validates that an
+  amount is entered whenever the checkbox is on.
+- Follows the same optional-column fallback pattern as `show_spot_price`:
+  `shop/[id]/page.tsx`'s product fetch retries without the two new columns if
+  they don't exist yet on an un-migrated database, so the page (and the
+  trade-in line, via its scrap-value fallback) keeps working before the SQL
+  migration runs. Verified live against the current (un-migrated) database —
+  `/shop/18k-heraldic-cross-band-ring-01` renders 200 with the trade-in line
+  intact.
+- **Needs a manual step:** run `supabase/product-special-price-override-2026-07.sql`
+  in the live Supabase project to add the columns and grant anon/authenticated
+  SELECT on them (same reasoning as the `show_spot_price` grant — see that
+  file's comments). Added to TASKS.md.
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run
+  build` all pass. Confirmed the product page still renders correctly today
+  (pre-migration) via a live local request.
+
+## 2026-07-07 (a bit earlier) -- Home hero loading spinner + fixed a React 19 console error on /shop
 
 - **Home hero loading spinner:** `HomeHero.tsx` fills the blank spot before
   the carousel/headline content is ready with a small centered spinner, tied

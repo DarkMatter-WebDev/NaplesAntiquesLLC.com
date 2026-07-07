@@ -5,6 +5,15 @@
 
 ## Backlog
 
+- **Run `supabase/product-special-price-override-2026-07.sql` in the live Supabase project**
+  and then verify the new per-item **"Override customer special pricing"** admin checkbox:
+  (1) confirm both columns exist and anon/authenticated can select them (product pages keep
+  working, no "permission denied for column" errors); (2) edit a test listing, check the box,
+  enter a custom dollar amount, save, and confirm its `/shop/[id]` page's "Own gold or
+  silver…" line shows that custom amount instead of the computed scrap value (the Scrap
+  value/Based on spot box above it should still show the real computed value, unchanged);
+  (3) uncheck the box and confirm the line reverts to the computed scrap value. See
+  `CURRENT_STATUS.md` + `DECISIONS.md` 2026-07-07 (latest).
 - **Optional:** if OneDrive sync load/lag is still noticeable during dev
   (separate from the now-fixed cache-corruption bug), also relocate
   `next-app/node_modules`'s *real* content off OneDrive the same way

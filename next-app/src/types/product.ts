@@ -81,6 +81,14 @@ export interface Product {
   // for items that aren't 100% precious metal, where a full-weight melt value
   // would overstate what the item is actually worth in scrap.
   show_spot_price: boolean | null;
+  // Manual override for the "Own gold or silver? Put it toward this piece and
+  // pay as little as ___" trade-in line on the product page. Off by default,
+  // in which case that line falls back to the computed scrap/melt value (the
+  // same number shown in the "Scrap value" box above it). When on, the amount
+  // below replaces just that line's price — the scrap-value box itself is
+  // unaffected, since it's meant to reflect the item's actual melt value.
+  special_price_override_enabled: boolean | null;
+  special_price_override_amount: number | null;
   status: ProductStatus | string;
   location: ProductLocation | string | null;
   images: string[];
@@ -217,6 +225,17 @@ export function normalizeProductStatus(status: ProductStatus | string | null | u
 // behavior) so the melt-value callout only disappears when explicitly turned off.
 export function shouldShowSpotPrice(product: Pick<Product, 'show_spot_price'>): boolean {
   return product.show_spot_price !== false;
+}
+
+// The admin-entered trade-in price only applies when explicitly enabled AND a
+// positive amount is set — an enabled checkbox with an empty/zero/negative
+// amount falls back to the computed scrap value rather than showing $0.
+export function getSpecialPriceOverrideAmount(
+  product: Pick<Product, 'special_price_override_enabled' | 'special_price_override_amount'>,
+): number | null {
+  if (!product.special_price_override_enabled) return null;
+  const amount = product.special_price_override_amount;
+  return typeof amount === 'number' && Number.isFinite(amount) && amount > 0 ? amount : null;
 }
 
 export function isProductSold(status: ProductStatus | string | null | undefined): boolean {

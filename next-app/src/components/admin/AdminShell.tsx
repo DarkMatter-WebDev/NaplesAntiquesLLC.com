@@ -133,7 +133,13 @@ function formatItemYear(value: string | number | null | undefined): string {
 // Columns added by later migrations that may not exist yet on an un-migrated
 // database. If a save hits a missing one, we retry without all of them so the
 // admin can keep saving before the migration is applied.
-const OPTIONAL_PRODUCT_COLUMNS = ['item_year', 'public_notes_es', 'show_spot_price'] as const;
+const OPTIONAL_PRODUCT_COLUMNS = [
+  'item_year',
+  'public_notes_es',
+  'show_spot_price',
+  'special_price_override_enabled',
+  'special_price_override_amount',
+] as const;
 
 function isMissingOptionalColumnError(error: { message?: string | null } | null | undefined) {
   const message = error?.message?.toLowerCase() ?? '';
@@ -568,6 +574,8 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
     length: null,
     pricing_multiplier: null,
     show_spot_price: true,
+    special_price_override_enabled: false,
+    special_price_override_amount: null,
     status: 'available',
     location: 'showcase',
     images: [],
@@ -1128,6 +1136,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     }
     if (e.price_mode === 'manual' && !e.manual_price_label?.trim()) {
       errs.push('Price label is required for manual price mode.');
+    }
+    if (e.special_price_override_enabled && !(e.special_price_override_amount && e.special_price_override_amount > 0)) {
+      errs.push('Enter a custom amount for the customer special pricing override, or uncheck it.');
     }
     return errs;
   }
@@ -4307,6 +4318,44 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   Uncheck for items that aren&apos;t 100% gold/silver (mixed metal, gemstones, plating…) — the
                   product page will show a short note instead of a scrap-value / spot-per-oz estimate.
                 </p>
+              </div>
+
+              <div>
+                <label className="inline-flex w-fit items-center gap-2 text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!editing.special_price_override_enabled}
+                    onChange={(e) => setEditing({
+                      ...editing,
+                      special_price_override_enabled: e.target.checked,
+                      special_price_override_amount: e.target.checked ? editing.special_price_override_amount : null,
+                    })}
+                    style={{ accentColor: 'var(--color-primary)' }}
+                  />
+                  Override customer special pricing
+                </label>
+                <p className="mt-1 text-xs normal-case" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  The &quot;Own gold or silver? Put it toward this piece…&quot; line on the product page defaults to
+                  the computed scrap value above. Check this to show a custom price on that line instead (the
+                  scrap-value box itself is unaffected).
+                </p>
+                {editing.special_price_override_enabled && (
+                  <div className="mt-2 max-w-[200px]">
+                    <label className="form-label">Custom Special Price</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="form-field w-full"
+                      placeholder="e.g. 350"
+                      value={editing.special_price_override_amount ?? ''}
+                      onChange={(e) => setEditing({
+                        ...editing,
+                        special_price_override_amount: e.target.value ? Number(e.target.value) : null,
+                      })}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="grid md:grid-cols-4 gap-4">

@@ -19,6 +19,7 @@ import {
   productStatusLabel,
   productSupportsLinkType,
   shouldShowSpotPrice,
+  getSpecialPriceOverrideAmount,
   type Product,
 } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
@@ -76,12 +77,20 @@ const PRODUCT_DETAIL_COLUMNS = [
   'gender',
   'item_year',
   'show_spot_price',
+  'special_price_override_enabled',
+  'special_price_override_amount',
 ].join(', ');
 
 // Columns introduced by later migrations that may not exist yet on an
 // un-migrated database. If any is missing, retry without all of them and
 // backfill nulls so the product page keeps working before the migration runs.
-const OPTIONAL_PRODUCT_DETAIL_COLUMNS = ['item_year', 'public_notes_es', 'show_spot_price'];
+const OPTIONAL_PRODUCT_DETAIL_COLUMNS = [
+  'item_year',
+  'public_notes_es',
+  'show_spot_price',
+  'special_price_override_enabled',
+  'special_price_override_amount',
+];
 
 const PRODUCT_DETAIL_COLUMNS_REQUIRED = PRODUCT_DETAIL_COLUMNS
   .split(', ')
@@ -112,7 +121,14 @@ const fetchPublicProduct = cache(async (id: string) => {
       .single();
     return {
       data: fallback.data
-        ? { ...(fallback.data as unknown as Record<string, unknown>), item_year: null, public_notes_es: null, show_spot_price: true } as Product
+        ? {
+            ...(fallback.data as unknown as Record<string, unknown>),
+            item_year: null,
+            public_notes_es: null,
+            show_spot_price: true,
+            special_price_override_enabled: false,
+            special_price_override_amount: null,
+          } as Product
         : null,
       error: fallback.error,
     };
@@ -289,6 +305,12 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   // Admin-controlled per item: some pieces aren't 100% precious metal, so a
   // melt value computed off the full item weight would overstate scrap value.
   const showSpotPrice = shouldShowSpotPrice(p);
+  // The "Own gold or silver?" trade-in line defaults to the computed scrap
+  // value, but an admin can override it with a flat custom price (e.g. to
+  // advertise a rounder, more attractive number than the literal melt value).
+  // The scrap-value box above stays tied to the real computed value either way.
+  const specialPriceOverrideAmount = getSpecialPriceOverrideAmount(p);
+  const tradeInValue = specialPriceOverrideAmount != null ? formatUsdPrice(specialPriceOverrideAmount) : scrapValue;
   const spotPerOz = p.category === 'Silver'
     ? spotData?.silverPerTroyOz
     : spotData?.goldPerTroyOz;
@@ -643,7 +665,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
               </div>
 
               {/* Store credit line */}
-              {scrapValue && showSpotPrice && isPurchasable && (
+              {tradeInValue && showSpotPrice && isPurchasable && (
                 <div
                   style={{
                     display: 'flex',
@@ -659,9 +681,9 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                   <span style={{ fontSize: '1rem', lineHeight: 1, flexShrink: 0 }}>⬡</span>
                   <p style={{ fontSize: '0.8125rem', color: '#374151', margin: 0, lineHeight: 1.4 }}>
                     {isEs ? (
-                      <>¿Tienes oro o plata? Aplícalo a esta pieza y paga desde <strong style={{ color: '#735c00' }}>{scrapValue}</strong> — llama al (239) 404-8505.</>
+                      <>¿Tienes oro o plata? Aplícalo a esta pieza y paga desde <strong style={{ color: '#735c00' }}>{tradeInValue}</strong> — llama al (239) 404-8505.</>
                     ) : (
-                      <>Own gold or silver? Put it toward this piece and pay as little as <strong style={{ color: '#735c00' }}>{scrapValue}</strong> — call (239) 404-8505.</>
+                      <>Own gold or silver? Put it toward this piece and pay as little as <strong style={{ color: '#735c00' }}>{tradeInValue}</strong> — call (239) 404-8505.</>
                     )}
                   </p>
                 </div>

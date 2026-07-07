@@ -1,5 +1,50 @@
 # Decisions Log
 
+## 2026-07-07 (latest) - Trade-in line override is a separate flat amount, not a scrap-value edit
+
+**Decision:** The new "Override customer special pricing" admin control only
+replaces the number shown on the product page's "Own gold or silver? Put it
+toward this piece and pay as little as ___" trade-in line. It does **not**
+touch the "Scrap value / Based on spot" box above it, which keeps showing the
+real value computed from `weight × purity × spot`. Implemented as two new
+nullable/boolean columns (`special_price_override_enabled`,
+`special_price_override_amount`) rather than repurposing an existing pricing
+field, and gated in `types/product.ts` via `getSpecialPriceOverrideAmount()`
+so an enabled-but-blank/zero/negative amount silently falls back to the
+computed scrap value instead of ever rendering `$0`.
+
+**Reason:** The user's request was specifically to let an admin advertise a
+custom, possibly rounder/more attractive trade-in price on that one line
+(e.g. "$300" instead of a literal $287.42 melt calculation) without lying
+about the item's actual computed scrap value elsewhere on the same page. Two
+different numbers, both true in their own context (one is "what we compute
+this melts for," the other is "what we're offering as a floor if you trade
+metal toward this piece") — collapsing them into one field would either
+overwrite the real melt value with a marketing number or require a second
+source of truth for "actual" scrap value, both worse than two clearly-named
+columns.
+
+**Alternatives considered:** (1) Reuse `manual_price_label`'s
+presence-implies-override pattern (single nullable text field, no separate
+boolean) — rejected: that field is a full price *label* (can be non-numeric
+prose), whereas this needs a raw currency amount to run through the existing
+`formatUsdPrice()` pipeline identically to the computed value, and the user
+explicitly asked for a checkbox + number combo rather than "type something to
+override, clear it to reset." (2) Let the override also apply to the
+scrap-value box itself — rejected: would make the box lie about the item's
+real melt value, and the user's wording ("override *that* special price")
+scoped the ask to the trade-in line specifically.
+
+**Scope/safety:** Visibility of the trade-in line now depends on
+`tradeInValue` (override amount OR computed scrap value) rather than requiring
+a computed scrap value specifically — so an admin can enable the override and
+show this promotional line even on an item missing weight/purity data. The
+`show_spot_price` per-item toggle and `isPurchasable` status gate still apply
+unchanged, keeping the line's other visibility rules intact. Follows the same
+optional-column retry/fallback and anon/authenticated grant pattern already
+established by `show_spot_price` (see `product-show-spot-price-2026-07.sql`)
+so this ships safely ahead of the SQL migration running live.
+
 ## 2026-07-07 (later still) - Filter the React 19 "script tag" console warning rather than rewrite the anti-flash script
 
 **Decision:** Keep the blocking inline `<script dangerouslySetInnerHTML>` in

@@ -55,6 +55,8 @@ create table if not exists public.products (
   public_notes_es      text,
   featured             boolean     not null default false,
   show_spot_price      boolean     not null default true,
+  special_price_override_enabled boolean not null default false,
+  special_price_override_amount  numeric(12,2),
   sort_order           integer     not null default 0,
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now()
@@ -93,7 +95,9 @@ alter table public.products
   add column if not exists public_notes text,
   add column if not exists public_notes_es text,
   add column if not exists featured boolean not null default false,
-  add column if not exists show_spot_price boolean not null default true;
+  add column if not exists show_spot_price boolean not null default true,
+  add column if not exists special_price_override_enabled boolean not null default false,
+  add column if not exists special_price_override_amount numeric(12,2);
 
 update public.products
 set

@@ -1,6 +1,43 @@
 # Changelog
 
-## 2026-07-07 (latest, home) - Home hero loading spinner + shop console warning fix
+## 2026-07-07 (latest) - Admin override for the product-page "customer special pricing" line
+
+- Product detail pages (`/shop/[id]`) show an "Own gold or silver? Put it
+  toward this piece and pay as little as ___" trade-in line, which always
+  mirrored the computed scrap/melt value shown in the box just above it. Added
+  a per-item admin override: a new **"Override customer special pricing"**
+  checkbox in the edit product form, plus a custom-amount input that appears
+  once checked, let an admin replace just that line's price with a flat
+  number (e.g. a rounder, more attractive advertised price) without touching
+  the real computed scrap-value box above it.
+- New `products` columns: `special_price_override_enabled` (boolean, default
+  `false`) and `special_price_override_amount` (numeric(12,2), nullable).
+  Added to `supabase/products.sql` (fresh installs) and to a new incremental
+  migration, `supabase/product-special-price-override-2026-07.sql`, for the
+  live database (mirrors `product-show-spot-price-2026-07.sql`'s pattern,
+  including the explicit anon/authenticated column grants needed because the
+  2026-07 security-hardening scripts replaced blanket `SELECT` on
+  `public.products` with a column allow-list computed at the time they ran).
+- `types/product.ts` gained `getSpecialPriceOverrideAmount()`: an
+  enabled-but-empty/zero/negative override amount is treated as "off" so the
+  page never shows a bogus $0 price and instead falls back to the computed
+  scrap value. `shop/[id]/page.tsx` computes a `tradeInValue` (override amount
+  if set, else the existing `scrapValue`) and uses it only for the trade-in
+  line — the scrap-value/spot-per-oz box keeps using the real `scrapValue`
+  unconditionally. The admin form (`AdminShell.tsx`) validates that an amount
+  is entered whenever the checkbox is checked.
+- Follows the existing optional-column fallback convention: both new columns
+  are added to `OPTIONAL_PRODUCT_DETAIL_COLUMNS` / `OPTIONAL_PRODUCT_COLUMNS`
+  so the product page and admin save both retry without them (defaulting to
+  "no override") if the SQL migration hasn't run yet on a given database.
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run
+  build` all pass. Confirmed live against the current (pre-migration)
+  database that `/shop/18k-heraldic-cross-band-ring-01` still renders 200
+  with the trade-in line intact via its scrap-value fallback.
+- **Pending manual step:** run `supabase/product-special-price-override-2026-07.sql`
+  in the live Supabase project (see TASKS.md).
+
+## 2026-07-07 (a bit earlier) - Home hero loading spinner + shop console warning fix
 
 - **Home hero loading spinner.** `HomeHero.tsx` now shows a small centered
   gold spinner over the blank spot that used to appear before the hero's
