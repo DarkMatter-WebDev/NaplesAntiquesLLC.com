@@ -1,5 +1,185 @@
 # Decisions Log
 
+## 2026-07-07 (later still) - Filter the React 19 "script tag" console warning rather than rewrite the anti-flash script
+
+**Decision:** Keep the blocking inline `<script dangerouslySetInnerHTML>` in
+`shop/(list)/page.tsx` (mutates `<main>` via `document.currentScript` before
+paint to skip the shop hero's entry-reveal replay on a repeat visit) exactly
+as-is, and add a small client component
+(`components/shop/ScriptTagWarningGuard.tsx`) whose module-scope side effect
+patches `console.error` to drop only the one exact known-false-positive
+message text React 19 logs for it on hydration.
+
+**Reason:** React 19 logs "Encountered a script tag while rendering React
+component..." for ANY literal `<script>` JSX host element, not just ones that
+are actually broken. Confirmed via `facebook/react#34008` and, more directly,
+`shadcn-ui/ui#10104` — the *exact* same warning, for the *exact* same
+technique (`next-themes`' theme-flash-prevention script), which the
+shadcn-ui/next-themes maintainers themselves describe as "a false positive
+for this use case" and whose own docs now recommend this same console-filter
+workaround. The script provably still runs correctly (verified live:
+`shop-repeat-visit` class applies, sessionStorage flag sets) — nothing is
+actually broken, only a dev console message.
+
+**Alternatives considered:** (1) Rewrite to use a client-side
+`useLayoutEffect` instead of a raw script — rejected: layout effects only run
+after hydration/JS-bundle-load, which is after the browser's first paint of
+server-rendered HTML, reintroducing the exact animation-replay flash this
+script exists to prevent. (2) `next/script` with `strategy="beforeInteractive"`
+— rejected: Next.js collects `beforeInteractive` scripts into `<head>` rather
+than leaving them in place in `<body>`, which breaks
+`document.currentScript.parentElement`'s dependency on being inline,
+immediately after `<main>` opens. (3) The `type="application/json"`-on-client
+/real-type-on-server attribute-swap trick some `next-themes` users adopted —
+rejected: relies on an undocumented internal React function
+(`isScriptDataBlock`) that could change behavior in a future patch release,
+and trades one warning for a *different* one (a server/client `type`
+attribute mismatch) unless additionally suppressed — no simpler than the
+console filter, but more fragile.
+
+**Scope/safety:** The filter matches only the exact known message prefix
+(`args[0].startsWith(...)`), so it can never mask an unrelated error, is
+dev-only (`NODE_ENV === 'development'`; production React doesn't emit this
+warning at all), and is idempotent (guarded by a flag on `window` so repeated
+module evaluation/HMR doesn't stack wrappers). Should this exact pattern be
+needed elsewhere in the app later, reuse the same guard component rather than
+duplicating the patch.
+
+## 2026-07-07 (later) - Relocate the Turbopack dev cache off OneDrive via NTFS junctions, not by moving the project
+
+**Decision:** Keep `next-app/` physically inside the OneDrive-synced project
+folder (per the existing source-of-truth rule), but make `next-app/.next` an
+NTFS directory junction pointing to
+`%LOCALAPPDATA%\dev-cache\NaplesEstateJewelry\next-app\.next` (a per-machine,
+non-synced local folder), with a matching `node_modules` junction at the same
+local location pointing back to the real `next-app/node_modules`. Also added a
+`predev` script (`scripts/dev-cache-guard.mjs`) that clears the Turbopack
+cache subfolder if it's ever left in an obviously-corrupted "bookkeeping
+files, no data files" state.
+
+**Reason:** Turbopack's dev cache is a RocksDB-style store that corrupts when
+another process holds a file lock on it mid-write; OneDrive's background sync
+does exactly that on Windows, and this had already produced sticky 500s
+requiring a manual `.next` delete in at least one earlier session (2026-07-05,
+"Dev-infra" note). Confirmed against a live upstream bug
+(vercel/next.js#95495) whose fix only ships starting in Next.js `16.3`
+canary/preview builds — not stable, not appropriate to adopt for this
+project's pinned `16.2.9` yet. Relocating just the disposable, already-`.gitignore`d
+`.next` folder onto local (non-synced) disk removes OneDrive from the picture
+entirely without moving the project or touching source/docs.
+
+**Alternatives considered:** (1) Wait for Next.js 16.3 stable — rejected for
+now, no ETA and canary is unsuitable for this project's toolchain. (2) Move
+`node_modules` off OneDrive too (not just `.next`) — deferred; the corruption
+was specifically in the `.next` dev cache, `node_modules` churns far less
+often post-install, and minimizing the number of junctions keeps the setup
+easier to reason about. Can revisit if OneDrive sync load on `node_modules`
+itself becomes a problem. (3) Pause OneDrive sync manually during dev sessions
+— rejected as a manual, easy-to-forget workaround rather than a fix.
+
+**Gotcha found while implementing:** a junction-only move of `.next` broke
+`next dev` entirely (`Cannot find module 'react/jsx-runtime'` on every route)
+because Node resolves the chunk files' *real* path (through the junction)
+before walking up for `node_modules`, and that upward walk from
+`%LOCALAPPDATA%\...` never reaches the real `next-app/node_modules` in
+OneDrive. Fixed by adding the second `node_modules` junction alongside the
+relocated `.next`, so the upward walk finds a `node_modules` entry at the
+right directory level. Anyone relocating other Next.js/Turbopack cache
+directories off-tree should expect the same requirement.
+
+**Scope note:** Both junctions are local filesystem state only — `.next` and
+`node_modules` are already `.gitignore`d, so this has no effect on the git
+repo copy, the wholesale-copy-to-GitHub workflow, or the Netlify build (fresh
+checkout, no junctions involved).
+
+## 2026-07-07 - Shop loading spinner via useTransition, not loading.tsx
+
+**Decision:** Show pending state for shop filter/sort/view/year/pagination
+navigations with a shared client-side `useTransition` context
+(`ShopNavigationProvider`/`useShopNavigation()` in
+`components/shop/ShopNavigationProgress.tsx`) plus `next/link`'s
+`useLinkStatus()` for the `<Link>`-based pagination controls, rendering a small
+spinner overlay on the results panel while any of them are pending. Every
+control that changes the URL now calls the shared `push()` instead of calling
+`useRouter().push()` itself.
+
+**Reason:** `/shop` already has a full-page `loading.tsx` skeleton, but it only
+fires for genuinely new navigations into the route — a same-route search-param
+change (the normal case for every filter/sort/pagination control here) keeps
+showing the last-rendered page/grid while React fetches the new RSC payload in
+the background (this is the intended React 18 "keep showing old content during
+a transition" behavior, not a bug), which is exactly what the owner reported as
+the page looking "frozen" for a beat. `useTransition`'s `isPending` is the
+correct, minimal-footprint signal for "a navigation triggered by this control is
+in flight," independent of whether that navigation is a fresh route or a
+param-only refresh.
+
+**Alternatives considered:** (1) Route this through `loading.tsx`/Suspense
+instead — rejected; as above, it doesn't fire for same-route search-param
+updates, which is the entire use case here. (2) Give every filter/sort/
+pagination control its own local `useTransition`/spinner — rejected; the
+spinner needs to be visible over the product grid regardless of which control
+(dropdown, sort, page link, per-page select) triggered the change, so the
+pending state has to be shared across all of them. (3) Skip pagination's
+`<Link>` elements and convert them to buttons calling the shared `push()` so
+they'd share `useTransition` directly — rejected to keep pagination as real,
+crawlable `<a href>` links (SEO/deep-linking); `useLinkStatus()` + a tiny bridge
+component gets the same shared-spinner behavior without giving that up. (4) No
+debounce on the spinner — rejected; would flash on every instant/prefetched
+navigation. Settled on a 150ms show-delay with immediate hide on completion.
+
+## 2026-07-06 (even later) - Shop filter facets always show every option
+
+**Decision:** The gallery's Brand and Item Type dropdowns always list every value
+present anywhere in the public catalog, regardless of which other filters
+(brand/metal/purity/status/etc.) are currently active. They remain scoped by the
+Jewelry-vs-Sterling-Silver category tab (a structural split of the store, not an
+ad-hoc filter), and Metal Color/Purity remain scoped by the selected Metal (gold
+vs silver — invalid combinations otherwise), but no dropdown's own available
+options shrink because of a value picked in another (or the same) dropdown.
+
+**Reason:** The owner reported that selecting Brand = "Taxco" then reopening the
+Brand dropdown only showed "Taxco" and "All brands" — every other brand vanished
+until the filter was cleared back to "All" first. The owner explicitly asked for
+free movement among choices, generalized to every dropdown, not just Brand.
+
+**Alternatives considered:** (1) Classic faceted-narrowing (à la Amazon: each
+dropdown reflects what's available given every *other* active filter, excluding
+its own) — rejected; the owner explicitly asked for full, unrestricted lists
+everywhere, not smarter narrowing. (2) Keep computing facets from the DB-filtered
+result set but union in the currently selected value if missing — rejected as a
+partial fix that still hides every *other* unselected option. (3) Fetch the full
+catalog unconditionally on every request — rejected in favor of reusing the same
+cached unfiltered read when no filters are active, avoiding an extra DB round trip
+in the common (unfiltered) case.
+
+## 2026-07-06 (later) - Per-item toggle to hide melt/scrap value, not a pricing-mode change
+
+**Decision:** Add a new, independent `products.show_spot_price` boolean (default
+`true`) that only controls whether the product page's melt/scrap-value + "based on
+spot $/oz" callout (and the paired store-credit line) is shown. It does not touch
+`price_mode`/`pricing_multiplier` or how the item's actual selling price is computed.
+When off, the callout is replaced with a short note explaining the item isn't 100%
+precious metal.
+
+**Reason:** The store already has a `price_mode` of `spot-multiplier` vs `manual`
+for how an item's *selling price* is computed. But regardless of that mode, the
+product detail page always shows a melt/scrap-value estimate whenever weight+purity
+are filled in — including for manually-priced items that keep weight/purity for
+internal reference. For mixed-metal/gemstone pieces, that melt estimate (computed
+off the full item weight) overstates real scrap value and could mislead buyers. The
+owner confirmed (2026-07-06) the fix should be a small explanatory note in place of
+the box, not a change to the item's actual price or pricing mode.
+
+**Alternatives considered:** (1) Reuse `price_mode === 'manual'` as the signal to
+hide the box — rejected because manual-priced items may legitimately still want to
+show an accurate melt value, and spot-multiplier items may need the box hidden too;
+the two concerns are orthogonal. (2) Hide the box outright with no explanation —
+rejected per owner request for a small asterisk-style note instead. (3) Also change
+the computed selling price when the toggle is off — rejected; the owner only asked
+to address the melt-value disclosure, and changing price computation would need a
+separate, explicit decision.
+
 ## 2026-07-06 - Remove manual Reserved item status
 
 **Decision:** Remove the manual **Reserved** product status from the active app. Product

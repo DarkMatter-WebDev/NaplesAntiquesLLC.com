@@ -18,6 +18,7 @@ import {
   productMetalVariantLabel,
   productStatusLabel,
   productSupportsLinkType,
+  shouldShowSpotPrice,
   type Product,
 } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
@@ -74,12 +75,13 @@ const PRODUCT_DETAIL_COLUMNS = [
   'tags_es',
   'gender',
   'item_year',
+  'show_spot_price',
 ].join(', ');
 
 // Columns introduced by later migrations that may not exist yet on an
 // un-migrated database. If any is missing, retry without all of them and
 // backfill nulls so the product page keeps working before the migration runs.
-const OPTIONAL_PRODUCT_DETAIL_COLUMNS = ['item_year', 'public_notes_es'];
+const OPTIONAL_PRODUCT_DETAIL_COLUMNS = ['item_year', 'public_notes_es', 'show_spot_price'];
 
 const PRODUCT_DETAIL_COLUMNS_REQUIRED = PRODUCT_DETAIL_COLUMNS
   .split(', ')
@@ -110,7 +112,7 @@ const fetchPublicProduct = cache(async (id: string) => {
       .single();
     return {
       data: fallback.data
-        ? { ...(fallback.data as unknown as Record<string, unknown>), item_year: null, public_notes_es: null } as Product
+        ? { ...(fallback.data as unknown as Record<string, unknown>), item_year: null, public_notes_es: null, show_spot_price: true } as Product
         : null,
       error: fallback.error,
     };
@@ -284,6 +286,9 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
 
   const meltValue = productWeight && p.purity ? calcSpotMeltValue(p, spotData) : null;
   const scrapValue = meltValue == null ? null : formatUsdPrice(meltValue);
+  // Admin-controlled per item: some pieces aren't 100% precious metal, so a
+  // melt value computed off the full item weight would overstate scrap value.
+  const showSpotPrice = shouldShowSpotPrice(p);
   const spotPerOz = p.category === 'Silver'
     ? spotData?.silverPerTroyOz
     : spotData?.goldPerTroyOz;
@@ -564,7 +569,17 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                     <span>✓ {isEs ? 'Autenticidad garantizada' : 'Authenticity guaranteed'}</span>
                   </p>
                 )}
-                {scrapValue && (
+                {scrapValue && !showSpotPrice && (
+                  <p
+                    className="mt-3 text-[0.72rem] leading-snug"
+                    style={{ color: 'var(--color-on-surface-variant)' }}
+                  >
+                    {isEs
+                      ? '*Esta pieza no es 100% oro/plata, por lo que el valor de spot no aplica directamente a este artículo.'
+                      : "*This piece isn't 100% gold or silver, so spot pricing doesn't apply directly to this item."}
+                  </p>
+                )}
+                {scrapValue && showSpotPrice && (
                   <div
                     className="mt-3 border p-1.5"
                     style={{
@@ -628,7 +643,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
               </div>
 
               {/* Store credit line */}
-              {scrapValue && isPurchasable && (
+              {scrapValue && showSpotPrice && isPurchasable && (
                 <div
                   style={{
                     display: 'flex',

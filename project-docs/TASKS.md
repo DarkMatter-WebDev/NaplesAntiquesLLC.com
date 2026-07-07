@@ -5,6 +5,28 @@
 
 ## Backlog
 
+- **Optional:** if OneDrive sync load/lag is still noticeable during dev
+  (separate from the now-fixed cache-corruption bug), also relocate
+  `next-app/node_modules`'s *real* content off OneDrive the same way
+  `.next` was (junction it to a local `%LOCALAPPDATA%` folder too, instead of
+  just having the reverse-pointing junction that exists today). Deferred
+  2026-07-07 — see DECISIONS.md same date; not needed for the corruption fix
+  itself, just a possible further perf/battery win.
+- **Watch for Next.js `16.3` stable release**, then evaluate upgrading — it
+  contains the upstream engine fix (vercel/next.js#95497) for the Windows
+  Turbopack dev-cache `Access is denied` bug that the 2026-07-07 junction
+  workaround (see CURRENT_STATUS.md / DECISIONS.md) works around today. Not
+  urgent since the workaround is stable, but the junction setup could
+  eventually be removed if the upstream fix makes it unnecessary.
+- **Run `supabase/product-show-spot-price-2026-07.sql` in the live Supabase project**
+  and then verify the new per-item **"Show spot / melt value on storefront"** admin
+  checkbox: (1) confirm the column exists and anon/authenticated can select it
+  (product pages keep working, no "permission denied for column" errors); (2) edit a
+  mixed-metal test listing, uncheck the box, save, and confirm its `/shop/[id]` page
+  shows the short note instead of the Scrap value/Based on spot box (and the "Own
+  gold or silver…" line disappears too); (3) re-check the box and confirm the melt
+  box returns. See `CURRENT_STATUS.md` + `DECISIONS.md` 2026-07-06 (later).
+
 > **Standing note (owner, 2026-07-05):** all working env is in **Netlify** (PayPal
 > sandbox, AI assistant, service role, webhook secrets, etc.). `next-app/.env.local`
 > is **stale — do not rely on it** for credentials. Remaining testing is done **live
@@ -220,6 +242,24 @@
 > start) — this section is intentionally just a short pointer, not a mirror
 > of it.
 
+- **2026-07-07 (later):** The Category sidebar buttons (Jewelry & Watches /
+  Sterling Silver) now deselect when re-clicked while active, clearing
+  `itemGroup` + its paired metal/purity params instead of re-pinning the same
+  value. `npm run lint`/`tsc`/`npm run build` pass; confirmed live.
+- **2026-07-07:** Added a lightweight loading spinner over the shop results panel
+  for filter/sort/view/year/pagination navigations (shared `useTransition`-backed
+  context + `useLinkStatus` for `<Link>` pagination), debounced 150ms so instant
+  navigations never flash it. `npm run lint`/`tsc`/`npm run build` pass; confirmed
+  live on desktop + mobile with network throttling.
+- **2026-07-06 (even later):** Fixed `/shop` filter dropdowns (Brand, dynamic Item
+  Type entries) so an active filter no longer narrows what shows up in that (or
+  another) dropdown next time it's opened — options now come from an always-
+  unfiltered catalog read. `npm run lint`/`tsc`/`npm run build` pass; confirmed live.
+- **2026-07-06 (later):** Added a per-item **"Show spot / melt value on storefront"**
+  admin toggle (`products.show_spot_price`, default true) for items that aren't 100%
+  precious metal; the product page shows a short note instead of the melt/scrap-value
+  box when off. `npm run lint`/`tsc`/`npm run build` pass. SQL migration + live
+  verification tracked in Backlog.
 - **2026-07-06:** Removed the admin product form's **Asking Price** input from New Item
   and Edit Item. Manual fixed pricing now uses **Price Label** as the visible source of
   truth; quick-fill/AI asking-price values fold into `manual_price_label`, product

@@ -76,6 +76,11 @@ export interface Product {
   chain_type: string | null;
   length: string | null;
   pricing_multiplier: number | null;
+  // Whether the product page shows the scrap/melt-value + spot-per-oz callout
+  // (and the matching "own gold/silver, put it toward this piece" line). Off
+  // for items that aren't 100% precious metal, where a full-weight melt value
+  // would overstate what the item is actually worth in scrap.
+  show_spot_price: boolean | null;
   status: ProductStatus | string;
   location: ProductLocation | string | null;
   images: string[];
@@ -205,6 +210,13 @@ export function normalizeProductStatus(status: ProductStatus | string | null | u
   if (value === 'sold') return 'sold';
   if (value === 'archived') return 'archived';
   return 'available';
+}
+
+// Legacy/pre-migration rows and any row fetched before the column existed have
+// show_spot_price === undefined; treat that the same as true (unchanged
+// behavior) so the melt-value callout only disappears when explicitly turned off.
+export function shouldShowSpotPrice(product: Pick<Product, 'show_spot_price'>): boolean {
+  return product.show_spot_price !== false;
 }
 
 export function isProductSold(status: ProductStatus | string | null | undefined): boolean {

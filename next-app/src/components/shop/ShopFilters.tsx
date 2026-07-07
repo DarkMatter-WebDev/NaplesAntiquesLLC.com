@@ -1,10 +1,11 @@
 'use client';
 
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { PRODUCT_METAL_VARIANTS, type SpotData } from '@/types/product';
 import ShopSortSelect from '@/components/shop/ShopSortSelect';
+import { useShopNavigation } from '@/components/shop/ShopNavigationProgress';
 
 const GOLD = '#735c00';
 const BORDER = 'rgba(115, 92, 0, 0.35)';
@@ -146,7 +147,7 @@ function getItemGroupForItemType(itemType: string | undefined) {
 }
 
 export default function ShopFilters({ locale, currentFilters, brandOptions, filteredCount, allCount, spotData, priceRange, itemTypeOptions, variant = 'classic', yearFilterNode }: Props) {
-  const router = useRouter();
+  const { push } = useShopNavigation();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isEs = locale === 'es';
@@ -207,9 +208,9 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
         params.delete(key);
       }
       params.delete('page');
-      router.push(`${pathname}?${params.toString()}`, { scroll: false });
+      push(`${pathname}?${params.toString()}`, { scroll: false });
     },
-    [pathname, router, searchParams]
+    [pathname, push, searchParams]
   );
 
   const updateItemTypeFilter = useCallback(
@@ -244,9 +245,9 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
         }
       }
       const qs = params.toString();
-      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+      push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
-    [pathname, router, searchParams]
+    [pathname, push, searchParams]
   );
 
   const updateMetalFilter = useCallback(
@@ -274,19 +275,34 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
       params.delete('page');
 
       const qs = params.toString();
-      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+      push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
-    [pathname, router, searchParams]
+    [pathname, push, searchParams]
   );
 
   const updateItemGroupFilter = useCallback(
     (value: 'jewelry' | 'everything-else') => {
       const params = new URLSearchParams(searchParams.toString());
-      params.set('itemGroup', value);
       params.delete('itemType');
       params.delete('chainType');
       params.delete('length');
       params.delete('page');
+
+      // Re-clicking the already-active category deselects it instead of
+      // re-pinning the same value — clears back to "no category filter"
+      // rather than toggling to the other option.
+      if (currentItemGroup === value) {
+        params.delete('itemGroup');
+        params.delete('metal');
+        params.delete('metalColor');
+        params.delete('metalType');
+        params.delete('purity');
+        const qs = params.toString();
+        push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+        return;
+      }
+
+      params.set('itemGroup', value);
       if (value === 'jewelry') {
         params.delete('metal');
         params.delete('metalColor');
@@ -307,9 +323,9 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
         }
       }
       const qs = params.toString();
-      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+      push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
-    [pathname, router, searchParams],
+    [currentItemGroup, pathname, push, searchParams],
   );
 
   const toggleLengthFilter = useCallback(
@@ -329,13 +345,13 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
       }
       params.delete('page');
       const qs = params.toString();
-      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+      push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
-    [currentFilters.itemType, pathname, router, searchParams]
+    [currentFilters.itemType, pathname, push, searchParams]
   );
 
   function clearAll() {
-    router.push(pathname, { scroll: false });
+    push(pathname, { scroll: false });
   }
 
   const hasFilters = !!(
@@ -496,9 +512,9 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
       }
       params.delete('page');
       const qs = params.toString();
-      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+      push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
-    [pathname, priceCeiling, priceFloor, priceRange, router, searchParams],
+    [pathname, priceCeiling, priceFloor, priceRange, push, searchParams],
   );
   const applyAndCloseFilters = useCallback(() => {
     if (priceRange) commitPriceRange(draftPriceMin, draftPriceMax);
@@ -741,7 +757,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
                   params.delete('metalType');
                   params.delete('page');
                   const qs = params.toString();
-                  router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+                  push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
                 }}
                 style={selectStyle}
               >

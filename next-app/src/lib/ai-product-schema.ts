@@ -30,6 +30,7 @@ export type ProductAutofillFields = {
   pricing_multiplier: number | null;
   asking_price: number | null;
   manual_price_label: string | null;
+  show_spot_price: boolean | null;
   description: string | null;
   public_notes: string | null;
 };
@@ -64,6 +65,7 @@ export const PRODUCT_AUTOFILL_FIELD_KEYS = [
   'pricing_multiplier',
   'asking_price',
   'manual_price_label',
+  'show_spot_price',
   'description',
   'public_notes',
 ] as const satisfies readonly (keyof ProductAutofillFields)[];
@@ -84,6 +86,7 @@ export const EMPTY_PRODUCT_AUTOFILL_FIELDS: ProductAutofillFields = {
   pricing_multiplier: null,
   asking_price: null,
   manual_price_label: null,
+  show_spot_price: null,
   description: null,
   public_notes: null,
 };
@@ -167,6 +170,20 @@ function cleanNumber(value: unknown, options: { min?: number; max?: number; deci
   if (options.max != null && numeric > options.max) return null;
   const multiplier = 10 ** (options.decimals ?? 2);
   return Math.round(numeric * multiplier) / multiplier;
+}
+
+function cleanBoolean(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (value === 1) return true;
+    if (value === 0) return false;
+    return null;
+  }
+  const normalized = cleanString(value, MAX_SHORT_TEXT_LENGTH)?.toLowerCase();
+  if (!normalized) return null;
+  if (['true', 'yes', 'show', 'shown', 'visible'].includes(normalized)) return true;
+  if (['false', 'no', 'hide', 'hidden', 'do not show', "don't show"].includes(normalized)) return false;
+  return null;
 }
 
 function cleanGender(value: unknown): ProductAutofillFields['gender'] {
@@ -259,6 +276,7 @@ export function coerceProductAutofill(input: ProductAutofillProviderResult): Pro
     pricing_multiplier: cleanNumber(rawFields.pricing_multiplier, { min: 0.01, max: 100, decimals: 3 }),
     asking_price: cleanNumber(rawFields.asking_price, { min: 0, max: MAX_PRICE, decimals: 2 }),
     manual_price_label: cleanString(rawFields.manual_price_label, MAX_SHORT_TEXT_LENGTH),
+    show_spot_price: cleanBoolean(rawFields.show_spot_price),
     description: cleanString(rawFields.description),
     public_notes: cleanString(rawFields.public_notes),
   };

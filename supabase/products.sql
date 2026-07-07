@@ -54,6 +54,7 @@ create table if not exists public.products (
   public_notes         text,
   public_notes_es      text,
   featured             boolean     not null default false,
+  show_spot_price      boolean     not null default true,
   sort_order           integer     not null default 0,
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now()
@@ -91,7 +92,8 @@ alter table public.products
   add column if not exists internal_notes text,
   add column if not exists public_notes text,
   add column if not exists public_notes_es text,
-  add column if not exists featured boolean not null default false;
+  add column if not exists featured boolean not null default false,
+  add column if not exists show_spot_price boolean not null default true;
 
 update public.products
 set

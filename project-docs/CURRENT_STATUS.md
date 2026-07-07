@@ -1,7 +1,505 @@
 ﻿# Current Status
 
 > Reflects the present state of development. **Update this at the end of every
-> work session.** Last updated: **2026-07-06**.
+> work session.** Last updated: **2026-07-07**.
+
+## 2026-07-07 (latest) -- Home hero loading spinner + fixed a React 19 console error on /shop
+
+- **Home hero loading spinner:** `HomeHero.tsx` fills the blank spot before
+  the carousel/headline content is ready with a small centered spinner, tied
+  to the existing `heroReady` state (appears with no flash on first paint,
+  disappears the instant content is ready, hidden under
+  `prefers-reduced-motion`). Sized 4.5rem per follow-up feedback (was
+  2.25rem).
+- **Fixed a React 19 dev console error on `/shop`** ("Encountered a script
+  tag while rendering React component...") caused by the blocking inline
+  `<script>` that skips the shop hero's entry-reveal replay on repeat visits.
+  This is a known, currently-unresolved React 19 limitation (any literal
+  `<script>` JSX element triggers it on hydration, even correct/necessary
+  ones with no first-party replacement API yet — see `facebook/react#34008`,
+  `shadcn-ui/ui#10104`). Added `components/shop/ScriptTagWarningGuard.tsx`, a
+  tiny client component that filters only that exact known-false-positive
+  message text (dev-only), leaving all other console output untouched.
+  Verified live: the script itself still runs correctly, and `console.error`
+  is confirmed patched with the expected filter logic. See CHANGELOG.md for
+  the full writeup.
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run
+  build` all pass for both changes.
+
+## 2026-07-07 (a bit earlier) -- Fixed the recurring "stuck/unresponsive dev server" issue (Turbopack cache vs. OneDrive)
+
+Root-caused and fixed the intermittent dev-server corruption noted in earlier
+sessions (2026-07-05 "Dev-infra" note; also hit again at the start of this
+session — two orphaned `next dev` processes were holding ports 3000/3001 but
+no longer answering requests). Confirmed against a live upstream Next.js/
+Turbopack bug (GitHub issue vercel/next.js#95495): the dev cache
+(`.next/dev/cache/turbopack`) is a RocksDB-style store that corrupts on
+Windows when another process locks it mid-write, and OneDrive's background
+sync of this project folder is exactly that. The real engine fix only ships
+starting in Next.js `16.3` canary/preview (merged 2026-07-06) — not stable,
+not something to adopt on this project's pinned `16.2.9` yet.
+
+- **Fix:** `next-app/.next` is now an **NTFS directory junction** pointing to
+  `%LOCALAPPDATA%\dev-cache\NaplesEstateJewelry\next-app\.next` (outside the
+  OneDrive-synced tree — OneDrive does not sync junctions), with a matching
+  **`node_modules` junction** alongside it (pointing back to the real
+  `next-app/node_modules`) — required because Node resolves the relocated
+  chunk files to their real path before its `node_modules` upward search, so
+  without the second junction every route 500'd
+  (`Cannot find module 'react/jsx-runtime'`). Both are local-machine-only
+  filesystem state; `.next`/`node_modules` are already `.gitignore`d, so this
+  has zero effect on the repo copy or the Netlify build. See DECISIONS.md
+  2026-07-07 (later) for the full writeup, including the gotcha.
+- **New `predev` safety net:** `next-app/scripts/dev-cache-guard.mjs`
+  (wired via `package.json`'s new `"predev"` script) clears the Turbopack
+  cache subfolder automatically if it's ever left in the "bookkeeping files
+  only, no real data" shape a failed commit leaves behind — so any future lock
+  contention self-heals on the next `npm run dev` instead of producing sticky
+  500s for the rest of a session.
+- Verification: killed the two stuck orphaned dev-server processes, applied
+  the junctions, confirmed `npm run dev` starts with no cache-deleted warning
+  and `GET /` / `GET /shop` both return `200` live, confirmed real `.sst`/
+  `.meta` cache files are landing in the relocated folder (not just empty
+  bookkeeping files). `npx tsc --noEmit`, `npm run lint` (0 problems), and
+  `npm run build` all pass with the `package.json`/new script in place.
+- **Note for future sessions on this machine:** if `next-app/.next` or
+  `next-app/node_modules` ever look empty/0-byte in a plain file browser, it's
+  because they're junctions to `%LOCALAPPDATA%\dev-cache\NaplesEstateJewelry\next-app\`
+  — that's expected, not a bug. Don't delete or "fix" the junctions; if a
+  cache-related error ever needs a manual clear, delete the *target* content
+  under `%LOCALAPPDATA%\dev-cache\...` (or just the `.next\dev\cache\turbopack`
+  subfolder through the junction, same as before). This setup is per-machine —
+  it doesn't need to be (and isn't) replicated in the repo or on Netlify.
+
+## 2026-07-07 (a bit earlier) -- Shop page graceful-loading audit: full top-down entry cascade + per-card reveal no longer replays its multi-second wave on reload
+
+Follow-up audit of the whole `/shop` page's loading experience (not just the
+hero) per the request to make sure everything "fades in from the top down"
+and reloads gracefully every time, while keeping the existing skeleton
+loader and inter-page spinner.
+
+- **Extended the entry-reveal cascade to every section, top to bottom.**
+  Previously only the hero (`shop-entry-reveal-hero`, 80ms delay) and the
+  filter sidebar (was `shop-entry-reveal-filters`, 260ms) faded in; the
+  mobile spot-price row, the desktop standalone year filter, and the whole
+  results panel (toolbar + product grid + pagination) just popped in with no
+  transition at all. Added the same `shop-entry-reveal` treatment (gated on
+  `isModern`, same as the hero) to all of them, with two new delay tiers in
+  `next-app/src/app/[locale]/shop/(list)/page.tsx`:
+  `shop-entry-reveal-secondary` (200ms — mobile spot-price row + desktop
+  standalone year filter, whichever is visible at that breakpoint) and
+  `shop-entry-reveal-results` (320ms — filter sidebar + results panel
+  together, since they sit side by side on desktop and shouldn't stagger
+  against each other). Net effect: hero -> spot/year row -> sidebar+grid,
+  a genuine top-down wave instead of a two-piece reveal with an abrupt grid
+  pop-in beneath it. All of it is still skipped on a repeat visit via the
+  existing `shop-repeat-visit` sessionStorage marker (generic selector, so
+  it automatically covers the newly-tagged elements too — no script changes
+  needed).
+- **Fixed a second, grid-level "reload stutter."** `ProductCard.tsx` already
+  had its own sophisticated per-card reveal (wait for the real `<img>` to
+  finish loading via `requestAnimationFrame` polling of `.complete`, then a
+  row/column-based stagger delay — `revealRow * (columns * 90 + 140) +
+  revealColumn * 90`) that runs on every mount. For a 4-column, 24-item page
+  that's up to ~2.7s of artificial delay for the last row, even though a
+  reload has every image already in the browser cache and ready instantly —
+  effectively a *second* stutter stacked on top of the hero's (independent
+  of it, and not fixed by the earlier hero-only patch). Reused the same
+  `shop-repeat-visit` marker: the per-card reveal effect now checks
+  `document.querySelector('main')?.classList.contains('shop-repeat-visit')`
+  and zeroes out the stagger delay when true, so repeat-visit cards still
+  fade in individually via the existing CSS `transition` (snappy, no pop)
+  the instant each one's image is ready, instead of riding out the full wave
+  again. First-time-this-session loads (and any filter/sort/page change,
+  which doesn't set the marker) keep the full cascading reveal unchanged.
+- **Confirmed already-graceful pieces stay intact:** the route's
+  `loading.tsx` skeleton (layout-matched skeleton cards + header bar,
+  streamed instantly on both a fresh navigation and a hard reload while the
+  server component awaits the catalog query) and `ShopLoadingOverlay` (the
+  client-side spinner shown in `.shop-results-panel` during
+  filter/sort/pagination transitions) were not touched — both already cover
+  their respective loading phases correctly and compose fine with the wider
+  entry cascade.
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run
+  build` all pass (`next-app/`). Not re-verified live in-browser this pass —
+  the local dev server/browser tooling was unresponsive during this session,
+  so this still needs a manual smoke test (fresh `/shop` load → confirm the
+  hero, spot/year row, and sidebar+grid arrive in that order top-down;
+  reload → confirm nothing replays/stutters and cards are simply present).
+
+## 2026-07-07 (just before) -- Shop hero "Don't just buy. Invest." no longer re-plays its entry animation on reload
+
+The modern shop hero + filter sidebar have a staggered fade/blur/slide-in CSS
+entry animation (`.shop-entry-reveal`, `shop-entry-reveal` keyframes,
+`next-app/src/app/[locale]/shop/(list)/page.tsx`) that — since `/shop` is a
+dynamic, server-rendered route — replayed from scratch on every single reload
+or quick return, which read as a stutter each time rather than a one-time
+welcome effect.
+
+- Added a small blocking inline `<script>` right after `<main>` (only when
+  `isModern`) that checks `sessionStorage` for a `shopHeroSeen` flag: unset ->
+  set it and let the animation play normally (first visit this tab session);
+  already set -> add a `shop-repeat-visit` class to the `<main>` element via
+  `document.currentScript.parentElement`, which a new CSS rule uses to force
+  `.shop-entry-reveal` straight to its end state (`opacity: 1; animation:
+  none; transform: none; filter: none;` — mirrors the existing
+  `prefers-reduced-motion` rule). Being a plain blocking `<script>` placed
+  before the animated elements in document order, it mutates `<main>`'s class
+  before the browser paints them, so there's no flash/flicker either way.
+  `<main>` carries `suppressHydrationWarning` since this is an intentional
+  out-of-band DOM mutation React's hydration isn't meant to reconcile against
+  (the same sanctioned pattern libraries like `next-themes` use for
+  pre-hydration `<html>` class tweaks).
+- Scope is deliberately per-tab-session, not permanent: `sessionStorage`
+  persists across reloads and back/forward navigation in the same tab (so a
+  reload or "quickly come back to it" no longer stutters) but resets for a
+  genuinely new tab/window, so first-time visitors still get the intended
+  cascading reveal.
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run
+  build` all pass. Tested live in-browser via CDP against a running dev
+  server: confirmed a fresh session plays the animation
+  (`animationName: "shop-entry-reveal"`, sets the sessionStorage flag), and
+  that reloading the same tab afterward shows `<main>` gaining
+  `shop-repeat-visit`, both the hero's and filter sidebar's
+  `animationName` computing to `"none"`, and `opacity: 1` immediately — no
+  flash, no error overlay, no hydration-warning badge in the Next.js dev
+  toolbar.
+
+## 2026-07-07 (a bit later) -- Local dev now reachable from other devices (LAN IP + Netlify Dev live tunnel)
+
+Investigated how to test the app on `localhost` AND `<your-LAN-IP>:port` (e.g.
+from a phone on the same Wi-Fi), plus whether Netlify could provide a public
+test URL without deploying. `next dev` already binds `0.0.0.0` by default in
+this Next.js version, but Next.js 15+/16 blocks cross-origin requests to dev
+assets/HMR by default (`allowedDevOrigins`), which silently breaks the page
+when loaded from anything other than `localhost`.
+
+- Added `allowedDevOrigins: ['192.168.119.224', '192.168.119.*']` to
+  `next-app/next.config.ts` (dev-only setting, no effect on production
+  builds/deploys) — this machine's current LAN IP, plus a same-subnet
+  wildcard as a hedge against the DHCP lease changing the last octet.
+- Documented three testing tiers in `next-app/README.md` (new "Testing from
+  another device" + "Testing via a public HTTPS tunnel" sections under
+  Development): (1) plain LAN IP over HTTP — works for normal browsing, but
+  is NOT a secure context, so the AI listing assistant's microphone
+  (Web Speech API) can't be granted there, only `localhost` gets that
+  exemption; (2) `next dev --experimental-https` for a self-signed HTTPS LAN
+  cert when mic/camera testing from another device is needed; (3) Netlify
+  Dev's `netlify dev --live` for a real HTTPS public tunnel
+  (`https://<name>--<site>.netlify.live`) that proxies the local dev server —
+  usable from any network (not just the same Wi-Fi), shareable, and exercises
+  the actual `netlify.toml` redirects/headers, all without deploying/publishing
+  anything. Netlify CLI isn't installed/linked yet in this project — the repo
+  has no `.netlify/` folder — so first use requires `netlify login` +
+  `netlify link` (documented in the README).
+- Verification: started `next dev`, confirmed via CDP that the homepage
+  loaded fully over `http://192.168.119.224:3001` (the port `next dev` picked
+  since 3000 was occupied) with all 46 `/_next/*` resources fetched
+  successfully and zero "Blocked cross-origin request" warnings in the server
+  log — confirming `allowedDevOrigins` is wired correctly. `npx tsc --noEmit`,
+  `npm run lint` (0 problems), `npm run build` all pass with the config
+  change in place. Did not install/test the Netlify CLI live-tunnel flow live
+  this session (no Netlify login credentials available in this environment).
+- Note: `NEXT_PUBLIC_SITE_URL`/`SITE_URL` in `.env.local` are hardcoded to
+  `https://naplesestatejewelry.co` — outbound emails (order invoices,
+  marketing) generated during local testing will still link to the live
+  production site, not the local/tunnel URL. This is expected/unchanged and
+  doesn't affect in-browser testing.
+
+## 2026-07-07 (a bit earlier) -- OG/Twitter preview image re-encoded lossy (1.77MB -> 268KB)
+
+Per the user's request, re-encoded `next-app/public/assets/images/pages/og-preview.webp`
+(the site-wide social-share preview image, added in an earlier session as a
+**lossless** WebP) as a standard **lossy** WebP instead. Decoded the existing
+lossless file (pixel-identical to the original PNG, which was already deleted)
+and re-encoded with `sharp` at `{ quality: 88, effort: 6 }` — landed at
+**267.7 KB** (down from 1,774,538 bytes), comfortably under the project's
+300KB page-image guideline. Same filename/path/dimensions (1983×793), so no
+change needed in `next-app/src/app/layout.tsx`.
+- Verification: visually diffed the new lossy file against the original
+  lossless version (both decoded back to PNG and viewed side by side) — no
+  visible difference in the logo text, gold gradients, or the dark textured
+  background at quality 88. `npx tsc --noEmit`, `npm run lint` (0 problems),
+  `npm run build` all pass. No temp conversion/comparison scripts or backup
+  files left behind.
+- Pending: same as before — no live re-deploy/crawler cache-bust done yet;
+  if this URL was already scraped by Facebook/X/etc. under the old (lossless)
+  build, it may need a manual "scrape again" via each platform's debugger
+  after the next deploy to pick up the smaller file.
+
+## 2026-07-07 (just before) -- AI Listing Agent: place-name "brands" (e.g. Taxco) and agent-controlled "show spot/melt value"
+
+Two refinements to the smart listing assistant (`next-app/src/lib/ai-product-provider.ts`
+system prompt, `next-app/src/lib/ai-product-schema.ts` schema/coercion,
+`next-app/src/components/admin/AdminShell.tsx` draft-apply wiring). Bumped
+`PROMPT_VERSION` to `product-listing-extraction-v12`.
+
+1. **Place-name trade identifiers now count as `brand`.** Previously `brand`
+   was extracted strictly from a stated maker, logo, or maker stamp. The
+   prompt now also recognizes well-known jewelry-making REGION/PLACE names as
+   a brand-equivalent when marked/stamped or stated — the standing example is
+   Mexican silver stamped/described as **"Taxco"** (bought and sold in the
+   trade as "Taxco jewelry"/"Taxco silver" even though Taxco is a town, not a
+   company). Same logic now applies to a handful of other similarly
+   recognized place-based identifiers when marked or stated: Navajo/Zuni/Hopi
+   for marked Native American silverwork, Bali for Balinese silver, Siam/Siam
+   Sterling for vintage Thai niello silver. Explicitly excluded: a generic
+   country-of-manufacture stamp with no distinct trade identity of its own
+   (e.g. a plain "Italy"/"925 Italy" stamp on a mass-produced chain stays
+   `brand: null` unless an actual maker mark/logo is also present) — this
+   guards against the model over-applying the new rule to every
+   country-stamped import chain.
+2. **The AI can now set "Show spot / melt value on storefront" (`show_spot_price`)
+   off during intake.** Added `show_spot_price: boolean | null` to
+   `ProductAutofillFields` (`ai-product-schema.ts`: new field key, new
+   `cleanBoolean()` coercer, wired into `coerceProductAutofill`) and to
+   `AdminShell.tsx`'s `applyAiDraftToForm` (new `setField('show_spot_price', ...)`
+   case) and `AI_PRODUCT_FIELD_LABELS` ("Show Spot/Melt Value"), plus a small
+   `formatAiFieldValue()` helper so the AI-fields review panel prints
+   "Shown"/"Hidden (item flagged not solid/priced by weight)" instead of the
+   raw `true`/`false`. The prompt instructs the model to leave this field
+   `null` (default: shown) unless the seller specifically says the item is
+   **not priced by weight**, **not solid** (gold-filled/plated, vermeil, clad
+   — vs. stated/marked solid 14K/18K/sterling), or **"weighted"** (the trade
+   term for hollow sterling holloware filled with plaster/resin for
+   stability, where gross weight overstates actual silver content) — never
+   inferred from photos alone, only from what the seller states about
+   construction/pricing basis.
+   - Confirmed the "Show spot / melt value on storefront" checkbox (added in
+     an earlier session) already renders identically on both the **new-item**
+     and **edit-item** forms — they share the same `AdminShell.tsx` editor
+     modal/state, so no separate new-item-only gap existed here; no UI
+     addition was needed for that half of the request, only the AI wiring.
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run build`
+  all pass. Not exercised against a live AI provider call this session (no
+  new photos/transcript run through `/api/admin/ai-product-fill`) — the
+  coercion path mirrors the existing, already-proven `cleanGender`/
+  `cleanPriceMode` string-enum pattern, and `setField`'s null/empty-string
+  skip check was confirmed to correctly pass through a literal `false`
+  (`false !== null && false !== ''`) so the field only gets skipped when the
+  model omits it, not when it deliberately returns `false`.
+- Pending: no live smoke test of an actual AI generation run yet exercising a
+  Taxco-marked photo or a "this one's weighted" transcript — recommended next
+  real intake to confirm end-to-end before relying on it for a real listing.
+
+## 2026-07-07 (earlier) -- Admin listing editor: fixed Product Type field clearing, mobile modal now edge-to-edge and footer-safe
+
+Two related admin `AdminShell.tsx` product editor ("add item"/"edit item")
+fixes:
+
+1. **Product Type field couldn't be cleared to type a brand-new type.**
+   Root cause was two-fold in `next-app/src/components/admin/AdminShell.tsx`
+   and `next-app/src/components/admin/ComboboxInput.tsx`:
+   - The field's `onChange` handler coerced an emptied value straight back to
+     `'Other'` on every keystroke (`normalizeProductTypeValue(value) ?? 'Other'`),
+     so the box could never actually go blank while editing — it now keeps a
+     genuinely empty value empty while typing, and only the save path
+     (`normalizedJewelryType = normalizeProductTypeValue(jewelryTypeInput) ?? 'Other'`,
+     unchanged) still defaults a still-blank field to `'Other'` at save time.
+   - The field was wrapped in `<ClearableField>`, whose clear button is
+     absolutely-positioned over the right edge of whatever it wraps. That
+     landed directly on top of `ComboboxInput`'s own built-in clear/toggle
+     button and physically intercepted every click meant for it — confirmed via
+     CDP (`Click intercepted by: <button class="clearable-field__button">`).
+     Removed the redundant `ClearableField` wrapper; `ComboboxInput` is fully
+     self-contained. Also reworked `ComboboxInput`'s own button to always show
+     an immediate one-click "x" clear whenever a value is present (previously
+     a two-step arm-then-clear dance where the "x" only appeared after a first
+     click).
+2. **Mobile viewport anchoring for the add/edit item modal.** In the
+   `.product-editor-modal` and its overlay:
+   - Sized to `h-svh` instead of `h-dvh` on mobile ("small viewport height" —
+     the guaranteed-visible area with the browser's address bar/toolbar fully
+     expanded — vs. the "dynamic" one that grows the instant the toolbar
+     auto-hides). This means the modal footer's Save/Cancel/etc. buttons can
+     never end up transiently covered by the browser chrome mid-animation.
+   - Added `overflow-x-hidden`/`max-w-[100vw]` on the overlay, modal, and
+     `.product-editor-body` as a hard guarantee against any horizontal scroll.
+   - Added a body-scroll lock (`document.body.style.overflow = 'hidden'` +
+     `overscrollBehavior: 'none'`) for as long as the modal is open, so the
+     (much wider than viewport) products table underneath can't be
+     panned/scrolled behind the fixed modal on touch devices.
+   - Desktop (`md:`) sizing (`max-w-5xl`, `h-auto`) is unchanged.
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run build`
+  all pass. Manually tested live at a 390×700 mobile viewport via CDP: typed
+  "Ring" into Product Type, single-clicked its clear button, confirmed the
+  field stayed blank and the full unfiltered option list reappeared, then
+  typed a brand-new custom type ("Tie Bar") and confirmed it was accepted
+  (and its conditional "Height" field appeared correctly). Confirmed
+  `document.documentElement.scrollWidth === innerWidth` (no horizontal
+  overflow) with 9 photos + all sections expanded, confirmed
+  `document.body.style.overflow` locks to `hidden` while the modal is open
+  and cleanly resets to `''` on close, and confirmed desktop sizing
+  (`max-width: 1024px`, `height: auto`) is unaffected.
+- Noted but out of scope: an intermittent React hydration-mismatch dev
+  overlay warning tied to the admin header's live "Orders" unread-count badge
+  (`AdminHeader.tsx`) — pre-existing, unrelated to these changes, not
+  investigated further this session.
+
+## 2026-07-07 (even earlier) -- New site-wide OG/Twitter card image
+
+Replaced the default social-share preview image. User dropped `logo.png`
+(1983×793 branded banner: watch, rings, chains, "NAPLES ESTATE JEWELRY —
+BUY · SELL · TRADE") at the project root; converted it losslessly to WebP via
+`sharp` (`{ lossless: true }`) and wired it up as the new default
+`openGraph`/`twitter` image in `next-app/src/app/layout.tsx`, replacing the
+old `trust.webp` fallback. Original PNG deleted per instructions; no PNG or
+scratch conversion script left behind.
+
+- New asset: `next-app/public/assets/images/pages/og-preview.webp` (1983×793,
+  ~1.77MB). Note: this is noticeably larger than other page images because it's
+  a **lossless** encode (as explicitly requested) of a highly-textured dark/
+  grainy background — lossy WebP would get this well under 300KB if file size
+  ever becomes a concern (this image is only ever fetched by link-preview
+  crawlers/social platforms, not rendered inline on any page, so it doesn't
+  affect Core Web Vitals).
+- `next-app/src/app/layout.tsx`'s site-wide `openGraph.images` /
+  `twitter.images` now point at `og-preview.webp` (with explicit
+  `width`/`height` on the OG variant). This is the fallback used by every page
+  except `/shop/[id]`, which still generates its own OG image per-product from
+  that product's own photo (unchanged).
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems) pass; visually
+  diffed the WebP output against the source PNG (re-decoded to PNG and viewed)
+  and confirmed pixel-for-pixel identical, as expected for lossless.
+- Pending: no live re-deploy/crawler cache-bust done yet — Facebook/X/etc.
+  cache OG images by URL, so if this URL was ever previously scraped under the
+  old build it may need a manual "scrape again" via each platform's debugger
+  after deploy.
+
+## 2026-07-07 (later still) -- Shop default per-page is now 24
+
+Changed `shop/(list)/page.tsx`'s `DEFAULT_PER_PAGE` from `48` to `24` — a bare
+`/shop` (or any filtered view) with no explicit `perPage` param now shows 24
+items per page instead of 48. This also fixes a pre-existing mismatch:
+`ShopPagination.tsx`'s "Per page" select already treated **24** as the implicit
+default (it omits the `perPage` param entirely when 24 is chosen, to keep the
+URL clean), even though the page's actual default was 48 — so choosing "24" from
+the dropdown looked identical to leaving it at the (then-48) default until you
+noticed the count. The two are now consistent.
+
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run build`
+  all pass. Confirmed live: a bare `/shop` renders exactly 24 product cards, 3
+  pages of pagination (up from 2 at 48/page), and the "Per page" select shows
+  `24` selected by default.
+
+## 2026-07-07 (later) -- Category toggle buttons (Jewelry & Watches / Sterling Silver) now deselect on re-click
+
+The modern-layout sidebar's gold-gradient **Category** buttons (`Jewelry & Watches`
+/ `Sterling Silver` — the `.modern-sidebar-gender-button` pills in `ShopFilters.tsx`)
+previously always applied the clicked value even if it was already active. Clicking
+the currently-active button now clears the category filter entirely (removes
+`itemGroup` and its paired `metal`/`metalColor`/`metalType`/`purity` params) instead
+of re-pinning the same value, so both buttons show unselected and the catalog
+returns to showing every item type/metal.
+
+- **`ShopFilters.tsx` (`updateItemGroupFilter`):** added an early branch — if
+  `currentItemGroup === value` (the clicked button is already active), clear
+  `itemGroup` + the metal/purity params it pins instead of setting them, then
+  return early. Behavior when clicking the *other* (inactive) button is unchanged.
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run build`
+  all pass. Confirmed live on the dev server: clicking **Sterling Silver** sets
+  `?itemGroup=everything-else&metal=silver` and marks it active; clicking it again
+  returns to bare `/shop` with neither button active; same round-trip verified for
+  **Jewelry & Watches** (`?itemGroup=jewelry` → bare `/shop`).
+
+## 2026-07-07 -- Shop filter/sort/pagination navigations now show a loading spinner
+
+Added a lightweight spinner over the shop results panel so changing a filter, the
+sort order, the gallery/list view, the year slider, or the per-page/page-number
+pagination no longer looks "frozen" while the new page renders on the server.
+
+- **New shared client module `components/shop/ShopNavigationProgress.tsx`:**
+  `ShopNavigationProvider` (wraps the catalog section in `shop/(list)/page.tsx`)
+  exposes a `push()` that runs `router.push` inside `useTransition`, so `isPending`
+  reflects the real RSC round trip for a filter/sort/view/year/per-page change.
+  Plain `<Link>` pagination (prev/page-number/next) isn't visible to that
+  `useTransition`, so a small `LinkPendingBridge` (using Next's `useLinkStatus`)
+  mirrors each pagination link's own pending state into the same shared context.
+- **`ShopLoadingOverlay`** renders a small spinner centered over the product
+  grid/toolbar/pagination area (`.shop-results-panel`, `position: relative`),
+  debounced 150ms so an instant/prefetched navigation never flashes it, and
+  disappears the instant the new content commits — no minimum show time.
+- **Every filter/sort/view/year/pagination control now calls the shared `push()`**
+  instead of its own `useRouter()` directly: `ShopFilters.tsx`, `ShopSortSelect.tsx`,
+  `ShopViewToggle.tsx`, `ShopYearFilter.tsx`, `ShopPagination.tsx`. Behavior/URLs are
+  unchanged — only the navigation call site moved.
+- Same mechanism on desktop and mobile (mobile filter drawer, mobile sort select,
+  and mobile pagination all route through the identical shared context); no
+  device-specific code branch was needed.
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run build`
+  all pass. Confirmed live on the dev server with CDP network throttling
+  (900ms latency): the spinner appears ~150–200ms after a select/dropdown change
+  or a pagination click and disappears the instant the new results land, on both
+  a desktop (1280px) and a mobile (390px) viewport; an untouched fast/instant
+  navigation never shows it.
+
+## 2026-07-06 (even later) -- Shop filter dropdowns no longer self-narrow
+
+Fixed the gallery filter dropdowns (Brand + the dynamic extra Item Type entries) so
+picking a value never shrinks what else shows up in that same dropdown (or others)
+on the next open — you could set Brand to "Taxco", then reopen the Brand dropdown
+and only see "Taxco" + "All brands" instead of the full brand list, forcing a reset
+back to "All" before picking a different brand.
+
+- **Root cause:** `/shop`'s catalog read (`queryShopCatalog`) applies the visitor's
+  active `status`/`purity`/`metalColor`/`metal`/`brand` filters at the **database**
+  level for performance, and the Brand/Item-Type dropdown option lists were being
+  computed from that *already-filtered* result set — so an active filter fed back
+  into narrowing the very dropdowns used to change it.
+- **Fix (`shop/(list)/page.tsx`):** facet option lists (`brandOptions`,
+  `itemTypeOptions`) now come from a second, always-unfiltered catalog fetch (same
+  `unstable_cache`-backed `loadShopCatalog`, called with every DB-level filter key
+  null) instead of the visitor's filtered `collectionProducts`. When the visitor has
+  no filters active, that's the exact same cache entry as the main read, so there's
+  no extra DB round trip in the common case; filtered views add one cheap, shared
+  (across all visitors) cached lookup for the unfiltered facet list.
+- Every other dropdown (Item Type's static list, Link Type, Metal, Metal Color,
+  Purity, Gender, Sort) was already a fixed/static option list not derived from the
+  filtered product set, so they weren't affected by this bug and needed no change.
+  Metal Color/Purity are still intentionally scoped by the selected Metal (gold vs
+  silver — a structural pairing, not the reported self-narrowing bug), and
+  Brand/Item-Type are still scoped by the Jewelry-vs-Sterling-Silver category tab,
+  same as before.
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run build` all
+  pass. Confirmed live on the dev server: `GET /shop?brand=Taxco` renders the Brand
+  `<select>` with the full 16-brand list (not just Taxco + "All brands").
+
+## 2026-07-06 (later) -- Per-item "Show spot/melt value" toggle (?? SQL migration pending)
+
+Added a per-listing admin toggle so items that aren't 100% precious metal (mixed
+metal, gemstones, plating…) don't show a misleading melt/scrap value on the
+storefront. New `products.show_spot_price` boolean column, default `true` (every
+existing listing keeps its current behavior).
+
+- **Admin edit/New Item form:** new **"Show spot / melt value on storefront"**
+  checkbox in the pricing section, with helper copy explaining when to turn it off.
+  Carries through Clone and the AI/quick-fill draft merge unchanged (only touched by
+  its own checkbox).
+- **Storefront (`/shop/[id]`):** the "Scrap gold/silver value" + "Based on spot
+  $/oz" callout box, and the paired "Own gold or silver? Put it toward this piece…"
+  store-credit line, are now gated on `show_spot_price !== false`. When off (and the
+  item still has weight+purity, so the box would otherwise have shown), the page
+  shows a short note instead: *"This piece isn't 100% gold or silver, so spot
+  pricing doesn't apply directly to this item"* (EN/ES). The actual selling price
+  ("Your price") and its computation are unaffected — this only controls the melt/
+  scrap-value disclosure, not pricing.
+- Follows the existing optional-column fallback pattern (like `item_year`): if the
+  live DB doesn't have the column yet, the product page and admin save both retry
+  without it and default to `true` (current behavior), so nothing breaks pre-migration.
+- **?? MANUAL STEP — run `supabase/product-show-spot-price-2026-07.sql` in Supabase.**
+  Also updated the canonical `supabase/products.sql` install script (both the
+  `create table` and the "add columns introduced after initial deploy" section) so a
+  fresh install includes the column. **The migration must also `grant select
+  (show_spot_price) on public.products to anon, authenticated`** — the 2026-07
+  hardening scripts locked anon/authenticated SELECT to a static column list, so a
+  new column isn't readable by the storefront until explicitly granted; the migration
+  file includes this grant.
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), and `npm run build`
+  all pass from `next-app/`. Confirmed live on the dev server (:3002, pre-migration
+  DB): a product page returns 200 and still renders the melt-value box via the
+  optional-column fallback (defaults to `true`). The admin checkbox itself was not
+  exercised in-browser (admin route requires an owner sign-in not available here);
+  code path mirrors the existing "Featured in shop" checkbox exactly.
 
 ## 2026-07-06 -- Manual Reserved item status removed
 
@@ -752,6 +1250,5 @@ rendering, ES notes, item-year persistence) is tracked separately in `TASKS.md`.
 ## Verification
 
 - Last known good local commands from `next-app/`:
-  `npx tsc --noEmit`, `npm run lint` (3 known pre-existing issues:
-  `AdminShell.tsx` state-in-effect error, `ShopFilters.tsx` unused-variable
-  warning, `app/layout.tsx` font-display warning), and `npm run build`.
+  `npx tsc --noEmit`, `npm run lint` (0 problems as of 2026-07-07), and
+  `npm run build` — all pass.

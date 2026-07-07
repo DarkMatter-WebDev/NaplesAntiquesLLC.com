@@ -1,7 +1,8 @@
 'use client';
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import type { CSSProperties } from 'react';
+import { useShopNavigation } from '@/components/shop/ShopNavigationProgress';
 
 const SORT_OPTIONS = [
   { value: '', label: 'Inventory order', labelEs: 'Inventario' },
@@ -28,7 +29,7 @@ export default function ShopSortSelect({
   labelStyle,
   selectStyle,
 }: Props) {
-  const router = useRouter();
+  const { push } = useShopNavigation();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isEs = locale === 'es';
@@ -42,7 +43,7 @@ export default function ShopSortSelect({
     }
     params.delete('page');
     const qs = params.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
 
   if (appearance === 'filter') {

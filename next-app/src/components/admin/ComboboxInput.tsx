@@ -13,13 +13,10 @@ interface Props {
 
 export default function ComboboxInput({ value, onChange, options, placeholder, id, disabled = false }: Props) {
   const [open, setOpen] = useState(false);
-  const [clearArmed, setClearArmed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const filtered = clearArmed
-    ? options
-    : value.trim()
+  const filtered = value.trim()
     ? options.filter(opt => opt.toLowerCase().includes(value.toLowerCase()))
     : options;
 
@@ -27,7 +24,6 @@ export default function ComboboxInput({ value, onChange, options, placeholder, i
     function onOutsideClick(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
-        setClearArmed(false);
       }
     }
     document.addEventListener('mousedown', onOutsideClick);
@@ -57,30 +53,32 @@ export default function ComboboxInput({ value, onChange, options, placeholder, i
             borderBottomRightRadius: 0,
             ...(disabled ? { background: 'var(--color-surface-container-low)', color: 'var(--color-on-surface-variant)' } : {}),
           }}
-          onChange={(e) => { onChange(e.target.value); setOpen(true); setClearArmed(false); }}
+          onChange={(e) => { onChange(e.target.value); setOpen(true); }}
           onFocus={() => { if (!disabled) setOpen(true); }}
           onKeyDown={(e) => {
-            if (e.key === 'Escape') { setOpen(false); setClearArmed(false); }
-            if (e.key === 'Enter') { setOpen(false); setClearArmed(false); }
+            if (e.key === 'Escape') setOpen(false);
+            if (e.key === 'Enter') setOpen(false);
           }}
           autoComplete="off"
         />
         <button
           type="button"
-          aria-label={value && clearArmed ? 'Clear field' : open ? 'Close options' : 'Show options'}
+          // A value present always shows a clear ("x") button — clicking it wipes the
+          // field in a single click, immediately, so the admin can type a brand-new
+          // custom entry into a truly blank box. When empty, it's just the
+          // open/close toggle for the suggestion list.
+          aria-label={value ? 'Clear field' : open ? 'Close options' : 'Show options'}
           disabled={disabled}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => {
             if (disabled) return;
-            if (value && clearArmed) {
+            if (value) {
               onChange('');
-              setOpen(false);
-              setClearArmed(false);
+              setOpen(true);
               focusInput();
               return;
             }
-            setOpen(true);
-            setClearArmed(Boolean(value));
+            setOpen((prev) => !prev);
             focusInput();
           }}
           style={{
@@ -92,15 +90,15 @@ export default function ComboboxInput({ value, onChange, options, placeholder, i
             border: '1px solid var(--color-outline-variant)',
             borderLeft: 'none',
             borderRadius: '0 2px 2px 0',
-            background: value && clearArmed ? 'var(--color-surface-container-lowest)' : 'var(--color-surface-container-low)',
+            background: value ? 'var(--color-surface-container-lowest)' : 'var(--color-surface-container-low)',
             color: 'var(--color-on-surface-variant)',
             cursor: disabled ? 'not-allowed' : 'pointer',
-            fontSize: value && clearArmed ? '0.85rem' : '0.7rem',
-            fontWeight: value && clearArmed ? 800 : 400,
+            fontSize: value ? '0.85rem' : '0.7rem',
+            fontWeight: value ? 800 : 400,
             transition: 'background 0.12s, color 0.12s',
           }}
         >
-          {value && clearArmed ? 'x' : (
+          {value ? 'x' : (
             <span style={{
               display: 'inline-block',
               transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -142,7 +140,6 @@ export default function ComboboxInput({ value, onChange, options, placeholder, i
                 e.preventDefault();
                 onChange(opt);
                 setOpen(false);
-                setClearArmed(false);
               }}
               style={{
                 padding: '0.45rem 0.75rem',

@@ -19,14 +19,14 @@ export const metadata: Metadata = {
     title: 'Naples Estate Jewelry — Fine Gold & Estate Pieces',
     description:
       'Buy and sell estate jewelry, fine gold chains, designer pieces, and bullion in Naples, FL. Live gold pricing on every item.',
-    images: [{ url: '/assets/images/pages/trust.webp' }],
+    images: [{ url: '/assets/images/pages/og-preview.webp', width: 1983, height: 793 }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Naples Estate Jewelry — Fine Gold & Estate Pieces',
     description:
       'Buy and sell estate jewelry, fine gold chains, designer pieces, and bullion in Naples, FL. Live gold pricing on every item.',
-    images: ['/assets/images/pages/trust.webp'],
+    images: ['/assets/images/pages/og-preview.webp'],
   },
 };
 

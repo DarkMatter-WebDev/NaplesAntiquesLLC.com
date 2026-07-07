@@ -21,6 +21,12 @@ const HTML_PAGES = [
 const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
+  // Dev-only: lets `npm run dev` (which already binds 0.0.0.0) accept requests
+  // from this machine's LAN IP too, not just localhost — needed so hot-reload
+  // and internal /_next asset requests aren't blocked when testing from a
+  // phone/tablet at http://<your-LAN-IP>:3000. No effect on production/builds.
+  // If your LAN IP changes (DHCP), update it here or just add another entry.
+  allowedDevOrigins: ['192.168.119.224', '192.168.119.*'],
   async headers() {
     return [
       {

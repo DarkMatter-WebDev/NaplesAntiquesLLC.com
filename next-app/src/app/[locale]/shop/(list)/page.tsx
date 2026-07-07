@@ -26,6 +26,8 @@ import ShopSortSelect from '@/components/shop/ShopSortSelect';
 import ShopViewToggle from '@/components/shop/ShopViewToggle';
 import ShopYearFilter from '@/components/shop/ShopYearFilter';
 import ShopPagination from '@/components/shop/ShopPagination';
+import { ShopNavigationProvider, ShopLoadingOverlay } from '@/components/shop/ShopNavigationProgress';
+import ScriptTagWarningGuard from '@/components/shop/ScriptTagWarningGuard';
 import { JEWELRY_ERA_MIN_YEAR, jewelryEraMaxYear, parseYearFilter } from '@/lib/jewelry-eras';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
@@ -239,7 +241,7 @@ function compareNullableNumbers(
 }
 
 const PER_PAGE_OPTIONS = [12, 24, 48, 96];
-const DEFAULT_PER_PAGE = 48;
+const DEFAULT_PER_PAGE = 24;
 const SHOP_PRODUCT_COLUMNS = [
   'id',
   'category',
@@ -425,8 +427,21 @@ export async function renderShopPage({
     brand: safeBrand,
   };
 
-  const [catalog, spotData] = await Promise.all([
+  // Facet dropdowns (Brand, Item Type) must always list every choice available
+  // in the catalog, not just what remains after the *other* filters the visitor
+  // already picked — otherwise picking one value quietly narrows another
+  // dropdown, forcing a reset back to "All" before you can pick something else.
+  // So facet options are always computed from a fully unfiltered catalog fetch,
+  // never from `collectionProducts` (which has the active filters baked in at
+  // the DB level). When the visitor has no filters active, that unfiltered
+  // fetch is the exact same cache entry as the main catalog read, so no extra
+  // DB round trip happens in the common case.
+  const unfilteredCatalogKey: ShopCatalogFilterKey = { status: null, purity: null, metalColor: null, metal: null, brand: null };
+  const catalogIsUnfiltered = JSON.stringify(catalogFilterKey) === JSON.stringify(unfilteredCatalogKey);
+
+  const [catalog, facetCatalog, spotData] = await Promise.all([
     loadShopCatalog(catalogFilterKey),
+    catalogIsUnfiltered ? Promise.resolve(null) : loadShopCatalog(unfilteredCatalogKey),
     fetchSpotData(),
   ]);
 
@@ -438,8 +453,11 @@ export async function renderShopPage({
   const allProducts: Product[] = catalog.products as unknown as Product[];
   const publicGalleryProducts = allProducts.filter(isVisibleInPublicGallery);
   const collectionProducts = publicGalleryProducts;
-  const itemTypeOptions = getShopItemTypeOptions(collectionProducts);
-  const brandScopeProducts = collectionProducts.filter((product) => {
+  const facetProducts: Product[] = (
+    (catalogIsUnfiltered ? catalog : facetCatalog)!.products as unknown as Product[]
+  ).filter(isVisibleInPublicGallery);
+  const itemTypeOptions = getShopItemTypeOptions(facetProducts);
+  const brandScopeProducts = facetProducts.filter((product) => {
     if (!productMatchesItemGroup(product, filters.itemGroup)) return false;
     if (filters.itemGroup === 'everything-else') return productMatchesBroadMetal(product, 'silver');
     return true;
@@ -677,7 +695,26 @@ export async function renderShopPage({
   return (
     <>
       <SiteHeader />
-      <main className={isModern ? 'modern-shop-page pt-20 md:pt-28 pb-20' : 'pt-20 md:pt-32 pb-20'}>
+      <main className={isModern ? 'modern-shop-page pt-20 md:pt-28 pb-20' : 'pt-20 md:pt-32 pb-20'} suppressHydrationWarning>
+        {isModern && (
+          // Blocking inline script (runs before the hero/filters below are painted) so a
+          // reload or quick return within the same tab session skips the entry animation
+          // instead of replaying it — sessionStorage persists across reloads/back-forward
+          // navigation but resets for a genuinely new tab, so first-time visitors still get
+          // the full reveal. Mutates this <main> node directly via document.currentScript,
+          // which is why suppressHydrationWarning is set above (React never expects this
+          // extra class from its own render). ScriptTagWarningGuard filters
+          // the known-false-positive React 19 dev warning this raw <script>
+          // triggers on hydration — see its own file for the full writeup.
+          <>
+            <ScriptTagWarningGuard />
+            <script
+              dangerouslySetInnerHTML={{
+                __html: "try{if(sessionStorage.getItem('shopHeroSeen')){document.currentScript.parentElement.classList.add('shop-repeat-visit')}else{sessionStorage.setItem('shopHeroSeen','1')}}catch(e){}",
+              }}
+            />
+          </>
+        )}
         <h1 className="sr-only">
           {locale === 'es' ? 'Comprar Joyería de Patrimonio en Naples, FL' : 'Shop Estate Jewelry in Naples, FL'}
         </h1>
@@ -754,7 +791,7 @@ export async function renderShopPage({
 
           {/* Spot prices: visible on mobile/tablet only — desktop sees them in the sidebar */}
           {spotData && (
-            <div className="shop-spot-mobile-row">
+            <div className={isModern ? 'shop-spot-mobile-row shop-entry-reveal shop-entry-reveal-secondary' : 'shop-spot-mobile-row'}>
               <div
                 style={{
                   padding: '0.42rem 0.7rem',
@@ -800,79 +837,82 @@ export async function renderShopPage({
             </div>
           )}
 
-          {/* Desktop only: standalone year filter above the catalog */}
-          <div className="shop-year-filter-standalone">
-            <ShopYearFilter
-              key={`${selectedYearMin ?? 'min'}-${selectedYearMax ?? 'max'}`}
-              locale={locale}
-              minYear={yearMinBound}
-              maxYear={yearMaxBound}
-              selectedMin={selectedYearMin}
-              selectedMax={selectedYearMax}
-            />
-          </div>
-
-          <div className="shop-catalog-layout">
-            {/* -- Filters ------------------------------------------ */}
-            <aside className={isModern ? 'shop-filter-sidebar shop-entry-reveal shop-entry-reveal-filters' : 'shop-filter-sidebar'} aria-label={isEs ? 'Filtros de tienda' : 'Shop filters'}>
-              <ShopFilters
+          <ShopNavigationProvider>
+            {/* Desktop only: standalone year filter above the catalog */}
+            <div className={isModern ? 'shop-year-filter-standalone shop-entry-reveal shop-entry-reveal-secondary' : 'shop-year-filter-standalone'}>
+              <ShopYearFilter
+                key={`${selectedYearMin ?? 'min'}-${selectedYearMax ?? 'max'}`}
                 locale={locale}
-                currentFilters={filters}
-                brandOptions={brandOptions}
-                filteredCount={sorted.length}
-                allCount={totalInventoryCount ?? collectionProducts.length}
-                spotData={spotData}
-                priceRange={priceRange}
-                itemTypeOptions={itemTypeOptions}
-                variant={isModern ? 'modern' : 'classic'}
-                yearFilterNode={
-                  <ShopYearFilter
-                    key={`mobile-${selectedYearMin ?? 'min'}-${selectedYearMax ?? 'max'}`}
-                    locale={locale}
-                    minYear={yearMinBound}
-                    maxYear={yearMaxBound}
-                    selectedMin={selectedYearMin}
-                    selectedMax={selectedYearMax}
-                  />
-                }
+                minYear={yearMinBound}
+                maxYear={yearMaxBound}
+                selectedMin={selectedYearMin}
+                selectedMax={selectedYearMax}
               />
-            </aside>
+            </div>
 
-            {/* -- Grid --------------------------------------------- */}
-            <section className="min-w-0">
-              <div className="shop-gallery-toolbar">
-                <ShopViewToggle locale={locale} currentView={view} />
-                <ShopSortSelect locale={locale} currentSort={filters.sort} />
-              </div>
-              {filtered.length === 0 ? (
-                <p
-                  className="py-24 text-center text-sm"
-                  style={{ color: 'var(--color-on-surface-variant)' }}
-                >
-                  {isEs ? 'Ningún artículo coincide con sus filtros.' : 'No items match your filters.'}
-                </p>
-              ) : (
-                <>
-                  <ShopProductGrid
-                    products={paginatedProducts}
-                    spotData={spotData}
-                    locale={locale}
-                    variant={isModern ? 'modern' : 'classic'}
-                    view={view}
-                  />
-                  <ShopPagination
-                    locale={locale}
-                    currentPage={currentPage}
-                    perPage={perPage}
-                    totalPages={totalPages}
-                    totalCount={sorted.length}
-                    showingStart={showingStart}
-                    showingEnd={showingEnd}
-                  />
-                </>
-              )}
-            </section>
-          </div>
+            <div className="shop-catalog-layout">
+              {/* -- Filters ------------------------------------------ */}
+              <aside className={isModern ? 'shop-filter-sidebar shop-entry-reveal shop-entry-reveal-results' : 'shop-filter-sidebar'} aria-label={isEs ? 'Filtros de tienda' : 'Shop filters'}>
+                <ShopFilters
+                  locale={locale}
+                  currentFilters={filters}
+                  brandOptions={brandOptions}
+                  filteredCount={sorted.length}
+                  allCount={totalInventoryCount ?? collectionProducts.length}
+                  spotData={spotData}
+                  priceRange={priceRange}
+                  itemTypeOptions={itemTypeOptions}
+                  variant={isModern ? 'modern' : 'classic'}
+                  yearFilterNode={
+                    <ShopYearFilter
+                      key={`mobile-${selectedYearMin ?? 'min'}-${selectedYearMax ?? 'max'}`}
+                      locale={locale}
+                      minYear={yearMinBound}
+                      maxYear={yearMaxBound}
+                      selectedMin={selectedYearMin}
+                      selectedMax={selectedYearMax}
+                    />
+                  }
+                />
+              </aside>
+
+              {/* -- Grid --------------------------------------------- */}
+              <section className={isModern ? 'min-w-0 shop-results-panel shop-entry-reveal shop-entry-reveal-results' : 'min-w-0 shop-results-panel'}>
+                <ShopLoadingOverlay />
+                <div className="shop-gallery-toolbar">
+                  <ShopViewToggle locale={locale} currentView={view} />
+                  <ShopSortSelect locale={locale} currentSort={filters.sort} />
+                </div>
+                {filtered.length === 0 ? (
+                  <p
+                    className="py-24 text-center text-sm"
+                    style={{ color: 'var(--color-on-surface-variant)' }}
+                  >
+                    {isEs ? 'Ningún artículo coincide con sus filtros.' : 'No items match your filters.'}
+                  </p>
+                ) : (
+                  <>
+                    <ShopProductGrid
+                      products={paginatedProducts}
+                      spotData={spotData}
+                      locale={locale}
+                      variant={isModern ? 'modern' : 'classic'}
+                      view={view}
+                    />
+                    <ShopPagination
+                      locale={locale}
+                      currentPage={currentPage}
+                      perPage={perPage}
+                      totalPages={totalPages}
+                      totalCount={sorted.length}
+                      showingStart={showingStart}
+                      showingEnd={showingEnd}
+                    />
+                  </>
+                )}
+              </section>
+            </div>
+          </ShopNavigationProvider>
           <style>{`
             .shop-spot-mobile-row {
               display: grid;
@@ -897,11 +937,18 @@ export async function renderShopPage({
               animation: shop-entry-reveal 620ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
               will-change: opacity, transform, filter;
             }
+            /* Top-down cascade: hero first, then the spot-price/era row right below
+               it, then the filter sidebar and results grid together (they sit side
+               by side on desktop, so they should arrive as one row, not staggered
+               against each other). */
             .shop-entry-reveal-hero {
               animation-delay: 80ms;
             }
-            .shop-entry-reveal-filters {
-              animation-delay: 260ms;
+            .shop-entry-reveal-secondary {
+              animation-delay: 200ms;
+            }
+            .shop-entry-reveal-results {
+              animation-delay: 320ms;
             }
             @keyframes shop-entry-reveal {
               from {
@@ -1057,6 +1104,9 @@ export async function renderShopPage({
             .shop-catalog-layout {
               display: block;
               margin-top: 2rem;
+            }
+            .shop-results-panel {
+              position: relative;
             }
             .shop-gallery-toolbar {
               display: flex;
@@ -1252,6 +1302,16 @@ export async function renderShopPage({
                 transform: none;
                 filter: none;
               }
+            }
+            /* Repeat visit within this tab session (reload, back/forward, quick
+               return) — render already-revealed instead of replaying the fade/
+               blur/slide-in, so it doesn't stutter every time. See the inline
+               script right after <main>. */
+            .shop-repeat-visit .shop-entry-reveal {
+              opacity: 1;
+              animation: none;
+              transform: none;
+              filter: none;
             }
           `}</style>
         </div>

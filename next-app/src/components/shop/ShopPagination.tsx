@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { useShopNavigation, LinkPendingBridge } from '@/components/shop/ShopNavigationProgress';
 
 const GOLD = '#735c00';
 const BRIGHT_GOLD_GRADIENT = 'linear-gradient(135deg, #dcb336, #b5890c)';
@@ -43,7 +44,7 @@ export default function ShopPagination({
   showingStart,
   showingEnd,
 }: Props) {
-  const router = useRouter();
+  const { push } = useShopNavigation();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isEs = locale === 'es';
@@ -69,7 +70,7 @@ export default function ShopPagination({
     }
     params.delete('page');
     const qs = params.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
 
   const pageNumbers = getVisiblePages(currentPage, totalPages);
@@ -300,6 +301,7 @@ function PageLink({
   return (
     <Link href={href} scroll={false} onClick={scrollToResultsTop} className={className} aria-current={active ? 'page' : undefined} title={label} aria-label={label}>
       {contents}
+      <LinkPendingBridge />
     </Link>
   );
 }

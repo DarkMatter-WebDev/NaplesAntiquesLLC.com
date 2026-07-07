@@ -133,7 +133,7 @@ function formatItemYear(value: string | number | null | undefined): string {
 // Columns added by later migrations that may not exist yet on an un-migrated
 // database. If a save hits a missing one, we retry without all of them so the
 // admin can keep saving before the migration is applied.
-const OPTIONAL_PRODUCT_COLUMNS = ['item_year', 'public_notes_es'] as const;
+const OPTIONAL_PRODUCT_COLUMNS = ['item_year', 'public_notes_es', 'show_spot_price'] as const;
 
 function isMissingOptionalColumnError(error: { message?: string | null } | null | undefined) {
   const message = error?.message?.toLowerCase() ?? '';
@@ -501,9 +501,15 @@ const AI_PRODUCT_FIELD_LABELS: Record<keyof ProductAutofillFields, string> = {
   pricing_multiplier: 'Multiplier',
   asking_price: 'Price Label',
   manual_price_label: 'Price Label',
+  show_spot_price: 'Show Spot/Melt Value',
   description: 'Description (EN)',
   public_notes: 'Notes (EN)',
 };
+
+function formatAiFieldValue(key: string, value: unknown): string {
+  if (key === 'show_spot_price') return value ? 'Shown' : 'Hidden (item flagged not solid/priced by weight)';
+  return String(value);
+}
 
 const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null; widthClass?: string; responsiveClass?: string }[] = [
   { label: 'Inv #', sortKey: 'inventoryNumber', widthClass: 'w-[54px]' },
@@ -561,6 +567,7 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
     chain_type: null,
     length: null,
     pricing_multiplier: null,
+    show_spot_price: true,
     status: 'available',
     location: 'showcase',
     images: [],
@@ -1025,6 +1032,24 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       window.removeEventListener('focus', loadStoredPrompt);
     };
   }, []);
+
+  // Lock the page underneath while the add/edit listing modal is open. Without
+  // this, the (much wider than the viewport) products table can still be
+  // scrolled/panned behind the fixed modal on touch devices, which is exactly
+  // the kind of background bleed-through that makes a fixed-position overlay
+  // feel like it's the one scrolling horizontally.
+  useEffect(() => {
+    if (!editing) return;
+    const { style } = document.body;
+    const previousOverflow = style.overflow;
+    const previousOverscroll = style.overscrollBehavior;
+    style.overflow = 'hidden';
+    style.overscrollBehavior = 'none';
+    return () => {
+      style.overflow = previousOverflow;
+      style.overscrollBehavior = previousOverscroll;
+    };
+  }, [editing]);
 
   const copyQuickFillPrompt = async () => {
     const copied = await copyTextToClipboard(quickFillPrompt);
@@ -1768,6 +1793,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       nextEditing.price_mode = 'manual';
       nextEditing.manual_price_label = normalizeManualPriceLabel(value);
     });
+    setField('show_spot_price', 'Show Spot/Melt Value', (value) => { nextEditing.show_spot_price = value; });
     setField('metal_type', 'Metal Type', (value) => {
       const nextCategory = getLegacyCategoryForMetalType(value, nextEditing.category);
       nextEditing.metal_type = value;
@@ -3286,11 +3312,20 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       {/* Edit / Add Modal */}
       {editing && (
         <div
-          className="fixed inset-0 z-50 flex md:items-start md:justify-center md:overflow-y-auto md:py-8 md:px-4"
+          className="fixed inset-0 z-50 flex overflow-x-hidden md:items-start md:justify-center md:overflow-y-auto md:py-8 md:px-4"
           style={{ background: 'rgba(0,0,0,0.5)' }}
         >
           <div
-            className="w-full h-dvh md:h-auto md:max-w-5xl border flex flex-col overflow-hidden product-editor-modal md:rounded-[8px]"
+            // Mobile: pinned edge-to-edge with zero horizontal wiggle room, and sized
+            // to the "small" viewport height (the guaranteed-visible area with the
+            // browser's address bar / bottom toolbar fully expanded) rather than the
+            // dynamic one — dvh grows as soon as the toolbar auto-hides, so a modal
+            // sized to it can end up taller than the space that's actually visible
+            // the instant the toolbar reappears, letting it cover the footer's Save
+            // buttons for a moment. Sizing to svh instead means the footer is always
+            // inside the guaranteed-safe area, at the cost of a little unused space
+            // on the rare frame where the toolbar happens to be hidden.
+            className="w-full max-w-[100vw] h-svh md:h-auto md:max-w-5xl border flex flex-col overflow-hidden product-editor-modal md:rounded-[8px]"
             style={{ background: '#f7f8fc', borderColor: '#d9deef' }}
           >
             {/* Modal header */}
@@ -3311,7 +3346,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               </button>
             </div>
 
-            <div className="product-editor-body p-4 md:p-7 flex flex-col gap-4 md:gap-5 overflow-y-auto flex-1 min-h-0">
+            <div className="product-editor-body p-4 md:p-7 flex flex-col gap-4 md:gap-5 overflow-y-auto overflow-x-hidden flex-1 min-h-0">
 
               {/* Photos */}
               <div
@@ -3580,7 +3615,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                             <span className="block font-bold uppercase tracking-wide mb-1" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
                               {AI_PRODUCT_FIELD_LABELS[key as keyof ProductAutofillFields] ?? key}
                             </span>
-                            <span style={{ color: 'var(--color-on-surface)' }}>{String(value)}</span>
+                            <span style={{ color: 'var(--color-on-surface)' }}>{formatAiFieldValue(key, value)}</span>
                             {aiDraft.confidence?.[key as keyof ProductAutofillFields] && (
                               <span className="block mt-1" style={{ color: 'var(--color-on-surface-variant)' }}>
                                 Confidence: {aiDraft.confidence[key as keyof ProductAutofillFields]}
@@ -3821,7 +3856,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                             <span className="block font-bold uppercase tracking-wide mb-1" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
                               {AI_PRODUCT_FIELD_LABELS[key as keyof ProductAutofillFields] ?? key}
                             </span>
-                            <span style={{ color: 'var(--color-on-surface)' }}>{String(value)}</span>
+                            <span style={{ color: 'var(--color-on-surface)' }}>{formatAiFieldValue(key, value)}</span>
                             {aiDraft.confidence?.[key as keyof ProductAutofillFields] && (
                               <span className="block mt-1" style={{ color: 'var(--color-on-surface-variant)' }}>
                                 Confidence: {aiDraft.confidence[key as keyof ProductAutofillFields]}
@@ -3978,28 +4013,30 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               <div className="grid md:grid-cols-3 gap-4">
                 <div>
                   <label className="form-label">Product Type</label>
-                  <ClearableField
-                    onClear={() => {
-                      setJewelryTypeInput('Other');
-                      setEditing({ ...editing, product_type: 'Other', jewelry_type: 'Other' });
-                      setChainTypeInput('');
-                      setLengthInput('');
+                  {/* No ClearableField wrapper here on purpose: its clear button is
+                      absolutely positioned over the right edge of whatever it wraps,
+                      which lands directly on top of ComboboxInput's own built-in
+                      clear/toggle button and physically intercepts every click meant
+                      for it. ComboboxInput is already fully self-contained (its own
+                      input, its own always-visible clear button), so it doesn't need
+                      — and must not have — this wrapper. */}
+                  <ComboboxInput
+                    value={jewelryTypeInput}
+                    onChange={(value) => {
+                      // Keep an actually-empty value empty while the admin is mid-edit
+                      // (clearing the field via the x button or backspacing it out) so
+                      // they can type a brand-new custom type into a truly blank box
+                      // instead of it snapping straight back to "Other". Blank is only
+                      // resolved to "Other" on save (see normalizedJewelryType above).
+                      const nextProductType = normalizeProductTypeValue(value) ?? '';
+                      setJewelryTypeInput(nextProductType);
+                      setEditing({ ...editing, product_type: nextProductType, jewelry_type: nextProductType });
+                      if (!productSupportsLinkType(nextProductType)) setChainTypeInput('');
+                      if (!productUsesLength(nextProductType) && !productUsesSize(nextProductType) && !productUsesHeight(nextProductType)) setLengthInput('');
                     }}
-                    show={jewelryTypeInput !== 'Other'}
-                  >
-                    <ComboboxInput
-                      value={jewelryTypeInput}
-                      onChange={(value) => {
-                        const nextProductType = normalizeProductTypeValue(value) ?? 'Other';
-                        setJewelryTypeInput(nextProductType);
-                        setEditing({ ...editing, product_type: nextProductType, jewelry_type: nextProductType });
-                        if (!productSupportsLinkType(nextProductType)) setChainTypeInput('');
-                        if (!productUsesLength(nextProductType) && !productUsesSize(nextProductType) && !productUsesHeight(nextProductType)) setLengthInput('');
-                      }}
-                      options={productTypeOptions}
-                      placeholder="e.g. Necklace, Cufflinks, Tie Clip..."
-                    />
-                  </ClearableField>
+                    options={productTypeOptions}
+                    placeholder="e.g. Necklace, Cufflinks, Tie Clip..."
+                  />
                 </div>
                 <div>
                   <label className="form-label">Date (Year Made)</label>
@@ -4254,6 +4291,22 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     </>
                   )}
                 </div>
+              </div>
+
+              <div>
+                <label className="inline-flex w-fit items-center gap-2 text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                  <input
+                    type="checkbox"
+                    checked={editing.show_spot_price !== false}
+                    onChange={(e) => setEditing({ ...editing, show_spot_price: e.target.checked })}
+                    style={{ accentColor: 'var(--color-primary)' }}
+                  />
+                  Show spot / melt value on storefront
+                </label>
+                <p className="mt-1 text-xs normal-case" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  Uncheck for items that aren&apos;t 100% gold/silver (mixed metal, gemstones, plating…) — the
+                  product page will show a short note instead of a scrap-value / spot-per-oz estimate.
+                </p>
               </div>
 
               <div className="grid md:grid-cols-4 gap-4">

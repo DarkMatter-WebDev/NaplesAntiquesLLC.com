@@ -1,6 +1,7 @@
 'use client';
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { useShopNavigation } from '@/components/shop/ShopNavigationProgress';
 
 interface Props {
   locale: string;
@@ -8,7 +9,7 @@ interface Props {
 }
 
 export default function ShopViewToggle({ locale, currentView }: Props) {
-  const router = useRouter();
+  const { push } = useShopNavigation();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isEs = locale === 'es';
@@ -22,7 +23,7 @@ export default function ShopViewToggle({ locale, currentView }: Props) {
       params.delete('view');
     }
     const qs = params.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
 
   return (

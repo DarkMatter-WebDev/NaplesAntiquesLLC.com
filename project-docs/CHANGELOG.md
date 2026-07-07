@@ -1,5 +1,182 @@
 # Changelog
 
+## 2026-07-07 (latest, home) - Home hero loading spinner + shop console warning fix
+
+- **Home hero loading spinner.** `HomeHero.tsx` now shows a small centered
+  gold spinner over the blank spot that used to appear before the hero's
+  carousel/headline content fades in (client-side data fetch + image
+  preload). Driven by the same `heroReady`/`.is-ready` state the hero's
+  existing fade-in animations already use, so it appears on first paint with
+  no flash and disappears the instant the real content is ready — no
+  artificial minimum display time. Hidden outright under
+  `prefers-reduced-motion`, where the hero content is already forced to full
+  opacity immediately with nothing to wait for. Sized at 4.5rem (bumped up
+  once from an initial 2.25rem per follow-up feedback) with a proportionally
+  thicker ring. `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run
+  build` all pass; confirmed live that the spinner mounts, and that its
+  computed opacity is `0` once `.is-ready` is present.
+- **Fixed a React 19 dev console error on `/shop`:** "Encountered a script
+  tag while rendering React component..." pointing at the blocking inline
+  `<script>` in `shop/(list)/page.tsx` (the one that skips the shop hero's
+  entry-reveal replay on a repeat visit via `document.currentScript`). This is
+  a known, currently-unresolved React 19 limitation — ANY literal `<script>`
+  JSX host element triggers this dev-only warning on hydration, even when (as
+  here) it's necessary and correct, running once via the browser's native
+  HTML parse with no clean first-party replacement API that preserves the
+  same "before paint, at this exact DOM position" guarantee (confirmed via
+  `facebook/react#34008` and `shadcn-ui/ui#10104`, the latter hitting the
+  identical warning for `next-themes`' equivalent anti-flash script and
+  officially recommending the same console-filter workaround shipped here).
+  Added `components/shop/ScriptTagWarningGuard.tsx` — a tiny client component
+  whose module-scope side effect (runs once, before hydration reaches the
+  script below it) patches `console.error` to drop only that exact known
+  message text, dev-only, leaving every other warning/error untouched.
+  Verified live: the script still runs correctly (`shop-repeat-visit` class
+  applies, sessionStorage flag set) and `console.error` is confirmed to be
+  the patched wrapper with the expected filter logic. `npx tsc --noEmit`,
+  `npm run lint` (0 problems), `npm run build` all pass.
+
+## 2026-07-07 (dev-infra) - Fixed the recurring Turbopack dev-cache corruption (OneDrive-caused)
+
+Root-caused and fixed the "sticky 500s / stuck dev server" issue noted in
+several earlier sessions (see the 2026-07-05 "Dev-infra" note below and
+DECISIONS.md). Confirmed via a live GitHub issue (vercel/next.js #95495,
+opened 2026-07-05) that Turbopack's dev cache (`.next/dev/cache/turbopack`,
+a RocksDB-style store) reliably corrupts on Windows when something else holds
+a file lock on it mid-write — OneDrive's background sync, which was
+continuously scanning/uploading this project folder (including build output),
+is exactly that kind of interferer. A real engine-level fix (skip a
+Windows-only directory-fsync call) merged into Next.js on 2026-07-06, but only
+ships in `16.3.0` canary/preview builds, not a version appropriate for this
+project's stable `16.2.9` yet.
+
+- **`next-app/.next` is now an NTFS junction** to
+  `%LOCALAPPDATA%\dev-cache\NaplesEstateJewelry\next-app\.next` (outside the
+  OneDrive-synced tree; OneDrive does not traverse/sync directory junctions).
+  A sibling **`node_modules` junction** at
+  `%LOCALAPPDATA%\dev-cache\NaplesEstateJewelry\next-app\node_modules` (pointing
+  back to the real, in-place `next-app/node_modules`) was required alongside
+  it: Node resolves the `.next` junction's dynamically-generated chunk files to
+  their real on-disk location before doing its `node_modules` upward-directory
+  search, so without this second junction, `next dev` 500'd on every route
+  with `Cannot find module 'react/jsx-runtime'` / `next/dist/build/adapter/...`
+  (discovered and fixed live this session). Both junctions are pure local
+  machine/filesystem state — `.next` and `node_modules` are already
+  `.gitignore`d and were never part of the repo-ready copy, so nothing here
+  affects the source tree, git, or the Netlify build (which does a fresh
+  checkout with no junctions).
+- **New `predev` safety net** (`next-app/scripts/dev-cache-guard.mjs`, wired
+  via a new `"predev"` script in `package.json`): before every `npm run dev`,
+  detects a Turbopack cache folder that has only bookkeeping files
+  (`CURRENT`/`LOCK`/`LOG*`) and no real `.sst`/`.meta` data — the exact shape
+  left behind by a failed first commit — and clears just that subfolder so the
+  dev server rebuilds cleanly instead of failing sticky for the rest of the
+  session. This is a backstop for any future lock contention (antivirus,
+  another process, an unclean shutdown), not the primary fix.
+- Verification: killed the two old orphaned/unresponsive `next dev` processes
+  from a prior session first (their ports were still `LISTENING` but no longer
+  answering requests — same underlying symptom). After the junction fix,
+  confirmed live: `npm run dev` starts clean with no "filesystem cache has
+  been deleted" warning, `GET /` and `GET /shop` both `200`, and the relocated
+  cache folder fills with real `.sst`/`.meta` files (checked via `cmd /c dir`
+  — PowerShell's `Get-ChildItem` oddly under-reports contents through this
+  junction in this session; not investigated further since it doesn't affect
+  Next.js/Node, which resolve it correctly). `npx tsc --noEmit`, `npm run
+  lint` (0 problems), and `npm run build` all pass with the `package.json`/new
+  script changes in place.
+
+## 2026-07-07 (latest, branding) - New default OG/Twitter card image
+
+- Added `next-app/public/assets/images/pages/og-preview.webp` — a lossless
+  WebP conversion (via `sharp`, `{ lossless: true }`) of a new branded banner
+  graphic (`logo.png`, 1983×793) dropped at the project root. Original PNG
+  deleted after conversion, no leftover scratch scripts.
+- `next-app/src/app/layout.tsx` — site-wide `openGraph.images` /
+  `twitter.images` now point at `og-preview.webp` instead of `trust.webp`.
+  Per-product `/shop/[id]` OG images are unaffected (still generated per
+  listing from that product's own photo).
+- Note: this asset is intentionally lossless per explicit request, so at
+  ~1.77MB it's much larger than other page images; it's only fetched by
+  social/link-preview crawlers (never rendered inline on-page), so this
+  doesn't affect on-site performance. Re-encode losslessly is easy to redo as
+  lossy later if a smaller file is wanted.
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems); visually
+  confirmed the WebP round-trips pixel-identical to the source PNG.
+
+## 2026-07-07 (later still, shop) - Default per-page changed to 24
+
+- `shop/(list)/page.tsx`'s `DEFAULT_PER_PAGE` changed from `48` to `24`, so a
+  bare `/shop` (no `perPage` param) now shows 24 items per page. This also
+  aligns the page default with `ShopPagination.tsx`'s "Per page" select, which
+  already special-cased 24 as the implicit default (omits `perPage` from the
+  URL when 24 is picked).
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run build`
+  all pass; confirmed live that `/shop` now renders 24 cards and 3 pagination
+  pages, with the Per Page select showing 24 selected.
+
+## 2026-07-07 (later, shop) - Category buttons deselect on re-click
+
+- `ShopFilters.tsx`'s `updateItemGroupFilter` now checks whether the clicked
+  Category button (`Jewelry & Watches` / `Sterling Silver`) is already the
+  active `currentItemGroup` — if so it clears `itemGroup` (and the `metal`/
+  `metalColor`/`metalType`/`purity` params that value pins) instead of
+  re-applying it, so re-clicking an already-selected category button
+  deselects it back to "no category filter."
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run build`
+  all pass; confirmed live that clicking an active category button clears the
+  URL back to bare `/shop` and both buttons show unselected.
+
+## 2026-07-07 (shop) - Loading spinner for filter/sort/pagination navigations
+
+- Added `components/shop/ShopNavigationProgress.tsx`: a shared
+  `ShopNavigationProvider`/`useShopNavigation()` context (wraps the catalog
+  section of `shop/(list)/page.tsx`) that runs filter/sort/view/year/per-page
+  `router.push` calls inside `useTransition`, plus a `LinkPendingBridge`
+  (`next/link`'s `useLinkStatus`) so `<Link>`-based pagination reports into the
+  same shared pending state.
+- Added `ShopLoadingOverlay`, a small centered spinner shown over the results
+  panel (`.shop-results-panel`) only once a navigation has been pending for
+  150ms and hidden the instant the new content commits — avoids a flash on
+  instant/prefetched navigations while never leaving the page looking frozen
+  on slower ones.
+- Updated `ShopFilters.tsx`, `ShopSortSelect.tsx`, `ShopViewToggle.tsx`,
+  `ShopYearFilter.tsx`, and `ShopPagination.tsx` to call the shared `push()`
+  instead of each calling `useRouter().push()` directly. No URL/behavior change.
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run build`
+  all pass. Confirmed live via CDP network throttling (900ms latency) on both a
+  1280px and a 390px viewport: the spinner shows ~150–200ms after a dropdown
+  change or a pagination click and disappears the moment the new results render.
+
+## 2026-07-06 (even later, shop) - Filter dropdowns no longer self-narrow
+
+- Fixed `/shop` (and `/shop-modern`, same shared `renderShopPage`): the Brand
+  dropdown (and the dynamic extra Item Type entries) used to only list whatever
+  remained in the *already brand/metal/purity/status-filtered* result set, so
+  selecting a value hid every other choice next time you opened that dropdown.
+- `shop/(list)/page.tsx` now computes `brandOptions`/`itemTypeOptions` from a
+  second, always-unfiltered `loadShopCatalog` read (shares the unfiltered cache
+  entry when no filters are active — no extra DB cost in the common case).
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run build`
+  all pass; confirmed live that `/shop?brand=Taxco` renders the full 16-brand list
+  in the Brand dropdown instead of just "Taxco" + "All brands".
+
+## 2026-07-06 (later, shop + admin products) - Per-item "Show spot/melt value" toggle
+
+- Added `products.show_spot_price` (boolean, default `true`) and a matching admin
+  **"Show spot / melt value on storefront"** checkbox in the New Item/Edit Item
+  pricing section, for items that aren't 100% precious metal.
+- `/shop/[id]` now hides the "Scrap gold/silver value" + "Based on spot $/oz" box
+  and the "Own gold or silver? Put it toward this piece…" line when the toggle is
+  off, replacing them with a short bilingual note. The actual "Your price" value
+  and its computation are unchanged.
+- Added `supabase/product-show-spot-price-2026-07.sql` (adds the column + the
+  explicit anon/authenticated column grant the 2026-07 hardening scripts now
+  require for any new product column) and updated `supabase/products.sql` so a
+  fresh install includes the column from the start.
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run build`
+  all pass from `next-app/`; confirmed live on the dev server that a product page
+  still renders correctly (falls back to `true`) before the SQL migration runs.
+
 ## 2026-07-06 (admin products) - Manual Reserved status removed
 
 - Removed the manual **Reserved** product status from the active admin app:

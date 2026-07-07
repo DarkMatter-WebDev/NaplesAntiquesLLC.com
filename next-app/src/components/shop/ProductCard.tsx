@@ -164,9 +164,19 @@ export default function ProductCard({
   useEffect(() => {
     if (!coverImageLoaded) return;
 
+    // Skip the decorative row/column stagger on a repeat visit within this tab
+    // session (reload, back/forward, quick return) — that marker is set by the
+    // inline script in shop/(list)/page.tsx. Images are already cached by then,
+    // so riding out the full multi-second cascade again would just read as a
+    // stutter; each card still fades in via the CSS transition below, just
+    // without the extra wave delay.
+    const isRepeatVisit = typeof document !== 'undefined'
+      && document.querySelector('main')?.classList.contains('shop-repeat-visit');
+    const effectiveDelayMs = isRepeatVisit ? 0 : revealDelayMs;
+
     const timer = window.setTimeout(() => {
       setRevealedCoverKey(coverKey);
-    }, revealDelayMs);
+    }, effectiveDelayMs);
 
     return () => window.clearTimeout(timer);
   }, [coverImageLoaded, coverKey, revealDelayMs]);

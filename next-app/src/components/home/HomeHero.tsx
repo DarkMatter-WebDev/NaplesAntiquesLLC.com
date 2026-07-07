@@ -199,6 +199,15 @@ export default function HomeHero({ locale, fallbackItems }: Props) {
       style={{ borderColor: 'rgba(220, 179, 54, 0.22)', ...theme }}
       data-customer-reveal-skip
     >
+      {/* Loading spinner — fills the blank spot while the carousel data/images
+          settle, and fades out the instant heroReady flips (no minimum show
+          time). Hidden outright under prefers-reduced-motion, where the
+          content below is already forced to opacity 1 with no fade to wait
+          for. */}
+      <div className="home-hero-loading" aria-hidden="true">
+        <span className="home-hero-spinner" />
+      </div>
+
       {/* Carousel background */}
       <div className="home-carousel-theme">
         <Carousel
@@ -319,6 +328,37 @@ export default function HomeHero({ locale, fallbackItems }: Props) {
             opacity: 1;
             filter: blur(0);
             transform: translateX(-50%) translateY(0);
+          }
+        }
+
+        /* Loading spinner — centered over the whole hero, above the (still
+           invisible) carousel/text layers. Fades out as soon as .is-ready is
+           added; no artificial minimum display time. */
+        .home-hero-loading {
+          position: absolute;
+          inset: 0;
+          z-index: 6;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          pointer-events: none;
+          opacity: 1;
+          transition: opacity 180ms ease;
+        }
+        .home-carousel-hero.is-ready .home-hero-loading {
+          opacity: 0;
+        }
+        .home-hero-spinner {
+          width: 4.5rem;
+          height: 4.5rem;
+          border-radius: 9999px;
+          border: 5px solid rgba(139, 108, 6, 0.18);
+          border-top-color: #b48200;
+          animation: home-hero-spin 800ms linear infinite;
+        }
+        @keyframes home-hero-spin {
+          to {
+            transform: rotate(360deg);
           }
         }
 
@@ -455,6 +495,10 @@ export default function HomeHero({ locale, fallbackItems }: Props) {
         }
 
         @media (prefers-reduced-motion: reduce) {
+          .home-hero-loading {
+            display: none;
+          }
+
           .home-carousel-theme,
           .home-hero-top,
           .home-hero-bottom {
