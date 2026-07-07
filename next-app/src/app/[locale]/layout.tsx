@@ -66,20 +66,23 @@ export default async function LocaleLayout({ children, params }: Props) {
   return (
     <html lang={locale} className={`${caslon.variable} ${hanken.variable}`}>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* Material Symbols is an icon font and is not exposed by next/font/google.
-            Preload the stylesheet, then drop the unused GRAD axis (never set in
-            this app) to shrink the variable font payload. opsz/wght/FILL are all
-            in use (wght 200 on the service pages, FILL toggles on cart/wishlist). */}
-        {/* display=block is intentional for an icon font: it hides the glyphs
-            until the font loads (max ~3s) instead of flashing fallback tofu
-            boxes the way swap/optional would — so the google-font-display rule is
-            a false positive here. */}
-        {/* eslint-disable-next-line @next/next/no-page-custom-font, @next/next/google-font-display */}
+        {/* Material Symbols (icon font) is self-hosted + subset via @font-face in
+            globals.css and served same-origin from /assets/fonts, so there is no
+            render-blocking third-party stylesheet on the critical path anymore.
+            Preload the (tiny, ~65KB) subset so it arrives inside font-display:
+            block's window — icons render immediately instead of briefly flashing
+            their ligature names as text. crossOrigin is required: webfonts are
+            always fetched in CORS/anonymous mode, so this must match the
+            @font-face fetch to avoid a double download.
+            The body fonts (caslon/hanken) are self-hosted by next/font at build
+            time, so no runtime fonts.googleapis.com / fonts.gstatic.com
+            connection remains — hence no preconnects here. */}
         <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=block"
+          rel="preload"
+          href="/assets/fonts/material-symbols-subset-v357.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
         />
         <script
           type="application/ld+json"

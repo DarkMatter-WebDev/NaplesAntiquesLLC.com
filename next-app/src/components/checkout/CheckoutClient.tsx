@@ -49,7 +49,7 @@ interface CustomerInfo {
 }
 
 export default function CheckoutClient({ locale, paypalClientId }: { locale: string; paypalClientId?: string | null }) {
-  const { items, remove, clear } = useCart();
+  const { items, remove, clear, setQuantity } = useCart();
   const isEs = locale === 'es';
   const prefix = isEs ? '/es' : '';
   const [customer, setCustomer] = useState<CustomerInfo>({
@@ -85,7 +85,10 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     createClient().auth.getUser().then(({ data }) => setIsGuest(!data.user)).catch(() => {});
   }, []);
 
-  const cartPayloadKey = `${items.map((item) => item.id).sort().join(',')}|${shippingMethod}`;
+  const cartPayloadKey = `${items
+    .map((item) => `${item.id}:${Math.max(1, Math.floor(item.purchaseQuantity ?? 1))}`)
+    .sort()
+    .join(',')}|${shippingMethod}`;
 
   // Invalidate the reusable order id when the cart or shipping method changes
   // after the order was created (buyer cancelled PayPal, then edited things).
@@ -121,7 +124,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
 
   function buildPayPalPayload() {
     return {
-      productIds: items.map((item) => item.id),
+      items: items.map((item) => ({ id: item.id, quantity: Math.max(1, Math.floor(item.purchaseQuantity ?? 1)) })),
       customer: {
         name: customer.name,
         email: customer.email,
@@ -406,6 +409,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
             shippingState={customer.state}
             onShippingMethodChange={setShippingMethod}
             onRemove={remove}
+            onSetQuantity={setQuantity}
             variant="expanded"
           />
         </div>

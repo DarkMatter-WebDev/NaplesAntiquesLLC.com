@@ -5,6 +5,7 @@ import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import { CardGrid, PageContainer, Section } from '@/components/layout/ResponsiveLayout';
 import HomeHero from '@/components/home/HomeHero';
+import HomeBootSplash from '@/components/home/HomeBootSplash';
 import ServiceIconCanvas from '@/components/home/ServiceIconCanvas';
 import type { CarouselItem } from '../../../../carousel/lib/carouselData';
 
@@ -43,6 +44,7 @@ export default async function HomePage({ params }: Props) {
 
   return (
     <>
+      <HomeBootSplash />
       <SiteHeader />
 
       <main className="flex flex-col pt-16">

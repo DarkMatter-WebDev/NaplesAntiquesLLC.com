@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import CartDrawer from '@/components/cart/CartDrawer';
-import { productImagePaddingForImage, type Product, type ProductStatus } from '@/types/product';
+import { normalizeProductQuantity, productImagePaddingForImage, type Product, type ProductStatus } from '@/types/product';
 import { createClient } from '@/lib/supabase/client';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 import { normalizeManualPriceLabel } from '@/lib/pricing';
@@ -17,6 +17,15 @@ export interface CartItem {
   image: string | null;
   image_padding?: Product['image_padding'];
   status: ProductStatus;
+  // Units currently in stock for this product. Missing/null is treated as 1 by
+  // isProductPurchasable() and normalizeProductQuantity(), so omitting it never
+  // regresses a one-of-a-kind item.
+  stockQuantity?: number | null;
+  // How many units of this listing the buyer wants to purchase. Defaults to 1
+  // and is always clamped to 1..stockQuantity. Distinct from stockQuantity
+  // (what's available). Optional on input for backward-compatible callers;
+  // normalizeCartItem() fills it in.
+  purchaseQuantity?: number;
   priceLabel: string;
   category?: Product['category'];
   metal_type?: string | null;
@@ -39,7 +48,8 @@ interface CartContextValue {
   items: CartItem[];
   count: number;
   isIn: (id: string) => boolean;
-  add: (item: CartItem) => void;
+  add: (item: CartItem, quantity?: number) => void;
+  setQuantity: (id: string, quantity: number) => void;
   remove: (id: string) => void;
   clear: () => void;
   drawerOpen: boolean;
@@ -54,11 +64,25 @@ const CartContext = createContext<CartContextValue | null>(null);
 
 const LS_KEY = 'nej-cart';
 
+// The most units a buyer may put in the cart for one listing. A missing/unknown
+// stock quantity is treated as one-of-a-kind (1).
+function cartStockCap(item: Pick<CartItem, 'stockQuantity'>): number {
+  return Math.max(1, normalizeProductQuantity(item.stockQuantity));
+}
+
+function clampPurchaseQuantity(quantity: number | undefined, item: Pick<CartItem, 'stockQuantity'>): number {
+  const requested = Number.isFinite(quantity) ? Math.floor(Number(quantity)) : 1;
+  return Math.min(cartStockCap(item), Math.max(1, requested));
+}
+
 function normalizeCartItem(item: CartItem): CartItem {
   return {
     ...item,
     image: normalizeLegacyLocalImageUrl(item.image),
     priceLabel: normalizeManualPriceLabel(item.priceLabel) ?? item.priceLabel,
+    // Backfill/clamp the buyer's requested quantity (old localStorage carts have
+    // no purchaseQuantity; a stale value could also exceed current stock).
+    purchaseQuantity: clampPurchaseQuantity(item.purchaseQuantity, item),
   };
 }
 
@@ -136,9 +160,25 @@ export function CartProvider({
 
   const isIn = useCallback((id: string) => items.some((i) => i.id === id), [items]);
 
-  const add = useCallback((item: CartItem) => {
-    const normalized = normalizeCartItem(item);
-    setItems((prev) => prev.some((i) => i.id === normalized.id) ? prev : [...prev, normalized]);
+  const add = useCallback((item: CartItem, quantity: number = 1) => {
+    const normalized = normalizeCartItem({ ...item, purchaseQuantity: quantity });
+    setItems((prev) => {
+      const existing = prev.find((i) => i.id === normalized.id);
+      if (!existing) return [...prev, normalized];
+      // Already in the cart — increase the requested quantity (capped at stock),
+      // refreshing the stock ceiling from the latest add() in case it changed.
+      const nextStock = normalized.stockQuantity ?? existing.stockQuantity;
+      const merged = { ...existing, stockQuantity: nextStock };
+      const nextQty = clampPurchaseQuantity(
+        (existing.purchaseQuantity ?? 1) + clampPurchaseQuantity(quantity, merged),
+        merged,
+      );
+      return prev.map((i) => (i.id === normalized.id ? { ...merged, purchaseQuantity: nextQty } : i));
+    });
+  }, []);
+
+  const setQuantity = useCallback((id: string, quantity: number) => {
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, purchaseQuantity: clampPurchaseQuantity(quantity, i) } : i)));
   }, []);
 
   const remove = useCallback((id: string) => {
@@ -162,7 +202,7 @@ export function CartProvider({
   }, []);
 
   return (
-    <CartContext.Provider value={{ items, count: items.length, isIn, add, remove, clear, drawerOpen, openDrawer, closeDrawer, recentlyAdded, notifyAdded, dismissAdded }}>
+    <CartContext.Provider value={{ items, count: items.reduce((sum, i) => sum + (i.purchaseQuantity ?? 1), 0), isIn, add, setQuantity, remove, clear, drawerOpen, openDrawer, closeDrawer, recentlyAdded, notifyAdded, dismissAdded }}>
       {children}
       <CartDrawer locale={locale} />
     </CartContext.Provider>

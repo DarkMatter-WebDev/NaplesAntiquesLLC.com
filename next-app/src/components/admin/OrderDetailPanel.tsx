@@ -106,8 +106,8 @@ export default function OrderDetailPanel({
   const emailOrder = withInvoiceLineDiscounts(order, numericItemDiscounts);
   const emailContent = buildInvoiceEmailContent(emailOrder, invoiceNumber);
   const emailUpdateContent = emailUpdateStatus ? buildFulfillmentUpdateEmailContent(order, emailUpdateStatus) : null;
-  const persistedLineDiscount = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(item.discount ?? 0), item.price_snapshot), 0);
-  const editedLineDiscount = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[item.id]) || 0, item.price_snapshot), 0);
+  const persistedLineDiscount = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(item.discount ?? 0), orderItemLineSubtotal(item)), 0);
+  const editedLineDiscount = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[item.id]) || 0, orderItemLineSubtotal(item)), 0);
   const orderLevelDiscount = Math.max(order.discount - persistedLineDiscount, 0);
   const editedTotalDiscount = orderLevelDiscount + editedLineDiscount;
   const taxableBeforeDiscount = Math.max(order.subtotal - order.discount, 0);
@@ -341,7 +341,7 @@ export default function OrderDetailPanel({
     setMessage(null);
 
     const updates = order.order_items.map((item) => {
-      const discount = clampMoneyDiscount(Number(itemDiscounts[item.id]) || 0, item.price_snapshot);
+      const discount = clampMoneyDiscount(Number(itemDiscounts[item.id]) || 0, orderItemLineSubtotal(item));
       return supabase.from('order_items').update({ discount }).eq('id', item.id);
     });
     const results = await Promise.all(updates);
@@ -365,7 +365,7 @@ export default function OrderDetailPanel({
         total: editedTotal,
         order_items: current.order_items.map((item) => ({
           ...item,
-          discount: clampMoneyDiscount(Number(itemDiscounts[item.id]) || 0, item.price_snapshot),
+          discount: clampMoneyDiscount(Number(itemDiscounts[item.id]) || 0, orderItemLineSubtotal(item)),
         })),
       }));
       setMessage({ text: 'Line discounts saved and order totals recalculated.', ok: true });
@@ -694,7 +694,7 @@ export default function OrderDetailPanel({
                 <table className="w-full min-w-[780px] text-sm">
                   <thead style={{ background: 'var(--color-surface-container-low)' }}>
                     <tr>
-                      {['Item', 'Date', 'Inventory', 'Metal', 'Purity', 'Weight', 'Price', 'Discount', 'Product'].map((heading) => (
+                      {['Item', 'Date', 'Inventory', 'Metal', 'Purity', 'Weight', 'Unit Price', 'Qty', 'Discount', 'Product'].map((heading) => (
                         <th key={heading} className="px-4 py-3 text-left text-[0.68rem] uppercase tracking-widest" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
                           {heading}
                         </th>
@@ -711,6 +711,7 @@ export default function OrderDetailPanel({
                         <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>{formatPublicPurity(item.purity_snapshot) ?? '-'}</td>
                         <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>{item.gram_weight_snapshot ? `${item.gram_weight_snapshot}g` : '-'}</td>
                         <td className="px-4 py-3 font-semibold" style={{ color: GOLD }}>{formatCurrency(item.price_snapshot)}</td>
+                        <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>{orderItemQty(item)}</td>
                         <td className="px-4 py-3">
                           <label className="grid min-w-28 gap-1">
                             <span className="sr-only">Line discount for {item.title_snapshot}</span>
@@ -718,7 +719,7 @@ export default function OrderDetailPanel({
                               className="form-field text-sm"
                               type="number"
                               min="0"
-                              max={item.price_snapshot}
+                              max={orderItemLineSubtotal(item)}
                               step="0.01"
                               value={itemDiscounts[item.id] ?? '0'}
                               onChange={(event) => setItemDiscounts((current) => ({ ...current, [item.id]: event.target.value }))}
@@ -1156,6 +1157,16 @@ function MoneyRow({ label, value, strong = false }: { label: string; value: numb
 function clampMoneyDiscount(value: number, max: number) {
   if (!Number.isFinite(value)) return 0;
   return Math.min(Math.max(value, 0), Math.max(max, 0));
+}
+
+function orderItemQty(item: { quantity?: number | null }): number {
+  const qty = Math.floor(Number(item.quantity ?? 1));
+  return Number.isFinite(qty) && qty > 0 ? qty : 1;
+}
+
+// Line subtotal (unit price × quantity) — the ceiling for a line-level discount.
+function orderItemLineSubtotal(item: { price_snapshot: number; quantity?: number | null }): number {
+  return item.price_snapshot * orderItemQty(item);
 }
 
 function emailTypeLabel(email: { email_type: string; status: string | null }): string {

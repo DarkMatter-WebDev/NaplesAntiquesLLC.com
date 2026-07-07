@@ -5,7 +5,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCart, type CartItem } from '@/context/CartContext';
-import { formatProductItemYear, isProductPurchasable, productImagePaddingBackground, productStatusLabel } from '@/types/product';
+import { formatProductItemYear, isProductPurchasable, normalizeProductQuantity, productImagePaddingBackground, productStatusLabel } from '@/types/product';
+import { QuantityStepper } from '@/components/checkout/OrderSummary';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 import { FL_TAX_RATE, FL_TAX_RATE_LABEL } from '@/lib/checkout-pricing';
 import { parseManualPriceLabelValue } from '@/lib/pricing';
@@ -27,7 +28,7 @@ function fmt(n: number) {
 }
 
 export default function CartDrawer({ locale }: { locale: string }) {
-  const { items, remove, clear, drawerOpen, closeDrawer } = useCart();
+  const { items, remove, clear, setQuantity, drawerOpen, closeDrawer } = useCart();
   const router = useRouter();
   const isEs = locale === 'es';
   const prefix = isEs ? '/es' : '';
@@ -150,7 +151,7 @@ export default function CartDrawer({ locale }: { locale: string }) {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <CartView items={items} isEs={isEs} prefix={prefix} onRemove={remove} onClear={clear} onClose={handleClose} onCheckout={handleProceedToCheckout} />
+          <CartView items={items} isEs={isEs} prefix={prefix} onRemove={remove} onSetQuantity={setQuantity} onClear={clear} onClose={handleClose} onCheckout={handleProceedToCheckout} />
         </div>
       </div>
 
@@ -253,6 +254,7 @@ function CartView({
   isEs,
   prefix,
   onRemove,
+  onSetQuantity,
   onClear,
   onClose,
   onCheckout,
@@ -261,6 +263,7 @@ function CartView({
   isEs: boolean;
   prefix: string;
   onRemove: (id: string) => void;
+  onSetQuantity: (id: string, quantity: number) => void;
   onClear: () => void;
   onClose: () => void;
   onCheckout: () => void;
@@ -279,10 +282,13 @@ function CartView({
     );
   }
 
-  const prices = items.map((i) => parsePrice(i.priceLabel));
-  const knownPrices = prices.filter((p): p is number => p !== null);
-  const hasUnknown = knownPrices.length < prices.length;
-  const subtotal = knownPrices.reduce((a, b) => a + b, 0);
+  const lineTotals = items.map((i) => {
+    const unit = parsePrice(i.priceLabel);
+    return unit === null ? null : unit * Math.max(1, normalizeProductQuantity(i.purchaseQuantity));
+  });
+  const knownLineTotals = lineTotals.filter((p): p is number => p !== null);
+  const hasUnknown = knownLineTotals.length < lineTotals.length;
+  const subtotal = knownLineTotals.reduce((a, b) => a + b, 0);
   const tax = subtotal * FL_TAX_RATE;
   const total = subtotal + tax;
 
@@ -290,7 +296,7 @@ function CartView({
       <div className="flex min-h-0 flex-col h-full">
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
         {items.map((item) => (
-          <CartItemRow key={item.id} item={item} isEs={isEs} prefix={prefix} onRemove={() => onRemove(item.id)} />
+          <CartItemRow key={item.id} item={item} isEs={isEs} prefix={prefix} onRemove={() => onRemove(item.id)} onSetQuantity={(qty) => onSetQuantity(item.id, qty)} />
         ))}
       </div>
 
@@ -347,12 +353,17 @@ function CartView({
   );
 }
 
-function CartItemRow({ item, isEs, prefix, onRemove }: { item: CartItem; isEs: boolean; prefix: string; onRemove: () => void }) {
+function CartItemRow({ item, isEs, prefix, onRemove, onSetQuantity }: { item: CartItem; isEs: boolean; prefix: string; onRemove: () => void; onSetQuantity: (quantity: number) => void }) {
   const title = isEs && item.title_es ? item.title_es : item.title;
   const description = (isEs && item.description_es ? item.description_es : item.description) ?? item.public_notes ?? null;
   const imageFrameBackground = productImagePaddingBackground(item.image_padding);
   const image = normalizeLegacyLocalImageUrl(item.image);
   const itemDate = formatProductItemYear(item.item_year);
+  const purchasable = isProductPurchasable(item.status, item.stockQuantity);
+  const stockCap = Math.max(1, normalizeProductQuantity(item.stockQuantity));
+  const qty = Math.max(1, normalizeProductQuantity(item.purchaseQuantity));
+  const unitPrice = parsePrice(item.priceLabel);
+  const lineTotal = unitPrice === null ? null : unitPrice * qty;
   return (
       <div className="flex gap-3 items-start border p-3" style={{ borderColor: BORDER, background: 'rgba(255, 255, 255, 0.74)' }}>
       <Link href={`${prefix}/shop/${item.id}`} className="relative flex-shrink-0 w-16 h-16 min-[380px]:h-20 min-[380px]:w-20 overflow-hidden" style={{ background: imageFrameBackground }}>
@@ -378,10 +389,23 @@ function CartItemRow({ item, isEs, prefix, onRemove }: { item: CartItem; isEs: b
             {description}
           </p>
         )}
-        {!isProductPurchasable(item.status) && (
+        {!purchasable && (
           <span className="text-[0.55rem] font-bold uppercase tracking-widest" style={{ color: 'var(--color-error)' }}>
             {isEs ? 'No disponible' : productStatusLabel(item.status)}
           </span>
+        )}
+        {purchasable && stockCap > 1 && (
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <QuantityStepper value={qty} max={stockCap} onChange={onSetQuantity} isEs={isEs} />
+            {lineTotal !== null && (
+              <span className="text-[0.7rem] font-bold" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                = {fmt(lineTotal)}
+              </span>
+            )}
+            <span className="w-full text-[0.6rem] font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+              {stockCap} {isEs ? 'en stock' : 'in stock'}
+            </span>
+          </div>
         )}
       </div>
       <button type="button" onClick={onRemove} className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[rgba(186,26,26,0.08)] hover:text-[color:var(--color-error)]"

@@ -89,6 +89,12 @@ export interface Product {
   // unaffected, since it's meant to reflect the item's actual melt value.
   special_price_override_enabled: boolean | null;
   special_price_override_amount: number | null;
+  // Units currently in stock for this listing. Most items are one-of-a-kind
+  // (default 1); a positive count above 1 means several identical units are
+  // listed together. Missing/null (e.g. a pre-migration row) normalizes to 1
+  // via normalizeProductQuantity() so existing one-of-a-kind behavior is
+  // unaffected until the column exists.
+  quantity: number | null;
   status: ProductStatus | string;
   location: ProductLocation | string | null;
   images: string[];
@@ -242,8 +248,23 @@ export function isProductSold(status: ProductStatus | string | null | undefined)
   return normalizeProductStatus(status) === 'sold';
 }
 
-export function isProductPurchasable(status: ProductStatus | string | null | undefined): boolean {
-  return normalizeProductStatus(status) === 'available';
+// Missing/null (undefined column, pre-migration row, or a call site that
+// hasn't been updated to pass it) normalizes to 1 — i.e. "don't gate on
+// stock" — so this is purely additive and never changes existing behavior
+// for callers that only ever dealt with one-of-a-kind items.
+export function normalizeProductQuantity(value: number | string | null | undefined): number {
+  if (value === null || value === undefined || value === '') return 1;
+  const numeric = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numeric)) return 1;
+  const floored = Math.floor(numeric);
+  return floored < 0 ? 0 : floored;
+}
+
+export function isProductPurchasable(
+  status: ProductStatus | string | null | undefined,
+  quantity?: number | string | null,
+): boolean {
+  return normalizeProductStatus(status) === 'available' && normalizeProductQuantity(quantity) > 0;
 }
 
 export const PUBLIC_SHOP_PRODUCT_STATUSES = ['available', 'sold', 'Available', 'Sold'] as const;

@@ -38,12 +38,12 @@ export function invoiceNumberForOrder(order: Pick<Order, 'order_number'>, fallba
 }
 
 export function withInvoiceLineDiscounts(order: InvoiceEmailOrder, itemDiscounts: Record<string, number>): InvoiceEmailOrder {
-  const persistedLineDiscount = order.order_items.reduce((sum, item) => sum + clampDiscount(Number(item.discount ?? 0), item.price_snapshot), 0);
+  const persistedLineDiscount = order.order_items.reduce((sum, item) => sum + clampDiscount(Number(item.discount ?? 0), lineSubtotalOf(item)), 0);
   const editedItems = order.order_items.map((item) => ({
     ...item,
-    discount: clampDiscount(itemDiscounts[item.id] ?? Number(item.discount ?? 0), item.price_snapshot),
+    discount: clampDiscount(itemDiscounts[item.id] ?? Number(item.discount ?? 0), lineSubtotalOf(item)),
   }));
-  const editedLineDiscount = editedItems.reduce((sum, item) => sum + clampDiscount(Number(item.discount ?? 0), item.price_snapshot), 0);
+  const editedLineDiscount = editedItems.reduce((sum, item) => sum + clampDiscount(Number(item.discount ?? 0), lineSubtotalOf(item)), 0);
   const orderLevelDiscount = Math.max(order.discount - persistedLineDiscount, 0);
   const discount = orderLevelDiscount + editedLineDiscount;
   const taxableBeforeDiscount = Math.max(order.subtotal - order.discount, 0);
@@ -73,10 +73,13 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
     : `Invoice ${invoiceNumber} from Naples Estate Jewelry`;
   const customerName = order.customer_name || 'there';
   const items = order.order_items.map((item) => {
-    const discount = clampDiscount(Number(item.discount ?? 0), item.price_snapshot);
-    const lineTotal = Math.max(item.price_snapshot - discount, 0);
+    const qty = orderItemQuantity(item);
+    const lineSubtotal = lineSubtotalOf(item);
+    const discount = clampDiscount(Number(item.discount ?? 0), lineSubtotal);
+    const lineTotal = Math.max(lineSubtotal - discount, 0);
     const circa = formatProductItemYear(item.item_year_snapshot);
     const details = [
+      qty > 1 ? `Qty ${qty} × ${formatCurrency(item.price_snapshot)}` : null,
       circa ? `Ca. ${circa}` : null,
       item.metal_snapshot,
       item.purity_snapshot ? `${formatPublicPurity(item.purity_snapshot)} purity` : null,
@@ -88,7 +91,7 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
       inventory: item.inventory_number || 'No inventory #',
       details: details || 'Estate jewelry item',
       price: formatCurrency(lineTotal),
-      originalPrice: formatCurrency(item.price_snapshot),
+      originalPrice: formatCurrency(lineSubtotal),
       discount: discount > 0 ? `-${formatCurrency(discount)}` : null,
       imageUrl: absoluteImageUrl(normalizeLegacyLocalImageUrl(item.image_snapshot)),
     };
@@ -280,6 +283,15 @@ function escapeHtml(value: string) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function orderItemQuantity(item: Pick<OrderItem, 'quantity'>): number {
+  const qty = Math.floor(Number(item.quantity ?? 1));
+  return Number.isFinite(qty) && qty > 0 ? qty : 1;
+}
+
+function lineSubtotalOf(item: Pick<OrderItem, 'price_snapshot' | 'quantity'>): number {
+  return item.price_snapshot * orderItemQuantity(item);
 }
 
 function clampDiscount(value: number, max: number) {

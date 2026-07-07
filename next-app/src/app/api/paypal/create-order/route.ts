@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { buildAddressObject, generateOrderNumber } from '@/lib/sales';
-import { buildOrderDraft, isOrderDraftError, shippingMethodForDb } from '@/lib/checkout-pricing';
+import { buildOrderDraft, isOrderDraftError, normalizeOrderLines, shippingMethodForDb, type OrderLine } from '@/lib/checkout-pricing';
 import { createPayPalOrder, paypalConfigured, type PayPalLineItem } from '@/lib/paypal';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { upsertOrderInvoice } from '@/lib/order-invoices';
@@ -12,10 +12,10 @@ export const runtime = 'nodejs';
 const CURRENCY = 'USD';
 const MAX_CART_ITEMS = 50;
 
-function lineItems(items: { title_snapshot: string; price_snapshot: number; inventory_number: string }[]): PayPalLineItem[] {
+function lineItems(items: { title_snapshot: string; price_snapshot: number; quantity: number; inventory_number: string }[]): PayPalLineItem[] {
   return items.map((item) => ({
     name: item.title_snapshot,
-    quantity: '1',
+    quantity: String(Math.max(1, Math.floor(item.quantity))),
     unitAmount: item.price_snapshot,
     sku: item.inventory_number,
   }));
@@ -35,9 +35,17 @@ export async function POST(req: Request) {
   if (!body) return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
 
   const reuseOrderId = typeof body.orderId === 'string' && body.orderId ? body.orderId : null;
-  const productIds = Array.isArray(body.productIds)
-    ? (Array.from(new Set(body.productIds.map(String).filter(Boolean))) as string[]).slice(0, MAX_CART_ITEMS)
-    : [];
+  // New payload: items = [{ id, quantity }]. Legacy fallback: productIds = string[]
+  // (each treated as quantity 1). normalizeOrderLines dedupes and clamps.
+  const rawLines: OrderLine[] = Array.isArray(body.items)
+    ? body.items.map((entry: { id?: unknown; quantity?: unknown }) => ({
+        productId: String(entry?.id ?? ''),
+        quantity: Number(entry?.quantity ?? 1),
+      }))
+    : Array.isArray(body.productIds)
+      ? body.productIds.map((id: unknown) => ({ productId: String(id ?? ''), quantity: 1 }))
+      : [];
+  const orderLines = normalizeOrderLines(rawLines).slice(0, MAX_CART_ITEMS);
   const customer = body.customer ?? {};
   const shippingMethod = String(body.shippingMethod ?? 'local-pickup');
 
@@ -66,20 +74,24 @@ export async function POST(req: Request) {
 
     const { data: orderItems } = await service
       .from('order_items')
-      .select('product_id, title_snapshot, price_snapshot, inventory_number')
+      .select('product_id, title_snapshot, price_snapshot, quantity, inventory_number')
       .eq('order_id', reuseOrderId);
 
-    const storedProductIds = new Set((orderItems ?? []).map((item) => String(item.product_id)));
+    // Compare the stored line set (product + quantity) against the current cart.
+    const storedLineKeys = new Set(
+      (orderItems ?? []).map((item) => `${String(item.product_id)}:${Math.max(1, Math.floor(Number(item.quantity ?? 1)))}`),
+    );
+    const currentLineKeys = orderLines.map((line) => `${line.productId}:${line.quantity}`);
     const sameProducts =
-      productIds.length > 0 &&
-      productIds.length === storedProductIds.size &&
-      productIds.every((id) => storedProductIds.has(id));
+      currentLineKeys.length > 0 &&
+      currentLineKeys.length === storedLineKeys.size &&
+      currentLineKeys.every((key) => storedLineKeys.has(key));
 
     let sameTotals = false;
     if (sameProducts) {
       // Recompute totals from the live cart payload; catches shipping-method
       // switches (express vs priority both store as 'shipping') and price drift.
-      const draft = await buildOrderDraft(supabase, productIds, shippingMethod, customer.state);
+      const draft = await buildOrderDraft(supabase, orderLines, shippingMethod, customer.state);
       sameTotals =
         !isOrderDraftError(draft) &&
         draft.subtotal === Number(order.subtotal) &&
@@ -91,6 +103,7 @@ export async function POST(req: Request) {
       const items = (orderItems ?? []).map((item) => ({
         title_snapshot: item.title_snapshot,
         price_snapshot: Number(item.price_snapshot),
+        quantity: Math.max(1, Math.floor(Number(item.quantity ?? 1))),
         inventory_number: item.inventory_number ?? '',
       }));
 
@@ -104,7 +117,12 @@ export async function POST(req: Request) {
           items: lineItems(items),
           referenceId: order.id,
         });
-        await service.from('orders').update({ paypal_order_id: paypalOrder.id }).eq('id', order.id);
+        // Reset status back to open/pending: the buyer may be resuming an order
+        // that onCancel previously soft-cancelled, and it's live again now.
+        await service
+          .from('orders')
+          .update({ paypal_order_id: paypalOrder.id, order_status: 'open', fulfillment_status: 'pending' })
+          .eq('id', order.id);
         return NextResponse.json({ paypalOrderId: paypalOrder.id, orderId: order.id });
       } catch (err) {
         console.error('PayPal create-order (reuse) error:', err);
@@ -134,7 +152,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const draft = await buildOrderDraft(supabase, productIds, shippingMethod, customer.state);
+  const draft = await buildOrderDraft(supabase, orderLines, shippingMethod, customer.state);
   if (isOrderDraftError(draft)) {
     return NextResponse.json({ error: draft.error }, { status: draft.status });
   }

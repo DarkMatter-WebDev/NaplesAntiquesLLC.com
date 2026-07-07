@@ -33,19 +33,24 @@ const PRINT_ORDER_COLUMNS = [
   'deleted_at',
   'created_at',
   'updated_at',
-  'order_items(id, order_id, product_id, inventory_number, title_snapshot, item_year_snapshot, metal_snapshot, purity_snapshot, gram_weight_snapshot, price_snapshot, discount, image_snapshot, created_at)',
+  'order_items(id, order_id, product_id, inventory_number, title_snapshot, item_year_snapshot, metal_snapshot, purity_snapshot, gram_weight_snapshot, price_snapshot, quantity, discount, image_snapshot, created_at)',
 ].join(', ');
 
-const PRINT_ORDER_COLUMNS_WITHOUT_ITEM_YEAR = PRINT_ORDER_COLUMNS.replace('item_year_snapshot, ', '');
+const PRINT_ORDER_COLUMNS_WITHOUT_ITEM_YEAR = PRINT_ORDER_COLUMNS
+  .replace('item_year_snapshot, ', '')
+  .replace('quantity, ', '');
 const PRINT_ORDER_COLUMNS_WITHOUT_REFUND_AMOUNT = PRINT_ORDER_COLUMNS.replace('refund_amount, ', '');
 const PRINT_ORDER_COLUMNS_WITHOUT_BOTH = PRINT_ORDER_COLUMNS_WITHOUT_ITEM_YEAR.replace('refund_amount, ', '');
 const PRINT_ORDER_COLUMNS_WITHOUT_DELETED_AT = PRINT_ORDER_COLUMNS.replace('deleted_at, ', '');
-const PRINT_ORDER_COLUMNS_WITHOUT_DELETED_AT_ITEM_YEAR = PRINT_ORDER_COLUMNS_WITHOUT_DELETED_AT.replace('item_year_snapshot, ', '');
+const PRINT_ORDER_COLUMNS_WITHOUT_DELETED_AT_ITEM_YEAR = PRINT_ORDER_COLUMNS_WITHOUT_DELETED_AT
+  .replace('item_year_snapshot, ', '')
+  .replace('quantity, ', '');
 const PRINT_ORDER_COLUMNS_WITHOUT_DELETED_AT_REFUND = PRINT_ORDER_COLUMNS_WITHOUT_DELETED_AT.replace('refund_amount, ', '');
 const PRINT_ORDER_COLUMNS_WITHOUT_DELETED_AT_BOTH = PRINT_ORDER_COLUMNS_WITHOUT_DELETED_AT_ITEM_YEAR.replace('refund_amount, ', '');
 
 function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
-  return Boolean(error?.message?.toLowerCase().includes('item_year'));
+  return Boolean(error?.message?.toLowerCase().includes('item_year'))
+    || Boolean(error?.message?.toLowerCase().includes('quantity'));
 }
 
 function isMissingRefundAmountError(error: { message?: string | null } | null | undefined) {

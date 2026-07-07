@@ -21,6 +21,7 @@ import {
   normalizeProductMetalType,
   normalizeProductLinkType,
   normalizeProductMetalVariant,
+  normalizeProductQuantity,
   normalizeProductTypeValue,
   productJewelryTypeLabel,
   hasAnyProductImagePadding,
@@ -139,6 +140,7 @@ const OPTIONAL_PRODUCT_COLUMNS = [
   'show_spot_price',
   'special_price_override_enabled',
   'special_price_override_amount',
+  'quantity',
 ] as const;
 
 function isMissingOptionalColumnError(error: { message?: string | null } | null | undefined) {
@@ -414,7 +416,8 @@ type SortKey =
   | 'melt'
   | 'mode'
   | 'currentPrice'
-  | 'status';
+  | 'status'
+  | 'quantity';
 
 type SortDirection = 'asc' | 'desc';
 type ImageTarget = { url: string; index: number };
@@ -508,6 +511,7 @@ const AI_PRODUCT_FIELD_LABELS: Record<keyof ProductAutofillFields, string> = {
   asking_price: 'Price Label',
   manual_price_label: 'Price Label',
   show_spot_price: 'Show Spot/Melt Value',
+  quantity: 'Quantity',
   description: 'Description (EN)',
   public_notes: 'Notes (EN)',
 };
@@ -534,6 +538,7 @@ const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null; widthClas
   { label: 'Mode', sortKey: 'mode', widthClass: 'w-[94px]' },
   { label: 'Price', sortKey: 'currentPrice', widthClass: 'w-[92px]' },
   { label: 'Status', sortKey: 'status', widthClass: 'w-[92px]' },
+  { label: 'Qty', sortKey: 'quantity', widthClass: 'w-[56px]' },
   { label: '', sortKey: null, widthClass: 'w-[44px]', responsiveClass: 'max-md:w-[28px] max-md:min-w-[28px] max-md:max-w-[28px]' },
 ];
 
@@ -576,6 +581,7 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
     show_spot_price: true,
     special_price_override_enabled: false,
     special_price_override_amount: null,
+    quantity: 1,
     status: 'available',
     location: 'showcase',
     images: [],
@@ -658,6 +664,8 @@ function getSortValue(
       return parseDisplayPrice(getDisplayPrice(product, spotData));
     case 'status':
       return getStatusLabel(product.status);
+    case 'quantity':
+      return normalizeProductQuantity(product.quantity);
   }
 }
 
@@ -1805,6 +1813,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       nextEditing.manual_price_label = normalizeManualPriceLabel(value);
     });
     setField('show_spot_price', 'Show Spot/Melt Value', (value) => { nextEditing.show_spot_price = value; });
+    setField('quantity', 'Quantity', (value) => { nextEditing.quantity = value; });
     setField('metal_type', 'Metal Type', (value) => {
       const nextCategory = getLegacyCategoryForMetalType(value, nextEditing.category);
       nextEditing.metal_type = value;
@@ -2369,6 +2378,16 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       quickAddMode || editing.price_mode === 'manual' || normalizedManualPriceLabel
         ? 'manual'
         : 'spot-multiplier';
+    const normalizedQuantity = normalizeProductQuantity(editing.quantity);
+    // One-directional auto-sync: saving a listing down to 0 units flips it to
+    // Sold so the storefront and admin table reflect reality immediately. We
+    // never auto-flip the other way (restocking a Sold item back to
+    // Available) — an admin who marks something Sold on purpose (e.g. a
+    // mistaken listing) shouldn't have that silently reversed by re-entering
+    // a positive quantity; they can flip Status back explicitly.
+    const baseStatus = normalizeProductStatus(editing.status);
+    const resolvedStatus: ProductStatus =
+      baseStatus === 'available' && normalizedQuantity <= 0 ? 'sold' : baseStatus;
 
     const payload = {
       ...editing,
@@ -2392,7 +2411,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       pricing_multiplier: effectivePriceMode === 'manual' ? null : editing.pricing_multiplier ?? null,
       manual_price_label: effectivePriceMode === 'manual' ? normalizedManualPriceLabel : null,
       asking_price: null,
-      status: normalizeProductStatus(editing.status),
+      quantity: normalizedQuantity,
+      status: resolvedStatus,
       location: editing.location || 'showcase',
       item_year: normalizeProductItemYear(editing.item_year),
       image_urls: editing.images,
@@ -3216,6 +3236,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                         {getStatusLabel(p.status)}
                       </span>
                     </td>
+                    <td className="px-2 py-3 whitespace-nowrap font-semibold" style={{ color: normalizeProductQuantity(p.quantity) === 0 ? 'var(--color-error)' : 'var(--color-on-surface-variant)' }}>
+                      {normalizeProductQuantity(p.quantity)}
+                    </td>
                     <td className={`sticky right-0 px-1 max-md:px-0 py-3 w-[44px] min-w-[44px] max-w-[44px] max-md:w-[28px] max-md:min-w-[28px] max-md:max-w-[28px] ${actionMenuId === p.id ? 'z-30' : 'z-10'}`} style={{ background: dragTargetProductId === p.id ? 'color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-container-lowest))' : 'var(--color-surface-container-lowest)' }}>
                       <div className="relative flex justify-end">
                         <button
@@ -3915,7 +3938,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   </span>
                 </div>
 
-              <div className="grid md:grid-cols-[minmax(0,1fr)_auto] gap-4 items-start">
+              <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(0,120px)_auto] gap-4 items-start">
                 <div>
                   <div className="mb-1 flex items-center justify-between gap-3">
                     <label className="form-label mb-0">Inventory #</label>
@@ -3961,6 +3984,31 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                       </p>
                     );
                   })()}
+                </div>
+                <div>
+                  <div className="mb-1 flex items-center justify-between gap-3">
+                    <label className="form-label mb-0">Quantity</label>
+                  </div>
+                  <ClearableField
+                    onClear={() => setEditing({ ...editing, quantity: 1 })}
+                    show={normalizeProductQuantity(editing.quantity) !== 1}
+                  >
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      inputMode="numeric"
+                      className="form-field w-full"
+                      value={editing.quantity ?? 1}
+                      onChange={(e) => setEditing({
+                        ...editing,
+                        quantity: e.target.value === '' ? null : normalizeProductQuantity(e.target.value),
+                      })}
+                    />
+                  </ClearableField>
+                  <p className="mt-1 text-[0.68rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    Units in stock. Defaults to 1 (one-of-a-kind).
+                  </p>
                 </div>
                 <button
                   type="button"

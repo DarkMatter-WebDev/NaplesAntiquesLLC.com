@@ -10,6 +10,7 @@ import {
   isProductPurchasable,
   isProductSold,
   isProductVisibleInShop,
+  normalizeProductQuantity,
   normalizeProductStatus,
   productJewelryTypeLabel,
   productImagePaddingBackground,
@@ -79,6 +80,7 @@ const PRODUCT_DETAIL_COLUMNS = [
   'show_spot_price',
   'special_price_override_enabled',
   'special_price_override_amount',
+  'quantity',
 ].join(', ');
 
 // Columns introduced by later migrations that may not exist yet on an
@@ -90,6 +92,7 @@ const OPTIONAL_PRODUCT_DETAIL_COLUMNS = [
   'show_spot_price',
   'special_price_override_enabled',
   'special_price_override_amount',
+  'quantity',
 ];
 
 const PRODUCT_DETAIL_COLUMNS_REQUIRED = PRODUCT_DETAIL_COLUMNS
@@ -128,6 +131,7 @@ const fetchPublicProduct = cache(async (id: string) => {
             show_spot_price: true,
             special_price_override_enabled: false,
             special_price_override_amount: null,
+            quantity: 1,
           } as Product
         : null,
       error: fallback.error,
@@ -278,7 +282,8 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   const metalLabel = productMetalVariantLabel(p.metal_variant, p.category, locale);
   const price = getDisplayPrice(p, spotData);
   const isSold = isProductSold(p.status);
-  const isPurchasable = isProductPurchasable(p.status);
+  const isPurchasable = isProductPurchasable(p.status, p.quantity);
+  const stockQuantity = normalizeProductQuantity(p.quantity);
   const productImages = p.image_urls?.length ? p.image_urls : p.images ?? [];
   const firstImagePadding = productImagePaddingForImage(p.image_padding, p.image_padding_by_image, productImages[0], 0);
   // The page background matches the first image's padding color, so the gallery
@@ -389,6 +394,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
     image: productImages[0] ?? null,
     image_padding: firstImagePadding,
     status: normalizedStatus,
+    stockQuantity: p.quantity,
     priceLabel: price,
     category: p.category,
     metal_type: p.metal_type,
@@ -556,7 +562,16 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                     </span>
                     {isEs ? 'Este es su precio' : 'This is your price'}
                   </p>
-                ) : (
+                ) : null}
+                {isPurchasable && stockQuantity > 1 && (
+                  <p
+                    className="mt-1"
+                    style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+                  >
+                    {isEs ? `${stockQuantity} unidades disponibles` : `${stockQuantity} units in stock`}
+                  </p>
+                )}
+                {!isPurchasable && (
                   <p
                     className="mt-1.5"
                     style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}

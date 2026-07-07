@@ -118,15 +118,18 @@ export default function PrintOrderClient({
             <tr>
               <th>Item</th>
               <th>Inventory</th>
-              <th className="money">Price</th>
+              <th className="money">Unit Price</th>
+              <th className="money">Qty</th>
               <th className="money">Discount</th>
               <th className="money">Line Total</th>
             </tr>
           </thead>
           <tbody>
             {order.order_items.length > 0 ? order.order_items.map((item) => {
-              const discount = clampMoneyDiscount(Number(item.discount ?? 0), item.price_snapshot);
-              const lineTotal = Math.max(item.price_snapshot - discount, 0);
+              const qty = Math.max(1, Math.floor(Number(item.quantity ?? 1)));
+              const lineSubtotal = item.price_snapshot * qty;
+              const discount = clampMoneyDiscount(Number(item.discount ?? 0), lineSubtotal);
+              const lineTotal = Math.max(lineSubtotal - discount, 0);
               const year = formatProductItemYear(item.item_year_snapshot);
               const specs = [
                 year ? `Ca. ${year}` : null,
@@ -143,12 +146,13 @@ export default function PrintOrderClient({
                   </td>
                   <td>{item.inventory_number || '-'}</td>
                   <td className="money">{formatCurrency(item.price_snapshot)}</td>
+                  <td className="money">{qty}</td>
                   <td className="money">{discount > 0 ? `-${formatCurrency(discount)}` : '-'}</td>
                   <td className="money strong">{formatCurrency(lineTotal)}</td>
                 </tr>
               );
             }) : (
-              <tr><td colSpan={5}>No item details were attached.</td></tr>
+              <tr><td colSpan={6}>No item details were attached.</td></tr>
             )}
           </tbody>
         </table>

@@ -1,6 +1,169 @@
 # Changelog
 
-## 2026-07-07 (latest) - Admin override for the product-page "customer special pricing" line
+## 2026-07-07 (latest) - Subset Material Symbols to ~65KB (fixes icon-name-as-text rendering bug)
+
+- Fixed icons rendering as raw ligature text ("shopping_bag", "chevron_right")
+  scattered across the site: with `font-display: block`, the self-hosted 2.33MB
+  variable font blew past the ~3s block window on real connections and fell back
+  to showing the ligature names as text.
+- Subset the woff2 to only the ~156 icons actually used
+  (`material-symbols-subset-v357.woff2`, 66,204 bytes — a 97% cut from 2.33MB),
+  keeping the FILL/opsz/wght variable axes so all `fontVariationSettings` uses
+  still work. Deleted the full 2.33MB font (it must not ship in `public/`).
+- Added a `preload` for the subset in `[locale]/layout.tsx` `<head>`
+  (`crossOrigin="anonymous"` to match the CORS webfont fetch) so it lands inside
+  the block window — icons paint immediately, no text flash.
+- Ligature-font subtlety + exact regeneration steps recorded in DECISIONS.md
+  (naive `--text` subsetting keeps all glyphs because the icon set uses every
+  letter; must subset by resolved ligature target glyphs with `--no-layout-closure`).
+- Verified: `npm run lint` + `npm run build` pass; all 156 used icons resolve in
+  the subset; dev server serves it `200 font/woff2` 66,204 bytes, the preload is
+  in the HTML, and the old 2.33MB URL now 404s.
+
+## 2026-07-07 - First-paint: self-host Material Symbols (drop render-blocking font link)
+
+- Removed the render-blocking third-party stylesheet
+  (`<link rel="stylesheet" href="fonts.googleapis.com/...Material+Symbols...">`)
+  and both Google `preconnect`s from `[locale]/layout.tsx` `<head>`. On
+  high-latency mobile this external CSS sat on the critical render path and
+  delayed first paint.
+- Self-hosted the icon font instead: the exact variable woff2 Google served
+  (all `opsz,wght,FILL@20..48,100..700,0..1` axes) is committed to
+  `public/assets/fonts/material-symbols-outlined-v357.woff2` (2.33MB) and
+  declared via an inline `@font-face` + `.material-symbols-outlined` base rule in
+  `globals.css`. Served same-origin under the existing `/assets/*` immutable
+  cache; `font-display: block` (unchanged intent) keeps glyphs invisible until
+  loaded rather than flashing raw ligature text. Versioned filename keeps future
+  updates cache-safe. All existing `fontVariationSettings` (FILL/wght/opsz) still
+  work since it's the same variable font.
+- Body fonts (caslon/hanken) were already self-hosted by `next/font`, so no
+  runtime Google Fonts connection remains at all.
+- Verified: `npm run lint` + `npm run build` pass; dev server serves the font
+  (`200 font/woff2`, 2,333,768 bytes) and the page HTML no longer references
+  `fonts.googleapis.com`. CSP unchanged (`font-src 'self'` already allowed;
+  leftover Google allowances are harmless).
+
+## 2026-07-07 - Homepage boot splash covers cold mobile/tablet loads
+
+- Problem: the branded loading screen (`(home)/loading.tsx` → `SiteLoadingScreen`)
+  is a Next.js Suspense fallback that only shows on soft (client-side) navigations
+  or dynamic streams. The homepage is statically prerendered (`● /[locale]`), so a
+  cold hard load — the common mobile/tablet first visit — serves complete static
+  HTML and the fallback never appears, leaving a blank during TTFB (Netlify cold
+  start) + the render-blocking Material Symbols stylesheet in
+  `[locale]/layout.tsx`. React/Suspense screens can't paint in that pre-hydration
+  window.
+- Fix: new `components/home/HomeBootSplash.tsx` (client) is server-rendered into
+  the homepage HTML so it paints on the first frame on every device, then fades
+  out on hydration (`requestAnimationFrame` + `onTransitionEnd`, with a 700ms
+  removal fallback for reduced-motion). Reuses the `site-loading-*` visuals; the
+  title is a `<div>` (not a second `<h1>`) to avoid duplicate headings. Rendered
+  as the first child of the homepage above `SiteHeader`.
+- CSS (`globals.css`): `.home-boot-splash` fixed overlay (`z-index:100`),
+  opacity fade, and a `home-boot-splash-failsafe` keyframe that force-hides it at
+  6s (1.2s under reduced-motion) so it can never stick even if JS is slow/disabled.
+- Homepage-scoped, additive, self-dismissing. No schema change. `npm run lint`
+  and `npm run build` pass.
+
+## 2026-07-07 - Abandoned PayPal checkouts no longer linger as open orders
+
+- New route `POST /api/paypal/cancel-order` (`app/api/paypal/cancel-order/
+  route.ts`): soft-cancels an unpaid, uncaptured order by setting
+  `order_status`/`fulfillment_status` to `cancelled`. Never touches
+  `payment_status`; guards against paid/captured orders (conditional update with
+  `.neq('payment_status','paid').is('paypal_capture_id', null)`); rate-limited
+  60/hr per IP; fails open / no-ops on unknown order.
+- `PayPalCheckoutButton`: tracks the create-order order id in `createdOrderIdRef`;
+  `onCancel` now fire-and-forgets a `keepalive` POST to cancel-order so closing
+  the PayPal window doesn't leave a stale open order in the admin. The ref is
+  cleared on successful capture so a paid order is never cancelled.
+- `create-order` reuse path now resets a resumed order to `order_status:'open'`,
+  `fulfillment_status:'pending'` (alongside the new `paypal_order_id`) so a retry
+  after a cancel isn't stuck as `cancelled`.
+- Reversible by design: a delayed real capture (client route or webhook) still
+  runs `capture_paypal_order`, marks the order paid, and flips it to `completed`.
+- No SQL/schema change. `npm run lint`, `npx tsc --noEmit`, `npm run build` pass.
+
+## 2026-07-07 - Admin master table: Quantity column
+
+- Added a sortable **Qty** column to the master admin product table
+  (`components/admin/AdminShell.tsx`), between **Status** and the row actions
+  menu. New `'quantity'` `SortKey` + `getSortValue` case
+  (`normalizeProductQuantity(product.quantity)`); the cell shows the normalized
+  stock count and renders in the error color when stock is `0`. Data was
+  already loaded (admin page uses `select('*')`); empty-state `colSpan` auto-
+  updates via `PRODUCT_TABLE_COLUMNS.length`. `npm run build` passes.
+
+## 2026-07-07 - Per-listing Quantity / stock count — Phase 2 (buyer multi-unit purchase + atomic decrement)
+
+- New `order_items.quantity` column (integer, default `1`, `check (quantity >=
+  1)`); `price_snapshot` stays the **unit** price, line total is
+  `price_snapshot * quantity`. New `supabase/checkout-quantity-2026-07.sql`
+  migration (run AFTER `product-quantity-2026-07.sql`); canonical
+  `supabase/no-reservation-checkout.sql` and `supabase/sales-workflow.sql`
+  updated for fresh installs.
+- `CartContext`: `CartItem.purchaseQuantity` (buyer's requested count, distinct
+  from `stockQuantity`); `add(item, quantity?)` merges/increments capped at
+  stock; new `setQuantity()`; cart `count` is now total units;
+  `normalizeCartItem()` clamps requested quantity to `1..stock`.
+- Shared `QuantityStepper` (in `OrderSummary.tsx`) on the product detail page,
+  cart drawer, and checkout summary — capped at live stock, shown only when
+  `stockQuantity > 1`, with per-line subtotals.
+- `checkout-pricing.ts#buildOrderDraft` now takes quantity-aware lines
+  (`{ productId, quantity }[]`, still accepts legacy `string[]`), rejects
+  over-stock lines, and sums `unit * quantity`; `CheckoutOrderItem` carries
+  `quantity`. `CheckoutClient` sends `items:[{id,quantity}]`; the create-order
+  route parses it, matches the reuse-order guard on product+quantity, and sends
+  real PayPal line-item quantities.
+- SQL: `capture_paypal_order` now decrements `products.quantity` atomically
+  under the existing per-product row lock (flip to `sold` only at 0) and treats
+  insufficient remaining stock as the item-conflict case; `create_paypal_order`
+  stores per-line quantity and rejects over-stock at creation.
+- Display: admin order detail, printable order, invoice/receipt emails, and the
+  customer account order views show `Qty N × unit` and correct line totals;
+  line-discount ceilings use the line subtotal. Admin manual-order form gained a
+  per-product quantity input.
+- Verified: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run build` all
+  pass. Live verification pending the two SQL migrations (see TASKS.md).
+
+## 2026-07-07 (earlier) - Per-listing Quantity / stock count — Phase 1
+
+- New `products.quantity` column (integer, default `1`, `check (quantity >=
+  0)`) — most listings stay one-of-a-kind, but a listing can now represent
+  several identical units in stock. New `supabase/product-quantity-2026-07.sql`
+  migration; canonical `supabase/products.sql` updated for fresh installs.
+- `types/product.ts`: new `normalizeProductQuantity()` helper (missing/null →
+  1); `isProductPurchasable(status, quantity?)` gained an optional second
+  argument and now also requires `quantity > 0`, backward-compatible with
+  every existing single-argument call site.
+- Threaded live quantity into every purchasability check that has it
+  available: `ProductCard`, `ProductListRow`, `CartDrawer`, the shop list's
+  purchasable-first sort, `checkout-pricing.ts#buildOrderDraft`'s
+  server-side gate, and the admin `OrdersPanel`'s available-products filter.
+  `CartItem` gained `stockQuantity` (units in stock, distinct from a future
+  "how many is the buyer buying" concept) so `CartButton`'s add-to-cart gate
+  also respects it.
+- Admin New Item / Edit Item form (`AdminShell.tsx`): new **Quantity** number
+  input next to Inventory #, default 1. Saving a listing down to quantity 0
+  auto-flips `status` to `sold`; restocking a `sold` item does not
+  auto-restore `available` (must be changed explicitly) — see DECISIONS.md
+  for the reasoning.
+- AI listing assistant: new `quantity` field (`ai-product-schema.ts`'s
+  `cleanQuantity()`, integer 1–500) filled only when the seller explicitly
+  states multiple identical units; a matched pair (e.g. earrings) is
+  explicitly called out in the prompt as one listing, not quantity 2. Bumped
+  `PROMPT_VERSION` to `product-listing-extraction-v13`.
+- Storefront: shop card badge, list-row status text, and the product detail
+  page show "N in stock" / "N units in stock" when `quantity > 1`.
+- **Phase 2 (deferred, tracked in TASKS.md):** buyer-facing quantity
+  selection in cart/checkout and atomic stock decrement in the PayPal capture
+  RPC — deliberately scoped out of this pass so the payment-capture rewrite
+  gets its own isolated review.
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run
+  build` all pass. **Needs the SQL migration run** before live use — see
+  TASKS.md.
+
+## 2026-07-07 (a bit earlier) - Admin override for the product-page "customer special pricing" line
 
 - Product detail pages (`/shop/[id]`) show an "Own gold or silver? Put it
   toward this piece and pay as little as ___" trade-in line, which always

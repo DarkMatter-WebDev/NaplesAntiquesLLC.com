@@ -443,12 +443,17 @@ function OrderDetailsDialog({
                     <strong>{item.title_snapshot}</strong>
                     {inventoryLabel && <em className="account-order-item-inventory">{inventoryLabel}</em>}
                     <span>
-                      {[item.metal_snapshot, purityLabel, item.gram_weight_snapshot ? `${item.gram_weight_snapshot}g` : null]
+                      {[
+                        item.metal_snapshot,
+                        purityLabel,
+                        item.gram_weight_snapshot ? `${item.gram_weight_snapshot}g` : null,
+                        accountItemQty(item) > 1 ? `${isEs ? 'Cant.' : 'Qty'} ${accountItemQty(item)} × ${formatCurrency(item.price_snapshot)}` : null,
+                      ]
                         .filter(Boolean)
                         .join(' · ')}
                     </span>
                   </div>
-                  <b>{formatCurrency(item.price_snapshot)}</b>
+                  <b>{formatCurrency(item.price_snapshot * accountItemQty(item))}</b>
                   </>
                 );
 
@@ -665,7 +670,13 @@ function OrderDetailsDialog({
             <tbody>
               {(order.order_items ?? []).map((item) => {
                 const purityLabel = formatPublicPurity(item.purity_snapshot);
-                const details = [item.metal_snapshot, purityLabel, item.gram_weight_snapshot ? `${item.gram_weight_snapshot}g` : null].filter(Boolean).join(' · ');
+                const qty = accountItemQty(item);
+                const details = [
+                  item.metal_snapshot,
+                  purityLabel,
+                  item.gram_weight_snapshot ? `${item.gram_weight_snapshot}g` : null,
+                  qty > 1 ? `${isEs ? 'Cant.' : 'Qty'} ${qty} × ${formatCurrency(item.price_snapshot)}` : null,
+                ].filter(Boolean).join(' · ');
                 return (
                   <tr key={item.id} style={{ borderBottom: '1px solid #eadfbd' }}>
                     <td style={{ padding: '0.85rem 0.5rem 0.85rem 0', verticalAlign: 'top' }}>
@@ -676,7 +687,7 @@ function OrderDetailsDialog({
                       {details && <p style={{ fontSize: '0.75rem', color: '#746b5b', marginTop: '0.15rem' }}>{details}</p>}
                     </td>
                     <td style={{ padding: '0.85rem 0', textAlign: 'right', fontWeight: 700, color: '#735c00', fontSize: '0.9rem', whiteSpace: 'nowrap', verticalAlign: 'top' }}>
-                      {formatCurrency(item.price_snapshot)}
+                      {formatCurrency(item.price_snapshot * qty)}
                     </td>
                   </tr>
                 );
@@ -731,6 +742,11 @@ function formatPublicInventoryNumber(value: string | number | null | undefined):
   if (value === null || value === undefined) return null;
   const normalized = String(value).trim().replace(/^#\s*/, '');
   return /^\d+$/.test(normalized) ? `Inv #${normalized}` : null;
+}
+
+function accountItemQty(item: { quantity?: number | null }): number {
+  const qty = Math.floor(Number(item.quantity ?? 1));
+  return Number.isFinite(qty) && qty > 0 ? qty : 1;
 }
 
 function OrderDetailLine({

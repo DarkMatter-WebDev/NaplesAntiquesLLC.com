@@ -31,6 +31,7 @@ export type ProductAutofillFields = {
   asking_price: number | null;
   manual_price_label: string | null;
   show_spot_price: boolean | null;
+  quantity: number | null;
   description: string | null;
   public_notes: string | null;
 };
@@ -66,6 +67,7 @@ export const PRODUCT_AUTOFILL_FIELD_KEYS = [
   'asking_price',
   'manual_price_label',
   'show_spot_price',
+  'quantity',
   'description',
   'public_notes',
 ] as const satisfies readonly (keyof ProductAutofillFields)[];
@@ -87,6 +89,7 @@ export const EMPTY_PRODUCT_AUTOFILL_FIELDS: ProductAutofillFields = {
   asking_price: null,
   manual_price_label: null,
   show_spot_price: null,
+  quantity: null,
   description: null,
   public_notes: null,
 };
@@ -236,6 +239,16 @@ function cleanLength(value: unknown): string | null {
   return normalizeProductLengthSizeValue(match[0]);
 }
 
+// Only meaningful when the seller explicitly states they have more than one
+// unit of the exact same item (e.g. "I have 3 of these", "listing a pair of
+// identical rounds"). Reject 0/negative and anything absurdly large — those
+// are almost certainly a misread of some other stated number (a price, a
+// weight, a year) rather than a real multi-unit count.
+function cleanQuantity(value: unknown): number | null {
+  const numeric = cleanNumber(value, { min: 1, max: 500, decimals: 0 });
+  return numeric != null ? Math.round(numeric) : null;
+}
+
 function cleanConfidence(value: unknown): ProductAutofillDraft['confidence'] {
   if (!value || typeof value !== 'object') return {};
   const confidence: ProductAutofillDraft['confidence'] = {};
@@ -277,6 +290,7 @@ export function coerceProductAutofill(input: ProductAutofillProviderResult): Pro
     asking_price: cleanNumber(rawFields.asking_price, { min: 0, max: MAX_PRICE, decimals: 2 }),
     manual_price_label: cleanString(rawFields.manual_price_label, MAX_SHORT_TEXT_LENGTH),
     show_spot_price: cleanBoolean(rawFields.show_spot_price),
+    quantity: cleanQuantity(rawFields.quantity),
     description: cleanString(rawFields.description),
     public_notes: cleanString(rawFields.public_notes),
   };

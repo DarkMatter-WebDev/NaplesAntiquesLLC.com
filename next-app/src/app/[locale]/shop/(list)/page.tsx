@@ -273,15 +273,17 @@ const SHOP_PRODUCT_COLUMNS = [
   'tags_es',
   'gender',
   'item_year',
+  'quantity',
   'sort_order',
 ].join(', ');
 const SHOP_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR = SHOP_PRODUCT_COLUMNS
   .split(', ')
-  .filter((column) => column !== 'item_year')
+  .filter((column) => column !== 'item_year' && column !== 'quantity')
   .join(', ');
 
 function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
-  return Boolean(error?.message?.toLowerCase().includes('item_year'));
+  return Boolean(error?.message?.toLowerCase().includes('item_year'))
+    || Boolean(error?.message?.toLowerCase().includes('quantity'));
 }
 
 // The catalog read is the single most expensive part of a cold /shop render: a
@@ -349,7 +351,7 @@ async function queryShopCatalog(filterKey: ShopCatalogFilterKey) {
   if (isMissingItemYearColumnError(productResult.error)) {
     const fallback = await buildProductQuery(SHOP_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR);
     products = (fallback.data as unknown[] | null)?.map(
-      (product) => ({ ...(product as Record<string, unknown>), item_year: null }),
+      (product) => ({ ...(product as Record<string, unknown>), item_year: null, quantity: 1 }),
     ) ?? null;
     errorMessage = fallback.error?.message ?? null;
   }
@@ -574,7 +576,9 @@ export async function renderShopPage({
 
   // Available items first, then selected sort within each group.
   const sorted = [...filtered].sort((a, b) => {
-    if (isProductPurchasable(a.status) !== isProductPurchasable(b.status)) return isProductPurchasable(a.status) ? -1 : 1;
+    const aPurchasable = isProductPurchasable(a.status, a.quantity);
+    const bPurchasable = isProductPurchasable(b.status, b.quantity);
+    if (aPurchasable !== bPurchasable) return aPurchasable ? -1 : 1;
     if (filters.sort === 'weight-asc' || filters.sort === 'weight-desc') {
       const byWeight = compareNullableNumbers(
         a.gram_weight ?? a.weight_grams,

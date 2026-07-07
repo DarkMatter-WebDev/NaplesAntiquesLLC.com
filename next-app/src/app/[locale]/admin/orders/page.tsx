@@ -34,9 +34,11 @@ const ORDER_LIST_COLUMNS = [
   'deleted_at',
   'created_at',
   'updated_at',
-  'order_items(id, order_id, product_id, inventory_number, title_snapshot, item_year_snapshot, metal_snapshot, purity_snapshot, gram_weight_snapshot, price_snapshot, discount, image_snapshot, created_at)',
+  'order_items(id, order_id, product_id, inventory_number, title_snapshot, item_year_snapshot, metal_snapshot, purity_snapshot, gram_weight_snapshot, price_snapshot, quantity, discount, image_snapshot, created_at)',
 ].join(', ');
-const ORDER_LIST_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT = ORDER_LIST_COLUMNS.replace('item_year_snapshot, ', '');
+const ORDER_LIST_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT = ORDER_LIST_COLUMNS
+  .replace('item_year_snapshot, ', '')
+  .replace('quantity, ', '');
 const ORDER_LIST_COLUMNS_WITHOUT_DELETED_AT = ORDER_LIST_COLUMNS.replace('deleted_at, ', '');
 const ORDER_LIST_COLUMNS_WITHOUT_BOTH = ORDER_LIST_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT.replace('deleted_at, ', '');
 
@@ -67,7 +69,8 @@ const ORDER_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR = ORDER_PRODUCT_COLUMNS
   .join(', ');
 
 function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
-  return Boolean(error?.message?.toLowerCase().includes('item_year'));
+  return Boolean(error?.message?.toLowerCase().includes('item_year'))
+    || Boolean(error?.message?.toLowerCase().includes('quantity'));
 }
 
 function isMissingDeletedAtColumnError(error: { message?: string | null } | null | undefined) {

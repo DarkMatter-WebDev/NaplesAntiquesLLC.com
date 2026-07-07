@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Product } from '@/types/product';
-import { isProductPurchasable, productStatusLabel } from '@/types/product';
+import { isProductPurchasable, normalizeProductQuantity, productStatusLabel } from '@/types/product';
 import type { Order, PaymentStatus, FulfillmentStatus, OrderStatus, ShippingMethod } from '@/types/sales';
 import { formatCurrency, formatOrderDate, orderStatusLabel } from '@/types/sales';
 import type { SpotData } from '@/types/product';
@@ -17,7 +17,8 @@ const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
 
 function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
-  return Boolean(error?.message?.toLowerCase().includes('item_year'));
+  return Boolean(error?.message?.toLowerCase().includes('item_year'))
+    || Boolean(error?.message?.toLowerCase().includes('quantity'));
 }
 
 interface Props {
@@ -91,6 +92,7 @@ export default function OrdersPanel({
   const [showCreate, setShowCreate] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [selectedProductDiscounts, setSelectedProductDiscounts] = useState<Record<string, string>>({});
+  const [selectedProductQuantities, setSelectedProductQuantities] = useState<Record<string, number>>({});
   const [productSearch, setProductSearch] = useState('');
   const [showAllProductMatches, setShowAllProductMatches] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -109,7 +111,7 @@ export default function OrdersPanel({
   }
 
   const availableProducts = useMemo(
-    () => products.filter((product) => isProductPurchasable(product.status)),
+    () => products.filter((product) => isProductPurchasable(product.status, product.quantity)),
     [products],
   );
 
@@ -140,9 +142,13 @@ export default function OrdersPanel({
     () => Object.fromEntries(selectedProducts.map((product) => [product.id, getSnapshotPrice(product, spotData)])),
     [selectedProducts, spotData],
   );
-  const subtotal = selectedProducts.reduce((sum, product) => sum + selectedProductPrices[product.id], 0);
+  const productStockCap = (product: Product) => Math.max(1, normalizeProductQuantity(product.quantity));
+  const qtyFor = (product: Product) =>
+    Math.min(productStockCap(product), Math.max(1, Math.floor(selectedProductQuantities[product.id] ?? 1)));
+  const lineSubtotalFor = (product: Product) => selectedProductPrices[product.id] * qtyFor(product);
+  const subtotal = selectedProducts.reduce((sum, product) => sum + lineSubtotalFor(product), 0);
   const lineDiscount = selectedProducts.reduce(
-    (sum, product) => sum + clampMoneyDiscount(Number(selectedProductDiscounts[product.id]) || 0, selectedProductPrices[product.id]),
+    (sum, product) => sum + clampMoneyDiscount(Number(selectedProductDiscounts[product.id]) || 0, lineSubtotalFor(product)),
     0,
   );
   const discount = (Number(form.discount) || 0) + lineDiscount;
@@ -179,6 +185,11 @@ export default function OrdersPanel({
   function removeProduct(id: string) {
     setSelectedProductIds((current) => current.filter((item) => item !== id));
     setSelectedProductDiscounts((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+    setSelectedProductQuantities((current) => {
       const next = { ...current };
       delete next[id];
       return next;
@@ -248,7 +259,8 @@ export default function OrdersPanel({
       purity_snapshot: product.purity ? String(product.purity) : null,
       gram_weight_snapshot: getProductWeight(product),
       price_snapshot: selectedProductPrices[product.id],
-      discount: clampMoneyDiscount(Number(selectedProductDiscounts[product.id]) || 0, selectedProductPrices[product.id]),
+      quantity: qtyFor(product),
+      discount: clampMoneyDiscount(Number(selectedProductDiscounts[product.id]) || 0, lineSubtotalFor(product)),
       image_snapshot: getProductImages(product)[0] ?? null,
     }));
 
@@ -257,6 +269,7 @@ export default function OrdersPanel({
       const fallbackPayloads = itemPayloads.map((item) => {
         const fallbackItem: Record<string, unknown> = { ...item };
         delete fallbackItem.item_year_snapshot;
+        delete fallbackItem.quantity;
         return fallbackItem;
       });
       const retry = await supabase.from('order_items').insert(fallbackPayloads);
@@ -289,6 +302,7 @@ export default function OrdersPanel({
     setShowCreate(false);
     setSelectedProductIds([]);
     setSelectedProductDiscounts({});
+    setSelectedProductQuantities({});
     setProductSearch('');
     setShowAllProductMatches(false);
     setForm(emptyForm);
@@ -762,19 +776,45 @@ export default function OrdersPanel({
                               <span className="mt-1 block text-[0.68rem] uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
                                 {product.inventory_number || product.sku || product.id} - {productStatusLabel(product.status)}
                               </span>
-                              <span className="mt-1 block text-sm font-bold" style={{ color: GOLD }}>{formatCurrency(selectedProductPrices[product.id])}</span>
-                              <label className="mt-3 grid max-w-44 gap-1">
-                                <span className="form-label">Line Discount</span>
-                                <input
-                                  className="form-field"
-                                  type="number"
-                                  min="0"
-                                  max={selectedProductPrices[product.id]}
-                                  step="0.01"
-                                  value={selectedProductDiscounts[product.id] ?? '0'}
-                                  onChange={(event) => setSelectedProductDiscounts((current) => ({ ...current, [product.id]: event.target.value }))}
-                                />
-                              </label>
+                              <span className="mt-1 block text-sm font-bold" style={{ color: GOLD }}>
+                                {formatCurrency(selectedProductPrices[product.id])}
+                                {qtyFor(product) > 1 && (
+                                  <span style={{ color: 'var(--color-on-surface-variant)', fontWeight: 500 }}>
+                                    {' '}× {qtyFor(product)} = {formatCurrency(lineSubtotalFor(product))}
+                                  </span>
+                                )}
+                              </span>
+                              <div className="mt-3 flex flex-wrap gap-3">
+                                {productStockCap(product) > 1 && (
+                                  <label className="grid max-w-28 gap-1">
+                                    <span className="form-label">Quantity ({productStockCap(product)} in stock)</span>
+                                    <input
+                                      className="form-field"
+                                      type="number"
+                                      min="1"
+                                      max={productStockCap(product)}
+                                      step="1"
+                                      value={selectedProductQuantities[product.id] ?? 1}
+                                      onChange={(event) => setSelectedProductQuantities((current) => ({
+                                        ...current,
+                                        [product.id]: Math.min(productStockCap(product), Math.max(1, Math.floor(Number(event.target.value) || 1))),
+                                      }))}
+                                    />
+                                  </label>
+                                )}
+                                <label className="grid max-w-44 gap-1">
+                                  <span className="form-label">Line Discount</span>
+                                  <input
+                                    className="form-field"
+                                    type="number"
+                                    min="0"
+                                    max={lineSubtotalFor(product)}
+                                    step="0.01"
+                                    value={selectedProductDiscounts[product.id] ?? '0'}
+                                    onChange={(event) => setSelectedProductDiscounts((current) => ({ ...current, [product.id]: event.target.value }))}
+                                  />
+                                </label>
+                              </div>
                             </div>
                             <button type="button" onClick={() => removeProduct(product.id)} className="text-left text-xs font-bold uppercase tracking-wide md:text-right" style={{ color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}>
                               Remove

@@ -1,6 +1,144 @@
 # Decisions Log
 
-## 2026-07-07 (latest) - Trade-in line override is a separate flat amount, not a scrap-value edit
+## 2026-07-07 (latest) - Self-host + subset Material Symbols instead of the Google Fonts <link>
+
+**Decision:** The Material Symbols icon font is now self-hosted as a **subset**
+woff2 committed to `next-app/public/assets/fonts/material-symbols-subset-v357.woff2`
+(~65KB), declared via an inline `@font-face` in `globals.css` and `preload`ed in
+`[locale]/layout.tsx`. The render-blocking third-party
+`<link rel="stylesheet" href="fonts.googleapis.com/...">` and both Google
+preconnects were removed.
+
+**Why:** The external stylesheet sat on the critical render path and delayed
+first paint on high-latency mobile. Worse, the full variable font is **2.33MB**;
+with `font-display: block` it routinely blew past the ~3s block window and then
+fell back to showing each icon's **ligature name as raw text** ("shopping_bag",
+"chevron_right") — the "rendering going wrong" the user reported. A 65KB subset
+loads inside the block window, so icons render cleanly.
+
+**Key subtlety (why the naive subset failed):** Material Symbols is a *ligature*
+font — pyftsubset keeps a ligature if its component **letter** glyphs survive, and
+the icon set collectively uses every letter, so `--text` retained all ~6,600
+glyphs (2.27MB, no savings). The working approach resolves each used icon name to
+its exact ligature **target glyph** and subsets by explicit glyph set with layout
+closure OFF, keeping the FILL/opsz/wght axes so `fontVariationSettings` (fill
+toggle, thin weights) still work.
+
+**To regenerate after adding/removing icons** (needs `pip install fonttools brotli`):
+
+1. Download the full variable woff2 (the URL is inside the CSS that this returns,
+   fetched with a modern browser UA):
+   `https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=block`
+2. Collect every icon-name literal from `next-app/src` + `next-app/carousel`
+   (icon names are always literals: `material-symbols-outlined` element text,
+   `icon:` fields, ternaries — greedy capture of quoted lowercase tokens is safe,
+   non-icon words only pull in shared letter glyphs).
+3. Resolve each name to its GSUB ligature target glyph and write the kept glyph
+   names (icon glyphs + their component letters) to a file.
+4. Subset (keeps ligatures + variable axes, no closure re-expansion):
+   `python -m fontTools.subset full.woff2 --glyphs-file=keep.txt --layout-features+=liga,dlig,clig,calt,rlig --no-layout-closure --flavor=woff2 --output-file=material-symbols-subset-vNNN.woff2`
+5. Bump the versioned filename, update the `@font-face` src + the `preload` href,
+   and verify every used icon still resolves in the new subset before shipping.
+
+## 2026-07-07 - Quantity Phase 2: unit price stays the snapshot, quantity is a separate column; capture decrements atomically under the existing lock
+
+**Decision:** For multi-unit purchases, `order_items.price_snapshot` keeps its
+existing meaning — the price of **one** unit — and a new `order_items.quantity`
+column holds the count; every line total is `price_snapshot * quantity`. This
+avoids reinterpreting a column that live orders, invoices, emails, and refund
+math already depend on, and keeps unit price visible on receipts.
+
+**Capture-time stock decrement reuses the existing row-lock, not a new
+mechanism:** `capture_paypal_order` already took a `FOR UPDATE` lock on the
+order's product rows to serialize concurrent captures of a one-of-one item.
+Phase 2 keeps that exact lock and simply changes what happens inside it: check
+that every line still has `quantity >= oi.quantity` (and status `available`),
+then `products.quantity = greatest(quantity - oi.quantity, 0)` and flip to
+`sold` only at 0. So the concurrency guarantee is unchanged; "oversell" is now
+the generalization of the old "already sold" conflict, surfaced through the
+same `item_conflict` return flag and admin-refund path.
+
+**Cart `count` now means total units, and `add()` increments instead of
+no-opping:** the header badge counts units (sum of `purchaseQuantity`), and
+re-adding an item in the cart raises its quantity (capped at stock) rather than
+being ignored — the natural behavior once a line can hold more than one unit.
+`normalizeCartItem()` clamps `purchaseQuantity` to `1..stockQuantity` on every
+load so stale localStorage carts (from before this field existed, or after
+stock dropped) self-heal instead of sending an impossible quantity to checkout.
+
+**Quantity UI only appears when `stockQuantity > 1`:** the stepper is hidden
+for one-of-a-kind items (the overwhelming majority of inventory), so the
+storefront/cart/checkout look identical to before for them; the shared
+`QuantityStepper` lives in `OrderSummary.tsx` and is reused by the detail page,
+cart drawer, and checkout summary to keep clamp/label behavior identical.
+
+**Order-reading pages fold `quantity` into the existing `item_year_snapshot`
+fallback tier:** rather than add a new combinatorial set of "columns without
+quantity" variants to every order query, `quantity` is stripped alongside
+`item_year_snapshot` whenever a missing-column error mentions either. A DB
+missing `quantity` predates this migration, and stripping both together keeps
+the fallback matrix from exploding; the transient cost (item_year also dropped
+from display until the migration runs) is acceptable on internal admin/account
+pages and disappears the moment the migration is applied.
+
+## 2026-07-07 (earlier) - Quantity is a real stock count (not a cosmetic label), shipped in two phases; status auto-sync is one-directional
+
+**Decision:** When asked to "add the ability to list multiple quantity of the
+same item," the user was offered two designs — an informational-only "3 in
+stock" label with no effect on purchasability, vs. a real stock count that
+drives availability (item stays purchasable until quantity hits 0, decrements
+atomically per paid order, lets a buyer choose a quantity). The user chose the
+**real stock count**. Given the size of that request (it touches the live
+PayPal capture RPC, checkout math, and the cart model), it was then split into
+two phases at the user's explicit direction:
+
+- **Phase 1 (this pass):** `products.quantity` column, admin New/Edit Item
+  field (default 1), AI listing-assistant autofill, `isProductPurchasable()`
+  gated on quantity, and storefront "N in stock" display.
+- **Phase 2 (deferred, tracked in TASKS.md):** buyer-facing quantity selection
+  in the cart/checkout, and atomic per-unit stock decrement in the PayPal
+  capture RPC.
+
+**Reason for the phase split:** the payment-capture path is the single most
+sensitive piece of code in the app (it's what stands between "buyer paid" and
+"product marked sold," with existing race-condition handling for concurrent
+buyers on a one-of-one item). Bundling a rewrite of that RPC into the same
+change as a purely additive admin/display field would make the diff much
+harder to review and would block shipping the low-risk half (which is most of
+the user's stated ask — "add the field... AI fills it in... add to new/edit
+item") behind the high-risk half.
+
+**`isProductPurchasable()` design — additive, not a breaking signature
+change:** rather than requiring every call site to pass a `Product` object,
+the function kept its original `status` first argument and gained an
+*optional* second `quantity` argument. A missing/undefined quantity
+normalizes to `1` (via the new `normalizeProductQuantity()`), so every
+pre-existing call site continues to compile and behave identically without
+being touched; only call sites that have live quantity data available
+(shop cards, product detail, checkout pricing, admin orders) were updated to
+pass it, making the stock gate take effect. The wishlist drawer's stored
+item snapshot has no live quantity data (same pre-existing limitation as its
+`status` staleness) and was intentionally left alone rather than plumbing a
+new field through a feature that doesn't refresh live product state anyway.
+
+**Status auto-sync is one-directional (quantity → 0 forces `sold`; quantity
+restocked above 0 never auto-restores `available`):** the admin save handler
+force-flips `status` to `sold` the moment a saved quantity reaches 0, so the
+storefront/admin table never show a "0 in stock, Available" contradiction.
+The reverse was deliberately NOT implemented — an admin who manually marks an
+item Sold (e.g. correcting a mistaken listing, or intentionally pulling stock
+without deleting it) shouldn't have that decision silently undone just
+because they later edit the quantity field back to a positive number for
+some unrelated reason. Restocking an item that's marked Sold requires
+explicitly flipping Status back via the dropdown that sits right next to it.
+
+**CartItem quantity naming — `stockQuantity`, not `quantity`:** deliberately
+avoided naming the new "units in stock" field on `CartItem` just `quantity`,
+reserving that name for Phase 2's "how many of this the buyer is buying" —
+so the two concepts (available stock vs. requested purchase count) can never
+collide once Phase 2 introduces the latter.
+
+## 2026-07-07 (a bit earlier) - Trade-in line override is a separate flat amount, not a scrap-value edit
 
 **Decision:** The new "Override customer special pricing" admin control only
 replaces the number shown on the product page's "Own gold or silver? Put it

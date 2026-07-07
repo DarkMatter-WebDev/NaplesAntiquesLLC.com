@@ -9,6 +9,7 @@ import { parseManualPriceLabelValue } from '@/lib/pricing';
 import {
   inferProductJewelryType,
   formatProductItemYear,
+  normalizeProductQuantity,
   productJewelryTypeLabel,
   productLengthSizeDisplay,
   productImagePaddingBackground,
@@ -36,6 +37,10 @@ function fmt(n: number) {
   }).format(n);
 }
 
+function purchaseQty(item: CartItem): number {
+  return Math.max(1, normalizeProductQuantity(item.purchaseQuantity));
+}
+
 export default function OrderSummary({
   items,
   isEs,
@@ -44,6 +49,7 @@ export default function OrderSummary({
   shippingState,
   onShippingMethodChange,
   onRemove,
+  onSetQuantity,
   variant = 'compact',
 }: {
   items: CartItem[];
@@ -56,12 +62,16 @@ export default function OrderSummary({
   shippingState?: string;
   onShippingMethodChange?: (value: string) => void;
   onRemove?: (id: string) => void;
+  onSetQuantity?: (id: string, quantity: number) => void;
   variant?: 'compact' | 'expanded';
 }) {
-  const prices = items.map((i) => parsePrice(i.priceLabel));
-  const knownPrices = prices.filter((p): p is number => p !== null);
-  const hasUnknown = knownPrices.length < prices.length;
-  const subtotal = knownPrices.reduce((a, b) => a + b, 0);
+  const lineTotals = items.map((i) => {
+    const unit = parsePrice(i.priceLabel);
+    return unit === null ? null : unit * purchaseQty(i);
+  });
+  const knownLineTotals = lineTotals.filter((p): p is number => p !== null);
+  const hasUnknown = knownLineTotals.length < lineTotals.length;
+  const subtotal = knownLineTotals.reduce((a, b) => a + b, 0);
   const tax = chargesFlSalesTax(shippingMethod, shippingState) ? subtotal * FL_TAX_RATE : 0;
   const selectedShipping = SHIPPING_OPTIONS.find((option) => option.value === shippingMethod) ?? SHIPPING_OPTIONS[0];
   const shipping = selectedShipping.price;
@@ -96,6 +106,7 @@ export default function OrderSummary({
             isEs={isEs}
             prefix={prefix}
             onRemove={onRemove ? () => onRemove(item.id) : undefined}
+            onSetQuantity={onSetQuantity ? (qty) => onSetQuantity(item.id, qty) : undefined}
             expanded={expanded}
           />
         ))}
@@ -162,12 +173,14 @@ function SummaryRow({
   isEs,
   prefix,
   onRemove,
+  onSetQuantity,
   expanded = false,
 }: {
   item: CartItem;
   isEs: boolean;
   prefix: string;
   onRemove?: () => void;
+  onSetQuantity?: (quantity: number) => void;
   expanded?: boolean;
 }) {
   const title = isEs && item.title_es ? item.title_es : item.title;
@@ -175,6 +188,10 @@ function SummaryRow({
   const specs = buildSpecLine(item, isEs);
   const imageFrameBackground = productImagePaddingBackground(item.image_padding);
   const image = normalizeLegacyLocalImageUrl(item.image);
+  const qty = purchaseQty(item);
+  const stockCap = Math.max(1, normalizeProductQuantity(item.stockQuantity));
+  const unitPrice = parsePrice(item.priceLabel);
+  const lineTotal = unitPrice === null ? null : unitPrice * qty;
   return (
     <div className={`flex gap-3 items-start ${expanded ? 'rounded-2xl border p-2 md:gap-3 md:p-2.5' : ''}`} style={expanded ? { borderColor: BORDER, background: 'rgba(255, 253, 248, 0.76)' } : undefined}>
       <Link
@@ -197,6 +214,11 @@ function SummaryRow({
           </Link>
           <p className={`${expanded ? 'text-xs' : 'text-[0.68rem]'} flex-shrink-0 font-bold`} style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
             {item.priceLabel}
+            {qty > 1 && lineTotal !== null && (
+              <span style={{ color: 'var(--color-on-surface-variant)', fontWeight: 600 }}>
+                {' '}× {qty} = {fmt(lineTotal)}
+              </span>
+            )}
           </p>
           {expanded && (circa || specs) && (
             <p className="mt-0.5 truncate text-[0.7rem] font-bold uppercase tracking-wide" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
@@ -205,6 +227,23 @@ function SummaryRow({
               {specs}
             </p>
           )}
+          {onSetQuantity && stockCap > 1 ? (
+            <div className="mt-1.5 flex items-center gap-2">
+              <QuantityStepper
+                value={qty}
+                max={stockCap}
+                onChange={onSetQuantity}
+                isEs={isEs}
+              />
+              <span className="text-[0.62rem] font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                {stockCap} {isEs ? 'en stock' : 'in stock'}
+              </span>
+            </div>
+          ) : qty > 1 ? (
+            <p className="mt-0.5 text-[0.68rem] font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+              {isEs ? 'Cantidad' : 'Qty'}: {qty}
+            </p>
+          ) : null}
         </div>
       </div>
       {onRemove && (
@@ -221,6 +260,61 @@ function SummaryRow({
           </span>
         </button>
       )}
+    </div>
+  );
+}
+
+export function QuantityStepper({
+  value,
+  max,
+  onChange,
+  isEs,
+}: {
+  value: number;
+  max: number;
+  onChange: (quantity: number) => void;
+  isEs: boolean;
+}) {
+  const clamp = (n: number) => Math.min(max, Math.max(1, n));
+  const btn: React.CSSProperties = {
+    width: '1.6rem',
+    height: '1.6rem',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '6px',
+    border: `1px solid ${BORDER}`,
+    background: 'var(--color-background)',
+    color: GOLD,
+    lineHeight: 1,
+  };
+  return (
+    <div className="inline-flex items-center gap-1.5" role="group" aria-label={isEs ? 'Cantidad' : 'Quantity'}>
+      <button
+        type="button"
+        onClick={() => onChange(clamp(value - 1))}
+        disabled={value <= 1}
+        style={{ ...btn, opacity: value <= 1 ? 0.4 : 1, cursor: value <= 1 ? 'not-allowed' : 'pointer' }}
+        aria-label={isEs ? 'Disminuir cantidad' : 'Decrease quantity'}
+      >
+        <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '15px' }}>remove</span>
+      </button>
+      <span
+        className="text-sm font-bold tabular-nums"
+        style={{ minWidth: '1.4rem', textAlign: 'center', color: 'var(--color-on-surface)', fontFamily: 'var(--font-label)' }}
+        aria-live="polite"
+      >
+        {value}
+      </span>
+      <button
+        type="button"
+        onClick={() => onChange(clamp(value + 1))}
+        disabled={value >= max}
+        style={{ ...btn, opacity: value >= max ? 0.4 : 1, cursor: value >= max ? 'not-allowed' : 'pointer' }}
+        aria-label={isEs ? 'Aumentar cantidad' : 'Increase quantity'}
+      >
+        <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '15px' }}>add</span>
+      </button>
     </div>
   );
 }

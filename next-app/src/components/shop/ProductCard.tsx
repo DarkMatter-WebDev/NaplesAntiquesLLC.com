@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { formatProductItemYear, inferProductJewelryType, isProductPurchasable, isProductSold, normalizeProductStatus, productImagePaddingBackground, productImagePaddingForImage, productLengthSizeDisplay, productMetalVariantLabel, productStatusLabel, productSupportsLinkType, type Product, type SpotData } from '@/types/product';
+import { formatProductItemYear, inferProductJewelryType, isProductPurchasable, isProductSold, normalizeProductQuantity, normalizeProductStatus, productImagePaddingBackground, productImagePaddingForImage, productLengthSizeDisplay, productMetalVariantLabel, productStatusLabel, productSupportsLinkType, type Product, type SpotData } from '@/types/product';
 import { getDisplayPrice } from '@/lib/pricing';
 import WishlistButton from '@/components/shop/WishlistButton';
 import type { WishlistItem } from '@/context/WishlistContext';
@@ -65,7 +65,8 @@ export default function ProductCard({
   const href = locale === 'es' ? `/es/shop/${product.id}` : `/shop/${product.id}`;
   const normalizedStatus = normalizeProductStatus(product.status);
   const isSold = isProductSold(product.status);
-  const isPurchasable = isProductPurchasable(product.status);
+  const isPurchasable = isProductPurchasable(product.status, product.quantity);
+  const stockQuantity = normalizeProductQuantity(product.quantity);
   const isModern = variant === 'modern';
   const brand = product.brand?.trim() ?? '';
   const fallbackFlagLabel = getProductCardFlagFallback(product);
@@ -91,6 +92,7 @@ export default function ProductCard({
     image: thumb,
     image_padding: thumbPadding,
     status: normalizedStatus,
+    stockQuantity: product.quantity,
     priceLabel: price,
     category: product.category,
     metal_type: product.metal_type,
@@ -244,7 +246,11 @@ export default function ProductCard({
               boxShadow: isModern ? '0 8px 18px rgba(115, 92, 0, 0.16)' : undefined,
             }}
           >
-            {isPurchasable ? (isEs ? 'Disponible' : 'Available') : productStatusLabel(product.status)}
+            {isPurchasable
+              ? stockQuantity > 1
+                ? (isEs ? `${stockQuantity} disponibles` : `${stockQuantity} in stock`)
+                : (isEs ? 'Disponible' : 'Available')
+              : productStatusLabel(product.status)}
           </div>
         )}
         {/* Cart icon button — mobile only, top-left (replaces Available tag on small screens) */}

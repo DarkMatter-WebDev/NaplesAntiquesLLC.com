@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useCart, type CartItem } from '@/context/CartContext';
-import { isProductPurchasable } from '@/types/product';
+import { QuantityStepper } from '@/components/checkout/OrderSummary';
+import { isProductPurchasable, normalizeProductQuantity } from '@/types/product';
 
 interface Props {
   item: CartItem;
@@ -15,7 +16,9 @@ export default function CartButton({ item, variant = 'card', locale = 'en', incl
   const { isIn, add, remove, notifyAdded } = useCart();
   const inCart = isIn(item.id);
   const isEs = locale === 'es';
-  const canPurchase = isProductPurchasable(item.status);
+  const canPurchase = isProductPurchasable(item.status, item.stockQuantity);
+  const stockCap = Math.max(1, normalizeProductQuantity(item.stockQuantity));
+  const [detailQty, setDetailQty] = useState(1);
   const [showCardConfirmation, setShowCardConfirmation] = useState(false);
   const confirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -34,7 +37,7 @@ export default function CartButton({ item, variant = 'card', locale = 'en', incl
       setShowCardConfirmation(false);
       remove(item.id);
     } else {
-      add(item);
+      add(item, variant === 'detail' ? detailQty : 1);
       if (variant === 'card') {
         if (confirmationTimer.current) clearTimeout(confirmationTimer.current);
         setShowCardConfirmation(true);
@@ -47,21 +50,26 @@ export default function CartButton({ item, variant = 'card', locale = 'en', incl
 
   if (variant === 'detail') {
     return (
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={!canPurchase && !inCart}
-        className={inCart ? 'outline-button flex items-center gap-2' : 'gold-button detail-cart-button flex items-center gap-2'}
-        style={inCart ? { borderColor: GOLD, color: GOLD } : !canPurchase ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
-        aria-pressed={inCart}
-      >
-        <span className="material-symbols-outlined" style={{ fontSize: '16px', lineHeight: 1 }}>
-          {inCart ? 'remove_shopping_cart' : 'add_shopping_cart'}
-        </span>
-        {inCart
-          ? (isEs ? 'En el carrito' : 'In Cart')
-          : canPurchase ? (isEs ? 'Agregar al carrito' : 'Add to Cart') : (isEs ? 'No disponible' : 'Unavailable')}
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        {!inCart && canPurchase && stockCap > 1 && (
+          <QuantityStepper value={detailQty} max={stockCap} onChange={setDetailQty} isEs={isEs} />
+        )}
+        <button
+          type="button"
+          onClick={handleClick}
+          disabled={!canPurchase && !inCart}
+          className={inCart ? 'outline-button flex items-center gap-2' : 'gold-button detail-cart-button flex items-center gap-2'}
+          style={inCart ? { borderColor: GOLD, color: GOLD } : !canPurchase ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
+          aria-pressed={inCart}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '16px', lineHeight: 1 }}>
+            {inCart ? 'remove_shopping_cart' : 'add_shopping_cart'}
+          </span>
+          {inCart
+            ? (isEs ? 'En el carrito' : 'In Cart')
+            : canPurchase ? (isEs ? 'Agregar al carrito' : 'Add to Cart') : (isEs ? 'No disponible' : 'Unavailable')}
+        </button>
+      </div>
     );
   }
 

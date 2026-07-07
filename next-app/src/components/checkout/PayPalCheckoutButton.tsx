@@ -55,8 +55,24 @@ function loadPayPalSdk(clientId: string, currency: string): Promise<void> {
   return promise;
 }
 
+// Fire-and-forget: tell the server to soft-cancel the unpaid order the buyer
+// just abandoned. `keepalive` lets the request survive a page/tab teardown.
+function cancelAbandonedOrder(orderId: string | null) {
+  if (!orderId) return;
+  try {
+    void fetch('/api/paypal/cancel-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    /* ignore — best effort */
+  }
+}
+
 export type PayPalPayload = {
-  productIds: string[];
+  items: { id: string; quantity: number }[];
   customer: Record<string, unknown>;
   shippingMethod: string;
   orderId: string | null;
@@ -100,6 +116,9 @@ export default function PayPalCheckoutButton({
   const getPayloadRef = useRef(getPayload);
   const onOrderIdRef = useRef(onOrderId);
   const onSuccessRef = useRef(onSuccess);
+  // Internal order id created by the most recent create-order call. Used to
+  // cancel the lingering unpaid order if the buyer abandons the PayPal window.
+  const createdOrderIdRef = useRef<string | null>(null);
   const isEsRef = useRef(isEs);
   const readyRef = useRef(ready);
   const missingFieldsRef = useRef(missingFields);
@@ -153,7 +172,10 @@ export default function PayPalCheckoutButton({
           if (!res.ok || !data?.paypalOrderId) {
             throw new Error(data?.error ?? 'create-order failed');
           }
-          if (data.orderId) onOrderIdRef.current(data.orderId);
+          if (data.orderId) {
+            createdOrderIdRef.current = data.orderId as string;
+            onOrderIdRef.current(data.orderId);
+          }
           return data.paypalOrderId as string;
         } catch (err) {
           setProcessing(false);
@@ -179,6 +201,8 @@ export default function PayPalCheckoutButton({
           if (!res.ok || !result?.success) {
             throw new Error(result?.error ?? 'capture failed');
           }
+          // Paid — this order must never be cancelled by a later unmount.
+          createdOrderIdRef.current = null;
           onSuccessRef.current({ orderId: result.orderId, orderNumber: result.orderNumber });
         } catch {
           setProcessing(false);
@@ -191,6 +215,10 @@ export default function PayPalCheckoutButton({
       },
       onCancel: () => {
         setProcessing(false);
+        // Buyer closed / cancelled the PayPal window before approving. Cancel the
+        // unpaid order that create-order already wrote so it doesn't linger in the
+        // admin as an open sale. Keep the id: an immediate retry reuses this order.
+        cancelAbandonedOrder(createdOrderIdRef.current);
         setMessage(
           isEsRef.current
             ? 'Pago cancelado. Puede intentarlo de nuevo cuando esté listo.'

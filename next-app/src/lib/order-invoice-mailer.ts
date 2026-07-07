@@ -30,12 +30,15 @@ const ORDER_INVOICE_COLUMNS = [
   'customer_notes',
   'created_at',
   'updated_at',
-  'order_items(id, order_id, product_id, inventory_number, title_snapshot, item_year_snapshot, metal_snapshot, purity_snapshot, gram_weight_snapshot, price_snapshot, discount, image_snapshot, created_at)',
+  'order_items(id, order_id, product_id, inventory_number, title_snapshot, item_year_snapshot, metal_snapshot, purity_snapshot, gram_weight_snapshot, price_snapshot, quantity, discount, image_snapshot, created_at)',
 ].join(', ');
-const ORDER_INVOICE_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT = ORDER_INVOICE_COLUMNS.replace('item_year_snapshot, ', '');
+const ORDER_INVOICE_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT = ORDER_INVOICE_COLUMNS
+  .replace('item_year_snapshot, ', '')
+  .replace('quantity, ', '');
 
 function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
-  return Boolean(error?.message?.toLowerCase().includes('item_year'));
+  return Boolean(error?.message?.toLowerCase().includes('item_year'))
+    || Boolean(error?.message?.toLowerCase().includes('quantity'));
 }
 
 export type SentInvoiceEmail = {

@@ -8,6 +8,7 @@ import {
   inferProductJewelryType,
   isProductPurchasable,
   isProductSold,
+  normalizeProductQuantity,
   normalizeProductStatus,
   productImagePaddingBackground,
   productImagePaddingForImage,
@@ -55,7 +56,8 @@ export default function ProductListRow({ product, spotData, locale, prioritizeIm
   const href = locale === 'es' ? `/es/shop/${product.id}` : `/shop/${product.id}`;
   const normalizedStatus = normalizeProductStatus(product.status);
   const isSold = isProductSold(product.status);
-  const isPurchasable = isProductPurchasable(product.status);
+  const isPurchasable = isProductPurchasable(product.status, product.quantity);
+  const stockQuantity = normalizeProductQuantity(product.quantity);
   const brand = product.brand?.trim() ?? '';
   const linkTypeLabel = getProductLinkTypeLabel(product);
 
@@ -69,6 +71,7 @@ export default function ProductListRow({ product, spotData, locale, prioritizeIm
     image: thumb,
     image_padding: thumbPadding,
     status: normalizedStatus,
+    stockQuantity: product.quantity,
     priceLabel: price,
     category: product.category,
     metal_type: product.metal_type,
@@ -132,7 +135,9 @@ export default function ProductListRow({ product, spotData, locale, prioritizeIm
             {isSold
               ? (isEs ? 'Vendido' : 'Sold')
               : isPurchasable
-                ? (isEs ? 'Disponible' : 'Available')
+                ? stockQuantity > 1
+                  ? (isEs ? `${stockQuantity} disponibles` : `${stockQuantity} in stock`)
+                  : (isEs ? 'Disponible' : 'Available')
                 : productStatusLabel(product.status)}
           </span>
           <span className="shop-list-metal">{metalLabel}</span>

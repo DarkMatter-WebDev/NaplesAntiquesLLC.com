@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Product } from '@/types/product';
-import { isProductPurchasable } from '@/types/product';
+import { isProductPurchasable, normalizeProductQuantity } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
 import { getProductImages, getProductMetal, getProductWeight, getSnapshotPrice } from '@/lib/sales';
 
@@ -62,15 +62,17 @@ const CHECKOUT_PRODUCT_COLUMNS = [
   'image_urls',
   'manual_price_label',
   'asking_price',
+  'quantity',
 ].join(', ');
 
 const CHECKOUT_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR = CHECKOUT_PRODUCT_COLUMNS
   .split(', ')
-  .filter((column) => column !== 'item_year')
+  .filter((column) => column !== 'item_year' && column !== 'quantity')
   .join(', ');
 
 function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
-  return Boolean(error?.message?.toLowerCase().includes('item_year'));
+  return Boolean(error?.message?.toLowerCase().includes('item_year'))
+    || Boolean(error?.message?.toLowerCase().includes('quantity'));
 }
 
 export type CheckoutOrderItem = {
@@ -81,9 +83,29 @@ export type CheckoutOrderItem = {
   metal_snapshot: string;
   purity_snapshot: string | null;
   gram_weight_snapshot: number | null;
+  // Unit price for one unit of the item. The line total is price_snapshot * quantity.
   price_snapshot: number;
+  quantity: number;
   image_snapshot: string | null;
 };
+
+// A requested cart line: which product and how many units of it the buyer wants.
+export type OrderLine = { productId: string; quantity: number };
+
+// Accept either the legacy string[] of product ids (each treated as quantity 1)
+// or the quantity-aware line shape. Normalizes to unique lines with a positive
+// integer quantity, dropping blanks.
+export function normalizeOrderLines(input: string[] | OrderLine[]): OrderLine[] {
+  const byId = new Map<string, number>();
+  for (const entry of input) {
+    const productId = typeof entry === 'string' ? entry : String(entry?.productId ?? '');
+    if (!productId) continue;
+    const rawQty = typeof entry === 'string' ? 1 : Number(entry?.quantity);
+    const quantity = Number.isFinite(rawQty) ? Math.max(1, Math.floor(rawQty)) : 1;
+    byId.set(productId, (byId.get(productId) ?? 0) + quantity);
+  }
+  return Array.from(byId, ([productId, quantity]) => ({ productId, quantity }));
+}
 
 export type OrderDraft = {
   items: CheckoutOrderItem[];
@@ -106,13 +128,17 @@ export function isOrderDraftError(value: OrderDraft | OrderDraftError): value is
  */
 export async function buildOrderDraft(
   supabase: SupabaseClient,
-  productIds: string[],
+  lines: string[] | OrderLine[],
   shippingMethod: string,
   shippingState?: string | null,
 ): Promise<OrderDraft | OrderDraftError> {
-  if (productIds.length === 0) {
+  const orderLines = normalizeOrderLines(lines);
+  if (orderLines.length === 0) {
     return { error: 'Cart is empty', status: 400 };
   }
+
+  const productIds = orderLines.map((line) => line.productId);
+  const quantityByProductId = new Map(orderLines.map((line) => [line.productId, line.quantity]));
 
   // Whitelist the shipping method. An unknown value used to silently resolve to a
   // $0 fee (SHIPPING_FEES[x] ?? 0) while still being recorded as a shipped order —
@@ -136,6 +162,7 @@ export async function buildOrderDraft(
     products = (fallback.data as unknown[] | null)?.map((product) => ({
       ...(product as Record<string, unknown>),
       item_year: null,
+      quantity: 1,
     })) ?? null;
     productsError = fallback.error;
   }
@@ -149,10 +176,24 @@ export async function buildOrderDraft(
     return { error: 'One or more cart items could not be found', status: 400 };
   }
 
-  const unavailable = typedProducts.filter((product) => !isProductPurchasable(product.status));
+  const unavailable = typedProducts.filter((product) => !isProductPurchasable(product.status, product.quantity));
   if (unavailable.length > 0) {
     return {
       error: `Unavailable item: ${unavailable.map((product) => product.title).join(', ')}`,
+      status: 409,
+    };
+  }
+
+  // Reject any line whose requested quantity exceeds live stock. This is the
+  // snapshot gate; the capture RPC re-checks under a row lock before selling.
+  const overstocked = typedProducts.filter(
+    (product) => (quantityByProductId.get(product.id) ?? 1) > normalizeProductQuantity(product.quantity),
+  );
+  if (overstocked.length > 0) {
+    return {
+      error: `Not enough stock for: ${overstocked
+        .map((product) => `${product.title} (only ${normalizeProductQuantity(product.quantity)} available)`)
+        .join(', ')}. Please lower the quantity.`,
       status: 409,
     };
   }
@@ -186,10 +227,11 @@ export async function buildOrderDraft(
     metal_snapshot: getProductMetal(product),
     purity_snapshot: product.purity ? String(product.purity) : null,
     gram_weight_snapshot: getProductWeight(product),
-    // Round each line price to cents so the snapshot, the order total, and the
+    // Round each unit price to cents so the snapshot, the order total, and the
     // PayPal amount breakdown all reconcile exactly (PayPal rejects a breakdown
     // whose parts don't sum to the total).
     price_snapshot: round2(getSnapshotPrice(product, spotData)),
+    quantity: quantityByProductId.get(product.id) ?? 1,
     image_snapshot: getProductImages(product)[0] ?? null,
   }));
 
@@ -207,7 +249,7 @@ export async function buildOrderDraft(
     };
   }
 
-  const subtotal = round2(items.reduce((sum, item) => sum + item.price_snapshot, 0));
+  const subtotal = round2(items.reduce((sum, item) => sum + item.price_snapshot * item.quantity, 0));
   const shippingFee = SHIPPING_FEES[shippingMethod] ?? 0;
   const tax = chargesFlSalesTax(shippingMethod, shippingState) ? round2(subtotal * FL_TAX_RATE) : 0;
   const total = round2(subtotal + tax + shippingFee);

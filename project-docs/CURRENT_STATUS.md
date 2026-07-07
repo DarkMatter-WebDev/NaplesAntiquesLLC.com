@@ -3,7 +3,173 @@
 > Reflects the present state of development. **Update this at the end of every
 > work session.** Last updated: **2026-07-07**.
 
-## 2026-07-07 (latest) -- Admin override for the product-page "customer special pricing" line
+## 2026-07-07 (latest) -- First-paint + homepage boot splash + abandoned-checkout cleanup + admin Qty column
+
+- **Faster first paint (esp. mobile) + fixed icon-as-text bug: Material Symbols
+  is now self-hosted AND subset.** The icon font was loaded via a render-blocking
+  third-party `<link>` to `fonts.googleapis.com` in `[locale]/layout.tsx`.
+  Replaced with an inline `@font-face` in `globals.css` pointing at a committed
+  same-origin **subset** woff2
+  (`public/assets/fonts/material-symbols-subset-v357.woff2`, ~65KB, down from
+  2.33MB) that keeps the FILL/opsz/wght axes; `preload`ed in the layout `<head>`.
+  This also fixed icons briefly rendering as their ligature names ("shopping_bag",
+  etc.) — that was the 2.33MB font exceeding `font-display: block`'s window; the
+  65KB subset loads well inside it. Both Google preconnects removed; body fonts
+  were already self-hosted by `next/font`, so no runtime Google Fonts connection
+  remains. Regeneration steps + the ligature-subset subtlety are in DECISIONS.md.
+  Verified: subset served `200 font/woff2` (66,204 bytes), preload in HTML, old
+  2.33MB URL 404s, all 156 used icons resolve in the subset.
+
+- **Homepage loading screen now covers cold mobile/tablet loads.** The branded
+  `SiteLoadingScreen` is a Suspense fallback (`(home)/loading.tsx`) that only
+  fires on soft navigations; because the homepage is statically prerendered, a
+  fresh mobile/tablet hard load served the static HTML and never showed it,
+  leaving a blank during TTFB + the render-blocking Material Symbols stylesheet.
+  New server-rendered `HomeBootSplash` (`components/home/HomeBootSplash.tsx`)
+  paints the same branded splash on the first frame across all devices and fades
+  out on hydration, with a CSS `home-boot-splash-failsafe` keyframe (6s; 1.2s
+  under reduced-motion) so it never sticks. Homepage-scoped and additive.
+  (The initial pre-paint lag itself is TTFB/Netlify cold start + the intentional
+  render-blocking Material Symbols `display=block` stylesheet — documented, not
+  changed here.)
+
+Earlier the same day:
+
+Two small follow-ups after the Quantity feature:
+
+- **Abandoned PayPal checkouts no longer linger as live orders.** Because the
+  "no-reservation" flow writes the order row (`unpaid`/`pending`/`open`) at
+  PayPal-order creation — *before* the buyer approves — closing the PayPal
+  window used to leave that order sitting in the admin as an open sale. New
+  route **`/api/paypal/cancel-order`** soft-cancels it, and
+  `PayPalCheckoutButton`'s `onCancel` now calls it (fire-and-forget, `keepalive`)
+  with the created order id. The cancel is **non-destructive and reversible**:
+  it only sets `order_status`/`fulfillment_status` to `cancelled` and never
+  touches `payment_status`, so a delayed real capture (client or webhook) still
+  finalizes the sale and flips it back to `completed`. The create-order **reuse**
+  path resets a resumed order back to `open`/`pending`, so retrying after a
+  cancel doesn't leave it stuck as `cancelled`. Guarded against paid/captured
+  orders and rate-limited (60/hr per IP). Note: a hard browser/tab kill may skip
+  `onCancel`; those rare stragglers still show as `open` and can be trashed in
+  the admin. Any order abandoned **before** this fix stays `open` and can be
+  deleted from the admin Orders list.
+- **Admin master product table** gained a sortable **Qty** column (between
+  Status and the row actions), red when stock is `0`.
+
+## 2026-07-07 -- Per-listing Quantity / stock count — Phase 2 (buyer multi-unit purchase + atomic stock decrement) (?? SQL migration pending)
+
+Completed the second half of the Quantity feature: a buyer can now purchase
+more than one unit of the same listing, and stock is decremented atomically at
+PayPal capture (a product flips to `sold` only when its remaining quantity
+reaches `0`). This replaces the old one-of-a-kind-only capture logic.
+
+- **`order_items.quantity`** (integer, default `1`, `check (quantity >= 1)`)
+  stores how many units of each line were bought. `price_snapshot` remains the
+  **unit** price; every line total is `price_snapshot * quantity`.
+- **Cart model (`CartContext`):** `CartItem` gained `purchaseQuantity` (how
+  many the buyer wants, distinct from `stockQuantity` = how many exist).
+  `add(item, quantity?)` now merges/increments an existing line (capped at
+  stock) instead of no-opping; new `setQuantity(id, qty)` clamps to
+  `1..stockQuantity`. Cart `count` (header badge) is now total **units**.
+  `normalizeCartItem()` backfills/clamps `purchaseQuantity` so stale
+  localStorage carts and over-stock values self-correct.
+- **Quantity stepper UI** (shared `QuantityStepper` exported from
+  `OrderSummary.tsx`): on the product detail page (`CartButton` detail variant),
+  in the cart drawer per line, and on the checkout order summary — each capped
+  at live stock, with per-line subtotals. Only shows when `stockQuantity > 1`,
+  so the one-of-a-kind experience is visually unchanged.
+- **Authoritative pricing (`checkout-pricing.ts`):** `buildOrderDraft` now
+  accepts quantity-aware lines (`{ productId, quantity }[]`, still tolerant of a
+  legacy `string[]`), rejects any line whose quantity exceeds live stock, and
+  computes subtotal as `sum(unit * quantity)`. `CheckoutOrderItem` carries
+  `quantity`.
+- **Checkout payload + routes:** `CheckoutClient` sends
+  `items: [{ id, quantity }]`; the create-order route parses it (legacy
+  `productIds` still accepted), the reuse-order guard now matches on product+
+  quantity, and PayPal line items send the real per-line quantity.
+- **Atomic decrement (SQL):** rewrote `capture_paypal_order` to, under the
+  existing per-product row lock, verify sufficient remaining stock for every
+  line and then decrement `products.quantity` (flip to `sold` at 0), and
+  `create_paypal_order` to store per-line quantity + reject over-stock at order
+  creation. The item-conflict path now fires on insufficient remaining stock.
+- **Display surfaces:** order detail (admin), printable order, invoice/receipt
+  emails, and the customer account order views all show `Qty N × unit` and the
+  correct line total; line-discount ceilings use the line subtotal, not the
+  unit price. The admin manual-order form (`OrdersPanel`) has a per-product
+  quantity input (capped at stock) that feeds the same math.
+- **?? MANUAL STEP — run `supabase/checkout-quantity-2026-07.sql` in Supabase**
+  (adds `order_items.quantity` + rewrites the two PayPal RPCs). Run it AFTER
+  `product-quantity-2026-07.sql` (Phase 1). The canonical
+  `supabase/no-reservation-checkout.sql` and `supabase/sales-workflow.sql` were
+  updated to match for fresh installs. Every order-reading page retries without
+  the column pre-migration, so nothing breaks before it runs.
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), and
+  `npm run build` all pass. Not yet exercised live (needs both SQL migrations
+  run first) — see TASKS.md.
+
+## 2026-07-07 (earlier) -- Per-listing Quantity / stock count — Phase 1 (field, admin, AI autofill, storefront gating) (?? SQL migration pending)
+
+Added a real stock count to listings instead of treating every product as
+strictly one-of-a-kind. New `products.quantity` column (integer, default `1`,
+`check (quantity >= 0)`). This is **Phase 1** of a two-phase plan (user
+explicitly chose to sequence it this way): the field itself, admin editing, AI
+listing-assistant autofill, and storefront purchasability gating/display ship
+now; letting a buyer choose a quantity > 1 in the cart/checkout and
+decrementing stock atomically in the PayPal capture RPC is deliberately
+deferred to a focused follow-up (that touches the live payment-capture SQL and
+checkout math, which warrants its own isolated pass).
+
+- **`isProductPurchasable(status, quantity?)` in `types/product.ts`** now takes
+  an optional second `quantity` argument (backward-compatible — existing call
+  sites that only pass `status` are unaffected, since a missing quantity
+  normalizes to `1` via the new `normalizeProductQuantity()` helper). A
+  product is purchasable only when `status === 'available'` AND
+  `quantity > 0`. Threaded the quantity argument through every call site that
+  has it available: `ProductCard`, `ProductListRow`, `CartDrawer`, the shop
+  list's purchasable-first sort, `checkout-pricing.ts#buildOrderDraft`'s
+  server-side availability gate, and the admin `OrdersPanel`'s
+  available-products filter.
+- **`CartItem` gained `stockQuantity`** (units in stock for the product, not
+  "how many are in the cart" — that concept doesn't exist yet, every cart line
+  is still exactly one listing). Populated wherever a `CartItem` is built from
+  a live product row (`ProductCard`, `ProductListRow`, `shop/[id]/page.tsx`);
+  `CartButton`'s add-to-cart gate now checks it. The wishlist's stored
+  snapshot doesn't carry live stock data (pre-existing limitation, same as its
+  existing `status` staleness) so its `CartButton` falls back to the
+  always-purchasable default, unchanged from before.
+- **Admin New Item / Edit Item form (`AdminShell.tsx`):** new **Quantity**
+  number input next to Inventory #, defaulting to 1. Save-time auto-sync is
+  one-directional only: saving a listing down to `0` flips `status` from
+  `available` to `sold` automatically (so the storefront/admin table reflect
+  reality immediately); restocking a `sold` item back above `0` does **not**
+  auto-flip status back to `available` — an admin who intentionally marked
+  something Sold shouldn't have that silently reversed, they flip Status back
+  explicitly. Follows the existing optional-column retry-fallback pattern
+  (`OPTIONAL_PRODUCT_COLUMNS`) so saves keep working pre-migration.
+- **AI listing assistant:** new `quantity` field in `ai-product-schema.ts`
+  (`cleanQuantity()`: integer 1–500, else null) and a new prompt paragraph in
+  `ai-product-provider.ts` — the model leaves it null (default: 1) unless the
+  seller explicitly states multiple identical units ("I have 3 of these"),
+  and is explicitly told a matched pair (e.g. earrings) is one listing with
+  quantity 1, not quantity 2. Bumped `PROMPT_VERSION` to
+  `product-listing-extraction-v13`.
+- **Storefront display:** the shop card badge, the list-view status text, and
+  the product detail page now show "N in stock" / "N units in stock" instead
+  of the generic "Available" copy whenever `quantity > 1`; unchanged for the
+  common one-of-a-kind case.
+- **?? MANUAL STEP — run `supabase/product-quantity-2026-07.sql` in Supabase**
+  (adds the column + `check (quantity >= 0)` constraint + the anon/
+  authenticated column grant needed because the 2026-07 hardening scripts
+  replaced blanket `SELECT` on `public.products` with a column allow-list).
+  Also updated the canonical `supabase/products.sql` install script. Until the
+  migration runs, every read path retries without the column and defaults
+  `quantity` to `1` (existing one-of-a-kind behavior), so nothing breaks
+  pre-migration.
+- Verification: `npx tsc --noEmit`, `npm run lint` (0 problems), and
+  `npm run build` all pass. Not yet exercised live (needs the SQL migration
+  run first) — see TASKS.md.
+
+## 2026-07-07 (a bit earlier) -- Admin override for the product-page "customer special pricing" line
 
 - Added a per-item manual override for the "Own gold or silver? Put it toward
   this piece and pay as little as ___" trade-in line on `/shop/[id]`. That

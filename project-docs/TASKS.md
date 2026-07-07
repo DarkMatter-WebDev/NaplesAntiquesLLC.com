@@ -5,6 +5,27 @@
 
 ## Backlog
 
+- **Run BOTH Quantity migrations in the live Supabase project, in order:**
+  `supabase/product-quantity-2026-07.sql` (Phase 1 — `products.quantity`), then
+  `supabase/checkout-quantity-2026-07.sql` (Phase 2 — `order_items.quantity` +
+  the rewritten `create_paypal_order`/`capture_paypal_order` RPCs). Then verify:
+  - **Phase 1 field:** (1) column exists and anon/authenticated can select it
+    (product pages keep working, no "permission denied for column" errors);
+    (2) set a test listing to Quantity 3, save, confirm `/shop/[id]` and the
+    shop card show "3 in stock"; (3) set Quantity 0 on an `available` listing,
+    save, confirm `status` auto-flips to `sold` and it leaves the purchasable
+    sort / "Add to Cart" disables; (4) a `sold` item restocked above 0 does NOT
+    auto-flip back to `available`.
+  - **Phase 2 multi-unit purchase:** (5) on a listing with stock ≥ 2, the
+    detail page, cart drawer, and checkout summary show a quantity stepper
+    capped at stock with correct per-line subtotals; (6) buy 2 of a stock-3
+    listing via PayPal and confirm capture succeeds, the order/invoice/receipt
+    show `Qty 2 × unit`, and `products.quantity` drops to 1 (item stays
+    `available`); (7) buy the last unit and confirm it flips to `sold`; (8) a
+    line whose requested quantity exceeds live stock is rejected at checkout
+    with a clear message; (9) the admin manual-order form's per-product quantity
+    input produces correct totals. See `CURRENT_STATUS.md` + `DECISIONS.md`
+    2026-07-07 (latest two entries).
 - **Run `supabase/product-special-price-override-2026-07.sql` in the live Supabase project**
   and then verify the new per-item **"Override customer special pricing"** admin checkbox:
   (1) confirm both columns exist and anon/authenticated can select them (product pages keep

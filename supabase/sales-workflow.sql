@@ -133,12 +133,18 @@ create table if not exists public.order_items (
   purity_snapshot text,
   gram_weight_snapshot numeric(8,2),
   price_snapshot numeric(12,2) not null default 0,
+  quantity integer not null default 1,
   image_snapshot text,
   created_at timestamptz not null default now()
 );
 
 alter table public.order_items
   add column if not exists item_year_snapshot smallint;
+
+-- Per-line purchase quantity (units of this listing bought on this order).
+-- price_snapshot is the UNIT price; the line total is price_snapshot * quantity.
+alter table public.order_items
+  add column if not exists quantity integer not null default 1;
 
 create table if not exists public.invoices (
   id uuid primary key default gen_random_uuid(),

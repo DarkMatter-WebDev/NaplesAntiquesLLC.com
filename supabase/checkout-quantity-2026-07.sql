@@ -1,22 +1,36 @@
--- Remove product reservation from the checkout flow.
--- Items stay 'available' until payment is actually captured.
--- "Whoever pays first gets the item."
+-- Phase 2 of the per-listing Quantity feature: let a buyer purchase more than
+-- one unit of the same listing, and decrement stock atomically at capture.
 --
--- This migration is the canonical inventory model for PayPal checkout. It
--- supersedes the 30-minute-hold model from paypal-checkout.sql: it adds the
--- no-reservation create/capture RPCs AND tears down the old reservation
--- machinery (the reserve_paypal_order hold + the release-expired sweep), so no
--- 30-minute inventory reservation can be created anymore.
+-- Depends on product-quantity-2026-07.sql (adds products.quantity). Run this
+-- AFTER that file and AFTER no-reservation-checkout.sql. Safe to re-run.
 --
--- Run in the Supabase SQL Editor AFTER paypal-checkout.sql. Safe to re-run.
--- NOTE: paypal-checkout.sql is marked "safe to re-run" and RECREATES
--- reserve_paypal_order / release_expired_paypal_reservations. If you ever re-run
--- paypal-checkout.sql, re-run THIS file afterward to drop them again.
+-- What this migration does:
+--   1. Adds order_items.quantity (how many units of that line the buyer bought).
+--   2. Rewrites create_paypal_order to store the per-line quantity and to reject
+--      an order whose requested quantity exceeds the live stock (snapshot check,
+--      no lock — the capture step below is the authoritative, serialized gate).
+--   3. Rewrites capture_paypal_order to, under the existing per-product row lock,
+--      verify sufficient remaining stock for every line and then DECREMENT
+--      products.quantity by the purchased amount (flipping status to 'sold' only
+--      when a product's remaining quantity reaches 0), instead of the old
+--      always-mark-'sold' one-of-a-kind logic.
+--
+-- The capture function keeps the same return signature
+-- (order_id, order_number, already_paid, item_conflict), so `create or replace`
+-- is sufficient — no drop needed.
 
 -- ---------------------------------------------------------------------------
--- create_paypal_order: create order + order_items without reserving products.
--- Products remain 'available' so concurrent buyers can all proceed to PayPal;
--- the capture step resolves any race atomically.
+-- 1. order_items.quantity
+-- ---------------------------------------------------------------------------
+alter table public.order_items
+  add column if not exists quantity integer not null default 1;
+
+alter table public.order_items drop constraint if exists order_items_quantity_check;
+alter table public.order_items add constraint order_items_quantity_check
+      check (quantity >= 1) not valid;
+
+-- ---------------------------------------------------------------------------
+-- 2. create_paypal_order: store per-line quantity + snapshot stock check.
 -- ---------------------------------------------------------------------------
 create or replace function public.create_paypal_order(
   order_payload jsonb,
@@ -112,12 +126,10 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- capture_paypal_order (updated): lock product rows to serialize concurrent
--- captures, detect items already sold to another buyer, and return an
--- item_conflict flag so the route can surface an appropriate error.
--- Must drop first because the return type gains a new column (item_conflict).
+-- 3. capture_paypal_order: lock product rows, verify sufficient remaining stock
+-- for every line, then decrement products.quantity by the purchased amount
+-- (marking a product 'sold' only when its remaining quantity hits 0).
 -- ---------------------------------------------------------------------------
-drop function if exists public.capture_paypal_order(uuid, text, jsonb);
 create or replace function public.capture_paypal_order(
   p_order_id uuid,
   p_capture_id text,
@@ -149,7 +161,7 @@ begin
   end if;
 
   -- Lock the product rows to prevent two concurrent captures from overselling
-  -- the same item. The second caller blocks here until the first transaction commits.
+  -- the same item. The second caller blocks here until the first commits.
   perform 1
   from public.products p
   join public.order_items oi on oi.product_id = p.id
@@ -216,87 +228,5 @@ begin
 end;
 $$;
 
--- Grant the new creation function to service_role only (called from server-side
--- API routes, not from the browser). The old reserve_paypal_order grant to
--- anon/authenticated is intentionally NOT carried over.
 grant execute on function public.create_paypal_order(jsonb, jsonb) to service_role;
-
--- capture_paypal_order already has a service_role grant from paypal-checkout.sql.
--- Re-grant to be safe after the replace.
 grant execute on function public.capture_paypal_order(uuid, text, jsonb) to service_role;
-
--- ---------------------------------------------------------------------------
--- apply_paypal_order_event (updated): drop the reservation-release step from the
--- 'denied' branch. Nothing is reserved anymore, so a denied capture simply marks
--- the order failed — there is no held product to return to the shop (a product
--- only ever leaves 'available' via a successful capture, which sets it 'sold').
--- ---------------------------------------------------------------------------
-create or replace function public.apply_paypal_order_event(
-  p_order_id uuid,
-  p_event text,
-  p_payment_response jsonb
-)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  if p_order_id is null then
-    return;
-  end if;
-
-  if p_event = 'denied' then
-    update public.orders
-    set payment_status = 'failed',
-        payment_response = coalesce(p_payment_response, payment_response)
-    where id = p_order_id and payment_status <> 'paid';
-
-  elsif p_event = 'refunded' then
-    -- Partial-refund aware (see orders-partial-refund-2026-07.sql): accumulate the
-    -- refunded amount and only mark the order fully 'refunded' once cumulative
-    -- refunds reach the total; a smaller refund is 'partially_refunded'.
-    update public.orders
-    set refund_amount = coalesce(refund_amount, 0)
-          + coalesce(nullif(p_payment_response->'resource'->'amount'->>'value', '')::numeric, total),
-        payment_status = case
-            when nullif(p_payment_response->'resource'->'amount'->>'value', '') is null then 'refunded'
-            when coalesce(refund_amount, 0)
-                 + (p_payment_response->'resource'->'amount'->>'value')::numeric >= coalesce(total, 0)
-              then 'refunded'
-            else 'partially_refunded'
-        end,
-        order_status = case
-            when nullif(p_payment_response->'resource'->'amount'->>'value', '') is null then 'refunded'
-            when coalesce(refund_amount, 0)
-                 + (p_payment_response->'resource'->'amount'->>'value')::numeric >= coalesce(total, 0)
-              then 'refunded'
-            else order_status
-        end,
-        payment_response = coalesce(p_payment_response, payment_response)
-    where id = p_order_id;
-
-  elsif p_event = 'dispute' then
-    update public.orders
-    set internal_notes = coalesce(internal_notes || ' | ', '') || 'PayPal dispute opened.',
-        payment_response = coalesce(p_payment_response, payment_response)
-    where id = p_order_id;
-  end if;
-end;
-$$;
-
-grant execute on function public.apply_paypal_order_event(uuid, text, jsonb) to service_role;
-
--- ---------------------------------------------------------------------------
--- Tear down the old 30-minute reservation machinery so no reservation can be
--- created. These functions are no longer called by any app route (create-order
--- uses create_paypal_order above). Dropping them also drops their grants.
---
--- The vestigial products.reserved_until / products.reserved_order_id /
--- orders.reserved_until columns are intentionally LEFT in place (always null now)
--- to avoid a destructive schema change; the capture RPC still null-clears them
--- harmlessly and the admin delete-order path tolerates them. Drop them later if
--- you want a fully clean schema.
--- ---------------------------------------------------------------------------
-drop function if exists public.reserve_paypal_order(jsonb, jsonb, integer);
-drop function if exists public.release_expired_paypal_reservations();
