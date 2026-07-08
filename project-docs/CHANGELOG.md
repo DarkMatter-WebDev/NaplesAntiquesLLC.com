@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-07-08 - Etsy markup→price workflow made explicit + admin status chips refresh after a sync
+
+Changing the Etsy price markup then "Sync All" left live prices unchanged
+because "Sync All" skips already-live items by design — re-pricing is the job of
+**"Push prices to Etsy now"** (Settings → Etsy Sync), which existed but wasn't
+discoverable. Now a saved markup change flags prices as stale and shows a
+highlighted callout above that button (button turns gold) guiding the owner to
+push; the flag clears after the push. Separately, `AdminShell`'s Etsy status
+chips (a single local DB read — no Etsy API) now refresh after the bulk sync
+modal closes and after any per-item drawer action (new `onSynced` prop on
+`EtsyProductPanel`), instead of only on mount. No migration; no owner action
+beyond deploy. `tsc`/`lint`/`build` pass, 154 tests green.
+
 ## 2026-07-08 - Site-wide customer trade-in price default (⚠️ SQL migration pending)
 
 New **Customer Trade-in Price** panel in Admin → Settings: set the "Own gold or

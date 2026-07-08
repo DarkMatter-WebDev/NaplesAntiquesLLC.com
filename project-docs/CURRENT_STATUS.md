@@ -3,6 +3,35 @@
 > Reflects the present state of development. **Update this at the end of every
 > work session.** Last updated: **2026-07-08**.
 
+## 2026-07-08 (session 9, twentieth addendum) -- 🟢 Markup→price workflow made explicit + status chips refresh after a sync
+
+Two loose ends from the owner: (1) after changing the Etsy price markup and
+re-syncing, live prices didn't update; (2) the admin table's Etsy status chips
+went stale after a sync.
+
+**(1) Markup wasn't lost — it was the wrong tool.** Verified live: the markup
+DID save (`etsy_connection.price_markup_pct = 10`). But "Sync All to Etsy"
+*intentionally skips already-live items* (`enqueueAllEligible` only queues
+non-active/draft_review), so it can't re-price them. The correct tool — **"Push
+prices to Etsy now"** in Settings → Etsy Sync (`pushPricesBatch`, pushes any
+listing whose computed price differs from `last_pushed_price`) — was there but
+not discoverable. Fix: `EtsySettingsPanel` now sets a `pricesStale` flag when
+the markup is saved to a *new* value; a highlighted gold callout appears above
+the push button (which itself turns gold) telling the owner their live prices
+still show the old markup until they push, and noting that "Sync All" skips live
+items by design. The flag clears once the push completes.
+
+**(2) Chips refresh after a sync.** `AdminShell`'s `/api/admin/etsy/listings`
+read (a single local DB call — no Etsy API) is now a reusable `refreshEtsyChips`
+callback, still fetched once on mount but also re-run when the bulk modal closes
+and after any per-item drawer action (sync / status check / price push, via a
+new `onSynced` prop on `EtsyProductPanel`). No extra Etsy API calls — it's the
+same local read, just re-invoked at the right moments.
+
+`npx tsc --noEmit`, `npm run lint`, `npx vitest run` (154/154), `npm run build`
+all pass. **No migration, no owner action** beyond deploy. Full detail:
+`project-docs/DECISIONS.md` 2026-07-08 (session 9, twentieth addendum).
+
 ## 2026-07-08 (session 9, nineteenth addendum) -- 🟢 Bulk "Check Etsy statuses" — recovers items stuck in 'error'
 
 The owner had forgotten to set the Etsy env vars in Netlify; a "Sync All" then

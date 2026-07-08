@@ -80,7 +80,15 @@ const ETSY_MANAGE_ACTIVE_URL = 'https://www.etsy.com/your/shops/me/tools/listing
 const ETSY_MANAGE_DRAFT_URL = 'https://www.etsy.com/your/shops/me/tools/listings?ref=seller-platform-mcnav&state=draft&sort=update_date';
 
 /** Self-contained Etsy drawer section: its own fetch, its own sync loop — mirrors the AI section's pattern (own state, own round trip, independent of the form's Save). */
-export default function EtsyProductPanel({ productId }: { productId: string }) {
+export default function EtsyProductPanel({
+  productId,
+  onSynced,
+}: {
+  productId: string;
+  /** Called after an action that can change this listing's sync state, so the
+   *  parent admin table can refresh its status chips (see AdminShell). */
+  onSynced?: () => void;
+}) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
@@ -198,6 +206,7 @@ export default function EtsyProductPanel({ productId }: { productId: string }) {
       setSyncing(false);
       setProgress(null);
       await loadPreview();
+      onSynced?.(); // refresh the parent table's status chips
     }
   };
 
@@ -217,6 +226,7 @@ export default function EtsyProductPanel({ productId }: { productId: string }) {
     } finally {
       setBusyAction(null);
       await loadPreview();
+      onSynced?.(); // refresh the parent table's status chips
     }
   };
 
@@ -241,6 +251,7 @@ export default function EtsyProductPanel({ productId }: { productId: string }) {
     } finally {
       setBusyAction(null);
       await loadPreview();
+      onSynced?.(); // refresh the parent table's status chips
     }
   };
 
@@ -264,6 +275,7 @@ export default function EtsyProductPanel({ productId }: { productId: string }) {
     } finally {
       setPushingPrice(false);
       await loadPreview();
+      onSynced?.(); // refresh the parent table's status chips
     }
   };
 

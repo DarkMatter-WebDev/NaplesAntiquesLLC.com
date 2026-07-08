@@ -889,19 +889,23 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   // renders every row as "Not listed".
   const [etsyListingsByProduct, setEtsyListingsByProduct] = useState<Record<string, { sync_state: string }>>({});
   const [showEtsyBulkModal, setShowEtsyBulkModal] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/admin/etsy/listings');
-        const data = await res.json().catch(() => null);
-        if (!cancelled && res.ok && data?.listings) setEtsyListingsByProduct(data.listings);
-      } catch {
-        // Best-effort — the chip simply stays "Not listed" for everyone.
-      }
-    })();
-    return () => { cancelled = true; };
+  // A single local DB read (no Etsy API call). Fetched once on mount, then
+  // re-run after any action that can change a listing's state (bulk sync, or a
+  // per-item sync/status/price action in the drawer) so the row chips don't go
+  // stale. No setState before the first await keeps react-hooks happy.
+  const refreshEtsyChips = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/etsy/listings');
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.listings) setEtsyListingsByProduct(data.listings);
+    } catch {
+      // Best-effort — the chip simply keeps its last-known state.
+    }
   }, []);
+  useEffect(() => {
+    const run = async () => { await refreshEtsyChips(); };
+    void run();
+  }, [refreshEtsyChips]);
   // Heads-up dialog shown before the Smart Assistant starts listening.
   const [showMicPrompt, setShowMicPrompt] = useState(false);
   const [imagePaddingTarget, setImagePaddingTarget] = useState<Product | null>(null);
@@ -4651,7 +4655,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 {isNew || !editing.id ? (
                   <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Save this listing first, then sync it to Etsy.</p>
                 ) : (
-                  <EtsyProductPanel productId={editing.id} />
+                  <EtsyProductPanel productId={editing.id} onSynced={refreshEtsyChips} />
                 )}
               </div>
 
@@ -5125,7 +5129,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       )}
 
       {/* Etsy bulk sync (Phase 2) */}
-      {showEtsyBulkModal && <EtsyBulkSyncModal onClose={() => setShowEtsyBulkModal(false)} />}
+      {showEtsyBulkModal && (
+        <EtsyBulkSyncModal
+          onClose={() => {
+            setShowEtsyBulkModal(false);
+            void refreshEtsyChips(); // a bulk run likely changed several rows
+          }}
+        />
+      )}
 
       {/* Delete confirmation */}
       {deleteTarget && (

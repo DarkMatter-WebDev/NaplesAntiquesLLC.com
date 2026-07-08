@@ -1,5 +1,57 @@
 # Decisions Log
 
+## 2026-07-08 (session 9, twentieth addendum) - Markup→price workflow made explicit + status chips refresh after a sync
+
+**Context:** the owner changed the Etsy price markup, re-synced, and the live
+Etsy prices didn't move — and separately noted the admin table's status chips go
+stale after a sync.
+
+**Diagnosis of (1) — not a save bug, a tool-choice bug.** Verified live against
+Supabase: the markup persisted correctly (`etsy_connection.price_markup_pct =
+10`; the settings route parses `Number(priceMarkupPct)`). The real issue: the
+owner re-priced via **"Sync All to Etsy"**, but `enqueueAllEligible` *by design*
+only queues items that are NOT already `active`/`draft_review` (it's for getting
+new items up, not re-pricing live ones), so live listings are skipped. Changing
+the markup only changes what *future* syncs compute; it does nothing to
+already-pushed prices on its own. The correct tool already existed — **"Push
+prices to Etsy now"** in Settings → Etsy Sync (`pushPricesBatch`: pushes every
+`active`/`draft_review` listing whose freshly-computed price differs from
+`last_pushed_price`, ignoring the daily-scheduler threshold) — but nothing tied
+"I just changed the markup" to "now click that button."
+
+**Decision — make the dependency visible rather than change the mechanics.**
+Keeping "Sync All" skipping live items is correct (re-uploading images/details
+for the whole catalog to change a price would be wasteful and slow). So instead:
+- `EtsySettingsPanel` tracks a `pricesStale` flag — set true when the markup is
+  saved to a value different from the last saved one, cleared when a price push
+  completes. While set, a highlighted gold callout renders above the push button
+  ("your live Etsy listings still show the old prices … click Push prices to
+  Etsy now … Sync All intentionally skips already-live items"), and the push
+  button itself switches from `outline-button` to `gold-button` to draw the eye.
+- This is purely a discoverability/guardrail nudge; the underlying push logic is
+  unchanged. `last_pushed_price` is null on all current live items, so the first
+  push after deploy will (correctly) re-price all of them to the new markup.
+
+**Decision for (2) — refresh chips locally, still no extra Etsy calls.** The
+row chips come from `AdminShell`'s single `/api/admin/etsy/listings` read, which
+is a **local DB query only** (confirmed nineteenth-addendum work; `getListingsMap`
+does one `etsy_listings` select, no Etsy API). It was fetched once on mount and
+never again, so it went stale after syncs. Extracted it into a `refreshEtsyChips`
+`useCallback` (mount effect now just calls it) and re-invoke it at the two points
+where state actually changes: when the bulk sync modal closes, and after any
+per-item drawer action via a new optional `onSynced` prop on `EtsyProductPanel`
+(fired in the `finally` of runSyncLoop / runAction / checkStatus / pushPriceOnly,
+right after its own `loadPreview`). Deliberately NOT wired into `loadPreview`
+itself (that also runs on mount/manual-refresh and would double-fetch). Net: zero
+additional Etsy API traffic — the same cheap local read, just re-run when the
+data could have changed.
+
+**Verification:** `npx tsc --noEmit`, `npm run lint`, `npx vitest run`
+(154/154), `npm run build` all pass. No schema/migration change; no owner action
+beyond deploy. Files: `next-app/src/components/admin/EtsySettingsPanel.tsx`,
+`next-app/src/components/admin/AdminShell.tsx`,
+`next-app/src/components/admin/EtsyProductPanel.tsx`.
+
 ## 2026-07-08 (session 9, nineteenth addendum) - Bulk "Check Etsy status of all" + recover items stuck in 'error'
 
 **Context:** the owner forgot to set the Etsy env vars in Netlify, so a "Sync

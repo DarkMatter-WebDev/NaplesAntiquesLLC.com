@@ -256,10 +256,18 @@ build.
   commits deliberately, not on blur), a **Push prices to Etsy now** button
   (batched price-only re-push across all live listings, ignores the daily
   threshold), recent activity log, and the required Etsy trademark
-  attribution line.
+  attribution line. Saving a *new* markup value marks prices stale and shows a
+  highlighted callout above the push button (button turns gold) — because
+  "Sync All" skips already-live items, "Push prices to Etsy now" is the tool
+  that actually applies a markup change to live listings; the callout clears
+  once the push completes (session 9, twentieth addendum).
 - **Product Admin table** — a per-row Etsy status chip (Not listed / Draft /
   Needs review / Active / Out of date / Delisted / Error), fed by one bulk
-  `/api/admin/etsy/listings` fetch on mount.
+  `/api/admin/etsy/listings` fetch (a local DB read, no Etsy API). Fetched on
+  mount via a `refreshEtsyChips` callback, then re-run when the bulk sync modal
+  closes and after any per-item drawer action (`onSynced` prop on
+  `EtsyProductPanel`) so chips don't go stale after a sync (session 9,
+  twentieth addendum).
 - **Product edit drawer → Etsy section** (`EtsyProductPanel.tsx`): dry-run
   preview (pre-flight checklist + mapped title/price/tags/materials/
   when_made/category/photo count, plus the computed Length or Ring size that

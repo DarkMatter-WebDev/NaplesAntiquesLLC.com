@@ -40,6 +40,10 @@ export default function EtsySettingsPanel() {
   const markupDirty = markupInput !== null && markupInput.trim() !== '' && markupInput.trim() !== String(savedMarkup);
   const [pushingPrices, setPushingPrices] = useState(false);
   const [priceProgress, setPriceProgress] = useState<{ pushed: number; failed: number } | null>(null);
+  // Set when the markup is saved to a NEW value: live Etsy listings still show
+  // the OLD prices until "Push prices to Etsy now" runs (saving the markup only
+  // changes what future syncs compute). Surfaces a prominent nudge below.
+  const [pricesStale, setPricesStale] = useState(false);
 
   const showNotice = (text: string, ok = true) => {
     setNotice({ text, ok });
@@ -101,8 +105,12 @@ export default function EtsySettingsPanel() {
 
   const saveMarkup = async () => {
     if (markupInput === null) return;
+    const changed = markupInput.trim() !== String(savedMarkup);
     const ok = await saveSettings({ priceMarkupPct: markupInput });
-    if (ok) setMarkupInput(null); // fall back to the freshly-saved value
+    if (ok) {
+      setMarkupInput(null); // fall back to the freshly-saved value
+      if (changed) setPricesStale(true); // live prices won't reflect it until pushed
+    }
   };
 
   // "Push prices now" — re-sends the current price of every live listing whose
@@ -134,6 +142,7 @@ export default function EtsySettingsPanel() {
           lastRemaining = data.remaining;
         }
       }
+      setPricesStale(false); // live prices now reflect the current markup
       showNotice(
         `Pushed ${totalPushed} price${totalPushed === 1 ? '' : 's'} to Etsy${totalFailed ? ` · ${totalFailed} failed` : ''}.`,
         totalFailed === 0,
@@ -372,20 +381,32 @@ export default function EtsySettingsPanel() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 flex-wrap border-t pt-4" style={{ borderColor: 'var(--color-outline-variant)' }}>
-              <button
-                type="button"
-                onClick={() => void pushAllPrices()}
-                disabled={pushingPrices || saving}
-                className="outline-button text-sm"
-              >
-                {pushingPrices ? 'Pushing prices…' : 'Push prices to Etsy now'}
-              </button>
-              <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                Re-sends the current price of every live listing to Etsy (prices only — no photos or details). Use this after changing the
-                markup, or when spot has moved — the daily scheduled push only fires past the threshold.
-                {priceProgress ? ` · Pushed ${priceProgress.pushed}${priceProgress.failed ? `, ${priceProgress.failed} failed` : ''}.` : ''}
-              </span>
+            <div className="border-t pt-4 flex flex-col gap-2" style={{ borderColor: 'var(--color-outline-variant)' }}>
+              {pricesStale && !pushingPrices && (
+                <div
+                  className="px-3 py-2 text-xs font-medium"
+                  style={{ background: 'color-mix(in srgb, #b8860b 14%, transparent)', border: '1px solid color-mix(in srgb, #b8860b 30%, transparent)', color: '#8a6400' }}
+                >
+                  Markup saved. Your live Etsy listings still show the old prices — saving the markup only changes what future syncs compute.
+                  Click <strong>Push prices to Etsy now</strong> to apply it to every live listing. (The bulk &ldquo;Sync All&rdquo; button
+                  intentionally skips already-live items, so it won&apos;t re-price them.)
+                </div>
+              )}
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => void pushAllPrices()}
+                  disabled={pushingPrices || saving}
+                  className={`${pricesStale ? 'gold-button' : 'outline-button'} text-sm`}
+                >
+                  {pushingPrices ? 'Pushing prices…' : 'Push prices to Etsy now'}
+                </button>
+                <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  Re-sends the current price of every live listing to Etsy (prices only — no photos or details). Use this after changing the
+                  markup, or when spot has moved — the daily scheduled push only fires past the threshold.
+                  {priceProgress ? ` · Pushed ${priceProgress.pushed}${priceProgress.failed ? `, ${priceProgress.failed} failed` : ''}.` : ''}
+                </span>
+              </div>
             </div>
 
             <div>
