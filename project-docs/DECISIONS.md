@@ -3,8 +3,8 @@
 ## 2026-07-07 (latest) - Self-host + subset Material Symbols instead of the Google Fonts <link>
 
 **Decision:** The Material Symbols icon font is now self-hosted as a **subset**
-woff2 committed to `next-app/public/assets/fonts/material-symbols-subset-v357.woff2`
-(~65KB), declared via an inline `@font-face` in `globals.css` and `preload`ed in
+woff2 committed to `next-app/public/assets/fonts/material-symbols-subset-v358.woff2`
+(~58KB), declared via an inline `@font-face` in `globals.css` and `preload`ed in
 `[locale]/layout.tsx`. The render-blocking third-party
 `<link rel="stylesheet" href="fonts.googleapis.com/...">` and both Google
 preconnects were removed.
@@ -26,13 +26,28 @@ toggle, thin weights) still work.
 
 **To regenerate after adding/removing icons** (needs `pip install fonttools brotli`):
 
+Run `python scripts/regenerate-material-symbols-subset.py` from `next-app/`.
+The script downloads nothing — place a full `material-symbols-full-v357.woff2`
+next to the subset first (URL is inside the Google CSS response for
+`Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=block`),
+then delete the full font before shipping.
+
+Icon extraction must include **multiline JSX element text** (e.g. `drag_indicator`
+on its own line inside a `<span class="material-symbols-outlined">`) — quoted-
+string-only scans miss those and the ligature falls back to raw text. The script
+also catches `icon:` fields, ternaries inside `{…}` icon spans, and quoted
+literals, then filters candidates to names that resolve to real GSUB ligatures
+(unwraps ExtensionSubst wrappers; Material Symbols ligatures live behind lookup
+type 7 → 4, not at the top level).
+
+Manual steps if regenerating by hand:
+
 1. Download the full variable woff2 (the URL is inside the CSS that this returns,
    fetched with a modern browser UA):
    `https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=block`
 2. Collect every icon-name literal from `next-app/src` + `next-app/carousel`
-   (icon names are always literals: `material-symbols-outlined` element text,
-   `icon:` fields, ternaries — greedy capture of quoted lowercase tokens is safe,
-   non-icon words only pull in shared letter glyphs).
+   (element text inside `material-symbols-outlined` spans — including multiline —
+   `icon:` fields, ternaries in `{…}` expressions, and quoted literals).
 3. Resolve each name to its GSUB ligature target glyph and write the kept glyph
    names (icon glyphs + their component letters) to a file.
 4. Subset (keeps ligatures + variable axes, no closure re-expansion):

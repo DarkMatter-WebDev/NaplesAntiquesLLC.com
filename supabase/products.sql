@@ -57,6 +57,8 @@ create table if not exists public.products (
   show_spot_price      boolean     not null default true,
   special_price_override_enabled boolean not null default false,
   special_price_override_amount  numeric(12,2),
+  special_price_override_mode    text    not null default 'amount',
+  special_price_override_percent numeric(6,2),
   quantity             integer     not null default 1,
   sort_order           integer     not null default 0,
   created_at           timestamptz not null default now(),
@@ -99,11 +101,21 @@ alter table public.products
   add column if not exists show_spot_price boolean not null default true,
   add column if not exists special_price_override_enabled boolean not null default false,
   add column if not exists special_price_override_amount numeric(12,2),
+  add column if not exists special_price_override_mode text not null default 'amount',
+  add column if not exists special_price_override_percent numeric(6,2),
   add column if not exists quantity integer not null default 1;
 
 alter table public.products drop constraint if exists products_quantity_check;
 alter table public.products add constraint products_quantity_check
       check (quantity >= 0) not valid;
+
+alter table public.products drop constraint if exists products_special_price_override_mode_check;
+alter table public.products add constraint products_special_price_override_mode_check
+      check (special_price_override_mode in ('amount', 'percent')) not valid;
+
+alter table public.products drop constraint if exists products_special_price_override_percent_check;
+alter table public.products add constraint products_special_price_override_percent_check
+      check (special_price_override_percent is null or special_price_override_percent >= 0) not valid;
 
 update public.products
 set

@@ -3,7 +3,41 @@
 > Reflects the present state of development. **Update this at the end of every
 > work session.** Last updated: **2026-07-07**.
 
-## 2026-07-07 (latest) -- First-paint + homepage boot splash + abandoned-checkout cleanup + admin Qty column
+## 2026-07-07 (latest) -- Icon font 404 regression fixed (v357 alias restored)
+
+- **Icons broke after hard refresh** because the browser was still requesting
+  the deleted `material-symbols-subset-v357.woff2` (404 in dev-server logs).
+  `font-display: block` then falls back to ligature names as text. Restored
+  v357 as an identical alias of the improved v358 subset (both URLs 200); subset
+  regen now always emits both files and keeps the full component alphabet.
+  Reload the page — no special hard-refresh needed.
+
+## 2026-07-07 -- Icon subset v358 (fixes drag_indicator / multiline JSX icons)
+
+- **Icons showing ligature names again (e.g. `drag_indicator` in admin table).**
+  The v357 subset missed icons whose names are multiline JSX text inside
+  `material-symbols-outlined` spans — only quoted-string extraction was used.
+  Regenerated subset as `material-symbols-subset-v358.woff2` (58KB) with a
+  proper scanner + GSUB ligature resolver (`scripts/regenerate-material-symbols-
+  subset.py`). Superset of v357 coverage; `drag_indicator` and peers now resolve.
+  `@font-face` + preload bumped to v358. `npm run build` + `lint` pass.
+
+## 2026-07-07 -- Customer special pricing: "percentage over spot" override mode
+
+- **The trade-in ("Own gold or silver?… pay as little as ___") override now
+  supports a percentage over spot, not just a flat amount.** Admin add/edit shows
+  an **Override Type** select when the override is enabled: *Fixed amount ($)*
+  (unchanged) or *Percentage over spot*, which advertises
+  `meltValue * (1 + percent/100)` and auto-tracks live spot (with a live dollar
+  preview in the form). New DB columns `special_price_override_mode`
+  (`'amount'` default) + `special_price_override_percent`; resolution centralized
+  in `resolveSpecialTradeInPrice(product, meltValue)` (`types/product.ts`), used
+  by `shop/[id]/page.tsx`. Existing rows stay on flat-amount behavior.
+  **Pending manual step: run `supabase/product-special-price-percent-2026-07.sql`
+  in Supabase** (adds the two columns + grants; storefront query column-lists them
+  and falls back gracefully if not yet applied). `npm run build` + `lint` pass.
+
+## 2026-07-07 -- First-paint + homepage boot splash + abandoned-checkout cleanup + admin Qty column
 
 - **Faster first paint (esp. mobile) + fixed icon-as-text bug: Material Symbols
   is now self-hosted AND subset.** The icon font was loaded via a render-blocking

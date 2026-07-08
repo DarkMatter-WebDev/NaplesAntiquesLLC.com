@@ -79,7 +79,7 @@ export default async function LocaleLayout({ children, params }: Props) {
             connection remains — hence no preconnects here. */}
         <link
           rel="preload"
-          href="/assets/fonts/material-symbols-subset-v357.woff2"
+          href="/assets/fonts/material-symbols-subset-v358.woff2"
           as="font"
           type="font/woff2"
           crossOrigin="anonymous"

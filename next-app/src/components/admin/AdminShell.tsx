@@ -22,6 +22,7 @@ import {
   normalizeProductLinkType,
   normalizeProductMetalVariant,
   normalizeProductQuantity,
+  normalizeSpecialPriceOverrideMode,
   normalizeProductTypeValue,
   productJewelryTypeLabel,
   hasAnyProductImagePadding,
@@ -43,7 +44,7 @@ import {
   type ProductStatus,
   type SpotData,
 } from '@/types/product';
-import { calcSpotMeltValue, getDisplayPrice, getSpotMeltDisplayPrice, normalizeManualPriceLabel } from '@/lib/pricing';
+import { calcSpotMeltValue, formatUsdPrice, getDisplayPrice, getSpotMeltDisplayPrice, normalizeManualPriceLabel } from '@/lib/pricing';
 import ComboboxInput from './ComboboxInput';
 import AdminHeader from './AdminHeader';
 import {
@@ -140,6 +141,8 @@ const OPTIONAL_PRODUCT_COLUMNS = [
   'show_spot_price',
   'special_price_override_enabled',
   'special_price_override_amount',
+  'special_price_override_mode',
+  'special_price_override_percent',
   'quantity',
 ] as const;
 
@@ -581,6 +584,8 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
     show_spot_price: true,
     special_price_override_enabled: false,
     special_price_override_amount: null,
+    special_price_override_mode: 'amount',
+    special_price_override_percent: null,
     quantity: 1,
     status: 'available',
     location: 'showcase',
@@ -1145,8 +1150,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     if (e.price_mode === 'manual' && !e.manual_price_label?.trim()) {
       errs.push('Price label is required for manual price mode.');
     }
-    if (e.special_price_override_enabled && !(e.special_price_override_amount && e.special_price_override_amount > 0)) {
-      errs.push('Enter a custom amount for the customer special pricing override, or uncheck it.');
+    if (e.special_price_override_enabled) {
+      if (normalizeSpecialPriceOverrideMode(e.special_price_override_mode) === 'percent') {
+        if (!(typeof e.special_price_override_percent === 'number' && e.special_price_override_percent >= 0)) {
+          errs.push('Enter a percentage over spot for the customer special pricing override, or uncheck it.');
+        }
+      } else if (!(e.special_price_override_amount && e.special_price_override_amount > 0)) {
+        errs.push('Enter a custom amount for the customer special pricing override, or uncheck it.');
+      }
     }
     return errs;
   }
@@ -2412,6 +2423,21 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       manual_price_label: effectivePriceMode === 'manual' ? normalizedManualPriceLabel : null,
       asking_price: null,
       quantity: normalizedQuantity,
+      // Keep only the field relevant to the chosen override mode; clear both
+      // when the override is off so stale amounts/percents never resurface.
+      special_price_override_mode: editing.special_price_override_enabled
+        ? normalizeSpecialPriceOverrideMode(editing.special_price_override_mode)
+        : 'amount',
+      special_price_override_amount:
+        editing.special_price_override_enabled &&
+        normalizeSpecialPriceOverrideMode(editing.special_price_override_mode) === 'amount'
+          ? editing.special_price_override_amount ?? null
+          : null,
+      special_price_override_percent:
+        editing.special_price_override_enabled &&
+        normalizeSpecialPriceOverrideMode(editing.special_price_override_mode) === 'percent'
+          ? editing.special_price_override_percent ?? null
+          : null,
       status: resolvedStatus,
       location: editing.location || 'showcase',
       item_year: normalizeProductItemYear(editing.item_year),
@@ -4384,26 +4410,87 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 </label>
                 <p className="mt-1 text-xs normal-case" style={{ color: 'var(--color-on-surface-variant)' }}>
                   The &quot;Own gold or silver? Put it toward this piece…&quot; line on the product page defaults to
-                  the computed scrap value above. Check this to show a custom price on that line instead (the
-                  scrap-value box itself is unaffected).
+                  the computed scrap value above. Check this to show a custom price on that line instead — either a
+                  flat amount or a percentage over the item&apos;s spot/melt value (the scrap-value box itself is
+                  unaffected).
                 </p>
-                {editing.special_price_override_enabled && (
-                  <div className="mt-2 max-w-[200px]">
-                    <label className="form-label">Custom Special Price</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      className="form-field w-full"
-                      placeholder="e.g. 350"
-                      value={editing.special_price_override_amount ?? ''}
-                      onChange={(e) => setEditing({
-                        ...editing,
-                        special_price_override_amount: e.target.value ? Number(e.target.value) : null,
-                      })}
-                    />
-                  </div>
-                )}
+                {editing.special_price_override_enabled && (() => {
+                  const overrideMode = normalizeSpecialPriceOverrideMode(editing.special_price_override_mode);
+                  const meltPreview = calcSpotMeltValue(editing as Product, spotData);
+                  const percentValue = editing.special_price_override_percent;
+                  const percentPreview =
+                    overrideMode === 'percent' &&
+                    meltPreview != null &&
+                    typeof percentValue === 'number' &&
+                    Number.isFinite(percentValue) &&
+                    percentValue >= 0
+                      ? meltPreview * (1 + percentValue / 100)
+                      : null;
+                  return (
+                    <div className="mt-2 space-y-2">
+                      <div className="max-w-[260px]">
+                        <label className="form-label">Override Type</label>
+                        <select
+                          className="form-field w-full"
+                          value={overrideMode}
+                          onChange={(e) => setEditing({
+                            ...editing,
+                            special_price_override_mode: e.target.value === 'percent' ? 'percent' : 'amount',
+                          })}
+                        >
+                          <option value="amount">Fixed amount ($)</option>
+                          <option value="percent">Percentage over spot</option>
+                        </select>
+                      </div>
+                      {overrideMode === 'percent' ? (
+                        <div className="max-w-[200px]">
+                          <label className="form-label">Percent Over Spot</label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              className="form-field w-full pr-8"
+                              placeholder="e.g. 10"
+                              value={editing.special_price_override_percent ?? ''}
+                              onChange={(e) => setEditing({
+                                ...editing,
+                                special_price_override_percent: e.target.value ? Number(e.target.value) : null,
+                              })}
+                            />
+                            <span
+                              className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm"
+                              style={{ color: 'var(--color-on-surface-variant)' }}
+                            >
+                              %
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs normal-case" style={{ color: 'var(--color-on-surface-variant)' }}>
+                            {percentPreview != null
+                              ? `Trade-in line shows ${formatUsdPrice(percentPreview)} at the current spot price, and auto-updates as spot moves.`
+                              : 'Trade-in line shows the item\u2019s melt value plus this percentage, updating live with spot.'}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="max-w-[200px]">
+                          <label className="form-label">Custom Special Price</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="form-field w-full"
+                            placeholder="e.g. 350"
+                            value={editing.special_price_override_amount ?? ''}
+                            onChange={(e) => setEditing({
+                              ...editing,
+                              special_price_override_amount: e.target.value ? Number(e.target.value) : null,
+                            })}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="grid md:grid-cols-4 gap-4">

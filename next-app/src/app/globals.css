@@ -24,7 +24,7 @@
   font-style: normal;
   font-weight: 100 700;
   font-display: block;
-  src: url('/assets/fonts/material-symbols-subset-v357.woff2') format('woff2');
+  src: url('/assets/fonts/material-symbols-subset-v358.woff2') format('woff2');
 }
 
 .material-symbols-outlined {
@@ -40,6 +40,7 @@
   word-wrap: normal;
   direction: ltr;
   -webkit-font-feature-settings: 'liga';
+  font-feature-settings: 'liga';
   -webkit-font-smoothing: antialiased;
 }
 

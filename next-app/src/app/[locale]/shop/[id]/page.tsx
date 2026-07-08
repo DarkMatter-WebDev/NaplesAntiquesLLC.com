@@ -20,7 +20,7 @@ import {
   productStatusLabel,
   productSupportsLinkType,
   shouldShowSpotPrice,
-  getSpecialPriceOverrideAmount,
+  resolveSpecialTradeInPrice,
   type Product,
 } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
@@ -80,6 +80,8 @@ const PRODUCT_DETAIL_COLUMNS = [
   'show_spot_price',
   'special_price_override_enabled',
   'special_price_override_amount',
+  'special_price_override_mode',
+  'special_price_override_percent',
   'quantity',
 ].join(', ');
 
@@ -92,6 +94,8 @@ const OPTIONAL_PRODUCT_DETAIL_COLUMNS = [
   'show_spot_price',
   'special_price_override_enabled',
   'special_price_override_amount',
+  'special_price_override_mode',
+  'special_price_override_percent',
   'quantity',
 ];
 
@@ -131,6 +135,8 @@ const fetchPublicProduct = cache(async (id: string) => {
             show_spot_price: true,
             special_price_override_enabled: false,
             special_price_override_amount: null,
+            special_price_override_mode: 'amount',
+            special_price_override_percent: null,
             quantity: 1,
           } as Product
         : null,
@@ -311,11 +317,12 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   // melt value computed off the full item weight would overstate scrap value.
   const showSpotPrice = shouldShowSpotPrice(p);
   // The "Own gold or silver?" trade-in line defaults to the computed scrap
-  // value, but an admin can override it with a flat custom price (e.g. to
-  // advertise a rounder, more attractive number than the literal melt value).
-  // The scrap-value box above stays tied to the real computed value either way.
-  const specialPriceOverrideAmount = getSpecialPriceOverrideAmount(p);
-  const tradeInValue = specialPriceOverrideAmount != null ? formatUsdPrice(specialPriceOverrideAmount) : scrapValue;
+  // value, but an admin can override it — either with a flat custom price or a
+  // percentage over the item's spot/melt value (e.g. to advertise a rounder,
+  // more attractive number, or one that auto-tracks spot). The scrap-value box
+  // above stays tied to the real computed value either way.
+  const specialTradeInPrice = resolveSpecialTradeInPrice(p, meltValue);
+  const tradeInValue = specialTradeInPrice != null ? formatUsdPrice(specialTradeInPrice) : scrapValue;
   const spotPerOz = p.category === 'Silver'
     ? spotData?.silverPerTroyOz
     : spotData?.goldPerTroyOz;

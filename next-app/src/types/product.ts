@@ -89,6 +89,12 @@ export interface Product {
   // unaffected, since it's meant to reflect the item's actual melt value.
   special_price_override_enabled: boolean | null;
   special_price_override_amount: number | null;
+  // How an enabled override expresses the trade-in price. 'amount' (default)
+  // uses the flat dollar figure above; 'percent' uses a markup over the item's
+  // computed spot/melt value (meltValue * (1 + percent/100)), so it auto-tracks
+  // the live spot price instead of being a fixed number.
+  special_price_override_mode: 'amount' | 'percent' | null;
+  special_price_override_percent: number | null;
   // Units currently in stock for this listing. Most items are one-of-a-kind
   // (default 1); a positive count above 1 means several identical units are
   // listed together. Missing/null (e.g. a pre-migration row) normalizes to 1
@@ -242,6 +248,41 @@ export function getSpecialPriceOverrideAmount(
   if (!product.special_price_override_enabled) return null;
   const amount = product.special_price_override_amount;
   return typeof amount === 'number' && Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
+// Missing/null mode (pre-migration row, or a call site that hasn't been updated
+// to pass it) normalizes to 'amount' — the flat-dollar behavior that existed
+// before the percent option — so this is purely additive.
+export function normalizeSpecialPriceOverrideMode(
+  value: string | null | undefined,
+): 'amount' | 'percent' {
+  return value === 'percent' ? 'percent' : 'amount';
+}
+
+// Resolves the actual trade-in price to advertise on the product page, given
+// the item's computed melt/spot value (pass null when it can't be computed).
+// Returns null when the override is off or its inputs are invalid, in which
+// case the caller falls back to the plain computed scrap value.
+//   'amount'  → the flat dollar figure (must be > 0)
+//   'percent' → meltValue * (1 + percent/100), requires a computable meltValue
+export function resolveSpecialTradeInPrice(
+  product: Pick<
+    Product,
+    | 'special_price_override_enabled'
+    | 'special_price_override_amount'
+    | 'special_price_override_mode'
+    | 'special_price_override_percent'
+  >,
+  meltValue: number | null,
+): number | null {
+  if (!product.special_price_override_enabled) return null;
+  if (normalizeSpecialPriceOverrideMode(product.special_price_override_mode) === 'percent') {
+    const percent = product.special_price_override_percent;
+    if (meltValue == null || !Number.isFinite(meltValue)) return null;
+    if (typeof percent !== 'number' || !Number.isFinite(percent) || percent < 0) return null;
+    return meltValue * (1 + percent / 100);
+  }
+  return getSpecialPriceOverrideAmount(product);
 }
 
 export function isProductSold(status: ProductStatus | string | null | undefined): boolean {

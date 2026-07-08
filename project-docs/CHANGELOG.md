@@ -1,6 +1,66 @@
 # Changelog
 
-## 2026-07-07 (latest) - Subset Material Symbols to ~65KB (fixes icon-name-as-text rendering bug)
+## 2026-07-07 (latest) - Icon font: restore v357 alias + stronger subset (fix 404 → ligature-text regression)
+
+- User reported icons fixed mid-session then broke again after a hard refresh.
+  Dev-server logs showed the browser was still requesting the **deleted**
+  `material-symbols-subset-v357.woff2` (404). With `font-display: block`, a
+  missing font falls back to showing ligature names as raw text — exactly the
+  regression. Likely cause: cached HTML/preload still pointed at v357 while the
+  file had been removed during the v358 swap.
+- Regenerated the subset (still `v358`, now 59,112 bytes / 168 glyphs) with the
+  full `a-z0-9_` component-alphabet baseline so GSUB ligatures stay stable, and
+  **also wrote an identical `material-symbols-subset-v357.woff2` alias** so any
+  cached page requesting the old filename gets a real font (both URLs now 200).
+- Added standard `font-feature-settings: 'liga'` alongside the existing
+  `-webkit-` rule in `globals.css`. `regenerate-material-symbols-subset.py`
+  now always emits the legacy alias copy.
+- Verified: both font URLs return `200`; `npm run lint` + `npm run build` pass.
+
+## 2026-07-07 - Fix icon ligature text flash: regenerate subset (v358, includes drag_indicator)
+
+- Icons such as `drag_indicator` in the admin product table were rendering as
+  raw ligature text again. Root cause: the v357 subset was built from quoted-
+  string extraction only; icons whose names sit on their own line inside a
+  `<span class="material-symbols-outlined">` (multiline JSX) were never included.
+- Regenerated the subset as `material-symbols-subset-v358.woff2` (58,144 bytes)
+  via `next-app/scripts/regenerate-material-symbols-subset.py`, which now scans
+  element text (including multiline), `icon:` fields, ternaries in `{…}` icon
+  spans, and quoted literals, then keeps only names that resolve to real GSUB
+  ligatures (unwrapping Material Symbols' ExtensionSubst → ligature lookups).
+  Coverage is a superset of v357 (132 resolved icons; adds `drag_indicator`,
+  `filter_list`, `colorize`, `receipt_long`, etc.; loses none).
+- Updated `@font-face` + `preload` to v358; deleted v357 subset. Documented the
+  multiline-extraction gap and the regen script in DECISIONS.md.
+- Verified: `npm run lint` + `npm run build` pass; all resolved icons present in
+  the new subset.
+
+## 2026-07-07 - Customer special pricing: add "percentage over spot" override mode
+
+- The per-item override for the "Own gold or silver? Put it toward this piece
+  and pay as little as ___" trade-in line can now be expressed two ways instead
+  of just a flat dollar amount:
+  - **Fixed amount ($)** — the existing behavior (`special_price_override_amount`).
+  - **Percentage over spot** — `meltValue * (1 + percent/100)`, which auto-tracks
+    the live spot price (`special_price_override_percent`).
+- DB: new `special_price_override_mode` (`'amount'` default | `'percent'`) and
+  `special_price_override_percent numeric(6,2)` columns
+  (`supabase/product-special-price-percent-2026-07.sql`, mirrored into canonical
+  `supabase/products.sql`). Existing rows default to `'amount'`, so behavior is
+  unchanged until an admin opts a listing into percent mode. **Run the new SQL
+  migration in Supabase.**
+- Types: `resolveSpecialTradeInPrice(product, meltValue)` +
+  `normalizeSpecialPriceOverrideMode()` in `types/product.ts` replace the direct
+  amount lookup at the product-page call site (`shop/[id]/page.tsx`), which now
+  passes the computed melt value so percent mode resolves against real spot.
+- Admin add/edit (`AdminShell.tsx`): when the override is on, an **Override Type**
+  select toggles between the amount field and a percent field; percent mode shows
+  a live preview of the resulting dollar figure at the current spot price. Save
+  payload stores only the field for the active mode (clears the other), and
+  validation requires the right field per mode.
+- Verified: `npm run lint` + `npm run build` pass.
+
+## 2026-07-07 - Subset Material Symbols to ~65KB (fixes icon-name-as-text rendering bug)
 
 - Fixed icons rendering as raw ligature text ("shopping_bag", "chevron_right")
   scattered across the site: with `font-display: block`, the self-hosted 2.33MB
