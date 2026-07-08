@@ -5,17 +5,21 @@
 
 ## Backlog
 
-- **🔴 Deploy the bulk-sync runaway fix, then re-run "Sync All" (2026-07-08,
-  session 9, seventeenth addendum):** The bulk "Sync all to Etsy" was looping
-  forever on already-synced items ("Processed 79 of 55 · 55 remaining",
-  climbing) — fixed in `sync.ts`/`drainQueueCore`/`EtsyBulkSyncModal`. **Until
-  this deploys to Netlify, do NOT re-run "Sync All"** — the live code still has
-  the bug and will loop. After deploy, run "Sync All" once: the ~55 items stuck
-  in `'pending'` (they show as "Not listed" in the admin until then) will be
-  re-synced as updates (image diff, not a re-upload) and land in
-  draft_review; the run should finish with processed ≈ item count, not
-  climbing. No migration, no manual DB cleanup. Full detail: `DECISIONS.md`
-  2026-07-08 (session 9, seventeenth addendum).
+- **🔴 Deploy the bulk-sync fixes, then re-run "Sync All" — report any error
+  (2026-07-08, session 9, seventeenth + eighteenth addenda):** Two rounds of
+  fixes in `sync.ts`/`drainQueueCore`/`drainQueue`/`EtsyBulkSyncModal`:
+  (17th) the bulk sync looped forever on already-synced items; (18th) it then
+  showed a bare "Batch sync failed." — now the client surfaces the server's
+  real error, and the drain contains a per-item throw (one bad listing can't
+  sink the batch) while stopping cleanly on a connection error. **Deploy both,
+  then run "Sync All" once.** Expected: the ~55 items stuck in `'pending'`
+  (shown as "Not listed" until then) re-sync as updates (image diff, not a
+  re-upload) → draft_review; the run finishes (processed ≈ item count). **If it
+  still errors, the message is now specific — report it** (the exact trigger of
+  the 18th-addendum failure was never confirmed: token was valid, pre-Etsy
+  logic clean, nothing logged). No migration, no manual DB cleanup. Full
+  detail: `DECISIONS.md` 2026-07-08 (session 9, seventeenth + eighteenth
+  addenda).
 
 - **🟡 Re-sync 2 corrected bracelets to Etsy (2026-07-08, session 9, fifteenth
   addendum):** Two bracelets were mistyped as `Necklace` (data error) and

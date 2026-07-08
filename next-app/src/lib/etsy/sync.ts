@@ -767,11 +767,40 @@ export async function drainQueueCore(deps: DrainDeps): Promise<DrainCoreResult> 
   return { results, exhausted: false };
 }
 
+/**
+ * A connection-level failure (bad/expired OAuth token, missing shop id) affects
+ * EVERY item, not just this one — the batch should stop with a clear "reconnect
+ * Etsy" message rather than march on marking the whole catalog errored. Every
+ * other throw is this item's problem and is contained (see drainQueue).
+ */
+function isConnectionLevelEtsyError(err: unknown): boolean {
+  if (err instanceof EtsyApiError) {
+    return err.status === 401 || err.code === 'invalid_grant' || err.code === 'auth_expired' || err.code === 'oauth_token_failed';
+  }
+  const message = err instanceof Error ? err.message : '';
+  return /reconnect|not connected|refresh token|shop id/i.test(message);
+}
+
 export async function drainQueue(): Promise<DrainResult> {
   const service = createServiceClient();
   const core = await drainQueueCore({
     claimNext: () => claimNextPendingListing(service),
-    runStep: (id) => runSyncStep(id, 'publish'),
+    // runSyncStep catches its OWN step errors, but a throw from its pre-flight
+    // setup (e.g. a token refresh) is uncaught and would otherwise fail the
+    // whole drain with a 500 (confirmed 2026-07-08). Contain per-item throws
+    // so one bad listing can't sink the batch; rethrow connection-level ones so
+    // the batch stops with an actionable message instead of erroring everything.
+    runStep: async (id) => {
+      try {
+        return await runSyncStep(id, 'publish');
+      } catch (err) {
+        if (isConnectionLevelEtsyError(err)) throw err;
+        const message = err instanceof Error ? err.message : 'Sync step failed unexpectedly.';
+        await upsertListing(service, id, { sync_state: 'error', last_error: message }).catch(() => {});
+        await insertSyncLog(service, { product_id: id, action: 'sync_step', outcome: 'error', message }).catch(() => {});
+        return { done: true, syncState: 'error', error: { code: 'sync_failed', message } };
+      }
+    },
     now: () => Date.now(),
     budgetMs: DRAIN_TIME_BUDGET_MS,
   });

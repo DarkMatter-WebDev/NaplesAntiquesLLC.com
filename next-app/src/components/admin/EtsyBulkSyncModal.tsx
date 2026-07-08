@@ -70,8 +70,8 @@ export default function EtsyBulkSyncModal({ onClose }: { onClose: () => void }) 
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ action: 'drain' }),
         });
-        const data = (await res.json().catch(() => null)) as DrainResult | null;
-        if (!res.ok || !data) throw new Error('Batch sync failed.');
+        const data = (await res.json().catch(() => null)) as (DrainResult & { error?: string }) | null;
+        if (!res.ok || !data) throw new Error(data?.error || 'Batch sync failed.');
         setProcessed((current) => current + data.results.length);
         setRemaining(data.remaining);
         done = data.done;

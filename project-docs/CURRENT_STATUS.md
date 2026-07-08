@@ -3,6 +3,32 @@
 > Reflects the present state of development. **Update this at the end of every
 > work session.** Last updated: **2026-07-08**.
 
+## 2026-07-08 (session 9, eighteenth addendum) -- 🟡 Bulk "Sync All" showed a generic "Batch sync failed." — made the real error visible + batch resilient
+
+After deploying the seventeenth-addendum fix, the owner re-ran "Sync All" and
+got a bare **"Batch sync failed."** Two problems, both fixed; the exact trigger
+is not yet confirmed (see below):
+1. **The client hid the real error.** `EtsyBulkSyncModal`'s drain loop threw its
+   own generic string on any non-OK response, ignoring the server's
+   `{ error: … }`. Now it surfaces the server message.
+2. **One uncaught throw killed the whole batch.** `runSyncStep` catches its own
+   step errors, but a throw from its pre-flight setup (before its try) — e.g. a
+   token refresh — propagated through the drain to a 500, failing all 55.
+   `drainQueue` now wraps each item: a per-item throw is contained (item marked
+   `error` + logged, drain continues); a connection-level error
+   (invalid_grant/401/"reconnect") rethrows so the batch stops with an
+   actionable message instead of erroring the whole catalog.
+
+**Cause not yet pinned:** the token was valid (expires 20:21, failure was
+earlier), the pre-Etsy logic doesn't throw for any of the 55 pending items
+(verified), and nothing was written to `etsy_sync_log` — so it was an uncaught
+throw in the Etsy-calling path or a transient/function-level blip I can't see
+from here. **Owner action:** re-run "Sync All" — the error is now specific
+(tells us exactly what failed), and one bad item won't sink the run. Report the
+message shown. `npx tsc --noEmit`, `npx vitest run` (150/150), `npm run lint`,
+`npm run build` all pass. Full detail: `project-docs/DECISIONS.md` 2026-07-08
+(session 9, eighteenth addendum).
+
 ## 2026-07-08 (session 9, seventeenth addendum) -- 🔴 Fixed a bulk "Sync All" runaway (unbounded API calls)
 
 Owner reported "Sync all to Etsy" showing "Processed 79 of 55 · 55 remaining"

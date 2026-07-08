@@ -1,5 +1,45 @@
 # Decisions Log
 
+## 2026-07-08 (session 9, eighteenth addendum) - Bulk sync: surface the real drain error + contain per-item throws
+
+**Problem:** after the seventeenth-addendum deploy, "Sync All" failed with a
+generic **"Batch sync failed."** Root of the OPACITY: `EtsyBulkSyncModal`'s
+drain loop did `throw new Error('Batch sync failed.')` on any non-OK response,
+ignoring the route's `{ error: <real message> }` — the same diagnostic gap as
+the earlier SKU/"&" 400s. Root of the FRAGILITY: `runSyncStep` catches its own
+step errors (inside its try), but a throw from the pre-flight setup that runs
+BEFORE that try — `fetchSpotData` / `ensureFreshAccessToken` /
+`buildMappedPayload` — is uncaught, so it propagates through `drainQueueCore` →
+`drainQueue` → the route's catch → a 500 that fails the ENTIRE batch (and isn't
+written to `etsy_sync_log`, which is why the failure left no trace).
+
+**Fix:**
+- **Client (`EtsyBulkSyncModal`):** the drain loop now throws
+  `data?.error || 'Batch sync failed.'` — the server's real message reaches the
+  owner.
+- **Drain (`drainQueue`):** wraps each item's `runSyncStep`. A per-item throw
+  is contained — the item is marked `error` + logged, and the drain continues,
+  so one bad listing can't sink the batch. A CONNECTION-level error
+  (`isConnectionLevelEtsyError`: EtsyApiError 401/invalid_grant/auth_expired/
+  oauth_token_failed, or a message about reconnect/refresh token/shop id)
+  rethrows, so the batch stops with an actionable "reconnect Etsy" message
+  rather than marking the whole catalog errored.
+
+**Cause of the specific failure NOT confirmed:** verified live the OAuth token
+was still valid (expiry 20:21 UTC, failure earlier), the pre-Etsy path
+(`buildPreflightChecks` + `buildMappedPayload`) throws for none of the 55
+pending items, and `etsy_sync_log` had only `ok` rows around the failure. So it
+was an uncaught throw somewhere in the Etsy-calling path, or a transient /
+Netlify-function-level blip not visible from here. The two fixes make the next
+occurrence self-explanatory (visible message) and non-fatal (contained), which
+is the right posture regardless of the exact trigger.
+
+**Verification:** `npx tsc --noEmit` (clean), `npx vitest run` (150/150 — the
+drain wrapper is I/O and not unit-tested directly, per this module's precedent;
+`drainQueueCore` and its seen-guard remain covered), `npm run lint` (0
+problems), `npm run build` (succeeded). **Owner action:** re-run "Sync All" and
+report the now-specific error if it recurs.
+
 ## 2026-07-08 (session 9, seventeenth addendum) - 🔴 Fixed a bulk "Sync All" runaway (unbounded API calls) on already-synced items
 
 **Bug (owner-reported):** the bulk "Sync all to Etsy" progress read "Processed
