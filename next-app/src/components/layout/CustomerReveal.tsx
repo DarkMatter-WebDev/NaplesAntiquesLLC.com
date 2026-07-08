@@ -24,6 +24,10 @@ const EXCLUDE_SELECTOR = [
   '[data-customer-reveal-root] header',
   '.shop-card-reveal',
   '.shop-card-reveal *',
+  '.shop-list-row',
+  '.shop-list-row *',
+  '.shop-entry-reveal',
+  '.shop-entry-reveal *',
   '.site-loading-screen',
   '.material-symbols-outlined',
   'script',
@@ -95,7 +99,11 @@ function collectRevealElements(root: HTMLElement) {
 
   return candidates.filter((element) => {
     if (seen.has(element) || element.closest(EXCLUDE_SELECTOR)) return false;
-    if (element.querySelector('.shop-product-grid')) return false;
+    // Shop catalog views carry dozens of lazy-loaded product images. Waiting on
+    // all of them before revealing a parent wrapper leaves list view stuck at
+    // opacity:0 (gallery is already skipped via .shop-product-grid). The shop
+    // page runs its own entry animation via .shop-entry-reveal / .shop-card-reveal.
+    if (element.querySelector('.shop-product-grid, .shop-product-list')) return false;
     if (element.querySelectorAll('img').length > 40) return false;
     if (element.offsetParent === null && window.getComputedStyle(element).position !== 'fixed') return false;
     seen.add(element);

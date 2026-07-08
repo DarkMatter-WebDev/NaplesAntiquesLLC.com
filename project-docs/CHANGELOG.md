@@ -1,6 +1,16 @@
 # Changelog
 
-## 2026-07-07 (latest) - Icon font: restore v357 alias + stronger subset (fix 404 → ligature-text regression)
+## 2026-07-07 (latest) - Fix shop list view blank initial load (CustomerReveal)
+
+- `/shop?view=list` appeared as a white page below the header until scroll.
+  `CustomerReveal` hid the shop wrapper at `opacity: 0` while waiting for every
+  lazy-loaded list thumbnail; gallery was already skipped via `.shop-product-grid`
+  but list was not. Updated `CustomerReveal.tsx` to also skip `.shop-product-list`
+  containers and to exclude `.shop-list-row` / `.shop-entry-reveal` (shop runs
+  its own reveal). Verified: list load + gallery→list toggle; `npm run lint` +
+  `npm run build` pass.
+
+## 2026-07-07 - Icon font: restore v357 alias + stronger subset (fix 404 → ligature-text regression)
 
 - User reported icons fixed mid-session then broke again after a hard refresh.
   Dev-server logs showed the browser was still requesting the **deleted**

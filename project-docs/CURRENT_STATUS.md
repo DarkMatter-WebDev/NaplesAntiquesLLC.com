@@ -3,7 +3,20 @@
 > Reflects the present state of development. **Update this at the end of every
 > work session.** Last updated: **2026-07-07**.
 
-## 2026-07-07 (latest) -- Icon font 404 regression fixed (v357 alias restored)
+## 2026-07-07 (latest) -- Shop list view blank-on-load fixed (CustomerReveal skip)
+
+- **`/shop?view=list` loaded as a blank white page** (header only) until the
+  user scrolled. Root cause: site-wide `CustomerReveal` marked the shop content
+  wrapper `data-customer-reveal="pending"` (`opacity: 0`) and waited for all 24
+  lazy list thumbnails to finish loading. Gallery view was already exempt via
+  `.shop-product-grid`; list view was not. Lazy images often do not start until
+  scroll, so the reveal never completed. Fix: skip catalog containers with
+  `.shop-product-list` (mirror gallery) and exclude `.shop-list-row` /
+  `.shop-entry-reveal` from CustomerReveal — the shop page has its own entry
+  animations. Verified in dev: direct load + gallery→list toggle; `npm run lint`
+  + `npm run build` pass.
+
+## 2026-07-07 -- Icon font 404 regression fixed (v357 alias restored)
 
 - **Icons broke after hard refresh** because the browser was still requesting
   the deleted `material-symbols-subset-v357.woff2` (404 in dev-server logs).
