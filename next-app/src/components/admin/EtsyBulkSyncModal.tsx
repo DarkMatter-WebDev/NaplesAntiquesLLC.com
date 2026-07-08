@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface EligibilitySummary {
   total: number;
@@ -26,20 +26,51 @@ export default function EtsyBulkSyncModal({ onClose }: { onClose: () => void }) 
   const [processed, setProcessed] = useState(0);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checkResult, setCheckResult] = useState<string | null>(null);
   const cancelledRef = useRef(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch('/api/admin/etsy/eligibility-summary');
-        const data = await res.json().catch(() => null);
-        if (!res.ok) throw new Error(data?.error || 'Could not load the eligibility summary.');
-        setSummary(data as EligibilitySummary);
-      } catch (err) {
-        setSummaryError(err instanceof Error ? err.message : 'Could not load the eligibility summary.');
-      }
-    })();
+  // No setState before the first await (react-hooks/set-state-in-effect) — see
+  // EtsyProductPanel.tsx's loadPreview for the same fetch-first pattern.
+  const loadSummary = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/etsy/eligibility-summary');
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || 'Could not load the eligibility summary.');
+      setSummary(data as EligibilitySummary);
+      setSummaryError(null);
+    } catch (err) {
+      setSummaryError(err instanceof Error ? err.message : 'Could not load the eligibility summary.');
+    }
   }, []);
+
+  useEffect(() => {
+    const run = async () => { await loadSummary(); };
+    void run();
+  }, [loadSummary]);
+
+  // "Check Etsy statuses" — reconcile every linked listing's local state to
+  // what Etsy actually reports (read-only; no content re-pushed). Recovers
+  // items stuck in 'error' after a transient failure, then refreshes the counts
+  // so those move out of the "errors" bucket and become syncable again.
+  const checkAll = async () => {
+    setChecking(true);
+    setCheckResult(null);
+    try {
+      const res = await fetch('/api/admin/etsy/verify-all', { method: 'POST' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) throw new Error(data?.error || 'Could not check Etsy statuses.');
+      setCheckResult(
+        `Checked ${data.checked} listing${data.checked === 1 ? '' : 's'} — ${data.updated} updated` +
+          `${data.reset ? `, ${data.reset} reset (gone from Etsy)` : ''}${data.errors ? `, ${data.errors} couldn’t be read` : ''}.`,
+      );
+      await loadSummary();
+    } catch (err) {
+      setCheckResult(err instanceof Error ? err.message : 'Could not check Etsy statuses.');
+    } finally {
+      setChecking(false);
+    }
+  };
 
   const start = async () => {
     cancelledRef.current = false;
@@ -126,15 +157,31 @@ export default function EtsyBulkSyncModal({ onClose }: { onClose: () => void }) 
                 )}
               </div>
             )}
+            {summary && summary.errors > 0 && (
+              <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                {summary.errors} item{summary.errors === 1 ? '' : 's'} in an error state. If a past sync hiccup left them errored but they&apos;re
+                actually fine on Etsy, click <strong>Check Etsy statuses</strong> to reconcile them (read-only — errored drafts return to
+                &ldquo;needs review,&rdquo; anything deleted resets to not-listed). Or click <strong>Start</strong> to re-sync them.
+              </p>
+            )}
+            {checkResult && <p className="text-xs" style={{ color: 'var(--color-primary)' }}>{checkResult}</p>}
             <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
               Queues every eligible item and pushes it to Etsy as a draft (or active, if auto-activate is on). This can take a while for a full
               catalog — feel free to leave this open, or check Settings → Etsy Sync later for progress.
             </p>
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={onClose} className="outline-button text-sm">
+            <div className="flex justify-end gap-2 flex-wrap">
+              <button type="button" onClick={onClose} disabled={checking} className="outline-button text-sm">
                 Cancel
               </button>
-              <button type="button" onClick={() => void start()} disabled={!summary || summary.eligible === 0} className="gold-button text-sm disabled:opacity-50">
+              <button type="button" onClick={() => void checkAll()} disabled={checking} className="outline-button text-sm disabled:opacity-50">
+                {checking ? 'Checking…' : 'Check Etsy statuses'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void start()}
+                disabled={checking || !summary || (summary.eligible === 0 && summary.errors === 0)}
+                className="gold-button text-sm disabled:opacity-50"
+              >
                 Start
               </button>
             </div>

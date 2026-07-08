@@ -540,6 +540,65 @@ export interface CheckListingStatusResult {
 }
 
 /**
+ * PURE: given our current sync_state and Etsy's reported listing state, the
+ * state patch to apply (empty = leave as-is). Also CLEARS a stale 'error' — a
+ * listing that errored on our side (e.g. the missing-API-key incident
+ * 2026-07-08) but is actually fine on Etsy reconciles back to its real state.
+ * Unknown Etsy states return an empty patch (report only, never guess).
+ */
+export function reconcileSyncStateFromEtsy(
+  current: EtsyListingRow['sync_state'],
+  etsyState: string,
+): { sync_state?: EtsyListingRow['sync_state']; listing_state?: EtsyListingRow['listing_state'] } {
+  switch (etsyState) {
+    case 'active':
+      return { sync_state: 'active', listing_state: 'active' };
+    case 'inactive':
+    case 'sold_out':
+      return { sync_state: 'delisted', listing_state: 'inactive' };
+    case 'expired':
+      return { sync_state: 'delisted', listing_state: 'ended' };
+    case 'draft':
+      // A draft on Etsy. If our state is stale — recorded active/delisted, or a
+      // leftover 'error' from a transient failure — reset to the terminal draft
+      // state; otherwise keep our finer draft-family state (draft_created/…).
+      return ['active', 'delisted', 'error'].includes(current)
+        ? { sync_state: 'draft_review', listing_state: 'draft' }
+        : { listing_state: 'draft' };
+    default:
+      return {};
+  }
+}
+
+/** Applies the reconciliation patch to one row; returns whether it changed. Shared by the per-item and bulk status checks. */
+async function applyEtsyReconciliation(
+  service: SupabaseClient,
+  listing: EtsyListingRow,
+  etsyState: string,
+): Promise<{ changed: boolean; syncState: EtsyListingRow['sync_state'] }> {
+  const patch = reconcileSyncStateFromEtsy(listing.sync_state, etsyState);
+  const nextSync = patch.sync_state ?? listing.sync_state;
+  const nextListing = patch.listing_state !== undefined ? patch.listing_state : listing.listing_state;
+  if (nextSync === listing.sync_state && nextListing === listing.listing_state) {
+    return { changed: false, syncState: listing.sync_state };
+  }
+  const clearError = listing.sync_state === 'error' && nextSync !== 'error';
+  const updated = await upsertListing(service, listing.product_id, {
+    ...patch,
+    last_synced_at: new Date().toISOString(),
+    ...(clearError ? { last_error: null, error_count: 0 } : {}),
+  });
+  await insertSyncLog(service, {
+    product_id: listing.product_id,
+    listing_id: listing.etsy_listing_id,
+    action: 'check_status',
+    outcome: 'ok',
+    message: `Reconciled with Etsy — listing state: ${etsyState}.`,
+  });
+  return { changed: true, syncState: updated.sync_state };
+}
+
+/**
  * Manual reconciliation for when the Etsy-side listing changed outside this
  * app. Two cases:
  *
@@ -568,44 +627,7 @@ export async function checkListingStatus(productId: string): Promise<CheckListin
   try {
     const res = await etsyFetch<{ state: string }>({ path: `/v3/application/listings/${listing.etsy_listing_id}`, accessToken });
     const etsyState = res.data.state;
-
-    // Map Etsy's coarse state onto our row. Only the states below are
-    // reconciled; an unrecognized state is reported without touching our row.
-    const patch: Partial<Omit<EtsyListingRow, 'product_id' | 'created_at'>> = {};
-    if (etsyState === 'active') {
-      patch.listing_state = 'active';
-      patch.sync_state = 'active';
-    } else if (etsyState === 'inactive' || etsyState === 'sold_out') {
-      patch.listing_state = 'inactive';
-      patch.sync_state = 'delisted';
-    } else if (etsyState === 'expired') {
-      patch.listing_state = 'ended';
-      patch.sync_state = 'delisted';
-    } else if (etsyState === 'draft') {
-      patch.listing_state = 'draft';
-      // Only step sync_state back to a draft state if we'd recorded it as
-      // active/delisted (an out-of-band un-publish); otherwise keep our finer
-      // draft-family state.
-      if (listing.sync_state === 'active' || listing.sync_state === 'delisted') patch.sync_state = 'draft_review';
-    }
-
-    const nextSyncState = patch.sync_state ?? listing.sync_state;
-    const nextListingState = patch.listing_state !== undefined ? patch.listing_state : listing.listing_state;
-    const changed = nextSyncState !== listing.sync_state || nextListingState !== listing.listing_state;
-
-    let syncState = listing.sync_state;
-    if (changed) {
-      const updated = await upsertListing(service, productId, { ...patch, last_synced_at: new Date().toISOString() });
-      syncState = updated.sync_state;
-      await insertSyncLog(service, {
-        product_id: productId,
-        listing_id: listing.etsy_listing_id,
-        action: 'check_status',
-        outcome: 'ok',
-        message: `Reconciled with Etsy — listing state: ${etsyState}.`,
-      });
-    }
-
+    const { changed, syncState } = await applyEtsyReconciliation(service, listing, etsyState);
     return {
       found: true,
       syncState,
@@ -637,6 +659,71 @@ export async function checkListingStatus(productId: string): Promise<CheckListin
     }
     throw err;
   }
+}
+
+export interface CheckAllStatusResult {
+  checked: number;
+  updated: number;
+  /** Listings gone from Etsy (404) — reset to not-listed. */
+  reset: number;
+  errors: number;
+}
+
+/**
+ * Bulk "Check Etsy status of all" — reconciles every LINKED listing's local
+ * state against what Etsy actually reports (read-only GET per listing; no
+ * content is re-pushed). Clears stale local states — most importantly the
+ * 'error' rows left by a transient failure (e.g. the 2026-07-08 missing-API-key
+ * incident) that are actually fine drafts on Etsy — so they return to their
+ * real state instead of being stuck un-syncable. A connection-level failure
+ * (bad token) stops the run so the owner gets a clear "reconnect" message
+ * rather than every item flapping. One call handles the whole catalog well
+ * under the route's 60s budget.
+ */
+export async function checkAllListingStatuses(): Promise<CheckAllStatusResult> {
+  const service = createServiceClient();
+  const { data } = await service.from('etsy_listings').select('*').not('etsy_listing_id', 'is', null);
+  const rows = (data ?? []) as EtsyListingRow[];
+  if (rows.length === 0) return { checked: 0, updated: 0, reset: 0, errors: 0 };
+
+  const { accessToken } = await ensureFreshAccessToken(service);
+  let checked = 0;
+  let updated = 0;
+  let reset = 0;
+  let errors = 0;
+
+  for (const listing of rows) {
+    if (!listing.etsy_listing_id) continue;
+    try {
+      const res = await etsyFetch<{ state: string }>({ path: `/v3/application/listings/${listing.etsy_listing_id}`, accessToken });
+      checked += 1;
+      const { changed } = await applyEtsyReconciliation(service, listing, res.data.state);
+      if (changed) updated += 1;
+    } catch (err) {
+      if (err instanceof EtsyApiError && err.status === 404) {
+        // Gone on Etsy (deleted there) — reset to not-listed, same as the per-item check.
+        await upsertListing(service, listing.product_id, {
+          etsy_listing_id: null,
+          sync_state: 'pending',
+          listing_state: null,
+          taxonomy_id: null,
+          content_hash: null,
+          last_pushed_price: null,
+          last_error: null,
+          error_count: 0,
+        });
+        await insertSyncLog(service, { product_id: listing.product_id, listing_id: listing.etsy_listing_id, action: 'check_status', outcome: 'ok', message: 'No longer on Etsy — reset to not-listed.' });
+        checked += 1;
+        reset += 1;
+      } else if (isConnectionLevelEtsyError(err)) {
+        throw err; // connection issue affects every listing — stop and surface it
+      } else {
+        errors += 1;
+      }
+    }
+  }
+
+  return { checked, updated, reset, errors };
 }
 
 export async function runDelist(productId: string): Promise<SyncStepResult> {

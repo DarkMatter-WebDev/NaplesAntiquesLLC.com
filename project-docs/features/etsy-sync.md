@@ -238,6 +238,8 @@ Five additive tables, RLS-enabled with **no** anon/authenticated policies
 | `delist` | POST | Deactivate or reactivate a linked listing |
 | `listings` | GET | Bulk `product_id -> sync_state` map (product table chip) |
 | `eligibility-summary` | GET | Bulk pre-flight counts for the "Sync All" confirm screen |
+| `verify-listing` | POST | Reconcile ONE listing's local state with Etsy's real state (read-only; clears a stale error, resets a 404 to not-listed) |
+| `verify-all` | POST | Bulk reconcile ALL linked listings (`checkAllListingStatuses`) — the "Check Etsy statuses" button; read-only, no content re-push. See DECISIONS.md session 9 nineteenth addendum |
 | `price-push` | POST | Phase 2 scheduled price push — secret-header-guarded, not admin-session-gated |
 | `push-prices` | POST | Manual "Push prices now" — one bounded batch of the price-only push across live listings whose price drifted (ignores the daily threshold); client polls until done. See DECISIONS.md session 9 thirteenth addendum |
 

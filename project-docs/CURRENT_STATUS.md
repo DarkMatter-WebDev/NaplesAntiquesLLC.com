@@ -3,6 +3,29 @@
 > Reflects the present state of development. **Update this at the end of every
 > work session.** Last updated: **2026-07-08**.
 
+## 2026-07-08 (session 9, nineteenth addendum) -- 🟢 Bulk "Check Etsy statuses" — recovers items stuck in 'error'
+
+The owner had forgotten to set the Etsy env vars in Netlify; a "Sync All" then
+errored all 55 non-terminal items ("no API key"). Redeployed with the vars set,
+but those 55 were stuck in `error` state — the bulk UI showed "0 eligible · 55
+errors" and START was disabled, so no way to recover them. (The items are fine
+on Etsy — drafts; the error was a config blip.)
+
+Built the owner's suggested fix: a **"Check Etsy statuses"** button in the
+"Sync All to Etsy" modal that reconciles every linked listing's local state to
+what Etsy actually reports (read-only, no content re-push). New pure
+`reconcileSyncStateFromEtsy` now clears a stale `'error'` (errored draft →
+`draft_review`); `checkAllListingStatuses()` + `/api/admin/etsy/verify-all`
+apply it across the catalog. Also **enabled START when there are errors** so
+they can alternatively be re-synced. Two recovery paths; reconciliation is the
+light default.
+
+`npx tsc --noEmit`, `npx vitest run` (154/154, +4 reconcile tests), `npm run
+lint`, `npm run build` all pass; route in the manifest. **Owner action:**
+deploy → "Sync All to Etsy" → **Check Etsy statuses** → the 55 errors clear to
+their real Etsy state. Full detail: `project-docs/DECISIONS.md` 2026-07-08
+(session 9, nineteenth addendum).
+
 ## 2026-07-08 (session 9, eighteenth addendum) -- 🟡 Bulk "Sync All" showed a generic "Batch sync failed." — made the real error visible + batch resilient
 
 After deploying the seventeenth-addendum fix, the owner re-ran "Sync All" and

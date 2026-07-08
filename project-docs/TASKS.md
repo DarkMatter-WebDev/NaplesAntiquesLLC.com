@@ -5,8 +5,18 @@
 
 ## Backlog
 
-- **🔴 Deploy the bulk-sync fixes, then re-run "Sync All" — report any error
-  (2026-07-08, session 9, seventeenth + eighteenth addenda):** Two rounds of
+- **🔴 Deploy the bulk-sync fixes, then recover the 55 error items (2026-07-08,
+  session 9, seventeenth–nineteenth addenda):** After deploy, open "Sync All to
+  Etsy" and click the new **"Check Etsy statuses"** button — it reconciles every
+  linked listing to its real Etsy state (read-only), clearing the 55 items
+  stuck in `error` (from the missing-env-var incident) back to `draft_review`.
+  Then the catalog is recovered without re-pushing anything. (Alternatively,
+  START now also re-syncs error items.) Prior rounds also in this deploy: the
+  runaway-loop fix and the error-visibility/resilience fix. Below is the
+  earlier detail:
+- **🔴 (superseded by the item above) Deploy the bulk-sync fixes, then re-run
+  "Sync All" — report any error (2026-07-08, session 9, seventeenth + eighteenth
+  addenda):** Two rounds of
   fixes in `sync.ts`/`drainQueueCore`/`drainQueue`/`EtsyBulkSyncModal`:
   (17th) the bulk sync looped forever on already-synced items; (18th) it then
   showed a bare "Batch sync failed." — now the client surfaces the server's

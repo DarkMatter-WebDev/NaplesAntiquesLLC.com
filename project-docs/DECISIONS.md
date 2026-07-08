@@ -1,5 +1,45 @@
 # Decisions Log
 
+## 2026-07-08 (session 9, nineteenth addendum) - Bulk "Check Etsy status of all" + recover items stuck in 'error'
+
+**Context:** the owner forgot to set the Etsy env vars in Netlify, so a "Sync
+All" errored all 55 non-terminal items ("no API key"). After redeploying with
+the vars set, those 55 sat in `sync_state='error'`, which the eligibility
+summary buckets separately (`0 eligible · 55 errors`) and START disables at
+`eligible===0` — so there was no way to recover them from the bulk UI. The
+items are actually fine on Etsy (drafts); the error was a transient config
+issue.
+
+**Fix — a bulk reconciliation + making errors retryable:**
+1. **`reconcileSyncStateFromEtsy(current, etsyState)` (pure, `sync.ts`)** — maps
+   Etsy's reported state onto our sync_state, and crucially now CLEARS a stale
+   `'error'`: an errored row that Etsy shows as a draft returns to
+   `draft_review` (active→active, inactive/sold_out/expired→delisted). Extracted
+   so both the per-item and bulk checks share it; `checkListingStatus` was
+   refactored onto it (and now also clears the error + `last_error`/`error_count`).
+2. **`checkAllListingStatuses()` + `/api/admin/etsy/verify-all`** — reconciles
+   EVERY linked listing against Etsy (read-only GET per listing, no content
+   re-pushed; 404 → reset to not-listed; a connection-level failure stops with a
+   clear message). One call handles the catalog under the route's 60s budget.
+3. **`EtsyBulkSyncModal`** — a **"Check Etsy statuses"** button on the summary
+   (with a hint shown when errors>0), which runs the bulk check then refreshes
+   the counts so reconciled errors move to "up to date." Also **enabled START
+   when there are errors** (not just `eligible>0`) so error items can be
+   re-synced too (`enqueueAllEligible` already enqueues them; the seventeenth
+   addendum makes them re-sync as updates).
+
+**Two recovery paths, both now available:** *Check Etsy statuses* (read-only,
+recommended for stale errors — the 55 → draft_review with zero Etsy writes) or
+*Start* (re-sync/update). Reconciliation is the light default.
+
+**Verification:** `npx tsc --noEmit` (clean), `npx vitest run` (154/154 — 4 new
+`reconcileSyncStateFromEtsy` tests incl. the error→draft_review recovery and
+keeping finer in-pipeline states), `npm run lint` (0 problems), `npm run build`
+(succeeded; `/api/admin/etsy/verify-all` in the manifest). Bulk/UI paths are
+I/O and not unit-tested directly, per this module's precedent. **Owner action:**
+deploy, open "Sync All to Etsy", click **Check Etsy statuses** — the 55 errored
+items reconcile to their real Etsy state and clear.
+
 ## 2026-07-08 (session 9, eighteenth addendum) - Bulk sync: surface the real drain error + contain per-item throws
 
 **Problem:** after the seventeenth-addendum deploy, "Sync All" failed with a

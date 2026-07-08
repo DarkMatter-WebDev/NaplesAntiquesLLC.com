@@ -1,5 +1,31 @@
 import { describe, expect, it, vi } from 'vitest';
-import { drainQueueCore, shouldPushPrice, type SyncStepResult } from '../sync';
+import { drainQueueCore, reconcileSyncStateFromEtsy, shouldPushPrice, type SyncStepResult } from '../sync';
+
+describe('reconcileSyncStateFromEtsy — mapping Etsy state onto our sync_state', () => {
+  it('maps active/inactive/expired/sold_out', () => {
+    expect(reconcileSyncStateFromEtsy('draft_review', 'active')).toEqual({ sync_state: 'active', listing_state: 'active' });
+    expect(reconcileSyncStateFromEtsy('active', 'inactive')).toEqual({ sync_state: 'delisted', listing_state: 'inactive' });
+    expect(reconcileSyncStateFromEtsy('active', 'sold_out')).toEqual({ sync_state: 'delisted', listing_state: 'inactive' });
+    expect(reconcileSyncStateFromEtsy('active', 'expired')).toEqual({ sync_state: 'delisted', listing_state: 'ended' });
+  });
+
+  it('clears a stale error when the item is actually a draft on Etsy (the missing-key recovery)', () => {
+    expect(reconcileSyncStateFromEtsy('error', 'draft')).toEqual({ sync_state: 'draft_review', listing_state: 'draft' });
+    expect(reconcileSyncStateFromEtsy('active', 'draft')).toEqual({ sync_state: 'draft_review', listing_state: 'draft' });
+    expect(reconcileSyncStateFromEtsy('delisted', 'draft')).toEqual({ sync_state: 'draft_review', listing_state: 'draft' });
+  });
+
+  it('keeps a finer in-pipeline draft state (only sets listing_state) when Etsy says draft', () => {
+    expect(reconcileSyncStateFromEtsy('draft_created', 'draft')).toEqual({ listing_state: 'draft' });
+    expect(reconcileSyncStateFromEtsy('inventory_synced', 'draft')).toEqual({ listing_state: 'draft' });
+    expect(reconcileSyncStateFromEtsy('draft_review', 'draft')).toEqual({ listing_state: 'draft' });
+  });
+
+  it('returns an empty patch for an unrecognized Etsy state (report only, never guess)', () => {
+    expect(reconcileSyncStateFromEtsy('active', 'edit')).toEqual({});
+    expect(reconcileSyncStateFromEtsy('draft_review', 'unavailable')).toEqual({});
+  });
+});
 
 describe('shouldPushPrice — Q4 threshold logic', () => {
   it('always pushes when there is no prior pushed price', () => {
