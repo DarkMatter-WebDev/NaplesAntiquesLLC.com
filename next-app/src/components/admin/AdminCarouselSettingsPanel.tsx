@@ -65,15 +65,22 @@ export default function AdminCarouselSettingsPanel() {
   const [catalog, setCatalog] = useState<Map<string, CarouselItem>>(() => new Map());
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [itemBg, setItemBg] = useState<Map<string, string | null>>(() => new Map());
-  const [showPrice, setShowPrice] = useState(false);
-  const [visibleCountDesktop, setVisibleCountDesktop] = useState(DEFAULT_VISIBLE_COUNT);
-  const [visibleCountMobile, setVisibleCountMobile] = useState(4);
+  const [visibleCountDesktop, setVisibleCountDesktop] = useState(String(DEFAULT_VISIBLE_COUNT));
+  const [visibleCountMobile, setVisibleCountMobile] = useState('4');
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
 
-  const clampVisible = (value: string) => {
-    const n = Math.round(Number(value));
-    return Number.isFinite(n) ? Math.min(MAX_VISIBLE_COUNT, Math.max(MIN_VISIBLE_COUNT, n)) : null;
+  const parseVisibleCountInput = (value: string): number | null => {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = Math.round(Number(trimmed));
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const previewVisibleCount = (value: string): number => {
+    const parsed = parseVisibleCountInput(value);
+    if (parsed == null) return DEFAULT_VISIBLE_COUNT;
+    return Math.min(MAX_VISIBLE_COUNT, Math.max(MIN_VISIBLE_COUNT, parsed));
   };
 
   // Selected items carry their per-photo bgColor, grouped into a white arc and a
@@ -148,9 +155,8 @@ export default function AdminCarouselSettingsPanel() {
         }
 
         if (settingsResult.status === 'fulfilled') {
-          setShowPrice(settingsResult.value.showPrice);
-          setVisibleCountDesktop(settingsResult.value.visibleCountDesktop);
-          setVisibleCountMobile(settingsResult.value.visibleCountMobile);
+          setVisibleCountDesktop(String(settingsResult.value.visibleCountDesktop));
+          setVisibleCountMobile(String(settingsResult.value.visibleCountMobile));
         } else {
           showNotice(`Carousel settings table is not ready: ${getErrorMessage(settingsResult.reason)}`, false);
         }
@@ -183,6 +189,25 @@ export default function AdminCarouselSettingsPanel() {
   };
 
   const handleSave = async () => {
+    const desktop = parseVisibleCountInput(visibleCountDesktop);
+    const mobile = parseVisibleCountInput(visibleCountMobile);
+
+    if (desktop == null || desktop < MIN_VISIBLE_COUNT || desktop > MAX_VISIBLE_COUNT) {
+      showNotice(
+        `Desktop "cards visible at once" must be a whole number from ${MIN_VISIBLE_COUNT} to ${MAX_VISIBLE_COUNT}.`,
+        false,
+      );
+      return;
+    }
+
+    if (mobile == null || mobile < MIN_VISIBLE_COUNT || mobile > MAX_VISIBLE_COUNT) {
+      showNotice(
+        `Mobile "cards visible at once" must be a whole number from ${MIN_VISIBLE_COUNT} to ${MAX_VISIBLE_COUNT}.`,
+        false,
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       const entries: SelectionEntry[] = selectedIds.map((id) => ({
@@ -191,7 +216,14 @@ export default function AdminCarouselSettingsPanel() {
       }));
       await saveSelection(entries);
       // bgColor is fixed to the default now that each photo sets its own.
-      await saveSettings({ showPrice, bgColor: DEFAULT_BG, visibleCountDesktop, visibleCountMobile });
+      await saveSettings({
+        showPrice: false,
+        bgColor: DEFAULT_BG,
+        visibleCountDesktop: desktop,
+        visibleCountMobile: mobile,
+      });
+      setVisibleCountDesktop(String(desktop));
+      setVisibleCountMobile(String(mobile));
       showNotice('Carousel hero settings saved.');
     } catch (error) {
       showNotice(getErrorMessage(error), false);
@@ -391,15 +423,6 @@ export default function AdminCarouselSettingsPanel() {
                 </div>
 
                 <div className="mt-5 grid gap-4 border-t pt-4" style={{ borderColor: 'var(--color-outline-variant)' }}>
-                  <label className="flex items-center gap-3 text-sm font-semibold" style={{ color: 'var(--color-on-surface)' }}>
-                    <input
-                      type="checkbox"
-                      checked={showPrice}
-                      onChange={(event) => setShowPrice(event.target.checked)}
-                    />
-                    Show price on carousel
-                  </label>
-
                   <div className="grid gap-3">
                     <span className="text-sm font-semibold" style={{ color: 'var(--color-on-surface)' }}>
                       Cards visible at once
@@ -409,35 +432,31 @@ export default function AdminCarouselSettingsPanel() {
                         Desktop
                         <input
                           id="carousel-visible-desktop"
-                          type="number"
-                          min={MIN_VISIBLE_COUNT}
-                          max={MAX_VISIBLE_COUNT}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           value={visibleCountDesktop}
-                          onChange={(event) => {
-                            const n = clampVisible(event.target.value);
-                            if (n != null) setVisibleCountDesktop(n);
-                          }}
+                          onChange={(event) => setVisibleCountDesktop(event.target.value)}
                           className="form-field w-20"
+                          aria-describedby="carousel-visible-count-help"
                         />
                       </label>
                       <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-on-surface)' }} htmlFor="carousel-visible-mobile">
                         Mobile
                         <input
                           id="carousel-visible-mobile"
-                          type="number"
-                          min={MIN_VISIBLE_COUNT}
-                          max={MAX_VISIBLE_COUNT}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           value={visibleCountMobile}
-                          onChange={(event) => {
-                            const n = clampVisible(event.target.value);
-                            if (n != null) setVisibleCountMobile(n);
-                          }}
+                          onChange={(event) => setVisibleCountMobile(event.target.value)}
                           className="form-field w-20"
+                          aria-describedby="carousel-visible-count-help"
                         />
                       </label>
                     </div>
-                    <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                      Fewer = closer &amp; more intimate; the rest cycle through ({MIN_VISIBLE_COUNT}&ndash;{MAX_VISIBLE_COUNT}). The preview below uses the desktop value.
+                    <span id="carousel-visible-count-help" className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      Fewer = closer &amp; more intimate; the rest cycle through ({MIN_VISIBLE_COUNT}&ndash;{MAX_VISIBLE_COUNT}). Values are checked when you save. The preview below uses the desktop value.
                     </span>
                   </div>
                 </div>
@@ -460,11 +479,10 @@ export default function AdminCarouselSettingsPanel() {
               >
                 <Carousel
                   items={previewItems}
-                  showPrice={showPrice}
                   bg={DEFAULT_BG}
                   cardWidth={7}
                   perspective={20}
-                  visibleCount={visibleCountDesktop}
+                  visibleCount={previewVisibleCount(visibleCountDesktop)}
                   onBackgroundChange={handlePreviewBackground}
                 />
               </div>

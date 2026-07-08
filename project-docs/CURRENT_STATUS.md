@@ -3,7 +3,15 @@
 > Reflects the present state of development. **Update this at the end of every
 > work session.** Last updated: **2026-07-07**.
 
-## 2026-07-07 (latest) -- Shop list view blank-on-load fixed (CustomerReveal skip)
+## 2026-07-08 (latest) -- Admin carousel: editable visible-count fields + removed show-price toggle
+
+- **Carousel admin "cards visible at once" (desktop/mobile) could not be cleared**
+  to type a new value — live clamping snapped back (often to 12). Inputs are now
+  plain text you can fully clear; range validation (`3`–`12`) runs on Save with a
+  notice if out of range. Removed non-functional **Show price on carousel**
+  checkbox; saves always persist `show_price: false`. `npm run lint` pass.
+
+## 2026-07-07 -- Shop list view blank-on-load fixed (CustomerReveal skip)
 
 - **`/shop?view=list` loaded as a blank white page** (header only) until the
   user scrolled. Root cause: site-wide `CustomerReveal` marked the shop content

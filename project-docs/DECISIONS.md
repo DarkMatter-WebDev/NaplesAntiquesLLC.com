@@ -1,6 +1,32 @@
 # Decisions Log
 
-## 2026-07-07 (latest) - Self-host + subset Material Symbols instead of the Google Fonts <link>
+## 2026-07-08 (latest) - Etsy sync: all 11 planning questions decided by owner
+
+**Decision:** The owner answered every open question in
+`etsy-sync-plan/13-open-questions.md` (full decisions + reasoning live there;
+this is the summary). Highlights: **draft-for-review** on Etsy (no
+auto-activate initially); **owner-attested vintage fallback** — items with
+`item_year` > 2006 or missing push as `when_made: '1990s'` in the Etsy
+payload only (DB/site untouched, flagged in dry-run) because the owner
+attests all inventory is genuinely vintage and the year labels are the error;
+**EN-only** listings; **daily ≥1%-threshold** spot-price push; **8% Etsy
+price markup** (site prices unchanged); **Domestic & Global Pricing stays
+OFF** (confirmed); **everything available is eligible incl. coins/bullion**
+(owner accepts Etsy policy risk; rejections surface per-item);
+**no reconciliation UI** needed (shop has only a few unrelated manual
+listings); **deactivate, never auto-delete**; **manual handling of Etsy
+sales** until/unless Phase 3; Etsy shipping/returns will **mirror the site's
+policies**.
+
+**Why:** These were the blocking inputs for the Etsy sync architecture plan
+(`etsy-sync-plan/`, written same day). Q2 (vintage rule) and Q6 (regional
+pricing) were hard blockers; both are now resolved.
+
+**Status:** Still planning-only — no code/SQL/config implemented. Remaining
+gates: Etsy app approval (`naples-estate-jewelry-sync`, pending personal
+approval) and Phase 0 shop setup per `etsy-sync-plan/12-phased-rollout.md`.
+
+## 2026-07-07 - Self-host + subset Material Symbols instead of the Google Fonts <link>
 
 **Decision:** The Material Symbols icon font is now self-hosted as a **subset**
 woff2 committed to `next-app/public/assets/fonts/material-symbols-subset-v358.woff2`

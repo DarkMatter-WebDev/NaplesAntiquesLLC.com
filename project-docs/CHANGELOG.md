@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-07-08 - Admin carousel visible-count inputs + remove show-price toggle
+
+- Fixed carousel admin "cards visible at once" fields (desktop/mobile): allow
+  clearing/typing freely; validate `3`–`12` only on Save with an error notice.
+  Removed non-functional "Show price on carousel" UI (always saves false).
+  Verified: `npm run lint` pass.
+
 ## 2026-07-07 (latest) - Fix shop list view blank initial load (CustomerReveal)
 
 - `/shop?view=list` appeared as a white page below the header until scroll.

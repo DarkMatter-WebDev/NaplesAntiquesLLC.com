@@ -5,6 +5,18 @@
 
 ## Backlog
 
+- **Etsy sync planning (2026-07-08):** full architecture plan for pushing the
+  Supabase catalog to an Etsy shop lives in **`etsy-sync-plan/`** at the
+  project root (17 planning docs — see `etsy-sync-plan/README.md` for the
+  index and recommended approach). **Planning only — nothing implemented.**
+  All 11 open questions were **decided by the owner 2026-07-08** (recorded in
+  `etsy-sync-plan/13-open-questions.md`; see DECISIONS.md same date for the
+  summary — former blockers Q2/Q6 are cleared). **Etsy approved the app
+  2026-07-08** (`naples-estate-jewelry-sync`). Remaining gate: Phase 0 shop
+  setup (Etsy onboarding, shipping/return/readiness profiles mirroring the
+  site, regional pricing off, redirect URIs + Netlify env vars — see
+  `etsy-sync-plan/06-shop-prerequisites.md` checklist), then Phase 1 per
+  `etsy-sync-plan/12-phased-rollout.md`.
 - **Run BOTH Quantity migrations in the live Supabase project, in order:**
   `supabase/product-quantity-2026-07.sql` (Phase 1 — `products.quantity`), then
   `supabase/checkout-quantity-2026-07.sql` (Phase 2 — `order_items.quantity` +
