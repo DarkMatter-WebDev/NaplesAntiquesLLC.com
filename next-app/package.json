@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
     "check:compression": "node scripts/check-compression.mjs",
     "measure:routes": "node scripts/measure-routes.mjs"
   },
@@ -19,7 +20,8 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "resend": "^6.12.4",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "sharp": "0.34.5"
   },
   "devDependencies": {
     "@netlify/plugin-nextjs": "^5.15.11",
@@ -30,6 +32,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }

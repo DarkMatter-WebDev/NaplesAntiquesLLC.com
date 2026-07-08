@@ -20,10 +20,11 @@ import {
   productStatusLabel,
   productSupportsLinkType,
   shouldShowSpotPrice,
-  resolveSpecialTradeInPrice,
+  resolveAdvertisedTradeInPrice,
   type Product,
 } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
+import { fetchSpecialPriceDefault } from '@/lib/shop-settings';
 import { jsonLdHtml } from '@/lib/json-ld';
 import { calcSpotMeltValue, formatUsdPrice, getDisplayPrice, purityToFraction } from '@/lib/pricing';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -316,12 +317,13 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   // Admin-controlled per item: some pieces aren't 100% precious metal, so a
   // melt value computed off the full item weight would overstate scrap value.
   const showSpotPrice = shouldShowSpotPrice(p);
-  // The "Own gold or silver?" trade-in line defaults to the computed scrap
-  // value, but an admin can override it — either with a flat custom price or a
-  // percentage over the item's spot/melt value (e.g. to advertise a rounder,
-  // more attractive number, or one that auto-tracks spot). The scrap-value box
-  // above stays tied to the real computed value either way.
-  const specialTradeInPrice = resolveSpecialTradeInPrice(p, meltValue);
+  // The "Own gold or silver?" trade-in line resolves in precedence order: a
+  // per-item override wins; else the SITE-WIDE default (a % over/under melt,
+  // set once in Admin → Settings → Customer Trade-in Price) applies to every
+  // item; else it falls back to the plain computed melt value. The scrap-value
+  // box above stays tied to the real computed value either way.
+  const siteTradeInDefault = await fetchSpecialPriceDefault(createPublicClient());
+  const specialTradeInPrice = resolveAdvertisedTradeInPrice(p, meltValue, siteTradeInDefault);
   const tradeInValue = specialTradeInPrice != null ? formatUsdPrice(specialTradeInPrice) : scrapValue;
   const spotPerOz = p.category === 'Silver'
     ? spotData?.silverPerTroyOz

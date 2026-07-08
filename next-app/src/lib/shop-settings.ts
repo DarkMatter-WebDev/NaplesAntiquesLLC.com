@@ -33,3 +33,48 @@ export async function saveShowSoldItems(supabase: SupabaseClient, showSoldItems:
     );
   if (error) throw new Error(error.message);
 }
+
+/** Site-wide default for the product-page trade-in line (a % over/under melt). */
+export interface SpecialPriceDefault {
+  enabled: boolean;
+  /** Signed percent applied to melt value; null when never set. */
+  percent: number | null;
+}
+
+/**
+ * The site-wide trade-in default. Degrades to `{ enabled: false, percent: null }`
+ * (the historical behavior — the line shows the plain melt value) on any error,
+ * including the columns not existing yet before the migration is applied.
+ */
+export async function fetchSpecialPriceDefault(supabase: SupabaseClient): Promise<SpecialPriceDefault> {
+  try {
+    const { data, error } = await supabase
+      .from(SHOP_SETTINGS_TABLE)
+      .select('special_price_default_enabled, special_price_default_percent')
+      .eq('id', SINGLE_ROW_ID)
+      .maybeSingle();
+    if (error) return { enabled: false, percent: null };
+    return {
+      enabled: data?.special_price_default_enabled ?? false,
+      percent: data?.special_price_default_percent ?? null,
+    };
+  } catch {
+    return { enabled: false, percent: null };
+  }
+}
+
+/** Persist the site-wide trade-in default. Throws on failure. */
+export async function saveSpecialPriceDefault(supabase: SupabaseClient, value: SpecialPriceDefault): Promise<void> {
+  const { error } = await supabase
+    .from(SHOP_SETTINGS_TABLE)
+    .upsert(
+      {
+        id: SINGLE_ROW_ID,
+        special_price_default_enabled: value.enabled,
+        special_price_default_percent: value.percent,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'id' },
+    );
+  if (error) throw new Error(error.message);
+}

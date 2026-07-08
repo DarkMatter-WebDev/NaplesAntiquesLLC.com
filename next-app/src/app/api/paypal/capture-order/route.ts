@@ -3,6 +3,7 @@ import { revalidateTag } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/service';
 import { capturePayPalOrder, paypalConfigured } from '@/lib/paypal';
 import { finalizePaidOrder, notifyItemConflict } from '@/lib/order-finalize';
+import { handleProductStatusChange } from '@/lib/etsy/sync';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -123,6 +124,12 @@ export async function POST(req: Request) {
   // which would serve the buyer their own just-sold item as available on the very
   // next /shop visit (only revalidating in the background for the visit after that).
   revalidateTag('shop-catalog', { expire: 0 }); // purchased items are now 'sold' in the gallery
+
+  // Phase 2 auto-delist (etsy-sync-plan/03-sync-lifecycle.md Flow 3):
+  // fire-and-forget, best-effort — never block the buyer's confirmation on Etsy.
+  const { data: capturedItems } = await service.from('order_items').select('product_id').eq('order_id', order.id);
+  const capturedProductIds = (capturedItems ?? []).map((item) => item.product_id).filter((id): id is string => Boolean(id));
+  void handleProductStatusChange(capturedProductIds).catch(() => {});
 
   // Invoice upsert (idempotent) + auto receipt email. Shared with the webhook
   // backstop so a browser-death capture still produces both. Best-effort — the

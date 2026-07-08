@@ -285,6 +285,43 @@ export function resolveSpecialTradeInPrice(
   return getSpecialPriceOverrideAmount(product);
 }
 
+/** The site-wide default trade-in price (a signed % over the item's melt value). */
+export interface SiteTradeInDefault {
+  enabled: boolean;
+  percent: number | null;
+}
+
+// The actual trade-in price to advertise on a product page, resolving the full
+// precedence in one place:
+//   1. the per-item override (resolveSpecialTradeInPrice) — always wins;
+//   2. else the SITE-WIDE default (meltValue * (1 + percent/100)) when enabled;
+//   3. else the plain computed melt value (or null when it can't be computed).
+// The site default percent may be negative (advertise below spot) or positive.
+export function resolveAdvertisedTradeInPrice(
+  product: Pick<
+    Product,
+    | 'special_price_override_enabled'
+    | 'special_price_override_amount'
+    | 'special_price_override_mode'
+    | 'special_price_override_percent'
+  >,
+  meltValue: number | null,
+  siteDefault: SiteTradeInDefault | null | undefined,
+): number | null {
+  const perItem = resolveSpecialTradeInPrice(product, meltValue);
+  if (perItem != null) return perItem;
+  if (
+    siteDefault?.enabled &&
+    meltValue != null &&
+    Number.isFinite(meltValue) &&
+    typeof siteDefault.percent === 'number' &&
+    Number.isFinite(siteDefault.percent)
+  ) {
+    return meltValue * (1 + siteDefault.percent / 100);
+  }
+  return meltValue;
+}
+
 export function isProductSold(status: ProductStatus | string | null | undefined): boolean {
   return normalizeProductStatus(status) === 'sold';
 }

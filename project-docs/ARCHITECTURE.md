@@ -1,8 +1,8 @@
 ﻿# Architecture
 
 > Update whenever significant structural changes occur. Last updated:
-> **2026-07-05** after the Orders Recycle Bin and invoice-generation updates
-> to the admin/orders lifecycle.
+> **2026-07-08** after the Etsy sync build (Phase 1 + Phase 2 code-complete,
+> unverified live — see `project-docs/features/etsy-sync.md`).
 
 ## System Design
 
@@ -199,6 +199,9 @@ Supabase is the source for app data:
   `product_id`, `position`, `bg_color` (per-photo White/Black group). Settings:
   `show_price`, `bg_color` (legacy default), `visible_count` (desktop ring size),
   `visible_count_mobile`.
+- `etsy_connection` / `etsy_oauth_states` / `etsy_listings` /
+  `etsy_listing_images` / `etsy_sync_log` - Etsy sync (2026-07-08, see
+  "Etsy Sync" below). **Written in `supabase/etsy-sync.sql`, not yet applied.**
 
 SQL setup and policy scripts live in `supabase/`.
 
@@ -344,6 +347,61 @@ storefront path; `/payment` stays a disabled placeholder). Full runbook:
   surface in the Messages center.
 - **Env:** `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_ENV`
   (sandbox/live â€” creds must match the env), `PAYPAL_WEBHOOK_ID`.
+
+## Etsy Sync (2026-07-08 — code-complete, unverified live)
+
+One-way push (Supabase `products` → an Etsy shop, as a secondary sales
+channel). Full plan: `etsy-sync-plan/` (17 docs); full build report: owner
+checklist in `etsy-sync-plan/OWNER-SETUP.md`; feature detail:
+`project-docs/features/etsy-sync.md`.
+
+- **Module:** `next-app/src/lib/etsy/` — `client.ts` (fetch wrapper: x-api-key
+  + bearer, throttle, 429/5xx backoff, typed `EtsyApiError`), `auth.ts` (OAuth
+  2.0 + PKCE, AES-256-GCM token encryption, refresh with rotation), `mapping.ts`
+  (pure `Product` → Etsy payload functions: title/tags/materials/`when_made`/
+  price/taxonomy/pre-flight — unit-tested), `images.ts` (Supabase Storage/
+  `/assets` fetch → `sharp` WebP→JPEG transcode → upload; image-diff
+  planning), `sync.ts` (the step machine: draft → images → inventory →
+  activate/draft-review, plus Phase 2 bulk queue drain, content-hash
+  out-of-date detection, and the scheduled price push), `store.ts` (typed
+  access to the `etsy_*` tables).
+- **Tables (`supabase/etsy-sync.sql`, written, not yet run):**
+  `etsy_connection` (single-row OAuth + shop defaults + sync policy),
+  `etsy_oauth_states` (transient PKCE handshake), `etsy_listings`
+  (product↔listing mapping + sync-state machine + content hash),
+  `etsy_listing_images` (per-image checkpoint), `etsy_sync_log`
+  (audit/dead-letter). All RLS-enabled, service-role-only (same trust model
+  as `webhook_events`); a `claim_next_pending_etsy_listing()` RPC does the
+  atomic `FOR UPDATE SKIP LOCKED` queue claim for Phase 2's bulk drain.
+- **Routes (all under `/api/admin/etsy/`, admin-gated + service-role client,
+  same pattern as `/api/admin/ai-settings`):** `connect`, `callback`,
+  `status`, `disconnect`, `settings`, `shop-profiles`, `preview` (dry-run, no
+  Etsy calls), `sync`, `sync-batch` (Phase 2 enqueue/drain), `delist`,
+  `listings` (bulk status map for the product table), `eligibility-summary`
+  (bulk pre-flight counts), `price-push` (Phase 2 scheduled push — guarded by
+  a shared secret header, not an admin session, since a cron has no browser
+  session). Phase 3's `/api/webhooks/etsy` (Etsy order ingest) is
+  deliberately **not built** — out of scope per the plan.
+- **Admin UI:** `EtsySettingsPanel.tsx` (composed into `/admin/settings` —
+  connect/disconnect, shipping/return/readiness dropdowns, sync policy
+  toggles, recent activity log), a per-product Etsy status chip + drawer
+  section (`EtsyProductPanel.tsx`, wired into `AdminShell.tsx` — dry-run
+  preview, sync/sync-updates, delist/reactivate), and `EtsyBulkSyncModal.tsx`
+  (Phase 2 "Sync All to Etsy" with a pre-flight summary and cancellable
+  progress).
+- **Phase 2 automation:** auto-delist/relist is triggered from
+  `handleProductStatusChange()` (`lib/etsy/sync.ts`), called from the
+  existing revalidation chokepoints — `adminRevalidateProduct(s)`
+  (`app/actions/admin-products.ts`), PayPal `capture-order`, and the PayPal
+  webhook — rather than a new "who changes product status" audit. Always
+  best-effort/non-throwing and gated off unless `auto_delist_on_sold` is on.
+- **Known gap before this is usable live:** Etsy taxonomy leaf IDs are
+  unpinned (`null`) in `ETSY_TAXONOMY_MAP` — pre-flight correctly blocks every
+  product until a developer runs `getSellerTaxonomyNodes` post-connect and
+  fills them in. Four other spec details are pinned as best-guesses with
+  `TODO(etsy-verify)` comments (image constraints, rate-limit header names,
+  the readiness-state list endpoint, image re-rank semantics). See
+  `project-docs/DECISIONS.md` 2026-07-08 (later) for the full list.
 
 ## Public-shop cache invalidation (2026-07-02)
 

@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import AdminCarouselSettingsPanel from './AdminCarouselSettingsPanel';
 import AdminShopVisibilityPanel from './AdminShopVisibilityPanel';
+import AdminSpecialPricePanel from './AdminSpecialPricePanel';
 import MarketingSettingsPanel from './MarketingSettingsPanel';
+import EtsySettingsPanel from './EtsySettingsPanel';
 
 type AiSettingsResponse = {
   systemPrompt: string;
@@ -309,7 +311,9 @@ export default function AdminSettingsPanel() {
           </div>
         </section>
         <AdminShopVisibilityPanel />
+        <AdminSpecialPricePanel />
         <MarketingSettingsPanel />
+        <EtsySettingsPanel />
       </div>
 
       {/* Carousel panel gets a wider container so its two tables can use the

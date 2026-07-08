@@ -1,5 +1,38 @@
 # Changelog
 
+## 2026-07-08 - Site-wide customer trade-in price default (⚠️ SQL migration pending)
+
+New **Customer Trade-in Price** panel in Admin → Settings: set the "Own gold or
+silver? … pay as little as ___" product-page line to a signed percent over/
+under the spot melt value for every item at once (negative = below spot). The
+existing per-item override still takes precedence. Centralized in
+`resolveAdvertisedTradeInPrice()` (`types/product.ts`): per-item override → site
+default → plain melt value. Stored on the single-row `shop_settings` table
+(`special_price_default_enabled`/`special_price_default_percent`); the
+shop-settings admin route now takes a partial patch so the existing Shop
+Visibility toggle is unaffected. Reads degrade gracefully pre-migration, so the
+storefront is unchanged until the column is present. **⚠️ Run
+`supabase/shop-special-price-default-2026-07.sql`** to enable. `tsc`/`lint`/
+`build`/141 tests pass (5 new precedence tests).
+
+## 2026-07-08 (later) - Etsy sync built: Phase 1 + Phase 2 code-complete (unverified live)
+
+Implemented the full Etsy sync feature per `etsy-sync-plan/BUILD-PROMPT.md`:
+`next-app/src/lib/etsy/` (client/auth/mapping/images/sync/store), 13 routes
+under `/api/admin/etsy/*`, the Etsy Sync admin settings panel, a per-product
+status chip + dry-run/sync/delist drawer section, a bulk "Sync All to Etsy"
+modal, and Phase 2 auto-delist/relist hooked into the existing
+`adminRevalidateProduct(s)`/PayPal capture/webhook chokepoints. SQL migration
+(`supabase/etsy-sync.sql`, 5 tables + a queue-claim RPC) is written but not
+run. Added `sharp` (explicit) and `vitest` (new test runner) as dependencies;
+48 new unit tests added and passing. Fixed a timezone bug in the vintage-year
+cutoff math (`getFullYear()` → `getUTCFullYear()`) found while testing.
+`npx tsc --noEmit`, `npm run lint`, `npm run build`, `npm run test` all pass.
+Not verified live (no Etsy credentials/sandbox in this environment) and
+browser UI verification was blocked by a pre-existing, unrelated dev-server
+issue (every route 404s, including untouched pages). Full detail:
+`project-docs/features/etsy-sync.md`; owner steps: `etsy-sync-plan/OWNER-SETUP.md`.
+
 ## 2026-07-08 - Admin carousel visible-count inputs + remove show-price toggle
 
 - Fixed carousel admin "cards visible at once" fields (desktop/mobile): allow

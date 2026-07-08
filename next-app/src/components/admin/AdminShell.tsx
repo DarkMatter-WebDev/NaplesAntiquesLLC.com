@@ -47,6 +47,8 @@ import {
 import { calcSpotMeltValue, formatUsdPrice, getDisplayPrice, getSpotMeltDisplayPrice, normalizeManualPriceLabel } from '@/lib/pricing';
 import ComboboxInput from './ComboboxInput';
 import AdminHeader from './AdminHeader';
+import EtsyProductPanel from './EtsyProductPanel';
+import EtsyBulkSyncModal from './EtsyBulkSyncModal';
 import {
   DEFAULT_QUICK_FILL_AI_FORMAT_PROMPT,
   QUICK_FILL_PROMPT_STORAGE_KEY,
@@ -542,8 +544,28 @@ const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null; widthClas
   { label: 'Price', sortKey: 'currentPrice', widthClass: 'w-[92px]' },
   { label: 'Status', sortKey: 'status', widthClass: 'w-[92px]' },
   { label: 'Qty', sortKey: 'quantity', widthClass: 'w-[56px]' },
+  { label: 'Etsy', sortKey: null, widthClass: 'w-[110px]' },
   { label: '', sortKey: null, widthClass: 'w-[44px]', responsiveClass: 'max-md:w-[28px] max-md:min-w-[28px] max-md:max-w-[28px]' },
 ];
+
+const ETSY_CHIP_LABELS: Record<string, string> = {
+  pending: 'Not listed',
+  draft_created: 'Draft',
+  images_synced: 'Draft',
+  inventory_synced: 'Draft',
+  draft_review: 'Needs review',
+  active: 'Active',
+  out_of_date: 'Out of date',
+  delisted: 'Delisted',
+  error: 'Error',
+};
+
+function etsyChipTone(state: string | undefined): { bg: string; fg: string } {
+  if (state === 'error') return { bg: 'color-mix(in srgb, var(--color-error) 14%, transparent)', fg: 'var(--color-error)' };
+  if (state === 'active') return { bg: 'color-mix(in srgb, var(--color-primary) 14%, transparent)', fg: 'var(--color-primary)' };
+  if (state === 'out_of_date' || state === 'draft_review') return { bg: 'color-mix(in srgb, #b8860b 16%, transparent)', fg: '#8a6400' };
+  return { bg: 'var(--color-surface-container)', fg: 'var(--color-on-surface-variant)' };
+}
 
 // Shared styling for a single item inside the row Actions dropdown menu.
 const ROW_ACTION_MENU_ITEM_CLASS = 'px-3 py-2 text-left text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-colors hover:bg-[var(--color-surface-container)]';
@@ -854,13 +876,32 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     onConfirm: () => void;
   } | null>(null);
   // Mobile-only collapse state for the editor's blocks (no effect on desktop).
-  const [openEditorSections, setOpenEditorSections] = useState<{ photos: boolean; ai: boolean; details: boolean }>({
+  const [openEditorSections, setOpenEditorSections] = useState<{ photos: boolean; ai: boolean; details: boolean; etsy: boolean }>({
     photos: false,
     ai: false,
     details: false,
+    etsy: false,
   });
-  const toggleEditorSection = (key: 'photos' | 'ai' | 'details') =>
+  const toggleEditorSection = (key: 'photos' | 'ai' | 'details' | 'etsy') =>
     setOpenEditorSections((current) => ({ ...current, [key]: !current[key] }));
+  // Bulk map for the product table's per-row Etsy status chip — best-effort,
+  // fetched once on mount; an empty map (pre-migration or not-yet-synced) just
+  // renders every row as "Not listed".
+  const [etsyListingsByProduct, setEtsyListingsByProduct] = useState<Record<string, { sync_state: string }>>({});
+  const [showEtsyBulkModal, setShowEtsyBulkModal] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/admin/etsy/listings');
+        const data = await res.json().catch(() => null);
+        if (!cancelled && res.ok && data?.listings) setEtsyListingsByProduct(data.listings);
+      } catch {
+        // Best-effort — the chip simply stays "Not listed" for everyone.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   // Heads-up dialog shown before the Smart Assistant starts listening.
   const [showMicPrompt, setShowMicPrompt] = useState(false);
   const [imagePaddingTarget, setImagePaddingTarget] = useState<Product | null>(null);
@@ -1114,7 +1155,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setQuickFillNotice(null);
     setQuickAddMode(false);
     setShowAdvancedIds(false);
-    setOpenEditorSections({ photos: false, ai: false, details: false });
+    setOpenEditorSections({ photos: false, ai: false, details: false, etsy: false });
     // Reset the Smart Listing Assistant so the next item starts completely fresh
     // (transcript, generated draft, notices, undo snapshot, and any active recording).
     stopAiRecording();
@@ -1181,7 +1222,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setQuickFillNotice(null);
     setQuickAddMode(false);
     setShowAdvancedIds(false);
-    setOpenEditorSections({ photos: false, ai: false, details: false });
+    setOpenEditorSections({ photos: false, ai: false, details: false, etsy: false });
     setInventoryNumberManual(false);
     const autoInventoryNumber =
       copy.inventory_number ??
@@ -2325,7 +2366,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setQuickEntry('');
     setQuickAddMode(false);
     setShowAdvancedIds(false);
-    setOpenEditorSections({ photos: false, ai: false, details: false });
+    setOpenEditorSections({ photos: false, ai: false, details: false, etsy: false });
     setInventoryNumberManual(false);
     const nextProductType = getProductJewelryType(product);
     setJewelryTypeInput(nextProductType);
@@ -2874,6 +2915,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             <button type="button" onClick={openAdd} className="gold-button text-sm flex-shrink-0">
               + Add Product
             </button>
+            <button type="button" onClick={() => setShowEtsyBulkModal(true)} className="outline-button text-sm flex-shrink-0">
+              Sync All to Etsy
+            </button>
             <button
               type="button"
               onClick={() => setShowTableFilters((current) => !current)}
@@ -3264,6 +3308,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     </td>
                     <td className="px-2 py-3 whitespace-nowrap font-semibold" style={{ color: normalizeProductQuantity(p.quantity) === 0 ? 'var(--color-error)' : 'var(--color-on-surface-variant)' }}>
                       {normalizeProductQuantity(p.quantity)}
+                    </td>
+                    <td className="px-2 py-3 whitespace-nowrap">
+                      <span
+                        className="inline-flex text-[0.6rem] font-bold uppercase tracking-widest px-2 py-0.5"
+                        style={{ background: etsyChipTone(etsyListingsByProduct[p.id]?.sync_state).bg, color: etsyChipTone(etsyListingsByProduct[p.id]?.sync_state).fg }}
+                      >
+                        {ETSY_CHIP_LABELS[etsyListingsByProduct[p.id]?.sync_state ?? 'pending'] ?? 'Not listed'}
+                      </span>
                     </td>
                     <td className={`sticky right-0 px-1 max-md:px-0 py-3 w-[44px] min-w-[44px] max-w-[44px] max-md:w-[28px] max-md:min-w-[28px] max-md:max-w-[28px] ${actionMenuId === p.id ? 'z-30' : 'z-10'}`} style={{ background: dragTargetProductId === p.id ? 'color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-container-lowest))' : 'var(--color-surface-container-lowest)' }}>
                       <div className="relative flex justify-end">
@@ -4577,6 +4629,32 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               </div>
               </div>
 
+              <div className="product-editor-panel" data-collapsed={openEditorSections.etsy ? 'false' : 'true'}>
+                <div className="editor-collapse-header flex items-start gap-3" role="button" tabIndex={0}
+                  aria-expanded={openEditorSections.etsy}
+                  onClick={() => toggleEditorSection('etsy')}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleEditorSection('etsy'); } }}>
+                  <div className="product-editor-icon" style={{ background: 'rgba(212, 175, 55, 0.18)', color: '#a9760a' }}>
+                    <span className="material-symbols-outlined" aria-hidden="true">shopping_bag</span>
+                  </div>
+                  <div>
+                    <h3 className="product-editor-section-title">Etsy</h3>
+                    <p className={`product-editor-section-copy${openEditorSections.etsy ? '' : ' hidden'}`}>Dry-run preview, sync, and delist/reactivate.</p>
+                  </div>
+                  <span className="ml-auto self-center" aria-hidden="true">
+                    <span className="material-symbols-outlined" style={{ color: '#a9760a' }}>
+                      {openEditorSections.etsy ? 'expand_less' : 'expand_more'}
+                    </span>
+                  </span>
+                </div>
+
+                {isNew || !editing.id ? (
+                  <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Save this listing first, then sync it to Etsy.</p>
+                ) : (
+                  <EtsyProductPanel productId={editing.id} />
+                )}
+              </div>
+
             </div>
 
             {/* Validation errors */}
@@ -5045,6 +5123,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
           </div>
         </div>
       )}
+
+      {/* Etsy bulk sync (Phase 2) */}
+      {showEtsyBulkModal && <EtsyBulkSyncModal onClose={() => setShowEtsyBulkModal(false)} />}
 
       {/* Delete confirmation */}
       {deleteTarget && (

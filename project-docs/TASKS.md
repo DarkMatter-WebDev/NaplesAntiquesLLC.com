@@ -5,18 +5,161 @@
 
 ## Backlog
 
-- **Etsy sync planning (2026-07-08):** full architecture plan for pushing the
-  Supabase catalog to an Etsy shop lives in **`etsy-sync-plan/`** at the
-  project root (17 planning docs — see `etsy-sync-plan/README.md` for the
-  index and recommended approach). **Planning only — nothing implemented.**
-  All 11 open questions were **decided by the owner 2026-07-08** (recorded in
-  `etsy-sync-plan/13-open-questions.md`; see DECISIONS.md same date for the
-  summary — former blockers Q2/Q6 are cleared). **Etsy approved the app
-  2026-07-08** (`naples-estate-jewelry-sync`). Remaining gate: Phase 0 shop
-  setup (Etsy onboarding, shipping/return/readiness profiles mirroring the
-  site, regional pricing off, redirect URIs + Netlify env vars — see
-  `etsy-sync-plan/06-shop-prerequisites.md` checklist), then Phase 1 per
-  `etsy-sync-plan/12-phased-rollout.md`.
+- **🔴 Deploy the bulk-sync runaway fix, then re-run "Sync All" (2026-07-08,
+  session 9, seventeenth addendum):** The bulk "Sync all to Etsy" was looping
+  forever on already-synced items ("Processed 79 of 55 · 55 remaining",
+  climbing) — fixed in `sync.ts`/`drainQueueCore`/`EtsyBulkSyncModal`. **Until
+  this deploys to Netlify, do NOT re-run "Sync All"** — the live code still has
+  the bug and will loop. After deploy, run "Sync All" once: the ~55 items stuck
+  in `'pending'` (they show as "Not listed" in the admin until then) will be
+  re-synced as updates (image diff, not a re-upload) and land in
+  draft_review; the run should finish with processed ≈ item count, not
+  climbing. No migration, no manual DB cleanup. Full detail: `DECISIONS.md`
+  2026-07-08 (session 9, seventeenth addendum).
+
+- **🟡 Re-sync 2 corrected bracelets to Etsy (2026-07-08, session 9, fifteenth
+  addendum):** Two bracelets were mistyped as `Necklace` (data error) and
+  corrected to `Bracelet` in the DB (`vintage-tiffany-...-cuban-curb-link-bracelet-26`,
+  `italian-14k-yellow-gold-figaro-link-bracelet-25`). Their existing Etsy
+  drafts still show the old Necklaces > Chains category until re-synced.
+  **Action:** on each, click **Refresh Preview** (confirm it now reads
+  "Bracelets > Chain & Link Bracelets" with bracelet tags) then **Sync
+  Updates**. Optional/owner's call: a Mickey Mouse "Pendant" is typed `Charm`
+  (Charm vs Pendant — change it if you prefer Pendant). **Done (sixteenth
+  addendum):** the dry-run now shows a non-blocking warning when a title
+  implies a different type than `product_type`, to catch future mistypes
+  before syncing.
+
+- **🔴 Run `supabase/shop-special-price-default-2026-07.sql` in Supabase
+  (2026-07-08, session 9, fourteenth addendum):** Adds
+  `shop_settings.special_price_default_enabled` + `special_price_default_percent`
+  for the new site-wide **Customer Trade-in Price** default (Admin → Settings).
+  Verified live the columns don't exist yet — the feature is safely OFF and
+  every product page shows the plain melt value until this runs (reads degrade
+  gracefully). After running: Admin → Settings → Customer Trade-in Price →
+  enable + set a % (negative = below spot) → Save; a product page reflects it
+  within ~5 min (ISR). The canonical `supabase/shop-settings.sql` was updated
+  too (fresh installs get the columns). Full detail: `DECISIONS.md` 2026-07-08
+  (session 9, fourteenth addendum).
+
+- **🟡 Etsy sync — verify the mapping + preview changes live (2026-07-08,
+  session 9, seventh–twelfth addenda):** Owner-requested changes, code done,
+  not yet re-synced/reviewed in-browser: (1) **length AND ring size auto-push now**
+  with no Netlify flag (`ETSY_SYNC_BRACELET_LENGTH=false` /
+  `ETSY_SYNC_RING_SIZE=false` disable them); (2) **vintage/antique tags** on
+  every item ("vintage jewelry"/"antique jewelry" + metal-specific
+  "vintage sterling"/"antique sterling" etc., always paired); (3) **no more
+  mid-word tag truncation** ("solid silver bracele" → word-boundary cut);
+  (4) **manual "Test Length"/"Test Ring Size" windows removed** — length/ring
+  size now appear in the **dry-run preview** ("7.75 in · pushes on sync" /
+  "10 1/2 (US/CA) · pushes on sync"), approve by syncing;
+  (5) **Check Etsy Status now reconciles draft→active** (it used to leave the
+  chip stuck on "Draft on Etsy — needs review" after activating on Etsy);
+  (6) **"View on Etsy" now opens the shop-manager list** (active → default
+  listings view, draft → `state=draft` filter) instead of the public
+  `etsy.com/listing/<id>` URL;
+  (7) **the 22 "ineligible" silver items now all sync** — they only failed the
+  taxonomy check (granular types like "Berry Spoon"/"Coffee Pot"/"Koma Clasp"
+  weren't mapped); a keyword→Etsy-leaf fallback (`ETSY_KEYWORD_TAXONOMY` in
+  `mapping.ts`, real ids) maps flatware→Flatware & Silverware (exact),
+  holloware→closest serveware leaf (approximate), Koma→Brooches. Live pre-flight
+  re-run confirms 0 ineligible now;
+  (8) **two bulk-sync 400s fixed** — Etsy allows "&" at most once in a title;
+  two sterling pieces had two, so `mapTitle` now keeps the first "&" and spells
+  the rest "and". Also `extractEtsyMessage` (`client.ts`) now parses Etsy's
+  field-error shape so future title/tag rejections show the real reason, not a
+  bare "400". Re-sync those two pieces (Serving Spoon + Oval Gallery Tray);
+  (9) **markup Save button + dedicated price push** — the markup field now has
+  an explicit Save; new "Push prices to Etsy now" (settings) + per-item "Push
+  price" (product drawer) use a lean price-only path (ignores the daily
+  threshold) because bulk "Sync All" skips already-live listings. **Verify:**
+  change markup → Save → "Push prices to Etsy now" → confirm live prices update.
+  Also: open a product's Etsy drawer,
+  confirm Length/Ring size show in the preview (no separate test box), re-sync
+  any listing (and a Ring) and confirm the new tags render with no chopped
+  words + length/ring size land automatically; activate a draft on Etsy →
+  Check Etsy Status → confirm the chip flips to "Active on Etsy" and "View on
+  Etsy" opens the active manager view; and reopen "Sync all to Etsy" to confirm
+  it now reads ~70 eligible / 0 ineligible (spot-check a few silver-piece
+  categories in the preview, override any approximate holloware fit that's
+  wrong). **Note for owner:** "antique" on a genuinely-1990s piece is a keyword
+  stretch (free-text search tag, not the accurate `when_made` field) — say if
+  you want it narrowed to older items only. Full detail: `DECISIONS.md`
+  2026-07-08 (session 9, seventh–twelfth addenda).
+- **🟢 Etsy sync — necklace sync RESOLVED + Necklace now maps to "Chains"
+  (2026-07-08, session 9, fourth–sixth addenda):** The "hung up syncing"
+  incident is fully resolved — the necklace synced live after three
+  compounding fixes surfaced one-by-one: (1) a legacy relative image path
+  Node's `fetch()` couldn't resolve (`resolveImageUrl()` in `images.ts`),
+  (2) Etsy rejecting the 51-char `sku`/slug — now SKU is never pushed at all
+  (`sync.ts`), and (3) owner's follow-up: the **Necklace** product type now
+  auto-maps to **Chains (1221)** instead of the old "Pendant Necklaces"
+  closest-match, and no longer shows the "review" badge (Pendant is its own
+  product type). **Remaining optional owner action:** any necklace already
+  synced under Pendant Necklaces won't move to Chains automatically — re-sync
+  it, or fix its category on etsy.com, if you want it moved. New necklaces
+  land under Chains from the next sync. Full detail: `DECISIONS.md`
+  2026-07-08 (session 9, fourth / fifth / sixth addenda).
+- **🟢 Etsy sync — Ring size CONFIRMED WORKING + now auto-on (2026-07-08,
+  session 9, addendum + eighth addendum):** Live-verified: size 10.5 →
+  matched real chart entry `value_id 1604` → written → read back and
+  confirmed correct ("Ring size", "US/CA", "10 1/2"). Ran against a
+  manually-overridden category, a stronger proof than the default path
+  alone. **Now automatic** (session 9, eighth addendum) — ring size pushes
+  on every Ring sync by default, no Netlify change; set
+  `ETSY_SYNC_RING_SIZE=false` to disable. The manual "Test Ring Size" button
+  keeps working either way.
+- **🟡 Etsy sync — one more live click to confirm the Length generalization
+  (2026-07-08, session 9):** Click **Test Length** on a non-Bracelet,
+  non-Ring product (a Necklace or Earrings draft) — the mechanism is proven
+  for Bracelet only so far; this confirms it also holds for another
+  category's own property id. Safe regardless of outcome (write-then-verify,
+  never silently trusts a 200). Full detail: `project-docs/DECISIONS.md`
+  2026-07-08 (session 9).
+- **🟢 Etsy sync — Bracelet length CONFIRMED WORKING (2026-07-08, session 8) —
+  optional next step, owner's call:** Investigation closed. Live-verified:
+  `value_ids: ['']` (an empty-string placeholder, never a guessed number)
+  causes Etsy to auto-generate its own real value_id for the custom length
+  value; read back and independently confirmed correct (property "Length",
+  scale "Inches", value "7.75" — not a repeat of the old "Gray" bug).
+  Materials/Gold solidity/Gold purity remain separately confirmed correct
+  (session 5). **Optional next step:** set `ETSY_SYNC_BRACELET_LENGTH=true`
+  in Netlify to turn on automatic Bracelet-length pushing for every regular
+  sync — no code changes needed, purely an env var flip when ready. Not
+  urgent; the manual "Test Bracelet Length" button in each Bracelet
+  product's Etsy panel keeps working regardless. Full detail:
+  `project-docs/DECISIONS.md` 2026-07-08 (session 8, third addendum).
+- **🔴 Etsy sync — manually fix "Gray" in the bracelet's Bracelet length field
+  (2026-07-08, session 5):** A bad property-push guess wrote the literal text
+  "Gray" into the live bracelet listing's Bracelet length field instead of
+  "7.75" — Etsy accepted it silently rather than rejecting it, so the app
+  never saw an error. The buggy code path is now removed (`mapProperties()`
+  no longer pushes Length at all — see `DECISIONS.md` 2026-07-08 session 5),
+  so this is a one-time cleanup, not a recurring risk. Fix it directly on
+  etsy.com: clear the field and either type `7.75` or click Etsy's own
+  **"Suggested: + 7.75 Inches"** chip shown right below it.
+- **🟡 Etsy sync — two more live clicks needed (2026-07-08, sessions 3-4):**
+  1. The bracelet draft (`heavy-italian-14k-yellow-gold-cuban-link-bracelet-53-91g-21`)
+     was **deleted directly on etsy.com** by the owner. Click **Check Etsy
+     Status** on it first — should reset it to "Not listed" (etsy_listing_id
+     cleared) — before trying **Sync to Etsy** for a clean fresh publish.
+  2. On any *other* already-listed product, click **Sync Updates** to confirm
+     the `who_made`/`is_supply` PATCH fix (was erroring live with "Cannot
+     update 'when_made' without 'who_made' and without 'is_supply'").
+  Materials/Gold purity/solidity are now confirmed correct live (owner's
+  screenshot, session 5) — no longer an open question. Full detail:
+  `CURRENT_STATUS.md`/`DECISIONS.md` 2026-07-08 (sessions 3-5).
+- **🟢 Etsy sync — core pipeline live-verified (2026-07-08):** OAuth connect,
+  `supabase/etsy-sync.sql`, and a first real draft sync (bracelet, now
+  `draft_review` on Etsy) all succeeded live this session — see
+  CURRENT_STATUS.md's 2026-07-08 entries for each. Taxonomy IDs are pinned
+  from a real `getSellerTaxonomyNodes` call (6 of 12 are best-fit
+  approximations flagged `approximate: true` in `ETSY_TAXONOMY_MAP` —
+  optional owner review, not a blocker). **Still unverified live:** token
+  refresh, the scheduled price push, delist/relist, resume-after-interrupt,
+  and a dry-run across more than one product — full remaining checklist in
+  `etsy-sync-plan/14-verification-checklist.md`. Do not treat unit-test-green
+  as live-verified for anything still unchecked there.
 - **Run BOTH Quantity migrations in the live Supabase project, in order:**
   `supabase/product-quantity-2026-07.sql` (Phase 1 — `products.quantity`), then
   `supabase/checkout-quantity-2026-07.sql` (Phase 2 — `order_items.quantity` +

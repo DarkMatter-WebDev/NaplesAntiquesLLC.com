@@ -14,8 +14,19 @@
 create table if not exists public.shop_settings (
   id              boolean     primary key default true check (id),
   show_sold_items boolean     not null default true,
+  -- Site-wide default for the product-page trade-in line — see
+  -- shop-special-price-default-2026-07.sql. Off by default (plain melt value).
+  special_price_default_enabled boolean not null default false,
+  special_price_default_percent numeric,
   updated_at      timestamptz not null default now()
 );
+
+-- Additive columns for existing installs (no-op if the table was just created
+-- above with them). Keeps this canonical script safe to run on an older DB.
+alter table public.shop_settings
+  add column if not exists special_price_default_enabled boolean not null default false;
+alter table public.shop_settings
+  add column if not exists special_price_default_percent numeric;
 
 -- Seed the single row so reads always find it.
 insert into public.shop_settings (id, show_sold_items)

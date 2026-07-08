@@ -1,7 +1,794 @@
 ﻿# Current Status
 
 > Reflects the present state of development. **Update this at the end of every
-> work session.** Last updated: **2026-07-07**.
+> work session.** Last updated: **2026-07-08**.
+
+## 2026-07-08 (session 9, seventeenth addendum) -- 🔴 Fixed a bulk "Sync All" runaway (unbounded API calls)
+
+Owner reported "Sync all to Etsy" showing "Processed 79 of 55 · 55 remaining"
+and climbing without end. Root cause: `enqueueAllEligible` re-enqueues
+already-synced items (with `etsy_listing_id`) to `'pending'`, but
+`runSyncStep('publish')` does nothing for a `'pending'`-with-listing_id item
+(every publish step gates on a later state) — so it stayed `'pending'` and the
+drain re-claimed the same items every pass forever.
+
+Fixed in three layers: (1) **root cause** — `runSyncStep` now treats a
+`'pending'` item that already has a listing_id as an **update** (`effectiveMode`),
+pushing current content via the diff path (image DIFF, not a re-upload) and
+moving it to a terminal state; (2) **server** — `drainQueueCore` stops a pass
+if it re-claims an item that didn't leave the queue; (3) **client** —
+`EtsyBulkSyncModal` stops polling if `remaining` stays flat for 5 polls.
+
+**No migration / no manual data cleanup.** The stuck `'pending'` rows will be
+processed correctly by the first drain after this DEPLOYS. **Until deployed,
+don't re-run "Sync All"** (Netlify still has the bug — it'll loop). `npx tsc
+--noEmit`, `npx vitest run` (150/150, +1), `npm run lint`, `npm run build` all
+pass. **Owner action:** deploy → run "Sync All" once (it should finish now, and
+the stuck items land in draft_review). Full detail: `project-docs/DECISIONS.md`
+2026-07-08 (session 9, seventeenth addendum).
+
+## 2026-07-08 (session 9, sixteenth addendum) -- 🟢 Pre-flight warning for title↔product_type mismatches
+
+Follow-up to the bracelet-mistype fix: the Etsy dry-run now shows a
+non-blocking amber warning when a listing's title clearly implies a different
+type than its `product_type` (e.g. a "…Bracelet" typed as Necklace) — so future
+mistypes are caught before syncing. `titleImpliedJewelryType()` only fires on
+an unambiguous single-type title (sets / "Pendant Necklace" / spoons don't
+trigger it), and types are grouped so neck-worn swaps (Pendant/Charm/Necklace)
+don't nag. It's a warning, never a block, and never auto-corrects
+(`product_type` stays owner-controlled). `npx tsc --noEmit`, `npx vitest run`
+(149/149, +8 tests), `npm run lint`, `npm run build` all pass. Full detail:
+`project-docs/DECISIONS.md` 2026-07-08 (session 9, sixteenth addendum).
+
+## 2026-07-08 (session 9, fifteenth addendum) -- 🟡 Data fix: 2 bracelets were typed as "Necklace" (mis-categorized on Etsy)
+
+Owner spotted a Cuban-curb-link **bracelet** syncing under Necklaces > Chains
+with "necklace" tags. Root cause = a **data** error, not the mapping: its
+`product_type` was `Necklace`. Audited the whole catalog for title↔type
+mismatches — found 5; **2 were unambiguous** (bracelets typed as Necklace) and
+3 were legitimate owner choices (a Mickey "pendant" typed as Charm, two
+"Koma Clasp" items). Corrected the 2 via direct service-role UPDATE
+(`product_type` + `jewelry_type` → `Bracelet`):
+`vintage-tiffany-...-cuban-curb-link-bracelet-26` and
+`italian-14k-yellow-gold-figaro-link-bracelet-25`. Verified downstream: they
+now map to **Jewelry > Bracelets > Chain & Link Bracelets (1196, exact)** with
+bracelet tags ("cuban link bracelet", "solid gold bracelet", …).
+
+**Owner action:** on those 2 listings click **Refresh Preview** then **Sync
+Updates** — the update path (`setListingCopy`) pushes `taxonomy_id` + tags, so
+the existing Etsy drafts move to the Bracelet category. The public shop
+reflects the type change within ~5 min (ISR; the direct DB write bypasses the
+app's instant revalidation). The 3 ambiguous items were left as-is (the Mickey
+"Charm" vs "Pendant" call is the owner's). Full detail: `DECISIONS.md`
+2026-07-08 (session 9, fifteenth addendum).
+
+## 2026-07-08 (session 9, fourteenth addendum) -- 🔴 Site-wide customer trade-in price default (needs a SQL migration)
+
+New Admin → Settings panel **Customer Trade-in Price**: set the "Own gold or
+silver? … pay as little as ___" line to a signed % over/under the spot melt
+value for ALL items at once (negative = below spot). The existing per-item
+override still wins. Resolution centralized in
+`resolveAdvertisedTradeInPrice()` (per-item override → site default → plain
+melt). Stored on `shop_settings` (`special_price_default_enabled/_percent`);
+the shop-settings route now handles a partial patch (visibility toggle still
+works). Public product page wired to the new resolver; changes propagate
+within ~5 min (ISR, like spot values).
+
+**🔴 PENDING MANUAL STEP — run `supabase/shop-special-price-default-2026-07.sql`
+in Supabase** (adds the two columns). Verified live the columns don't exist
+yet, so the feature is safely OFF until then — every page shows the plain melt
+value (confirmed: a real product page renders its melt value unchanged). Reads
+degrade gracefully pre-migration.
+
+`npx tsc --noEmit`, `npx vitest run` (141/141, +5 tests), `npm run lint`, `npm
+run build` all pass. Admin panel not driven live (needs login); public
+consumer verified. **Owner action:** run the SQL, then enable + set a % in
+Admin → Settings → Customer Trade-in Price → Save. Full detail:
+`project-docs/DECISIONS.md` 2026-07-08 (session 9, fourteenth addendum).
+
+## 2026-07-08 (session 9, thirteenth addendum) -- 🟡 Etsy sync: markup Save button + dedicated "Push prices now" (bulk + per-item)
+
+Two re-pricing improvements:
+1. **Explicit Save button** on the Etsy price-markup field (was auto-save on
+   blur). Controlled field, disabled until changed, no-effect derived pattern.
+2. **Dedicated price push** — because the bulk "Sync All to Etsy" *skips*
+   already-live listings (so it never re-prices what's up), and the daily push
+   is threshold-gated + cron-only. New `pushPricesBatch()` +
+   `/api/admin/etsy/push-prices` re-sends the current price of every live
+   listing whose price drifted, via the lean price-only path, ignoring the
+   threshold; batched/resumable/stall-guarded. Surfaced as a **"Push prices to
+   Etsy now"** button in Etsy Sync settings and a per-item **"Push price"**
+   button in each product's Etsy drawer.
+
+`npx tsc --noEmit`, `npx vitest run` (136/136), `npm run lint`, `npm run build`
+all pass; `/api/admin/etsy/push-prices` in the manifest. **Owner action:**
+change markup → Save → "Push prices to Etsy now"; confirm live prices update.
+Full detail: `project-docs/DECISIONS.md` 2026-07-08 (session 9, thirteenth
+addendum).
+
+## 2026-07-08 (session 9, twelfth addendum) -- 🟡 Etsy sync: fixed the 2 remaining bulk-sync 400s (title "&"-once rule) + made Etsy field-errors legible
+
+Owner bulk-synced after the eleventh-addendum fix — most succeeded, **2 failed
+with a bare "Etsy request failed (400)."** Read the real reason from
+`etsy_sync_log.detail`: both hit Etsy's rule that **"&" may appear at most once
+in a title** (both had two, e.g. "Grape & Scroll … Sterling & England"). Not a
+category issue.
+
+Fixed: `mapTitle` now keeps the first "&" and converts the rest to "and"
+(confirmed on the two real titles — both drop to 1 "&", maker names intact).
+Also fixed the diagnostic gap that hid the reason: `extractEtsyMessage` in
+`client.ts` now parses Etsy's numeric-keyed field-error shape, so a
+title/tag/field rejection shows its real message instead of a generic 400.
+
+`npx tsc --noEmit`, `npx vitest run` (136/136, +7 tests incl. new
+`client.test.ts`), `npm run lint`, `npm run build` all pass. **Owner action:**
+re-sync the two silver pieces (Serving Spoon + Oval Gallery Tray) — should
+publish now. Full detail: `project-docs/DECISIONS.md` 2026-07-08 (session 9,
+twelfth addendum).
+
+## 2026-07-08 (session 9, eleventh addendum) -- 🟢 Etsy sync: the 22 "ineligible" silver items are now all eligible
+
+Owner's "Sync all to Etsy" showed 22 ineligible items. Diagnosed against the
+live catalog: **all 22 failed ONLY the taxonomy check** — the owner enters
+granular silver product types (Berry Spoon, Cold Meat Fork, Coffee Pot, Salt
+Cellar, Koma Clasp, Tray, Napkin Ring, …) that aren't among the ~13 coarse
+`ProductJewelryType` keys in `ETSY_TAXONOMY_MAP`, so they had no category and
+were blocked.
+
+Fixed with `ETSY_KEYWORD_TAXONOMY` in `mapping.ts` — an Etsy-scoped
+keyword→leaf fallback (real ids fetched live) consulted only when the coarse
+map misses: flatware → Flatware & Silverware (1048, exact); trays/pots/cellars/
+bowls → their closest serveware leaf (approximate); Koma clasps → Brooches
+(1201). Doesn't touch app-wide `normalizeProductJewelryType`. **Re-ran the live
+pre-flight: 0 ineligible, all 74 available items eligible.** Approximate fits
+show "Closest match — review" and can be overridden per item.
+
+Also: the bulk modal's ineligible list now shows the *reason* per item, not
+just the name. `npx tsc --noEmit`, `npx vitest run` (129/129, +5 tests), `npm
+run lint`, `npm run build` all pass. **Owner action:** reopen "Sync all to
+Etsy" (~70 eligible / 0 ineligible now) and spot-check categories in the
+preview. Full detail: `project-docs/DECISIONS.md` 2026-07-08 (session 9,
+eleventh addendum).
+
+## 2026-07-08 (session 9, tenth addendum) -- 🟡 Etsy sync: Check Etsy Status reconciles draft→active; View on Etsy → shop-manager pages
+
+Two owner-reported fixes after activating a listing on Etsy:
+1. **Check Etsy Status now updates the chip.** It used to only *report* Etsy's
+   state when the listing still existed (only wrote back on the deleted/404
+   case), so activating a draft on Etsy left our chip stuck on "Draft on Etsy
+   — needs review". `checkListingStatus()` now writes Etsy's real state back
+   (active → "Active on Etsy", inactive/expired/sold_out → delisted, draft →
+   keeps our finer draft-family state). The chip flips immediately since the
+   client reloads after the check.
+2. **"View on Etsy" now opens the owner's shop-manager list**, not the public
+   `etsy.com/listing/<id>` URL (which doesn't work for drafts). Active →
+   the default listings view; draft/other → the `state=draft` filter. Driven
+   by `listing_state`, which fix #1 keeps accurate.
+
+`npx tsc --noEmit`, `npx vitest run` (124/124), `npm run lint`, `npm run
+build` all pass. **Not verified live** (needs a live Etsy listing + admin
+login). **Owner action:** activate a draft on Etsy → Check Etsy Status →
+confirm chip flips to "Active on Etsy" and "View on Etsy" opens the active
+manager view. Full detail: `project-docs/DECISIONS.md` 2026-07-08 (session 9,
+tenth addendum).
+
+## 2026-07-08 (session 9, ninth addendum) -- 🟡 Etsy sync: manual test windows removed, length/ring size folded into the dry-run preview
+
+Owner asked to drop the separate "Test Length" / "Test Ring Size" windows and
+show those values in the dry-run preview for approve-by-sync. Done:
+- The two manual-test UI sections (inputs + Test buttons + JSON boxes) are
+  gone from `EtsyProductPanel.tsx`.
+- The dry-run preview now shows a **Length** row (length-bearing types) or a
+  **Ring size** row (Rings) with the computed value that will push ("7.75 in
+  · pushes on sync" / "10 1/2 (US/CA) · pushes on sync") or "nothing to push"
+  when the source field is empty. Computed in `preview/route.ts` with the
+  existing pure parsers — no Etsy calls, so the dry-run stays read/write-free.
+- Cleaned up the now-orphaned code: deleted the two experiment API routes and
+  the `runLengthExperiment`/`runRingSizeExperiment` manual functions. The
+  automatic path (`attemptLengthSync`/`attemptRingSizeSync`) is untouched.
+
+`npx tsc --noEmit`, `npx vitest run` (124/124), `npm run lint`, `npm run
+build` all pass. Restarted the dev server to clear a stale compiled chunk
+(source verified clean). **Not visually verified in-browser** (admin panel
+needs a login the preview lacks) — build/type-check is the proof. **Owner
+action:** open a product's Etsy drawer, confirm Length/Ring size show in the
+preview, then sync. Full detail: `project-docs/DECISIONS.md` 2026-07-08
+(session 9, ninth addendum).
+
+## 2026-07-08 (session 9, eighth addendum) -- 🟡 Etsy sync: Ring size now auto-on too
+
+Owner asked to make ring size automatic like length. Flipped the same gate
+in `sync.ts` from opt-in (`ETSY_SYNC_RING_SIZE === 'true'`) to on-by-default
+(`!== 'false'`). Ring size now pushes on every Ring sync with no Netlify
+change; `ETSY_SYNC_RING_SIZE=false` disables it. Length and ring size are
+now both default-on, each independently disable-able. Same safety
+(read-back + verify, real chart values only — never a guess).
+
+`npx tsc --noEmit`, `npx vitest run` (124/124), `npm run lint`, `npm run
+build` all pass. **Owner action:** sync a Ring and confirm the size lands
+automatically. Full detail: `project-docs/DECISIONS.md` 2026-07-08 (session
+9, eighth addendum).
+
+## 2026-07-08 (session 9, seventh addendum) -- 🟡 Etsy sync: length auto-on + vintage/antique tags + no mid-word truncation
+
+Three owner asks after the necklace sync worked:
+
+1. **Length auto-pushes now — no Netlify flag needed.** Flipped the code gate
+   from opt-in (`ETSY_SYNC_BRACELET_LENGTH === 'true'`) to on-by-default
+   (`!== 'false'`) in `sync.ts`, since the owner confirmed it works and I
+   can't set Netlify vars myself. Set `ETSY_SYNC_BRACELET_LENGTH=false` to
+   turn it back off. Still safe (write→read-back→verify, fails closed). Ring
+   size stays opt-in (owner only asked about length).
+2. **Vintage/antique tags.** Every item now gets "vintage jewelry" + "antique
+   jewelry", plus a metal-specific pair ("vintage sterling"/"antique
+   sterling" for silver, "vintage gold"/"antique gold", etc.). Pairs are
+   atomic (never a lone "vintage" without "antique", per the owner's rule).
+3. **No more chopped tags.** The live "solid silver bracele" bug (a 21-char
+   tag hard-cut to 20 mid-word) is fixed — tags now truncate at a word
+   boundary ("solid silver").
+
+`npx tsc --noEmit`, `npx vitest run` (124/124, +4 tag tests), `npm run lint`,
+`npm run build` all pass. **Owner action:** re-sync a listing and confirm the
+new tags + automatic length. Note: "antique" on a 1990s piece is a keyword
+stretch (it's a free-text tag, not the accurate `when_made` field) — flagged
+in case you want it narrowed later. Full detail: `project-docs/DECISIONS.md`
+2026-07-08 (session 9, seventh addendum).
+
+## 2026-07-08 (session 9, sixth addendum) -- 🟢 Etsy sync: necklace sync WORKED live; Necklace now auto-maps to "Chains"
+
+The necklace sync succeeded live after the image-path + SKU fixes — the
+original "hung up syncing" incident is resolved. Owner then noticed it
+landed under "Pendant Necklaces" (the old closest-match) and asked for
+chain-style necklaces to auto-map to **"Chains"** instead, since this
+catalog is mostly chains.
+
+Done: `ETSY_TAXONOMY_MAP.Necklace` now points to **Chains (taxonomy_id
+1221)** instead of Pendant Necklaces (1229). The real id came from a live
+`seller-taxonomy/nodes` fetch (siblings cross-checked against already-pinned
+ids), and Chains was confirmed to carry the same Material/Gold solidity/Gold
+purity/Length properties this app pushes — so nothing about the property
+push changes. Dropped the `approximate` flag too (Pendant is its own product
+type, so "Necklace" genuinely means a chain here) → no more "Closest match —
+review" nag on necklaces.
+
+**Does not retro-move already-synced necklaces** — only future syncs/
+re-syncs send Chains; existing Etsy listings stay under Pendant Necklaces
+until re-synced or corrected on etsy.com. `npx tsc --noEmit`, `npx vitest
+run` (120/120), `npm run lint`, `npm run build` all pass. **Owner action:**
+sync a necklace and confirm it lands under Necklaces › Chains. Full detail:
+`project-docs/DECISIONS.md` 2026-07-08 (session 9, sixth addendum).
+
+## 2026-07-08 (session 9, fifth addendum) -- 🟡 Etsy sync no longer pushes SKU at all (owner's explicit call)
+
+Same necklace, next error after the image-path fix: `Etsy rejected the
+request: There was a problem with /sku : cannot be more than 32 characters`
+(the product's `sku` field holds its 51-character slug). Owner: *"i dont
+need to upload sku to etsy at all (its no use to me)."* Fixed permanently
+by no longer sending `sku` in the `updateListingInventory` payload at all
+(`next-app/src/lib/etsy/sync.ts`) — not a truncation, a full removal.
+
+**Accepted trade-off (disclosed, not silent):** the original design used
+the pushed SKU for a narrow crash-recovery guard (adopt an orphaned Etsy
+draft on retry if a prior sync died between Etsy accepting the create call
+and our DB write). That guard can never match anything once SKU isn't
+pushed, so it was removed outright rather than left as dead API calls on
+every publish. Residual risk is low: a sync dying in that exact narrow
+window now creates an extra draft instead of adopting one — an easily
+spotted, easily deleted stray, not live-listing corruption. Also removed
+the now-misleading "SKU" row from the admin dry-run preview (it implied
+the value gets pushed, which is exactly the assumption that prompted this
+change). `mapSku()` itself is untouched — still feeds the description's
+"Inventory #:" line and the content-hash change detector, neither of which
+has a length constraint.
+
+`npx tsc --noEmit`, `npx vitest run` (118/118), `npm run lint` (0
+problems), `npm run build` all pass. **Not yet re-verified live — owner
+action:** retry the necklace sync once more; this should clear both the
+image-path error and this SKU error together. Full detail:
+`project-docs/DECISIONS.md` 2026-07-08 (session 9, fifth addendum).
+
+## 2026-07-08 (session 9, fourth addendum) -- 🟡 Fixed the real cause the circuit breaker surfaced — relative legacy image paths
+
+The necklace sync (previous entry) failed fast with a real reason instead of
+looping forever: `Failed to parse URL from
+/assets/images/shop/shop-14k-heavy-diamond-cut-cuban-chain-04.webp`. Root
+cause: this product has an image stored as a relative, same-origin path (a
+legacy convention from before photos moved to Supabase Storage) instead of a
+full URL. Node's server-side `fetch()` has no implicit page origin, unlike a
+browser, so it threw immediately on every attempt — a pre-existing gap in
+the original build (the file's header comment always claimed to support
+both source types; the code never actually handled the relative case).
+
+**Fixed:** new `resolveImageUrl()` in `next-app/src/lib/etsy/images.ts`
+passes absolute URLs through untouched and resolves anything else against
+the app's canonical site URL (reused the existing `getSiteUrl()` helper from
+`order-email-branding.ts`). `fetchImageBytes` now calls it before fetching.
+No database reset needed — the existing retry-from-`error` path and the
+circuit breaker's own success-resets-the-counter logic handle it.
+
+`npx tsc --noEmit`, `npx vitest run` (118/118, incl. 4 new regression tests
+for this exact path), `npm run lint` (0 problems), `npm run build` all pass.
+**Not yet re-verified live — owner action:** retry the necklace sync once
+more; this should be the actual resolution of the original "hung up
+syncing" report. Full detail: `project-docs/DECISIONS.md` 2026-07-08
+(session 9, fourth addendum).
+
+## 2026-07-08 (session 9, third addendum) -- 🟡 Fixed a real infinite-retry loop during image sync (found while testing Length on a Necklace)
+
+Owner tried testing Length on a Necklace and the sync appeared to hang
+("Uploading image 4 of 8…" forever). Investigation found this was genuinely
+stuck, not just slow: 100+ identical sync calls, zero images ever recorded.
+Root cause: the image step already correctly downgrades a single bad photo
+to a warning (by design, so one bad image doesn't block a whole sync) — but
+nothing distinguished "some images succeeded" from "every image in this
+batch failed," so a persistently-failing image got retried forever, and the
+warning explaining why was being silently discarded by the client during
+polling the entire time.
+
+**Fixed at two independent layers:**
+- **Server (`sync.ts`):** tracks real successes vs. attempts; after 5
+  consecutive zero-progress batches, stops and marks the listing `error`
+  with a clear message instead of looping forever.
+- **Client (`EtsyProductPanel.tsx`):** now shows warnings live during
+  polling (previously only shown at the very end) and independently stops
+  after 5 identical progress responses in a row.
+
+Also hit a **stale dev-server cache** (`ReferenceError: isBracelet is not
+defined` — a variable renamed last session; confirmed the actual source is
+clean). Fixed by restarting the dev server — this project's known
+Turbopack/OneDrive cache quirk, not a code bug.
+
+`npx tsc --noEmit`, `npm run lint` (0 problems), `npm run build`, 114 tests
+all pass. **🟡 Still unknown:** why this specific necklace's images
+actually fail to upload — the fix makes the failure fast and visible
+instead of silent and infinite, but doesn't diagnose the root cause yet.
+**Owner action:** retry the necklace sync — safe either way now (succeeds,
+or fails fast with a real reason within ~5 attempts). Full detail:
+`project-docs/DECISIONS.md` 2026-07-08 (session 9, third addendum).
+
+## 2026-07-08 (session 9, addendum) -- 🟢 Ring size CONFIRMED WORKING live
+
+Owner ran **Test Ring Size** (10.5) on a real draft ring listing — genuine,
+independently-verified success:
+
+```
+Verified — Etsy's "Ring size" property now reads 10 1/2 (US/CA).
+```
+
+`10.5` → `"10 1/2"` → matched a real chart entry (`value_id 1604`, never
+invented) → written → read back and confirmed on all three checks (property
+name, scale, value). Notably ran against a **manually-overridden** category
+("Multi-Stone Rings," not our automatic guess) — a stronger proof than
+testing the default path alone. Updated code comments and admin UI copy
+from "Experimental" to "confirmed working," matching Length's session 8
+treatment. No logic changed — `tsc`/`lint`/114 tests all still pass.
+
+**Still outstanding (unrelated to this result):** confirming the Length
+generalization on a non-Bracelet category (a Necklace or Earrings draft) —
+Length is proven for Bracelet only so far. **`ETSY_SYNC_RING_SIZE`** is
+still unset in Netlify — proven, but turning it on for regular syncs is the
+owner's call. Full detail: `project-docs/DECISIONS.md` 2026-07-08 (session
+9, addendum).
+
+## 2026-07-08 (session 9) -- 🟡 Etsy sync: Length generalized to 11 categories, Ring size built from scratch — needs live clicks to confirm
+
+Owner asked to generalize the proven Bracelet-length mechanism to other
+categories, naming Ring size and Necklace length. These turned out to need
+different treatment:
+
+- **Length generalized (near-zero new risk):** the discover/write/verify
+  logic never actually depended on Bracelet — only the gating did. Widened
+  to every category confirmed to carry a length property: Necklace,
+  Bracelet, Pendant, Charm, Earrings, Brooch, Cufflinks, Watch, Coin,
+  Bullion, Silverware (all except Ring). Renamed
+  `attemptBraceletLengthSync`/`runBraceletLengthExperiment` to generic names
+  (route moved `bracelet-length-experiment` → `length-experiment`); the
+  `ETSY_SYNC_BRACELET_LENGTH` env var name is unchanged to avoid a needless
+  Netlify config edit.
+- **Ring size built new** (`next-app/src/lib/etsy/ring-size-experiment.ts`):
+  confirmed live this is a genuinely different, enumerated property (real
+  sizes like "7 1/2", scoped to a region — US/CA vs UK/AU, which uses
+  **letter notation** for physically different sizes). Because every
+  standard size already has a real, discoverable value_id, this never needs
+  Length's empty-string placeholder — it only ever uses a real matched
+  value, and reports "unsupported for this value" (never a guess) when a
+  size has no chart match. New `ETSY_SYNC_RING_SIZE` flag (off by default),
+  new "Test Ring Size" admin section for Ring products.
+- Cleaned up the admin UI's category detection: it used to pattern-match
+  `taxonomyPath` display text, which doesn't scale across 11 categories
+  spanning 4 different Etsy departments. The preview API now returns an
+  authoritative `productType` field instead.
+
+`npx tsc --noEmit`, `npm run lint` (0 problems), `npm run build` all pass.
+**114 unit tests pass** (up from 93), including 21 new Ring-size tests using
+the real live-fetched chart data. **🟡 Needs live clicks:** "Test Ring Size"
+on a draft Ring listing, and "Test Length" on a non-Bracelet category
+(Necklace/Earrings/etc.) to confirm the generalization holds outside
+Bracelet specifically. Full detail: `project-docs/DECISIONS.md` 2026-07-08
+(session 9).
+
+## 2026-07-08 (session 8, third addendum) -- 🟢 Etsy Bracelet length CONFIRMED WORKING — investigation closed
+
+Owner re-ran **Test Bracelet Length** (7.75) after the read-back fix — real,
+independently-verified success this time:
+
+```
+Verified — Etsy's "Bracelet length" property now reads 7.75 Inches.
+```
+
+`verifyLengthReadback` confirmed all three checks itself (property name,
+scale, and parsed value all correct) — this is not just "Etsy said 200," the
+same standard that caught the "Gray" false-positive would have caught this
+if it were wrong too. **Mechanism confirmed:** `value_ids: ['']` (an
+empty-string placeholder, never a guessed number) causes Etsy to
+auto-generate and assign its own real, shop-scoped `value_id` for the
+custom length value — confirmed via the read-back showing a real Etsy-issued
+id (`52788369096`) we never supplied ourselves.
+
+**This closes the investigation opened at the start of session 7.**
+Materials, Gold solidity, Gold purity, and now Bracelet length are all
+confirmed correct live. Updated code comments and the admin UI copy from
+"unproven experiment" to "confirmed working." Scope stays deliberately
+Bracelet-only (not generalized to other length-bearing categories — not
+asked for). **`ETSY_SYNC_BRACELET_LENGTH` is still unset** — the mechanism
+is proven, but turning on automatic pushing for every regular sync is the
+owner's call; see `etsy-sync-plan/OWNER-SETUP.md`. Full detail:
+`project-docs/DECISIONS.md` 2026-07-08 (session 8, third addendum).
+
+Owner re-synced the bracelet and re-ran the length experiment. Got a 404
+that didn't add up (the listing genuinely existed and was fully synced), so
+it was investigated rather than accepted. **Root cause: the read-back
+verification (`getListingProperty`, the singular endpoint) was built on an
+Etsy endpoint whose own spec says "Development... in progress, will only
+return a 501"** — it was never going to work, missed when first researched
+in session 5/7. Fixed by switching to `getListingProperties` (plural, the
+"General Release" list endpoint) in `client.ts`; `length-experiment.ts` now
+finds the right entry from the full list. Also split the write and
+read-back into separate try/catch blocks so a future failure states clearly
+which phase broke.
+
+**Important nuance:** because the OLD code's write and read-back weren't
+separated, it's possible the previous run's write (`value_ids: ['']`)
+actually succeeded and only the (broken) verification step failed — meaning
+we don't know if the live bracelet draft currently has something written to
+its Bracelet length field or not. Re-running is safe either way (same value,
+idempotent write) and will now give a real, trustworthy answer.
+
+`npx tsc --noEmit`, `npm run lint` (0 problems), 93 tests pass. **🟡 Needs
+one more live click:** "Test Bracelet Length" (7.75) on the bracelet again.
+Full detail: `project-docs/DECISIONS.md` 2026-07-08 (session 8, second
+addendum).
+
+## 2026-07-08 (session 8) -- Etsy Bracelet length: live-tested, safety design confirmed, genuinely unsupported for now
+
+Owner ran the "Test Bracelet Length" experiment (session 7) live: Etsy
+rejected it with `Missing input parameter: [value_ids]` — a clean HTTP 400,
+**no data written**. This proves the rebuilt safety design works exactly as
+intended (loud rejection instead of the old silent "Gray" corruption).
+Followed the owner's own rule to stop here rather than guess further.
+Bracelet length stays unsupported; `ETSY_SYNC_BRACELET_LENGTH` stays unset.
+Also fixed a small UI redundancy (the result was shown twice — top banner +
+result box; now only the dedicated result box, which persists instead of
+auto-dismissing).
+
+**Same session, addendum:** owner chose to try one more variant —
+`value_ids: ['']` (one key, empty string — distinct from the zero-keys case
+just confirmed to fail). Implemented (`client.ts`'s `updateListingProperty`
+now accepts `(number | '')[]`, `length-experiment.ts`'s fallback changed
+from `[]` to `['']`); `npx tsc --noEmit`, `npm run lint` (0 problems), 93
+tests pass. **🟡 Not yet run live** — click "Test Bracelet Length" again to
+see whether this variant fares any differently. Full detail:
+`project-docs/DECISIONS.md` 2026-07-08 (session 8).
+
+## 2026-07-08 (session 7) -- 🟡 Etsy Bracelet length rebuilt as a safe discover-write-verify cycle, still off by default
+
+Rebuilt Bracelet length syncing (removed in session 5 after a hardcoded guess
+wrote "Gray" instead of "7.75") to the owner's explicit spec: never hardcode
+a property/scale/value id, never derive a value id from the length number,
+never trust a 200 response — always read the property back and compare.
+
+- **New `next-app/src/lib/etsy/length-experiment.ts`:** live-discovers the
+  Bracelet length property/Inches-scale from Etsy's own
+  `getPropertiesByTaxonomyId` response every time (nothing hardcoded), builds
+  a safe payload (real `possible_values` match if one exists, otherwise an
+  empty `value_ids` array — never a guessed number), writes it, then reads
+  the property back and fails closed on any mismatch.
+- **New admin action, not automatic:** a "Test Bracelet Length" section in
+  each Bracelet product's Etsy panel (`/admin`) — type an inches value, run
+  it, see the full discovered property id/scale id/payload/read-back. Hard
+  safety rail: refuses to run against an active (live) listing, draft
+  listings only.
+- **New env var `ETSY_SYNC_BRACELET_LENGTH`** (unset by default) — only once
+  the owner has manually proven the experiment succeeds should this be set
+  to `true` in Netlify, which turns on automatic Bracelet-length pushing in
+  the regular sync pipeline (same discover-write-verify logic, no
+  active-listing restriction at that point). A verification mismatch always
+  shows as a warning, never a silent success.
+- **Verification:** `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run
+  build` all pass. **93 unit tests pass** (up from 71) — includes a direct
+  regression test asserting `value_ids` is never `[5]` (the exact session-5
+  bug) even when the target length coincidentally equals a scale id, and the
+  real "Gray" incident replayed against the verification logic and confirmed
+  caught.
+- **🟡 Not yet run live** — needs the owner to click "Test Bracelet Length"
+  on a draft Bracelet listing (I can't drive the admin session myself). Full
+  detail: `project-docs/DECISIONS.md` 2026-07-08 (session 7).
+
+## 2026-07-08 (session 6) -- Etsy image pipeline now checks against Etsy's own photo guidance
+
+Owner shared Etsy's seller-help photo tips (2000px both dimensions, first
+photo 635px floor for search ranking, keep uploads under 1MB) and asked if
+our pipeline matches. `next-app/src/lib/etsy/images.ts`: fixed the existing
+2000px check to require the **shortest** edge clear it (was longest-edge
+only — a 2400x1200 photo used to pass incorrectly); added a first-photo-only
+635px check; added a >1MB warning; added a resize-down-only cap (2400px,
+never upscales) so oversized phone photos don't balloon file size/transcode
+time while still safely clearing the recommendation. All non-blocking
+(warnings only, same as every other property/image check in this pipeline).
+**Deliberately not done:** intake-time validation on new photo uploads, or a
+catalog-wide audit of existing product photos already below these
+thresholds — both are real follow-ups but scoped differently (admin upload
+UX / a new report) and weren't asked for. `npx tsc --noEmit`, `npm run lint`
+(0 problems), `npm run build` all pass; 71 unit tests pass (up from 64).
+Full detail: `project-docs/DECISIONS.md` 2026-07-08 (session 6).
+
+## 2026-07-08 (session 5) -- 🟢🔴 Etsy category properties: Materials/Gold purity/solidity confirmed correct live; Length removed after it silently corrupted a listing
+
+The owner's live bracelet listing confirmed **Materials ("Yellow gold"), Gold
+solidity ("Solid gold"), and Gold purity ("14k") all pushed exactly right** —
+this part of the properties feature (session 3) is now live-verified, not
+just unit-tested.
+
+**Bracelet length showed "Gray" instead of "7.75".** Unlike every other guess
+this session, Etsy didn't reject this one with an error — it silently
+accepted the malformed `value_ids` and stored a value from a completely
+unrelated global vocabulary (a color). Researched Etsy's own tutorial docs
+for the correct format: their own example for a scale-based property shows
+an opaque, undocumented numeric id with no way to derive or obtain it
+ourselves. Given a wrong guess here doesn't fail safely, **removed the Length
+property push entirely** (`next-app/src/lib/etsy/mapping.ts`) rather than
+risk writing more silently-wrong data. Full reasoning:
+`project-docs/DECISIONS.md` 2026-07-08 (session 5).
+
+- **Verification:** `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run
+  build` all pass. 64 unit tests pass (down from 69 — 5 Length-specific tests
+  removed as no longer applicable).
+- **🔴 Owner action needed:** the live bracelet listing still has "Gray" in
+  its Bracelet length field — fix it directly on etsy.com (clear it, click
+  Etsy's own **"Suggested: + 7.75 Inches"** chip, or type `7.75`). Nothing in
+  this app will touch that field going forward.
+
+## 2026-07-08 (session 4) -- 🟡 Etsy sync: fixed a real update-mode bug, added a "Check Etsy Status" reconciliation button
+
+Two follow-ups from live-testing the properties feature (previous entry):
+
+- **Fixed a real live bug:** clicking **Sync Updates** failed with `"Etsy
+  rejected the request: Cannot update 'when_made' without 'who_made' and
+  without 'is_supply' and vice versa"`. `setListingCopy` in
+  `next-app/src/lib/etsy/sync.ts` sent `when_made` alone on the update-mode
+  PATCH; Etsy requires the three fields together. Fixed by adding
+  `who_made`/`is_supply` (already computed, just not passed here) to that
+  call.
+- **New: "Check Etsy Status" button.** The owner deleted a draft directly on
+  etsy.com to remake it cleanly, and the admin panel kept showing "Draft on
+  Etsy" — our DB has no way to learn about an out-of-band deletion by
+  itself. Added `checkListingStatus()` (`sync.ts`) + `POST
+  /api/admin/etsy/verify-listing`: GETs the real listing, and a 404 (Etsy
+  hard-deletes draft listings) resets the local row to not-listed so **Sync
+  to Etsy** reappears for a clean remake. New button in
+  `EtsyProductPanel.tsx`, shown only when a listing is linked, reusing the
+  existing notice-banner pattern.
+- **Verification:** `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run
+  build` all pass; 69 unit tests still pass (neither change is unit-tested
+  directly — both need a live DB + Etsy connection, same as
+  `runSyncStep`/`runDelist`, which also have no dedicated tests). **Not yet
+  verified live** — no admin session available to click through. **Owner
+  action:** click **Sync Updates** again on any previously-active/draft_review
+  listing to confirm the who_made/is_supply fix; click **Check Etsy Status**
+  on the deleted bracelet draft to confirm it resets to "Not listed" (then
+  **Sync to Etsy** should offer a clean fresh publish). Full detail:
+  `project-docs/DECISIONS.md` 2026-07-08 (session 4).
+
+## 2026-07-08 (session 3) -- 🟡 Etsy sync: structured category properties (Material/Gold purity/Length) now pushed for every product type — needs one live click to confirm
+
+After the tag-quality refinement (previous entry), the owner asked whether we
+could auto-accept Etsy's own "Suggested" attribute chips (Material, Gold
+purity, Gemstone, Bracelet width/length, Adjustable) shown in Etsy's listing
+editor. The v3 API has no endpoint exposing those UI suggestions — confirmed
+by a full spec search (only `suggested_title` exists, a title suggestion, not
+attributes). Built the constructive alternative instead: push the same kind
+of values ourselves via `updateListingProperty`, using data already on the
+product record.
+
+- **New `mapProperties()` in `next-app/src/lib/etsy/mapping.ts`**, wired into
+  `sync.ts`'s existing inventory step (`pushListingProperties()`) as an
+  additive, best-effort sub-step — never blocks or fails the sync, per-property
+  try/catch turns any failure into a `warnings[]` entry instead (already
+  surfaced in the admin UI via `EtsyProductPanel.tsx`'s existing notice banner).
+  Only pushes: **Material**, **Gold solidity/purity** (Gold items only), and a
+  **length-equivalent property** (Bracelet/Necklace length, Small jewelry
+  length for Earrings/Brooch, or the generic Length property for everything
+  else). Deliberately never guesses Gemstone, Bracelet/Pendant width,
+  Adjustable, Closure, Ring size, or Watch band material — none has a source
+  column anywhere in the schema.
+- **Generalized across every product type per the owner's explicit request**
+  ("apply to any product type, including sterling categories like spoons"):
+  fetched `getPropertiesByTaxonomyId` live for all 10 unique pinned taxonomy
+  ids and found the length-equivalent property is genuinely
+  category-dependent (3 distinct property ids, 2 distinct non-Inches
+  scale-id namespaces) and that Cufflinks/Coin/Bullion/**Silverware** have no
+  Gold purity/solidity property at all — a Bracelet-only implementation
+  would have silently mis-mapped every other category. Full reasoning:
+  `project-docs/DECISIONS.md` 2026-07-08 (session 3).
+- **New client capability:** `next-app/src/lib/etsy/client.ts` gained
+  `formUrlEncoded` support on `etsyFetch` (this operation's spec declares
+  ONLY `application/x-www-form-urlencoded`, not JSON) and a new
+  `updateListingProperty()` call.
+- **Verification:** `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run
+  build` all pass. **69 unit tests pass** (up from 56) — new
+  `describe('mapProperties', ...)` block in `mapping.test.ts` covers every
+  pinned product type including the explicitly-requested Silverware/spoon
+  case, plus the never-guess list and the vermeil edge case.
+- **🟡 Not yet verified live — one detail needs a real click to confirm.**
+  Materials/Gold solidity/Gold purity are fully enumerated (zero ambiguity,
+  low risk). The length-equivalent property is scale-based with no
+  enumerated values, so the exact `value_ids` wire format for it is a
+  best-informed guess from the spec's wording, not confirmed against a real
+  response (a sandboxed attempt to test this directly via a decrypted-token
+  script was correctly blocked — that bypasses the real app's request path,
+  so it needs a real logged-in click instead). **Owner action:** click **Sync
+  Updates** on the bracelet (`heavy-italian-14k-yellow-gold-cuban-link-bracelet-53-91g-21`,
+  already a draft on Etsy) or any product from `/admin`. Since every property
+  push is non-blocking, this is low-risk either way: success shows the normal
+  "Synced" notice with no property warning; a wrong Length guess shows
+  `Category property <id> skipped — <Etsy's real error>` in the notice
+  banner, which pinpoints exactly what to fix next. Report back whichever
+  happens.
+
+## 2026-07-08 (milestone) -- Etsy sync: first live OAuth connection verified end-to-end
+
+Owner clicked **Connect Etsy** in `/admin/settings` (local dev) and it
+worked cleanly on the first real attempt. Verified directly against the live
+Supabase data (service-role REST query, not just "no error shown in
+browser"): `etsy_connection.status = 'connected'`, real Etsy `shop_id`
+(`11326431`, shop name "RugsAnonymous" — **owner should confirm this is the
+intended shop** if they have more than one), `scopes` matches the 5
+requested exactly, `access_token_enc`/`refresh_token_enc` are properly
+AES-256-GCM encrypted (3-part ciphertext, not bare tokens),
+`access_token_expires_at` is +1h from connect (matches Etsy's token
+lifetime), `etsy_oauth_states` correctly emptied (single-use row consumed),
+and `etsy_sync_log` shows exactly one clean `connect`/`ok` row. This is the
+first fully-verified item on `etsy-sync-plan/14-verification-checklist.md`'s
+Phase 1 list (item 1, now checked off) — confirms the auth-format/API-host
+fixes from earlier this session work end-to-end, not just in theory.
+
+**Next:** pick shipping profile / return policy / readiness state defaults
+in the Settings panel (checklist item 3), then a dry-run preview on a few
+real products (item 4) before attempting a first real draft publish.
+
+## 2026-07-08 (final, confirmed) -- Etsy sync: supabase/etsy-sync.sql ran successfully live
+
+Owner re-ran the corrected migration and confirmed all 5 tables
+(`etsy_connection`, `etsy_oauth_states`, `etsy_listings`,
+`etsy_listing_images`, `etsy_sync_log`) were created. `etsy-sync-plan/OWNER-SETUP.md`
+step 1 is done. Next: click **Connect Etsy** in `/admin/settings` (local dev
+env vars are already set in `next-app/.env.local`) to test the OAuth
+round-trip — the first real end-to-end write-side test of this feature.
+
+## 2026-07-08 (final) -- Etsy sync: fixed products.id type bug (text, not uuid) hit while running the live migration
+
+Owner ran `supabase/etsy-sync.sql` for real and hit a live error:
+`products.id` is `text`, not `uuid` (never directly verified against
+`supabase/products.sql` before — inferred incorrectly from the TypeScript
+type and other tables' conventions). Fixed all 3 `product_id` columns
+(`etsy_listings`, `etsy_listing_images`, `etsy_sync_log`) plus the
+queue-claim RPC's return type. The script is idempotent, so re-running it
+picks up cleanly from wherever it stopped. Also added a manual per-product
+Etsy category override feature (search all real Etsy categories and pick
+one, overriding the automatic guess) after the owner spotted that Etsy's
+"Rings" category list includes a plain "Bands" option my automated
+`ETSY_TAXONOMY_MAP` guess had missed. Full detail:
+`project-docs/DECISIONS.md` 2026-07-08 "final" and "latest" entries.
+
+## 2026-07-08 (latest, fourth) -- Etsy sync: taxonomy IDs pinned via a real live call — the biggest remaining blocker is resolved
+
+With the auth fixes confirmed (previous entry), the owner authorized a retry;
+`GET seller-taxonomy/nodes` succeeded live (3065 nodes). All 12
+`ETSY_TAXONOMY_MAP` entries in `next-app/src/lib/etsy/mapping.ts` are now
+pinned to real IDs (6 exact matches, 6 flagged `approximate: true` where
+Etsy has no generic leaf for that product type — e.g. no plain "chain
+necklace" or "bullion" category exists at all). Pre-flight no longer blocks
+every product on this. Full reasoning per approximate pick:
+`project-docs/DECISIONS.md` 2026-07-08 (latest). `npx tsc --noEmit`,
+`npm run lint`, `npm run build`, 48 unit tests all still pass. Still not
+verified: whether Etsy's `createDraftListing` actually accepts each pinned
+ID (first real publish attempt will confirm) — everything past the taxonomy
+fetch itself (OAuth connect, real draft/image/inventory writes) remains
+unexercised live.
+
+## 2026-07-08 (latest, third) -- Etsy sync: fixed two real auth bugs (x-api-key format, API host)
+
+Owner supplied real Etsy credentials plus a full local copy of the OpenAPI
+spec (the earlier in-session web fetch had silently truncated). Testing the
+credentials surfaced that **every** Etsy API call in the previous pass would
+have failed: the `x-api-key` header must be `keystring:shared_secret`
+(confirmed from the spec's own text), not the keystring alone, and the API
+host is `openapi.etsy.com`, not `api.etsy.com`. Both fixed in
+`next-app/src/lib/etsy/client.ts`/`auth.ts`; **`ETSY_SHARED_SECRET` is now
+required from day one**, not Phase-3-only — see the updated
+`etsy-sync-plan/OWNER-SETUP.md`. Also resolved 2 of the 4 remaining
+`TODO(etsy-verify)` items against the full spec (readiness-state endpoint
+path confirmed correct, just had wrong response field names — fixed; image
+re-rank confirmed to have no cheaper path than delete+re-upload). Only image
+upload size/format caps and rate-limit header names remain unresolved (not in
+the spec at all). `npx tsc --noEmit` / `npm run lint` / `npm run build` /
+48 unit tests all still pass. **Not yet re-verified live** — see
+`project-docs/DECISIONS.md` 2026-07-08 "even later" for full detail.
+
+## 2026-07-08 (latest, second) -- 🔴 HANDOFF — Etsy sync built (Phase 1 + Phase 2 code-complete, unverified live)
+
+Implemented the Etsy sync feature end to end per `etsy-sync-plan/BUILD-PROMPT.md`,
+following the 17-doc plan in `etsy-sync-plan/` as source of truth. **Full owner
+checklist is `etsy-sync-plan/OWNER-SETUP.md` — read that before doing anything
+live.** Summary here; do not duplicate the checklist in this file.
+
+- **Built:** `next-app/src/lib/etsy/{client,auth,mapping,images,sync,store}.ts`,
+  13 admin route handlers under `/api/admin/etsy/*` (Phase 3's
+  `/api/webhooks/etsy` deliberately NOT built, per scope), the Etsy Sync
+  settings panel (`EtsySettingsPanel.tsx`, composed into `/admin/settings`),
+  a per-product Etsy status chip + drawer section (`EtsyProductPanel.tsx` in
+  `AdminShell.tsx`), and a bulk "Sync All to Etsy" modal
+  (`EtsyBulkSyncModal.tsx`) with a free pre-flight-summary route. Phase 2
+  auto-delist/relist is wired into the existing revalidation chokepoints
+  (`adminRevalidateProduct(s)` in `app/actions/admin-products.ts`, PayPal
+  `capture-order`, and the PayPal webhook) rather than a new "who changes
+  product status" audit, exactly as the plan intended.
+- **SQL migration written, NOT run:** `supabase/etsy-sync.sql` (5 tables:
+  `etsy_connection`, `etsy_oauth_states`, `etsy_listings`,
+  `etsy_listing_images`, `etsy_sync_log`, all RLS-enabled/service-role-only,
+  plus a `claim_next_pending_etsy_listing()` atomic-queue-claim RPC for Phase
+  2's bulk drain). **This is the first manual owner step — see OWNER-SETUP.md.**
+- **New dependencies:** `sharp` (WebP→JPEG transcode; was already a transitive
+  dep, now explicit) and `vitest` (this project had no test runner before —
+  added `npm run test` / `next-app/vitest.config.ts`).
+- **Build-time resolutions (live OpenAPI spec pulled 2026-07-08):** the
+  `when_made` enum is now **confirmed** verbatim from the live spec (19
+  values, `mapping.ts`) — more precise than the plan's guess. Four items the
+  spec fetch could **not** resolve (truncated response) are pinned with
+  `TODO(etsy-verify)` and best-guess defaults: image upload size/format caps,
+  rate-limit header names, the readiness-state list endpoint path, and
+  whether image re-rank needs re-upload. **Taxonomy leaf IDs are deliberately
+  left unpinned (`null`)** in `ETSY_TAXONOMY_MAP` — they require a live,
+  authenticated `getSellerTaxonomyNodes` call with no `ETSY_API_KEY` available
+  in this environment; pre-flight correctly **blocks every product** until a
+  developer pins real IDs post-connect. Full list + reasoning:
+  `etsy-sync-plan/OWNER-SETUP.md` and `project-docs/features/etsy-sync.md`.
+- **Also found/fixed while building:** `mapping.ts`'s vintage-cutoff-year math
+  used local-timezone `getFullYear()`, which could drift the 20-year cutoff by
+  a year depending on server timezone vs UTC near a year boundary — switched
+  to `getUTCFullYear()` (caught by a unit test).
+- **Verification:** `npx tsc --noEmit`, `npm run lint` (0 problems), `npm run
+  build` all pass from `next-app/`. **48 new unit tests pass** (`npm run
+  test` — `lib/etsy/__tests__/{mapping,images,sync}.test.ts`): title/tag/
+  materials mapping, every `when_made` bucket incl. boundary years and the
+  1990s fallback, price flattening (both modes, 8% markup, <$0.20 rejection),
+  the private-field allowlist guarantee, WebP↔JPEG transcode (with/without
+  alpha, generated in-memory — no binary fixtures committed), image-diff
+  planning, price-push threshold logic, and the bulk-drain orchestration loop.
+  **Not verified:** anything requiring a live Etsy connection (OAuth
+  round-trip, real draft/image/inventory calls, the scheduled price push, the
+  Postgres `FOR UPDATE SKIP LOCKED` queue-claim guarantee against a live DB) —
+  there is no Etsy sandbox, and this environment has no `ETSY_API_KEY`/tokens.
+  Browser UI verification was also not possible this session: the local dev
+  server 404s on **every** route right now, including pre-existing pages
+  never touched by this work (confirmed by hitting `/` and `/en/about`) — a
+  pre-existing local dev-environment condition, not caused by this change.
+- **Pending manual steps (owner):** run `supabase/etsy-sync.sql`; set Netlify
+  env vars; complete Etsy shop setup (shipping/return/readiness, confirm
+  Domestic & Global Pricing off); register redirect URIs; click **Connect
+  Etsy**; a developer must then pin real taxonomy IDs and spot-check the four
+  `TODO(etsy-verify)` items against the live API. Full ordered steps:
+  `etsy-sync-plan/OWNER-SETUP.md`.
 
 ## 2026-07-08 (latest) -- Admin carousel: editable visible-count fields + removed show-price toggle
 

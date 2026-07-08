@@ -67,6 +67,26 @@ manual price label. Bare numeric labels are normalized by the shared helper
 checkout, and order snapshot pricing so fixed-price items do not fall back to
 dash totals when entered as a plain number.
 
+## Customer trade-in price ("Own gold or silver? … pay as little as ___")
+
+A separate, marketing-only line on `shop/[id]`, independent of the sale price
+and the scrap-value box (which always shows the real melt value).
+`resolveAdvertisedTradeInPrice(product, meltValue, siteDefault)` in
+`types/product.ts` resolves it in strict precedence:
+
+1. **Per-item override** (`products.special_price_override_*` — a flat dollar
+   amount or a signed % over melt) — always wins.
+2. **Site-wide default** — `shop_settings.special_price_default_enabled` +
+   `special_price_default_percent` (signed; negative = below spot). Set once in
+   Admin → Settings → **Customer Trade-in Price** (`AdminSpecialPricePanel.tsx`,
+   via the `shop-settings` route + `fetchSpecialPriceDefault`). Applies
+   `meltValue * (1 + percent/100)` to every item at once.
+3. **Plain melt value** — the historical default when neither is set.
+
+Reads degrade to "off" pre-migration. **Migration:
+`supabase/shop-special-price-default-2026-07.sql`.** Changes propagate to
+product pages within ~5 min (ISR), like the spot values they show.
+
 ## Source And Fallback
 
 `spot-price.ts` currently uses `api.gold-api.com` and keeps a fallback so the
