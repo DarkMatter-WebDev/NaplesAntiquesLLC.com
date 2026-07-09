@@ -64,12 +64,26 @@ interface EbaySignatureHeader {
 }
 
 function parseSignatureHeader(header: string | null): EbaySignatureHeader | null {
-  if (!header) return null;
+  if (!header) {
+    console.error('ebay-account-deletion: POST had no X-EBAY-SIGNATURE header at all.');
+    return null;
+  }
   try {
     const decoded = Buffer.from(header, 'base64').toString('utf8');
     const parsed = JSON.parse(decoded) as EbaySignatureHeader;
-    return parsed?.kid && parsed?.signature ? parsed : null;
-  } catch {
+    if (!parsed?.kid || !parsed?.signature) {
+      console.error(
+        'ebay-account-deletion: X-EBAY-SIGNATURE decoded but is missing kid/signature. Decoded keys:',
+        Object.keys(parsed ?? {}),
+      );
+      return null;
+    }
+    return parsed;
+  } catch (err) {
+    // Log the raw header (not a secret — it's eBay's own signature metadata,
+    // not one of our tokens) so we can see its actual shape if it doesn't
+    // match the assumed base64-JSON format.
+    console.error('ebay-account-deletion: could not parse X-EBAY-SIGNATURE as base64 JSON. Raw header:', header, 'Error:', err);
     return null;
   }
 }
@@ -81,14 +95,29 @@ async function fetchPublicKeyPem(keyId: string): Promise<string> {
   const cached = publicKeyCache.get(keyId);
   if (cached && Date.now() - cached.fetchedAt < PUBLIC_KEY_TTL_MS) return cached.pem;
 
-  const token = await getApplicationToken();
+  let token: string;
+  try {
+    token = await getApplicationToken();
+  } catch (err) {
+    console.error('ebay-account-deletion: getApplicationToken() failed while fetching the notification public key:', err);
+    throw err;
+  }
+
   const res = await fetch(`${EBAY_API_BASE}/commerce/notification/v1/public_key/${encodeURIComponent(keyId)}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
   });
-  if (!res.ok) throw new Error(`Could not fetch eBay notification public key (HTTP ${res.status}).`);
-  const data = (await res.json()) as { key?: string };
-  const raw = (data.key ?? '').trim();
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    console.error(`ebay-account-deletion: getPublicKey failed (HTTP ${res.status}) for kid=${keyId}. Body:`, body.slice(0, 500));
+    throw new Error(`Could not fetch eBay notification public key (HTTP ${res.status}).`);
+  }
+  const data = (await res.json()) as Record<string, unknown>;
+  console.error('ebay-account-deletion: getPublicKey response keys:', Object.keys(data));
+  const raw = String((data as { key?: string }).key ?? '').trim();
+  if (!raw) {
+    console.error('ebay-account-deletion: getPublicKey response had no usable "key" field. Full response:', JSON.stringify(data).slice(0, 1000));
+  }
   const pem = raw.includes('BEGIN PUBLIC KEY') ? raw : `-----BEGIN PUBLIC KEY-----\n${raw.match(/.{1,64}/g)?.join('\n') ?? raw}\n-----END PUBLIC KEY-----`;
   publicKeyCache.set(keyId, { pem, fetchedAt: Date.now() });
   return pem;
@@ -102,8 +131,22 @@ async function verifyEbaySignature(rawBody: string, signatureHeader: string | nu
     const verifier = crypto.createVerify('SHA256');
     verifier.update(rawBody);
     verifier.end();
-    return verifier.verify(publicKeyPem, Buffer.from(parsed.signature!, 'base64'));
-  } catch {
+    const result = verifier.verify(publicKeyPem, Buffer.from(parsed.signature!, 'base64'));
+    if (!result) {
+      console.error(
+        'ebay-account-deletion: signature cryptographically did not verify. kid=',
+        parsed.kid,
+        'alg=',
+        parsed.alg,
+        'signature length (base64 chars)=',
+        parsed.signature?.length,
+        'body length=',
+        rawBody.length,
+      );
+    }
+    return result;
+  } catch (err) {
+    console.error('ebay-account-deletion: verifyEbaySignature threw:', err);
     return false;
   }
 }
