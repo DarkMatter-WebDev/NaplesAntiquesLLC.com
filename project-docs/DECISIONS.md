@@ -1,5 +1,140 @@
 # Decisions Log
 
+## 2026-07-08 (session 10, second addendum) - Shop mobile/tablet: search bar replaces the piece-count pill; count moves to the toolbar
+
+**Context:** On mobile/tablet the shop's real search box lives inside the
+filter panel, which is collapsed behind the **Filters** toggle — so it's hidden
+until the buyer opens filters. Meanwhile a long pill directly under the Filters
+button just showed the piece count ("74 pieces"). The owner wanted the visible
+field to be a search bar, with the count relocated next to the view/sort buttons.
+
+**Decision — swap the two roles responsively, leave desktop as-is.** Rather than
+add a second component or move DOM across the sidebar/results boundary, I made
+the existing "meta" pill responsive and added a mobile-only count to the toolbar:
+- `ShopFilters.tsx`: the meta block (was an inline-styled count+clear pill) is now
+  `.shop-filters-meta` containing three children — `.shop-filters-meta-count`
+  (the count text), `.shop-filters-meta-search` (a full-width `<input
+  type="search">` bound to `updateFilter('q', …)`), and the existing Clear
+  Filters button. Base (mobile/tablet) CSS shows the search + hides the count and
+  drops the pill chrome; the `@media (min-width: 1024px)` block flips it back —
+  count shown, search hidden, pill border/background restored. So desktop is
+  visually unchanged.
+- `shop/(list)/page.tsx`: wrapped `ShopViewToggle` and a new
+  `.shop-toolbar-count` span in a `.shop-toolbar-left` group inside
+  `.shop-gallery-toolbar`; the count is hidden at ≥1024px (desktop keeps the
+  count in the filter sidebar). The label is computed once as `resultsCountLabel`
+  from the same `sorted.length` / `totalInventoryCount` values passed to
+  `ShopFilters`, so the two counts can't drift.
+
+**Why not move the sidebar search itself:** it's inside the collapsible panel
+(desktop sidebar) and shares a grid row with the live gold/silver spot badges.
+Pulling it out for mobile would disturb that layout and the desktop stacking
+order. A dedicated mobile search input that writes the same `q` param is simpler
+and can't fight the panel search (only one is visible per breakpoint; both are
+uncontrolled `defaultValue` inputs, same pattern already used there).
+
+**Clear Filters preserved:** it still renders in the meta block when `hasFilters`,
+so on mobile it appears just under the new search bar (confirmed live).
+
+**Verification:** `npx tsc --noEmit`, `npm run lint`, `npm run build` all pass.
+Live in the preview: mobile (375px) and tablet (768px) show the search bar under
+Filters with the count in the toolbar; typing "ring" set `?q=ring` and the
+toolbar count updated to "12 of 78 pieces"; desktop (1280px) shows the count pill
+in the sidebar, no toolbar count, and the original sidebar search still present.
+No console errors. Files: `next-app/src/components/shop/ShopFilters.tsx`,
+`next-app/src/app/[locale]/shop/(list)/page.tsx`.
+
+**Follow-up fix (same session) — Sort select overflow on mobile.** Adding the
+piece count beside the view toggle narrowed the space for the Sort control, and
+its `<select>` overflowed the pill on mobile. Root cause was a pre-existing CSS
+source-order bug the change merely exposed: the base rule
+`.shop-gallery-sort select { min-width: min(11.5rem, 56vw) }` is declared *after*
+the `@media (max-width: 767px)` override `.shop-gallery-sort select { min-width:
+0 }`, so at equal specificity the base won at every width and the select could
+never shrink below ~184px. With the roomier pre-change toolbar that fit; the new
+count made it overflow. Fixed by raising the mobile override's specificity to
+`.shop-gallery-toolbar .shop-gallery-sort select` so `min-width: 0` wins and the
+select shrinks (measured 184px → 141px, no container/page overflow). Chose the
+specificity bump over reordering the large `<style>` block (lower risk).
+(Also hit — and fixed — the project's well-known gotcha: a backtick placed inside
+a CSS comment in the `<style>{`…`}</style>` template literal terminated the string
+and broke the parse; comments in these blocks must stay backtick-free. Confirmed
+resolved by a clean `npm run build` + a dev-server restart to clear the stale
+Turbopack error state.)
+
+## 2026-07-08 (session 10, addendum) - Netlify secrets scan: omit PAYPAL_ENV (not a secret)
+
+**Context:** A deploy failed at the "building site" stage — Netlify's secrets
+scanner reported `Secret env var "PAYPAL_ENV"'s value detected` across hundreds
+of build-output files (`.next/server/app/*.html`/`.rsc`/`.segment.rsc`, node_modules
+chunks, `required-server-files.json`, etc.) and exited non-zero (exit code 2).
+
+**Decision:** Add `PAYPAL_ENV` to `SECRETS_SCAN_OMIT_KEYS` in root `netlify.toml`
+(now `…,PAYPAL_CLIENT_ID,PAYPAL_ENV`). `PAYPAL_ENV` is **not a secret** — the only
+values the code reads are `"sandbox"` / `"live"` (`next-app/src/lib/paypal.ts:11`:
+`(process.env.PAYPAL_ENV ?? 'sandbox').toLowerCase() !== 'live'`). The scanner is
+substring-matching that generic word, which naturally appears as a literal string
+all over the build output (e.g. the word "sandbox"/"live" in vendored JS and
+rendered pages), producing a mass of false positives. This mirrors the 2026-06-30
+`PAYPAL_CLIENT_ID` decision exactly.
+
+**Reason:** The value is a non-sensitive mode flag, so whitelisting the one key is
+the correct, targeted fix — not disabling the scanner or excluding paths.
+`PAYPAL_CLIENT_SECRET` / `PAYPAL_ENV` are unrelated; the real secret
+(`PAYPAL_CLIENT_SECRET`) stays server-side and is deliberately NOT on the omit list.
+
+**Alternatives considered:** (1) `SECRETS_SCAN_OMIT_PATHS` — rejected, far broader
+than needed and would blind the scanner to real secrets in those files. (2)
+`SECRETS_SCAN_ENABLED=false` — rejected, removes the safety net entirely. (3)
+Setting a less-collision-prone value — pointless; "sandbox"/"live" are PayPal's
+own env names and still substring-match.
+
+**Owner action:** re-copy this folder to the deploy repo and redeploy. Keep the
+`PAYPAL_ENV` env var set in Netlify (`sandbox` until go-live, `live` in
+production) — this change only tells the scanner to ignore it, it does not remove
+the variable. Verification is the next deploy passing the secrets-scan stage.
+
+## 2026-07-08 (session 10) - Checkout defaults to shipping, not local pickup
+
+**Context:** Owner wanted the buyer checkout to assume the average buyer needs
+the item shipped — fill in the shipping address by default and make the buyer
+manually switch to Local Pickup if they'd rather collect in person.
+
+**Decision — change only the client default, nothing else.** The checkout's
+shipping method was initialized from `SHIPPING_OPTIONS[0]`, which is
+`local-pickup` (price 0). Everything downstream already keys off the selected
+method:
+- `CheckoutClient` computes `needsShipping = shippingMethod !== 'local-pickup'`
+  and makes the Street/City/State/ZIP inputs `required` + part of `payReady`
+  when true.
+- `OrderSummary` prices shipping and (via `chargesFlSalesTax`) tax off the
+  method.
+- The server (`/api/paypal/create-order`) independently re-derives address
+  requirements (`needsShipping`) and all totals from the submitted method; its
+  `String(body.shippingMethod ?? 'local-pickup')` is only a fallback for a
+  *missing* value, and the client always sends one.
+
+So flipping the default from `local-pickup` to a real shipping method
+automatically requires the address and charges shipping, with no server, schema,
+or validation changes.
+
+**Which shipping default:** chose **Priority Insured ($45)** over Express
+Overnight Insured ($75) — the sensible standard default that doesn't silently
+push buyers onto the pricier overnight tier. Encoded as a single named export
+`DEFAULT_SHIPPING_METHOD` in `OrderSummary.tsx` (single source of truth,
+imported by `CheckoutClient`) rather than a bare string literal, so the default
+and the option list live in the same file. `OrderSummary`'s existing
+`?? SHIPPING_OPTIONS[0]` lookup is untouched — it's just a safety fallback for an
+unrecognized value, not the default.
+
+**Verification:** `npx tsc --noEmit`, `npm run lint`, `npm run build` all pass.
+Live-verified in the dev preview by seeding a one-item cart and loading
+`/checkout`: the shipping `<select>` defaults to "Priority Insured"
+(`priority-insured`), the Street Address input reports `required === true`,
+Shipping Cost shows $45, and there are no console errors. Files:
+`next-app/src/components/checkout/OrderSummary.tsx`,
+`next-app/src/components/checkout/CheckoutClient.tsx`.
+
 ## 2026-07-08 (session 9, twentieth addendum) - Markup→price workflow made explicit + status chips refresh after a sync
 
 **Context:** the owner changed the Etsy price markup, re-synced, and the live
@@ -48,7 +183,8 @@ data could have changed.
 
 **Verification:** `npx tsc --noEmit`, `npm run lint`, `npx vitest run`
 (154/154), `npm run build` all pass. No schema/migration change; no owner action
-beyond deploy. Files: `next-app/src/components/admin/EtsySettingsPanel.tsx`,
+beyond deploy. **Deployed and confirmed working live by the owner 2026-07-08.**
+Files: `next-app/src/components/admin/EtsySettingsPanel.tsx`,
 `next-app/src/components/admin/AdminShell.tsx`,
 `next-app/src/components/admin/EtsyProductPanel.tsx`.
 

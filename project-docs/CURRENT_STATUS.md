@@ -3,6 +3,65 @@
 > Reflects the present state of development. **Update this at the end of every
 > work session.** Last updated: **2026-07-08**.
 
+## 2026-07-08 (session 10, second addendum) -- 🟢 Shop mobile/tablet: piece-count pill became a search bar; count moved to the toolbar
+
+Owner asked that on mobile/tablet the long pill under the **Filters** button
+(which showed "74 pieces") become a search bar, and the piece count move down
+next to the view/sort buttons. Done responsively without touching desktop: the
+`.shop-filters-meta` block in `next-app/src/components/shop/ShopFilters.tsx` now
+renders a full-width search `<input>` below 1024px and the count pill at ≥1024px
+(desktop sidebar unchanged); `next-app/src/app/[locale]/shop/(list)/page.tsx`'s
+`.shop-gallery-toolbar` gained a mobile/tablet-only `.shop-toolbar-count` beside
+`ShopViewToggle`. The mobile search binds to the same `q` search param as the
+sidebar search, and Clear Filters is preserved (appears under the search when a
+filter is active). Also fixed a follow-up overflow the new count exposed: the
+Sort `<select>` was overflowing its pill on mobile because the base
+`.shop-gallery-sort select` min-width rule sits after (and beat) the mobile
+`min-width: 0` override — resolved by raising the override's specificity so the
+select shrinks to fit. `npx tsc --noEmit`, `npm run lint`, `npm run build` all
+pass; **verified live in the preview** at mobile (375px), tablet (768px), and
+desktop (1280px) — typing filters live (`?q=ring` → toolbar reads "12 of 78
+pieces"), the Sort control no longer overflows, desktop still shows the count in
+the sidebar with no toolbar count, no console errors. No migration, no owner
+action. Full detail: `project-docs/DECISIONS.md` 2026-07-08 (session 10, second
+addendum).
+
+## 2026-07-08 (session 10, addendum) -- 🟢 Fixed a failing deploy: PAYPAL_ENV false-positive in Netlify secrets scan
+
+A deploy failed at the "building site" stage — Netlify's secrets scanner flagged
+`PAYPAL_ENV`'s value across hundreds of build-output files and exited non-zero.
+`PAYPAL_ENV` is **not a secret**: its only values are `sandbox`/`live`
+(`next-app/src/lib/paypal.ts:11`), and the scanner substring-matches that generic
+word everywhere it appears in vendored JS + rendered pages. Fixed by adding
+`PAYPAL_ENV` to `SECRETS_SCAN_OMIT_KEYS` in root `netlify.toml` (now
+`…,PAYPAL_CLIENT_ID,PAYPAL_ENV`) — the same targeted fix already used for
+`PAYPAL_CLIENT_ID` on 2026-06-30. The real secret `PAYPAL_CLIENT_SECRET` is NOT
+omitted and stays server-side. **Owner action:** re-copy this folder to the deploy
+repo and redeploy; keep the `PAYPAL_ENV` var set in Netlify (this only tells the
+scanner to ignore it). Full detail: `project-docs/DECISIONS.md` 2026-07-08
+(session 10, addendum).
+
+## 2026-07-08 (session 10) -- 🟢 Checkout defaults to shipping (Priority Insured), not local pickup
+
+Owner asked that the buyer checkout assume the average buyer needs the item
+shipped: default to a shipping method, require the address up front, and make
+local pickup an opt-in. Done with a one-line default change — new
+`DEFAULT_SHIPPING_METHOD = 'priority-insured'` export in
+`next-app/src/components/checkout/OrderSummary.tsx`, consumed by
+`CheckoutClient.tsx`'s `shippingMethod` initial state (was `SHIPPING_OPTIONS[0]`
+= `local-pickup`). Because the address fields and totals already gate on
+`needsShipping` (method ≠ `local-pickup`), the Street/City/State/ZIP fields are
+now required by default and the buyer must deliberately pick **Local Pickup** to
+skip them. The Address section also shows a bilingual helper line telling the
+buyer their order ships to that address and to switch the shipping method to
+Local Pickup if they'd rather collect in person. No server or schema change —
+the PayPal create-order route already derives address requirements and pricing
+from the submitted method. `npx tsc --noEmit`, `npm run lint`, `npm run build`
+all pass; **verified live in the dev preview** (checkout defaults to Priority
+Insured, $45 shipping, address fields required, helper line renders, no console
+errors). No migration, no owner action. Full detail:
+`project-docs/DECISIONS.md` 2026-07-08 (session 10).
+
 ## 2026-07-08 (session 9, twentieth addendum) -- 🟢 Markup→price workflow made explicit + status chips refresh after a sync
 
 Two loose ends from the owner: (1) after changing the Etsy price markup and
@@ -29,7 +88,8 @@ new `onSynced` prop on `EtsyProductPanel`). No extra Etsy API calls — it's the
 same local read, just re-invoked at the right moments.
 
 `npx tsc --noEmit`, `npm run lint`, `npx vitest run` (154/154), `npm run build`
-all pass. **No migration, no owner action** beyond deploy. Full detail:
+all pass. **No migration, no owner action** beyond deploy. **Deployed and
+confirmed working live by the owner 2026-07-08.** Full detail:
 `project-docs/DECISIONS.md` 2026-07-08 (session 9, twentieth addendum).
 
 ## 2026-07-08 (session 9, nineteenth addendum) -- 🟢 Bulk "Check Etsy statuses" — recovers items stuck in 'error'

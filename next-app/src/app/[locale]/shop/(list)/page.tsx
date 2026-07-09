@@ -696,6 +696,13 @@ export async function renderShopPage({
     );
   }
 
+  // Piece count shown in the results toolbar on mobile/tablet (on desktop it
+  // stays in the filter sidebar). Mirrors the count in ShopFilters exactly.
+  const resultsAllCount = totalInventoryCount ?? collectionProducts.length;
+  const resultsCountLabel = isEs
+    ? (sorted.length === resultsAllCount ? `${resultsAllCount} piezas` : `${sorted.length} de ${resultsAllCount} piezas`)
+    : (sorted.length === resultsAllCount ? `${resultsAllCount} pieces` : `${sorted.length} of ${resultsAllCount} pieces`);
+
   return (
     <>
       <SiteHeader />
@@ -884,7 +891,10 @@ export async function renderShopPage({
               <section className={isModern ? 'min-w-0 shop-results-panel shop-entry-reveal shop-entry-reveal-results' : 'min-w-0 shop-results-panel'}>
                 <ShopLoadingOverlay />
                 <div className="shop-gallery-toolbar">
-                  <ShopViewToggle locale={locale} currentView={view} />
+                  <div className="shop-toolbar-left">
+                    <ShopViewToggle locale={locale} currentView={view} />
+                    <span className="shop-toolbar-count">{resultsCountLabel}</span>
+                  </div>
                   <ShopSortSelect locale={locale} currentSort={filters.sort} />
                 </div>
                 {filtered.length === 0 ? (
@@ -1057,7 +1067,11 @@ export async function renderShopPage({
                 min-width: 0;
                 justify-content: space-between;
               }
-              .shop-gallery-sort select {
+              /* Higher specificity so this wins over the later base
+                 .shop-gallery-sort select min-width rule (min 11.5rem / 56vw) —
+                 otherwise the select can't shrink and overflows beside the
+                 piece count in the toolbar. */
+              .shop-gallery-toolbar .shop-gallery-sort select {
                 min-width: 0;
                 flex: 1;
                 text-align: right;
@@ -1118,6 +1132,20 @@ export async function renderShopPage({
               align-items: center;
               gap: 0.6rem;
               margin-bottom: 0.8rem;
+            }
+            .shop-toolbar-left {
+              display: inline-flex;
+              align-items: center;
+              gap: 0.7rem;
+              min-width: 0;
+            }
+            /* Piece count sits beside the view toggle on mobile/tablet; hidden on
+               desktop, where the count lives in the filter sidebar instead. */
+            .shop-toolbar-count {
+              font-family: var(--font-label);
+              font-size: 0.75rem;
+              color: var(--color-on-surface-variant);
+              white-space: nowrap;
             }
             .shop-gallery-sort {
               display: inline-flex;
@@ -1198,6 +1226,9 @@ export async function renderShopPage({
               color: var(--color-primary);
             }
             @media (min-width: 1024px) {
+              .shop-toolbar-count {
+                display: none;
+              }
               .shop-catalog-layout {
                 display: grid;
                 grid-template-columns: minmax(17rem, 19rem) minmax(0, 1fr);

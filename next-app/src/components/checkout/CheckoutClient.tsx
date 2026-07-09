@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useCart, type CartItem } from '@/context/CartContext';
-import OrderSummary, { SHIPPING_OPTIONS } from '@/components/checkout/OrderSummary';
+import OrderSummary, { DEFAULT_SHIPPING_METHOD } from '@/components/checkout/OrderSummary';
 import PayPalCheckoutButton from '@/components/checkout/PayPalCheckoutButton';
 import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 import { createClient } from '@/lib/supabase/client';
@@ -56,7 +56,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     name: '', email: '', phone: '', notes: '',
     address_line1: '', address_line2: '', city: '', state: '', postal_code: '', country: 'United States',
   });
-  const [shippingMethod, setShippingMethod] = useState(SHIPPING_OPTIONS[0].value);
+  const [shippingMethod, setShippingMethod] = useState(DEFAULT_SHIPPING_METHOD);
   const [infoConfirmed, setInfoConfirmed] = useState(false);
   const [productInfoById, setProductInfoById] = useState<Record<string, CartProductInfo>>({});
   // On a successful capture we snapshot the order (items + shipping + contact) so
@@ -458,7 +458,9 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
               </p>
               {needsShipping && (
                 <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                  {isEs ? 'Necesaria para el método de envío seleccionado.' : 'Required for the delivery method you selected.'}
+                  {isEs
+                    ? 'Enviaremos su pedido a esta dirección. ¿Prefiere recogerlo en persona? Cambie el método de envío a Recogida local en el resumen del pedido.'
+                    : 'We’ll ship your order to this address. Prefer to pick it up in person? Switch the shipping method to Local Pickup in your order summary.'}
                 </p>
               )}
             </div>

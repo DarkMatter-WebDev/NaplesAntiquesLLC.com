@@ -1,5 +1,60 @@
 # Changelog
 
+## 2026-07-08 - Shop mobile/tablet: search bar under Filters, piece count moved to toolbar
+
+On mobile/tablet the long pill under the **Filters** button showed the piece
+count ("74 pieces") while the search box was hidden inside the collapsed filter
+panel. Swapped the roles: that field is now an always-visible full-width
+**search bar**, and the piece count moved down beside the view-toggle buttons in
+the results toolbar. Implemented responsively — the `.shop-filters-meta` block in
+`ShopFilters.tsx` renders a search input below 1024px and the count pill at/above
+1024px (desktop sidebar is unchanged), and `shop/(list)/page.tsx`'s toolbar gained
+a mobile/tablet-only `.shop-toolbar-count` beside `ShopViewToggle`. The mobile
+search binds to the same `q` param as the sidebar search; Clear Filters is
+preserved. `tsc`/`lint`/`build` pass; verified in the preview at mobile (375px),
+tablet (768px), and desktop (1280px) — search filters live (`?q=ring` → "12 of 78
+pieces"), no console errors.
+
+Follow-up: adding the count beside the view toggle squeezed the Sort control and
+the `<select>` overflowed its pill on mobile. Root cause was pre-existing — the
+base `.shop-gallery-sort select { min-width: min(11.5rem, 56vw) }` rule sits
+*after* the mobile `min-width: 0` override in source order, so at equal
+specificity it won and the select couldn't shrink. Fixed by bumping the mobile
+override's specificity (`.shop-gallery-toolbar .shop-gallery-sort select`) so the
+select shrinks to fit. Verified: select drops from 184px → 141px, no container or
+page overflow.
+
+## 2026-07-08 - Fixed failing deploy: PAYPAL_ENV false-positive in Netlify secrets scan
+
+A deploy failed at "building site" because Netlify's secrets scanner detected
+`PAYPAL_ENV`'s value across hundreds of build-output files. `PAYPAL_ENV` is not a
+secret — its only values are `sandbox`/`live` (`next-app/src/lib/paypal.ts`), a
+generic word the scanner substring-matches throughout vendored JS and rendered
+pages. Added `PAYPAL_ENV` to `SECRETS_SCAN_OMIT_KEYS` in root `netlify.toml`,
+mirroring the existing `PAYPAL_CLIENT_ID` whitelist. `PAYPAL_CLIENT_SECRET`
+remains excluded from the omit list and server-side only. Re-copy the folder and
+redeploy to clear the failure; the `PAYPAL_ENV` env var stays set in Netlify.
+
+## 2026-07-08 - Checkout now defaults to shipping instead of local pickup
+
+The buyer checkout flow previously defaulted the shipping method to **Local
+Pickup** (the first `SHIPPING_OPTIONS` entry), which left the address fields
+optional and assumed the buyer would collect in person. Since most buyers need
+the item delivered, the default is now **Priority Insured ($45)** — a new
+`DEFAULT_SHIPPING_METHOD` export in `OrderSummary.tsx` that `CheckoutClient.tsx`
+seeds its `shippingMethod` state from. As a result the Street Address / City /
+State / ZIP fields are required by default (they already gate on
+`needsShipping`), and a buyer who wants to collect locally must deliberately
+switch the shipping dropdown to Local Pickup. The Address section also gained a
+bilingual helper line — "We’ll ship your order to this address. Prefer to pick
+it up in person? Switch the shipping method to Local Pickup in your order
+summary." — pointing buyers to the opt-in. No server change needed — the
+create-order route already drives address requirements and totals off the
+submitted method (its `?? 'local-pickup'` is only a fallback for a missing
+value). `tsc`/`lint`/`build` all pass; verified in-browser (default select =
+Priority Insured, address fields required, $45 shipping, helper line renders, no
+console errors).
+
 ## 2026-07-08 - Etsy markup→price workflow made explicit + admin status chips refresh after a sync
 
 Changing the Etsy price markup then "Sync All" left live prices unchanged
@@ -11,7 +66,8 @@ push; the flag clears after the push. Separately, `AdminShell`'s Etsy status
 chips (a single local DB read — no Etsy API) now refresh after the bulk sync
 modal closes and after any per-item drawer action (new `onSynced` prop on
 `EtsyProductPanel`), instead of only on mount. No migration; no owner action
-beyond deploy. `tsc`/`lint`/`build` pass, 154 tests green.
+beyond deploy. `tsc`/`lint`/`build` pass, 154 tests green. Confirmed working
+live by the owner.
 
 ## 2026-07-08 - Site-wide customer trade-in price default (⚠️ SQL migration pending)
 

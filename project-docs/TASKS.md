@@ -5,14 +5,6 @@
 
 ## Backlog
 
-- **🟢 Deploy the markup→price + chip-refresh polish (2026-07-08, session 9,
-  twentieth addendum):** No migration, no manual step — just deploy.
-  Then, to re-price live Etsy listings after a markup change, use **Settings →
-  Etsy Sync → "Push prices to Etsy now"** (NOT "Sync All", which skips
-  already-live items by design). After the deploy, saving a new markup shows a
-  gold callout pointing at that button, and the admin table's Etsy status chips
-  now refresh after each sync/status/price action instead of only on page load.
-  Detail: `project-docs/DECISIONS.md` (twentieth addendum).
 - **🔴 Deploy the bulk-sync fixes, then recover the 55 error items (2026-07-08,
   session 9, seventeenth–nineteenth addenda):** After deploy, open "Sync All to
   Etsy" and click the new **"Check Etsy statuses"** button — it reconciles every
@@ -449,6 +441,16 @@
 > start) — this section is intentionally just a short pointer, not a mirror
 > of it.
 
+- **2026-07-08 (session 10):** Buyer checkout now defaults to shipping (**Priority
+  Insured**, $45) instead of Local Pickup — address fields required by default,
+  pickup is opt-in. One-line default change (`DEFAULT_SHIPPING_METHOD` in
+  `OrderSummary.tsx`, consumed by `CheckoutClient.tsx`); no server/schema change.
+  `tsc`/`lint`/`build` pass; verified live in the dev preview.
+- **2026-07-08 (session 9, twentieth addendum):** Etsy markup→price workflow
+  made explicit (saving a new markup nudges the owner to "Push prices to Etsy
+  now", since "Sync All" skips already-live items) + admin status chips refresh
+  after every sync/status/price action instead of only on page load.
+  `tsc`/`lint`/`build`/154 tests pass; **confirmed working live by the owner.**
 - **2026-07-07 (later):** The Category sidebar buttons (Jewelry & Watches /
   Sterling Silver) now deselect when re-clicked while active, clearing
   `itemGroup` + its paired metal/purity params instead of re-pinning the same

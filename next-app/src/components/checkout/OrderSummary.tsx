@@ -25,6 +25,12 @@ export const SHIPPING_OPTIONS = [
   { value: 'priority-insured', labelEn: 'Priority Insured', labelEs: 'Prioritario asegurado', price: 45 },
 ];
 
+// Checkout defaults to shipping (most buyers need the item delivered), so the
+// address fields are required by default and the buyer must deliberately switch
+// to Local Pickup. Priority Insured is the standard default rather than the
+// pricier overnight option.
+export const DEFAULT_SHIPPING_METHOD = 'priority-insured';
+
 function parsePrice(label: string): number | null {
   return parseManualPriceLabelValue(label);
 }

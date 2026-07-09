@@ -992,46 +992,28 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
           </div>
         </div>
 
-      {/* Meta: count + clear */}
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '0.75rem 1.25rem',
-          fontSize: '0.8125rem',
-          color: 'var(--color-on-surface-variant)',
-          fontFamily: 'var(--font-label)',
-          border: '1px solid rgba(115, 92, 0, 0.12)',
-          borderRadius: 'var(--radius-xl)',
-          background: 'rgba(255, 255, 255, 0.72)',
-          padding: '0.55rem 0.85rem',
-        }}
-      >
-        <span>
+      {/* Meta row. Desktop: piece-count pill (+ clear) in the sidebar.
+          Mobile/tablet: this long field becomes the always-visible search bar
+          and the piece count moves down to the results toolbar. */}
+      <div className="shop-filters-meta">
+        <span className="shop-filters-meta-count">
           {isEs
             ? (filteredCount === allCount ? `${allCount} piezas` : `${filteredCount} de ${allCount} piezas`)
             : (filteredCount === allCount ? `${allCount} pieces` : `${filteredCount} of ${allCount} pieces`)}
         </span>
+        <div className="shop-filters-meta-search">
+          <input
+            type="search"
+            defaultValue={currentFilters.q ?? ''}
+            placeholder={isEs
+              ? 'Buscar oro, cadena, pulsera, collar, anillo…'
+              : 'Search gold, chain, bracelet, necklace, ring…'}
+            onChange={(e) => updateFilter('q', e.target.value)}
+            aria-label={isEs ? 'Buscar productos' : 'Search products'}
+          />
+        </div>
         {hasFilters && (
-          <button
-            type="button"
-            onClick={clearAll}
-            style={{
-              fontSize: '0.6875rem',
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              textDecoration: 'underline',
-              textUnderlineOffset: '3px',
-              color: GOLD,
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-              fontFamily: 'var(--font-label)',
-            }}
-          >
+          <button type="button" onClick={clearAll} className="shop-filters-meta-clear">
             {isEs ? 'Limpiar filtros' : 'Clear filters'}
           </button>
         )}
@@ -1052,6 +1034,64 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
         }
         .shop-filter-panel.is-open {
           display: block;
+        }
+        /* Results meta. Mobile/tablet: the field is a full-width search bar
+           (the piece count moves to the results toolbar). Desktop: restores the
+           count pill in the sidebar. */
+        .shop-filters-meta {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: center;
+          gap: 0.6rem 1rem;
+          font-size: 0.8125rem;
+          color: var(--color-on-surface-variant);
+          font-family: var(--font-label);
+        }
+        .shop-filters-meta-count {
+          display: none;
+        }
+        .shop-filters-meta-search {
+          flex: 1 1 100%;
+          min-width: 0;
+        }
+        .shop-filters-meta-search input[type='search'] {
+          width: 100%;
+          padding: 0.6rem 1rem;
+          border: 1px solid rgba(115, 92, 0, 0.5);
+          border-radius: 999px;
+          background: var(--color-background);
+          color: var(--color-on-surface);
+          font-family: var(--font-label);
+          font-size: 0.9rem;
+        }
+        .shop-filters-meta-clear {
+          font-size: 0.6875rem;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          text-decoration: underline;
+          text-underline-offset: 3px;
+          color: ${GOLD};
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 0;
+          font-family: var(--font-label);
+        }
+        @media (min-width: 1024px) {
+          .shop-filters-meta {
+            gap: 0.75rem 1.25rem;
+            border: 1px solid rgba(115, 92, 0, 0.12);
+            border-radius: var(--radius-xl);
+            background: rgba(255, 255, 255, 0.72);
+            padding: 0.55rem 0.85rem;
+          }
+          .shop-filters-meta-count {
+            display: inline;
+          }
+          .shop-filters-meta-search {
+            display: none;
+          }
         }
         .shop-clear-filters-top {
           display: flex;
