@@ -1,13 +1,12 @@
 # Feature: Etsy Sync
 
-> Status: **Phase 1 + Phase 2 built and core pipeline live-verified**
-> (OAuth connect, DB migration, and a first real draft sync all confirmed
-> live 2026-07-08 — see "Verification status" below for exactly what is and
-> isn't confirmed yet). Built 2026-07-08 per `etsy-sync-plan/BUILD-PROMPT.md`,
-> following the 17-doc plan in `etsy-sync-plan/` as the source of truth.
-> Phase 3 (Etsy order webhooks) is out of scope and not built. **Before doing
-> anything live, read `etsy-sync-plan/OWNER-SETUP.md`** — it has the complete
-> ordered owner checklist; this doc is technical reference, not a runbook.
+> Status: **Phase 1 + Phase 2 built and CONFIRMED LIVE end to end** (owner,
+> 2026-07-09 — see "Verification status" below for the full history). Built
+> 2026-07-08 per `etsy-sync-plan/BUILD-PROMPT.md`, following the 17-doc plan
+> in `etsy-sync-plan/` as the source of truth. Phase 3 (Etsy order webhooks)
+> is out of scope and not built. **Before doing anything live, read
+> `etsy-sync-plan/OWNER-SETUP.md`** — it has the complete ordered owner
+> checklist; this doc is technical reference, not a runbook.
 
 ## What this is
 
@@ -360,7 +359,17 @@ full list and reasoning. Headline items:
 
 ## Verification status
 
-**Done, confirmed live (across this session, 2026-07-08):** `supabase/etsy-sync.sql`
+**Confirmed live end to end (owner, 2026-07-09).** Every item on the
+original remaining checklist is now confirmed working in production,
+including the previously-open token refresh, scheduled price push,
+delist/relist, resume-after-interrupt, and multi-product dry-run. See
+`project-docs/CURRENT_STATUS.md` / `DECISIONS.md` sessions 3-12 for the full
+incident-by-incident history (bracelet length "Gray" bug + fix, image
+pipeline hardening, necklace sync + Necklace→Chains mapping, ring size, the
+22-ineligible-silver-items taxonomy fallback, bulk-sync runaway +
+error-visibility fixes, tag/markup/price-push refinements).
+
+**Done, confirmed live (2026-07-08, sessions 1-2):** `supabase/etsy-sync.sql`
 ran successfully; **Connect Etsy** OAuth round-trip succeeded on the first
 real attempt (verified directly against Supabase, not just "no error
 shown"); taxonomy IDs are pinned from a real `getSellerTaxonomyNodes` call;
@@ -372,17 +381,10 @@ gap — see DECISIONS.md "session 2"). `npx tsc --noEmit`, `npm run lint`
 (0 problems), `npm run build` all pass. **69 unit tests pass** (`npm run
 test`) covering mapping rules (title/tags/materials/properties/when_made/
 price/allowlist), image transcode, image-diff planning, price-push
-threshold logic, and the bulk-drain orchestration loop.
+threshold logic, and the bulk-drain orchestration loop. (Test count grew
+through session 11 as new mapping/tag/reconciliation logic landed — see
+`CHANGELOG.md` for the running total.)
 
-**Not yet verified live:** the new structured-properties push
-(`mapProperties`/`updateListingProperty`, session 3 — see above; safe either
-way since it's non-blocking), token refresh, the scheduled price push,
-delist/relist, resume-after-interrupt, and a dry-run across more than one
-product. Full remaining checklist:
-`etsy-sync-plan/14-verification-checklist.md`.
-
-**Owner/developer next steps:** click **Sync Updates** on the bracelet (or
-any product) to confirm the properties push landed correctly (see
-CURRENT_STATUS.md 2026-07-08 session 3 for exactly what to look for), then
-continue down `etsy-sync-plan/14-verification-checklist.md`'s remaining
-Phase 1 items.
+**Owner/developer next steps:** none outstanding from the original
+verification checklist. Ongoing use is normal admin operation (the Etsy
+drawer per product; "Sync All to Etsy" for bulk).

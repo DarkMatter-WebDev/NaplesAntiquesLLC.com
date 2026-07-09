@@ -5,322 +5,20 @@
 
 ## Backlog
 
-- **🔴 Run `supabase/marketing-buyers-audience-2026-07.sql` in Supabase
-  (2026-07-09, session 11, third addendum):** Run this *after*
-  `buyers-2026-07.sql`. Adds `buyers.marketing_opt_out`, grants `buyers` to
-  `service_role` (needed for the public unsubscribe endpoint), re-defines the
-  buyer-upsert trigger to carry forward a pre-existing opt-out, and widens
-  `email_campaigns`'s audience-scope check to allow `'buyers'`. Until this
-  runs, selecting "Buyers" in Email Campaigns will error (missing column /
-  constraint rejection) rather than send. **After running:** (1) open Email
-  Campaigns → Compose Campaign and confirm a 4th **Buyers** option appears
-  with a real (non-error) recipient count; (2) send a real campaign to the
-  Buyers audience and confirm it succeeds; (3) confirm someone who
-  previously unsubscribed (via the newsletter or their account) does **not**
-  receive it; (4) unsubscribe as a buyer-only email (no newsletter signup, no
-  account) via the emailed unsubscribe link and confirm a later Buyers
-  campaign skips them too; (5) *(fifth addendum)* confirm **Combined**'s
-  recipient count now equals subscribers + accounts + buyers combined (not
-  just the first two); (6) *(fifth addendum)* on `/admin/subscribers`, spot
-  check a few rows that overlap (e.g. a known buyer who's also a newsletter
-  subscriber) and confirm the Source column shows a correct combined label
-  ("Newsletter subscriber + Past buyer", etc.) rather than just one of them.
-  Full detail: `DECISIONS.md` 2026-07-09 (session 11, third + fifth
-  addenda).
-
-- **🟡 Verify Buyers auto-populate/delete behavior with real orders (2026-07-09,
-  session 11):** The grant bug is fixed and confirmed — `/admin/buyers` loads
-  without the permission error. Still not explicitly confirmed with real data:
-  (1) place one real test order (PayPal sandbox, or a manual admin order
-  marked Paid) for a new email and confirm a row appears automatically with
-  no other action needed; (2) delete a buyer and confirm their past orders in
-  `/admin/orders` are completely unaffected; (3) place another order for that
-  same deleted email and confirm it reappears as a fresh row. No app code
-  change expected either way. Full detail: `DECISIONS.md` 2026-07-09
-  (session 11).
-
-- **🟡 Verify the Buyers select + Copy Selected Emails feature live (2026-07-09,
-  session 11, second addendum):** Row checkboxes, header "select all"
-  (indeterminate when partial), and a **Copy Selected Emails** button were
-  added to `/admin/buyers` — code/`tsc`/`lint`/`build` all pass but couldn't
-  be clicked through in this environment (no admin session available).
-  Confirm: selecting a few rows updates the count and enables the button;
-  "select all" checks every row (and shows indeterminate, not checked, when
-  only some are picked); **Copy Selected Emails** puts a comma-separated list
-  of exactly the selected emails on the clipboard; deleting a selected row
-  removes it from the selection cleanly (no stale/stuck indeterminate state).
-  Full detail: `DECISIONS.md` 2026-07-09 (session 11, second addendum).
-
-- **🟡 Verify the "Ship to" → "Address" receipt/invoice relabel live (2026-07-08,
-  session 10, ninth addendum):** Local Pickup orders should now show **"Address"**
-  instead of **"Ship to"** on the buyer's receipt/invoice email (initial send,
-  admin resend, admin email preview, Print Invoice page) and on the checkout's
-  own on-page/printable confirmation — code/`tsc`/`lint`/`build`/`vitest`
-  (167/167) all pass, but couldn't be driven live this session (dev server
-  conflict, see the eighth addendum item below). Once free: (1) place a Local
-  Pickup test order, expand the address accordion and fill it in, complete
-  payment, and confirm both the on-page confirmation and the emailed receipt say
-  "Address" (not "Ship to"); (2) place a real-shipping test order and confirm
-  both still say "Ship To" exactly as before; (3) as admin, open that pickup
-  order's detail panel and confirm the email preview + Print Invoice page also
-  say "Address". No migration. Full detail: `DECISIONS.md` 2026-07-08 (session
-  10, ninth addendum).
-
-- **🟡 Verify the AI Listing Assistant Prompt accordion live (2026-07-08, session
-  10, eighth addendum):** `/admin/settings`'s AI prompt section now loads
-  collapsed behind an accordion (matching the checkout address pattern) —
-  code/`tsc`/`lint`/`build` all pass, but couldn't be driven live this session
-  (another chat's dev server held Next's single-instance lock on `next-app`, so
-  no local preview could start). Once free: load `/admin/settings`, confirm the
-  AI Listing Assistant Prompt section loads collapsed, click the header to
-  expand it (chevron flips, textarea + Copy/Edit/Save/Restore appear), click
-  again to collapse, and confirm every other settings section (Storage Cleanup,
-  Shop Visibility, Trade-in Price, Marketing, Etsy, Carousel) is unaffected. No
-  migration. Full detail: `DECISIONS.md` 2026-07-08 (session 10, eighth addendum).
-
-- **🟡 Verify the new owner new-order email (2026-07-08, session 10, sixth
-  addendum):** `finalizePaidOrder` now emails a new-order summary to
-  `info@naplesestatejewelry.co` (override: env `ORDER_NOTIFICATION_EMAIL`) from
-  `noreply@naplesestatejewelry.co`, reply-to the buyer. After deploy, complete a
-  PayPal sandbox (or live) order and confirm the email arrives at that inbox with
-  the right order #, total, customer contact, items, and the "View order in admin"
-  link. **Confirm:** (a) `info@naplesestatejewelry.co` is a real, monitored mailbox
-  and (b) Resend can deliver to it (it's just a recipient — the verified sender is
-  unchanged). Optional: set `ORDER_NOTIFICATION_EMAIL` in Netlify to send elsewhere
-  (e.g. a personal address) instead. No migration. Full detail: `DECISIONS.md`
-  2026-07-08 (session 10, sixth addendum).
-
-- **🟡 Verify the checkout stock-awareness error paths with a real PayPal flow
-  (2026-07-08, session 10, fourth addendum):** The availability display, cart
-  drawer banner, on-load re-check, and pay-block are all verified live (guest
-  checkout, simulated sold-out via a missing product row). Still needs a **PayPal
-  sandbox** run to exercise: (1) an item that sells out *during* the PayPal window
-  → capture returns `item_conflict` → confirm the buyer sees the specific
-  "purchased by another buyer — refund" message (not the generic one) and the
-  summary re-checks; (2) a create-order rejection for a just-sold item → confirm
-  the stock-specific message + summary flags it; (3) a genuine generic PayPal
-  error → confirm the new "if an item just sold out…" note appears. Code wired in
-  `PayPalCheckoutButton` (`onAvailabilityIssue` → `refreshAvailability`). No
-  migration. Full detail: `DECISIONS.md` 2026-07-08 (session 10, fourth addendum).
-  **Also (fifth addendum) — card-error escalation:** with a PayPal sandbox card
-  that declines, confirm the **1st** unknown `onError` shows "re-enter and
-  double-check your card number," and a **2nd** consecutive one shows "try a
-  different card / call us." The count persists in `sessionStorage`
-  (`nej-checkout-unknown-errors`) and clears after a successful payment.
-
-- **🔴 Run `supabase/etsy-listings-extra-tags-2026-07.sql` in Supabase
-  (2026-07-08, session 10, third addendum):** Adds `etsy_listings.extra_tags
-  text[]` for the new per-product **Additional tags** field in the Etsy drawer.
-  Until it runs, custom tags can't be saved (the title-word broadening works
-  regardless — no schema needed). After running, verify in a product's Etsy
-  drawer: (1) type comma-separated tags into **Additional tags**, click **Save
-  tags**, confirm they appear FIRST in the dry-run **Tags** line (merged with the
-  auto tags, ≤13 total); (2) reload the drawer and confirm the field prefilled
-  with the saved tags; (3) clear the field + Save reverts to auto-only; (4) on a
-  product whose TITLE has a descriptor its `product_type` lacks (e.g. a "…Charm
-  Bracelet" typed Bracelet), confirm **charm** and **charm bracelet** now appear
-  in Tags without any manual entry. Then re-sync to push to an already-listed
-  item. Full detail: `DECISIONS.md` 2026-07-08 (session 10, third addendum).
-
-- **🔴 Deploy the bulk-sync fixes, then recover the 55 error items (2026-07-08,
-  session 9, seventeenth–nineteenth addenda):** After deploy, open "Sync All to
-  Etsy" and click the new **"Check Etsy statuses"** button — it reconciles every
-  linked listing to its real Etsy state (read-only), clearing the 55 items
-  stuck in `error` (from the missing-env-var incident) back to `draft_review`.
-  Then the catalog is recovered without re-pushing anything. (Alternatively,
-  START now also re-syncs error items.) Prior rounds also in this deploy: the
-  runaway-loop fix and the error-visibility/resilience fix. Below is the
-  earlier detail:
-- **🔴 (superseded by the item above) Deploy the bulk-sync fixes, then re-run
-  "Sync All" — report any error (2026-07-08, session 9, seventeenth + eighteenth
-  addenda):** Two rounds of
-  fixes in `sync.ts`/`drainQueueCore`/`drainQueue`/`EtsyBulkSyncModal`:
-  (17th) the bulk sync looped forever on already-synced items; (18th) it then
-  showed a bare "Batch sync failed." — now the client surfaces the server's
-  real error, and the drain contains a per-item throw (one bad listing can't
-  sink the batch) while stopping cleanly on a connection error. **Deploy both,
-  then run "Sync All" once.** Expected: the ~55 items stuck in `'pending'`
-  (shown as "Not listed" until then) re-sync as updates (image diff, not a
-  re-upload) → draft_review; the run finishes (processed ≈ item count). **If it
-  still errors, the message is now specific — report it** (the exact trigger of
-  the 18th-addendum failure was never confirmed: token was valid, pre-Etsy
-  logic clean, nothing logged). No migration, no manual DB cleanup. Full
-  detail: `DECISIONS.md` 2026-07-08 (session 9, seventeenth + eighteenth
-  addenda).
-
-- **🟡 Re-sync 2 corrected bracelets to Etsy (2026-07-08, session 9, fifteenth
-  addendum):** Two bracelets were mistyped as `Necklace` (data error) and
-  corrected to `Bracelet` in the DB (`vintage-tiffany-...-cuban-curb-link-bracelet-26`,
-  `italian-14k-yellow-gold-figaro-link-bracelet-25`). Their existing Etsy
-  drafts still show the old Necklaces > Chains category until re-synced.
-  **Action:** on each, click **Refresh Preview** (confirm it now reads
-  "Bracelets > Chain & Link Bracelets" with bracelet tags) then **Sync
-  Updates**. Optional/owner's call: a Mickey Mouse "Pendant" is typed `Charm`
-  (Charm vs Pendant — change it if you prefer Pendant). **Done (sixteenth
-  addendum):** the dry-run now shows a non-blocking warning when a title
-  implies a different type than `product_type`, to catch future mistypes
-  before syncing.
-
-- **🔴 Run `supabase/shop-special-price-default-2026-07.sql` in Supabase
-  (2026-07-08, session 9, fourteenth addendum):** Adds
-  `shop_settings.special_price_default_enabled` + `special_price_default_percent`
-  for the new site-wide **Customer Trade-in Price** default (Admin → Settings).
-  Verified live the columns don't exist yet — the feature is safely OFF and
-  every product page shows the plain melt value until this runs (reads degrade
-  gracefully). After running: Admin → Settings → Customer Trade-in Price →
-  enable + set a % (negative = below spot) → Save; a product page reflects it
-  within ~5 min (ISR). The canonical `supabase/shop-settings.sql` was updated
-  too (fresh installs get the columns). Full detail: `DECISIONS.md` 2026-07-08
-  (session 9, fourteenth addendum).
-
-- **🟡 Etsy sync — verify the mapping + preview changes live (2026-07-08,
-  session 9, seventh–twelfth addenda):** Owner-requested changes, code done,
-  not yet re-synced/reviewed in-browser: (1) **length AND ring size auto-push now**
-  with no Netlify flag (`ETSY_SYNC_BRACELET_LENGTH=false` /
-  `ETSY_SYNC_RING_SIZE=false` disable them); (2) **vintage/antique tags** on
-  every item ("vintage jewelry"/"antique jewelry" + metal-specific
-  "vintage sterling"/"antique sterling" etc., always paired); (3) **no more
-  mid-word tag truncation** ("solid silver bracele" → word-boundary cut);
-  (4) **manual "Test Length"/"Test Ring Size" windows removed** — length/ring
-  size now appear in the **dry-run preview** ("7.75 in · pushes on sync" /
-  "10 1/2 (US/CA) · pushes on sync"), approve by syncing;
-  (5) **Check Etsy Status now reconciles draft→active** (it used to leave the
-  chip stuck on "Draft on Etsy — needs review" after activating on Etsy);
-  (6) **"View on Etsy" now opens the shop-manager list** (active → default
-  listings view, draft → `state=draft` filter) instead of the public
-  `etsy.com/listing/<id>` URL;
-  (7) **the 22 "ineligible" silver items now all sync** — they only failed the
-  taxonomy check (granular types like "Berry Spoon"/"Coffee Pot"/"Koma Clasp"
-  weren't mapped); a keyword→Etsy-leaf fallback (`ETSY_KEYWORD_TAXONOMY` in
-  `mapping.ts`, real ids) maps flatware→Flatware & Silverware (exact),
-  holloware→closest serveware leaf (approximate), Koma→Brooches. Live pre-flight
-  re-run confirms 0 ineligible now;
-  (8) **two bulk-sync 400s fixed** — Etsy allows "&" at most once in a title;
-  two sterling pieces had two, so `mapTitle` now keeps the first "&" and spells
-  the rest "and". Also `extractEtsyMessage` (`client.ts`) now parses Etsy's
-  field-error shape so future title/tag rejections show the real reason, not a
-  bare "400". Re-sync those two pieces (Serving Spoon + Oval Gallery Tray);
-  (9) **markup Save button + dedicated price push** — the markup field now has
-  an explicit Save; new "Push prices to Etsy now" (settings) + per-item "Push
-  price" (product drawer) use a lean price-only path (ignores the daily
-  threshold) because bulk "Sync All" skips already-live listings. **Verify:**
-  change markup → Save → "Push prices to Etsy now" → confirm live prices update.
-  Also: open a product's Etsy drawer,
-  confirm Length/Ring size show in the preview (no separate test box), re-sync
-  any listing (and a Ring) and confirm the new tags render with no chopped
-  words + length/ring size land automatically; activate a draft on Etsy →
-  Check Etsy Status → confirm the chip flips to "Active on Etsy" and "View on
-  Etsy" opens the active manager view; and reopen "Sync all to Etsy" to confirm
-  it now reads ~70 eligible / 0 ineligible (spot-check a few silver-piece
-  categories in the preview, override any approximate holloware fit that's
-  wrong). **Note for owner:** "antique" on a genuinely-1990s piece is a keyword
-  stretch (free-text search tag, not the accurate `when_made` field) — say if
-  you want it narrowed to older items only. Full detail: `DECISIONS.md`
-  2026-07-08 (session 9, seventh–twelfth addenda).
-- **🟢 Etsy sync — necklace sync RESOLVED + Necklace now maps to "Chains"
-  (2026-07-08, session 9, fourth–sixth addenda):** The "hung up syncing"
-  incident is fully resolved — the necklace synced live after three
-  compounding fixes surfaced one-by-one: (1) a legacy relative image path
-  Node's `fetch()` couldn't resolve (`resolveImageUrl()` in `images.ts`),
-  (2) Etsy rejecting the 51-char `sku`/slug — now SKU is never pushed at all
-  (`sync.ts`), and (3) owner's follow-up: the **Necklace** product type now
-  auto-maps to **Chains (1221)** instead of the old "Pendant Necklaces"
-  closest-match, and no longer shows the "review" badge (Pendant is its own
-  product type). **Remaining optional owner action:** any necklace already
-  synced under Pendant Necklaces won't move to Chains automatically — re-sync
-  it, or fix its category on etsy.com, if you want it moved. New necklaces
-  land under Chains from the next sync. Full detail: `DECISIONS.md`
-  2026-07-08 (session 9, fourth / fifth / sixth addenda).
-- **🟢 Etsy sync — Ring size CONFIRMED WORKING + now auto-on (2026-07-08,
-  session 9, addendum + eighth addendum):** Live-verified: size 10.5 →
-  matched real chart entry `value_id 1604` → written → read back and
-  confirmed correct ("Ring size", "US/CA", "10 1/2"). Ran against a
-  manually-overridden category, a stronger proof than the default path
-  alone. **Now automatic** (session 9, eighth addendum) — ring size pushes
-  on every Ring sync by default, no Netlify change; set
-  `ETSY_SYNC_RING_SIZE=false` to disable. The manual "Test Ring Size" button
-  keeps working either way.
-- **🟡 Etsy sync — one more live click to confirm the Length generalization
-  (2026-07-08, session 9):** Click **Test Length** on a non-Bracelet,
-  non-Ring product (a Necklace or Earrings draft) — the mechanism is proven
-  for Bracelet only so far; this confirms it also holds for another
-  category's own property id. Safe regardless of outcome (write-then-verify,
-  never silently trusts a 200). Full detail: `project-docs/DECISIONS.md`
-  2026-07-08 (session 9).
-- **🟢 Etsy sync — Bracelet length CONFIRMED WORKING (2026-07-08, session 8) —
-  optional next step, owner's call:** Investigation closed. Live-verified:
-  `value_ids: ['']` (an empty-string placeholder, never a guessed number)
-  causes Etsy to auto-generate its own real value_id for the custom length
-  value; read back and independently confirmed correct (property "Length",
-  scale "Inches", value "7.75" — not a repeat of the old "Gray" bug).
-  Materials/Gold solidity/Gold purity remain separately confirmed correct
-  (session 5). **Optional next step:** set `ETSY_SYNC_BRACELET_LENGTH=true`
-  in Netlify to turn on automatic Bracelet-length pushing for every regular
-  sync — no code changes needed, purely an env var flip when ready. Not
-  urgent; the manual "Test Bracelet Length" button in each Bracelet
-  product's Etsy panel keeps working regardless. Full detail:
-  `project-docs/DECISIONS.md` 2026-07-08 (session 8, third addendum).
-- **🔴 Etsy sync — manually fix "Gray" in the bracelet's Bracelet length field
-  (2026-07-08, session 5):** A bad property-push guess wrote the literal text
-  "Gray" into the live bracelet listing's Bracelet length field instead of
-  "7.75" — Etsy accepted it silently rather than rejecting it, so the app
-  never saw an error. The buggy code path is now removed (`mapProperties()`
-  no longer pushes Length at all — see `DECISIONS.md` 2026-07-08 session 5),
-  so this is a one-time cleanup, not a recurring risk. Fix it directly on
-  etsy.com: clear the field and either type `7.75` or click Etsy's own
-  **"Suggested: + 7.75 Inches"** chip shown right below it.
-- **🟡 Etsy sync — two more live clicks needed (2026-07-08, sessions 3-4):**
-  1. The bracelet draft (`heavy-italian-14k-yellow-gold-cuban-link-bracelet-53-91g-21`)
-     was **deleted directly on etsy.com** by the owner. Click **Check Etsy
-     Status** on it first — should reset it to "Not listed" (etsy_listing_id
-     cleared) — before trying **Sync to Etsy** for a clean fresh publish.
-  2. On any *other* already-listed product, click **Sync Updates** to confirm
-     the `who_made`/`is_supply` PATCH fix (was erroring live with "Cannot
-     update 'when_made' without 'who_made' and without 'is_supply'").
-  Materials/Gold purity/solidity are now confirmed correct live (owner's
-  screenshot, session 5) — no longer an open question. Full detail:
-  `CURRENT_STATUS.md`/`DECISIONS.md` 2026-07-08 (sessions 3-5).
-- **🟢 Etsy sync — core pipeline live-verified (2026-07-08):** OAuth connect,
-  `supabase/etsy-sync.sql`, and a first real draft sync (bracelet, now
-  `draft_review` on Etsy) all succeeded live this session — see
-  CURRENT_STATUS.md's 2026-07-08 entries for each. Taxonomy IDs are pinned
-  from a real `getSellerTaxonomyNodes` call (6 of 12 are best-fit
-  approximations flagged `approximate: true` in `ETSY_TAXONOMY_MAP` —
-  optional owner review, not a blocker). **Still unverified live:** token
-  refresh, the scheduled price push, delist/relist, resume-after-interrupt,
-  and a dry-run across more than one product — full remaining checklist in
-  `etsy-sync-plan/14-verification-checklist.md`. Do not treat unit-test-green
-  as live-verified for anything still unchecked there.
-- **Run BOTH Quantity migrations in the live Supabase project, in order:**
-  `supabase/product-quantity-2026-07.sql` (Phase 1 — `products.quantity`), then
-  `supabase/checkout-quantity-2026-07.sql` (Phase 2 — `order_items.quantity` +
-  the rewritten `create_paypal_order`/`capture_paypal_order` RPCs). Then verify:
-  - **Phase 1 field:** (1) column exists and anon/authenticated can select it
-    (product pages keep working, no "permission denied for column" errors);
-    (2) set a test listing to Quantity 3, save, confirm `/shop/[id]` and the
-    shop card show "3 in stock"; (3) set Quantity 0 on an `available` listing,
-    save, confirm `status` auto-flips to `sold` and it leaves the purchasable
-    sort / "Add to Cart" disables; (4) a `sold` item restocked above 0 does NOT
-    auto-flip back to `available`.
-  - **Phase 2 multi-unit purchase:** (5) on a listing with stock ≥ 2, the
-    detail page, cart drawer, and checkout summary show a quantity stepper
-    capped at stock with correct per-line subtotals; (6) buy 2 of a stock-3
-    listing via PayPal and confirm capture succeeds, the order/invoice/receipt
-    show `Qty 2 × unit`, and `products.quantity` drops to 1 (item stays
-    `available`); (7) buy the last unit and confirm it flips to `sold`; (8) a
-    line whose requested quantity exceeds live stock is rejected at checkout
-    with a clear message; (9) the admin manual-order form's per-product quantity
-    input produces correct totals. See `CURRENT_STATUS.md` + `DECISIONS.md`
-    2026-07-07 (latest two entries).
-- **Run `supabase/product-special-price-override-2026-07.sql` in the live Supabase project**
-  and then verify the new per-item **"Override customer special pricing"** admin checkbox:
-  (1) confirm both columns exist and anon/authenticated can select them (product pages keep
-  working, no "permission denied for column" errors); (2) edit a test listing, check the box,
-  enter a custom dollar amount, save, and confirm its `/shop/[id]` page's "Own gold or
-  silver…" line shows that custom amount instead of the computed scrap value (the Scrap
-  value/Based on spot box above it should still show the real computed value, unchanged);
-  (3) uncheck the box and confirm the line reverts to the computed scrap value. See
-  `CURRENT_STATUS.md` + `DECISIONS.md` 2026-07-07 (latest).
+- **⭐ eBay sync: CODE-COMPLETE (2026-07-09, session 14), unverified live.**
+  Phase 0 webhook + Phase 1 + Phase 2 all built per
+  `ebay-sync-plan/BUILD-PROMPT.md`; `tsc`/`lint`/`build`/`vitest` (238/238)
+  all pass. See `CURRENT_STATUS.md` session 14 and
+  `project-docs/features/ebay-sync.md` for what shipped and every
+  `TODO(ebay-verify)`. **Everything remaining is a manual owner/developer
+  step** — `ebay-sync-plan/OWNER-SETUP.md` is now the finalized, ordered
+  checklist (steps 1 and 7 were already done pre-build; steps 2–6 and 8–10
+  are next, in order: run `supabase/ebay-sync.sql`, set Netlify env vars,
+  deploy, subscribe to account-deletion notifications, configure the
+  RuName, connect eBay in `/admin/settings`, then the live verification
+  pass). No live eBay account/credentials were available in the build
+  environment, so nothing past unit tests has been exercised — treat every
+  eBay-side interaction as untested until OWNER-SETUP.md's steps are done.
 - **Optional:** if OneDrive sync load/lag is still noticeable during dev
   (separate from the now-fixed cache-corruption bug), also relocate
   `next-app/node_modules`'s *real* content off OneDrive the same way
@@ -334,21 +32,13 @@
   workaround (see CURRENT_STATUS.md / DECISIONS.md) works around today. Not
   urgent since the workaround is stable, but the junction setup could
   eventually be removed if the upstream fix makes it unnecessary.
-- **Run `supabase/product-show-spot-price-2026-07.sql` in the live Supabase project**
-  and then verify the new per-item **"Show spot / melt value on storefront"** admin
-  checkbox: (1) confirm the column exists and anon/authenticated can select it
-  (product pages keep working, no "permission denied for column" errors); (2) edit a
-  mixed-metal test listing, uncheck the box, save, and confirm its `/shop/[id]` page
-  shows the short note instead of the Scrap value/Based on spot box (and the "Own
-  gold or silver…" line disappears too); (3) re-check the box and confirm the melt
-  box returns. See `CURRENT_STATUS.md` + `DECISIONS.md` 2026-07-06 (later).
 
 > **Standing note (owner, 2026-07-05):** all working env is in **Netlify** (PayPal
 > sandbox, AI assistant, service role, webhook secrets, etc.). `next-app/.env.local`
 > is **stale — do not rely on it** for credentials. Remaining testing is done **live
 > after deployment**, and the **owner owns that testing** (don't attempt live
-> PayPal/AI/email tests from here). This likely clears the old PayPal "Netlify has the
-> wrong credentials" blocker — confirm on the next deploy.
+> PayPal/AI/email tests from here). **Confirmed 2026-07-09:** this cleared the old
+> PayPal "Netlify has the wrong credentials" blocker — checkout is live in production.
 
 - **Verify live invoice row creation on deliberate test orders.** Code now creates
   invoices idempotently at order creation and can recover missing legacy invoices from
@@ -387,11 +77,6 @@
   test on. Next time: cancel any order → the Reopen button should appear → click it →
   order returns to `open`/`pending` and unpaid products to `pending_payment` (leaving
   the public gallery again).
-- **Bring PayPal checkout live (sandbox → production).** Canonical, up-to-date
-  status/steps live in the **🔴 HANDOFF — PayPal checkout** section at the top
-  of `CURRENT_STATUS.md` — read that first, not this file, for the current
-  blocker and ordered go-live steps. (Do not duplicate the checklist here; it
-  goes stale the moment the two copies diverge — see DECISIONS 2026-07-02.)
 - **Run `supabase/order-emails.sql` in the live Supabase project** to enable the
   per-order email history on `/admin/orders/[id]` (new **Email History** card under
   the Summary) and the logging of auto-sent receipts. Until run, history reads empty
@@ -448,14 +133,6 @@
   `shop-new-listing-06-04.jpg` / `-05.jpg` now point at the `.webp` files and
   render correctly (the JPGs were already deleted from `public/`; Netlify 301s
   were the interim safety net).
-- **Promote CSP from Report-Only to enforcing.** Root `netlify.toml` ships
-  `Content-Security-Policy-Report-Only`. After deploy, watch the browser
-  console / a report endpoint across the main pages; once clean, rename the
-  header key to `Content-Security-Policy`. Current policy: default-src
-  'self'; img-src 'self' data: + Supabase; script-src 'self' 'unsafe-inline';
-  style-src 'self' 'unsafe-inline' + fonts.googleapis.com; font-src 'self' +
-  fonts.gstatic.com; connect-src 'self' + Supabase + api.gold-api.com;
-  frame-ancestors 'none'.
 - **Verify the security headers, caching, and 410 bot rules live** after the
   next Netlify deploy (`curl -I` the site + a `/wp-login.php` probe → 410).
   These come from root `netlify.toml` and cannot be exercised by the local
@@ -479,32 +156,56 @@
   300KB guideline (they stayed slightly over at the requested q80/2048
   because they are large detailed photos) — drop to q75 or cap ~1600px if
   desired.
-- **Remaining shop performance work (deferred — higher risk, left for a
-  focused follow-up):**
-  1. **DB-side pagination/faceting.** `shop/page.tsx` still fetches ALL public
-     rows (including `images`/`tags` arrays) then filters/sorts/slices in JS
-     to build facets. Push the visible page to `.range(start,
-     start+perPage-1)` and compute brand/price/count facets via a separate
-     lightweight aggregate query or materialized view, rather than over the
-     full row set each request.
-  2. **Make bare `/shop` (no query params) static/ISR** instead of fully
-     dynamic. It awaits `searchParams` for filters, which opts the whole
-     route into dynamic SSR even for the no-filter external-link case. Split
-     the default catalog into a statically generated segment + client-side
-     URL filtering, or render the no-filter view from a `'use cache'`
-     segment.
-  3. **Server-render `ProductCard`'s static markup**; isolate only the
-     interactive bits (cart/wishlist buttons, hover carousel, rAF image-load
-     poll) into small client islands.
-  4. **Re-encode oversized `/public` page images** that violate the
-     2048px/WebP rule: `shop-new-listing-06-05.jpg` (~1.07 MB), `money.webp`
-     (~882 KB), and regenerate the brand `logo.webp` source (491 KB) smaller.
-  5. Consider self-hosting/subsetting the Material Symbols icon glyphs
-     actually used (~12) to drop the third-party render-blocking font
-     stylesheet entirely. (The `google-font-display` lint warning it used to
-     cause is already resolved — a scoped suppression on the `<link>` explains
-     that `display=block` is intentional for an icon font; this item is now a
-     pure perf optimization, no longer a lint fix.)
+- **Remaining shop performance work (2026-07-09, session 12):** most of the
+  original 6-item list turned out to already be done (found while scoping
+  this) or was completed this session; one item remains genuinely open:
+  1. **🟢 Done (session 12):** bare `/shop` (no filter/sort/page params) is
+     now static/ISR via a twin page (`shop-index`) reached by a
+     `next.config.ts` rewrite when none of the ~20 filter query keys are
+     present — build manifest confirms `● /[locale]/shop-index` (SSG,
+     `revalidate: 300`) vs `ƒ /[locale]/shop` (unchanged, still fully
+     dynamic for any real filter/sort/page/search). Verified live: bare
+     `/shop` and every filtered/sorted/paginated URL tested render correct,
+     distinct content; interactive controls (sort, view toggle, filters,
+     pagination — all `useSearchParams()` client components, now
+     Suspense-wrapped so the twin page can prerender) work identically,
+     confirmed by an actual click-through (sort→URL update, view toggle→URL
+     update), no console errors, 171/171 vitest, `tsc`/`build`/`lint` clean.
+     **Caveat:** dev mode never performs real static generation (Next's own
+     docs: pages always render on-demand in dev), so the actual CDN
+     cache-hit benefit can only be confirmed after a real Netlify deploy —
+     what's verified here is correct routing/rendering/interactivity plus
+     the build-time SSG classification, not live edge-cache behavior.
+  2. **🟢 Done (session 12), partial:** the facet-only catalog fetch (Brand
+     + Item Type dropdown options, used only when a DB-level filter like
+     metal/purity/brand/status is active) now selects a ~12-column subset
+     instead of the full ~31-column product row (drops `images`/`image_urls`/
+     `image_padding*` and every pricing/detail-only field) — verified live
+     that brand options are byte-identical across the unfiltered, `?metal=gold`,
+     and `?metal=silver` cases. **Full `.range()`-based DB pagination was
+     deliberately NOT done** — see `DECISIONS.md` 2026-07-09 (session 12) for
+     why: most real filters (item type, chain type, length, gender, year,
+     free-text search, and price range — which needs the live, non-stored
+     spot price) only exist as JS-side logic today, so a correct DB-side
+     fast path is much narrower than it sounds and a wrong equivalence
+     condition would silently return incorrect results for some filter
+     combination on the highest-traffic page in the app. Left as a real,
+     separate follow-up rather than rushed.
+  3. **Still open:** server-render `ProductCard`'s static markup; isolate
+     only the interactive bits (cart/wishlist buttons, hover carousel, rAF
+     image-load poll) into small client islands.
+  4. **🟢 Already done (found while scoping, not this session's work):**
+     the oversized-image items were already fixed by an earlier session —
+     `shop-new-listing-06-05.webp` is 189KB (was described as a 1.07MB JPG),
+     `money.webp` is 330KB (was 882KB), `logo.webp` is 4.7KB (was 491KB).
+     All under or near the 300KB guideline; TASKS.md just hadn't been
+     updated to reflect it.
+  5. **🟢 Already done (found while scoping, not this session's work):** the
+     Material Symbols icon font is already self-hosted and subset
+     (`material-symbols-subset-v358.woff2`, 59KB, `font-display: block`,
+     preloaded in `layout.tsx`, versioned regeneration process documented in
+     `globals.css`) — no third-party Google Fonts stylesheet remains on the
+     critical path. TASKS.md just hadn't been updated to reflect it.
   6. **Done 2026-07-05:** product-detail double DB query deduped via `React.cache`
      on `fetchPublicProduct` (generateMetadata + page now share one query).
 - Migrate the remaining legacy local-only product photos to Supabase Storage
@@ -558,6 +259,31 @@
 > start) — this section is intentionally just a short pointer, not a mirror
 > of it.
 
+- **2026-07-09 (session 12) — owner confirmed live in production:** PayPal
+  checkout live (go-live blocker resolved); `buyers-2026-07.sql` +
+  `marketing-buyers-audience-2026-07.sql` run, Buyers tab/Combined-audience
+  behavior confirmed; Etsy sync confirmed live end to end (bulk-sync recovery,
+  ineligible-silver fix, length/ring size auto-push, tags, markup/price push,
+  necklace→Chains, corrected bracelets, custom tags, core-pipeline checklist
+  incl. token refresh/scheduled price push/delist-relist/resume-after-
+  interrupt/multi-product dry-run); session 10-11 UX/email items confirmed
+  (Ship to→Address relabel, AI Prompt accordion, owner new-order email,
+  checkout stock-awareness + card-error paths). See `CURRENT_STATUS.md` +
+  `DECISIONS.md` 2026-07-09 (session 12).
+- **2026-07-09 (session 12, addendum) — owner confirmed the rest live too:**
+  `product-quantity-2026-07.sql` + `checkout-quantity-2026-07.sql` (multi-unit
+  purchase), `product-special-price-override-2026-07.sql` (per-item override
+  checkbox), `shop-special-price-default-2026-07.sql` (site-wide trade-in
+  default), and `product-show-spot-price-2026-07.sql` (per-item spot-price
+  visibility toggle) are all applied and their behavior confirmed live.
+  **CSP was already enforcing** in root `netlify.toml` (verified directly —
+  the Backlog item describing it as pending Report-Only was stale; the live
+  policy is also more complete than that item described, now covering
+  TradingView + PayPal domains too). The deferred shop
+  performance work (DB-side pagination, static/ISR for `/shop`, ProductCard
+  server-render split, image re-encoding, icon font subsetting) remains
+  genuinely unbuilt and stays open below — not part of this confirmation.
+  See `DECISIONS.md` 2026-07-09 (session 12, addendum).
 - **2026-07-09 (session 11, fourth addendum):** New gold palm tree favicon —
   compressed to a transparent 64×64 PNG (4.2 KB) via `sharp` and swapped in for
   the old `favicon.ico`. Fully verified live on both locales, no pending owner

@@ -3,7 +3,8 @@
 import { revalidateTag, revalidatePath } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/service';
 import { requireAdmin } from '@/lib/admin-auth';
-import { handleProductStatusChange } from '@/lib/etsy/sync';
+import { handleProductStatusChange as handleEtsyProductStatusChange } from '@/lib/etsy/sync';
+import { handleProductStatusChange as handleEbayProductStatusChange } from '@/lib/ebay/sync';
 import type { ProductStatus } from '@/types/product';
 
 export async function adminUpdateProductStatus(
@@ -43,8 +44,10 @@ export async function adminRevalidateProducts(ids: string[]): Promise<void> {
   // Phase 2: auto-delist/relist piggybacks on this existing chokepoint (every
   // products-write path already calls this) rather than a new "where do
   // status changes happen" audit — see etsy-sync-plan/03-sync-lifecycle.md
-  // Flow 3. Fire-and-forget: never let an Etsy hiccup block this revalidation.
-  void handleProductStatusChange(ids).catch(() => {});
+  // Flow 3 and ebay-sync-plan/03-sync-lifecycle.md Flow 3. Fire-and-forget:
+  // never let an Etsy or eBay hiccup block this revalidation.
+  void handleEtsyProductStatusChange(ids).catch(() => {});
+  void handleEbayProductStatusChange(ids).catch(() => {});
 }
 
 export async function adminRevalidateProduct(id: string): Promise<void> {
@@ -57,5 +60,6 @@ export async function adminRevalidateProduct(id: string): Promise<void> {
   // localePrefix is 'as-needed': default locale (en) has no prefix.
   revalidatePath(`/shop/${id}`);
   revalidatePath(`/es/shop/${id}`);
-  void handleProductStatusChange([id]).catch(() => {});
+  void handleEtsyProductStatusChange([id]).catch(() => {});
+  void handleEbayProductStatusChange([id]).catch(() => {});
 }

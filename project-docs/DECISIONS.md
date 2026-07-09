@@ -1,5 +1,366 @@
 # Decisions Log
 
+## 2026-07-09 (session 14) - eBay sync build: interpretations, gaps, and judgment calls
+
+**Context:** built the full eBay sync integration from `ebay-sync-plan/`
+(BUILD-PROMPT.md's mission). No eBay credentials or network access to
+developer.ebay.com were available in the build environment (WebFetch timed
+out on every attempt), so per BUILD-PROMPT.md hard rule 8, uncertain values
+were pinned as best-supported guesses marked `TODO(ebay-verify)` rather than
+left unbuilt, wherever the plan itself already flagged the item as
+`TODO(ebay-verify)`. Recording every place a judgment call was made:
+
+1. **No Fashion Jewelry category id is pinned anywhere in the code**
+   (`lib/ebay/mapping.ts`'s `EBAY_FASHION_CATEGORY_MAP` is intentionally
+   empty). The plan's own candidate table (02-field-mapping.md §D) only
+   pins Fine Jewelry leaf ids; a Fashion Jewelry id was never given and
+   this build has no way to look one up live. Fabricating a plausible
+   number felt too close to the Etsy build's "Gray" incident (a guessed
+   value that looked fine and was silently wrong) — a wrong *category* id
+   is a softer failure (eBay 400s at publish, not a silent corruption), but
+   still risky enough to leave unpinned. Consequence: **every vermeil item
+   is blocked at pre-flight** with a clear "resolve via eBay's Taxonomy API
+   before publishing this item" message until a developer pins real ids.
+   Added to `OWNER-SETUP.md` as a required pre-first-vermeil-publish step.
+2. **Item-aspect values (Metal, Metal Purity, Chain Length, Ring Size, Year
+   Manufactured, Item Weight) are best-effort, not validated against eBay's
+   live `getItemAspectsForCategory` SELECTION_ONLY value lists** — same root
+   cause (no live Taxonomy access). Pre-flight surfaces a permanent
+   informational warning (`aspect_values_unverified`) rather than pretending
+   to validate against invented allowed-value lists. A SELECTION_ONLY
+   mismatch fails loudly at publish time (a 400, not a silent bad write),
+   which is a materially safer failure mode than the property-guessing bug
+   that bit the Etsy build.
+3. **No eBay username is ever stored/shown** — the plan's OAuth scope list
+   (`sell.inventory` + `sell.account`, base scope) has no identity-lookup
+   scope, and 04-oauth-and-secrets.md never names one. `ebay_username`
+   stays `null`; the settings panel shows the connected date and token
+   countdown instead. Flagging this as a plan gap rather than silently
+   adding an unscoped API call.
+4. **No per-product category-override route/column was built.**
+   07-admin-ux.md's product-panel description mentions "category path (+
+   approximate flag + override select)", but 08-database-schema.md's
+   `ebay_listings` table has only a single `category_id` column (no
+   override-id/override-path pair like Etsy's `taxonomy_override_id`), and
+   09-api-routes.md's route table has no `/category` route for eBay (Etsy
+   has one). Treated 08/09 as authoritative (they're the literal schema/API
+   source of truth) over 07's prose aside; the dry-run preview still shows
+   category + the `approximate` flag, just with no manual override capability
+   yet.
+5. **`bulkUpdatePriceQuantity` is called one SKU per request**, not batched
+   up to the plan's suspected ≤25/call cap — plan's own
+   `rest-endpoints-used.md:57` flags the batching shape `TODO(ebay-verify)`;
+   one-per-call is simpler, isolates per-item failures, and is far under
+   every quota at this catalog's size (~78 products).
+6. **Account-deletion webhook signature verification** (`X-EBAY-SIGNATURE`
+   header decoding + `getPublicKey` response shape) is implemented from the
+   commonly-documented eBay Notification API pattern (base64 JSON header
+   carrying `{kid, signature}`; ECDSA/SHA-256 over the raw body; PEM-ish
+   public key), not a live-verified contract. The challenge-echo GET path
+   (the actually load-bearing, precisely-specified half) is exact and
+   unit-tested against the plan's stated algorithm. Flagged
+   `TODO(ebay-verify)` in `app/api/webhooks/ebay-account-deletion/route.ts`;
+   spot-check against a real "Send Test Notification" before relying on it.
+7. **eBay API endpoint hosts/paths/header formats generally** are pinned
+   from well-established, stable eBay Sell API conventions (unchanged for
+   years) rather than a fresh OpenAPI fetch — `WebFetch` to
+   `developer.ebay.com` timed out on every attempt (no network access from
+   this environment). This is the exact class of mistake that bit the Etsy
+   build twice (wrong `x-api-key` format, wrong host); spot-checking the
+   Sell Inventory/OAuth endpoints against real docs before the first live
+   sync is the single highest-value manual verification step.
+
+Full detail, plus every other `TODO(ebay-verify)` and the finalized
+verification checklist, is in `project-docs/features/ebay-sync.md` and
+`ebay-sync-plan/OWNER-SETUP.md`.
+
+## 2026-07-09 (session 13, addendum) - eBay sync: ALL 15 owner decisions made
+
+The owner answered every open question in `ebay-sync-plan/13-open-questions.md`
+(the canonical record — decisions + original reasoning live there, mirroring
+how the Etsy decisions were recorded). Summary: Q1 review-first; Q2
+admin-variable markup seeded 15% (matching the updated Etsy markup UX); Q3
+daily ≥1% price push like Etsy; Q4/Q4b vermeil→Fashion Jewelry, modern Fine
+Jewelry leaves for solid pieces; Q5 all Pre-owned + one standard condition
+template; **Q6/Q6b coins/bullion EXCLUDED, silverware included**
+(non-default — narrower than Etsy's full-catalog Q7); Q7 quantity-zero +
+Out-of-Stock Control; Q8 flat-rate insured+signature shipping / 30-day
+buyer-pays returns / immediate payment ON; Q9 Best Offer off; Q10 subscribe
+to account-deletion notifications; Q11 SKU = products.id; Q12 no Store
+subscription; Q13 owner's existing eBay account (a few unrelated manual
+listings — no reconciliation UI, same as Etsy Q8); **Q14 selling limits
+confirmed a non-issue** (non-default — the plan's limit machinery demoted to
+informational safety nets); Q15 Phase 3 order ingest deferred. Plan docs
+affected by the two non-defaults were updated in place the same day.
+
+## 2026-07-09 (session 13) - eBay sync planning decisions (plan-level, not owner decisions)
+
+**Context:** owner asked for an eBay integration planned exactly the way the
+Etsy sync was — deep API research first, then a plan folder mirroring
+`etsy-sync-plan/`. Owner decisions themselves are deliberately NOT made —
+they're collected in `ebay-sync-plan/13-open-questions.md` (15, all open).
+Plan-level architectural decisions made while writing the plan:
+
+1. **Mirror the Etsy module/table/route shape 1:1 rather than refactor to a
+   channel-generic abstraction.** A shared "channels framework" would mean
+   touching the live, owner-verified Etsy code for zero user-visible gain
+   and real regression risk. Two parallel small modules (`lib/etsy/`,
+   `lib/ebay/`) that a maintainer can diff side-by-side is the cheaper,
+   safer cohesion. The only planned shared edit is Phase 2 adding the eBay
+   hide/withdraw call next to the existing Etsy call at the already-known
+   product-status chokepoints.
+2. **No per-image table (`ebay_listing_images` does not exist).** eBay takes
+   `imageUrls[]` (HTTPS, WebP accepted) in the one inventory-item payload
+   and copies them to its Picture Services itself — there are no per-image
+   API calls to checkpoint. Image change detection rides the existing
+   URL-identity insight inside the overall content hash. 4 tables, not 5.
+3. **Review-first as the default publish mode** because eBay has no draft
+   state (`publishOffer` is live+buyable immediately, and unpublished
+   Inventory-API offers aren't visible as drafts in Seller Hub). The
+   unpublished offer + our dry-run preview is the review gate; auto-publish
+   is a Phase 2 trust toggle, mirroring Etsy's draft-for-review →
+   auto-activate path.
+4. **Phase 3 order ingest is polling (`getOrders` cursor), not webhooks.**
+   eBay's REST notification topics for sellers are thin, the richer sale
+   events are legacy SOAP (fire-once/no-retry), and eBay's own docs tell
+   subscribers to poll GetOrders as the source of truth anyway.
+5. **Subscribe to marketplace account-deletion notifications (small Phase 0
+   endpoint) rather than opt out** — recommended, pending Q10: the opt-out
+   ("not persisting eBay data") becomes untruthful the day Phase 3 ships,
+   and eBay warns false exemption claims can disable the account. Building
+   the endpoint once removes the cliff. It's also the production-keyset
+   activation gate, so it's Phase 0 regardless.
+6. **SKU = `products.id`** (recommended, pending Q11): deterministic
+   eBay-side identity ≤50 chars, which structurally eliminates the
+   duplicate-listing crash window the Etsy build needed a SKU-adoption
+   guard for (eBay's inventory key is chosen by us, not assigned by them).
+7. **Research method note:** developer.ebay.com blocks automated fetching;
+   research agents used Wayback snapshots of the official pages, eBay's
+   published OpenAPI contracts (mirrored), and official policy pages, with
+   per-fact source URLs recorded in the plan docs. Facts that couldn't be
+   pinned (current fee percentages, `bulkUpdatePriceQuantity` batching
+   shape, Authenticity Guarantee threshold, Cert-ID-rotation token
+   survival, localhost RuName rules) are marked `TODO(ebay-verify)` for
+   Phase 0 — the same discipline whose absence bit the Etsy build twice
+   (x-api-key format, API host).
+
+## 2026-07-09 (session 12, second addendum) - Shop static/ISR + facet-query scope decisions
+
+**Context:** owner asked to implement all three remaining shop-performance
+backlog items (DB-side pagination/faceting, static/ISR for bare `/shop`,
+icon-font subsetting) so the site is ready ahead of the catalog growing, not
+scrambling after. Explored the actual code before touching anything, per
+this app's `../AGENTS.md` guidance to read `node_modules/next/dist/docs/`
+before writing code in this specific, breaking-change-heavy Next.js version.
+
+**Finding: 2 of 5 sub-items were already done.** The icon font
+(`material-symbols-subset-v358.woff2`) and all 3 flagged oversized images
+were already fixed in earlier, unrelated sessions; the shop-performance
+Backlog entry just hadn't been updated to say so. No code needed — see
+`TASKS.md` for the current sizes/state.
+
+**Decision 1 — how to make bare `/shop` static without enabling Cache
+Components / PPR.** This Next.js version (16.2.9) does not have
+`cacheComponents: true` set in `next.config.ts`, meaning `'use cache'` and
+Partial Prerendering are unavailable (confirmed against
+`node_modules/next/dist/docs/.../use-cache.md`: it explicitly requires that
+flag). Enabling it would be an app-wide behavioral change to caching
+semantics for every route — far too broad a blast radius for a single-page
+ask. Also ruled out `export const dynamic = 'force-static'` on the real
+page: per Next's own docs it forces `cookies()`/`headers()`/`useSearchParams()`
+to return empty, which would make the SERVER always render the unfiltered
+view even for a real, deep-linked filtered URL (e.g. someone bookmarks
+`/shop?metal=gold`) — a correctness regression (wrong content, then a
+visible flash to the right content once the client "corrects" it), not
+worth it for a storefront that leans on shareable/bookmarkable filtered
+URLs.
+
+**Chosen approach: a twin page + a next.config.ts rewrite, not middleware.**
+Created `src/app/[locale]/shop-index/page.tsx`, whose own function signature
+never declares a `searchParams` prop — it calls the existing, unmodified
+`renderShopPage()` helper (already exported and already reused by the
+`shop-modern` preview route) with a plain `Promise.resolve({})`. Because
+Next's dynamic-API tracking instruments the *framework-provided* searchParams
+object specifically (not just "any awaited promise"), a page that never
+receives that prop has nothing dynamic to bail out on, and is eligible for
+prerendering/ISR. `next.config.ts` gained a `rewrites()` rule (`beforeFiles`)
+that sends `/shop` → `/shop-index` (same for `/en`/`/es`) **only when none of
+the ~20 known filter query keys are present**, using Next's built-in
+`has`/`missing` query matching — a declarative, well-tested mechanism,
+deliberately chosen over adding a rewrite to `proxy.ts`'s custom middleware,
+which already carries a documented Next-16-specific gotcha about locale
+rewrite loops (see its own inline comment). The rewrite is a rewrite, not a
+redirect — the browser URL always stays `/shop`. Canonical/alternates on the
+twin page point at `/shop` so it's never treated as separately indexable
+content. The real dynamic page and every one of its existing filters/sort/
+pagination/facet logic are completely untouched — this only adds a new,
+additive path for the literal no-params case.
+
+**A real build error surfaced a genuine (but ultimately harmless) gap.**
+`next build` failed prerendering `/shop-index` with "useSearchParams() should
+be wrapped in a suspense boundary" — 5 client components in the shop tree
+(`ShopFilters`, `ShopSortSelect`, `ShopViewToggle`, `ShopPagination`,
+`ShopYearFilter`) call the hook. Read all 5 before touching anything: in
+every case, `searchParams` is read only inside `useCallback`/event-handler
+bodies (building the next navigation URL on click), never in the component's
+render path. That means wrapping each in `<Suspense>` is provably a no-op
+for the real dynamic page (a live request always has a real value, so
+nothing ever suspends there) and shouldn't produce a visible flash on the
+static twin either, since the rendered markup never depended on the search
+params value in the first place — only the click-time behavior does, and you
+can't click before hydration completes anyway. Used sized (not empty)
+fallbacks regardless, to rule out layout shift even in the worst case.
+
+**Decision 2 — facet query column narrowing, implemented; full DB-side
+`.range()` pagination, deliberately deferred.** The facet-only catalog fetch
+(Brand/Item Type dropdown options, fires only when a DB-level filter is
+active) was fetching the full ~31-column product row just to read ~12 of
+them; narrowed it to exactly what `inferProductJewelryType`/
+`getProductItemTypeKey`/brand grouping need, dropping the heavy
+`images`/`image_urls`/`image_padding*` JSONB columns entirely for that path.
+`loadShopCatalog()` gained a `'full' | 'facet'` variant folded into its
+`unstable_cache` key so the two column sets can't cross-contaminate each
+other's cache entries. Verified live: brand options are byte-identical
+across bare `/shop`, `?metal=gold`, and `?metal=silver`.
+
+Full `.range()`-based DB-side pagination — the part of the original ask most
+directly about "readiness for a bigger catalog" — was **not** implemented.
+Reading `queryShopCatalog`/the `filtered` array closely: only
+status/purity/metal/brand are pushed to the database today; item-type
+inference (keyword matching against title/tags), chain-type matching,
+length, gender, year range, free-text search, and price-range filtering
+(which needs the *live* gold/silver spot price — not a column in the table
+at all) all happen in JS after the DB fetch. A safe DB-side pagination fast
+path would require detecting exactly when that JS filtering is a no-op and
+falling back to today's behavior otherwise; getting that equivalence
+condition even slightly wrong would silently return an incorrect page/count
+for some real filter combination on the highest-traffic, most heavily-tuned
+page in the app, with no obvious signal that it happened. Given the bare
+(no-filter) case — the single most common real-world hit — is now handled by
+the static/ISR twin instead, the remaining marginal value of a narrower
+DB-pagination fast path is smaller than it first appeared, so this was
+scoped out rather than rushed. Recorded here as a deliberate, considered
+choice: a future session doing this properly should budget time to either
+replicate the JS filter semantics in SQL (a real, separate project) or add a
+narrowly-scoped, thoroughly-tested fast path for the specific case where
+only DB-pushed filters are active and sort isn't price-based.
+
+**Verification, and its limits.** `npx tsc --noEmit`, `npm run lint`,
+`npm run build` (manifest: `● /[locale]/shop-index` SSG vs `ƒ /[locale]/shop`
+Dynamic, unchanged), `npx vitest run` (171/171) all pass. Verified live in
+the preview: bare `/shop` (78 pieces) and `?metal=gold` (47 of 78),
+`?q=<nonsense>` (0 of 78), and `?page=1` (routes to the dynamic page, since
+`page` is a present query key, even though the value is the default) all
+render correct, distinct content; sort-select and view-toggle clicks
+correctly update the URL and re-render; no console errors on desktop,
+mobile (375px), or `/es/shop`. **Cannot verify from here:** actual Netlify
+CDN cache-hit behavior for the new static route — Next's own docs confirm
+dev mode never performs real static generation ("Pages are always rendered
+on-demand" in dev), so this environment can only confirm the build-time SSG
+classification and that routing/rendering/interactivity are correct, not
+that the production edge cache actually serves the prerendered response.
+
+## 2026-07-09 (session 12, addendum) - Owner confirmed the remaining pending items too, except shop performance
+
+**Context:** the session 12 entry below closed out PayPal/Buyers/Etsy/session
+10-11 items but explicitly left five things open: the Quantity migrations,
+`product-special-price-override-2026-07.sql`, `shop-special-price-default-2026-07.sql`,
+`product-show-spot-price-2026-07.sql`, CSP enforcement, and the deferred shop
+performance work. Same-day follow-up: the owner confirmed all of these are
+also up to date, **except** shop performance.
+
+**Decision on scope — one item treated differently on purpose.** The four
+SQL migrations and CSP enforcement are all "already-built, needs a live
+click-test or a one-time SQL run" items — the same category as everything in
+the entry below, where the owner's direct confirmation is this project's only
+available verification path (no production credentials here). Marked
+resolved on that basis.
+
+The deferred shop performance work is categorically different: it was never
+built at all (explicitly flagged "deferred — higher risk, left for a focused
+follow-up" with five concrete unbuilt sub-items — DB-side pagination/faceting,
+static/ISR for bare `/shop`, a `ProductCard` server/client split, oversized
+`/public` image re-encoding, and Material Symbols icon-font subsetting).
+There is no code to have tested, so "confirmed working live" cannot be true
+of it. Asked the owner directly rather than silently comply or silently
+ignore the instruction; owner confirmed: **leave it open in Backlog** — it
+is not done and should not be recorded as done.
+
+**One item was independently verified, not just taken on faith.** CSP
+enforcement's ground truth lives in this repo (`netlify.toml`), not in
+production — so it was checked directly rather than only trusted: root
+`netlify.toml`'s security-headers block already has an active
+`Content-Security-Policy` line (not `-Report-Only`), with a commented-out
+Report-Only line kept as a documented rollback path. The `TASKS.md` Backlog
+item describing this as still pending was stale; the live policy is also
+broader than what that item described (adds TradingView + PayPal to the
+allowlist, on top of Supabase/Google Fonts/gold-api.com). No code change was
+required — the promotion had already happened, just not been reflected in
+`TASKS.md`.
+
+**Verification method for the four SQL migrations:** owner confirmation only
+(same rationale as the entry below) — this environment cannot query or run
+DDL against the production Supabase project.
+
+## 2026-07-09 (session 12) - Owner confirmed a batch of pending items live; TASKS.md trimmed
+
+**Context:** Across sessions 5-11, a large number of items had accumulated in
+`TASKS.md` Backlog as "code-complete, needs a live click/SQL run to confirm" —
+the PayPal go-live blocker, the Buyers/marketing-audience migrations, the
+whole Etsy sync build, and several session 10-11 UX/email features. This
+environment cannot drive live PayPal/Etsy/admin sessions itself (no
+production credentials), so these were always going to need the owner's own
+post-deploy testing per the 2026-07-05 standing note in `TASKS.md` (all
+working env lives in Netlify; live testing is owner-owned, done post-deploy).
+
+**Decision:** the owner reviewed the outstanding list and confirmed, in
+conversation, that all of the following are live and working correctly in
+production. Per this project's established convention (e.g. the session 9
+twentieth-addendum favicon/chip-refresh entry: "confirmed working live by the
+owner"), the owner's direct confirmation is treated as valid live
+verification — this project has no other mechanism to verify production
+PayPal/Etsy/email behavior. No app code changed; this is a documentation-only
+session correcting `TASKS.md`/`CURRENT_STATUS.md` to stop flagging resolved
+work as open.
+
+**Confirmed resolved:**
+1. **PayPal checkout go-live blocker.** Netlify's PayPal credential mismatch
+   (originally documented 2026-06-30) is resolved — checkout processes real
+   payments live.
+2. **Buyers + marketing-audience migrations.** `buyers-2026-07.sql` and
+   `marketing-buyers-audience-2026-07.sql` are both applied; the Buyers admin
+   tab, its select/Copy Selected Emails UI, the Buyers Compose Campaign
+   audience, opt-out suppression, and Combined-includes-buyers all work as
+   designed.
+3. **Etsy sync, end to end.** Every open Etsy sync verification item back to
+   the original session 3-8 build (core pipeline, bracelet length, ring size,
+   necklace→Chains mapping) through the session 9-10 hardening (bulk-sync
+   runaway/error-visibility fixes, the 22 ineligible silver items, tag
+   truncation, vintage/antique tags, markup Save + price push, custom tags)
+   is confirmed working live, including the previously-"still unverified"
+   core-pipeline checklist items (token refresh, scheduled price push,
+   delist/relist, resume-after-interrupt, multi-product dry-run).
+4. **Session 10-11 UX/email items:** the Local Pickup "Ship to"→"Address"
+   receipt/invoice relabel, the AI Listing Assistant Prompt accordion, the
+   owner new-order notification email, and the checkout stock-awareness +
+   escalating card-error paths.
+
+**Explicitly out of scope for this confirmation** (still open in `TASKS.md`
+Backlog, not mentioned by the owner): the Quantity-migration verification
+items, `product-special-price-override-2026-07.sql`,
+`shop-special-price-default-2026-07.sql`, `product-show-spot-price-2026-07.sql`,
+CSP enforcement, security-header/bot-rule verification, the contact/
+free-evaluation form end-to-end check, the account duplicate-email/
+password-reset flow check, and the deferred shop-performance follow-up work.
+These were not part of what the owner confirmed and remain untouched.
+
+**Why not re-verify from this environment instead of taking the owner's
+word:** this project's Netlify-hosted production PayPal/Etsy/Resend
+credentials are not available here (`next-app/.env.local` is stale — see the
+2026-07-05 standing note in `TASKS.md`) — live production behavior has only
+ever been confirmed by the owner testing post-deploy, consistent with every
+prior "confirmed working live by the owner" entry in this log.
+
 ## 2026-07-09 (session 11, fifth addendum) - "Combined" audience now genuinely means all three sources
 
 **Context:** The third addendum deliberately kept "Combined" (`all`) meaning

@@ -202,6 +202,10 @@ Supabase is the source for app data:
 - `etsy_connection` / `etsy_oauth_states` / `etsy_listings` /
   `etsy_listing_images` / `etsy_sync_log` - Etsy sync (2026-07-08, see
   "Etsy Sync" below). **Written in `supabase/etsy-sync.sql`, not yet applied.**
+- `ebay_connection` / `ebay_oauth_states` / `ebay_listings` /
+  `ebay_sync_log` - eBay sync (2026-07-09, see "eBay Sync" below); one fewer
+  table than Etsy (no per-image table — eBay takes image URLs directly).
+  **Written in `supabase/ebay-sync.sql`, not yet applied.**
 
 SQL setup and policy scripts live in `supabase/`.
 
@@ -402,6 +406,80 @@ checklist in `etsy-sync-plan/OWNER-SETUP.md`; feature detail:
   `TODO(etsy-verify)` comments (image constraints, rate-limit header names,
   the readiness-state list endpoint, image re-rank semantics). See
   `project-docs/DECISIONS.md` 2026-07-08 (later) for the full list.
+
+## eBay Sync (2026-07-09 — code-complete, unverified live)
+
+One-way push (Supabase `products` → an eBay listing, as a secondary sales
+channel), deliberately mirroring the Etsy Sync shape above. Full plan:
+`ebay-sync-plan/` (18 docs); owner checklist:
+`ebay-sync-plan/OWNER-SETUP.md`; feature detail:
+`project-docs/features/ebay-sync.md`.
+
+- **Module:** `next-app/src/lib/ebay/` — `client.ts` (fetch wrapper: Bearer
+  auth, throttle, 429/5xx backoff, typed `EbayApiError`, cached
+  client-credentials application token for Taxonomy/Metadata-class calls),
+  `auth.ts` (OAuth 2.0 authorization-code, **no PKCE** — confidential
+  client, Basic auth on token calls; AES-256-GCM token encryption;
+  non-rotating ~18-month refresh token), `mapping.ts` (pure `Product` →
+  `InventoryItem`+`Offer` payload functions: title/aspects/condition/
+  category/price+markup/**Q16 price-tiered shipping-policy resolution**/
+  pre-flight — unit-tested, 49 tests), `sync.ts` (the step machine:
+  item → offer → review/published, plus Phase 2 bulk queue drain,
+  content-hash out-of-date detection, and the scheduled price push —
+  `drainQueueCore`/`shouldPushPrice` unit-tested, 9 tests), `store.ts`
+  (typed access to the `ebay_*` tables). No `images.ts` — eBay's Inventory
+  API takes public HTTPS image URLs directly, so the server never touches
+  image bytes.
+- **Tables (`supabase/ebay-sync.sql`, written, not yet run):**
+  `ebay_connection` (single-row OAuth + account defaults, incl. the Q16
+  express-shipping policy id + `high_value_shipping_threshold`),
+  `ebay_oauth_states` (transient handshake state — no PKCE verifier column),
+  `ebay_listings` (product↔SKU/offer/listing mapping + sync-state machine +
+  content hash), `ebay_sync_log` (audit/dead-letter). All RLS-enabled,
+  service-role-only; `claim_next_pending_ebay_listing()` RPC does the atomic
+  `FOR UPDATE SKIP LOCKED` queue claim, with the re-enqueue/update detection
+  and drain seen-guard built in from day one (a fix the Etsy build only
+  added after a production incident).
+- **Routes (all under `/api/admin/ebay/`, admin-gated, `{error:{code,message}}`
+  error shape):** `connect`, `callback`, `status`, `disconnect`, `settings`,
+  `account-profiles`, `preview` (dry-run, no eBay calls), `sync` (modes:
+  `publish`/`update`/`price-only`/`publish-live`), `sync-batch` (Phase 2
+  enqueue/drain), `delist` (hide/withdraw/restore), `listings` (bulk status
+  map), `eligibility-summary`, `verify-listing`, `verify-all`, `price-push`
+  (cron-secret-guarded), `push-prices`. Plus the Phase 0 compliance webhook
+  `/api/webhooks/ebay-account-deletion` (GET challenge echo, POST
+  signature-verified ack, reuses `webhook_events` for idempotency). Phase
+  3's order-ingest route is deliberately **not built** — out of scope per Q15.
+- **Admin UI:** `EbaySettingsPanel.tsx` (composed into `/admin/settings` next
+  to `EtsySettingsPanel` — connect/disconnect, 5 policy fields incl. the
+  Q16 express-shipping picker + threshold, markup save/stale-callout/
+  push-now, recent activity), a per-product eBay status chip + drawer
+  section (`EbayProductPanel.tsx`, wired into `AdminShell.tsx` next to the
+  Etsy section — dry-run preview, sync/publish-on-eBay/price-only-push,
+  hide/end/restore), and `EbayBulkSyncModal.tsx` (Phase 2 "Sync all to
+  eBay" with a pre-flight summary and cancellable progress).
+- **Phase 2 automation:** auto-hide (quantity-zero, Q7)/withdraw is
+  triggered from `handleProductStatusChange()` (`lib/ebay/sync.ts`), added
+  **next to** the existing Etsy call — never replacing it — at all three
+  chokepoints: `adminRevalidateProduct(s)` (`app/actions/admin-products.ts`),
+  PayPal `capture-order`, and the PayPal webhook. Always
+  best-effort/non-throwing.
+- **Structural differences from Etsy** (by design, not gaps): no draft
+  state — `publishOffer` goes live immediately, so review-first (Q1) is
+  enforced entirely by stopping the step machine at `review` until an
+  explicit `publish-live` call; ~3-4 API calls per publish vs Etsy's ~12
+  (no image upload calls); heavier one-time account prerequisites (Business
+  Policy opt-in, inventory location, the account-deletion compliance gate)
+  before the production keyset activates at all.
+- **Known gaps before this is usable live:** no Fashion Jewelry eBay
+  category id is pinned anywhere (vermeil items are correctly blocked at
+  pre-flight rather than guessing one); item-aspect values aren't
+  cross-checked against eBay's live SELECTION_ONLY value lists; no eBay
+  username is resolved (out of the plan's OAuth scope list); this build
+  environment had no eBay credentials or network access to
+  developer.ebay.com to verify any of the above, or the general API
+  host/header conventions, against a live contract. Full list with
+  reasoning: `project-docs/DECISIONS.md` 2026-07-09 (session 14).
 
 ## Public-shop cache invalidation (2026-07-02)
 

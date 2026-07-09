@@ -1,5 +1,137 @@
 # Changelog
 
+## 2026-07-09 - eBay sync built: Phase 0 webhook + Phase 1 + Phase 2, code-complete
+
+Implemented the full eBay sync integration from `ebay-sync-plan/` per
+`BUILD-PROMPT.md`: the account-deletion compliance webhook
+(`/api/webhooks/ebay-account-deletion`), `lib/ebay/` (client/auth/mapping/
+sync/store, mirroring `lib/etsy/`'s shape), 16 admin API routes under
+`/api/admin/ebay/`, `supabase/ebay-sync.sql` (written, not run), and the
+admin UI (`EbaySettingsPanel`, `EbayProductPanel`, `EbayBulkSyncModal`,
+wired into `AdminSettingsPanel.tsx`/`AdminShell.tsx`). Added the eBay
+auto-delist/relist hook next to every existing Etsy call at all three
+product-status chokepoints (`app/actions/admin-products.ts` ×2,
+`app/api/paypal/capture-order/route.ts`, `app/api/paypal/webhook/route.ts`).
+238 vitest tests pass (58 new eBay tests + all 180 pre-existing tests
+unchanged); `tsc`/`lint`/`build` all clean. No live eBay account was
+available to verify against — see `project-docs/features/ebay-sync.md` for
+every `TODO(ebay-verify)` and `ebay-sync-plan/OWNER-SETUP.md` for the
+finalized manual setup + verification checklist.
+
+## 2026-07-09 - eBay Business Policies created live; new price-tiered express shipping feature (Q16)
+
+Created all four Business Policies on the owner's real eBay account via
+browser automation, owner-confirmed at each decision point: two shipping
+policies (standard "NEJ Insured Flat Rate" and a new "NEJ Express
+High-Value" tier), one return policy, one payment policy. Mid-session the
+owner requested an automatic price-based shipping upgrade — items over an
+admin-editable threshold (seeded $1000) route to the express policy instead
+of the standard one — recorded as Q16 and threaded through the field
+mapping, database schema, admin UX, account-prerequisites, sync-lifecycle,
+BUILD-PROMPT, and OWNER-SETUP docs. The policy choice is a pure mapping-time
+branch in our own sync code; eBay's Business Policies have no conditional
+logic themselves. `OWNER-SETUP.md` step 7 is now marked done with the real
+policy names. No app code or database changes — only live eBay account
+configuration and plan documentation.
+
+## 2026-07-09 - eBay plan build-ready: BUILD-PROMPT.md and OWNER-SETUP.md added
+
+Completed the handoff artifacts in `ebay-sync-plan/` (same sequence the Etsy
+plan followed): `BUILD-PROMPT.md` is the verbatim implementing-agent prompt
+with the 15 decided answers encoded as hard requirements plus a
+never-modify-the-Etsy-integration rule; `OWNER-SETUP.md` is the ordered
+10-step manual checklist (registration → migration → env vars → deploy →
+keyset-activating account-deletion subscription → RuName → Seller Hub
+policies → connect → live verification → optional cron), marked DRAFT until
+the build finalizes file:line specifics. README index updated. Owner can
+start the registration and Seller Hub policy steps immediately; everything
+else waits on a build greenlight.
+
+## 2026-07-09 - eBay plan: all 15 owner decisions made; plan docs updated in place
+
+Same-day follow-up to the entry below: the owner answered every question in
+`ebay-sync-plan/13-open-questions.md` (now rewritten in the decided format,
+reasoning preserved). Notable non-defaults: **coins/bullion are excluded
+from eBay** (jewelry/watches/silverware only — narrower than the Etsy
+full-catalog choice, which deletes the coin grading regime and bullion
+policy handling from scope), and **selling limits are confirmed a
+non-issue** (owner's existing account holds the catalog easily — limit
+checks stay only as informational safety nets). Everything else landed on
+the recommended defaults: review-first publishing, admin-variable markup
+seeded 15%, Etsy-style daily 1%-threshold price push, vermeil→Fashion
+Jewelry, standard Pre-owned condition template, quantity-zero sold
+handling, flat-rate insured+signature/30-day-returns/immediate-pay
+policies, Best Offer off, subscribe to account-deletion notifications,
+SKU = products.id, no Store subscription, Phase 3 deferred. Affected plan
+docs updated in place. Still planning-only — no code, SQL, or eBay-side
+setup.
+
+## 2026-07-09 - eBay sync architecture plan written (planning only, no code)
+
+New `ebay-sync-plan/` folder at the project root: a 17-doc architecture plan
+for pushing the catalog to eBay as a second secondary channel, deliberately
+mirroring `etsy-sync-plan/`'s structure and grounded in deep research of
+eBay's RESTful APIs (OAuth, Sell Inventory/Account/Metadata/Fulfillment,
+Commerce Taxonomy/Media/Notification, call limits, sandbox, compliance).
+Key design outcomes: ~3–4 API calls per publish (eBay ingests our public
+WebP image URLs itself — no transcode/upload pipeline), non-rotating
+18-month refresh token, review-first publishing because eBay has no draft
+state, quantity-zero + Out-of-Stock Control for sold items, and a Phase 0
+marketplace-account-deletion webhook that gates production keyset
+activation. 15 owner decisions collected in
+`ebay-sync-plan/13-open-questions.md` — **all OPEN**; no code, SQL, or
+eBay-side setup has happened. Existing functionality (including the live
+Etsy sync) is untouched; the only planned shared edit is Phase 2 adding an
+eBay call next to the Etsy call at the existing product-status chokepoints.
+
+## 2026-07-09 - Bare /shop is now static/ISR; facet query slimmed down
+
+Split `/shop` into two pages: the existing dynamic page (unchanged, still
+handles every real filter/sort/page/search) and a new static/ISR twin
+(`shop-index`) that a `next.config.ts` rewrite routes bare `/shop` requests
+to when no filter query params are present — URL stays `/shop` throughout.
+Build manifest confirms the split (`● shop-index` SSG vs `ƒ shop` Dynamic).
+Also narrowed the facet-only catalog query (Brand/Item Type dropdown
+options) from ~31 columns to ~12, dropping the heavy image JSONB fields;
+verified brand options are identical before/after across several filter
+combinations. Full DB-side range-pagination was scoped but deliberately not
+implemented — most real filters are JS-only today (including price range,
+which needs the live, non-stored spot price), so a safe fast path is
+narrower and riskier than it sounds; see `DECISIONS.md` for the full
+reasoning. Also found (not this session's work) that the icon-font
+subsetting and oversized-image sub-items from the same backlog entry were
+already done by earlier sessions. `tsc`/`lint`/`build`/171 vitest tests all
+pass; verified live in the preview (correct content + interactivity across
+bare/filtered/sorted/paginated URLs, desktop/mobile/ES, no console errors).
+Netlify CDN cache-hit behavior itself needs confirming after a real deploy —
+dev mode never performs real static generation.
+
+## 2026-07-09 - Owner confirmed the remaining pending items too (Quantity/special-price/show-spot-price migrations; CSP)
+
+Follow-up to the same-day entry below: owner confirmed the Quantity
+migrations, `product-special-price-override-2026-07.sql`,
+`shop-special-price-default-2026-07.sql`, and `product-show-spot-price-2026-07.sql`
+are applied and working live. Checked CSP directly against `netlify.toml`
+(not live testing) and found it was **already enforcing**, not Report-Only
+as the stale Backlog item claimed — no code change needed. The deferred shop
+performance work (DB pagination, static/ISR, ProductCard refactor, image
+re-encoding, icon font subsetting) was explicitly confirmed still open —
+it was never built, so it stays in Backlog rather than being marked done.
+See `DECISIONS.md` 2026-07-09 (session 12, addendum).
+
+## 2026-07-09 - Owner confirmed a batch of pending items live in production
+
+Documentation-only update: owner confirmed PayPal checkout is live in
+production (go-live blocker resolved), the Buyers + marketing-audience SQL
+migrations are applied and working, Etsy sync is verified live end to end
+(bulk-sync recovery, ineligible-silver fix, length/ring-size auto-push, tags,
+markup/price push, necklace→Chains, corrected bracelets, custom tags, and the
+remaining core-pipeline checklist), and the session 10-11 UX/email items
+(Ship to→Address relabel, AI Prompt accordion, owner new-order email,
+checkout stock-awareness + card-error paths) all work as built. `TASKS.md`
+Backlog trimmed accordingly; see `DECISIONS.md` 2026-07-09 (session 12) for
+the full list and what's explicitly still open.
+
 ## 2026-07-09 - "Combined" audience now genuinely means all three sources
 
 "Combined" on Compose Campaign now actually combines Newsletter subscribers +

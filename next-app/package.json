@@ -10,7 +10,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "check:compression": "node scripts/check-compression.mjs",
-    "measure:routes": "node scripts/measure-routes.mjs"
+    "measure:routes": "node scripts/measure-routes.mjs",
+    "ebay:pin-fashion-categories": "node scripts/pin-ebay-fashion-categories.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

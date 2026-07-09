@@ -7,6 +7,7 @@ import AdminShopVisibilityPanel from './AdminShopVisibilityPanel';
 import AdminSpecialPricePanel from './AdminSpecialPricePanel';
 import MarketingSettingsPanel from './MarketingSettingsPanel';
 import EtsySettingsPanel from './EtsySettingsPanel';
+import EbaySettingsPanel from './EbaySettingsPanel';
 
 type AiSettingsResponse = {
   systemPrompt: string;
@@ -339,6 +340,7 @@ export default function AdminSettingsPanel() {
         <AdminSpecialPricePanel />
         <MarketingSettingsPanel />
         <EtsySettingsPanel />
+        <EbaySettingsPanel />
       </div>
 
       {/* Carousel panel gets a wider container so its two tables can use the

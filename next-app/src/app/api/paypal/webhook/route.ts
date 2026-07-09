@@ -3,7 +3,8 @@ import { revalidateTag } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/service';
 import { verifyPayPalWebhook } from '@/lib/paypal';
 import { finalizePaidOrder, notifyItemConflict } from '@/lib/order-finalize';
-import { handleProductStatusChange } from '@/lib/etsy/sync';
+import { handleProductStatusChange as handleEtsyProductStatusChange } from '@/lib/etsy/sync';
+import { handleProductStatusChange as handleEbayProductStatusChange } from '@/lib/ebay/sync';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -133,11 +134,12 @@ export async function POST(req: Request) {
         } else if (!capResult?.already_paid) {
           // This webhook (not the client) completed the sale — invoice + receipt.
           await finalizePaidOrder(service, internalOrderId);
-          // Phase 2 auto-delist (etsy-sync-plan/03-sync-lifecycle.md Flow 3) —
-          // fire-and-forget, best-effort.
+          // Phase 2 auto-delist (etsy-sync-plan/03-sync-lifecycle.md Flow 3 and
+          // ebay-sync-plan/03-sync-lifecycle.md Flow 3) — fire-and-forget, best-effort.
           const { data: capturedItems } = await service.from('order_items').select('product_id').eq('order_id', internalOrderId);
           const capturedProductIds = (capturedItems ?? []).map((item) => item.product_id).filter((id): id is string => Boolean(id));
-          void handleProductStatusChange(capturedProductIds).catch(() => {});
+          void handleEtsyProductStatusChange(capturedProductIds).catch(() => {});
+          void handleEbayProductStatusChange(capturedProductIds).catch(() => {});
         }
       }
     } else if (eventType === 'PAYMENT.CAPTURE.DENIED') {

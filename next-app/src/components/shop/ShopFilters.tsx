@@ -401,7 +401,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
       : allItemTypeOptions;
   const itemGroupOptions = [
     { value: 'jewelry' as const, label: isEs ? 'Joyería y relojes' : 'Jewelry & Watches' },
-    { value: 'everything-else' as const, label: isEs ? 'Plata sterling' : 'Sterling Silver' },
+    { value: 'everything-else' as const, label: isEs ? 'Todo lo demás' : 'Everything Else' },
   ];
 
   const labelStyle = {

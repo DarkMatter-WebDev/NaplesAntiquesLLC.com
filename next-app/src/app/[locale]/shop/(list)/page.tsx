@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { alternatesFor } from '@/lib/seo';
 import { unstable_cache } from 'next/cache';
 import { createPublicClient } from '@/lib/supabase/public';
@@ -281,6 +282,27 @@ const SHOP_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR = SHOP_PRODUCT_COLUMNS
   .filter((column) => column !== 'item_year' && column !== 'quantity')
   .join(', ');
 
+// Narrow column set for the facet-only catalog fetch (Brand + Item Type dropdown
+// options — see the "Facet dropdowns" comment below). That result only ever feeds
+// inferProductJewelryType/getProductItemTypeKey/brand grouping, never a rendered
+// product card, so the heavy image columns and every field only pricing/grid/
+// detail views need are safely dropped — cuts this fetch's payload as the catalog
+// grows, without touching the main catalog fetch or any filter/sort logic at all.
+const SHOP_FACET_COLUMNS = [
+  'id',
+  'status',
+  'category',
+  'metal_variant',
+  'title',
+  'title_es',
+  'brand',
+  'product_type',
+  'jewelry_type',
+  'chain_type',
+  'tags',
+  'tags_es',
+].join(', ');
+
 function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
   return Boolean(error?.message?.toLowerCase().includes('item_year'))
     || Boolean(error?.message?.toLowerCase().includes('quantity'));
@@ -300,7 +322,7 @@ type ShopCatalogFilterKey = {
   brand: string | null;
 };
 
-async function queryShopCatalog(filterKey: ShopCatalogFilterKey) {
+async function queryShopCatalog(filterKey: ShopCatalogFilterKey, columns: string, columnsWithoutItemYear: string) {
   const supabase = createPublicClient();
 
   // Admin-controlled: when "show sold items" is off, the gallery lists available
@@ -339,7 +361,7 @@ async function queryShopCatalog(filterKey: ShopCatalogFilterKey) {
 
   // Products + total-inventory count run concurrently.
   const [productResult, totalInventoryResult] = await Promise.all([
-    buildProductQuery(SHOP_PRODUCT_COLUMNS),
+    buildProductQuery(columns),
     supabase
       .from('products')
       .select('id', { count: 'exact', head: true })
@@ -349,7 +371,7 @@ async function queryShopCatalog(filterKey: ShopCatalogFilterKey) {
   let products = productResult.data as unknown[] | null;
   let errorMessage = productResult.error?.message ?? null;
   if (isMissingItemYearColumnError(productResult.error)) {
-    const fallback = await buildProductQuery(SHOP_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR);
+    const fallback = await buildProductQuery(columnsWithoutItemYear);
     products = (fallback.data as unknown[] | null)?.map(
       (product) => ({ ...(product as Record<string, unknown>), item_year: null, quantity: 1 }),
     ) ?? null;
@@ -363,10 +385,16 @@ async function queryShopCatalog(filterKey: ShopCatalogFilterKey) {
   };
 }
 
-function loadShopCatalog(filterKey: ShopCatalogFilterKey) {
+function loadShopCatalog(filterKey: ShopCatalogFilterKey, variant: 'full' | 'facet' = 'full') {
+  const columns = variant === 'facet' ? SHOP_FACET_COLUMNS : SHOP_PRODUCT_COLUMNS;
+  // The facet-only column set never includes item_year/quantity, so there is
+  // nothing narrower to fall back to if a column is unexpectedly missing —
+  // reuse the same list and let the (extremely unlikely, schema-drift-only)
+  // error surface as errorMessage rather than silently retrying with itself.
+  const columnsWithoutItemYear = variant === 'facet' ? SHOP_FACET_COLUMNS : SHOP_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR;
   return unstable_cache(
-    () => queryShopCatalog(filterKey),
-    ['shop-catalog', JSON.stringify(filterKey)],
+    () => queryShopCatalog(filterKey, columns, columnsWithoutItemYear),
+    ['shop-catalog', JSON.stringify(filterKey), variant],
     { revalidate: 300, tags: ['shop-catalog'] },
   )();
 }
@@ -443,7 +471,7 @@ export async function renderShopPage({
 
   const [catalog, facetCatalog, spotData] = await Promise.all([
     loadShopCatalog(catalogFilterKey),
-    catalogIsUnfiltered ? Promise.resolve(null) : loadShopCatalog(unfilteredCatalogKey),
+    catalogIsUnfiltered ? Promise.resolve(null) : loadShopCatalog(unfilteredCatalogKey, 'facet'),
     fetchSpotData(),
   ]);
 
@@ -851,40 +879,48 @@ export async function renderShopPage({
           <ShopNavigationProvider>
             {/* Desktop only: standalone year filter above the catalog */}
             <div className={isModern ? 'shop-year-filter-standalone shop-entry-reveal shop-entry-reveal-secondary' : 'shop-year-filter-standalone'}>
-              <ShopYearFilter
-                key={`${selectedYearMin ?? 'min'}-${selectedYearMax ?? 'max'}`}
-                locale={locale}
-                minYear={yearMinBound}
-                maxYear={yearMaxBound}
-                selectedMin={selectedYearMin}
-                selectedMax={selectedYearMax}
-              />
+              {/* useSearchParams() (in event handlers only, not the initial render — see
+                  DECISIONS.md 2026-07-09) requires a Suspense boundary so the
+                  static/ISR shop-index twin can prerender; a real per-request render
+                  (the normal dynamic page) never suspends here. */}
+              <Suspense fallback={<div style={{ minHeight: '3.25rem' }} aria-hidden="true" />}>
+                <ShopYearFilter
+                  key={`${selectedYearMin ?? 'min'}-${selectedYearMax ?? 'max'}`}
+                  locale={locale}
+                  minYear={yearMinBound}
+                  maxYear={yearMaxBound}
+                  selectedMin={selectedYearMin}
+                  selectedMax={selectedYearMax}
+                />
+              </Suspense>
             </div>
 
             <div className="shop-catalog-layout">
               {/* -- Filters ------------------------------------------ */}
               <aside className={isModern ? 'shop-filter-sidebar shop-entry-reveal shop-entry-reveal-results' : 'shop-filter-sidebar'} aria-label={isEs ? 'Filtros de tienda' : 'Shop filters'}>
-                <ShopFilters
-                  locale={locale}
-                  currentFilters={filters}
-                  brandOptions={brandOptions}
-                  filteredCount={sorted.length}
-                  allCount={totalInventoryCount ?? collectionProducts.length}
-                  spotData={spotData}
-                  priceRange={priceRange}
-                  itemTypeOptions={itemTypeOptions}
-                  variant={isModern ? 'modern' : 'classic'}
-                  yearFilterNode={
-                    <ShopYearFilter
-                      key={`mobile-${selectedYearMin ?? 'min'}-${selectedYearMax ?? 'max'}`}
-                      locale={locale}
-                      minYear={yearMinBound}
-                      maxYear={yearMaxBound}
-                      selectedMin={selectedYearMin}
-                      selectedMax={selectedYearMax}
-                    />
-                  }
-                />
+                <Suspense fallback={<div style={{ minHeight: '32rem' }} aria-hidden="true" />}>
+                  <ShopFilters
+                    locale={locale}
+                    currentFilters={filters}
+                    brandOptions={brandOptions}
+                    filteredCount={sorted.length}
+                    allCount={totalInventoryCount ?? collectionProducts.length}
+                    spotData={spotData}
+                    priceRange={priceRange}
+                    itemTypeOptions={itemTypeOptions}
+                    variant={isModern ? 'modern' : 'classic'}
+                    yearFilterNode={
+                      <ShopYearFilter
+                        key={`mobile-${selectedYearMin ?? 'min'}-${selectedYearMax ?? 'max'}`}
+                        locale={locale}
+                        minYear={yearMinBound}
+                        maxYear={yearMaxBound}
+                        selectedMin={selectedYearMin}
+                        selectedMax={selectedYearMax}
+                      />
+                    }
+                  />
+                </Suspense>
               </aside>
 
               {/* -- Grid --------------------------------------------- */}
@@ -892,10 +928,14 @@ export async function renderShopPage({
                 <ShopLoadingOverlay />
                 <div className="shop-gallery-toolbar">
                   <div className="shop-toolbar-left">
-                    <ShopViewToggle locale={locale} currentView={view} />
+                    <Suspense fallback={<div style={{ minHeight: '2.26rem', width: '4.4rem' }} aria-hidden="true" />}>
+                      <ShopViewToggle locale={locale} currentView={view} />
+                    </Suspense>
                     <span className="shop-toolbar-count">{resultsCountLabel}</span>
                   </div>
-                  <ShopSortSelect locale={locale} currentSort={filters.sort} />
+                  <Suspense fallback={<div style={{ minHeight: '2.25rem', width: '11.5rem' }} aria-hidden="true" />}>
+                    <ShopSortSelect locale={locale} currentSort={filters.sort} />
+                  </Suspense>
                 </div>
                 {filtered.length === 0 ? (
                   <p
@@ -913,15 +953,17 @@ export async function renderShopPage({
                       variant={isModern ? 'modern' : 'classic'}
                       view={view}
                     />
-                    <ShopPagination
-                      locale={locale}
-                      currentPage={currentPage}
-                      perPage={perPage}
-                      totalPages={totalPages}
-                      totalCount={sorted.length}
-                      showingStart={showingStart}
-                      showingEnd={showingEnd}
-                    />
+                    <Suspense fallback={<div style={{ minHeight: '2.5rem' }} aria-hidden="true" />}>
+                      <ShopPagination
+                        locale={locale}
+                        currentPage={currentPage}
+                        perPage={perPage}
+                        totalPages={totalPages}
+                        totalCount={sorted.length}
+                        showingStart={showingStart}
+                        showingEnd={showingEnd}
+                      />
+                    </Suspense>
                   </>
                 )}
               </section>

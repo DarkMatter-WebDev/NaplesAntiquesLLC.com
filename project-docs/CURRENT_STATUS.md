@@ -3,6 +3,357 @@
 > Reflects the present state of development. **Update this at the end of every
 > work session.** Last updated: **2026-07-09**.
 
+## 2026-07-09 (session 14) -- 🟡 eBay sync: Phase 0 webhook + Phase 1 + Phase 2 code-complete, unverified live
+
+Built the full eBay sync integration per `ebay-sync-plan/BUILD-PROMPT.md`,
+mirroring the shipped Etsy integration's shape. `npx tsc --noEmit`, `npm run
+lint`, `npm run build`, and `npx vitest run` (238/238 tests, including every
+pre-existing Etsy test — no regression) all pass clean from `next-app/`.
+**Nothing has been run or tested against a live eBay account** — this build
+environment has no eBay credentials and no network access to eBay's docs
+(WebFetch to developer.ebay.com timed out repeatedly); see
+`ebay-sync-plan/OWNER-SETUP.md` for the finalized owner checklist and
+`project-docs/features/ebay-sync.md` for the full feature detail, gaps, and
+every `TODO(ebay-verify)` left in the code.
+
+- **Phase 0:** `/api/webhooks/ebay-account-deletion` (challenge-echo GET +
+  signature-verified POST, reusing `webhook_events` for idempotency) is
+  built and unit-tested (challenge-hash algorithm + signature-failure path).
+  Still needs deployment + the Developer Portal subscription step
+  (OWNER-SETUP.md step 5) before the production keyset activates.
+- **Phase 1:** `lib/ebay/` (`client.ts`, `auth.ts`, `mapping.ts`, `sync.ts`,
+  `store.ts`), all 11 Phase 1 routes under `/api/admin/ebay/`, and the
+  `EbaySettingsPanel`/`EbayProductPanel` admin UI are code-complete.
+  `mapping.ts` has 49 unit tests (title truncation, aspect mapping, Fine vs
+  Fashion/vermeil routing, Coin/Bullion ineligibility, price+markup, image
+  URL absolutization, the private-field allowlist guarantee, Q16 threshold
+  routing).
+- **Phase 2:** bulk queue/drain (`sync-batch`, `eligibility-summary`,
+  `verify-all`), scheduled + manual price push (`price-push`,
+  `push-prices`), `EbayBulkSyncModal.tsx`, and the auto-hide/withdraw hook
+  (`handleProductStatusChange` in `lib/ebay/sync.ts`) wired in **next to**
+  every existing Etsy call — `app/actions/admin-products.ts` (both
+  functions), `app/api/paypal/capture-order/route.ts`, and
+  `app/api/paypal/webhook/route.ts` — are all code-complete. `sync.ts`'s
+  `drainQueueCore` (claim/seen-guard/time-budget) and `shouldPushPrice`
+  threshold logic are unit-tested with fake dependencies (9 tests). Phase 3
+  (eBay order ingest) was deliberately **not built**, per Q15.
+- **Migration `supabase/ebay-sync.sql` is written, not run.** 4 tables
+  (`ebay_connection`, `ebay_oauth_states`, `ebay_listings`, `ebay_sync_log`)
+  + `claim_next_pending_ebay_listing()` RPC — 🔴 **owner must run this in the
+  Supabase SQL Editor** before any of the above can work (OWNER-SETUP.md
+  step 2).
+- **No live-eBay verification was possible or attempted** from this build
+  environment (no credentials, no network access to eBay). Every item in
+  `ebay-sync-plan/14-verification-checklist.md`'s "Phase 0/1 verification"
+  and Phase 2 sections — OAuth round-trip, first real publish, price push
+  observed, hide/restore, etc. — is on `OWNER-SETUP.md` as a post-setup step,
+  clearly marked untested.
+- **Unresolved `TODO(ebay-verify)` items carried into the code** (full list
+  in `project-docs/features/ebay-sync.md`): eBay category leaf IDs (pinned
+  from the plan's own candidate table, not a live Taxonomy call); **no
+  Fashion Jewelry category id is pinned at all** (vermeil items are
+  correctly blocked at pre-flight with a clear message rather than guessing
+  one); item-aspect values are not cross-checked against eBay's live
+  SELECTION_ONLY value lists; `bulkUpdatePriceQuantity` batching shape;
+  eBay's account-deletion notification signature-header/public-key response
+  shape; the exact eBay API host/header conventions generally (pinned from
+  well-established knowledge of eBay's stable Sell APIs, not a fresh fetch
+  of the OpenAPI contract — WebFetch to developer.ebay.com was attempted and
+  timed out every time).
+
+## 2026-07-09 (session 13, fifth addendum) -- 🟢 eBay plan: final consistency pass, ready to hand off to a build agent
+
+Before handoff, swept every `ebay-sync-plan/` doc for stale references left
+over from adding Q16 mid-session (several said "all 15 decisions" / "15
+decided" — now corrected to 16 throughout: README.md, 13-open-questions.md
+header, 12-phased-rollout.md, BUILD-PROMPT.md). Also updated
+`12-phased-rollout.md` Phase 0 scope and `BUILD-PROMPT.md`'s "Scope" section
+to explicitly say registration/keysets and all four Business Policies are
+**already done live** (not just planned) so a build agent doesn't re-attempt
+or ask the owner to redo them, and added the express-shipping ($1000+ →
+"NEJ Express High-Value") case to both the Phase 1 exit criteria and
+`14-verification-checklist.md`'s dry-run test list. `ebay-sync-plan/` is now
+18 files, self-consistent, and build-ready:
+`BUILD-PROMPT.md` is the verbatim agent handoff, `OWNER-SETUP.md` has steps
+1 and 7 done and 2–6/8–10 as the remaining checklist. No app code or SQL
+exists yet — next action is literally starting the build.
+
+## 2026-07-09 (session 13, fourth addendum) -- 🟢 eBay Business Policies LIVE on the real account; new Q16 price-tiered shipping feature added
+
+Continuing the eBay prep, created all four Business Policies live on the
+owner's eBay account via browser automation (owner confirmed each step,
+including two mid-flow permission checks — one denied by the auto-mode
+classifier for an unconfirmed $5 figure, correctly caught): **NEJ Insured
+Flat Rate** (USPS Priority Mail, $15 first item/$5 additional, 2-day
+handling — signature confirmation and insurance turned out to have no
+policy-level toggle in eBay's UI at all; owner decided to add those
+manually per high-value shipment at label time rather than force Adult
+Signature Required on every buyer), **NEJ 30-Day Returns** (30 days, buyer
+pays return shipping, money-back — all page defaults matched Q8b exactly),
+and **NEJ Immediate Payment** (Q8c's setting was the page default).
+
+**New scope, requested mid-session:** owner asked for an automatic
+price-tiered express shipping option — recorded as **Q16** in
+`13-open-questions.md`. Decision: items priced over an **admin-editable
+threshold** (seeded $1000) get a second live shipping policy, **NEJ Express
+High-Value** (FedEx 2Day, $50 flat, 1-business-day handling), instead of
+the standard one. Confirmed with the owner that eBay's Business Policies
+have no conditional logic — the policy choice is a pure mapping-time branch
+in our own sync code (`lib/ebay/mapping.ts`), comparing the computed price
+to the threshold and setting `fulfillmentPolicyId` accordingly; no eBay-side
+configuration needed beyond the two static policies (both now live). Added
+two new `ebay_connection` columns (`express_fulfillment_policy_id`,
+`high_value_shipping_threshold`) and updated
+02/03/06/07/08-*.md/13-open-questions.md/BUILD-PROMPT.md/OWNER-SETUP.md/
+README.md accordingly.
+
+**`OWNER-SETUP.md` step 7 now marked done** with the real policy names and
+settings. No code or SQL changes — only live eBay account configuration
+(business policies) and plan documentation.
+
+## 2026-07-09 (session 13, third addendum) -- 🟢 eBay OWNER-SETUP step 1 confirmed DONE against the real account
+
+Owner asked to prep the real-world eBay setup. Using a connected browser
+(no credentials entered — the session was already signed in), confirmed:
+an eBay Developers Program app named **PostnSync** already exists under the
+owner's real, established selling account (Seller Hub: "bullishbuyer25",
+100% feedback/128 reviews, 4 active listings, "Above Standard" seller
+level, real sales in the last 90 days — matches the Q13 "existing account
+with a few unrelated listings" decision). Both Sandbox and Production
+keysets already exist; Production shows the expected
+"disabled — comply with marketplace deletion/account closure notification"
+state (the Q10 gate). Confirmed by direct observation (screenshot) that the
+whole Production panel, including the "User Tokens" link needed for RuName
+setup (step 6), is inert until that compliance step clears — not something
+to attempt early. `OWNER-SETUP.md` step 1 is now marked done in place;
+steps 6 and 7 got small factual annotations (the Business Policies page URL
+under `ebay.com/sh/*` couldn't be pinned down — three guesses 404'd; left
+as a note to navigate via Seller Hub's own menu instead of guessing
+further). Generated the three Netlify secret values
+(`EBAY_TOKEN_ENC_KEY`/`EBAY_VERIFICATION_TOKEN`/`EBAY_CRON_SECRET`) via
+`openssl` — given to the owner directly, not stored in any file. No code,
+SQL, or eBay/Netlify account changes were made — only observation.
+
+## 2026-07-09 (session 13, second addendum) -- 🟢 eBay plan is BUILD-READY: BUILD-PROMPT.md + OWNER-SETUP.md written
+
+With all 15 decisions in, wrote the two handoff artifacts (mirroring the
+Etsy sequence): **`ebay-sync-plan/BUILD-PROMPT.md`** — the verbatim prompt
+for the implementing agent (plan-is-law rules, the decided Q1–Q15 encoded as
+requirements, never-touch-the-Etsy-code rule, fetch-full-OpenAPI-contracts
+rule from the Etsy build's truncated-spec lesson, testing gates, ending
+protocol) — and **`ebay-sync-plan/OWNER-SETUP.md`** — the ordered owner
+checklist (10 steps: developer-program registration → migration → env vars →
+deploy → account-deletion subscription that activates the production keyset →
+RuName → Seller Hub policies per Q8 → Connect + in-app setup → live
+verification → optional price-push cron). OWNER-SETUP is explicitly a
+**DRAFT at planning time** — steps marked 🔨 depend on the build, and the
+implementing agent finalizes the file per the BUILD-PROMPT ending protocol.
+Owner can start steps 1 and 7 (registration; Seller Hub policies) today —
+see TASKS.md. Still no code/SQL/eBay-side changes.
+
+## 2026-07-09 (session 13, addendum) -- 🟢 eBay plan: owner answered ALL 15 open questions; plan updated in place
+
+Walked the owner through `ebay-sync-plan/13-open-questions.md` one question
+at a time; all 15 (plus sub-questions Q4b/Q6b) are now **DECIDED** and
+recorded in that file with the original reasoning kept. Headlines:
+review-first publishing (Q1); admin-variable eBay markup like the updated
+Etsy panel, seeded 15% (Q2); daily ≥1% price push same as Etsy (Q3);
+vermeil→Fashion Jewelry + modern Fine Jewelry leaves (Q4/Q4b); one standard
+"Pre-owned" condition template (Q5); **coins/bullion EXCLUDED from eBay —
+jewelry/watches/silverware only** (Q6/Q6b, narrower than the Etsy
+full-catalog decision); quantity-zero + Out-of-Stock Control for sold items
+(Q7); flat-rate insured+signature shipping, 30-day buyer-pays returns,
+immediate payment ON (Q8); Best Offer off (Q9); subscribe to
+account-deletion notifications (Q10); SKU = products.id (Q11); no Store
+subscription (Q12); owner's existing eBay account with a few unrelated
+listings (Q13); **selling limits confirmed a non-issue** — account holds the
+catalog easily (Q14); Phase 3 order ingest deferred, manual is fine (Q15).
+
+Docs affected by the two non-default answers (Q6 exclusion, Q14 limits)
+were updated in place across the plan (01/02/03/06/07/08/10/12/14/15 +
+README). Still planning-only: no code, no SQL, no eBay accounts touched.
+Next gate: greenlight the build → BUILD-PROMPT.md/OWNER-SETUP.md + Phase 0
+(see TASKS.md ⭐).
+
+## 2026-07-09 (session 13) -- 🟡 eBay sync PLANNED (17-doc architecture plan; nothing built; 15 owner decisions open)
+
+Owner asked for an eBay integration planned the same way the Etsy sync was —
+deep research on eBay's RESTful APIs first, then a planning folder mirroring
+`etsy-sync-plan/`. Delivered **`ebay-sync-plan/`** at the project root:
+README + docs 01–15 + `rest-endpoints-used.md` (17 files; `OWNER-SETUP.md` /
+`BUILD-PROMPT.md` deliberately deferred until decisions land, same as the
+Etsy sequence). Research covered eBay's REST foundations, OAuth
+(authorization-code, RuName, non-rotating 18-month refresh token, no PKCE),
+Sell Inventory (inventoryItem→offer→publish), Account (business policies,
+privileges/selling limits), Commerce Taxonomy/Metadata (categories, aspects,
+condition IDs), Media, Notification (the mandatory marketplace
+account-deletion webhook that gates production keyset activation), call
+limits, sandbox, and the jewelry/bullion/coin marketplace policies.
+
+Architecture headline vs Etsy: same shape (lib/ebay module, /api/admin/ebay
+routes, 4 additive service-role tables, step machine, dry-run, content-hash
+updates, threshold-gated daily price push), but ~3–4 calls per publish
+instead of ~12 — eBay ingests our public WebP image URLs itself, so the
+whole transcode/upload pipeline and the per-image table disappear. The two
+structural differences: eBay has **no draft state** (publish is live
+immediately → review-first gating via unpublished offers + our dry-run), and
+heavier one-time account gates (business-policy opt-in, inventory location,
+account-deletion endpoint, **monthly selling limits** that a gold catalog
+will exceed until raised — the real capacity constraint, not API quota).
+
+**Nothing was built, no SQL written/run, no eBay accounts touched.** Next
+step is owner review of `ebay-sync-plan/13-open-questions.md` (15 questions,
+all OPEN — see TASKS.md ⭐ entry). No verification commands were applicable
+(documentation only; no app code changed).
+
+## 2026-07-09 (session 12, second addendum) -- 🟢 Shop performance: bare /shop is now static/ISR + facet query slimmed down
+
+Owner asked to tackle the "readiness for catalog growth" shop performance
+backlog (DB-side pagination/faceting, static/ISR for bare `/shop`, icon-font
+subsetting) so the site is ready ahead of time, not after the catalog grows.
+Scoping it first turned up that 2 of the 5 original items were **already
+done** by earlier sessions without the Backlog entry being updated: the
+Material Symbols icon font is already self-hosted/subset (59KB, no
+third-party stylesheet), and the flagged oversized images were already
+re-encoded (`shop-new-listing-06-05.webp` 189KB, `money.webp` 330KB,
+`logo.webp` 4.7KB — all previously described as 1.07MB/882KB/491KB).
+
+**Built this session:**
+- **Bare `/shop` is now static/ISR.** The real dynamic page (`shop/(list)/page.tsx`)
+  is completely unchanged — still awaits `searchParams` and stays fully
+  dynamic for any real filter/sort/page/search. A new twin page,
+  `src/app/[locale]/shop-index/page.tsx`, never receives a `searchParams`
+  prop at all (so Next has nothing dynamic to track) and calls the same
+  shared `renderShopPage()` helper with a plain resolved `{}` — making it
+  eligible for prerendering/ISR (`revalidate: 300`). A `next.config.ts`
+  `rewrites()` rule (not middleware — `proxy.ts`'s locale handling already
+  has a documented loop gotcha, so this avoids touching it) sends `/shop`
+  and `/es/shop` to the twin **only when none of the ~20 filter query keys
+  are present**; the browser URL never changes (a rewrite, not a redirect).
+  Canonical/alternates on the twin point at `/shop` so it's never a separate
+  indexable URL. Build manifest confirms the split: `● /[locale]/shop-index`
+  (SSG) vs `ƒ /[locale]/shop` (still Dynamic, untouched).
+  - Hit one real build error along the way: prerendering failed because 5
+    client components under the shop tree (`ShopFilters`, `ShopSortSelect`,
+    `ShopViewToggle`, `ShopPagination`, `ShopYearFilter`) call
+    `useSearchParams()`, which requires a Suspense boundary to prerender.
+    Checked each one first — in all 5, `searchParams` is read only inside
+    click/change handlers (building the next navigation URL), never in the
+    render path — so wrapping them in `<Suspense>` is provably a no-op for
+    the real dynamic page (nothing ever suspends when a real request is
+    live) and shouldn't produce a visible flash on the static twin either,
+    since their rendered output doesn't depend on the search params value.
+    Sized fallbacks used to avoid layout shift regardless.
+- **Facet-only catalog fetch slimmed down.** The separate query used only to
+  compute Brand/Item Type dropdown options (fires when a DB-level filter —
+  metal/purity/brand/status — is active) now selects ~12 columns instead of
+  the full ~31 (drops `images`/`image_urls`/`image_padding*` and every
+  pricing/detail-only field). `loadShopCatalog()` gained a `'full' | 'facet'`
+  variant param folded into the `unstable_cache` key so the two column sets
+  can't collide. Verified live: brand dropdown options are **byte-identical**
+  across the unfiltered, `?metal=gold`, and `?metal=silver` cases.
+
+**Deliberately NOT done: full DB-side `.range()` pagination.** Scoping this
+seriously changed the plan — most real filters (item type inference, chain
+type, length, gender, year range, free-text search, and price range, which
+needs the *live* spot price, not a stored column) only exist as JS logic
+today; DB-level filtering currently covers only status/purity/metal/brand.
+A safe DB-side pagination fast path would need to detect exactly when JS
+filtering is a no-op, and getting that condition wrong would silently return
+wrong results for some real filter combination on the highest-traffic page
+in the app. Treated as a genuine separate follow-up rather than rushed — see
+`DECISIONS.md` for the full reasoning.
+
+`npx tsc --noEmit`, `npm run lint`, `npm run build` (route manifest confirms
+the SSG/Dynamic split), `npx vitest run` (171/171) all pass. **Verified live
+in the preview:** bare `/shop` and multiple filtered/sorted/paginated URLs
+all render correct, distinct content (78 pieces bare, 47 of 78 for
+`?metal=gold`, 0 of 78 for a nonsense search, correct behavior for
+`?page=1` since a real query key present routes it to the dynamic page);
+sort-select and view-toggle clicks correctly update the URL and re-render;
+no console errors on desktop or mobile (375px) or on `/es/shop`. **Caveat:**
+dev mode never performs real static generation (confirmed against Next's own
+docs), so only the build-time SSG classification and routing/rendering
+correctness are verified here — the actual Netlify CDN cache-hit behavior
+needs confirming after a real deploy. Full detail: `project-docs/DECISIONS.md`
+2026-07-09 (session 12, second addendum).
+
+## 2026-07-09 (session 12) -- 🟢 Owner confirmed a batch of pending items live in production
+
+Owner confirmed the following are live and working correctly in production,
+closing out several items that were previously code-complete-but-unverified or
+blocked on a manual step. This is a documentation update recording the
+owner's confirmation — no code changed in this session.
+
+- **PayPal checkout is live.** The long-standing go-live blocker (Netlify had
+  mismatched PayPal credentials — see the 2026-06-30 "🔴 HANDOFF — PayPal
+  checkout" section further below) is resolved. Checkout accepts real
+  payments in production. This also confirms the 2026-07-05 standing note's
+  hypothesis (moving all working env vars to Netlify would clear it).
+- **Buyers + marketing-audience SQL migrations are applied.** Both
+  `supabase/buyers-2026-07.sql` and `supabase/marketing-buyers-audience-2026-07.sql`
+  are run. The admin Buyers tab (auto-populate on paid order, delete, row-select
+  + Copy Selected Emails), the 4th "Buyers" Compose Campaign audience with
+  opt-out suppression, and "Combined" including buyers are all confirmed
+  working live.
+- **Etsy sync is confirmed live end to end.** Closes out the 2026-07-08
+  "🔴 HANDOFF — Etsy sync built (Phase 1 + Phase 2 code-complete, unverified
+  live)" section further below, plus every session 9-12 Etsy verification
+  item in `TASKS.md`: bulk-sync recovery from the stuck-`error` incident, the
+  22 previously-ineligible silver items, automatic length/ring-size push,
+  vintage/antique tags, the tag-truncation fix, the markup Save + dedicated
+  price-push flow, Necklace→Chains category mapping, the 2 corrected
+  bracelets, custom tags, and the remaining core-pipeline checklist items
+  (token refresh, scheduled price push, delist/relist, resume-after-interrupt,
+  multi-product dry-run).
+- **Session 10-11 UX/email items confirmed live:** the receipt/invoice
+  "Ship to" → "Address" relabel for Local Pickup orders, the AI Listing
+  Assistant Prompt settings accordion, the owner new-order notification
+  email, and the checkout stock-awareness + escalating card-error paths.
+
+`TASKS.md` Backlog has been trimmed accordingly (see that file's Completed
+section and `CHANGELOG.md`/`DECISIONS.md` 2026-07-09 session 12 for the
+consolidated record). **Scope note (superseded by the addendum below):** at
+the time of this entry, the Quantity-migration checks, the
+`product-special-price-override`/`shop-special-price-default`/
+`product-show-spot-price` migrations, and CSP enforcement were still open —
+see the same-day addendum immediately below for their resolution. The
+deferred shop performance work remains genuinely open (unbuilt, not part of
+either confirmation).
+
+## 2026-07-09 (session 12, addendum) -- 🟢 Owner confirmed the remaining pending items too (except shop performance)
+
+Same-day follow-up to the session 12 entry above: the owner confirmed the
+remaining items from that entry's scope note are also live and working,
+except the deferred shop performance work (explicitly confirmed still
+open — it was never built, so there's nothing to verify).
+
+- **Quantity migrations** (`product-quantity-2026-07.sql` +
+  `checkout-quantity-2026-07.sql`) — applied; multi-unit purchase (stepper,
+  per-line subtotals, stock decrement, sold-out auto-flip) confirmed live.
+- **`product-special-price-override-2026-07.sql`** — applied; the per-item
+  "Override customer special pricing" checkbox confirmed live.
+- **`shop-special-price-default-2026-07.sql`** — applied; the site-wide
+  Customer Trade-in Price default confirmed live.
+- **`product-show-spot-price-2026-07.sql`** — applied; the per-item
+  "Show spot / melt value on storefront" toggle confirmed live.
+- **CSP enforcement** — checked directly against root `netlify.toml` (a
+  static file read, not live testing): **CSP is already enforcing**, not
+  Report-Only. The `TASKS.md` Backlog item describing it as pending was
+  stale — the live policy is also more complete than that item's
+  description (it now also allowlists TradingView and PayPal domains
+  alongside Supabase, Google Fonts, and gold-api.com). No code change was
+  needed.
+
+**Explicitly NOT part of this confirmation:** the deferred shop performance
+work (DB-side pagination/faceting for `/shop`, making bare `/shop`
+static/ISR, server-rendering `ProductCard`'s static markup, re-encoding
+oversized `/public` images, self-hosting/subsetting the Material Symbols
+icon font). That work does not exist yet — the owner confirmed it should
+stay open in Backlog rather than be marked done. See `DECISIONS.md`
+2026-07-09 (session 12, addendum).
+
 ## 2026-07-09 (session 11, fifth addendum) -- 🟡 "Combined" now genuinely means all three audiences (Newsletter + Accounts + Buyers)
 
 Owner asked for "Combined" to actually combine all three — reversing the

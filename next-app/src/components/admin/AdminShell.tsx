@@ -49,6 +49,8 @@ import ComboboxInput from './ComboboxInput';
 import AdminHeader from './AdminHeader';
 import EtsyProductPanel from './EtsyProductPanel';
 import EtsyBulkSyncModal from './EtsyBulkSyncModal';
+import EbayProductPanel from './EbayProductPanel';
+import EbayBulkSyncModal from './EbayBulkSyncModal';
 import {
   DEFAULT_QUICK_FILL_AI_FORMAT_PROMPT,
   QUICK_FILL_PROMPT_STORAGE_KEY,
@@ -545,6 +547,7 @@ const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null; widthClas
   { label: 'Status', sortKey: 'status', widthClass: 'w-[92px]' },
   { label: 'Qty', sortKey: 'quantity', widthClass: 'w-[56px]' },
   { label: 'Etsy', sortKey: null, widthClass: 'w-[110px]' },
+  { label: 'eBay', sortKey: null, widthClass: 'w-[110px]' },
   { label: '', sortKey: null, widthClass: 'w-[44px]', responsiveClass: 'max-md:w-[28px] max-md:min-w-[28px] max-md:max-w-[28px]' },
 ];
 
@@ -564,6 +567,27 @@ function etsyChipTone(state: string | undefined): { bg: string; fg: string } {
   if (state === 'error') return { bg: 'color-mix(in srgb, var(--color-error) 14%, transparent)', fg: 'var(--color-error)' };
   if (state === 'active') return { bg: 'color-mix(in srgb, var(--color-primary) 14%, transparent)', fg: 'var(--color-primary)' };
   if (state === 'out_of_date' || state === 'draft_review') return { bg: 'color-mix(in srgb, #b8860b 16%, transparent)', fg: '#8a6400' };
+  return { bg: 'var(--color-surface-container)', fg: 'var(--color-on-surface-variant)' };
+}
+
+const EBAY_CHIP_LABELS: Record<string, string> = {
+  pending: 'Not listed',
+  item_synced: 'Preparing…',
+  offer_created: 'Preparing…',
+  review: 'Ready to publish',
+  published: 'Live',
+  out_of_date: 'Out of date',
+  hidden_oos: 'Hidden (sold)',
+  ended: 'Ended',
+  error: 'Error',
+};
+
+function ebayChipTone(state: string | undefined): { bg: string; fg: string } {
+  if (state === 'error') return { bg: 'color-mix(in srgb, var(--color-error) 14%, transparent)', fg: 'var(--color-error)' };
+  if (state === 'published') return { bg: 'color-mix(in srgb, var(--color-primary) 14%, transparent)', fg: 'var(--color-primary)' };
+  if (state === 'out_of_date' || state === 'review' || state === 'item_synced' || state === 'offer_created') {
+    return { bg: 'color-mix(in srgb, #b8860b 16%, transparent)', fg: '#8a6400' };
+  }
   return { bg: 'var(--color-surface-container)', fg: 'var(--color-on-surface-variant)' };
 }
 
@@ -876,13 +900,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     onConfirm: () => void;
   } | null>(null);
   // Mobile-only collapse state for the editor's blocks (no effect on desktop).
-  const [openEditorSections, setOpenEditorSections] = useState<{ photos: boolean; ai: boolean; details: boolean; etsy: boolean }>({
+  const [openEditorSections, setOpenEditorSections] = useState<{ photos: boolean; ai: boolean; details: boolean; etsy: boolean; ebay: boolean }>({
     photos: false,
     ai: false,
     details: false,
     etsy: false,
+    ebay: false,
   });
-  const toggleEditorSection = (key: 'photos' | 'ai' | 'details' | 'etsy') =>
+  const toggleEditorSection = (key: 'photos' | 'ai' | 'details' | 'etsy' | 'ebay') =>
     setOpenEditorSections((current) => ({ ...current, [key]: !current[key] }));
   // Bulk map for the product table's per-row Etsy status chip — best-effort,
   // fetched once on mount; an empty map (pre-migration or not-yet-synced) just
@@ -906,6 +931,23 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     const run = async () => { await refreshEtsyChips(); };
     void run();
   }, [refreshEtsyChips]);
+  // eBay twin of the Etsy chip map above — same one-fetch-for-the-whole-table
+  // pattern (never one call per row).
+  const [ebayListingsByProduct, setEbayListingsByProduct] = useState<Record<string, { sync_state: string }>>({});
+  const [showEbayBulkModal, setShowEbayBulkModal] = useState(false);
+  const refreshEbayChips = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/ebay/listings');
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.listings) setEbayListingsByProduct(data.listings);
+    } catch {
+      // Best-effort — the chip simply keeps its last-known state.
+    }
+  }, []);
+  useEffect(() => {
+    const run = async () => { await refreshEbayChips(); };
+    void run();
+  }, [refreshEbayChips]);
   // Heads-up dialog shown before the Smart Assistant starts listening.
   const [showMicPrompt, setShowMicPrompt] = useState(false);
   const [imagePaddingTarget, setImagePaddingTarget] = useState<Product | null>(null);
@@ -1159,7 +1201,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setQuickFillNotice(null);
     setQuickAddMode(false);
     setShowAdvancedIds(false);
-    setOpenEditorSections({ photos: false, ai: false, details: false, etsy: false });
+    setOpenEditorSections({ photos: false, ai: false, details: false, etsy: false, ebay: false });
     // Reset the Smart Listing Assistant so the next item starts completely fresh
     // (transcript, generated draft, notices, undo snapshot, and any active recording).
     stopAiRecording();
@@ -1226,7 +1268,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setQuickFillNotice(null);
     setQuickAddMode(false);
     setShowAdvancedIds(false);
-    setOpenEditorSections({ photos: false, ai: false, details: false, etsy: false });
+    setOpenEditorSections({ photos: false, ai: false, details: false, etsy: false, ebay: false });
     setInventoryNumberManual(false);
     const autoInventoryNumber =
       copy.inventory_number ??
@@ -2370,7 +2412,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setQuickEntry('');
     setQuickAddMode(false);
     setShowAdvancedIds(false);
-    setOpenEditorSections({ photos: false, ai: false, details: false, etsy: false });
+    setOpenEditorSections({ photos: false, ai: false, details: false, etsy: false, ebay: false });
     setInventoryNumberManual(false);
     const nextProductType = getProductJewelryType(product);
     setJewelryTypeInput(nextProductType);
@@ -2922,6 +2964,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             <button type="button" onClick={() => setShowEtsyBulkModal(true)} className="outline-button text-sm flex-shrink-0">
               Sync All to Etsy
             </button>
+            <button type="button" onClick={() => setShowEbayBulkModal(true)} className="outline-button text-sm flex-shrink-0">
+              Sync all to eBay
+            </button>
             <button
               type="button"
               onClick={() => setShowTableFilters((current) => !current)}
@@ -3319,6 +3364,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                         style={{ background: etsyChipTone(etsyListingsByProduct[p.id]?.sync_state).bg, color: etsyChipTone(etsyListingsByProduct[p.id]?.sync_state).fg }}
                       >
                         {ETSY_CHIP_LABELS[etsyListingsByProduct[p.id]?.sync_state ?? 'pending'] ?? 'Not listed'}
+                      </span>
+                    </td>
+                    <td className="px-2 py-3 whitespace-nowrap">
+                      <span
+                        className="inline-flex text-[0.6rem] font-bold uppercase tracking-widest px-2 py-0.5"
+                        style={{ background: ebayChipTone(ebayListingsByProduct[p.id]?.sync_state).bg, color: ebayChipTone(ebayListingsByProduct[p.id]?.sync_state).fg }}
+                      >
+                        {EBAY_CHIP_LABELS[ebayListingsByProduct[p.id]?.sync_state ?? 'pending'] ?? 'Not listed'}
                       </span>
                     </td>
                     <td className={`sticky right-0 px-1 max-md:px-0 py-3 w-[44px] min-w-[44px] max-w-[44px] max-md:w-[28px] max-md:min-w-[28px] max-md:max-w-[28px] ${actionMenuId === p.id ? 'z-30' : 'z-10'}`} style={{ background: dragTargetProductId === p.id ? 'color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-container-lowest))' : 'var(--color-surface-container-lowest)' }}>
@@ -4659,6 +4712,32 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 )}
               </div>
 
+              <div className="product-editor-panel" data-collapsed={openEditorSections.ebay ? 'false' : 'true'}>
+                <div className="editor-collapse-header flex items-start gap-3" role="button" tabIndex={0}
+                  aria-expanded={openEditorSections.ebay}
+                  onClick={() => toggleEditorSection('ebay')}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleEditorSection('ebay'); } }}>
+                  <div className="product-editor-icon" style={{ background: 'rgba(212, 175, 55, 0.18)', color: '#a9760a' }}>
+                    <span className="material-symbols-outlined" aria-hidden="true">storefront</span>
+                  </div>
+                  <div>
+                    <h3 className="product-editor-section-title">eBay</h3>
+                    <p className={`product-editor-section-copy${openEditorSections.ebay ? '' : ' hidden'}`}>Dry-run preview, sync, publish, and delist/restore.</p>
+                  </div>
+                  <span className="ml-auto self-center" aria-hidden="true">
+                    <span className="material-symbols-outlined" style={{ color: '#a9760a' }}>
+                      {openEditorSections.ebay ? 'expand_less' : 'expand_more'}
+                    </span>
+                  </span>
+                </div>
+
+                {isNew || !editing.id ? (
+                  <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Save this listing first, then sync it to eBay.</p>
+                ) : (
+                  <EbayProductPanel productId={editing.id} onSynced={refreshEbayChips} />
+                )}
+              </div>
+
             </div>
 
             {/* Validation errors */}
@@ -5134,6 +5213,16 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
           onClose={() => {
             setShowEtsyBulkModal(false);
             void refreshEtsyChips(); // a bulk run likely changed several rows
+          }}
+        />
+      )}
+
+      {/* eBay bulk sync */}
+      {showEbayBulkModal && (
+        <EbayBulkSyncModal
+          onClose={() => {
+            setShowEbayBulkModal(false);
+            void refreshEbayChips(); // a bulk run likely changed several rows
           }}
         />
       )}

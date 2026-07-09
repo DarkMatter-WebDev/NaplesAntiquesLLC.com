@@ -27,6 +27,33 @@ const nextConfig: NextConfig = {
   // phone/tablet at http://<your-LAN-IP>:3000. No effect on production/builds.
   // If your LAN IP changes (DHCP), update it here or just add another entry.
   allowedDevOrigins: ['192.168.119.224', '192.168.119.*'],
+  async rewrites() {
+    // Bare /shop and /es/shop (no filter/sort/page query params at all) are
+    // rewritten — URL stays the same, only the internal handler changes —
+    // to the static/ISR twin at shop-index, so this by-far-most-common visit
+    // (nav links, external links, first-time visitors) gets a prerendered
+    // response instead of full per-request dynamic SSR. Any request carrying
+    // even one of these keys (a real filter, a saved/shared filtered link,
+    // or pagination) is left alone and keeps hitting the real dynamic page,
+    // whose behavior is completely unchanged. Listed explicitly rather than
+    // "any query string" so harmless params (utm_source, etc.) don't
+    // needlessly force the slower path. Keep this list in sync with the
+    // `Props['searchParams']` keys in shop/(list)/page.tsx.
+    const shopFilterKeys = [
+      'metal', 'metalColor', 'metalType', 'purity', 'status', 'itemType',
+      'chainType', 'length', 'gender', 'brand', 'q', 'sort', 'page',
+      'perPage', 'priceMin', 'priceMax', 'yearMin', 'yearMax', 'itemGroup',
+      'view',
+    ];
+    const missingAllFilters = shopFilterKeys.map((key) => ({ type: 'query' as const, key }));
+    return {
+      beforeFiles: [
+        { source: '/shop', destination: '/shop-index', missing: missingAllFilters },
+        { source: '/en/shop', destination: '/en/shop-index', missing: missingAllFilters },
+        { source: '/es/shop', destination: '/es/shop-index', missing: missingAllFilters },
+      ],
+    };
+  },
   async headers() {
     return [
       {
