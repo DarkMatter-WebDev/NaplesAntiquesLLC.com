@@ -94,6 +94,10 @@ create table if not exists public.etsy_listings (
   -- UI can show the picked category without an extra Etsy taxonomy fetch.
   taxonomy_override_id   bigint,
   taxonomy_override_path text,
+  -- Owner-supplied custom Etsy tags (added 2026-07-08): merged into the
+  -- auto-generated tags by lib/etsy/mapping.ts mapTags() (owner's tags first),
+  -- within Etsy's 13-tag cap. See supabase/etsy-listings-extra-tags-2026-07.sql.
+  extra_tags        text[],
   last_synced_at    timestamptz,
   last_error        text,                     -- operator-friendly summary (redacted)
   error_count       int not null default 0,   -- consecutive failures, for backoff/giving up

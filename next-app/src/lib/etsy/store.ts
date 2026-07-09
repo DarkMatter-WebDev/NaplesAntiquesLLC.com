@@ -55,6 +55,8 @@ export interface EtsyListingRow {
   /** Manual per-product category override — wins over the automatic ETSY_TAXONOMY_MAP guess when set. */
   taxonomy_override_id: number | null;
   taxonomy_override_path: string | null;
+  /** Owner-supplied extra Etsy tags (added 2026-07-08), merged into the auto-generated tags. */
+  extra_tags: string[] | null;
   last_synced_at: string | null;
   last_error: string | null;
   error_count: number;

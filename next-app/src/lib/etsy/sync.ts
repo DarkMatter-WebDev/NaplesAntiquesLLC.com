@@ -303,7 +303,7 @@ export async function runSyncStep(productId: string, mode: SyncMode = 'publish')
   if (!connection) return { done: true, syncState: 'error', error: { code: 'not_connected', message: 'Etsy is not connected.' } };
 
   const { accessToken, shopId } = await ensureFreshAccessToken(service);
-  const payload = buildMappedPayload(product, connection, spotData, taxonomyOverride);
+  const payload = buildMappedPayload(product, connection, spotData, taxonomyOverride, listing?.extra_tags ?? null);
   const warnings: string[] = [];
 
   // A bulk enqueue resets items to 'pending'. For an item that ALREADY exists
@@ -906,7 +906,7 @@ export async function scanAndMarkOutOfDate(): Promise<number> {
     const product = await fetchProduct(service, row.product_id);
     if (!product) continue;
     const taxonomyOverride = row.taxonomy_override_id ? { id: row.taxonomy_override_id, path: row.taxonomy_override_path ?? '' } : null;
-    const payload = buildMappedPayload(product, connection, spotData, taxonomyOverride);
+    const payload = buildMappedPayload(product, connection, spotData, taxonomyOverride, row.extra_tags ?? null);
     if (computeContentHash(payload) !== row.content_hash) {
       await upsertListing(service, row.product_id, { sync_state: 'out_of_date' });
       count += 1;
@@ -988,7 +988,7 @@ export async function runScheduledPricePush(): Promise<{ pushed: number; skipped
       continue;
     }
     const taxonomyOverride = row.taxonomy_override_id ? { id: row.taxonomy_override_id, path: row.taxonomy_override_path ?? '' } : null;
-    const payload = buildMappedPayload(product, connection, spotData, taxonomyOverride);
+    const payload = buildMappedPayload(product, connection, spotData, taxonomyOverride, row.extra_tags ?? null);
     if (payload.price == null || !shouldPushPrice(payload.price, row.last_pushed_price, connection.price_push_threshold_pct)) {
       skipped += 1;
       continue;
@@ -1041,7 +1041,7 @@ export async function pushPricesBatch(): Promise<{ done: boolean; pushed: number
     const product = await fetchProduct(service, row.product_id);
     if (!product) continue;
     const taxonomyOverride = row.taxonomy_override_id ? { id: row.taxonomy_override_id, path: row.taxonomy_override_path ?? '' } : null;
-    const payload = buildMappedPayload(product, connection, spotData, taxonomyOverride);
+    const payload = buildMappedPayload(product, connection, spotData, taxonomyOverride, row.extra_tags ?? null);
     if (payload.price != null && payload.price !== row.last_pushed_price) needsPush.push(row.product_id);
   }
 

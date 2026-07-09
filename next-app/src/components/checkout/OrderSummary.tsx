@@ -9,12 +9,15 @@ import { parseManualPriceLabelValue } from '@/lib/pricing';
 import {
   inferProductJewelryType,
   formatProductItemYear,
+  isProductPurchasable,
   normalizeProductQuantity,
   productJewelryTypeLabel,
   productLengthSizeDisplay,
   productImagePaddingBackground,
   productMetalVariantLabel,
 } from '@/types/product';
+
+const AVAILABLE_GREEN = '#2e7d32';
 
 const GOLD = '#735c00';
 const BORDER = '#d8d0c2';
@@ -57,6 +60,7 @@ export default function OrderSummary({
   onRemove,
   onSetQuantity,
   variant = 'compact',
+  showAvailability = false,
 }: {
   items: CartItem[];
   isEs: boolean;
@@ -70,6 +74,9 @@ export default function OrderSummary({
   onRemove?: (id: string) => void;
   onSetQuantity?: (id: string, quantity: number) => void;
   variant?: 'compact' | 'expanded';
+  /** Show each item's live availability (In stock / N available / Sold out).
+   *  On for the live checkout summary; off for the printed confirmation snapshot. */
+  showAvailability?: boolean;
 }) {
   const lineTotals = items.map((i) => {
     const unit = parsePrice(i.priceLabel);
@@ -114,6 +121,7 @@ export default function OrderSummary({
             onRemove={onRemove ? () => onRemove(item.id) : undefined}
             onSetQuantity={onSetQuantity ? (qty) => onSetQuantity(item.id, qty) : undefined}
             expanded={expanded}
+            showAvailability={showAvailability}
           />
         ))}
       </div>
@@ -181,6 +189,7 @@ function SummaryRow({
   onRemove,
   onSetQuantity,
   expanded = false,
+  showAvailability = false,
 }: {
   item: CartItem;
   isEs: boolean;
@@ -188,6 +197,7 @@ function SummaryRow({
   onRemove?: () => void;
   onSetQuantity?: (quantity: number) => void;
   expanded?: boolean;
+  showAvailability?: boolean;
 }) {
   const title = isEs && item.title_es ? item.title_es : item.title;
   const circa = formatProductItemYear(item.item_year);
@@ -196,6 +206,7 @@ function SummaryRow({
   const image = normalizeLegacyLocalImageUrl(item.image);
   const qty = purchaseQty(item);
   const stockCap = Math.max(1, normalizeProductQuantity(item.stockQuantity));
+  const purchasable = isProductPurchasable(item.status, item.stockQuantity);
   const unitPrice = parsePrice(item.priceLabel);
   const lineTotal = unitPrice === null ? null : unitPrice * qty;
   return (
@@ -231,6 +242,16 @@ function SummaryRow({
               {circa && <span className="normal-case">Ca. {circa}</span>}
               {circa && specs && ' · '}
               {specs}
+            </p>
+          )}
+          {showAvailability && !purchasable && (
+            <p className="mt-0.5 text-[0.68rem] font-bold uppercase tracking-wide" style={{ color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}>
+              {isEs ? 'Agotado — ya no disponible' : 'Sold out — no longer available'}
+            </p>
+          )}
+          {showAvailability && purchasable && stockCap <= 1 && (
+            <p className="mt-0.5 text-[0.68rem] font-bold uppercase tracking-wide" style={{ color: AVAILABLE_GREEN, fontFamily: 'var(--font-label)' }}>
+              {isEs ? 'Disponible' : 'In stock'}
             </p>
           )}
           {onSetQuantity && stockCap > 1 ? (

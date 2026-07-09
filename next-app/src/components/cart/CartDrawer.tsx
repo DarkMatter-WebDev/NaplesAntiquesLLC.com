@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation';
 import { useCart, type CartItem } from '@/context/CartContext';
 import { formatProductItemYear, isProductPurchasable, normalizeProductQuantity, productImagePaddingBackground, productStatusLabel } from '@/types/product';
 import { QuantityStepper } from '@/components/checkout/OrderSummary';
+import StockAlertBanner from '@/components/cart/StockAlertBanner';
+import type { StockAlert } from '@/context/CartContext';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 import { FL_TAX_RATE, FL_TAX_RATE_LABEL } from '@/lib/checkout-pricing';
 import { parseManualPriceLabelValue } from '@/lib/pricing';
@@ -28,11 +30,18 @@ function fmt(n: number) {
 }
 
 export default function CartDrawer({ locale }: { locale: string }) {
-  const { items, remove, clear, setQuantity, drawerOpen, closeDrawer } = useCart();
+  const { items, remove, clear, setQuantity, drawerOpen, closeDrawer, refreshAvailability, stockAlerts, dismissStockAlerts } = useCart();
   const router = useRouter();
   const isEs = locale === 'es';
   const prefix = isEs ? '/es' : '';
   const checkoutHref = `${prefix}/checkout`;
+
+  // Re-check live stock each time the drawer is opened, so the shopper sees an
+  // up-to-date picture (and an alert) if something sold out while it sat in their
+  // cart. Fire-and-forget — a failed check just leaves the cart as-is.
+  useEffect(() => {
+    if (drawerOpen) void refreshAvailability();
+  }, [drawerOpen, refreshAvailability]);
 
   // Auth state, resolved when the drawer opens, so "Proceed to Checkout" knows
   // whether to go straight through (signed in) or offer the sign-in / guest gate.
@@ -151,7 +160,7 @@ export default function CartDrawer({ locale }: { locale: string }) {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <CartView items={items} isEs={isEs} prefix={prefix} onRemove={remove} onSetQuantity={setQuantity} onClear={clear} onClose={handleClose} onCheckout={handleProceedToCheckout} />
+          <CartView items={items} isEs={isEs} prefix={prefix} onRemove={remove} onSetQuantity={setQuantity} onClear={clear} onClose={handleClose} onCheckout={handleProceedToCheckout} stockAlerts={stockAlerts} onDismissAlerts={dismissStockAlerts} />
         </div>
       </div>
 
@@ -258,6 +267,8 @@ function CartView({
   onClear,
   onClose,
   onCheckout,
+  stockAlerts,
+  onDismissAlerts,
 }: {
   items: CartItem[];
   isEs: boolean;
@@ -267,6 +278,8 @@ function CartView({
   onClear: () => void;
   onClose: () => void;
   onCheckout: () => void;
+  stockAlerts: StockAlert[];
+  onDismissAlerts: () => void;
 }) {
   if (items.length === 0) {
     return (
@@ -295,6 +308,7 @@ function CartView({
   return (
       <div className="flex min-h-0 flex-col h-full">
       <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
+        <StockAlertBanner alerts={stockAlerts} isEs={isEs} onDismiss={onDismissAlerts} />
         {items.map((item) => (
           <CartItemRow key={item.id} item={item} isEs={isEs} prefix={prefix} onRemove={() => onRemove(item.id)} onSetQuantity={(qty) => onSetQuantity(item.id, qty)} />
         ))}

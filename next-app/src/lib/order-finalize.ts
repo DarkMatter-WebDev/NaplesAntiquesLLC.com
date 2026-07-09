@@ -38,6 +38,18 @@ export async function finalizePaidOrder(service: SupabaseClient, orderId: string
       console.error('Auto receipt email error:', err);
     }
   }
+
+  // Also alert the shop directly (in addition to the admin Orders list) so the
+  // owner is notified of a new order by email. Best-effort and independent of the
+  // customer receipt above — it doesn't need the buyer to have an email on file.
+  if (resendKey) {
+    try {
+      const { sendNewOrderOwnerNotification } = await import('@/lib/order-owner-notification');
+      await sendNewOrderOwnerNotification({ supabase: service, resendKey, orderId: order.id });
+    } catch (err) {
+      console.error('Owner new-order notification error:', err);
+    }
+  }
 }
 
 /**

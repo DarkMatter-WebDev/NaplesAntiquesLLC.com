@@ -11,7 +11,7 @@ import {
 } from '@/lib/marketing';
 
 function normalizeScope(value: unknown): AudienceScope {
-  return value === 'subscribers' || value === 'accounts' || value === 'all' ? value : 'all';
+  return value === 'subscribers' || value === 'accounts' || value === 'buyers' || value === 'all' ? value : 'all';
 }
 
 export async function POST(req: Request) {

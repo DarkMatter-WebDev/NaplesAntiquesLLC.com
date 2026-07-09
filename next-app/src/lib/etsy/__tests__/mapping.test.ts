@@ -25,7 +25,10 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
     category: 'Gold',
     metal_type: 'Gold',
     metal_variant: 'yellow_gold',
-    title: 'Test Product',
+    // Only metal/karat/color words, all filtered out of title-tag extraction,
+    // so the default product adds no title-derived tags — existing tag tests
+    // stay deterministic. Tests that exercise title broadening set their own.
+    title: '14K Yellow Gold',
     title_es: null,
     price_label: null,
     manual_price_label: null,
@@ -287,6 +290,91 @@ describe('mapTags', () => {
     const product = makeProduct({ tags: ['14K & Co.!'], product_type: 'Other', chain_type: null, purity: null, metal_type: 'Non-Metal', category: 'Silver' });
     const tags = mapTags(product);
     expect(tags).toContain('14K Co');
+  });
+
+  // Owner report 2026-07-08: a "…Charm Bracelet" typed only as a Bracelet had no
+  // "charm" tag. Title broadening now surfaces meaningful title words the
+  // structured fields miss.
+  it('pulls an important title word ("charm") — and its type phrase — into the tags', () => {
+    const product = makeProduct({
+      title: '14K Gold Charm Bracelet',
+      product_type: 'Bracelet',
+      jewelry_type: 'Bracelet',
+      chain_type: null,
+      tags: [],
+    });
+    const tags = mapTags(product);
+    expect(tags).toContain('charm');
+    expect(tags).toContain('charm bracelet');
+  });
+
+  it('surfaces other distinctive title words (e.g. "byzantine") while filtering metal/karat/color/unit noise', () => {
+    const product = makeProduct({
+      title: '18K Yellow Gold Byzantine Link Bracelet 7.5 in',
+      product_type: 'Bracelet',
+      jewelry_type: 'Bracelet',
+      purity: 18,
+      chain_type: null,
+      tags: [],
+    });
+    const tags = mapTags(product);
+    expect(tags).toContain('byzantine');
+    // Title extraction contributes no standalone noise: "yellow" (a color) and
+    // bare measurement tokens are never added by it. ("18k" can still appear,
+    // but via the structured karat logic — not from the title.)
+    expect(tags).not.toContain('yellow');
+    expect(tags).not.toContain('7'); // measurement stripped
+    expect(tags).not.toContain('5'); // "7.5" split → digits filtered
+  });
+
+  it('does not add a title word that just repeats the product type', () => {
+    const product = makeProduct({
+      title: 'Gold Bracelet',
+      product_type: 'Bracelet',
+      jewelry_type: 'Bracelet',
+      chain_type: null,
+      tags: [],
+    });
+    // "bracelet" still appears via structured logic, but the title added nothing
+    // beyond it — no duplicate, and no bogus phrase like "gold bracelet bracelet".
+    const tags = mapTags(product);
+    expect(tags.filter((t) => t === 'bracelet').length).toBeLessThanOrEqual(1);
+    expect(tags).not.toContain('bracelet bracelet');
+  });
+
+  // Owner request 2026-07-08: custom tags entered in the Etsy drawer merge into
+  // the auto-generated set and are guaranteed to appear (added first).
+  it('merges owner-supplied custom tags first, deduped and cap-respecting', () => {
+    const product = makeProduct({
+      product_type: 'Bracelet',
+      jewelry_type: 'Bracelet',
+      metal_variant: 'yellow_gold',
+      metal_type: 'Gold',
+      category: 'Gold',
+      purity: 14,
+      chain_type: null,
+      tags: [],
+    });
+    const tags = mapTags(product, ['gift for her', 'estate find']);
+    expect(tags[0]).toBe('gift for her');
+    expect(tags).toContain('estate find');
+    expect(tags.length).toBeLessThanOrEqual(13);
+  });
+
+  it('ignores empty/blank custom tags and dedupes them against auto tags', () => {
+    const product = makeProduct({
+      product_type: 'Bracelet',
+      jewelry_type: 'Bracelet',
+      metal_type: 'Gold',
+      category: 'Gold',
+      metal_variant: 'yellow_gold',
+      purity: 14,
+      chain_type: null,
+      tags: [],
+    });
+    const tags = mapTags(product, ['  ', '', 'estate jewelry']);
+    expect(tags.filter((t) => t.toLowerCase() === 'estate jewelry')).toHaveLength(1);
+    expect(tags).not.toContain('');
   });
 });
 

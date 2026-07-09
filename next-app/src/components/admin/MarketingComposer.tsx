@@ -17,9 +17,10 @@ type SettingsState = {
 };
 
 const AUDIENCE_LABELS: Record<AudienceScope, string> = {
-  all: 'Newsletter subscribers + account holders',
+  all: 'Newsletter subscribers + account holders + past buyers',
   subscribers: 'Newsletter subscribers only',
   accounts: 'Account holders only',
+  buyers: 'Past buyers only',
 };
 
 type AudienceCounts = Record<AudienceScope, number | null>;
@@ -42,6 +43,7 @@ export default function MarketingComposer() {
     all: null,
     subscribers: null,
     accounts: null,
+    buyers: null,
   });
   const [settings, setSettings] = useState<SettingsState | null>(null);
   const [busy, setBusy] = useState<'count' | 'test' | 'send' | null>(null);
@@ -64,12 +66,13 @@ export default function MarketingComposer() {
     setBusy('count');
     setNotice(null);
     try {
-      const [all, subscribers, accounts] = await Promise.all([
+      const [all, subscribers, accounts, buyers] = await Promise.all([
         fetchAudienceCount('all'),
         fetchAudienceCount('subscribers'),
         fetchAudienceCount('accounts'),
+        fetchAudienceCount('buyers'),
       ]);
-      setAudienceCounts({ all, subscribers, accounts });
+      setAudienceCounts({ all, subscribers, accounts, buyers });
     } catch (err) {
       setNotice({ text: err instanceof Error ? err.message : 'Could not count recipients.', ok: false });
     } finally {
@@ -81,11 +84,12 @@ export default function MarketingComposer() {
     let cancelled = false;
     (async () => {
       try {
-        const [settingsRes, allCount, subscribersCount, accountsCount] = await Promise.all([
+        const [settingsRes, allCount, subscribersCount, accountsCount, buyersCount] = await Promise.all([
           fetch('/api/admin/marketing/settings'),
           fetchAudienceCount('all'),
           fetchAudienceCount('subscribers'),
           fetchAudienceCount('accounts'),
+          fetchAudienceCount('buyers'),
         ]);
         const settingsData = await settingsRes.json().catch(() => null);
         if (!settingsRes.ok) throw new Error(settingsData?.error || 'Could not load marketing settings.');
@@ -95,6 +99,7 @@ export default function MarketingComposer() {
             all: allCount,
             subscribers: subscribersCount,
             accounts: accountsCount,
+            buyers: buyersCount,
           });
         }
       } catch (err) {
@@ -305,8 +310,8 @@ export default function MarketingComposer() {
       <div className="grid gap-4">
         <label>
           <span className="form-label">Audience</span>
-          <div className="mt-2 grid gap-2 md:grid-cols-3" aria-label="Audience recipient counts">
-            {(['all', 'subscribers', 'accounts'] as AudienceScope[]).map((item) => (
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 md:grid-cols-4" aria-label="Audience recipient counts">
+            {(['all', 'subscribers', 'accounts', 'buyers'] as AudienceScope[]).map((item) => (
               <button
                 key={item}
                 type="button"
@@ -319,7 +324,7 @@ export default function MarketingComposer() {
                 }}
               >
                 <span className="block text-[0.58rem] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-                  {item === 'all' ? 'Combined' : item === 'subscribers' ? 'Newsletter' : 'Accounts'}
+                  {item === 'all' ? 'Combined' : item === 'subscribers' ? 'Newsletter' : item === 'accounts' ? 'Accounts' : 'Buyers'}
                 </span>
                 <strong className="mt-1 block text-sm">{countLabel(item)}</strong>
                 <span className="mt-0.5 block text-[0.72rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
@@ -339,6 +344,7 @@ export default function MarketingComposer() {
             <option value="all">{AUDIENCE_LABELS.all} ({countLabel('all')})</option>
             <option value="subscribers">{AUDIENCE_LABELS.subscribers} ({countLabel('subscribers')})</option>
             <option value="accounts">{AUDIENCE_LABELS.accounts} ({countLabel('accounts')})</option>
+            <option value="buyers">{AUDIENCE_LABELS.buyers} ({countLabel('buyers')})</option>
           </select>
         </label>
         <label>

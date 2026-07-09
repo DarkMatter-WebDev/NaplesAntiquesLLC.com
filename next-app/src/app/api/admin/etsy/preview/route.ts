@@ -34,9 +34,10 @@ export async function POST(req: Request) {
   const taxonomyOverride = listing?.taxonomy_override_id
     ? { id: listing.taxonomy_override_id, path: listing.taxonomy_override_path ?? '' }
     : null;
+  const extraTags = listing?.extra_tags ?? null;
 
   const preflight = buildPreflightChecks(typedProduct, connection, spotData, taxonomyOverride);
-  const payload = buildMappedPayload(typedProduct, connection, spotData, taxonomyOverride);
+  const payload = buildMappedPayload(typedProduct, connection, spotData, taxonomyOverride, extraTags);
   // Authoritative product-type signal for the admin UI (e.g. deciding whether
   // to show the length vs ring-size preview row) — more reliable than the
   // client trying to pattern-match taxonomyPath text.
@@ -66,5 +67,8 @@ export async function POST(req: Request) {
     payload,
     productType,
     structuredProperties: { length: lengthPreview, ringSize: ringSizePreview },
+    // The raw owner-supplied custom tags (not the merged set in payload.tags) so
+    // the admin drawer can prefill its editable "additional tags" field.
+    extraTags: extraTags ?? [],
   });
 }

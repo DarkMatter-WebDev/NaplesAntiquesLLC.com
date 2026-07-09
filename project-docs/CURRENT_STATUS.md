@@ -1,7 +1,425 @@
 ﻿# Current Status
 
 > Reflects the present state of development. **Update this at the end of every
-> work session.** Last updated: **2026-07-08**.
+> work session.** Last updated: **2026-07-09**.
+
+## 2026-07-09 (session 11, fifth addendum) -- 🟡 "Combined" now genuinely means all three audiences (Newsletter + Accounts + Buyers)
+
+Owner asked for "Combined" to actually combine all three — reversing the
+deliberate choice from the third addendum to keep it Newsletter+Accounts
+only. `buildMarketingAudience('all', ...)` now also pulls from `buyers`
+(same `marketing_opt_out`-filtered query the standalone Buyers scope already
+uses), merged in alongside subscribers/accounts.
+
+**Fixed a real mislabeling bug this uncovered.** `buildMarketingAudience()`
+is shared by the Compose Campaign form *and* the separate `/admin/subscribers`
+"Reachable Recipients" page — so buyers now flow into that page too (correctly:
+"reachable recipients" should mean everyone a Combined campaign would actually
+reach). But `SubscribersManager.tsx`'s source label only knew about
+`'subscriber'/'account'/'both'`; a buyer-only row would have silently shown
+"Newsletter subscriber" — wrong, since they never subscribed. Given the
+Buyers backfill pulled in every historical paid order, overlap with existing
+subscribers/accounts is the common case here, not a rare edge case, so this
+was worth fixing rather than shipping a wrong label for a lot of real rows.
+
+Replaced the old binary `'both'` value with a deterministic sorted
+`'+'`-joined combination (e.g. `'account+buyer'`, `'account+buyer+subscriber'`)
+via an exported, now-unit-tested `combineSource()`, and rewrote
+`sourceLabel()` to check by substring instead of exact match — every
+combination now renders a correct, specific label ("Account holder + Past
+buyer", etc.) instead of falling through to a wrong default. Also fixed the
+non-manageable-row fallback text (previously always said "Account profile"
+regardless of why edit/delete wasn't available).
+
+**Deliberately left alone:** `SubscribersManager.tsx`'s client-side
+optimistic-update logic (the temporary local state right after adding/
+removing a subscriber, before `router.refresh()` reconciles with the server)
+still has narrower `'account'`/`'both'` checks that won't perfectly handle a
+buyer-overlap in that split-second window. Not fixed — it self-corrects on
+the immediate follow-up refresh already in both flows, and the realistic
+trigger (manually adding a newsletter subscription on an email that's
+*also* a buyer) is a rare admin action, not a normal user path.
+
+`npx tsc --noEmit`, `npm run lint`, `npm run build` all pass; `npx vitest
+run` 171/171 (+4 new tests for `combineSource`). **Not verified live** — same
+standing limitation as the rest of the Buyers/marketing work (no admin
+session in this environment). No new migration — this only depends on the
+`buyers` table/`marketing_opt_out` column from the third addendum's
+`marketing-buyers-audience-2026-07.sql`, already required. **Owner action:**
+once that migration has run, confirm "Combined" 's recipient count on Compose
+Campaign now includes buyers, and spot-check `/admin/subscribers` shows
+sensible combined labels (e.g. "Account holder + Past buyer") for anyone who
+overlaps. Full detail: `project-docs/DECISIONS.md` 2026-07-09 (session 11,
+fifth addendum).
+
+## 2026-07-09 (session 11, fourth addendum) -- 🟢 New gold palm tree favicon (browser tab icon)
+
+Owner dropped a new gold palm tree image (`icon.PNG`, 1536×1024, transparent
+background) at the project root and asked to compress it and use it as the
+site's browser-tab icon, then delete the leftover file. Checked this Next.js
+version's actual supported icon-file conventions first (bundled docs at
+`node_modules/next/dist/docs`) — the `icon` special file only accepts
+`.ico/.jpg/.jpeg/.png/.svg`, **not `.webp`**, so a literal WebP file would
+have silently gone unrecognized with the old favicon staying in place. Used
+`sharp` (already a project dependency) to auto-trim the transparent margins
+down to the palm tree's real bounding box, pad it back to a small square
+canvas with a bit of breathing room (still transparent, so it reads
+correctly against both light- and dark-themed browser tab bars), and export
+at 64×64 — **4.2 KB**. Replaced `next-app/src/app/favicon.ico` with the new
+`next-app/src/app/icon.png` (Next.js auto-generates the `<link rel="icon">`
+tag; no manual metadata needed).
+
+**Caught a real bug while wiring this up:** `proxy.ts`'s middleware matcher
+excludes `favicon.ico` from locale-prefix rewriting by name, but the new
+icon's generated route (`/icon.png?<hash>`) wasn't covered by name — it
+happened to still match the matcher's generic file-extension exclusion
+(`.*\.(?:...|png|...)`), so it worked either way, but added an explicit
+`icon` exclusion alongside `favicon.ico` for the same defensive clarity,
+rather than depending on that being incidental.
+
+**Verified live in the preview:** reloaded both `/en` and `/es`, confirmed
+the exact same `<link rel="icon" href="/icon.png?...` type="image/png"
+sizes="64x64">` tag renders on both, fetched that URL directly and got `200
+image/png`, 4250 bytes matching the file on disk, no console errors,
+screenshot showed no other regressions. `npx tsc --noEmit`, `npm run lint`,
+`npm run build` all pass (`○ /icon.png` in the route manifest as a static
+route). Deleted the leftover root `icon.png` after confirming everything
+worked. No migration, no owner action. Full detail:
+`project-docs/DECISIONS.md` 2026-07-09 (session 11, fourth addendum).
+
+## 2026-07-09 (session 11, third addendum) -- 🔴 Email Campaigns: "Buyers" added as a fourth audience (SQL migration pending)
+
+Owner asked to add **Buyers** as a selectable audience in the admin Email
+Campaigns "Compose Campaign" form, alongside the existing Newsletter
+subscribers / Account holders options. Straightforward on the UI surface, but
+surfaced a real compliance gap along the way: the `buyers` table (session 11)
+had no marketing-opt-out concept at all, so a "Buyers" campaign could have
+re-emailed someone who had already unsubscribed through a completely
+different channel (the newsletter, or their account) — worth catching now
+rather than after the first real send.
+
+**Fixed with a new `buyers.marketing_opt_out` column** (default `false`) and
+query-time filtering (`buildMarketingAudience('buyers')` only includes rows
+where it's `false`), matching exactly how the existing `accounts` scope
+already filters on `profiles.marketing_opt_out`. Three supporting pieces:
+1. **`suppressMarketingEmail()`** (the function every unsubscribe click
+   ultimately calls) now also flips `buyers.marketing_opt_out = true` — so a
+   buyer with no newsletter signup and no account (nowhere else to record an
+   unsubscribe) still gets suppressed correctly and permanently.
+2. **The buyer-upsert trigger now carries forward a pre-existing opt-out** —
+   if someone unsubscribed from the newsletter *before* ever buying anything,
+   their first paid order won't silently re-add them as mailable; a
+   **later** order never resets an existing buyer's opt-out back to false
+   (opting back in is a deliberate action, not a side effect of buying again).
+3. **`email_campaigns.audience_scope`'s CHECK constraint** (originally only
+   `'subscribers'/'accounts'/'all'`) had to be widened to allow `'buyers'` —
+   without this, sending a Buyers-scope campaign would have failed at the
+   database level the same way the original Buyers-tab grant issue did.
+
+**"Combined" (the "all" scope) intentionally still means Newsletter +
+Accounts only** — Buyers is a new, separate, standalone 4th option, not
+folded into "Combined." Redefining "Combined" to silently include buyers too
+would have changed the size/composition of an option the owner already
+relies on, which wasn't asked for.
+
+`npx tsc --noEmit`, `npm run lint`, `npm run build` all pass; `npx vitest run`
+unchanged at 167/167 (no new pure logic worth isolating — a SQL trigger
+enhancement and query/type wiring). **Not verified live** — same standing
+limitation as the rest of the Buyers work: no admin session available in
+this environment to click through Compose Campaign. **Owner action:** run
+`supabase/marketing-buyers-audience-2026-07.sql` (after
+`buyers-2026-07.sql`), then in Email Campaigns confirm a 4th "Buyers" button
+appears with a real count, sending a real (or test-scale) Buyers campaign
+succeeds, and that someone who previously unsubscribed does NOT receive it.
+Full detail: `project-docs/DECISIONS.md` 2026-07-09 (session 11, third
+addendum).
+
+## 2026-07-09 (session 11, second addendum) -- 🟢 Buyers tab: select rows + Copy Selected Emails
+
+Owner confirmed the Buyers tab works after the grant fix, then asked for
+row selection (individual or all) plus a button to copy the selected emails,
+comma-separated. Added to `BuyersManager.tsx`: a checkbox column (per-row +
+a header "select all" with a proper indeterminate state when some-but-not-all
+rows are checked), and a **Copy Selected Emails** button (shows the count,
+disabled when nothing's selected) that joins the selected rows' emails with
+`, ` and copies via the existing shared `copyTextToClipboard()` helper
+(`@/lib/clipboard` — reused rather than duplicating the clipboard-fallback
+logic `SubscribersManager.tsx` has inlined). Deleting a row also prunes it
+out of the current selection so the "select all" state stays consistent.
+No bulk-delete was added — only what was asked for (select + copy emails);
+the existing per-row Delete button is unchanged.
+
+`npx tsc --noEmit`, `npm run lint`, `npm run build` all pass. **Not verified
+live** — same standing limitation as the rest of this feature: no admin
+session available in this preview environment to click through it. Verified
+instead by re-reading the selection/indeterminate-checkbox logic line by
+line (a stateful `Set<string>` of selected emails, pruned on delete; "select
+all" toggles between empty and full). No schema/migration change — purely
+client-side UI over data the Buyers table already returns. Full detail:
+`project-docs/DECISIONS.md` 2026-07-09 (session 11, second addendum).
+
+## 2026-07-09 (session 11, addendum) -- 🔴 Buyers migration missing a required grant — "permission denied for table buyers"
+
+Owner ran `buyers-2026-07.sql` and hit **"Could not load buyers: permission
+denied for table buyers"** on `/admin/buyers`. Root cause: the migration
+enabled RLS and added an admin-only policy, but never granted the base
+table-level privilege to the `authenticated` role — in this Supabase project,
+Postgres checks table-level grants *before* it ever consults RLS, so a table
+with RLS + a policy but no grant denies everyone, admin or not. Every other
+admin-managed table already has this (`grant select, insert, update, delete
+on public.orders to authenticated;` in `sales-workflow.sql`); the Buyers
+migration simply omitted the equivalent line — my mistake, not something the
+owner did wrong.
+
+**Fixed:** added `grant select, insert, update, delete on public.buyers to
+authenticated;` right after the RLS policy in `supabase/buyers-2026-07.sql`
+(the policy still narrows this to admins only — the grant just clears the
+table-level gate the policy sits behind). The file is fully idempotent
+(`create table if not exists`, `create or replace function`, `drop ... if
+exists` before every trigger/policy, backfill on `conflict do nothing`), so
+**re-running the whole updated file is safe** — or the owner can run just the
+one new `grant` line directly. Full detail: `project-docs/DECISIONS.md`
+2026-07-09 (session 11, addendum).
+
+## 2026-07-09 (session 11) -- 🔴 New admin "Buyers" tab — auto-populated customer directory (SQL migration pending)
+
+Owner asked for a new admin tab compiling a table of every buyer who's placed an
+order, with the ability to delete entries, and new paid orders automatically
+adding a row. Built as a genuinely new, standalone feature (not derived from
+`orders` at read-time):
+
+- **New `public.buyers` table** (`supabase/buyers-2026-07.sql`): one row per
+  unique customer email, with name, phone, linked `user_id` (nullable, for
+  guest buyers), `order_count`, `total_spent`, `first_order_at`, `last_order_at`.
+- **Auto-populated via a database trigger on `public.orders`**, not application
+  code — deliberate, because this app has **two independent order-creation
+  paths** with no shared function: the PayPal flow (`create_paypal_order`/
+  `capture_paypal_order` RPCs in `no-reservation-checkout.sql`) and the admin's
+  "Create Manual Order" form (a direct client-side insert straight into
+  `orders` from `OrdersPanel.tsx`, bypassing PayPal entirely). A table-level
+  trigger (`orders_upsert_buyer`, firing `after insert or update of
+  payment_status`) is the only mechanism that reliably sees every write
+  regardless of which path performed it — including any future one. It fires
+  exactly once per order's transition INTO `payment_status = 'paid'` (guards
+  against double-counting on a later unrelated edit, e.g. a fulfillment-status
+  change) and upserts the buyer's row by normalized email.
+- **One-time backfill included in the same migration** — a `group by` over
+  every existing paid order populates history that predates this feature, so
+  the tab doesn't start empty; safe to re-run (`on conflict do nothing`).
+- **Admin UI**: new **Buyers** tab in the main admin nav (between Orders and
+  Messages), a new `/admin/buyers` page, and `BuyersManager.tsx` — a simple
+  list + confirm-and-delete table (Name/Email/Phone/Orders/Total Spent/Last
+  Order/Delete), mirroring the existing Subscribers tab's pattern (plain hard
+  delete with a native confirm dialog, no recycle bin — this is a contact-list
+  view, not a financial record like Orders). New `DELETE /api/admin/buyers`
+  route (admin-gated via the existing `requireAdmin()` helper); there's no
+  manual "add" — rows only come from paid orders, by design. Deleting a buyer
+  only removes their directory row; their actual orders/invoices are
+  completely unaffected, and they're added back as a fresh row if they order
+  again.
+- **Deliberately simple, not tracked:** refunds do not decrement
+  `order_count`/`total_spent` afterward — these are a lifetime-paid summary,
+  not a live balance, matching how this app treats refunds elsewhere as an
+  explicitly-flagged state rather than unwinding earlier side effects.
+
+`npx tsc --noEmit`, `npm run lint`, `npm run build` all pass; `npx vitest run`
+167/167 (unchanged — no new pure logic worth isolating in a table trigger, a
+thin delete route, or a plain list UI). **Partially verified live:** started a
+fresh preview server and confirmed `/admin/buyers` correctly 307-redirects an
+unauthenticated visitor to sign-in with no crash (same behavior as every other
+admin route) — could not go further, since this environment has no live admin
+credentials to sign in with (same standing limitation as every other
+admin-gated feature built in this project).
+
+**🔴 PENDING MANUAL STEP — run `supabase/buyers-2026-07.sql` in Supabase.**
+Until it runs, the `/admin/buyers` page will show a "Could not load buyers: …"
+error banner (the table doesn't exist yet) instead of a working list — it does
+not crash the page. **Owner action after running the SQL:** (1) open
+`/admin/buyers` and confirm existing paying customers already appear
+(populated by the migration's backfill), with correct order counts/totals;
+(2) place one real test order (PayPal or a manual admin order marked Paid) for
+a NEW email and confirm a new row appears automatically without any other
+action; (3) delete a buyer from the list and confirm their past orders in
+`/admin/orders` are untouched; (4) place another order for that same
+just-deleted email and confirm they reappear as a fresh row. No app code
+change needed for any of this — purely the SQL migration. Full detail:
+`project-docs/DECISIONS.md` 2026-07-09 (session 11).
+
+## 2026-07-08 (session 10, ninth addendum) -- 🟡 Buyer receipts/invoices: "Ship to" becomes "Address" for Local Pickup orders
+
+Owner asked that when a buyer chose Local Pickup, the initial email receipt and
+any follow-up emails/invoices/notifications not show "Ship to" — a pickup buyer
+who optionally filled in the (accordion) address field isn't actually being
+shipped anything. Fixed at the single shared source: `buildInvoiceEmailContent()`
+in `order-invoice-email.ts` now computes `isPickup = order.shipping_method ===
+'pickup'` (the DB-stored value — the checkout's `'local-pickup'` is mapped to
+`'pickup'` at order-creation time) and labels the address block **"Address"**
+instead of **"Ship to"** when true, in both the plain-text and HTML email
+bodies. Because this one function is shared by the automatic on-payment receipt
+send, the admin's manual "Email Receipt/Invoice" resend, the admin's live email
+preview (`OrderDetailPanel`), and the admin's Print Invoice page, all four
+update together — no other file needed a matching fix. Real shipping methods
+are completely unchanged (still always "Ship to"). Also updated the checkout's
+own on-page/printable "Order Received" receipt (`CheckoutClient.tsx`) the same
+way — it previously hid the whole address block for Local Pickup regardless of
+whether one was provided; now it shows "Address" (with whatever the buyer
+optionally entered) if present, and stays hidden if not, matching the emailed
+receipt's behavior.
+
+**Deliberately left unchanged:** the owner's own new-order notification email
+(`order-owner-notification.ts`) still says "Ship to" — that email goes to the
+owner, not the buyer, so it was out of scope for this request; flagged in case
+the owner wants it matched too.
+
+`npx tsc --noEmit`, `npm run lint`, `npm run build` all pass; `npx vitest run`
+167/167 (+3 new tests in `order-invoice-email.test.ts` covering pickup-with-
+address → "Address", real-shipping → "Ship to" unchanged, and no-address-on-file
+→ no block either way). **Not verified live** — another chat's dev server still
+holds Next's single-instance lock on this `next-app` directory, so no preview
+server could be started this session either. **Owner action:** once free, place
+a Local Pickup test order with an address optionally filled in via the
+accordion, and confirm the receipt email (and the on-page confirmation) both say
+"Address" instead of "Ship to"; place a real-shipping test order and confirm it
+still says "Ship to" as before. No migration — purely a display/label change
+reading the existing `shipping_method`/`shipping_address` columns. Full detail:
+`project-docs/DECISIONS.md` 2026-07-08 (session 10, ninth addendum).
+
+## 2026-07-08 (session 10, eighth addendum) -- 🟡 Admin Settings: AI Listing Assistant Prompt also collapses into an accordion
+
+Owner asked that the **AI Listing Assistant Prompt** section on `/admin/settings`
+collapse into an accordion too, matching the checkout address pattern from the
+seventh addendum. Done in `AdminSettingsPanel.tsx`: new `promptExpanded` state
+(default `false` — collapsed on load, since the prompt textarea alone is
+460px tall and was pushing every other settings panel down); the section header
+is now a clickable row (`role="button"`, `tabIndex`, `aria-expanded`/
+`aria-controls`, a chevron that flips `expand_more`/`expand_less`) mirroring the
+`editor-collapse-header` pattern already used by `AdminShell.tsx`'s product-editor
+sections, rather than a plain `<button>` (the header wraps an `<h2>`, which isn't
+valid content inside a real `<button>`). The textarea and its Copy/Edit/Save/
+Restore controls, notices, and load-error banner only render when expanded; no
+other settings section (Storage Cleanup, Shop Visibility, Trade-in Price,
+Marketing, Etsy, Carousel) was touched. `npx tsc --noEmit`, `npm run lint`, `npm
+run build` all pass. **Not verified live** — another chat's dev server was
+already running against this same `next-app` directory, and Next.js refuses to
+run two `next dev` instances against one project directory at all (a singleton
+lock independent of port), so no preview server could be started this session;
+verified instead by reading the full resulting JSX for correct nesting. **Owner
+action:** once only one dev server (or the deployed site) is running, open
+`/admin/settings` and confirm the AI prompt section loads collapsed, the header
+click/keyboard-toggles it (chevron flips), and the prompt editor only appears
+once expanded. No migration. Full detail: `project-docs/DECISIONS.md` 2026-07-08
+(session 10, eighth addendum).
+
+## 2026-07-08 (session 10, seventh addendum) -- 🟢 Checkout: address collapses behind an "Address (optional)" accordion for Local Pickup
+
+Owner asked that when the shipping method is **Local Pickup**, the address area
+collapse behind an accordion button labeled **"Address (optional)"** the buyer can
+expand if they want. Done in `CheckoutClient.tsx`: new `addressExpanded` state; the
+address inputs render only when `needsShipping || addressExpanded`. For Local
+Pickup the header becomes a toggle button (chevron, `aria-expanded`/`aria-controls`)
+and the inputs stay optional; for any real shipping method the address is unchanged
+(always shown, required, with the ship-to helper). `npx tsc --noEmit`, `npm run
+lint`, `npm run build` pass; **verified live in the preview**: shipping default →
+address shown + required (no accordion); switch to Local Pickup → collapsed
+"ADDRESS (OPTIONAL)" accordion, inputs hidden; expand → optional inputs (no
+asterisks, `required=false`), chevron flips; no console errors. No migration. Full
+detail: `project-docs/DECISIONS.md` 2026-07-08 (session 10, seventh addendum).
+
+## 2026-07-08 (session 10, sixth addendum) -- 🟢 Owner emailed on every new (paid) order
+
+Owner wasn't getting a direct email on new orders — only the admin Orders list
+(the customer already gets a receipt). `finalizePaidOrder` (the shared post-payment
+step for both the capture route and the webhook backstop) now also sends a
+best-effort **owner notification** email to `info@naplesestatejewelry.co`
+(override: env `ORDER_NOTIFICATION_EMAIL`) with the order number, total, customer
+contact, line items, totals, fulfillment + ship-to, notes, and a "View order in
+admin" link. From `noreply@naplesestatejewelry.co` (verified sender), **reply-to =
+the buyer** so the owner can reply directly. Independent of the customer receipt
+(doesn't require a buyer email) and best-effort (a mail failure never affects the
+payment). New `next-app/src/lib/order-owner-notification.ts`; wired in
+`order-finalize.ts`. `npx tsc --noEmit`, `npm run lint`, `npm run build` pass. Not
+browser-verifiable (server-side email on real capture) — **owner action:** after
+deploy, run a PayPal sandbox/live order and confirm an email arrives at
+`info@naplesestatejewelry.co`. Also confirm Resend is allowed to send to that
+inbox and that it's monitored. Full detail: `project-docs/DECISIONS.md` 2026-07-08
+(session 10, sixth addendum).
+
+## 2026-07-08 (session 10, fifth addendum) -- 🟢 Checkout: escalating card-error guidance on unknown PayPal failures
+
+Owner reported a buyer using PayPal's debit/credit-card form got an error and was
+bounced back with no useful guidance (cause unknown — possibly a mistyped card).
+Since we can't see PayPal's reason, the generic `onError` path now gives graceful,
+escalating card help: **1st** unknown error → "re-enter and double-check your card
+number" (hedged with "if you paid by card…", and still notes a sold-out item could
+be the cause); **2nd+** consecutive → "try a different card, or call (239)
+404-8505." The counter lives in `sessionStorage` (`nej-checkout-unknown-errors`) so
+the 2nd-time detection survives a full-page redirect back from the card flow, and
+clears on a completed payment. A live stock re-check runs in parallel (so a real
+sold-out cause is flagged in the summary instead). Handled errors (availability,
+create-order) are unaffected and don't increment the card counter. Pure helpers
+moved to `next-app/src/lib/checkout-error-messages.ts` + unit-tested. `npx tsc
+--noEmit`, `npm run lint`, `npm run build` pass; `npx vitest run` 164/164 (+5).
+**Verified in the preview** the checkout still renders normally (PayPal button + In
+stock, no console errors); the actual onError escalation needs a **PayPal sandbox**
+card failure to drive live (added to the session-10 fourth-addendum verify item).
+Full detail: `project-docs/DECISIONS.md` 2026-07-08 (session 10, fifth addendum).
+
+## 2026-07-08 (session 10, fourth addendum) -- 🟢 Checkout/cart stock awareness + clearer sold-out errors
+
+Owner: buying an already-sold item showed only "Something went wrong with PayPal."
+Fixed by surfacing and re-checking availability everywhere:
+- **Checkout order summary** now shows per-item **In stock / N available / Sold
+  out — no longer available**; if anything is unavailable the PayPal button is
+  replaced with a clear "remove it to continue" message (payReady also gates on
+  it), so the opaque error is avoided for the common case.
+- **Re-check on checkout load and after a PayPal error** (create-order/capture) —
+  the summary updates the moment the buyer is returned to the page.
+- **Cart drawer re-checks on open**, showing an "Availability changed" banner
+  naming sold-out / reduced items and re-clamping quantities to live stock.
+- **PayPal error copy** — the generic onError message now notes a just-sold-out
+  item may be the cause and to check the summary; availability-caused
+  create-order/capture failures show a specific message.
+
+Centralized in `CartContext` (`refreshAvailability` reads live status/quantity,
+updates items, records `stockAlerts`; shared `StockAlertBanner` used by drawer +
+checkout). Explicit-items pattern avoids a stale-ref race on the hydration commit;
+the checkout effect converges (bounded to 2 reads, verified). Degrades gracefully
+if `products.quantity` isn't present yet (status-only) — **no migration required**.
+`npx tsc --noEmit`, `npm run lint`, `npm run build` pass; `npx vitest run` 159/159.
+**Verified live in the preview** (guest checkout, no admin needed): a sold-out
+item (simulated via a missing product row) → banner + labels + blocked pay + hidden
+PayPal button; all-available cart → normal checkout with PayPal button + "In stock";
+cart drawer → banner on open; no console errors, no render loop. Full detail:
+`project-docs/DECISIONS.md` 2026-07-08 (session 10, fourth addendum).
+
+## 2026-07-08 (session 10, third addendum) -- 🔴 Etsy sync: custom tags + title-word broadening (SQL migration pending)
+
+Owner asked for (1) the ability to add custom tags on top of what the Etsy sync
+auto-fills, and (2) a fix for important title words (e.g. "charm" from a "…Charm
+Bracelet") not appearing in tags.
+
+**Custom tags:** new **Additional tags** field in the product drawer's Etsy
+section, persisted per product on `etsy_listings.extra_tags`. `mapTags()` merges
+them FIRST (so they're guaranteed within Etsy's 13-tag cap), via the same
+clean/dedup/clamp path. New `PUT /api/admin/etsy/tags`; the dry-run preview now
+returns the raw custom tags (to prefill the field) and the Tags line shows the
+merged result. Uses the same no-effect-derived input pattern as the markup Save
+field. **Title-word broadening:** `mapTags()` now also extracts meaningful words
+from the title — the product-type phrase first ("charm bracelet"), then
+standalone words ("charm", "byzantine"…) — filtering metal/karat/color/unit/
+number/grammar noise and the type word itself, capped at 4 standalone words so it
+can't crowd out the estate/vintage/antique tags. This half needs no schema change
+and works immediately.
+
+**🔴 PENDING MANUAL STEP — run `supabase/etsy-listings-extra-tags-2026-07.sql`**
+(adds `etsy_listings.extra_tags text[]`; canonical `supabase/etsy-sync.sql` also
+updated for fresh installs). Until it runs, custom tags simply can't be saved
+(the title broadening still works). Reads degrade gracefully. `npx tsc --noEmit`,
+`npm run lint`, `npm run build` all pass; `npx vitest run` 159/159 (+5 tag
+tests); `/api/admin/etsy/tags` in the route manifest. Admin drawer UI is
+build/type-verified only (needs an admin login to drive live, per this module's
+precedent). Full detail: `project-docs/DECISIONS.md` 2026-07-08 (session 10,
+third addendum).
 
 ## 2026-07-08 (session 10, second addendum) -- 🟢 Shop mobile/tablet: piece-count pill became a search bar; count moved to the toolbar
 

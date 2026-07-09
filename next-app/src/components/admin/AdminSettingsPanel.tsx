@@ -34,6 +34,10 @@ export default function AdminSettingsPanel() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const [editing, setEditing] = useState(false);
+  // Collapsed by default so the (very tall) prompt editor doesn't dominate the
+  // page on load; the admin expands it deliberately, like the other settings
+  // accordions.
+  const [promptExpanded, setPromptExpanded] = useState(false);
   const [gcRunning, setGcRunning] = useState(false);
   const [gcResult, setGcResult] = useState<StorageGcResult | null>(null);
   const [gcNotice, setGcNotice] = useState<{ text: string; ok: boolean } | null>(null);
@@ -162,19 +166,39 @@ export default function AdminSettingsPanel() {
         </div>
 
         <section className="border bg-white" style={{ borderColor: 'var(--color-outline-variant)' }}>
-          <div className="border-b px-5 py-4" style={{ borderColor: 'var(--color-outline-variant)' }}>
-            <h2
-              className="text-xl font-bold"
-              style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
-            >
-              AI Listing Assistant Prompt
-            </h2>
-            <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-              The single prompt that drives photo &amp; transcript autofill. Edit it to permanently change how
-              listings are generated &mdash; your saved text becomes the prompt and applies to all new listings immediately.
-            </p>
+          <div
+            className="border-b px-5 py-4 flex items-center justify-between gap-3 cursor-pointer select-none"
+            style={{ borderColor: 'var(--color-outline-variant)' }}
+            role="button"
+            tabIndex={0}
+            aria-expanded={promptExpanded}
+            aria-controls="ai-settings-prompt-panel"
+            onClick={() => setPromptExpanded((open) => !open)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setPromptExpanded((open) => !open);
+              }
+            }}
+          >
+            <div>
+              <h2
+                className="text-xl font-bold"
+                style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
+              >
+                AI Listing Assistant Prompt
+              </h2>
+              <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                The single prompt that drives photo &amp; transcript autofill. Edit it to permanently change how
+                listings are generated &mdash; your saved text becomes the prompt and applies to all new listings immediately.
+              </p>
+            </div>
+            <span className="material-symbols-outlined flex-shrink-0" aria-hidden="true" style={{ color: 'var(--color-primary)' }}>
+              {promptExpanded ? 'expand_less' : 'expand_more'}
+            </span>
           </div>
-          <div className="p-5 flex flex-col gap-4">
+          {promptExpanded && (
+          <div id="ai-settings-prompt-panel" className="p-5 flex flex-col gap-4">
             {notice && (
               <div
                 className="px-3 py-2 text-xs font-medium"
@@ -245,6 +269,7 @@ export default function AdminSettingsPanel() {
               </div>
             </div>
           </div>
+          )}
         </section>
         <section className="mt-6 border bg-white" style={{ borderColor: 'var(--color-outline-variant)' }}>
           <div className="border-b px-5 py-4" style={{ borderColor: 'var(--color-outline-variant)' }}>

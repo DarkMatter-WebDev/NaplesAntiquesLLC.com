@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { composeUnknownErrorMessage, isAvailabilityError } from '@/lib/checkout-error-messages';
 
 type PayPalButtonsActions = { resolve: () => Promise<void>; reject: () => Promise<void> };
 type PayPalButtonsConfig = {
@@ -78,6 +79,38 @@ export type PayPalPayload = {
   orderId: string | null;
 };
 
+// Count of consecutive *unknown* PayPal errors (the SDK's onError with no reason
+// we can pin down — e.g. a card declined in PayPal's hosted card form). Kept in
+// sessionStorage so "they were sent back a second time" is detected even if the
+// card flow did a full-page redirect back to us. Cleared on a completed payment.
+const UNKNOWN_ERROR_COUNT_KEY = 'nej-checkout-unknown-errors';
+
+function readUnknownErrorCount(): number {
+  try {
+    return Number(sessionStorage.getItem(UNKNOWN_ERROR_COUNT_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function bumpUnknownErrorCount(): number {
+  const next = readUnknownErrorCount() + 1;
+  try {
+    sessionStorage.setItem(UNKNOWN_ERROR_COUNT_KEY, String(next));
+  } catch {
+    /* ignore — private mode / storage disabled */
+  }
+  return next;
+}
+
+function clearUnknownErrorCount(): void {
+  try {
+    sessionStorage.removeItem(UNKNOWN_ERROR_COUNT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function PayPalCheckoutButton({
   clientId,
   currency = 'USD',
@@ -88,6 +121,7 @@ export default function PayPalCheckoutButton({
   getPayload,
   onOrderId,
   onSuccess,
+  onAvailabilityIssue,
 }: {
   clientId: string;
   currency?: string;
@@ -101,6 +135,10 @@ export default function PayPalCheckoutButton({
   getPayload: () => PayPalPayload;
   onOrderId: (orderId: string) => void;
   onSuccess: (result: { orderId: string; orderNumber: string }) => void;
+  /** Called when an error may be caused by an item selling out (create-order
+   *  rejection, capture conflict, or a generic PayPal error) so the parent can
+   *  re-check live stock and update the summary. */
+  onAvailabilityIssue?: () => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [sdkReady, setSdkReady] = useState(false);
@@ -123,6 +161,10 @@ export default function PayPalCheckoutButton({
   const readyRef = useRef(ready);
   const missingFieldsRef = useRef(missingFields);
   const needsInfoConfirmationRef = useRef(needsInfoConfirmation);
+  const onAvailabilityIssueRef = useRef(onAvailabilityIssue);
+  // Set when createOrder/onApprove already showed a specific message, so the
+  // PayPal SDK's follow-up onError doesn't clobber it with the generic one.
+  const handledErrorRef = useRef(false);
   useEffect(() => {
     getPayloadRef.current = getPayload;
     onOrderIdRef.current = onOrderId;
@@ -131,6 +173,7 @@ export default function PayPalCheckoutButton({
     readyRef.current = ready;
     missingFieldsRef.current = missingFields;
     needsInfoConfirmationRef.current = needsInfoConfirmation;
+    onAvailabilityIssueRef.current = onAvailabilityIssue;
   });
 
   useEffect(() => {
@@ -157,10 +200,12 @@ export default function PayPalCheckoutButton({
         }
         setMissingHint(null);
         setMessage(null);
+        handledErrorRef.current = false;
         return actions.resolve();
       },
       createOrder: async () => {
         setMessage(null);
+        handledErrorRef.current = false;
         setProcessing(true);
         try {
           const res = await fetch('/api/paypal/create-order', {
@@ -179,11 +224,24 @@ export default function PayPalCheckoutButton({
           return data.paypalOrderId as string;
         } catch (err) {
           setProcessing(false);
-          setMessage(
-            isEsRef.current
-              ? 'No se pudo iniciar el pago. Verifique su carrito e intente de nuevo.'
-              : 'Could not start payment. Please check your cart and try again.',
-          );
+          handledErrorRef.current = true; // a specific message is shown below; onError must not overwrite it
+          const serverMsg = err instanceof Error ? err.message : '';
+          if (isAvailabilityError(serverMsg)) {
+            // An item sold out (or dropped below the requested quantity) before we
+            // could start payment. Re-check live stock so the summary flags it.
+            onAvailabilityIssueRef.current?.();
+            setMessage(
+              isEsRef.current
+                ? 'Un artículo de su pedido ya no está disponible o tiene poco stock. Revise la disponibilidad en su resumen de arriba y ajuste su carrito.'
+                : 'An item in your order is no longer available or is low on stock. Check the availability in your order summary above and adjust your cart.',
+            );
+          } else {
+            setMessage(
+              isEsRef.current
+                ? 'No se pudo iniciar el pago. Verifique su carrito e intente de nuevo.'
+                : 'Could not start payment. Please check your cart and try again.',
+            );
+          }
           throw err;
         }
       },
@@ -203,14 +261,28 @@ export default function PayPalCheckoutButton({
           }
           // Paid — this order must never be cancelled by a later unmount.
           createdOrderIdRef.current = null;
+          clearUnknownErrorCount(); // fresh slate: their next checkout starts un-escalated
           onSuccessRef.current({ orderId: result.orderId, orderNumber: result.orderNumber });
-        } catch {
+        } catch (err) {
           setProcessing(false);
-          setMessage(
-            isEsRef.current
-              ? 'No pudimos confirmar su pago. Si se le cobró, contáctenos y lo resolveremos.'
-              : 'We could not confirm your payment. If you were charged, contact us and we will resolve it.',
-          );
+          handledErrorRef.current = true;
+          const serverMsg = err instanceof Error ? err.message : '';
+          if (isAvailabilityError(serverMsg)) {
+            // Payment captured but the item was won by another buyer first — the
+            // server flagged it for a refund. Show that, and re-check stock.
+            onAvailabilityIssueRef.current?.();
+            setMessage(
+              isEsRef.current
+                ? 'Uno o más artículos de su pedido fueron comprados por otro cliente justo antes. Nuestro equipo lo contactará para un reembolso completo.'
+                : 'Sorry — one or more items in your order were just purchased by another buyer. Our team will contact you to process a full refund.',
+            );
+          } else {
+            setMessage(
+              isEsRef.current
+                ? 'No pudimos confirmar su pago. Si se le cobró, contáctenos y lo resolveremos.'
+                : 'We could not confirm your payment. If you were charged, contact us and we will resolve it.',
+            );
+          }
         }
       },
       onCancel: () => {
@@ -227,11 +299,18 @@ export default function PayPalCheckoutButton({
       },
       onError: () => {
         setProcessing(false);
-        setMessage(
-          isEsRef.current
-            ? 'Ocurrió un problema con PayPal. Intente de nuevo.'
-            : 'Something went wrong with PayPal. Please try again.',
-        );
+        // createOrder / onApprove already showed a specific reason — don't clobber it.
+        if (handledErrorRef.current) {
+          handledErrorRef.current = false;
+          return;
+        }
+        // Truly-unknown PayPal failure (e.g. a card declined in PayPal's hosted
+        // card form). We can't see the reason, so we re-check stock in parallel
+        // (in case that's it) and give card guidance that escalates the second
+        // time the buyer is bounced back with no clearer cause.
+        onAvailabilityIssueRef.current?.();
+        const attempt = bumpUnknownErrorCount();
+        setMessage(composeUnknownErrorMessage(attempt, isEsRef.current));
       },
     });
 

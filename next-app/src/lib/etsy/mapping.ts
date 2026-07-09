@@ -155,6 +155,78 @@ function karatFromPurity(purity: number | null | undefined): number | null {
   return karat > 0 ? karat : null;
 }
 
+// Words in a title that carry ~no standalone Etsy-search value or are already
+// captured by the structured tags (metal, karat, color, product type). Filtered
+// out of the title-word broadening below so only genuinely useful descriptors
+// (e.g. "charm", "byzantine", "figaro", "diamond") survive.
+const TITLE_NOISE_WORDS = new Set<string>([
+  // grammar / filler
+  'the', 'and', 'for', 'with', 'from', 'this', 'that', 'your', 'our', 'plus',
+  'new', 'used', 'pre', 'owned', 'lot', 'set', 'pair',
+  // descriptors already implied or low-value on their own
+  'solid', 'genuine', 'real', 'fine', 'estate', 'vintage', 'antique',
+  // metals / finishes (covered by structured metal tags)
+  'gold', 'silver', 'platinum', 'palladium', 'sterling', 'vermeil', 'plated', 'filled',
+  // colors (covered by the "<color> <metal> <type>" compound)
+  'yellow', 'white', 'rose', 'tricolor', 'tri', 'bicolor', 'bi', 'two', 'tone', 'multi', 'color', 'colour',
+]);
+
+// Measurement / unit tokens that shouldn't become tags on their own.
+const TITLE_UNIT_WORDS = new Set<string>([
+  'in', 'inch', 'inches', 'mm', 'cm', 'ct', 'cts', 'ctw', 'tcw', 'tw', 'carat', 'carats',
+  'gram', 'grams', 'gr', 'dwt', 'oz', 'ozt', 'pc', 'pcs',
+]);
+
+// Cap on standalone title words added as tags, so title broadening can't crowd
+// out the on-brand estate/vintage/antique tags within Etsy's 13-tag budget.
+// (Type-word phrases like "charm bracelet" are added separately, before this.)
+const TITLE_WORD_TAG_LIMIT = 4;
+
+/** Naive singularizer good enough to match a plural title word to a singular product type (bracelets→bracelet, charms→charm). */
+function singularizeWord(word: string): string {
+  return word.endsWith('s') && word.length > 3 ? word.slice(0, -1) : word;
+}
+
+/**
+ * Broadens the tag set with meaningful words from the product TITLE that the
+ * structured fields don't already cover — the fix for a "…Charm Bracelet" whose
+ * `product_type` is only "Bracelet" ending up with no "charm" tag (owner report
+ * 2026-07-08). Returns:
+ *  - `phrases`: a word immediately preceding the product-type word, joined with
+ *    it ("charm" + bracelet → "charm bracelet") — the highest-value derived tag.
+ *  - `words`: standalone meaningful words in title order.
+ * Noise (metal/color/karat/units, pure numbers, grammar words, and the product
+ * type word itself) is filtered so only search-useful descriptors remain.
+ */
+function extractTitleTags(title: string | null | undefined, typeWord: string): { phrases: string[]; words: string[] } {
+  if (!title) return { phrases: [], words: [] };
+  const tokens = title.toLowerCase().split(/[^a-z0-9]+/i).filter(Boolean);
+  const typeSingular = typeWord ? singularizeWord(typeWord) : '';
+  const isNoise = (word: string): boolean =>
+    word.length < 3 ||
+    /\d/.test(word) || // numbers, karat tokens (14k), purity (925), sizes
+    TITLE_NOISE_WORDS.has(word) ||
+    TITLE_UNIT_WORDS.has(word) ||
+    (typeSingular !== '' && singularizeWord(word) === typeSingular);
+
+  const words: string[] = [];
+  for (const token of tokens) {
+    if (isNoise(token) || words.includes(token)) continue;
+    words.push(token);
+  }
+
+  const phrases: string[] = [];
+  if (typeSingular !== '') {
+    for (let i = 1; i < tokens.length; i += 1) {
+      if (singularizeWord(tokens[i]) === typeSingular && !isNoise(tokens[i - 1])) {
+        const phrase = `${tokens[i - 1]} ${typeWord}`;
+        if (!phrases.includes(phrase)) phrases.push(phrase);
+      }
+    }
+  }
+  return { phrases, words };
+}
+
 /**
  * Composed, buyer-searchable tags built from the product's own structured
  * fields (metal/purity/chain type/product type), not a sanitized pass-through
@@ -166,7 +238,9 @@ function karatFromPurity(purity: number | null | undefined): number | null {
  * any genuine free-text seller tags that aren't one of the internal prefixes.
  */
 export function mapTags(
-  product: Pick<Product, 'tags' | 'chain_type' | 'metal_variant' | 'metal_type' | 'category' | 'purity' | 'product_type' | 'jewelry_type' | 'brand'>,
+  product: Pick<Product, 'title' | 'tags' | 'chain_type' | 'metal_variant' | 'metal_type' | 'category' | 'purity' | 'product_type' | 'jewelry_type' | 'brand'>,
+  /** Owner-supplied custom tags (Etsy drawer) merged into the auto-generated set. */
+  extraTags?: string[] | null,
 ): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -196,6 +270,11 @@ export function mapTags(
     add(antique);
   };
 
+  // Owner-supplied custom tags go FIRST — deliberately chosen, so they're
+  // guaranteed to fit within Etsy's 13-tag cap and carry the most search weight.
+  // They pass through the same clean/dedup/clamp as every other tag via add().
+  for (const extra of extraTags ?? []) add(extra);
+
   const productTypeLabel = normalizeProductJewelryType(product.product_type ?? product.jewelry_type);
   const typeWord = productTypeLabel && productTypeLabel !== 'Other' ? productTypeLabel.toLowerCase() : '';
   const metalType = normalizeProductMetalType(product.metal_type, product.category);
@@ -215,6 +294,22 @@ export function mapTags(
   if (chainWord) add(`${chainWord} chain`); // "cuban link chain"
   if (metalWord && typeWord) add(`solid ${metalWord} ${typeWord}`); // "solid gold bracelet"
   if (colorWord && metalWord && typeWord) add(`${colorWord} ${metalWord} ${typeWord}`); // "yellow gold bracelet"
+
+  // Broaden with meaningful words from the TITLE the structured fields miss —
+  // e.g. "charm" / "charm bracelet" from a "…Charm Bracelet" typed only as a
+  // Bracelet (owner report 2026-07-08). Type-word phrases ("charm bracelet")
+  // rank highest, then standalone words. Capped so it can't crowd out the
+  // on-brand estate/vintage/antique tags below; noise is already filtered out.
+  const titleTags = extractTitleTags(product.title, typeWord);
+  for (const phrase of titleTags.phrases) add(phrase);
+  let titleWordsAdded = 0;
+  for (const word of titleTags.words) {
+    if (titleWordsAdded >= TITLE_WORD_TAG_LIMIT) break;
+    const before = out.length;
+    add(word);
+    if (out.length > before) titleWordsAdded += 1;
+  }
+
   if (product.brand) add(product.brand);
   if (karatWord && metalWord) add(`${karatWord} ${metalWord}`); // "14k gold"
   if (metalWord && typeWord) add(`${metalWord} ${typeWord}`); // "gold bracelet"
@@ -796,6 +891,7 @@ export function buildMappedPayload(
   connection: EtsyConnectionRow | null,
   spotData: SpotData | null,
   taxonomyOverride?: TaxonomyOverride | null,
+  extraTags?: string[] | null,
 ): MappedEtsyPayload {
   const markupPct = connection?.price_markup_pct ?? 8;
   const whenMade = mapWhenMade(product.item_year);
@@ -807,7 +903,7 @@ export function buildMappedPayload(
   return {
     title: mapTitle(product.title),
     description: mapDescription(product),
-    tags: mapTags(product),
+    tags: mapTags(product, extraTags),
     materials: mapMaterials(product),
     taxonomyId: taxonomy?.taxonomyId ?? null,
     taxonomyPath: taxonomy?.path ?? null,

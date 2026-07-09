@@ -39,6 +39,8 @@ interface PreviewResponse {
   productType: string | null;
   /** Structured properties that auto-push on sync, shown in the dry-run for review. Either value is null when there's nothing to push for this product. */
   structuredProperties?: { length: string | null; ringSize: string | null };
+  /** Raw owner-supplied custom tags (not the merged set in payload.tags) — prefills the editable "Additional tags" field. */
+  extraTags?: string[];
 }
 
 interface EtsyListingSummary {
@@ -97,6 +99,12 @@ export default function EtsyProductPanel({
   const [progress, setProgress] = useState<SyncStepResult['progress'] | null>(null);
   const [busyAction, setBusyAction] = useState<'delist' | 'reactivate' | 'check-status' | null>(null);
   const [pushingPrice, setPushingPrice] = useState(false);
+  // Editable custom tags. null = "not being edited" → the field shows the saved
+  // value from the preview (a no-effect derived pattern that avoids the
+  // react-hooks/set-state-in-effect rule this codebase enforces, and never
+  // clobbers an in-progress edit when the preview reloads).
+  const [extraTagsInput, setExtraTagsInput] = useState<string | null>(null);
+  const [savingTags, setSavingTags] = useState(false);
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [categoryInput, setCategoryInput] = useState('');
@@ -279,6 +287,31 @@ export default function EtsyProductPanel({
     }
   };
 
+  // Save the owner's custom tags (comma-separated) → etsy_listings.extra_tags,
+  // then reload the preview so payload.tags reflects the merged result. Resetting
+  // the input to null lets the field fall back to the freshly-saved value.
+  const saveTags = async () => {
+    if (extraTagsInput === null) return;
+    const tags = extraTagsInput.split(',').map((tag) => tag.trim()).filter(Boolean);
+    setSavingTags(true);
+    try {
+      const res = await fetch('/api/admin/etsy/tags', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ productId, tags }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || 'Could not save the tags.');
+      showNotice('Additional tags saved.', true);
+      setExtraTagsInput(null);
+    } catch (err) {
+      showNotice(err instanceof Error ? err.message : 'Could not save the tags.', false);
+    } finally {
+      setSavingTags(false);
+      await loadPreview();
+    }
+  };
+
   const openCategoryPicker = async () => {
     setCategoryPickerOpen(true);
     setCategoryInput(preview?.payload.taxonomyPath ?? '');
@@ -342,6 +375,12 @@ export default function EtsyProductPanel({
   // unrelated enumerated property).
   const isLengthBearing = preview.productType != null && preview.productType !== 'Ring' && preview.productType !== 'Other';
   const isRing = preview.productType === 'Ring';
+
+  // Editable custom-tags field: show the in-progress edit if any, else the saved
+  // value from the preview. "Dirty" gates the Save button.
+  const savedExtraTags = (preview.extraTags ?? []).join(', ');
+  const extraTagsValue = extraTagsInput ?? savedExtraTags;
+  const extraTagsDirty = extraTagsInput !== null && extraTagsInput.trim() !== savedExtraTags.trim();
 
   return (
     <div className="flex flex-col gap-4">
@@ -421,6 +460,31 @@ export default function EtsyProductPanel({
         <div>
           <span className="form-label">Materials</span>
           <p>{preview.payload.materials.join(', ') || '—'}</p>
+        </div>
+        <div className="md:col-span-2">
+          <span className="form-label">Additional tags</span>
+          <p className="text-[0.7rem] mb-1" style={{ color: 'var(--color-on-surface-variant)' }}>
+            Comma-separated custom tags, merged into the auto-generated tags above (yours appear first). Etsy caps a listing at 13 tags total, so extras beyond that are dropped. Re-sync to push changes to an already-listed item.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              type="text"
+              value={extraTagsValue}
+              onChange={(event) => setExtraTagsInput(event.target.value)}
+              placeholder="e.g. charm bracelet, gift for her"
+              className="form-field flex-1"
+              disabled={savingTags}
+              aria-label="Additional Etsy tags"
+            />
+            <button
+              type="button"
+              onClick={() => void saveTags()}
+              disabled={savingTags || !extraTagsDirty}
+              className="gold-button text-xs disabled:opacity-50"
+            >
+              {savingTags ? 'Saving…' : 'Save tags'}
+            </button>
+          </div>
         </div>
         <div>
           <span className="form-label">When made</span>

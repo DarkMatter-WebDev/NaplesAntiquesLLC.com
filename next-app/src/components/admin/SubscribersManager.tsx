@@ -12,15 +12,23 @@ export type SubscriberRow = {
   subscriberEmail: string | null;
 };
 
+// `row.source` may be a single value ('subscriber'/'account'/'buyer') or a
+// sorted '+'-joined combination (see combineSource in lib/marketing.ts) when
+// the same email matched more than one audience — checked by substring
+// rather than exact match so any combination renders a correct label instead
+// of falling through to a wrong default.
 function sourceLabel(row: SubscriberRow) {
-  if (row.subscriberSource === 'admin_manual') {
-    if (row.source === 'both') return 'Admin manual + account';
-    return 'Admin manual';
-  }
-  const source = row.source;
-  if (source === 'both') return 'Subscriber + account';
-  if (source === 'account') return 'Account holder';
-  return 'Newsletter subscriber';
+  const source = row.source ?? '';
+  const isSubscriber = source.includes('subscriber');
+  const isAccount = source.includes('account');
+  const isBuyer = source.includes('buyer');
+
+  const parts: string[] = [];
+  if (isSubscriber) parts.push(row.subscriberSource === 'admin_manual' ? 'Admin manual' : 'Newsletter subscriber');
+  if (isAccount) parts.push('Account holder');
+  if (isBuyer) parts.push('Past buyer');
+
+  return parts.length > 0 ? parts.join(' + ') : 'Newsletter subscriber';
 }
 
 async function copyText(value: string) {
@@ -330,7 +338,10 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
                       </div>
                     ) : (
                       <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                        Account profile
+                        {[
+                          subscriber.source?.includes('account') ? 'Account profile' : null,
+                          subscriber.source?.includes('buyer') ? 'Buyer record' : null,
+                        ].filter(Boolean).join(' + ') || 'Not editable here'}
                       </span>
                     )}
                   </td>

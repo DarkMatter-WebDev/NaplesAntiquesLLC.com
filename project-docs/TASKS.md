@@ -5,6 +5,123 @@
 
 ## Backlog
 
+- **🔴 Run `supabase/marketing-buyers-audience-2026-07.sql` in Supabase
+  (2026-07-09, session 11, third addendum):** Run this *after*
+  `buyers-2026-07.sql`. Adds `buyers.marketing_opt_out`, grants `buyers` to
+  `service_role` (needed for the public unsubscribe endpoint), re-defines the
+  buyer-upsert trigger to carry forward a pre-existing opt-out, and widens
+  `email_campaigns`'s audience-scope check to allow `'buyers'`. Until this
+  runs, selecting "Buyers" in Email Campaigns will error (missing column /
+  constraint rejection) rather than send. **After running:** (1) open Email
+  Campaigns → Compose Campaign and confirm a 4th **Buyers** option appears
+  with a real (non-error) recipient count; (2) send a real campaign to the
+  Buyers audience and confirm it succeeds; (3) confirm someone who
+  previously unsubscribed (via the newsletter or their account) does **not**
+  receive it; (4) unsubscribe as a buyer-only email (no newsletter signup, no
+  account) via the emailed unsubscribe link and confirm a later Buyers
+  campaign skips them too; (5) *(fifth addendum)* confirm **Combined**'s
+  recipient count now equals subscribers + accounts + buyers combined (not
+  just the first two); (6) *(fifth addendum)* on `/admin/subscribers`, spot
+  check a few rows that overlap (e.g. a known buyer who's also a newsletter
+  subscriber) and confirm the Source column shows a correct combined label
+  ("Newsletter subscriber + Past buyer", etc.) rather than just one of them.
+  Full detail: `DECISIONS.md` 2026-07-09 (session 11, third + fifth
+  addenda).
+
+- **🟡 Verify Buyers auto-populate/delete behavior with real orders (2026-07-09,
+  session 11):** The grant bug is fixed and confirmed — `/admin/buyers` loads
+  without the permission error. Still not explicitly confirmed with real data:
+  (1) place one real test order (PayPal sandbox, or a manual admin order
+  marked Paid) for a new email and confirm a row appears automatically with
+  no other action needed; (2) delete a buyer and confirm their past orders in
+  `/admin/orders` are completely unaffected; (3) place another order for that
+  same deleted email and confirm it reappears as a fresh row. No app code
+  change expected either way. Full detail: `DECISIONS.md` 2026-07-09
+  (session 11).
+
+- **🟡 Verify the Buyers select + Copy Selected Emails feature live (2026-07-09,
+  session 11, second addendum):** Row checkboxes, header "select all"
+  (indeterminate when partial), and a **Copy Selected Emails** button were
+  added to `/admin/buyers` — code/`tsc`/`lint`/`build` all pass but couldn't
+  be clicked through in this environment (no admin session available).
+  Confirm: selecting a few rows updates the count and enables the button;
+  "select all" checks every row (and shows indeterminate, not checked, when
+  only some are picked); **Copy Selected Emails** puts a comma-separated list
+  of exactly the selected emails on the clipboard; deleting a selected row
+  removes it from the selection cleanly (no stale/stuck indeterminate state).
+  Full detail: `DECISIONS.md` 2026-07-09 (session 11, second addendum).
+
+- **🟡 Verify the "Ship to" → "Address" receipt/invoice relabel live (2026-07-08,
+  session 10, ninth addendum):** Local Pickup orders should now show **"Address"**
+  instead of **"Ship to"** on the buyer's receipt/invoice email (initial send,
+  admin resend, admin email preview, Print Invoice page) and on the checkout's
+  own on-page/printable confirmation — code/`tsc`/`lint`/`build`/`vitest`
+  (167/167) all pass, but couldn't be driven live this session (dev server
+  conflict, see the eighth addendum item below). Once free: (1) place a Local
+  Pickup test order, expand the address accordion and fill it in, complete
+  payment, and confirm both the on-page confirmation and the emailed receipt say
+  "Address" (not "Ship to"); (2) place a real-shipping test order and confirm
+  both still say "Ship To" exactly as before; (3) as admin, open that pickup
+  order's detail panel and confirm the email preview + Print Invoice page also
+  say "Address". No migration. Full detail: `DECISIONS.md` 2026-07-08 (session
+  10, ninth addendum).
+
+- **🟡 Verify the AI Listing Assistant Prompt accordion live (2026-07-08, session
+  10, eighth addendum):** `/admin/settings`'s AI prompt section now loads
+  collapsed behind an accordion (matching the checkout address pattern) —
+  code/`tsc`/`lint`/`build` all pass, but couldn't be driven live this session
+  (another chat's dev server held Next's single-instance lock on `next-app`, so
+  no local preview could start). Once free: load `/admin/settings`, confirm the
+  AI Listing Assistant Prompt section loads collapsed, click the header to
+  expand it (chevron flips, textarea + Copy/Edit/Save/Restore appear), click
+  again to collapse, and confirm every other settings section (Storage Cleanup,
+  Shop Visibility, Trade-in Price, Marketing, Etsy, Carousel) is unaffected. No
+  migration. Full detail: `DECISIONS.md` 2026-07-08 (session 10, eighth addendum).
+
+- **🟡 Verify the new owner new-order email (2026-07-08, session 10, sixth
+  addendum):** `finalizePaidOrder` now emails a new-order summary to
+  `info@naplesestatejewelry.co` (override: env `ORDER_NOTIFICATION_EMAIL`) from
+  `noreply@naplesestatejewelry.co`, reply-to the buyer. After deploy, complete a
+  PayPal sandbox (or live) order and confirm the email arrives at that inbox with
+  the right order #, total, customer contact, items, and the "View order in admin"
+  link. **Confirm:** (a) `info@naplesestatejewelry.co` is a real, monitored mailbox
+  and (b) Resend can deliver to it (it's just a recipient — the verified sender is
+  unchanged). Optional: set `ORDER_NOTIFICATION_EMAIL` in Netlify to send elsewhere
+  (e.g. a personal address) instead. No migration. Full detail: `DECISIONS.md`
+  2026-07-08 (session 10, sixth addendum).
+
+- **🟡 Verify the checkout stock-awareness error paths with a real PayPal flow
+  (2026-07-08, session 10, fourth addendum):** The availability display, cart
+  drawer banner, on-load re-check, and pay-block are all verified live (guest
+  checkout, simulated sold-out via a missing product row). Still needs a **PayPal
+  sandbox** run to exercise: (1) an item that sells out *during* the PayPal window
+  → capture returns `item_conflict` → confirm the buyer sees the specific
+  "purchased by another buyer — refund" message (not the generic one) and the
+  summary re-checks; (2) a create-order rejection for a just-sold item → confirm
+  the stock-specific message + summary flags it; (3) a genuine generic PayPal
+  error → confirm the new "if an item just sold out…" note appears. Code wired in
+  `PayPalCheckoutButton` (`onAvailabilityIssue` → `refreshAvailability`). No
+  migration. Full detail: `DECISIONS.md` 2026-07-08 (session 10, fourth addendum).
+  **Also (fifth addendum) — card-error escalation:** with a PayPal sandbox card
+  that declines, confirm the **1st** unknown `onError` shows "re-enter and
+  double-check your card number," and a **2nd** consecutive one shows "try a
+  different card / call us." The count persists in `sessionStorage`
+  (`nej-checkout-unknown-errors`) and clears after a successful payment.
+
+- **🔴 Run `supabase/etsy-listings-extra-tags-2026-07.sql` in Supabase
+  (2026-07-08, session 10, third addendum):** Adds `etsy_listings.extra_tags
+  text[]` for the new per-product **Additional tags** field in the Etsy drawer.
+  Until it runs, custom tags can't be saved (the title-word broadening works
+  regardless — no schema needed). After running, verify in a product's Etsy
+  drawer: (1) type comma-separated tags into **Additional tags**, click **Save
+  tags**, confirm they appear FIRST in the dry-run **Tags** line (merged with the
+  auto tags, ≤13 total); (2) reload the drawer and confirm the field prefilled
+  with the saved tags; (3) clear the field + Save reverts to auto-only; (4) on a
+  product whose TITLE has a descriptor its `product_type` lacks (e.g. a "…Charm
+  Bracelet" typed Bracelet), confirm **charm** and **charm bracelet** now appear
+  in Tags without any manual entry. Then re-sync to push to an already-listed
+  item. Full detail: `DECISIONS.md` 2026-07-08 (session 10, third addendum).
+
 - **🔴 Deploy the bulk-sync fixes, then recover the 55 error items (2026-07-08,
   session 9, seventeenth–nineteenth addenda):** After deploy, open "Sync All to
   Etsy" and click the new **"Check Etsy statuses"** button — it reconciles every
@@ -441,6 +558,16 @@
 > start) — this section is intentionally just a short pointer, not a mirror
 > of it.
 
+- **2026-07-09 (session 11, fourth addendum):** New gold palm tree favicon —
+  compressed to a transparent 64×64 PNG (4.2 KB) via `sharp` and swapped in for
+  the old `favicon.ico`. Fully verified live on both locales, no pending owner
+  action. See `CHANGELOG.md` 2026-07-09.
+- **2026-07-09 (session 11):** New admin **Buyers** tab — auto-populated customer
+  directory (name/email/phone/order count/total spent/last order) via a database
+  trigger on `orders`, covering both the PayPal and admin-manual order paths. Owner
+  hit a missing-grant bug on first run (fixed same-day, confirmed working), then
+  added row selection + a **Copy Selected Emails** button. `tsc`/`lint`/`build`
+  pass. See `CHANGELOG.md` 2026-07-09 entries.
 - **2026-07-08 (session 10):** Buyer checkout now defaults to shipping (**Priority
   Insured**, $45) instead of Local Pickup — address fields required by default,
   pickup is opt-in. One-line default change (`DEFAULT_SHIPPING_METHOD` in

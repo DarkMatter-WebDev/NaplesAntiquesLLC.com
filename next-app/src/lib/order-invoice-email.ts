@@ -67,6 +67,10 @@ export function isOrderPaid(order: Pick<Order, 'payment_status'>): boolean {
 export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoiceNumber?: string | null): InvoiceEmailContent {
   const invoiceNumber = invoiceNumberForOrder(order, fallbackInvoiceNumber);
   const paid = isOrderPaid(order);
+  // Local pickup orders can still have an address on file (the checkout address
+  // accordion lets a pickup buyer optionally provide one) — label it "Address"
+  // rather than "Ship to" since nothing is actually being shipped.
+  const isPickup = order.shipping_method === 'pickup';
   // A paid order gets a "receipt"; an unpaid order gets an "invoice".
   const subject = paid
     ? `Receipt for order ${order.order_number} from Naples Estate Jewelry`
@@ -113,6 +117,7 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
     : 'Call or text us at (239) 404-8505 with any questions about payment, pickup, delivery, or shipping.';
   const closing = 'Thank you, NaplesEstateJewelry.co';
   const shipToLines = formatAddressLines(order.shipping_address);
+  const shipToLabel = isPickup ? 'Address' : 'Ship to';
 
   return {
     subject,
@@ -137,6 +142,7 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
       fulfillmentStatus: orderStatusLabel(order.fulfillment_status),
       shippingMethod: orderStatusLabel(order.shipping_method),
       shipTo: shipToLines,
+      shipToLabel,
     }),
     text: [
       greeting,
@@ -151,7 +157,7 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
       `Tax: ${totals.tax}`,
       `Shipping: ${totals.shipping}`,
       `Total: ${totals.total}`,
-      ...(shipToLines.length > 0 ? ['', 'Ship to:', ...shipToLines] : []),
+      ...(shipToLines.length > 0 ? ['', `${shipToLabel}:`, ...shipToLines] : []),
       '',
       note,
       closing,
@@ -175,6 +181,7 @@ function buildInvoiceEmailHtml({
   fulfillmentStatus,
   shippingMethod,
   shipTo,
+  shipToLabel,
 }: Omit<InvoiceEmailContent, 'html' | 'text' | 'invoiceNumber'> & {
   orderNumber: string;
   paid: boolean;
@@ -182,6 +189,7 @@ function buildInvoiceEmailHtml({
   fulfillmentStatus: string;
   shippingMethod: string;
   shipTo: string[];
+  shipToLabel: string;
 }) {
   const itemRows = items.length > 0
     ? items.map((item) => `
@@ -240,7 +248,7 @@ function buildInvoiceEmailHtml({
 
                   <div style="margin:0 0 22px;padding:14px 16px;background:#fbfaf5;border:1px solid #eadfbd;color:#746b5b;font-size:13px;line-height:1.5;">
                     Shipping method: ${escapeHtml(shippingMethod)}
-                    ${shipTo.length > 0 ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #eadfbd;"><strong style="display:block;color:#1d1a14;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Ship to</strong>${shipTo.map(escapeHtml).join('<br/>')}</div>` : ''}
+                    ${shipTo.length > 0 ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #eadfbd;"><strong style="display:block;color:#1d1a14;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">${escapeHtml(shipToLabel)}</strong>${shipTo.map(escapeHtml).join('<br/>')}</div>` : ''}
                   </div>
 
                   <p style="margin:0 0 18px;font-size:15px;line-height:1.55;">${escapeHtml(note)}</p>

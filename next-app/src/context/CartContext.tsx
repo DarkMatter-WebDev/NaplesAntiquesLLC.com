@@ -2,10 +2,21 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import CartDrawer from '@/components/cart/CartDrawer';
-import { normalizeProductQuantity, productImagePaddingForImage, type Product, type ProductStatus } from '@/types/product';
+import { isProductPurchasable, normalizeProductQuantity, productImagePaddingForImage, type Product, type ProductStatus } from '@/types/product';
 import { createClient } from '@/lib/supabase/client';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 import { normalizeManualPriceLabel } from '@/lib/pricing';
+
+// A cart item whose live availability changed since it was added — surfaced to
+// the shopper as a heads-up in the cart drawer and at checkout. 'sold-out' = no
+// longer purchasable at all; 'reduced' = still purchasable but fewer units are
+// left than they had requested.
+export type StockAlert = { id: string; title: string; kind: 'sold-out' | 'reduced'; available: number };
+
+// Live availability row read during refreshAvailability(). `quantity` is optional
+// because the column may not exist yet (migration pending), in which case the
+// query falls back to selecting status only.
+type FreshProductRow = { id: string; status: string; quantity?: number | null };
 
 export interface CartItem {
   id: string;
@@ -58,6 +69,12 @@ interface CartContextValue {
   recentlyAdded: string | null;
   notifyAdded: (title: string) => void;
   dismissAdded: () => void;
+  // Live-stock checking: re-reads each cart item's current status/quantity from
+  // the DB, updates the stored items, and records any that went out of stock or
+  // dropped below the requested quantity.
+  stockAlerts: StockAlert[];
+  refreshAvailability: (itemsOverride?: CartItem[]) => Promise<void>;
+  dismissStockAlerts: () => void;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -106,7 +123,16 @@ export function CartProvider({
   const [hydrated, setHydrated] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [recentlyAdded, setRecentlyAdded] = useState<string | null>(null);
+  const [stockAlerts, setStockAlerts] = useState<StockAlert[]>([]);
   const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Latest items snapshot for no-argument refreshAvailability() callers (the cart
+  // drawer opening, a PayPal error handler) — decoupled from an items-change
+  // commit, so this effect-updated ref is fresh for them. Callers that fire during
+  // the same commit as an items change (checkout's hydration effect) pass their
+  // fresh items in explicitly instead of relying on this ref.
+  const itemsRef = useRef(items);
+  useEffect(() => { itemsRef.current = items; }, [items]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -201,8 +227,89 @@ export function CartProvider({
     addedTimer.current = setTimeout(() => setRecentlyAdded(null), 3500);
   }, []);
 
+  const dismissStockAlerts = useCallback(() => setStockAlerts([]), []);
+
+  // Re-check live availability for every cart item. Updates each item's stored
+  // status/stockQuantity (and re-clamps its requested quantity) and records a
+  // StockAlert for anything that just went out of stock or dropped below what the
+  // shopper wanted. Best-effort: a read failure leaves the cart untouched.
+  const refreshAvailability = useCallback(async (itemsOverride?: CartItem[]) => {
+    // Prefer explicitly-passed items (fresh even mid-commit); otherwise read the
+    // effect-updated ref (fine for decoupled callers like the drawer/error path).
+    const snapshot = itemsOverride ?? itemsRef.current;
+    if (snapshot.length === 0) {
+      setStockAlerts([]);
+      return;
+    }
+    const ids = snapshot.map((item) => item.id);
+    const supabase = createClient();
+    let rows: FreshProductRow[];
+    const res = await supabase.from('products').select('id, status, quantity').in('id', ids);
+    if (res.error) {
+      // `quantity` may not exist yet (migration pending) — fall back to status only.
+      if (/quantity/i.test(res.error.message ?? '')) {
+        const fallback = await supabase.from('products').select('id, status').in('id', ids);
+        if (fallback.error || !fallback.data) return;
+        rows = fallback.data as unknown as FreshProductRow[];
+      } else {
+        return;
+      }
+    } else {
+      if (!res.data) return;
+      rows = res.data as unknown as FreshProductRow[];
+    }
+
+    const freshById = new Map(rows.map((row) => [row.id, row]));
+    const alerts: StockAlert[] = [];
+
+    // Alert on the item's CURRENT availability (not a before/after diff): anything
+    // no longer purchasable, or with fewer units left than requested, is flagged.
+    // Basing this on current state keeps the alert stable across repeated refreshes
+    // and page reloads — a diff against the stored status would vanish the moment
+    // this same call rewrites that status to 'sold'.
+    for (const item of snapshot) {
+      const fresh = freshById.get(item.id);
+      // A missing row means the product was deleted — treat as sold out.
+      const nextStatus = (fresh?.status ?? 'sold') as ProductStatus;
+      const nextQuantity = fresh && 'quantity' in fresh ? fresh.quantity ?? null : item.stockQuantity ?? null;
+      const requested = Math.max(1, normalizeProductQuantity(item.purchaseQuantity));
+      const availableUnits = normalizeProductQuantity(nextQuantity);
+      if (!isProductPurchasable(nextStatus, nextQuantity)) {
+        alerts.push({ id: item.id, title: item.title, kind: 'sold-out', available: 0 });
+      } else if (availableUnits < requested) {
+        alerts.push({ id: item.id, title: item.title, kind: 'reduced', available: availableUnits });
+      }
+    }
+
+    setItems((prev) => {
+      let changed = false;
+      const next = prev.map((item) => {
+        const fresh = freshById.get(item.id);
+        if (!fresh && item.status !== 'sold') {
+          changed = true;
+          return { ...item, status: 'sold' as ProductStatus };
+        }
+        if (!fresh) return item;
+        const nextStatus = fresh.status as ProductStatus;
+        const nextQuantity = 'quantity' in fresh ? fresh.quantity ?? null : item.stockQuantity ?? null;
+        const clampedQty = clampPurchaseQuantity(item.purchaseQuantity, { stockQuantity: nextQuantity });
+        if (item.status === nextStatus && item.stockQuantity === nextQuantity && item.purchaseQuantity === clampedQty) {
+          return item;
+        }
+        changed = true;
+        return { ...item, status: nextStatus, stockQuantity: nextQuantity, purchaseQuantity: clampedQty };
+      });
+      return changed ? next : prev;
+    });
+    setStockAlerts(alerts);
+  }, []);
+
+  // Drop stale alerts for items no longer in the cart (removed / cleared) at read
+  // time — avoids a set-state-in-effect while keeping alerts consistent with items.
+  const visibleStockAlerts = stockAlerts.filter((alert) => items.some((item) => item.id === alert.id));
+
   return (
-    <CartContext.Provider value={{ items, count: items.reduce((sum, i) => sum + (i.purchaseQuantity ?? 1), 0), isIn, add, setQuantity, remove, clear, drawerOpen, openDrawer, closeDrawer, recentlyAdded, notifyAdded, dismissAdded }}>
+    <CartContext.Provider value={{ items, count: items.reduce((sum, i) => sum + (i.purchaseQuantity ?? 1), 0), isIn, add, setQuantity, remove, clear, drawerOpen, openDrawer, closeDrawer, recentlyAdded, notifyAdded, dismissAdded, stockAlerts: visibleStockAlerts, refreshAvailability, dismissStockAlerts }}>
       {children}
       <CartDrawer locale={locale} />
     </CartContext.Provider>

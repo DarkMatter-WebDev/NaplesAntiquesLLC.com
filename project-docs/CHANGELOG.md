@@ -1,5 +1,211 @@
 # Changelog
 
+## 2026-07-09 - "Combined" audience now genuinely means all three sources
+
+"Combined" on Compose Campaign now actually combines Newsletter subscribers +
+Account holders + Buyers (previously deliberately Newsletter+Accounts only).
+Since the same audience-builder feeds the separate `/admin/subscribers`
+"Reachable Recipients" page, this surfaced a real mislabeling bug there — a
+buyer-only contact would have shown as "Newsletter subscriber" (wrong).
+Fixed by replacing the old binary "both" value with a proper sorted
+multi-source combination (e.g. "account+buyer") and updating the Source
+column to render every combination correctly instead of only the two it
+originally knew about. `tsc`/`lint`/`build` pass; `vitest` 171/171 (+4 new
+tests). Not yet verified live. No new migration required.
+
+## 2026-07-09 - New gold palm tree favicon
+
+Replaced the browser-tab icon with the owner's new gold palm tree artwork.
+This Next.js version's icon file convention doesn't support `.webp` (only
+ico/jpg/jpeg/png/svg), so compressed it as a trimmed, padded, transparent
+**PNG at 64×64 (4.2 KB)** instead via `sharp`, and swapped
+`app/favicon.ico` for `app/icon.png`. Also added `icon` to the `proxy.ts`
+middleware matcher's exclusion list alongside `favicon.ico` (defensive —
+the actual route already happened to be covered by the generic extension
+exclusion, but shouldn't rely on that incidentally). Verified live on both
+`/en` and `/es`: correct `<link rel="icon">` tag, direct fetch returns `200
+image/png` at the exact byte size on disk, no console errors. `tsc`/`lint`/
+`build` pass. Deleted the leftover source PNG after confirming it worked.
+
+## 2026-07-09 - Email Campaigns: "Buyers" added as a fourth audience
+
+Added **Buyers** as a 4th selectable audience in the admin Email Campaigns
+Compose Campaign form, alongside Newsletter subscribers / Account holders /
+Combined. Along the way, gave `buyers` a real `marketing_opt_out` column so
+a Buyers campaign correctly skips anyone who already unsubscribed (via the
+newsletter, their account, or a prior buyers-only unsubscribe) — the
+unsubscribe endpoint now updates all three tables, and the buyer-upsert
+trigger carries forward a pre-existing opt-out for brand-new buyer rows
+(never resets it on a later order). Also widened the `email_campaigns`
+audience-scope CHECK constraint, which would otherwise have rejected a
+Buyers-scope send at the database level. "Combined" is unchanged — still
+Newsletter + Accounts only, not redefined to include Buyers.
+`tsc`/`lint`/`build` pass; `vitest` unchanged at 167/167. Not yet verified
+live (no admin session available in this environment).
+**Requires running `supabase/marketing-buyers-audience-2026-07.sql`** (after
+`buyers-2026-07.sql`) before the new audience option will work.
+
+## 2026-07-09 - Buyers tab: select rows + Copy Selected Emails
+
+Added row checkboxes (individual or "select all", with a proper
+indeterminate state) to the admin Buyers table, plus a **Copy Selected
+Emails** button that copies the selected rows' emails as a comma-separated
+list via the existing shared clipboard helper. Deleting a row also removes
+it from the current selection. No bulk-delete added — just select + copy, as
+asked. `tsc`/`lint`/`build` pass. Not yet verified live (no admin session
+available in this environment).
+
+## 2026-07-09 - New admin "Buyers" tab: auto-populated customer directory
+
+Added a **Buyers** tab to the main admin nav (between Orders and Messages):
+a table of every customer who's ever paid for an order (Name/Email/Phone/
+Orders/Total Spent/Last Order), with a delete action per row. Populated by a
+**database trigger** on `public.orders` — not application code — because the
+app has two independent order-creation paths (the PayPal RPC flow and the
+admin's own manual-order form, which inserts directly with no shared code
+path) and only a table-level trigger reliably catches both. Fires once per
+order's real transition into `payment_status = 'paid'`, so abandoned/unpaid
+carts never appear and a later edit never double-counts. A one-time backfill
+in the same migration populates existing order history so the tab doesn't
+start empty. Deleting a buyer only removes their directory row — their
+orders/invoices are untouched, and they're re-added automatically the next
+time they pay for something. `tsc`/`lint`/`build` pass; `vitest` unchanged at
+167/167. Partially verified live (auth-redirect behavior only — no admin
+session available in this environment to exercise the full list/delete flow).
+**Requires running `supabase/buyers-2026-07.sql` in Supabase before the tab
+will show anything but an error banner.** First run surfaced a real bug in the
+migration itself — RLS + a policy but no base table grant, so Postgres denied
+every role outright ("permission denied for table buyers") — fixed same-day
+by adding the missing `grant ... to authenticated` line; the file is
+idempotent, so re-running it (or just the new grant line) is all that's
+needed.
+
+## 2026-07-08 - Buyer receipts/invoices: "Ship to" becomes "Address" for Local Pickup orders
+
+A Local Pickup buyer who optionally fills in an address (via the checkout's
+address accordion) used to see it labeled **"Ship to"** on their receipt/invoice
+email, even though nothing is being shipped. Fixed at the shared source
+(`buildInvoiceEmailContent()` in `order-invoice-email.ts`), so it covers the
+initial receipt, the admin's manual resend, the admin's email preview, and the
+Print Invoice page all at once: now shows **"Address"** instead of **"Ship to"**
+whenever `shipping_method` is `pickup`. Real shipping orders are unchanged. The
+checkout's own on-page/printable "Order Received" receipt (`CheckoutClient.tsx`)
+got the matching fix — it previously hid the address entirely for Local Pickup
+even when one was provided; now it shows "Address" when present, same as the
+email. The owner's own new-order notification email was deliberately left
+as-is (owner-facing, not buyer-facing — outside this request's scope).
+`tsc`/`lint`/`build` pass; `vitest` 167/167 (+3 new tests). Not yet verified live
+(no local dev server could be started — another chat's server holds Next's
+single-instance lock on this project directory).
+
+## 2026-07-08 - Admin Settings: AI Listing Assistant Prompt also collapses into an accordion
+
+The **AI Listing Assistant Prompt** section on `/admin/settings` (a 460px-tall
+textarea that used to always render open, pushing every other settings panel
+down) now loads **collapsed behind an accordion**, matching the checkout address
+accordion. Click the header to expand/collapse (chevron flips); the prompt
+editor and its Copy/Edit/Save/Restore controls only render while expanded. Pure
+UI change in `AdminSettingsPanel.tsx` (new `promptExpanded` state), reusing the
+same collapsible-header pattern already used in the admin product editor.
+`tsc`/`lint`/`build` pass. Not yet verified live — no local dev server could be
+started this session (another chat's server already held Next's single-instance
+lock on `next-app`); verify by loading `/admin/settings` once free.
+
+## 2026-07-08 - Checkout: address collapses behind an "Address (optional)" accordion for Local Pickup
+
+When the shipping method is **Local Pickup**, the address fields (not needed for
+pickup) are now hidden behind a collapsed **"Address (optional)"** accordion the
+buyer can expand if they still want to provide one — the inputs stay optional (no
+required markers). For any real shipping method the address is unchanged: always
+shown and required, with the ship-to helper text. Purely a checkout UI change in
+`CheckoutClient.tsx` (new `addressExpanded` state; inputs render when
+`needsShipping || addressExpanded`). `tsc`/`lint`/`build` pass; verified in the
+preview across all three states (shipping → shown+required; pickup → collapsed
+accordion; expand → optional inputs; no console errors).
+
+## 2026-07-08 - Owner now emailed on every new (paid) order
+
+Previously a new order only appeared in the admin Orders list (the customer got a
+receipt, but the owner got no direct email). `finalizePaidOrder` now also sends a
+best-effort **owner notification** to `info@naplesestatejewelry.co` (override with
+`ORDER_NOTIFICATION_EMAIL`) summarizing the order: number, total, customer
+name/email/phone, line items, totals, fulfillment method + ship-to, customer
+notes, and a "View order in admin" button. Sent from the verified
+`noreply@naplesestatejewelry.co`, with **reply-to set to the buyer** so the owner
+can reply straight to the customer. Fires alongside the customer receipt on both
+capture paths (client route + webhook backstop), so it's covered even if the
+buyer's browser dies after approval. Best-effort — a mail failure never affects
+the completed payment; degrades gracefully if `products.quantity` isn't present
+yet. New `lib/order-owner-notification.ts`. `tsc`/`lint`/`build` pass.
+
+## 2026-07-08 - Checkout: graceful, escalating message for unknown PayPal (card) errors
+
+A buyer paying via PayPal's hosted debit/credit-card form was bounced back with a
+generic error and no guidance. Now the generic PayPal `onError` (a failure we
+can't attribute — the likely card-decline case) gives card-specific help that
+escalates: the **first** time it suggests re-entering and double-checking the card
+number "just in case"; the **second** consecutive time it suggests trying a
+different card (or calling us). The count is kept in `sessionStorage`
+(`nej-checkout-unknown-errors`) so "sent back a second time" is detected even if
+the card flow did a full-page redirect; it clears on a completed payment. A live
+stock re-check still runs in parallel, so if the real cause was a sold-out item
+the summary flags it instead. Availability-caused and create-order errors are
+unaffected (they show their own specific messages and don't count toward the card
+escalation). Pure helpers extracted to `lib/checkout-error-messages.ts` and
+unit-tested. `tsc`/`lint`/`build` pass, 164 tests (+5).
+
+## 2026-07-08 - Checkout/cart stock awareness: availability shown, re-checked, and clearer sold-out errors
+
+A buyer trying to pay for an item that had sold out got only an opaque "Something
+went wrong with PayPal." Now stock is surfaced and re-checked throughout:
+
+- **Live availability on the checkout order summary** — each item shows **In
+  stock** / **N available** / **Sold out — no longer available**. If anything is
+  unavailable, the PayPal button is replaced with a clear "remove it to continue"
+  message so the buyer never hits the opaque error.
+- **Re-check on load + after a PayPal error** — checkout re-reads each item's live
+  status/quantity when it loads and again if create-order/capture fails, so the
+  summary updates immediately when a buyer is sent back after an error.
+- **Cart drawer re-checks on open** — opening the cart re-verifies stock and shows
+  an "Availability changed" banner naming anything that sold out (or dropped below
+  the requested quantity) while it sat in the cart; quantities are re-clamped to
+  live stock.
+- **Clearer PayPal errors** — the generic "Something went wrong with PayPal" note
+  now adds that a just-sold-out item may be the cause and to check the summary;
+  create-order/capture failures caused by availability show a specific message
+  (item sold out / won by another buyer) instead of the generic one.
+
+Availability logic is centralized in `CartContext` (`refreshAvailability` +
+`stockAlerts`), shared by the drawer and checkout via a new `StockAlertBanner`.
+Reads degrade gracefully if the `quantity` column isn't present yet (status-only).
+No migration required. `tsc`/`lint`/`build` pass, 159 tests; verified in-browser
+(sold-out item → banner + labels + blocked pay; all-available → normal checkout;
+drawer banner on open; no render loop — bounded re-check).
+
+## 2026-07-08 - Etsy sync: custom tags + title-word broadening (⚠️ SQL migration pending)
+
+Two tag improvements on the product drawer's Etsy section:
+
+1. **Custom tags.** New "Additional tags" field (comma-separated) persisted per
+   product on `etsy_listings.extra_tags`. `mapTags()` merges them into the
+   auto-generated set **first** (guaranteed within Etsy's 13-tag cap), through
+   the same clean/dedup/clamp path. New `PUT /api/admin/etsy/tags`; the dry-run
+   preview returns the raw custom tags to prefill the field, and the Tags line
+   shows the merged result. Re-sync pushes changes to an already-listed item.
+2. **Title-word broadening (the "charm" fix).** A "…Charm Bracelet" typed only
+   as a Bracelet produced no "charm" tag because tags came only from structured
+   fields. `mapTags()` now also pulls meaningful words from the **title** —
+   type-word phrases first ("charm bracelet"), then standalone words ("charm",
+   "byzantine", "figaro"…) — filtering metal/karat/color/unit/number/grammar
+   noise and the product-type word itself, capped so it can't crowd out the
+   estate/vintage/antique tags.
+
+**⚠️ Run `supabase/etsy-listings-extra-tags-2026-07.sql`** (adds
+`etsy_listings.extra_tags text[]`). Reads degrade gracefully until then — the
+title-word broadening works immediately (no schema dependency); only the custom
+tags need the column. `tsc`/`lint`/`build` pass, 159 tests (+5). Admin drawer UI
+build/type-verified (needs an admin login to drive live).
+
 ## 2026-07-08 - Shop mobile/tablet: search bar under Filters, piece count moved to toolbar
 
 On mobile/tablet the long pill under the **Filters** button showed the piece

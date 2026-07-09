@@ -6,11 +6,12 @@ import AdminOrdersLink from './AdminOrdersLink';
 
 const GOLD = '#735c00';
 
-export type AdminSection = 'products' | 'orders' | 'messages' | 'subscribers' | 'marketing' | 'users' | 'settings';
+export type AdminSection = 'products' | 'orders' | 'buyers' | 'messages' | 'subscribers' | 'marketing' | 'users' | 'settings';
 
 const SECTION_LABELS: Record<AdminSection, string> = {
   products: 'Products',
   orders: 'Orders',
+  buyers: 'Buyers',
   messages: 'Messages',
   subscribers: 'Subscribers',
   marketing: 'Email Campaigns',
@@ -238,6 +239,9 @@ export default function AdminHeader({
         userEmail={userEmail}
         style={active === 'orders' ? activeStyle : linkStyle}
       />
+      <AdminNavItem href={`${adminBasePath}/buyers`} active={active === 'buyers'}>
+        Buyers
+      </AdminNavItem>
       <AdminMessagesLink
         href={`${adminBasePath}/messages`}
         unreadCount={unreadMessagesCount}

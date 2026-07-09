@@ -5,10 +5,11 @@ import Link from 'next/link';
 import { useCart, type CartItem } from '@/context/CartContext';
 import OrderSummary, { DEFAULT_SHIPPING_METHOD } from '@/components/checkout/OrderSummary';
 import PayPalCheckoutButton from '@/components/checkout/PayPalCheckoutButton';
+import StockAlertBanner from '@/components/cart/StockAlertBanner';
 import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 import { createClient } from '@/lib/supabase/client';
 import { normalizeManualPriceLabel, parseManualPriceLabelValue } from '@/lib/pricing';
-import { productImagePaddingForImage } from '@/types/product';
+import { isProductPurchasable, productImagePaddingForImage } from '@/types/product';
 
 const GOLD = '#735c00';
 
@@ -49,7 +50,7 @@ interface CustomerInfo {
 }
 
 export default function CheckoutClient({ locale, paypalClientId }: { locale: string; paypalClientId?: string | null }) {
-  const { items, remove, clear, setQuantity } = useCart();
+  const { items, remove, clear, setQuantity, refreshAvailability, stockAlerts, dismissStockAlerts } = useCart();
   const isEs = locale === 'es';
   const prefix = isEs ? '/es' : '';
   const [customer, setCustomer] = useState<CustomerInfo>({
@@ -58,6 +59,10 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
   });
   const [shippingMethod, setShippingMethod] = useState(DEFAULT_SHIPPING_METHOD);
   const [infoConfirmed, setInfoConfirmed] = useState(false);
+  // For Local Pickup the address is optional and hidden behind an accordion the
+  // buyer can expand if they want to provide it. (Ignored when shipping is
+  // selected — the address is required and always shown then.)
+  const [addressExpanded, setAddressExpanded] = useState(false);
   const [productInfoById, setProductInfoById] = useState<Record<string, CartProductInfo>>({});
   // On a successful capture we snapshot the order (items + shipping + contact) so
   // the confirmation screen can render a complete, printable summary — the cart is
@@ -85,6 +90,17 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     createClient().auth.getUser().then(({ data }) => setIsGuest(!data.user)).catch(() => {});
   }, []);
 
+  // Re-check live stock when the checkout page loads (and whenever the cart
+  // changes), so an item that sold out while it sat in the cart is caught here —
+  // and flagged — before the buyer pays, rather than surfacing as an opaque
+  // PayPal error. `items` is passed explicitly (and is the dep) because on the
+  // hydration commit it's fresher than the context's effect-updated ref. It
+  // converges: refreshAvailability only re-sets items when something actually
+  // changed, so the reference stabilizes after at most one update.
+  useEffect(() => {
+    if (items.length > 0) void refreshAvailability(items);
+  }, [items, refreshAvailability]);
+
   const cartPayloadKey = `${items
     .map((item) => `${item.id}:${Math.max(1, Math.floor(item.purchaseQuantity ?? 1))}`)
     .sort()
@@ -108,7 +124,11 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
       customer.city.trim() !== '' &&
       customer.state.trim() !== '' &&
       customer.postal_code.trim() !== '');
-  const payReady = items.length > 0 && contactReady && shippingAddressReady && infoConfirmed;
+  // An item that's gone sold out (or over-requested) can't be paid for — block
+  // checkout with a clear message instead of letting it fail at PayPal.
+  const unavailableItems = items.filter((item) => !isProductPurchasable(item.status, item.stockQuantity));
+  const hasUnavailableItem = unavailableItems.length > 0;
+  const payReady = items.length > 0 && contactReady && shippingAddressReady && infoConfirmed && !hasUnavailableItem;
 
   const missingFieldLabels = [
     needsShipping && customer.address_line1.trim() === '' ? (isEs ? 'Dirección' : 'Street Address') : null,
@@ -335,10 +355,10 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
                   <p>{c.email}</p>
                   <p>{c.phone}</p>
                 </div>
-                {needsShippingReceipt && (
+                {(needsShippingReceipt || c.address_line1.trim() !== '') && (
                   <div>
                     <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-                      {isEs ? 'Envío a' : 'Ship To'}
+                      {needsShippingReceipt ? (isEs ? 'Envío a' : 'Ship To') : (isEs ? 'Dirección' : 'Address')}
                     </p>
                     <p style={{ color: 'var(--color-on-surface)' }}>{c.address_line1}</p>
                     {c.address_line2 && <p>{c.address_line2}</p>}
@@ -401,6 +421,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
 
       <div className="checkout-dashboard">
         <div className="checkout-review">
+          <StockAlertBanner alerts={stockAlerts} isEs={isEs} onDismiss={dismissStockAlerts} />
           <OrderSummary
             items={summaryItems}
             isEs={isEs}
@@ -411,6 +432,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
             onRemove={remove}
             onSetQuantity={setQuantity}
             variant="expanded"
+            showAvailability
           />
         </div>
 
@@ -452,46 +474,79 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
           </div>
 
           <div className="checkout-address-fields">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-                {isEs ? 'Dirección' : 'Address'}
-              </p>
-              {needsShipping && (
+            {needsShipping ? (
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                  {isEs ? 'Dirección' : 'Address'}
+                </p>
                 <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
                   {isEs
                     ? 'Enviaremos su pedido a esta dirección. ¿Prefiere recogerlo en persona? Cambie el método de envío a Recogida local en el resumen del pedido.'
                     : 'We’ll ship your order to this address. Prefer to pick it up in person? Switch the shipping method to Local Pickup in your order summary.'}
                 </p>
-              )}
-            </div>
-            <div>
-              <label className="form-label">{isEs ? 'Dirección' : 'Street Address'}{needsShipping ? ' *' : ''}</label>
-              <input required={needsShipping} className="form-field" autoComplete="address-line1" value={customer.address_line1} onChange={(e) => setCustomer({ ...customer, address_line1: e.target.value })} />
-            </div>
-            <div>
-              <label className="form-label">{isEs ? 'Apartamento, suite, etc. (opcional)' : 'Apartment, suite, etc. (optional)'}</label>
-              <input className="form-field" autoComplete="address-line2" value={customer.address_line2} onChange={(e) => setCustomer({ ...customer, address_line2: e.target.value })} />
-            </div>
-            <div className="responsive-form-grid">
-              <div>
-                <label className="form-label">{isEs ? 'Ciudad' : 'City'}{needsShipping ? ' *' : ''}</label>
-                <input required={needsShipping} className="form-field" autoComplete="address-level2" value={customer.city} onChange={(e) => setCustomer({ ...customer, city: e.target.value })} />
               </div>
-              <div>
-                <label className="form-label">{isEs ? 'Estado' : 'State'}{needsShipping ? ' *' : ''}</label>
-                <input required={needsShipping} className="form-field" autoComplete="address-level1" value={customer.state} onChange={(e) => setCustomer({ ...customer, state: e.target.value })} />
+            ) : (
+              // Local pickup: address isn't needed, so tuck it behind an accordion
+              // the buyer can open if they'd still like to add one.
+              <button
+                type="button"
+                onClick={() => setAddressExpanded((open) => !open)}
+                aria-expanded={addressExpanded}
+                aria-controls="checkout-address-inputs"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.5rem',
+                  width: '100%',
+                  padding: '0.7rem 0.85rem',
+                  border: '1px solid rgba(216, 208, 194, 0.94)',
+                  borderRadius: 'var(--radius-lg)',
+                  background: 'rgba(255, 253, 248, 0.9)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <span className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                  {isEs ? 'Dirección (opcional)' : 'Address (optional)'}
+                </span>
+                <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '20px', color: GOLD, lineHeight: 1 }}>
+                  {addressExpanded ? 'expand_less' : 'expand_more'}
+                </span>
+              </button>
+            )}
+            {(needsShipping || addressExpanded) && (
+              <div id="checkout-address-inputs" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label className="form-label">{isEs ? 'Dirección' : 'Street Address'}{needsShipping ? ' *' : ''}</label>
+                  <input required={needsShipping} className="form-field" autoComplete="address-line1" value={customer.address_line1} onChange={(e) => setCustomer({ ...customer, address_line1: e.target.value })} />
+                </div>
+                <div>
+                  <label className="form-label">{isEs ? 'Apartamento, suite, etc. (opcional)' : 'Apartment, suite, etc. (optional)'}</label>
+                  <input className="form-field" autoComplete="address-line2" value={customer.address_line2} onChange={(e) => setCustomer({ ...customer, address_line2: e.target.value })} />
+                </div>
+                <div className="responsive-form-grid">
+                  <div>
+                    <label className="form-label">{isEs ? 'Ciudad' : 'City'}{needsShipping ? ' *' : ''}</label>
+                    <input required={needsShipping} className="form-field" autoComplete="address-level2" value={customer.city} onChange={(e) => setCustomer({ ...customer, city: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="form-label">{isEs ? 'Estado' : 'State'}{needsShipping ? ' *' : ''}</label>
+                    <input required={needsShipping} className="form-field" autoComplete="address-level1" value={customer.state} onChange={(e) => setCustomer({ ...customer, state: e.target.value })} />
+                  </div>
+                </div>
+                <div className="responsive-form-grid">
+                  <div>
+                    <label className="form-label">{isEs ? 'Código postal' : 'ZIP / Postal Code'}{needsShipping ? ' *' : ''}</label>
+                    <input required={needsShipping} className="form-field" autoComplete="postal-code" value={customer.postal_code} onChange={(e) => setCustomer({ ...customer, postal_code: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="form-label">{isEs ? 'País' : 'Country'}</label>
+                    <input className="form-field" autoComplete="country-name" value={customer.country} onChange={(e) => setCustomer({ ...customer, country: e.target.value })} />
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="responsive-form-grid">
-              <div>
-                <label className="form-label">{isEs ? 'Código postal' : 'ZIP / Postal Code'}{needsShipping ? ' *' : ''}</label>
-                <input required={needsShipping} className="form-field" autoComplete="postal-code" value={customer.postal_code} onChange={(e) => setCustomer({ ...customer, postal_code: e.target.value })} />
-              </div>
-              <div>
-                <label className="form-label">{isEs ? 'País' : 'Country'}</label>
-                <input className="form-field" autoComplete="country-name" value={customer.country} onChange={(e) => setCustomer({ ...customer, country: e.target.value })} />
-              </div>
-            </div>
+            )}
           </div>
 
           <div>
@@ -552,7 +607,27 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
             </label>
           </div>
 
-          {paypalClientId ? (
+          {hasUnavailableItem ? (
+            <div
+              role="alert"
+              className="flex items-start gap-2 text-sm"
+              style={{
+                padding: '0.75rem 0.85rem',
+                border: '1px solid color-mix(in srgb, var(--color-error) 45%, transparent)',
+                background: 'color-mix(in srgb, var(--color-error) 9%, transparent)',
+                borderRadius: 'var(--radius-lg)',
+                color: 'var(--color-error)',
+                fontWeight: 600,
+              }}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '1.15rem', lineHeight: 1.25, flexShrink: 0 }}>error</span>
+              <span>
+                {isEs
+                  ? `Ya no está disponible: ${unavailableItems.map((i) => i.title_es || i.title).join(', ')}. Elimínelo de su pedido arriba para continuar con el pago.`
+                  : `No longer available: ${unavailableItems.map((i) => i.title).join(', ')}. Please remove it from your order above to continue to payment.`}
+              </span>
+            </div>
+          ) : paypalClientId ? (
             <PayPalCheckoutButton
               clientId={paypalClientId}
               ready={payReady}
@@ -564,6 +639,9 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
                 orderIdRef.current = id;
                 orderPayloadKeyRef.current = cartPayloadKey;
               }}
+              // A create-order/capture error can mean an item just sold out — re-check
+              // live stock so the summary + this button reflect it immediately.
+              onAvailabilityIssue={() => { void refreshAvailability(); }}
               onSuccess={({ orderNumber }) => {
                 // Snapshot the order for the printable confirmation, THEN clear the
                 // cart (clearing empties `items`, so capture the summary first).
