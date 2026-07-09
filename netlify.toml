@@ -8,10 +8,13 @@
   # PAYPAL_CLIENT_ID is public by design — it ships to the browser inside the
   # PayPal JS SDK URL (so it appears in checkout HTML/RSC). It is NOT the secret;
   # PAYPAL_CLIENT_SECRET stays server-side and must never be added here.
-  # PAYPAL_ENV is not a secret either — its only values are "sandbox"/"live"
-  # (see next-app/src/lib/paypal.ts). The scanner flags it because that generic
-  # word appears as a literal string throughout the build output.
-  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SITE_URL,NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,PAYPAL_CLIENT_ID,PAYPAL_ENV"
+  # PAYPAL_ENV and EBAY_ENV are not secrets either — their only values are
+  # "sandbox"/"live" and "sandbox"/"production" respectively (see
+  # next-app/src/lib/paypal.ts and next-app/src/lib/ebay/client.ts). The
+  # scanner flags them because those generic words appear as literal strings
+  # throughout the build output (e.g. Next.js's own NODE_ENV==="production"
+  # checks baked into every chunk) — same false-positive, same fix.
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SITE_URL,NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,PAYPAL_CLIENT_ID,PAYPAL_ENV,EBAY_ENV"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
