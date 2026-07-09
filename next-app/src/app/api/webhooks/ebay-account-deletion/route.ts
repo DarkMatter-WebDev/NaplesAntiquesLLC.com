@@ -113,7 +113,10 @@ async function fetchPublicKeyPem(keyId: string): Promise<string> {
     throw new Error(`Could not fetch eBay notification public key (HTTP ${res.status}).`);
   }
   const data = (await res.json()) as Record<string, unknown>;
-  console.error('ebay-account-deletion: getPublicKey response keys:', Object.keys(data));
+  // Not secret — this is a PUBLIC key + its own algorithm/digest metadata,
+  // literally meant to be publicly known so anyone can verify eBay's
+  // signature. Safe to log in full while we pin down the real response shape.
+  console.error('ebay-account-deletion: getPublicKey full response:', JSON.stringify(data));
   const raw = String((data as { key?: string }).key ?? '').trim();
   if (!raw) {
     console.error('ebay-account-deletion: getPublicKey response had no usable "key" field. Full response:', JSON.stringify(data).slice(0, 1000));
