@@ -50,10 +50,16 @@ export function mapSku(product: Pick<Product, 'id'>): string {
 }
 
 // ---------------------------------------------------------------------------
-// Condition — Q5: USED_EXCELLENT (id 3000, "Pre-owned") + one standard
-// template for every item, never per-item authoring.
+// Condition — Q5: USED_EXCELLENT (legacy condition id 3000, "Pre-owned") + one
+// standard template for every item, never per-item authoring.
+//
+// The Sell Inventory API's `condition` field on createOrReplaceInventoryItem
+// takes the ConditionEnum string name (e.g. "USED_EXCELLENT"), NOT the
+// numeric condition id from the older Trading API. Sending "3000" produces
+// eBay error 2004 "Could not serialize field [condition]" — confirmed live
+// 2026-07-09 against the production inventory_item endpoint.
 // ---------------------------------------------------------------------------
-export const EBAY_CONDITION_ID = '3000';
+export const EBAY_CONDITION_ID = 'USED_EXCELLENT';
 export const EBAY_CONDITION_DESCRIPTION =
   'Estate piece in excellent pre-owned condition. Please review photos for detail.';
 

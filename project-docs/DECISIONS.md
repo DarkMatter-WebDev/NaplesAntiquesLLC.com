@@ -1,5 +1,29 @@
 # Decisions Log
 
+## 2026-07-09 (session 14, third addendum) - eBay `condition` field: numeric id rejected, must be ConditionEnum string
+
+**Context:** First real "Sync to eBay" attempt (Heavy Italian 14K Yellow Gold
+Cuban Link Bracelet) failed on the `PUT /sell/inventory/v1/inventory_item/{sku}`
+call. Root-caused via live Netlify function logs (after adding centralized
+`parameters`-field logging to `lib/ebay/client.ts`'s `ebayFetch`, since eBay's
+top-level error message — "The request has errors" — is a generic wrapper)
+to: `errorId 2004, "Could not serialize field [condition]"`.
+
+**Root cause:** `EBAY_CONDITION_ID` (`lib/ebay/mapping.ts`) held eBay's legacy
+Trading API numeric condition id (`'3000'`), which was sent verbatim as the
+`condition` field on `createOrReplaceInventoryItem`. The Sell Inventory REST
+API's `condition` field is typed as `ConditionEnum` and expects the string
+name (`"USED_EXCELLENT"`), not the numeric id — the two ID systems don't
+share a wire format even though `3000` and `USED_EXCELLENT` refer to the same
+logical condition.
+
+**Fix:** Changed `EBAY_CONDITION_ID` to `'USED_EXCELLENT'`. No other payload
+fields were affected; `conditionDescription` (Q5's fixed template) was
+already a plain string and unaffected. Updated the one test asserting the
+old value (`__tests__/mapping.test.ts`). Verified via `tsc --noEmit`,
+`npm run lint`, and `vitest run src/lib/ebay` (58/58 passing) — not yet
+re-verified live against eBay's API pending owner redeploy + retry.
+
 ## 2026-07-09 (session 14, second addendum) - eBay account-deletion webhook: confirmed live, two real bugs found and fixed
 
 **Context:** Following the session-14 build, the owner worked through

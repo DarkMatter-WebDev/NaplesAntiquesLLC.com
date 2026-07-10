@@ -148,8 +148,8 @@ describe('mapSku', () => {
 });
 
 describe('condition (Q5)', () => {
-  it('is a fixed id and one standard template', () => {
-    expect(EBAY_CONDITION_ID).toBe('3000');
+  it('is a fixed ConditionEnum string and one standard template', () => {
+    expect(EBAY_CONDITION_ID).toBe('USED_EXCELLENT');
     expect(EBAY_CONDITION_DESCRIPTION.length).toBeGreaterThan(0);
     expect(EBAY_CONDITION_DESCRIPTION.length).toBeLessThanOrEqual(1000);
   });
