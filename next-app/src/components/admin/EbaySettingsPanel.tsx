@@ -86,6 +86,8 @@ export default function EbaySettingsPanel() {
   // panel: set true when a *changed* markup is saved, cleared once prices
   // are pushed to eBay.
   const [pricesStale, setPricesStale] = useState(false);
+  const [locationPostalCode, setLocationPostalCode] = useState('');
+  const [settingUpLocation, setSettingUpLocation] = useState(false);
 
   const showNotice = (text: string, ok = true) => {
     setNotice({ text, ok });
@@ -208,6 +210,30 @@ export default function EbaySettingsPanel() {
       showNotice(err instanceof Error ? err.message : 'Could not disconnect.', false);
     } finally {
       setDisconnecting(false);
+    }
+  };
+
+  const setupLocation = async () => {
+    const postalCode = locationPostalCode.trim();
+    if (!postalCode) {
+      showNotice('Enter a postal code first.', false);
+      return;
+    }
+    setSettingUpLocation(true);
+    try {
+      const res = await fetch('/api/admin/ebay/location', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ postalCode, country: 'US' }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(errorMessage(data, 'Could not create the inventory location.'));
+      showNotice(`Inventory location created: ${data.merchantLocationKey}.`);
+      await loadStatus();
+    } catch (err) {
+      showNotice(err instanceof Error ? err.message : 'Could not create the inventory location.', false);
+    } finally {
+      setSettingUpLocation(false);
     }
   };
 
@@ -386,9 +412,31 @@ export default function EbaySettingsPanel() {
                 {status.defaults.merchantLocationKey ? (
                   <p className="text-sm" style={{ color: 'var(--color-on-surface)' }}>{status.defaults.merchantLocationKey}</p>
                 ) : (
-                  <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                    Not set up yet — this is created automatically when you connect.
-                  </p>
+                  <div>
+                    <p className="text-xs mb-2" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      One-time setup — enter your business postal code to create it
+                      (needs a real ZIP so eBay has accurate shipping-origin data).
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        className="form-field"
+                        style={{ maxWidth: '8rem' }}
+                        placeholder="ZIP code"
+                        value={locationPostalCode}
+                        disabled={settingUpLocation}
+                        onChange={(e) => setLocationPostalCode(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="outline-button"
+                        disabled={settingUpLocation || !locationPostalCode.trim()}
+                        onClick={() => void setupLocation()}
+                      >
+                        {settingUpLocation ? 'Creating…' : 'Create'}
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

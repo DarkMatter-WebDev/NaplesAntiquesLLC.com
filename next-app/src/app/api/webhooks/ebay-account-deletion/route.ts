@@ -13,6 +13,17 @@ import { insertSyncLog } from '@/lib/ebay/store';
 // notifications. We store no eBay buyer data (no Phase 3 order ingest is
 // built), so there is nothing to delete on our side — this handler is close
 // to a no-op by design.
+//
+// CONFIRMED LIVE 2026-07-09 (session 14, owner's real production keyset,
+// "Send Test Notification" succeeded end to end): eBay's getPublicKey
+// response is { key, algorithm: "ECDSA", digest: "SHA1" } — the digest is
+// SHA1, NOT SHA256 (this build's original guess). The "key" field arrives as
+// "-----BEGIN PUBLIC KEY-----<base64><NO line breaks>-----END PUBLIC
+// KEY-----" — markers present but not valid PEM as-is; buildPemFromRawKey()
+// below always strips whatever markers/whitespace are present and rebuilds
+// the PEM itself rather than trusting the raw string's shape. See
+// project-docs/DECISIONS.md 2026-07-09 (session 14, second addendum) for the
+// full debugging trail.
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -47,15 +58,14 @@ export async function GET(req: Request) {
 }
 
 // ---------------------------------------------------------------------------
-// Signature verification for the POST notification. TODO(ebay-verify): the
-// exact X-EBAY-SIGNATURE decoding shape and the getPublicKey response field
-// names are pinned from the commonly-documented eBay Notification API
-// pattern (base64 JSON header carrying {kid, signature}; ECDSA/SHA-256 over
-// the raw request body; PEM-ish public key from
-// /commerce/notification/v1/public_key/{kid}) — this build environment has
-// no network access to confirm the live contract (see
-// next-app/src/lib/ebay/client.ts's header note). Spot check against a real
-// "Send Test Notification" payload before relying on this in production.
+// Signature verification for the POST notification. CONFIRMED LIVE
+// 2026-07-09 (session 14) against the owner's real production keyset's
+// "Send Test Notification": the X-EBAY-SIGNATURE header is base64 JSON
+// carrying { kid, signature } as originally assumed; the actual digest is
+// SHA1 (from getPublicKey's own "digest" field, not hardcoded) over the raw
+// request body, verified with the EC public key from
+// /commerce/notification/v1/public_key/{kid} (see buildPemFromRawKey below
+// for the response's actual, initially-surprising key format).
 // ---------------------------------------------------------------------------
 interface EbaySignatureHeader {
   alg?: string;

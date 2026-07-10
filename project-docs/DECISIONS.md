@@ -1,5 +1,49 @@
 # Decisions Log
 
+## 2026-07-09 (session 14, second addendum) - eBay account-deletion webhook: confirmed live, two real bugs found and fixed
+
+**Context:** Following the session-14 build, the owner worked through
+`OWNER-SETUP.md` live: ran `supabase/ebay-sync.sql`, set Netlify env vars,
+deployed, and configured the Marketplace Account Deletion subscription in
+the Developer Portal. The GET challenge-echo validated immediately (exact
+algorithm match, no issues) and the production keyset auto-enabled — **the
+GET challenge alone satisfies eBay's Q10 compliance gate; "Send Test
+Notification" is a separate, optional manual check, not required to unlock
+the keyset.**
+
+**Two real, previously-`TODO(ebay-verify)` bugs surfaced and were fixed**
+once "Send Test Notification" started exercising the POST signature-verify
+path, diagnosed via temporary structural `console.error` logging added to
+`app/api/webhooks/ebay-account-deletion/route.ts` and read live from
+Netlify's function logs (no secrets were ever logged — only eBay's own
+public-key metadata, HTTP statuses, and header shapes):
+
+1. **Digest is SHA1, not SHA256.** eBay's `getPublicKey` response includes
+   its own `digest` field (`"SHA1"`) alongside `algorithm: "ECDSA"` — the
+   build had hardcoded `crypto.createVerify('SHA256')`. Fixed by reading the
+   digest from the response instead of assuming one.
+2. **The `key` field is not valid PEM as delivered.** It arrives as
+   `-----BEGIN PUBLIC KEY-----<base64><no line breaks>-----END PUBLIC
+   KEY-----` — a single line with the markers baked in but zero internal
+   line breaks, which Node's OpenSSL binding rejects
+   (`error:1E08010C:DECODER routines::unsupported`). The original code's
+   `raw.includes('BEGIN PUBLIC KEY') ? raw : ...` check saw the markers and
+   used the string as-is instead of reformatting it. Fixed by always
+   stripping any markers/whitespace and rebuilding a properly line-wrapped
+   PEM ourselves (`buildPemFromRawKey()`), regardless of the raw string's
+   shape. Verified locally against the actual key bytes from the log
+   (`crypto.createPublicKey()` now parses it as an EC `prime256v1` key).
+
+**Result:** both the GET challenge and the POST signature verification are
+now confirmed working end to end against the owner's real production
+keyset — "Send Test Notification" succeeds with no errors in Netlify's
+function logs, and the eBay portal shows no failure banner. This resolves
+the `TODO(ebay-verify)` items on the account-deletion webhook's signature
+check specifically (see `project-docs/features/ebay-sync.md`, updated in
+place). The rest of the eBay integration's `TODO(ebay-verify)` items
+(category ids, aspect value lists, `bulkUpdatePriceQuantity` batching,
+etc.) are unrelated and remain open.
+
 ## 2026-07-09 (session 14) - eBay sync build: interpretations, gaps, and judgment calls
 
 **Context:** built the full eBay sync integration from `ebay-sync-plan/`

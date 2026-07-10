@@ -1,6 +1,10 @@
 # Feature: eBay Sync
 
-> Status: **code-complete, unverified live** (built 2026-07-09, session 14).
+> Status: **code-complete; the Phase 0 account-deletion webhook is
+> confirmed live** (built 2026-07-09 session 14; webhook verified live the
+> same day, session 14 second addendum). Everything else (Phase 1 publish
+> flow, Phase 2 automation) remains unverified against a live eBay account —
+> see "Verification status" below.
 > Full plan: `ebay-sync-plan/` (18 docs). Owner checklist:
 > `ebay-sync-plan/OWNER-SETUP.md`. Deliberately mirrors the shipped Etsy
 > integration's shape — see `project-docs/features/etsy-sync.md` — but is a
@@ -238,12 +242,20 @@ left unbuilt. Full reasoning for each: `project-docs/DECISIONS.md`
 5. **`bulkUpdatePriceQuantity` sends one SKU per call**, not a batch of up
    to 25 — the plan's own `rest-endpoints-used.md:57` flags the exact
    batching shape `TODO(ebay-verify)`.
-6. **Account-deletion webhook signature verification** (`X-EBAY-SIGNATURE`
-   decoding + `getPublicKey` response shape) is implemented from the
-   commonly-documented pattern, not a live-verified contract — the
-   challenge-echo GET half (precisely specified by the plan) is exact and
-   unit-tested. Spot-check the POST path against a real "Send Test
-   Notification" before relying on it.
+6. ~~Account-deletion webhook signature verification unverified~~ —
+   **RESOLVED 2026-07-09 (session 14, second addendum).** Confirmed live
+   against the owner's real production keyset's "Send Test Notification":
+   the `X-EBAY-SIGNATURE` header shape was correct as originally assumed,
+   but two real bugs surfaced and were fixed — (a) eBay's digest is **SHA1**,
+   not the originally-hardcoded SHA256 (now read from `getPublicKey`'s own
+   `digest` field instead of assumed), and (b) the `key` field arrives as a
+   single line with PEM markers but no internal line breaks, which
+   Node's OpenSSL binding rejects outright — now always rebuilt into a
+   properly line-wrapped PEM regardless of the raw string's shape
+   (`buildPemFromRawKey()` in the route file). Both the GET challenge and
+   POST signature verification are now confirmed working end to end. Full
+   debugging trail: `project-docs/DECISIONS.md` 2026-07-09 (session 14,
+   second addendum).
 7. **General eBay API host/header conventions** are pinned from
    well-established, stable Sell API knowledge, not a fresh OpenAPI fetch —
    spot-check the Sell Inventory/OAuth endpoints against real docs before
@@ -256,7 +268,19 @@ left unbuilt. Full reasoning for each: `project-docs/DECISIONS.md`
 
 ## Verification status
 
-**No live-eBay verification was possible or attempted.** What IS verified:
+**Live-eBay verification, Phase 0 (2026-07-09, session 14 second addendum):**
+the account-deletion webhook is confirmed working end to end against the
+owner's real production keyset — the GET challenge validated immediately
+(auto-enabled the previously-disabled production keyset — that alone
+satisfies eBay's Q10 compliance gate) and "Send Test Notification" (the
+POST signature-verify path) now succeeds with zero errors in Netlify's
+function logs and no failure banner in the eBay portal, after fixing two
+real bugs found via live debugging (SHA1 digest, malformed single-line PEM
+— see DECISIONS.md). **Everything else below (Phase 1 publish flow, Phase 2
+automation) remains unverified** — connecting the app (OAuth), a dry-run
+preview, and an actual product publish have not been attempted yet.
+
+What IS verified (code-level, all builds/phases):
 
 - `npx tsc --noEmit` — clean.
 - `npm run lint` — clean (0 errors).
@@ -275,8 +299,9 @@ left unbuilt. Full reasoning for each: `project-docs/DECISIONS.md`
   ring-size + 22 length + 22 images + 5 client tests, and all non-Etsy
   suites) — **zero regressions**.
 
-Every live-eBay item from `ebay-sync-plan/14-verification-checklist.md`
-(keyset activation, sandbox OAuth round-trip, first real publish,
-idempotency drills, hide/restore, price push observation) is on
-`ebay-sync-plan/OWNER-SETUP.md` as a post-setup step, explicitly marked
-untested by this build.
+**Keyset activation is now done** (the one Phase 0 item from
+`ebay-sync-plan/14-verification-checklist.md`'s "Phase 0/1 verification"
+list). Every remaining live-eBay item from that checklist (sandbox OAuth
+round-trip, first real publish, idempotency drills, hide/restore, price
+push observation) is on `ebay-sync-plan/OWNER-SETUP.md` as a post-setup
+step, explicitly marked untested by this build.

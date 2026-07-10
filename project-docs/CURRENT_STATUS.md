@@ -3,6 +3,38 @@
 > Reflects the present state of development. **Update this at the end of every
 > work session.** Last updated: **2026-07-09**.
 
+## 2026-07-09 (session 14, addendum) -- 🟢 eBay account-deletion webhook confirmed live; production keyset enabled
+
+Owner worked through `OWNER-SETUP.md` live after the session-14 build: ran
+`supabase/ebay-sync.sql`, set Netlify env vars, deployed, and configured the
+Marketplace Account Deletion subscription in the Developer Portal. **The GET
+challenge validated immediately and auto-enabled the previously-disabled
+production keyset** — that alone satisfies eBay's Q10 compliance gate.
+"Send Test Notification" (the POST signature-verify path) initially failed
+with a 412; live-debugged via temporary diagnostic logging read straight
+from Netlify's function logs (two real bugs: eBay's digest is SHA1 not the
+hardcoded SHA256, and its public-key response needs reformatting into a
+proper multi-line PEM) and now succeeds end to end with zero errors. Full
+trail: `project-docs/DECISIONS.md` (session 14, second addendum);
+`ebay-sync-plan/OWNER-SETUP.md` step 5 updated to ✅ done.
+
+Also found live: eBay's portal rejects a pure lowercase-hex verification
+token (e.g. a raw GUID) as invalid — needs mixed-case/varied characters.
+Noted in OWNER-SETUP.md for next time (e.g. a future token rotation).
+
+`EBAY_ENV`'s value ("production") also tripped Netlify's secrets scanner as
+a false positive (same class of issue `PAYPAL_ENV` already had) — added to
+`SECRETS_SCAN_OMIT_KEYS` in root `netlify.toml`.
+
+**Step 6 (RuName) also done same session:** created and OAuth-enabled via
+the Developer Portal — RuName `Christopher_Sur-Christop-PostnS-ubfab`,
+Display Title "Naples Estate Jewelry", privacy/accepted/declined URLs set
+per the plan. Owner still needs to set `EBAY_RUNAME` in Netlify and redeploy.
+
+**Still not done:** connecting the app (OAuth) in `/admin/settings`, a
+dry-run preview, and an actual product publish — Phase 1/2's live
+verification remains outstanding, per `OWNER-SETUP.md` steps 8, 9.
+
 ## 2026-07-09 (session 14) -- 🟡 eBay sync: Phase 0 webhook + Phase 1 + Phase 2 code-complete, unverified live
 
 Built the full eBay sync integration per `ebay-sync-plan/BUILD-PROMPT.md`,
