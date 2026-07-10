@@ -88,12 +88,33 @@ function parseSignatureHeader(header: string | null): EbaySignatureHeader | null
   }
 }
 
-const publicKeyCache = new Map<string, { pem: string; fetchedAt: number }>();
+interface EbayPublicKey {
+  pem: string;
+  digest: string;
+}
+
+const publicKeyCache = new Map<string, EbayPublicKey & { fetchedAt: number }>();
 const PUBLIC_KEY_TTL_MS = 60 * 60 * 1000; // cached ~1h per ebay-sync-plan/09-api-routes.md
 
-async function fetchPublicKeyPem(keyId: string): Promise<string> {
+// Confirmed live 2026-07-09: eBay's getPublicKey response is
+// { key, algorithm: "ECDSA", digest: "SHA1" } — the digest is NOT SHA256 (a
+// wrong assumption this build originally made). The "key" field itself
+// arrives as "-----BEGIN PUBLIC KEY-----<base64, no line breaks>-----END
+// PUBLIC KEY-----" — markers present, but not valid PEM as-is (OpenSSL
+// requires the base64 body wrapped onto its own lines). Always strip
+// whatever markers/whitespace are present and rebuild the PEM ourselves
+// rather than trusting the raw string's shape.
+function buildPemFromRawKey(raw: string): string {
+  const base64Body = raw
+    .replace(/-----BEGIN [^-]+-----/g, '')
+    .replace(/-----END [^-]+-----/g, '')
+    .replace(/\s+/g, '');
+  return `-----BEGIN PUBLIC KEY-----\n${base64Body.match(/.{1,64}/g)?.join('\n') ?? base64Body}\n-----END PUBLIC KEY-----\n`;
+}
+
+async function fetchPublicKey(keyId: string): Promise<EbayPublicKey> {
   const cached = publicKeyCache.get(keyId);
-  if (cached && Date.now() - cached.fetchedAt < PUBLIC_KEY_TTL_MS) return cached.pem;
+  if (cached && Date.now() - cached.fetchedAt < PUBLIC_KEY_TTL_MS) return cached;
 
   let token: string;
   try {
@@ -112,26 +133,22 @@ async function fetchPublicKeyPem(keyId: string): Promise<string> {
     console.error(`ebay-account-deletion: getPublicKey failed (HTTP ${res.status}) for kid=${keyId}. Body:`, body.slice(0, 500));
     throw new Error(`Could not fetch eBay notification public key (HTTP ${res.status}).`);
   }
-  const data = (await res.json()) as Record<string, unknown>;
-  // Not secret — this is a PUBLIC key + its own algorithm/digest metadata,
-  // literally meant to be publicly known so anyone can verify eBay's
-  // signature. Safe to log in full while we pin down the real response shape.
-  console.error('ebay-account-deletion: getPublicKey full response:', JSON.stringify(data));
-  const raw = String((data as { key?: string }).key ?? '').trim();
+  const data = (await res.json()) as { key?: string; algorithm?: string; digest?: string };
+  const raw = String(data.key ?? '').trim();
   if (!raw) {
     console.error('ebay-account-deletion: getPublicKey response had no usable "key" field. Full response:', JSON.stringify(data).slice(0, 1000));
   }
-  const pem = raw.includes('BEGIN PUBLIC KEY') ? raw : `-----BEGIN PUBLIC KEY-----\n${raw.match(/.{1,64}/g)?.join('\n') ?? raw}\n-----END PUBLIC KEY-----`;
-  publicKeyCache.set(keyId, { pem, fetchedAt: Date.now() });
-  return pem;
+  const result: EbayPublicKey = { pem: buildPemFromRawKey(raw), digest: data.digest || 'SHA256' };
+  publicKeyCache.set(keyId, { ...result, fetchedAt: Date.now() });
+  return result;
 }
 
 async function verifyEbaySignature(rawBody: string, signatureHeader: string | null): Promise<boolean> {
   const parsed = parseSignatureHeader(signatureHeader);
   if (!parsed) return false;
   try {
-    const publicKeyPem = await fetchPublicKeyPem(parsed.kid!);
-    const verifier = crypto.createVerify('SHA256');
+    const { pem: publicKeyPem, digest } = await fetchPublicKey(parsed.kid!);
+    const verifier = crypto.createVerify(digest);
     verifier.update(rawBody);
     verifier.end();
     const result = verifier.verify(publicKeyPem, Buffer.from(parsed.signature!, 'base64'));
