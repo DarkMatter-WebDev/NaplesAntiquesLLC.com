@@ -4718,7 +4718,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   onClick={() => toggleEditorSection('ebay')}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleEditorSection('ebay'); } }}>
                   <div className="product-editor-icon" style={{ background: 'rgba(212, 175, 55, 0.18)', color: '#a9760a' }}>
-                    <span className="material-symbols-outlined" aria-hidden="true">storefront</span>
+                    <span className="material-symbols-outlined" aria-hidden="true">shopping_bag</span>
                   </div>
                   <div>
                     <h3 className="product-editor-section-title">eBay</h3>

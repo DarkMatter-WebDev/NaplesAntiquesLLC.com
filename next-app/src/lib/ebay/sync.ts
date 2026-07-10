@@ -377,7 +377,13 @@ async function handleSyncError(
     return { done: true, syncState: listing?.sync_state ?? 'pending', error: { code, message } };
   }
 
+  // ebay_sku is NOT NULL — on a first-ever sync attempt there's no existing
+  // row yet, so this upsert is really an INSERT and must supply it (falls
+  // back to productId, same convention as the preflight-failure branch
+  // above and enqueueProducts()) or the error-logging write itself throws
+  // and masks the real failure that got us here.
   await upsertListing(service, productId, {
+    ebay_sku: listing?.ebay_sku ?? productId,
     sync_state: 'error',
     last_error: message,
     error_count: (listing?.error_count ?? 0) + 1,

@@ -31,9 +31,39 @@ the Developer Portal — RuName `Christopher_Sur-Christop-PostnS-ubfab`,
 Display Title "Naples Estate Jewelry", privacy/accepted/declined URLs set
 per the plan. Owner still needs to set `EBAY_RUNAME` in Netlify and redeploy.
 
-**Still not done:** connecting the app (OAuth) in `/admin/settings`, a
-dry-run preview, and an actual product publish — Phase 1/2's live
-verification remains outstanding, per `OWNER-SETUP.md` steps 8, 9.
+**Step 8 also done same session:** connected via OAuth in `/admin/settings`;
+all 4 policy dropdowns set (Standard: NEJ Insured Flat Rate, Express: NEJ
+Express High-Value, Payment: NEJ Immediate Payment, Return: NEJ 30-Day
+Returns). Inventory location creation — previously scoped as a manual
+curl+SQL step since it needs a real business postal code — got a proper
+one-time-setup UI instead (`POST /api/admin/ebay/location` +
+`EbaySettingsPanel.tsx`, ZIP code field + Create button, uses the
+already-connected session's token): confirmed working live,
+`merchant_location_key = 'nej-naples-fl'` set successfully. Also fixed a
+misleading UI string that claimed the location was "created automatically
+when you connect" (it isn't — never was built that way).
+
+**Also fixed same session:** the eBay drawer-section icon (`storefront`) rendered
+as literal clipped text ("FRONT") instead of an icon — this project ships a
+hand-subsetted Material Symbols font (`next-app/scripts/regenerate-material-
+symbols-subset.py`, only bundles glyphs actually referenced in source at
+generation time), and `storefront` was a new icon name introduced by this
+build, never in the subset. Swapped to `shopping_bag` (same icon Etsy's
+section already uses, confirmed safe) rather than regenerating the font —
+a one-line fix, zero other files touched.
+
+**Dry-run previews spot-checked live (same session):** a spot-priced
+high-value bracelet ($5,206→$5,987.43 w/ markup, correctly resolved
+**express** shipping per Q16), a manual-priced silver bracelet (brand +
+925 purity format both correct), and a ring (**Ring Size: 10.5** shown
+correctly, not Chain Length). No Coin/Bullion items exist in the current
+catalog to spot-check live (unit-tested only).
+
+**Still not done:** an actual product publish —
+Phase 1/2's live sync verification remains outstanding, per
+`OWNER-SETUP.md` step 9. No Fashion Jewelry category is pinned yet, so
+vermeil items will stay blocked at pre-flight until that's resolved
+(see `ebay-sync-plan/OWNER-SETUP.md` step 9's category-pinning note).
 
 ## 2026-07-09 (session 14) -- 🟡 eBay sync: Phase 0 webhook + Phase 1 + Phase 2 code-complete, unverified live
 
