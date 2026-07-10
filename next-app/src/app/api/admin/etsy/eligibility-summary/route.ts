@@ -4,9 +4,11 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { fetchSpotData } from '@/lib/spot-price';
 import { buildPreflightChecks, isPreflightPassing } from '@/lib/etsy/mapping';
 import { getConnection, getListingsMap } from '@/lib/etsy/store';
+import { scanAndMarkOutOfDate } from '@/lib/etsy/sync';
 import type { Product } from '@/types/product';
 
 export const runtime = 'nodejs';
+export const maxDuration = 30;
 
 /**
  * Pre-flight summary for the "Sync all to Etsy" confirm screen
@@ -17,6 +19,15 @@ export const runtime = 'nodejs';
 export async function GET() {
   const { error } = await requireAdmin();
   if (error) return error;
+
+  // Defensive backstop: the primary content-change detection runs on every
+  // product save (adminRevalidateProduct/-Products, fire-and-forget), but a
+  // save-time hiccup shouldn't leave a real price change permanently
+  // invisible to "Sync all" — confirmed live 2026-07-10 (scanAndMarkOutOfDate
+  // existed but was never called from anywhere, so no price edit was ever
+  // detected). Re-checking here whenever the owner opens this dialog closes
+  // that gap regardless of what happened before.
+  await scanAndMarkOutOfDate().catch(() => {});
 
   const service = createServiceClient();
   const connection = await getConnection(service);

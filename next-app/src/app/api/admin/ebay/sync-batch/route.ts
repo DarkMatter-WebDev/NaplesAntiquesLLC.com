@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
-import { drainQueue, enqueueAllEligible, enqueueProducts } from '@/lib/ebay/sync';
+import { drainPublishQueue, drainQueue, enqueueAllEligible, enqueueProducts } from '@/lib/ebay/sync';
 
 // Phase 2 bulk queue + drain. Same envelope as the Etsy sync-batch route:
 // enqueue / enqueue-all-eligible / drain, backed by
@@ -35,9 +35,14 @@ export async function POST(req: Request) {
     const result = await drainQueue();
     return NextResponse.json(result);
   }
+  if (body.action === 'drain-publish') {
+    // Publishes prepared 'review' listings live — deliberate go-live action.
+    const result = await drainPublishQueue();
+    return NextResponse.json(result);
+  }
 
   return NextResponse.json(
-    { error: { code: 'invalid_action', message: 'action must be "enqueue", "enqueue-all-eligible", or "drain".' } },
+    { error: { code: 'invalid_action', message: 'action must be "enqueue", "enqueue-all-eligible", "drain", or "drain-publish".' } },
     { status: 400 },
   );
 }

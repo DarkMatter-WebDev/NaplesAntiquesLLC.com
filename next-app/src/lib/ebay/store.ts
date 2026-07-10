@@ -143,21 +143,42 @@ export async function getListingsMap(service: SupabaseClient): Promise<Record<st
   return Object.fromEntries(rows.map((row) => [row.product_id, row]));
 }
 
+// Deliberately NOT a single .upsert(...): Postgres validates NOT NULL
+// constraints against the row `INSERT ... ON CONFLICT DO UPDATE` WOULD have
+// inserted before it even checks for a conflict — so a one-shot upsert with
+// a partial patch (any call site not passing ebay_sku, e.g. the
+// offer/publish state-transition calls below) throws a NOT NULL violation
+// even when updating an existing row. Confirmed live 2026-07-09 (Failing row
+// showed ebay_sku=null despite the row already existing). Try a real UPDATE
+// first — a genuine partial update, no such validation — and only fall back
+// to INSERT (which does need every NOT NULL column) when no row exists yet.
 export async function upsertListing(
   service: SupabaseClient,
   productId: string,
   patch: Partial<Omit<EbayListingRow, 'product_id'>>,
 ): Promise<EbayListingRow> {
-  const { data, error } = await service
+  const { data: updated, error: updateError } = await service
     .from('ebay_listings')
-    .upsert({ product_id: productId, ...patch, updated_at: new Date().toISOString() }, { onConflict: 'product_id' })
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('product_id', productId)
+    .select('*')
+    .maybeSingle();
+  if (updateError) {
+    if (isMissingSchemaError(updateError)) throw new EbayNotMigratedError();
+    throw new Error(updateError.message);
+  }
+  if (updated) return updated as EbayListingRow;
+
+  const { data: inserted, error: insertError } = await service
+    .from('ebay_listings')
+    .insert({ product_id: productId, ebay_sku: productId, ...patch, updated_at: new Date().toISOString() })
     .select('*')
     .single();
-  if (error) {
-    if (isMissingSchemaError(error)) throw new EbayNotMigratedError();
-    throw new Error(error.message);
+  if (insertError) {
+    if (isMissingSchemaError(insertError)) throw new EbayNotMigratedError();
+    throw new Error(insertError.message);
   }
-  return data as EbayListingRow;
+  return inserted as EbayListingRow;
 }
 
 export async function deleteListingRow(service: SupabaseClient, productId: string): Promise<void> {
@@ -215,6 +236,39 @@ export async function countPendingListings(service: SupabaseClient): Promise<num
     .from('ebay_listings')
     .select('product_id', { count: 'exact', head: true })
     .eq('sync_state', 'pending');
+  if (error) {
+    if (isMissingSchemaError(error)) return 0;
+    throw new Error(error.message);
+  }
+  return count ?? 0;
+}
+
+// Bulk-publish queue: items already prepared to a reviewable offer
+// (sync_state 'review') that the owner can push live. No dedicated claim RPC
+// like the pending queue needs — publishLiveStep is idempotent and always
+// transitions the row OUT of 'review' (to 'published' on success, 'error' on
+// failure), so selecting the oldest remaining 'review' row each pass never
+// re-serves the same one; drainQueueCore's seen-guard is the backstop.
+export async function claimNextReviewListing(service: SupabaseClient): Promise<string | null> {
+  const { data, error } = await service
+    .from('ebay_listings')
+    .select('product_id')
+    .eq('sync_state', 'review')
+    .order('updated_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    if (isMissingSchemaError(error)) return null;
+    throw new Error(error.message);
+  }
+  return (data as { product_id: string } | null)?.product_id ?? null;
+}
+
+export async function countReviewListings(service: SupabaseClient): Promise<number> {
+  const { count, error } = await service
+    .from('ebay_listings')
+    .select('product_id', { count: 'exact', head: true })
+    .eq('sync_state', 'review');
   if (error) {
     if (isMissingSchemaError(error)) return 0;
     throw new Error(error.message);

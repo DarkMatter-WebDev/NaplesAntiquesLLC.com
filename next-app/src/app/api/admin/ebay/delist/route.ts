@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
-import { runDelist } from '@/lib/ebay/sync';
+import { runDelist, runUnstage } from '@/lib/ebay/sync';
 
 // Manual delist verbs (Q7): hide (quantity-zero, Out-of-Stock Control),
-// withdraw (archived/deleted), restore.
+// withdraw (archived/deleted), restore, plus 'unstage' (discard a prepared-
+// but-unpublished offer and reset to not-listed).
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
-const VALID_ACTIONS = ['hide', 'withdraw', 'restore'] as const;
+const VALID_ACTIONS = ['hide', 'withdraw', 'restore', 'unstage'] as const;
 
 export async function POST(req: Request) {
   const { error } = await requireAdmin();
@@ -28,6 +29,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: { code: 'invalid_action', message: `action must be one of ${VALID_ACTIONS.join(', ')}.` } }, { status: 400 });
   }
 
-  const result = await runDelist(body.productId, action);
+  const result = action === 'unstage' ? await runUnstage(body.productId) : await runDelist(body.productId, action);
   return NextResponse.json(result);
 }

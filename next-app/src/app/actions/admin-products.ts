@@ -3,8 +3,8 @@
 import { revalidateTag, revalidatePath } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/service';
 import { requireAdmin } from '@/lib/admin-auth';
-import { handleProductStatusChange as handleEtsyProductStatusChange } from '@/lib/etsy/sync';
-import { handleProductStatusChange as handleEbayProductStatusChange } from '@/lib/ebay/sync';
+import { handleProductStatusChange as handleEtsyProductStatusChange, scanAndMarkOutOfDate as scanEtsyOutOfDate } from '@/lib/etsy/sync';
+import { handleProductStatusChange as handleEbayProductStatusChange, scanAndMarkOutOfDate as scanEbayOutOfDate } from '@/lib/ebay/sync';
 import type { ProductStatus } from '@/types/product';
 
 export async function adminUpdateProductStatus(
@@ -48,6 +48,14 @@ export async function adminRevalidateProducts(ids: string[]): Promise<void> {
   // never let an Etsy or eBay hiccup block this revalidation.
   void handleEtsyProductStatusChange(ids).catch(() => {});
   void handleEbayProductStatusChange(ids).catch(() => {});
+  // Same chokepoint reuse for content-change detection (price edits, etc.):
+  // scanAndMarkOutOfDate was built+tested but never actually called from
+  // anywhere until 2026-07-10, so an already-synced listing never flipped to
+  // 'out_of_date' after a price edit — "Sync all" kept reporting it as
+  // already up to date. Scoped to just these ids, so this stays cheap on a
+  // single-product save instead of re-hashing the whole catalog.
+  void scanEtsyOutOfDate(ids).catch(() => {});
+  void scanEbayOutOfDate(ids).catch(() => {});
 }
 
 export async function adminRevalidateProduct(id: string): Promise<void> {
@@ -62,4 +70,6 @@ export async function adminRevalidateProduct(id: string): Promise<void> {
   revalidatePath(`/es/shop/${id}`);
   void handleEtsyProductStatusChange([id]).catch(() => {});
   void handleEbayProductStatusChange([id]).catch(() => {});
+  void scanEtsyOutOfDate([id]).catch(() => {});
+  void scanEbayOutOfDate([id]).catch(() => {});
 }

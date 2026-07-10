@@ -5,6 +5,7 @@ import { fetchSpotData } from '@/lib/spot-price';
 import type { Product } from '@/types/product';
 import { buildPreflightChecks, isPreflightPassing, type EbayConnectionDefaults } from '@/lib/ebay/mapping';
 import { getConnection, getListingsMap, type EbayConnectionRow } from '@/lib/ebay/store';
+import { scanAndMarkOutOfDate } from '@/lib/ebay/sync';
 
 // Free (no eBay calls) bulk pre-flight counts for the "Sync all to eBay"
 // confirm screen — the Etsy eligibility-summary route's twin.
@@ -31,6 +32,11 @@ function toConnectionDefaults(connection: EbayConnectionRow | null): EbayConnect
 export async function GET() {
   const { error } = await requireAdmin();
   if (error) return error;
+
+  // Defensive backstop — same reasoning as the Etsy twin route: the primary
+  // content-change detection runs on every product save (fire-and-forget),
+  // so re-check here too whenever the owner opens "Sync all to eBay".
+  await scanAndMarkOutOfDate().catch(() => {});
 
   const service = createServiceClient();
   const [{ data: products }, connectionRow, spotData, listingsMap] = await Promise.all([
@@ -64,12 +70,18 @@ export async function GET() {
     }
   }
 
+  // Prepared-but-not-live listings the owner can bulk-publish. Counted across
+  // the whole listings map (not just available products) so an item that went
+  // unavailable after being prepared still shows up for the publish flow.
+  const readyToPublish = Object.values(listingsMap).filter((listing) => listing.sync_state === 'review').length;
+
   return NextResponse.json({
     total: (products ?? []).length,
     eligible,
     ineligible,
     upToDate,
     errors,
+    readyToPublish,
     ineligibleSamples,
   });
 }

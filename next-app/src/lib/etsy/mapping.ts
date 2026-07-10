@@ -228,6 +228,23 @@ function extractTitleTags(title: string | null | undefined, typeWord: string): {
 }
 
 /**
+ * Whether an item is worn JEWELRY (vs. silver holloware/flatware, a coin, …)
+ * for TAG purposes, decided by its resolved Etsy taxonomy: jewelry lives under
+ * "Jewelry >" or "Accessories >" (brooches/cufflinks live under Accessories),
+ * everything else (Home & Living tableware, Art & Collectibles coins, …) is
+ * not. Drives whether the jewelry-specific category tags ("silver jewelry",
+ * "estate jewelry", "vintage/antique jewelry") apply — a silver mug should not
+ * be tagged "estate jewelry" (owner report 2026-07-10). An unmapped type
+ * (can't sync anyway) defaults to jewelry, preserving prior behavior for this
+ * jewelry-dominant catalog.
+ */
+function isJewelryProductType(productType: string | null | undefined): boolean {
+  const taxonomy = resolveTaxonomy(productType);
+  if (!taxonomy?.path) return true;
+  return taxonomy.path.startsWith('Jewelry >') || taxonomy.path.startsWith('Accessories >');
+}
+
+/**
  * Composed, buyer-searchable tags built from the product's own structured
  * fields (metal/purity/chain type/product type), not a sanitized pass-through
  * of the site's internal filter tags (`jt:`/`ct:`/`len:` — meant for this
@@ -313,18 +330,35 @@ export function mapTags(
   if (product.brand) add(product.brand);
   if (karatWord && metalWord) add(`${karatWord} ${metalWord}`); // "14k gold"
   if (metalWord && typeWord) add(`${metalWord} ${typeWord}`); // "gold bracelet"
-  if (metalWord) add(`${metalWord} jewelry`); // "gold jewelry"
-  add('estate jewelry');
+
+  // JEWELRY-specific category tags — but ONLY for actual worn jewelry. A
+  // silver mug/tray/spoon is not "estate jewelry" (owner report 2026-07-10);
+  // it gets object-appropriate silver keywords instead. Determined by the
+  // resolved Etsy taxonomy (jewelry vs. Home & Living / Collectibles).
+  const isJewelry = isJewelryProductType(product.product_type ?? product.jewelry_type);
+  const isSilverObject = !isJewelry && metalType === 'Silver';
+  if (isJewelry) {
+    if (metalWord) add(`${metalWord} jewelry`); // "gold jewelry"
+    add('estate jewelry');
+  } else if (isSilverObject) {
+    add('sterling silver');
+    add('estate silver');
+  }
   // Vintage/antique category signals. This whole catalog is attested estate/
   // vintage (Q2 — see mapWhenMade), and buyers search both "vintage" and
   // "antique" loosely, so per the owner's request (2026-07-08) every item
   // carries BOTH terms — antique is always paired with vintage — plus a
   // metal-specific pair when the metal is known ("vintage sterling"/"antique
-  // sterling", "vintage gold"/"antique gold", …). Placed right after "estate
-  // jewelry" so these on-brand terms outrank the generic single words below
-  // within the 13-tag budget.
+  // sterling", "vintage gold"/"antique gold", …). Placed right after the
+  // category tags so these on-brand terms outrank the generic single words
+  // below within the 13-tag budget. The generic "…jewelry" pair likewise
+  // becomes a "…silver" pair for non-jewelry silver objects.
   if (vintageMetalWord) addVintageAntiquePair(`vintage ${vintageMetalWord}`, `antique ${vintageMetalWord}`);
-  addVintageAntiquePair('vintage jewelry', 'antique jewelry');
+  if (isJewelry) {
+    addVintageAntiquePair('vintage jewelry', 'antique jewelry');
+  } else if (isSilverObject) {
+    addVintageAntiquePair('vintage silver', 'antique silver');
+  }
   if (karatWord) add(karatWord); // "14k"
   if (metalWord) add(metalWord); // "gold"
   if (typeWord) add(typeWord); // "bracelet"
@@ -653,6 +687,26 @@ const ETSY_KEYWORD_TAXONOMY: { pattern: RegExp; mapping: TaxonomyMapping }[] = [
   { pattern: /salt cellar|\bcellar\b|caster|muffineer|shaker/i, mapping: { taxonomyId: 1050, path: 'Home & Living > Kitchen & Dining > Dining & Serving > Salt & Pepper Shakers', approximate: true } },
   { pattern: /coffee ?pot|tea ?pot|teapot|chocolate ?pot/i, mapping: { taxonomyId: 1932, path: 'Home & Living > Kitchen & Dining > Coffee & Tea Makers > Tea Makers > Teapots', approximate: true } },
   { pattern: /tazza|compote|comport|epergne/i, mapping: { taxonomyId: 2538, path: 'Home & Living > Kitchen & Dining > Dining & Serving > Trays & Platters > Platters', approximate: true } },
+  // --- 2026-07-10 round 2: pre-mapped for the new "Mug" item + antique-silver
+  // forms the shop may acquire. Etsy's taxonomy is craft/handmade-oriented and
+  // has no dedicated antique-silver leaves, so most are closest-fit
+  // (approximate) — owner can override per item. Ids fetched live from
+  // seller-taxonomy/nodes (scripts/research-etsy-taxonomy.mjs). "butter dish"
+  // precedes the generic bowl/dish rule below on purpose (first-match wins).
+  { pattern: /\bmug\b|\bcup\b/i, mapping: { taxonomyId: 1062, path: 'Home & Living > Kitchen & Dining > Drink & Barware > Drinkware > Mugs', approximate: true } },
+  { pattern: /goblet|chalice|tankard|beaker|\bstein\b/i, mapping: { taxonomyId: 1861, path: 'Home & Living > Kitchen & Dining > Drink & Barware > Barware > Steins', approximate: true } },
+  { pattern: /candelabra/i, mapping: { taxonomyId: 2213, path: 'Home & Living > Home Decor > Candles & Home Fragrances > Candleholders > Candelabras' } },
+  { pattern: /candlestick|candle ?holder/i, mapping: { taxonomyId: 2214, path: 'Home & Living > Home Decor > Candles & Home Fragrances > Candleholders > Candlestick Holders' } },
+  { pattern: /pitcher|\bewer\b|water jug/i, mapping: { taxonomyId: 1938, path: 'Home & Living > Kitchen & Dining > Drink & Barware > Drinkware > Pitchers & Drinking Sets > Pitchers', approximate: true } },
+  { pattern: /\bvase\b|\burn\b/i, mapping: { taxonomyId: 1026, path: 'Home & Living > Home Decor > Home Accents > Vases', approximate: true } },
+  { pattern: /\bbell\b/i, mapping: { taxonomyId: 6081, path: 'Home & Living > Home Decor > Home Accents > Bells', approximate: true } },
+  { pattern: /inkwell|inkstand/i, mapping: { taxonomyId: 6415, path: 'Craft Supplies & Tools > Paints, Inks & Dyes > Inks > Inkwells', approximate: true } },
+  { pattern: /butter dish/i, mapping: { taxonomyId: 1045, path: 'Home & Living > Kitchen & Dining > Dining & Serving > Serving Odds & Ends > Butter Dishes' } },
+  { pattern: /porringer/i, mapping: { taxonomyId: 1044, path: 'Home & Living > Kitchen & Dining > Dining & Serving > Bowls', approximate: true } },
+  { pattern: /cigarette case/i, mapping: { taxonomyId: 134, path: 'Bags & Purses > Accessory Cases > Cigarette Cases' } },
+  { pattern: /card case/i, mapping: { taxonomyId: 192, path: 'Bags & Purses > Wallets & Money Clips > Business Card Cases', approximate: true } },
+  { pattern: /vesta|match ?safe/i, mapping: { taxonomyId: 134, path: 'Bags & Purses > Accessory Cases > Cigarette Cases', approximate: true } },
+  { pattern: /snuff ?box|vinaigrette|trinket|\bbox\b/i, mapping: { taxonomyId: 6102, path: 'Jewelry > Jewelry Storage > Jewelry Boxes', approximate: true } },
   { pattern: /\btray\b|salver/i, mapping: { taxonomyId: 2537, path: 'Home & Living > Kitchen & Dining > Dining & Serving > Trays & Platters > Trays', approximate: true } },
   { pattern: /platter/i, mapping: { taxonomyId: 2538, path: 'Home & Living > Kitchen & Dining > Dining & Serving > Trays & Platters > Platters' } },
   { pattern: /\bbowl\b|\bdish\b/i, mapping: { taxonomyId: 1044, path: 'Home & Living > Kitchen & Dining > Dining & Serving > Bowls', approximate: true } },
@@ -689,7 +743,17 @@ export interface MappedImageEntry {
   rank: number;
 }
 
-export const ETSY_MAX_IMAGES = 10;
+// Etsy raised its platform-wide listing photo limit from 10 to 20 in August
+// 2025 (per Etsy's own listing-editor UI: "Add up to 20 photos and 2 videos"
+// — confirmed live 2026-07-10, owner screenshot) — the 10-cap here was
+// correct when etsy-sync-plan/05-image-pipeline.md was researched, but is
+// now stale. Multiple independent sources (seller community posts, and a
+// third-party Etsy listing tool's own "full 20-image support" announcement —
+// such tools integrate exclusively via the public API, so this isn't just a
+// client-side UI change) corroborate the API cap moved with the UI, not just
+// the editor. The image pipeline already uploads in step-budgeted batches
+// (IMAGE_STEP_BUDGET, images.ts) so this needed no structural change.
+export const ETSY_MAX_IMAGES = 20;
 
 // ---------------------------------------------------------------------------
 // Pre-flight — never reaches Etsy; blocks sync with a per-check message.
@@ -924,7 +988,19 @@ export function buildMappedPayload(
   };
 }
 
-/** Stable hash of the mapped output, for cheap out-of-date detection (no Etsy reads needed). */
+/**
+ * Stable hash of the mapped output, for cheap out-of-date detection (no Etsy
+ * reads needed).
+ *
+ * `price` is deliberately EXCLUDED (2026-07-10) — spot-multiplier items
+ * reprice on every gold/silver tick, which would flag most of the catalog
+ * out_of_date daily from market drift alone. Price already has its own
+ * dedicated path (Q4 threshold-gated scheduled push + the "Push prices now"
+ * bulk action, both keyed off last_pushed_price directly, not this hash) —
+ * see shouldPushPrice/pushPricesBatch below. This hash is for everything
+ * ELSE: any real content edit (title, description, tags, materials,
+ * taxonomy, images, quantity) still flags out-of-date.
+ */
 export function computeContentHash(payload: MappedEtsyPayload): string {
   const stable = {
     title: payload.title,
@@ -934,7 +1010,6 @@ export function computeContentHash(payload: MappedEtsyPayload): string {
     taxonomyId: payload.taxonomyId,
     whenMade: payload.whenMade,
     itemWeight: payload.itemWeight,
-    price: payload.price,
     quantity: payload.quantity,
     sku: payload.sku,
     images: payload.images.map((image) => ({ sourceKey: image.sourceKey, rank: image.rank })),

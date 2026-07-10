@@ -200,6 +200,14 @@ export async function deleteListingImageRow(service: SupabaseClient, id: number)
   if (error) throw new Error(error.message);
 }
 
+// Called when a listing_id is being retired (reset-to-not-listed after a 404,
+// or replaced by a new draft) — without this, its etsy_listing_images rows
+// become orphaned bookkeeping with no live listing to reconcile against.
+export async function deleteListingImagesByListingId(service: SupabaseClient, etsyListingId: number): Promise<void> {
+  const { error } = await service.from('etsy_listing_images').delete().eq('etsy_listing_id', etsyListingId);
+  if (error && !isMissingSchemaError(error)) throw new Error(error.message);
+}
+
 export async function insertSyncLog(service: SupabaseClient, input: EtsySyncLogInput): Promise<void> {
   const { error } = await service.from('etsy_sync_log').insert({
     product_id: input.product_id ?? null,

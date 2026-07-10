@@ -1,7 +1,283 @@
 ﻿# Current Status
 
 > Reflects the present state of development. **Update this at the end of every
-> work session.** Last updated: **2026-07-09**.
+> work session.** Last updated: **2026-07-10**.
+
+## 2026-07-10 (session 14, twentieth addendum) -- 🟢 eBay sync audit: no orphaned-row bug (no image table); fixed a real content_hash gap in Publish Now
+
+Owner asked to check eBay for the same orphaned-row issue found on Etsy, then
+more broadly for other sync issues. eBay has no `ebay_listing_images` table
+(images are direct-URL handoff, no upload/tracking rows to orphan) and its
+bulk status checker delegates to the single-item checker rather than
+duplicating logic, so that class of bug can't occur there. Broader audit of
+all 79 `ebay_listings` rows found a real one: `publishLiveStep` ("Publish
+Now", the shop's only publish path since auto_publish is off) never recorded
+a `content_hash`/`last_pushed_price`/`last_pushed_qty` baseline, so a
+freshly-published item got spuriously flagged `out_of_date` the next time
+`scanAndMarkOutOfDate` ran (every "Sync all to eBay" open). Fixed by having
+`publishLiveStep` set those fields at publish time, mirroring the two other
+publish paths that already did. Also traced and ruled out (unreachable) a
+suspected `effectiveMode` gap for re-syncing `review`-state items — every
+real call path already avoids it. Verified live: re-ran Sync Updates on the
+affected mug listing, confirmed fields now populate and it stays
+published/LIVE; re-queried all 79 rows — 0 with null content_hash (was 1).
+`tsc`/`lint`/`vitest` (275/275)/`build` clean. See DECISIONS.md 20th
+addendum.
+
+## 2026-07-10 (session 14, nineteenth addendum) -- 🟢 Etsy-wide photo audit: zero missing photos; fixed + cleaned up 38 orphaned image rows
+
+Owner asked to check all other Etsy listings for missing photos too.
+Audited every Etsy-linked product's CURRENT listing (image row count
+filtered by matching `etsy_listing_id`) against its real photo count —
+**zero mismatches**, every live listing has its full photo set. Found a
+separate byproduct bug along the way: 38 orphaned `etsy_listing_images`
+rows from listings previously deleted-on-Etsy-then-reset, because the 404
+handling in `checkListingStatus`/`checkAllListingStatuses` never cleaned up
+image rows tied to the retired listing id. Fixed both call sites (new
+`deleteListingImagesByListingId` in `lib/etsy/store.ts`). Reported the
+planned impact (4 dead listing-id groups, 2 products) to the owner per the
+destructive-operation-safety rule; owner confirmed; deleted the 38 rows by
+exact listing id; re-verified orphan count 0, current-listing rows
+untouched (614→576 total). `tsc`/`lint`/`vitest` (275/275)/`build` clean.
+See DECISIONS.md 19th addendum.
+
+## 2026-07-10 (session 14, eighteenth addendum) -- 🟢 Confirmed photo-sync-on-live-listings works; ran it for all 10 photo-cap-affected products
+
+Confirmed (not built — already existed) that "Sync Updates" on an
+already-active Etsy listing re-diffs and pushes new/changed photos, not
+just new drafts (`effectiveMode === 'update'` unconditionally runs the
+image step in `runSyncStep`). Ran it for all 10 real products the old
+10-photo cap had been truncating (11-17 photos each). Verified every one:
+image row count now exactly matches each product's real photo count
+(11/11 through 17/17), all still `active` (no demotion), real distinct
+Etsy image ids confirm genuine live uploads (spot-checked the 17-photo
+coffee pot). No code changes — pure verification + execution. See
+DECISIONS.md 18th addendum.
+
+## 2026-07-10 (session 14, seventeenth addendum) -- 🟢 Etsy photo cap raised 10→20 (real Etsy platform change, Aug 2025)
+
+Owner asked if Etsy's API still caps photos at 10 despite the editor now
+showing "up to 20." Confirmed via web research (Etsy raised the platform-
+wide limit in August 2025; a third-party Etsy integration tool's own "full
+20-image support" announcement is meaningful evidence the API cap moved
+too, not just the web UI). Our `ETSY_MAX_IMAGES = 10` was correct when
+originally researched pre-build but is now stale — a real live bug: 10
+catalog products currently have 11-17 photos, all silently truncated on
+every sync. Raised the constant to 20 (pipeline already uploads in step-
+budgeted batches, no structural change needed). Verified live against a
+real 17-photo product — all 17 now map through, preflight clean.
+`tsc`/`lint`/`vitest` (275/275)/`build` clean. See DECISIONS.md 17th
+addendum.
+
+## 2026-07-10 (session 14, sixteenth addendum) -- 🟢 Added eBay "Un-stage (discard draft)" action
+
+Owner wanted a way to fully un-stage a prepared-but-unpublished eBay offer (a
+'review'/'ended' item) — not publish, not end, but discard it and return to
+Not Listed. Added `deleteOfferCall` + `runUnstage()` (deletes the unpublished
+offer on eBay, resets the row to not-listed, refuses a live listing, tolerates
+a 404), a new `unstage` action on the delist route, and an "Un-stage (discard
+draft)" button in EbayProductPanel (shown for review/ended/offer_created).
+Un-staged items leave the review/publish queue. Verified live: mug (was
+'review') → un-stage → 'pending', offer/listing/hash cleared, readyToPublish
+1→0, panel shows Not Listed. `tsc`/`lint`/`vitest` (275/275)/`build` clean.
+See DECISIONS.md 16th addendum.
+
+## 2026-07-10 (session 14, fifteenth addendum) -- 🟢 Re-syncing an ENDED eBay item no longer wrongly shows "live"; Publish button surfaces
+
+Follow-on: after ending a listing, "Sync to eBay" reported it published/LIVE
+even though nothing was published (Q1 review-first). Root cause: runSyncStep's
+"already live" check keyed on the lingering (dead) ebay_listing_id. Fixed so
+liveness is `ebay_listing_id != null && sync_state !== 'ended'` — an ended
+item now goes through the review gate → 'review' (not published); the
+review-gate write clears the stale listing_id (so the Publish button /
+publishLiveStep actually works); and effectiveMode now refreshes the offer's
+content for an ended re-sync. The existing "Publish on eBay" button renders
+for 'review', so the fix surfaces it — no new UI. Verified live: ended mug →
+Sync → 'review' (offer preserved, listing_id cleared), no error.
+`tsc`/`lint`/`vitest` (275/275)/`build` clean. See DECISIONS.md 15th addendum.
+
+## 2026-07-10 (session 14, fourteenth addendum) -- 🔴🟢 eBay "Check status" reported a deleted listing as still live; fixed
+
+Owner deleted a live eBay listing (silver mug) directly on eBay, but "Check
+eBay Status" kept saying "Confirmed live." Root cause (eBay analogue of the
+Etsy inv-#61 bug): `checkListingStatus` treated the mere presence of a
+listingId as "published" — but eBay's GetOffer keeps returning the OLD
+listingId on an ENDED offer (verified live: status UNPUBLISHED +
+listingStatus ENDED). Fixed with a pure `reconcileEbayStateFromOffer()` that
+reads eBay's authoritative `listing.listingStatus` (ENDED→ended,
+OUT_OF_STOCK→hidden_oos, ACTIVE→published), never trusts our stored id, and
+resets to not-listed on a full offer-404. Verified live: status check now
+returns 'ended', panel shows Ended (with Restore) instead of LIVE.
+`tsc`/`lint`/`vitest` (275/275)/`build` clean. See DECISIONS.md 14th addendum.
+
+## 2026-07-10 (session 14, thirteenth addendum) -- 🟢 Etsy tags: silver tableware no longer tagged "jewelry"
+
+Owner report: the silver mug's Etsy tags still included "silver jewelry",
+"estate jewelry", "vintage/antique jewelry" — wrong for tableware.
+`mapTags` emitted those 4 jewelry-category tags for every item. Fixed with a
+new `isJewelryProductType()` (jewelry-vs-object from the resolved taxonomy);
+non-jewelry silver objects now get "sterling silver"/"estate silver" +
+"vintage silver"/"antique silver" instead. Real jewelry unaffected; mirrors
+the eBay-side silver-object aspect trimming. Verified live (mug tags now
+carry zero "jewelry" terms) + `tsc`/`lint`/`vitest` (270/270)/`build` clean.
+See DECISIONS.md 13th addendum.
+
+## 2026-07-10 (session 14, twelfth addendum) -- 🟢 Pre-mapped a new "Mug" item + ~25 expected future antique-silver types (both marketplaces) + generic silver fallback
+
+Owner added an "Antique Georgian Sterling Silver Handled Mug" (type "Mug")
+that mapped to no category on either marketplace. Researched real category
+ids (eBay get_category_suggestions + Etsy seller-taxonomy tree, via new/
+extended scripts) and pre-mapped ~25 antique-silver forms the shop may
+acquire: drinking vessels, holloware (candlesticks, pitchers, vases,
+creamers, bowls, teapots, butter dishes), and objets de vertu (boxes,
+vinaigrettes, cigarette/card/vesta cases, bells, inkwells). Added an
+`objectCategory` flag so non-"Antiques>Silver" object leaves (Bell/Inkwell)
+still get the lean silver aspect set, and a **generic silver fallback**
+(eBay 1215 "Other Antique Sterling Silver") so ANY future unmapped sterling
+item lands in a valid publishable category instead of failing preflight
+(silver-only; unknown gold types still return null). Etsy mappings are
+mostly "closest match" (approximate) since its taxonomy is craft-oriented —
+owner can override per item. Verified live: Mug → eBay 37993 Cups & Goblets
+(clean aspects, no bogus Chain Length) + Etsy 1062 Mugs, both preflight
+passing. `tsc`/`lint`/`vitest` (267/267)/`build` clean. See DECISIONS.md
+12th addendum.
+
+## 2026-07-10 (session 14, eleventh addendum) -- 🟢 Price excluded from out-of-date detection on both marketplaces (owner decision)
+
+Owner asked: price changes shouldn't trigger the out-of-date flag (both
+Etsy and eBay); any other content change still should. Removed `price` from
+`computeContentHash()`'s hashed fields in both `lib/etsy/mapping.ts` and
+`lib/ebay/mapping.ts` — price already has its own dedicated threshold-gated
+push path (`shouldPushPrice`/`pushPricesBatch`) on both marketplaces, so
+folding it into the same hash that gates bulk sync just meant daily
+gold/silver drift created constant noise unrelated to that tool's job.
+eBay's `fulfillmentPolicyId` deliberately stays in the hash — a price
+crossing the Q16 high-value shipping threshold is a structural change, not
+mere drift. **One-time side effect (expected, not a bug):** changing the
+hash formula means every previously-stored hash no longer matches, so the
+very next scan flags the whole synced catalog out-of-date once more
+(confirmed live: Etsy eligible jumped back to 78/78) — after the next full
+"Sync all" run rewrites every hash with the new formula, only genuine
+content changes will re-flag anything, never price alone. `tsc`/`lint`/
+`vitest` (260/260)/`build` all clean. See DECISIONS.md 11th addendum.
+
+## 2026-07-10 (session 14, tenth addendum) -- 🔴🟢 First real bulk Etsy sync (post out-of-date fix) demoted 63 active listings to "needs review"; fixed + corrected
+
+Owner ran the just-fixed "Sync all to Etsy" for real (77 items). 63
+previously-active listings showed as "Draft — needs review" afterward.
+Root cause: the `update` re-sync path only pushes content (never touches
+Etsy's actual listing state) but was deciding the LOCAL status label using
+`connection.auto_activate` alone — the policy meant for brand-new listings
+— so with auto_activate off (default) every re-sync demoted the local label
+regardless of whether the listing was already live. Verified NO real harm:
+`listing_state` (Etsy's own last-reported state) stayed `active` for all 63
+rows, and the sync log shows zero duplicate pushes — 63 completed + 14
+still-pending = 77 queued exactly, nothing lost or double-pushed to Etsy.
+Fixed with a new pure `resolveUpdatedListingSyncState()` helper (uses the
+listing's real listing_state, not the auto_activate policy, to decide
+whether an update stays active) + regression tests. Corrected the 63
+mislabeled rows back to `active` (owner-approved, scoped, verified 100%
+match before running). `tsc`/`lint`/`vitest` (158 Etsy tests) clean. A
+separate, purely cosmetic progress-counter display quirk ("82 of 77") was
+investigated and confirmed to have no backend consequence — not fixed. See
+DECISIONS.md 10th addendum.
+
+## 2026-07-10 (session 14, ninth addendum) -- 🔴🟢 Found + fixed: price/content edits on already-synced Etsy AND eBay listings were NEVER detected (since launch)
+
+Owner reported editing prices then "Sync all to Etsy" saying 0 eligible.
+Root cause: `scanAndMarkOutOfDate()` (marks an active listing `out_of_date`
+when its content no longer matches what was last pushed) is fully built +
+unit-tested in BOTH `lib/etsy/sync.ts` and `lib/ebay/sync.ts` but was never
+called from anywhere — confirmed via repo-wide grep. Fixed by wiring it into
+`adminRevalidateProduct`/`-Products` (the chokepoint every admin save
+already hits) for real-time detection, plus a defensive full-scan backstop
+in both `eligibility-summary` routes. Verified live (read-only endpoint
+call, no synthetic data mutation): Etsy's `upToDate` dropped 78→1, `eligible`
+0→77 in one call — a genuine backlog (all 70 spot-priced items had real
+gold/silver drift since last sync 2026-07-08; 7 of 8 manual-priced items had
+other real content drift, confirmed by spot-checking that one's
+`last_pushed_price` already matched, so price wasn't what changed). This
+means the mechanism never worked for ANY field, not just price, since the
+Etsy sync build shipped. `tsc`/`lint`/`vitest` (255)/`build` all clean.
+Did NOT run the actual bulk sync push — 77 real Etsy listing updates is the
+owner's call. See DECISIONS.md 9th addendum for full detail.
+
+## 2026-07-10 (session 14, eighth addendum) -- 🟢 Bulk "Publish all ready" button added; first silver item synced live-to-review end to end
+
+Owner bulk-synced the catalog (~77 items now in "Ready to publish"). First
+non-jewelry item (Tiffany Punch Ladle → Antiques > Silver Flatware `20104`)
+confirmed synced end-to-end against live eBay: offer `204276692011` created,
+zero errors, clean silver aspects (no bogus "Chain Length"), stopped at
+review. Then added a **"Publish all ready"** bulk action (new toolbar button
++ `EbayBulkPublishModal` + `drain-publish` batch action + `drainPublishQueue`
+reusing the tested `drainQueueCore`) to push the whole review queue live in
+one click. Owner chose (via AskUserQuestion) to KEEP review-first as the
+default rather than switch to auto-publish — the one-step path already exists
+as the `auto_publish` settings toggle if ever wanted. Verified
+`tsc`/`lint`/`vitest` (254)/`build` clean; modal shows correct live count
+(77) + warning, no console errors. Actual bulk go-live left to the owner's
+click. See DECISIONS.md 8th addendum.
+
+## 2026-07-10 (session 14, seventh addendum) -- 🟢 eBay category maps rebuilt from live Taxonomy API; ~26 silver items + brooches/cufflinks/vermeil now mappable
+
+"Sync all to eBay" showed 23 ineligible. Root cause: the build agent's
+category pins (made without eBay access) were wrong/missing for a big slice
+of the catalog — ~26 sterling-silver serving pieces (spoons, forks, trays,
+coffee pots, etc.) mapped to nothing; Brooch/Cufflinks/Watch pinned to
+invalid/non-leaf ids (`12595`/`4196`/`281`); vermeil Fashion leaves empty.
+Fixed by RESEARCHING the correct leaves via eBay's live Taxonomy API (two
+read-only scripts: `research-ebay-category-suggestions.mjs` +
+`research-ebay-required-aspects.mjs`) rather than guessing. Added
+`EBAY_SILVER_CATEGORY_MAP` (Antiques > Silver leaves, all zero-required-
+aspect), corrected the jewelry leaves (Brooch→261989, Cufflinks→137843,
+Watch→31387), pinned verified vermeil Fashion leaves (Koma/Necklace→155101,
+Brooch→50677), and made `mapAspects` category-aware so silverware no longer
+gets nonsensical jewelry aspects (e.g. "Chain Length: 12.5 in" on a punch
+ladle). Verified `tsc`/`lint`/`vitest` (254/254)/`build` all clean; category
+resolution + clean aspects confirmed live via local preview for Ladle, Tray,
+Coffee Pot, Koma, Brooch. Watch still needs a "Department" aspect before a
+watch can publish (no watches in catalog — documented TODO). Actual eBay
+item/offer creation for silver categories not yet run end-to-end (owner's
+"Sync to eBay" click). See DECISIONS.md 7th addendum for full detail.
+
+## 2026-07-10 (session 14, sixth addendum) -- 🟢 First eBay product reaches "Ready to publish"; local dev testing now works against live prod data
+
+Local dev (`.env.local`) now mirrors the production eBay keyset (including a
+rotated `EBAY_TOKEN_ENC_KEY` after the original was lost — see DECISIONS.md),
+so eBay sync can be debugged locally against the same live eBay account and
+Supabase DB production uses, instead of only via Netlify's live function
+logs. First real "Sync to eBay" attempt (Heavy Italian 14K Yellow Gold Cuban
+Link Bracelet) surfaced and fixed 4 real bugs in sequence: `condition` field
+needed the ConditionEnum string not the legacy numeric id; `Accept-Language`
+header required on every call, not just writes; SKU needed to be
+alphanumeric-only and ≤50 chars (Q11 wrongly assumed `products.id` is a
+36-char UUID — it's actually a long hyphenated slug); and a Postgres
+upsert-vs-NOT-NULL gotcha in `upsertListing()` that broke every offer/publish
+state-transition call. Full detail in DECISIONS.md. The bracelet now reaches
+`sync_state: 'review'` ("Ready to publish") with a clean pre-flight — the
+full item+offer chain works end-to-end. Pushed two more products through to
+stress-test different shapes: a ring synced clean first try; the David
+Yurman Sterling Silver bangle hit a 6th real bug — local static-asset image
+paths with spaces in the filename (`/assets/shoppics/IMG_5132 (Product
+Staging).webp`) produced an unencoded space in the eBay-bound URL (errorId
+25721 "Incorrect URL format"). Fixed by URL-encoding relative asset paths in
+`resolveEbayImageUrl()`. All 3 products reached "Ready to publish," then the
+owner tried the actual **Publish on eBay** button — a distinct action from
+"Sync to eBay", since eBay only validates REQUIRED item specifics at publish
+time, not at item/offer creation. That surfaced "Main Stone" then "Style"
+missing (one at a time, since eBay's error only ever reports the first
+missing field). Instead of continuing trial-and-error, wrote
+`scripts/research-ebay-required-aspects.mjs` to query eBay's own Taxonomy
+API for the authoritative required-aspect list per category — confirmed all
+4 real Fine Jewelry leaves need `Brand`, `Main Stone`, `Metal`, `Metal
+Purity` (already mapped) plus `Style`/`Type`/`Ring Size`, and that these
+fields are FREE_TEXT (not a closed enum), so Main Stone now passes through
+real `stone_details` text instead of a generic placeholder, and `Style`
+defaults to `"Classic"` (Q5-style, one universal non-overclaiming value).
+All 3 products confirmed back at "Ready to publish." **Not yet published
+live** — that's next, and is a deliberate owner click, not something run as
+part of this verification. Verified via `tsc --noEmit`, `npm run lint`,
+`vitest run src/lib/ebay` (65/65) after each fix.
 
 ## 2026-07-09 (session 14, addendum) -- 🟢 eBay account-deletion webhook confirmed live; production keyset enabled
 

@@ -17,7 +17,9 @@ import {
 } from './mapping';
 import {
   claimNextPendingListing,
+  claimNextReviewListing,
   countPendingListings,
+  countReviewListings,
   getConnection,
   getListing,
   insertSyncLog,
@@ -178,10 +180,21 @@ async function withdrawOfferCall(accessToken: string, offerId: string): Promise<
   await ebayFetch({ method: 'POST', path: `/sell/inventory/v1/offer/${encodeURIComponent(offerId)}/withdraw`, accessToken });
 }
 
+// Deletes an UNPUBLISHED offer outright (the prepared draft). Only valid for
+// an unpublished offer — a live/published listing must be withdrawn first.
+async function deleteOfferCall(accessToken: string, offerId: string): Promise<void> {
+  await ebayFetch({ method: 'DELETE', path: `/sell/inventory/v1/offer/${encodeURIComponent(offerId)}`, accessToken });
+}
+
 interface GetOfferResponse {
   offerId: string;
+  // Offer publication state: "PUBLISHED" | "UNPUBLISHED". Confirmed live
+  // 2026-07-10: an ended-on-eBay listing returns status "UNPUBLISHED" with
+  // listing.listingStatus "ENDED" — but listing.listingId is STILL present
+  // (the old, now-dead id), which is exactly why the prior liveness check
+  // (isPublished = Boolean(listingId)) wrongly reported it as live.
   status?: string;
-  listing?: { listingId?: string };
+  listing?: { listingId?: string; listingStatus?: string; soldQuantity?: number };
 }
 
 async function getOfferCall(accessToken: string, offerId: string): Promise<GetOfferResponse> {
@@ -260,11 +273,16 @@ export async function runSyncStep(productId: string, mode: SyncMode = 'publish')
   // Runaway-prevention (required from day one — ebay-sync-plan/
   // 08-database-schema.md — unlike Etsy, where this was a later production
   // fix): a bulk enqueue resets an item to 'pending'. For an item that
-  // already has a listing id, a fresh-publish pass creates nothing new and
+  // already has an offer, a fresh-publish pass creates nothing new and
   // would just sit in 'pending' forever, so the drain loop would re-claim it
-  // every pass without end. Treat it as an update instead.
+  // every pass without end. Treat it as an update instead. Also covers a
+  // re-sync of an ENDED item (owner ended/deleted it on eBay, then re-syncs
+  // to re-list) — its existing offer's content must be refreshed before it
+  // can be re-published with current price/details.
   const effectiveMode: SyncMode =
-    mode === 'publish' && listing?.ebay_listing_id != null && listing.sync_state === 'pending' ? 'update' : mode;
+    mode === 'publish' && listing?.ebay_offer_id != null && (listing.sync_state === 'pending' || listing.sync_state === 'ended')
+      ? 'update'
+      : mode;
 
   const payload = buildMappedPayload(product, connection, spotData);
 
@@ -298,8 +316,14 @@ export async function runSyncStep(productId: string, mode: SyncMode = 'publish')
       await updateOffer(accessToken, offerId, payload);
     }
 
-    // Step 3 — publish decision.
-    if (!listing?.ebay_listing_id) {
+    // Step 3 — publish decision. A stale ebay_listing_id lingers on an ENDED
+    // listing (eBay keeps returning the old id even after it's ended — see
+    // checkListingStatus), so "already live" is keyed on sync_state, NOT just
+    // the id's presence. Re-syncing an ended item must go through the
+    // review/publish gate — never silently re-mark it published/live (reported
+    // bug 2026-07-10: "Sync to eBay" showed an un-published item as LIVE).
+    const isLiveOnEbay = listing?.ebay_listing_id != null && listing.sync_state !== 'ended';
+    if (!isLiveOnEbay) {
       if (connectionRow.auto_publish) {
         const published = await publishOfferCall(accessToken, offerId!);
         const hash = computeContentHash(payload);
@@ -325,8 +349,11 @@ export async function runSyncStep(productId: string, mode: SyncMode = 'publish')
       // Q1: review-first default — stop here. Publish is a distinct,
       // deliberately-clicked action (mode: 'publish-live') since eBay has no
       // draft state — an unpublished offer is invisible in Seller Hub, so
-      // this preview IS the review surface.
-      await upsertListing(service, productId, { sync_state: 'review', last_error: null, error_count: 0 });
+      // this preview IS the review surface. Clear any stale ebay_listing_id
+      // (an ended item carries the old, dead id): a review item has no live
+      // listing, and leaving it set would make publishLiveStep short-circuit
+      // as "already published" and never actually re-publish.
+      await upsertListing(service, productId, { sync_state: 'review', ebay_listing_id: null, last_error: null, error_count: 0 });
       await insertSyncLog(service, { product_id: productId, action: 'offer_ready', outcome: 'ok' });
       return {
         done: true,
@@ -335,9 +362,11 @@ export async function runSyncStep(productId: string, mode: SyncMode = 'publish')
       };
     }
 
-    // Already published — this is an update pass.
+    // Already published — this is an update pass. isLiveOnEbay (true in this
+    // branch) guarantees a live listing id.
+    const liveListingId = listing!.ebay_listing_id!;
     const hash = computeContentHash(payload);
-    const nextState: EbaySyncState = listing.sync_state === 'hidden_oos' ? 'hidden_oos' : 'published';
+    const nextState: EbaySyncState = listing!.sync_state === 'hidden_oos' ? 'hidden_oos' : 'published';
     await upsertListing(service, productId, {
       sync_state: nextState,
       content_hash: hash,
@@ -346,12 +375,12 @@ export async function runSyncStep(productId: string, mode: SyncMode = 'publish')
       last_error: null,
       error_count: 0,
     });
-    await insertSyncLog(service, { product_id: productId, listing_id: listing.ebay_listing_id, action: 'update', outcome: 'ok' });
+    await insertSyncLog(service, { product_id: productId, listing_id: liveListingId, action: 'update', outcome: 'ok' });
     return {
       done: true,
       syncState: nextState,
-      listingId: listing.ebay_listing_id,
-      listingUrl: listingUrlFor(listing.ebay_listing_id),
+      listingId: liveListingId,
+      listingUrl: listingUrlFor(liveListingId),
     };
   } catch (err) {
     return handleSyncError(service, productId, listing, err, 'sync');
@@ -416,11 +445,35 @@ async function publishLiveStep(
   try {
     const { accessToken } = await ensureFreshAccessToken(service);
     const published = await publishOfferCall(accessToken, listing.ebay_offer_id);
+
+    // Record a content_hash/last_pushed_* baseline at publish time — the
+    // review step (runSyncStep's Q1 branch) never sets one, so without this
+    // scanAndMarkOutOfDate spuriously flags a freshly-published item
+    // 'out_of_date' the moment it next runs (confirmed live 2026-07-10: the
+    // review→Publish Now path is this shop's only publish path since
+    // auto_publish is off, and produced exactly this — content_hash null on
+    // an otherwise-fine 'published' row). Best-effort: the publish itself
+    // must still succeed even if this lookup fails.
+    let contentPatch: Partial<Pick<EbayListingRow, 'content_hash' | 'last_pushed_price' | 'last_pushed_qty'>> = {};
+    const product = await loadProduct(service, productId).catch(() => null);
+    const connectionRow = product ? await getConnection(service).catch(() => null) : null;
+    if (product && connectionRow) {
+      const connection = toConnectionDefaults(connectionRow);
+      const spotData = await fetchSpotData().catch(() => null);
+      const payload = buildMappedPayload(product, connection, spotData);
+      contentPatch = {
+        content_hash: computeContentHash(payload),
+        last_pushed_price: payload.price,
+        last_pushed_qty: payload.quantity,
+      };
+    }
+
     await upsertListing(service, productId, {
       sync_state: 'published',
       ebay_listing_id: published.listingId,
       last_error: null,
       error_count: 0,
+      ...contentPatch,
     });
     await insertSyncLog(service, { product_id: productId, listing_id: published.listingId, action: 'publish', outcome: 'ok' });
     return {
@@ -549,6 +602,55 @@ export async function runDelist(productId: string, action: 'hide' | 'withdraw' |
   }
 }
 
+// "Un-stage": fully discard a PREPARED-but-not-live offer (a 'review' item, or
+// an 'ended' item whose unpublished offer still lingers) — delete the offer on
+// eBay and reset the row to not-listed, so it drops out of the review/publish
+// queue and shows "Not listed" again. A live listing is refused (must be
+// ended/hidden first). Idempotent: a 404 on delete (offer already gone) still
+// resets the local state.
+export async function runUnstage(productId: string): Promise<SyncStepResult> {
+  const service = createServiceClient();
+  const connectionRow = await getConnection(service);
+  const listing = await getListing(service, productId);
+  if (!connectionRow || connectionRow.status !== 'connected') {
+    return { done: true, syncState: listing?.sync_state ?? 'pending', error: { code: 'not_connected', message: 'eBay is not connected.' } };
+  }
+  if (!listing?.ebay_offer_id) {
+    // Nothing staged — already not listed on eBay.
+    return { done: true, syncState: 'pending' };
+  }
+  if (listing.ebay_listing_id != null && ['published', 'out_of_date', 'hidden_oos'].includes(listing.sync_state)) {
+    return {
+      done: true,
+      syncState: listing.sync_state,
+      error: { code: 'is_live', message: 'This item is live on eBay — end the listing first, then un-stage it.' },
+    };
+  }
+  try {
+    const { accessToken } = await ensureFreshAccessToken(service);
+    try {
+      await deleteOfferCall(accessToken, listing.ebay_offer_id);
+    } catch (err) {
+      // 404 = the offer is already gone on eBay; still reset local state.
+      if (!(err instanceof EbayApiError && err.status === 404)) throw err;
+    }
+    await upsertListing(service, productId, {
+      sync_state: 'pending',
+      ebay_offer_id: null,
+      ebay_listing_id: null,
+      content_hash: null,
+      last_pushed_price: null,
+      last_pushed_qty: null,
+      last_error: null,
+      error_count: 0,
+    });
+    await insertSyncLog(service, { product_id: productId, action: 'unstage', outcome: 'ok', message: 'Discarded the prepared eBay offer — reset to not-listed.' });
+    return { done: true, syncState: 'pending' };
+  } catch (err) {
+    return handleSyncError(service, productId, listing, err, 'unstage');
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Reconciliation — read-only calls that pull local state back in line with
 // what eBay actually shows, for out-of-band changes (manual Seller Hub edits,
@@ -560,6 +662,39 @@ export interface CheckListingStatusResult {
   message: string;
 }
 
+/**
+ * PURE: given our current sync_state and what eBay's GetOffer actually
+ * reports, the reconciled sync_state + whether the listing is live. The
+ * authoritative "is it live" signal is `listing.listingStatus`, NOT the mere
+ * presence of a listingId — eBay keeps returning the old listingId on an
+ * ENDED offer (confirmed live 2026-07-10, the reported bug: a listing the
+ * owner deleted on eBay kept showing "Confirmed live" because the prior check
+ * treated any listingId as proof of publication). Mirrors the Etsy
+ * reconcileSyncStateFromEtsy discipline: map eBay's real state, never guess.
+ */
+export function reconcileEbayStateFromOffer(
+  current: EbaySyncState,
+  offerStatus: string | undefined,
+  listingStatus: string | undefined,
+): { syncState: EbaySyncState; live: boolean } {
+  const ls = (listingStatus ?? '').toUpperCase();
+  const os = (offerStatus ?? '').toUpperCase();
+
+  if (ls === 'ENDED') return { syncState: 'ended', live: false };
+  if (ls === 'OUT_OF_STOCK') return { syncState: 'hidden_oos', live: false };
+  // Genuinely live: eBay shows an ACTIVE listing (or a PUBLISHED offer with no
+  // finer listing status). Preserve a local hidden_oos (quantity-zeroed via
+  // Out-of-Stock control but still an active listing on eBay's side).
+  if (ls === 'ACTIVE' || (os === 'PUBLISHED' && ls === '')) {
+    return { syncState: current === 'hidden_oos' ? 'hidden_oos' : 'published', live: true };
+  }
+  // Offer exists but is UNPUBLISHED with no active/ended listing. If we thought
+  // it was live, eBay ended it out of band → 'ended'; if it was never
+  // published, it's a prepared offer awaiting publish → 'review'.
+  if (['published', 'out_of_date', 'hidden_oos'].includes(current)) return { syncState: 'ended', live: false };
+  return { syncState: 'review', live: false };
+}
+
 export async function checkListingStatus(productId: string): Promise<CheckListingStatusResult> {
   const service = createServiceClient();
   const listing = await getListing(service, productId);
@@ -569,17 +704,39 @@ export async function checkListingStatus(productId: string): Promise<CheckListin
   try {
     const { accessToken } = await ensureFreshAccessToken(service);
     const offer = await getOfferCall(accessToken, listing.ebay_offer_id);
-    const remoteListingId = offer.listing?.listingId ?? listing.ebay_listing_id ?? undefined;
-    const isPublished = (offer.status ?? '').toUpperCase() === 'PUBLISHED' || Boolean(remoteListingId);
-    const nextState: EbaySyncState = isPublished ? (listing.sync_state === 'hidden_oos' ? 'hidden_oos' : 'published') : listing.sync_state;
+    const { syncState, live } = reconcileEbayStateFromOffer(listing.sync_state, offer.status, offer.listing?.listingStatus);
+    // Only trust eBay's listingId, never our stale stored one.
+    const remoteListingId = offer.listing?.listingId ?? listing.ebay_listing_id;
     await upsertListing(service, productId, {
-      sync_state: nextState,
-      ebay_listing_id: remoteListingId ?? listing.ebay_listing_id,
+      sync_state: syncState,
+      ebay_listing_id: remoteListingId,
       last_error: null,
     });
     await insertSyncLog(service, { product_id: productId, listing_id: remoteListingId, action: 'verify', outcome: 'ok' });
-    return { found: true, syncState: nextState, message: isPublished ? 'Confirmed live on eBay.' : 'Offer exists but is not published yet.' };
+    const message = live
+      ? 'Confirmed live on eBay.'
+      : syncState === 'ended'
+        ? 'This listing has ended on eBay (ended or removed there) — marked as ended here.'
+        : syncState === 'hidden_oos'
+          ? 'This listing is out of stock / hidden on eBay.'
+          : 'Offer exists but is not published yet.';
+    return { found: true, syncState, message };
   } catch (err) {
+    // The whole OFFER is gone (deleted on eBay), not just the listing — reset
+    // to not-listed so a fresh "Sync to eBay" re-creates it, mirroring the
+    // Etsy 404 path. A non-404 error leaves state untouched (transient).
+    if (err instanceof EbayApiError && err.status === 404) {
+      await upsertListing(service, productId, {
+        sync_state: 'pending',
+        ebay_offer_id: null,
+        ebay_listing_id: null,
+        content_hash: null,
+        last_error: null,
+        error_count: 0,
+      });
+      await insertSyncLog(service, { product_id: productId, action: 'verify', outcome: 'ok', message: 'Offer no longer exists on eBay — reset to not-listed.' });
+      return { found: false, syncState: 'pending', message: 'This offer no longer exists on eBay — reset to not-listed. You can sync it fresh.' };
+    }
     const message = err instanceof EbayApiError ? err.operatorMessage : err instanceof Error ? err.message : 'Could not verify.';
     return { found: false, syncState: listing.sync_state, message };
   }
@@ -694,17 +851,43 @@ export async function drainQueue(): Promise<DrainResult> {
   return { done: core.exhausted && remaining === 0, remaining, results: core.results };
 }
 
+// Bulk-publish drain — publishes every already-prepared 'review' listing
+// live, in the same time-budgeted, resumable, seen-guarded shape as
+// drainQueue (reuses drainQueueCore). Distinct from drainQueue because
+// publishing is a deliberate go-live action (Q1), never folded into sync.
+export async function drainPublishQueue(): Promise<DrainResult> {
+  const service = createServiceClient();
+  const core = await drainQueueCore({
+    claimNext: () => claimNextReviewListing(service),
+    runStep: (productId) => runSyncStep(productId, 'publish-live'),
+    now: () => Date.now(),
+    budgetMs: DRAIN_TIME_BUDGET_MS,
+  });
+  const remaining = await countReviewListings(service);
+  return { done: core.exhausted && remaining === 0, remaining, results: core.results };
+}
+
 // ---------------------------------------------------------------------------
 // Content-hash change detection — no eBay reads needed.
+//
+// Mirrors the Etsy fix (lib/etsy/sync.ts scanAndMarkOutOfDate): this was
+// fully built and unit-tested but never actually CALLED from anywhere, so a
+// price edit on an already-published listing was never detected — confirmed
+// live 2026-07-10 via the identical Etsy bug report. Wired into the same
+// adminRevalidateProduct/adminRevalidateProducts chokepoint as the Etsy
+// version (see admin-products.ts). Pass `productIds` to check just those
+// products (the intended per-save call shape) instead of the full catalog.
 // ---------------------------------------------------------------------------
-export async function scanAndMarkOutOfDate(): Promise<number> {
+export async function scanAndMarkOutOfDate(productIds?: string[]): Promise<number> {
   const service = createServiceClient();
   const connectionRow = await getConnection(service);
   if (!connectionRow) return 0;
   const connection = toConnectionDefaults(connectionRow);
   const spotData = await fetchSpotData().catch(() => null);
 
-  const { data: listings } = await service.from('ebay_listings').select('*').in('sync_state', ['published', 'hidden_oos']);
+  let query = service.from('ebay_listings').select('*').in('sync_state', ['published', 'hidden_oos']);
+  if (productIds) query = query.in('product_id', productIds);
+  const { data: listings } = await query;
   let flagged = 0;
   for (const listing of (listings ?? []) as EbayListingRow[]) {
     const product = await loadProduct(service, listing.product_id);

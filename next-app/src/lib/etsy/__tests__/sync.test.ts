@@ -1,5 +1,25 @@
 import { describe, expect, it, vi } from 'vitest';
-import { drainQueueCore, reconcileSyncStateFromEtsy, shouldPushPrice, type SyncStepResult } from '../sync';
+import { drainQueueCore, reconcileSyncStateFromEtsy, resolveUpdatedListingSyncState, shouldPushPrice, type SyncStepResult } from '../sync';
+
+describe('resolveUpdatedListingSyncState — re-syncing an EXISTING listing must never silently demote it', () => {
+  it('keeps a genuinely-active listing active, regardless of auto_activate — an update never calls setListingState', () => {
+    expect(resolveUpdatedListingSyncState('active', false)).toBe('active');
+    expect(resolveUpdatedListingSyncState('active', true)).toBe('active');
+  });
+
+  it('a genuinely-still-draft listing follows the auto_activate policy, same as first-publish', () => {
+    expect(resolveUpdatedListingSyncState('draft', false)).toBe('draft_review');
+    expect(resolveUpdatedListingSyncState('draft', true)).toBe('active');
+  });
+
+  it('regression: confirmed live 2026-07-10 — 63 already-active listings were demoted to draft_review after one bulk price sync because this used to key off auto_activate alone, ignoring whether the listing was actually live', () => {
+    // The exact bug: an active listing, connection auto_activate off (the
+    // default) — old logic: `connection.auto_activate ? 'active' : 'draft_review'`
+    // would incorrectly return 'draft_review' here.
+    expect(resolveUpdatedListingSyncState('active', false)).not.toBe('draft_review');
+    expect(resolveUpdatedListingSyncState('active', false)).toBe('active');
+  });
+});
 
 describe('reconcileSyncStateFromEtsy — mapping Etsy state onto our sync_state', () => {
   it('maps active/inactive/expired/sold_out', () => {
@@ -21,8 +41,11 @@ describe('reconcileSyncStateFromEtsy — mapping Etsy state onto our sync_state'
     expect(reconcileSyncStateFromEtsy('draft_review', 'draft')).toEqual({ listing_state: 'draft' });
   });
 
-  it('returns an empty patch for an unrecognized Etsy state (report only, never guess)', () => {
-    expect(reconcileSyncStateFromEtsy('active', 'edit')).toEqual({});
+  it('treats "edit" as delisted — a real Etsy state for a listing pulled back after selling, confirmed live 2026-07-10 (inv #61)', () => {
+    expect(reconcileSyncStateFromEtsy('active', 'edit')).toEqual({ sync_state: 'delisted', listing_state: 'inactive' });
+  });
+
+  it('returns an empty patch for a genuinely unrecognized Etsy state (report only, never guess)', () => {
     expect(reconcileSyncStateFromEtsy('draft_review', 'unavailable')).toEqual({});
   });
 });

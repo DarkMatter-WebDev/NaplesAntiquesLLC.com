@@ -10,6 +10,7 @@ import {
   computeEbayPrice,
   isEbayIneligibleProductType,
   isPreflightPassing,
+  isSilverAntiqueCategory,
   mapAspects,
   mapDescription,
   mapSku,
@@ -142,8 +143,25 @@ describe('mapTitle', () => {
 });
 
 describe('mapSku', () => {
-  it('is products.id verbatim (Q11)', () => {
-    expect(mapSku({ id: 'abc-123' })).toBe('abc-123');
+  it('strips non-alphanumeric characters from short ids (Q11)', () => {
+    expect(mapSku({ id: 'abc-123' })).toBe('abc123');
+  });
+
+  it('is <=50 chars and alphanumeric-only for long slugged ids', () => {
+    const id = 'heavy-italian-14k-yellow-gold-cuban-link-bracelet-53-91g-21';
+    const sku = mapSku({ id });
+    expect(sku.length).toBeLessThanOrEqual(50);
+    expect(sku).toMatch(/^[a-zA-Z0-9]+$/);
+  });
+
+  it('is deterministic and collision-resistant for near-identical long ids', () => {
+    const idA = `${'a'.repeat(60)}-first`;
+    const idB = `${'a'.repeat(60)}-second`;
+    const skuA1 = mapSku({ id: idA });
+    const skuA2 = mapSku({ id: idA });
+    const skuB = mapSku({ id: idB });
+    expect(skuA1).toBe(skuA2);
+    expect(skuA1).not.toBe(skuB);
   });
 });
 
@@ -207,10 +225,47 @@ describe('mapAspects', () => {
     expect(aspects['Chain Length']).toEqual(['20 in']);
   });
 
-  it('never fabricates a stone/gemstone aspect (no verified-safe source)', () => {
+  it('never invents a "Gemstone" aspect that was never in scope', () => {
     const aspects = mapAspects(makeProduct({ stone_details: 'Blue sapphire, 2ct' }));
     expect(Object.keys(aspects)).not.toContain('Gemstone');
-    expect(Object.keys(aspects)).not.toContain('Main Stone');
+  });
+
+  it('Main Stone is always present — required by eBay\'s Fine Jewelry categories, only enforced at publish time (errorId: "item specific Main Stone is missing")', () => {
+    expect(mapAspects(makeProduct({ stone_details: null }))['Main Stone']).toEqual(['No Stone']);
+    expect(mapAspects(makeProduct({ stone_details: '' }))['Main Stone']).toEqual(['No Stone']);
+  });
+
+  it('Main Stone passes through real stone_details text — confirmed safe via eBay\'s Taxonomy API (aspectMode FREE_TEXT, not a closed enum)', () => {
+    expect(mapAspects(makeProduct({ stone_details: 'Blue sapphire, 2ct' }))['Main Stone']).toEqual(['Blue sapphire, 2ct']);
+  });
+
+  it('caps an overlong Main Stone value at eBay\'s per-value length limit', () => {
+    const long = 'x'.repeat(100);
+    const aspects = mapAspects(makeProduct({ stone_details: long }));
+    expect(aspects['Main Stone']?.[0].length).toBeLessThanOrEqual(65);
+  });
+
+  it('Style is always present — required for Necklaces/Pendants, Earrings, and Bracelets & Charms (recommended for Rings)', () => {
+    expect(mapAspects(makeProduct())['Style']).toEqual(['Classic']);
+  });
+
+  it('drops jewelry-only aspects for silver-antique items (no "Chain Length" on a punch ladle)', () => {
+    const ladle = makeProduct({ product_type: 'Ladle', jewelry_type: 'Ladle', metal_variant: 'silver', length: '12.5', brand: 'Tiffany & Co.' });
+    const aspects = mapAspects(ladle, { silverAntique: true });
+    // Kept — sensible for silverware:
+    expect(aspects.Metal).toEqual(['Sterling Silver']);
+    expect(aspects.Brand).toEqual(['Tiffany & Co.']);
+    expect(aspects.Type).toEqual(['Ladle']);
+    // Dropped — jewelry-only, nonsensical for a ladle:
+    expect(aspects['Chain Length']).toBeUndefined();
+    expect(aspects['Main Stone']).toBeUndefined();
+    expect(aspects.Style).toBeUndefined();
+  });
+
+  it('still emits the full jewelry aspect set when silverAntique is not set', () => {
+    const aspects = mapAspects(makeProduct());
+    expect(aspects['Main Stone']).toBeDefined();
+    expect(aspects.Style).toEqual(['Classic']);
   });
 });
 
@@ -221,10 +276,19 @@ describe('resolveCategory — Fine vs Fashion routing (Q4) and Coin/Bullion excl
     expect(category?.path).toMatch(/Fine Jewelry/);
   });
 
-  it('routes vermeil to Fashion Jewelry (no Fine Jewelry leaf) — currently unpinned, so resolves to null', () => {
+  it('routes a vermeil Necklace to the Fashion Jewelry leaf (155101), never Fine', () => {
     const category = resolveCategory(makeProduct({ metal_variant: 'vermeil', product_type: 'Necklace' }));
-    // No Fashion Jewelry leaf id is pinned in this build (TODO(ebay-verify));
-    // the important guarantee is that vermeil NEVER resolves to a Fine leaf.
+    expect(category?.categoryId).toBe('155101');
+    expect(category?.path).toMatch(/Fashion Jewelry/);
+  });
+
+  it('routes a vermeil "Koma Clasp" (the catalog\'s real vermeil items) to Fashion Necklaces & Pendants', () => {
+    const category = resolveCategory(makeProduct({ metal_variant: 'vermeil', product_type: 'Koma Clasp', jewelry_type: 'Koma Clasp' }));
+    expect(category?.categoryId).toBe('155101');
+  });
+
+  it('leaves an unpinned vermeil type (Ring — no such item exists) as null rather than guessing', () => {
+    const category = resolveCategory(makeProduct({ metal_variant: 'vermeil', product_type: 'Ring', jewelry_type: 'Ring' }));
     expect(category).toBeNull();
   });
 
@@ -253,6 +317,84 @@ describe('resolveCategory — Fine vs Fashion routing (Q4) and Coin/Bullion excl
   it('Silverware IS eligible and maps to a category (Q6b)', () => {
     const category = resolveCategory(makeProduct({ product_type: 'Silverware', jewelry_type: 'Silverware', metal_variant: 'silver' }));
     expect(category).not.toBeNull();
+  });
+
+  it('corrected jewelry leaves: Brooch → Fine Brooches & Pins, Cufflinks → Men\'s Cufflinks (old 12595/4196 were invalid)', () => {
+    const brooch = resolveCategory(makeProduct({ product_type: 'Brooch', jewelry_type: 'Brooch', metal_variant: 'yellow_gold' }));
+    expect(brooch?.categoryId).toBe('261989');
+    const cufflinks = resolveCategory(makeProduct({ product_type: 'Cufflinks', jewelry_type: 'Cufflinks', metal_variant: 'yellow_gold' }));
+    expect(cufflinks?.categoryId).toBe('137843');
+  });
+
+  it('maps every silver flatware serving-piece type to the verified Flatware & Silverware leaf (20104)', () => {
+    for (const type of ['Spoon', 'Serving Spoon', 'Salt Spoon', 'Berry Spoon', 'Mote Spoon', 'Cold Meat Fork', 'Fish Server', 'Ladle', 'Knife']) {
+      const category = resolveCategory(makeProduct({ product_type: type, jewelry_type: type, metal_variant: 'silver' }));
+      expect(category?.categoryId).toBe('20104');
+      expect(category?.path).toMatch(/Antiques > Silver/);
+    }
+  });
+
+  it('maps silver holloware types to their own dedicated leaves', () => {
+    const cases: Record<string, string> = {
+      Tray: '39441',
+      'Coffee Pot': '37998',
+      'Salt Cellar': '163273',
+      'Napkin Ring': '39440',
+      'Decanter Label': '163056',
+      'Tazza Set': '63620',
+    };
+    for (const [type, id] of Object.entries(cases)) {
+      const category = resolveCategory(makeProduct({ product_type: type, jewelry_type: type, metal_variant: 'silver' }));
+      expect(category?.categoryId).toBe(id);
+    }
+  });
+
+  it('silver category lookup is case-insensitive (guards against product_type casing drift)', () => {
+    const category = resolveCategory(makeProduct({ product_type: 'cold meat fork', jewelry_type: 'cold meat fork', metal_variant: 'silver' }));
+    expect(category?.categoryId).toBe('20104');
+  });
+
+  it('pre-mapped 2026-07-10: the new Mug item + expected future silver forms map to real verified leaves', () => {
+    const cases: Record<string, string> = {
+      Mug: '37993', Cup: '37993', Goblet: '37993', Tankard: '37993',
+      Bowl: '37991', Compote: '37991', Porringer: '37991',
+      Candlestick: '20103', Candelabra: '20103',
+      Pitcher: '37995', Ewer: '37995',
+      Vase: '39443', Creamer: '163055', 'Sugar Bowl': '163055', Teapot: '37998',
+      Box: '37992', 'Snuff Box': '37992', Vinaigrette: '107441', 'Cigarette Case': '105900',
+      Bell: '261598', Inkwell: '970',
+    };
+    for (const [type, id] of Object.entries(cases)) {
+      const category = resolveCategory(makeProduct({ product_type: type, jewelry_type: type, metal_variant: 'silver' }));
+      expect(category?.categoryId).toBe(id);
+    }
+  });
+
+  it('generic silver fallback: an unanticipated SILVER product_type still gets a valid catch-all leaf (1215), not null', () => {
+    const category = resolveCategory(makeProduct({ product_type: 'Épergne Centerpiece', jewelry_type: 'Épergne Centerpiece', metal_variant: 'silver' }));
+    expect(category?.categoryId).toBe('1215');
+    expect(category?.approximate).toBe(true);
+  });
+
+  it('generic fallback is SILVER-only: an unanticipated GOLD product_type still returns null (needs explicit mapping)', () => {
+    const category = resolveCategory(makeProduct({ product_type: 'Épergne Centerpiece', jewelry_type: 'Épergne Centerpiece', metal_variant: 'yellow_gold' }));
+    expect(category).toBeNull();
+  });
+
+  it('Bell/Inkwell (Collectibles path, not Antiques>Silver) still get the lean silver-object aspect set via objectCategory', () => {
+    for (const type of ['Bell', 'Inkwell']) {
+      const category = resolveCategory(makeProduct({ product_type: type, jewelry_type: type, metal_variant: 'silver' }));
+      expect(isSilverAntiqueCategory(category)).toBe(true);
+    }
+  });
+
+  it('the new Mug item gets clean silver-object aspects — no bogus "Chain Length" / "Main Stone"', () => {
+    const product = makeProduct({ product_type: 'Mug', jewelry_type: 'Mug', metal_variant: 'silver', length: '4.55' });
+    const payload = buildMappedPayload(product, makeConnection(), null);
+    expect(payload.categoryId).toBe('37993');
+    expect(payload.aspects['Chain Length']).toBeUndefined();
+    expect(payload.aspects['Main Stone']).toBeUndefined();
+    expect(payload.aspects.Type).toEqual(['Mug']);
   });
 
   it('an explicit override always wins', () => {
@@ -331,6 +473,12 @@ describe('resolveImageUrls / resolveEbayImageUrl — both URL shapes', () => {
     expect(resolveEbayImageUrl('/assets/images/shop/a.png')).toBe('https://naplesestatejewelry.co/assets/images/shop/a.png');
   });
 
+  it('URL-encodes spaces in a local filename (errorId 25721 "Incorrect URL format")', () => {
+    const result = resolveEbayImageUrl('/assets/shoppics/IMG_5132 (Product Staging).webp');
+    expect(result).toBe('https://naplesestatejewelry.co/assets/shoppics/IMG_5132%20(Product%20Staging).webp');
+    expect(result).not.toMatch(/ /);
+  });
+
   it('caps at 24 images and prefers image_urls over the legacy images[] mirror', () => {
     const urls = Array.from({ length: 30 }, (_, i) => `https://example.com/img-${i}.webp`);
     const result = resolveImageUrls(makeProduct({ image_urls: urls, images: ['/assets/legacy.png'] }));
@@ -363,11 +511,16 @@ describe('buildPreflightChecks', () => {
     expect(checks.find((c) => c.check === 'connected')?.ok).toBe(false);
   });
 
-  it('blocks a vermeil item because the Fashion Jewelry category is unpinned', () => {
-    const checks = buildPreflightChecks(makeProduct({ metal_variant: 'vermeil' }), makeConnection(), null);
+  it('blocks a vermeil item of a type whose Fashion Jewelry leaf is unpinned (e.g. Ring)', () => {
+    const checks = buildPreflightChecks(makeProduct({ metal_variant: 'vermeil', product_type: 'Ring', jewelry_type: 'Ring' }), makeConnection(), null);
     const categoryCheck = checks.find((c) => c.check === 'category');
     expect(categoryCheck?.ok).toBe(false);
     expect(categoryCheck?.message).toMatch(/Fashion Jewelry/i);
+  });
+
+  it('does NOT block a vermeil item whose Fashion Jewelry leaf IS pinned (Necklace/Koma Clasp)', () => {
+    const checks = buildPreflightChecks(makeProduct({ metal_variant: 'vermeil', product_type: 'Necklace', jewelry_type: 'Necklace' }), makeConnection(), null);
+    expect(checks.find((c) => c.check === 'category')?.ok).toBe(true);
   });
 
   it('blocks a zero-quantity item', () => {
@@ -418,9 +571,16 @@ describe('computeContentHash', () => {
     expect(computeContentHash(payload)).toBe(computeContentHash({ ...payload }));
   });
 
-  it('changes when the price changes', () => {
+  it('does NOT change on a price-only change (2026-07-10) — price has its own dedicated push path; this hash is for content, not market drift', () => {
     const a = buildMappedPayload(makeProduct({ manual_price_label: '$100', price_mode: 'manual' }), makeConnection(), null);
     const b = buildMappedPayload(makeProduct({ manual_price_label: '$200', price_mode: 'manual' }), makeConnection(), null);
+    expect(a.price).not.toBe(b.price);
+    expect(computeContentHash(a)).toBe(computeContentHash(b));
+  });
+
+  it('still changes when a non-price field changes (title)', () => {
+    const a = buildMappedPayload(makeProduct({ title: 'Original Title' }), makeConnection(), null);
+    const b = buildMappedPayload(makeProduct({ title: 'Different Title' }), makeConnection(), null);
     expect(computeContentHash(a)).not.toBe(computeContentHash(b));
   });
 

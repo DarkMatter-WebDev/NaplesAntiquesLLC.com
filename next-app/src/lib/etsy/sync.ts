@@ -27,6 +27,7 @@ import {
   claimNextPendingListing,
   countPendingListings,
   deleteListingImageRow,
+  deleteListingImagesByListingId,
   getConnection,
   getListing,
   getListingImages,
@@ -36,6 +37,7 @@ import {
   upsertListing,
   type EtsyConnectionRow,
   type EtsyListingRow,
+  type EtsySyncState,
 } from './store';
 
 // Sync engine: the step machine described in etsy-sync-plan/03-sync-lifecycle.md.
@@ -277,6 +279,31 @@ async function setListingCopy(params: { shopId: number; listingId: number; acces
   });
 }
 
+/**
+ * PURE: the sync_state a listing should land at after an 'update' pass that
+ * started from 'out_of_date'/'pending' (i.e. a re-enqueued EXISTING listing,
+ * not a fresh draft). An update only pushes content via setListingCopy — it
+ * never calls setListingState — so it can't change whether the listing is
+ * actually live on Etsy. Deciding the resulting LOCAL sync_state from the
+ * connection's auto_activate policy (as if this were a brand-new listing)
+ * was wrong: it silently demoted every already-active listing to
+ * 'draft_review' on every re-sync once out-of-date detection started working
+ * (confirmed live 2026-07-10 — 63 genuinely-active listings relabeled
+ * "needs review" after one bulk price sync, even though their real Etsy
+ * listing_state never left 'active'). Use the listing's real last-known
+ * listing_state instead: if it was actually active, it stays active; only a
+ * listing that was genuinely still a draft goes through the auto-activate
+ * decision, matching the ORIGINAL first-publish semantics this branch was
+ * meant to preserve.
+ */
+export function resolveUpdatedListingSyncState(
+  listingState: EtsyListingRow['listing_state'],
+  autoActivate: boolean,
+): EtsySyncState {
+  if (listingState === 'active') return 'active';
+  return autoActivate ? 'active' : 'draft_review';
+}
+
 /** Runs one bounded step-machine invocation for a single product. Idempotent — safe to call again. */
 export async function runSyncStep(productId: string, mode: SyncMode = 'publish'): Promise<SyncStepResult> {
   const service = createServiceClient();
@@ -486,7 +513,7 @@ export async function runSyncStep(productId: string, mode: SyncMode = 'publish')
       // above) — resolve it to a terminal state so it leaves the drain queue.
       const nextState =
         listing.sync_state === 'out_of_date' || listing.sync_state === 'pending'
-          ? connection.auto_activate ? 'active' : 'draft_review'
+          ? resolveUpdatedListingSyncState(listing.listing_state, connection.auto_activate)
           : listing.sync_state;
       listing = await upsertListing(service, productId, {
         content_hash: computeContentHash(payload),
@@ -555,6 +582,15 @@ export function reconcileSyncStateFromEtsy(
       return { sync_state: 'active', listing_state: 'active' };
     case 'inactive':
     case 'sold_out':
+    // 'edit' is a real Etsy listing state, not a guess — confirmed live
+    // 2026-07-10 against a genuinely-sold single-quantity listing (Sterling
+    // Silver Modernist Marquise-Form Openwork Ring, inv #61): Etsy pulled it
+    // back to 'edit' rather than 'sold_out', but it's equally gone from the
+    // shop and needs the seller's attention before it could go active again
+    // — same terminal handling as inactive/sold_out. Previously fell into
+    // the "unknown state, don't guess" default, which is why syncing this
+    // item's status never cleared its stale 'active' chip.
+    case 'edit':
       return { sync_state: 'delisted', listing_state: 'inactive' };
     case 'expired':
       return { sync_state: 'delisted', listing_state: 'ended' };
@@ -638,6 +674,7 @@ export async function checkListingStatus(productId: string): Promise<CheckListin
     };
   } catch (err) {
     if (err instanceof EtsyApiError && err.status === 404) {
+      await deleteListingImagesByListingId(service, listing.etsy_listing_id);
       const updated = await upsertListing(service, productId, {
         etsy_listing_id: null,
         sync_state: 'pending',
@@ -702,6 +739,7 @@ export async function checkAllListingStatuses(): Promise<CheckAllStatusResult> {
     } catch (err) {
       if (err instanceof EtsyApiError && err.status === 404) {
         // Gone on Etsy (deleted there) — reset to not-listed, same as the per-item check.
+        await deleteListingImagesByListingId(service, listing.etsy_listing_id);
         await upsertListing(service, listing.product_id, {
           etsy_listing_id: null,
           sync_state: 'pending',
@@ -895,12 +933,31 @@ export async function drainQueue(): Promise<DrainResult> {
   return { done: core.exhausted && remaining === 0, remaining, results: core.results };
 }
 
-/** Marks active/draft_review listings whose mapped payload no longer matches the last pushed hash. */
-export async function scanAndMarkOutOfDate(): Promise<number> {
+/**
+ * Marks active/draft_review listings whose mapped payload no longer matches
+ * the last pushed hash — the mechanism that's supposed to catch a price (or
+ * any other mapped-field) edit on an already-synced product and flip it to
+ * 'out_of_date' so "Sync all to Etsy" and the per-item panel pick it back up.
+ *
+ * Pass `productIds` to check just those products (cheap — the intended call
+ * shape from adminRevalidateProduct/adminRevalidateProducts, which already
+ * fires after every admin product save) instead of the full catalog. Omit it
+ * for a full sweep (e.g. a future cron safety net).
+ *
+ * Confirmed live 2026-07-10: this function was fully built and unit-tested
+ * but never actually CALLED from anywhere — so no price edit on a live
+ * listing was ever detected, and "Sync all to Etsy" always reported 0
+ * eligible for already-active items. Wiring it into the existing
+ * revalidate-on-save chokepoint (see admin-products.ts) fixes this without a
+ * new "when do products change" audit.
+ */
+export async function scanAndMarkOutOfDate(productIds?: string[]): Promise<number> {
   const service = createServiceClient();
   const connection = await getConnection(service);
   const spotData = await fetchSpotData();
-  const { data } = await service.from('etsy_listings').select('*').in('sync_state', ['active', 'draft_review']);
+  let query = service.from('etsy_listings').select('*').in('sync_state', ['active', 'draft_review']);
+  if (productIds) query = query.in('product_id', productIds);
+  const { data } = await query;
   let count = 0;
   for (const row of (data ?? []) as EtsyListingRow[]) {
     const product = await fetchProduct(service, row.product_id);

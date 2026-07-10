@@ -239,6 +239,70 @@ describe('mapTags', () => {
     expect(tags).toContain('antique sterling');
   });
 
+  it('does NOT tag a silver TABLEWARE item as jewelry (owner report 2026-07-10: silver mug) — uses silver-object keywords instead', () => {
+    const product = makeProduct({
+      title: 'Antique Georgian Sterling Silver Handled Mug, London 1824, Edward Farrell',
+      product_type: 'Mug',
+      jewelry_type: 'Mug',
+      metal_type: 'Silver',
+      category: 'Silver',
+      metal_variant: 'silver',
+      purity: 925,
+      chain_type: null,
+      brand: 'Edward Farrell',
+      tags: [],
+    });
+    const tags = mapTags(product);
+    // No jewelry-category tags on a mug.
+    expect(tags).not.toContain('silver jewelry');
+    expect(tags).not.toContain('estate jewelry');
+    expect(tags).not.toContain('vintage jewelry');
+    expect(tags).not.toContain('antique jewelry');
+    // Object-appropriate silver keywords instead.
+    expect(tags).toContain('sterling silver');
+    expect(tags).toContain('estate silver');
+    expect(tags).toContain('vintage silver');
+    expect(tags).toContain('antique silver');
+    // The metal-specific "sterling" pair still applies (metal is known).
+    expect(tags).toContain('vintage sterling');
+    expect(tags).toContain('antique sterling');
+  });
+
+  it('flatware (a silver spoon) also gets object tags, not jewelry tags', () => {
+    const product = makeProduct({
+      title: 'Gorham Chantilly Sterling Silver Salt Spoon',
+      product_type: 'Salt Spoon',
+      jewelry_type: 'Salt Spoon',
+      metal_type: 'Silver',
+      category: 'Silver',
+      metal_variant: 'silver',
+      purity: 925,
+      chain_type: null,
+      tags: [],
+    });
+    const tags = mapTags(product);
+    expect(tags).not.toContain('estate jewelry');
+    expect(tags).not.toContain('vintage jewelry');
+    expect(tags).toContain('estate silver');
+  });
+
+  it('a silver BRACELET (real jewelry) still gets the jewelry tags — the fix is object-only', () => {
+    const product = makeProduct({
+      product_type: 'Bracelet',
+      jewelry_type: 'Bracelet',
+      metal_type: 'Silver',
+      category: 'Silver',
+      metal_variant: 'silver',
+      purity: 925,
+      chain_type: null,
+      tags: [],
+    });
+    const tags = mapTags(product);
+    expect(tags).toContain('estate jewelry');
+    expect(tags).toContain('vintage jewelry');
+    expect(tags).toContain('antique jewelry');
+  });
+
   it('uses a "gold" metal-specific vintage/antique pair for gold items', () => {
     const product = makeProduct({
       product_type: 'Ring',
@@ -606,12 +670,12 @@ describe('buildMappedPayload — private-field allowlist guarantee', () => {
     expect(payload.whenMadeUsedFallback).toBe(true);
   });
 
-  it('caps images at 10 and assigns 1-based rank', () => {
-    const urls = Array.from({ length: 15 }, (_, i) => `https://example.com/img-${i}.webp`);
+  it('caps images at 20 (raised from 10 in August 2025) and assigns 1-based rank', () => {
+    const urls = Array.from({ length: 25 }, (_, i) => `https://example.com/img-${i}.webp`);
     const payload = buildMappedPayload(makeProduct({ image_urls: urls }), null, null);
-    expect(payload.images).toHaveLength(10);
+    expect(payload.images).toHaveLength(20);
     expect(payload.images[0].rank).toBe(1);
-    expect(payload.images[9].rank).toBe(10);
+    expect(payload.images[19].rank).toBe(20);
   });
 });
 
@@ -661,6 +725,26 @@ describe('resolveEffectiveTaxonomy — manual per-product category override', ()
     it('maps Bhutanese Koma clasps / garment hooks to Brooches (1201), not tableware', () => {
       expect(resolveTaxonomy('Koma Clasp')).toMatchObject({ taxonomyId: 1201, approximate: true });
       expect(resolveTaxonomy('Garment Hook')).toMatchObject({ taxonomyId: 1201 });
+    });
+
+    it('pre-mapped 2026-07-10: the new Mug item + expected future silver forms resolve to real leaves', () => {
+      expect(resolveTaxonomy('Mug')).toMatchObject({ taxonomyId: 1062 });
+      expect(resolveTaxonomy('Cup')).toMatchObject({ taxonomyId: 1062 });
+      expect(resolveTaxonomy('Goblet')).toMatchObject({ taxonomyId: 1861 });
+      expect(resolveTaxonomy('Tankard')).toMatchObject({ taxonomyId: 1861 });
+      expect(resolveTaxonomy('Candlestick')).toMatchObject({ taxonomyId: 2214 });
+      expect(resolveTaxonomy('Candelabra')).toMatchObject({ taxonomyId: 2213 });
+      expect(resolveTaxonomy('Pitcher')).toMatchObject({ taxonomyId: 1938 });
+      expect(resolveTaxonomy('Vase')).toMatchObject({ taxonomyId: 1026 });
+      expect(resolveTaxonomy('Bell')).toMatchObject({ taxonomyId: 6081 });
+      expect(resolveTaxonomy('Inkwell')).toMatchObject({ taxonomyId: 6415 });
+      expect(resolveTaxonomy('Cigarette Case')).toMatchObject({ taxonomyId: 134 });
+      expect(resolveTaxonomy('Snuff Box')).toMatchObject({ taxonomyId: 6102 });
+    });
+
+    it('"Butter Dish" beats the generic bowl/dish rule (order matters — first match wins)', () => {
+      expect(resolveTaxonomy('Butter Dish')).toMatchObject({ taxonomyId: 1045 });
+      expect(resolveTaxonomy('Serving Dish')).toMatchObject({ taxonomyId: 1044 }); // still the generic bowl leaf
     });
 
     it('does not disturb a coarse mapped type (Necklace still → Chains 1221, exact)', () => {
@@ -755,9 +839,16 @@ describe('computeContentHash', () => {
     expect(computeContentHash(payload)).toBe(computeContentHash({ ...payload }));
   });
 
-  it('changes when the price changes', () => {
+  it('does NOT change on a price-only change (2026-07-10) — price has its own dedicated push path; this hash is for content, not market drift', () => {
     const a = buildMappedPayload(makeProduct({ manual_price_label: '$100', price_mode: 'manual' }), null, null);
     const b = buildMappedPayload(makeProduct({ manual_price_label: '$200', price_mode: 'manual' }), null, null);
+    expect(a.price).not.toBe(b.price);
+    expect(computeContentHash(a)).toBe(computeContentHash(b));
+  });
+
+  it('still changes when a non-price field changes (title)', () => {
+    const a = buildMappedPayload(makeProduct({ title: 'Original Title' }), null, null);
+    const b = buildMappedPayload(makeProduct({ title: 'Different Title' }), null, null);
     expect(computeContentHash(a)).not.toBe(computeContentHash(b));
   });
 });

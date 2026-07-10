@@ -1,5 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import { drainQueueCore, shouldPushPrice, type DrainDeps, type SyncStepResult } from '../sync';
+import { drainQueueCore, reconcileEbayStateFromOffer, shouldPushPrice, type DrainDeps, type SyncStepResult } from '../sync';
+
+describe('reconcileEbayStateFromOffer — mapping eBay GetOffer onto our sync_state', () => {
+  it('reports NOT live for an ENDED listing even though eBay still returns the old listingId (the reported bug 2026-07-10)', () => {
+    // Exact live shape: owner deleted the listing on eBay; GetOffer returns
+    // status UNPUBLISHED + listingStatus ENDED, but listingId is still present.
+    expect(reconcileEbayStateFromOffer('published', 'UNPUBLISHED', 'ENDED')).toEqual({ syncState: 'ended', live: false });
+  });
+
+  it('confirms live only when eBay shows an ACTIVE listing', () => {
+    expect(reconcileEbayStateFromOffer('published', 'PUBLISHED', 'ACTIVE')).toEqual({ syncState: 'published', live: true });
+    expect(reconcileEbayStateFromOffer('review', 'PUBLISHED', 'ACTIVE')).toEqual({ syncState: 'published', live: true });
+    // Published offer with no finer listing status → still treated live.
+    expect(reconcileEbayStateFromOffer('published', 'PUBLISHED', undefined)).toEqual({ syncState: 'published', live: true });
+  });
+
+  it('preserves a local hidden_oos when the listing is still active on eBay', () => {
+    expect(reconcileEbayStateFromOffer('hidden_oos', 'PUBLISHED', 'ACTIVE')).toEqual({ syncState: 'hidden_oos', live: true });
+  });
+
+  it('maps an OUT_OF_STOCK listing to hidden_oos', () => {
+    expect(reconcileEbayStateFromOffer('published', 'PUBLISHED', 'OUT_OF_STOCK')).toEqual({ syncState: 'hidden_oos', live: false });
+  });
+
+  it('an UNPUBLISHED offer we thought was live → ended; one we never published → review', () => {
+    expect(reconcileEbayStateFromOffer('published', 'UNPUBLISHED', undefined)).toEqual({ syncState: 'ended', live: false });
+    expect(reconcileEbayStateFromOffer('review', 'UNPUBLISHED', undefined)).toEqual({ syncState: 'review', live: false });
+    expect(reconcileEbayStateFromOffer('offer_created', 'UNPUBLISHED', undefined)).toEqual({ syncState: 'review', live: false });
+  });
+});
 
 describe('shouldPushPrice — Q3 threshold logic', () => {
   it('always pushes when there is no prior pushed price', () => {

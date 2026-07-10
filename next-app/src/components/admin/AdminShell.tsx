@@ -51,6 +51,7 @@ import EtsyProductPanel from './EtsyProductPanel';
 import EtsyBulkSyncModal from './EtsyBulkSyncModal';
 import EbayProductPanel from './EbayProductPanel';
 import EbayBulkSyncModal from './EbayBulkSyncModal';
+import EbayBulkPublishModal from './EbayBulkPublishModal';
 import {
   DEFAULT_QUICK_FILL_AI_FORMAT_PROMPT,
   QUICK_FILL_PROMPT_STORAGE_KEY,
@@ -935,6 +936,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   // pattern (never one call per row).
   const [ebayListingsByProduct, setEbayListingsByProduct] = useState<Record<string, { sync_state: string }>>({});
   const [showEbayBulkModal, setShowEbayBulkModal] = useState(false);
+  const [showEbayPublishModal, setShowEbayPublishModal] = useState(false);
   const refreshEbayChips = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/ebay/listings');
@@ -2966,6 +2968,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             </button>
             <button type="button" onClick={() => setShowEbayBulkModal(true)} className="outline-button text-sm flex-shrink-0">
               Sync all to eBay
+            </button>
+            <button type="button" onClick={() => setShowEbayPublishModal(true)} className="outline-button text-sm flex-shrink-0">
+              Publish all ready
             </button>
             <button
               type="button"
@@ -5223,6 +5228,16 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
           onClose={() => {
             setShowEbayBulkModal(false);
             void refreshEbayChips(); // a bulk run likely changed several rows
+          }}
+        />
+      )}
+
+      {/* eBay bulk publish — pushes every "Ready to publish" listing live */}
+      {showEbayPublishModal && (
+        <EbayBulkPublishModal
+          onClose={() => {
+            setShowEbayPublishModal(false);
+            void refreshEbayChips(); // publishing changed several rows' state
           }}
         />
       )}

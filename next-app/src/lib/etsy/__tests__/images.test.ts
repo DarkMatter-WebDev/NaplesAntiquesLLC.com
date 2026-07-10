@@ -183,9 +183,9 @@ describe('planImageDiff', () => {
     expect(ops.every((op) => op.type === 'rerank')).toBe(true);
   });
 
-  it('caps the desired set at 10 images (Etsy per-listing max)', () => {
-    const urls = Array.from({ length: 15 }, (_, i) => `${STORAGE_PREFIX}products/img-${i}.webp`);
+  it('caps the desired set at 20 images (Etsy per-listing max, raised from 10 in August 2025)', () => {
+    const urls = Array.from({ length: 25 }, (_, i) => `${STORAGE_PREFIX}products/img-${i}.webp`);
     const ops = planImageDiff(urls, []);
-    expect(ops).toHaveLength(10);
+    expect(ops).toHaveLength(20);
   });
 });

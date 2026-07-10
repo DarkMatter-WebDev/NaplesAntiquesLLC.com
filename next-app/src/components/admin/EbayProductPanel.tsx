@@ -97,7 +97,7 @@ export default function EbayProductPanel({
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [progress, setProgress] = useState<{ step: string } | null>(null);
-  const [busyAction, setBusyAction] = useState<'delist' | 'restore' | 'check-status' | null>(null);
+  const [busyAction, setBusyAction] = useState<'delist' | 'restore' | 'check-status' | 'unstage' | null>(null);
   const [pushingPrice, setPushingPrice] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
@@ -261,8 +261,8 @@ export default function EbayProductPanel({
     }
   };
 
-  const runDelistAction = async (action: 'hide' | 'withdraw' | 'restore') => {
-    setBusyAction(action === 'restore' ? 'restore' : 'delist');
+  const runDelistAction = async (action: 'hide' | 'withdraw' | 'restore' | 'unstage') => {
+    setBusyAction(action === 'restore' ? 'restore' : action === 'unstage' ? 'unstage' : 'delist');
     try {
       const res = await fetch('/api/admin/ebay/delist', {
         method: 'POST',
@@ -272,7 +272,13 @@ export default function EbayProductPanel({
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(errorMessage(data, 'Action failed.'));
       showNotice(
-        action === 'hide' ? 'Marked sold out on eBay.' : action === 'withdraw' ? 'Listing ended on eBay.' : 'Listing restored on eBay.',
+        action === 'hide'
+          ? 'Marked sold out on eBay.'
+          : action === 'withdraw'
+            ? 'Listing ended on eBay.'
+            : action === 'unstage'
+              ? 'Un-staged — discarded the prepared eBay offer. This item is no longer queued to publish.'
+              : 'Listing restored on eBay.',
         true,
       );
     } catch (err) {
@@ -298,6 +304,9 @@ export default function EbayProductPanel({
   const hasOffer = Boolean(listing?.ebayOfferId);
   const hasListing = Boolean(listing?.ebayListingId);
   const canRestore = listing?.syncState === 'hidden_oos' || listing?.syncState === 'ended';
+  // A prepared offer that isn't live — can be fully discarded ("un-staged").
+  const canUnstage =
+    hasOffer && (listing?.syncState === 'review' || listing?.syncState === 'ended' || listing?.syncState === 'offer_created');
 
   return (
     <div className="flex flex-col gap-4">
@@ -476,6 +485,17 @@ export default function EbayProductPanel({
         {hasListing && canRestore && (
           <button type="button" onClick={() => void runDelistAction('restore')} disabled={busyAction !== null} className="outline-button text-sm">
             {busyAction === 'restore' ? 'Restoring…' : 'Restore'}
+          </button>
+        )}
+        {canUnstage && (
+          <button
+            type="button"
+            onClick={() => void runDelistAction('unstage')}
+            disabled={busyAction !== null || syncing}
+            className="outline-button text-sm"
+            title="Discard the prepared (unpublished) eBay offer and return this item to Not Listed — removes it from the publish queue."
+          >
+            {busyAction === 'unstage' ? 'Un-staging…' : 'Un-stage (discard draft)'}
           </button>
         )}
       </div>
