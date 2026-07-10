@@ -53,6 +53,7 @@ interface EbayErrorDetailEntry {
   domain?: string;
   category?: string;
   message?: string;
+  parameters?: Array<{ name?: string; value?: string }>;
 }
 
 export class EbayApiError extends Error {
@@ -106,6 +107,12 @@ function redactDetail(body: EbayErrorEnvelope | null): EbayErrorDetailEntry[] | 
     domain: entry.domain,
     category: entry.category,
     message: typeof (entry.longMessage ?? entry.message) === 'string' ? (entry.longMessage ?? entry.message)!.slice(0, 500) : undefined,
+    // eBay's own field-name/value validation hints (e.g. which aspect or
+    // policy field was rejected) — not secret, and often the only place the
+    // *specific* reason behind a generic top-level message shows up.
+    parameters: Array.isArray(entry.parameters)
+      ? entry.parameters.map((p) => ({ name: p.name, value: typeof p.value === 'string' ? p.value.slice(0, 200) : p.value }))
+      : undefined,
   }));
 }
 
@@ -246,6 +253,12 @@ export async function ebayFetch<T>(opts: EbayRequestOptions): Promise<EbayRespon
       attempt += 1;
       continue;
     }
+    // Log the allowlisted detail (errorId/category/message/parameters — never
+    // headers or tokens) for every non-retryable failure. eBay's top-level
+    // message is often a generic wrapper ("The request has errors...") with
+    // the actually-actionable reason only in a per-error `parameters` entry —
+    // this is the one place that gets surfaced for every call site at once.
+    console.error(`ebay client: ${opts.method} ${opts.path} failed (HTTP ${res.status}):`, JSON.stringify(error.detail));
     throw error;
   }
 }
