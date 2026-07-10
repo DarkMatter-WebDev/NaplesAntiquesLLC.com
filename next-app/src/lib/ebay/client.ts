@@ -225,7 +225,12 @@ export async function ebayFetch<T>(opts: EbayRequestOptions): Promise<EbayRespon
   const url = buildUrl(opts.path, opts.query);
   const maxRetries = opts.maxRetries ?? 3;
 
-  const headers: Record<string, string> = { Accept: 'application/json' };
+  // Accept-Language is required on every Sell Inventory API call (not just
+  // writes) — GET calls (e.g. getOffers) have no request body, so
+  // Content-Language doesn't apply to them, but eBay still validates
+  // Accept-Language on the response language. Confirmed live 2026-07-09:
+  // omitting it entirely produced "Invalid value for header Accept-Language."
+  const headers: Record<string, string> = { Accept: 'application/json', 'Accept-Language': 'en-US' };
   if (opts.accessToken) headers.Authorization = `Bearer ${opts.accessToken}`;
   if (opts.contentLanguage) headers['Content-Language'] = 'en-US';
   let body: string | undefined;

@@ -1,5 +1,22 @@
 # Decisions Log
 
+## 2026-07-09 (session 14, fourth addendum) - eBay Sell API: `Accept-Language` header required on every call, not just writes
+
+**Context:** Immediately after the `condition` fix (below), the same sync
+retry hit a new error: `"Invalid value for header Accept-Language."`. The
+client (`lib/ebay/client.ts`) only ever sent `Content-Language: en-US`, and
+only on calls explicitly marked `contentLanguage: true` (the write calls:
+`putInventoryItem`, `createOffer`, `updateOffer`). Read calls with no body
+(`findExistingOfferId`'s `GET /sell/inventory/v1/offer`) sent neither
+language header at all — `Content-Language` doesn't semantically apply to a
+bodyless GET, but eBay still validates `Accept-Language` on it.
+
+**Fix:** `ebayFetch` now unconditionally sends `Accept-Language: en-US` on
+every Sell API call, alongside the existing conditional `Content-Language`
+on writes. Verified via `tsc --noEmit`, `npm run lint`, and
+`vitest run src/lib/ebay` (58/58 passing) — not yet re-verified live pending
+owner redeploy + retry.
+
 ## 2026-07-09 (session 14, third addendum) - eBay `condition` field: numeric id rejected, must be ConditionEnum string
 
 **Context:** First real "Sync to eBay" attempt (Heavy Italian 14K Yellow Gold
