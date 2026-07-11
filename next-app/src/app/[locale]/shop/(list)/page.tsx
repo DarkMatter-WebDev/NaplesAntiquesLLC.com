@@ -879,10 +879,9 @@ export async function renderShopPage({
           <ShopNavigationProvider>
             {/* Desktop only: standalone year filter above the catalog */}
             <div className={isModern ? 'shop-year-filter-standalone shop-entry-reveal shop-entry-reveal-secondary' : 'shop-year-filter-standalone'}>
-              {/* useSearchParams() (in event handlers only, not the initial render — see
-                  DECISIONS.md 2026-07-09) requires a Suspense boundary so the
-                  static/ISR shop-index twin can prerender; a real per-request render
-                  (the normal dynamic page) never suspends here. */}
+              {/* useSearchParams() (in event handlers only, not the initial render) is
+                  wrapped in Suspense defensively; a real per-request render never
+                  suspends here. */}
               <Suspense fallback={<div style={{ minHeight: '3.25rem' }} aria-hidden="true" />}>
                 <ShopYearFilter
                   key={`${selectedYearMin ?? 'min'}-${selectedYearMax ?? 'max'}`}

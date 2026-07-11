@@ -498,6 +498,13 @@ export default function ProductCard({
       </div>
       {isModern && includeModernStyles && (
         <style>{`
+          .shop-card-image-arrow {
+            transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease, transform 100ms ease;
+          }
+          .shop-card-image-arrow:active {
+            transform: scale(0.8);
+            transition-duration: 0.05s;
+          }
           .shop-card-reveal {
             opacity: 0;
             transform: translateY(18px) scale(0.985);
@@ -761,10 +768,14 @@ export default function ProductCard({
             .shop-card-reveal,
             .shop-card-reveal.is-visible,
             .modern-product-card,
-            .modern-product-card.is-visible:hover {
+            .modern-product-card.is-visible:hover,
+            .shop-card-image-arrow {
               transition: none;
               transform: none;
               filter: none;
+            }
+            .shop-card-image-arrow:active {
+              transform: none;
             }
           }
         `}</style>

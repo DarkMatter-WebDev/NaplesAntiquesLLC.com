@@ -70,11 +70,23 @@ export default function ShopViewToggle({ locale, currentView }: Props) {
           background: transparent;
           color: var(--color-on-surface-variant);
           cursor: pointer;
-          transition: background-color 160ms ease, color 160ms ease;
+          transition: background-color 160ms ease, color 160ms ease, transform 100ms ease;
         }
         .shop-view-toggle button:hover {
           color: var(--color-primary);
           background: rgba(212, 175, 55, 0.12);
+        }
+        .shop-view-toggle button:active {
+          transform: scale(0.86);
+          transition-duration: 0.05s;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .shop-view-toggle button {
+            transition: background-color 160ms ease, color 160ms ease;
+          }
+          .shop-view-toggle button:active {
+            transform: none;
+          }
         }
         .shop-view-toggle button[data-active] {
           background: linear-gradient(135deg, #dcb336, #b5890c);

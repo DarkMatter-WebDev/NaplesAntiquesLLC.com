@@ -1122,6 +1122,19 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
           font-size: 1rem;
           line-height: 1;
         }
+        .shop-clear-filters-top button,
+        .shop-filters-meta-clear,
+        .shop-length-button,
+        .shop-price-filter-header button {
+          transition: transform 100ms ease, opacity 100ms ease;
+        }
+        .shop-clear-filters-top button:active,
+        .shop-filters-meta-clear:active,
+        .shop-length-button:active,
+        .shop-price-filter-header button:active {
+          transform: scale(0.93);
+          transition-duration: 0.05s;
+        }
         .shop-apply-filters-row {
           display: flex;
           justify-content: center;
@@ -1155,6 +1168,11 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
           filter: brightness(1.04);
           box-shadow: 0 16px 34px rgba(181, 137, 12, 0.28);
           transform: translateY(-1px);
+        }
+        .shop-apply-filters-button:active {
+          transform: scale(0.97);
+          filter: brightness(0.98);
+          transition-duration: 0.05s;
         }
         .shop-apply-filters-button .material-symbols-outlined {
           font-size: 1.15rem;
@@ -1414,6 +1432,10 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
         .modern-sidebar-gender-button:hover {
           transform: translateY(-1px);
         }
+        .modern-sidebar-gender-button:active {
+          transform: scale(0.95);
+          transition-duration: 0.05s;
+        }
         .shop-filters-modern .shop-filter-grid {
           gap: 0.72rem !important;
         }
@@ -1499,6 +1521,26 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
         @media (min-width: 1024px) {
           .shop-year-filter-in-panel {
             display: none;
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .modern-sidebar-gender-button,
+          .shop-clear-filters-top button,
+          .shop-filters-meta-clear,
+          .shop-length-button,
+          .shop-price-filter-header button,
+          .shop-apply-filters-button {
+            transition: none;
+          }
+          .modern-sidebar-gender-button:hover,
+          .modern-sidebar-gender-button:active,
+          .shop-clear-filters-top button:active,
+          .shop-filters-meta-clear:active,
+          .shop-length-button:active,
+          .shop-price-filter-header button:active,
+          .shop-apply-filters-button:hover,
+          .shop-apply-filters-button:active {
+            transform: none;
           }
         }
       `}</style>

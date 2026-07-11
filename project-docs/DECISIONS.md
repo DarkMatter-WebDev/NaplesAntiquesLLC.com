@@ -1,5 +1,96 @@
 # Decisions Log
 
+## 2026-07-10 (session 15) — Root-caused and fixed: shop Category filter buttons broken in production; reverted the session-12 static-twin optimization
+
+**Context:** Owner reported the shop's "Jewelry & Watches" / "Everything
+Else" sidebar buttons stopped working, and asked to revert them to how they
+used to function.
+
+**Investigation.** The buttons (`ShopFilters.tsx`'s `modern-sidebar-gender-
+button`s, calling `updateItemGroupFilter`) worked perfectly in the local dev
+server (`npm run dev`) — URL updated, active state flipped, result count
+changed correctly. This matched dev-only verification language already in
+`CURRENT_STATUS.md`'s 2026-07-09 (session 12) entries ("dev mode never
+performs real static generation… actual CDN cache-hit behavior needs
+confirming after a real deploy"). Built and ran a real local production
+server (`next build && next start`, new `Next.js Prod` launch config, port
+3003) to test the real thing, and reproduced it immediately: clicking a
+Category button updated the URL (`?itemGroup=jewelry`) but the visible
+result count and active state never changed — a silent no-op from the
+shopper's point of view.
+
+**Root cause.** The 2026-07-09 (session 12) shop-performance work added a
+`next.config.ts` `rewrites()` rule sending bare `/shop` (and `/es/shop`, no
+filter query params present) to a static/ISR twin page (`shop-index`) for
+faster first loads, plus `export const revalidate = 300` on the real
+dynamic page. Isolated the exact trigger with three tests against the
+production build:
+1. Temporarily removing just `export const revalidate = 300` from the real
+   page did **not** fix it — ruled out.
+2. Landing directly on a filtered URL (`/shop?itemGroup=jewelry`, never
+   visiting bare `/shop` first) and clicking a different filter worked
+   perfectly, every time.
+3. Visiting bare `/shop` first (which a real visitor always does — nav
+   links, external links, first-time visitors all land here per the
+   session-12 design itself), then clicking a filter, reliably failed to
+   update content, even though the URL always changed correctly.
+
+Conclusion: once the browser's first `/shop` load was served through the
+static twin (via the rewrite), Next.js's client-side Router/Segment Cache
+treated the `/shop` route as effectively static for that browser session —
+subsequent `router.push()` calls changing only search params correctly
+updated the address bar but never triggered a fresh RSC fetch, so the
+displayed content silently stayed on the original unfiltered render. This
+is a client-cache interaction, not a per-request server bug — server-side
+rendering of every individual URL (verified via direct `curl` for bare,
+`?itemGroup=jewelry`, and `?itemGroup=everything-else`) was always correct.
+Because the shop-performance session's own live verification was done only
+in dev (explicitly flagged as a known gap at the time), this regression
+shipped to production undetected until the owner hit it live.
+
+**Fix: reverted the session-12 static-twin optimization**, restoring
+`/shop` to the single always-dynamic route it was before that session,
+rather than attempting a novel fix for the underlying Next.js caching
+interaction (unprovable without a live Netlify deploy, and the owner
+explicitly asked for the old, known-working behavior back):
+- Removed the `rewrites()` rule from `next.config.ts` entirely (nothing
+  else used it).
+- Deleted the now-unreachable `src/app/[locale]/shop-index/page.tsx` twin
+  (owner confirmed via AskUserQuestion before deleting, per this project's
+  destructive-operation-safety rule).
+- Restored `export const revalidate = 300` on the real page (proven not to
+  be the cause; no reason to also remove it) and cleaned up a stale code
+  comment that referenced the now-deleted twin.
+- Left the `<Suspense>` wrapping around the 5 `useSearchParams()`-using
+  client components (`ShopFilters`, `ShopSortSelect`, `ShopViewToggle`,
+  `ShopPagination`, `ShopYearFilter`) in place — harmless on the real
+  dynamic page (nothing ever suspends there) and not part of the reported
+  bug, so removing it would be unnecessary extra risk.
+
+**Verification.** `npx tsc --noEmit`, `npm run lint`, `npm run build`
+(manifest confirms `/[locale]/shop` is `ƒ Dynamic` again, no `/shop-index`
+route), `npx vitest run` (275/275) all clean. Verified against a real local
+production build (not dev): fresh visit to bare `/shop` → click "Jewelry &
+Watches" → URL becomes `?itemGroup=jewelry`, button shows active, count
+updates 79 → "55 of 79 pieces"; click again → correctly deselects back to
+79/no active button (the 2026-07-07 re-click-to-deselect behavior still
+works); click "Everything Else" → `?itemGroup=everything-else&metal=silver`,
+count → "24 of 79 pieces". Repeated the same sequence on a 375px mobile
+viewport (open the Filters panel, then the Category buttons) — same
+correct behavior. One tooling caveat: the headless preview browser's
+synthetic click/MouseEvent dispatch was unreliable specifically on the
+mobile-viewport emulation (a preview-tooling quirk, confirmed by directly
+invoking the button's real React `onClick` handler, which worked
+correctly) — this does not reflect any app behavior, real touch/click
+events in an actual mobile browser are unaffected.
+
+**Not investigated further:** whether Next.js 16.2.9's client Router Cache
+has a more targeted fix (e.g. `experimental.staleTimes: { dynamic: 0 }`)
+that could let a future session re-attempt the bare-`/shop` static-caching
+optimization safely. Left as a possible future improvement, not attempted
+here — the owner asked for the filters restored to how they used to work,
+not for a new caching strategy to be introduced and re-verified.
+
 ## 2026-07-10 (session 14, twentieth addendum) — Audited eBay listings for sync issues: no orphaned-row bug possible (no image table); found + fixed a real content_hash gap in the Publish Now path
 
 **Context:** Follow-on to the 19th addendum. Owner asked to check the eBay

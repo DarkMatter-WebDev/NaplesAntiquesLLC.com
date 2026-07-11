@@ -223,6 +223,19 @@ export default function ShopPagination({
           box-shadow: 0 8px 18px rgba(42, 34, 12, 0.07);
           transform: translateY(-1px);
         }
+        .shop-page-control:active {
+          transform: scale(0.93);
+          transition-duration: 0.05s;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .shop-page-control {
+            transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+          }
+          .shop-page-control:hover,
+          .shop-page-control:active {
+            transform: none;
+          }
+        }
         .shop-page-control.is-active {
           border-color: transparent;
           background: ${BRIGHT_GOLD_GRADIENT};

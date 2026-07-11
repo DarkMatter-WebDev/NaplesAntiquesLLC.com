@@ -307,6 +307,11 @@ table {
   box-shadow: 0 14px 30px rgba(181, 137, 12, 0.24);
   transform: translateY(-1px);
 }
+.gold-button:active {
+  transform: scale(0.95);
+  filter: brightness(0.98);
+  transition-duration: 0.05s;
+}
 
 .detail-cart-button {
   background: #0f5f46;
@@ -345,6 +350,23 @@ table {
   color: var(--color-primary);
   box-shadow: 0 12px 24px rgba(38, 28, 6, 0.08);
   transform: translateY(-1px);
+}
+.outline-button:active {
+  transform: scale(0.95);
+  transition-duration: 0.05s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gold-button,
+  .outline-button {
+    transition: none;
+  }
+  .gold-button:hover,
+  .gold-button:active,
+  .outline-button:hover,
+  .outline-button:active {
+    transform: none;
+  }
 }
 
 /* Dark ("black padding") product pages lighten page text by overriding the

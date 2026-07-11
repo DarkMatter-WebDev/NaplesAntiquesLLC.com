@@ -9,6 +9,13 @@
       "cwd": "next-app"
     },
     {
+      "name": "Next.js Prod",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start", "--", "-p", "3003"],
+      "port": 3003,
+      "cwd": "next-app"
+    },
+    {
       "name": "Treasure Island Dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],

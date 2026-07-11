@@ -1,5 +1,45 @@
 # Changelog
 
+## 2026-07-10 - Added instant "press" feedback to shop buttons whose effect isn't immediately visible
+
+Owner reported that clicking some shop buttons gave no indication anything
+happened until the page finished loading/filtering. Added a CSS `:active`
+press animation (quick scale-down, ~50ms) to every shop control whose click
+triggers an async navigation/filter rather than an instant local UI change:
+the Category buttons (Jewelry & Watches / Everything Else), the product
+card photo prev/next arrows, era filter buttons + reset, the gallery/list
+view toggle, pagination controls, length filter chips, clear-filters
+buttons, the price-range reset, the "Save and Apply Filters" button, and
+the shared `.gold-button`/`.outline-button` classes used site-wide
+(including the shop's "Filters" toggle). Native `<select>` dropdowns
+(sort, metal, brand, etc.) were left alone since opening the dropdown is
+already immediate feedback. All new transforms respect
+`prefers-reduced-motion`. `tsc`/`lint`/`build`/`vitest` (275/275) clean;
+verified live that filtering still works correctly after the change and
+that every new `:active` rule is present in the compiled stylesheet.
+
+## 2026-07-10 - Fixed: shop "Jewelry & Watches" / "Everything Else" filter buttons silently no-op'd in production
+
+Owner reported the shop's Category sidebar buttons stopped working. Root
+cause: the 2026-07-09 (session 12) "shop performance" work added a
+`next.config.ts` rewrite sending bare `/shop` (no filter query params) to a
+static/ISR twin page (`shop-index`) for faster first loads. That rewrite
+broke client-side filter navigation in a real production build — verified
+live in dev only, never in a production build, so the regression went
+unnoticed. Once a visitor's browser had been routed through the static twin,
+every subsequent filter click (category buttons, and likely metal/brand/
+sort/etc.) updated the URL via `router.push()` but the page content silently
+stayed unfiltered. Confirmed via a local production build (`next build && next
+start`): a full page load of a filtered URL always rendered correctly, but a
+soft client-side navigation from the bare page never picked up new search
+params. Fixed by removing the `/shop` → `/shop-index` rewrite and deleting
+the now-orphaned twin page, restoring `/shop` to the single always-dynamic
+route it was before session 12. `tsc`/`lint`/`build`/`vitest` (275/275) all
+clean; verified live in a production build (not just dev) on both desktop
+and mobile viewports — category buttons now correctly filter, toggle
+active state, and deselect on re-click. See `DECISIONS.md` 2026-07-10 for
+the full root-cause writeup.
+
 ## 2026-07-09 - eBay sync built: Phase 0 webhook + Phase 1 + Phase 2, code-complete
 
 Implemented the full eBay sync integration from `ebay-sync-plan/` per

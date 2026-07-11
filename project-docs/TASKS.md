@@ -159,23 +159,23 @@
 - **Remaining shop performance work (2026-07-09, session 12):** most of the
   original 6-item list turned out to already be done (found while scoping
   this) or was completed this session; one item remains genuinely open:
-  1. **🟢 Done (session 12):** bare `/shop` (no filter/sort/page params) is
-     now static/ISR via a twin page (`shop-index`) reached by a
-     `next.config.ts` rewrite when none of the ~20 filter query keys are
-     present — build manifest confirms `● /[locale]/shop-index` (SSG,
-     `revalidate: 300`) vs `ƒ /[locale]/shop` (unchanged, still fully
-     dynamic for any real filter/sort/page/search). Verified live: bare
-     `/shop` and every filtered/sorted/paginated URL tested render correct,
-     distinct content; interactive controls (sort, view toggle, filters,
-     pagination — all `useSearchParams()` client components, now
-     Suspense-wrapped so the twin page can prerender) work identically,
-     confirmed by an actual click-through (sort→URL update, view toggle→URL
-     update), no console errors, 171/171 vitest, `tsc`/`build`/`lint` clean.
-     **Caveat:** dev mode never performs real static generation (Next's own
-     docs: pages always render on-demand in dev), so the actual CDN
-     cache-hit benefit can only be confirmed after a real Netlify deploy —
-     what's verified here is correct routing/rendering/interactivity plus
-     the build-time SSG classification, not live edge-cache behavior.
+  1. **🔴 REVERTED (2026-07-10, session 15).** The static/ISR twin
+     (`shop-index` + a `next.config.ts` rewrite for bare `/shop`) broke the
+     shop's Category filter buttons (and likely other filters) in a real
+     production build — the client-side Router Cache stopped picking up
+     search-param-only navigations once a visitor's first `/shop` load went
+     through the static twin, so filter clicks updated the URL but silently
+     never updated the results. This regression shipped because session
+     12's own live verification was dev-only (dev never performs real
+     static generation, so the bug was invisible there). Reverted: the
+     rewrite and the `shop-index` twin page are both removed; `/shop` is
+     back to being a single always-dynamic route. See `DECISIONS.md`
+     2026-07-10 (session 15) for the full root-cause writeup. **Making bare
+     `/shop` static/fast again is back to being open** — a future attempt
+     should either find a Next.js-supported way to force a fresh fetch on
+     search-param navigation (e.g. `experimental.staleTimes: { dynamic: 0
+     }`) or verify any such optimization against a real Netlify deploy (not
+     just dev) before considering it done.
   2. **🟢 Done (session 12), partial:** the facet-only catalog fetch (Brand
      + Item Type dropdown options, used only when a DB-level filter like
      metal/purity/brand/status is active) now selects a ~12-column subset

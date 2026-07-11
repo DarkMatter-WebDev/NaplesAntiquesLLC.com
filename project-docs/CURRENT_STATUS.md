@@ -3,6 +3,58 @@
 > Reflects the present state of development. **Update this at the end of every
 > work session.** Last updated: **2026-07-10**.
 
+## 2026-07-10 (session 15, addendum) -- 🟢 Shop buttons now show instant press feedback on click
+
+Follow-on to the filter-button fix above. Owner noted several shop buttons
+gave no visible confirmation that a click registered until the async
+navigation/filter finished. Added a quick CSS `:active` scale-down (~50ms)
+to every shop control that triggers a delayed effect: Category buttons,
+product-card photo prev/next arrows, era filter buttons + reset, gallery/
+list view toggle, pagination, length chips, clear-filters buttons, price
+reset, "Save and Apply Filters", and the shared `.gold-button`/
+`.outline-button` classes (used site-wide, including the shop Filters
+toggle). Native `<select>` dropdowns were left as-is (opening the dropdown
+is already immediate feedback). Respects `prefers-reduced-motion`.
+`tsc`/`lint`/`build`/`vitest` (275/275) clean; verified live that every new
+`:active` rule compiled correctly and that filtering still works. See
+`CHANGELOG.md` 2026-07-10 for the full list of touched components.
+
+## 2026-07-10 (session 15) -- 🔴🟢 Shop Category filter buttons (Jewelry & Watches / Everything Else) were broken in production; fixed by reverting the session-12 static-twin optimization
+
+Owner reported the shop's Category sidebar buttons stopped working and
+asked to revert them to how they used to function. The buttons worked fine
+in the local dev server, but a real local production build (`next build &&
+next start`) reproduced the bug immediately: clicking a Category button
+updated the URL but the visible results silently never changed. Root cause:
+the 2026-07-09 (session 12) "shop performance" work rewrote bare `/shop`
+(no filter params — the page every real visitor lands on first, via nav
+links/external links) to a static/ISR twin page for faster first loads.
+Once a browser's first `/shop` load went through that static twin, Next's
+client-side Router Cache kept treating `/shop` as static for the rest of
+that browser session — every later filter click updated the address bar
+but never re-fetched fresh content. This shipped undetected because the
+session-12 work's own live verification was done only in dev, which (as
+that session's own notes flagged) never exercises real static-generation/
+caching behavior.
+
+**Fixed by reverting the optimization**, not by patching around the
+Next.js caching interaction: removed the `/shop` → `/shop-index` rewrite
+from `next.config.ts`, and deleted the now-unreachable `shop-index` twin
+page (owner-confirmed before deleting). `/shop` is back to being the
+single, always-dynamic route it was before session 12. `tsc`/`lint`/
+`build`/`vitest` (275/275) all clean. Verified against a real local
+production build (desktop + 375px mobile): Category buttons now correctly
+filter (79 → 55 of 79 for Jewelry & Watches, → 24 of 79 for Everything
+Else), toggle their active state, and deselect back to unfiltered on
+re-click. See `DECISIONS.md` 2026-07-10 (session 15) for the full
+investigation and the tests that isolated the exact cause.
+
+**Owner action:** none required — this was a pure code fix, no migration,
+no config/env changes. The shop-performance backlog item for making bare
+`/shop` static/fast is now reopened (see `TASKS.md`) since the approach
+that shipped for it has been reverted; a future attempt should budget time
+to verify a fix against a real Netlify deploy before shipping, not dev-only.
+
 ## 2026-07-10 (session 14, twentieth addendum) -- 🟢 eBay sync audit: no orphaned-row bug (no image table); fixed a real content_hash gap in Publish Now
 
 Owner asked to check eBay for the same orphaned-row issue found on Etsy, then

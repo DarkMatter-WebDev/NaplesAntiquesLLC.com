@@ -255,11 +255,16 @@ export default function ShopYearFilter({ locale, minYear, maxYear, selectedMin, 
           text-underline-offset: 3px;
           cursor: pointer;
           flex-shrink: 0;
+          transition: transform 100ms ease;
         }
         .shop-year-reset:disabled {
           opacity: 0.4;
           cursor: default;
           text-decoration: none;
+        }
+        .shop-year-reset:active:not(:disabled) {
+          transform: scale(0.92);
+          transition-duration: 0.05s;
         }
         .shop-year-toggle {
           display: none;
@@ -274,8 +279,13 @@ export default function ShopYearFilter({ locale, minYear, maxYear, selectedMin, 
           color: var(--color-on-surface-variant);
           flex-shrink: 0;
           border-radius: 4px;
+          transition: background 160ms ease, transform 100ms ease;
         }
         .shop-year-toggle:hover { background: rgba(115, 92, 0, 0.08); }
+        .shop-year-toggle:active {
+          transform: scale(0.88);
+          transition-duration: 0.05s;
+        }
         .shop-year-eras {
           display: flex;
           flex-direction: column;
@@ -302,6 +312,11 @@ export default function ShopYearFilter({ locale, minYear, maxYear, selectedMin, 
           white-space: nowrap;
           cursor: pointer;
           font: inherit;
+          transition: transform 100ms ease;
+        }
+        .shop-year-era:active {
+          transform: scale(0.9);
+          transition-duration: 0.05s;
         }
         .shop-year-era:last-child {
           border-right: 1px solid rgba(115, 92, 0, 0.18);
@@ -341,11 +356,17 @@ export default function ShopYearFilter({ locale, minYear, maxYear, selectedMin, 
         }
         @media (prefers-reduced-motion: reduce) {
           .shop-year-era-full,
-          .shop-year-era-short { transition: none; }
+          .shop-year-era-short,
+          .shop-year-era,
+          .shop-year-reset,
+          .shop-year-toggle { transition: none; }
           .shop-year-era:hover .shop-year-era-full,
           .shop-year-era:hover .shop-year-era-short,
           .shop-year-era:focus-visible .shop-year-era-full,
-          .shop-year-era:focus-visible .shop-year-era-short { transform: none; }
+          .shop-year-era:focus-visible .shop-year-era-short,
+          .shop-year-era:active,
+          .shop-year-reset:active,
+          .shop-year-toggle:active { transform: none; }
         }
         .shop-year-era-active .shop-year-era-full,
         .shop-year-era-active .shop-year-era-short {
