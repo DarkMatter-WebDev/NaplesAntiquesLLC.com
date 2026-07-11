@@ -1,7 +1,47 @@
 ﻿# Current Status
 
 > Reflects the present state of development. **Update this at the end of every
-> work session.** Last updated: **2026-07-10**.
+> work session.** Last updated: **2026-07-11**.
+
+## 2026-07-11 (session 16) -- 🟢 Buy-side local SEO overhaul: /sell hub + 6 city landing pages + technical SEO fixes
+
+Ran a full SEO audit, then acted on it with a BUY-side focus per the owner:
+the goal is ranking for "jewelry buyers naples", "sell gold naples", "sell
+sterling naples", "sterling buyers naples", and every combo across the six
+service cities (Naples, Marco Island, Bonita Springs, Estero, Fort Myers,
+Cape Coral). The technical SEO foundation was already strong (per-page
+titles/descriptions, canonical + en/es/x-default hreflang, dynamic
+sitemap/robots, Product/Offer/Breadcrumb/FAQ schema, next/image with alt).
+
+**Built this session:**
+- `src/lib/service-areas.ts` + new `/sell` hub and `/sell/[city]` pages
+  (bilingual, SSG, one per city). Each city page targets every buy-side
+  combo via keyworded H2/H3s (Sell Gold / Jewelry / Sterling Silver /
+  Diamonds / Coins & Bullion / Watches "in {City}" and "{thing} buyers in
+  {City}"), plus How-It-Works, a 5-Q local FAQ, and inter-city links.
+  Per-page schema: city-scoped `JewelryStore` + `BreadcrumbList` + `FAQPage`.
+- Enriched the global `JewelryStore` JSON-LD (`[locale]/layout.tsx`):
+  `sameAs`, `logo`, `email`, `@id`, `alternateName`, `knowsAbout`,
+  `makesOffer`, all 6 cities in `areaServed`, buy-oriented description.
+- Reoriented root + home metadata to buy-side keywords.
+- Fixed OG share image to 1200×630 (was 1983×793).
+- Removed the `/sell`→/free-evaluation redirect (now a real hub); added
+  `/sell` + city URLs to the sitemap; added an "Areas We Serve" footer
+  section + repointed header "Sell To Us" at `/sell`; stabilized sitemap
+  `lastModified`.
+
+**Verification:** `tsc`/`lint` clean; `npm run build` OK with `/sell` +
+6 `/sell/[city]` as SSG (EN+ES). Live-preview confirmed titles, canonical,
+hreflang, all JSON-LD blocks, sitemap entries, footer links, and that the
+new icons render as real glyphs. Icons were limited to glyphs already in
+the committed Material Symbols subset (the full font isn't in the repo to
+regenerate from — see the subset gotcha in prior sessions).
+
+**Not done (needs owner content/decisions):** customer reviews/testimonials
++ `Review`/`AggregateRating` schema (real trust + rich-result gap), a
+blog/educational content track, and confirming Google Search Console / Bing
+verification + sitemap submission. See the SEO audit summary in the session
+transcript.
 
 ## 2026-07-10 (session 15, addendum) -- 🟢 Shop buttons now show instant press feedback on click
 

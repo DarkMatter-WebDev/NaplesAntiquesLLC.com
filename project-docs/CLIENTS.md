@@ -13,11 +13,11 @@
 
 ---
 
-## Naples Estate Jewelry & Antiques
+## Naples Estate Jewelry
 
 | Field | Value |
 |-------|-------|
-| **Client / business** | Naples Estate Jewelry & Antiques (Naples Antiques LLC) |
+| **Client / business** | Naples Estate Jewelry (legal entity: Naples Antiques LLC) |
 | **Primary contact** | Chris — (239) 404-8505 |
 | **Primary domain** | `naplesestatejewelry.co` |
 | **Related domains** | `naplesjewelrybuyers.com`, `naplesestatejewelry.com` |

@@ -1,5 +1,125 @@
 # Changelog
 
+## 2026-07-11 - Google Search Console property added (pending deploy); SEO health-checked live production
+
+Owner asked to set up Google Search Console and submit the sitemap, using
+the browser (owner already signed in to Google). Used the Claude-in-Chrome
+extension (owner's real browser session) since the sandboxed preview
+browser has no Google login.
+
+- **Added the GSC property** `https://naplesestatejewelry.co` (URL-prefix
+  type) via search.google.com/search-console, signed in as
+  info@surettesystems.com. Chose the HTML-tag verification method (no DNS
+  changes) and captured the verification token.
+- **Added `verification: { google: '...' }`** to the root metadata object
+  in `next-app/src/app/layout.tsx` — Next's Metadata API turns this into
+  `<meta name="google-site-verification" ...>` in `<head>`, matching how
+  title/OG/twitter metadata already work there. Verified locally that the
+  tag renders. `tsc` clean.
+- **Verification is NOT complete yet — blocked on deploy.** This project's
+  production site is updated by the owner manually copying this folder to
+  a separate GitHub repo (see `AGENTS.md`); confirmed live
+  `naplesestatejewelry.co/sitemap.xml` still lacks `/sell` and the new city
+  pages from the earlier session, so the verification tag isn't live
+  either. **Owner action needed:** deploy, then ask to finish — I'll click
+  Verify in Search Console and submit the sitemap (already includes
+  `/sell` + all 6 city URLs from the prior session, no further sitemap
+  code change needed here).
+- **Ran Google's Rich Results Test against the live production homepage**
+  (read-only, no auth) to sanity-check current structured data before the
+  new deploy lands: 2 valid items (JewelryStore local-business + Organization),
+  crawled clean. Only "non-critical" flags were the optional
+  `streetAddress`/`postalCode` fields, which are deliberately omitted —
+  this is a mobile, appointment-only business with no public storefront,
+  and publishing a specific address for a business that transacts in
+  precious metals would be a real physical-security consideration, not an
+  oversight. Not changed.
+- **Checked Bing Webmaster Tools** — not signed into any Microsoft account
+  in the owner's browser, so did not attempt setup (would require creating
+  a new Microsoft account, which needs the owner present). Flagged as a
+  recommended follow-up instead.
+- **Google Business Profile** — not created. This is the single highest-
+  leverage remaining local-SEO lever for buy-side searches ("gold buyers
+  near me", etc.) but creating one is a bigger, semi-public commitment
+  (business info decisions, phone/postcard verification tied to the real
+  business) that needs the owner's direct involvement, not something to
+  spin up unilaterally via browser automation.
+
+## 2026-07-11 - Brand-name sweep: "Naples Estate Jewelry & Antiques" / "Naples Antiques" cleanup
+
+Owner asked to change every "Naples Antiques" / "Naples Estate Jewelry &
+Antiques" usage to just "Naples Estate Jewelry". Swept the whole project
+(`Antiques` case-insensitive across app + docs). Findings:
+
+- **The live app already only uses "Naples Estate Jewelry."** A prior
+  session (see the 2026-07-XX entry below: "Standardized the public brand
+  to 'Naples Estate Jewelry' everywhere") had already dropped "& Antiques"
+  from every user-facing surface — footer, JSON-LD, product schema `brand`,
+  emails, page titles/metadata, translations. Nothing to change there.
+- **Deliberately left as-is:** Terms/Privacy still say "operated by Naples
+  Antiques LLC" — that is the actual registered legal entity name (not a
+  brand choice), and the same prior session explicitly kept it there "for
+  legal validity." Renaming a real LLC's legal name in a legal disclosure
+  would misstate the entity, so this needs the owner's explicit sign-off if
+  it should also change — flagged, not touched.
+- **Left untouched (not brand-name usage):** every other "antiques" mention
+  in the app (FAQ title, About page bio, Estate Services copy) uses the
+  word as a service category — "jewelry, silver, antiques" — describing
+  what the business actually buys, not the company name.
+- **Updated the two remaining descriptive mentions** in `project-docs/`:
+  `PROJECT_OVERVIEW.md`'s Project Purpose line and `CLIENTS.md`'s client
+  section heading/table row, both changed from "Naples Estate Jewelry &
+  Antiques" to "Naples Estate Jewelry (legal entity: Naples Antiques LLC)".
+  Historical records (this changelog, `meetings/2026-06-01-notes.md`) were
+  left untouched as history.
+
+No SEO changes were needed beyond this — the brand name was already
+consistent across metadata, JSON-LD, sitemap, and translations from the
+prior standardization pass.
+
+## 2026-07-11 - Buy-side local SEO: city landing pages + technical SEO fixes
+
+Owner clarified the primary SEO goal is ranking for BUY-side searches
+(people wanting to sell to us): "jewelry buyers naples", "sell gold naples",
+"sell sterling naples", "sterling buyers naples", etc., across all service
+cities. Implemented:
+
+- **New buy-side local landing pages.** `src/lib/service-areas.ts` (6 cities:
+  Naples, Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral, each
+  with a unique intro + nearby-area list) powers a new `/sell` hub page and
+  `/sell/[city]` pages (bilingual EN/ES, prerendered SSG). Each city page
+  front-loads high-intent headings — "Sell Gold in {City}", "Sterling Silver
+  buyers in {City}", "Sell Diamonds in {City}", etc. — plus How-It-Works,
+  a 5-question local FAQ, and cross-links to the other cities. Structured
+  data per city page: a city-scoped `JewelryStore` (areaServed = city +
+  neighborhoods), `BreadcrumbList`, and `FAQPage`.
+- **Enriched the global `JewelryStore` JSON-LD** (`[locale]/layout.tsx`):
+  added `sameAs` (related domains), `logo`, `email`, `@id`, `alternateName`,
+  `knowsAbout`, `makesOffer`, and expanded `areaServed` from 4 to all 6
+  cities. Description reoriented to buying.
+- **Reoriented site + home metadata** to buy-side keywords (root
+  `layout.tsx` default title/description/OG; home `generateMetadata`).
+- **Fixed the OG share image** from 1983×793 (~2.5:1) to a proper 1200×630
+  (1.91:1) center cover-crop so social cards no longer letterbox/crop.
+- **Wiring:** removed the `/sell`→/free-evaluation redirect (now a real
+  hub); added `/sell` + all city URLs to `sitemap.ts` with hreflang; added
+  an "Areas We Serve" footer section (sitewide internal links) and pointed
+  the header "Sell To Us" nav at the `/sell` hub; changed the footer's
+  first column from shop links to sell-to-us links. Sitemap static-page
+  `lastModified` now uses a stable content date instead of churning "now".
+
+Icons on the new pages use only glyphs already present in the committed
+Material Symbols subset (the full font isn't in the repo to regenerate
+from): paid, redeem, star, diamond, toll, watch, call, home, payments,
+verified_user — each verified to resolve in the subset and to render as a
+single glyph (rendered width == font-size) in the live preview.
+
+`tsc`/`lint` clean; `npm run build` succeeds with `/sell` and all 6
+`/sell/[city]` routes as SSG (● in the manifest, EN+ES). Verified live in
+preview: correct titles, self-referencing canonical + en/es/x-default
+hreflang, all four JSON-LD blocks present and valid, sitemap includes the
+new URLs, footer links render, no console errors.
+
 ## 2026-07-10 - Added instant "press" feedback to shop buttons whose effect isn't immediately visible
 
 Owner reported that clicking some shop buttons gave no indication anything

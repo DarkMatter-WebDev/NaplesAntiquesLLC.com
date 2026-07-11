@@ -5,7 +5,7 @@
 
 ## Project Purpose
 
-Marketing + commerce website for **Naples Estate Jewelry & Antiques** (legal
+Marketing + commerce website for **Naples Estate Jewelry** (legal
 entity: *Naples Antiques LLC*). The site does two jobs:
 
 1. **Lead generation** for a private, mobile, appointment-only buying service —

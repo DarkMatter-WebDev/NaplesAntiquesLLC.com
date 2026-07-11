@@ -1,10 +1,18 @@
 import type { MetadataRoute } from 'next';
 import { createClient } from '@supabase/supabase-js';
+import { SERVICE_AREAS } from '@/lib/service-areas';
 
 const BASE = 'https://naplesestatejewelry.co';
 
+// Stable last-modified date for content pages. Using a fixed date (bumped when
+// page content is meaningfully updated) avoids sending a churning "modified now"
+// signal on every crawl, which dilutes the freshness signal for pages that did
+// not actually change.
+const CONTENT_LAST_MODIFIED = new Date('2026-07-11');
+
 const STATIC_PAGES = [
   { path: '', priority: 1.0, changeFrequency: 'weekly' },
+  { path: '/sell', priority: 0.9, changeFrequency: 'monthly' },
   { path: '/shop', priority: 0.9, changeFrequency: 'daily' },
   { path: '/auctions', priority: 0.7, changeFrequency: 'monthly' },
   { path: '/about', priority: 0.7, changeFrequency: 'monthly' },
@@ -35,11 +43,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [];
 
   for (const { path, priority, changeFrequency } of STATIC_PAGES) {
+    // The shop reprices daily, so it genuinely changes often; other static
+    // pages use the stable content date rather than "now".
+    const lastModified = path === '/shop' ? now : CONTENT_LAST_MODIFIED;
     entries.push({
       url: `${BASE}${path}`,
-      lastModified: now,
+      lastModified,
       priority,
       changeFrequency,
+      alternates: { languages: { en: `${BASE}${path}`, es: `${BASE}/es${path}` } },
+    });
+  }
+
+  // Buy-side local landing pages (/sell/[city]).
+  for (const area of SERVICE_AREAS) {
+    const path = `/sell/${area.slug}`;
+    entries.push({
+      url: `${BASE}${path}`,
+      lastModified: CONTENT_LAST_MODIFIED,
+      priority: 0.8,
+      changeFrequency: 'monthly',
       alternates: { languages: { en: `${BASE}${path}`, es: `${BASE}/es${path}` } },
     });
   }

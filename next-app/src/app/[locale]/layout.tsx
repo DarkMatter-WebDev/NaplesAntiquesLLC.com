@@ -18,12 +18,16 @@ interface Props {
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'JewelryStore',
+  '@id': 'https://naplesestatejewelry.co/#business',
   name: 'Naples Estate Jewelry',
+  alternateName: ['Naples Jewelry Buyers', 'Naples Gold & Silver Buyer'],
   url: 'https://naplesestatejewelry.co',
   telephone: '+12394048505',
+  email: 'info@naplesestatejewelry.co',
   image: 'https://naplesestatejewelry.co/assets/images/pages/trust.webp',
+  logo: 'https://naplesestatejewelry.co/assets/images/branding/logo.webp',
   description:
-    'Naples, FL estate jeweler buying and selling fine gold chains, estate pieces, designer jewelry, and bullion. Free on-site evaluations by appointment across Southwest Florida.',
+    'Naples, FL gold, jewelry, and sterling silver buyer paying top dollar for estate jewelry, gold, silver, diamonds, coins, watches, and full estates. Free on-site evaluations by appointment across Southwest Florida.',
   address: {
     '@type': 'PostalAddress',
     addressLocality: 'Naples',
@@ -46,7 +50,25 @@ const jsonLd = {
   priceRange: '$$',
   currenciesAccepted: 'USD',
   paymentAccepted: 'Cash, Check, Wire Transfer, PayPal, Credit Card, Debit Card',
-  areaServed: ['Naples', 'Marco Island', 'Bonita Springs', 'Fort Myers'],
+  // Related domains + profiles help Google consolidate this business entity.
+  sameAs: [
+    'https://naplesjewelrybuyers.com',
+    'https://naplesestatejewelry.com',
+  ],
+  areaServed: [
+    'Naples, FL', 'Marco Island, FL', 'Bonita Springs, FL',
+    'Estero, FL', 'Fort Myers, FL', 'Cape Coral, FL',
+  ].map((name) => ({ '@type': 'City', name })),
+  knowsAbout: [
+    'Selling gold', 'Selling estate jewelry', 'Selling sterling silver',
+    'Selling diamonds', 'Selling coins and bullion', 'Selling luxury watches',
+  ],
+  makesOffer: [
+    { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Gold buying — we buy gold jewelry, coins, and bullion' } },
+    { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Estate jewelry buying — we buy fine and designer jewelry' } },
+    { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Sterling silver buying — we buy silver flatware, holloware, and jewelry' } },
+    { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Diamond, coin, and watch buying' } },
+  ],
 };
 
 export function generateStaticParams() {

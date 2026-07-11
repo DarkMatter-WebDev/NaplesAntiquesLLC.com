@@ -4,29 +4,36 @@ import './globals.css';
 // The <html>/<body> shell lives in [locale]/layout.tsx so `lang` can reflect the
 // locale (en/es). This root layout is a passthrough that only owns global metadata
 // and the globals.css import. The root not-found.tsx renders its own <html>.
+const SITE_TITLE = 'Sell Gold, Jewelry & Sterling Silver in Naples, FL | Naples Estate Jewelry';
+const SITE_DESCRIPTION =
+  'Naples gold, jewelry, and sterling silver buyer paying top dollar. We buy estate jewelry, gold, silver, diamonds, coins, and watches across Naples, Marco Island, Bonita Springs, Estero, Fort Myers & Cape Coral. Free appraisals — we come to you.';
+
 export const metadata: Metadata = {
   title: {
     template: '%s | Naples Estate Jewelry',
-    default: 'Naples Estate Jewelry — Fine Gold & Estate Pieces',
+    default: SITE_TITLE,
   },
-  description:
-    'Buy and sell estate jewelry, fine gold chains, designer pieces, and bullion in Naples, FL. Live gold pricing on every item.',
+  description: SITE_DESCRIPTION,
   metadataBase: new URL('https://naplesestatejewelry.co'),
   openGraph: {
     type: 'website',
     siteName: 'Naples Estate Jewelry',
     url: 'https://naplesestatejewelry.co',
-    title: 'Naples Estate Jewelry — Fine Gold & Estate Pieces',
-    description:
-      'Buy and sell estate jewelry, fine gold chains, designer pieces, and bullion in Naples, FL. Live gold pricing on every item.',
-    images: [{ url: '/assets/images/pages/og-preview.webp', width: 1983, height: 793 }],
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [{ url: '/assets/images/pages/og-preview.webp', width: 1200, height: 630 }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Naples Estate Jewelry — Fine Gold & Estate Pieces',
-    description:
-      'Buy and sell estate jewelry, fine gold chains, designer pieces, and bullion in Naples, FL. Live gold pricing on every item.',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     images: ['/assets/images/pages/og-preview.webp'],
+  },
+  // Google Search Console (URL-prefix property https://naplesestatejewelry.co,
+  // HTML-tag verification method). Do not remove — Search Console re-checks this
+  // tag periodically to keep the property verified.
+  verification: {
+    google: 'mOpCYI06DOHizh2_SK1_iWJ967utv2WO4T3OFmbLSsA',
   },
 };
 

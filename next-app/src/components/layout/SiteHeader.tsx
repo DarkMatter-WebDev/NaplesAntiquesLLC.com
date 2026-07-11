@@ -292,7 +292,7 @@ export default function SiteHeader() {
 
           {/* Sell To Us dropdown */}
           <div className="group relative flex items-center">
-              <Link href={href('/estate-jewelry')} className={navLinkBase} data-active={isAnyActive(SELL_ITEMS) ? 'true' : 'false'} style={{ color: SECONDARY }}>
+              <Link href={href('/sell')} className={navLinkBase} data-active={isActive('/sell') || isAnyActive(SELL_ITEMS) ? 'true' : 'false'} style={{ color: SECONDARY }}>
                 {t('sellToUs')}
               </Link>
             <DesktopDropdown items={SELL_ITEMS} t={t} href={href} />

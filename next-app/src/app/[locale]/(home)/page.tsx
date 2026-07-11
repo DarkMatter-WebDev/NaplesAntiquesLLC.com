@@ -11,8 +11,16 @@ import type { CarouselItem } from '../../../../carousel/lib/carouselData';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
+  const isEs = locale === 'es';
   return {
-    title: { absolute: 'Naples Estate Jewelry — Fine Gold & Estate Pieces' },
+    title: {
+      absolute: isEs
+        ? 'Compramos Oro, Joyería y Plata Esterlina en Naples, FL | Naples Estate Jewelry'
+        : 'Sell Gold, Jewelry & Sterling Silver in Naples, FL | Naples Estate Jewelry',
+    },
+    description: isEs
+      ? 'Compramos oro, joyería de patrimonio, plata esterlina, diamantes, monedas y relojes en Naples y el suroeste de Florida. Evaluaciones gratuitas — vamos a usted. Llame al (239) 404-8505.'
+      : 'We buy gold, estate jewelry, sterling silver, diamonds, coins, and watches in Naples and across Southwest Florida. Top-dollar payouts, free appraisals, we come to you. Call (239) 404-8505.',
     alternates: alternatesFor('/', locale),
   };
 }

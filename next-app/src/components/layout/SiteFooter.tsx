@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { SERVICE_AREAS } from '@/lib/service-areas';
 
 interface Props {
   locale?: string;
@@ -11,11 +12,11 @@ export default function SiteFooter({ locale = 'en' }: Props) {
   const year = new Date().getFullYear();
 
   const shopLinks = [
-    { label: isEs ? 'Joyería de Oro' : 'Gold Jewelry', href: p('/shop') + '?metal=gold' },
-    { label: isEs ? 'Joyería de Plata' : 'Silver Jewelry', href: p('/shop') + '?metal=silver' },
-    { label: isEs ? 'Todos los Artículos' : 'All Items', href: p('/shop') },
+    { label: isEs ? 'Vender Oro' : 'Sell Gold', href: p('/gold-services') },
+    { label: isEs ? 'Vender Plata' : 'Sell Sterling Silver', href: p('/silver-services') },
+    { label: isEs ? 'Vender Joyería' : 'Sell Estate Jewelry', href: p('/estate-jewelry') },
     { label: isEs ? 'Evaluación Gratuita' : 'Free Evaluation', href: p('/free-evaluation') },
-    { label: isEs ? 'Servicios de Oro' : 'Gold Services', href: p('/gold-services') },
+    { label: isEs ? 'Tienda' : 'Shop', href: p('/shop') },
   ];
 
   const companyLinks = [
@@ -74,12 +75,12 @@ export default function SiteFooter({ locale = 'en' }: Props) {
             </a>
           </div>
 
-          <nav className="hidden md:flex md:flex-col md:gap-3" aria-label={isEs ? 'Enlaces de tienda' : 'Shop links'}>
+          <nav className="hidden md:flex md:flex-col md:gap-3" aria-label={isEs ? 'Vender con nosotros' : 'Sell to us'}>
             <p
               className="text-[0.65rem] font-bold uppercase tracking-[0.3em]"
               style={{ fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}
             >
-              {isEs ? 'Tienda' : 'Shop'}
+              {isEs ? 'Vender' : 'Sell to Us'}
             </p>
             {shopLinks.map(({ label, href }) => (
               <Link
@@ -132,8 +133,33 @@ export default function SiteFooter({ locale = 'en' }: Props) {
           </nav>
         </div>
 
+        <nav
+          className="mt-4 border-t pt-4 md:mt-10 md:pt-6"
+          style={{ borderColor: 'var(--color-outline-variant)' }}
+          aria-label={isEs ? 'Áreas que servimos' : 'Areas we serve'}
+        >
+          <p
+            className="mb-2 text-center text-[0.6rem] font-bold uppercase tracking-[0.3em] md:text-left"
+            style={{ fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}
+          >
+            {isEs ? 'Áreas que Servimos' : 'Areas We Serve'}
+          </p>
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 md:justify-start">
+            {SERVICE_AREAS.map((a) => (
+              <Link
+                key={a.slug}
+                href={p(`/sell/${a.slug}`)}
+                className="text-[0.68rem] leading-tight transition-colors hover:underline md:text-xs md:underline-offset-2"
+                style={{ color: 'var(--color-on-surface-variant)' }}
+              >
+                {isEs ? `Vender en ${a.city}` : `Sell in ${a.city}`}
+              </Link>
+            ))}
+          </div>
+        </nav>
+
         <div
-          className="mt-4 flex flex-col items-center justify-between gap-1 border-t pt-3 text-center md:mt-10 md:flex-row md:items-center md:gap-3 md:pt-6 md:text-left"
+          className="mt-4 flex flex-col items-center justify-between gap-1 border-t pt-3 text-center md:mt-6 md:flex-row md:items-center md:gap-3 md:pt-6 md:text-left"
           style={{ borderColor: 'var(--color-outline-variant)' }}
         >
           <p

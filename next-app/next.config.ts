@@ -47,10 +47,9 @@ const nextConfig: NextConfig = {
       rules.push({ source: `/${page}.html`, destination: dest, permanent: true });
       rules.push({ source: `/es/${page}.html`, destination: page === 'index' ? '/es' : `/es/${page}`, permanent: true });
     }
-    // The nav "Sell" entry and habitual /cart typing should land somewhere real,
-    // not 404. /cart is a drawer (no page), so send it to the shop.
-    rules.push({ source: '/sell', destination: '/free-evaluation', permanent: true });
-    rules.push({ source: '/es/sell', destination: '/es/free-evaluation', permanent: true });
+    // Habitual /cart typing should land somewhere real, not 404. /cart is a
+    // drawer (no page), so send it to the shop. (`/sell` is now a real hub page
+    // — the buy-side local landing pages live at /sell and /sell/[city].)
     rules.push({ source: '/cart', destination: '/shop', permanent: false });
     rules.push({ source: '/es/cart', destination: '/es/shop', permanent: false });
     // Saved items / wishlist are a drawer (no page); keep these URLs off 404.
