@@ -211,7 +211,7 @@ export default function ContactForm({ locale, submitted }: Props) {
                         type="button"
                         aria-label={isEs ? 'Cerrar' : 'Close'}
                         onClick={() => dialogRef.current?.close()}
-                        className="flex-shrink-0 rounded-full w-9 h-9 inline-grid place-items-center transition-colors"
+                        className="contact-form-dialog-close flex-shrink-0 rounded-full w-9 h-9 inline-grid place-items-center transition-colors"
                         style={{
                           border: '1px solid var(--color-outline-variant)',
                           color: 'var(--color-primary)',

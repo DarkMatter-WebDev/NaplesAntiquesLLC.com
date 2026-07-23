@@ -51,9 +51,11 @@ const jsonLd = {
   currenciesAccepted: 'USD',
   paymentAccepted: 'Cash, Check, Wire Transfer, PayPal, Credit Card, Debit Card',
   // Related domains + profiles help Google consolidate this business entity.
+  // naplesestatejewelry.com is NOT owned by this business (confirmed 2026-07-11:
+  // it's a parked GoDaddy for-sale page) — do not add it back without confirming
+  // ownership first.
   sameAs: [
     'https://naplesjewelrybuyers.com',
-    'https://naplesestatejewelry.com',
   ],
   areaServed: [
     'Naples, FL', 'Marco Island, FL', 'Bonita Springs, FL',

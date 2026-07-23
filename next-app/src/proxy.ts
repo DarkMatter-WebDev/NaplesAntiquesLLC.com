@@ -47,7 +47,7 @@ async function refreshSupabaseSession(request: NextRequest, response: NextRespon
     }
   );
 
-  await supabase.auth.getUser();
+  await supabase.auth.getClaims();
   return response;
 }
 

@@ -35,6 +35,12 @@ begin
   execute format('grant select (%s) on public.products to authenticated', cols);
 end $$;
 
+-- Verification: every value should be false.
+select
+  has_column_privilege('authenticated', 'public.products', 'cost_basis', 'select') as authenticated_can_read_cost_basis,
+  has_column_privilege('authenticated', 'public.products', 'minimum_price', 'select') as authenticated_can_read_minimum_price,
+  has_column_privilege('authenticated', 'public.products', 'internal_notes', 'select') as authenticated_can_read_internal_notes;
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- ROLLBACK (uncomment to revert):
 -- ─────────────────────────────────────────────────────────────────────────────

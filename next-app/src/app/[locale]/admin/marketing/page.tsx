@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
+import { getVerifiedUser } from '@/lib/auth-claims';
 import { createServiceClient } from '@/lib/supabase/service';
 import AdminHeader from '@/components/admin/AdminHeader';
 import CampaignDeleteButton from '@/components/admin/CampaignDeleteButton';
@@ -80,7 +81,7 @@ export default async function AdminMarketingPage({ params }: Props) {
   const adminBasePath = isEs ? '/es/admin' : '/admin';
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getVerifiedUser(supabase);
 
   if (!user) redirect(isEs ? '/es/account/sign-in' : '/account/sign-in');
 

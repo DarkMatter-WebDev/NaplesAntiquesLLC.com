@@ -80,7 +80,7 @@ export default function CartButton({ item, variant = 'card', locale = 'en', incl
         onClick={handleClick}
         disabled={!canPurchase && !inCart}
         aria-pressed={inCart}
-        className="flex items-center justify-center gap-1.5"
+        className="shop-list-cart-button flex items-center justify-center gap-1.5"
         style={{
           borderRadius: '6px',
           padding: '0.5rem 0.85rem',

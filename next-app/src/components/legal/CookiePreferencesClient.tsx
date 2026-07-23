@@ -39,10 +39,10 @@ export default function CookiePreferencesClient({ locale }: { locale: string }) 
           : (isEs ? 'El aviso de cookies no está marcado como aceptado en este navegador.' : 'The cookie notice is not currently marked accepted in this browser.')}
       </p>
       <div className="flex flex-wrap gap-2.5">
-        <button type="button" className="gold-button px-5 py-2.5" onClick={acceptNotice}>
+        <button type="button" className="gold-button px-5 py-2.5" onClick={acceptNotice} disabled={accepted}>
           {isEs ? 'Aceptar aviso' : 'Accept Notice'}
         </button>
-        <button type="button" className="outline-button px-5 py-2.5" onClick={resetNotice}>
+        <button type="button" className="outline-button px-5 py-2.5" onClick={resetNotice} disabled={!accepted}>
           {isEs ? 'Restablecer aviso' : 'Reset Notice'}
         </button>
       </div>

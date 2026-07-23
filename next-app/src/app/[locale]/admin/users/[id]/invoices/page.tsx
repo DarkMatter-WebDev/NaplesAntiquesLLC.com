@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import { getVerifiedUser } from '@/lib/auth-claims';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { formatCurrency, formatOrderDate, orderStatusLabel } from '@/types/sales';
 
@@ -58,7 +59,7 @@ export default async function AdminUserInvoicesPage({ params }: Props) {
   const adminBasePath = isEs ? '/es/admin' : '/admin';
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getVerifiedUser(supabase);
 
   if (!user) {
     redirect(isEs ? '/es/account/sign-in' : '/account/sign-in');
@@ -121,7 +122,7 @@ export default async function AdminUserInvoicesPage({ params }: Props) {
       <main className="px-4 md:px-8 py-8">
         <div className="max-w-[1200px] mx-auto">
           <div className="mb-6">
-            <Link href={`${adminBasePath}/users`} className="text-xs font-bold uppercase tracking-widest hover:underline" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
+            <Link href={`${adminBasePath}/users`} className="hover-underline-grow text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
               Back to Users
             </Link>
           </div>
@@ -168,7 +169,7 @@ export default async function AdminUserInvoicesPage({ params }: Props) {
                       <td className="px-4 py-3 font-semibold" style={{ color: 'var(--color-on-surface)' }}>{invoice.invoice_number}</td>
                       <td className="px-4 py-3">
                         {invoice.order_id ? (
-                          <Link href={`${adminBasePath}/orders/${invoice.order_id}`} className="text-xs font-bold uppercase tracking-wide hover:underline" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
+                          <Link href={`${adminBasePath}/orders/${invoice.order_id}`} className="hover-underline-grow text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
                             Open Order
                           </Link>
                         ) : '-'}
@@ -181,7 +182,7 @@ export default async function AdminUserInvoicesPage({ params }: Props) {
                       <td className="px-4 py-3 font-semibold" style={{ color: 'var(--color-primary)' }}>{formatCurrency(invoice.total)}</td>
                       <td className="px-4 py-3">
                         {invoice.invoice_pdf_url ? (
-                          <a href={invoice.invoice_pdf_url} className="text-xs font-bold uppercase tracking-wide hover:underline" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
+                          <a href={invoice.invoice_pdf_url} className="hover-underline-grow text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
                             PDF
                           </a>
                         ) : '-'}

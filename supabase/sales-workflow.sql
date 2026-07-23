@@ -114,6 +114,8 @@ create table if not exists public.orders (
   payment_method text,
   payment_reference text,
   shipping_method text not null default 'pickup',
+  shipping_carrier text,
+  tracking_number text,
   shipping_address jsonb,
   billing_address jsonb,
   internal_notes text,
@@ -145,6 +147,43 @@ alter table public.order_items
 -- price_snapshot is the UNIT price; the line total is price_snapshot * quantity.
 alter table public.order_items
   add column if not exists quantity integer not null default 1;
+
+-- Preserve the final storefront price after a product is sold. Checkout writes
+-- the order snapshot before changing product status, so this trigger can copy
+-- the authoritative unit price without relying on a live metal quote in SQL.
+create or replace function public.apply_product_sold_price_lock()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if lower(coalesce(new.status, '')) = 'available' then
+    new.sold_price := null;
+    return new;
+  end if;
+
+  if lower(coalesce(new.status, '')) = 'sold'
+     and new.sold_price is null
+     and (tg_op = 'INSERT' or lower(coalesce(old.status, '')) <> 'sold') then
+    select oi.price_snapshot
+      into new.sold_price
+      from public.order_items oi
+      join public.orders o on o.id = oi.order_id
+     where oi.product_id = new.id
+       and o.payment_status = 'paid'
+     order by oi.created_at desc
+     limit 1;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists products_sold_price_lock on public.products;
+create trigger products_sold_price_lock
+  before insert or update of status, sold_price on public.products
+  for each row execute function public.apply_product_sold_price_lock();
 
 create table if not exists public.invoices (
   id uuid primary key default gen_random_uuid(),

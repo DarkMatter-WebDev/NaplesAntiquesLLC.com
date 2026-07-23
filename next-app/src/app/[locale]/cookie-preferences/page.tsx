@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 import LegalPolicyPage from '@/components/legal/LegalPolicyPage';
 import CookiePreferencesClient from '@/components/legal/CookiePreferencesClient';
+import { getLegalMetadata } from '@/lib/legal-metadata';
+import { getSpanishLegalCopy } from '@/lib/spanish-legal-copy';
 
-export const metadata: Metadata = {
-  title: 'Cookie Preferences | Naples Estate Jewelry',
-  description: 'Cookie and browser storage preferences for Naples Estate Jewelry.',
-  robots: { index: false, follow: true },
-};
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  return getLegalMetadata('cookie-preferences', locale);
+}
 
 interface Props {
   params: Promise<{ locale: string }>;
@@ -15,17 +16,19 @@ interface Props {
 export default async function CookiePreferencesPage({ params }: Props) {
   const { locale } = await params;
   const isEs = locale === 'es';
+  const spanishCopy = getSpanishLegalCopy('cookie-preferences', locale);
 
   return (
     <LegalPolicyPage
       locale={locale}
-      title={isEs ? 'Preferencias de Cookies' : 'Cookie Preferences'}
-      intro={[
+      title={spanishCopy?.title ?? 'Cookie Preferences'}
+      updated={spanishCopy?.updated}
+      intro={spanishCopy?.intro ?? [
         'This site currently uses essential cookies and browser storage to operate core features. During the compliance audit, no Google Analytics, Google Tag Manager, Meta Pixel, Microsoft Clarity, Hotjar, or similar tracking pixel was found in the app source.',
       ]}
-      sections={[
+      sections={spanishCopy?.sections ?? [
         {
-          title: 'Essential Cookies and Storage',
+          title: isEs ? 'Cookies y Almacenamiento Esenciales' : 'Essential Cookies and Storage',
           bullets: [
             'Supabase authentication cookies for sign-in and account sessions.',
             'Language routing cookies such as NEXT_LOCALE.',
@@ -34,13 +37,13 @@ export default async function CookiePreferencesPage({ params }: Props) {
           ],
         },
         {
-          title: 'Optional Analytics or Advertising Cookies',
+          title: isEs ? 'Cookies Opcionales de Analítica o Publicidad' : 'Optional Analytics or Advertising Cookies',
           body: [
             'No optional analytics or advertising cookie system is currently enabled in the app source reviewed for this audit. If that changes, this page should be updated with a real opt-in or opt-out control before those tools are enabled.',
           ],
         },
         {
-          title: 'Managing Browser Controls',
+          title: isEs ? 'Administrar los Controles del Navegador' : 'Managing Browser Controls',
           body: [
             'You can also clear cookies and local storage in your browser settings. Doing so may sign you out, clear your local cart or favorites, reset your language choice, or cause the cookie notice to appear again.',
           ],

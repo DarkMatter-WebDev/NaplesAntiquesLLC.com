@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { normalizeEmail, stableEventId, suppressMarketingEmail } from '@/lib/marketing';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -60,6 +61,11 @@ function campaignIdFromPayload(data: Record<string, unknown>) {
 }
 
 export async function POST(req: Request) {
+  const ip = getClientIp(req);
+  if (!(await checkRateLimit(`resend-webhook:${ip}`, 300, 60))) {
+    return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
+  }
+
   const body = await req.text();
   if (!verifySvixSignature(body, req.headers)) {
     return NextResponse.json({ error: 'Invalid signature.' }, { status: 401 });

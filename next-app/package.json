@@ -16,13 +16,15 @@
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.1",
-    "next": "16.2.9",
+    "fast-xml-parser": "^5.10.1",
+    "next": "16.2.10",
     "next-intl": "^4.13.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "resend": "^6.12.4",
     "server-only": "^0.0.1",
-    "sharp": "0.34.5"
+    "sharp": "0.34.5",
+    "tus-js-client": "^4.3.1"
   },
   "devDependencies": {
     "@netlify/plugin-nextjs": "^5.15.11",
@@ -31,9 +33,19 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9",
+    "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "js-yaml": "4.3.0",
+    "minimatch@3.1.5": {
+      "brace-expansion": "1.1.16"
+    },
+    "minimatch@10.2.5": {
+      "brace-expansion": "5.0.7"
+    },
+    "postcss": "8.5.15"
   }
 }

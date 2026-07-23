@@ -115,7 +115,7 @@ export default async function HomePage({ params }: Props) {
                 </p>
                 <Link
                   href={item.href}
-                  className="w-fit text-xs font-bold uppercase tracking-[0.16em] transition-colors hover:underline"
+                  className="hover-underline-grow w-fit text-xs font-bold uppercase tracking-[0.16em]"
                   style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
                 >
                   {item.cta}

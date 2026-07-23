@@ -201,12 +201,21 @@ export async function insertSyncLog(service: SupabaseClient, input: EbaySyncLogI
   }
 }
 
-export async function getRecentSyncLog(service: SupabaseClient, limit = 50): Promise<EbaySyncLogRow[]> {
-  const { data, error } = await service
+export async function getRecentSyncLog(
+  service: SupabaseClient,
+  limit = 50,
+  options: { excludeActions?: string[] } = {},
+): Promise<EbaySyncLogRow[]> {
+  let query = service
     .from('ebay_sync_log')
     .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit);
+    .order('created_at', { ascending: false });
+
+  for (const action of options.excludeActions ?? []) {
+    query = query.neq('action', action);
+  }
+
+  const { data, error } = await query.limit(limit);
   if (error) {
     if (isMissingSchemaError(error)) return [];
     throw new Error(error.message);

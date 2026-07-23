@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
+import { getVerifiedUser } from '@/lib/auth-claims';
 import { buildInvoiceEmailContent } from '@/lib/order-invoice-email';
 import type { Order, OrderItem } from '@/types/sales';
 import PrintInvoiceClient from './PrintInvoiceClient';
@@ -46,7 +47,7 @@ export default async function AdminOrderInvoicePrintPage({ params }: Props) {
   const adminBasePath = isEs ? '/es/admin' : '/admin';
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getVerifiedUser(supabase);
 
   if (!user) {
     redirect(isEs ? '/es/account/sign-in' : '/account/sign-in');

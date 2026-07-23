@@ -29,7 +29,7 @@ interface Props {
 
 export default function ShopYearFilter({ locale, minYear, maxYear, selectedMin, selectedMax }: Props) {
   const isEs = locale === 'es';
-  const { push } = useShopNavigation();
+  const { getSearchParams, push } = useShopNavigation();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
@@ -49,7 +49,7 @@ export default function ShopYearFilter({ locale, minYear, maxYear, selectedMin, 
     (min: number, max: number) => {
       const lo = Math.min(min, max);
       const hi = Math.max(min, max);
-      const params = new URLSearchParams(searchParams.toString());
+      const params = getSearchParams(searchParams.toString());
       if (lo <= minYear && hi >= maxYear) {
         params.delete('yearMin');
         params.delete('yearMax');
@@ -60,7 +60,7 @@ export default function ShopYearFilter({ locale, minYear, maxYear, selectedMin, 
       params.delete('page');
       push(`${pathname}?${params.toString()}`, { scroll: false });
     },
-    [pathname, push, searchParams, minYear, maxYear],
+    [getSearchParams, pathname, push, searchParams, minYear, maxYear],
   );
 
   const selectEra = useCallback(
@@ -75,12 +75,12 @@ export default function ShopYearFilter({ locale, minYear, maxYear, selectedMin, 
   const reset = useCallback(() => {
     setDraftMin(minYear);
     setDraftMax(maxYear);
-    const params = new URLSearchParams(searchParams.toString());
+    const params = getSearchParams(searchParams.toString());
     params.delete('yearMin');
     params.delete('yearMax');
     params.delete('page');
     push(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [pathname, push, searchParams, minYear, maxYear]);
+  }, [getSearchParams, pathname, push, searchParams, minYear, maxYear]);
 
   const leftPct = ((draftMin - minYear) / span) * 100;
   const rightPct = 100 - ((draftMax - minYear) / span) * 100;

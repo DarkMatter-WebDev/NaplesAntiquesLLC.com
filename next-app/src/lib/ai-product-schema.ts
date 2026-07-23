@@ -7,6 +7,7 @@ import {
   normalizeProductMetalType,
   normalizeProductMetalVariant,
   normalizeProductTypeValue,
+  normalizeProductWidthMm,
   type Product,
   type ProductMetalType,
   type ProductMetalVariant,
@@ -23,6 +24,7 @@ export type ProductAutofillFields = {
   gender: 'Unisex' | 'Men' | 'Women' | null;
   chain_type: string | null;
   length: string | null;
+  width_mm: number | null;
   price_mode: 'spot-multiplier' | 'manual' | null;
   purity: number | null;
   weight_grams: number | null;
@@ -43,7 +45,7 @@ export type ProductAutofillDraft = {
   confidence: Partial<Record<keyof ProductAutofillFields, ProductAutofillConfidence>>;
 };
 
-export type ProductAutofillProviderResult = Partial<ProductAutofillDraft> & {
+export type ProductAutofillProviderResult = Omit<Partial<ProductAutofillDraft>, 'fields' | 'warnings' | 'uncertainties' | 'confidence'> & {
   fields?: Partial<Record<keyof ProductAutofillFields, unknown>>;
   warnings?: unknown;
   uncertainties?: unknown;
@@ -59,6 +61,7 @@ export const PRODUCT_AUTOFILL_FIELD_KEYS = [
   'gender',
   'chain_type',
   'length',
+  'width_mm',
   'price_mode',
   'purity',
   'weight_grams',
@@ -81,6 +84,7 @@ export const EMPTY_PRODUCT_AUTOFILL_FIELDS: ProductAutofillFields = {
   gender: null,
   chain_type: null,
   length: null,
+  width_mm: null,
   price_mode: null,
   purity: null,
   weight_grams: null,
@@ -159,6 +163,37 @@ function cleanTitle(value: unknown): string | null {
 function cleanStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map((item) => cleanString(item, 260)).filter((item): item is string => Boolean(item));
+}
+
+const SELLER_ATTRIBUTION_PATTERNS: RegExp[] = [
+  /\b(?:the\s+)?seller\s+(?:suggests?|recommends?|believes?|thinks?|says?|states?|reports?|describes?|identifies?|calls?|mentions?)\b[^.!?\r\n]*(?:[.!?]|$)/gi,
+  /\baccording\s+to\s+(?:the\s+)?seller\b[^.!?\r\n]*(?:[.!?]|$)/gi,
+  /\b(?:seller|owner)[-'\s](?:suggested|recommended|believed|thought|stated|reported|described|identified)\b[^.!?\r\n]*(?:[.!?]|$)/gi,
+];
+
+export function sanitizeBuyerFacingText(value: string | null): { value: string | null; removed: string[] } {
+  if (!value) return { value: null, removed: [] };
+
+  const removed: string[] = [];
+  let cleaned = value;
+  for (const pattern of SELLER_ATTRIBUTION_PATTERNS) {
+    cleaned = cleaned.replace(pattern, (match) => {
+      const suggestion = match.trim();
+      if (suggestion) removed.push(suggestion);
+      return ' ';
+    });
+  }
+
+  cleaned = cleaned
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.;:])/g, '$1')
+    .trim();
+
+  if (removed.length > 0) {
+    cleaned = cleaned.replace(/^[\s,.;:]+|[\s,.;:]+$/g, '').trim();
+  }
+
+  return { value: cleaned || null, removed };
 }
 
 function cleanNumber(value: unknown, options: { min?: number; max?: number; decimals?: number } = {}): number | null {
@@ -272,9 +307,17 @@ export function coerceProductAutofill(input: ProductAutofillProviderResult): Pro
   const metalType = fallbackMetalType ? normalizeProductMetalType(fallbackMetalType, 'Gold') : null;
   const fallbackCategory: Product['category'] = metalType === 'Silver' || metalType === 'Platinum' || metalType === 'Palladium' ? 'Silver' : 'Gold';
   const productType = normalizeProductTypeValue(cleanString(rawFields.product_type, MAX_SHORT_TEXT_LENGTH));
+  const sellerSuggestions: string[] = [];
+  const cleanBuyerField = (value: string | null) => {
+    const sanitized = sanitizeBuyerFacingText(value);
+    sellerSuggestions.push(...sanitized.removed);
+    return sanitized.value;
+  };
+  const sanitizedTitle = sanitizeBuyerFacingText(cleanString(rawFields.title, MAX_SHORT_TEXT_LENGTH));
+  sellerSuggestions.push(...sanitizedTitle.removed);
 
   const fields: ProductAutofillFields = {
-    title: cleanTitle(rawFields.title),
+    title: cleanTitle(sanitizedTitle.value),
     product_type: productType,
     brand: cleanString(rawFields.brand, MAX_SHORT_TEXT_LENGTH),
     metal_type: metalType,
@@ -282,6 +325,7 @@ export function coerceProductAutofill(input: ProductAutofillProviderResult): Pro
     gender: cleanGender(rawFields.gender),
     chain_type: cleanString(rawFields.chain_type, MAX_SHORT_TEXT_LENGTH),
     length: cleanLength(rawFields.length),
+    width_mm: normalizeProductWidthMm(rawFields.width_mm as string | number | null | undefined),
     price_mode: cleanPriceMode(rawFields.price_mode),
     purity: cleanPurity(rawFields.purity),
     weight_grams: cleanNumber(rawFields.weight_grams, { min: 0.01, max: 100000, decimals: 2 }),
@@ -291,12 +335,13 @@ export function coerceProductAutofill(input: ProductAutofillProviderResult): Pro
     manual_price_label: cleanString(rawFields.manual_price_label, MAX_SHORT_TEXT_LENGTH),
     show_spot_price: cleanBoolean(rawFields.show_spot_price),
     quantity: cleanQuantity(rawFields.quantity),
-    description: cleanString(rawFields.description),
-    public_notes: cleanString(rawFields.public_notes),
+    description: cleanBuyerField(cleanString(rawFields.description)),
+    public_notes: cleanBuyerField(cleanString(rawFields.public_notes)),
   };
 
   if (fields.product_type && fields.product_type !== 'Necklace' && fields.product_type !== 'Bracelet') {
     fields.chain_type = null;
+    fields.width_mm = null;
   }
   // The size/length field carries the length for Necklace/Bracelet, the ring size for Ring,
   // and the item's height for every other form (e.g. a 1.5 in brooch, a 0.75 in pendant).
@@ -322,7 +367,7 @@ export function coerceProductAutofill(input: ProductAutofillProviderResult): Pro
   return {
     fields,
     warnings: cleanStringArray(input.warnings),
-    uncertainties: cleanStringArray(input.uncertainties),
+    uncertainties: cleanStringArray([...cleanStringArray(input.uncertainties), ...sellerSuggestions]).slice(0, 10),
     confidence: cleanConfidence(input.confidence),
   };
 }

@@ -1,4 +1,4 @@
-import type { Product, SpotData } from '@/types/product';
+import { getProductSoldPriceLock, isProductSold, type Product, type SpotData } from '@/types/product';
 
 const GRAMS_PER_TROY_OZ = 31.1034768;
 const FALLBACK_GOLD_SPOT = 5500;
@@ -74,16 +74,39 @@ export function calcSpotMeltValue(product: Product, spotData: SpotData | null): 
   return weightGrams * purityToFraction(purity) * spotPerGram;
 }
 
+export function getProductPriceValue(product: Product, spotData: SpotData | null): number | null {
+  const lockedPrice = getProductSoldPriceLock(product);
+  if (lockedPrice != null) return lockedPrice;
+  if (product.price_mode === 'manual') {
+    return parseManualPriceLabelValue(product.manual_price_label);
+  }
+  return calcSpotPriceValue(product, spotData);
+}
+
 export function getSpotMeltDisplayPrice(product: Product, spotData: SpotData | null): string {
   const value = calcSpotMeltValue(product, spotData);
   return value == null ? '-' : formatUsdPrice(value);
 }
 
 export function getDisplayPrice(product: Product, spotData: SpotData | null): string {
+  const lockedPrice = getProductSoldPriceLock(product);
+  if (lockedPrice != null) return formatUsdPrice(lockedPrice);
   if (product.price_mode === 'manual') {
     return normalizeManualPriceLabel(product.manual_price_label) ?? 'Contact for price';
   }
   return calcSpotPrice(product, spotData) ?? 'Contact for price';
+}
+
+export function getStorefrontDisplayPrice(
+  product: Product,
+  spotData: SpotData | null,
+  hideSoldItemPrices: boolean,
+  locale = 'en',
+): string {
+  if (hideSoldItemPrices && isProductSold(product.status)) {
+    return locale === 'es' ? 'Vendido' : 'Sold';
+  }
+  return getDisplayPrice(product, spotData);
 }
 
 export function getPriceContext(product: Product, spotData: SpotData | null, locale = 'en'): string {

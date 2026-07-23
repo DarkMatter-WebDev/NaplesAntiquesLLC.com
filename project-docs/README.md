@@ -1,4 +1,4 @@
-# Project Docs — Persistent Memory System
+# Project Docs - Persistent Memory System
 
 This folder is the project's **long-term memory**. It exists so that any AI
 session, chat reset, or new contributor can quickly understand the project
@@ -15,15 +15,15 @@ docs and evidence-backed verification.
 | File | Purpose |
 |------|---------|
 | `PROJECT_OVERVIEW.md` | **Read first.** Purpose, business goals, audience, tech stack, deployment. |
-| `CURRENT_STATUS.md` | Present state: what works, recent work, priorities, blockers, next steps. |
+| `CURRENT_STATUS.md` | Concise present-state snapshot: what works, deployment state, blockers, and immediate priorities. |
 | `ARCHITECTURE.md` | System design, folder structure, DB schema, integrations, auth, hosting. |
 | `STRUCTURE.md` | Canonical repo map + structural **invariants** that keep the site consistent. |
 | `INTEGRITY.md` | Next.js integrity rules + pre-publish checklist. |
 | `LEGACY_REMOVAL_REPORT.md` | 2026-06-13 audit separating current Next.js app files from legacy static-site cleanup candidates. |
 | `COMPLIANCE_AUDIT.md` | 2026-06-19 website compliance audit and implementation report. |
-| `DECISIONS.md` | Dated log of important technical/design/business decisions + rationale. |
-| `TASKS.md` | Backlog / In Progress / Completed task tracking. |
-| `CHANGELOG.md` | Dated log of meaningful changes. |
+| `DECISIONS.md` | Current durable technical/design/business decisions and rationale. |
+| `TASKS.md` | Open work plus a short recent-completions summary. |
+| `CHANGELOG.md` | The one full-history, dated log of meaningful changes. |
 | `CLIENTS.md` | Dark Matter Web Services client/hosting/maintenance tracking (no secrets). |
 | `features/` | One file per feature with deeper detail. |
 | `meetings/` | Dated notes (`YYYY-MM-DD-notes.md`). |
@@ -33,7 +33,9 @@ docs and evidence-backed verification.
 At the start of every session:
 
 1. Read root `AGENTS.md`.
-2. Read `PROJECT_OVERVIEW.md`, `CURRENT_STATUS.md`, `TASKS.md`, `DECISIONS.md`.
+2. Read `PROJECT_OVERVIEW.md`, `CURRENT_STATUS.md`, `TASKS.md`, and
+   `DECISIONS.md`. These files are intentionally compact enough for every
+   session.
 3. Build an understanding of the project and **summarize current state** before
    making changes.
 4. Ask for clarification only if required.
@@ -42,8 +44,10 @@ At the start of every session:
 
 Before ending a work session, never leave project state undocumented:
 
-1. Update `CURRENT_STATUS.md`.
-2. Update `TASKS.md` (move items between Backlog / In Progress / Completed).
+1. Update `CURRENT_STATUS.md` only when the present system or its immediate
+   priorities changed; do not append a session diary.
+2. Update `TASKS.md` by removing completed items and adding only still-open
+   work. Keep no more than a short recent-completions summary.
 3. Record important decisions in `DECISIONS.md`.
 4. Add significant changes to `CHANGELOG.md`.
 5. Update `ARCHITECTURE.md` if the architecture changed.
@@ -57,6 +61,9 @@ Before ending a work session, never leave project state undocumented:
 - Treat these Markdown files as the source of truth for project context.
 - Keep docs concise but current; prefer updating existing files over creating new
   ones.
+- Keep historical detail in `CHANGELOG.md`, not duplicated in the three startup
+  files. Feature implementation detail belongs in `features/` or an existing
+  dedicated runbook.
 - If unsure whether something matters, document it.
 - Write for both humans and AI agents.
 - Do not run git operations in this source-of-truth folder; the human handles
@@ -70,3 +77,15 @@ Before ending a work session, never leave project state undocumented:
   `npm run build` from `next-app/` - see `INTEGRITY.md`.
 - **Never commit secrets.** In `CLIENTS.md`, record only where credentials live,
   never the credentials themselves. (`.env` / `.env.local` are gitignored.)
+
+## Memory Maintenance
+
+- `CURRENT_STATUS.md` is a replace-in-place snapshot, organized by system.
+- `TASKS.md` is an open-work queue, not a permanent completed archive.
+- `DECISIONS.md` contains only decisions that still govern the project.
+  Superseded decisions stay discoverable in `CHANGELOG.md`.
+- `CHANGELOG.md` may grow because it is the intentional historical record and
+  is not part of routine session startup.
+- Before deleting a plan, runbook, report, or root asset, verify references in
+  code, SQL, config, and docs. Ambiguous source artwork is retained and added to
+  `TASKS.md` for an owner decision.

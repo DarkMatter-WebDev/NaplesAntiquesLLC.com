@@ -3,44 +3,48 @@ import type { Product } from '@/types/product';
 import { isProductPurchasable, normalizeProductQuantity } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
 import { getProductImages, getProductMetal, getProductWeight, getSnapshotPrice } from '@/lib/sales';
+import { getCheckoutShippingFee } from '@/lib/checkout-shipping';
 
 // Authoritative checkout pricing. This is the single source of truth for tax,
 // shipping, and the per-item snapshot prices — the frontend never sends amounts.
 // FL_TAX_RATE is THE one source of truth for the rate — cart/checkout/admin all
-// import it so the displayed and charged rate can never drift apart again (they
-// previously diverged: 7% checkout vs 6.5% admin).
+// import it so the displayed and charged rate can never drift apart again.
 export const FL_TAX_RATE = 0.06;
 // Human label for the rate, kept next to it so the two never disagree.
 export const FL_TAX_RATE_LABEL = '6%';
 
-export const SHIPPING_FEES: Record<string, number> = {
-  'local-pickup': 0,
-  'express-overnight-insured': 75,
-  'priority-insured': 45,
-};
-
-export function shippingMethodForDb(value: string): string {
-  return value === 'local-pickup' ? 'pickup' : 'shipping';
-}
-
-// FL sales tax nexus: we only collect it when the sale is completed in Florida —
-// local pickup (always happens here in Naples) or a shipping address within FL.
-// Out-of-state shipments are not taxed. Matches common free-text entries for the
-// state field ("FL", "Fla", "Florida", any case/whitespace).
 export function isFloridaState(state: string | null | undefined): boolean {
   const normalized = (state ?? '').trim().toLowerCase().replace(/\.$/, '');
   return normalized === 'fl' || normalized === 'fla' || normalized === 'florida';
 }
 
-// `shippingMethod` here is the raw checkout value ('local-pickup' | 'express-…' |
-// 'priority-…'), not the DB-normalized `orders.shipping_method` column value.
-export function chargesFlSalesTax(shippingMethod: string, shippingState: string | null | undefined): boolean {
+// `shippingMethod` is the raw checkout value, not the DB-normalized value.
+export function chargesFlSalesTax(
+  shippingMethod: string,
+  shippingState: string | null | undefined,
+): boolean {
   return shippingMethod === 'local-pickup' || isFloridaState(shippingState);
 }
 
 /** Round to whole cents. Used so order amounts and the PayPal breakdown agree. */
 export function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+/** Owner policy: Florida tax applies to taxable merchandise plus charged shipping. */
+export function calculateFlSalesTax(taxableMerchandise: number, shippingFee = 0): number {
+  const taxableBase = Math.max(0, taxableMerchandise) + Math.max(0, shippingFee);
+  return round2(taxableBase * FL_TAX_RATE);
+}
+
+/** Display checkout amounts to the same cent precision used for payment. */
+export function formatCheckoutCurrency(value: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
 const CHECKOUT_PRODUCT_COLUMNS = [
@@ -140,10 +144,10 @@ export async function buildOrderDraft(
   const productIds = orderLines.map((line) => line.productId);
   const quantityByProductId = new Map(orderLines.map((line) => [line.productId, line.quantity]));
 
-  // Whitelist the shipping method. An unknown value used to silently resolve to a
-  // $0 fee (SHIPPING_FEES[x] ?? 0) while still being recorded as a shipped order —
-  // i.e. free insured shipping via a tampered request.
-  if (!(shippingMethod in SHIPPING_FEES)) {
+  // Whitelist the shipping method. An unknown value must never silently resolve
+  // to a $0 fee while still being recorded as a shipped order.
+  const shippingFee = getCheckoutShippingFee(shippingMethod);
+  if (shippingFee === null) {
     return { error: 'Invalid shipping method.', status: 400 };
   }
 
@@ -250,8 +254,9 @@ export async function buildOrderDraft(
   }
 
   const subtotal = round2(items.reduce((sum, item) => sum + item.price_snapshot * item.quantity, 0));
-  const shippingFee = SHIPPING_FEES[shippingMethod] ?? 0;
-  const tax = chargesFlSalesTax(shippingMethod, shippingState) ? round2(subtotal * FL_TAX_RATE) : 0;
+  const tax = chargesFlSalesTax(shippingMethod, shippingState)
+    ? calculateFlSalesTax(subtotal, shippingFee)
+    : 0;
   const total = round2(subtotal + tax + shippingFee);
 
   return { items, subtotal, tax, shippingFee, total };

@@ -391,7 +391,7 @@ export default function ResetPasswordPage() {
 
         <p className="mt-7 text-sm text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
           {isEs ? '¿La recordó? ' : 'Remembered it? '}
-          <Link href={`${prefix}/account/sign-in`} className="font-bold hover:underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>
+          <Link href={`${prefix}/account/sign-in`} className="hover-underline-grow font-bold" style={{ color: 'var(--color-primary)' }}>
             {isEs ? 'Inicie sesión' : 'Sign in'}
           </Link>
         </p>

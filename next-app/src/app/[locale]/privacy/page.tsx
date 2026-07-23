@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import LegalPolicyPage from '@/components/legal/LegalPolicyPage';
+import { getLegalMetadata } from '@/lib/legal-metadata';
+import { getSpanishLegalCopy } from '@/lib/spanish-legal-copy';
 
-export const metadata: Metadata = {
-  title: 'Privacy Policy | Naples Estate Jewelry',
-  description: 'Privacy Policy for Naples Estate Jewelry. How we collect, use, and protect personal information.',
-  robots: { index: false, follow: true },
-};
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  return getLegalMetadata('privacy', locale);
+}
 
 interface Props {
   params: Promise<{ locale: string }>;
@@ -14,12 +15,14 @@ interface Props {
 export default async function PrivacyPage({ params }: Props) {
   const { locale } = await params;
   const isEs = locale === 'es';
+  const spanishCopy = getSpanishLegalCopy('privacy', locale);
 
   return (
     <LegalPolicyPage
       locale={locale}
-      title={isEs ? 'Política de Privacidad' : 'Privacy Policy'}
-      intro={[
+      title={spanishCopy?.title ?? 'Privacy Policy'}
+      updated={spanishCopy?.updated}
+      intro={spanishCopy?.intro ?? [
         isEs
           ? 'Naples Estate Jewelry, operated by Naples Antiques LLC, respects your privacy. This policy explains how we collect and use information when you visit our website, create an account, submit an item, make an inquiry, subscribe for updates, or place an online order.'
           : 'Naples Estate Jewelry, operated by Naples Antiques LLC, respects your privacy. This policy explains how we collect and use information when you visit our website, create an account, submit an item, make an inquiry, subscribe for updates, or place an online order.',
@@ -27,7 +30,7 @@ export default async function PrivacyPage({ params }: Props) {
           ? 'This policy is written for our current small-business website. It does not claim compliance with any certification or privacy framework that we have not separately obtained.'
           : 'This policy is written for our current small-business website. It does not claim compliance with any certification or privacy framework that we have not separately obtained.',
       ]}
-      sections={[
+      sections={spanishCopy?.sections ?? [
         {
           title: isEs ? 'Información que recopilamos' : 'Information We Collect',
           bullets: [

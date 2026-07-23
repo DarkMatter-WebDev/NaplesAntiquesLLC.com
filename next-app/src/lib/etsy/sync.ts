@@ -24,8 +24,12 @@ import {
   uploadListingImage,
 } from './images';
 import {
+  claimNextRepairableListing,
   claimNextPendingListing,
+  claimNextDraftReviewListing,
+  countDraftReviewListings,
   countPendingListings,
+  countRepairableListings,
   deleteListingImageRow,
   deleteListingImagesByListingId,
   getConnection,
@@ -35,6 +39,8 @@ import {
   insertSyncLog,
   pruneOldSyncLogs,
   upsertListing,
+  ETSY_REPAIRABLE_SYNC_STATES,
+  ETSY_RESUMABLE_SYNC_STATES,
   type EtsyConnectionRow,
   type EtsyListingRow,
   type EtsySyncState,
@@ -146,6 +152,10 @@ async function updateListingInventory(params: {
       ],
     },
   });
+}
+
+export function isWritableEtsyListingState(state: string): boolean {
+  return state === 'active' || state === 'draft';
 }
 
 /**
@@ -304,6 +314,27 @@ export function resolveUpdatedListingSyncState(
   return autoActivate ? 'active' : 'draft_review';
 }
 
+/** Persist the price baseline whenever the inventory write itself succeeded. */
+export function resolveInventoryCheckpointPatch(
+  syncState: EtsySyncState,
+  mode: SyncMode,
+  pushedPrice: EtsyListingRow['last_pushed_price'],
+): { sync_state?: EtsySyncState; last_pushed_price?: EtsyListingRow['last_pushed_price'] } {
+  if (syncState === 'images_synced') {
+    return { sync_state: 'inventory_synced', last_pushed_price: pushedPrice };
+  }
+  if (mode === 'update') return { last_pushed_price: pushedPrice };
+  return {};
+}
+
+export function isReadyToPublishEtsyListing(
+  listing: Pick<EtsyListingRow, 'sync_state' | 'listing_state' | 'etsy_listing_id'>,
+): boolean {
+  return listing.sync_state === 'draft_review'
+    && listing.listing_state === 'draft'
+    && listing.etsy_listing_id != null;
+}
+
 /** Runs one bounded step-machine invocation for a single product. Idempotent — safe to call again. */
 export async function runSyncStep(productId: string, mode: SyncMode = 'publish'): Promise<SyncStepResult> {
   const service = createServiceClient();
@@ -344,9 +375,36 @@ export async function runSyncStep(productId: string, mode: SyncMode = 'publish')
   // not a re-upload — plus inventory/properties/copy) and move it to a
   // terminal state so it leaves the queue.
   const effectiveMode: SyncMode =
-    mode === 'publish' && listing?.etsy_listing_id != null && listing.sync_state === 'pending' ? 'update' : mode;
+    mode === 'publish'
+      && listing?.etsy_listing_id != null
+      && ['pending', 'out_of_date'].includes(listing.sync_state)
+      ? 'update'
+      : mode;
 
   try {
+    if (listing?.etsy_listing_id && (effectiveMode === 'update' || effectiveMode === 'price-only')) {
+      const listingId = listing.etsy_listing_id;
+      const remote = await etsyFetch<{ state: string }>({
+        path: `/v3/application/listings/${listingId}`,
+        accessToken,
+      });
+      const remoteState = remote.data.state;
+      const preserveQueuedState = listing.sync_state === 'pending' && isWritableEtsyListingState(remoteState);
+      const patch = reconcileQueuedUpdateState(listing.sync_state, remoteState);
+      await applyEtsyReconciliation(service, listing, remoteState, { preserveSyncState: preserveQueuedState });
+      listing = { ...listing, ...patch };
+      if (!isWritableEtsyListingState(remoteState)) {
+        const message = `This listing is ${remoteState} on Etsy. Reactivate it before syncing updates.`;
+        return {
+          done: true,
+          syncState: listing.sync_state,
+          listingId,
+          listingUrl: listingUrlFor(listingId),
+          error: { code: 'remote_listing_inactive', message },
+        };
+      }
+    }
+
     // Step 1 — draft.
     if (!listing || !listing.etsy_listing_id) {
       const listingId = await createDraftListing({ shopId, accessToken, connection, payload });
@@ -479,9 +537,8 @@ export async function runSyncStep(productId: string, mode: SyncMode = 'publish')
 
       warnings.push(...(await pushListingProperties({ shopId, listingId, accessToken, product, service, listing })));
 
-      if (listing.sync_state === 'images_synced') {
-        listing = await upsertListing(service, productId, { sync_state: 'inventory_synced', last_pushed_price: payload.price });
-      }
+      const checkpointPatch = resolveInventoryCheckpointPatch(listing.sync_state, effectiveMode, payload.price);
+      if (Object.keys(checkpointPatch).length > 0) listing = await upsertListing(service, productId, checkpointPatch);
     }
 
     // Step 4 — activate, or hold for owner review (Q1 default).
@@ -579,7 +636,12 @@ export function reconcileSyncStateFromEtsy(
 ): { sync_state?: EtsyListingRow['sync_state']; listing_state?: EtsyListingRow['listing_state'] } {
   switch (etsyState) {
     case 'active':
-      return { sync_state: 'active', listing_state: 'active' };
+      // Remote lifecycle confirms that the listing is live, but it does not
+      // prove that our mapped content still matches the last pushed hash.
+      return {
+        sync_state: current === 'out_of_date' ? 'out_of_date' : 'active',
+        listing_state: 'active',
+      };
     case 'inactive':
     case 'sold_out':
     // 'edit' is a real Etsy listing state, not a guess — confirmed live
@@ -606,13 +668,22 @@ export function reconcileSyncStateFromEtsy(
   }
 }
 
+/** Keep an explicitly queued update queued while refreshing its remote listing state. */
+export function reconcileQueuedUpdateState(current: EtsySyncState, etsyState: string) {
+  const patch = reconcileSyncStateFromEtsy(current, etsyState);
+  if (current === 'pending' && isWritableEtsyListingState(etsyState)) delete patch.sync_state;
+  return patch;
+}
+
 /** Applies the reconciliation patch to one row; returns whether it changed. Shared by the per-item and bulk status checks. */
 async function applyEtsyReconciliation(
   service: SupabaseClient,
   listing: EtsyListingRow,
   etsyState: string,
+  options: { preserveSyncState?: boolean } = {},
 ): Promise<{ changed: boolean; syncState: EtsyListingRow['sync_state'] }> {
   const patch = reconcileSyncStateFromEtsy(listing.sync_state, etsyState);
+  if (options.preserveSyncState) delete patch.sync_state;
   const nextSync = patch.sync_state ?? listing.sync_state;
   const nextListing = patch.listing_state !== undefined ? patch.listing_state : listing.listing_state;
   if (nextSync === listing.sync_state && nextListing === listing.listing_state) {
@@ -668,7 +739,9 @@ export async function checkListingStatus(productId: string): Promise<CheckListin
       found: true,
       syncState,
       etsyState,
-      message: changed
+      message: syncState === 'out_of_date'
+        ? `Confirmed ${etsyState} on Etsy; local updates still need to be synced.`
+        : changed
         ? `Updated — this listing is now ${etsyState} on Etsy.`
         : `Already in sync — listing state on Etsy: ${etsyState}.`,
     };
@@ -704,6 +777,14 @@ export interface CheckAllStatusResult {
   /** Listings gone from Etsy (404) — reset to not-listed. */
   reset: number;
   errors: number;
+  /** Requested products that do not have a linked Etsy listing. */
+  skipped: number;
+  items: Array<{
+    productId: string;
+    syncState: EtsyListingRow['sync_state'];
+    linked: boolean;
+    checkError: boolean;
+  }>;
 }
 
 /**
@@ -717,11 +798,35 @@ export interface CheckAllStatusResult {
  * rather than every item flapping. One call handles the whole catalog well
  * under the route's 60s budget.
  */
-export async function checkAllListingStatuses(): Promise<CheckAllStatusResult> {
+export async function checkAllListingStatuses(productIds?: string[]): Promise<CheckAllStatusResult> {
   const service = createServiceClient();
-  const { data } = await service.from('etsy_listings').select('*').not('etsy_listing_id', 'is', null);
+  if (productIds && productIds.length === 0) {
+    return { checked: 0, updated: 0, reset: 0, errors: 0, skipped: 0, items: [] };
+  }
+
+  let query = service.from('etsy_listings').select('*').not('etsy_listing_id', 'is', null);
+  if (productIds) query = query.in('product_id', productIds);
+  const { data, error } = await query;
+  if (error) throw error;
   const rows = (data ?? []) as EtsyListingRow[];
-  if (rows.length === 0) return { checked: 0, updated: 0, reset: 0, errors: 0 };
+  const skipped = productIds ? Math.max(0, productIds.length - rows.length) : 0;
+  const requestedIds = productIds ?? rows.map((row) => row.product_id);
+  const itemStatus = new Map(rows.map((row) => [row.product_id, {
+    productId: row.product_id,
+    syncState: row.sync_state,
+    linked: true,
+    checkError: false,
+  }]));
+  if (rows.length === 0) {
+    return {
+      checked: 0,
+      updated: 0,
+      reset: 0,
+      errors: 0,
+      skipped,
+      items: requestedIds.map((productId) => ({ productId, syncState: 'pending', linked: false, checkError: false })),
+    };
+  }
 
   const { accessToken } = await ensureFreshAccessToken(service);
   let checked = 0;
@@ -734,8 +839,9 @@ export async function checkAllListingStatuses(): Promise<CheckAllStatusResult> {
     try {
       const res = await etsyFetch<{ state: string }>({ path: `/v3/application/listings/${listing.etsy_listing_id}`, accessToken });
       checked += 1;
-      const { changed } = await applyEtsyReconciliation(service, listing, res.data.state);
+      const { changed, syncState } = await applyEtsyReconciliation(service, listing, res.data.state);
       if (changed) updated += 1;
+      itemStatus.set(listing.product_id, { productId: listing.product_id, syncState, linked: true, checkError: false });
     } catch (err) {
       if (err instanceof EtsyApiError && err.status === 404) {
         // Gone on Etsy (deleted there) — reset to not-listed, same as the per-item check.
@@ -753,15 +859,25 @@ export async function checkAllListingStatuses(): Promise<CheckAllStatusResult> {
         await insertSyncLog(service, { product_id: listing.product_id, listing_id: listing.etsy_listing_id, action: 'check_status', outcome: 'ok', message: 'No longer on Etsy — reset to not-listed.' });
         checked += 1;
         reset += 1;
+        itemStatus.set(listing.product_id, { productId: listing.product_id, syncState: 'pending', linked: false, checkError: false });
       } else if (isConnectionLevelEtsyError(err)) {
         throw err; // connection issue affects every listing — stop and surface it
       } else {
         errors += 1;
+        itemStatus.set(listing.product_id, { productId: listing.product_id, syncState: listing.sync_state, linked: true, checkError: true });
       }
     }
   }
 
-  return { checked, updated, reset, errors };
+  return {
+    checked,
+    updated,
+    reset,
+    errors,
+    skipped,
+    items: requestedIds.map((productId) => itemStatus.get(productId)
+      ?? { productId, syncState: 'pending', linked: false, checkError: false }),
+  };
 }
 
 export async function runDelist(productId: string): Promise<SyncStepResult> {
@@ -787,38 +903,93 @@ export async function runReactivate(productId: string): Promise<SyncStepResult> 
   if (!listing?.etsy_listing_id) {
     throw new Error('This product has never been synced to Etsy — use "Sync to Etsy" instead.');
   }
-  const connection = await getConnection(service);
   const { accessToken, shopId } = await ensureFreshAccessToken(service);
-  const targetState = connection?.auto_activate ? 'active' : 'draft_review';
-  if (targetState === 'active') {
-    await setListingState({ shopId, listingId: listing.etsy_listing_id, accessToken, state: 'active' });
-  }
+  // This is an explicit publish action. Etsy has no "reactivate as draft"
+  // transition; updateListing accepts only active or inactive for state.
+  await setListingState({ shopId, listingId: listing.etsy_listing_id, accessToken, state: 'active' });
   const updated = await upsertListing(service, productId, {
-    sync_state: targetState,
-    listing_state: targetState === 'active' ? 'active' : 'draft',
+    sync_state: 'active',
+    listing_state: 'active',
     last_synced_at: new Date().toISOString(),
   });
   await insertSyncLog(service, { product_id: productId, listing_id: listing.etsy_listing_id, action: 'relist', outcome: 'ok' });
   return { done: true, syncState: updated.sync_state, listingId: listing.etsy_listing_id, listingUrl: listingUrlFor(listing.etsy_listing_id) };
 }
 
+/** Explicitly publishes one completed review draft. Never used by normal sync. */
+export async function runPublishReady(productId: string): Promise<SyncStepResult> {
+  const service = createServiceClient();
+  const listing = await getListing(service, productId);
+  if (!listing || !isReadyToPublishEtsyListing(listing)) {
+    return {
+      done: true,
+      syncState: listing?.sync_state ?? 'pending',
+      warnings: ['This listing is not a completed Etsy draft awaiting review.'],
+    };
+  }
+  const listingId = listing.etsy_listing_id;
+  if (listingId == null) {
+    return { done: true, syncState: listing.sync_state, warnings: ['This Etsy draft has no linked listing ID.'] };
+  }
+
+  const product = await fetchProduct(service, productId);
+  if (!product || normalizeProductStatus(product.status) !== 'available') {
+    throw new Error('This product is no longer available and was not published to Etsy.');
+  }
+
+  const { accessToken, shopId } = await ensureFreshAccessToken(service);
+  await setListingState({ shopId, listingId, accessToken, state: 'active' });
+  const updated = await upsertListing(service, productId, {
+    sync_state: 'active',
+    listing_state: 'active',
+    last_synced_at: new Date().toISOString(),
+    last_error: null,
+    error_count: 0,
+  });
+  await insertSyncLog(service, {
+    product_id: productId,
+    listing_id: listingId,
+    action: 'activate',
+    outcome: 'ok',
+    message: 'Published completed review draft live from the bulk action.',
+  });
+  return {
+    done: true,
+    syncState: updated.sync_state,
+    listingId,
+    listingUrl: listingUrlFor(listingId),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Phase 2 — bulk queue (enqueue + drain) and content-hash-driven "out of date"
 // detection. `etsy_listings.sync_state = 'pending'` rows ARE the queue.
 // ---------------------------------------------------------------------------
+export function isSelectedEtsySyncCandidate(
+  listing: Pick<EtsyListingRow, 'sync_state' | 'etsy_listing_id'> | null,
+): boolean {
+  if (!listing) return true;
+  return ETSY_RESUMABLE_SYNC_STATES.includes(listing.sync_state)
+    || listing.sync_state === 'error';
+}
+
 export async function enqueueProducts(productIds: string[]): Promise<number> {
+  await scanAndMarkOutOfDate(productIds);
   const service = createServiceClient();
   let count = 0;
-  for (const id of productIds) {
+  for (const id of new Set(productIds)) {
     const existing = await getListing(service, id);
-    if (existing && !['error', 'unlinked'].includes(existing.sync_state) && existing.etsy_listing_id) continue;
-    await upsertListing(service, id, { sync_state: 'pending' });
+    if (!isSelectedEtsySyncCandidate(existing)) continue;
+    if (!existing || ['error', 'unlinked'].includes(existing.sync_state)) {
+      await upsertListing(service, id, { sync_state: 'pending' });
+    }
     count += 1;
   }
   return count;
 }
 
 export async function enqueueAllEligible(): Promise<number> {
+  await scanAndMarkOutOfDate();
   const service = createServiceClient();
   const connection = await getConnection(service);
   const spotData = await fetchSpotData();
@@ -833,7 +1004,9 @@ export async function enqueueAllEligible(): Promise<number> {
     const preflight = buildPreflightChecks(product, connection, spotData, taxonomyOverride);
     if (!isPreflightPassing(preflight)) continue;
     if (existing && (existing.sync_state === 'active' || existing.sync_state === 'draft_review')) continue;
-    await upsertListing(service, product.id, { sync_state: 'pending' });
+    if (!existing || !ETSY_RESUMABLE_SYNC_STATES.includes(existing.sync_state)) {
+      await upsertListing(service, product.id, { sync_state: 'pending' });
+    }
     count += 1;
   }
   return count;
@@ -842,7 +1015,7 @@ export async function enqueueAllEligible(): Promise<number> {
 export interface DrainResult {
   done: boolean;
   remaining: number;
-  results: { productId: string; syncState: string }[];
+  results: { productId: string; syncState: string; done: boolean }[];
 }
 
 const DRAIN_TIME_BUDGET_MS = 8000;
@@ -855,7 +1028,7 @@ export interface DrainDeps {
 }
 
 export interface DrainCoreResult {
-  results: { productId: string; syncState: string }[];
+  results: { productId: string; syncState: string; done: boolean }[];
   /** true when the queue emptied (claimNext returned null); false when the time budget was hit first. */
   exhausted: boolean;
 }
@@ -884,7 +1057,7 @@ export async function drainQueueCore(deps: DrainDeps): Promise<DrainCoreResult> 
     if (seen.has(productId)) return { results, exhausted: false };
     seen.add(productId);
     const result = await deps.runStep(productId);
-    results.push({ productId, syncState: result.syncState });
+    results.push({ productId, syncState: result.syncState, done: result.done });
     // A product still mid-image-batch (done:false) stays claimable by design —
     // break so the rest of the queue drains before we come back to it.
     if (!result.done) break;
@@ -930,6 +1103,114 @@ export async function drainQueue(): Promise<DrainResult> {
     budgetMs: DRAIN_TIME_BUDGET_MS,
   });
   const remaining = await countPendingListings(service);
+  return { done: core.exhausted && remaining === 0, remaining, results: core.results };
+}
+
+export interface EtsyRepairSummary {
+  total: number;
+  outOfDate: number;
+  incomplete: number;
+}
+
+export async function getEtsyRepairSummary(): Promise<EtsyRepairSummary> {
+  await scanAndMarkOutOfDate();
+  const service = createServiceClient();
+  const { data, error } = await service
+    .from('etsy_listings')
+    .select('sync_state')
+    .not('etsy_listing_id', 'is', null)
+    .in('sync_state', ETSY_REPAIRABLE_SYNC_STATES);
+  if (error) throw new Error(error.message);
+  const states = (data ?? []) as Array<{ sync_state: EtsySyncState }>;
+  return {
+    total: states.length,
+    outOfDate: states.filter((row) => row.sync_state === 'out_of_date').length,
+    incomplete: states.filter((row) => row.sync_state !== 'out_of_date').length,
+  };
+}
+
+async function runRepairStep(productId: string): Promise<SyncStepResult> {
+  const checked = await checkListingStatus(productId);
+  if (!checked.found) {
+    return {
+      done: true,
+      syncState: checked.syncState,
+      warnings: [checked.message],
+    };
+  }
+
+  await scanAndMarkOutOfDate([productId]);
+  const service = createServiceClient();
+  const listing = await getListing(service, productId);
+  if (!listing?.etsy_listing_id || !ETSY_REPAIRABLE_SYNC_STATES.includes(listing.sync_state)) {
+    return {
+      done: true,
+      syncState: listing?.sync_state ?? 'pending',
+      warnings: ['This listing no longer needs Etsy repair.'],
+    };
+  }
+
+  const mode: SyncMode = listing.sync_state === 'out_of_date' || listing.listing_state === 'active'
+    ? 'update'
+    : 'publish';
+  return runSyncStep(productId, mode);
+}
+
+export async function drainRepairQueue(): Promise<DrainResult> {
+  const service = createServiceClient();
+  const core = await drainQueueCore({
+    claimNext: () => claimNextRepairableListing(service),
+    runStep: async (productId) => {
+      try {
+        return await runRepairStep(productId);
+      } catch (err) {
+        if (isConnectionLevelEtsyError(err)) throw err;
+        const message = err instanceof Error ? err.message : 'Etsy repair failed unexpectedly.';
+        await upsertListing(service, productId, { sync_state: 'error', last_error: message }).catch(() => {});
+        await insertSyncLog(service, { product_id: productId, action: 'repair', outcome: 'error', message }).catch(() => {});
+        return { done: true, syncState: 'error', error: { code: 'repair_failed', message } };
+      }
+    },
+    now: () => Date.now(),
+    budgetMs: DRAIN_TIME_BUDGET_MS,
+  });
+  const remaining = await countRepairableListings(service);
+  return { done: core.exhausted && remaining === 0, remaining, results: core.results };
+}
+
+// Deliberate go-live drain for completed Etsy drafts. This is separate from
+// normal sync so review-first remains the default and every activation starts
+// from an explicit admin confirmation.
+export async function drainPublishQueue(): Promise<DrainResult> {
+  const service = createServiceClient();
+  const core = await drainQueueCore({
+    claimNext: () => claimNextDraftReviewListing(service),
+    runStep: async (productId) => {
+      try {
+        return await runPublishReady(productId);
+      } catch (err) {
+        if (isConnectionLevelEtsyError(err)) throw err;
+        const message = err instanceof Error ? err.message : 'Etsy publish failed unexpectedly.';
+        const listing = await getListing(service, productId).catch(() => null);
+        await upsertListing(service, productId, {
+          sync_state: 'error',
+          last_error: message,
+          error_count: (listing?.error_count ?? 0) + 1,
+        }).catch(() => {});
+        await insertSyncLog(service, {
+          product_id: productId,
+          listing_id: listing?.etsy_listing_id ?? null,
+          action: 'activate',
+          outcome: 'error',
+          message,
+        }).catch(() => {});
+        return { done: true, syncState: 'error', error: { code: 'publish_failed', message } };
+      }
+    },
+    now: () => Date.now(),
+    budgetMs: DRAIN_TIME_BUDGET_MS,
+  });
+  const remaining = await countDraftReviewListings(service);
   return { done: core.exhausted && remaining === 0, remaining, results: core.results };
 }
 
@@ -1051,8 +1332,9 @@ export async function runScheduledPricePush(): Promise<{ pushed: number; skipped
       continue;
     }
     try {
-      await runSyncStep(row.product_id, 'price-only');
-      pushed += 1;
+      const result = await runSyncStep(row.product_id, 'price-only');
+      if (result.error) skipped += 1;
+      else pushed += 1;
     } catch {
       skipped += 1;
     }
@@ -1107,7 +1389,7 @@ export async function pushPricesBatch(): Promise<{ done: boolean; pushed: number
   for (const productId of needsPush.slice(0, PRICE_PUSH_BATCH)) {
     try {
       const result = await runSyncStep(productId, 'price-only');
-      if (result.syncState === 'error') failed += 1;
+      if (result.error || result.syncState === 'error') failed += 1;
       else pushed += 1;
     } catch {
       failed += 1;

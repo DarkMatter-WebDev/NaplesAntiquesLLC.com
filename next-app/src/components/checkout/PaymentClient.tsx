@@ -4,7 +4,12 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
-import OrderSummary, { SHIPPING_OPTIONS } from '@/components/checkout/OrderSummary';
+import OrderSummary from '@/components/checkout/OrderSummary';
+import {
+  DEFAULT_SHIPPING_METHOD,
+  isCheckoutShippingMethod,
+} from '@/lib/checkout-shipping';
+import { useHideSoldItemPrices } from '@/hooks/useHideSoldItemPrices';
 
 const GOLD = '#735c00';
 const BORDER = '#d8d0c2';
@@ -13,12 +18,13 @@ export default function PaymentClient({ locale }: { locale: string }) {
   const { items } = useCart();
   const searchParams = useSearchParams();
   const isEs = locale === 'es';
+  const hideSoldItemPrices = useHideSoldItemPrices(true);
   const prefix = isEs ? '/es' : '';
-  const initialShipping = searchParams.get('shipping') ?? SHIPPING_OPTIONS[0].value;
-  const [shippingMethod, setShippingMethod] = useState(
-    SHIPPING_OPTIONS.some((option) => option.value === initialShipping)
+  const initialShipping = searchParams.get('shipping') ?? DEFAULT_SHIPPING_METHOD;
+  const [shippingMethod, setShippingMethod] = useState<string>(
+    isCheckoutShippingMethod(initialShipping)
       ? initialShipping
-      : SHIPPING_OPTIONS[0].value,
+      : DEFAULT_SHIPPING_METHOD,
   );
 
   if (items.length === 0) {
@@ -41,7 +47,7 @@ export default function PaymentClient({ locale }: { locale: string }) {
   return (
     <div className="mx-auto w-full max-w-6xl px-[clamp(1rem,4vw,2rem)] py-10 md:py-16">
       <div className="mb-8">
-        <Link href={`${prefix}/checkout`} className="text-xs font-bold uppercase tracking-widest hover:underline" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+        <Link href={`${prefix}/checkout`} className="hover-underline-grow text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
           {isEs ? '< Volver al checkout' : '< Back to checkout'}
         </Link>
         <h1 className="text-3xl md:text-5xl font-bold mt-4 mb-3" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
@@ -122,6 +128,7 @@ export default function PaymentClient({ locale }: { locale: string }) {
           prefix={prefix}
           shippingMethod={shippingMethod}
           onShippingMethodChange={setShippingMethod}
+          hideSoldItemPrices={hideSoldItemPrices}
         />
       </div>
     </div>

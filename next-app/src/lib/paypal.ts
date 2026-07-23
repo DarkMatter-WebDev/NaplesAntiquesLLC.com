@@ -3,6 +3,7 @@
 // PAYPAL_CLIENT_SECRET. The `server-only` import turns any client import into a
 // build error rather than a silent secret leak.
 import 'server-only';
+import { createHash } from 'node:crypto';
 
 const SANDBOX_BASE = 'https://api-m.sandbox.paypal.com';
 const LIVE_BASE = 'https://api-m.paypal.com';
@@ -65,6 +66,16 @@ export type PayPalLineItem = {
   sku?: string;
 };
 
+export type PayPalShippingAddress = {
+  fullName: string;
+  addressLine1: string;
+  addressLine2?: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  countryCode: string;
+};
+
 export type CreatePayPalOrderInput = {
   currency: string;
   subtotal: number;
@@ -74,6 +85,8 @@ export type CreatePayPalOrderInput = {
   items: PayPalLineItem[];
   /** Our internal order reference, echoed back on the PayPal order. */
   referenceId: string;
+  /** Validated merchant-provided address. Omit for local pickup. */
+  shippingAddress?: PayPalShippingAddress | null;
   invoiceId?: string;
   brandName?: string;
 };
@@ -91,8 +104,16 @@ export type PayPalOrderResult = {
   status: string;
 };
 
-export async function createPayPalOrder(input: CreatePayPalOrderInput): Promise<PayPalOrderResult> {
-  const token = await getAccessToken();
+export function payPalCreateRequestId(input: CreatePayPalOrderInput): string {
+  const request = buildPayPalOrderRequest(input);
+  const digest = createHash('sha256')
+    .update(JSON.stringify(request))
+    .digest('hex')
+    .slice(0, 31);
+  return `create-${digest}`;
+}
+
+export function buildPayPalOrderRequest(input: CreatePayPalOrderInput): Record<string, unknown> {
   const currency = input.currency;
 
   // PayPal requires item_total + tax_total + shipping to equal amount.value, and
@@ -133,22 +154,47 @@ export async function createPayPalOrder(input: CreatePayPalOrderInput): Promise<
   };
   if (input.invoiceId) purchaseUnit.invoice_id = input.invoiceId;
 
+  if (input.shippingAddress) {
+    const shipping = input.shippingAddress;
+    purchaseUnit.shipping = {
+      name: { full_name: shipping.fullName.slice(0, 300) },
+      address: {
+        address_line_1: shipping.addressLine1.slice(0, 300),
+        ...(shipping.addressLine2 ? { address_line_2: shipping.addressLine2.slice(0, 300) } : {}),
+        admin_area_2: shipping.city.slice(0, 120),
+        admin_area_1: shipping.state.slice(0, 300),
+        postal_code: shipping.postalCode.slice(0, 60),
+        country_code: shipping.countryCode,
+      },
+    };
+  }
+
+  return {
+    intent: 'CAPTURE',
+    purchase_units: [purchaseUnit],
+    application_context: {
+      brand_name: input.brandName ?? 'Naples Estate Jewelry',
+      shipping_preference: input.shippingAddress ? 'SET_PROVIDED_ADDRESS' : 'NO_SHIPPING',
+      user_action: 'PAY_NOW',
+    },
+  };
+}
+
+export async function createPayPalOrder(input: CreatePayPalOrderInput): Promise<PayPalOrderResult> {
+  const token = await getAccessToken();
+  const request = buildPayPalOrderRequest(input);
+
   const res = await fetch(`${paypalApiBase()}/v2/checkout/orders`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
+      // A retry with the same order details returns the same PayPal order. This
+      // prevents an ambiguous local failure from creating a second payable order.
+      'PayPal-Request-Id': payPalCreateRequestId(input),
     },
     cache: 'no-store',
-    body: JSON.stringify({
-      intent: 'CAPTURE',
-      purchase_units: [purchaseUnit],
-      application_context: {
-        brand_name: input.brandName ?? 'Naples Estate Jewelry',
-        shipping_preference: 'NO_SHIPPING',
-        user_action: 'PAY_NOW',
-      },
-    }),
+    body: JSON.stringify(request),
   });
 
   const data = (await res.json().catch(() => null)) as
@@ -163,6 +209,63 @@ export async function createPayPalOrder(input: CreatePayPalOrderInput): Promise<
   return { id: data.id, status: data.status ?? 'CREATED' };
 }
 
+export type PayPalRefundResult = {
+  id: string;
+  status: string;
+  amount: number;
+  currency: string;
+  raw: unknown;
+};
+
+export async function refundPayPalCapture(input: {
+  captureId: string;
+  amount: number;
+  currency?: string;
+  requestId: string;
+}): Promise<PayPalRefundResult> {
+  const token = await getAccessToken();
+  const currency = input.currency ?? 'USD';
+  const res = await fetch(
+    `${paypalApiBase()}/v2/payments/captures/${encodeURIComponent(input.captureId)}/refund`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'PayPal-Request-Id': input.requestId.slice(0, 38),
+      },
+      cache: 'no-store',
+      body: JSON.stringify({
+        amount: {
+          value: money(input.amount),
+          currency_code: currency,
+        },
+      }),
+    },
+  );
+
+  const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!res.ok || !data?.id) {
+    const message = typeof data?.message === 'string' ? data.message : `status ${res.status}`;
+    const err = new Error(`PayPal refund failed: ${message}`) as Error & {
+      paypalStatus?: number;
+      raw?: unknown;
+    };
+    err.paypalStatus = res.status;
+    err.raw = data;
+    throw err;
+  }
+
+  const amount = data.amount as { value?: string; currency_code?: string } | undefined;
+  return {
+    id: String(data.id),
+    status: String(data.status ?? 'UNKNOWN'),
+    amount: Number(amount?.value ?? input.amount),
+    currency: String(amount?.currency_code ?? currency),
+    raw: data,
+  };
+}
+
 export type PayPalCaptureResult = {
   status: string;
   captureId: string | null;
@@ -170,6 +273,36 @@ export type PayPalCaptureResult = {
   capturedCurrency: string | null;
   raw: unknown;
 };
+
+export function parsePayPalCaptureResponse(raw: unknown): PayPalCaptureResult {
+  const data = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+  const purchaseUnits = (data.purchase_units as Array<Record<string, unknown>> | undefined) ?? [];
+  const payments = (purchaseUnits[0]?.payments as Record<string, unknown> | undefined) ?? {};
+  const captures = (payments.captures as Array<Record<string, unknown>> | undefined) ?? [];
+  const capture = captures[0];
+  const captureAmount = capture?.amount as { value?: string; currency_code?: string } | undefined;
+
+  return {
+    status: String(capture?.status ?? data.status ?? 'UNKNOWN'),
+    captureId: capture?.id ? String(capture.id) : null,
+    capturedAmount: captureAmount?.value != null ? Number(captureAmount.value) : null,
+    capturedCurrency: captureAmount?.currency_code ?? null,
+    raw,
+  };
+}
+
+export async function getPayPalOrderCapture(paypalOrderId: string): Promise<PayPalCaptureResult> {
+  const token = await getAccessToken();
+  const res = await fetch(`${paypalApiBase()}/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!res.ok || !data) {
+    throw new Error(`PayPal order lookup failed (${res.status}).`);
+  }
+  return parsePayPalCaptureResponse(data);
+}
 
 export async function capturePayPalOrder(paypalOrderId: string): Promise<PayPalCaptureResult> {
   const token = await getAccessToken();
@@ -195,19 +328,7 @@ export async function capturePayPalOrder(paypalOrderId: string): Promise<PayPalC
     throw err;
   }
 
-  const purchaseUnits = (data.purchase_units as Array<Record<string, unknown>> | undefined) ?? [];
-  const payments = (purchaseUnits[0]?.payments as Record<string, unknown> | undefined) ?? {};
-  const captures = (payments.captures as Array<Record<string, unknown>> | undefined) ?? [];
-  const capture = captures[0];
-  const captureAmount = capture?.amount as { value?: string; currency_code?: string } | undefined;
-
-  return {
-    status: String(data.status ?? 'UNKNOWN'),
-    captureId: capture?.id ? String(capture.id) : null,
-    capturedAmount: captureAmount?.value != null ? Number(captureAmount.value) : null,
-    capturedCurrency: captureAmount?.currency_code ?? null,
-    raw: data,
-  };
+  return parsePayPalCaptureResponse(data);
 }
 
 /**

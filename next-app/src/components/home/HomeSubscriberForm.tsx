@@ -87,7 +87,7 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
         <button
           type="submit"
           disabled={status === 'saving'}
-          className="h-9 rounded-full px-4 text-[0.7rem] font-bold uppercase tracking-widest disabled:opacity-60 sm:h-11 sm:px-5 sm:text-xs"
+          className="home-subscriber-join h-9 rounded-full px-4 text-[0.7rem] font-bold uppercase tracking-widest disabled:opacity-60 sm:h-11 sm:px-5 sm:text-xs"
           style={{ background: GOLD, color: '#171717', boxShadow: '0 2px 10px rgba(0,0,0,0.18)' }}
         >
           {status === 'saving' ? (isEs ? 'Enviando' : 'Joining') : (isEs ? 'Unirse' : 'Join')}

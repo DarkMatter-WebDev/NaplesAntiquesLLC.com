@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { revalidateTag } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import {
-  fetchShowSoldItems,
+  fetchShopVisibilitySettings,
   saveShowSoldItems,
+  saveHideSoldItemPrices,
   fetchSpecialPriceDefault,
   saveSpecialPriceDefault,
 } from '@/lib/shop-settings';
@@ -17,11 +18,11 @@ export async function GET() {
 
   try {
     const service = createServiceClient();
-    const [showSoldItems, specialPriceDefault] = await Promise.all([
-      fetchShowSoldItems(service),
+    const [visibility, specialPriceDefault] = await Promise.all([
+      fetchShopVisibilitySettings(service),
       fetchSpecialPriceDefault(service),
     ]);
-    return NextResponse.json({ showSoldItems, specialPriceDefault });
+    return NextResponse.json({ ...visibility, specialPriceDefault });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to load shop settings.' },
@@ -45,6 +46,11 @@ export async function PUT(req: Request) {
   try {
     if (typeof body.showSoldItems === 'boolean') {
       await saveShowSoldItems(service, body.showSoldItems);
+      touched = true;
+    }
+
+    if (typeof body.hideSoldItemPrices === 'boolean') {
+      await saveHideSoldItemPrices(service, body.hideSoldItemPrices);
       touched = true;
     }
 
@@ -72,12 +78,14 @@ export async function PUT(req: Request) {
     // list-view changes reflect immediately. Individual product pages are
     // time-revalidated (ISR, ~5 min) like the spot-price values they show.
     revalidateTag('shop-catalog', { expire: 0 });
+    revalidatePath('/shop/[id]', 'page');
+    revalidatePath('/es/shop/[id]', 'page');
 
-    const [showSoldItems, specialPriceDefault] = await Promise.all([
-      fetchShowSoldItems(service),
+    const [visibility, specialPriceDefault] = await Promise.all([
+      fetchShopVisibilitySettings(service),
       fetchSpecialPriceDefault(service),
     ]);
-    return NextResponse.json({ showSoldItems, specialPriceDefault });
+    return NextResponse.json({ ...visibility, specialPriceDefault });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to save shop settings.' },

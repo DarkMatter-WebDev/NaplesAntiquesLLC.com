@@ -11,7 +11,7 @@ export async function GET() {
 
   const service = createServiceClient();
   const connection = await getConnection(service);
-  const recentActivity = await getRecentSyncLog(service, 25);
+  const recentActivity = await getRecentSyncLog(service, 25, { excludeActions: ['account_deletion'] });
 
   return NextResponse.json({
     connected: connection?.status === 'connected',

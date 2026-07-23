@@ -1,5 +1,1478 @@
 # Changelog
 
+## 2026-07-23 - Removed Admin Products summary cards
+
+Removed the shared Admin Products block that displayed the Total, Available,
+and Sold inventory boxes. The inventory table and filters remain unchanged, and
+the removal applies to all viewport sizes. `npm run lint` passed; `npm run build`
+compiled successfully but still stops at the known generated `renderShopPage`
+route-contract error.
+
+## 2026-07-23 - Locked Admin Products to viewport
+
+Changed the Admin Products shell to a fixed dynamic-viewport flex layout. The
+page no longer scrolls at the document level; only the product table wrapper
+scrolls vertically and horizontally. `npm run lint` passed, and the preview
+confirmed the document/body height matches the viewport.
+
+## 2026-07-23 - Changed nav icons to icon-only motion
+
+Removed the remaining nav-icon hover shadow and container lift. Desktop Saved
+Items and Cart now retain color feedback while moving only the Material Symbol
+glyph itself, with press scaling on the glyph. `npm run lint` passed and the
+desktop preview confirmed transparent backgrounds and no button box shadow.
+
+## 2026-07-23 - Removed nav icon hover background fill
+
+Removed the pale yellow hover background from the desktop Saved Items and Cart
+nav buttons while preserving their color, shadow, lift, and press feedback.
+`npm run lint` passed, and the refreshed desktop preview confirmed transparent
+nav-icon backgrounds with no hover background declaration.
+
+## 2026-07-23 - Added desktop button hover affordances
+
+Audited the public storefront and added desktop hover/press feedback to the
+header Saved Items and Cart controls, newsletter Join, shop-card wishlist and
+list-view cart actions, product gallery thumbnails, account/contact/cart
+dismissals, and checkout address/quantity controls. Mobile-only menu and cart
+controls were intentionally left outside this pass. `npm run lint` passed. The
+app compiled during `npm run build`, which still stops at the known generated
+route-contract error for `renderShopPage`.
+
+## 2026-07-23 - Compacted and reconciled project memory
+
+Converted the three mandatory startup files from cumulative session archives
+into bounded current references. `CURRENT_STATUS.md` now describes the present
+system and known deployment/build state, `TASKS.md` contains open work plus a
+short recent-completions summary, and `DECISIONS.md` contains only durable
+decisions that still govern the project. This removed roughly 800 KB of
+duplicated startup reading while preserving the full dated history in this
+changelog and feature-specific detail in the existing runbooks.
+
+Reconciled `README.md`, `PROJECT_OVERVIEW.md`, `STRUCTURE.md`, `INTEGRITY.md`,
+`ARCHITECTURE.md`, `CLIENTS.md`, and the Etsy/eBay feature docs. Corrections
+include the current 6% Florida tax basis, centralized shipping/address modules,
+separate marketplace status actions, applied marketplace schemas, PayPal
+environment ownership, the known `renderShopPage` build blocker, and the
+source-of-truth folder's no-git workflow.
+
+Removed only three verified generated artifacts: two stale July 17 dev-server
+logs and the regenerable TypeScript build cache. Retained both marketplace plan
+folders because code, SQL, and runbooks actively reference them. Retained root
+`banner.png` because visual inspection proved it is a newer, materially
+different candidate than the shipped eBay WebP; its remaining website URL and
+owner decision are now explicit in `TASKS.md`.
+
+Verification was documentation-focused: generated artifacts were rechecked as
+absent, startup-memory sizes and links/references were audited, and stale
+cross-document phrases were searched. No app code, SQL, environment, customer
+data, product data, order, or payment changed, so app tests/build were not
+rerun; the current 435-test/lint/build baseline remains in
+`CURRENT_STATUS.md`.
+
+## 2026-07-23 - Included shipping in Florida sales tax
+
+Changed the owner-selected Florida tax policy so charged shipping is included
+in the 6% taxable base. Local Pickup remains merchandise-only in practice
+because its fee is $0, and non-Florida shipping continues to receive $0 Florida
+tax.
+
+Added `calculateFlSalesTax` as the shared calculation for customer checkout,
+authoritative PayPal pricing, cart estimates, and admin manual orders. Updated
+order-detail and invoice discount recalculation to infer the stored rate against
+merchandise plus shipping.
+
+Rendered checks confirmed exact totals for Local Pickup, $45 Priority Insured,
+$75 Express Overnight Insured, and a California destination. All 435 tests and
+lint pass. The production build compiled in 12.3 seconds before the unchanged
+generated `renderShopPage` route-export type error. No SQL, orders, payments, or
+customer/product data changed.
+
+## 2026-07-23 - Hardened domestic checkout shipping
+
+Restricted checkout delivery to U.S. addresses and replaced free-text State
+with a canonical selector for all 50 states plus D.C. ZIP input now validates
+five-digit and ZIP+4 formats, canonicalizes nine-digit values, and shows a
+specific inline error. The create-order route independently normalizes the
+address and rejects missing fields, state typos, invalid ZIPs, international
+countries, and unknown shipping methods before creating any order.
+
+Moved Local Pickup ($0), Priority Insured ($45), and Express Overnight Insured
+($75), including labels, default, validation, and database mapping, into
+`src/lib/checkout-shipping.ts`. The browser summary and authoritative server
+pricing now consume one definition.
+
+Florida DOR guidance was rechecked during this work. The owner subsequently
+superseded the merchandise-only calculation with the shipping-tax policy
+recorded above. County surtax was intentionally left unchanged. Browser checks
+confirmed Florida and California estimates, ZIP+4 normalization, and the fixed
+U.S. country. Four tampered API requests returned the intended 400 errors.
+
+## 2026-07-23 - Audited checkout shipping and sales-tax handling
+
+Performed a read-only implementation, legal-source, and aggregate-order audit.
+The checkout currently charges 6% for local pickup or an entered Florida state,
+zero for other states, and separately adds server-authoritative $45 priority or
+$75 express insured shipping. PayPal receives a reconciled merchandise, tax,
+shipping, and total breakdown. Florida guidance supports leaving the optional,
+separately stated shipping fee outside the taxable base.
+
+The audit found that Florida destination-county surtax is not implemented and
+that free-text state input can turn a misspelled Florida destination into a
+zero-tax order. It also found duplicated UI/server shipping definitions,
+domestic flat fees available to arbitrary two-letter countries, a flat 6%
+pre-address mini-cart estimate, and no jurisdiction/parity regressions.
+
+The website has one paid shipped order in 2026: $1,986.61 merchandise to
+California with $75 shipping and no tax. This is far below California's
+$500,000 remote-seller threshold, but California counts marketplace sales, so
+the owner's Etsy/eBay and other-channel totals remain part of the nexus review.
+Five focused checkout/PayPal tests pass. No application code, SQL, orders, or
+customer/product data changed.
+
+## 2026-07-23 - Audited shop thumbnail delivery before deployment
+
+Performed a read-only code, browser, and response-header audit of gallery and
+list thumbnails. The 96-item gallery mounts one cover per card, uses responsive
+Next image candidates for 81 remote covers, and keeps 15 local WebP covers
+between 17.3 and 56.5 KiB. First-row images are preloaded, later images remain
+lazy, offscreen cards use `content-visibility`, and carousel neighbors mount
+only after interaction.
+
+Normal desktop and mobile scroll passes had no pending visible thumbnails. Only
+deliberate multi-thousand-pixel jumps briefly outran lazy loading, and those
+images completed within 250 ms. A sampled live Netlify 256 px transform was a
+3,992-byte WebP with `public,max-age=3600` and a confirmed edge hit. Two
+development LCP warnings identified second-row/large-jump lazy images as a
+minor optional tuning opportunity. No application code, SQL, or data changed;
+tests and builds were not rerun.
+
+## 2026-07-22 - Replaced and compressed the navigation logo
+
+Added the supplied navy-and-gold Naples Estate Jewelry mark to the desktop
+header as `public/assets/images/branding/nav-logo.webp`. The source was resized
+from 1254x1254 to 160x160 and encoded as a 5,442-byte WebP, reducing the
+original 1,708,329-byte PNG by 99.68%. The original root PNG was removed after
+the new asset and header reference were verified. The pre-existing
+`logo.webp` was intentionally retained for its structured-data consumers.
+
+The rendered desktop logo loads through Next's image optimizer at 40x40, and
+the existing image-hidden mobile wordmark behavior remains intact. Desktop and
+mobile checks found no horizontal overflow. `npm run lint` passes. The
+production build compiled in 12.8 seconds before the unchanged generated
+`renderShopPage` route-contract error. No SQL or data writes were involved.
+
+## 2026-07-22 - Added gallery-card image progress
+
+Added a three-pixel gold progress fill to the bottom edge of modern multi-image
+product photos. Its unfilled portion is transparent, leaving only the completed
+progress visible. It appears while the image is hovered and uses the
+existing active carousel index, so cover, autoplay, and arrow navigation all
+share one exact fraction. Each image adds one segment and the final image fills
+the track completely. The indicator ignores pointer input and drops its 700 ms
+transition for reduced-motion users.
+
+A rendered 12-item gallery produced 12 correctly initialized indicators, and a
+follow-up computed-style check confirmed the track is `rgba(0, 0, 0, 0)`. A
+four-image card reached `scaleX(1)` at image four and removed its Next arrow;
+list view rendered no indicators and no page overflow. Browser logs had no
+runtime errors. All 424 tests and lint pass. The production bundle compiled in
+13.2 seconds before the unchanged generated `renderShopPage` route-contract
+error. No SQL or data writes were involved.
+
+## 2026-07-22 - Fixed narrow shop toolbar and pagination formatting
+
+Extended compact pagination through 440 px, resolving the measured 421-431 px
+inner-row spill with a small safety buffer. At the same breakpoint, the results
+toolbar now wraps into a stable view/count row plus a full-width Sort row. The
+Spanish select grew from about 41 px to 191 px at 320 px and displays long
+values without clipping. Corrected Weight-high-to-low copy to
+`Peso: mayor a menor`.
+
+Browser checks covered gallery/list, long Spanish sort selection, expanded
+general and Necklace Length/Width filters, the 440/441 px transition, and 320,
+390, 440, 441, 768, 1024, and 1440 px control bounds. No customer control left
+the viewport and no page-level overflow remained. Eight focused tests, all 424
+tests, and lint pass. The production bundle compiled in 16.6 seconds before
+the unchanged generated `renderShopPage` route-contract error. No SQL or data
+writes were involved.
+
+## 2026-07-22 - Buyer-tested the new shop pagination without writes
+
+Ran first, middle, and final-page customer flows through real links; verified
+Previous/Next, browser Back, result ranges, disabled boundary controls,
+filtered Necklace URLs, per-page reset, and short sequences that show every
+page. English and Spanish compact pagination updated its localized page status
+correctly at 320/420 px with no page-level overflow or runtime errors.
+
+Found one minor responsive follow-up: at 421-431 px a middle-page numbered row
+spills about five pixels beyond each side of its inner border, while remaining
+inside the outer card; it fits at 432 px. Added a Backlog item to extend the
+compact breakpoint with a small buffer; the subsequent responsive fix above
+closed that item. Keyboard Enter activation was inconclusive in the browser
+harness and is not classified as a product defect.
+Console inspection also surfaced one unrelated existing Next.js image LCP
+warning. No application code, SQL, tests, or data changed in this session.
+
+## 2026-07-22 - Replaced ambiguous shop page jumps with ellipses
+
+Changed long shop pagination sequences to mark omitted ranges explicitly. The
+first current catalog page now renders `1 2 ... 11`, middle pages retain their
+neighbors between two ellipses, and result sets of seven pages or fewer still
+show every page. A one-page gap is expanded to the actual page number rather
+than represented by an ellipsis.
+
+At 440 px and below, the number sequence is replaced by localized `Page X of Y`
+text between the unchanged arrow controls. A 320 px Spanish browser check
+showed the localized page 6 of 11 status without component or page overflow,
+and Previous moved correctly to page 5. Desktop page-one/middle and 390 px
+English checks also passed.
+
+Added five pagination-sequence regressions. Eight focused pagination tests,
+all 424 tests, and lint pass. The production bundle compiled successfully in
+13.0 seconds before the unchanged generated `renderShopPage` route-contract
+error. No SQL or data writes were involved.
+
+## 2026-07-22 - Reconciled latest shop feature documentation
+
+Updated the durable Online Shop runbook to cover canonical Length handling,
+the conditional Necklace/Bracelet Width ranges and cleanup rules, list/gallery
+attribute parity, left-aligned Width controls, and the shared animated hover
+underline. Corrected the completed Width QA history so its Length mismatch
+points to the subsequent completed fix rather than an obsolete backlog note.
+
+This pass changed documentation only. Application code, SQL, and customer or
+product data were untouched, so implementation tests and builds were not
+rerun.
+
+## 2026-07-22 - Animated text-action hover underlines
+
+Added a shared `hover-underline-grow` interaction modeled on the desktop nav.
+The one-pixel line now grows from left to right over 190 ms instead of appearing
+as an immediate solid text decoration. Pointer hover and keyboard focus share
+the effect; reduced-motion preferences remove the transition.
+
+Migrated every former `hover:underline` text action across the storefront,
+checkout, account pages, cart, Saved Items, footer, and admin. Shop card and
+list-row titles now use the same treatment. Persistent underlines and active
+state indicators were intentionally preserved.
+
+A fresh browser render verified the compiled zero-width starting state and
+190 ms background-size transition. All 419 tests and lint pass. The production
+build compiled in 18.8 seconds before the unchanged generated `renderShopPage`
+route-export error. No SQL or data writes were involved.
+
+## 2026-07-22 - Aligned Width filter checkboxes
+
+Left-aligned the checkbox marker and label inside every Necklace/Bracelet Width
+range button. The two-column layout, button sizes, selection behavior, and
+Length controls are unchanged, but differing label lengths no longer shift the
+markers toward each button's center.
+
+Browser geometry checks measured the same 11 px marker inset for all five
+buttons across both desktop columns, and visual inspection confirmed the
+corrected sidebar. All 419 tests and lint pass. The production build compiled
+in 19.7 seconds before the unchanged generated `renderShopPage` route-export
+error. No SQL or data writes were involved.
+
+## 2026-07-22 - Hardened manual and AI product-length input
+
+Made decimal-equivalent Length/Size inputs canonical in the shared product
+normalizer: `24`, `24 in`, `24 inches`, `24"`, and `24.0 in` now all produce
+`24`, while `7.50 in` produces `7.5`. The Add/Edit form already used this helper
+on change and again before saving the database column and compatibility tag;
+its placeholder now explicitly shows that the `in` suffix is accepted.
+
+Bumped the product extraction prompt to v16 and added Length to the
+non-overridable field contract. AI extraction may interpret plain or
+inch-suffixed transcript evidence but must return a bare canonical numeric
+string. Added direct product-normalizer and AI-coercion regressions, including
+custom-prompt enforcement.
+
+The three focused suites passed 35 tests, all 419 tests passed, and lint passed.
+A signed-in, no-write Add Product browser test observed `24`, `24`, and `7.5`
+after entering `24`, `24 in`, and `7.50 in`; the draft was cancelled. The build
+compiled in 15.8 seconds before the unchanged generated `renderShopPage`
+route-export error; `npx tsc --noEmit` reports that same existing issue. No
+migration or product-row update is required.
+
+## 2026-07-22 - Fixed Necklace and Bracelet Length filters
+
+Replaced direct Length string comparison with a shared numeric-inch
+normalization contract. Current `24 in` controls now match stored `24` values,
+while unitless, decimal, `inches`, and quoted legacy links remain compatible.
+Invalid/non-positive values are ignored, equivalent selections are
+de-duplicated, and the filter controls continue to show/write their existing
+readable labels. Added focused regression coverage for normalization and
+product matching.
+
+Buyer verification covered direct and clicked 24-inch selections, legacy URLs,
+22/24-inch multi-select, two Width intersections, Bracelet 7.5-inch, malformed
+and incompatible links, available-only, gallery/list, Spanish mobile, and a
+short desktop viewport. Counts matched inventory: 5 for 24 inches, 7 for 22 or
+24 inches, 4 and 2 for the tested Length/Width intersections, and 3 for the
+7.5-inch Bracelet filter. Spanish mobile retained its selected Longitud/Ancho
+controls without horizontal overflow.
+
+`npm test -- --run src/lib/__tests__/shop-filter-state.test.ts` passed 17 tests,
+`npm test -- --run` passed all 415 tests, and `npm run lint` passed. The
+production build compiled successfully in 16.8 seconds before the unchanged
+generated `renderShopPage` named-export route-contract error; `npx tsc
+--noEmit` reports that same existing error. No migration or data update is
+required.
+
+## 2026-07-22 - Extensively buyer-tested Width filtering without writes
+
+Compared every Necklace/Bracelet width range and representative combinations
+against an anonymous live inventory read, then exercised clicks, rapid
+multi-select, back/forward, Clear Filters, type/category cleanup, availability,
+search, purity, link type, grid/list, sorting, pagination, zero results,
+malformed/shared URLs, and EN/ES layouts. More than 50 route/interaction checks
+and 13 viewport sizes from 320x568 through 2560x1440 passed. Seven direct routes
+returned HTTP 200, all 413 tests passed, and browser logs contained no runtime
+errors; only existing development LCP advisories appeared.
+
+The new Width implementation behaved correctly throughout. The pass found one
+separate pre-existing Length bug: controls submit unit-bearing values such as
+`24 in`, while stored lengths are numeric strings such as `24`, so direct string
+comparison yields zero results. Tasks now tracks the required normalization
+fix. No application code, database rows, buyer state, or settings changed.
+
+## 2026-07-22 - Added Necklace and Bracelet width filters
+
+Added a localized Width section beneath Length whenever Necklace or Bracelet is
+selected. Buyers can combine Under 3 mm, 3-4.9 mm, 5-6.9 mm, 7-9.9 mm, and
+10 mm+ checkbox-style choices. Selected ranges use OR behavior with one another
+and continue to intersect with every other active shop filter.
+
+Moved the conditional Length and Width groups directly after Link Type and
+before Brand in the main filter grid. The full-width dependent row uses a
+subtle left rule to connect those measurements visually with the selected
+Necklace/Bracelet type instead of leaving them easy to miss below Price.
+
+Added allowlisted/de-duplicated width URL state, automatic cleanup on item-type
+or category changes, and exact `width_mm` range matching with non-overlapping
+boundaries. Unsupported item types hide and ignore width state, while products
+with null width remain visible unless a width range is active. No migration is
+needed.
+
+All 413 tests and lint pass. The build compiled in 11.8 seconds before the
+unchanged generated `renderShopPage` route-export error. Browser verification
+covered EN/ES, single and combined ranges, Necklace-to-Bracelet cleanup, stale
+Ring URLs, 390x844 mobile, and a 1024x400 desktop sidebar. Counts and displayed
+widths matched the read-only inventory audit, with no horizontal overflow or
+runtime errors and no product/buyer writes.
+
+Post-move desktop/mobile checks confirmed the Item Type, Link Type,
+Length/Width, Brand order, no 390x844 overflow, and an unchanged five-result
+Under-3-mm necklace filter. Focused tests (15) and lint pass; the build compiled
+in 13.5 seconds before the same known route-export error.
+
+## 2026-07-22 - Fixed constrained sticky shop filters
+
+Constrained the desktop shop filter sidebar to the viewport height available
+below its sticky header offset, with a 1rem bottom margin. Added a `100vh`
+fallback plus `100dvh`, vertical overflow scrolling, a stable thin scrollbar,
+and natural scroll chaining back to the product page when the sidebar reaches
+its boundary. The existing collapsible 768-1023 px tablet layout is unchanged.
+
+Verified 1024x600, 1024x768, 1180x820, 1366x768, 1440x900, and 1440x1200. The
+previously inaccessible final control is reachable without changing page scroll
+at every constrained size; the 1,324 px expanded necklace panel, Spanish route,
+focus visibility, 1023x768 collapse behavior, scroll-boundary handoff, and
+horizontal overflow also pass. All 411 tests and lint pass. The production
+build compiled in 18.8 seconds before the unchanged generated `renderShopPage`
+route-export error, confirmed independently by `npx tsc --noEmit`.
+
+A subsequent 34-case responsive pass covered 320x568 through 2560x1440,
+including the 767/768, 1023/1024, and 1279/1280 breakpoint edges, 1024x400,
+portrait tablets, expanded Necklace filters, EN/ES, and gallery/list routes.
+Every control remained reachable, desktop internal scrolling did not move the
+page, and no horizontal overflow or runtime error appeared. The only console
+warning was the pre-existing development LCP image advisory. This follow-up made
+no application or buyer-data changes.
+
+## 2026-07-22 - Reproduced responsive filter-sidebar clipping
+
+Ran a no-write viewport matrix against the public shop. Portrait tablets and
+the 768-1023 px tablet breakpoint passed: filters stay collapsed until opened,
+remain in normal document flow, and all controls are reachable by page scroll.
+
+At 1024 px and wider, the filter toggle disappears and the full approximately
+1,031 px panel becomes sticky 104 px below the viewport top without a maximum
+height or internal scrolling. Six common landscape-tablet sizes and five
+compact-desktop sizes clipped the lower controls. The expanded necklace panel
+at 1024x768 reached 1,315 px and left its final control 598 px below the
+viewport until the page bottom. No application code or user data changed; the
+viewport-constrained scrolling fix is tracked in Tasks.
+
+## 2026-07-22 - Matched product list attributes to gallery tiles
+
+Added eligible necklace/bracelet width as the fourth list-view spec pill,
+immediately after purity, weight, and length, using the same
+`productWidthDisplay` helper as gallery cards. The list view already rendered
+the tile's other product attributes, so this closes the only data-display gap
+without changing the compact row structure. Unsupported types and null widths
+remain hidden, and EN/ES accessible labels use Width/Ancho respectively.
+
+Focused width tests (9), all 411 tests, and lint pass. The final production
+build compiled in 17.1 seconds before reaching the unchanged generated
+`renderShopPage` route-export error; `npx tsc --noEmit` confirmed that same
+single known error. Live EN/ES checks displayed `6.5 mm` for inventory `#26`,
+kept all four pills on one line at 390x844, omitted width from a non-applicable
+ladle, and showed no horizontal overflow.
+
+## 2026-07-22 - Added necklace and bracelet width
+
+Added `products.width_mm` as a nullable millimeter measurement with a guarded,
+re-runnable Supabase migration and public column grants. Updated the canonical
+products setup, shared Product type, normalizer, formatter, and shop query. The
+catalog retries without the new column before migration so existing cards stay
+available.
+
+Added a conditional Width (mm) number field to the shared Add/Edit product
+drawer. It appears only for Necklaces and Bracelets, clears for other types,
+validates positive values up to 1000 mm, and blocks saving a non-null width if
+the migration has not been applied. Smart Listing Assistant prompt/schema v15
+now extracts explicitly stated width from speech, converts centimeters/inches
+to millimeters, preserves the distinction from length, and ignores width for
+non-applicable types even with an older saved custom prompt.
+
+Product cards show eligible width at the right side of the price row. Focused
+tests (2 files, 14 tests), all tests (44 files, 411 tests), and lint pass. The
+build compiled in 13.5 seconds and then reached the unchanged generated
+`renderShopPage` route-export error. A signed-out public browser check rendered
+24 filtered cards without a catalog error before migration. The owner then ran
+the migration successfully: Supabase reported `numeric(8,2)` with true anon and
+authenticated read privileges, a direct anonymous REST query returned HTTP 200
+with `width_mm`, and a fresh shop request returned HTTP 200. Authenticated
+Add/Edit and populated-card verification remain pending because the available
+preview session was signed out of admin.
+
+Post-migration functional testing inserted a uniquely named Draft Bracelet with
+`width_mm = 8.5`, read the exact value back, confirmed PostgreSQL rejected a
+zero-width draft with constraint code `23514`, deleted the valid draft, and
+verified zero test rows remained. The 14 focused AI/product-width tests passed
+again.
+
+Reviewed all 39 existing Necklace/Bracelet records and backfilled 35 null
+widths from explicit title, description, note, or tag evidence. The backfill
+used the primary chain/body-link width when a listing described multiple
+components: inventory `#12` received 5.5 mm rather than its 13 mm connector
+width, and `#89` received 15 mm rather than its 20 mm widest point. Inventory
+`#48`, `#77`, `#87`, and `#91` remain null because their measurements describe
+diamonds, charms, beads, or decorative discs instead of the wearable width.
+
+Conditional writes required every target width to still be null. Read-back
+verification confirmed all 35 exact values, and independent service-role and
+anonymous queries both returned 39 applicable rows with 35 populated widths.
+A fresh Tiffany-filtered public catalog query displayed `Width: 6.5 mm` for
+inventory `#26` in the intended price-row position and omitted width from a
+non-applicable ladle. No application code changed during this data backfill.
+
+## 2026-07-22 - Completed Spanish legal copy and LCP loading fixes
+
+Added complete Spanish copy for Privacy, Terms, Returns and Refunds, Shipping,
+Accessibility, Cookie Preferences, Auction Terms, and Vendor Terms, including a
+localized updated date and all body paragraphs and bullets. Added shared
+localized metadata for Payment and Unsubscribe so titles receive the site name
+once, and localized the Spanish Unsubscribe heading and preference content.
+
+Updated image loading so every currently visible homepage carousel card is
+eager, with high fetch priority limited to the front card, while offscreen
+preloads remain lazy. Product detail now eagerly loads its duplicate first
+thumbnail/video poster alongside the eager/high main hero; later thumbnails
+remain lazy. Added focused regression helpers and tests for both loading rules
+and the new localization contracts.
+
+Focused tests (4 files, 22 tests), all tests (44 files, 407 tests), and lint
+pass. The build compiles in 14.9 seconds before stopping at the unchanged
+`renderShopPage` named-export route contract error. Browser verification covered
+all eight Spanish legal pages, EN/ES Payment and Unsubscribe, homepage carousel,
+and product gallery attributes; every route returned 200 and fresh server output
+contained no LCP warning. No migration is required.
+
+## 2026-07-22 - Extended customer regression across secondary routes and dense flows
+
+Ran a no-write buyer pass across navigation, search edges, combined filters,
+sorting, list/grid and availability modes, 96-item pagination, product lightbox,
+temporary Saved Items/cart state, sold inventory, stale checkout, fulfillment
+switching, account forms, inquiry handoffs, EN/ES policy pages, secondary
+payment/unsubscribe routes, missing products, direct HTTP requests, and server
+logs. Temporary state was removed; the original sold cart item remains.
+
+Core flows passed with no application errors. The dense catalog rendered 96
+cards/images in about 1.6 seconds without overflow, the tested route set returned
+expected 200/404 responses, six repeated shop requests returned 200, and all 401
+automated tests passed. Added follow-ups for English body copy on Spanish policy
+pages, duplicated/unlocalized Payment and Unsubscribe metadata/UI, and remaining
+homepage/product LCP warnings. No application code, account, order, payment, or
+database data changed.
+
+## 2026-07-22 - Fixed extended customer-QA follow-ups
+
+Added shared storefront query normalization so repeated spaces collapse before
+both filtering and URL navigation. Added centralized localized metadata for
+eight legal/policy routes, localized contact and free-evaluation metadata, and
+localized Spanish legal H1s and section headings. Route titles now rely on the
+root template for one brand suffix instead of duplicating Naples Estate Jewelry.
+
+Removed the cart line-item area's forced fill height so the summary follows the
+last item, and made the active product image explicitly eager/high priority while
+keeping gallery thumbnails lazy. Browser verification confirmed 47 products for
+`yellow   gold`, correct English/Spanish titles and headings, a 29px cart content
+gap, and the intended image attributes. Focused tests (29), all tests (41 files,
+401 tests), and lint pass. The production build compiles and then stops at the
+unchanged existing `renderShopPage` named route export. No migration is required.
+
+Repeat verification later the same day again passed all 401 tests in 11.4
+seconds. Live checks reconfirmed the normalized 47-result search, Spanish
+shipping title/H1, product hero loading attributes, and compact cart spacing.
+No application code or buyer data changed during the repeat.
+
+## 2026-07-21 - Extended customer regression across desktop, tablet, and mobile
+
+Repeated the buyer journey without application or data changes and extended it
+through multi-filter sorting, list/grid modes, 96-item pagination from the page
+bottom, product lightbox controls, temporary Saved Items and mixed cart state,
+checkout availability and fulfillment guards, account forms, inquiry handoff,
+English/Spanish policy routes, missing products, responsive menus, and overflow.
+The temporary available item was removed from cart and Saved Items; the original
+sold cart item remains.
+
+Core flows passed with no application errors. The representative HTTP matrix
+returned expected 200 responses and a correct missing-product 404, ten repeated
+shop requests all returned 200, and server output was clean. Added backlog items
+for repeated interior search whitespace, incomplete Spanish/legal metadata and
+headings, excess mobile cart-drawer whitespace, and the product hero image's
+Next.js LCP loading warning. No lint/build run was needed because only project
+documentation changed.
+
+## 2026-07-21 - Fixed extended buyer-QA storefront findings
+
+Replaced product tickers' time-dependent hydrating text with deterministic,
+localized next-update copy and an asynchronous post-hydration countdown. Search
+now trims surrounding whitespace before both URL commits and server filtering.
+Added route-specific localized metadata for account authentication, shop,
+auctions, checkout, and missing pages; localized Spanish product size and all
+gallery accessibility controls; corrected the Spanish checkout H1; and removed
+the duplicated site name from checkout titles. Generated a real 32px
+`favicon.ico` from the existing palm-tree `icon.png`.
+
+Focused tests (23), all tests (40 files, 384 tests), the final ticker regression
+(2), and lint pass. The optimized build compiles and then stops at the unrelated
+existing `renderShopPage` named route export. Buyer browser checks passed for
+search, hydration, metadata, localization, checkout, and restored cart/Saved
+state; final product and favicon HTTP requests returned 200. No migration is
+required.
+
+## 2026-07-21 - Extended buyer QA across storefront routes and mobile layouts
+
+Retested the complete buyer journey without application or data changes, adding
+account signup/reset, auctions, malformed query strings, missing products,
+inquiry handoff, direct-checkout protection, Spanish metadata/copy, repeated
+HTTP requests, and mobile overflow checks to the earlier coverage. Available
+and sold products, media/lightbox, Saved Items cleanup, cart availability
+blocking, filters, sorting, pagination/history, responsive navigation, and
+localized forms remained usable. The pre-existing sold cart item was preserved.
+
+Found reproducible follow-ups for the product price-update ticker hydration,
+untrimmed search whitespace, account/Spanish metadata and localization, a
+duplicated checkout title, and missing `/favicon.ico`. One early development
+shop request returned 500 with an incomplete-JSON parse error, but the route
+matrix and eight repeated shop requests subsequently returned 200, so it was
+not treated as a confirmed application defect. No lint/build run was needed for
+this documentation-only session.
+
+## 2026-07-21 - Blocked unavailable carts before checkout
+
+Added a shared cart-availability selector and used it in the cart drawer and
+checkout. Any sold, archived, or zero-stock item now disables and relabels the
+drawer CTA as Remove Unavailable Items; both the initial checkout handler and
+guest continuation also guard against stale availability. The existing sold
+test item showed the warning and disabled CTA on desktop and 390x844 without
+opening the checkout gate. Added two selector regressions. All 379 tests and
+lint pass; build compiles before the unrelated existing `renderShopPage` route
+export error. No migration is required.
+
+The earlier apparent pagination regression was a semantic browser-command
+artifact that also affected ordinary product links. A real pointer click on the
+unchanged control advanced to `/shop?page=2` and displayed 25-48 of 129, so no
+pagination implementation change was retained.
+
+## 2026-07-21 - Buyer-tested storefront, cart, and checkout without writes
+
+Ran a desktop and 390x844 mobile buyer journey through navigation, search,
+filters, sorting, product cards/details, sold presentation, Saved Items, cart,
+guest checkout, and shipping/pickup mode. Saved Items was returned to empty, the
+pre-existing one-item cart was preserved, and no order, payment, account, app
+code, or database data was created or changed. The pass found that a sold cart
+item blocks payment correctly but the enabled checkout CTA permits an avoidable
+trip through the guest gate first. Its initial pagination result was later
+identified as a semantic browser-command limitation and superseded by a passing
+real-pointer check.
+
+## 2026-07-21 - Fixed rapid-filter pagination hydration errors
+
+Separated pagination's deterministic rendered hrefs from pending navigation
+state. Server and first-client link attributes now use committed URL params;
+event-time pending state is merged only when a page link is actually clicked.
+Immediate Gold/category and 700ms search/era browser reproductions now produce
+zero hydration errors, and filtered page 2 still preserves filters and scrolls
+to the results start. Added three URL-construction regressions. All 377 tests
+and lint pass; build compiles before the unrelated existing `renderShopPage`
+route-export type error. No migration is required.
+
+## 2026-07-21 - Browser-tested shop filters and deep links
+
+Exercised baseline, combined metal/purity/sort, non-jewelry category, filtered
+page-size/page-2, search, era, list, Spanish catalog/filter, product-detail/back,
+and empty-result paths. Counts, sorting, preserved queries, scroll landing,
+loading feedback, and one-image-per-card behavior passed. Six representative
+deep links returned HTTP 200. Found and documented one unresolved rapid-click
+hydration race in pagination hrefs; settled interactions do not reproduce it and
+visible results remain correct. No application code or data changed.
+
+## 2026-07-21 - Made shop cards and max-page navigation lightweight
+
+Changed gallery cards from mounting every carousel image to one cover image
+until interaction, then only the active image and immediate neighbors. Removed
+the image polling, image-gated card reveal, blur, stagger delays, and broad
+`will-change`; added responsive offscreen content visibility. Compacted duplicate
+image arrays and URL-keyed padding metadata after catalog pagination. Per-page
+changes now scroll to the results start, and navigation feedback is fixed in the
+viewport. At 96 items, mounted images dropped 715 -> 96, DOM elements 4,341 ->
+~3,712, HTML 2.92 MB -> 1.21 MB, and the measured 24-to-96 transition 2.58s ->
+1.24s. Added six image-window/data-compaction regressions. All 374 tests and
+lint pass; build compiles before the unrelated existing `renderShopPage`
+route-export type error. No migration is required.
+
+## 2026-07-21 - Audited shop gallery loading without code changes
+
+Measured the default and maximum per-page catalog flows in the local preview.
+The 24-item view produced 1,511 DOM elements, 165 gallery images, and a 739 KB
+HTML response; 96 items produced 4,341 DOM elements, 715 gallery images, and a
+2.92 MB response. Confirmed that visible cards load every opacity-hidden
+carousel image and that changing page size at the bottom preserves the old
+scroll position because the select does not invoke the page links' existing
+results-scroll helper. Recorded a staged remediation in Tasks and Decisions.
+No app code, database data, or configuration changed; no build was required.
+
+## 2026-07-21 - Clarified PayPal details-entry and processing messages
+
+Replaced PayPal checkout's single early processing state with separate hosted
+details/approval and capture stages. Buyers opening PayPal or the card form are
+now told to complete and review their details and that payment is not processed
+until submission. The processing message appears only after approval. Updated
+English and Spanish copy and retained idle resets for cancellation and errors.
+All 368 tests and lint pass; the preview returns 200. The optimized build
+compiles before the unrelated existing `renderShopPage` route-export type
+error. No payment session or database migration was used.
+
+## 2026-07-21 - Displayed exact cents in cart and checkout totals
+
+Replaced the cart drawer and checkout summary's duplicated whole-dollar
+formatters with one exact two-decimal checkout currency formatter. Displayed
+subtotal, tax, shipping, quantity line totals, and grand total now retain cents,
+and estimate arithmetic uses the authoritative cents-rounding helper. The live
+$1 test item shows $1.00 subtotal, $0.06 Florida tax, and $1.06 estimated total.
+Added two regressions; all 368 tests and lint pass, and the preview returns 200.
+The optimized build compiles before the unrelated existing `renderShopPage`
+route-export type error stops build/typecheck. No migration is required.
+
+## 2026-07-21 - Cleaned up pickup order address details
+
+Changed the customer account order dialog to ignore country-only checkout
+address objects and to render Additional Details only when meaningful notes or
+address values exist. Pickup orders without an entered address no longer show
+a blank Shipping address row or lone "United States" value; an optional real
+pickup address is labeled Address. Added three formatter regressions. All 366
+tests and lint pass, and the restarted preview returns HTTP 200. Authenticated
+visual verification on pickup order `NEJ-20260721-VGKOX` confirmed the modal
+ends after Customer and Totals without the empty section or console errors.
+Build/typecheck remain blocked by the unrelated existing `renderShopPage`
+named export in the Shop page route.
+
+## 2026-07-21 - Fixed resumable Etsy sync and added bulk recovery
+
+Expanded the Etsy atomic queue from pending-only to every resumable state,
+preserved queued updates during remote reconciliation, retained content-drifted
+rows during enqueue, and corrected partial-image progress/stall accounting.
+Added a repair-only API/claim path and an Admin Actions confirmation that finds
+and resumes all linked interrupted/out-of-date listings without creating new
+drafts. After the owner applied the migration, the live one-click run repaired
+all 36: zero repairable/error rows remain, inventory #117 continued from 4 to
+8 to 10 image checkpoints, and 72 repair-run logs contain no error outcome.
+Also fixed update-mode inventory writes to retain their pushed-price baseline.
+Added 5/8/9-image and inventory-checkpoint regressions. All 363 tests,
+TypeScript, lint, authenticated UI checks, and the 416-page build pass.
+
+## 2026-07-21 - Investigated recent Etsy out-of-date listings (no code change)
+
+Read-only live data and sync-log analysis traced all 36 recent out-of-date Etsy
+rows to bulk continuation after the four-image request budget. Each affected
+listing has more than four source photos, exactly four app checkpoints, no
+inventory/update completion, and no content hash. Inventory #105 completed in
+one request because it has four photos; #110 became current after a later full
+retry. Recorded the durable queue-continuation repair and safe per-item recovery
+path. No application code, database data, token, or Etsy listing was changed.
+
+## 2026-07-21 - Fixed selected Etsy sync skipping out-of-date rows
+
+Corrected the selected Etsy enqueue filter so linked `out_of_date` listings are
+queued instead of silently discarded. Added deduplication, already-pending
+counting, candidate regression tests, and clearer selected/queued progress
+copy. A read-only live audit found 36 affected available listings: all are
+active on Etsy and all lack a last-pushed content hash, so they genuinely need
+a baseline sync even though the app cannot prove a particular field differs.
+No Etsy write was performed. All 355 tests, TypeScript, lint, authenticated UI
+checks, and the 417-page build pass; no migration is required.
+
+## 2026-07-21 - Split Etsy and eBay status checks
+
+Replaced the combined marketplace-status card with separate Etsy and eBay
+actions. The selected-products results modal now reconciles, displays, retries,
+drills into, and returns from posting for only the chosen marketplace. Fixed
+the adjacent singular selected-product accessibility label. Authenticated
+one-item checks confirmed independent Listed results without pushing listing
+content. All 352 tests, TypeScript, lint, desktop/mobile checks, and the 417-page
+build pass; no migration is required.
+
+## 2026-07-21 - Added bulk Etsy draft publishing
+
+Added Publish all ready to Etsy beside the eBay command in the Admin Products
+Actions modal. Completed review drafts can now be explicitly promoted to active
+through a counted confirmation and bounded progress flow. The backend accepts
+only linked draft-review rows, rechecks product availability, contains and logs
+per-item failures, and refreshes Etsy status chips after close. Authenticated
+desktop/mobile and zero-ready summary checks made no Etsy writes. Focused tests,
+all 352 tests, TypeScript, lint, and the 417-page build pass; no migration is
+required.
+
+## 2026-07-21 - Consolidated marketplace bulk controls in Actions
+
+Removed Sync All to Etsy, Sync All to eBay, and Publish all ready from the
+Admin Products toolbar. Added the existing global eBay publish workflow to the
+Actions modal and kept that modal accessible without selected products, with
+only selection-scoped choices disabled in the empty state. Authenticated
+selected/empty and desktop/mobile checks passed without marketplace writes, as
+did all 351 tests, TypeScript, lint, and the 416-page production build.
+
+## 2026-07-21 - Added optional sold-item price masking
+
+Added a second Shop Visibility checkbox that shows Sold/Vendido instead of a
+price for sold inventory across customer catalog, detail, wishlist, cart, and
+live checkout views. Stored prices, completed-order receipts, admin data, and
+marketplace flows remain unchanged. Added stale saved-item refresh, structured
+data handling, a backward-compatible settings read, canonical schema updates,
+and an idempotent migration. Focused tests, all 351 tests, TypeScript, lint, the
+416-page build, and authenticated desktop/mobile UI checks pass. Production requires
+`supabase/shop-sold-price-visibility-2026-07.sql` before the toggle can persist.
+
+## 2026-07-21 - Added missing-Spanish regeneration to listing edits
+
+Added a bottom-of-editor action that translates only blank Spanish title,
+description, and notes fields from their English counterparts. Concurrent
+Spanish edits and changed English sources are preserved, translations remain
+pending until normal save, and the paid API now has a distributed per-admin
+hourly limit. Added four regressions for request selection and stale-result
+merging. Authenticated no-write desktop/mobile checks, all 350 tests,
+TypeScript, lint, and the 416-page production build pass.
+
+## 2026-07-21 - Hardened API abuse controls and cleared security advisories
+
+Added Netlify edge throttling for all API paths, changed the shared distributed
+limiter to fail closed, added stale-counter cleanup, and rate-limited PayPal
+capture plus PayPal/eBay/Cloudflare/Resend webhooks before upstream work.
+Moved newsletter subscription to the service role and added SQL that revokes
+direct anon/authenticated subscription RPC execution. Restricted canonical
+product SELECT grants to public columns, duplicated browser security headers
+through Next, updated Next to 16.2.10, and patched all audited transitive
+dependencies. Added security regressions. All 346 tests, TypeScript, lint, both
+dependency audits, the 416-page build, and local header/status smoke checks
+pass. Production deployment and three idempotent Supabase scripts remain manual.
+
+## 2026-07-21 - Added reviewed Etsy category correction and type fallback
+
+Added Etsy's exact-category picker to the selected-item review form with
+in-place preflight refresh. Pinned live taxonomy mappings for Grape Shears,
+Serving Set, Coaster, and Matchbox Holder/Vesta Case, resolving the four current
+unmapped-type failures. Added an approximate generic collectible fallback for
+future custom types and regression coverage. Authenticated no-write UI checks,
+TypeScript, lint, all 339 tests, and the 416-page build pass. No migration or
+manual database reset is required.
+
+## 2026-07-21 - Fixed duplicate Etsy review warning keys
+
+Labeled Etsy upload advisories by photo rank, deduplicated repeated per-photo
+messages, and accumulated warnings across every bounded reviewed-sync request.
+Added defensive non-colliding React keys and focused formatter tests. Focused
+tests, TypeScript, lint, all 338 tests, and the 416-page build pass; no live
+marketplace content was submitted.
+
+## 2026-07-21 - Fixed marketplace status drift
+
+Changed active Etsy/eBay reconciliation to preserve local `out_of_date` instead
+of replacing it with `active`/`published`. Status results now distinguish a
+live listing with pending local updates. Added regression tests for both
+marketplaces, restored inventory #53's verified eBay flag with a guarded
+one-row update, and confirmed a real status check leaves it **Live, updates
+needed**. TypeScript, lint, all 336 tests, and the 416-page build pass.
+
+## 2026-07-21 - Diagnosed marketplace status drift
+
+Confirmed that Etsy/eBay lifecycle reconciliation can erase a valid local
+`out_of_date` signal without pushing content or refreshing its hash. Inventory
+#53 reproduced the eBay case: all compared remote fields match except its
+fulfillment policy, which should now use the high-value tier after its mapped
+price crossed $1,000. A catalog-wide read-only hash audit found only #53 hidden,
+#73 visibly out of date on both marketplaces, and no false out-of-date rows.
+Documented the cross-marketplace correction as pending; no app or database code
+was changed.
+
+## 2026-07-21 - Added posting actions to Not listed results
+
+Widened the focused marketplace status detail and added Post to Etsy/eBay on
+each Not listed product. The action opens the existing one-item immediate or
+review-first sync flow, keeps the full table selection, and returns to a fresh
+combined status check after close or completion. Authenticated no-write checks
+passed for both marketplace routes; TypeScript, lint, all 334 tests, and the
+416-page production build pass.
+
+## 2026-07-20 - Fixed the marketplace-result Back icon
+
+Replaced the status-detail Back button's missing `arrow_back` Material Symbols
+ligature with a font-independent arrow. Browser verification confirmed the
+correct glyph and zero raw ligature text. Audited all current direct icon text,
+icon expressions, and configured icon fields against the committed subset;
+`arrow_back` was the only mismatch. Documented a proposed manifest-backed
+lint/build integrity gate for owner approval without implementing the broader
+permanent change. TypeScript, lint, and the production build pass.
+
+## 2026-07-20 - Compacted marketplace status results
+
+Replaced the default per-item Etsy/eBay result lists with three clickable,
+mutually exclusive totals: Listed, Not listed, and Needs attention. Nonzero
+totals open a focused detail view with inventory numbers, titles, and exact
+marketplace states; Back restores the summary without rerunning checks, and
+zero totals are disabled. A live mixed-status check produced 1 Listed / 1 Not
+listed for both marketplaces and verified both drill-downs. Added focused
+grouping tests; TypeScript, lint, all 334 tests, and the production build pass.
+
+## 2026-07-20 - Added per-item marketplace status results
+
+The combined selected-product Etsy/eBay check now lists every selected product
+under each marketplace with its inventory number, title, and final state such
+as Live, Draft, Not listed, Ended, or Hidden (sold). Remote check failures are
+identified per item. Removed the misleading Updated tile from the dialog while
+retaining the internal reconciliation counter for API compatibility. A live
+read-only two-item check showed inventory #21 and #24 as Live on both Etsy and
+eBay, with both titles present in both sections. TypeScript, lint, all 332
+tests, and the 416-page production build pass.
+
+## 2026-07-20 - Added review-first selected Etsy/eBay sync
+
+Selected-product marketplace posting now offers immediate batch sync or a
+sequential review flow. The review flow shows each Etsy/eBay preflight, submits
+one product through the existing bounded sync endpoint, advances on success,
+and supports refresh, retry, skip, carried warnings, and final counts. Sync to
+both hands the selection from Etsy to an independent eBay method choice. No
+live marketplace write was used during browser verification; TypeScript, lint,
+332 tests, and the production build pass.
+
+## 2026-07-20 - Added selected Etsy/eBay status checks
+
+Added one combined Check Etsy and eBay action to the selected-products Actions
+modal. The two status routes reconcile optional validated product IDs in
+parallel, retain separate progress/results and retry behavior, refresh both
+table chips, preserve the selection, return completed checks to the Actions
+modal, and never push listing content. Authenticated live read-only desktop and
+320px checks passed for one linked Etsy listing and one linked eBay offer with
+no horizontal overflow; TypeScript, lint, 332 tests, and the production build
+pass.
+
+## 2026-07-20 - Standardized instant customer button feedback
+
+Audited all 88 customer-facing buttons. Added immediate busy/disabled labels to
+sign-out, cart checkout authentication, and public error retry; removed the
+150 ms shop navigation-overlay delay; disabled active view/cookie no-ops; and
+added a global pressed response for custom buttons. Browser checks confirmed
+the shop, cookie, and cart flows, and 332 tests, TypeScript, lint, and the
+416-page production build pass.
+
+## 2026-07-20 - Fixed compact admin modal overflow
+
+Portaled the Admin Users Delete Account confirmation out of its no-wrap table
+cell and added explicit text wrapping, long-token handling, viewport-bounded
+scrolling, and narrow-phone action stacking. Applied the same overflow guards
+to selected-product actions and the Etsy/eBay bulk sync and publish dialogs.
+Authenticated desktop and 320px checks found zero horizontal overflow across
+all five dialogs; TypeScript, lint, and the 416-page production build pass.
+
+## 2026-07-20 - Verified the corrected PayPal hardening migration
+
+Confirmed the corrected hardening SQL is live: `orders.refund_amount` and the
+refund ledger are readable, the dependency-aware readiness RPC returns `true`,
+and a zero-write refund probe reaches the intended missing-order guard instead
+of the former missing-column error. Repeated the complete SQL inventory across
+59 files, 33 tables, 479 table/column contracts, and 22 function names with no
+unexpected missing live artifact. There are no known pending migrations.
+
+## 2026-07-20 - Audited the live schema after PayPal hardening
+
+Confirmed the hardening ledger and PayPal RPC contracts are live, then found
+that `orders.refund_amount` was still absent and caused `apply_paypal_refund()`
+to fail with `42703`. Made the hardening SQL add that dependency itself and
+replaced its unconditional readiness response with concrete table/column/RPC
+checks. The updated hardening file must be re-run. A complete additive-schema
+comparison covered 206 artifacts across all 59 SQL files and found no other
+missing live table or column. The same read-only audit found every app-used RPC,
+zero stale product/order image paths, zero old `new-listing-*` IDs, and the
+expected anonymous product-column and payment-RPC restrictions. A sweep of all
+22 SQL-defined function names found no unexpected missing callable function;
+tests (332), TypeScript, lint, and the 416-page production build pass.
+
+## 2026-07-20 - Hardened PayPal checkout and added real admin refunds
+
+Added deterministic create/refund idempotency, capture-first persistence,
+buyer retry lockout after ambiguous captured-payment failures, retryable webhook
+claims with checked RPC errors, capture-ID refund/dispute lookup, receipt
+finalization retries, a 50-line cart limit, and winning-order sold-price binding.
+Capture-refunded webhooks now calculate the increment from PayPal's cumulative
+refunded total, and refund pending/failed events update the ledger without
+changing the order's refunded total.
+Admin full and partial PayPal refunds now move money through PayPal and reconcile
+once through the new `paypal_refunds` ledger; manual-order status controls remain
+local. Ambiguous capture responses now use a PayPal order lookup, every
+captured/unresolved branch activates a reload-persistent same-cart payment lock,
+different refund targets are blocked while one is pending, and automatic
+receipt/owner retries use Resend idempotency keys. Added
+`supabase/paypal-checkout-hardening-2026-07.sql`, which must be run
+before deployment. Full tests (332), TypeScript, lint, build, and authenticated
+desktop/mobile admin checks pass; no payment or refund was submitted.
+
+## 2026-07-20 - Defaulted Admin Products to available items
+
+The main Admin Products table now opens showing only available inventory.
+Existing status filters and clear/reset controls remain available for other
+product states. Verified in the authenticated admin preview and with the
+TypeScript, lint, and production build checks.
+
+## 2026-07-20 - Stabilized homepage carousel thumbnail clicks
+
+Hardened the homepage 3D carousel so far-side projected cards cannot steal
+clicks, front-facing cards stack by viewer depth, and the ring pauses as the
+pointer enters or engages the scene. Verified the exact mobile product-link
+navigation plus TypeScript, lint, and production build.
+
+## 2026-07-20 - Aligned Admin Products totals footer
+
+Removed the extra bottom padding that was lifting the sticky Melt/Price totals
+bar above the table's lower edge. The footer now rests directly above the
+horizontal scrollbar and no longer overlays the last visible rows. Verified in
+the authenticated admin preview with TypeScript, lint, and production build
+passing.
+
+## 2026-07-20 - Added selected-product marketplace actions
+
+Added product-table checkboxes, select-all-visible behavior, and a top Actions
+modal for syncing selected products to Etsy, eBay, or both. Selected runs send
+explicit product IDs through the existing queue/drain flows; the combined run
+waits for a successful Etsy completion before opening eBay. Verified the live
+admin preview and passed the full Vitest suite, TypeScript, lint, and build.
+
+## 2026-07-20 - Kept seller suggestions out of AI buyer copy
+
+Added an immutable buyer-facing copy firewall to Smart Listing Assistant
+generation, including requests using saved/custom admin prompts. Seller
+suggestions, guesses, opinions, requested wording, and unverified
+identifications are excluded from title, description, and public notes. Direct
+seller-attribution sentences are also removed by response coercion and moved
+to uncertainties for admin review. Added focused regression coverage and
+verified TypeScript, lint, and production build.
+
+## 2026-07-20 - Restored missing Material Symbols video glyphs
+
+Audited recent admin, marketplace, and storefront icon usage against the
+self-hosted subset. Regenerated the two versioned font assets so the product
+edit form's `videocam` icon and the storefront gallery's `play_circle` icon
+render as glyphs instead of raw ligature text. Removed temporary font and
+keep-list artifacts. Verified `/admin`, the edit form, a storefront product,
+the Etsy manager, and the eBay manager in the authenticated browser, with
+TypeScript, lint, and production build passing.
+
+## 2026-07-20 - Added Admin Products quick-actions modal
+
+Clicking a product thumbnail, title, or any neutral cell in the main Admin
+Products table now opens a quick-actions modal with a larger image, key inventory/pricing facts,
+the same row actions as the right-edge dropdown, and compact Manage Etsy /
+Manage eBay launchers with current sync status chips. The full marketplace
+workflows moved to dedicated pages at `/admin/products/[id]/etsy` and
+`/admin/products/[id]/ebay`, reusing the existing product panels on a page-sized
+surface instead of embedding them in the modal.
+
+Verified with `npx tsc --noEmit`, `npm run lint`, `npm run build`, and an
+authenticated browser smoke check at `/admin` confirming neutral-cell modal
+open, fixed icon rendering, full-size image preview, Manage Etsy navigation,
+eBay page controls, and the existing dropdown remaining independent.
+
+## 2026-07-20 - Recorded applied SQL migrations and verified order email table
+
+Updated project docs after the owner ran
+`product-videos-cloudflare-stream-2026-07.sql`,
+`product-sold-price-lock-2026-07.sql`, `order-shipping-tracking-2026-07.sql`,
+and the current `no-reservation-checkout.sql` copy. A read-only service-role
+schema check also confirmed `order_emails` exists with 14 rows, so
+`order-emails.sql` is no longer tracked as pending.
+
+Backlog items now focus on Cloudflare environment/webhook setup and live
+behavior verification rather than applying those SQL files. Audited the
+unreferenced-by-filename `supabase/*.sql` candidates and removed none, because
+they remain useful schema repair/setup/audit/recovery scripts rather than
+disposable scratch files.
+
+## 2026-07-20 - Added Admin Products table Melt and Price totals
+
+Added a sticky bottom totals row to the main Admin Products table. The footer
+shows the visible row count plus totals under Melt and Price, calculated from
+the current filtered table using the same helpers that render each row.
+
+Verified by restarting the port 3000 preview, checking `/admin` in the browser
+for a 21-cell sticky footer with Melt/Price totals, and running `npm run lint`,
+`npx tsc --noEmit`, and `npm run build`.
+
+## 2026-07-19 - Fixed admin Quantity field clearing
+
+Updated the Add Listing/Edit Listing Quantity input so admins can delete the
+current number, see a blank field while typing, and enter a replacement value
+without the control snapping back to 1. Leaving it blank and blurring restores
+the documented default of 1, while save-time quantity normalization is unchanged.
+
+Verified with `npm run lint`, `npx tsc --noEmit`, `npm run build`, and a local
+preview response check at `/admin`.
+
+## 2026-07-19 - Optimized the proposed eBay description banner
+
+Converted the owner-supplied 2169x725 root PNG to a visually verified 1400x468
+WebP using quality 90/high-effort encoding. The asset fell from 2,136,002 bytes
+to 113,460 bytes (about 94.7% smaller) and now lives at
+`next-app/public/assets/marketplaces/ebay-description-banner.webp`. Removed the
+superseded root PNG only after verifying the output format, dimensions, file,
+and rendered appearance.
+
+No marketplace mapper or listing was changed. The asset contains a visible
+phone number and off-eBay domain, so integration is held pending a compliant
+artwork revision.
+
+## 2026-07-18 - Added Draft to the main Products-table menu
+
+Added a Draft action to each non-draft product's Actions menu and a distinct
+purple Draft badge. Draft rows can use the existing Available action to return
+to the public shop. New/Edit Item already supported Draft, and the storefront's
+existing public-status contract continues to exclude draft products.
+
+Added regression coverage for draft normalization, public visibility, and
+purchasability while preserving Available/Sold behavior. Verified with
+`npx tsc --noEmit`, strict lint, `npm test` (23 files, 318 tests),
+`npm run build`, and a signed-in read-only admin browser check.
+
+## 2026-07-17 - Built the Cloudflare Stream product-video workflow
+
+Added one-video-per-product persistence, direct resumable TUS provisioning,
+admin-only upload/status/commit/delete APIs, signed idempotent webhook handling,
+download generation, provider-first cleanup, bounded orphan recovery, and
+marketplace out-of-date marking. Added the product editor's mobile Record/
+Choose flow and staged Save/Cancel semantics, plus ready-only mixed public
+gallery playback and `VideoObject` metadata without adding video work to shop
+list queries. Expanded the Netlify CSP for Stream/upload hosts and added
+`tus-js-client`.
+
+Also fixed product-detail fallback detection for the still-pending `sold_price`
+migration, which local preview testing exposed as a 404 on otherwise valid
+product links. Added five product-video constraint/state/media/webhook tests.
+`npm test` passes (316/316), strict lint, TypeScript, and production build pass.
+The signed-in admin preview passed; real provider/mobile/marketplace checks are
+deployment-gated and explicitly documented.
+
+## 2026-07-17 - Added full-size admin table image previews
+
+Made each Products-table thumbnail clickable and keyboard accessible. It now
+opens the original product image in the shared full-screen admin viewer, with
+the product title as alt text and without the editor-only Crop command.
+
+Added a prominent top-right close icon, Escape dismissal, backdrop dismissal,
+and temporary body scroll locking. Desktop and 390x844 browser walkthroughs
+confirmed image rendering and every close path. `npm test` (311/311), strict
+lint, TypeScript, and production build pass.
+
+## 2026-07-17 - Froze admin product headers and identity columns
+
+Converted the Products table wrapper into a bounded vertical/horizontal scroll
+area. The entire header row now stays visible vertically; Order, Inv #, Image,
+and Title stay visible horizontally through the divider before Brand; and
+Actions remains fixed on the right. Mobile uses a narrower frozen Title column
+to preserve room for scrolling data.
+
+Corrected header classification so Etsy and eBay, which are non-sortable, are
+no longer accidentally styled as right-sticky Actions columns. Desktop and
+390x844 browser walkthroughs passed in both scroll directions. `npm test`
+(311/311), strict lint, TypeScript, and production build pass.
+
+## 2026-07-17 - Fixed Etsy image upload progress counting
+
+Changed the per-product Etsy sync display from per-request batch progress to
+cumulative progress against the original fixed total. Multi-request uploads now
+advance `4/17`, `8/17`, `12/17` rather than showing `4/17`, `4/13`, `4/9`.
+Partial failures advance only by successful operations.
+
+Added focused regression tests. `npm test` (311/311), strict lint, TypeScript,
+and the production build pass. A real browser Sync Updates run for inventory
+#83 completed Active with no error; Etsy skipped image work because all 17
+checkpoints already matched, so no live image was altered merely to force the
+counter onto the screen.
+
+## 2026-07-17 - Reconciled current Etsy/eBay states without content pushes
+
+Ran the authenticated Check Etsy statuses and Check eBay statuses workflows
+across all 83 Etsy links and 79 eBay offers. No marketplace read errors were
+reported. Identified Etsy inventory #83 and eBay inventory #53 as the only
+linked available listings needing updates; eBay inventories #83 and #84 remain
+optional first-time publishes. Inventory #82 remains live but detached.
+
+The eBay bulk summary exposed an existing local scan issue that briefly marked
+sold inventory #6 out of date despite its remote quantity already being zero.
+The normal read-only status check restored `hidden_oos`. No listing content,
+price, quantity, publication state, or availability was pushed in this session.
+
+## 2026-07-16 - Audited and hardened all Etsy/eBay API sync paths
+
+Read every linked record through the connected marketplace APIs. Etsy's 83
+links resolved to 70 active, 7 edit-state, and 6 rate-limited-then-successfully-
+retried active listings; eBay's 79 offers resolved to 73 active, 5 out of stock,
+and inventory #82's known ended predecessor. No duplicate eBay SKU offers or
+unexplained local/remote state mismatches were found.
+
+Hardened eBay offer creation, bulk result validation, crash recovery, publish/
+restore ID handling, detached-relist write guards, and API-specific 404
+classification. Hardened Etsy writable-state checks, true remote reactivation,
+and manual/scheduled failure accounting. Added regression coverage for offer
+duration/selection, item-level bulk failures, and Etsy lifecycle guards.
+
+Browser-tested inventory #82's guarded Sync Updates and Push price only paths;
+both stopped with the reattachment warning. `npm test` (309/309), `npm run lint
+-- --max-warnings=0`, `npx tsc --noEmit`, and `npm run build` pass.
+
+## 2026-07-16 - Fixed eBay relisted items drifting to Ended
+
+Added a seller-authenticated Trading `GetItem` reader and structured XML parsing
+for eBay relist metadata. Status verification now follows `RelistedItemID`,
+checks the seller SKU at every hop, adopts an active replacement listing ID,
+and rejects mismatches or malformed loops. A detached relist is shown as Live
+with an explicit warning, while app-side sync, price, and delist writes are
+blocked/skipped until the live listing is deliberately reattached.
+
+Live-tested inventory #82: the old completed listing `800320565937` points to
+active relist `800354878200`; two consecutive admin status checks now remain
+Live and View on eBay uses the active ID. Added five regression tests for XML
+parsing and relist resolution. `npm test` (305/305), `npm run lint`,
+`npx tsc --noEmit`, and `npm run build` pass.
+
+## 2026-07-16 - Reduced admin authentication, catalog, and order-page latency
+
+Changed protected admin pages, the shared admin-action guard, and session proxy
+from the always-networked Supabase `getUser()` lookup to cryptographically
+verified `getClaims()`. The project exposes an ES256 public signing key, so the
+SDK can verify claims locally with cached JWKS data. Database authorization still
+checks `profiles.is_admin`; no trust was moved to unverified session data.
+
+Replaced the Products page's initial `select('*')` transport with a compact
+summary contract. The full private/editor product is now loaded on demand for
+Edit, Duplicate, image padding, and permanent-delete cleanup. Summaries retain
+all canonical image references but omit the mirrored legacy array and editor
+text. Deferred the Orders page's entire product catalog and metal-price lookup
+until Create Manual Order opens, and parallelized the Recycle Bin count.
+
+Local browser measurements reduced Products generated HTML from 1,008,716 to
+about 759,900 characters and serialized data from 468,404 to about 219,600.
+Orders dropped from 261,444 to about 72,000 HTML characters and from 238,121 to
+about 48,700 serialized characters. Browser-tested the authenticated routes,
+full nine-image product editor, and populated manual-order picker without
+submitting writes. `npm test` (300/300), `npm run lint`, `npx tsc --noEmit`, and
+`npm run build` pass.
+
+## 2026-07-16 - Verified order email delivery and clarified sender identity
+
+Queried the configured Resend account for order `NEJ-20260715-HT3P1` and found
+the exact customer receipt and shipped-update records. Both were sent from
+`Naples Estate Jewelry <noreply@naplesestatejewelry.co>` to
+`c.reatiga@yahoo.com`, and both report `delivered`. The AOL account previously
+shown as `Sent by` was the signed-in admin who initiated the update, not the
+email sender.
+
+Admin Email History now shows the actual From address and labels a human sender
+action as `Initiated by`, while retaining the automatic-order-confirmation
+label. Hardened both customer order email paths so they only log and report
+success after Resend returns an accepted email ID; API-level rejections can no
+longer appear as successful history entries. `npm test` (296/296),
+`npm run lint`, `npx tsc --noEmit`, `npm run build`, and the refreshed admin
+browser check all pass.
+
+## 2026-07-16 - PayPal now receives and locks the checkout delivery address
+
+Changed shipped PayPal orders from `NO_SHIPPING` to
+`SET_PROVIDED_ADDRESS` and added the validated checkout name/address to the
+PayPal purchase unit. Buyers now see the same destination held on the internal
+order and cannot replace it with a different wallet address during PayPal
+approval. Local Pickup retains `NO_SHIPPING` and omits shipping data.
+
+Hardened PayPal order retries so contact/address validation also runs before the
+reuse branch and edited buyer/address fields are saved before a replacement
+PayPal order is created. Added delivery/pickup payload regression tests.
+`npm test` (296/296), `npm run lint`, `npx tsc --noEmit`, and `npm run build`
+pass. A deliberate live approval-screen check remains an owner task.
+
+## 2026-07-16 - Sold products now lock their final storefront price
+
+Added a durable `products.sold_price` lock and applied it consistently to
+storefront price display/sorting, wishlist prices, order snapshots, and Etsy/eBay
+price mappings. Admin Sold actions capture the current resolved price, while
+paid-order actions provide the exact `order_items.price_snapshot`. The database
+trigger covers PayPal checkout and other status-only writes. Relisting an item
+as Available clears the lock so manual or spot-driven updates resume.
+
+The idempotent `supabase/product-sold-price-lock-2026-07.sql` migration also
+backfills existing Sold products when an authoritative order snapshot exists.
+Legacy manually Sold rows without a snapshot are intentionally not assigned an
+invented historical amount. The app's compatibility reads/writes keep the local
+preview usable before migration. Added Sold/Archived/relisted pricing and
+marketplace regression tests. `npm test` (294/294), `npm run lint`,
+`npx tsc --noEmit`, and `npm run build` pass.
+
+## 2026-07-16 - Fixed archived product deletion and hid archives by default
+
+Changed the Admin Products table's default Status view to `All except Archived`.
+Admins can still select `Archived` for only retired listings or `All Statuses`
+for the complete table, and clearing filters restores the default archive-hidden
+view.
+
+Fixed Delete repeatedly archiving a product that already had Archived status.
+Products with order history still archive on the first delete as a guard. An
+explicit `Delete permanently` on an already archived product now removes the
+catalog row while the database retains order/invoice snapshots and nulls their
+live product link. Confirmation text explains both paths.
+
+Browser-tested the entire flow with the owner-authorized `test-item-60`: default
+83/84 view, archived-only 1/84 view, permanent deletion, and final 83/83 view.
+Database read-back confirmed the product is gone and its order line still has
+the title, $1 price, image snapshot, and null `product_id`. No browser errors or
+warnings. `npm test` (289/289), `npm run lint`, `npx tsc --noEmit`, and
+`npm run build` pass.
+
+## 2026-07-16 - Fixed invoice thumbnails missing from physical print output
+
+Investigated the admin invoice thumbnail path after the image appeared in the
+preview but left a blank spot on a laser-printer page. The live WebP URL loaded
+cleanly at 1016x1200, ruling out a missing asset. The generated Print Now window
+was printing immediately after writing its HTML, before remote images were
+guaranteed to load or decode.
+
+Print Now now waits for invoice images to load/error, decodes successful images,
+allows the finished layout to settle briefly, and then opens the print dialog.
+The wait has an eight-second fallback so printing still proceeds if an image host
+is unavailable. `npm run lint`, `npx tsc --noEmit`, and `npm run build` pass;
+browser verification found a fully loaded thumbnail and no console warnings or
+errors. A physical laser-printer confirmation remains after deployment.
+
+## 2026-07-16 - Admin invoice print output now uses a 98% scale
+
+Applied a print-only `zoom: 0.98` to both invoice printing paths: the clean
+Letter-sized window opened by Print Now and direct browser printing of the
+invoice page. This gives the document the same small reduction the owner was
+manually selecting to keep the footer from spilling onto page two. The on-screen
+invoice and preview remain full size.
+
+Browser verification confirmed an unchanged 816px preview paper, no screen zoom,
+the active 98% print-media rule, and no overflow/console errors. Focused ESLint,
+`npx tsc --noEmit`, and `npm run build` pass.
+
+## 2026-07-16 - Shipped fulfillment now saves and emails carrier/tracking details
+
+Added optional `shipping_carrier` and `tracking_number` fields to orders through
+the idempotent `supabase/order-shipping-tracking-2026-07.sql` migration and the
+fresh-install sales schema. Admin order detail now requests those values when
+marking an order Shipped, displays saved shipment details, and lets an admin add
+or edit them on an already-shipped order.
+
+Fulfillment email previews and delivered HTML/plain-text messages include any
+saved carrier and tracking number. The server email route reads shipment values
+from the authoritative order row. Added a compatibility query so order detail
+continues loading before the migration is applied, with shipment tracking
+controls withheld until the schema is ready.
+
+Added two fulfillment-email tests. `npm test` (289/289), `npm run lint`,
+`npx tsc --noEmit`, and `npm run build` pass. Browser-tested the pre-migration
+fallback on the current shipped admin order with a clean console. Live migration
+and one deliberate delivered-email check remain owner steps.
+
+## 2026-07-16 - Additional shop walkthrough fixed hidden Silver on stale links
+
+Ran a second customer-facing shop matrix across all 24 visible Item Types,
+category/type transitions, realistic combined filters, pagination, list/grid
+views, price and weight ordering, era/price controls, English/Spanish routes,
+stale query strings, and the mobile filter drawer at 390x844.
+
+Fixed one shared/bookmarked URL edge case: when a specific jewelry Item Type
+supersedes `itemGroup=everything-else`, normalization now removes the category's
+auto-owned metal/color/purity state as well as the category itself. The
+reproduced Rings URL changed from zero results with hidden Silver filtering to
+all seven Rings. Added a focused regression test. `npm test` (287/287),
+`npm run lint`, `npx tsc --noEmit`, and `npm run build` pass; the browser had no
+console warnings/errors or horizontal overflow.
+
+## 2026-07-16 - Item Type menu now hides types with no public inventory
+
+Changed the public shop's Item Type options to derive from the full public
+catalog, retaining configured and dynamic types only when at least one
+`available` or `sold` product uses them. The list stays stable across Category
+and other filters, preserving cross-category navigation. Old links that select
+a now-unavailable type fall back to All items and clear type-owned chain/length
+state instead of producing a hidden zero-result constraint.
+
+Added an availability regression test and browser-tested bare shop, category
+switching, and a stale Coins URL. `npm test` (286/286), `npm run lint`,
+`npx tsc --noEmit`, and `npm run build` pass; browser console remained clean.
+
+## 2026-07-16 - Full shop-filter audit removed category/type locks and rapid-change races
+
+Reworked public shop filter state after Coins and other non-jewelry Item Types
+silently activated Everything Else, forced Silver, and removed all jewelry types
+from the menu. Categories now activate only when explicitly selected; Item Type
+and Brand keep complete catalog-wide option lists; choosing a specific type
+releases an active category and its Silver constraint; conflicting shared URLs
+are normalized; and invalid link/length/metal/purity dependents are ignored or
+cleared. Added shared in-flight query composition across Filters, Sort, View,
+Year, and Pagination so rapid changes no longer drop earlier selections.
+
+Added `src/lib/shop-filter-state.ts` plus 9 regression tests. Browser-tested all
+entry/switch/clear/history paths on desktop and 390x844 mobile, including
+zero-result recovery and rapid multi-control changes. `npm test` (285/285),
+`npm run lint`, `npx tsc --noEmit`, and `npm run build` pass.
+
+## 2026-07-16 - eBay account-deletion flood investigated; admin activity cleaned up
+
+Investigated why Admin Settings showed many `account_deletion` rows. Live
+Supabase read-only audit found 10,922 unique processed
+`MARKETPLACE_ACCOUNT_DELETION` events since 2026-07-10, almost all first
+delivery attempts, so this is eBay compliance notification volume rather than
+an app retry loop. Changed the eBay admin status feed to exclude
+`account_deletion` from Recent eBay Activity, keeping real seller sync actions
+visible. Also changed future eBay account-deletion webhook inserts to sanitize
+`webhook_events.payload`, preserving notification metadata but stripping eBay
+user identifiers (`username`, `userId`, `eiasToken`) before storage. Added a
+sanitizer regression test. Existing live payload rows still need an
+owner-confirmed DB scrub; tracked in `TASKS.md`.
+
+Verification: eBay webhook tests 10/10 pass, `npm run lint`, `npx tsc
+--noEmit`, and `npm run build` pass.
+
+## 2026-07-16 - Hide fine-metal weight math when storefront spot/melt value is hidden
+
+Changed the public product detail spec row so items with Admin -> "Show spot /
+melt value on storefront" unchecked show only the total gram weight, not the
+calculated fine gold/silver grams or fine troy-ounce breakdown. Verified against
+the Rolex GMT-Master II example (`209.30 g total`) and ran `npm run lint`,
+`npx tsc --noEmit`, and `npm run build` successfully.
+
+## 2026-07-11 (continued, 2) - Removed a `sameAs` schema error; discovered naplesjewelrybuyers.com is a live competing site
+
+While researching "what else to optimize" per the owner's ask, checked the
+two "related domains" that were listed in the `JewelryStore` `sameAs`
+array and in `PROJECT_OVERVIEW.md`/`CLIENTS.md`:
+
+- **`naplesestatejewelry.com` is NOT owned.** It's a parked GoDaddy domain
+  listed for sale ($2,100) — not this business's property. It was
+  incorrectly added to `sameAs` in an earlier session by trusting stale
+  project-doc claims without verifying. Removed it from
+  `[locale]/layout.tsx`'s `sameAs` array (a wrong `sameAs` link is a real
+  schema-accuracy problem, not just cosmetic) and corrected
+  `PROJECT_OVERVIEW.md`/`CLIENTS.md`. Flagged to the owner as a possible
+  defensive-purchase opportunity given how closely it matches the brand.
+- **`naplesjewelrybuyers.com` is real, live, and independently built** —
+  its own full site with `LocalBusiness`/`Jeweler` + `WebSite` + `FAQPage`
+  schema, own FAQ copy, a "photo submission portal," and its own buy-side
+  positioning ("Sell Gold, Silver & Jewelry in Naples, FL"). It targets
+  nearly the same keywords as the `/sell` + `/sell/[city]` pages built
+  earlier today on the main site — a real keyword-cannibalization risk
+  between two of the owner's own properties. Not changed — this needs the
+  owner's input on what that site is actually for (a separate ad-landing
+  page? phased out? should be consolidated?) before touching it. Flagged
+  as the top strategic SEO question going forward.
+
+`tsc` clean after the `sameAs` fix; verified locally that the JSON-LD now
+only lists the real domain.
+
+## 2026-07-11 (continued) - GSC verified + sitemap submitted; Google Business Profile built (pending address verification)
+
+Owner deployed the pending code changes, then asked to finish Search Console
+and set up a Google Business Profile.
+
+**Google Search Console — fully live:**
+- Confirmed the deploy landed (live `sitemap.xml` now includes `/sell` +
+  all 6 city pages; `/sell/fort-myers` returns 200; the verification meta
+  tag is present in production `<head>`).
+- Returned to the pending GSC property and re-triggered verification —
+  **"Ownership auto verified"** via the HTML-tag method.
+- Submitted `sitemap.xml` — Google read it successfully, **107 pages
+  discovered** immediately.
+- Requested indexing for the new `/sell` hub page directly (individual
+  per-URL requests are quota-limited, so did not spam every city page —
+  the sitemap submission already covers discovery for all 107 URLs).
+
+**Google Business Profile — built, one manual step left for the owner:**
+- Checked for name conflicts first: no existing Google Business/Maps
+  listing under "Naples Estate Jewelry"; the one close match on Florida's
+  Sunbiz registry (**"NAPLES ESTATE JEWELRY, INC.", doc# P98000005757) is
+  status INACT** (dissolved) — safe to proceed, flagged to the owner for
+  awareness.
+- Created a new Business Profile: name "Naples Estate Jewelry", primary
+  category **"Jewelry buyer"** (the precise buy-side GBP category),
+  **service-area business** (no public storefront — matches the real
+  mobile/appointment-only model; deliberately did not enter a location
+  address for public display), all 6 service areas (Naples, Marco Island,
+  Bonita Springs, Estero, Fort Myers, Cape Coral), phone + SMS chat number
+  (239) 404-8505, website, hours Mon–Sat 10am–5pm (matches the site's
+  existing `JewelryStore` schema hours exactly), and a ~540-character buy-
+  side business description mentioning every service (gold, estate
+  jewelry, sterling silver, diamonds, coins, watches) and every city.
+  Skipped storefront/product photos (no real photos available to use —
+  left for the owner) and the Google Ads $500 credit offer (a spending/
+  billing decision, not something to accept unilaterally).
+- **Confirmed built correctly** via the profile dashboard (name, category,
+  6 service areas, hours, phone, website all present).
+- **🔴 Blocked on the owner:** the profile shows "NOT PUBLICLY VISIBLE"
+  until verified. Owner supplied the private mailing address (4243 30th
+  Ave SW, Naples, FL — Google's address autocomplete corrected the ZIP to
+  the valid 34116-8311; the owner-typed 34166 is not a real Naples ZIP)
+  and it was entered and saved on the profile. **Postcard mail
+  verification is no longer offered for this listing** — Google now only
+  offers **video verification** (record a short video showing the
+  business location/equipment/proof of management) for this
+  service-area-business profile type. That requires the owner in person
+  and was correctly left undone — a fabricated video would be a real
+  integrity problem with Google's system, not something to fake. Saved
+  progress via "Verify Later" rather than attempting it. **Owner action:**
+  go to business.google.com → Naples Estate Jewelry → Get verified →
+  submit a short business video when ready.
+- **🟢 Duplicate profiles removed (owner-directed).** Owner asked to
+  delete the 2 other unverified profiles found in the same account.
+  Verified both were still unverified drafts (no live data, no reviews)
+  before removing, then selected exactly "Naples Estate Jewelry Co" and
+  "Naples Gold and Jewelry Buyers" (leaving the correct "Naples Estate
+  Jewelry" / 04174729584373572986 unchecked) and used Business Profile
+  Manager's bulk "Remove businesses" action. Confirmed via the account's
+  business list afterward: **1 business remaining** — only "Naples Estate
+  Jewelry."
+
 ## 2026-07-11 - Google Search Console property added (pending deploy); SEO health-checked live production
 
 Owner asked to set up Google Search Console and submit the sitemap, using

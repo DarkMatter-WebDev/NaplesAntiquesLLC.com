@@ -135,6 +135,11 @@ export function computeUploadWarnings(params: { rank: number; width: number; hei
   return warnings;
 }
 
+export function formatUploadWarnings(rank: number, warnings: Array<string | undefined>): string | undefined {
+  const unique = Array.from(new Set(warnings.filter((warning): warning is string => Boolean(warning))));
+  return unique.length > 0 ? `Photo ${rank}: ${unique.join(' ')}` : undefined;
+}
+
 export interface UploadImageResult {
   etsyListingImageId: number;
   bytesSha256: string;
@@ -155,7 +160,7 @@ export async function uploadListingImage(params: {
   const warnings = [
     transcoded.warning,
     ...computeUploadWarnings({ rank: params.rank, width: transcoded.width, height: transcoded.height, byteLength: transcoded.buffer.byteLength }),
-  ].filter((warning): warning is string => Boolean(warning));
+  ];
 
   const form = new FormData();
   // Buffer's underlying ArrayBufferLike type includes SharedArrayBuffer, which
@@ -170,7 +175,7 @@ export async function uploadListingImage(params: {
     params.accessToken,
   );
 
-  return { etsyListingImageId: res.data.listing_image_id, bytesSha256, warning: warnings.length ? warnings.join(' ') : undefined };
+  return { etsyListingImageId: res.data.listing_image_id, bytesSha256, warning: formatUploadWarnings(params.rank, warnings) };
 }
 
 export interface EtsyListingImageApi {

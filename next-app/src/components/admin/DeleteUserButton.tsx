@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createPortal } from 'react-dom';
 
 interface Props {
   userId: string;
@@ -52,16 +53,16 @@ export default function DeleteUserButton({ userId, userName, userEmail, isAdmin 
         Delete
       </button>
 
-      {open && (
+      {open && typeof document !== 'undefined' && createPortal(
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby="delete-user-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto whitespace-normal p-4 sm:items-center"
           style={{ background: 'rgba(0,0,0,0.45)' }}
           onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
         >
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="min-w-0 w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl [overflow-wrap:anywhere] sm:p-6">
             {/* Icon */}
             <div
               className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full"
@@ -82,7 +83,7 @@ export default function DeleteUserButton({ userId, userName, userEmail, isAdmin 
             <p className="text-center text-sm mb-1" style={{ color: 'var(--color-on-surface-variant)' }}>
               You are about to permanently delete:
             </p>
-            <p className="text-center font-semibold mb-5" style={{ color: 'var(--color-on-surface)' }}>
+            <p className="min-w-0 text-center font-semibold mb-5 [overflow-wrap:anywhere]" style={{ color: 'var(--color-on-surface)' }}>
               {userName}{userEmail ? ` · ${userEmail}` : ''}
             </p>
 
@@ -96,7 +97,7 @@ export default function DeleteUserButton({ userId, userName, userEmail, isAdmin 
             )}
 
             <div
-              className="mb-5 rounded-lg border px-4 py-3 text-sm leading-relaxed"
+              className="mb-5 min-w-0 whitespace-normal rounded-lg border px-4 py-3 text-sm leading-relaxed [overflow-wrap:anywhere]"
               style={{ borderColor: '#fecaca', background: '#fef2f2', color: '#991b1b' }}
             >
               This action is <strong>permanent and cannot be undone.</strong> The login credentials, profile data, and all associated records will be immediately and irreversibly deleted.
@@ -108,12 +109,12 @@ export default function DeleteUserButton({ userId, userName, userEmail, isAdmin 
               </p>
             )}
 
-            <div className="flex gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <button
                 type="button"
                 onClick={closeModal}
                 disabled={deleting}
-                className="flex-1 outline-button"
+                className="w-full justify-center outline-button"
               >
                 Cancel
               </button>
@@ -121,14 +122,15 @@ export default function DeleteUserButton({ userId, userName, userEmail, isAdmin 
                 type="button"
                 onClick={handleDelete}
                 disabled={deleting}
-                className="flex-1 rounded-lg px-4 py-2.5 text-sm font-bold text-white transition-opacity"
+                className="w-full rounded-lg px-4 py-2.5 text-sm font-bold text-white transition-opacity"
                 style={{ background: '#b91c1c', opacity: deleting ? 0.6 : 1, cursor: deleting ? 'not-allowed' : 'pointer' }}
               >
                 {deleting ? 'Deleting…' : 'Delete permanently'}
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );

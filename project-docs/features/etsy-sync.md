@@ -10,6 +10,82 @@
 
 ## What this is
 
+**2026-07-21 resumable queue fix:** Bounded four-image work remains claimable
+across requests after a row advances from `pending` to `draft_created`,
+`images_synced`, or `inventory_synced`; `out_of_date` updates use the same
+durable continuation contract. Normal and repair drains have separate atomic
+claim RPCs. Admin Actions exposes a counted **Repair all Etsy sync issues**
+flow that checks remote lifecycle and resumes only linked interrupted/drifted
+rows. `supabase/etsy-resumable-sync-queue-2026-07.sql` is applied and the first
+live run repaired all 36 affected listings with zero remaining/error rows.
+Successful update-mode inventory writes also persist `last_pushed_price`, so a
+completed recovery establishes both content and price baselines.
+
+**2026-07-21 reviewed category correction:** The selected-products sequential
+review form exposes Etsy's full exact-category picker and saves the established
+per-product taxonomy override, then reloads that item's preflight before submit.
+Live seller-taxonomy mappings cover Grape Shears/Serving Set (1052), Coaster
+(1060), and Matchbox Holder/Vesta Case (closest leaf 1867). Any future unknown
+custom type uses approximate generic collectible leaf 69 instead of blocking;
+the visible warning and picker let the admin correct it before posting. Existing
+Error rows from the old unmapped preflight clear on their next successful sync.
+
+**2026-07-21 review-warning fix:** Etsy upload advisories identify the photo
+rank and deduplicate repeated text within one photo. The sequential review flow
+retains a unique accumulated warning set across all bounded image requests and
+does not use display text alone as a React key, preventing identical source-size
+advisories from triggering the Next.js duplicate-key overlay.
+
+**2026-07-21 status-drift fix:** An active Etsy status check preserves local
+`out_of_date` instead of replacing it with `active`. Remote lifecycle and local
+content freshness remain independent, and the result explains that the listing
+is active while local updates still need to be synced. A successful update,
+which refreshes the content hash, remains the path that clears the flag.
+
+**2026-07-21 status-to-post route:** Each product in the selected status
+dialog's Etsy Not listed detail has **Post to Etsy**. It scopes the existing
+selected Etsy sync dialog to that product, where the admin still chooses
+immediate sync or review-first submission. Closing or completing that route
+returns to a newly reconciled combined status summary without clearing the
+original table selection.
+
+**2026-07-20 selected review-first sync:** Selected products can either use the
+existing immediate Etsy batch queue or open a sequential review flow. Each step
+loads the real Etsy preview checks and mapped fields, chooses publish versus
+update from the local listing summary, and runs the existing bounded Etsy sync
+endpoint only after the admin submits. Terminal success advances to the next
+item; the current item remains available for refresh/retry on failure, and an
+explicit skip is counted. In Sync to both, completing or skipping the Etsy set
+hands the same selection to the eBay method chooser.
+
+**2026-07-20 selected reconciliation:** The Admin Products Actions modal has a
+channel-specific **Check Etsy status** action for the selected products. It
+calls `verify-all` with an optional deduplicated `productIds` list and returns
+a final state for every selected product independently from eBay. The default
+view reduces those records to clickable Listed, Not listed, and Needs attention
+totals. A nonzero total opens only its matching products and translates Etsy
+state into Live, Draft, Not listed, Inactive, Out of date, or a check/error
+result; Back restores the totals without another request. The internal
+local-update count remains in the API contract but is not displayed. It only
+reads Etsy and reconciles local state; it does not push listing content, and a
+failed Etsy check can be retried without discarding a successful eBay result.
+The selection remains active for a follow-up sync. A live mixed-status check
+showed one Listed and one Not listed, and both drill-downs passed.
+
+**2026-07-17 progress correction:** The admin product panel converts Etsy's
+bounded four-operation image responses into cumulative progress against the
+first response's fixed total. The displayed numerator advances across requests,
+the denominator stays fixed, and partial failures count only successful work.
+
+**2026-07-16 full API audit:** All 83 linked listings were read from Etsy: 70
+active, 7 in Etsy's `edit` state, and 6 initially rate-limited listings that
+all returned active on individual retry. Inventory #83's local `out_of_date`
+state is intentional because app content changed; no unexplained drift was
+found. Existing-listing update and price-only writes now fetch remote state and
+proceed only for writable active/draft listings. Reactivation always sends the
+remote active-state request, and manual/scheduled batch summaries count returned
+sync errors as failures instead of reporting a false push.
+
 A one-way push of the Naples Estate Jewelry catalog (Supabase `products`,
 which stays the sole source of truth) to the owner's Etsy shop as a secondary,
 admin-driven sales channel. Nothing on Etsy is ever authoritative for catalog
@@ -30,9 +106,9 @@ next-app/src/lib/etsy/
   mapping.ts  PURE functions, unit-tested: Product -> Etsy payload. Title
               truncation (140 char, word boundary) + "&"-once rule (Etsy
               allows one "&" per title; the rest become "and" — live 400 fix,
-              DECISIONS.md session 9 twelfth addendum), tags (13 x 20 chars,
+              CHANGELOG.md session 9 twelfth addendum), tags (13 x 20 chars,
               WORD-BOUNDARY truncation — never chops a word mid-way, see
-              DECISIONS.md 2026-07-08 session 9 seventh addendum;
+              CHANGELOG.md 2026-07-08 session 9 seventh addendum;
               jt:/ct:/len: prefix stripping, composed buyer-searchable
               phrases, paired vintage/antique category tags — jewelry-level
               + metal-specific, always all-or-nothing per pair), materials,
@@ -42,10 +118,10 @@ next-app/src/lib/etsy/
               ETSY_KEYWORD_TAXONOMY fallback that maps granular silver
               holloware/flatware/serveware types — "Berry Spoon", "Coffee
               Pot", "Koma Clasp", … — to real Etsy leaves so they're no
-              longer stuck ineligible; DECISIONS.md session 9 eleventh
+              longer stuck ineligible; CHANGELOG.md session 9 eleventh
               addendum), pre-flight checks (incl. a non-blocking
               title↔product_type mismatch warning via titleImpliedJewelryType
-              — DECISIONS.md session 9 sixteenth addendum), content-hash. Also
+              — CHANGELOG.md session 9 sixteenth addendum), content-hash. Also
               mapProperties(): structured category properties (Material,
               Gold purity/solidity) — see "Structured category properties"
               below for what's covered and what's deliberately never
@@ -55,14 +131,14 @@ next-app/src/lib/etsy/
   images.ts   Supabase Storage / legacy /assets fetch (resolveImageUrl()
               resolves a relative path against getSiteUrl() first — Node's
               fetch() has no implicit origin like a browser does; see
-              DECISIONS.md 2026-07-08 session 9 fourth addendum) -> sharp
+              CHANGELOG.md 2026-07-08 session 9 fourth addendum) -> sharp
               WebP->JPEG transcode (quality 90, flattened to white for
               alpha, format sniffed from bytes not extension, resized
               down-only to 2400px) -> multipart upload; pure image-diff
               planning (planImageDiff) and crash-window reconciliation.
               computeUploadWarnings() checks against Etsy's own photo
               guidance (both-dimensions 2000px, first-photo 635px, 1MB file
-              size) — non-blocking, see DECISIONS.md 2026-07-08 (session 6)
+              size) — non-blocking, see CHANGELOG.md 2026-07-08 (session 6)
   sync.ts     the step machine (pending -> draft_created -> images_synced ->
               inventory_synced -> active|draft_review), Phase 2 bulk queue
               (enqueue/drain), content-hash out-of-date scan, scheduled price
@@ -156,7 +232,7 @@ verify, so a bad value fails closed into a warning. The computed length that
 will push is shown in the dry-run preview (Length row) for review before
 syncing — the old manual "Test Length" button was removed (session 9, ninth
 addendum) as redundant once length auto-syncs. Full story:
-`project-docs/DECISIONS.md` 2026-07-08 (sessions 7-9).
+`project-docs/CHANGELOG.md` 2026-07-08 (sessions 7-9).
 
 ### Ring size (`ring-size-experiment.ts`, session 9)
 
@@ -191,9 +267,9 @@ runs on every Ring sync with no env var needed. Set `ETSY_SYNC_RING_SIZE=false`
 to disable it. `buildRingSizePayload` only ever uses a real matched chart
 value (never a guess/placeholder), and every write is read back and verified,
 so a bad size fails closed into a warning. Full detail:
-`project-docs/DECISIONS.md` 2026-07-08 (session 9, addendum + eighth addendum).
+`project-docs/CHANGELOG.md` 2026-07-08 (session 9, addendum + eighth addendum).
 
-## Database (`supabase/etsy-sync.sql` — written, NOT yet applied)
+## Database (`supabase/etsy-sync.sql` - applied)
 
 Five additive tables, RLS-enabled with **no** anon/authenticated policies
 (service-role only, same trust model as `webhook_events`):
@@ -212,14 +288,15 @@ Five additive tables, RLS-enabled with **no** anon/authenticated policies
   `bytes_sha256`.
 - `etsy_sync_log` — audit/dead-letter: action, outcome, redacted message/detail.
 - `claim_next_pending_etsy_listing()` — a `FOR UPDATE SKIP LOCKED` RPC so two
-  concurrent "Sync all" drains can never grab the same product. Claims
-  `sync_state='pending'` only. NOTE: a re-enqueued item that already exists on
-  Etsy lands in `'pending'` WITH a listing_id; `runSyncStep` detects this
-  (`effectiveMode='update'`) and runs the update path so it advances to a
-  terminal state instead of being re-claimed forever — plus a `drainQueueCore`
-  seen-guard + client stall guard bound any future non-advancing item. See
-  DECISIONS.md 2026-07-08 (session 9, seventeenth addendum) — the bulk-sync
-  runaway fix.
+  concurrent normal drains cannot grab the same product. It claims `pending`,
+  `draft_created`, `images_synced`, `inventory_synced`, and `out_of_date`, so
+  bounded work stays queued until terminal completion.
+- `claim_next_repairable_etsy_listing()` — the same atomic contract restricted
+  to linked `draft_created`, `images_synced`, `inventory_synced`, and
+  `out_of_date` rows. It powers the explicit global repair without creating
+  unrelated new Etsy drafts.
+- `supabase/etsy-resumable-sync-queue-2026-07.sql` idempotently installs both
+  claim functions and their service-role-only grants.
 
 ## API routes (`/api/admin/etsy/*`, admin-gated, service-role client)
 
@@ -233,14 +310,15 @@ Five additive tables, RLS-enabled with **no** anon/authenticated policies
 | `shop-profiles` | GET | Proxy-read shipping profiles/return policies/readiness states |
 | `preview` | POST | Dry-run: pre-flight + mapped payload, zero Etsy calls |
 | `sync` | POST | One bounded step-machine invocation (`publish`\|`update`\|`price-only`) |
-| `sync-batch` | POST | Phase 2: `enqueue` \| `enqueue-all-eligible` \| `drain` |
+| `sync-batch` | POST | Phase 2: `enqueue` \| `enqueue-all-eligible` \| `drain` \| `drain-repair` |
 | `delist` | POST | Deactivate or reactivate a linked listing |
 | `listings` | GET | Bulk `product_id -> sync_state` map (product table chip) |
 | `eligibility-summary` | GET | Bulk pre-flight counts for the "Sync All" confirm screen |
+| `repair-summary` | GET | Read-only drift scan and count of linked interrupted/out-of-date listings |
 | `verify-listing` | POST | Reconcile ONE listing's local state with Etsy's real state (read-only; clears a stale error, resets a 404 to not-listed) |
-| `verify-all` | POST | Bulk reconcile ALL linked listings (`checkAllListingStatuses`) — the "Check Etsy statuses" button; read-only, no content re-push. See DECISIONS.md session 9 nineteenth addendum |
+| `verify-all` | POST | Reconcile all linked listings or only optional validated `productIds` (`checkAllListingStatuses`); read-only, no content re-push |
 | `price-push` | POST | Phase 2 scheduled price push — secret-header-guarded, not admin-session-gated |
-| `push-prices` | POST | Manual "Push prices now" — one bounded batch of the price-only push across live listings whose price drifted (ignores the daily threshold); client polls until done. See DECISIONS.md session 9 thirteenth addendum |
+| `push-prices` | POST | Manual "Push prices now" — one bounded batch of the price-only push across live listings whose price drifted (ignores the daily threshold); client polls until done. See CHANGELOG.md session 9 thirteenth addendum |
 
 `/api/webhooks/etsy` (Phase 3, order ingest) is **not built** — the plan
 documents `webhook_events` reuse for it but explicitly scopes it out of this
@@ -267,6 +345,14 @@ build.
   closes and after any per-item drawer action (`onSynced` prop on
   `EtsyProductPanel`) so chips don't go stale after a sync (session 9,
   twentieth addendum).
+- **Product Admin selected Actions** — **Check Etsy** reconciles only the
+  selected linked listings, reports checked/updated/reset/error/skipped totals,
+  refreshes Etsy chips on close, and keeps the selection for a follow-up sync.
+- **Product Admin Actions** — **Repair all Etsy sync issues** is global and
+  remains available without a table selection. Its confirmation counts linked
+  repairable rows; the bounded drain checks Etsy state first, keeps live rows
+  live and drafts as drafts, skips unavailable listings, and supports
+  stop-after-current without abandoning partial image work.
 - **Product edit drawer → Etsy section** (`EtsyProductPanel.tsx`): dry-run
   preview (pre-flight checklist + mapped title/price/tags/materials/
   when_made/category/photo count, plus the computed Length or Ring size that
@@ -291,7 +377,9 @@ Pre-flight (no Etsy calls) → create draft → upload images (checkpointed,
 ~4/invocation to stay inside a Netlify function's time budget) → set
 inventory (price/qty) → activate or hold as `draft_review` (Q1 default:
 draft-for-review, no auto-activate). Every step reads its DB checkpoint
-first and is safe to repeat. **SKU is deliberately never pushed to Etsy**
+first and is safe to repeat. All nonterminal publish/update states remain in
+the atomic queue until `done:true`, even when a four-image request returns
+partial progress. **SKU is deliberately never pushed to Etsy**
 (removed 2026-07-08, session 9, fifth addendum — Etsy's 32-char cap
 rejected this catalog's longer slugs, and the owner has no use for it on
 Etsy's side); this also means the SKU-adoption crash-recovery guard that
@@ -324,7 +412,7 @@ price push gated by a ≥1%-of-last-pushed-price threshold (Q4).
 
 ## Build-time resolutions and known gaps
 
-See `project-docs/DECISIONS.md` (2026-07-08, "Etsy sync build-time
+See `project-docs/CHANGELOG.md` (2026-07-08, "Etsy sync build-time
 resolutions" and "even later — two real auth bugs found and fixed") for the
 full list and reasoning. Headline items:
 
@@ -336,9 +424,9 @@ full list and reasoning. Headline items:
   alone — the plan and the first build pass got this wrong, and it broke
   every single API call with `"Shared secret is required in x-api-key
   header"`), and the API host is `openapi.etsy.com`, not `api.etsy.com`.
-  **`ETSY_SHARED_SECRET` is now required from day one**, not Phase-3-only.
-  Fixed in `next-app/src/lib/etsy/client.ts`/`auth.ts`. **Not yet re-verified
-  live** with the corrected format.
+  **`ETSY_SHARED_SECRET` is required from day one**, not Phase-3-only.
+  Fixed in `next-app/src/lib/etsy/client.ts`/`auth.ts` and subsequently
+  confirmed through the live Phase 1/2 flow.
 - **Taxonomy leaf IDs are now pinned** (2026-07-08, real
   `getSellerTaxonomyNodes` call — the fix above, confirmed live). 6 of 12
   product types are exact category matches; 6 are marked
@@ -363,7 +451,7 @@ full list and reasoning. Headline items:
 original remaining checklist is now confirmed working in production,
 including the previously-open token refresh, scheduled price push,
 delist/relist, resume-after-interrupt, and multi-product dry-run. See
-`project-docs/CURRENT_STATUS.md` / `DECISIONS.md` sessions 3-12 for the full
+`project-docs/CHANGELOG.md` entries dated 2026-07-08 through 2026-07-10 for the full
 incident-by-incident history (bracelet length "Gray" bug + fix, image
 pipeline hardening, necklace sync + Necklace→Chains mapping, ring size, the
 22-ineligible-silver-items taxonomy fallback, bulk-sync runaway +
@@ -377,7 +465,7 @@ a first real draft synced end-to-end (bracelet
 `heavy-italian-14k-yellow-gold-cuban-link-bracelet-53-91g-21`, now
 `draft_review` on Etsy) after fixing two real bugs found only by driving a
 live sync (missing `readiness_state_id`, a retry-from-error state-machine
-gap — see DECISIONS.md "session 2"). `npx tsc --noEmit`, `npm run lint`
+gap — see CHANGELOG.md "session 2"). `npx tsc --noEmit`, `npm run lint`
 (0 problems), `npm run build` all pass. **69 unit tests pass** (`npm run
 test`) covering mapping rules (title/tags/materials/properties/when_made/
 price/allowlist), image transcode, image-diff planning, price-push
@@ -385,6 +473,7 @@ threshold logic, and the bulk-drain orchestration loop. (Test count grew
 through session 11 as new mapping/tag/reconciliation logic landed — see
 `CHANGELOG.md` for the running total.)
 
-**Owner/developer next steps:** none outstanding from the original
-verification checklist. Ongoing use is normal admin operation (the Etsy
-drawer per product; "Sync All to Etsy" for bulk).
+**Owner/developer next steps:** the original live checklist is complete.
+Ongoing work is normal admin operation plus observing the fixed cumulative
+image counter during the next deliberate image upload. Use the Etsy drawer or
+the channel-specific Actions-modal controls for selected/bulk work.

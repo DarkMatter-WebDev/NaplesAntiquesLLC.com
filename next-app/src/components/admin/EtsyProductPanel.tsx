@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { cumulativeImageProgress } from '@/lib/etsy/progress';
 import ComboboxInput from './ComboboxInput';
 
 interface PreflightCheck {
@@ -166,6 +167,7 @@ export default function EtsyProductPanel({
   const runSyncLoop = async (mode: 'publish' | 'update') => {
     setSyncing(true);
     setProgress(null);
+    let imageProgressTotal: number | null = null;
     // Stall detection: if the exact same progress comes back repeatedly,
     // stop instead of polling forever. Confirmed live 2026-07-08 (session
     // 9): a persistently-failing image caused 100+ identical polls against
@@ -189,7 +191,12 @@ export default function EtsyProductPanel({
           break;
         }
         if (!data.done) {
-          setProgress(data.progress ?? null);
+          let displayProgress = data.progress ?? null;
+          if (displayProgress?.step === 'images' && displayProgress.total != null) {
+            imageProgressTotal ??= displayProgress.total;
+            displayProgress = cumulativeImageProgress(displayProgress, imageProgressTotal);
+          }
+          setProgress(displayProgress);
           if (data.warnings?.length) showNotice(data.warnings.join(' '), false);
           const signature = JSON.stringify(data.progress);
           if (signature === lastProgressSignature) {

@@ -20,7 +20,7 @@
 | **Client / business** | Naples Estate Jewelry (legal entity: Naples Antiques LLC) |
 | **Primary contact** | Chris — (239) 404-8505 |
 | **Primary domain** | `naplesestatejewelry.co` |
-| **Related domains** | `naplesjewelrybuyers.com`, `naplesestatejewelry.com` |
+| **Related domains** | `naplesjewelrybuyers.com` (live, separate site). `naplesestatejewelry.com` is NOT owned — parked/for sale on GoDaddy, confirmed 2026-07-11 |
 | **Hosting** | Netlify (Next.js via `@netlify/plugin-nextjs`) — site name/ID: _TBD_ |
 | **GitHub repo** | `https://github.com/DarkMatter-WebDev/NaplesAntiquesLLC.com` (owner: DarkMatter-WebDev) |
 | **Netlify site** | _TBD — confirm Netlify team + site slug_ |
@@ -44,6 +44,7 @@
 | **Supabase** | Auth, Postgres data, products, inquiries, saved state, and Storage bucket `product-images` (project ref `evzluixourmsefwdsieu`) | _TBD_ | public anon key in `NEXT_PUBLIC_SUPABASE_ANON_KEY`; **service-role key** (if any) -> store reference only, never in repo |
 | **gold-api.com** | Live gold spot price (XAU) | _TBD (public endpoint, no key currently)_ | n/a |
 | **Resend** | Inquiry email from the Next app when configured | _TBD_ | `RESEND_API_KEY` in local/Netlify env only |
+| **Cloudflare Stream** | Direct resumable product-video upload, processing, playback, and MP4 generation | _TBD_ | account id/customer code plus API token/webhook secret in Netlify env only; never store values here |
 | **Domain registrar** | DNS for the domains above | _TBD_ | _TBD_ |
 
 ### Credential locations (references only)
@@ -53,6 +54,10 @@
 - Resend login/API owner: _TBD_
 - Domain registrar login: _TBD_
 - `.env` / `.env.local` are gitignored and must never be committed.
+- Cloudflare Stream credentials: Netlify environment variables
+  `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_STREAM_API_TOKEN`,
+  `CLOUDFLARE_STREAM_CUSTOMER_CODE`, and
+  `CLOUDFLARE_STREAM_WEBHOOK_SECRET` (values intentionally not documented).
 
 ### Outstanding requests
 
@@ -63,8 +68,9 @@
 ### Notes
 
 - Site built and maintained by Dark Matter Web Services.
-- Local dev on Windows / PowerShell. The parent folder has no `.git`; `next-app`
-  currently has its own `.git` directory.
+- Local dev runs on Windows / PowerShell. This source-of-truth folder has no git
+  workflow even if incidental metadata is present; the owner handles version
+  control manually in a separate folder.
 
 ---
 

@@ -107,13 +107,21 @@ export async function sendOrderInvoiceEmail(opts: {
   try {
     const { Resend } = await import('resend');
     const resend = new Resend(resendKey);
-    await resend.emails.send({
-      from: 'Naples Estate Jewelry <noreply@naplesestatejewelry.co>',
-      to: recipient,
-      subject: content.subject,
-      html: content.html,
-      text: content.text,
-    });
+    const result = await resend.emails.send(
+      {
+        from: 'Naples Estate Jewelry <noreply@naplesestatejewelry.co>',
+        to: recipient,
+        subject: content.subject,
+        html: content.html,
+        text: content.text,
+      },
+      opts.sentBy?.id === null
+        ? { idempotencyKey: `order-${orderId}-automatic-receipt` }
+        : undefined,
+    );
+    if (result.error || !result.data?.id) {
+      throw new Error(result.error?.message ?? 'Resend did not return an accepted email ID.');
+    }
   } catch (error) {
     console.error('Invoice/receipt email error:', error);
     return { ok: false, status: 500, error: `Could not send the ${emailType} email.` };

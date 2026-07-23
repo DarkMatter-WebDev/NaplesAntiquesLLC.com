@@ -27,7 +27,9 @@ create table if not exists public.products (
   jewelry_type         text        not null default 'Necklace',
   chain_type           text,
   length               text,
+  width_mm              numeric(8,2),
   pricing_multiplier   numeric(5,3),
+  sold_price           numeric(12,2),
   status               text        not null default 'available',
   location             text        not null default 'showcase',
   images               jsonb       not null default '[]',
@@ -83,6 +85,7 @@ alter table public.products
   add column if not exists jewelry_type text not null default 'Necklace',
   add column if not exists chain_type text,
   add column if not exists length text,
+  add column if not exists width_mm numeric(8,2),
   add column if not exists image_urls jsonb not null default '[]'::jsonb,
   add column if not exists image_padding text not null default 'none',
   add column if not exists image_padding_by_image jsonb not null default '{}'::jsonb,
@@ -103,11 +106,20 @@ alter table public.products
   add column if not exists special_price_override_amount numeric(12,2),
   add column if not exists special_price_override_mode text not null default 'amount',
   add column if not exists special_price_override_percent numeric(6,2),
+  add column if not exists sold_price numeric(12,2),
   add column if not exists quantity integer not null default 1;
+
+alter table public.products drop constraint if exists products_sold_price_check;
+alter table public.products add constraint products_sold_price_check
+      check (sold_price is null or sold_price >= 0) not valid;
 
 alter table public.products drop constraint if exists products_quantity_check;
 alter table public.products add constraint products_quantity_check
       check (quantity >= 0) not valid;
+
+alter table public.products drop constraint if exists products_width_mm_check;
+alter table public.products add constraint products_width_mm_check
+      check (width_mm is null or (width_mm > 0 and width_mm <= 1000)) not valid;
 
 alter table public.products drop constraint if exists products_special_price_override_mode_check;
 alter table public.products add constraint products_special_price_override_mode_check
@@ -231,12 +243,29 @@ create policy "Admins can delete products"
 
 -- ── 5. Table grants ──────────────────────────────────────────────────────────
 
--- Anonymous visitors need SELECT for the public shop page.
-grant select on public.products to anon;
+-- Public catalogue roles can read only customer-facing columns. Admin catalogue
+-- reads use the server-side service client; authenticated browser sessions must
+-- never expose acquisition cost, minimum price, or internal notes.
+revoke select on public.products from anon, authenticated;
 
--- Authenticated users (including admins) need full access.
--- Row-level policies above restrict actual write access to admins only.
-grant select, insert, update, delete on public.products to authenticated;
+do $$
+declare public_columns text;
+begin
+  select string_agg(quote_ident(column_name), ', ')
+    into public_columns
+    from information_schema.columns
+   where table_schema = 'public'
+     and table_name = 'products'
+     and column_name not in (
+       'cost_basis', 'minimum_price', 'acquisition_date', 'acquisition_source',
+       'internal_notes', 'private_price_label', 'live_spot_snapshot'
+     );
+
+  execute format('grant select (%s) on public.products to anon, authenticated', public_columns);
+end $$;
+
+-- RLS still limits these writes to admins.
+grant insert, update, delete on public.products to authenticated;
 
 -- ── 6. Storage bucket: product-images ───────────────────────────────────────
 -- Create this once via the Supabase dashboard (Storage → New bucket):

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
 import { getSiteUrl } from '@/lib/order-email-branding';
-import { computeUploadWarnings, planImageDiff, resolveImageUrl, sha256Hex, transcodeToJpeg } from '../images';
+import { computeUploadWarnings, formatUploadWarnings, planImageDiff, resolveImageUrl, sha256Hex, transcodeToJpeg } from '../images';
 import type { EtsyListingImageRow } from '../store';
 
 /**
@@ -124,6 +124,17 @@ describe('computeUploadWarnings', () => {
   it('flags nothing for a well-sized, small-file photo', () => {
     const warnings = computeUploadWarnings({ rank: 1, width: 2000, height: 2000, byteLength: 400_000 });
     expect(warnings).toEqual([]);
+  });
+});
+
+describe('formatUploadWarnings', () => {
+  it('labels warnings by photo rank and removes exact duplicates', () => {
+    expect(formatUploadWarnings(3, ['Small source.', 'Small source.', 'Large upload.']))
+      .toBe('Photo 3: Small source. Large upload.');
+  });
+
+  it('returns undefined when there is nothing to report', () => {
+    expect(formatUploadWarnings(1, [undefined])).toBeUndefined();
   });
 });
 

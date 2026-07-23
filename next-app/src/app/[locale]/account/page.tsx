@@ -6,10 +6,12 @@ import AccountDashboard from '@/components/account/AccountDashboard';
 import { type CustomerProfile } from '@/components/account/AccountProfileForm';
 import SiteFooter from '@/components/layout/SiteFooter';
 import type { Order, OrderItem } from '@/types/sales';
+import { getAccountMetadata } from '@/lib/account-metadata';
 
-export const metadata: Metadata = {
-  title: 'My Account',
-};
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  return getAccountMetadata('account', locale);
+}
 
 const CUSTOMER_PROFILE_COLUMNS = [
   'first_name',

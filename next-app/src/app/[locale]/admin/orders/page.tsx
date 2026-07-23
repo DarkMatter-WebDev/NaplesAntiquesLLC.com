@@ -1,11 +1,10 @@
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
+import { getVerifiedUser } from '@/lib/auth-claims';
 import OrdersPanel from '@/components/admin/OrdersPanel';
 import AdminHeader from '@/components/admin/AdminHeader';
 import type { Order } from '@/types/sales';
-import type { Product } from '@/types/product';
-import { fetchSpotData } from '@/lib/spot-price';
 
 export const metadata: Metadata = { title: 'Admin - Orders' };
 
@@ -42,32 +41,6 @@ const ORDER_LIST_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT = ORDER_LIST_COLUMNS
 const ORDER_LIST_COLUMNS_WITHOUT_DELETED_AT = ORDER_LIST_COLUMNS.replace('deleted_at, ', '');
 const ORDER_LIST_COLUMNS_WITHOUT_BOTH = ORDER_LIST_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT.replace('deleted_at, ', '');
 
-const ORDER_PRODUCT_COLUMNS = [
-  'id',
-  'category',
-  'metal_type',
-  'metal_variant',
-  'title',
-  'title_es',
-  'item_year',
-  'price_mode',
-  'purity',
-  'weight_grams',
-  'inventory_number',
-  'sku',
-  'gram_weight',
-  'pricing_multiplier',
-  'status',
-  'images',
-  'image_urls',
-  'manual_price_label',
-  'asking_price',
-].join(', ');
-const ORDER_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR = ORDER_PRODUCT_COLUMNS
-  .split(', ')
-  .filter((column) => column !== 'item_year')
-  .join(', ');
-
 function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
   return Boolean(error?.message?.toLowerCase().includes('item_year'))
     || Boolean(error?.message?.toLowerCase().includes('quantity'));
@@ -90,7 +63,7 @@ export default async function AdminOrdersPage({ params, searchParams }: Props) {
   const adminBasePath = isEs ? '/es/admin' : '/admin';
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getVerifiedUser(supabase);
 
   if (!user) {
     redirect(isEs ? '/es/account/sign-in' : '/account/sign-in');
@@ -114,21 +87,19 @@ export default async function AdminOrdersPage({ params, searchParams }: Props) {
     ? ordersQuery.not('deleted_at', 'is', null)
     : ordersQuery.is('deleted_at', null);
 
-  const [ordersResult, productsResult, spotData, { count: unreadMessagesCount }] = await Promise.all([
+  const [ordersResult, { count: unreadMessagesCount }, trashCountResult] = await Promise.all([
     filteredOrdersQuery,
-    supabase
-      .from('products')
-      .select(ORDER_PRODUCT_COLUMNS)
-      .order('sort_order', { ascending: true }),
-    fetchSpotData(),
     supabase
       .from('admin_notifications')
       .select('id', { count: 'exact', head: true })
       .eq('is_read', false),
+    supabase
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .not('deleted_at', 'is', null),
   ]);
   let orders = ordersResult.data;
   let recycleBinSupported = !ordersResult.error;
-  let products: unknown[] | null = productsResult.data as unknown[] | null;
   if (ordersResult.error) {
     recycleBinSupported = !isMissingDeletedAtColumnError(ordersResult.error);
     if (isMissingItemYearColumnError(ordersResult.error) && recycleBinSupported) {
@@ -154,21 +125,7 @@ export default async function AdminOrdersPage({ params, searchParams }: Props) {
       }
     }
   }
-  if (isMissingItemYearColumnError(productsResult.error)) {
-    const fallback = await supabase
-      .from('products')
-      .select(ORDER_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR)
-      .order('sort_order', { ascending: true });
-    products = (fallback.data as unknown[] | null)?.map((product) => ({ ...(product as Record<string, unknown>), item_year: null })) ?? null;
-  }
-  let trashCount = 0;
-  if (recycleBinSupported) {
-    const { count } = await supabase
-      .from('orders')
-      .select('id', { count: 'exact', head: true })
-      .not('deleted_at', 'is', null);
-    trashCount = count ?? 0;
-  }
+  const trashCount = recycleBinSupported ? trashCountResult.count ?? 0 : 0;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-background, #fafaf8)' }}>
@@ -181,8 +138,8 @@ export default async function AdminOrdersPage({ params, searchParams }: Props) {
 
       <OrdersPanel
         initialOrders={(orders ?? []) as unknown as Order[]}
-        products={(products ?? []) as unknown as Product[]}
-        spotData={spotData}
+        products={[]}
+        spotData={null}
         locale={locale}
         view={isTrash ? 'trash' : 'active'}
         trashCount={trashCount}

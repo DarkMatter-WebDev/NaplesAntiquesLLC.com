@@ -3,6 +3,39 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
+const INVOICE_PRINT_SCALE = 0.98;
+const PRINT_ASSET_TIMEOUT_MS = 8_000;
+
+async function waitForPrintImages(printWindow: Window) {
+  const images = Array.from(printWindow.document.images);
+  if (images.length === 0) return;
+
+  const imageReady = (image: HTMLImageElement) =>
+    new Promise<void>((resolve) => {
+      if (image.complete) {
+        resolve();
+        return;
+      }
+
+      const finish = () => resolve();
+      image.addEventListener('load', finish, { once: true });
+      image.addEventListener('error', finish, { once: true });
+    }).then(async () => {
+      if (image.naturalWidth > 0 && typeof image.decode === 'function') {
+        await image.decode().catch(() => undefined);
+      }
+    });
+
+  await Promise.race([
+    Promise.all(images.map(imageReady)),
+    new Promise<void>((resolve) => printWindow.setTimeout(resolve, PRINT_ASSET_TIMEOUT_MS)),
+  ]);
+}
+
+function waitForPrintLayout(printWindow: Window) {
+  return new Promise<void>((resolve) => printWindow.setTimeout(resolve, 50));
+}
+
 export default function PrintInvoiceClient({
   invoiceHtml,
   invoiceNumber,
@@ -118,17 +151,20 @@ export default function PrintInvoiceClient({
             <span style={{ fontSize: '0.82rem', color: '#c8b264', fontWeight: 700 }}>Print Preview — {invoiceNumber}</span>
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 const win = window.open('', '_blank');
                 if (!win) return;
                 win.document.write(
                   '<!DOCTYPE html><html><head><meta charset="utf-8">' +
                   `<title>${invoiceNumber}</title>` +
-                  '<style>*{box-sizing:border-box;}body{margin:0;padding:0;}@page{size:letter;margin:0.5in;}</style>' +
+                  `<style>*{box-sizing:border-box;}body{margin:0;padding:0;zoom:${INVOICE_PRINT_SCALE};}@page{size:letter;margin:0.5in;}</style>` +
                   `</head><body>${invoiceHtml}</body></html>`,
                 );
                 win.document.close();
                 win.onafterprint = () => win.close();
+                await waitForPrintImages(win);
+                await waitForPrintLayout(win);
+                win.focus();
                 win.print();
               }}
               style={{
@@ -163,7 +199,7 @@ export default function PrintInvoiceClient({
       <style>{`
         @media print {
           .no-print { display: none !important; }
-          body { margin: 0; padding: 0; }
+          body { margin: 0; padding: 0; zoom: ${INVOICE_PRINT_SCALE}; }
         }
       `}</style>
     </>

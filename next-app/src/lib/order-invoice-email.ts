@@ -46,9 +46,9 @@ export function withInvoiceLineDiscounts(order: InvoiceEmailOrder, itemDiscounts
   const editedLineDiscount = editedItems.reduce((sum, item) => sum + clampDiscount(Number(item.discount ?? 0), lineSubtotalOf(item)), 0);
   const orderLevelDiscount = Math.max(order.discount - persistedLineDiscount, 0);
   const discount = orderLevelDiscount + editedLineDiscount;
-  const taxableBeforeDiscount = Math.max(order.subtotal - order.discount, 0);
+  const taxableBeforeDiscount = Math.max(order.subtotal - order.discount, 0) + order.shipping_fee;
   const taxRate = taxableBeforeDiscount > 0 ? order.tax / taxableBeforeDiscount : 0;
-  const tax = Math.max(order.subtotal - discount, 0) * taxRate;
+  const tax = (Math.max(order.subtotal - discount, 0) + order.shipping_fee) * taxRate;
   const total = Math.max(order.subtotal - discount, 0) + tax + order.shipping_fee;
 
   return {

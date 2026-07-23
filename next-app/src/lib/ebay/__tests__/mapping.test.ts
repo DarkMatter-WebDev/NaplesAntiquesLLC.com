@@ -422,6 +422,14 @@ describe('computeEbayPrice', () => {
     expect(result.price).toBe(result.basePrice);
   });
 
+  it('uses a sold product price lock instead of the latest metal price', () => {
+    const product = makeProduct({ status: 'sold', sold_price: 800, price_mode: 'spot-multiplier' });
+    const spotData: SpotData = { goldPerTroyOz: 9_999, silverPerTroyOz: null, fetchedAt: Date.now(), source: 'api' };
+    const result = computeEbayPrice(product, spotData, 15);
+    expect(result.basePrice).toBe(800);
+    expect(result.price).toBe(920);
+  });
+
   it('has no platform price floor (unlike Etsy) — a low price still computes', () => {
     const product = makeProduct({ price_mode: 'manual', manual_price_label: '$0.10' });
     const result = computeEbayPrice(product, null, 0);

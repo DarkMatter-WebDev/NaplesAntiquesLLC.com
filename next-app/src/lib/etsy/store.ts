@@ -42,6 +42,21 @@ export type EtsySyncState =
   | 'delisted'
   | 'error';
 
+export const ETSY_RESUMABLE_SYNC_STATES: EtsySyncState[] = [
+  'pending',
+  'draft_created',
+  'images_synced',
+  'inventory_synced',
+  'out_of_date',
+];
+
+export const ETSY_REPAIRABLE_SYNC_STATES: EtsySyncState[] = [
+  'draft_created',
+  'images_synced',
+  'inventory_synced',
+  'out_of_date',
+];
+
 export type EtsyListingState = 'draft' | 'active' | 'inactive' | 'ended' | null;
 
 export interface EtsyListingRow {
@@ -238,7 +253,7 @@ export async function pruneOldSyncLogs(service: SupabaseClient): Promise<void> {
   await service.from('etsy_sync_log').delete().lt('created_at', cutoff);
 }
 
-/** Atomically claims one 'pending' row via the SQL-level FOR UPDATE SKIP LOCKED RPC (see supabase/etsy-sync.sql). */
+/** Atomically claims one resumable row via the SQL-level FOR UPDATE SKIP LOCKED RPC (see supabase/etsy-sync.sql). */
 export async function claimNextPendingListing(service: SupabaseClient): Promise<string | null> {
   const { data, error } = await service.rpc('claim_next_pending_etsy_listing');
   if (error) {
@@ -249,8 +264,62 @@ export async function claimNextPendingListing(service: SupabaseClient): Promise<
 }
 
 export async function countPendingListings(service: SupabaseClient): Promise<number> {
-  const { count, error } = await service.from('etsy_listings').select('product_id', { count: 'exact', head: true }).eq('sync_state', 'pending');
+  const { count, error } = await service
+    .from('etsy_listings')
+    .select('product_id', { count: 'exact', head: true })
+    .in('sync_state', ETSY_RESUMABLE_SYNC_STATES);
   if (error) return 0;
+  return count ?? 0;
+}
+
+export async function claimNextRepairableListing(service: SupabaseClient): Promise<string | null> {
+  const { data, error } = await service.rpc('claim_next_repairable_etsy_listing');
+  if (error) {
+    if (isMissingSchemaError(error)) throw new EtsyNotMigratedError();
+    throw new Error(error.message);
+  }
+  return (data as string | null) ?? null;
+}
+
+export async function countRepairableListings(service: SupabaseClient): Promise<number> {
+  const { count, error } = await service
+    .from('etsy_listings')
+    .select('product_id', { count: 'exact', head: true })
+    .not('etsy_listing_id', 'is', null)
+    .in('sync_state', ETSY_REPAIRABLE_SYNC_STATES);
+  if (error) return 0;
+  return count ?? 0;
+}
+
+// Bulk-publish queue: completed drafts that were intentionally held for owner
+// review. Selecting the oldest row is sufficient because a successful publish
+// moves it to active and a contained item error moves it to error.
+export async function claimNextDraftReviewListing(service: SupabaseClient): Promise<string | null> {
+  const { data, error } = await service
+    .from('etsy_listings')
+    .select('product_id')
+    .eq('sync_state', 'draft_review')
+    .eq('listing_state', 'draft')
+    .order('updated_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    if (isMissingSchemaError(error)) return null;
+    throw new Error(error.message);
+  }
+  return (data as { product_id: string } | null)?.product_id ?? null;
+}
+
+export async function countDraftReviewListings(service: SupabaseClient): Promise<number> {
+  const { count, error } = await service
+    .from('etsy_listings')
+    .select('product_id', { count: 'exact', head: true })
+    .eq('sync_state', 'draft_review')
+    .eq('listing_state', 'draft');
+  if (error) {
+    if (isMissingSchemaError(error)) return 0;
+    throw new Error(error.message);
+  }
   return count ?? 0;
 }
 

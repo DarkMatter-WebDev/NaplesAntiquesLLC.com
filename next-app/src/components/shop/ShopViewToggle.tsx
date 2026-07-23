@@ -9,14 +9,14 @@ interface Props {
 }
 
 export default function ShopViewToggle({ locale, currentView }: Props) {
-  const { push } = useShopNavigation();
+  const { getSearchParams, push } = useShopNavigation();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isEs = locale === 'es';
 
   function setView(value: 'gallery' | 'list') {
     if (value === currentView) return;
-    const params = new URLSearchParams(searchParams.toString());
+    const params = getSearchParams(searchParams.toString());
     if (value === 'list') {
       params.set('view', 'list');
     } else {
@@ -31,6 +31,7 @@ export default function ShopViewToggle({ locale, currentView }: Props) {
       <button
         type="button"
         onClick={() => setView('gallery')}
+        disabled={currentView === 'gallery'}
         data-active={currentView === 'gallery' || undefined}
         aria-pressed={currentView === 'gallery'}
         aria-label={isEs ? 'Vista de galería' : 'Gallery view'}
@@ -41,6 +42,7 @@ export default function ShopViewToggle({ locale, currentView }: Props) {
       <button
         type="button"
         onClick={() => setView('list')}
+        disabled={currentView === 'list'}
         data-active={currentView === 'list' || undefined}
         aria-pressed={currentView === 'list'}
         aria-label={isEs ? 'Vista de lista' : 'List view'}
@@ -75,6 +77,9 @@ export default function ShopViewToggle({ locale, currentView }: Props) {
         .shop-view-toggle button:hover {
           color: var(--color-primary);
           background: rgba(212, 175, 55, 0.12);
+        }
+        .shop-view-toggle button:disabled {
+          cursor: default;
         }
         .shop-view-toggle button:active {
           transform: scale(0.86);

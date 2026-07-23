@@ -1,7 +1,7 @@
 # Feature: Shop Listings - Product Runbook
 
 > How to add, edit, audit, and retire listings in the current Next.js/Supabase
-> shop. Last updated: **2026-06-20**.
+> shop. Last updated: **2026-07-22**.
 
 ## Source Of Truth
 
@@ -30,8 +30,12 @@ Keep these fields especially consistent:
 - `product_type` / `jewelry_type`: broad item form. Admin supports curated
   options plus concise custom product type strings.
 - `chain_type`: link type, scoped to necklace/bracelet products.
-- `length`: bare numeric/string measurement; buyer-facing code adds units when
-  appropriate.
+- `length`: bare canonical numeric/string measurement; Add/Edit and AI inputs
+  accept plain or inch-suffixed forms (`24`, `24 in`, `24 inches`, `24"`) and
+  normalize them before storage. Buyer-facing code adds units when appropriate.
+- `width_mm`: optional physical width across a necklace chain or bracelet
+  chain/band, stored as a positive millimeter value. It is null for other
+  product types or when unknown.
 - `category`: legacy pricing category (`Gold`/`Silver`).
 - `metal_type`: broader metal family.
 - `metal_variant`: merchandising color/subtype such as yellow gold, white gold,
@@ -42,8 +46,9 @@ Keep these fields especially consistent:
 
 1. Open `/admin` as an admin user.
 2. Choose Add Product.
-3. Fill title, metal/pricing fields, product type, brand, size/length, notes,
-   status, and Spanish copy when available.
+3. Fill title, metal/pricing fields, product type, brand, size/length, optional
+   necklace/bracelet width in millimeters, notes, status, and Spanish copy when
+   available.
 4. Upload photos in the drawer. New files are compressed to WebP and uploaded to
    Supabase Storage.
 5. Put the intended cover photo first. Drag/reorder images in the drawer if
@@ -53,8 +58,13 @@ Keep these fields especially consistent:
 7. Use image padding controls for product-card/detail frame color when a photo
    needs a white/black/custom-color background.
 8. Save. The normal save path writes metadata and image URL/path strings to
-   Supabase.
+   Supabase. Length/size is normalized again at this boundary before both the
+   `length` column and legacy `len:` tag are written.
 9. Verify the product on `/shop` and `/shop/[id]`.
+
+The Smart Listing Assistant uses the same length normalizer. Its non-overridable
+field contract accepts plain or inch-suffixed transcript evidence but requires
+one bare numeric output, including when an admin has saved a custom AI prompt.
 
 ## Edit A Listing
 
@@ -67,12 +77,17 @@ Keep these fields especially consistent:
 - Run the relevant SQL migrations before relying on newer fields such as
   product type, brand, metal variants, per-photo padding, and unique inventory
   numbers in production.
+- `supabase/product-width-mm-2026-07.sql` was applied and verified on
+  2026-07-22. The admin still refuses to silently discard a non-null width if a
+  different environment is missing the column.
 
 ## Retire Or Mark Sold
 
 - Use `sold` for sold inventory.
 - Use `archived` for internal records that should not appear publicly.
-- Use `pending_payment` when checkout/order flow is holding inventory.
+- Use `pending_payment` only for an admin/manual unpaid-order workflow that
+  deliberately holds inventory. Public PayPal checkout has no reservation; the
+  first successful capture moves the product directly from Available to Sold.
 - Avoid hard delete if the product has order, invoice, saved-item, or inquiry
   history.
 

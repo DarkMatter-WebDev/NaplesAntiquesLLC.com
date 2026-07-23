@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { fetchSpotData } from '@/lib/spot-price';
 import type { Product } from '@/types/product';
 import { normalizeProductQuantity, normalizeProductStatus } from '@/types/product';
-import { EbayApiError, ebayFetch } from './client';
+import { EbayApiError, ebayFetch, ebayTradingGetItemStatus, type EbayTradingItemStatus } from './client';
 import { ensureFreshAccessToken } from './auth';
 import {
   buildMappedPayload,
@@ -40,6 +40,13 @@ import {
 // shape is kept anyway for crash-window safety and bulk-drain uniformity.
 
 export type SyncMode = 'publish' | 'update' | 'price-only' | 'publish-live';
+
+export const RELISTED_LISTING_WARNING =
+  'This item is live through an eBay relist that is no longer attached to the app-managed offer. Manage it on eBay until it is reattached.';
+
+function isDetachedRelistedListing(listing: EbayListingRow | null): boolean {
+  return listing?.last_error === RELISTED_LISTING_WARNING;
+}
 
 export interface SyncStepResult {
   done: boolean;
@@ -106,11 +113,12 @@ interface CreateOfferResponse {
   offerId: string;
 }
 
-function offerBody(payload: MappedEbayPayload) {
+export function offerBody(payload: MappedEbayPayload) {
   return {
     sku: payload.sku,
     marketplaceId: payload.marketplaceId,
     format: 'FIXED_PRICE',
+    listingDuration: 'GTC',
     listingDescription: payload.description,
     availableQuantity: payload.quantity,
     categoryId: payload.categoryId,
@@ -135,15 +143,28 @@ async function createOffer(accessToken: string, payload: MappedEbayPayload): Pro
   return res.data.offerId;
 }
 
-async function findExistingOfferId(accessToken: string, sku: string): Promise<string | null> {
+interface ExistingOfferSummary {
+  offerId: string;
+  format?: string;
+  marketplaceId?: string;
+}
+
+export function selectExistingFixedPriceOfferId(
+  offers: ExistingOfferSummary[] | undefined,
+  marketplaceId: string,
+): string | null {
+  return offers?.find((offer) => offer.format === 'FIXED_PRICE' && offer.marketplaceId === marketplaceId)?.offerId ?? null;
+}
+
+async function findExistingOfferId(accessToken: string, sku: string, marketplaceId: string): Promise<string | null> {
   try {
-    const res = await ebayFetch<{ offers?: Array<{ offerId: string }> }>({
+    const res = await ebayFetch<{ offers?: ExistingOfferSummary[] }>({
       method: 'GET',
       path: '/sell/inventory/v1/offer',
       accessToken,
       query: { sku },
     });
-    return res.data.offers?.[0]?.offerId ?? null;
+    return selectExistingFixedPriceOfferId(res.data.offers, marketplaceId);
   } catch {
     return null;
   }
@@ -213,6 +234,27 @@ interface BulkPriceQuantityEntry {
   price?: number;
 }
 
+interface BulkPriceQuantityResponse {
+  responses?: Array<{
+    statusCode?: number;
+    offerId?: string;
+    sku?: string;
+    errors?: Array<{ message?: string }>;
+  }>;
+}
+
+export function bulkPriceQuantityFailureMessage(
+  response: BulkPriceQuantityResponse,
+  expectedResponses: number,
+): string | null {
+  const responses = response.responses ?? [];
+  if (responses.length < expectedResponses) return 'eBay returned an incomplete bulk price/quantity response.';
+  const failed = responses.find((entry) => entry.statusCode == null || entry.statusCode < 200 || entry.statusCode >= 300);
+  if (!failed) return null;
+  const target = failed.offerId ? `offer ${failed.offerId}` : failed.sku ? `SKU ${failed.sku}` : 'an offer';
+  return failed.errors?.find((error) => error.message)?.message ?? `eBay rejected the price/quantity update for ${target}.`;
+}
+
 // TODO(ebay-verify): batching shape (entries appear one-SKU-each, <=25/call
 // per the plan's own flag at rest-endpoints-used.md) — this build sends one
 // entry per call for isolation/simplicity; batch if verified safe.
@@ -225,7 +267,22 @@ async function bulkUpdatePriceQuantity(accessToken: string, entries: BulkPriceQu
       ? { offers: [{ offerId: entry.offerId, ...(entry.price != null ? { price: { value: String(entry.price), currency: 'USD' } } : {}) }] }
       : {}),
   }));
-  await ebayFetch({ method: 'POST', path: '/sell/inventory/v1/bulk_update_price_quantity', accessToken, json: { requests } });
+  const res = await ebayFetch<BulkPriceQuantityResponse>({
+    method: 'POST',
+    path: '/sell/inventory/v1/bulk_update_price_quantity',
+    accessToken,
+    json: { requests },
+  });
+  const failure = bulkPriceQuantityFailureMessage(res.data, entries.length);
+  if (failure) {
+    throw new EbayApiError({
+      status: 400,
+      code: 'bulk_item_failed',
+      operatorMessage: failure,
+      retryable: false,
+      detail: { responses: res.data.responses },
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -239,6 +296,13 @@ export async function runSyncStep(productId: string, mode: SyncMode = 'publish')
 
   if (mode === 'publish-live') return publishLiveStep(service, productId, listing);
   if (mode === 'price-only') return priceOnlyStep(service, productId, listing);
+  if (isDetachedRelistedListing(listing)) {
+    return {
+      done: true,
+      syncState: listing!.sync_state,
+      error: { code: 'detached_relist', message: RELISTED_LISTING_WARNING },
+    };
+  }
 
   const product = await loadProduct(service, productId);
   if (!product) {
@@ -288,6 +352,46 @@ export async function runSyncStep(productId: string, mode: SyncMode = 'publish')
 
   try {
     const { accessToken } = await ensureFreshAccessToken(service);
+    let remoteOfferState: ReturnType<typeof reconcileEbayStateFromOffer> | null = null;
+    let remoteListingId = listing?.ebay_listing_id ?? null;
+
+    if (listing?.ebay_offer_id) {
+      const offer = await getOfferCall(accessToken, listing.ebay_offer_id);
+      remoteOfferState = reconcileEbayStateFromOffer(listing.sync_state, offer.status, offer.listing?.listingStatus);
+      remoteListingId = offer.listing?.listingId ?? remoteListingId;
+
+      // Never write an ended managed offer when eBay has an active external
+      // relist. That old offer can accept updates without changing the listing
+      // buyers actually see.
+      if (!remoteOfferState.live && remoteOfferState.syncState === 'ended' && remoteListingId) {
+        const relist = await resolveEbayRelistChain({
+          startingListingId: remoteListingId,
+          expectedSku: listing.ebay_sku,
+          lookup: (listingId) => ebayTradingGetItemStatus(accessToken, listingId),
+        });
+        if (relist.state === 'active') {
+          await upsertListing(service, productId, {
+            sync_state: 'published',
+            ebay_listing_id: relist.listingId,
+            last_error: RELISTED_LISTING_WARNING,
+          });
+          await insertSyncLog(service, {
+            product_id: productId,
+            listing_id: relist.listingId,
+            action: 'sync',
+            outcome: 'warning',
+            message: RELISTED_LISTING_WARNING,
+          });
+          return {
+            done: true,
+            syncState: 'published',
+            listingId: relist.listingId,
+            listingUrl: listingUrlFor(relist.listingId),
+            error: { code: 'detached_relist', message: RELISTED_LISTING_WARNING },
+          };
+        }
+      }
+    }
 
     // Step 1 — inventory item (full replace; idempotent, safe to repeat).
     await putInventoryItem(accessToken, payload);
@@ -307,7 +411,7 @@ export async function runSyncStep(productId: string, mode: SyncMode = 'publish')
         // offer without persisting the id (eBay enforces one offer per
         // SKU+marketplace+format, so "already exists" is the only way this
         // create can fail for an otherwise-valid payload).
-        const adopted = await findExistingOfferId(accessToken, payload.sku);
+        const adopted = await findExistingOfferId(accessToken, payload.sku, payload.marketplaceId);
         if (!adopted) throw err;
         offerId = adopted;
       }
@@ -322,7 +426,9 @@ export async function runSyncStep(productId: string, mode: SyncMode = 'publish')
     // the id's presence. Re-syncing an ended item must go through the
     // review/publish gate — never silently re-mark it published/live (reported
     // bug 2026-07-10: "Sync to eBay" showed an un-published item as LIVE).
-    const isLiveOnEbay = listing?.ebay_listing_id != null && listing.sync_state !== 'ended';
+    const isLiveOnEbay = remoteOfferState
+      ? remoteOfferState.live || remoteOfferState.syncState === 'hidden_oos'
+      : listing?.ebay_listing_id != null && listing.sync_state !== 'ended';
     if (!isLiveOnEbay) {
       if (connectionRow.auto_publish) {
         const published = await publishOfferCall(accessToken, offerId!);
@@ -364,11 +470,12 @@ export async function runSyncStep(productId: string, mode: SyncMode = 'publish')
 
     // Already published — this is an update pass. isLiveOnEbay (true in this
     // branch) guarantees a live listing id.
-    const liveListingId = listing!.ebay_listing_id!;
+    const liveListingId = remoteListingId ?? listing!.ebay_listing_id!;
     const hash = computeContentHash(payload);
     const nextState: EbaySyncState = listing!.sync_state === 'hidden_oos' ? 'hidden_oos' : 'published';
     await upsertListing(service, productId, {
       sync_state: nextState,
+      ebay_listing_id: liveListingId,
       content_hash: hash,
       last_pushed_price: payload.price,
       last_pushed_qty: nextState === 'hidden_oos' ? 0 : payload.quantity,
@@ -432,6 +539,13 @@ async function publishLiveStep(
   productId: string,
   listing: EbayListingRow | null,
 ): Promise<SyncStepResult> {
+  if (isDetachedRelistedListing(listing)) {
+    return {
+      done: true,
+      syncState: listing!.sync_state,
+      error: { code: 'detached_relist', message: RELISTED_LISTING_WARNING },
+    };
+  }
   if (!listing?.ebay_offer_id) {
     return {
       done: true,
@@ -439,7 +553,7 @@ async function publishLiveStep(
       error: { code: 'no_offer', message: 'Sync this item first to prepare an offer before publishing.' },
     };
   }
-  if (listing.ebay_listing_id) {
+  if (listing.ebay_listing_id && ['published', 'out_of_date', 'hidden_oos'].includes(listing.sync_state)) {
     return { done: true, syncState: listing.sync_state, listingId: listing.ebay_listing_id, listingUrl: listingUrlFor(listing.ebay_listing_id) };
   }
   try {
@@ -493,6 +607,13 @@ async function priceOnlyStep(
   productId: string,
   listing: EbayListingRow | null,
 ): Promise<SyncStepResult> {
+  if (isDetachedRelistedListing(listing)) {
+    return {
+      done: true,
+      syncState: listing!.sync_state,
+      error: { code: 'detached_relist', message: RELISTED_LISTING_WARNING },
+    };
+  }
   if (!listing?.ebay_offer_id) {
     return {
       done: true,
@@ -571,10 +692,68 @@ async function restoreListingQuantity(
   await insertSyncLog(service, { product_id: productId, listing_id: listing.ebay_listing_id, action: 'restore', outcome: 'ok' });
 }
 
+async function findDetachedRelistListingId(accessToken: string, listing: EbayListingRow): Promise<string | null> {
+  if (!listing.ebay_offer_id || !listing.ebay_listing_id) return null;
+  const offer = await getOfferCall(accessToken, listing.ebay_offer_id);
+  const state = reconcileEbayStateFromOffer(listing.sync_state, offer.status, offer.listing?.listingStatus);
+  if (state.live || state.syncState !== 'ended') return null;
+  const relist = await resolveEbayRelistChain({
+    startingListingId: offer.listing?.listingId ?? listing.ebay_listing_id,
+    expectedSku: listing.ebay_sku,
+    lookup: (listingId) => ebayTradingGetItemStatus(accessToken, listingId),
+  });
+  return relist.state === 'active' ? relist.listingId : null;
+}
+
+async function restoreEndedListing(
+  service: SupabaseClient,
+  listing: EbayListingRow,
+  product: Product,
+  connectionRow: EbayConnectionRow,
+  productId: string,
+): Promise<string> {
+  if (!listing.ebay_offer_id) throw new Error('This ended listing no longer has an eBay offer to republish.');
+  const connection = toConnectionDefaults(connectionRow);
+  const spotData = await fetchSpotData().catch(() => null);
+  const checks = buildPreflightChecks(product, connection, spotData);
+  const failing = checks.find((check) => !check.ok);
+  if (failing) throw new Error(failing.message ?? 'This item is not ready to be restored on eBay.');
+
+  const payload = buildMappedPayload(product, connection, spotData);
+  const { accessToken } = await ensureFreshAccessToken(service);
+  await putInventoryItem(accessToken, payload);
+  await updateOffer(accessToken, listing.ebay_offer_id, payload);
+  const published = await publishOfferCall(accessToken, listing.ebay_offer_id);
+  await upsertListing(service, productId, {
+    sync_state: 'published',
+    ebay_listing_id: published.listingId,
+    content_hash: computeContentHash(payload),
+    last_pushed_price: payload.price,
+    last_pushed_qty: payload.quantity,
+    last_error: null,
+    error_count: 0,
+  });
+  await insertSyncLog(service, {
+    product_id: productId,
+    listing_id: published.listingId,
+    action: 'restore',
+    outcome: 'ok',
+    detail: { priorListingId: listing.ebay_listing_id },
+  });
+  return published.listingId;
+}
+
 export async function runDelist(productId: string, action: 'hide' | 'withdraw' | 'restore'): Promise<SyncStepResult> {
   const service = createServiceClient();
   const connectionRow = await getConnection(service);
   const listing = await getListing(service, productId);
+  if (isDetachedRelistedListing(listing)) {
+    return {
+      done: true,
+      syncState: listing!.sync_state,
+      error: { code: 'detached_relist', message: RELISTED_LISTING_WARNING },
+    };
+  }
   if (!connectionRow || connectionRow.status !== 'connected') {
     return { done: true, syncState: listing?.sync_state ?? 'pending', error: { code: 'not_connected', message: 'eBay is not connected.' } };
   }
@@ -586,6 +765,29 @@ export async function runDelist(productId: string, action: 'hide' | 'withdraw' |
     };
   }
   try {
+    const { accessToken } = await ensureFreshAccessToken(service);
+    const detachedRelistId = await findDetachedRelistListingId(accessToken, listing);
+    if (detachedRelistId) {
+      await upsertListing(service, productId, {
+        sync_state: 'published',
+        ebay_listing_id: detachedRelistId,
+        last_error: RELISTED_LISTING_WARNING,
+      });
+      await insertSyncLog(service, {
+        product_id: productId,
+        listing_id: detachedRelistId,
+        action: `delist_${action}`,
+        outcome: 'warning',
+        message: RELISTED_LISTING_WARNING,
+      });
+      return {
+        done: true,
+        syncState: 'published',
+        listingId: detachedRelistId,
+        listingUrl: listingUrlFor(detachedRelistId),
+        error: { code: 'detached_relist', message: RELISTED_LISTING_WARNING },
+      };
+    }
     if (action === 'withdraw') {
       await withdrawListing(service, listing, productId);
       return { done: true, syncState: 'ended' };
@@ -594,9 +796,19 @@ export async function runDelist(productId: string, action: 'hide' | 'withdraw' |
       await hideListingQuantityZero(service, listing, productId);
       return { done: true, syncState: 'hidden_oos' };
     }
-    const { data: productRow } = await service.from('products').select('quantity').eq('id', productId).maybeSingle();
-    await restoreListingQuantity(service, listing, productId, productRow?.quantity ?? 1);
-    return { done: true, syncState: 'published' };
+    const product = await loadProduct(service, productId);
+    if (!product) throw new Error('Product not found.');
+    if (listing.sync_state === 'ended') {
+      const listingId = await restoreEndedListing(service, listing, product, connectionRow, productId);
+      return { done: true, syncState: 'published', listingId, listingUrl: listingUrlFor(listingId) };
+    }
+    await restoreListingQuantity(service, listing, productId, product.quantity);
+    return {
+      done: true,
+      syncState: 'published',
+      listingId: listing.ebay_listing_id ?? undefined,
+      listingUrl: listing.ebay_listing_id ? listingUrlFor(listing.ebay_listing_id) : undefined,
+    };
   } catch (err) {
     return handleSyncError(service, productId, listing, err, `delist_${action}`);
   }
@@ -660,6 +872,7 @@ export interface CheckListingStatusResult {
   found: boolean;
   syncState: EbaySyncState;
   message: string;
+  error?: boolean;
 }
 
 /**
@@ -684,15 +897,54 @@ export function reconcileEbayStateFromOffer(
   if (ls === 'OUT_OF_STOCK') return { syncState: 'hidden_oos', live: false };
   // Genuinely live: eBay shows an ACTIVE listing (or a PUBLISHED offer with no
   // finer listing status). Preserve a local hidden_oos (quantity-zeroed via
-  // Out-of-Stock control but still an active listing on eBay's side).
+  // Out-of-Stock control but still an active listing on eBay's side). Preserve
+  // out_of_date too: lifecycle status does not prove content freshness.
   if (ls === 'ACTIVE' || (os === 'PUBLISHED' && ls === '')) {
-    return { syncState: current === 'hidden_oos' ? 'hidden_oos' : 'published', live: true };
+    return {
+      syncState: current === 'hidden_oos' || current === 'out_of_date' ? current : 'published',
+      live: true,
+    };
   }
   // Offer exists but is UNPUBLISHED with no active/ended listing. If we thought
   // it was live, eBay ended it out of band → 'ended'; if it was never
   // published, it's a prepared offer awaiting publish → 'review'.
   if (['published', 'out_of_date', 'hidden_oos'].includes(current)) return { syncState: 'ended', live: false };
   return { syncState: 'review', live: false };
+}
+
+export type EbayRelistChainResult =
+  | { state: 'active'; listingId: string; hops: number }
+  | { state: 'inactive'; listingId: string; hops: number; listingStatus: string | null }
+  | { state: 'sku_mismatch'; listingId: string; hops: number; actualSku: string | null }
+  | { state: 'loop_or_limit'; listingId: string; hops: number };
+
+/** Follow eBay's old-listing -> RelistedItemID chain without adopting another product. */
+export async function resolveEbayRelistChain(params: {
+  startingListingId: string;
+  expectedSku: string;
+  lookup: (listingId: string) => Promise<EbayTradingItemStatus>;
+  maxHops?: number;
+}): Promise<EbayRelistChainResult> {
+  const maxHops = params.maxHops ?? 8;
+  const seen = new Set<string>();
+  let listingId = params.startingListingId;
+
+  for (let hops = 0; hops < maxHops; hops += 1) {
+    if (seen.has(listingId)) return { state: 'loop_or_limit', listingId, hops };
+    seen.add(listingId);
+    const item = await params.lookup(listingId);
+    if (item.sku !== params.expectedSku) {
+      return { state: 'sku_mismatch', listingId, hops, actualSku: item.sku };
+    }
+    if ((item.listingStatus ?? '').toUpperCase() === 'ACTIVE') {
+      return { state: 'active', listingId: item.itemId, hops };
+    }
+    if (!item.relistedItemId) {
+      return { state: 'inactive', listingId: item.itemId, hops, listingStatus: item.listingStatus };
+    }
+    listingId = item.relistedItemId;
+  }
+  return { state: 'loop_or_limit', listingId, hops: maxHops };
 }
 
 export async function checkListingStatus(productId: string): Promise<CheckListingStatusResult> {
@@ -703,29 +955,13 @@ export async function checkListingStatus(productId: string): Promise<CheckListin
   }
   try {
     const { accessToken } = await ensureFreshAccessToken(service);
-    const offer = await getOfferCall(accessToken, listing.ebay_offer_id);
-    const { syncState, live } = reconcileEbayStateFromOffer(listing.sync_state, offer.status, offer.listing?.listingStatus);
-    // Only trust eBay's listingId, never our stale stored one.
-    const remoteListingId = offer.listing?.listingId ?? listing.ebay_listing_id;
-    await upsertListing(service, productId, {
-      sync_state: syncState,
-      ebay_listing_id: remoteListingId,
-      last_error: null,
-    });
-    await insertSyncLog(service, { product_id: productId, listing_id: remoteListingId, action: 'verify', outcome: 'ok' });
-    const message = live
-      ? 'Confirmed live on eBay.'
-      : syncState === 'ended'
-        ? 'This listing has ended on eBay (ended or removed there) — marked as ended here.'
-        : syncState === 'hidden_oos'
-          ? 'This listing is out of stock / hidden on eBay.'
-          : 'Offer exists but is not published yet.';
-    return { found: true, syncState, message };
-  } catch (err) {
-    // The whole OFFER is gone (deleted on eBay), not just the listing — reset
-    // to not-listed so a fresh "Sync to eBay" re-creates it, mirroring the
-    // Etsy 404 path. A non-404 error leaves state untouched (transient).
-    if (err instanceof EbayApiError && err.status === 404) {
+    let offer: GetOfferResponse;
+    try {
+      offer = await getOfferCall(accessToken, listing.ebay_offer_id);
+    } catch (err) {
+      // Only GetOffer can prove that the managed offer itself is gone. A 404
+      // from the later Trading relist lookup must not sever a valid offer link.
+      if (!(err instanceof EbayApiError && err.status === 404)) throw err;
       await upsertListing(service, productId, {
         sync_state: 'pending',
         ebay_offer_id: null,
@@ -734,11 +970,68 @@ export async function checkListingStatus(productId: string): Promise<CheckListin
         last_error: null,
         error_count: 0,
       });
-      await insertSyncLog(service, { product_id: productId, action: 'verify', outcome: 'ok', message: 'Offer no longer exists on eBay — reset to not-listed.' });
-      return { found: false, syncState: 'pending', message: 'This offer no longer exists on eBay — reset to not-listed. You can sync it fresh.' };
+      await insertSyncLog(service, { product_id: productId, action: 'verify', outcome: 'ok', message: 'Offer no longer exists on eBay - reset to not-listed.' });
+      return { found: false, syncState: 'pending', message: 'This offer no longer exists on eBay - reset to not-listed. You can sync it fresh.' };
     }
+    const offerState = reconcileEbayStateFromOffer(listing.sync_state, offer.status, offer.listing?.listingStatus);
+    let syncState = offerState.syncState;
+    let live = offerState.live;
+    // Only trust eBay's listingId, never our stale stored one.
+    let remoteListingId = offer.listing?.listingId ?? listing.ebay_listing_id;
+    let relisted = false;
+
+    // The Inventory offer remains ENDED when a seller relists that item in
+    // eBay. Trading GetItem exposes the replacement ID, so follow that chain
+    // before deciding the product is truly gone.
+    if (!live && syncState === 'ended' && (listing.ebay_listing_id ?? remoteListingId)) {
+      const relist = await resolveEbayRelistChain({
+        startingListingId: listing.ebay_listing_id ?? remoteListingId!,
+        expectedSku: listing.ebay_sku,
+        lookup: (listingId) => ebayTradingGetItemStatus(accessToken, listingId),
+      });
+      if (relist.state === 'sku_mismatch') {
+        throw new Error('eBay relisted this item under a different SKU, so it was not adopted automatically.');
+      }
+      if (relist.state === 'loop_or_limit') {
+        throw new Error('eBay returned an invalid or unusually long relist chain; local status was left unchanged.');
+      }
+      remoteListingId = relist.listingId;
+      if (relist.state === 'active') {
+        syncState = 'published';
+        live = true;
+        relisted = true;
+      }
+    }
+
+    await upsertListing(service, productId, {
+      sync_state: syncState,
+      ebay_listing_id: remoteListingId,
+      last_error: relisted ? RELISTED_LISTING_WARNING : null,
+      error_count: 0,
+    });
+    await insertSyncLog(service, {
+      product_id: productId,
+      listing_id: remoteListingId,
+      action: 'verify',
+      outcome: relisted ? 'warning' : 'ok',
+      message: relisted ? RELISTED_LISTING_WARNING : null,
+      detail: relisted ? { source: 'trading_relist', activeListingId: remoteListingId } : null,
+    });
+    const message = relisted
+      ? `Confirmed live on eBay as relisted item ${remoteListingId}. The linked listing ID was corrected here.`
+      : live && syncState === 'out_of_date'
+        ? 'Confirmed live on eBay; local updates still need to be synced.'
+      : live
+        ? 'Confirmed live on eBay.'
+      : syncState === 'ended'
+        ? 'This listing has ended on eBay (ended or removed there) — marked as ended here.'
+        : syncState === 'hidden_oos'
+          ? 'This listing is out of stock / hidden on eBay.'
+          : 'Offer exists but is not published yet.';
+    return { found: true, syncState, message };
+  } catch (err) {
     const message = err instanceof EbayApiError ? err.operatorMessage : err instanceof Error ? err.message : 'Could not verify.';
-    return { found: false, syncState: listing.sync_state, message };
+    return { found: false, syncState: listing.sync_state, message, error: true };
   }
 }
 
@@ -747,12 +1040,35 @@ export interface CheckAllStatusResult {
   updated: number;
   reset: number;
   errors: number;
+  /** Requested products that do not have a linked eBay offer. */
+  skipped: number;
+  items: Array<{
+    productId: string;
+    syncState: EbaySyncState;
+    linked: boolean;
+    checkError: boolean;
+  }>;
 }
 
-export async function checkAllListingStatuses(): Promise<CheckAllStatusResult> {
+export async function checkAllListingStatuses(productIds?: string[]): Promise<CheckAllStatusResult> {
   const service = createServiceClient();
-  const { data } = await service.from('ebay_listings').select('product_id, sync_state').not('ebay_offer_id', 'is', null);
+  if (productIds && productIds.length === 0) {
+    return { checked: 0, updated: 0, reset: 0, errors: 0, skipped: 0, items: [] };
+  }
+
+  let query = service.from('ebay_listings').select('product_id, sync_state').not('ebay_offer_id', 'is', null);
+  if (productIds) query = query.in('product_id', productIds);
+  const { data, error } = await query;
+  if (error) throw error;
   const rows = (data ?? []) as Array<{ product_id: string; sync_state: EbaySyncState }>;
+  const skipped = productIds ? Math.max(0, productIds.length - rows.length) : 0;
+  const requestedIds = productIds ?? rows.map((row) => row.product_id);
+  const itemStatus = new Map(rows.map((row) => [row.product_id, {
+    productId: row.product_id,
+    syncState: row.sync_state,
+    linked: true,
+    checkError: false,
+  }]));
   let updated = 0;
   let reset = 0;
   let errors = 0;
@@ -760,12 +1076,28 @@ export async function checkAllListingStatuses(): Promise<CheckAllStatusResult> {
     try {
       const result = await checkListingStatus(row.product_id);
       if (row.sync_state !== result.syncState) updated += 1;
-      if (row.sync_state === 'error' && result.syncState !== 'error') reset += 1;
+      if (!result.found && !result.error && result.syncState === 'pending') reset += 1;
+      if (result.error) errors += 1;
+      itemStatus.set(row.product_id, {
+        productId: row.product_id,
+        syncState: result.syncState,
+        linked: result.error ? true : result.found,
+        checkError: Boolean(result.error),
+      });
     } catch {
       errors += 1;
+      itemStatus.set(row.product_id, { productId: row.product_id, syncState: row.sync_state, linked: true, checkError: true });
     }
   }
-  return { checked: rows.length, updated, reset, errors };
+  return {
+    checked: rows.length,
+    updated,
+    reset,
+    errors,
+    skipped,
+    items: requestedIds.map((productId) => itemStatus.get(productId)
+      ?? { productId, syncState: 'pending', linked: false, checkError: false }),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -925,6 +1257,10 @@ export async function runScheduledPricePush(): Promise<{ pushed: number; skipped
   let skipped = 0;
   const { accessToken } = await ensureFreshAccessToken(service);
   for (const listing of (listings ?? []) as EbayListingRow[]) {
+    if (isDetachedRelistedListing(listing)) {
+      skipped += 1;
+      continue;
+    }
     const product = await loadProduct(service, listing.product_id);
     if (!product) continue;
     const priceResult = computeEbayPrice(product, spotData, connection.price_markup_pct);
@@ -975,6 +1311,10 @@ export async function pushPricesBatch(): Promise<{ done: boolean; pushed: number
   if (listings?.length) {
     const { accessToken } = await ensureFreshAccessToken(service);
     for (const listing of listings as EbayListingRow[]) {
+      if (isDetachedRelistedListing(listing)) {
+        failed += 1;
+        continue;
+      }
       const product = await loadProduct(service, listing.product_id);
       if (!product) continue;
       const priceResult = computeEbayPrice(product, spotData, connection.price_markup_pct);

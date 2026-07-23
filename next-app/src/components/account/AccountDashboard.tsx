@@ -9,8 +9,9 @@ import AccountProfileForm, { type CustomerProfile } from '@/components/account/A
 import SignOutButton from '@/components/account/SignOutButton';
 import { createClient } from '@/lib/supabase/client';
 import { useWishlist } from '@/context/WishlistContext';
-import { formatCurrency, formatOrderDate, formatPublicPurity, orderStatusLabel, type Order } from '@/types/sales';
-import { productImagePaddingBackground } from '@/types/product';
+import { useHideSoldItemPrices } from '@/hooks/useHideSoldItemPrices';
+import { formatCurrency, formatOrderAddress, formatOrderDate, formatPublicPurity, orderStatusLabel, type Order } from '@/types/sales';
+import { isProductSold, productImagePaddingBackground } from '@/types/product';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 
 type AccountTab = 'overview' | 'orders' | 'wishlist';
@@ -351,6 +352,14 @@ function OrderDetailsDialog({
   const [invoices, setInvoices] = useState<DialogInvoice[]>([]);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const shippingAddress = formatOrderAddress(order.shipping_address);
+  const billingAddress = formatOrderAddress(order.billing_address);
+  const hasAdditionalDetails = Boolean(order.customer_notes || shippingAddress || billingAddress);
+  const shippingAddressLabel = order.shipping_method === 'pickup'
+    ? (isEs ? 'Dirección' : 'Address')
+    : order.shipping_method === 'local_delivery'
+      ? (isEs ? 'Dirección de entrega' : 'Delivery address')
+      : (isEs ? 'Dirección de envío' : 'Shipping address');
 
   useEffect(() => {
     let cancelled = false;
@@ -488,12 +497,12 @@ function OrderDetailsDialog({
           </div>
         </div>
 
-        {(order.customer_notes || order.shipping_address || order.billing_address) && (
+        {hasAdditionalDetails && (
           <div className="account-order-dialog-section">
             <h3>{isEs ? 'Detalles adicionales' : 'Additional Details'}</h3>
             <OrderDetailLine label={isEs ? 'Notas' : 'Notes'} value={order.customer_notes} />
-            <OrderDetailLine label={isEs ? 'Dirección de entrega' : 'Shipping address'} value={formatAddress(order.shipping_address)} />
-            <OrderDetailLine label={isEs ? 'Dirección de facturación' : 'Billing address'} value={formatAddress(order.billing_address)} />
+            <OrderDetailLine label={shippingAddressLabel} value={shippingAddress} />
+            <OrderDetailLine label={isEs ? 'Dirección de facturación' : 'Billing address'} value={billingAddress} />
           </div>
         )}
 
@@ -767,20 +776,11 @@ function OrderDetailLine({
   );
 }
 
-function formatAddress(address: Record<string, unknown> | null): string | null {
-  if (!address) return null;
-  const parts = ['address_line1', 'address_line2', 'city', 'state', 'postal_code', 'country']
-    .map((key) => address[key])
-    .filter((value): value is string | number => typeof value === 'string' || typeof value === 'number')
-    .map((value) => String(value).trim())
-    .filter(Boolean);
-  return parts.length > 0 ? parts.join(', ') : null;
-}
-
 function WishlistTab({ locale }: { locale: string }) {
   const { items, remove } = useWishlist();
   const isEs = locale === 'es';
   const prefix = isEs ? '/es' : '';
+  const hideSoldItemPrices = useHideSoldItemPrices();
 
   return (
     <div className="account-card account-tab-card">
@@ -809,8 +809,14 @@ function WishlistTab({ locale }: { locale: string }) {
                 </Link>
                 <div>
                   <Link href={`${prefix}/shop/${item.id}`}>{title}</Link>
-                  <span>{item.price_mode === 'manual' ? (item.manual_price_label ?? (isEs ? 'Consultar precio' : 'Ask for price')) : (isEs ? 'Precio según mercado' : 'Live market price')}</span>
-                  <button type="button" onClick={() => remove(item.id)}>
+                  <span>
+                    {hideSoldItemPrices && isProductSold(item.status)
+                      ? (isEs ? 'Vendido' : 'Sold')
+                      : item.price_mode === 'manual'
+                        ? (item.manual_price_label ?? (isEs ? 'Consultar precio' : 'Ask for price'))
+                        : (isEs ? 'Precio según mercado' : 'Live market price')}
+                  </span>
+                  <button type="button" className="account-wishlist-remove" onClick={() => remove(item.id)}>
                     {isEs ? 'Eliminar' : 'Remove'}
                   </button>
                 </div>

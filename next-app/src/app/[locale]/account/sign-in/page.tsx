@@ -118,7 +118,7 @@ export default function SignInPage() {
               <div className="mt-2 text-right">
                 <Link
                   href={`${prefix}/account/reset-password`}
-                  className="text-xs font-bold hover:underline underline-offset-2"
+                  className="hover-underline-grow text-xs font-bold"
                   style={{ color: 'var(--color-primary)' }}
                 >
                   {isEs ? '¿Olvidó su contraseña?' : 'Forgot password?'}
@@ -142,7 +142,7 @@ export default function SignInPage() {
           <p className="mt-7 text-sm text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
             {isEs ? '¿No tiene una cuenta? ' : "Don't have an account? "}
             <Link href={`${prefix}/account/sign-up`}
-              className="font-bold hover:underline underline-offset-2"
+              className="hover-underline-grow font-bold"
               style={{ color: 'var(--color-primary)' }}>
               {isEs ? 'Cree una' : 'Create one'}
             </Link>

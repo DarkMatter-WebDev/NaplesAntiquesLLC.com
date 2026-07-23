@@ -2,10 +2,20 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { buildAddressObject, generateOrderNumber } from '@/lib/sales';
-import { buildOrderDraft, isOrderDraftError, normalizeOrderLines, shippingMethodForDb, type OrderLine } from '@/lib/checkout-pricing';
-import { createPayPalOrder, paypalConfigured, type PayPalLineItem } from '@/lib/paypal';
+import { buildOrderDraft, isOrderDraftError, normalizeOrderLines, type OrderLine } from '@/lib/checkout-pricing';
+import { isCheckoutShippingMethod, shippingMethodForDb } from '@/lib/checkout-shipping';
+import {
+  createPayPalOrder,
+  paypalConfigured,
+  type PayPalLineItem,
+  type PayPalShippingAddress,
+} from '@/lib/paypal';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { upsertOrderInvoice } from '@/lib/order-invoices';
+import {
+  type NormalizedUsShippingAddress,
+  validateUsShippingAddress,
+} from '@/lib/us-address';
 
 export const runtime = 'nodejs';
 
@@ -19,6 +29,21 @@ function lineItems(items: { title_snapshot: string; price_snapshot: number; quan
     unitAmount: item.price_snapshot,
     sku: item.inventory_number,
   }));
+}
+
+function buildPayPalShippingAddress(
+  customer: Record<string, unknown>,
+  address: NormalizedUsShippingAddress,
+): PayPalShippingAddress {
+  return {
+    fullName: String(customer.name ?? '').trim(),
+    addressLine1: address.line1,
+    addressLine2: address.line2,
+    city: address.city,
+    state: address.state,
+    postalCode: address.postalCode,
+    countryCode: address.countryCode,
+  };
 }
 
 export async function POST(req: Request) {
@@ -45,9 +70,50 @@ export async function POST(req: Request) {
     : Array.isArray(body.productIds)
       ? body.productIds.map((id: unknown) => ({ productId: String(id ?? ''), quantity: 1 }))
       : [];
-  const orderLines = normalizeOrderLines(rawLines).slice(0, MAX_CART_ITEMS);
+  const orderLines = normalizeOrderLines(rawLines);
+  if (orderLines.length > MAX_CART_ITEMS) {
+    return NextResponse.json(
+      { error: `A checkout can contain at most ${MAX_CART_ITEMS} unique products.` },
+      { status: 400 },
+    );
+  }
   const customer = body.customer ?? {};
   const shippingMethod = String(body.shippingMethod ?? 'local-pickup');
+  if (!isCheckoutShippingMethod(shippingMethod)) {
+    return NextResponse.json({ error: 'Invalid shipping method.' }, { status: 400 });
+  }
+  const needsShipping = shippingMethod !== 'local-pickup';
+
+  if (!customer.name || !customer.email || !customer.phone) {
+    return NextResponse.json({ error: 'Name, email, and phone are required' }, { status: 400 });
+  }
+
+  const addressValidation = needsShipping
+    ? validateUsShippingAddress({
+        line1: customer.address_line1,
+        line2: customer.address_line2,
+        city: customer.city,
+        state: customer.state,
+        postalCode: customer.postal_code,
+        country: customer.country,
+      })
+    : null;
+  if (addressValidation?.error) {
+    return NextResponse.json({ error: addressValidation.error }, { status: 400 });
+  }
+  const normalizedShippingAddress = addressValidation?.address ?? null;
+
+  const orderShippingAddress = buildAddressObject({
+    line1: normalizedShippingAddress?.line1 ?? customer.address_line1,
+    line2: normalizedShippingAddress?.line2 ?? customer.address_line2,
+    city: normalizedShippingAddress?.city ?? customer.city,
+    state: normalizedShippingAddress?.state ?? customer.state,
+    postalCode: normalizedShippingAddress?.postalCode ?? customer.postal_code,
+    country: normalizedShippingAddress?.country ?? customer.country,
+  });
+  const paypalShippingAddress = normalizedShippingAddress
+    ? buildPayPalShippingAddress(customer, normalizedShippingAddress)
+    : null;
 
   const supabase = await createClient();
   const service = createServiceClient();
@@ -91,7 +157,12 @@ export async function POST(req: Request) {
     if (sameProducts) {
       // Recompute totals from the live cart payload; catches shipping-method
       // switches (express vs priority both store as 'shipping') and price drift.
-      const draft = await buildOrderDraft(supabase, orderLines, shippingMethod, customer.state);
+      const draft = await buildOrderDraft(
+        supabase,
+        orderLines,
+        shippingMethod,
+        normalizedShippingAddress?.state ?? customer.state,
+      );
       sameTotals =
         !isOrderDraftError(draft) &&
         draft.subtotal === Number(order.subtotal) &&
@@ -116,13 +187,27 @@ export async function POST(req: Request) {
           total: Number(order.total),
           items: lineItems(items),
           referenceId: order.id,
+          shippingAddress: paypalShippingAddress,
         });
         // Reset status back to open/pending: the buyer may be resuming an order
         // that onCancel previously soft-cancelled, and it's live again now.
-        await service
+        const { data: associatedOrder, error: updateError } = await service
           .from('orders')
-          .update({ paypal_order_id: paypalOrder.id, order_status: 'open', fulfillment_status: 'pending' })
-          .eq('id', order.id);
+          .update({
+            paypal_order_id: paypalOrder.id,
+            order_status: 'open',
+            fulfillment_status: 'pending',
+            customer_name: String(customer.name).trim(),
+            customer_email: String(customer.email).trim(),
+            customer_phone: String(customer.phone).trim(),
+            shipping_address: orderShippingAddress,
+          })
+          .eq('id', order.id)
+          .select('id')
+          .maybeSingle();
+        if (updateError || !associatedOrder) {
+          throw new Error(`Could not associate the PayPal order: ${updateError?.message ?? 'order row was not updated'}`);
+        }
         return NextResponse.json({ paypalOrderId: paypalOrder.id, orderId: order.id });
       } catch (err) {
         console.error('PayPal create-order (reuse) error:', err);
@@ -135,24 +220,12 @@ export async function POST(req: Request) {
   }
 
   // ---- New order path.
-  if (!customer.name || !customer.email || !customer.phone) {
-    return NextResponse.json({ error: 'Name, email, and phone are required' }, { status: 400 });
-  }
-
-  const needsShipping = shippingMethod !== 'local-pickup';
-  if (needsShipping && (
-    !String(customer.address_line1 ?? '').trim() ||
-    !String(customer.city ?? '').trim() ||
-    !String(customer.state ?? '').trim() ||
-    !String(customer.postal_code ?? '').trim()
-  )) {
-    return NextResponse.json(
-      { error: 'A complete shipping address (street, city, state, and ZIP) is required for the selected delivery method.' },
-      { status: 400 },
-    );
-  }
-
-  const draft = await buildOrderDraft(supabase, orderLines, shippingMethod, customer.state);
+  const draft = await buildOrderDraft(
+    supabase,
+    orderLines,
+    shippingMethod,
+    normalizedShippingAddress?.state ?? customer.state,
+  );
   if (isOrderDraftError(draft)) {
     return NextResponse.json({ error: draft.error }, { status: draft.status });
   }
@@ -175,14 +248,7 @@ export async function POST(req: Request) {
     total: draft.total,
     payment_method: 'paypal',
     shipping_method: shippingMethodForDb(shippingMethod),
-    shipping_address: buildAddressObject({
-      line1: customer.address_line1,
-      line2: customer.address_line2,
-      city: customer.city,
-      state: customer.state,
-      postalCode: customer.postal_code,
-      country: customer.country,
-    }),
+    shipping_address: orderShippingAddress,
     billing_address: null,
     internal_notes: null,
     customer_notes: customer.notes ? String(customer.notes).trim() : null,
@@ -222,9 +288,18 @@ export async function POST(req: Request) {
       total: draft.total,
       items: lineItems(draft.items),
       referenceId: orderId,
+      shippingAddress: paypalShippingAddress,
     });
 
-    await service.from('orders').update({ paypal_order_id: paypalOrder.id }).eq('id', orderId);
+    const { data: associatedOrder, error: associationError } = await service
+      .from('orders')
+      .update({ paypal_order_id: paypalOrder.id })
+      .eq('id', orderId)
+      .select('id')
+      .maybeSingle();
+    if (associationError || !associatedOrder) {
+      throw new Error(`Could not associate the PayPal order: ${associationError?.message ?? 'order row was not updated'}`);
+    }
     await upsertOrderInvoice(service, orderId);
 
     return NextResponse.json({ paypalOrderId: paypalOrder.id, orderId });

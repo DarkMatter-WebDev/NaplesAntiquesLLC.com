@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import type { Product, SpotData } from '@/types/product';
 import { inferProductJewelryType, normalizeProductLengthSizeValue, normalizeProductQuantity } from '@/types/product';
-import { calcSpotPriceValue, parseManualPriceLabelValue } from '@/lib/pricing';
+import { getProductPriceValue } from '@/lib/pricing';
 import { getSiteUrl } from '@/lib/order-email-branding';
 
 // Pure allowlist mapper: Product -> eBay InventoryItem + Offer fields. Mirrors
@@ -512,10 +512,8 @@ export interface EbayPriceResult {
 }
 
 export function computeEbayPrice(product: Product, spotData: SpotData | null, markupPct: number): EbayPriceResult {
-  const base =
-    product.price_mode === 'manual'
-      ? parseManualPriceLabelValue(product.manual_price_label) ?? (product.asking_price ?? null)
-      : calcSpotPriceValue(product, spotData);
+  const base = getProductPriceValue(product, spotData)
+    ?? (product.price_mode === 'manual' ? product.asking_price ?? null : null);
 
   if (base == null || !Number.isFinite(base) || base <= 0) {
     return {

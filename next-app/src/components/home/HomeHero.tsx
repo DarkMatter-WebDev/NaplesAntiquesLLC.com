@@ -451,9 +451,12 @@ export default function HomeHero({ locale, fallbackItems }: Props) {
         @media (min-width: 1024px) {
           .home-carousel-hero .home-carousel-theme > div:first-child {
             --cardW: clamp(26em, 29vw, 36em) !important;
-            /* Larger perspective = less extreme foreshortening, so the side
-               cards (the smallest ones) stay bigger and more legible. */
-            --perspective: 34em !important;
+            /* Keep the far side of the ring in front of the perspective plane.
+               At the old value, wide cards could land almost on that plane,
+               producing enormous transformed hitboxes that covered neighbors.
+               This keeps the projection comfortably away from the camera plane
+               even at the maximum desktop card width. */
+            --perspective: 70em !important;
             transform: scale(1.42);
           }
         }

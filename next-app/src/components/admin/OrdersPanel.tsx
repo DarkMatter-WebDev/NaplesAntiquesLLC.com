@@ -10,8 +10,8 @@ import type { Order, PaymentStatus, FulfillmentStatus, OrderStatus, ShippingMeth
 import { formatCurrency, formatOrderDate, orderStatusLabel } from '@/types/sales';
 import type { SpotData } from '@/types/product';
 import { buildAddressObject, generateOrderNumber, getProductImages, getProductMetal, getProductWeight, getSnapshotPrice } from '@/lib/sales';
-import { isFloridaState, FL_TAX_RATE } from '@/lib/checkout-pricing';
-import { adminRevalidateProducts } from '@/app/actions/admin-products';
+import { calculateFlSalesTax, isFloridaState } from '@/lib/checkout-pricing';
+import { adminGetManualOrderProducts, adminUpdateProductsStatus } from '@/app/actions/admin-products';
 
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
@@ -71,8 +71,8 @@ const emptyForm: FormState = {
 
 export default function OrdersPanel({
   initialOrders,
-  products,
-  spotData,
+  products: initialProducts,
+  spotData: initialSpotData,
   locale,
   view = 'active',
   trashCount = 0,
@@ -84,6 +84,9 @@ export default function OrdersPanel({
   const ordersPath = `${adminBasePath}/orders`;
   const isTrash = view === 'trash';
   const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [spotData, setSpotData] = useState<SpotData | null>(initialSpotData);
+  const [loadingProducts, setLoadingProducts] = useState(false);
   const [syncedFrom, setSyncedFrom] = useState(initialOrders);
   const [search, setSearch] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('');
@@ -152,11 +155,13 @@ export default function OrdersPanel({
     0,
   );
   const discount = (Number(form.discount) || 0) + lineDiscount;
-  const shippingFee = Number(form.shipping_fee) || 0;
-  // Pickup and local delivery are always completed in Florida; a shipped order
-  // only owes FL tax when the destination address is also in Florida.
+  const shippingFee = Math.max(Number(form.shipping_fee) || 0, 0);
+  // Pickup and local delivery are completed in Florida. Shipped orders owe
+  // Florida tax only when their destination is also in Florida.
   const chargesTax = form.shipping_method !== 'shipping' || isFloridaState(form.state);
-  const tax = chargesTax ? Math.max(subtotal - discount, 0) * FL_TAX_RATE : 0;
+  const tax = chargesTax
+    ? calculateFlSalesTax(Math.max(subtotal - discount, 0), shippingFee)
+    : 0;
   const total = Math.max(subtotal - discount, 0) + tax + shippingFee;
 
   const filteredOrders = orders.filter((order) => {
@@ -175,6 +180,22 @@ export default function OrdersPanel({
     }
     return true;
   });
+
+  async function openCreateOrder() {
+    setShowCreate(true);
+    if (products.length > 0 || loadingProducts) return;
+
+    setLoadingProducts(true);
+    setMessage(null);
+    const result = await adminGetManualOrderProducts();
+    setLoadingProducts(false);
+    if (result.error || !result.products) {
+      setMessage({ text: result.error ?? 'Could not load products.', ok: false });
+      return;
+    }
+    setProducts(result.products);
+    setSpotData(result.spotData ?? null);
+  }
 
   function addProduct(id: string) {
     setSelectedProductIds((current) => current.includes(id) ? current : [...current, id]);
@@ -281,20 +302,14 @@ export default function OrdersPanel({
       return;
     }
 
-    const { error: productError } = await supabase
-      .from('products')
-      .update({ status: 'pending_payment' })
-      .in('id', selectedProductIds);
+    const { error: productError } = await adminUpdateProductsStatus(selectedProductIds, 'pending_payment');
 
     if (productError) {
-      setMessage({ text: `Order created, but product statuses were not updated: ${productError.message}`, ok: false });
+      setMessage({ text: `Order created, but product statuses were not updated: ${productError}`, ok: false });
       setSaving(false);
       return;
     }
 
-    // Browser-client write: purge the shop cache so pending-payment items leave
-    // the public gallery immediately.
-    await adminRevalidateProducts(selectedProductIds);
     await fetch(`/api/admin/orders/${order.id}/invoice`, { method: 'POST' });
 
     setOrders((current) => [{ ...(order as Order), order_items: itemPayloads as never }, ...current]);
@@ -342,19 +357,13 @@ export default function OrdersPanel({
         new Set((order.order_items ?? []).map((item) => item.product_id).filter((id): id is string => Boolean(id))),
       );
       if (productIds.length > 0) {
-        const { error: productError } = await supabase
-          .from('products')
-          .update({ status: 'available' })
-          .in('id', productIds);
+        const { error: productError } = await adminUpdateProductsStatus(productIds, 'available');
         if (productError) {
           setConfirmDelete(null);
-          setMessage({ text: `Could not return items to inventory: ${productError.message}`, ok: false });
+          setMessage({ text: `Could not return items to inventory: ${productError}`, ok: false });
           setDeleting(false);
           return;
         }
-        // Browser-client write — purge the shop cache so the returned items
-        // show as available in the public gallery immediately.
-        await adminRevalidateProducts(productIds);
       }
     }
 
@@ -438,7 +447,7 @@ export default function OrdersPanel({
                   <span className="material-symbols-outlined text-[1.1rem]" aria-hidden="true">delete</span>
                   Recycle Bin{recycleBinSupported && trashCount > 0 ? ` (${trashCount})` : ''}
                 </Link>
-                <button type="button" onClick={() => setShowCreate(true)} className="gold-button w-full justify-center text-sm md:w-auto">
+                <button type="button" onClick={() => void openCreateOrder()} className="gold-button w-full justify-center text-sm md:w-auto">
                   Create Manual Order
                 </button>
               </>
@@ -485,7 +494,7 @@ export default function OrdersPanel({
             <button
               type="button"
               onClick={() => { setSearch(''); setPaymentFilter(''); setFulfillmentFilter(''); setOrderFilter(''); }}
-              className="mt-3 text-xs font-bold uppercase tracking-wide hover:underline md:mt-0 md:pb-2"
+              className="hover-underline-grow mt-3 text-xs font-bold uppercase tracking-wide md:mt-0 md:pb-2"
               style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
             >
               Clear
@@ -628,7 +637,7 @@ export default function OrdersPanel({
                           type="button"
                           onClick={() => restoreOrder(order)}
                           disabled={actingOrderId === order.id}
-                          className="text-xs font-bold uppercase tracking-wide hover:underline disabled:opacity-50"
+                          className="hover-underline-grow text-xs font-bold uppercase tracking-wide disabled:opacity-50"
                           style={{ color: GOLD, fontFamily: 'var(--font-label)' }}
                         >
                           Restore
@@ -638,7 +647,7 @@ export default function OrdersPanel({
                           type="button"
                           onClick={() => purgeOrder(order)}
                           disabled={actingOrderId === order.id}
-                          className="text-xs font-bold uppercase tracking-wide hover:underline disabled:opacity-50"
+                          className="hover-underline-grow text-xs font-bold uppercase tracking-wide disabled:opacity-50"
                           style={{ color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}
                         >
                           Delete Forever
@@ -646,13 +655,13 @@ export default function OrdersPanel({
                       </div>
                     ) : (
                       <>
-                        <Link href={`${adminBasePath}/orders/${order.id}`} className="text-xs font-bold uppercase tracking-wide hover:underline" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                        <Link href={`${adminBasePath}/orders/${order.id}`} className="hover-underline-grow text-xs font-bold uppercase tracking-wide" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
                           View
                         </Link>
                         <button
                           type="button"
                           onClick={() => { setReturnToInventory(true); setConfirmDelete(order); }}
-                          className="ml-4 text-xs font-bold uppercase tracking-wide hover:underline"
+                          className="hover-underline-grow ml-4 text-xs font-bold uppercase tracking-wide"
                           style={{ color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}
                         >
                           Delete
@@ -701,6 +710,11 @@ export default function OrdersPanel({
 
                 <section>
                   <h3 className="form-label">Products</h3>
+                  {loadingProducts && (
+                    <p className="mb-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      Loading available products...
+                    </p>
+                  )}
                   <div className="relative">
                     <div className="relative">
                       <input
@@ -708,6 +722,7 @@ export default function OrdersPanel({
                         type="search"
                         placeholder="Search by inventory # or product title"
                         value={productSearch}
+                        disabled={loadingProducts}
                         onChange={(e) => {
                           setProductSearch(e.target.value);
                           setShowAllProductMatches(false);

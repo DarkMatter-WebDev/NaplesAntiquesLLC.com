@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 function normalizeEmail(value: unknown) {
@@ -27,7 +27,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  // The underlying SECURITY DEFINER RPC is service-role-only so callers cannot
+  // bypass this route's validation and IP limit through PostgREST directly.
+  const supabase = createServiceClient();
   const { error } = await supabase.rpc('subscribe_homepage', {
     subscriber_email: email,
     subscriber_name: fullName || null,

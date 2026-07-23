@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
+import { getVerifiedUser } from '@/lib/auth-claims';
 import AdminHeader from '@/components/admin/AdminHeader';
 import SubscribersManager, { type SubscriberRow } from '@/components/admin/SubscribersManager';
 import { buildMarketingAudience } from '@/lib/marketing';
@@ -17,7 +18,7 @@ export default async function AdminSubscribersPage({ params }: Props) {
   const adminBasePath = isEs ? '/es/admin' : '/admin';
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getVerifiedUser(supabase);
 
   if (!user) {
     redirect(isEs ? '/es/account/sign-in' : '/account/sign-in');

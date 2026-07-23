@@ -9,7 +9,7 @@ interface Props {
   onDark?: boolean;
 }
 
-function formatRemaining(ms: number): string {
+export function formatRemaining(ms: number): string {
   const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
@@ -17,12 +17,16 @@ function formatRemaining(ms: number): string {
 }
 
 export default function PriceUpdateTicker({ nextUpdateAt, locale, onDark = false }: Props) {
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState<number | null>(null);
   const isEs = locale === 'es';
 
   useEffect(() => {
+    const initialTimer = window.setTimeout(() => setNow(Date.now()), 0);
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+    };
   }, []);
 
   const updateTime = useMemo(() => (
@@ -41,9 +45,11 @@ export default function PriceUpdateTicker({ nextUpdateAt, locale, onDark = false
         fontFamily: 'var(--font-label)',
       }}
     >
-      {isEs
-        ? `Actualiza en ${formatRemaining(nextUpdateAt - now)} · ${updateTime}`
-        : `Updates in ${formatRemaining(nextUpdateAt - now)} · ${updateTime}`}
+      {now == null
+        ? (isEs ? `Próxima actualización · ${updateTime}` : `Next update · ${updateTime}`)
+        : isEs
+          ? `Actualiza en ${formatRemaining(nextUpdateAt - now)} · ${updateTime}`
+          : `Updates in ${formatRemaining(nextUpdateAt - now)} · ${updateTime}`}
     </p>
   );
 }

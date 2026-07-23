@@ -1,4 +1,5 @@
 import 'server-only';
+import { XMLParser } from 'fast-xml-parser';
 
 // Fetch wrapper for eBay's REST APIs. Modeled on next-app/src/lib/etsy/client.ts's
 // shape (throttle + backoff + typed error + redacted logging) — never imports
@@ -25,6 +26,7 @@ export const EBAY_AUTH_BASE = isSandbox() ? 'https://auth.sandbox.ebay.com' : 'h
 // env-prefix convention (auth.sandbox.ebay.com); the plan's
 // rest-endpoints-used.md only confirms the production host (auth.ebay.com).
 export const EBAY_TOKEN_URL = `${EBAY_API_BASE}/identity/v1/oauth2/token`;
+const EBAY_TRADING_API_URL = `${EBAY_API_BASE}/ws/api.dll`;
 
 export function ebayConfigured(): boolean {
   return Boolean(process.env.EBAY_CLIENT_ID && process.env.EBAY_CLIENT_SECRET);
@@ -266,6 +268,100 @@ export async function ebayFetch<T>(opts: EbayRequestOptions): Promise<EbayRespon
     console.error(`ebay client: ${opts.method} ${opts.path} failed (HTTP ${res.status}):`, JSON.stringify(error.detail));
     throw error;
   }
+}
+
+export interface EbayTradingItemStatus {
+  itemId: string;
+  sku: string | null;
+  listingStatus: string | null;
+  relistedItemId: string | null;
+}
+
+interface TradingGetItemEnvelope {
+  GetItemResponse?: {
+    Ack?: string;
+    Item?: {
+      ItemID?: string;
+      SKU?: string;
+      SellingStatus?: { ListingStatus?: string };
+      ListingDetails?: { RelistedItemID?: string };
+    };
+    Errors?:
+      | { ErrorCode?: string; LongMessage?: string; ShortMessage?: string }
+      | Array<{ ErrorCode?: string; LongMessage?: string; ShortMessage?: string }>;
+  };
+}
+
+const tradingXmlParser = new XMLParser({
+  removeNSPrefix: true,
+  parseTagValue: false,
+  trimValues: true,
+});
+
+export function parseTradingGetItemResponse(xml: string): {
+  ack: string;
+  item: EbayTradingItemStatus | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+} {
+  const parsed = tradingXmlParser.parse(xml) as TradingGetItemEnvelope;
+  const response = parsed.GetItemResponse;
+  const rawErrors = response?.Errors;
+  const firstError = Array.isArray(rawErrors) ? rawErrors[0] : rawErrors;
+  const item = response?.Item;
+  return {
+    ack: response?.Ack ?? '',
+    item: item?.ItemID
+      ? {
+          itemId: item.ItemID,
+          sku: item.SKU ?? null,
+          listingStatus: item.SellingStatus?.ListingStatus ?? null,
+          relistedItemId: item.ListingDetails?.RelistedItemID ?? null,
+        }
+      : null,
+    errorCode: firstError?.ErrorCode ?? null,
+    errorMessage: firstError?.LongMessage ?? firstError?.ShortMessage ?? null,
+  };
+}
+
+/**
+ * Seller-side listing status lookup. The Inventory API does not move an old
+ * offer to a listing that was relisted outside that offer, while Trading
+ * GetItem exposes the old listing's RelistedItemID chain.
+ */
+export async function ebayTradingGetItemStatus(accessToken: string, itemId: string): Promise<EbayTradingItemStatus> {
+  if (!/^\d+$/.test(itemId)) {
+    throw new Error('Invalid eBay listing ID.');
+  }
+
+  const body = `<?xml version="1.0" encoding="utf-8"?><GetItemRequest xmlns="urn:ebay:apis:eBLBaseComponents"><ItemID>${itemId}</ItemID><DetailLevel>ReturnAll</DetailLevel></GetItemRequest>`;
+  await throttle();
+  const res = await fetch(EBAY_TRADING_API_URL, {
+    method: 'POST',
+    headers: {
+      'X-EBAY-API-CALL-NAME': 'GetItem',
+      'X-EBAY-API-COMPATIBILITY-LEVEL': '1423',
+      'X-EBAY-API-SITEID': '0',
+      'X-EBAY-API-IAF-TOKEN': accessToken,
+      'Content-Type': 'text/xml',
+    },
+    body,
+    cache: 'no-store',
+  });
+  const parsed = parseTradingGetItemResponse(await res.text());
+  if (res.ok && ['SUCCESS', 'WARNING'].includes(parsed.ack.toUpperCase()) && parsed.item) {
+    return parsed.item;
+  }
+
+  const status = res.status || 502;
+  const message = parsed.errorMessage || `eBay Trading API error (HTTP ${status}).`;
+  throw new EbayApiError({
+    status,
+    code: status === 401 ? 'auth_expired' : 'trading_api_error',
+    operatorMessage: status === 401 ? 'eBay connection expired - click Reconnect eBay.' : message,
+    retryable: status >= 500,
+    detail: parsed.errorCode ? [{ errorId: parsed.errorCode, message: message.slice(0, 500) }] : null,
+  });
 }
 
 // ---------------------------------------------------------------------------

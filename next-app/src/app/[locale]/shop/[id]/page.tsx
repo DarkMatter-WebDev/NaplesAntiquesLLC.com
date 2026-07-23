@@ -24,9 +24,9 @@ import {
   type Product,
 } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
-import { fetchSpecialPriceDefault } from '@/lib/shop-settings';
+import { fetchShopVisibilitySettings, fetchSpecialPriceDefault } from '@/lib/shop-settings';
 import { jsonLdHtml } from '@/lib/json-ld';
-import { calcSpotMeltValue, formatUsdPrice, getDisplayPrice, purityToFraction } from '@/lib/pricing';
+import { calcSpotMeltValue, formatUsdPrice, getStorefrontDisplayPrice, purityToFraction } from '@/lib/pricing';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import ProductImageGallery from '@/components/shop/ProductImageGallery';
@@ -35,6 +35,8 @@ import type { WishlistItem } from '@/context/WishlistContext';
 import CartButton from '@/components/shop/CartButton';
 import type { CartItem } from '@/context/CartContext';
 import PriceUpdateTicker from '@/components/shop/PriceUpdateTicker';
+import { createServiceClient } from '@/lib/supabase/service';
+import { getProductVideo, toPublicProductVideo } from '@/lib/product-video-store';
 
 interface Props {
   params: Promise<{ locale: string; id: string }>;
@@ -61,6 +63,7 @@ const PRODUCT_DETAIL_COLUMNS = [
   'weight_grams',
   'gram_weight',
   'pricing_multiplier',
+  'sold_price',
   'inventory_number',
   'sku',
   'slug',
@@ -83,6 +86,7 @@ const PRODUCT_DETAIL_COLUMNS = [
   'special_price_override_amount',
   'special_price_override_mode',
   'special_price_override_percent',
+  'sold_price',
   'quantity',
 ].join(', ');
 
@@ -98,6 +102,7 @@ const OPTIONAL_PRODUCT_DETAIL_COLUMNS = [
   'special_price_override_mode',
   'special_price_override_percent',
   'quantity',
+  'sold_price',
 ];
 
 const PRODUCT_DETAIL_COLUMNS_REQUIRED = PRODUCT_DETAIL_COLUMNS
@@ -138,6 +143,7 @@ const fetchPublicProduct = cache(async (id: string) => {
             special_price_override_amount: null,
             special_price_override_mode: 'amount',
             special_price_override_percent: null,
+            sold_price: null,
             quantity: 1,
           } as Product
         : null,
@@ -149,6 +155,17 @@ const fetchPublicProduct = cache(async (id: string) => {
     data: result.data as unknown as Product | null,
     error: result.error,
   };
+});
+
+const fetchPublicProductVideo = cache(async (id: string) => {
+  try {
+    const service = createServiceClient();
+    return toPublicProductVideo(await getProductVideo(service, id));
+  } catch {
+    // Video is an optional enhancement. Product detail pages continue to work
+    // before the migration/env rollout or during a provider-side incident.
+    return null;
+  }
 });
 
 export async function generateStaticParams() {
@@ -281,14 +298,19 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   const p = product as Product;
   if (!isProductVisibleInShop(p.status) && !returnHref) notFound();
 
-  const spotData = await fetchSpotData();
+  const publicSettingsClient = createPublicClient();
+  const [spotData, productVideo, visibility] = await Promise.all([
+    fetchSpotData(),
+    fetchPublicProductVideo(p.id),
+    fetchShopVisibilitySettings(publicSettingsClient),
+  ]);
 
   const title = isEs && p.title_es ? p.title_es : p.title;
   const description = isEs && p.description_es ? p.description_es : p.description;
   const publicNotes = (isEs && p.public_notes_es?.trim() ? p.public_notes_es : p.public_notes)?.trim();
   const metalLabel = productMetalVariantLabel(p.metal_variant, p.category, locale);
-  const price = getDisplayPrice(p, spotData);
   const isSold = isProductSold(p.status);
+  const price = getStorefrontDisplayPrice(p, spotData, visibility.hideSoldItemPrices, locale);
   const isPurchasable = isProductPurchasable(p.status, p.quantity);
   const stockQuantity = normalizeProductQuantity(p.quantity);
   const productImages = p.image_urls?.length ? p.image_urls : p.images ?? [];
@@ -322,7 +344,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   // set once in Admin → Settings → Customer Trade-in Price) applies to every
   // item; else it falls back to the plain computed melt value. The scrap-value
   // box above stays tied to the real computed value either way.
-  const siteTradeInDefault = await fetchSpecialPriceDefault(createPublicClient());
+  const siteTradeInDefault = await fetchSpecialPriceDefault(publicSettingsClient);
   const specialTradeInPrice = resolveAdvertisedTradeInPrice(p, meltValue, siteTradeInDefault);
   const tradeInValue = specialTradeInPrice != null ? formatUsdPrice(specialTradeInPrice) : scrapValue;
   const spotPerOz = p.category === 'Silver'
@@ -342,6 +364,14 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
     ? p.chain_type ?? (p.tags ?? []).find(t => t.startsWith('ct:'))?.slice(3) ?? null
     : null;
   const buyerLength = productLengthSizeDisplay(p);
+  const localizedBuyerLength = buyerLength
+    ? isEs
+      ? buyerLength.replace(/^Size:\s*/i, 'Talla: ').replace(/\s+in$/i, ' pulg')
+      : buyerLength
+    : null;
+  const buyerLengthSpecValue = localizedBuyerLength && jewelryType === 'Ring'
+    ? localizedBuyerLength.replace(/^(?:Size|Talla):\s*/i, '')
+    : localizedBuyerLength;
   const specs: { label: string; value: string }[] = [];
 
   if (p.brand?.trim()) specs.push({ label: isEs ? 'Marca' : 'Brand', value: p.brand.trim() });
@@ -354,15 +384,13 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   if (metalValue) specs.push({ label: isEs ? 'Metal' : 'Metal', value: metalValue });
 
   if (productWeight) {
-    let weightValue = `${productWeight.toFixed(2)} g`;
-    if (p.purity) {
+    let weightValue = p.purity ? `${productWeight.toFixed(2)} g total` : `${productWeight.toFixed(2)} g`;
+    if (showSpotPrice && p.purity) {
       const fineGrams = productWeight * purityToFraction(p.purity);
       const fineTroyOz = fineGrams / GRAMS_PER_TROY_OZ;
       weightValue = isEs
         ? `${productWeight.toFixed(2)} g total · ${fineGrams.toFixed(2)} g ${p.category === 'Gold' ? 'oro fino' : 'plata fina'} · ${fineTroyOz.toFixed(4)} oz troy`
         : `${productWeight.toFixed(2)} g total · ${fineGrams.toFixed(2)} g fine ${p.category === 'Gold' ? 'gold' : 'silver'} · ${fineTroyOz.toFixed(4)} troy oz`;
-    }
-    if (p.purity) {
       weightValue = isEs
         ? weightValue.replace(' oz troy', ` oz troy de ${p.category === 'Gold' ? 'oro fino' : 'plata fina'}`)
         : weightValue.replace(' troy oz', ` troy oz fine ${p.category === 'Gold' ? 'gold' : 'silver'}`);
@@ -372,9 +400,9 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
 
   specs.push({ label: isEs ? 'Tipo de producto' : 'Product Type', value: productJewelryTypeLabel(jewelryType, locale) });
   if (chainType) specs.push({ label: isEs ? 'Tipo de enlace' : 'Link Type', value: chainType });
-  if (buyerLength) specs.push({
+  if (buyerLengthSpecValue) specs.push({
     label: jewelryType === 'Ring' ? (isEs ? 'Talla' : 'Size') : (isEs ? 'Largo' : 'Length'),
-    value: buyerLength,
+    value: buyerLengthSpecValue,
   });
 
   const gender = (p.gender ?? '').trim() || 'Unisex';
@@ -434,6 +462,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
     weight_grams: p.weight_grams,
     pricing_multiplier: p.pricing_multiplier,
     manual_price_label: p.manual_price_label,
+    sold_price: p.sold_price,
   };
 
 
@@ -475,11 +504,23 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
       { '@type': 'ListItem', position: 3, name: title, item: canonicalProductUrl },
     ],
   };
+  const videoLd = productVideo && schemaImage && productVideo.uploadedAt ? {
+    '@context': 'https://schema.org',
+    '@type': 'VideoObject',
+    name: `${title} product video`,
+    description: description || `${title} at Naples Estate Jewelry`,
+    thumbnailUrl: schemaImage,
+    uploadDate: productVideo.uploadedAt,
+    duration: `PT${Math.max(1, Math.round(productVideo.durationSeconds))}S`,
+    embedUrl: productVideo.iframeUrl,
+    ...(productVideo.downloadUrl ? { contentUrl: productVideo.downloadUrl } : {}),
+  } : null;
 
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(breadcrumbLd) }} />
+      {videoLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(videoLd) }} />}
       <SiteHeader />
       <main className={`pt-24 md:pt-28 pb-20${isDarkPage ? ' product-page-dark' : ''}`} style={mainStyle}>
 
@@ -487,7 +528,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
         <div className="max-w-7xl mx-auto px-4 md:px-8 mb-6">
           <Link
             href={backHref}
-            className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest hover:underline underline-offset-2"
+            className="hover-underline-grow inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest"
             style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
           >
             ← {backLabel}
@@ -498,7 +539,14 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
           <div className="grid md:grid-cols-2 gap-10 lg:gap-16">
 
             {/* Gallery */}
-            <ProductImageGallery images={productImages} title={title} imagePadding={p.image_padding} imagePaddingByImage={p.image_padding_by_image} />
+            <ProductImageGallery
+              images={productImages}
+              title={title}
+              imagePadding={p.image_padding}
+              imagePaddingByImage={p.image_padding_by_image}
+              video={productVideo}
+              locale={locale}
+            />
 
             {/* Info */}
             <div className="flex flex-col gap-5">
@@ -534,12 +582,12 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                   {metalLabel}
                   {p.purity ? ` · ${formatKarat(p.purity)}` : ''}
                 </span>
-                {buyerLength && (
+                {localizedBuyerLength && (
                   <span
                     className="text-[0.62rem] font-bold uppercase tracking-[0.3em]"
                     style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
                   >
-                    &middot; {buyerLength}
+                    &middot; {localizedBuyerLength}
                   </span>
                 )}
                 </div>
@@ -683,7 +731,13 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                         </div>
                       )}
                     </div>
-                    {nextSpotUpdateAt && <PriceUpdateTicker nextUpdateAt={nextSpotUpdateAt} locale={locale} onDark={isDarkPage} />}
+                    {nextSpotUpdateAt && (
+                      <PriceUpdateTicker
+                        nextUpdateAt={nextSpotUpdateAt}
+                        locale={locale}
+                        onDark={isDarkPage}
+                      />
+                    )}
                   </div>
                 )}
               </div>

@@ -410,11 +410,11 @@ export default function SignUpPage() {
               />
               <span>
                 {isEs ? 'Acepto los ' : 'I agree to the '}
-                <Link href={`${prefix}/terms`} target="_blank" rel="noopener noreferrer" className="font-bold hover:underline" style={{ color: 'var(--color-primary)' }}>
+                <Link href={`${prefix}/terms`} target="_blank" rel="noopener noreferrer" className="hover-underline-grow font-bold" style={{ color: 'var(--color-primary)' }}>
                   {isEs ? 'Términos de Servicio' : 'Terms of Service'}
                 </Link>{' '}
                 {isEs ? 'y la ' : 'and '}
-                <Link href={`${prefix}/privacy`} target="_blank" rel="noopener noreferrer" className="font-bold hover:underline" style={{ color: 'var(--color-primary)' }}>
+                <Link href={`${prefix}/privacy`} target="_blank" rel="noopener noreferrer" className="hover-underline-grow font-bold" style={{ color: 'var(--color-primary)' }}>
                   {isEs ? 'Política de Privacidad' : 'Privacy Policy'}
                 </Link>
                 .
@@ -470,7 +470,7 @@ export default function SignUpPage() {
           <p className="mt-7 text-sm text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
             {isEs ? '¿Ya tiene una cuenta? ' : 'Already have an account? '}
             <Link href={`${prefix}/account/sign-in`}
-              className="font-bold hover:underline underline-offset-2"
+              className="hover-underline-grow font-bold"
               style={{ color: 'var(--color-primary)' }}>
               {isEs ? 'Inicie sesión' : 'Sign in'}
             </Link>
@@ -482,4 +482,3 @@ export default function SignUpPage() {
     </>
   );
 }
-

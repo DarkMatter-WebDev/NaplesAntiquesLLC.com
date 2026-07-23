@@ -8,10 +8,12 @@ import MessageUsForm from '@/components/contact/MessageUsForm';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
+  const isEs = locale === 'es';
   return {
-    title: 'Contact Us — Submit Your Item',
-    description:
-      'Contact Naples Estate Jewelry to submit photos and details about estate jewelry, gold, silver, watches, coins, or antiques. Mobile, private evaluations throughout Southwest Florida. Call or text (239) 404-8505.',
+    title: isEs ? 'Contáctenos — Envíe Su Artículo' : 'Contact Us — Submit Your Item',
+    description: isEs
+      ? 'Contacte a Naples Estate Jewelry para enviar fotos y detalles de joyería, oro, plata, relojes, monedas o antigüedades. Evaluaciones móviles y privadas en el suroeste de Florida.'
+      : 'Contact Naples Estate Jewelry to submit photos and details about estate jewelry, gold, silver, watches, coins, or antiques. Mobile, private evaluations throughout Southwest Florida. Call or text (239) 404-8505.',
     alternates: alternatesFor('/contact', locale),
   };
 }

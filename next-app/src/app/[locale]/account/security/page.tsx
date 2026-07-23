@@ -5,10 +5,12 @@ import SiteHeader from '@/components/layout/SiteHeader';
 import { AccountSideRail, AccountSupportStrip, AccountTabs, PasswordChangeForm } from '@/components/account/AccountDashboard';
 import { type CustomerProfile } from '@/components/account/AccountProfileForm';
 import SiteFooter from '@/components/layout/SiteFooter';
+import { getAccountMetadata } from '@/lib/account-metadata';
 
-export const metadata: Metadata = {
-  title: 'Admin and Security',
-};
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  return getAccountMetadata('security', locale);
+}
 
 const SECURITY_PROFILE_COLUMNS = [
   'first_name',
@@ -425,4 +427,3 @@ export default async function AccountSecurityPage({ params }: Props) {
     </>
   );
 }
-

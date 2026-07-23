@@ -1,8 +1,8 @@
 -- Public shop display settings (single-row).
 --
--- Currently holds one toggle: whether SOLD products are shown in the public shop
--- gallery. Default TRUE preserves the existing behavior (available + sold are
--- both shown) until an admin turns it off.
+-- Controls whether SOLD products are shown in the public shop gallery and whether
+-- their customer-facing prices are replaced with "Sold". Defaults preserve the
+-- existing behavior until an admin opts into price masking.
 --
 -- Reads: the public storefront needs this value, so anon/authenticated may SELECT.
 -- Writes: only the admin API route (service-role client, gated by requireAdmin())
@@ -14,6 +14,7 @@
 create table if not exists public.shop_settings (
   id              boolean     primary key default true check (id),
   show_sold_items boolean     not null default true,
+  hide_sold_item_prices boolean not null default false,
   -- Site-wide default for the product-page trade-in line — see
   -- shop-special-price-default-2026-07.sql. Off by default (plain melt value).
   special_price_default_enabled boolean not null default false,
@@ -23,6 +24,8 @@ create table if not exists public.shop_settings (
 
 -- Additive columns for existing installs (no-op if the table was just created
 -- above with them). Keeps this canonical script safe to run on an older DB.
+alter table public.shop_settings
+  add column if not exists hide_sold_item_prices boolean not null default false;
 alter table public.shop_settings
   add column if not exists special_price_default_enabled boolean not null default false;
 alter table public.shop_settings

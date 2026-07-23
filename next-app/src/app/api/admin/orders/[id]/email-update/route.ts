@@ -47,28 +47,45 @@ export async function POST(req: Request, { params }: Props) {
     return NextResponse.json({ error: 'Admin access required.' }, { status: 403 });
   }
 
-  const { data: order, error: orderError } = await supabase
+  let orderResult = await supabase
     .from('orders')
-    .select('order_number, customer_name')
+    .select('order_number, customer_name, shipping_carrier, tracking_number')
     .eq('id', id)
     .single();
+
+  if (orderResult.error && /shipping_carrier|tracking_number/i.test(orderResult.error.message)) {
+    orderResult = await supabase
+      .from('orders')
+      .select('order_number, customer_name')
+      .eq('id', id)
+      .single();
+  }
+
+  const { data: order, error: orderError } = orderResult;
 
   if (orderError || !order) {
     return NextResponse.json({ error: orderError?.message ?? 'Order not found.' }, { status: 404 });
   }
 
-  const content = buildFulfillmentUpdateEmailContent(order, status);
+  const content = buildFulfillmentUpdateEmailContent({
+    ...order,
+    shipping_carrier: 'shipping_carrier' in order ? order.shipping_carrier : null,
+    tracking_number: 'tracking_number' in order ? order.tracking_number : null,
+  }, status);
 
   try {
     const { Resend } = await import('resend');
     const resend = new Resend(resendKey);
-    await resend.emails.send({
+    const result = await resend.emails.send({
       from: 'Naples Estate Jewelry <noreply@naplesestatejewelry.co>',
       to: recipient,
       subject: content.subject,
       html: content.html,
       text: content.text,
     });
+    if (result.error || !result.data?.id) {
+      throw new Error(result.error?.message ?? 'Resend did not return an accepted email ID.');
+    }
   } catch (error) {
     console.error('Fulfillment update email error:', error);
     return NextResponse.json({ error: 'Could not send update email.' }, { status: 500 });

@@ -16,10 +16,11 @@ import {
   productMetalVariantLabel,
   productStatusLabel,
   productSupportsLinkType,
+  productWidthDisplay,
   type Product,
   type SpotData,
 } from '@/types/product';
-import { getDisplayPrice } from '@/lib/pricing';
+import { getStorefrontDisplayPrice } from '@/lib/pricing';
 import WishlistButton from '@/components/shop/WishlistButton';
 import type { WishlistItem } from '@/context/WishlistContext';
 import CartButton from '@/components/shop/CartButton';
@@ -30,18 +31,20 @@ interface Props {
   product: Product;
   spotData: SpotData | null;
   locale: string;
+  hideSoldItemPrices?: boolean;
   prioritizeImage?: boolean;
 }
 
-export default function ProductListRow({ product, spotData, locale, prioritizeImage = false }: Props) {
+export default function ProductListRow({ product, spotData, locale, hideSoldItemPrices = false, prioritizeImage = false }: Props) {
   const isEs = locale === 'es';
   const title = isEs && product.title_es ? product.title_es : product.title;
-  const price = getDisplayPrice(product, spotData);
+  const price = getStorefrontDisplayPrice(product, spotData, hideSoldItemPrices, locale);
   const metalLabel = productMetalVariantLabel(product.metal_variant, product.category, locale);
   const purityLabel = formatPurity(product, isEs);
   const purityChipStyle = getPurityChipStyle(product);
   const weightLabel = formatWeight(product.gram_weight ?? product.weight_grams);
   const lengthLabel = formatLengthChip(productLengthSizeDisplay(product));
+  const widthLabel = productWidthDisplay(product);
   const itemDateLabel = formatProductItemYear(product.item_year);
   const images = useMemo(
     () =>
@@ -56,6 +59,7 @@ export default function ProductListRow({ product, spotData, locale, prioritizeIm
   const href = locale === 'es' ? `/es/shop/${product.id}` : `/shop/${product.id}`;
   const normalizedStatus = normalizeProductStatus(product.status);
   const isSold = isProductSold(product.status);
+  const isSoldPriceHidden = isSold && hideSoldItemPrices;
   const isPurchasable = isProductPurchasable(product.status, product.quantity);
   const stockQuantity = normalizeProductQuantity(product.quantity);
   const brand = product.brand?.trim() ?? '';
@@ -102,6 +106,7 @@ export default function ProductListRow({ product, spotData, locale, prioritizeIm
     weight_grams: product.weight_grams,
     pricing_multiplier: product.pricing_multiplier,
     manual_price_label: product.manual_price_label,
+    sold_price: product.sold_price,
   };
 
   return (
@@ -143,7 +148,7 @@ export default function ProductListRow({ product, spotData, locale, prioritizeIm
           <span className="shop-list-metal">{metalLabel}</span>
         </div>
         <Link href={href} prefetch={false} className="shop-list-title-link">
-          <h3 className="shop-list-title">{title}</h3>
+          <h3 className="shop-list-title hover-underline-grow">{title}</h3>
         </Link>
         <div className="shop-list-meta">
           {(brand || linkTypeLabel) && (
@@ -176,12 +181,21 @@ export default function ProductListRow({ product, spotData, locale, prioritizeIm
               {lengthLabel}
             </span>
           )}
+          {widthLabel && (
+            <span
+              className="shop-list-chip"
+              style={{ background: 'rgba(77, 99, 93, 0.08)', borderColor: 'rgba(77, 99, 93, 0.2)', color: '#3f5f56' }}
+              aria-label={`${isEs ? 'Ancho' : 'Width'}: ${widthLabel}`}
+            >
+              {widthLabel}
+            </span>
+          )}
         </div>
       </div>
 
       <div className="shop-list-aside">
         <div className="shop-list-price">
-          <span className="shop-list-price-label">{isEs ? 'Tu precio' : 'Your price'}</span>
+          <span className="shop-list-price-label">{isSoldPriceHidden ? (isEs ? 'Estado' : 'Status') : (isEs ? 'Tu precio' : 'Your price')}</span>
           <span className="shop-list-price-value">{price}</span>
         </div>
         <div className="shop-list-actions">

@@ -84,6 +84,59 @@ export type PayPalPayload = {
 // sessionStorage so "they were sent back a second time" is detected even if the
 // card flow did a full-page redirect back to us. Cleared on a completed payment.
 const UNKNOWN_ERROR_COUNT_KEY = 'nej-checkout-unknown-errors';
+const CAPTURE_RECOVERY_KEY = 'nej-checkout-capture-recovery';
+const CAPTURE_RECOVERY_TTL_MS = 24 * 60 * 60 * 1000;
+
+type CaptureRecovery = {
+  orderId: string | null;
+  cartKey: string;
+  reason: 'captured' | 'unknown' | 'conflict';
+  createdAt: number;
+};
+
+type PaymentStage = 'idle' | 'awaiting-approval' | 'processing';
+
+function cartKey(payload: PayPalPayload): string {
+  return JSON.stringify(
+    payload.items
+      .map((item) => [item.id, item.quantity] as const)
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
+function readCaptureRecovery(): CaptureRecovery | null {
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(CAPTURE_RECOVERY_KEY) ?? 'null') as CaptureRecovery | null;
+    if (!parsed || Date.now() - parsed.createdAt > CAPTURE_RECOVERY_TTL_MS) {
+      sessionStorage.removeItem(CAPTURE_RECOVERY_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveCaptureRecovery(payload: PayPalPayload, orderId: string | null, reason: CaptureRecovery['reason']): void {
+  try {
+    sessionStorage.setItem(CAPTURE_RECOVERY_KEY, JSON.stringify({
+      orderId,
+      cartKey: cartKey(payload),
+      reason,
+      createdAt: Date.now(),
+    } satisfies CaptureRecovery));
+  } catch {
+    /* ignore - current-page state still blocks another submission */
+  }
+}
+
+function clearCaptureRecovery(): void {
+  try {
+    sessionStorage.removeItem(CAPTURE_RECOVERY_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 function readUnknownErrorCount(): number {
   try {
@@ -144,7 +197,8 @@ export default function PayPalCheckoutButton({
   const [sdkReady, setSdkReady] = useState(false);
   const [sdkError, setSdkError] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [processing, setProcessing] = useState(false);
+  const [paymentStage, setPaymentStage] = useState<PaymentStage>('idle');
+  const [captureRecoveryRequired, setCaptureRecoveryRequired] = useState(false);
   // Inline red reminder shown when the buyer clicks pay before completing the
   // required fields / confirmation checkbox (replaces the old full-screen modal).
   const [missingHint, setMissingHint] = useState<{ fields: string[]; needsConfirm: boolean } | null>(null);
@@ -162,6 +216,7 @@ export default function PayPalCheckoutButton({
   const missingFieldsRef = useRef(missingFields);
   const needsInfoConfirmationRef = useRef(needsInfoConfirmation);
   const onAvailabilityIssueRef = useRef(onAvailabilityIssue);
+  const captureRecoveryRequiredRef = useRef(captureRecoveryRequired);
   // Set when createOrder/onApprove already showed a specific message, so the
   // PayPal SDK's follow-up onError doesn't clobber it with the generic one.
   const handledErrorRef = useRef(false);
@@ -174,7 +229,19 @@ export default function PayPalCheckoutButton({
     missingFieldsRef.current = missingFields;
     needsInfoConfirmationRef.current = needsInfoConfirmation;
     onAvailabilityIssueRef.current = onAvailabilityIssue;
+    captureRecoveryRequiredRef.current = captureRecoveryRequired;
   });
+
+  useEffect(() => {
+    const saved = readCaptureRecovery();
+    if (!saved || saved.cartKey !== cartKey(getPayloadRef.current())) return;
+    setCaptureRecoveryRequired(true);
+    setMessage(
+      isEsRef.current
+        ? 'El estado de este pago requiere confirmación. No vuelva a enviarlo; contáctenos si necesita ayuda.'
+        : 'This payment needs confirmation. Do not submit it again; contact us if you need help.',
+    );
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -194,6 +261,23 @@ export default function PayPalCheckoutButton({
       // Validate contact details before opening the PayPal window. The buttons are
       // always visible; if the form isn't filled, reject the click and prompt.
       onClick: (_data, actions) => {
+        if (captureRecoveryRequiredRef.current) {
+          const saved = readCaptureRecovery();
+          if (saved && saved.cartKey !== cartKey(getPayloadRef.current())) {
+            clearCaptureRecovery();
+            captureRecoveryRequiredRef.current = false;
+            setCaptureRecoveryRequired(false);
+            setMessage(null);
+            return actions.resolve();
+          }
+          setMessage(
+            isEsRef.current
+              ? 'PayPal ya capturó este pago y la actualización del pedido sigue pendiente. No envíe el pago otra vez; contáctenos si necesita ayuda.'
+              : 'PayPal already captured this payment and the order update is still pending. Do not submit payment again; contact us if you need help.',
+          );
+          setMissingHint(null);
+          return actions.reject();
+        }
         if (!readyRef.current) {
           setMissingHint({ fields: missingFieldsRef.current, needsConfirm: needsInfoConfirmationRef.current });
           return actions.reject();
@@ -206,7 +290,7 @@ export default function PayPalCheckoutButton({
       createOrder: async () => {
         setMessage(null);
         handledErrorRef.current = false;
-        setProcessing(true);
+        setPaymentStage('awaiting-approval');
         try {
           const res = await fetch('/api/paypal/create-order', {
             method: 'POST',
@@ -223,7 +307,7 @@ export default function PayPalCheckoutButton({
           }
           return data.paypalOrderId as string;
         } catch (err) {
-          setProcessing(false);
+          setPaymentStage('idle');
           handledErrorRef.current = true; // a specific message is shown below; onError must not overwrite it
           const serverMsg = err instanceof Error ? err.message : '';
           if (isAvailabilityError(serverMsg)) {
@@ -249,6 +333,7 @@ export default function PayPalCheckoutButton({
         // The buyer approved (hit Pay Now) in the PayPal window — capture the
         // payment now so the sale completes here, then the parent shows the
         // order confirmation screen.
+        setPaymentStage('processing');
         try {
           const res = await fetch('/api/paypal/capture-order', {
             method: 'POST',
@@ -257,14 +342,53 @@ export default function PayPalCheckoutButton({
           });
           const result = await res.json().catch(() => null);
           if (!res.ok || !result?.success) {
+            if (result?.paymentCaptured || result?.paymentStatusUnknown) {
+              const recoveryReason: CaptureRecovery['reason'] = result?.itemConflict
+                ? 'conflict'
+                : result?.paymentCaptured
+                  ? 'captured'
+                  : 'unknown';
+              saveCaptureRecovery(
+                getPayloadRef.current(),
+                result?.orderId ?? createdOrderIdRef.current,
+                recoveryReason,
+              );
+              createdOrderIdRef.current = null;
+              setPaymentStage('idle');
+              setCaptureRecoveryRequired(true);
+              captureRecoveryRequiredRef.current = true;
+              handledErrorRef.current = true;
+              if (result?.itemConflict) {
+                onAvailabilityIssueRef.current?.();
+                setMessage(
+                  isEsRef.current
+                    ? 'PayPal capturó su pago, pero otro cliente compró el artículo primero. No vuelva a pagar; nuestro equipo lo contactará para el reembolso.'
+                    : 'PayPal captured your payment, but another buyer purchased the item first. Do not pay again; our team will contact you about the refund.',
+                );
+              } else if (result?.paymentCaptured) {
+                setMessage(
+                  isEsRef.current
+                    ? 'PayPal capturó su pago, pero la actualización del pedido sigue pendiente. No vuelva a pagar. Nuestro equipo puede confirmar el pedido con la referencia de PayPal.'
+                    : 'PayPal captured your payment, but the order update is still pending. Do not pay again. Our team can confirm the order from the PayPal reference.',
+                );
+              } else {
+                setMessage(
+                  isEsRef.current
+                    ? 'PayPal no pudo confirmar el estado del pago. No vuelva a enviarlo hasta que nuestro equipo lo revise.'
+                    : 'PayPal could not confirm the payment status. Do not submit it again until our team reviews it.',
+                );
+              }
+              return;
+            }
             throw new Error(result?.error ?? 'capture failed');
           }
           // Paid — this order must never be cancelled by a later unmount.
           createdOrderIdRef.current = null;
+          clearCaptureRecovery();
           clearUnknownErrorCount(); // fresh slate: their next checkout starts un-escalated
           onSuccessRef.current({ orderId: result.orderId, orderNumber: result.orderNumber });
         } catch (err) {
-          setProcessing(false);
+          setPaymentStage('idle');
           handledErrorRef.current = true;
           const serverMsg = err instanceof Error ? err.message : '';
           if (isAvailabilityError(serverMsg)) {
@@ -286,7 +410,8 @@ export default function PayPalCheckoutButton({
         }
       },
       onCancel: () => {
-        setProcessing(false);
+        setPaymentStage('idle');
+        if (captureRecoveryRequiredRef.current) return;
         // Buyer closed / cancelled the PayPal window before approving. Cancel the
         // unpaid order that create-order already wrote so it doesn't linger in the
         // admin as an open sale. Keep the id: an immediate retry reuses this order.
@@ -298,7 +423,7 @@ export default function PayPalCheckoutButton({
         );
       },
       onError: () => {
-        setProcessing(false);
+        setPaymentStage('idle');
         // createOrder / onApprove already showed a specific reason — don't clobber it.
         if (handledErrorRef.current) {
           handledErrorRef.current = false;
@@ -385,21 +510,41 @@ export default function PayPalCheckoutButton({
       <div style={{ position: 'relative' }}>
         <div
           ref={containerRef}
-          aria-busy={processing}
+          aria-busy={paymentStage !== 'idle'}
           style={{
-            opacity: sdkReady && !ready ? 0.5 : 1,
+            opacity: sdkReady && (!ready || captureRecoveryRequired) ? 0.5 : 1,
             transition: 'opacity 150ms ease',
           }}
         />
         {/* Until the buyer is ready, an invisible overlay swallows the click so
             the PayPal flow never starts (no popup flash / jolt) — it just shows
             the reminder. Removed once ready, so real clicks reach the button. */}
-        {sdkReady && !ready && (
+        {sdkReady && (!ready || captureRecoveryRequired) && (
           <button
             type="button"
             tabIndex={-1}
-            aria-label={isEs ? 'Complete los datos requeridos para pagar' : 'Complete the required details before paying'}
-            onClick={() => setMissingHint({ fields: missingFields, needsConfirm: needsInfoConfirmation })}
+            aria-label={captureRecoveryRequired
+              ? (isEs ? 'El pago ya fue capturado' : 'Payment already captured')
+              : (isEs ? 'Complete los datos requeridos para pagar' : 'Complete the required details before paying')}
+            onClick={() => {
+              if (captureRecoveryRequired) {
+                const saved = readCaptureRecovery();
+                if (saved && saved.cartKey !== cartKey(getPayloadRef.current())) {
+                  clearCaptureRecovery();
+                  captureRecoveryRequiredRef.current = false;
+                  setCaptureRecoveryRequired(false);
+                  setMessage(null);
+                  return;
+                }
+                setMessage(
+                  isEs
+                    ? 'PayPal ya capturó este pago. No lo envíe otra vez.'
+                    : 'PayPal already captured this payment. Do not submit it again.',
+                );
+                return;
+              }
+              setMissingHint({ fields: missingFields, needsConfirm: needsInfoConfirmation });
+            }}
             style={{
               position: 'absolute',
               inset: 0,
@@ -419,18 +564,25 @@ export default function PayPalCheckoutButton({
           {isEs ? 'Cargando PayPal…' : 'Loading PayPal…'}
         </p>
       )}
-      {sdkReady && !ready && (
+      {sdkReady && !ready && !captureRecoveryRequired && (
         <p className="mt-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
           {isEs
             ? 'Complete los datos requeridos para continuar al pago.'
             : 'Complete the required details to continue to payment.'}
         </p>
       )}
-      {processing && (
+      {paymentStage === 'awaiting-approval' && (
         <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
           {isEs
-            ? 'Procesando su pago… Para cancelar, cierre la ventana de PayPal con la × en la esquina.'
-            : 'Processing your payment… To cancel, close the PayPal window using the × in the corner.'}
+            ? 'Complete sus datos de pago en la ventana segura de PayPal. Su pago no se procesará hasta que los revise y los envíe. Para cancelar, cierre la ventana de PayPal con la × en la esquina.'
+            : 'Complete your payment details in the secure PayPal window. Your payment will not be processed until you review and submit them. To cancel, close the PayPal window using the × in the corner.'}
+        </p>
+      )}
+      {paymentStage === 'processing' && (
+        <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+          {isEs
+            ? 'Procesando su pago… Mantenga esta página abierta.'
+            : 'Processing your payment… Please keep this page open.'}
         </p>
       )}
       {message && (

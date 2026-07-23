@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { getSiteUrl } from '@/lib/order-email-branding';
 import { EBAY_API_BASE, getApplicationToken } from '@/lib/ebay/client';
 import { insertSyncLog } from '@/lib/ebay/store';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 // Phase 0 compliance endpoint (ebay-sync-plan/09-api-routes.md,
 // ebay-sync-plan/15-compliance.md). The production keyset stays disabled
@@ -71,6 +72,41 @@ interface EbaySignatureHeader {
   alg?: string;
   kid?: string;
   signature?: string;
+}
+
+interface EbayAccountDeletionEvent {
+  metadata?: {
+    topic?: string;
+    schemaVersion?: string;
+    deprecated?: boolean;
+  };
+  notification?: {
+    notificationId?: string;
+    eventDate?: string;
+    publishDate?: string;
+    publishAttemptCount?: number;
+    data?: {
+      username?: string;
+      userId?: string;
+      eiasToken?: string;
+    };
+  };
+}
+
+export function sanitizeAccountDeletionEvent(event: EbayAccountDeletionEvent): Record<string, unknown> {
+  return {
+    metadata: {
+      topic: event.metadata?.topic ?? 'MARKETPLACE_ACCOUNT_DELETION',
+      schemaVersion: event.metadata?.schemaVersion ?? null,
+      deprecated: event.metadata?.deprecated ?? null,
+    },
+    notification: {
+      notificationId: event.notification?.notificationId ?? null,
+      eventDate: event.notification?.eventDate ?? null,
+      publishDate: event.notification?.publishDate ?? null,
+      publishAttemptCount: event.notification?.publishAttemptCount ?? null,
+    },
+  };
 }
 
 function parseSignatureHeader(header: string | null): EbaySignatureHeader | null {
@@ -182,13 +218,18 @@ async function verifyEbaySignature(rawBody: string, signatureHeader: string | nu
 }
 
 export async function POST(req: Request) {
+  const ip = getClientIp(req);
+  if (!(await checkRateLimit(`ebay-account-deletion:${ip}`, 120, 60))) {
+    return NextResponse.json({ error: { code: 'rate_limited', message: 'Too many requests.' } }, { status: 429 });
+  }
+
   const rawBody = await req.text();
   const verified = await verifyEbaySignature(rawBody, req.headers.get('x-ebay-signature'));
   if (!verified) {
     return NextResponse.json({ error: { code: 'invalid_signature', message: 'Signature verification failed.' } }, { status: 412 });
   }
 
-  let event: { notification?: { notificationId?: string } } = {};
+  let event: EbayAccountDeletionEvent = {};
   try {
     event = JSON.parse(rawBody || '{}');
   } catch {
@@ -207,7 +248,7 @@ export async function POST(req: Request) {
     provider: 'ebay',
     event_id: notificationId,
     event_type: 'MARKETPLACE_ACCOUNT_DELETION',
-    payload: event,
+    payload: sanitizeAccountDeletionEvent(event),
     status: 'received',
   });
 

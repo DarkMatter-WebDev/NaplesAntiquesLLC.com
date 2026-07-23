@@ -18,6 +18,7 @@ export interface WishlistItem {
   weight_grams: number | null;
   pricing_multiplier: number | null;
   manual_price_label: string | null;
+  sold_price?: number | null;
 }
 
 interface WishlistContextValue {
@@ -58,6 +59,7 @@ export function WishlistProvider({
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const productIdsKey = items.map((item) => item.id).sort().join('|');
 
   // Hydrate from localStorage once on mount
   useEffect(() => {
@@ -76,20 +78,15 @@ export function WishlistProvider({
   }, [items, hydrated]);
 
   useEffect(() => {
-    if (!hydrated) return;
-    const missingPaddingIds = items
-      .filter((item) => item.image && item.image_padding === undefined)
-      .map((item) => item.id);
-    if (missingPaddingIds.length === 0) return;
-
+    if (!hydrated || !productIdsKey) return;
+    const productIds = productIdsKey.split('|');
     let cancelled = false;
 
-    async function loadImagePadding() {
-      const supabase = createClient();
-      const { data } = await supabase
+    async function loadCurrentProductState() {
+      const { data } = await createClient()
         .from('products')
-        .select('id, image_padding, image_padding_by_image')
-        .in('id', missingPaddingIds);
+        .select('id, status, sold_price, image_padding, image_padding_by_image')
+        .in('id', productIds);
 
       if (cancelled || !data) return;
       const productById = new Map(data.map((product) => [product.id, product]));
@@ -98,20 +95,26 @@ export function WishlistProvider({
         let changed = false;
         const next = current.map((item) => {
           const product = productById.get(item.id);
-          if (item.image_padding !== undefined || !product) return item;
+          if (!product) return item;
+          const imagePadding = item.image_padding === undefined
+            ? productImagePaddingForImage(product.image_padding, product.image_padding_by_image, item.image, 0)
+            : item.image_padding;
+          const status = product.status as ProductStatus;
+          const soldPrice = product.sold_price ?? null;
+          if (imagePadding === item.image_padding && status === item.status && soldPrice === (item.sold_price ?? null)) return item;
           changed = true;
-          return { ...item, image_padding: productImagePaddingForImage(product.image_padding, product.image_padding_by_image, item.image, 0) };
+          return { ...item, image_padding: imagePadding, status, sold_price: soldPrice };
         });
         return changed ? next : current;
       });
     }
 
-    loadImagePadding();
+    void loadCurrentProductState();
 
     return () => {
       cancelled = true;
     };
-  }, [hydrated, items]);
+  }, [hydrated, productIdsKey]);
 
   const isIn = useCallback((id: string) => items.some((i) => i.id === id), [items]);
 

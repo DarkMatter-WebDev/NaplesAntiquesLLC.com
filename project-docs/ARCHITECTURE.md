@@ -1,13 +1,18 @@
 ﻿# Architecture
 
 > Update whenever significant structural changes occur. Last updated:
-> **2026-07-08** after the Etsy sync build (Phase 1 + Phase 2 code-complete,
-> unverified live — see `project-docs/features/etsy-sync.md`).
+> **2026-07-23** after checkout address/shipping/tax centralization and memory
+> reconciliation.
 
 ## System Design
 
 The active site is a **Next.js App Router** app in `next-app/`, deployed on
 Netlify with `@netlify/plugin-nextjs`.
+
+`next-app/netlify/edge-functions/api-rate-limit.ts` applies a broad per-IP and
+domain limit before `/api/*` reaches Next.js. Sensitive public routes then use
+the distributed Supabase counter in `next-app/src/lib/rate-limit.ts` for tighter
+endpoint-specific windows.
 
 ```text
 Browser
@@ -22,7 +27,9 @@ Browser
         â”œâ”€â”€> Supabase Auth + Postgres + Storage
         â”œâ”€â”€> gold-api.com via server-side spot-price helper
         â”œâ”€â”€> PayPal Orders API v2 (sandbox/live) for online payments
-        â””â”€â”€> Resend for inquiry/order and direct marketing email when configured
+        â”œâ”€â”€> Resend for inquiry/order and direct marketing email when configured
+        â””â”€â”€> Cloudflare Stream for direct resumable product-video upload,
+              processing, playback, webhook state, and generated MP4
 ```
 
 The old root `*.html`, `es/`, `scripts/`, root `assets/`, and
@@ -101,9 +108,10 @@ Account registration stores Terms/Privacy acceptance in Supabase Auth user
 metadata. `supabase/compliance-consent.sql` and `supabase/schema.sql` add
 matching `profiles` fields for acceptance timestamps and accepted policy version
 so the live database can copy those values into profile records. Homepage
-subscribers can opt out through `/unsubscribe`, which
-posts to `/api/unsubscribe` and calls the `unsubscribe_homepage` RPC added to
-`supabase/homepage-subscribers.sql`.
+subscribers can opt out through `/unsubscribe`, which posts to
+`/api/unsubscribe`. Subscribe/unsubscribe mutation RPCs are service-role-only;
+public callers must pass through the Next routes' validation and distributed
+IP limits.
 
 ## Carousel Hero
 
@@ -158,6 +166,13 @@ under `/api/admin/*` (`ai-product-fill`, `ai-settings`, `messages`,
 list is representative, not exhaustive â€” see `next-app/src/app/api/` for the
 full route tree.
 
+Product video routes add authenticated `/api/admin/product-video/*` lifecycle
+handlers and the public signed webhook endpoint
+`/api/webhooks/cloudflare-stream`. The browser POSTs only upload metadata to the
+app, receives a one-time TUS URL, then sends video chunks directly to Stream.
+Public product detail rendering reads a ready-only server projection; shop list
+queries do not join/poll video state.
+
 ## Data Model
 
 Supabase is the source for app data:
@@ -171,7 +186,15 @@ Supabase is the source for app data:
   shown on the /es product page), and admin-only cost/acquisition fields. The
   legacy `internal_notes` column is retained for the `details` fold but no longer
   surfaced in the listing form.
-- `orders` - order headers/customer totals/payment/fulfillment state, plus PayPal
+- `product_videos` - one active Cloudflare Stream uid and metadata/playback URL
+  set per product; video bytes never enter Postgres.
+- `product_video_uploads` - short-lived admin-owned upload candidates, allowing
+  new listings/replacements to remain uncommitted until Save and to be deleted
+  on Cancel.
+- `cloudflare_stream_webhook_events` - raw-body event hashes for idempotent,
+  signature-verified processing callbacks.
+- `orders` - order headers/customer totals/payment/fulfillment state, shipment
+  details (`shipping_carrier`, `tracking_number`), plus PayPal
   references (`paypal_order_id`, `paypal_capture_id`, `payment_response`, `paid_at`)
   and legacy `reserved_until` compatibility data. `deleted_at` powers the admin Orders
   Recycle Bin (`/admin/orders?view=trash`). `customer_notes` and the `shipping_address` jsonb
@@ -183,7 +206,11 @@ Supabase is the source for app data:
   paid capture updates the same row to `paid`; the order detail page can
   generate/refresh the row for older orders.
 - `webhook_events` - idempotent log of PayPal (and future provider) webhook events,
-  unique on `(provider, event_id)`.
+  unique on `(provider, event_id)`. PayPal delivery attempts atomically claim
+  new, prior-error, or stale-processing rows before applying business changes.
+- `paypal_refunds` - PayPal refund ledger, unique by provider refund ID and
+  deterministic request key. Completed refunds are applied to an order exactly
+  once by `apply_paypal_refund` while pending provider states remain unapplied.
 - `admin_notifications` - admin message center notifications for contact messages
   and inquiries. (PayPal order events no longer write here â€” paid orders surface on
   the Orders-tab badge instead.)
@@ -201,11 +228,12 @@ Supabase is the source for app data:
   `visible_count_mobile`.
 - `etsy_connection` / `etsy_oauth_states` / `etsy_listings` /
   `etsy_listing_images` / `etsy_sync_log` - Etsy sync (2026-07-08, see
-  "Etsy Sync" below). **Written in `supabase/etsy-sync.sql`, not yet applied.**
+  "Etsy Sync" below). `supabase/etsy-sync.sql` and the resumable-queue
+  hardening migration are applied.
 - `ebay_connection` / `ebay_oauth_states` / `ebay_listings` /
   `ebay_sync_log` - eBay sync (2026-07-09, see "eBay Sync" below); one fewer
   table than Etsy (no per-image table — eBay takes image URLs directly).
-  **Written in `supabase/ebay-sync.sql`, not yet applied.**
+  `supabase/ebay-sync.sql` is applied.
 
 SQL setup and policy scripts live in `supabase/`.
 
@@ -311,15 +339,22 @@ storefront path; `/payment` stays a disabled placeholder). Full runbook:
   window. The shipping method is chosen on the Order Summary's "Shipping" row; the
   Shipping Address block sits in the left review column under the summary.
 - **Server lib:** `next-app/src/lib/paypal.ts` (OAuth token cache, Orders v2
-  create/capture, `verifyPayPalWebhook`). `next-app/src/lib/checkout-pricing.ts`
-  is the single source of truth for authoritative subtotal/7%-tax/shipping/total
-  (also used by the legacy checkout route). **No amounts are trusted from the
-  browser.**
+  create/capture, capture refunds, `verifyPayPalWebhook`) plus
+  `next-app/src/lib/paypal-refunds.ts` (cent-based cumulative refund planning and
+  deterministic request IDs) and `next-app/src/lib/paypal-webhook.ts` (capture-ID
+  resolution and cumulative-refund parsing). `next-app/src/lib/checkout-pricing.ts`
+  is the single source of truth for authoritative subtotal/6%-Florida-tax/
+  shipping/total, `next-app/src/lib/checkout-shipping.ts` owns the allowed
+  methods and fees, and `next-app/src/lib/us-address.ts` validates U.S.
+  destinations. **No amounts or unvalidated destination fields are trusted from
+  the browser.**
 - **Routes:** `POST /api/paypal/create-order` (build authoritative order, create
   PayPal order â€” no inventory hold), `POST /api/paypal/capture-order`
   (capture, verify amount+currency, mark paid + products sold, resolve the
   concurrent-buyer race), `POST /api/paypal/webhook` (signature-verified,
-  idempotent via `webhook_events`).
+  retryable/idempotent via `webhook_events`), and admin-authenticated
+  `POST /api/admin/orders/[id]/refund` (full/additional partial PayPal refunds,
+  blocked until the refund-ledger migration is ready).
 - **Invoices:** PayPal create-order and manual admin order creation generate a
   draft invoice row with `upsertOrderInvoice`; paid capture calls the same helper
   so the existing row becomes `paid` instead of creating a duplicate. Admin order
@@ -339,20 +374,35 @@ storefront path; `/payment` stays a disabled placeholder). Full runbook:
   products `available`, so multiple buyers can check out the same piece at once.
   `capture_paypal_order` resolves the race: it row-locks the product rows, and if
   the item was already `sold` by a first buyer's capture it returns `item_conflict`
-  (this order is flagged `failed` for a manual refund); otherwise it flips the
+  (this order is flagged `failed` and retains its capture ID for a refund);
+  otherwise it flips the
   products to `sold` and the order to `payment_status='paid'` /
   `order_status='completed'`. Capture + denial/refund webhook call
   `revalidateTag('shop-catalog', { expire: 0 })` so sold items leave the gallery
   promptly. The old 30-min `reserve_paypal_order` hold + expiry sweep were removed
   (`no-reservation-checkout.sql`). The active app has no manual admin **Reserved**
   product status.
+- **Failure recovery and refunds (2026-07-20):** PayPal order creation uses a
+  deterministic request ID. Capture evidence is saved before inventory
+  finalization, and the buyer is blocked from paying again when PayPal captured
+  money or its status remains unresolved. The route reconciles ambiguous calls
+  through a PayPal order lookup, and a 24-hour same-cart browser lock survives
+  reloads. Webhook RPC/finalization failures stay retryable; automatic buyer and
+  owner emails use stable Resend idempotency keys.
+  Admin PayPal refunds use deterministic request IDs plus the `paypal_refunds`
+  ledger so the same cumulative target can be retried without moving money or
+  incrementing `orders.refund_amount` twice. Capture-refunded webhooks calculate
+  their incremental amount from PayPal's cumulative refunded total, while
+  pending/failed refund resources update the ledger without changing order
+  totals. `supabase/paypal-checkout-hardening-2026-07.sql` is applied; retain
+  its verification probes and migration ordering for new environments.
 - **Admin surfacing:** the admin **Orders** nav badge (`AdminOrdersLink`) counts active
   orders created after that admin/browser last viewed Orders; paid orders no longer
   surface in the Messages center.
 - **Env:** `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_ENV`
   (sandbox/live â€” creds must match the env), `PAYPAL_WEBHOOK_ID`.
 
-## Etsy Sync (2026-07-08 — code-complete, unverified live)
+## Etsy Sync (Phase 1/2 live)
 
 One-way push (Supabase `products` → an Etsy shop, as a secondary sales
 channel). Full plan: `etsy-sync-plan/` (17 docs); full build report: owner
@@ -369,18 +419,20 @@ checklist in `etsy-sync-plan/OWNER-SETUP.md`; feature detail:
   activate/draft-review, plus Phase 2 bulk queue drain, content-hash
   out-of-date detection, and the scheduled price push), `store.ts` (typed
   access to the `etsy_*` tables).
-- **Tables (`supabase/etsy-sync.sql`, written, not yet run):**
+- **Tables (`supabase/etsy-sync.sql`, applied):**
   `etsy_connection` (single-row OAuth + shop defaults + sync policy),
   `etsy_oauth_states` (transient PKCE handshake), `etsy_listings`
   (product↔listing mapping + sync-state machine + content hash),
   `etsy_listing_images` (per-image checkpoint), `etsy_sync_log`
   (audit/dead-letter). All RLS-enabled, service-role-only (same trust model
-  as `webhook_events`); a `claim_next_pending_etsy_listing()` RPC does the
-  atomic `FOR UPDATE SKIP LOCKED` queue claim for Phase 2's bulk drain.
+  as `webhook_events`); `claim_next_pending_etsy_listing()` atomically claims
+  every resumable state and `claim_next_repairable_etsy_listing()` provides a
+  linked-only recovery queue. Both use `FOR UPDATE SKIP LOCKED`.
 - **Routes (all under `/api/admin/etsy/`, admin-gated + service-role client,
   same pattern as `/api/admin/ai-settings`):** `connect`, `callback`,
   `status`, `disconnect`, `settings`, `shop-profiles`, `preview` (dry-run, no
-  Etsy calls), `sync`, `sync-batch` (Phase 2 enqueue/drain), `delist`,
+  Etsy calls), `sync`, `sync-batch` (Phase 2 enqueue/drain plus repair drain),
+  `repair-summary` (read-only linked recovery count), `delist`,
   `listings` (bulk status map for the product table), `eligibility-summary`
   (bulk pre-flight counts), `price-push` (Phase 2 scheduled push — guarded by
   a shared secret header, not an admin session, since a cron has no browser
@@ -390,24 +442,24 @@ checklist in `etsy-sync-plan/OWNER-SETUP.md`; feature detail:
   connect/disconnect, shipping/return/readiness dropdowns, sync policy
   toggles, recent activity log), a per-product Etsy status chip + drawer
   section (`EtsyProductPanel.tsx`, wired into `AdminShell.tsx` — dry-run
-  preview, sync/sync-updates, delist/reactivate), and `EtsyBulkSyncModal.tsx`
-  (Phase 2 "Sync All to Etsy" with a pre-flight summary and cancellable
-  progress).
+  preview, sync/sync-updates, delist/reactivate), `EtsyBulkSyncModal.tsx`
+  (Phase 2 sync with a pre-flight summary and cancellable progress), and
+  `EtsyBulkRepairModal.tsx` (counted one-click continuation for linked
+  interrupted/out-of-date listings).
 - **Phase 2 automation:** auto-delist/relist is triggered from
   `handleProductStatusChange()` (`lib/etsy/sync.ts`), called from the
   existing revalidation chokepoints — `adminRevalidateProduct(s)`
   (`app/actions/admin-products.ts`), PayPal `capture-order`, and the PayPal
   webhook — rather than a new "who changes product status" audit. Always
   best-effort/non-throwing and gated off unless `auto_delist_on_sold` is on.
-- **Known gap before this is usable live:** Etsy taxonomy leaf IDs are
-  unpinned (`null`) in `ETSY_TAXONOMY_MAP` — pre-flight correctly blocks every
-  product until a developer runs `getSellerTaxonomyNodes` post-connect and
-  fills them in. Four other spec details are pinned as best-guesses with
-  `TODO(etsy-verify)` comments (image constraints, rate-limit header names,
-  the readiness-state list endpoint, image re-rank semantics). See
-  `project-docs/DECISIONS.md` 2026-07-08 (later) for the full list.
+- **Current verification limits:** taxonomy leaves are pinned from the live
+  seller taxonomy and unknown types have an explicit reviewed fallback.
+  Two `TODO(etsy-verify)` items remain because Etsy's machine-readable spec
+  does not publish them: image upload caps and rate-limit response-header
+  names. The trigger-agnostic daily price-push route exists; any automated
+  schedule is an external Netlify/cron deployment concern.
 
-## eBay Sync (2026-07-09 — code-complete, unverified live)
+## eBay Sync (partially live-verified)
 
 One-way push (Supabase `products` → an eBay listing, as a secondary sales
 channel), deliberately mirroring the Etsy Sync shape above. Full plan:
@@ -430,7 +482,7 @@ channel), deliberately mirroring the Etsy Sync shape above. Full plan:
   (typed access to the `ebay_*` tables). No `images.ts` — eBay's Inventory
   API takes public HTTPS image URLs directly, so the server never touches
   image bytes.
-- **Tables (`supabase/ebay-sync.sql`, written, not yet run):**
+- **Tables (`supabase/ebay-sync.sql`, applied):**
   `ebay_connection` (single-row OAuth + account defaults, incl. the Q16
   express-shipping policy id + `high_value_shipping_threshold`),
   `ebay_oauth_states` (transient handshake state — no PKCE verifier column),
@@ -471,15 +523,14 @@ channel), deliberately mirroring the Etsy Sync shape above. Full plan:
   (no image upload calls); heavier one-time account prerequisites (Business
   Policy opt-in, inventory location, the account-deletion compliance gate)
   before the production keyset activates at all.
-- **Known gaps before this is usable live:** no Fashion Jewelry eBay
-  category id is pinned anywhere (vermeil items are correctly blocked at
-  pre-flight rather than guessing one); item-aspect values aren't
-  cross-checked against eBay's live SELECTION_ONLY value lists; no eBay
-  username is resolved (out of the plan's OAuth scope list); this build
-  environment had no eBay credentials or network access to
-  developer.ebay.com to verify any of the above, or the general API
-  host/header conventions, against a live contract. Full list with
-  reasoning: `project-docs/DECISIONS.md` 2026-07-09 (session 14).
+- **Current verification limits:** the account-deletion webhook, OAuth,
+  selected status/relist reconciliation, controlled publishes/updates, and
+  several live category/policy paths have been exercised. Fine, antique
+  silver, and the catalog's verified Fashion leaves are pinned; unsupported
+  future Fashion types still fail preflight rather than guessing. Remaining
+  `TODO(ebay-verify)` items include some allowed aspect values, sandbox-host
+  assumptions, multi-SKU price batching, and plan-level account details. The
+  external relist for inventory #82 remains intentionally write-blocked.
 
 ## Public-shop cache invalidation (2026-07-02)
 
@@ -503,6 +554,20 @@ Supabase Auth is configured through:
 - `next-app/src/lib/supabase/public.ts` for anonymous server-side public reads.
 - `next-app/src/proxy.ts`, which refreshes Supabase sessions during routing only
   for user-state route prefixes.
+
+Protected admin pages and shared admin server actions use
+`next-app/src/lib/auth-claims.ts` to verify the JWT with Supabase `getClaims()`.
+The current project uses ES256 signing, allowing cached-JWKS local verification;
+authorization still requires a live `profiles.is_admin` database row. Never
+replace that database role check with a claim or unverified session object.
+
+Admin product loading is intentionally two-stage. `/admin` initially selects
+the compact contract in `next-app/src/lib/admin-product-summary.ts`; full
+service-role product rows are returned only by the guarded `adminGetProduct`
+action for Edit/Duplicate/Pad/Delete workflows. `/admin/orders` similarly loads
+manual-order product summaries and spot pricing only after Create Manual Order
+is opened. Summary records keep the full canonical `image_urls` reference set
+and omit the duplicate legacy `images` array.
 
 Account routes live under `next-app/src/app/[locale]/account/`.
 
@@ -550,6 +615,13 @@ default. The fill route passes the override into the provider through the
 the default prompt is used so generation never breaks. Required setup SQL lives
 at `next-app/sql/ai-settings-setup.sql`.
 
+Every provider request also appends the immutable
+`BUYER_FACING_COPY_GUARDRAILS` from `ai-product-provider.ts`, so a saved/custom
+prompt cannot put seller suggestions, opinions, guesses, or unverified
+identifications into buyer-facing `title`, `description`, or `public_notes`.
+The schema coercer applies a second conservative check for direct seller
+attribution and preserves removed sentences in `uncertainties`.
+
 The assistant sends the first allowed product images as visual context to the
 provider layer. `AI_MAX_IMAGES` controls the count and defaults to 2; local
 `/assets/...` product images and Supabase Storage `product-images` URLs are the
@@ -581,6 +653,9 @@ Root `netlify.toml`:
 
 It keeps useful legacy image redirects that still land on
 `next-app/public/assets`. Redirects to deleted legacy scripts were removed.
+Browser security headers are defined in both root `netlify.toml` and
+`next-app/next.config.ts` so SSR/API responses retain the policy if one
+deployment layer's header processing is skipped.
 
 ## Verification
 
@@ -593,3 +668,8 @@ npm run build
 
 Run `npm run lint` when touching TypeScript, React components, routing, or
 shared UI behavior.
+
+Current known build state: compilation succeeds, then Next's generated route
+contract rejects the named `renderShopPage` export from
+`src/app/[locale]/shop/(list)/page.tsx`. Treat this as a build blocker until the
+shared renderer is moved out of the route module and `npm run build` exits 0.

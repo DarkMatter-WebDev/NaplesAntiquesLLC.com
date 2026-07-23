@@ -159,7 +159,8 @@ begin
 end;
 $$;
 
-grant execute on function public.subscribe_homepage(text, text, text) to anon, authenticated;
+revoke execute on function public.subscribe_homepage(text, text, text) from public, anon, authenticated;
+grant execute on function public.subscribe_homepage(text, text, text) to service_role;
 
 create or replace function public.unsubscribe_homepage(subscriber_email text)
 returns boolean
@@ -196,4 +197,5 @@ begin
 end;
 $$;
 
-grant execute on function public.unsubscribe_homepage(text) to anon, authenticated;
+revoke execute on function public.unsubscribe_homepage(text) from public, anon, authenticated;
+grant execute on function public.unsubscribe_homepage(text) to service_role;

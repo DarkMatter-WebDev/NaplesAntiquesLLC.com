@@ -59,9 +59,15 @@ Current consent model:
 
 ## Checkout / Order Leads
 
-Checkout posts to `/api/checkout/order`, creates an unpaid order, snapshots cart
-items, moves products to `pending_payment`, adds an admin notification, and
-sends an order email when Resend/email env is configured.
+The storefront checkout uses `/api/paypal/create-order` followed by
+`/api/paypal/capture-order`. It creates an unpaid internal order before PayPal
+approval but does not reserve inventory; the first successful capture marks the
+order paid and products sold. Paid capture sends buyer/owner email when Resend
+is configured.
+
+The older `/api/checkout/order` unpaid/manual follow-up route is retained for
+non-storefront workflows. That path may move products to `pending_payment` and
+add an admin notification; it is not the public PayPal checkout path.
 
 ## Click-To-Call And CTAs
 

@@ -35,7 +35,7 @@ and should be reviewed by the business owner and counsel before relying on it.
   inquiry, and the "Message Us Directly" form all post to `/api/inquire` /
   `/api/contact-message` (Supabase + Resend) — **not** Netlify Forms. Netlify
   Forms was replaced on 2026-06-25 after it was found to silently fail on
-  this client-rendered React app (see DECISIONS 2026-06-25).
+  this client-rendered React app (see CHANGELOG 2026-06-25).
 - **Newsletter form:** homepage subscriber CTA posts to `/api/subscribe` and the
   `subscribe_homepage` RPC.
 - **Analytics/tracking:** source audit found no Google Analytics, Google Tag

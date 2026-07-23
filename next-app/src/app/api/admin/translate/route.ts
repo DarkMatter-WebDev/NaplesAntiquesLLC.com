@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { translateProductCopyToSpanish } from '@/lib/ai-translate';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const MAX_TITLE_LENGTH = 400;
 const MAX_DESCRIPTION_LENGTH = 8000;
+const HOURLY_LIMIT = Math.max(1, Number(process.env.TRANSLATE_RATE_LIMIT_HOURLY) || 30);
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -16,6 +18,10 @@ export async function POST(req: Request) {
     .eq('id', user.id)
     .single();
   if (!profile?.is_admin) return NextResponse.json({ error: 'Admin access required.' }, { status: 403 });
+  if (!(await checkRateLimit(`admin-translate:${user.id}`, HOURLY_LIMIT, 3600))) {
+    console.warn('[admin/translate] rate_limited', { userId: user.id });
+    return NextResponse.json({ error: 'Spanish translation limit reached. Please try again later.' }, { status: 429 });
+  }
 
   const body = await req.json().catch(() => null);
   const title = (typeof body?.title === 'string' ? body.title : '').slice(0, MAX_TITLE_LENGTH);

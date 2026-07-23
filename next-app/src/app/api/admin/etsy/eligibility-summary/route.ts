@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { fetchSpotData } from '@/lib/spot-price';
 import { buildPreflightChecks, isPreflightPassing } from '@/lib/etsy/mapping';
 import { getConnection, getListingsMap } from '@/lib/etsy/store';
-import { scanAndMarkOutOfDate } from '@/lib/etsy/sync';
+import { isReadyToPublishEtsyListing, scanAndMarkOutOfDate } from '@/lib/etsy/sync';
 import type { Product } from '@/types/product';
 
 export const runtime = 'nodejs';
@@ -69,5 +69,7 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ total: products.length, eligible, ineligible, upToDate, errors, ineligibleSamples });
+  const readyToPublish = Object.values(listings).filter(isReadyToPublishEtsyListing).length;
+
+  return NextResponse.json({ total: products.length, eligible, ineligible, upToDate, errors, readyToPublish, ineligibleSamples });
 }

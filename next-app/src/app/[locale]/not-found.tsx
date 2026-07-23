@@ -1,8 +1,22 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
+import { getLocale } from 'next-intl/server';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 
-export default function NotFound() {
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return {
+    title: locale === 'es' ? 'Página No Encontrada' : 'Page Not Found',
+    robots: { index: false, follow: false },
+  };
+}
+
+export default async function NotFound() {
+  const locale = await getLocale();
+  const isEs = locale === 'es';
+  const prefix = isEs ? '/es' : '';
+
   return (
     <>
       <SiteHeader />
@@ -20,21 +34,23 @@ export default function NotFound() {
           className="text-4xl md:text-5xl font-bold mb-6 tracking-tight"
           style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
         >
-          Page Not Found
+          {isEs ? 'Página No Encontrada' : 'Page Not Found'}
         </h1>
         <p className="text-lg mb-10 max-w-md" style={{ color: 'var(--color-on-surface-variant)' }}>
-          The page you&rsquo;re looking for doesn&rsquo;t exist or may have moved.
+          {isEs
+            ? 'La página que busca no existe o puede haberse movido.'
+            : 'The page you\'re looking for doesn\'t exist or may have moved.'}
         </p>
         <div className="flex flex-wrap gap-4 justify-center">
-          <Link href="/" className="gold-button">
-            Go Home
+          <Link href={prefix || '/'} className="gold-button">
+            {isEs ? 'Ir al Inicio' : 'Go Home'}
           </Link>
-          <Link href="/shop" className="outline-button">
-            Browse Shop
+          <Link href={`${prefix}/shop`} className="outline-button">
+            {isEs ? 'Ver la Tienda' : 'Browse Shop'}
           </Link>
         </div>
       </main>
-      <SiteFooter locale="en" />
+      <SiteFooter locale={locale} />
     </>
   );
 }

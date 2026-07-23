@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 // Branded error boundary for public routes. Without this, a render-time throw
@@ -12,6 +12,8 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const [isRetrying, setIsRetrying] = useState(false);
+
   useEffect(() => {
     console.error(error);
   }, [error]);
@@ -52,8 +54,17 @@ export default function Error({
         .
       </p>
       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-        <button onClick={reset} className="gold-button">
-          Try again
+        <button
+          type="button"
+          onClick={() => {
+            setIsRetrying(true);
+            reset();
+          }}
+          disabled={isRetrying}
+          aria-busy={isRetrying}
+          className="gold-button"
+        >
+          {isRetrying ? 'Trying again...' : 'Try again'}
         </button>
         <Link href="/" className="gold-button">
           Home

@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { resolveAdvertisedTradeInPrice } from '../product';
+import {
+  AVAILABLE_ONLY_SHOP_PRODUCT_STATUSES,
+  PUBLIC_SHOP_PRODUCT_STATUSES,
+  isProductPurchasable,
+  isProductVisibleInShop,
+  normalizeProductLengthSizeValue,
+  normalizeProductWidthMm,
+  normalizeProductStatus,
+  productWidthDisplay,
+  resolveAdvertisedTradeInPrice,
+} from '../product';
 
 type OverrideFields = Parameters<typeof resolveAdvertisedTradeInPrice>[0];
 
@@ -46,5 +56,67 @@ describe('resolveAdvertisedTradeInPrice', () => {
       special_price_override_percent: 25,
     };
     expect(resolveAdvertisedTradeInPrice(pct, 1000, { enabled: true, percent: 10 })).toBe(1250);
+  });
+});
+
+describe('draft product visibility', () => {
+  it('keeps draft as a real status while excluding it from the public shop', () => {
+    expect(normalizeProductStatus('Draft')).toBe('draft');
+    expect(isProductVisibleInShop('draft')).toBe(false);
+    expect(isProductPurchasable('draft', 1)).toBe(false);
+    expect(PUBLIC_SHOP_PRODUCT_STATUSES).not.toContain('draft');
+    expect(AVAILABLE_ONLY_SHOP_PRODUCT_STATUSES).not.toContain('draft');
+  });
+
+  it('preserves the established available and sold public behavior', () => {
+    expect(isProductVisibleInShop('available')).toBe(true);
+    expect(isProductPurchasable('available', 1)).toBe(true);
+    expect(isProductVisibleInShop('sold')).toBe(true);
+  });
+});
+
+describe('product width', () => {
+  const productForWidth = (product_type: string, width_mm: number | null) => ({
+    product_type,
+    jewelry_type: product_type,
+    width_mm,
+    title: `${product_type} test`,
+    title_es: null,
+    chain_type: null,
+    tags: [],
+    tags_es: [],
+  });
+
+  it('normalizes positive millimeter measurements to two decimal places', () => {
+    expect(normalizeProductWidthMm('8 mm')).toBe(8);
+    expect(normalizeProductWidthMm(12.345)).toBe(12.35);
+    expect(normalizeProductWidthMm(0)).toBeNull();
+    expect(normalizeProductWidthMm(1001)).toBeNull();
+  });
+
+  it('displays width only for necklaces and bracelets', () => {
+    expect(productWidthDisplay(productForWidth('Necklace', 8))).toBe('8 mm');
+    expect(productWidthDisplay(productForWidth('Bracelet', 12.5))).toBe('12.5 mm');
+    expect(productWidthDisplay(productForWidth('Ring', 8))).toBeNull();
+    expect(productWidthDisplay(productForWidth('Bracelet', null))).toBeNull();
+  });
+});
+
+describe('product length and size normalization', () => {
+  it('stores plain and inch-suffixed measurements as the same bare number', () => {
+    expect(normalizeProductLengthSizeValue(24)).toBe('24');
+    expect(normalizeProductLengthSizeValue('24')).toBe('24');
+    expect(normalizeProductLengthSizeValue('24 in')).toBe('24');
+    expect(normalizeProductLengthSizeValue('24in')).toBe('24');
+    expect(normalizeProductLengthSizeValue('24 inches')).toBe('24');
+    expect(normalizeProductLengthSizeValue('24"')).toBe('24');
+    expect(normalizeProductLengthSizeValue('24.0 in')).toBe('24');
+    expect(normalizeProductLengthSizeValue('7.50 in')).toBe('7.5');
+  });
+
+  it('keeps ring-size shorthand and non-measurement legacy text compatible', () => {
+    expect(normalizeProductLengthSizeValue('size: 7.50')).toBe('7.5');
+    expect(normalizeProductLengthSizeValue('adjustable')).toBe('adjustable');
+    expect(normalizeProductLengthSizeValue('')).toBe('');
   });
 });

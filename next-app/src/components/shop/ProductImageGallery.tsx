@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { productImagePaddingBackground, productImagePaddingForImage, type ProductImagePaddingMap } from '@/types/product';
+import { buildProductMediaItems, type PublicProductVideo } from '@/lib/product-video';
+import { productThumbnailLoading } from '@/lib/storefront-image-loading';
 
 const ZOOM = 3;    // magnification
 const PANEL = 220; // floating zoom box size px
@@ -17,6 +19,8 @@ interface Props {
   title: string;
   imagePadding?: string | null;
   imagePaddingByImage?: ProductImagePaddingMap | null;
+  video?: PublicProductVideo | null;
+  locale?: string;
 }
 
 interface ZoomState {
@@ -33,8 +37,9 @@ interface ZoomState {
   bh: number;
 }
 
-export default function ProductImageGallery({ images, title, imagePadding = null, imagePaddingByImage = null }: Props) {
+export default function ProductImageGallery({ images, title, imagePadding = null, imagePaddingByImage = null, video = null, locale = 'en' }: Props) {
   const [active, setActive] = useState(0);
+  const [videoSelected, setVideoSelected] = useState(false);
   const [zoom, setZoom] = useState<ZoomState | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -48,6 +53,40 @@ export default function ProductImageGallery({ images, title, imagePadding = null
   const [lastActive, setLastActive] = useState(active);
 
   const hasMultipleImages = images.length > 1;
+  const isEs = locale === 'es';
+  const labels = isEs ? {
+    productVideo: 'Video del producto',
+    viewFullSize: 'Ver en tamaño completo',
+    previousMedia: 'Contenido anterior',
+    nextMedia: 'Contenido siguiente',
+    previousMediaThumbnail: 'Miniatura anterior',
+    nextMediaThumbnail: 'Miniatura siguiente',
+    playProductVideo: 'Reproducir video del producto',
+    viewImage: (index: number) => `Ver imagen ${index}`,
+    fullSizeViewer: `${title} - visor de imagen en tamaño completo`,
+    closeImageViewer: 'Cerrar visor de imágenes',
+    close: 'Cerrar',
+    hoverToMagnify: 'Pase el cursor para ampliar',
+    previousImage: 'Imagen anterior',
+    nextImage: 'Imagen siguiente',
+  } : {
+    productVideo: 'Product video',
+    viewFullSize: 'Click to view full size',
+    previousMedia: 'Previous media',
+    nextMedia: 'Next media',
+    previousMediaThumbnail: 'Previous media thumbnail',
+    nextMediaThumbnail: 'Next media thumbnail',
+    playProductVideo: 'Play product video',
+    viewImage: (index: number) => `View image ${index}`,
+    fullSizeViewer: `${title} - full size image viewer`,
+    closeImageViewer: 'Close image viewer',
+    close: 'Close',
+    hoverToMagnify: 'Hover to magnify',
+    previousImage: 'Previous image',
+    nextImage: 'Next image',
+  };
+  const mediaItems = useMemo(() => buildProductMediaItems(images.length, Boolean(video)), [images.length, video]);
+  const hasMultipleMedia = mediaItems.length > 1;
 
   const closeZoom = useCallback(() => {
     touchZoomingRef.current = false;
@@ -56,7 +95,14 @@ export default function ProductImageGallery({ images, title, imagePadding = null
 
   const moveToImage = useCallback((index: number) => {
     closeZoom();
+    setVideoSelected(false);
     setActive(index);
+  }, [closeZoom]);
+
+  const moveToVideo = useCallback(() => {
+    closeZoom();
+    setLightboxOpen(false);
+    setVideoSelected(true);
   }, [closeZoom]);
 
   const showPreviousImage = useCallback(() => {
@@ -69,12 +115,27 @@ export default function ProductImageGallery({ images, title, imagePadding = null
     setActive((currentIndex) => (currentIndex + 1) % images.length);
   }, [closeZoom, images.length]);
 
+  const showPreviousMedia = useCallback(() => {
+    const currentIndex = videoSelected ? mediaItems.findIndex((item) => item.type === 'video') : mediaItems.findIndex((item) => item.type === 'image' && item.index === active);
+    const target = mediaItems[(currentIndex - 1 + mediaItems.length) % mediaItems.length];
+    if (target?.type === 'video') moveToVideo();
+    else if (target) moveToImage(target.index);
+  }, [active, mediaItems, moveToImage, moveToVideo, videoSelected]);
+
+  const showNextMedia = useCallback(() => {
+    const currentIndex = videoSelected ? mediaItems.findIndex((item) => item.type === 'video') : mediaItems.findIndex((item) => item.type === 'image' && item.index === active);
+    const target = mediaItems[(currentIndex + 1) % mediaItems.length];
+    if (target?.type === 'video') moveToVideo();
+    else if (target) moveToImage(target.index);
+  }, [active, mediaItems, moveToImage, moveToVideo, videoSelected]);
+
   const openLightbox = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (videoSelected) return;
     // Ignore clicks that land on the prev/next edge buttons.
     if (e.target instanceof HTMLElement && e.target.closest('.product-gallery-edge-button')) return;
     closeZoom();
     setLightboxOpen(true);
-  }, [closeZoom]);
+  }, [closeZoom, videoSelected]);
 
   // Closing the lightbox also clears any active magnifier — the zoom panel
   // renders outside the lightbox portal, so it would otherwise linger.
@@ -251,20 +312,14 @@ export default function ProductImageGallery({ images, title, imagePadding = null
   }
   const fadingFrom = prevImage && prevImage !== current ? prevImage : null;
   const imageFrameBackground = resolveFrameBackground(current, active);
-  const visibleThumbnailIndexes = hasMultipleImages
-    ? images.length === 2
-      ? [active, (active + 1) % images.length]
-      : [-1, 0, 1].map((offset) => (active + offset + images.length) % images.length)
-    : [active];
-
   return (
     <div className="flex flex-col gap-3">
       {/* Main image */}
       <div
         ref={containerRef}
         className="relative aspect-square overflow-hidden"
-        style={{ background: imageFrameBackground, cursor: 'crosshair', touchAction: 'none' }}
-        title="Click to view full size"
+        style={{ background: videoSelected ? '#0b0b0b' : imageFrameBackground, cursor: videoSelected ? 'default' : 'crosshair', touchAction: videoSelected ? 'auto' : 'none' }}
+        title={videoSelected ? labels.productVideo : labels.viewFullSize}
         onClick={openLightbox}
         onPointerDown={(e) => handleZoomPointerDown(e, containerRef.current, imageRef.current, 'main')}
         onPointerMove={(e) => handleZoomPointerMove(e, containerRef.current, imageRef.current, 'main')}
@@ -272,6 +327,15 @@ export default function ProductImageGallery({ images, title, imagePadding = null
         onPointerUp={closeZoom}
         onPointerCancel={closeZoom}
       >
+        {videoSelected && video ? (
+          <iframe
+            src={video.iframeUrl}
+            title={`${title} ${labels.productVideo.toLowerCase()}`}
+            className="absolute inset-0 h-full w-full"
+            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
+            allowFullScreen
+          />
+        ) : <>
         {fadingFrom && (
           <Image
             key={`prev-${fadingFrom}`}
@@ -292,19 +356,21 @@ export default function ProductImageGallery({ images, title, imagePadding = null
           fill
           sizes="(max-width: 768px) 100vw, 50vw"
           className="object-contain object-center product-gallery-fade-in"
-          priority
+          loading="eager"
+          fetchPriority="high"
           unoptimized={current.startsWith('/assets/')}
         />
+        </>}
 
-        {hasMultipleImages && (
+        {hasMultipleMedia && (
           <>
             <button
               type="button"
               className="product-gallery-edge-button product-gallery-edge-prev absolute left-0 top-0 z-10 flex h-full w-[28%] items-center justify-start px-3 text-[var(--color-primary)] opacity-0 transition-opacity hover:opacity-100 focus:opacity-100"
               onPointerDown={handleNavigationPointerDown}
-              onClick={showPreviousImage}
-              aria-label="Previous image"
-              title="Previous image"
+              onClick={showPreviousMedia}
+              aria-label={labels.previousMedia}
+              title={labels.previousMedia}
             >
               <span
                 className="flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(115,92,0,0.28)] bg-white/85 shadow-sm backdrop-blur"
@@ -319,9 +385,9 @@ export default function ProductImageGallery({ images, title, imagePadding = null
               type="button"
               className="product-gallery-edge-button product-gallery-edge-next absolute right-0 top-0 z-10 flex h-full w-[28%] items-center justify-end px-3 text-[var(--color-primary)] opacity-0 transition-opacity hover:opacity-100 focus:opacity-100"
               onPointerDown={handleNavigationPointerDown}
-              onClick={showNextImage}
-              aria-label="Next image"
-              title="Next image"
+              onClick={showNextMedia}
+              aria-label={labels.nextMedia}
+              title={labels.nextMedia}
             >
               <span
                 className="flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(115,92,0,0.28)] bg-white/85 shadow-sm backdrop-blur"
@@ -336,7 +402,7 @@ export default function ProductImageGallery({ images, title, imagePadding = null
         )}
 
         {/* Lens square */}
-        {zoom && zoom.source === 'main' && (
+        {!videoSelected && zoom && zoom.source === 'main' && (
           <div
             style={{
               position: 'absolute',
@@ -354,22 +420,33 @@ export default function ProductImageGallery({ images, title, imagePadding = null
       </div>
 
       {/* Thumbnails */}
-      {images.length > 1 && (
+      {hasMultipleMedia && (
         <div className="flex items-center justify-center gap-3">
           <button
             type="button"
-            onClick={showPreviousImage}
+            onClick={showPreviousMedia}
             className="flex h-10 w-10 flex-shrink-0 items-center justify-center border border-[var(--color-outline-variant)] bg-white text-[var(--color-primary)] transition-colors hover:border-[var(--color-primary)] hover:bg-[rgba(212,160,23,0.08)]"
-            aria-label="Previous thumbnail"
-            title="Previous image"
+            aria-label={labels.previousMediaThumbnail}
+            title={labels.previousMedia}
           >
             <span className="material-symbols-outlined text-2xl" aria-hidden="true">
               chevron_left
             </span>
           </button>
 
-          <div className="product-gallery-thumbnails flex items-center justify-center gap-2">
-            {visibleThumbnailIndexes.map((i, slotIndex) => {
+          <div className="product-gallery-thumbnails flex max-w-[calc(100vw-8rem)] items-center gap-2 overflow-x-auto py-1">
+            {mediaItems.map((item, slotIndex) => {
+              if (item.type === 'video') return (
+                <button key="product-video" type="button" onClick={moveToVideo}
+                  className="product-gallery-thumbnail relative h-16 w-16 flex-shrink-0 overflow-hidden border-2 transition-all"
+                  data-active={videoSelected ? 'true' : 'false'}
+                  style={{ borderColor: videoSelected ? 'var(--color-primary)' : 'var(--color-outline-variant)', background: '#171717' }}
+                  aria-label={labels.playProductVideo}>
+                  <Image src={images[0]} alt="" fill sizes="64px" loading="eager" className="object-cover opacity-55" unoptimized={images[0].startsWith('/assets/')} />
+                  <span className="material-symbols-outlined absolute inset-0 z-10 flex items-center justify-center text-3xl text-white" aria-hidden="true">play_circle</span>
+                </button>
+              );
+              const i = item.index;
               const img = images[i] ?? current;
               const thumbnailFrameBackground = resolveFrameBackground(img, i);
 
@@ -379,18 +456,19 @@ export default function ProductImageGallery({ images, title, imagePadding = null
                   type="button"
                   onClick={() => moveToImage(i)}
                   className="product-gallery-thumbnail relative h-16 w-16 flex-shrink-0 overflow-hidden border-2 transition-all"
-                  data-active={i === active ? 'true' : 'false'}
+                  data-active={!videoSelected && i === active ? 'true' : 'false'}
                   style={{
-                    borderColor: i === active ? 'var(--color-primary)' : 'var(--color-outline-variant)',
+                    borderColor: !videoSelected && i === active ? 'var(--color-primary)' : 'var(--color-outline-variant)',
                     background: thumbnailFrameBackground,
                   }}
-                  aria-label={`View image ${i + 1}`}
+                  aria-label={labels.viewImage(i + 1)}
                 >
                   <Image
                     src={img}
                     alt={`${title} ${i + 1}`}
                     fill
                     sizes="64px"
+                    loading={productThumbnailLoading(i)}
                     className="object-contain object-center"
                     unoptimized={img.startsWith('/assets/')}
                   />
@@ -401,10 +479,10 @@ export default function ProductImageGallery({ images, title, imagePadding = null
 
           <button
             type="button"
-            onClick={showNextImage}
+            onClick={showNextMedia}
             className="flex h-10 w-10 flex-shrink-0 items-center justify-center border border-[var(--color-outline-variant)] bg-white text-[var(--color-primary)] transition-colors hover:border-[var(--color-primary)] hover:bg-[rgba(212,160,23,0.08)]"
-            aria-label="Next thumbnail"
-            title="Next image"
+            aria-label={labels.nextMediaThumbnail}
+            title={labels.nextMedia}
           >
             <span className="material-symbols-outlined text-2xl" aria-hidden="true">
               chevron_right
@@ -447,14 +525,14 @@ export default function ProductImageGallery({ images, title, imagePadding = null
           style={{ background: 'rgba(18,14,7,0.94)' }}
           role="dialog"
           aria-modal="true"
-          aria-label={`${title} — full size image viewer`}
+          aria-label={labels.fullSizeViewer}
           onClick={(e) => { if (e.target === e.currentTarget) closeLightbox(); }}
         >
           <button
             type="button"
             onClick={() => closeLightbox()}
-            aria-label="Close image viewer"
-            title="Close"
+            aria-label={labels.closeImageViewer}
+            title={labels.close}
             className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-black/30 text-white transition-colors hover:bg-black/60"
           >
             <span className="material-symbols-outlined text-[28px] leading-none" aria-hidden="true">close</span>
@@ -468,7 +546,7 @@ export default function ProductImageGallery({ images, title, imagePadding = null
               ref={lightboxContainerRef}
               className="relative h-full w-full max-w-5xl"
               style={{ cursor: 'crosshair', touchAction: 'none' }}
-              title="Hover to magnify"
+              title={labels.hoverToMagnify}
               onPointerDown={(e) => handleZoomPointerDown(e, lightboxContainerRef.current, lightboxImageRef.current, 'lightbox')}
               onPointerMove={(e) => handleZoomPointerMove(e, lightboxContainerRef.current, lightboxImageRef.current, 'lightbox')}
               onPointerLeave={handlePointerLeave}
@@ -520,8 +598,8 @@ export default function ProductImageGallery({ images, title, imagePadding = null
                 <button
                   type="button"
                   onClick={showPreviousImage}
-                  aria-label="Previous image"
-                  title="Previous image"
+                  aria-label={labels.previousImage}
+                  title={labels.previousImage}
                   className="absolute left-3 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/30 text-white transition-colors hover:bg-black/60"
                 >
                   <span className="material-symbols-outlined text-[32px] leading-none" aria-hidden="true">chevron_left</span>
@@ -529,8 +607,8 @@ export default function ProductImageGallery({ images, title, imagePadding = null
                 <button
                   type="button"
                   onClick={showNextImage}
-                  aria-label="Next image"
-                  title="Next image"
+                  aria-label={labels.nextImage}
+                  title={labels.nextImage}
                   className="absolute right-3 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/30 text-white transition-colors hover:bg-black/60"
                 >
                   <span className="material-symbols-outlined text-[32px] leading-none" aria-hidden="true">chevron_right</span>
@@ -554,7 +632,7 @@ export default function ProductImageGallery({ images, title, imagePadding = null
                         borderColor: i === active ? 'var(--color-primary)' : 'rgba(255,255,255,0.35)',
                         background: thumbBg,
                       }}
-                      aria-label={`View image ${i + 1}`}
+                      aria-label={labels.viewImage(i + 1)}
                       aria-current={i === active ? 'true' : undefined}
                     >
                       <Image

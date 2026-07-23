@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
-import { drainQueue, enqueueAllEligible, enqueueProducts } from '@/lib/etsy/sync';
+import { drainPublishQueue, drainQueue, drainRepairQueue, enqueueAllEligible, enqueueProducts } from '@/lib/etsy/sync';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -27,7 +27,15 @@ export async function POST(req: Request) {
       const result = await drainQueue();
       return NextResponse.json(result);
     }
-    return NextResponse.json({ error: 'Unknown action. Use enqueue, enqueue-all-eligible, or drain.' }, { status: 400 });
+    if (action === 'drain-publish') {
+      const result = await drainPublishQueue();
+      return NextResponse.json(result);
+    }
+    if (action === 'drain-repair') {
+      const result = await drainRepairQueue();
+      return NextResponse.json(result);
+    }
+    return NextResponse.json({ error: 'Unknown action. Use enqueue, enqueue-all-eligible, drain, drain-publish, or drain-repair.' }, { status: 400 });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Batch sync failed.' }, { status: 500 });
   }

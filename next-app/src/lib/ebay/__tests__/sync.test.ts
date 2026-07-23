@@ -1,5 +1,110 @@
 import { describe, expect, it } from 'vitest';
-import { drainQueueCore, reconcileEbayStateFromOffer, shouldPushPrice, type DrainDeps, type SyncStepResult } from '../sync';
+import {
+  bulkPriceQuantityFailureMessage,
+  drainQueueCore,
+  offerBody,
+  reconcileEbayStateFromOffer,
+  resolveEbayRelistChain,
+  selectExistingFixedPriceOfferId,
+  shouldPushPrice,
+  type DrainDeps,
+  type SyncStepResult,
+} from '../sync';
+
+describe('offer contract hardening', () => {
+  it('sets the required GTC duration on fixed-price offers', () => {
+    const payload = {
+      sku: 'sku-1',
+      title: 'Title',
+      description: 'Description',
+      aspects: {},
+      conditionId: '3000',
+      conditionDescription: 'Used',
+      categoryId: '1',
+      categoryPath: 'Test',
+      categoryIsApproximate: false,
+      categoryIsOverride: false,
+      price: 100,
+      priceBeforeMarkup: 90,
+      quantity: 1,
+      images: [],
+      fulfillmentPolicyId: 'fulfillment',
+      shippingTier: 'standard' as const,
+      paymentPolicyId: 'payment',
+      returnPolicyId: 'return',
+      merchantLocationKey: 'location',
+      marketplaceId: 'EBAY_US',
+    };
+    expect(offerBody(payload).listingDuration).toBe('GTC');
+  });
+
+  it('adopts only the fixed-price offer for the configured marketplace', () => {
+    const offers = [
+      { offerId: 'auction', format: 'AUCTION', marketplaceId: 'EBAY_US' },
+      { offerId: 'uk-fixed', format: 'FIXED_PRICE', marketplaceId: 'EBAY_GB' },
+      { offerId: 'us-fixed', format: 'FIXED_PRICE', marketplaceId: 'EBAY_US' },
+    ];
+    expect(selectExistingFixedPriceOfferId(offers, 'EBAY_US')).toBe('us-fixed');
+    expect(selectExistingFixedPriceOfferId(offers, 'EBAY_CA')).toBeNull();
+  });
+
+  it('treats a per-offer failure inside HTTP 200 as a failed bulk update', () => {
+    expect(bulkPriceQuantityFailureMessage({ responses: [{ statusCode: 200, offerId: 'ok' }] }, 1)).toBeNull();
+    expect(
+      bulkPriceQuantityFailureMessage(
+        { responses: [{ statusCode: 400, offerId: 'bad', errors: [{ message: 'Offer is unpublished.' }] }] },
+        1,
+      ),
+    ).toBe('Offer is unpublished.');
+    expect(bulkPriceQuantityFailureMessage({ responses: [] }, 1)).toMatch(/incomplete/i);
+  });
+});
+
+describe('resolveEbayRelistChain', () => {
+  it('follows a completed listing to the active relist with the same SKU', async () => {
+    const lookup = async (listingId: string) =>
+      listingId === 'old'
+        ? { itemId: 'old', sku: 'sku-82', listingStatus: 'Completed', relistedItemId: 'new' }
+        : { itemId: 'new', sku: 'sku-82', listingStatus: 'Active', relistedItemId: null };
+
+    await expect(resolveEbayRelistChain({ startingListingId: 'old', expectedSku: 'sku-82', lookup })).resolves.toEqual({
+      state: 'active',
+      listingId: 'new',
+      hops: 1,
+    });
+  });
+
+  it('leaves a genuinely completed listing inactive when it has no relist', async () => {
+    const lookup = async () => ({ itemId: 'old', sku: 'sku-82', listingStatus: 'Completed', relistedItemId: null });
+    await expect(resolveEbayRelistChain({ startingListingId: 'old', expectedSku: 'sku-82', lookup })).resolves.toEqual({
+      state: 'inactive',
+      listingId: 'old',
+      hops: 0,
+      listingStatus: 'Completed',
+    });
+  });
+
+  it('never adopts a relist whose seller SKU belongs to another product', async () => {
+    const lookup = async () => ({ itemId: 'new', sku: 'different-sku', listingStatus: 'Active', relistedItemId: null });
+    await expect(resolveEbayRelistChain({ startingListingId: 'new', expectedSku: 'sku-82', lookup })).resolves.toEqual({
+      state: 'sku_mismatch',
+      listingId: 'new',
+      hops: 0,
+      actualSku: 'different-sku',
+    });
+  });
+
+  it('stops a malformed relist loop', async () => {
+    const lookup = async (listingId: string) => ({
+      itemId: listingId,
+      sku: 'sku-82',
+      listingStatus: 'Completed',
+      relistedItemId: listingId === 'a' ? 'b' : 'a',
+    });
+    const result = await resolveEbayRelistChain({ startingListingId: 'a', expectedSku: 'sku-82', lookup });
+    expect(result.state).toBe('loop_or_limit');
+  });
+});
 
 describe('reconcileEbayStateFromOffer — mapping eBay GetOffer onto our sync_state', () => {
   it('reports NOT live for an ENDED listing even though eBay still returns the old listingId (the reported bug 2026-07-10)', () => {
@@ -13,6 +118,11 @@ describe('reconcileEbayStateFromOffer — mapping eBay GetOffer onto our sync_st
     expect(reconcileEbayStateFromOffer('review', 'PUBLISHED', 'ACTIVE')).toEqual({ syncState: 'published', live: true });
     // Published offer with no finer listing status → still treated live.
     expect(reconcileEbayStateFromOffer('published', 'PUBLISHED', undefined)).toEqual({ syncState: 'published', live: true });
+  });
+
+  it('preserves local content drift when eBay confirms the listing is active', () => {
+    expect(reconcileEbayStateFromOffer('out_of_date', 'PUBLISHED', 'ACTIVE')).toEqual({ syncState: 'out_of_date', live: true });
+    expect(reconcileEbayStateFromOffer('out_of_date', 'PUBLISHED', undefined)).toEqual({ syncState: 'out_of_date', live: true });
   });
 
   it('preserves a local hidden_oos when the listing is still active on eBay', () => {

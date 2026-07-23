@@ -9,6 +9,7 @@ interface Props {
   products: Product[];
   spotData: SpotData | null;
   locale: string;
+  hideSoldItemPrices?: boolean;
   variant?: 'classic' | 'modern';
   view?: 'gallery' | 'list';
 }
@@ -26,7 +27,7 @@ function getShopGridColumnCount() {
   return 1;
 }
 
-export default function ShopProductGrid({ products, spotData, locale, variant = 'classic', view = 'gallery' }: Props) {
+export default function ShopProductGrid({ products, spotData, locale, hideSoldItemPrices = false, variant = 'classic', view = 'gallery' }: Props) {
   const [columnCount, setColumnCount] = useState(3);
 
   useEffect(() => {
@@ -48,6 +49,7 @@ export default function ShopProductGrid({ products, spotData, locale, variant = 
             product={product}
             spotData={spotData}
             locale={locale}
+            hideSoldItemPrices={hideSoldItemPrices}
             prioritizeImage={index < 4}
           />
         ))}
@@ -152,10 +154,6 @@ export default function ShopProductGrid({ products, spotData, locale, variant = 
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
-          }
-          .shop-list-title-link:hover .shop-list-title {
-            text-decoration: underline;
-            text-underline-offset: 2px;
           }
           .shop-list-meta {
             display: flex;
@@ -296,13 +294,28 @@ export default function ShopProductGrid({ products, spotData, locale, variant = 
           product={product}
           spotData={spotData}
           locale={locale}
+          hideSoldItemPrices={hideSoldItemPrices}
           variant={variant}
-          revealIndex={index}
-          revealColumnCount={columnCount}
           prioritizeImage={index < columnCount}
           includeModernStyles={index === 0}
         />
       ))}
+      <style>{`
+        .shop-product-grid > article {
+          content-visibility: auto;
+          contain-intrinsic-size: auto 19rem;
+        }
+        @media (min-width: 768px) {
+          .shop-product-grid > article {
+            contain-intrinsic-size: auto 20rem;
+          }
+        }
+        @media (min-width: 1536px) {
+          .shop-product-grid > article {
+            contain-intrinsic-size: auto 24rem;
+          }
+        }
+      `}</style>
     </div>
   );
 }

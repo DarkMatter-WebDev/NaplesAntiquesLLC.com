@@ -1,8 +1,10 @@
 'use client';
 
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useShopNavigation, LinkPendingBridge } from '@/components/shop/ShopNavigationProgress';
+import { buildShopPaginationHref, getShopPaginationItems } from '@/lib/shop-pagination';
 
 const GOLD = '#735c00';
 const BRIGHT_GOLD_GRADIENT = 'linear-gradient(135deg, #dcb336, #b5890c)';
@@ -44,25 +46,42 @@ export default function ShopPagination({
   showingStart,
   showingEnd,
 }: Props) {
-  const { push } = useShopNavigation();
+  const { getSearchParams, push } = useShopNavigation();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isEs = locale === 'es';
 
+  // Render from committed URL state so SSR and the first client render match.
+  // Pending state is merged only after a click, where it cannot alter hydration.
   function buildHref(page: number) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (page <= 1) {
-      params.delete('page');
-    } else {
-      params.set('page', String(page));
-    }
-    const qs = params.toString();
-    return qs ? `${pathname}?${qs}` : pathname;
+    return buildShopPaginationHref(pathname, searchParams.toString(), page);
+  }
+
+  function handlePageClick(
+    event: ReactMouseEvent<HTMLAnchorElement>,
+    page: number,
+    renderedHref: string,
+  ) {
+    scrollToResultsTop();
+    if (
+      event.defaultPrevented
+      || event.button !== 0
+      || event.metaKey
+      || event.ctrlKey
+      || event.shiftKey
+      || event.altKey
+    ) return;
+
+    const pendingHref = buildShopPaginationHref(pathname, getSearchParams(searchParams.toString()), page);
+    if (pendingHref === renderedHref) return;
+
+    event.preventDefault();
+    push(pendingHref, { scroll: false });
   }
 
   function updatePerPage(value: string) {
     const nextPerPage = Number(value);
-    const params = new URLSearchParams(searchParams.toString());
+    const params = getSearchParams(searchParams.toString());
     if (nextPerPage === 24) {
       params.delete('perPage');
     } else {
@@ -70,10 +89,11 @@ export default function ShopPagination({
     }
     params.delete('page');
     const qs = params.toString();
+    scrollToResultsTop();
     push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
 
-  const pageNumbers = getVisiblePages(currentPage, totalPages);
+  const paginationItems = getShopPaginationItems(currentPage, totalPages);
 
   return (
     <nav
@@ -97,26 +117,47 @@ export default function ShopPagination({
         {totalPages > 1 && (
           <>
           <PageLink
+            page={Math.max(1, currentPage - 1)}
             href={buildHref(Math.max(1, currentPage - 1))}
             disabled={currentPage <= 1}
             label={isEs ? 'Anterior' : 'Previous'}
             icon="chevron_left"
             iconOnly
+            onClick={handlePageClick}
           />
-          {pageNumbers.map((page) => (
-            <PageLink
-              key={page}
-              href={buildHref(page)}
-              active={page === currentPage}
-              label={String(page)}
-            />
-          ))}
+          <span className="shop-pagination-sequence">
+            {paginationItems.map((item, index) => item === 'ellipsis' ? (
+              <span
+                key={`ellipsis-${index}`}
+                className="shop-pagination-ellipsis"
+                aria-hidden="true"
+              >
+                &hellip;
+              </span>
+            ) : (
+              <PageLink
+                key={item}
+                page={item}
+                href={buildHref(item)}
+                active={item === currentPage}
+                label={String(item)}
+                onClick={handlePageClick}
+              />
+            ))}
+          </span>
+          <span className="shop-pagination-mobile-status" aria-live="polite">
+            {isEs
+              ? `P\u00e1gina ${currentPage} de ${totalPages}`
+              : `Page ${currentPage} of ${totalPages}`}
+          </span>
           <PageLink
+            page={Math.min(totalPages, currentPage + 1)}
             href={buildHref(Math.min(totalPages, currentPage + 1))}
             disabled={currentPage >= totalPages}
             label={isEs ? 'Siguiente' : 'Next'}
             icon="chevron_right"
             iconOnly
+            onClick={handlePageClick}
           />
           </>
         )}
@@ -174,6 +215,26 @@ export default function ShopPagination({
           border: 1px solid rgba(115, 92, 0, 0.1);
           border-radius: var(--radius-xl);
           background: rgba(255, 255, 255, 0.96);
+        }
+        .shop-pagination-sequence {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.28rem;
+        }
+        .shop-pagination-ellipsis {
+          width: 1.6rem;
+          min-height: 2.35rem;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--color-on-surface-variant);
+          font-family: var(--font-label);
+          font-size: 0.86rem;
+          font-weight: 800;
+          line-height: 1;
+        }
+        .shop-pagination-mobile-status {
+          display: none;
         }
         .shop-pagination-size {
           justify-self: end;
@@ -270,25 +331,46 @@ export default function ShopPagination({
             justify-content: space-between;
           }
         }
+        @media (max-width: 440px) {
+          .shop-pagination-sequence {
+            display: none;
+          }
+          .shop-pagination-mobile-status {
+            min-height: 2.35rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 0.45rem;
+            color: var(--color-on-surface);
+            font-family: var(--font-label);
+            font-size: 0.75rem;
+            font-weight: 800;
+            line-height: 1;
+          }
+        }
       `}</style>
     </nav>
   );
 }
 
 function PageLink({
+  page,
   href,
   label,
   active = false,
   disabled = false,
   icon,
   iconOnly = false,
+  onClick,
 }: {
+  page: number;
   href: string;
   label: string;
   active?: boolean;
   disabled?: boolean;
   icon?: string;
   iconOnly?: boolean;
+  onClick: (event: ReactMouseEvent<HTMLAnchorElement>, page: number, href: string) => void;
 }) {
   const className = [
     'shop-page-control',
@@ -312,16 +394,17 @@ function PageLink({
   }
 
   return (
-    <Link href={href} scroll={false} onClick={scrollToResultsTop} className={className} aria-current={active ? 'page' : undefined} title={label} aria-label={label}>
+    <Link
+      href={href}
+      scroll={false}
+      onClick={(event) => onClick(event, page, href)}
+      className={className}
+      aria-current={active ? 'page' : undefined}
+      title={label}
+      aria-label={label}
+    >
       {contents}
       <LinkPendingBridge />
     </Link>
   );
-}
-
-function getVisiblePages(currentPage: number, totalPages: number) {
-  const pages = new Set<number>([1, totalPages, currentPage]);
-  if (currentPage > 1) pages.add(currentPage - 1);
-  if (currentPage < totalPages) pages.add(currentPage + 1);
-  return Array.from(pages).sort((a, b) => a - b);
 }

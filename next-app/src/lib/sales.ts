@@ -1,7 +1,7 @@
 import type { Product } from '@/types/product';
 import { productMetalVariantLabel } from '@/types/product';
 import type { SpotData } from '@/types/product';
-import { calcSpotPriceValue, parseManualPriceLabelValue } from '@/lib/pricing';
+import { getProductPriceValue } from '@/lib/pricing';
 
 export function generateOrderNumber(date = new Date()): string {
   const stamp = [
@@ -26,13 +26,10 @@ export function getProductWeight(product: Product): number | null {
 }
 
 export function getSnapshotPrice(product: Product, spotData: SpotData | null): number {
-  if (product.price_mode === 'manual') {
-    const parsed = parseManualPriceLabelValue(product.manual_price_label);
-    if (parsed != null) return parsed;
-    if (product.asking_price != null) return Number(product.asking_price);
-    return 0;
-  }
-  return calcSpotPriceValue(product, spotData) ?? 0;
+  const resolved = getProductPriceValue(product, spotData);
+  if (resolved != null) return resolved;
+  if (product.price_mode === 'manual' && product.asking_price != null) return Number(product.asking_price);
+  return 0;
 }
 
 export function buildAddressObject(fields: {

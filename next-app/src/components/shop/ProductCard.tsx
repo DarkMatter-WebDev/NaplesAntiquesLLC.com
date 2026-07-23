@@ -1,23 +1,23 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { formatProductItemYear, inferProductJewelryType, isProductPurchasable, isProductSold, normalizeProductQuantity, normalizeProductStatus, productImagePaddingBackground, productImagePaddingForImage, productLengthSizeDisplay, productMetalVariantLabel, productStatusLabel, productSupportsLinkType, type Product, type SpotData } from '@/types/product';
-import { getDisplayPrice } from '@/lib/pricing';
+import { formatProductItemYear, inferProductJewelryType, isProductPurchasable, isProductSold, normalizeProductQuantity, normalizeProductStatus, productImagePaddingBackground, productImagePaddingForImage, productLengthSizeDisplay, productMetalVariantLabel, productStatusLabel, productSupportsLinkType, productWidthDisplay, type Product, type SpotData } from '@/types/product';
+import { getStorefrontDisplayPrice } from '@/lib/pricing';
 import WishlistButton from '@/components/shop/WishlistButton';
 import type { WishlistItem } from '@/context/WishlistContext';
 import CartButton from '@/components/shop/CartButton';
 import type { CartItem } from '@/context/CartContext';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
+import { getMountedProductImageIndexes } from '@/lib/shop-card-images';
 
 interface Props {
   product: Product;
   spotData: SpotData | null;
   locale: string;
+  hideSoldItemPrices?: boolean;
   variant?: 'classic' | 'modern';
-  revealIndex?: number;
-  revealColumnCount?: number;
   prioritizeImage?: boolean;
   includeModernStyles?: boolean;
 }
@@ -26,26 +26,24 @@ export default function ProductCard({
   product,
   spotData,
   locale,
+  hideSoldItemPrices = false,
   variant = 'classic',
-  revealIndex = 0,
-  revealColumnCount = 3,
   prioritizeImage = false,
   includeModernStyles = false,
 }: Props) {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isImageHovering, setIsImageHovering] = useState(false);
   const [isImageArrowHovering, setIsImageArrowHovering] = useState(false);
-  const [loadedCoverKey, setLoadedCoverKey] = useState<string | null>(null);
-  const [revealedCoverKey, setRevealedCoverKey] = useState<string | null>(null);
-  const coverImageRef = useRef<HTMLImageElement | null>(null);
+  const [hasCarouselInteraction, setHasCarouselInteraction] = useState(false);
   const isEs = locale === 'es';
   const title = isEs && product.title_es ? product.title_es : product.title;
-  const price = getDisplayPrice(product, spotData);
+  const price = getStorefrontDisplayPrice(product, spotData, hideSoldItemPrices, locale);
   const metalLabel = productMetalVariantLabel(product.metal_variant, product.category, locale);
   const purityLabel = formatPurity(product, isEs);
   const purityChipStyle = getPurityChipStyle(product);
   const weightLabel = formatWeight(product.gram_weight ?? product.weight_grams);
   const lengthLabel = formatLengthChip(productLengthSizeDisplay(product));
+  const widthLabel = productWidthDisplay(product);
   const itemDateLabel = formatProductItemYear(product.item_year);
   const images = useMemo(
     () =>
@@ -65,6 +63,7 @@ export default function ProductCard({
   const href = locale === 'es' ? `/es/shop/${product.id}` : `/shop/${product.id}`;
   const normalizedStatus = normalizeProductStatus(product.status);
   const isSold = isProductSold(product.status);
+  const isSoldPriceHidden = isSold && hideSoldItemPrices;
   const isPurchasable = isProductPurchasable(product.status, product.quantity);
   const stockQuantity = normalizeProductQuantity(product.quantity);
   const isModern = variant === 'modern';
@@ -74,13 +73,10 @@ export default function ProductCard({
   const isBrandFlag = brand.length > 0;
   const flagFitClass = getProductCardFlagFitClass(flagLabel);
   const showBrandTag = flagLabel.length > 0 && safeActiveImageIndex === 0 && !isImageArrowHovering;
-  const revealColumns = Math.max(1, revealColumnCount);
-  const revealRow = Math.floor(revealIndex / revealColumns);
-  const revealColumn = revealIndex % revealColumns;
-  const revealDelayMs = revealRow * (revealColumns * 90 + 140) + revealColumn * 90;
-  const coverKey = `${product.id}:${revealIndex}:${thumb ?? 'no-image'}`;
-  const coverImageLoaded = !thumb || loadedCoverKey === coverKey;
-  const isRevealed = revealedCoverKey === coverKey;
+  const mountedImageIndexes = useMemo(
+    () => getMountedProductImageIndexes(images.length, safeActiveImageIndex, hasCarouselInteraction),
+    [hasCarouselInteraction, images.length, safeActiveImageIndex],
+  );
 
   const cartItem: CartItem = {
     id: product.id,
@@ -123,6 +119,7 @@ export default function ProductCard({
     weight_grams: product.weight_grams,
     pricing_multiplier: product.pricing_multiplier,
     manual_price_label: product.manual_price_label,
+    sold_price: product.sold_price,
   };
 
   useEffect(() => {
@@ -134,56 +131,6 @@ export default function ProductCard({
   }, [canShowNextImage, images.length, isImageHovering, isImageArrowHovering]);
 
   useEffect(() => {
-    if (!thumb) return;
-
-    let frame = 0;
-    let attempts = 0;
-    const fallbackTimer = window.setTimeout(() => {
-      setLoadedCoverKey(coverKey);
-    }, 1800);
-
-    const checkCoverImage = () => {
-      const coverImage = coverImageRef.current;
-      if (coverImage?.complete && coverImage.naturalWidth > 0) {
-        window.clearTimeout(fallbackTimer);
-        setLoadedCoverKey(coverKey);
-        return;
-      }
-
-      attempts += 1;
-      if (attempts < 180) {
-        frame = window.requestAnimationFrame(checkCoverImage);
-      }
-    };
-
-    frame = window.requestAnimationFrame(checkCoverImage);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.clearTimeout(fallbackTimer);
-    };
-  }, [coverKey, thumb]);
-
-  useEffect(() => {
-    if (!coverImageLoaded) return;
-
-    // Skip the decorative row/column stagger on a repeat visit within this tab
-    // session (reload, back/forward, quick return) — that marker is set by the
-    // inline script in shop/(list)/page.tsx. Images are already cached by then,
-    // so riding out the full multi-second cascade again would just read as a
-    // stutter; each card still fades in via the CSS transition below, just
-    // without the extra wave delay.
-    const isRepeatVisit = typeof document !== 'undefined'
-      && document.querySelector('main')?.classList.contains('shop-repeat-visit');
-    const effectiveDelayMs = isRepeatVisit ? 0 : revealDelayMs;
-
-    const timer = window.setTimeout(() => {
-      setRevealedCoverKey(coverKey);
-    }, effectiveDelayMs);
-
-    return () => window.clearTimeout(timer);
-  }, [coverImageLoaded, coverKey, revealDelayMs]);
-
-  useEffect(() => {
     if (isImageHovering || activeImageIndex === 0) return;
     const timer = window.setTimeout(() => {
       setActiveImageIndex(0);
@@ -193,11 +140,13 @@ export default function ProductCard({
 
   const showPreviousImage = () => {
     if (!canShowPreviousImage) return;
+    setHasCarouselInteraction(true);
     setActiveImageIndex((current) => Math.max(current - 1, 0));
   };
 
   const showNextImage = () => {
     if (!canShowNextImage) return;
+    setHasCarouselInteraction(true);
     setActiveImageIndex((current) => Math.min(current + 1, images.length - 1));
   };
 
@@ -207,7 +156,7 @@ export default function ProductCard({
         isModern
           ? 'modern-product-card bg-white'
           : 'bg-[color:var(--color-surface-container-lowest)] border border-[color:var(--color-outline-variant)]'
-      } shop-card-reveal ${isRevealed ? 'is-visible' : ''}`}
+      }`}
       style={isModern ? {
         border: '1px solid rgba(115, 92, 0, 0.12)',
         borderRadius: '8px',
@@ -219,10 +168,11 @@ export default function ProductCard({
       <div
         className={`relative aspect-square overflow-hidden ${isModern ? 'modern-product-image' : ''}`}
         style={{ background: imageFrameBackground }}
-        onPointerEnter={() => setIsImageHovering(true)}
+        onPointerEnter={() => {
+          setHasCarouselInteraction(true);
+          setIsImageHovering(true);
+        }}
         onPointerLeave={() => setIsImageHovering(false)}
-        onMouseEnter={() => setIsImageHovering(true)}
-        onMouseLeave={() => setIsImageHovering(false)}
       >
         {isSold && (
           <div
@@ -290,12 +240,13 @@ export default function ProductCard({
 
         {activeImage ? (
           <Link href={href} prefetch={false} className="absolute inset-0">
-            {images.map((image, index) => (
+            {mountedImageIndexes.map((index) => {
+              const image = images[index];
+              return (
               <Image
                 key={`${product.id}-${index}-${image}`}
-                ref={index === 0 ? coverImageRef : undefined}
                 src={image}
-                alt={title}
+                alt={index === safeActiveImageIndex ? title : ''}
                 fill
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1719px) 25vw, (max-width: 1959px) 20vw, (max-width: 2319px) 16vw, 14vw"
                 className={`pointer-events-none object-contain object-center transition-opacity duration-700 ease-in-out ${
@@ -306,22 +257,30 @@ export default function ProductCard({
                 // Later (hover-carousel) images stay lazy so they don't compete.
                 priority={prioritizeImage && index === 0}
                 loading={prioritizeImage && index === 0 ? undefined : 'lazy'}
-                onLoad={() => {
-                  if (index === 0) setLoadedCoverKey(coverKey);
-                }}
-                onError={() => {
-                  if (index === 0) setLoadedCoverKey(coverKey);
-                }}
                 // Local assets in the static folder aren't in remotePatterns; unoptimized for those
                 unoptimized={image.startsWith('/assets/')}
               />
-            ))}
+              );
+            })}
           </Link>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-[#735c00]/35">
             <span className="material-symbols-outlined" style={{ fontSize: '2rem' }} aria-hidden="true">
               image
             </span>
+          </div>
+        )}
+        {isModern && hasMultipleImages && (
+          <div
+            className={`shop-card-image-progress ${isImageHovering ? 'is-visible' : ''}`}
+            data-current-image={safeActiveImageIndex + 1}
+            data-image-count={images.length}
+            aria-hidden="true"
+          >
+            <span
+              className="shop-card-image-progress-fill"
+              style={{ transform: `scaleX(${(safeActiveImageIndex + 1) / images.length})` }}
+            />
           </div>
         )}
         {hasMultipleImages && (
@@ -394,7 +353,7 @@ export default function ProductCard({
 
         <Link href={href} prefetch={false} className="group/title">
           <h3
-            className="font-bold text-[0.98rem] leading-snug mt-0.5 line-clamp-3 group-hover/title:underline underline-offset-2"
+            className="hover-underline-grow font-bold text-[0.98rem] leading-snug mt-0.5 line-clamp-3"
             style={{
               fontFamily: 'var(--font-headline)',
               color: 'var(--color-on-surface)',
@@ -445,7 +404,7 @@ export default function ProductCard({
             className="modern-price-label text-[0.68rem] font-extrabold uppercase tracking-widest"
             style={{ color: 'var(--color-on-surface-variant)' }}
           >
-            {isEs ? 'Tu precio' : 'Your price'}
+            {isSoldPriceHidden ? (isEs ? 'Estado' : 'Status') : (isEs ? 'Tu precio' : 'Your price')}
           </span>
           <span
             className="modern-price-value text-base font-extrabold uppercase tracking-wide"
@@ -453,6 +412,15 @@ export default function ProductCard({
           >
             {price}
           </span>
+          {widthLabel && (
+            <span
+              className={`product-card-width text-[0.66rem] font-bold whitespace-nowrap ${isModern ? 'modern-card-width' : 'ml-auto'}`}
+              style={{ color: 'var(--color-on-surface-variant)' }}
+              aria-label={`${isEs ? 'Ancho' : 'Width'}: ${widthLabel}`}
+            >
+              {widthLabel}
+            </span>
+          )}
         </p>
         <div
           className="grid grid-cols-3 gap-1 text-[0.68rem] font-bold leading-none"
@@ -505,34 +473,39 @@ export default function ProductCard({
             transform: scale(0.8);
             transition-duration: 0.05s;
           }
-          .shop-card-reveal {
+          .shop-card-image-progress {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 25;
+            height: 3px;
+            overflow: hidden;
+            background: transparent;
             opacity: 0;
-            transform: translateY(18px) scale(0.985);
-            filter: blur(6px);
             pointer-events: none;
-            transition:
-              opacity 520ms ease,
-              transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1),
-              filter 520ms ease,
-              box-shadow 180ms ease,
-              border-color 180ms ease;
-            will-change: opacity, transform, filter;
+            transition: opacity 160ms ease;
           }
-          .shop-card-reveal.is-visible {
+          .modern-product-image:hover .shop-card-image-progress,
+          .shop-card-image-progress.is-visible {
             opacity: 1;
-            transform: translateY(0) scale(1);
-            filter: blur(0);
-            pointer-events: auto;
+          }
+          .shop-card-image-progress-fill {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: #d2a51e;
+            box-shadow: 0 0 8px rgba(255, 235, 157, 0.6);
+            transform-origin: left center;
+            transition: transform 700ms ease-in-out;
           }
           .modern-product-card {
             transition:
-              opacity 520ms ease,
-              transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1),
-              filter 520ms ease,
+              transform 180ms ease,
               box-shadow 180ms ease,
               border-color 180ms ease;
           }
-          .modern-product-card.is-visible:hover {
+          .modern-product-card:hover {
             transform: translateY(-3px);
             border-color: rgba(181, 137, 12, 0.26) !important;
             box-shadow: 0 18px 44px rgba(42, 34, 12, 0.14) !important;
@@ -579,6 +552,14 @@ export default function ProductCard({
             font-weight: 700;
             letter-spacing: 0.005em;
             text-transform: none;
+            font-variant-numeric: tabular-nums;
+          }
+          .modern-product-card .modern-card-width {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.66rem;
             font-variant-numeric: tabular-nums;
           }
           /* Compact spec chips (purity / weight / length) */
@@ -765,11 +746,11 @@ export default function ProductCard({
             }
           }
           @media (prefers-reduced-motion: reduce) {
-            .shop-card-reveal,
-            .shop-card-reveal.is-visible,
             .modern-product-card,
-            .modern-product-card.is-visible:hover,
-            .shop-card-image-arrow {
+            .modern-product-card:hover,
+            .shop-card-image-arrow,
+            .shop-card-image-progress,
+            .shop-card-image-progress-fill {
               transition: none;
               transform: none;
               filter: none;

@@ -52,6 +52,8 @@ export interface Order {
   payment_method: string | null;
   payment_reference: string | null;
   shipping_method: ShippingMethod;
+  shipping_carrier?: string | null;
+  tracking_number?: string | null;
   shipping_address: Record<string, unknown> | null;
   billing_address: Record<string, unknown> | null;
   internal_notes: string | null;
@@ -86,6 +88,27 @@ export function formatOrderDate(value: string | null | undefined): string {
 export function orderStatusLabel(value: string | null | undefined): string {
   if (!value) return '-';
   return value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+export function formatOrderAddress(address: Record<string, unknown> | null): string | null {
+  if (!address) return null;
+
+  const addressParts = ['address_line1', 'address_line2', 'city', 'state', 'postal_code']
+    .map((key) => address[key])
+    .filter((value): value is string | number => typeof value === 'string' || typeof value === 'number')
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+
+  // Checkout may retain a default country even when the buyer entered no address.
+  if (addressParts.length === 0) return null;
+
+  const country = address.country;
+  if (typeof country === 'string' || typeof country === 'number') {
+    const normalizedCountry = String(country).trim();
+    if (normalizedCountry) addressParts.push(normalizedCountry);
+  }
+
+  return addressParts.join(', ');
 }
 
 /** Formats a stored purity snapshot for display — appends "K" for karat gold values

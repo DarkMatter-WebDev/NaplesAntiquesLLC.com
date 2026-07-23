@@ -5,14 +5,21 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCart, type CartItem } from '@/context/CartContext';
-import { formatProductItemYear, isProductPurchasable, normalizeProductQuantity, productImagePaddingBackground, productStatusLabel } from '@/types/product';
+import { formatProductItemYear, isProductPurchasable, isProductSold, normalizeProductQuantity, productImagePaddingBackground, productStatusLabel } from '@/types/product';
 import { QuantityStepper } from '@/components/checkout/OrderSummary';
 import StockAlertBanner from '@/components/cart/StockAlertBanner';
 import type { StockAlert } from '@/context/CartContext';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
-import { FL_TAX_RATE, FL_TAX_RATE_LABEL } from '@/lib/checkout-pricing';
+import {
+  calculateFlSalesTax,
+  FL_TAX_RATE_LABEL,
+  formatCheckoutCurrency,
+  round2,
+} from '@/lib/checkout-pricing';
 import { parseManualPriceLabelValue } from '@/lib/pricing';
 import { createClient } from '@/lib/supabase/client';
+import { useHideSoldItemPrices } from '@/hooks/useHideSoldItemPrices';
+import { findUnavailableCartItems } from '@/lib/cart-availability';
 
 const GOLD = '#735c00';
 const BORDER = '#d8d0c2';
@@ -21,20 +28,14 @@ function parsePrice(label: string): number | null {
   return parseManualPriceLabelValue(label);
 }
 
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(n);
-}
-
 export default function CartDrawer({ locale }: { locale: string }) {
   const { items, remove, clear, setQuantity, drawerOpen, closeDrawer, refreshAvailability, stockAlerts, dismissStockAlerts } = useCart();
   const router = useRouter();
   const isEs = locale === 'es';
   const prefix = isEs ? '/es' : '';
   const checkoutHref = `${prefix}/checkout`;
+  const hideSoldItemPrices = useHideSoldItemPrices(drawerOpen);
+  const hasUnavailableItems = findUnavailableCartItems(items).length > 0;
 
   // Re-check live stock each time the drawer is opened, so the shopper sees an
   // up-to-date picture (and an alert) if something sold out while it sat in their
@@ -48,6 +49,7 @@ export default function CartDrawer({ locale }: { locale: string }) {
   // null = not yet known.
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
   const [showCheckoutGate, setShowCheckoutGate] = useState(false);
+  const [checkoutPending, setCheckoutPending] = useState(false);
 
   useEffect(() => {
     if (!drawerOpen || loggedIn !== null) return;
@@ -59,6 +61,9 @@ export default function CartDrawer({ locale }: { locale: string }) {
   }, [drawerOpen, loggedIn]);
 
   async function handleProceedToCheckout() {
+    if (checkoutPending || hasUnavailableItems) return;
+    setCheckoutPending(true);
+
     // Resolve auth on the spot if the drawer was clicked before the effect settled.
     let isLoggedIn = loggedIn;
     if (isLoggedIn === null) {
@@ -71,11 +76,13 @@ export default function CartDrawer({ locale }: { locale: string }) {
       }
     }
     if (isLoggedIn) {
+      setCheckoutPending(false);
       closeDrawer();
       router.push(checkoutHref);
     } else {
       // Signed-out shoppers get the choice to log in, create an account, or
       // continue as a guest before landing on checkout.
+      setCheckoutPending(false);
       setShowCheckoutGate(true);
     }
   }
@@ -160,7 +167,7 @@ export default function CartDrawer({ locale }: { locale: string }) {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <CartView items={items} isEs={isEs} prefix={prefix} onRemove={remove} onSetQuantity={setQuantity} onClear={clear} onClose={handleClose} onCheckout={handleProceedToCheckout} stockAlerts={stockAlerts} onDismissAlerts={dismissStockAlerts} />
+          <CartView items={items} isEs={isEs} prefix={prefix} hideSoldItemPrices={hideSoldItemPrices} onRemove={remove} onSetQuantity={setQuantity} onClear={clear} onClose={handleClose} onCheckout={handleProceedToCheckout} checkoutPending={checkoutPending} hasUnavailableItems={hasUnavailableItems} stockAlerts={stockAlerts} onDismissAlerts={dismissStockAlerts} />
         </div>
       </div>
 
@@ -170,7 +177,12 @@ export default function CartDrawer({ locale }: { locale: string }) {
           prefix={prefix}
           checkoutHref={checkoutHref}
           onClose={() => setShowCheckoutGate(false)}
-          onGuest={() => { setShowCheckoutGate(false); closeDrawer(); router.push(checkoutHref); }}
+          onGuest={() => {
+            setShowCheckoutGate(false);
+            if (hasUnavailableItems) return;
+            closeDrawer();
+            router.push(checkoutHref);
+          }}
           onNavigate={(href) => { setShowCheckoutGate(false); closeDrawer(); router.push(href); }}
         />
       )}
@@ -262,22 +274,28 @@ function CartView({
   items,
   isEs,
   prefix,
+  hideSoldItemPrices,
   onRemove,
   onSetQuantity,
   onClear,
   onClose,
   onCheckout,
+  checkoutPending,
+  hasUnavailableItems,
   stockAlerts,
   onDismissAlerts,
 }: {
   items: CartItem[];
   isEs: boolean;
   prefix: string;
+  hideSoldItemPrices: boolean;
   onRemove: (id: string) => void;
   onSetQuantity: (id: string, quantity: number) => void;
   onClear: () => void;
   onClose: () => void;
   onCheckout: () => void;
+  checkoutPending: boolean;
+  hasUnavailableItems: boolean;
   stockAlerts: StockAlert[];
   onDismissAlerts: () => void;
 }) {
@@ -296,21 +314,22 @@ function CartView({
   }
 
   const lineTotals = items.map((i) => {
+    if (hideSoldItemPrices && isProductSold(i.status)) return null;
     const unit = parsePrice(i.priceLabel);
     return unit === null ? null : unit * Math.max(1, normalizeProductQuantity(i.purchaseQuantity));
   });
   const knownLineTotals = lineTotals.filter((p): p is number => p !== null);
   const hasUnknown = knownLineTotals.length < lineTotals.length;
-  const subtotal = knownLineTotals.reduce((a, b) => a + b, 0);
-  const tax = subtotal * FL_TAX_RATE;
-  const total = subtotal + tax;
+  const subtotal = round2(knownLineTotals.reduce((a, b) => a + b, 0));
+  const tax = calculateFlSalesTax(subtotal);
+  const total = round2(subtotal + tax);
 
   return (
-      <div className="flex min-h-0 flex-col h-full">
-      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
+      <div className="flex min-h-0 flex-col">
+      <div className="px-4 py-4 flex flex-col gap-3">
         <StockAlertBanner alerts={stockAlerts} isEs={isEs} onDismiss={onDismissAlerts} />
         {items.map((item) => (
-          <CartItemRow key={item.id} item={item} isEs={isEs} prefix={prefix} onRemove={() => onRemove(item.id)} onSetQuantity={(qty) => onSetQuantity(item.id, qty)} />
+          <CartItemRow key={item.id} item={item} isEs={isEs} prefix={prefix} hideSoldItemPrices={hideSoldItemPrices} onRemove={() => onRemove(item.id)} onSetQuantity={(qty) => onSetQuantity(item.id, qty)} />
         ))}
       </div>
 
@@ -318,18 +337,18 @@ function CartView({
         <div className="flex flex-col gap-1 text-xs" style={{ fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}>
           <div className="flex justify-between">
             <span>Subtotal</span>
-            <span>{subtotal > 0 ? fmt(subtotal) : '-'}{hasUnknown ? '*' : ''}</span>
+            <span>{subtotal > 0 ? formatCheckoutCurrency(subtotal) : '-'}{hasUnknown ? '*' : ''}</span>
           </div>
           <div className="flex justify-between">
             <span>{isEs ? `Impuesto FL (${FL_TAX_RATE_LABEL})` : `FL Sales Tax (${FL_TAX_RATE_LABEL})`}</span>
-            <span>{subtotal > 0 ? fmt(tax) : '-'}</span>
+            <span>{subtotal > 0 ? formatCheckoutCurrency(tax) : '-'}</span>
           </div>
           <div
             className="flex justify-between pt-1 mt-1 font-bold text-sm"
             style={{ borderTop: `1px solid ${BORDER}`, color: 'var(--color-on-surface)' }}
           >
             <span>{isEs ? 'Total estimado' : 'Est. Total'}</span>
-            <span style={{ color: GOLD }}>{subtotal > 0 ? fmt(total) : '-'}</span>
+            <span style={{ color: GOLD }}>{subtotal > 0 ? formatCheckoutCurrency(total) : '-'}</span>
           </div>
           {hasUnknown && (
             <p className="text-[0.6rem] mt-1" style={{ color: 'var(--color-on-surface-variant)' }}>
@@ -343,9 +362,22 @@ function CartView({
       </div>
 
       <div className="px-4 py-4 flex flex-col gap-2 flex-shrink-0">
-        <button type="button" onClick={onCheckout} className="gold-button justify-center" style={{ width: '100%' }}>
-          {isEs ? 'Proceder al pago' : 'Proceed to Checkout'}
-          <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '17px', lineHeight: 1 }}>chevron_right</span>
+        <button
+          type="button"
+          onClick={onCheckout}
+          disabled={checkoutPending || hasUnavailableItems}
+          aria-busy={checkoutPending}
+          className="gold-button justify-center"
+          style={{ width: '100%' }}
+        >
+          {hasUnavailableItems
+            ? (isEs ? 'Elimina los artículos no disponibles' : 'Remove Unavailable Items')
+            : checkoutPending
+            ? (isEs ? 'Comprobando...' : 'Checking...')
+            : (isEs ? 'Proceder al pago' : 'Proceed to Checkout')}
+          {!checkoutPending && !hasUnavailableItems && (
+            <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '17px', lineHeight: 1 }}>chevron_right</span>
+          )}
         </button>
         <button
           type="button"
@@ -367,13 +399,14 @@ function CartView({
   );
 }
 
-function CartItemRow({ item, isEs, prefix, onRemove, onSetQuantity }: { item: CartItem; isEs: boolean; prefix: string; onRemove: () => void; onSetQuantity: (quantity: number) => void }) {
+function CartItemRow({ item, isEs, prefix, hideSoldItemPrices, onRemove, onSetQuantity }: { item: CartItem; isEs: boolean; prefix: string; hideSoldItemPrices: boolean; onRemove: () => void; onSetQuantity: (quantity: number) => void }) {
   const title = isEs && item.title_es ? item.title_es : item.title;
   const description = (isEs && item.description_es ? item.description_es : item.description) ?? item.public_notes ?? null;
   const imageFrameBackground = productImagePaddingBackground(item.image_padding);
   const image = normalizeLegacyLocalImageUrl(item.image);
   const itemDate = formatProductItemYear(item.item_year);
   const purchasable = isProductPurchasable(item.status, item.stockQuantity);
+  const hidePrice = hideSoldItemPrices && isProductSold(item.status);
   const stockCap = Math.max(1, normalizeProductQuantity(item.stockQuantity));
   const qty = Math.max(1, normalizeProductQuantity(item.purchaseQuantity));
   const unitPrice = parsePrice(item.priceLabel);
@@ -386,12 +419,12 @@ function CartItemRow({ item, isEs, prefix, onRemove, onSetQuantity }: { item: Ca
           : <div className="w-full h-full flex items-center justify-center text-xl opacity-30">Photo</div>}
       </Link>
       <div className="flex-1 min-w-0 flex flex-col gap-1">
-        <Link href={`${prefix}/shop/${item.id}`} className="text-sm font-bold leading-snug hover:underline"
+        <Link href={`${prefix}/shop/${item.id}`} className="hover-underline-grow text-sm font-bold leading-snug"
           style={{ color: 'var(--color-on-surface)', fontFamily: 'var(--font-headline)' }}>
           {title}
         </Link>
         <p className="text-xs font-bold uppercase tracking-wide" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-          {item.priceLabel}
+          {hidePrice ? (isEs ? 'Vendido' : 'Sold') : item.priceLabel}
         </p>
         {itemDate && (
           <p className="text-[0.64rem] font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
@@ -413,7 +446,7 @@ function CartItemRow({ item, isEs, prefix, onRemove, onSetQuantity }: { item: Ca
             <QuantityStepper value={qty} max={stockCap} onChange={onSetQuantity} isEs={isEs} />
             {lineTotal !== null && (
               <span className="text-[0.7rem] font-bold" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-                = {fmt(lineTotal)}
+                = {formatCheckoutCurrency(lineTotal)}
               </span>
             )}
             <span className="w-full text-[0.6rem] font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>

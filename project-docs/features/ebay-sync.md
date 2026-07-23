@@ -1,16 +1,81 @@
 # Feature: eBay Sync
 
-> Status: **code-complete; the Phase 0 account-deletion webhook is
-> confirmed live** (built 2026-07-09 session 14; webhook verified live the
-> same day, session 14 second addendum). Everything else (Phase 1 publish
-> flow, Phase 2 automation) remains unverified against a live eBay account —
-> see "Verification status" below.
+> Status: **code-complete; the Phase 0 account-deletion webhook and listing
+> status/relist reconciliation are confirmed live.** Phase 1/2 write behavior
+> is only partially live-tested; see "Verification status" below.
 > Full plan: `ebay-sync-plan/` (18 docs). Owner checklist:
 > `ebay-sync-plan/OWNER-SETUP.md`. Deliberately mirrors the shipped Etsy
 > integration's shape — see `project-docs/features/etsy-sync.md` — but is a
 > separate, independent module; neither channel depends on the other.
 
 ## What this is
+
+**2026-07-21 status-drift fix:** An active eBay status check preserves local
+`out_of_date` instead of replacing it with `published`. Remote lifecycle and
+local content freshness remain independent, and the result reports **Live,
+updates needed** until a successful sync refreshes the content hash. Inventory
+#53 live-verified the fix after its mapped fulfillment policy crossed the
+$1,000 high-value threshold.
+
+**2026-07-21 status-to-post route:** Each product in the selected status
+dialog's eBay Not listed detail has **Post to eBay**. It scopes the existing
+selected eBay sync dialog to that product, where the admin still chooses
+immediate sync or review-first submission. Closing or completing that route
+returns to a newly reconciled combined status summary without clearing the
+original table selection.
+
+**2026-07-20 selected review-first sync:** Selected products can either use the
+existing immediate eBay batch queue or open a sequential review flow. Each step
+loads the real eBay preview checks, condition, shipping, aspects, and mapped
+fields, then runs the established bounded single-product sync endpoint only
+after explicit submission. Terminal success advances; failures stay on the
+current item for refresh/retry, and explicit skips are counted. The flow keeps
+eBay's existing review/publish/update semantics and is independently selectable
+after Etsy in Sync to both.
+
+**2026-07-20 selected reconciliation:** The Admin Products Actions modal has a
+channel-specific **Check eBay status** action for the selected products. It
+calls `verify-all` with an optional deduplicated `productIds` list and returns
+a final state for every selected product independently from Etsy. The default
+view reduces those records to clickable Listed, Not listed, and Needs attention
+totals. A nonzero total opens only its matching products and translates eBay
+state into Live, Draft, Not listed, Ended, Hidden (sold), Out of date, or a
+check/error result; Back restores the totals without another request. The
+internal local-update count remains in the API contract but is not displayed.
+It performs marketplace reads and local reconciliation only, preserves the
+selection, and pushes no listing content. A failed eBay check can be retried
+without discarding a successful Etsy result. A live mixed-status check showed
+one Listed and one Not listed, and both drill-downs passed.
+
+**2026-07-19 description-banner preparation:** A shared banner was optimized
+to `next-app/public/assets/marketplaces/ebay-description-banner.webp` (1400x468
+WebP, 113,460 bytes), but it is not part of `mapDescription()` or any live
+listing. The supplied art visibly includes the business phone number and
+off-eBay domain, so it must be replaced with a policy-safe branding-only
+variant before integration. A future compliant banner must use a public HTTPS
+asset, stay non-clickable and responsive, appear only in the HTML description
+(not `imageUrls`), and pass one controlled desktop/mobile listing check before
+bulk Sync Updates.
+
+**2026-07-16 full API audit:** All 79 linked offers were read from eBay, plus
+per-SKU offer lookups: 73 were published/active, 5 unpublished/out-of-stock,
+and one was inventory #82's known ended predecessor. No duplicate SKU offers or
+API errors were found. Shared write paths now validate each entry in bulk HTTP
+200 responses, include the required fixed-price `listingDuration: GTC`, capture
+new listing IDs after publish/restore, distinguish Inventory-offer 404s from
+Trading-item failures, and resolve detached relists before writes. Crash
+recovery only adopts exact-marketplace fixed-price offers. Focused regression
+tests and guarded admin-browser actions cover these cases; destructive live
+write scenarios remain subject to the verification notes below.
+
+**2026-07-16 relist correction:** Inventory `getOffer` can remain attached to
+an ended item after that item is relisted outside the offer. Status verification
+now uses seller-authenticated Trading `GetItem` to follow the bounded
+`RelistedItemID` chain, requires the same seller SKU at each hop, and adopts the
+latest active listing ID. A detached relist is displayed as Live with an admin
+warning, while app-side sync, price, and delist writes are blocked until an
+owner-approved reattachment is completed. Inventory #82 was live-tested twice
+against active relist `800354878200` without drifting back to Ended.
 
 A one-way push (Supabase `products` → an eBay listing) as a secondary sales
 channel, same trust model as Etsy sync: `products` stays the source of
@@ -90,12 +155,12 @@ Two structural differences from Etsy that shaped the whole design:
   already-published item reinterpreted as `mode: 'update'` instead of a
   fresh publish, plus a drain seen-guard) is built in **from day one** here
   — on Etsy this was a fix added after a real production incident
-  (`DECISIONS.md` 2026-07-08, seventeenth addendum).
+  (`CHANGELOG.md` 2026-07-08, seventeenth addendum).
 - **`store.ts`** — typed access to `ebay_connection` / `ebay_oauth_states` /
   `ebay_listings` / `ebay_sync_log` (service-role only; same
   schema-not-migrated defensive pattern as `etsy/store.ts`).
 
-## Database (`supabase/ebay-sync.sql` — written, NOT yet applied)
+## Database (`supabase/ebay-sync.sql` - applied)
 
 One fewer table than Etsy (no `ebay_listing_images` — see "no image bytes"
 above):
@@ -134,7 +199,8 @@ dry-run) · `sync` (POST, modes `publish`/`update`/`price-only`/
 `publish-live`) · `sync-batch` (POST, Phase 2 `enqueue`/
 `enqueue-all-eligible`/`drain`) · `delist` (POST, `hide`/`withdraw`/
 `restore`) · `listings` (GET, bulk chip map) · `eligibility-summary` (GET) ·
-`verify-listing` (POST) · `verify-all` (POST) · `price-push` (POST,
+`verify-listing` (POST) · `verify-all` (POST; all linked listings or
+optional validated `productIds`) · `price-push` (POST,
 `x-cron-secret` header, not admin-gated — a cron has no browser session) ·
 `push-prices` (POST, admin-gated manual push).
 
@@ -142,11 +208,18 @@ Plus, outside `/api/admin/ebay/`: **`/api/webhooks/ebay-account-deletion`**
 (Phase 0 compliance endpoint, not admin-gated — eBay calls it directly). GET
 answers the challenge (`hex(sha256(challengeCode + EBAY_VERIFICATION_TOKEN +
 endpointUrl))`, exact concatenation order, unit-tested). POST verifies
-`X-EBAY-SIGNATURE`, records the notification in `webhook_events`
+`X-EBAY-SIGNATURE`, records a sanitized notification in `webhook_events`
 (`provider='ebay'`, unique on `(provider, event_id)`) for idempotency, and
-acks 200. We store no eBay buyer data (no Phase 3), so the handler is close
-to a no-op by design — see "Build-time resolutions" below for what's
-unverified about the signature check specifically.
+acks 200. The stored payload keeps only notification metadata
+(`notificationId`, event/publish dates, publish attempt count) and strips eBay
+user identifiers (`username`, `userId`, `eiasToken`) before persistence. We
+store no eBay buyer data (no Phase 3), so the handler is close to a no-op by
+design.
+
+**2026-07-16 correction:** the first live implementation stored raw
+account-deletion payloads in `webhook_events.payload`; a read-only audit found
+10,922 existing rows with eBay user identifiers. Code is fixed for future rows,
+but the existing rows need the owner-confirmed scrub tracked in `TASKS.md`.
 
 Phase 3's order-ingest route is **not built** (Q15 — deferred, manual
 handling is fine; the `orders_cursor` column is the only seam left in
@@ -177,6 +250,9 @@ place).
   {upToDate} up to date · {errors} errors"`, with Coin/Bullion items
   showing up under "ineligible" with the Q6 reason), enqueue + drain with
   live progress and a cooperative "Stop after current item" cancel.
+- **Product Admin selected Actions** — **Check eBay** reconciles only the
+  selected linked offers, reports checked/updated/reset/error/skipped totals,
+  refreshes eBay chips on close, and keeps the selection for a follow-up sync.
 - **Not built:** a dedicated "eBay: out of date / error / not listed"
   product-table filter chip — there's no existing single-marketplace filter
   control on the Etsy side to extend, so this was skipped rather than
@@ -214,20 +290,20 @@ Condition is fixed: `USED_EXCELLENT` (id `3000`, "Pre-owned") + one standard
 
 ## Build-time resolutions and known gaps
 
-No eBay credentials or network access to `developer.ebay.com` were
-available in the build environment (`WebFetch` timed out on every attempt),
-so per `BUILD-PROMPT.md` hard rule 8, uncertain values are pinned as
-best-supported guesses and marked `TODO(ebay-verify)` in code rather than
-left unbuilt. Full reasoning for each: `project-docs/DECISIONS.md`
-2026-07-09 (session 14). Summary:
+The numbered list below records the initial build-time uncertainty. Since that
+first pass, live OAuth/webhook/status/relist and controlled write work has
+verified several assumptions, and live Taxonomy calls pinned the categories
+actually used by the current catalog. Remaining code-level
+`TODO(ebay-verify)` items are the sandbox auth-host assumption, selected
+allowed aspect values, multi-SKU price batching, and plan-level account
+details. Historical reasoning is in `project-docs/CHANGELOG.md` under
+2026-07-09 and 2026-07-10.
 
-1. **No Fashion Jewelry category id is pinned** (`EBAY_FASHION_CATEGORY_MAP`
-   in `mapping.ts` is empty) — every vermeil item is blocked at pre-flight
-   with a clear message until a developer pins real ids via a live
-   `getCategorySuggestions` call. Fine Jewelry leaf ids (261993/261994/
-   261990/261988/etc.) ARE pinned, from the plan's own candidate table, but
-   are themselves still flagged `TODO(ebay-verify)` by the plan (eBay
-   restructures its taxonomy periodically).
+1. **Current catalog Fashion Jewelry leaves are pinned.**
+   `EBAY_FASHION_CATEGORY_MAP` contains the live-verified Necklace/Pendant/
+   Charm/Koma Clasp and Brooch leaves used by existing inventory. Unsupported
+   future vermeil types still block at preflight rather than guessing. Fine
+   Jewelry and antique-silver leaves are also pinned from live taxonomy work.
 2. **Item-aspect values are not cross-checked** against eBay's live
    `getItemAspectsForCategory` SELECTION_ONLY allowed-value lists — a
    mismatch fails loudly at publish time (a 400), not silently, which is a
@@ -254,7 +330,7 @@ left unbuilt. Full reasoning for each: `project-docs/DECISIONS.md`
    properly line-wrapped PEM regardless of the raw string's shape
    (`buildPemFromRawKey()` in the route file). Both the GET challenge and
    POST signature verification are now confirmed working end to end. Full
-   debugging trail: `project-docs/DECISIONS.md` 2026-07-09 (session 14,
+   debugging trail: `project-docs/CHANGELOG.md` 2026-07-09 (session 14,
    second addendum).
 7. **General eBay API host/header conventions** are pinned from
    well-established, stable Sell API knowledge, not a fresh OpenAPI fetch —
@@ -268,7 +344,7 @@ left unbuilt. Full reasoning for each: `project-docs/DECISIONS.md`
 
 ## Verification status
 
-**Live-eBay verification, Phase 0 (2026-07-09, session 14 second addendum):**
+**Live-eBay verification began with Phase 0 (2026-07-09):**
 the account-deletion webhook is confirmed working end to end against the
 owner's real production keyset — the GET challenge validated immediately
 (auto-enabled the previously-disabled production keyset — that alone
@@ -276,9 +352,11 @@ satisfies eBay's Q10 compliance gate) and "Send Test Notification" (the
 POST signature-verify path) now succeeds with zero errors in Netlify's
 function logs and no failure banner in the eBay portal, after fixing two
 real bugs found via live debugging (SHA1 digest, malformed single-line PEM
-— see DECISIONS.md). **Everything else below (Phase 1 publish flow, Phase 2
-automation) remains unverified** — connecting the app (OAuth), a dry-run
-preview, and an actual product publish have not been attempted yet.
+— see the 2026-07-09 changelog). Since then OAuth, previews, controlled
+publishes/updates, category and fulfillment-policy paths, and selected
+status/relist reconciliation have also been exercised live. The full owner
+write-path/idempotency matrix is still incomplete, so untested cases remain
+explicit in `ebay-sync-plan/OWNER-SETUP.md` and `project-docs/TASKS.md`.
 
 What IS verified (code-level, all builds/phases):
 
@@ -299,9 +377,8 @@ What IS verified (code-level, all builds/phases):
   ring-size + 22 length + 22 images + 5 client tests, and all non-Etsy
   suites) — **zero regressions**.
 
-**Keyset activation is now done** (the one Phase 0 item from
+**Keyset activation is done** (the Phase 0 item from
 `ebay-sync-plan/14-verification-checklist.md`'s "Phase 0/1 verification"
-list). Every remaining live-eBay item from that checklist (sandbox OAuth
-round-trip, first real publish, idempotency drills, hide/restore, price
-push observation) is on `ebay-sync-plan/OWNER-SETUP.md` as a post-setup
-step, explicitly marked untested by this build.
+list). Treat `ebay-sync-plan/OWNER-SETUP.md` as the detailed matrix, but use
+the current status at the top of this file and `project-docs/TASKS.md` before
+repeating a step; several originally untested paths are now complete.

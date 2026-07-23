@@ -7,7 +7,7 @@ import {
   normalizeProductStatus,
   productMetalVariantLabel,
 } from '@/types/product';
-import { calcSpotPriceValue, parseManualPriceLabelValue } from '@/lib/pricing';
+import { getProductPriceValue } from '@/lib/pricing';
 import { getProductImages } from '@/lib/sales';
 import { getProductImageStoragePath } from '@/lib/product-image-storage';
 import type { EtsyConnectionRow } from './store';
@@ -590,10 +590,8 @@ export interface EtsyPriceResult {
 }
 
 export function computeEtsyPrice(product: Product, spotData: SpotData | null, markupPct: number): EtsyPriceResult {
-  const basePrice =
-    product.price_mode === 'manual'
-      ? (parseManualPriceLabelValue(product.manual_price_label) ?? (product.asking_price != null ? Number(product.asking_price) : null))
-      : calcSpotPriceValue(product, spotData);
+  const basePrice = getProductPriceValue(product, spotData)
+    ?? (product.price_mode === 'manual' && product.asking_price != null ? Number(product.asking_price) : null);
 
   if (basePrice == null || !Number.isFinite(basePrice) || basePrice <= 0) {
     return { price: null, basePrice: null, rejectedReason: 'No price could be computed for this item.' };
@@ -687,6 +685,13 @@ const ETSY_KEYWORD_TAXONOMY: { pattern: RegExp; mapping: TaxonomyMapping }[] = [
   { pattern: /salt cellar|\bcellar\b|caster|muffineer|shaker/i, mapping: { taxonomyId: 1050, path: 'Home & Living > Kitchen & Dining > Dining & Serving > Salt & Pepper Shakers', approximate: true } },
   { pattern: /coffee ?pot|tea ?pot|teapot|chocolate ?pot/i, mapping: { taxonomyId: 1932, path: 'Home & Living > Kitchen & Dining > Coffee & Tea Makers > Tea Makers > Teapots', approximate: true } },
   { pattern: /tazza|compote|comport|epergne/i, mapping: { taxonomyId: 2538, path: 'Home & Living > Kitchen & Dining > Dining & Serving > Trays & Platters > Platters', approximate: true } },
+  // Catalog types confirmed against Etsy's live seller taxonomy on 2026-07-21.
+  { pattern: /grape shears?/i, mapping: { taxonomyId: 1052, path: 'Home & Living > Kitchen & Dining > Dining & Serving > Serving Utensils' } },
+  { pattern: /serving set/i, mapping: { taxonomyId: 1052, path: 'Home & Living > Kitchen & Dining > Dining & Serving > Serving Utensils' } },
+  { pattern: /coaster/i, mapping: { taxonomyId: 1060, path: 'Home & Living > Kitchen & Dining > Drink & Barware > Drinkware > Coasters' } },
+  // Etsy has no matchbox-holder/vesta leaf. Antique vesta cases fit its
+  // Tobacciana collection most closely under Lighters.
+  { pattern: /matchbox|match box|vesta(?: case)?/i, mapping: { taxonomyId: 1867, path: 'Art & Collectibles > Collectibles > Tobacciana > Lighters', approximate: true } },
   // --- 2026-07-10 round 2: pre-mapped for the new "Mug" item + antique-silver
   // forms the shop may acquire. Etsy's taxonomy is craft/handmade-oriented and
   // has no dedicated antique-silver leaves, so most are closest-fit
@@ -714,6 +719,16 @@ const ETSY_KEYWORD_TAXONOMY: { pattern: RegExp; mapping: TaxonomyMapping }[] = [
   { pattern: /spoon|fork|knife|ladle|server|flatware|silverware|tongs|sifter|scoop|caddy|marrow/i, mapping: { taxonomyId: 1048, path: 'Home & Living > Kitchen & Dining > Dining & Serving > Flatware & Silverware' } },
 ];
 
+// Etsy exposes no universal "Other" seller-taxonomy leaf. This is its broadest
+// practical vintage-collectible catch-all for an estate item whose custom
+// product type misses every explicit mapping. It remains approximate so the
+// admin is prompted to use the category picker before submitting when needed.
+const ETSY_GENERIC_TAXONOMY: TaxonomyMapping = {
+  taxonomyId: 69,
+  path: 'Art & Collectibles > Collectibles > Figurines & Knick Knacks',
+  approximate: true,
+};
+
 export function resolveTaxonomy(productType: string | null | undefined): TaxonomyMapping | null {
   const normalized = normalizeProductJewelryType(productType) ?? 'Other';
   const direct = ETSY_TAXONOMY_MAP[normalized];
@@ -723,7 +738,7 @@ export function resolveTaxonomy(productType: string | null | undefined): Taxonom
   for (const rule of ETSY_KEYWORD_TAXONOMY) {
     if (rule.pattern.test(raw)) return rule.mapping;
   }
-  return null;
+  return ETSY_GENERIC_TAXONOMY;
 }
 
 // ---------------------------------------------------------------------------
@@ -885,7 +900,7 @@ export function buildPreflightChecks(
         : taxonomyOverride
           ? undefined
           : taxonomy.approximate
-            ? `Using "${taxonomy.path}" as the closest available Etsy category — no exact match exists for this product type. Pick the exact category in the Etsy drawer if this isn't right.`
+            ? `Using "${taxonomy.path}" as the closest available Etsy category — no exact match exists for this product type. Use the category picker if this isn't right.`
             : undefined,
   });
 

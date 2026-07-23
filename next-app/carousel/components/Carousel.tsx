@@ -23,6 +23,7 @@ import {
   type CarouselItem,
 } from "../lib/carouselData";
 import { DEFAULT_BG } from "../lib/carouselConfig";
+import { carouselImageLoading } from "@/lib/storefront-image-loading";
 
 type Props = {
   /** Provide items directly to bypass the Supabase fetch. */
@@ -263,7 +264,19 @@ export function Carousel({
       if (a < 0) a += 360; // [0, 360)
       // Centered, front-facing slot (for the text theme).
       const rad = (a * Math.PI) / 180;
-      if (Math.cos(rad) > 0) {
+      // A back-facing 3D card can still have a very large projected box while
+      // it passes behind the camera. Keep those hidden planes out of hit
+      // testing so they cannot cover a card that is actually visible.
+      const card = ring.children[p] as HTMLElement | undefined;
+      const depth = Math.cos(rad);
+      const isFrontFacing = depth > 0;
+      if (card) {
+        card.dataset.carouselFacing = isFrontFacing ? "front" : "back";
+        // When front cards overlap in projection, the card closest to the
+        // viewer must win hit testing just as it wins visual stacking.
+        card.style.zIndex = isFrontFacing ? String(Math.round((depth + 1) * 100)) : "-1";
+      }
+      if (isFrontFacing) {
         const score = Math.abs(Math.sin(rad)); // 0 = dead center
         if (score < bestScore) {
           bestScore = score;
@@ -401,6 +414,7 @@ export function Carousel({
         {slotItems.map((itemIndex, slot) => {
           const item = data[itemIndex];
           if (!item) return null;
+          const imageLoading = carouselImageLoading(slot);
           const inner = (
             <>
               <Image
@@ -413,6 +427,8 @@ export function Carousel({
                 // instead of the full-resolution original.
                 sizes="(max-width: 640px) 80vw, (max-width: 1024px) 50vw, 35vw"
                 quality={90}
+                loading={imageLoading.loading}
+                fetchPriority={imageLoading.fetchPriority}
                 draggable={false}
               />
               {showThePrice && item.priceLabel && (
@@ -434,6 +450,10 @@ export function Carousel({
               href={item.href}
               className={`${styles.card} ${styles.link}`}
               style={cardStyle}
+              onPointerDown={() => {
+                const ring = ringRef.current;
+                if (ring) ring.style.animationPlayState = "paused";
+              }}
             >
               {inner}
             </a>

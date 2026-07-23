@@ -632,6 +632,14 @@ describe('computeEtsyPrice', () => {
     expect(result.price).toBe(1166.67);
   });
 
+  it('uses a sold product price lock instead of the latest metal price', () => {
+    const product = makeProduct({ status: 'sold', sold_price: 800, price_mode: 'spot-multiplier' });
+    const spotData = { goldPerTroyOz: 9_999, silverPerTroyOz: null, fetchedAt: Date.now(), source: 'api' as const };
+    const result = computeEtsyPrice(product, spotData, 8);
+    expect(result.basePrice).toBe(800);
+    expect(result.price).toBe(864);
+  });
+
   it('rejects prices under $0.20', () => {
     const product = makeProduct({ price_mode: 'manual', manual_price_label: '$0.10' });
     const result = computeEtsyPrice(product, null, 0);
@@ -742,6 +750,26 @@ describe('resolveEffectiveTaxonomy — manual per-product category override', ()
       expect(resolveTaxonomy('Snuff Box')).toMatchObject({ taxonomyId: 6102 });
     });
 
+    it('maps the four 2026-07-21 failed catalog types to verified Etsy leaves', () => {
+      expect(resolveTaxonomy('Grape Shears')).toEqual({
+        taxonomyId: 1052,
+        path: 'Home & Living > Kitchen & Dining > Dining & Serving > Serving Utensils',
+      });
+      expect(resolveTaxonomy('Serving Set')).toEqual({
+        taxonomyId: 1052,
+        path: 'Home & Living > Kitchen & Dining > Dining & Serving > Serving Utensils',
+      });
+      expect(resolveTaxonomy('Coaster')).toEqual({
+        taxonomyId: 1060,
+        path: 'Home & Living > Kitchen & Dining > Drink & Barware > Drinkware > Coasters',
+      });
+      expect(resolveTaxonomy('Matchbox Holder')).toEqual({
+        taxonomyId: 1867,
+        path: 'Art & Collectibles > Collectibles > Tobacciana > Lighters',
+        approximate: true,
+      });
+    });
+
     it('"Butter Dish" beats the generic bowl/dish rule (order matters — first match wins)', () => {
       expect(resolveTaxonomy('Butter Dish')).toMatchObject({ taxonomyId: 1045 });
       expect(resolveTaxonomy('Serving Dish')).toMatchObject({ taxonomyId: 1044 }); // still the generic bowl leaf
@@ -751,8 +779,17 @@ describe('resolveEffectiveTaxonomy — manual per-product category override', ()
       expect(resolveTaxonomy('Necklace')).toEqual({ taxonomyId: 1221, path: 'Jewelry > Necklaces > Chains' });
     });
 
-    it('returns null for a genuinely unmappable type — never a silent guess', () => {
-      expect(resolveTaxonomy('Flux Capacitor')).toBeNull();
+    it('uses a visibly approximate generic collectible leaf for an unmapped future type', () => {
+      expect(resolveTaxonomy('Flux Capacitor')).toEqual({
+        taxonomyId: 69,
+        path: 'Art & Collectibles > Collectibles > Figurines & Knick Knacks',
+        approximate: true,
+      });
+
+      const checks = buildPreflightChecks(makeProduct({ product_type: 'Flux Capacitor', jewelry_type: 'Flux Capacitor' }), null, null);
+      const taxonomyCheck = checks.find((check) => check.check === 'taxonomy');
+      expect(taxonomyCheck?.ok).toBe(true);
+      expect(taxonomyCheck?.message).toMatch(/category picker/i);
     });
   });
 

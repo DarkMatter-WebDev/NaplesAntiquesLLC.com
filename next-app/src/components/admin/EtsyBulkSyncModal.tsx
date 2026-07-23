@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import SelectedMarketplaceReviewFlow from './SelectedMarketplaceReviewFlow';
 
 interface EligibilitySummary {
   total: number;
@@ -14,11 +15,14 @@ interface EligibilitySummary {
 interface DrainResult {
   done: boolean;
   remaining: number;
-  results: { productId: string; syncState: string }[];
+  results: { productId: string; syncState: string; done: boolean }[];
 }
 
 /** Phase 2 bulk action (etsy-sync-plan/07-admin-ux.md §3): pre-flight summary -> confirm -> drain the queue with progress -> stop-after-current cancel. */
-export default function EtsyBulkSyncModal({ onClose }: { onClose: () => void }) {
+export default function EtsyBulkSyncModal({ onClose, productIds }: { onClose: (completed?: boolean) => void; productIds?: string[] }) {
+  const selectedProductIds = productIds?.length ? productIds : null;
+  const selectedRun = selectedProductIds !== null;
+  const selectedCount = selectedProductIds?.length ?? 0;
   const [phase, setPhase] = useState<'summary' | 'running' | 'done'>('summary');
   const [summary, setSummary] = useState<EligibilitySummary | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
@@ -28,6 +32,7 @@ export default function EtsyBulkSyncModal({ onClose }: { onClose: () => void }) 
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<string | null>(null);
+  const [selectedFlow, setSelectedFlow] = useState<'choice' | 'review'>('choice');
   const cancelledRef = useRef(false);
 
   // No setState before the first await (react-hooks/set-state-in-effect) — see
@@ -45,9 +50,21 @@ export default function EtsyBulkSyncModal({ onClose }: { onClose: () => void }) 
   }, []);
 
   useEffect(() => {
+    if (selectedRun) return;
     const run = async () => { await loadSummary(); };
     void run();
-  }, [loadSummary]);
+  }, [loadSummary, selectedRun]);
+
+  if (selectedRun && selectedFlow === 'review') {
+    return (
+      <SelectedMarketplaceReviewFlow
+        marketplace="etsy"
+        productIds={selectedProductIds ?? []}
+        onBack={() => setSelectedFlow('choice')}
+        onClose={onClose}
+      />
+    );
+  }
 
   // "Check Etsy statuses" — reconcile every linked listing's local state to
   // what Etsy actually reports (read-only; no content re-pushed). Recovers
@@ -57,7 +74,15 @@ export default function EtsyBulkSyncModal({ onClose }: { onClose: () => void }) 
     setChecking(true);
     setCheckResult(null);
     try {
-      const res = await fetch('/api/admin/etsy/verify-all', { method: 'POST' });
+      const res = await fetch('/api/admin/etsy/verify-all', {
+        method: 'POST',
+        ...(selectedRun
+          ? {
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ productIds: selectedProductIds }),
+            }
+          : {}),
+      });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data) throw new Error(data?.error || 'Could not check Etsy statuses.');
       setCheckResult(
@@ -80,19 +105,17 @@ export default function EtsyBulkSyncModal({ onClose }: { onClose: () => void }) 
       const enqueueRes = await fetch('/api/admin/etsy/sync-batch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'enqueue-all-eligible' }),
+        body: JSON.stringify(selectedRun
+          ? { action: 'enqueue', productIds: selectedProductIds }
+          : { action: 'enqueue-all-eligible' }),
       });
       const enqueueData = await enqueueRes.json().catch(() => null);
       if (!enqueueRes.ok) throw new Error(enqueueData?.error || 'Could not queue products.');
       setQueued(enqueueData.queued ?? 0);
 
       let done = false;
-      // Stall guard: if 'remaining' stops shrinking across several polls, the
-      // queue isn't draining (an item that never leaves the queue would
-      // otherwise loop forever — the 2026-07-08 runaway). A legitimate slow
-      // multi-photo item keeps 'remaining' flat for at most ~3 polls, so 5
-      // identical readings means genuinely stuck. (The server also bounds each
-      // pass; this is the outer bound on the poll loop.)
+      // Multi-photo listings remain queued while each four-image batch succeeds,
+      // so an unchanged count is only a stall when the server processed nothing.
       let lastRemaining: number | null = null;
       let stall = 0;
       while (!done && !cancelledRef.current) {
@@ -103,11 +126,12 @@ export default function EtsyBulkSyncModal({ onClose }: { onClose: () => void }) 
         });
         const data = (await res.json().catch(() => null)) as (DrainResult & { error?: string }) | null;
         if (!res.ok || !data) throw new Error(data?.error || 'Batch sync failed.');
-        setProcessed((current) => current + data.results.length);
+        const completed = data.results.filter((result) => result.done).length;
+        setProcessed((current) => current + completed);
         setRemaining(data.remaining);
         done = data.done;
         if (done) break;
-        if (data.remaining === lastRemaining) {
+        if (data.results.length === 0 && data.remaining === lastRemaining) {
           stall += 1;
           if (stall >= 5) {
             setError('Some items aren’t progressing (the queue stopped shrinking) — stopped to avoid hammering Etsy. Sync those products individually to see the error, then retry.');
@@ -115,8 +139,8 @@ export default function EtsyBulkSyncModal({ onClose }: { onClose: () => void }) 
           }
         } else {
           stall = 0;
-          lastRemaining = data.remaining;
         }
+        lastRemaining = data.remaining;
       }
       setPhase('done');
     } catch (err) {
@@ -126,17 +150,23 @@ export default function EtsyBulkSyncModal({ onClose }: { onClose: () => void }) 
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
-      <div className="w-full max-w-md border bg-white p-5 flex flex-col gap-4" style={{ borderColor: 'var(--color-outline-variant)' }}>
+    <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto whitespace-normal p-4 sm:items-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
+      <div className="min-w-0 w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto border bg-white p-5 flex flex-col gap-4 [overflow-wrap:anywhere]" style={{ borderColor: 'var(--color-outline-variant)' }}>
         <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-          Sync all to Etsy
+          {selectedRun ? `Sync ${selectedCount} selected to Etsy` : 'Sync all to Etsy'}
         </h3>
 
         {phase === 'summary' && (
           <>
-            {summaryError && <p className="text-sm" style={{ color: 'var(--color-error)' }}>{summaryError}</p>}
-            {!summaryError && !summary && <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>Checking eligibility…</p>}
-            {summary && (
+            {selectedRun && (
+              <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                Ready to evaluate <strong style={{ color: 'var(--color-primary)' }}>{selectedCount}</strong> selected product{selectedCount === 1 ? '' : 's'}.
+                New, errored, and sync-needed listings will be queued; current listings will be skipped.
+              </p>
+            )}
+            {!selectedRun && summaryError && <p className="text-sm" style={{ color: 'var(--color-error)' }}>{summaryError}</p>}
+            {!selectedRun && !summaryError && !summary && <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>Checking eligibility…</p>}
+            {!selectedRun && summary && (
               <div className="text-sm flex flex-col gap-1" style={{ color: 'var(--color-on-surface-variant)' }}>
                 <p>
                   <strong style={{ color: 'var(--color-primary)' }}>{summary.eligible} eligible</strong> · {summary.ineligible} ineligible ·{' '}
@@ -157,7 +187,7 @@ export default function EtsyBulkSyncModal({ onClose }: { onClose: () => void }) 
                 )}
               </div>
             )}
-            {summary && summary.errors > 0 && (
+            {!selectedRun && summary && summary.errors > 0 && (
               <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
                 {summary.errors} item{summary.errors === 1 ? '' : 's'} in an error state. If a past sync hiccup left them errored but they&apos;re
                 actually fine on Etsy, click <strong>Check Etsy statuses</strong> to reconcile them (read-only — errored drafts return to
@@ -169,22 +199,54 @@ export default function EtsyBulkSyncModal({ onClose }: { onClose: () => void }) 
               Queues every eligible item and pushes it to Etsy as a draft (or active, if auto-activate is on). This can take a while for a full
               catalog — feel free to leave this open, or check Settings → Etsy Sync later for progress.
             </p>
-            <div className="flex justify-end gap-2 flex-wrap">
-              <button type="button" onClick={onClose} disabled={checking} className="outline-button text-sm">
-                Cancel
-              </button>
-              <button type="button" onClick={() => void checkAll()} disabled={checking} className="outline-button text-sm disabled:opacity-50">
-                {checking ? 'Checking…' : 'Check Etsy statuses'}
-              </button>
-              <button
-                type="button"
-                onClick={() => void start()}
-                disabled={checking || !summary || (summary.eligible === 0 && summary.errors === 0)}
-                className="gold-button text-sm disabled:opacity-50"
-              >
-                Start
-              </button>
-            </div>
+            {selectedRun ? (
+              <>
+                <p className="form-label">Choose sync method</p>
+                <div className="grid gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void start()}
+                    disabled={checking || selectedCount === 0}
+                    className="gold-button justify-center text-sm disabled:opacity-50"
+                  >
+                    Sync immediately
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFlow('review')}
+                    disabled={checking || selectedCount === 0}
+                    className="outline-button justify-center text-sm disabled:opacity-50"
+                  >
+                    Review and submit one by one
+                  </button>
+                </div>
+                <div className="flex justify-end gap-2 flex-wrap">
+                  <button type="button" onClick={() => onClose(false)} disabled={checking} className="outline-button text-sm">
+                    Cancel
+                  </button>
+                  <button type="button" onClick={() => void checkAll()} disabled={checking} className="outline-button text-sm disabled:opacity-50">
+                    {checking ? 'Checking…' : 'Check selected Etsy statuses'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-end gap-2 flex-wrap">
+                <button type="button" onClick={() => onClose(false)} disabled={checking} className="outline-button text-sm">
+                  Cancel
+                </button>
+                <button type="button" onClick={() => void checkAll()} disabled={checking} className="outline-button text-sm disabled:opacity-50">
+                  {checking ? 'Checking…' : 'Check Etsy statuses'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void start()}
+                  disabled={checking || !summary || (summary.eligible === 0 && summary.errors === 0)}
+                  className="gold-button text-sm disabled:opacity-50"
+                >
+                  Start
+                </button>
+              </div>
+            )}
           </>
         )}
 
@@ -207,12 +269,14 @@ export default function EtsyBulkSyncModal({ onClose }: { onClose: () => void }) 
               <p className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</p>
             ) : (
               <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-                Done — processed {processed} product{processed === 1 ? '' : 's'}. Check each item&apos;s Etsy status in its drawer, or Settings → Etsy
-                Sync for the activity log.
+                {selectedRun && queued != null
+                  ? `Done — queued ${queued} of ${selectedCount} selected and processed ${processed} product${processed === 1 ? '' : 's'}.`
+                  : `Done — processed ${processed} product${processed === 1 ? '' : 's'}.`}{' '}
+                Check each item&apos;s Etsy status in its drawer, or Settings → Etsy Sync for the activity log.
               </p>
             )}
             <div className="flex justify-end">
-              <button type="button" onClick={onClose} className="gold-button text-sm">
+              <button type="button" onClick={() => onClose(!error && !cancelledRef.current)} className="gold-button text-sm">
                 Close
               </button>
             </div>

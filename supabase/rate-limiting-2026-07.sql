@@ -15,6 +15,9 @@ create table if not exists public.rate_limits (
 -- function below. Enable RLS with no policies = default deny for anon/authenticated.
 alter table public.rate_limits enable row level security;
 
+create index if not exists rate_limits_window_start_idx
+  on public.rate_limits (window_start);
+
 -- Atomic check-and-increment. Returns TRUE when the caller is still within
 -- `p_max` actions per rolling `p_window_seconds` window for `p_key`, FALSE when
 -- the limit is exceeded. The single upsert makes it race-safe across concurrent
@@ -32,6 +35,10 @@ as $$
 declare
   v_count integer;
 begin
+  if p_key is null or length(p_key) > 200 or p_max < 1 or p_window_seconds < 1 then
+    raise exception 'Invalid rate-limit parameters.';
+  end if;
+
   insert into public.rate_limits (key, count, window_start)
     values (p_key, 1, now())
   on conflict (key) do update
@@ -47,6 +54,14 @@ begin
                 end
   returning count into v_count;
 
+  -- Keep unique-IP/key traffic from growing this table forever without making
+  -- every request perform a global delete. Roughly one percent of keys trigger
+  -- an indexed cleanup of rows that have been stale for at least a day.
+  if mod(hashtextextended(p_key, 0), 100) = 0 then
+    delete from public.rate_limits
+    where window_start < now() - interval '1 day';
+  end if;
+
   return v_count <= p_max;
 end;
 $$;
@@ -56,6 +71,5 @@ $$;
 revoke execute on function public.check_rate_limit(text, integer, integer) from public;
 grant  execute on function public.check_rate_limit(text, integer, integer) to service_role;
 
--- Optional housekeeping: prune stale rows so the table stays small. Safe to run
--- on a schedule (pg_cron) or manually.
+-- Optional extra housekeeping: safe to run on a schedule or manually.
 --   delete from public.rate_limits where window_start < now() - interval '1 day';

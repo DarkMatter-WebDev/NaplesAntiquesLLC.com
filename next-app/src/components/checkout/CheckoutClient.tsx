@@ -3,13 +3,22 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useCart, type CartItem } from '@/context/CartContext';
-import OrderSummary, { DEFAULT_SHIPPING_METHOD } from '@/components/checkout/OrderSummary';
+import OrderSummary from '@/components/checkout/OrderSummary';
 import PayPalCheckoutButton from '@/components/checkout/PayPalCheckoutButton';
 import StockAlertBanner from '@/components/cart/StockAlertBanner';
 import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 import { createClient } from '@/lib/supabase/client';
 import { normalizeManualPriceLabel, parseManualPriceLabelValue } from '@/lib/pricing';
-import { isProductPurchasable, productImagePaddingForImage } from '@/types/product';
+import { productImagePaddingForImage } from '@/types/product';
+import { useHideSoldItemPrices } from '@/hooks/useHideSoldItemPrices';
+import { findUnavailableCartItems } from '@/lib/cart-availability';
+import { DEFAULT_SHIPPING_METHOD } from '@/lib/checkout-shipping';
+import {
+  isUnitedStatesCountry,
+  normalizeUsState,
+  normalizeUsZip,
+  US_STATES,
+} from '@/lib/us-address';
 
 const GOLD = '#735c00';
 
@@ -52,12 +61,13 @@ interface CustomerInfo {
 export default function CheckoutClient({ locale, paypalClientId }: { locale: string; paypalClientId?: string | null }) {
   const { items, remove, clear, setQuantity, refreshAvailability, stockAlerts, dismissStockAlerts } = useCart();
   const isEs = locale === 'es';
+  const hideSoldItemPrices = useHideSoldItemPrices(true);
   const prefix = isEs ? '/es' : '';
   const [customer, setCustomer] = useState<CustomerInfo>({
     name: '', email: '', phone: '', notes: '',
     address_line1: '', address_line2: '', city: '', state: '', postal_code: '', country: 'United States',
   });
-  const [shippingMethod, setShippingMethod] = useState(DEFAULT_SHIPPING_METHOD);
+  const [shippingMethod, setShippingMethod] = useState<string>(DEFAULT_SHIPPING_METHOD);
   const [infoConfirmed, setInfoConfirmed] = useState(false);
   // For Local Pickup the address is optional and hidden behind an accordion the
   // buyer can expand if they want to provide it. (Ignored when shipping is
@@ -116,25 +126,29 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
   }, [cartPayloadKey]);
 
   const needsShipping = shippingMethod !== 'local-pickup';
+  const normalizedShippingState = normalizeUsState(customer.state);
+  const normalizedShippingZip = normalizeUsZip(customer.postal_code);
   const contactReady =
     customer.name.trim() !== '' && customer.email.trim() !== '' && customer.phone.trim() !== '';
   const shippingAddressReady =
     !needsShipping ||
     (customer.address_line1.trim() !== '' &&
       customer.city.trim() !== '' &&
-      customer.state.trim() !== '' &&
-      customer.postal_code.trim() !== '');
+      normalizedShippingState !== null &&
+      normalizedShippingZip !== null &&
+      isUnitedStatesCountry(customer.country));
   // An item that's gone sold out (or over-requested) can't be paid for — block
   // checkout with a clear message instead of letting it fail at PayPal.
-  const unavailableItems = items.filter((item) => !isProductPurchasable(item.status, item.stockQuantity));
+  const unavailableItems = findUnavailableCartItems(items);
   const hasUnavailableItem = unavailableItems.length > 0;
   const payReady = items.length > 0 && contactReady && shippingAddressReady && infoConfirmed && !hasUnavailableItem;
 
   const missingFieldLabels = [
     needsShipping && customer.address_line1.trim() === '' ? (isEs ? 'Dirección' : 'Street Address') : null,
     needsShipping && customer.city.trim() === '' ? (isEs ? 'Ciudad' : 'City') : null,
-    needsShipping && customer.state.trim() === '' ? (isEs ? 'Estado' : 'State') : null,
-    needsShipping && customer.postal_code.trim() === '' ? (isEs ? 'Código postal' : 'ZIP / Postal Code') : null,
+    needsShipping && normalizedShippingState === null ? (isEs ? 'Estado válido de EE. UU.' : 'Valid U.S. State') : null,
+    needsShipping && normalizedShippingZip === null ? (isEs ? 'Código postal válido de EE. UU.' : 'Valid U.S. ZIP Code') : null,
+    needsShipping && !isUnitedStatesCountry(customer.country) ? (isEs ? 'Dirección en Estados Unidos' : 'United States Address') : null,
     customer.name.trim() === '' ? (isEs ? 'Nombre completo' : 'Full Name') : null,
     customer.phone.trim() === '' ? (isEs ? 'Teléfono' : 'Phone') : null,
     customer.email.trim() === '' ? (isEs ? 'Correo electrónico' : 'Email') : null,
@@ -408,11 +422,11 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     <div className="checkout-page">
       <div className="checkout-shell">
       <section className="checkout-hero">
-        <Link href={`${prefix}/shop`} className="text-xs font-bold uppercase tracking-widest hover:underline" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+        <Link href={`${prefix}/shop`} className="hover-underline-grow text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
           {isEs ? '< Volver a la tienda' : '< Back to shop'}
         </Link>
         <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold mt-1 mb-0 md:mt-4 md:mb-3" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-          {isEs ? 'Checkout' : 'Checkout'}
+          {isEs ? 'Finalizar Compra' : 'Checkout'}
         </h1>
         <p className="hidden md:block text-sm md:text-base" style={{ color: 'var(--color-on-surface-variant)' }}>
           {isEs ? 'Complete sus datos para finalizar la compra de los artículos de su carrito.' : 'Complete your details to check out the items in your cart.'}
@@ -433,6 +447,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
             onSetQuantity={setQuantity}
             variant="expanded"
             showAvailability
+            hideSoldItemPrices={hideSoldItemPrices}
           />
         </div>
 
@@ -493,6 +508,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
                 onClick={() => setAddressExpanded((open) => !open)}
                 aria-expanded={addressExpanded}
                 aria-controls="checkout-address-inputs"
+                className="checkout-address-toggle"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -532,17 +548,66 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
                   </div>
                   <div>
                     <label className="form-label">{isEs ? 'Estado' : 'State'}{needsShipping ? ' *' : ''}</label>
-                    <input required={needsShipping} className="form-field" autoComplete="address-level1" value={customer.state} onChange={(e) => setCustomer({ ...customer, state: e.target.value })} />
+                    <select
+                      required={needsShipping}
+                      className="form-field"
+                      autoComplete="address-level1"
+                      value={customer.state}
+                      onChange={(e) => setCustomer({ ...customer, state: e.target.value })}
+                    >
+                      <option value="">{isEs ? 'Seleccione un estado' : 'Select a state'}</option>
+                      {US_STATES.map(([code, name]) => (
+                        <option key={code} value={code}>{name}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 <div className="responsive-form-grid">
                   <div>
                     <label className="form-label">{isEs ? 'Código postal' : 'ZIP / Postal Code'}{needsShipping ? ' *' : ''}</label>
-                    <input required={needsShipping} className="form-field" autoComplete="postal-code" value={customer.postal_code} onChange={(e) => setCustomer({ ...customer, postal_code: e.target.value })} />
+                    <input
+                      required={needsShipping}
+                      className="form-field"
+                      autoComplete="postal-code"
+                      inputMode="numeric"
+                      maxLength={10}
+                      pattern="[0-9]{5}(-[0-9]{4})?"
+                      placeholder="12345"
+                      value={customer.postal_code}
+                      aria-invalid={needsShipping && customer.postal_code.trim() !== '' && normalizedShippingZip === null}
+                      aria-describedby={
+                        needsShipping && customer.postal_code.trim() !== '' && normalizedShippingZip === null
+                          ? 'checkout-zip-error'
+                          : undefined
+                      }
+                      onChange={(e) => {
+                        const entered = e.target.value;
+                        setCustomer({
+                          ...customer,
+                          postal_code: normalizeUsZip(entered) ?? entered,
+                        });
+                      }}
+                    />
+                    {needsShipping && customer.postal_code.trim() !== '' && normalizedShippingZip === null && (
+                      <p id="checkout-zip-error" role="alert" className="mt-1 text-xs" style={{ color: 'var(--color-error)' }}>
+                        {isEs
+                          ? 'Ingrese un código postal de EE. UU. válido (12345 o 12345-6789).'
+                          : 'Enter a valid U.S. ZIP code (12345 or 12345-6789).'}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="form-label">{isEs ? 'País' : 'Country'}</label>
-                    <input className="form-field" autoComplete="country-name" value={customer.country} onChange={(e) => setCustomer({ ...customer, country: e.target.value })} />
+                    <input
+                      readOnly
+                      className="form-field"
+                      autoComplete="country-name"
+                      value="United States"
+                      aria-describedby="checkout-country-note"
+                    />
+                    <p id="checkout-country-note" className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      {isEs ? 'Actualmente solo enviamos dentro de Estados Unidos.' : 'We currently ship only within the United States.'}
+                    </p>
                   </div>
                 </div>
               </div>

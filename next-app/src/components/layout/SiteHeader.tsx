@@ -102,6 +102,32 @@ const HEADER_STYLES = `
     transform: translateY(-1px);
   }
 
+  /* Desktop icon actions need the same affordance as the text CTAs. */
+  .site-header-icon-button {
+    transition: color 150ms ease;
+  }
+  @media (min-width: 1280px) {
+    .site-header-icon-button {
+      cursor: pointer;
+    }
+    .site-header-icon-button:hover {
+      color: ${GOLD} !important;
+    }
+    .site-header-icon-button > .material-symbols-outlined {
+      transition: transform 150ms ease;
+    }
+    .site-header-icon-button:hover > .material-symbols-outlined {
+      transform: translateY(-1px);
+    }
+    .site-header-icon-button:active {
+      color: ${GOLD} !important;
+    }
+    .site-header-icon-button:active > .material-symbols-outlined {
+      transform: scale(0.92);
+      transition-duration: 0.05s;
+    }
+  }
+
   /* Menu toggle (mobile) */
   .menu-toggle {
     border: 1px solid rgba(115, 92, 0, 0.5);
@@ -257,7 +283,7 @@ export default function SiteHeader() {
         {/* Brand */}
         <Link href={href('/')} className="flex items-center gap-2 min-w-0 shrink overflow-hidden">
           <Image
-            src="/assets/images/branding/logo.webp"
+            src="/assets/images/branding/nav-logo.webp"
             alt="Naples Estate Jewelry Logo"
             width={40}
             height={40}
@@ -336,7 +362,7 @@ export default function SiteHeader() {
           <button
             type="button"
             onClick={openWishlist}
-            className="relative hidden xl:flex items-center justify-center w-8 h-8 transition-colors"
+            className="site-header-icon-button relative hidden xl:flex items-center justify-center w-8 h-8 transition-colors"
             style={{ color: wishlistCount > 0 ? GOLD : '#5e5e5d' }}
             aria-label="Saved items"
           >
@@ -365,7 +391,7 @@ export default function SiteHeader() {
             <button
               type="button"
               onClick={openCart}
-              className="relative flex items-center justify-center w-8 h-8 transition-colors"
+              className="site-header-icon-button relative flex items-center justify-center w-8 h-8 transition-colors"
               style={{ color: cartCount > 0 ? GOLD : '#5e5e5d' }}
               aria-label="Cart"
             >

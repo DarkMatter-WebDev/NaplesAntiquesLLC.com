@@ -6,6 +6,16 @@ import type { CSSProperties, ReactNode } from 'react';
 import { PRODUCT_METAL_VARIANTS, type SpotData } from '@/types/product';
 import ShopSortSelect from '@/components/shop/ShopSortSelect';
 import { useShopNavigation } from '@/components/shop/ShopNavigationProgress';
+import {
+  changeShopItemGroupParams,
+  changeShopItemTypeParams,
+  getExplicitShopItemGroup,
+  normalizeShopLengthInches,
+  normalizeShopSearchQuery,
+  normalizeShopWidthRanges,
+  SHOP_WIDTH_RANGE_OPTIONS,
+  shopItemTypeSupportsLinkType,
+} from '@/lib/shop-filter-state';
 
 const GOLD = '#735c00';
 const BORDER = 'rgba(115, 92, 0, 0.35)';
@@ -58,15 +68,7 @@ function getLengthOptionsForItemType(itemType: string | undefined) {
 }
 
 function itemTypeSupportsLinkType(itemType: string | undefined) {
-  return itemType === 'necklace' || itemType === 'bracelet';
-}
-
-function normalizeLengths(length: string | string[] | undefined): string[] {
-  const values = Array.isArray(length) ? length : length ? [length] : [];
-  return values
-    .flatMap((value) => value.split(','))
-    .map((value) => value.trim())
-    .filter(Boolean);
+  return shopItemTypeSupportsLinkType(itemType);
 }
 
 function getMetalColorOptions(metal: string | undefined) {
@@ -86,6 +88,7 @@ interface Props {
     itemType?: string;
     chainType?: string;
     length?: string | string[];
+    width?: string | string[];
     gender?: string;
     brand?: string;
     q?: string;
@@ -132,22 +135,8 @@ const ITEM_TYPE_OPTIONS = [
 
 type ItemTypeOption = (typeof ITEM_TYPE_OPTIONS)[number];
 
-// Jewelry & Watches covers wearable jewelry plus watches; every other item type
-// (coins, bullion, silverware, and tableware like spoons, trays, goblets, cups)
-// belongs to the Sterling Silver group.
-const JEWELRY_ITEM_TYPE_KEYS = ['necklace', 'bracelet', 'earrings', 'ring', 'pendant', 'charm', 'brooch', 'cufflinks', 'watch'];
-
-function isJewelryItemType(itemType: string | undefined): boolean {
-  return !!itemType && JEWELRY_ITEM_TYPE_KEYS.includes(itemType);
-}
-
-function getItemGroupForItemType(itemType: string | undefined) {
-  if (!itemType || itemType === 'all') return undefined;
-  return isJewelryItemType(itemType) ? 'jewelry' : 'everything-else';
-}
-
 export default function ShopFilters({ locale, currentFilters, brandOptions, filteredCount, allCount, spotData, priceRange, itemTypeOptions, variant = 'classic', yearFilterNode }: Props) {
-  const { push } = useShopNavigation();
+  const { getSearchParams, push } = useShopNavigation();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isEs = locale === 'es';
@@ -177,13 +166,16 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
   const visibleMetalColor = metalColorOptions.some((variant) => variant.value === selectedMetalColor)
     ? selectedMetalColor
     : undefined;
-  const selectedLengths = normalizeLengths(currentFilters.length);
   const lengthOptions = getLengthOptionsForItemType(currentFilters.itemType);
-  const visibleLengthValues = lengthOptions.map((option) => option.value);
-  const visibleSelectedLengths = selectedLengths.filter((value) => visibleLengthValues.includes(value));
+  const selectedLengthInches = normalizeShopLengthInches(currentFilters.length);
+  const visibleSelectedLengths = lengthOptions
+    .filter((option) => selectedLengthInches.includes(normalizeShopLengthInches(option.value)[0]))
+    .map((option) => option.value);
+  const selectedWidthRanges = normalizeShopWidthRanges(currentFilters.width);
   const showLengthFilter = lengthOptions.length > 0;
+  const showWidthFilter = itemTypeSupportsLinkType(currentFilters.itemType);
   const showLinkTypeFilter = itemTypeSupportsLinkType(currentFilters.itemType);
-  const currentItemGroup = currentFilters.itemGroup ?? getItemGroupForItemType(currentFilters.itemType);
+  const currentItemGroup = getExplicitShopItemGroup(currentFilters.itemGroup);
   const showMetalFilter = currentItemGroup !== 'everything-else';
   const showGenderFilter = currentItemGroup !== 'everything-else';
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -198,68 +190,48 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
     : { source: selectedPriceSource, min: selectedPriceMin, max: selectedPriceMax };
   const draftPriceMin = activeDraftPrice.min;
   const draftPriceMax = activeDraftPrice.max;
+  const liveSearchParams = useCallback(
+    () => getSearchParams(searchParams.toString()),
+    [getSearchParams, searchParams],
+  );
 
   const updateFilter = useCallback(
     (key: string, value: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (value) {
-        params.set(key, value);
+      const params = liveSearchParams();
+      const normalizedValue = key === 'q' ? normalizeShopSearchQuery(value) : value;
+      if (normalizedValue) {
+        params.set(key, normalizedValue);
       } else {
         params.delete(key);
       }
       params.delete('page');
       push(`${pathname}?${params.toString()}`, { scroll: false });
     },
-    [pathname, push, searchParams]
+    [liveSearchParams, pathname, push]
   );
 
   const updateItemTypeFilter = useCallback(
     (value: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (value) {
-        params.set('itemType', value);
-      } else {
-        params.delete('itemType');
-      }
-      params.delete('itemGroup');
-      params.delete('length');
-      params.delete('page');
-      if (!itemTypeSupportsLinkType(value)) params.delete('chainType');
-      if (value === 'all') {
-        params.delete('metal');
-        params.delete('metalColor');
-        params.delete('metalType');
-        params.delete('purity');
-      } else if (value && !isJewelryItemType(value)) {
-        // Sterling Silver item types (silverware, coins, tableware like spoons,
-        // trays, goblets, cups, …) live under the silver group — constrain metal.
-        params.set('metal', 'silver');
-        if (params.get('purity') && !SILVER_PURITY_OPTIONS.some((option) => option.value === params.get('purity'))) {
-          params.delete('purity');
-        }
-        const selectedColor = params.get('metalColor') ?? params.get('metalType');
-        const silverTypes = new Set<string>(PRODUCT_METAL_VARIANTS.Silver.map((variant) => variant.value));
-        if (selectedColor && !silverTypes.has(selectedColor)) {
-          params.delete('metalColor');
-          params.delete('metalType');
-        }
-      }
+      const params = changeShopItemTypeParams(liveSearchParams(), value, currentItemGroup);
       const qs = params.toString();
       push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
-    [pathname, push, searchParams]
+    [currentItemGroup, liveSearchParams, pathname, push]
   );
 
   const updateMetalFilter = useCallback(
     (value: string) => {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = liveSearchParams();
       if (value) {
         params.set('metal', value);
       } else {
         params.delete('metal');
       }
 
-      const selectedColor = params.get('metalColor') ?? params.get('metalType');
+      const selectedColor = visibleMetalColor;
+      params.delete('metalColor');
+      params.delete('metalType');
+      if (selectedColor) params.set('metalColor', selectedColor);
       const goldTypes = new Set<string>(PRODUCT_METAL_VARIANTS.Gold.map((variant) => variant.value));
       const silverTypes = new Set<string>(PRODUCT_METAL_VARIANTS.Silver.map((variant) => variant.value));
       if ((value === 'gold' && selectedColor && !goldTypes.has(selectedColor)) ||
@@ -267,7 +239,9 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
         params.delete('metalColor');
         params.delete('metalType');
       }
-      const selectedPurity = params.get('purity');
+      const selectedPurity = visiblePurity;
+      params.delete('purity');
+      if (selectedPurity) params.set('purity', selectedPurity);
       if ((value === 'gold' && selectedPurity && !GOLD_PURITY_OPTIONS.some((option) => option.value === selectedPurity)) ||
           (value === 'silver' && selectedPurity && !SILVER_PURITY_OPTIONS.some((option) => option.value === selectedPurity))) {
         params.delete('purity');
@@ -277,64 +251,26 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
       const qs = params.toString();
       push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
-    [pathname, push, searchParams]
+    [liveSearchParams, pathname, push, visibleMetalColor, visiblePurity]
   );
 
   const updateItemGroupFilter = useCallback(
     (value: 'jewelry' | 'everything-else') => {
-      const params = new URLSearchParams(searchParams.toString());
-      params.delete('itemType');
-      params.delete('chainType');
-      params.delete('length');
-      params.delete('page');
-
-      // Re-clicking the already-active category deselects it instead of
-      // re-pinning the same value — clears back to "no category filter"
-      // rather than toggling to the other option.
-      if (currentItemGroup === value) {
-        params.delete('itemGroup');
-        params.delete('metal');
-        params.delete('metalColor');
-        params.delete('metalType');
-        params.delete('purity');
-        const qs = params.toString();
-        push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-        return;
-      }
-
-      params.set('itemGroup', value);
-      if (value === 'jewelry') {
-        params.delete('metal');
-        params.delete('metalColor');
-        params.delete('metalType');
-        params.delete('purity');
-      } else {
-        params.set('metal', 'silver');
-        params.delete('gender');
-        const selectedPurity = params.get('purity');
-        if (selectedPurity && !SILVER_PURITY_OPTIONS.some((option) => option.value === selectedPurity)) {
-          params.delete('purity');
-        }
-        const selectedColor = params.get('metalColor') ?? params.get('metalType');
-        const silverTypes = new Set<string>(PRODUCT_METAL_VARIANTS.Silver.map((variant) => variant.value));
-        if (selectedColor && !silverTypes.has(selectedColor)) {
-          params.delete('metalColor');
-          params.delete('metalType');
-        }
-      }
+      const params = changeShopItemGroupParams(liveSearchParams(), value, currentItemGroup);
       const qs = params.toString();
       push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
-    [currentItemGroup, pathname, push, searchParams],
+    [currentItemGroup, liveSearchParams, pathname, push],
   );
 
   const toggleLengthFilter = useCallback(
     (value: string) => {
-      const params = new URLSearchParams(
-        typeof window === 'undefined' ? searchParams.toString() : window.location.search,
-      );
-      const allowedValues = getLengthOptionsForItemType(currentFilters.itemType).map((option) => option.value);
-      const current = normalizeLengths(params.getAll('length')).filter((item) => allowedValues.includes(item));
+      const params = liveSearchParams();
+      const allowedOptions = getLengthOptionsForItemType(currentFilters.itemType);
+      const currentInches = normalizeShopLengthInches(params.getAll('length'));
+      const current = allowedOptions
+        .filter((option) => currentInches.includes(normalizeShopLengthInches(option.value)[0]))
+        .map((option) => option.value);
       const next = current.includes(value)
         ? current.filter((item) => item !== value)
         : [...current, value];
@@ -347,7 +283,26 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
       const qs = params.toString();
       push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
-    [currentFilters.itemType, pathname, push, searchParams]
+    [currentFilters.itemType, liveSearchParams, pathname, push]
+  );
+
+  const toggleWidthFilter = useCallback(
+    (value: string) => {
+      const params = liveSearchParams();
+      const current = normalizeShopWidthRanges(params.getAll('width'));
+      const next = current.includes(value)
+        ? current.filter((item) => item !== value)
+        : [...current, value];
+      if (next.length > 0) {
+        params.set('width', next.join(','));
+      } else {
+        params.delete('width');
+      }
+      params.delete('page');
+      const qs = params.toString();
+      push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [liveSearchParams, pathname, push]
   );
 
   function clearAll() {
@@ -362,6 +317,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
     currentFilters.itemType ||
     (showLinkTypeFilter && currentFilters.chainType) ||
     visibleSelectedLengths.length > 0 ||
+    selectedWidthRanges.length > 0 ||
     currentFilters.gender ||
     currentFilters.brand ||
     currentFilters.q ||
@@ -378,6 +334,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
     currentFilters.itemType,
     showLinkTypeFilter ? currentFilters.chainType : undefined,
     ...visibleSelectedLengths,
+    ...selectedWidthRanges,
     currentFilters.gender,
     currentFilters.brand,
     priceFilterActive ? 'price' : undefined,
@@ -388,17 +345,13 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
   const visibleItemType = currentFilters.itemType ?? '';
   const allItemTypeOptions = (() => {
     const seen = new Set<string>();
-    return [...ITEM_TYPE_OPTIONS, ...(itemTypeOptions ?? [])].filter((option) => {
+    return (itemTypeOptions ?? ITEM_TYPE_OPTIONS).filter((option) => {
       if (seen.has(option.value)) return false;
       seen.add(option.value);
       return true;
     });
   })();
-  const visibleItemTypeOptions = currentItemGroup === 'everything-else'
-    ? allItemTypeOptions.filter((option) => !isJewelryItemType(option.value))
-    : currentItemGroup === 'jewelry'
-      ? allItemTypeOptions.filter((option) => isJewelryItemType(option.value))
-      : allItemTypeOptions;
+  const visibleItemTypeOptions = allItemTypeOptions;
   const itemGroupOptions = [
     { value: 'jewelry' as const, label: isEs ? 'Joyería y relojes' : 'Jewelry & Watches' },
     { value: 'everything-else' as const, label: isEs ? 'Todo lo demás' : 'Everything Else' },
@@ -499,7 +452,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
       if (!priceRange) return;
       const nextLow = clampPrice(Math.min(low, high), priceFloor, priceCeiling);
       const nextHigh = clampPrice(Math.max(low, high), priceFloor, priceCeiling);
-      const params = new URLSearchParams(searchParams.toString());
+      const params = liveSearchParams();
       if (nextLow > priceFloor) {
         params.set('priceMin', String(nextLow));
       } else {
@@ -514,7 +467,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
       const qs = params.toString();
       push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
-    [pathname, priceCeiling, priceFloor, priceRange, push, searchParams],
+    [liveSearchParams, pathname, priceCeiling, priceFloor, priceRange, push],
   );
   const applyAndCloseFilters = useCallback(() => {
     if (priceRange) commitPriceRange(draftPriceMin, draftPriceMax);
@@ -712,6 +665,163 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
               </div>
             )}
 
+            {(showLengthFilter || showWidthFilter) && (
+              <div
+                className="shop-dependent-measure-filters"
+                style={{
+                  gridColumn: '1 / -1',
+                  display: 'grid',
+                  gap: '0.75rem',
+                  padding: '0.15rem 0 0.25rem 0.7rem',
+                  borderLeft: '2px solid rgba(115, 92, 0, 0.22)',
+                }}
+              >
+                {showLengthFilter && (
+                  <div>
+                    <span style={labelStyle}>{isEs ? 'Longitud' : 'Length'}</span>
+                    <div
+                      className="shop-length-multi"
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '0.4rem',
+                        alignItems: 'center',
+                      }}
+                    >
+                      {lengthOptions.map((option) => {
+                        const selected = visibleSelectedLengths.includes(option.value);
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => toggleLengthFilter(option.value)}
+                            aria-pressed={selected}
+                            className="shop-length-button"
+                            style={{
+                              minHeight: '2rem',
+                              minWidth: currentFilters.itemType === 'bracelet' ? '6.2rem' : '4.3rem',
+                              padding: '0.38rem 0.65rem',
+                              border: `1px solid ${selected ? GOLD : BORDER}`,
+                              borderRadius: '2px',
+                              background: selected
+                                ? 'color-mix(in srgb, var(--color-primary) 10%, var(--color-background))'
+                                : 'var(--color-background)',
+                              color: selected ? GOLD : 'var(--color-on-surface)',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.35rem',
+                              fontFamily: 'var(--font-label)',
+                              fontSize: '0.74rem',
+                              fontWeight: selected ? 800 : 700,
+                              lineHeight: 1.1,
+                              textAlign: 'center',
+                            }}
+                          >
+                            <span
+                              aria-hidden="true"
+                              style={{
+                                width: '0.8rem',
+                                height: '0.8rem',
+                                border: `1px solid ${selected ? GOLD : 'rgba(115, 92, 0, 0.5)'}`,
+                                borderRadius: '2px',
+                                background: selected ? GOLD : 'transparent',
+                                color: selected ? 'var(--color-background)' : 'transparent',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flex: '0 0 auto',
+                                fontSize: '0.72rem',
+                                fontWeight: 900,
+                                lineHeight: 1,
+                              }}
+                              className="material-symbols-outlined"
+                            >
+                              check
+                            </span>
+                            <span>{isEs ? (option.labelEs ?? option.label) : (option.labelEn ?? option.label)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {showWidthFilter && (
+                  <div>
+                    <span style={labelStyle}>{isEs ? 'Ancho' : 'Width'}</span>
+                    <div
+                      className="shop-length-multi shop-width-multi"
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '0.4rem',
+                        alignItems: 'center',
+                      }}
+                    >
+                      {SHOP_WIDTH_RANGE_OPTIONS.map((option) => {
+                        const selected = selectedWidthRanges.includes(option.value);
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => toggleWidthFilter(option.value)}
+                            aria-pressed={selected}
+                            className="shop-length-button shop-width-button"
+                            style={{
+                              minHeight: '2rem',
+                              minWidth: '6.2rem',
+                              padding: '0.38rem 0.65rem',
+                              border: `1px solid ${selected ? GOLD : BORDER}`,
+                              borderRadius: '2px',
+                              background: selected
+                                ? 'color-mix(in srgb, var(--color-primary) 10%, var(--color-background))'
+                                : 'var(--color-background)',
+                              color: selected ? GOLD : 'var(--color-on-surface)',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'flex-start',
+                              gap: '0.35rem',
+                              fontFamily: 'var(--font-label)',
+                              fontSize: '0.74rem',
+                              fontWeight: selected ? 800 : 700,
+                              lineHeight: 1.1,
+                              textAlign: 'left',
+                            }}
+                          >
+                            <span
+                              aria-hidden="true"
+                              style={{
+                                width: '0.8rem',
+                                height: '0.8rem',
+                                border: `1px solid ${selected ? GOLD : 'rgba(115, 92, 0, 0.5)'}`,
+                                borderRadius: '2px',
+                                background: selected ? GOLD : 'transparent',
+                                color: selected ? 'var(--color-background)' : 'transparent',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flex: '0 0 auto',
+                                fontSize: '0.72rem',
+                                fontWeight: 900,
+                                lineHeight: 1,
+                              }}
+                              className="material-symbols-outlined"
+                            >
+                              check
+                            </span>
+                            <span>{isEs ? option.labelEs : option.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Brand */}
             <div>
               <label style={labelStyle}>{isEs ? 'Marca' : 'Brand'}</label>
@@ -748,7 +858,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
               <select
                 value={visibleMetalColor ?? ''}
                 onChange={(e) => {
-                  const params = new URLSearchParams(searchParams.toString());
+                  const params = liveSearchParams();
                   if (e.target.value) {
                     params.set('metalColor', e.target.value);
                   } else {
@@ -891,78 +1001,6 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
                     }}
                   />
                 </label>
-              </div>
-            </div>
-          )}
-
-          {showLengthFilter && (
-            <div style={{ maxWidth: '56rem', margin: '0 auto 0.85rem' }}>
-              <span style={labelStyle}>{isEs ? 'Longitud' : 'Length'}</span>
-              <div
-                className="shop-length-multi"
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '0.4rem',
-                  alignItems: 'center',
-                }}
-              >
-                {lengthOptions.map((option) => {
-                  const selected = visibleSelectedLengths.includes(option.value);
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => toggleLengthFilter(option.value)}
-                      aria-pressed={selected}
-                      className="shop-length-button"
-                      style={{
-                        minHeight: '2rem',
-                        minWidth: currentFilters.itemType === 'bracelet' ? '6.2rem' : '4.3rem',
-                        padding: '0.38rem 0.65rem',
-                        border: `1px solid ${selected ? GOLD : BORDER}`,
-                        borderRadius: '2px',
-                        background: selected
-                          ? 'color-mix(in srgb, var(--color-primary) 10%, var(--color-background))'
-                          : 'var(--color-background)',
-                        color: selected ? GOLD : 'var(--color-on-surface)',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.35rem',
-                        fontFamily: 'var(--font-label)',
-                        fontSize: '0.74rem',
-                        fontWeight: selected ? 800 : 700,
-                        lineHeight: 1.1,
-                        textAlign: 'center',
-                      }}
-                    >
-                      <span
-                        aria-hidden="true"
-                        style={{
-                          width: '0.8rem',
-                          height: '0.8rem',
-                          border: `1px solid ${selected ? GOLD : 'rgba(115, 92, 0, 0.5)'}`,
-                          borderRadius: '2px',
-                          background: selected ? GOLD : 'transparent',
-                          color: selected ? 'var(--color-background)' : 'transparent',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flex: '0 0 auto',
-                          fontSize: '0.72rem',
-                          fontWeight: 900,
-                          lineHeight: 1,
-                        }}
-                        className="material-symbols-outlined"
-                      >
-                        check
-                      </span>
-                      <span>{isEs ? (option.labelEs ?? option.label) : (option.labelEn ?? option.label)}</span>
-                    </button>
-                  );
-                })}
               </div>
             </div>
           )}

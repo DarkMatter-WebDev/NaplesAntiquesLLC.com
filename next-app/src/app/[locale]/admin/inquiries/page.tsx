@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
+import { getVerifiedUser } from '@/lib/auth-claims';
 import InquiriesPanel from '@/components/admin/InquiriesPanel';
 import AdminHeader from '@/components/admin/AdminHeader';
 import type { Inquiry } from '@/components/admin/InquiriesPanel';
@@ -29,7 +30,7 @@ export default async function AdminInquiriesPage({ params }: Props) {
   const adminBasePath = locale === 'es' ? '/es/admin' : '/admin';
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getVerifiedUser(supabase);
 
   if (!user) {
     redirect(locale === 'es' ? '/es/account/sign-in' : '/account/sign-in');

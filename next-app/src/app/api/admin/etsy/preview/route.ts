@@ -67,6 +67,14 @@ export async function POST(req: Request) {
     payload,
     productType,
     structuredProperties: { length: lengthPreview, ringSize: ringSizePreview },
+    listing: listing
+      ? {
+          syncState: listing.sync_state,
+          etsyListingId: listing.etsy_listing_id,
+          listingState: listing.listing_state,
+          lastError: listing.last_error,
+        }
+      : null,
     // The raw owner-supplied custom tags (not the merged set in payload.tags) so
     // the admin drawer can prefill its editable "additional tags" field.
     extraTags: extraTags ?? [],

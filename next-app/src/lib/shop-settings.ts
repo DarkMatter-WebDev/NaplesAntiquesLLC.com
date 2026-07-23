@@ -3,6 +3,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 export const SHOP_SETTINGS_TABLE = 'shop_settings';
 const SINGLE_ROW_ID = true;
 
+export interface ShopVisibilitySettings {
+  showSoldItems: boolean;
+  hideSoldItemPrices: boolean;
+}
+
 /**
  * Whether SOLD products should appear in the public shop gallery.
  *
@@ -23,12 +28,49 @@ export async function fetchShowSoldItems(supabase: SupabaseClient): Promise<bool
   }
 }
 
+/**
+ * Public sold-item visibility and price behavior. The price mask defaults off
+ * until its additive column exists, preserving the historical storefront.
+ */
+export async function fetchShopVisibilitySettings(supabase: SupabaseClient): Promise<ShopVisibilitySettings> {
+  try {
+    const { data, error } = await supabase
+      .from(SHOP_SETTINGS_TABLE)
+      .select('show_sold_items, hide_sold_item_prices')
+      .eq('id', SINGLE_ROW_ID)
+      .maybeSingle();
+    if (!error) {
+      return {
+        showSoldItems: data?.show_sold_items ?? true,
+        hideSoldItemPrices: data?.hide_sold_item_prices ?? false,
+      };
+    }
+  } catch {
+    // Fall through to the old-column-compatible read below.
+  }
+
+  return {
+    showSoldItems: await fetchShowSoldItems(supabase),
+    hideSoldItemPrices: false,
+  };
+}
+
 /** Persist the toggle. Throws on failure so the caller can surface an error. */
 export async function saveShowSoldItems(supabase: SupabaseClient, showSoldItems: boolean): Promise<void> {
   const { error } = await supabase
     .from(SHOP_SETTINGS_TABLE)
     .upsert(
       { id: SINGLE_ROW_ID, show_sold_items: showSoldItems, updated_at: new Date().toISOString() },
+      { onConflict: 'id' },
+    );
+  if (error) throw new Error(error.message);
+}
+
+export async function saveHideSoldItemPrices(supabase: SupabaseClient, hideSoldItemPrices: boolean): Promise<void> {
+  const { error } = await supabase
+    .from(SHOP_SETTINGS_TABLE)
+    .upsert(
+      { id: SINGLE_ROW_ID, hide_sold_item_prices: hideSoldItemPrices, updated_at: new Date().toISOString() },
       { onConflict: 'id' },
     );
   if (error) throw new Error(error.message);

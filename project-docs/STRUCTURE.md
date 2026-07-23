@@ -1,12 +1,12 @@
-# Structure & Build Integrity
+# Structure And Build Integrity
 
-> Canonical map of the current project layout and the invariants that keep the
-> Next.js site consistent. Last updated: **2026-06-30**.
+> Canonical project map and single sources of truth. Last reconciled:
+> **2026-07-23**.
 
-## What kind of site this is
+## Runtime Shape
 
-The active site is a **Next.js App Router application** in `next-app/`. Netlify
-is connected at the parent project folder, but root `netlify.toml` sets:
+The active site is the Next.js App Router application in `next-app/`. Root
+`netlify.toml` intentionally points Netlify at that directory:
 
 ```toml
 [build]
@@ -15,89 +15,120 @@ is connected at the parent project folder, but root `netlify.toml` sets:
   publish = ".next"
 ```
 
-The former root static HTML site has been removed. Do not reintroduce root
-`*.html`, `scripts/`, `assets/`, or `netlify/functions/` as app runtime.
+The retired root static site must not return. Root is for operating
+instructions, deployment config, SQL, project memory, and dedicated marketplace
+plans. App source and runtime assets belong under `next-app/`.
 
-## Single sources of truth
-
-| Concern | Single source of truth |
-|---------|------------------------|
-| Pages/routes | `next-app/src/app/[locale]/*` (`(home)` owns the localized homepage route) |
-| Shared layout | `next-app/src/components/layout/*` |
-| Product data | Supabase `products` table |
-| Product type contract | `next-app/src/types/product.ts` |
-| Product uploads | Supabase Storage bucket `product-images` |
-| Product pricing | `next-app/src/lib/pricing.ts` and `next-app/src/lib/spot-price.ts` |
-| Metal price API | `next-app/src/app/api/metal-prices/route.ts` |
-| Inquiry API | `next-app/src/app/api/inquire/route.ts` and `next-app/src/app/api/inquiries/[id]/route.ts` |
-| Online payments (PayPal) | `next-app/src/lib/paypal.ts` + `next-app/src/app/api/paypal/{create-order,capture-order,webhook}/route.ts` + `next-app/src/components/checkout/PayPalCheckoutButton.tsx` |
-| Authoritative checkout totals | `next-app/src/lib/checkout-pricing.ts` (subtotal/tax/shipping/total — never trusted from the client) |
-| Public-shop cache invalidation | `next-app/src/app/actions/admin-products.ts` (`adminRevalidateProduct`/`adminRevalidateProducts`) — every write to `products` that should be visible in `/shop` immediately, from any client (browser or server), must call one of these after the write |
-| Supabase clients | `next-app/src/lib/supabase/client.ts` and `server.ts` |
-| Translations | `next-app/messages/en.json` and `next-app/messages/es.json` |
-| Local static assets | `next-app/public/assets/*` |
-| SEO robots/sitemap | `next-app/src/app/robots.ts` and `next-app/src/app/sitemap.ts` |
-| Project memory | `project-docs/` |
-
-## Directory map
+## Directory Map
 
 ```text
 NaplesEstateJewelry.co/
-├── AGENTS.md
-├── ACCOUNT_SETUP.md
-├── netlify.toml
-├── supabase/
-│   ├── schema.sql
-│   ├── products.sql
-│   ├── inquiries.sql
-│   └── fix-permissions.sql
-├── project-docs/
-└── next-app/
-    ├── package.json
-    ├── netlify.toml
-    ├── next.config.ts
-    ├── messages/
-    ├── public/
-    │   ├── assets/
-    │   └── netlify-forms.html
-    └── src/
-        ├── app/
-        ├── components/
-        ├── context/
-        ├── i18n/
-        ├── lib/
-        └── types/
+|-- AGENTS.md
+|-- ACCOUNT_SETUP.md
+|-- CLAUDE.md
+|-- netlify.toml
+|-- ebay-sync-plan/
+|-- etsy-sync-plan/
+|-- project-docs/
+|   |-- features/
+|   |-- PROJECT_OVERVIEW.md
+|   |-- CURRENT_STATUS.md
+|   |-- TASKS.md
+|   |-- DECISIONS.md
+|   |-- CHANGELOG.md
+|   `-- ...
+|-- supabase/
+`-- next-app/
+    |-- package.json
+    |-- package-lock.json
+    |-- next.config.ts
+    |-- netlify/
+    |-- messages/
+    |-- public/
+    |   `-- assets/
+    `-- src/
+        |-- app/
+        |-- components/
+        |-- context/
+        |-- hooks/
+        |-- i18n/
+        |-- lib/
+        `-- types/
 ```
 
-## Structural invariants
+`banner.png` is a temporary owner-supplied source candidate for eBay artwork.
+It is not a runtime asset and is retained only because it differs materially
+from the shipped WebP. Resolve its policy/content decision in `TASKS.md`; do not
+let additional loose app assets accumulate at root.
 
-1. **Keep the app in `next-app/` unless doing a deliberate repo-root
-   promotion.** Root `netlify.toml` depends on that base directory.
-2. **Do not add runtime files back to the parent root.** Root is for deployment
-   config, docs, and database setup. App code and public assets belong under
-   `next-app/`.
-3. **Products live in Supabase.** Do not rebuild a static JS product catalog.
-4. **Product ids are permanent.** Saved cart/wishlist state and URLs depend on
-   product ids. Retire items by status rather than renaming ids.
-5. **Image bytes do not belong in product rows.** Product rows store URL/path
-   strings only. New uploaded inventory photos belong in Supabase Storage bucket
-   `product-images`; legacy local paths such as `/assets/images/pages/trust.webp`
-   must resolve inside `next-app/public/assets/...`.
-6. **Bilingual route behavior stays in `next-intl`.** Add or change localized
-   strings in `messages/en.json` and `messages/es.json` or in clearly paired
-   localized page logic.
-7. **Secrets stay out of the repo.** `.env` and `.env.local` remain ignored.
-   Only public `NEXT_PUBLIC_*` values may be exposed to browser code.
-8. **Build before publishing.** Run `npm run build` from `next-app/` after code,
-   route, schema contract, or config changes.
+## Single Sources Of Truth
 
-## Known follow-up
+| Concern | Source |
+|---|---|
+| Localized pages/routes | `next-app/src/app/[locale]/` |
+| Shared layout | `next-app/src/components/layout/` |
+| Product data | Supabase `products` |
+| Product TypeScript contract | `next-app/src/types/product.ts` |
+| Product uploads | Supabase Storage bucket `product-images` |
+| Product video | Cloudflare Stream bytes; Supabase `product_videos` metadata; `src/lib/product-video*.ts` and `cloudflare-stream.ts` |
+| Product pricing | `next-app/src/lib/pricing.ts` and `spot-price.ts` |
+| Authoritative checkout totals | `next-app/src/lib/checkout-pricing.ts` |
+| Shipping methods and fees | `next-app/src/lib/checkout-shipping.ts` |
+| U.S. address normalization | `next-app/src/lib/us-address.ts` |
+| PayPal integration | `src/lib/paypal*.ts`, PayPal API routes, and `features/paypal-checkout.md` |
+| Etsy integration | `src/lib/etsy/`, Etsy API routes, `etsy-sync-plan/`, and `features/etsy-sync.md` |
+| eBay integration | `src/lib/ebay/`, eBay API routes, `ebay-sync-plan/`, and `features/ebay-sync.md` |
+| Distributed rate limits | `next-app/src/lib/rate-limit.ts` and hardening SQL |
+| Broad API edge limit | `next-app/netlify/edge-functions/api-rate-limit.ts` |
+| Public-shop cache invalidation | `next-app/src/app/actions/admin-products.ts` |
+| Supabase clients | `next-app/src/lib/supabase/client.ts` and `server.ts` |
+| Translations | `next-app/messages/en.json` and `es.json` |
+| Local runtime assets | `next-app/public/assets/` |
+| SEO robots/sitemap | `next-app/src/app/robots.ts` and `sitemap.ts` |
+| Project memory | `project-docs/` |
 
-The cleanest long-term shape is to promote `next-app/` to the repository root.
-Until then, keep the parent folder lean and avoid duplicating app assets or app
-configuration outside `next-app/`.
+## Structural Invariants
 
-Product image storage has one remaining cleanup track from the 2026-06-20 audit:
-move the remaining legacy local-only product photos to Supabase Storage. The
-91 old unreferenced `product-images/products` objects found by the audit were
-archived and deleted through the confirmed Storage GC flow.
+1. Keep the runtime under `next-app/` unless the entire deployment structure is
+   deliberately migrated and all config/docs change together.
+2. Never rebuild a static product catalog. Public/admin product reads come from
+   Supabase and select only needed columns.
+3. Preserve product IDs. They are route and saved-state keys.
+4. Store image/video references in database rows, never media bytes.
+5. New product images use Supabase Storage and WebP/downscale/cache defaults.
+6. Video bytes go directly to Cloudflare Stream and only ready projections
+   reach public product pages.
+7. Keep EN/ES route behavior paired.
+8. Browser code gets only public Supabase values. Service-role and provider
+   secrets stay server-only.
+9. Every public product write that should change `/shop` calls the shared
+   product cache revalidation helper.
+10. Checkout amounts, shipping methods, and destination validity are recomputed
+    server-side from their shared libraries.
+11. Public mutations use layered rate limits and validated app routes; do not
+    expose direct public database mutation RPCs.
+12. Supabase schema changes update SQL, TypeScript contracts, query projections,
+    UI, tests, and project memory together.
+13. `CURRENT_STATUS.md`, `TASKS.md`, and `DECISIONS.md` stay concise.
+    `CHANGELOG.md` is the only full-history memory file.
+14. Do not run git commands in this source-of-truth folder.
+
+## Current Known Build Issue
+
+`npm run build` currently compiles the application, then Next's generated route
+contract rejects the named `renderShopPage` export in
+`src/app/[locale]/shop/(list)/page.tsx`. Until the shared renderer leaves the
+route module and the command exits 0, production build verification is not
+complete.
+
+## Cleanup Notes
+
+- Generated `.next`, `*.tsbuildinfo`, logs, caches, and dependency folders are
+  disposable and must remain ignored.
+- Marketplace plan folders are active references from code, SQL, and runbooks;
+  they are not stale planning debris.
+- `LEGACY_REMOVAL_REPORT.md` and `COMPLIANCE_AUDIT.md` are retained evidence,
+  not startup memory.
+- The remaining legacy local-only product-image migration is tracked in
+  `TASKS.md`.
+

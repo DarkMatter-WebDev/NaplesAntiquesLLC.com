@@ -4,12 +4,23 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { CartItem } from '@/context/CartContext';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
-import { chargesFlSalesTax, FL_TAX_RATE, FL_TAX_RATE_LABEL } from '@/lib/checkout-pricing';
+import {
+  calculateFlSalesTax,
+  chargesFlSalesTax,
+  FL_TAX_RATE_LABEL,
+  formatCheckoutCurrency,
+  round2,
+} from '@/lib/checkout-pricing';
 import { parseManualPriceLabelValue } from '@/lib/pricing';
+import {
+  CHECKOUT_SHIPPING_OPTIONS,
+  getCheckoutShippingOption,
+} from '@/lib/checkout-shipping';
 import {
   inferProductJewelryType,
   formatProductItemYear,
   isProductPurchasable,
+  isProductSold,
   normalizeProductQuantity,
   productJewelryTypeLabel,
   productLengthSizeDisplay,
@@ -22,28 +33,8 @@ const AVAILABLE_GREEN = '#2e7d32';
 const GOLD = '#735c00';
 const BORDER = '#d8d0c2';
 
-export const SHIPPING_OPTIONS = [
-  { value: 'local-pickup', labelEn: 'Local Pickup', labelEs: 'Recogida local', price: 0 },
-  { value: 'express-overnight-insured', labelEn: 'Express Overnight Insured', labelEs: 'Express nocturno asegurado', price: 75 },
-  { value: 'priority-insured', labelEn: 'Priority Insured', labelEs: 'Prioritario asegurado', price: 45 },
-];
-
-// Checkout defaults to shipping (most buyers need the item delivered), so the
-// address fields are required by default and the buyer must deliberately switch
-// to Local Pickup. Priority Insured is the standard default rather than the
-// pricier overnight option.
-export const DEFAULT_SHIPPING_METHOD = 'priority-insured';
-
 function parsePrice(label: string): number | null {
   return parseManualPriceLabelValue(label);
-}
-
-function fmt(n: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(n);
 }
 
 function purchaseQty(item: CartItem): number {
@@ -61,6 +52,7 @@ export default function OrderSummary({
   onSetQuantity,
   variant = 'compact',
   showAvailability = false,
+  hideSoldItemPrices = false,
 }: {
   items: CartItem[];
   isEs: boolean;
@@ -77,18 +69,23 @@ export default function OrderSummary({
   /** Show each item's live availability (In stock / N available / Sold out).
    *  On for the live checkout summary; off for the printed confirmation snapshot. */
   showAvailability?: boolean;
+  /** Mask prices for sold items on live customer-facing summaries. */
+  hideSoldItemPrices?: boolean;
 }) {
   const lineTotals = items.map((i) => {
+    if (hideSoldItemPrices && isProductSold(i.status)) return null;
     const unit = parsePrice(i.priceLabel);
     return unit === null ? null : unit * purchaseQty(i);
   });
   const knownLineTotals = lineTotals.filter((p): p is number => p !== null);
   const hasUnknown = knownLineTotals.length < lineTotals.length;
-  const subtotal = knownLineTotals.reduce((a, b) => a + b, 0);
-  const tax = chargesFlSalesTax(shippingMethod, shippingState) ? subtotal * FL_TAX_RATE : 0;
-  const selectedShipping = SHIPPING_OPTIONS.find((option) => option.value === shippingMethod) ?? SHIPPING_OPTIONS[0];
+  const subtotal = round2(knownLineTotals.reduce((a, b) => a + b, 0));
+  const selectedShipping = getCheckoutShippingOption(shippingMethod) ?? CHECKOUT_SHIPPING_OPTIONS[0];
   const shipping = selectedShipping.price;
-  const total = subtotal + tax + shipping;
+  const tax = chargesFlSalesTax(shippingMethod, shippingState)
+    ? calculateFlSalesTax(subtotal, shipping)
+    : 0;
+  const total = round2(subtotal + tax + shipping);
 
   const expanded = variant === 'expanded';
 
@@ -122,13 +119,14 @@ export default function OrderSummary({
             onSetQuantity={onSetQuantity ? (qty) => onSetQuantity(item.id, qty) : undefined}
             expanded={expanded}
             showAvailability={showAvailability}
+            hideSoldItemPrices={hideSoldItemPrices}
           />
         ))}
       </div>
       <div className={`${expanded ? 'ml-auto max-w-md rounded-2xl bg-[rgba(255,253,248,0.78)] px-3.5 py-3 shadow-[0_12px_34px_rgba(38,28,6,0.05)]' : ''} flex flex-col gap-1 text-xs border-t pt-3`} style={{ borderColor: BORDER, fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}>
         <div className="flex justify-between">
           <span>Subtotal</span>
-          <span>{subtotal > 0 ? fmt(subtotal) : '-'}{hasUnknown ? '*' : ''}</span>
+          <span>{subtotal > 0 ? formatCheckoutCurrency(subtotal) : '-'}{hasUnknown ? '*' : ''}</span>
         </div>
         <div className="flex justify-between">
           <span>
@@ -136,7 +134,7 @@ export default function OrderSummary({
               ? (isEs ? `Impuesto FL (${FL_TAX_RATE_LABEL})` : `FL Sales Tax (${FL_TAX_RATE_LABEL})`)
               : (isEs ? 'Impuesto FL' : 'FL Sales Tax')}
           </span>
-          <span>{subtotal > 0 ? fmt(tax) : '-'}</span>
+          <span>{subtotal > 0 ? formatCheckoutCurrency(tax) : '-'}</span>
         </div>
         {onShippingMethodChange ? (
           <div className="flex items-center justify-between gap-2 pt-2">
@@ -154,7 +152,7 @@ export default function OrderSummary({
                 outline: 'none',
               }}
             >
-              {SHIPPING_OPTIONS.map((option) => (
+              {CHECKOUT_SHIPPING_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {isEs ? option.labelEs : option.labelEn}
                 </option>
@@ -171,11 +169,11 @@ export default function OrderSummary({
         )}
         <div className="flex justify-between">
           <span>{isEs ? 'Costo de envío' : 'Shipping Cost'}</span>
-          <span>{fmt(shipping)}</span>
+          <span>{formatCheckoutCurrency(shipping)}</span>
         </div>
         <div className="flex justify-between pt-2 mt-2 font-bold text-base" style={{ borderTop: `1px solid ${BORDER}`, color: 'var(--color-on-surface)' }}>
           <span>{isEs ? 'Total estimado' : 'Est. Total'}</span>
-          <span style={{ color: GOLD }}>{subtotal > 0 ? fmt(total) : '-'}</span>
+          <span style={{ color: GOLD }}>{subtotal > 0 ? formatCheckoutCurrency(total) : '-'}</span>
         </div>
       </div>
     </aside>
@@ -190,6 +188,7 @@ function SummaryRow({
   onSetQuantity,
   expanded = false,
   showAvailability = false,
+  hideSoldItemPrices = false,
 }: {
   item: CartItem;
   isEs: boolean;
@@ -198,6 +197,7 @@ function SummaryRow({
   onSetQuantity?: (quantity: number) => void;
   expanded?: boolean;
   showAvailability?: boolean;
+  hideSoldItemPrices?: boolean;
 }) {
   const title = isEs && item.title_es ? item.title_es : item.title;
   const circa = formatProductItemYear(item.item_year);
@@ -207,6 +207,7 @@ function SummaryRow({
   const qty = purchaseQty(item);
   const stockCap = Math.max(1, normalizeProductQuantity(item.stockQuantity));
   const purchasable = isProductPurchasable(item.status, item.stockQuantity);
+  const soldPriceHidden = hideSoldItemPrices && isProductSold(item.status);
   const unitPrice = parsePrice(item.priceLabel);
   const lineTotal = unitPrice === null ? null : unitPrice * qty;
   return (
@@ -224,16 +225,16 @@ function SummaryRow({
         <div className="min-w-0">
           <Link
             href={`${prefix}/shop/${item.id}`}
-            className={`${expanded ? 'text-[0.8rem] md:text-sm line-clamp-2' : 'text-xs line-clamp-2'} font-bold leading-snug hover:underline`}
+            className={`${expanded ? 'text-[0.8rem] md:text-sm line-clamp-2' : 'text-xs line-clamp-2'} hover-underline-grow font-bold leading-snug`}
             style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
           >
             {title}
           </Link>
           <p className={`${expanded ? 'text-xs' : 'text-[0.68rem]'} flex-shrink-0 font-bold`} style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-            {item.priceLabel}
-            {qty > 1 && lineTotal !== null && (
+            {soldPriceHidden ? (isEs ? 'Vendido' : 'Sold') : item.priceLabel}
+            {!soldPriceHidden && qty > 1 && lineTotal !== null && (
               <span style={{ color: 'var(--color-on-surface-variant)', fontWeight: 600 }}>
-                {' '}× {qty} = {fmt(lineTotal)}
+                {' '}× {qty} = {formatCheckoutCurrency(lineTotal)}
               </span>
             )}
           </p>
@@ -321,6 +322,7 @@ export function QuantityStepper({
         type="button"
         onClick={() => onChange(clamp(value - 1))}
         disabled={value <= 1}
+        className="checkout-quantity-button"
         style={{ ...btn, opacity: value <= 1 ? 0.4 : 1, cursor: value <= 1 ? 'not-allowed' : 'pointer' }}
         aria-label={isEs ? 'Disminuir cantidad' : 'Decrease quantity'}
       >
@@ -337,6 +339,7 @@ export function QuantityStepper({
         type="button"
         onClick={() => onChange(clamp(value + 1))}
         disabled={value >= max}
+        className="checkout-quantity-button"
         style={{ ...btn, opacity: value >= max ? 0.4 : 1, cursor: value >= max ? 'not-allowed' : 'pointer' }}
         aria-label={isEs ? 'Aumentar cantidad' : 'Increase quantity'}
       >

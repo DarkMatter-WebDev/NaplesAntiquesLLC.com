@@ -1,6 +1,6 @@
 'use client';
 
-import { adminUpdateProductStatus, adminRevalidateProduct } from '@/app/actions/admin-products';
+import { adminGetProduct, adminUpdateProductStatus, adminRevalidateProduct } from '@/app/actions/admin-products';
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -18,6 +18,7 @@ import {
   normalizeProductItemYear,
   normalizeProductJewelryType,
   normalizeProductLengthSizeValue,
+  normalizeProductWidthMm,
   normalizeProductMetalType,
   normalizeProductLinkType,
   normalizeProductMetalVariant,
@@ -44,14 +45,20 @@ import {
   type ProductStatus,
   type SpotData,
 } from '@/types/product';
-import { calcSpotMeltValue, formatUsdPrice, getDisplayPrice, getSpotMeltDisplayPrice, normalizeManualPriceLabel } from '@/lib/pricing';
+import { calcSpotMeltValue, formatUsdPrice, getDisplayPrice, getProductPriceValue, getSpotMeltDisplayPrice, normalizeManualPriceLabel } from '@/lib/pricing';
 import ComboboxInput from './ComboboxInput';
 import AdminHeader from './AdminHeader';
 import EtsyProductPanel from './EtsyProductPanel';
 import EtsyBulkSyncModal from './EtsyBulkSyncModal';
+import EtsyBulkPublishModal from './EtsyBulkPublishModal';
+import EtsyBulkRepairModal from './EtsyBulkRepairModal';
 import EbayProductPanel from './EbayProductPanel';
 import EbayBulkSyncModal from './EbayBulkSyncModal';
 import EbayBulkPublishModal from './EbayBulkPublishModal';
+import SelectedProductsActionsModal, { type SelectedMarketplaceAction } from './SelectedProductsActionsModal';
+import SelectedProductsStatusModal from './SelectedProductsStatusModal';
+import type { Marketplace } from '@/lib/selected-marketplace-status';
+import ProductVideoEditor, { type ProductVideoEditorHandle } from './ProductVideoEditor';
 import {
   DEFAULT_QUICK_FILL_AI_FORMAT_PROMPT,
   QUICK_FILL_PROMPT_STORAGE_KEY,
@@ -59,6 +66,13 @@ import {
 } from '@/lib/admin-settings';
 import { PRODUCT_IMAGES_BUCKET, uniqueProductImageStoragePaths } from '@/lib/product-image-storage';
 import type { ProductAutofillDraft, ProductAutofillFields } from '@/lib/ai-product-schema';
+import { getSnapshotPrice } from '@/lib/sales';
+import { toAdminProductSummary } from '@/lib/admin-product-summary';
+import {
+  buildMissingSpanishCopyRequest,
+  mergeMissingSpanishCopy,
+  translatedSpanishTargets,
+} from '@/lib/admin-spanish-copy';
 
 // Quick Fill is removed from the editor UI for now. The parser and panel still
 // live in this file behind the flag so it can be restored without a backup copy.
@@ -148,7 +162,9 @@ const OPTIONAL_PRODUCT_COLUMNS = [
   'special_price_override_amount',
   'special_price_override_mode',
   'special_price_override_percent',
+  'sold_price',
   'quantity',
+  'width_mm',
 ] as const;
 
 function isMissingOptionalColumnError(error: { message?: string | null } | null | undefined) {
@@ -159,6 +175,16 @@ function isMissingOptionalColumnError(error: { message?: string | null } | null 
 function withoutOptionalColumns<T extends Record<string, unknown>>(payload: T): T {
   const rest: Record<string, unknown> = { ...payload };
   for (const column of OPTIONAL_PRODUCT_COLUMNS) delete rest[column];
+  return rest as T;
+}
+
+function isMissingWidthColumnError(error: { message?: string | null } | null | undefined) {
+  return Boolean(error?.message?.toLowerCase().includes('width_mm'));
+}
+
+function withoutWidthColumn<T extends Record<string, unknown>>(payload: T): T {
+  const rest: Record<string, unknown> = { ...payload };
+  delete rest.width_mm;
   return rest as T;
 }
 
@@ -217,6 +243,7 @@ function getStatusLabel(status: Product['status'] | null | undefined): string {
 function getStatusTone(status: Product['status'] | null | undefined) {
   const normalized = normalizeProductStatus(status);
   if (normalized === 'available') return { bg: 'var(--color-primary)', fg: 'var(--color-on-primary)' };
+  if (normalized === 'draft') return { bg: '#ede9fe', fg: '#5b21b6' };
   if (normalized === 'sold') return { bg: 'var(--color-on-surface)', fg: 'var(--color-surface)' };
   if (normalized === 'pending_payment') return { bg: '#8a5a00', fg: '#fff' };
   if (normalized === 'archived') return { bg: '#6b7280', fg: '#fff' };
@@ -428,7 +455,7 @@ type SortKey =
   | 'quantity';
 
 type SortDirection = 'asc' | 'desc';
-type ImageTarget = { url: string; index: number };
+type ImageTarget = { url: string; index: number; alt?: string };
 type CropRect = { x: number; y: number; width: number; height: number };
 type CropDragMode = 'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 type BrowserEyeDropper = { open: () => Promise<{ sRGBHex: string }> };
@@ -520,6 +547,7 @@ const AI_PRODUCT_FIELD_LABELS: Record<keyof ProductAutofillFields, string> = {
   manual_price_label: 'Price Label',
   show_spot_price: 'Show Spot/Melt Value',
   quantity: 'Quantity',
+  width_mm: 'Width (mm)',
   description: 'Description (EN)',
   public_notes: 'Notes (EN)',
 };
@@ -530,9 +558,9 @@ function formatAiFieldValue(key: string, value: unknown): string {
 }
 
 const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null; widthClass?: string; responsiveClass?: string }[] = [
-  { label: 'Inv #', sortKey: 'inventoryNumber', widthClass: 'w-[54px]' },
-  { label: 'Image', sortKey: 'image', widthClass: 'w-16' },
-  { label: 'Title', sortKey: 'title', widthClass: 'w-[210px]' },
+  { label: 'Inv #', sortKey: 'inventoryNumber', widthClass: 'w-[54px] min-w-[54px] max-w-[54px]' },
+  { label: 'Image', sortKey: 'image', widthClass: 'w-16 min-w-16 max-w-16' },
+  { label: 'Title', sortKey: 'title', widthClass: 'w-[210px] min-w-[210px] max-w-[210px] max-md:w-[160px] max-md:min-w-[160px] max-md:max-w-[160px]' },
   { label: 'Brand', sortKey: 'brand', widthClass: 'w-[92px]' },
   { label: 'Metal Color', sortKey: 'metalVariant', widthClass: 'w-[104px]' },
   { label: 'Type', sortKey: 'jewelryType', widthClass: 'w-[78px]' },
@@ -551,6 +579,12 @@ const PRODUCT_TABLE_COLUMNS: { label: string; sortKey: SortKey | null; widthClas
   { label: 'eBay', sortKey: null, widthClass: 'w-[110px]' },
   { label: '', sortKey: null, widthClass: 'w-[44px]', responsiveClass: 'max-md:w-[28px] max-md:min-w-[28px] max-md:max-w-[28px]' },
 ];
+
+const PRODUCT_TABLE_FROZEN_LEFT_CLASSES: Record<string, string> = {
+  'Inv #': 'left-[52px] max-md:left-[36px]',
+  Image: 'left-[106px] max-md:left-[90px]',
+  Title: 'left-[170px] max-md:left-[154px]',
+};
 
 const ETSY_CHIP_LABELS: Record<string, string> = {
   pending: 'Not listed',
@@ -594,6 +628,7 @@ function ebayChipTone(state: string | undefined): { bg: string; fg: string } {
 
 // Shared styling for a single item inside the row Actions dropdown menu.
 const ROW_ACTION_MENU_ITEM_CLASS = 'px-3 py-2 text-left text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-colors hover:bg-[var(--color-surface-container)]';
+const PRODUCT_ACTION_BUTTON_CLASS = 'inline-flex items-center justify-center gap-1.5 border px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors hover:bg-[var(--color-surface-container)] disabled:cursor-not-allowed disabled:opacity-60';
 
 function getMasterProductOrder(products: Product[]): Product[] {
   return [...products].sort((a, b) => {
@@ -627,7 +662,9 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
     jewelry_type: '',
     chain_type: null,
     length: null,
+    width_mm: null,
     pricing_multiplier: null,
+    sold_price: null,
     show_spot_price: true,
     special_price_override_enabled: false,
     special_price_override_amount: null,
@@ -669,6 +706,10 @@ function emptyProduct(): Omit<Product, 'created_at' | 'updated_at'> {
 function parseDisplayPrice(value: string): number | null {
   const numeric = Number(value.replace(/[^0-9.-]+/g, ''));
   return Number.isFinite(numeric) ? numeric : null;
+}
+
+function formatAdminTableTotal(total: number, count: number): string {
+  return count > 0 ? formatUsdPrice(total) : '-';
 }
 
 function getSortValue(
@@ -849,6 +890,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [quickAddMode, setQuickAddMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [loadingProductId, setLoadingProductId] = useState<string | null>(null);
+  const [productActionTarget, setProductActionTarget] = useState<Product | null>(null);
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
   // Fixed-viewport coordinates for the open row action menu. The menu renders as
   // position: fixed (escaping the table's overflow-x-auto clip) and flips above
@@ -880,18 +923,37 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     });
   }, []);
 
+  const closeActionMenu = useCallback(() => {
+    setActionMenuId(null);
+    setActionMenuPos(null);
+  }, []);
+
+  const openProductActions = useCallback((product: Product) => {
+    closeActionMenu();
+    setProductActionTarget(product);
+  }, [closeActionMenu]);
+
+  const handleProductRowClick = (event: React.MouseEvent<HTMLTableRowElement>, product: Product) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (target.closest('a, button, input, select, textarea, summary, [role="button"], [role="menuitem"], [data-product-drag-handle]')) {
+      return;
+    }
+    openProductActions(product);
+  };
+
   // The action menu is anchored to the trigger's viewport position, so close it
   // if the user scrolls (incl. the table's horizontal scroll) or resizes.
   useEffect(() => {
     if (!actionMenuId) return;
-    const close = () => { setActionMenuId(null); setActionMenuPos(null); };
+    const close = () => { closeActionMenu(); };
     window.addEventListener('scroll', close, true);
     window.addEventListener('resize', close);
     return () => {
       window.removeEventListener('scroll', close, true);
       window.removeEventListener('resize', close);
     };
-  }, [actionMenuId]);
+  }, [actionMenuId, closeActionMenu]);
 
   // Confirmation gate for the listing editor's close/cancel/save actions.
   const [editorConfirm, setEditorConfirm] = useState<{
@@ -901,20 +963,28 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     onConfirm: () => void;
   } | null>(null);
   // Mobile-only collapse state for the editor's blocks (no effect on desktop).
-  const [openEditorSections, setOpenEditorSections] = useState<{ photos: boolean; ai: boolean; details: boolean; etsy: boolean; ebay: boolean }>({
+  const [openEditorSections, setOpenEditorSections] = useState<{ photos: boolean; video: boolean; ai: boolean; details: boolean; etsy: boolean; ebay: boolean }>({
     photos: false,
+    video: false,
     ai: false,
     details: false,
     etsy: false,
     ebay: false,
   });
-  const toggleEditorSection = (key: 'photos' | 'ai' | 'details' | 'etsy' | 'ebay') =>
+  const toggleEditorSection = (key: 'photos' | 'video' | 'ai' | 'details' | 'etsy' | 'ebay') =>
     setOpenEditorSections((current) => ({ ...current, [key]: !current[key] }));
   // Bulk map for the product table's per-row Etsy status chip — best-effort,
   // fetched once on mount; an empty map (pre-migration or not-yet-synced) just
   // renders every row as "Not listed".
   const [etsyListingsByProduct, setEtsyListingsByProduct] = useState<Record<string, { sync_state: string }>>({});
   const [showEtsyBulkModal, setShowEtsyBulkModal] = useState(false);
+  const [showEtsyPublishModal, setShowEtsyPublishModal] = useState(false);
+  const [showEtsyRepairModal, setShowEtsyRepairModal] = useState(false);
+  const [selectedProductIdSet, setSelectedProductIdSet] = useState<Set<string>>(() => new Set());
+  const [showSelectedActionsModal, setShowSelectedActionsModal] = useState(false);
+  const [selectedBulkRun, setSelectedBulkRun] = useState<SelectedMarketplaceAction | null>(null);
+  const [selectedStatusCheck, setSelectedStatusCheck] = useState<Marketplace | null>(null);
+  const [selectedStatusPostTarget, setSelectedStatusPostTarget] = useState<{ productId: string; marketplace: 'etsy' | 'ebay' } | null>(null);
   // A single local DB read (no Etsy API call). Fetched once on mount, then
   // re-run after any action that can change a listing's state (bulk sync, or a
   // per-item sync/status/price action in the drawer) so the row chips don't go
@@ -957,7 +1027,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const imagePaddingTargetIndexRef = useRef(0);
   const [imagePaddingCustomColor, setImagePaddingCustomColor] = useState('#ffffff');
   const [imagePaddingNotice, setImagePaddingNotice] = useState<{ text: string; ok: boolean } | null>(null);
-  const [filterStatus, setFilterStatus] = useState('');
+  const [filterStatus, setFilterStatus] = useState('available');
   const [filterMetal, setFilterMetal] = useState('');
   const [filterMetalVariant, setFilterMetalVariant] = useState('');
   const [filterPurity, setFilterPurity] = useState('');
@@ -971,6 +1041,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [filterFeatured, setFilterFeatured] = useState('');
   const [showTableFilters, setShowTableFilters] = useState(false);
   const originalRef = useRef<ReturnType<typeof emptyProduct> | null>(null);
+  const productVideoEditorRef = useRef<ProductVideoEditorHandle>(null);
   const [uploading, setUploading] = useState(false);
   const [sessionUploadedImageUrls, setSessionUploadedImageUrls] = useState<Set<string>>(() => new Set());
   const [dragOver, setDragOver] = useState(false);
@@ -1011,6 +1082,15 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [showAdvancedIds, setShowAdvancedIds] = useState(false);
   const [inventoryNumberManual, setInventoryNumberManual] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [translatingSpanish, setTranslatingSpanish] = useState(false);
+  const [spanishTranslationNotice, setSpanishTranslationNotice] = useState<{ text: string; ok: boolean } | null>(null);
+  const spanishTranslationRequestRef = useRef(0);
+
+  function resetSpanishTranslation() {
+    spanishTranslationRequestRef.current += 1;
+    setTranslatingSpanish(false);
+    setSpanishTranslationNotice(null);
+  }
 
   // --- Editor undo history -------------------------------------------------
   // Snapshots of the editable state (editing + the derived type/link/length
@@ -1117,6 +1197,141 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     quickFillNoticeTimer.current = setTimeout(() => setQuickFillNotice(null), 5000);
   };
 
+  async function loadFullProduct(product: Product): Promise<Product | null> {
+    setLoadingProductId(product.id);
+    const result = await adminGetProduct(product.id);
+    setLoadingProductId(null);
+    if (result.error || !result.product) {
+      flash(result.error ?? 'Could not load the product.', false);
+      return null;
+    }
+    return { ...product, ...result.product };
+  }
+
+  async function openFullProductEditor(product: Product) {
+    const fullProduct = await loadFullProduct(product);
+    if (!fullProduct) return;
+    closeActionMenu();
+    setProductActionTarget(null);
+    openEdit(fullProduct);
+  }
+
+  async function duplicateFullProduct(product: Product) {
+    const fullProduct = await loadFullProduct(product);
+    if (!fullProduct) return;
+    closeActionMenu();
+    setProductActionTarget(null);
+    duplicateProduct(fullProduct);
+  }
+
+  async function openFullImagePaddingChooser(product: Product) {
+    const fullProduct = await loadFullProduct(product);
+    if (!fullProduct) return;
+    closeActionMenu();
+    setProductActionTarget(null);
+    openImagePaddingChooser(fullProduct);
+  }
+
+  function renderProductActions(product: Product, surface: 'menu' | 'modal') {
+    const closeSurfaces = () => {
+      closeActionMenu();
+      if (surface === 'modal') setProductActionTarget(null);
+    };
+    const isModal = surface === 'modal';
+    const actionClass = isModal ? PRODUCT_ACTION_BUTTON_CLASS : ROW_ACTION_MENU_ITEM_CLASS;
+    const actionStyle = (color: string) => ({
+      color,
+      fontFamily: 'var(--font-label)',
+      ...(isModal ? {
+        borderColor: 'var(--color-outline-variant)',
+        background: 'var(--color-surface-container-lowest)',
+      } : {}),
+    });
+    const iconClass = isModal ? 'material-symbols-outlined inline-flex leading-none' : 'hidden';
+    const iconStyle = {
+      fontFamily: 'Material Symbols Outlined',
+      fontWeight: 400,
+      fontStyle: 'normal',
+      fontSize: '16px',
+      lineHeight: 1,
+      letterSpacing: 'normal',
+      textTransform: 'none',
+    };
+
+    return (
+      <>
+        <Link
+          href={`${locale === 'es' ? '/es' : ''}/shop/${product.id}?returnTo=admin`}
+          onClick={closeSurfaces}
+          className={actionClass}
+          style={actionStyle('var(--color-on-surface-variant)')}
+        >
+          {isModal && <span className={iconClass} style={iconStyle} aria-hidden="true">visibility</span>}
+          View
+        </Link>
+        <button type="button" onClick={() => void openFullProductEditor(product)}
+          disabled={loadingProductId === product.id}
+          className={actionClass}
+          style={actionStyle('var(--color-primary)')}>
+          {isModal && <span className={iconClass} style={iconStyle} aria-hidden="true">edit</span>}
+          {loadingProductId === product.id ? 'Loading...' : 'Edit'}
+        </button>
+        <button type="button" onClick={() => void duplicateFullProduct(product)}
+          disabled={loadingProductId === product.id}
+          className={actionClass}
+          style={actionStyle('var(--color-on-surface-variant)')}>
+          {isModal && <span className={iconClass} style={iconStyle} aria-hidden="true">description</span>}
+          {loadingProductId === product.id ? 'Loading...' : 'Duplicate'}
+        </button>
+        <button type="button" onClick={() => void openFullImagePaddingChooser(product)}
+          disabled={loadingProductId === product.id}
+          className={actionClass}
+          style={actionStyle(hasAnyProductImagePadding(product.image_padding, product.image_padding_by_image) ? '#0f7a4f' : '#7a4a1f')}>
+          {isModal && <span className={iconClass} style={iconStyle} aria-hidden="true">image</span>}
+          {loadingProductId === product.id ? 'Loading...' : 'Pad'}
+        </button>
+        {normalizeProductStatus(product.status) !== 'draft' && (
+          <button type="button" onClick={() => { closeSurfaces(); void updateProductStatus(product, 'draft'); }}
+            className={actionClass}
+            style={actionStyle('#5b21b6')}>
+            {isModal && <span className={iconClass} style={iconStyle} aria-hidden="true">draft</span>}
+            Draft
+          </button>
+        )}
+        {normalizeProductStatus(product.status) !== 'available' && (
+          <button type="button" onClick={() => { closeSurfaces(); void updateProductStatus(product, 'available'); }}
+            className={actionClass}
+            style={actionStyle('var(--color-primary)')}>
+            {isModal && <span className={iconClass} style={iconStyle} aria-hidden="true">store</span>}
+            Available
+          </button>
+        )}
+        {normalizeProductStatus(product.status) !== 'sold' && (
+          <button type="button" onClick={() => { closeSurfaces(); void updateProductStatus(product, 'sold'); }}
+            className={actionClass}
+            style={actionStyle('var(--color-on-surface)')}>
+            {isModal && <span className={iconClass} style={iconStyle} aria-hidden="true">sell</span>}
+            Sold
+          </button>
+        )}
+        {normalizeProductStatus(product.status) !== 'archived' && (
+          <button type="button" onClick={() => { closeSurfaces(); void updateProductStatus(product, 'archived'); }}
+            className={actionClass}
+            style={actionStyle('var(--color-on-surface-variant)')}>
+            {isModal && <span className={iconClass} style={iconStyle} aria-hidden="true">inventory_2</span>}
+            Archive
+          </button>
+        )}
+        <button type="button" onClick={() => { closeSurfaces(); setDeleteTarget(product); }}
+          className={actionClass}
+          style={actionStyle('var(--color-error)')}>
+          {isModal && <span className={iconClass} style={iconStyle} aria-hidden="true">delete</span>}
+          Delete
+        </button>
+      </>
+    );
+  }
+
   function openImagePaddingChooser(product: Product) {
     const firstImage = getProductImages(product)[0] ?? null;
     const paddingValue = productImagePaddingForImage(product.image_padding, product.image_padding_by_image, firstImage, 0);
@@ -1161,6 +1376,37 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     };
   }, [editing]);
 
+  useEffect(() => {
+    if (!previewImg) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPreviewImg(null);
+    };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [previewImg]);
+
+  useEffect(() => {
+    if (!productActionTarget) return;
+    const previousOverflow = document.body.style.overflow;
+    const previousOverscroll = document.body.style.overscrollBehavior;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setProductActionTarget(null);
+    };
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.overscrollBehavior = previousOverscroll;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [productActionTarget]);
+
   const copyQuickFillPrompt = async () => {
     const copied = await copyTextToClipboard(quickFillPrompt);
     if (!copied) {
@@ -1193,6 +1439,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   }
 
   function openAddFromProducts(sourceProducts: Product[]) {
+    resetSpanishTranslation();
     originalRef.current = null;
     setSessionUploadedImageUrls(new Set());
     setFormErrors([]);
@@ -1203,7 +1450,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setQuickFillNotice(null);
     setQuickAddMode(false);
     setShowAdvancedIds(false);
-    setOpenEditorSections({ photos: false, ai: false, details: false, etsy: false, ebay: false });
+    setOpenEditorSections({ photos: false, video: false, ai: false, details: false, etsy: false, ebay: false });
     // Reset the Smart Listing Assistant so the next item starts completely fresh
     // (transcript, generated draft, notices, undo snapshot, and any active recording).
     stopAiRecording();
@@ -1239,6 +1486,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     if (e.price_mode === 'manual' && !e.manual_price_label?.trim()) {
       errs.push('Price label is required for manual price mode.');
     }
+    if (e.width_mm != null && normalizeProductWidthMm(e.width_mm) == null) {
+      errs.push('Width must be between 0.01 and 1000 millimeters.');
+    }
     if (e.special_price_override_enabled) {
       if (normalizeSpecialPriceOverrideMode(e.special_price_override_mode) === 'percent') {
         if (!(typeof e.special_price_override_percent === 'number' && e.special_price_override_percent >= 0)) {
@@ -1252,6 +1502,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   }
 
   function openEdit(p: Product) {
+    resetSpanishTranslation();
     const nextProductType = getProductJewelryType(p);
     const nextMetalType = getProductMetalType(p);
     const copy = {
@@ -1259,6 +1510,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       product_type: p.product_type ?? nextProductType,
       jewelry_type: p.jewelry_type ?? nextProductType,
       metal_type: p.metal_type ?? nextMetalType,
+      width_mm: p.width_mm ?? null,
     };
     originalRef.current = copy;
     setSessionUploadedImageUrls(new Set());
@@ -1270,7 +1522,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setQuickFillNotice(null);
     setQuickAddMode(false);
     setShowAdvancedIds(false);
-    setOpenEditorSections({ photos: false, ai: false, details: false, etsy: false, ebay: false });
+    setOpenEditorSections({ photos: false, video: false, ai: false, details: false, etsy: false, ebay: false });
     setInventoryNumberManual(false);
     const autoInventoryNumber =
       copy.inventory_number ??
@@ -1712,6 +1964,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
     if (!productSupportsLinkType(newJewelryType)) {
       newChainType = '';
+      updates.width_mm = null;
     }
     if (!productUsesLength(newJewelryType) && !productUsesSize(newJewelryType) && !productUsesHeight(newJewelryType)) {
       newLength = '';
@@ -1932,7 +2185,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       nextJewelryType = value;
       nextEditing.product_type = value;
       nextEditing.jewelry_type = value;
-      if (!productSupportsLinkType(value)) nextChainType = '';
+      if (!productSupportsLinkType(value)) {
+        nextChainType = '';
+        nextEditing.width_mm = null;
+      }
       if (!productUsesLength(value) && !productUsesSize(value) && !productUsesHeight(value)) nextLength = '';
     });
     setField('chain_type', 'Link Type', (value) => {
@@ -1942,6 +2198,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       nextEditing.jewelry_type = nextJewelryType;
     });
     setField('length', getLengthSizeLabel(nextJewelryType), (value) => { nextLength = normalizeProductLengthSizeValue(value); });
+    setField('width_mm', 'Width (mm)', (value) => {
+      if (productSupportsLinkType(nextJewelryType)) nextEditing.width_mm = normalizeProductWidthMm(value);
+    });
 
     if (applied.length === 0) {
       showAiNotice('No AI values to apply. Generate a listing first.', false);
@@ -1969,6 +2228,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   }
 
   function closeModal() {
+    resetSpanishTranslation();
     setEditorConfirm(null);
     setShowMicPrompt(false);
     setEditing(null);
@@ -1992,6 +2252,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       ? [...(originalRef.current.images ?? []), ...(originalRef.current.image_urls ?? [])]
       : [];
     const sourceId = originalRef.current?.id ?? null;
+    try {
+      await productVideoEditorRef.current?.discard();
+    } catch (error) {
+      flash(error instanceof Error ? error.message : 'Could not remove the draft video.', false);
+      return;
+    }
     closeModal();
     if (orphanUploads.length > 0) {
       await deleteProductImagesIfUnused(orphanUploads, sourceId, products, keepImages);
@@ -2294,7 +2560,17 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   async function updateProductStatus(product: Product, status: ProductStatus) {
     const result = await adminUpdateProductStatus(product.id, status);
     if (!result.error) {
-      setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, status } : p));
+      const hasSoldPrice = Object.prototype.hasOwnProperty.call(result.soldPrices ?? {}, product.id);
+      setProducts((prev) => prev.map((p) => p.id === product.id ? {
+        ...p,
+        status,
+        ...(hasSoldPrice ? { sold_price: result.soldPrices?.[product.id] ?? null } : {}),
+      } : p));
+      setProductActionTarget((current) => current?.id === product.id ? {
+        ...current,
+        status,
+        ...(hasSoldPrice ? { sold_price: result.soldPrices?.[product.id] ?? null } : {}),
+      } : current);
       flash(`${product.title} marked ${getStatusLabel(status)}`);
       return;
     }
@@ -2397,11 +2673,13 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   }
 
   function duplicateProduct(product: Product) {
-    const copyId = `${product.id}-copy-${Date.now()}`;
+    resetSpanishTranslation();
+    const copyInventoryNumber = getNextInventoryNumber(products);
+    const copyId = `${product.id}-copy-${copyInventoryNumber}`;
     const copy = {
       ...product,
       id: copyId,
-      inventory_number: getNextInventoryNumber(products),
+      inventory_number: copyInventoryNumber,
       sku: null,
       slug: copyId,
       title: `${product.title} (Copy)`,
@@ -2414,7 +2692,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setQuickEntry('');
     setQuickAddMode(false);
     setShowAdvancedIds(false);
-    setOpenEditorSections({ photos: false, ai: false, details: false, etsy: false, ebay: false });
+    setOpenEditorSections({ photos: false, video: false, ai: false, details: false, etsy: false, ebay: false });
     setInventoryNumberManual(false);
     const nextProductType = getProductJewelryType(product);
     setJewelryTypeInput(nextProductType);
@@ -2424,9 +2702,65 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setIsNew(true);
   }
 
+  async function regenerateMissingSpanish() {
+    if (!editing || translatingSpanish) return;
+
+    const request = buildMissingSpanishCopyRequest(editing);
+    if (request.targets.length === 0) {
+      setSpanishTranslationNotice({
+        text: 'Clear a Spanish field with matching English copy before regenerating.',
+        ok: false,
+      });
+      return;
+    }
+
+    const requestId = ++spanishTranslationRequestRef.current;
+    setTranslatingSpanish(true);
+    setSpanishTranslationNotice(null);
+
+    try {
+      const response = await fetch('/api/admin/translate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Spanish translation failed.');
+      }
+      if (requestId !== spanishTranslationRequestRef.current) return;
+
+      const translatedTargets = translatedSpanishTargets(request.targets, data ?? {});
+      if (translatedTargets.length === 0) {
+        throw new Error('No Spanish copy was returned. Please try again.');
+      }
+
+      setEditing((current) => current
+        ? mergeMissingSpanishCopy(current, request, data ?? {})
+        : current);
+
+      const missingCount = request.targets.length - translatedTargets.length;
+      setSpanishTranslationNotice({
+        text: missingCount > 0
+          ? `Generated ${translatedTargets.length} Spanish ${translatedTargets.length === 1 ? 'field' : 'fields'}; ${missingCount} could not be generated.`
+          : `Generated ${translatedTargets.length} Spanish ${translatedTargets.length === 1 ? 'field' : 'fields'}. Review them before saving.`,
+        ok: missingCount === 0,
+      });
+    } catch (error) {
+      if (requestId !== spanishTranslationRequestRef.current) return;
+      setSpanishTranslationNotice({
+        text: error instanceof Error ? error.message : 'Spanish translation failed.',
+        ok: false,
+      });
+    } finally {
+      if (requestId === spanishTranslationRequestRef.current) setTranslatingSpanish(false);
+    }
+  }
+
   // --- Save product ---
   async function handleSave(afterSave: 'stay' | 'another' | 'close' = 'close') {
-    if (!editing) return;
+    if (!editing || translatingSpanish) return;
     setSaving(true);
 
     // English now / Spanish on save: the listing AI generates English only, so fill any
@@ -2467,6 +2801,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     const supportsHeight = productUsesHeight(normalizedJewelryType);
     const normalizedLinkType = supportsLinkType ? chainTypeInput.trim() : '';
     const normalizedLength = supportsLength || supportsSize || supportsHeight ? normalizeProductLengthSizeValue(lengthInput) : '';
+    const normalizedWidthMm = supportsLinkType ? normalizeProductWidthMm(editing.width_mm) : null;
+    if (supportsLinkType && editing.width_mm != null && normalizedWidthMm == null) {
+      setFormErrors(['Width must be between 0.01 and 1000 millimeters.']);
+      setSaving(false);
+      return;
+    }
     const normalizedMetalType = normalizeProductMetalType(editing.metal_type, editing.category);
     const legacyCategory = getLegacyCategoryForMetalType(normalizedMetalType, editing.category);
     const baseTags = (editing.tags ?? []).filter(t => !t.startsWith('jt:') && !t.startsWith('ct:') && !t.startsWith('len:'));
@@ -2488,6 +2828,31 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     const baseStatus = normalizeProductStatus(editing.status);
     const resolvedStatus: ProductStatus =
       baseStatus === 'available' && normalizedQuantity <= 0 ? 'sold' : baseStatus;
+    if (
+      resolvedStatus === 'sold'
+      && effectivePriceMode === 'spot-multiplier'
+      && editing.sold_price == null
+      && (!spotData || spotData.source === 'fallback')
+    ) {
+      setFormErrors(['Live metal pricing is unavailable, so this item cannot be saved as Sold with a reliable locked price.']);
+      setSaving(false);
+      return;
+    }
+    const priceDraft = {
+      ...editing,
+      price_mode: effectivePriceMode,
+      manual_price_label: effectivePriceMode === 'manual' ? normalizedManualPriceLabel : null,
+      pricing_multiplier: effectivePriceMode === 'manual' ? null : editing.pricing_multiplier ?? null,
+      status: resolvedStatus,
+    } as Product;
+    const capturedSoldPrice = resolvedStatus === 'sold' && editing.sold_price == null
+      ? getSnapshotPrice(priceDraft, spotData)
+      : null;
+    const resolvedSoldPrice = resolvedStatus === 'available'
+      ? null
+      : editing.sold_price ?? (capturedSoldPrice && capturedSoldPrice > 0
+        ? Math.round((capturedSoldPrice + Number.EPSILON) * 100) / 100
+        : null);
 
     const payload = {
       ...editing,
@@ -2507,8 +2872,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       jewelry_type: normalizedJewelryType,
       chain_type: normalizedLinkType || null,
       length: normalizedLength || null,
+      width_mm: normalizedWidthMm,
       price_mode: effectivePriceMode,
       pricing_multiplier: effectivePriceMode === 'manual' ? null : editing.pricing_multiplier ?? null,
+      sold_price: resolvedSoldPrice,
       manual_price_label: effectivePriceMode === 'manual' ? normalizedManualPriceLabel : null,
       asking_price: null,
       quantity: normalizedQuantity,
@@ -2551,6 +2918,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
     let nextProducts = products;
     let savedId: string | undefined;
+    const productChanged = isNew || JSON.stringify(payload) !== JSON.stringify(originalRef.current);
+    const videoChanged = productVideoEditorRef.current?.hasPendingChanges() ?? false;
 
     if (isNew) {
       // Don't use .select() on insert — `authenticated` no longer has SELECT on
@@ -2560,33 +2929,58 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       // full row reloads via the service role on the next page load). (CODE-D04)
       let { error } = await supabase.from('products').insert(payload);
       if (isMissingOptionalColumnError(error)) {
-        const retry = await supabase.from('products').insert(withoutOptionalColumns(payload));
+        if (isMissingWidthColumnError(error) && payload.width_mm != null) {
+          flash('Run supabase/product-width-mm-2026-07.sql before saving a product width.', false);
+          setSaving(false);
+          return;
+        }
+        const retryPayload = isMissingWidthColumnError(error)
+          ? withoutWidthColumn(payload)
+          : withoutOptionalColumns(payload);
+        const retry = await supabase.from('products').insert(retryPayload);
         error = retry.error;
       }
       if (error) { flash(error.message, false); setSaving(false); return; }
-      const savedProduct = payload as unknown as Product;
+      const savedProduct = toAdminProductSummary(payload as unknown as Product);
       savedId = savedProduct.id;
       nextProducts = [savedProduct, ...products];
       setProducts(nextProducts);
     } else {
       // Skip the network call entirely if nothing changed.
-      if (JSON.stringify(payload) === JSON.stringify(originalRef.current)) {
-        setSaving(false);
-        if (afterSave === 'close') closeModal();
-        else if (afterSave === 'another') openAdd();
-        return;
-      }
       // Don't use .select().single() on update — RLS may allow UPDATE but not SELECT,
       // causing PGRST116 and blocking the modal from closing.
-      let { error } = await supabase.from('products').update(payload).eq('id', originalProductId);
-      if (isMissingOptionalColumnError(error)) {
-        const retry = await supabase.from('products').update(withoutOptionalColumns(payload)).eq('id', originalProductId);
-        error = retry.error;
-      }
-      if (error) { flash(error.message, false); setSaving(false); return; }
       savedId = originalProductId;
-      nextProducts = products.map((p) => p.id === originalProductId ? (payload as unknown as Product) : p);
-      setProducts(nextProducts);
+      if (productChanged) {
+        let { error } = await supabase.from('products').update(payload).eq('id', originalProductId);
+        if (isMissingOptionalColumnError(error)) {
+          if (isMissingWidthColumnError(error) && payload.width_mm != null) {
+            flash('Run supabase/product-width-mm-2026-07.sql before saving a product width.', false);
+            setSaving(false);
+            return;
+          }
+          const retryPayload = isMissingWidthColumnError(error)
+            ? withoutWidthColumn(payload)
+            : withoutOptionalColumns(payload);
+          const retry = await supabase.from('products').update(retryPayload).eq('id', originalProductId);
+          error = retry.error;
+        }
+        if (error) { flash(error.message, false); setSaving(false); return; }
+        const productSummary = toAdminProductSummary(payload as unknown as Product);
+        nextProducts = products.map((p) => p.id === originalProductId ? productSummary : p);
+        setProducts(nextProducts);
+      }
+    }
+
+    const videoResult = await productVideoEditorRef.current?.commit(payload.id, payload.images?.[0] ?? null);
+    if (videoResult && !videoResult.ok) {
+      if (isNew) {
+        setIsNew(false);
+        setEditing(payload as ReturnType<typeof emptyProduct>);
+        originalRef.current = payload as ReturnType<typeof emptyProduct>;
+      }
+      setFormErrors([videoResult.error ?? 'Could not save the product video.']);
+      setSaving(false);
+      return;
     }
 
     // Reconcile storage on commit: delete every image this listing no longer
@@ -2604,7 +2998,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     }
     setSessionUploadedImageUrls(new Set());
 
-    flash(isNew ? 'Product added' : 'Product saved');
+    flash(isNew ? 'Product added' : productChanged ? 'Product saved' : videoChanged ? 'Product video saved' : 'No changes to save');
     setSaving(false);
     if (savedId) void adminRevalidateProduct(savedId);
 
@@ -2636,7 +3030,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       return;
     }
 
-    if ((count ?? 0) > 0) {
+    if ((count ?? 0) > 0 && normalizeProductStatus(deleteTarget.status) !== 'archived') {
       const { error } = await supabase.from('products').update({ status: 'archived' }).eq('id', deleteTarget.id);
       if (error) { flash(error.message, false); return; }
       void adminRevalidateProduct(deleteTarget.id);
@@ -2646,14 +3040,22 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       return;
     }
 
-    const deleteImageUrls = [...(deleteTarget.images ?? []), ...(deleteTarget.image_urls ?? [])];
+    const fullDeleteTarget = await loadFullProduct(deleteTarget);
+    if (!fullDeleteTarget) return;
+    const deleteImageUrls = [...(fullDeleteTarget.images ?? []), ...(fullDeleteTarget.image_urls ?? [])];
+    const videoDeleteResponse = await fetch(`/api/admin/product-video/${encodeURIComponent(deleteTarget.id)}`, { method: 'DELETE' });
+    if (!videoDeleteResponse.ok) {
+      const videoDeleteData = await videoDeleteResponse.json().catch(() => null);
+      flash(videoDeleteData?.error ?? 'The product was not deleted because its Stream video could not be removed.', false);
+      return;
+    }
     const { error } = await supabase.from('products').delete().eq('id', deleteTarget.id);
     if (error) { flash(error.message, false); return; }
     void adminRevalidateProduct(deleteTarget.id);
     const nextProducts = products.filter((p) => p.id !== deleteTarget.id);
     setProducts(nextProducts);
     await deleteProductImagesIfUnused(deleteImageUrls, deleteTarget.id, nextProducts);
-    flash('Product deleted');
+    flash('Product permanently deleted');
     setDeleteTarget(null);
   }
 
@@ -2677,7 +3079,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       getProductLength(p),
     ].filter(Boolean).join(' ').toLowerCase();
     if (search && !searchText.includes(search.toLowerCase())) return false;
-    if (filterStatus && normalizeProductStatus(p.status) !== filterStatus) return false;
+    const productStatus = normalizeProductStatus(p.status);
+    if (!filterStatus && productStatus === 'archived') return false;
+    if (filterStatus && filterStatus !== 'all' && productStatus !== filterStatus) return false;
     if (filterMetal === 'gold' && getProductMetalType(p) !== 'Gold') return false;
     if (filterMetal === 'silver' && getProductMetalType(p) !== 'Silver') return false;
     if (filterMetalVariant && getProductMetalVariant(p) !== filterMetalVariant) return false;
@@ -2722,6 +3126,135 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       })
       .map(({ product }) => product);
   }, [filtered, inventoryNumbers, sortConfig, spotData]);
+
+  const selectedProducts = useMemo(
+    () => products.filter((product) => selectedProductIdSet.has(product.id)),
+    [products, selectedProductIdSet],
+  );
+  const selectedProductIds = useMemo(() => selectedProducts.map((product) => product.id), [selectedProducts]);
+  const selectedStatusProducts = useMemo(
+    () => selectedProducts.map((product) => ({
+      id: product.id,
+      title: product.title,
+      inventoryNumber: product.inventory_number,
+    })),
+    [selectedProducts],
+  );
+  const selectedVisibleCount = useMemo(
+    () => sortedProducts.filter((product) => selectedProductIdSet.has(product.id)).length,
+    [selectedProductIdSet, sortedProducts],
+  );
+  const allVisibleSelected = sortedProducts.length > 0 && selectedVisibleCount === sortedProducts.length;
+
+  function setProductSelected(productId: string, selected: boolean) {
+    setSelectedProductIdSet((current) => {
+      const next = new Set(current);
+      if (selected) next.add(productId);
+      else next.delete(productId);
+      return next;
+    });
+  }
+
+  function setAllVisibleSelected(selected: boolean) {
+    setSelectedProductIdSet((current) => {
+      const next = new Set(current);
+      for (const product of sortedProducts) {
+        if (selected) next.add(product.id);
+        else next.delete(product.id);
+      }
+      return next;
+    });
+  }
+
+  function chooseSelectedMarketplaceAction(action: SelectedMarketplaceAction) {
+    setShowSelectedActionsModal(false);
+    if (action === 'repair-etsy') {
+      setShowEtsyRepairModal(true);
+      return;
+    }
+    if (action === 'publish-etsy-ready') {
+      setShowEtsyPublishModal(true);
+      return;
+    }
+    if (action === 'publish-ready') {
+      setShowEbayPublishModal(true);
+      return;
+    }
+    if (selectedProductIds.length === 0) return;
+    setSelectedStatusPostTarget(null);
+    if (action === 'check-etsy' || action === 'check-ebay') {
+      setSelectedStatusCheck(action === 'check-etsy' ? 'etsy' : 'ebay');
+      return;
+    }
+    setSelectedBulkRun(action);
+    if (action === 'ebay') setShowEbayBulkModal(true);
+    else setShowEtsyBulkModal(true);
+  }
+
+  function postSelectedStatusProduct(productId: string, marketplace: 'etsy' | 'ebay') {
+    if (!selectedProductIdSet.has(productId)) return;
+    setSelectedStatusCheck(null);
+    setSelectedStatusPostTarget({ productId, marketplace });
+    setSelectedBulkRun(marketplace);
+    if (marketplace === 'etsy') setShowEtsyBulkModal(true);
+    else setShowEbayBulkModal(true);
+  }
+
+  function handleEtsyBulkClose(completed = false) {
+    setShowEtsyBulkModal(false);
+    void refreshEtsyChips();
+    if (selectedStatusPostTarget?.marketplace === 'etsy') {
+      setSelectedStatusPostTarget(null);
+      setSelectedBulkRun(null);
+      setSelectedStatusCheck('etsy');
+      return;
+    }
+    if (selectedBulkRun === 'both' && completed) {
+      setSelectedBulkRun('ebay');
+      setShowEbayBulkModal(true);
+      return;
+    }
+    if (selectedBulkRun) {
+      setSelectedBulkRun(null);
+      setSelectedProductIdSet(new Set());
+    }
+  }
+
+  function handleEbayBulkClose(completed = false) {
+    setShowEbayBulkModal(false);
+    void refreshEbayChips();
+    if (selectedStatusPostTarget?.marketplace === 'ebay') {
+      setSelectedStatusPostTarget(null);
+      setSelectedBulkRun(null);
+      setSelectedStatusCheck('ebay');
+      return;
+    }
+    if (selectedBulkRun && (completed || selectedBulkRun === 'ebay')) {
+      setSelectedBulkRun(null);
+      setSelectedProductIdSet(new Set());
+    }
+  }
+
+  const productTableTotals = useMemo(() => {
+    return sortedProducts.reduce(
+      (totals, product) => {
+        const meltValue = calcSpotMeltValue(product, spotData);
+        if (meltValue != null && Number.isFinite(meltValue)) {
+          totals.meltTotal += meltValue;
+          totals.meltCount += 1;
+        }
+
+        const priceValue = getProductPriceValue(product, spotData);
+        if (priceValue != null && Number.isFinite(priceValue)) {
+          totals.priceTotal += priceValue;
+          totals.priceCount += 1;
+        }
+
+        return totals;
+      },
+      { meltTotal: 0, meltCount: 0, priceTotal: 0, priceCount: 0 },
+    );
+  }, [sortedProducts, spotData]);
 
   function toggleSort(key: SortKey) {
     setSortConfig((current) => {
@@ -2876,13 +3409,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     resetRowDrag();
   }
 
-  const total = products.length;
-  const available = products.filter((p) => normalizeProductStatus(p.status) === 'available').length;
-  const sold = products.filter((p) => normalizeProductStatus(p.status) === 'sold').length;
   const existingBrandOptions = Array.from(new Set(products.map((product) => product.brand?.trim()).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b));
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--color-background)' }}>
+    <div className="flex h-dvh min-h-0 flex-col overflow-hidden" style={{ background: 'var(--color-background)' }}>
 
       <AdminHeader
         adminBasePath={adminBasePath}
@@ -2918,7 +3448,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         )}
       />
 
-      <div className="max-w-[1700px] 2xl:max-w-[2200px] mx-auto px-4 md:px-8 2xl:px-10 py-8">
+      <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden max-w-[1700px] 2xl:max-w-[2200px] mx-auto px-4 md:px-8 2xl:px-10 py-8">
 
         {/* Flash message */}
         {msg && (
@@ -2934,22 +3464,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
           </div>
         )}
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-          {[
-            { label: 'Total', value: total },
-            { label: 'Available', value: available },
-            { label: 'Sold', value: sold },
-          ].map(({ label, value }) => (
-            <div key={label}
-              className="border p-4"
-              style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-lowest)' }}>
-              <p className="text-2xl font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>{value}</p>
-              <p className="text-xs uppercase tracking-wide mt-1" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>{label}</p>
-            </div>
-          ))}
-        </div>
-
         {/* Toolbar */}
         <div className="flex flex-col gap-3 mb-5">
           <div className="flex items-center gap-3 flex-wrap">
@@ -2963,14 +3477,15 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             <button type="button" onClick={openAdd} className="gold-button text-sm flex-shrink-0">
               + Add Product
             </button>
-            <button type="button" onClick={() => setShowEtsyBulkModal(true)} className="outline-button text-sm flex-shrink-0">
-              Sync All to Etsy
-            </button>
-            <button type="button" onClick={() => setShowEbayBulkModal(true)} className="outline-button text-sm flex-shrink-0">
-              Sync all to eBay
-            </button>
-            <button type="button" onClick={() => setShowEbayPublishModal(true)} className="outline-button text-sm flex-shrink-0">
-              Publish all ready
+            <button
+              type="button"
+              onClick={() => setShowSelectedActionsModal(true)}
+              className="outline-button inline-flex items-center gap-2 text-sm flex-shrink-0"
+              aria-label={selectedProductIds.length > 0 ? `Actions for ${selectedProductIds.length} selected ${selectedProductIds.length === 1 ? 'product' : 'products'}` : 'Product actions'}
+              title={selectedProductIds.length > 0 ? 'Actions for selected products' : 'Product actions'}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '17px', lineHeight: 1 }}>edit_note</span>
+              Actions{selectedProductIds.length > 0 ? ` (${selectedProductIds.length})` : ''}
             </button>
             <button
               type="button"
@@ -3088,7 +3603,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               ] : []),
               {
                 label: 'Status', value: filterStatus, set: setFilterStatus,
-                options: [['', 'All Statuses'], ...STATUSES.map((status) => [status.value, status.label])],
+                options: [
+                  ['', 'All except Archived'],
+                  ['all', 'All Statuses'],
+                  ...STATUSES.map((status) => [status.value, status.label]),
+                ],
               },
               {
                 label: 'Location', value: filterLocation, set: setFilterLocation,
@@ -3135,7 +3654,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   setFilterLocation('');
                   setFilterFeatured('');
                 }}
-                className="text-xs font-bold uppercase tracking-wide hover:underline self-end pb-1"
+                className="hover-underline-grow text-xs font-bold uppercase tracking-wide self-end pb-1"
                 style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
               >
                 Clear
@@ -3147,7 +3666,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         </div>
 
         {/* Product table */}
-        <div className="border" style={{ borderColor: 'var(--color-outline-variant)' }}>
+        <div className="flex min-h-0 flex-1 flex-col border" style={{ borderColor: 'var(--color-outline-variant)' }}>
           <div
             className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2 text-xs"
             style={{
@@ -3176,7 +3695,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   setFilterFeatured('');
                   setSortConfig(null);
                 }}
-                className="font-bold uppercase tracking-wide hover:underline"
+                className="hover-underline-grow font-bold uppercase tracking-wide"
                 style={{ color: 'var(--color-primary)' }}
               >
                 Reset view to drag reorder
@@ -3188,29 +3707,44 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               </span>
             )}
           </div>
-          <div className="overflow-x-auto pb-24">
+          <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
             <table className="w-max min-w-[1680px] 2xl:min-w-[1960px] text-sm">
               <thead>
                 <tr className="border-b text-left" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}>
                   <th
-                    className="px-3 py-3 max-md:px-1 text-xs font-bold uppercase tracking-wide whitespace-nowrap"
-                    style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                    className="sticky left-0 top-0 z-40 w-[52px] min-w-[52px] max-w-[52px] px-3 py-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap max-md:w-[36px] max-md:min-w-[36px] max-md:max-w-[36px] max-md:px-1"
+                    style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)', background: 'var(--color-surface-container-low)' }}
                   >
-                    <span className="max-md:hidden">Order</span>
+                    <span className="flex flex-col items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        ref={(node) => {
+                          if (node) node.indeterminate = selectedVisibleCount > 0 && !allVisibleSelected;
+                        }}
+                        onChange={(event) => setAllVisibleSelected(event.target.checked)}
+                        onClick={(event) => event.stopPropagation()}
+                        className="h-4 w-4 accent-[var(--color-primary)]"
+                        aria-label="Select all visible products"
+                        title="Select all visible products"
+                      />
+                      <span className="max-md:hidden">Order</span>
+                    </span>
                   </th>
                   {PRODUCT_TABLE_COLUMNS.map(({ label, sortKey, widthClass, responsiveClass }) => {
                     const active = sortConfig?.key === sortKey;
-                    const isActionsColumn = !sortKey;
+                    const isActionsColumn = label === '';
+                    const frozenLeftClass = PRODUCT_TABLE_FROZEN_LEFT_CLASSES[label];
                     return (
                       <th
                         key={label || 'actions'}
                         aria-sort={active ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : undefined}
-                        className={`px-2 py-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap ${widthClass ?? ''}${responsiveClass ? ` ${responsiveClass}` : ''}${label === 'Brand' ? ' border-l text-center' : ''}${isActionsColumn ? ' sticky right-0 z-10' : ''}`}
+                        className={`sticky top-0 px-2 py-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap ${isActionsColumn || frozenLeftClass ? 'z-40' : 'z-30'} ${widthClass ?? ''}${responsiveClass ? ` ${responsiveClass}` : ''}${label === 'Brand' ? ' text-center' : ''}${label === 'Title' ? ' border-r shadow-[4px_0_6px_-6px_rgba(0,0,0,0.45)]' : ''}${frozenLeftClass ? ` ${frozenLeftClass}` : ''}${isActionsColumn ? ' right-0' : ''}`}
                         style={{
                           color: 'var(--color-on-surface-variant)',
                           fontFamily: 'var(--font-label)',
-                          borderColor: label === 'Brand' ? 'var(--color-outline-variant)' : undefined,
-                          background: isActionsColumn ? 'var(--color-surface-container-low)' : undefined,
+                          borderColor: label === 'Title' ? 'var(--color-outline-variant)' : undefined,
+                          background: 'var(--color-surface-container-low)',
                         }}
                       >
                         {sortKey ? (
@@ -3238,6 +3772,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               <tbody>
                 {sortedProducts.map((p) => (
                   <tr key={p.id}
+                    onClick={(event) => handleProductRowClick(event, p)}
                     draggable={canDragReorder}
                     onDragStart={(e) => {
                       if (!canDragReorder) return;
@@ -3259,34 +3794,52 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                       handleProductDrop(p);
                     }}
                     onDragEnd={resetRowDrag}
-                    className="border-b hover:bg-[color:var(--color-surface-container-low)] transition-colors"
+                    className="cursor-pointer border-b hover:bg-[color:var(--color-surface-container-low)] transition-colors"
                     style={{
                       borderColor: dragTargetProductId === p.id ? 'var(--color-primary)' : 'var(--color-outline-variant)',
                       background: dragTargetProductId === p.id
                         ? 'color-mix(in srgb, var(--color-primary) 8%, transparent)'
                         : undefined,
                     }}>
-                    <td className="px-2 py-3 max-md:px-0.5 max-md:w-[36px] whitespace-nowrap w-[52px]">
-                      <span
-                        className="material-symbols-outlined inline-flex h-8 w-8 items-center justify-center"
-                        aria-hidden="true"
-                        style={{
-                          color: canDragReorder ? 'var(--color-primary)' : 'var(--color-outline-variant)',
-                          cursor: canDragReorder ? 'grab' : 'not-allowed',
-                          fontSize: '20px',
-                          userSelect: 'none',
-                        }}
-                      >
-                        drag_indicator
-                      </span>
+                    <td
+                      className="sticky left-0 z-20 w-[52px] min-w-[52px] max-w-[52px] whitespace-nowrap px-2 py-3 max-md:w-[36px] max-md:min-w-[36px] max-md:max-w-[36px] max-md:px-0.5"
+                      style={{ background: dragTargetProductId === p.id ? 'color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-container-lowest))' : 'var(--color-surface-container-lowest)' }}
+                    >
+                      <div className="flex flex-col items-center gap-1">
+                        <input
+                          type="checkbox"
+                          checked={selectedProductIdSet.has(p.id)}
+                          onChange={(event) => setProductSelected(p.id, event.target.checked)}
+                          onClick={(event) => event.stopPropagation()}
+                          className="h-4 w-4 accent-[var(--color-primary)]"
+                          aria-label={`Select ${p.title}`}
+                        />
+                        <span
+                          data-product-drag-handle="true"
+                          className="material-symbols-outlined inline-flex h-6 w-8 items-center justify-center"
+                          aria-hidden="true"
+                          style={{
+                            color: canDragReorder ? 'var(--color-primary)' : 'var(--color-outline-variant)',
+                            cursor: canDragReorder ? 'grab' : 'not-allowed',
+                            fontSize: '20px',
+                            userSelect: 'none',
+                          }}
+                        >
+                          drag_indicator
+                        </span>
+                      </div>
                     </td>
-                    <td className="px-2 py-3 max-md:px-1 whitespace-nowrap w-[54px] font-bold text-xs" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
+                    <td className="sticky left-[52px] z-20 w-[54px] min-w-[54px] max-w-[54px] whitespace-nowrap px-2 py-3 text-xs font-bold max-md:left-[36px] max-md:px-1" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)', background: dragTargetProductId === p.id ? 'color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-container-lowest))' : 'var(--color-surface-container-lowest)' }}>
                       {formatInventoryNumberDisplay(p.inventory_number ?? inventoryNumbers.get(p.id))}
                     </td>
-                    <td className="p-0">
+                    <td className="sticky left-[106px] z-20 w-16 min-w-16 max-w-16 p-0 max-md:left-[90px]" style={{ background: dragTargetProductId === p.id ? 'color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-container-lowest))' : 'var(--color-surface-container-lowest)' }}>
                       {getProductImages(p)[0] ? (
-                        <div
-                          className="relative w-16 h-16 overflow-hidden"
+                        <button
+                          type="button"
+                          onClick={() => openProductActions(p)}
+                          className="relative block h-16 w-16 cursor-pointer overflow-hidden outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-inset"
+                          aria-label={`Open actions for ${p.title}`}
+                          title="Open product actions"
                           style={{ background: productImagePaddingBackground(productImagePaddingForImage(p.image_padding, p.image_padding_by_image, getProductImages(p)[0], 0)) }}
                         >
                           <Image
@@ -3297,18 +3850,27 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                             className="object-contain object-center"
                             unoptimized={getProductImages(p)[0].startsWith('/assets/')}
                           />
-                        </div>
+                        </button>
                       ) : (
                         <div className="w-16 h-16 flex items-center justify-center text-xl"
                           style={{ background: 'var(--color-surface-container)' }}>📷</div>
                       )}
                     </td>
-                    <td className="px-2 py-3 font-medium w-[210px] max-w-[210px]" style={{ color: 'var(--color-on-surface)' }}>
-                      <span className="line-clamp-2">{p.title}</span>
+                    <td className="sticky left-[170px] z-20 w-[210px] min-w-[210px] max-w-[210px] border-r px-2 py-3 font-medium shadow-[4px_0_6px_-6px_rgba(0,0,0,0.45)] max-md:left-[154px] max-md:w-[160px] max-md:min-w-[160px] max-md:max-w-[160px]" style={{ color: 'var(--color-on-surface)', borderColor: 'var(--color-outline-variant)', background: dragTargetProductId === p.id ? 'color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-container-lowest))' : 'var(--color-surface-container-lowest)' }}>
+                      <button
+                        type="button"
+                        onClick={() => openProductActions(p)}
+                        className="hover-underline-grow line-clamp-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2"
+                        style={{ color: 'var(--color-on-surface)' }}
+                        aria-label={`Open actions for ${p.title}`}
+                        title="Open product actions"
+                      >
+                        {p.title}
+                      </button>
                     </td>
                     <td
-                      className="border-l px-2 py-3 whitespace-nowrap w-[92px] max-w-[92px]"
-                      style={{ color: 'var(--color-on-surface-variant)', borderColor: 'var(--color-outline-variant)' }}
+                      className="px-2 py-3 whitespace-nowrap w-[92px] max-w-[92px]"
+                      style={{ color: 'var(--color-on-surface-variant)' }}
                     >
                       <span className="block truncate text-center">{p.brand || '-'}</span>
                     </td>
@@ -3396,7 +3958,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                         </button>
                         {actionMenuId === p.id && actionMenuPos && (
                           <>
-                            <div className="fixed inset-0 z-40" onClick={() => { setActionMenuId(null); setActionMenuPos(null); }} aria-hidden="true" />
+                            <div className="fixed inset-0 z-40" onClick={closeActionMenu} aria-hidden="true" />
                             <div
                               role="menu"
                               className="fixed z-50 flex min-w-[150px] flex-col overflow-hidden rounded-md border shadow-lg"
@@ -3410,58 +3972,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                                 fontFamily: 'var(--font-label)',
                               }}
                             >
-                              <Link
-                                href={`${locale === 'es' ? '/es' : ''}/shop/${p.id}?returnTo=admin`}
-                                onClick={() => setActionMenuId(null)}
-                                className={ROW_ACTION_MENU_ITEM_CLASS}
-                                style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
-                              >
-                                View
-                              </Link>
-                              <button type="button" onClick={() => { setActionMenuId(null); openEdit(p); }}
-                                className={ROW_ACTION_MENU_ITEM_CLASS}
-                                style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-                                Edit
-                              </button>
-                              <button type="button" onClick={() => { setActionMenuId(null); duplicateProduct(p); }}
-                                className={ROW_ACTION_MENU_ITEM_CLASS}
-                                style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-                                Duplicate
-                              </button>
-                              <button type="button" onClick={() => { setActionMenuId(null); openImagePaddingChooser(p); }}
-                                className={ROW_ACTION_MENU_ITEM_CLASS}
-                                style={{
-                                  color: hasAnyProductImagePadding(p.image_padding, p.image_padding_by_image) ? '#0f7a4f' : '#7a4a1f',
-                                  fontFamily: 'var(--font-label)',
-                                }}>
-                                Pad
-                              </button>
-                              {normalizeProductStatus(p.status) !== 'available' && (
-                                <button type="button" onClick={() => { setActionMenuId(null); updateProductStatus(p, 'available'); }}
-                                  className={ROW_ACTION_MENU_ITEM_CLASS}
-                                  style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-                                  Available
-                                </button>
-                              )}
-                              {normalizeProductStatus(p.status) !== 'sold' && (
-                                <button type="button" onClick={() => { setActionMenuId(null); updateProductStatus(p, 'sold'); }}
-                                  className={ROW_ACTION_MENU_ITEM_CLASS}
-                                  style={{ color: 'var(--color-on-surface)', fontFamily: 'var(--font-label)' }}>
-                                  Sold
-                                </button>
-                              )}
-                              {normalizeProductStatus(p.status) !== 'archived' && (
-                                <button type="button" onClick={() => { setActionMenuId(null); updateProductStatus(p, 'archived'); }}
-                                  className={ROW_ACTION_MENU_ITEM_CLASS}
-                                  style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-                                  Archive
-                                </button>
-                              )}
-                              <button type="button" onClick={() => { setActionMenuId(null); setDeleteTarget(p); }}
-                                className={ROW_ACTION_MENU_ITEM_CLASS}
-                                style={{ color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}>
-                                Delete
-                              </button>
+                              {renderProductActions(p, 'menu')}
                             </div>
                           </>
                         )}
@@ -3478,10 +3989,249 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   </tr>
                 )}
               </tbody>
+              {sortedProducts.length > 0 && (
+                <tfoot>
+                  <tr
+                    className="border-t text-xs font-bold uppercase tracking-wide"
+                    style={{
+                      borderColor: 'var(--color-outline-variant)',
+                      background: 'var(--color-surface-container)',
+                      boxShadow: '0 -8px 18px -18px rgba(0,0,0,0.55)',
+                    }}
+                  >
+                    <td
+                      className="sticky bottom-0 left-0 z-30 w-[52px] min-w-[52px] max-w-[52px] px-2 py-3 max-md:w-[36px] max-md:min-w-[36px] max-md:max-w-[36px]"
+                      style={{ background: 'var(--color-surface-container)' }}
+                    />
+                    <td
+                      className="sticky bottom-0 left-[52px] z-30 w-[54px] min-w-[54px] max-w-[54px] px-2 py-3 max-md:left-[36px] max-md:px-1"
+                      style={{ background: 'var(--color-surface-container)' }}
+                    />
+                    <td
+                      className="sticky bottom-0 left-[106px] z-30 w-16 min-w-16 max-w-16 px-2 py-3 max-md:left-[90px]"
+                      style={{ background: 'var(--color-surface-container)' }}
+                    />
+                    <td
+                      className="sticky bottom-0 left-[170px] z-30 w-[210px] min-w-[210px] max-w-[210px] border-r px-2 py-3 shadow-[4px_0_6px_-6px_rgba(0,0,0,0.45)] max-md:left-[154px] max-md:w-[160px] max-md:min-w-[160px] max-md:max-w-[160px]"
+                      style={{
+                        color: 'var(--color-on-surface)',
+                        borderColor: 'var(--color-outline-variant)',
+                        background: 'var(--color-surface-container)',
+                      }}
+                    >
+                      <span className="block truncate">Visible totals - {sortedProducts.length} rows</span>
+                    </td>
+                    <td className="sticky bottom-0 px-2 py-3 w-[92px] max-w-[92px]" style={{ background: 'var(--color-surface-container)' }} />
+                    <td className="sticky bottom-0 px-2 py-3" style={{ background: 'var(--color-surface-container)' }} />
+                    <td className="sticky bottom-0 px-2 py-3" style={{ background: 'var(--color-surface-container)' }} />
+                    <td className="sticky bottom-0 hidden px-2 py-3 w-[118px] max-w-[118px] 2xl:table-cell" style={{ background: 'var(--color-surface-container)' }} />
+                    <td className="sticky bottom-0 px-2 py-3" style={{ background: 'var(--color-surface-container)' }} />
+                    <td className="sticky bottom-0 px-2 py-3" style={{ background: 'var(--color-surface-container)' }} />
+                    <td className="sticky bottom-0 px-2 py-3" style={{ background: 'var(--color-surface-container)' }} />
+                    <td className="sticky bottom-0 px-2 py-3" style={{ background: 'var(--color-surface-container)' }} />
+                    <td className="sticky bottom-0 px-2 py-3" style={{ background: 'var(--color-surface-container)' }} />
+                    <td
+                      className="sticky bottom-0 px-2 py-3 whitespace-nowrap font-semibold"
+                      style={{ color: 'var(--color-on-surface)', background: 'var(--color-surface-container)' }}
+                    >
+                      {formatAdminTableTotal(productTableTotals.meltTotal, productTableTotals.meltCount)}
+                    </td>
+                    <td
+                      className="sticky bottom-0 px-2 py-3 text-[0.65rem]"
+                      style={{ color: 'var(--color-on-surface-variant)', background: 'var(--color-surface-container)' }}
+                    >
+                      Total
+                    </td>
+                    <td
+                      className="sticky bottom-0 px-2 py-3 whitespace-nowrap font-semibold"
+                      style={{ color: 'var(--color-primary)', background: 'var(--color-surface-container)' }}
+                    >
+                      {formatAdminTableTotal(productTableTotals.priceTotal, productTableTotals.priceCount)}
+                    </td>
+                    <td className="sticky bottom-0 px-2 py-3" style={{ background: 'var(--color-surface-container)' }} />
+                    <td className="sticky bottom-0 px-2 py-3" style={{ background: 'var(--color-surface-container)' }} />
+                    <td className="sticky bottom-0 px-2 py-3" style={{ background: 'var(--color-surface-container)' }} />
+                    <td className="sticky bottom-0 px-2 py-3" style={{ background: 'var(--color-surface-container)' }} />
+                    <td
+                      className="sticky bottom-0 right-0 z-20 w-[44px] min-w-[44px] max-w-[44px] px-1 py-3 max-md:w-[28px] max-md:min-w-[28px] max-md:max-w-[28px] max-md:px-0"
+                      style={{ background: 'var(--color-surface-container)' }}
+                    />
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </div>
       </div>
+
+      {/* Product quick-actions modal */}
+      {productActionTarget && (() => {
+        const images = getProductImages(productActionTarget);
+        const coverImage = images[0] ?? null;
+        const coverPadding = productImagePaddingForImage(
+          productActionTarget.image_padding,
+          productActionTarget.image_padding_by_image,
+          coverImage,
+          0,
+        );
+        const etsyState = etsyListingsByProduct[productActionTarget.id]?.sync_state ?? 'pending';
+        const ebayState = ebayListingsByProduct[productActionTarget.id]?.sync_state ?? 'pending';
+        const productMarketplaceBase = `${adminBasePath}/products/${encodeURIComponent(productActionTarget.id)}`;
+        const marketplaceIconStyle = {
+          fontFamily: 'Material Symbols Outlined',
+          fontWeight: 400,
+          fontStyle: 'normal',
+          fontSize: '18px',
+          lineHeight: 1,
+          letterSpacing: 'normal',
+          textTransform: 'none',
+        };
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-3 py-4 md:px-6 md:py-8"
+            style={{ background: 'rgba(0,0,0,0.52)' }}
+            onClick={() => setProductActionTarget(null)}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="product-actions-title"
+          >
+            <div
+              className="flex w-full max-w-3xl flex-col overflow-hidden border shadow-2xl"
+              style={{ background: 'var(--color-background)', borderColor: 'var(--color-outline-variant)' }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div
+                className="flex items-start justify-between gap-4 border-b px-4 py-3 md:px-5"
+                style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-lowest)' }}
+              >
+                <div className="min-w-0">
+                  <p className="text-[0.65rem] font-bold uppercase tracking-widest" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
+                    Item {formatInventoryNumberDisplay(productActionTarget.inventory_number ?? inventoryNumbers.get(productActionTarget.id))}
+                  </p>
+                  <h2 id="product-actions-title" className="mt-1 text-xl font-bold md:text-2xl" style={{ color: 'var(--color-on-surface)', fontFamily: 'var(--font-headline)' }}>
+                    {productActionTarget.title}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setProductActionTarget(null)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-offset-2"
+                  style={{ color: 'var(--color-on-surface-variant)' }}
+                  aria-label="Close product actions"
+                  title="Close"
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">close</span>
+                </button>
+              </div>
+
+              <div className="grid gap-4 p-4 md:grid-cols-[240px_1fr] md:p-5">
+                <aside className="flex flex-col gap-4">
+                  <button
+                    type="button"
+                    onClick={() => coverImage && setPreviewImg({ url: coverImage, index: 0, alt: productActionTarget.title })}
+                    disabled={!coverImage}
+                    className="relative aspect-square w-full overflow-hidden border text-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
+                    style={{
+                      borderColor: 'var(--color-outline-variant)',
+                      background: coverImage ? productImagePaddingBackground(coverPadding) : 'var(--color-surface-container)',
+                    }}
+                    aria-label={coverImage ? `View full-size image of ${productActionTarget.title}` : 'No product image'}
+                    title={coverImage ? 'View full-size image' : 'No product image'}
+                  >
+                    {coverImage ? (
+                      <Image
+                        src={coverImage}
+                        alt={productActionTarget.title}
+                        fill
+                        sizes="(max-width: 768px) 92vw, 240px"
+                        className="object-contain object-center"
+                        unoptimized={coverImage.startsWith('/assets/')}
+                      />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                        No photo
+                      </span>
+                    )}
+                  </button>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="border px-3 py-2" style={{ borderColor: 'var(--color-outline-variant)' }}>
+                      <span className="block font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>Status</span>
+                      <span style={{ color: 'var(--color-on-surface)' }}>{getStatusLabel(productActionTarget.status)}</span>
+                    </div>
+                    <div className="border px-3 py-2" style={{ borderColor: 'var(--color-outline-variant)' }}>
+                      <span className="block font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>Qty</span>
+                      <span style={{ color: 'var(--color-on-surface)' }}>{normalizeProductQuantity(productActionTarget.quantity)}</span>
+                    </div>
+                    <div className="border px-3 py-2" style={{ borderColor: 'var(--color-outline-variant)' }}>
+                      <span className="block font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>Price</span>
+                      <span style={{ color: 'var(--color-primary)' }}>{getDisplayPrice(productActionTarget, spotData)}</span>
+                    </div>
+                    <div className="border px-3 py-2" style={{ borderColor: 'var(--color-outline-variant)' }}>
+                      <span className="block font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>Melt</span>
+                      <span style={{ color: 'var(--color-on-surface)' }}>{getSpotMeltDisplayPrice(productActionTarget, spotData)}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    {renderProductActions(productActionTarget, 'modal')}
+                  </div>
+                </aside>
+
+                <div className="flex min-w-0 flex-col gap-4">
+                  <div className="grid gap-3">
+                    <a
+                      href={`${productMarketplaceBase}/etsy`}
+                      className="flex items-center justify-between gap-4 border px-4 py-3 transition-colors hover:bg-[var(--color-surface-container)]"
+                      style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-lowest)', color: 'var(--color-on-surface)' }}
+                    >
+                      <span className="flex min-w-0 items-center gap-3">
+                        <span className="material-symbols-outlined shrink-0" style={marketplaceIconStyle} aria-hidden="true">shopping_bag</span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-bold uppercase tracking-wide" style={{ fontFamily: 'var(--font-label)' }}>Manage Etsy</span>
+                          <span className="block truncate text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Preview, sync, tags, category, price, status</span>
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <span
+                          className="inline-flex text-[0.6rem] font-bold uppercase tracking-widest px-2 py-0.5"
+                          style={{ background: etsyChipTone(etsyState).bg, color: etsyChipTone(etsyState).fg }}
+                        >
+                          {ETSY_CHIP_LABELS[etsyState] ?? 'Not listed'}
+                        </span>
+                        <span className="material-symbols-outlined" style={marketplaceIconStyle} aria-hidden="true">chevron_right</span>
+                      </span>
+                    </a>
+
+                    <a
+                      href={`${productMarketplaceBase}/ebay`}
+                      className="flex items-center justify-between gap-4 border px-4 py-3 transition-colors hover:bg-[var(--color-surface-container)]"
+                      style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-lowest)', color: 'var(--color-on-surface)' }}
+                    >
+                      <span className="flex min-w-0 items-center gap-3">
+                        <span className="material-symbols-outlined shrink-0" style={marketplaceIconStyle} aria-hidden="true">store</span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-bold uppercase tracking-wide" style={{ fontFamily: 'var(--font-label)' }}>Manage eBay</span>
+                          <span className="block truncate text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>Preview, sync, publish, price, status, delist</span>
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <span
+                          className="inline-flex text-[0.6rem] font-bold uppercase tracking-widest px-2 py-0.5"
+                          style={{ background: ebayChipTone(ebayState).bg, color: ebayChipTone(ebayState).fg }}
+                        >
+                          {EBAY_CHIP_LABELS[ebayState] ?? 'Not listed'}
+                        </span>
+                        <span className="material-symbols-outlined" style={marketplaceIconStyle} aria-hidden="true">chevron_right</span>
+                      </span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Edit / Add Modal */}
       {editing && (
@@ -3663,6 +4413,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   </div>
                 )}
               </div>
+
+              <ProductVideoEditor
+                ref={productVideoEditorRef}
+                productId={editing.id || 'new-product'}
+                loadExisting={!isNew}
+                collapsed={!openEditorSections.video}
+                onToggle={() => toggleEditorSection('video')}
+              />
 
               {/* AI Listing Assistant */}
               <div
@@ -4139,11 +4897,14 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                       step="1"
                       inputMode="numeric"
                       className="form-field w-full"
-                      value={editing.quantity ?? 1}
+                      value={editing.quantity ?? ''}
                       onChange={(e) => setEditing({
                         ...editing,
                         quantity: e.target.value === '' ? null : normalizeProductQuantity(e.target.value),
                       })}
+                      onBlur={() => {
+                        if (editing.quantity === null) setEditing({ ...editing, quantity: 1 });
+                      }}
                     />
                   </ClearableField>
                   <p className="mt-1 text-[0.68rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
@@ -4229,7 +4990,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                       // resolved to "Other" on save (see normalizedJewelryType above).
                       const nextProductType = normalizeProductTypeValue(value) ?? '';
                       setJewelryTypeInput(nextProductType);
-                      setEditing({ ...editing, product_type: nextProductType, jewelry_type: nextProductType });
+                      setEditing({
+                        ...editing,
+                        product_type: nextProductType,
+                        jewelry_type: nextProductType,
+                        width_mm: productSupportsLinkType(nextProductType) ? editing.width_mm ?? null : null,
+                      });
                       if (!productSupportsLinkType(nextProductType)) setChainTypeInput('');
                       if (!productUsesLength(nextProductType) && !productUsesSize(nextProductType) && !productUsesHeight(nextProductType)) setLengthInput('');
                     }}
@@ -4326,7 +5092,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               </div>
 
               {/* Conditional product detail fields */}
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-3 gap-4">
                 {(() => {
                   const canUseLinkType = productSupportsLinkType(jewelryTypeInput);
                   return canUseLinkType ? (
@@ -4350,7 +5116,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     ? 'height in inches, e.g. 1.5, 0.75...'
                     : lengthSizeLabel === 'Size'
                       ? 'e.g. 6.5, 7, 8...'
-                      : 'e.g. 22, 24, 7.5...';
+                      : 'e.g. 22, 22 in, 7.5...';
                   return (
                     <div>
                       <label className="form-label">{lengthSizeLabel}</label>
@@ -4363,6 +5129,27 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     </div>
                   );
                 })()}
+                {productSupportsLinkType(jewelryTypeInput) && (
+                  <div>
+                    <label className="form-label">Width (mm)</label>
+                    <ClearableField onClear={() => setEditing({ ...editing, width_mm: null })} show={editing.width_mm != null}>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={0.01}
+                        max={1000}
+                        step={0.01}
+                        placeholder="e.g. 8.5"
+                        className="form-field w-full"
+                        value={editing.width_mm ?? ''}
+                        onChange={(event) => setEditing({
+                          ...editing,
+                          width_mm: event.target.value === '' ? null : Number(event.target.value),
+                        })}
+                      />
+                    </ClearableField>
+                  </div>
+                )}
               </div>
 
               {isNew && (
@@ -4761,6 +5548,36 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             )}
 
             {/* Modal footer — 2-up grid on mobile (so nothing overflows), single row on desktop */}
+            <div
+              className="px-3 py-3 border-t flex flex-col gap-2 sm:flex-row sm:items-center"
+              style={{ borderColor: 'var(--color-outline-variant)' }}
+            >
+              <button
+                type="button"
+                onClick={regenerateMissingSpanish}
+                disabled={translatingSpanish || saving || buildMissingSpanishCopyRequest(editing).targets.length === 0}
+                className="outline-button text-sm inline-flex w-full items-center justify-center gap-1.5 disabled:opacity-40 sm:w-auto"
+                title="Fill blank Spanish title, description, and notes from their English versions"
+              >
+                <span className="material-symbols-outlined text-base leading-none" aria-hidden="true">sync</span>
+                {translatingSpanish ? 'Generating Spanish...' : 'Regenerate Missing Spanish'}
+              </button>
+              {spanishTranslationNotice && (
+                <div
+                  className="px-3 py-2 text-xs font-medium sm:flex-1"
+                  role="status"
+                  style={{
+                    background: spanishTranslationNotice.ok ? 'color-mix(in srgb, #166534 10%, transparent)' : 'color-mix(in srgb, var(--color-error) 10%, transparent)',
+                    border: `1px solid ${spanishTranslationNotice.ok ? 'color-mix(in srgb, #166534 30%, transparent)' : 'color-mix(in srgb, var(--color-error) 28%, transparent)'}`,
+                    color: spanishTranslationNotice.ok ? '#166534' : 'var(--color-error)',
+                    fontFamily: 'var(--font-label)',
+                  }}
+                >
+                  {spanishTranslationNotice.text}
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-2 px-3 py-4 border-t [&>button]:w-full md:flex md:items-center md:gap-1.5 md:[&>button]:w-auto"
               style={{ borderColor: 'var(--color-outline-variant)', paddingBottom: 'max(1rem, calc(1rem + env(safe-area-inset-bottom, 0px)))' }}>
               {/* Clone — edit mode only, pushed to the left */}
@@ -4769,6 +5586,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   type="button"
                   onClick={() => {
                     if (!editing) return;
+                    resetSpanishTranslation();
                     const clone = {
                       ...editing,
                       id: '',
@@ -4792,7 +5610,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     setIsNew(true);
                     resetUndoHistory();
                   }}
-                  className="outline-button text-sm"
+                  disabled={translatingSpanish || saving}
+                  className="outline-button text-sm disabled:opacity-40"
                 >
                   Clone
                 </button>
@@ -4800,7 +5619,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               <button
                 type="button"
                 onClick={undoEdit}
-                disabled={!canUndoEdit || saving}
+                disabled={!canUndoEdit || saving || translatingSpanish}
                 className="outline-button text-sm disabled:opacity-40 flex items-center justify-center gap-1.5"
                 title="Undo the last change"
               >
@@ -4810,13 +5629,13 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               <button type="button" onClick={requestCloseEditor} className="outline-button text-sm">
                 Cancel
               </button>
-              <button type="button" onClick={() => requestSaveEditor('stay')} disabled={saving} className="outline-button text-sm disabled:opacity-50">
+              <button type="button" onClick={() => requestSaveEditor('stay')} disabled={saving || translatingSpanish} className="outline-button text-sm disabled:opacity-50">
                 {saving ? 'Saving…' : 'Save'}
               </button>
-              <button type="button" onClick={() => requestSaveEditor('another')} disabled={saving} className="outline-button text-sm disabled:opacity-50">
+              <button type="button" onClick={() => requestSaveEditor('another')} disabled={saving || translatingSpanish} className="outline-button text-sm disabled:opacity-50">
                 Save + Add Another
               </button>
-              <button type="button" onClick={() => requestSaveEditor('close')} disabled={saving} className="gold-button gold-button-gradient text-sm disabled:opacity-50">
+              <button type="button" onClick={() => requestSaveEditor('close')} disabled={saving || translatingSpanish} className="gold-button gold-button-gradient text-sm disabled:opacity-50">
                 {saving ? 'Saving…' : 'Save and Close'}
               </button>
             </div>
@@ -4879,12 +5698,25 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
           className="fixed inset-0 z-[60] flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.85)' }}
           onClick={() => setPreviewImg(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Full-size product image"
         >
+          <button
+            type="button"
+            onClick={() => setPreviewImg(null)}
+            className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full text-white transition-colors hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            style={{ background: 'rgba(0,0,0,0.65)' }}
+            aria-label="Close image preview"
+            title="Close"
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">close</span>
+          </button>
           <div className="relative max-w-3xl w-full max-h-[85vh] flex flex-col items-center justify-center gap-3" onClick={(e) => e.stopPropagation()}>
             <div className="relative h-[78vh] max-h-[78vh] w-full">
               <Image
                 src={previewImg.url}
-                alt="Preview"
+                alt={previewImg.alt ?? 'Product image preview'}
                 fill
                 sizes="(max-width: 768px) 92vw, 768px"
                 className="object-contain"
@@ -4893,28 +5725,22 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               />
             </div>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setCropRect(FULL_IMAGE_CROP);
-                  setCropTarget(previewImg);
-                }}
-                className="gold-button text-xs"
-              >
-                Crop
-              </button>
+              {editing && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCropRect(FULL_IMAGE_CROP);
+                    setCropTarget(previewImg);
+                  }}
+                  className="gold-button text-xs"
+                >
+                  Crop
+                </button>
+              )}
               <button type="button" onClick={() => setPreviewImg(null)} className="outline-button text-xs">
                 Close
               </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setPreviewImg(null)}
-              className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center text-white font-bold text-sm"
-              style={{ background: 'rgba(0,0,0,0.6)' }}
-            >
-              ✕
-            </button>
           </div>
         </div>
       )}
@@ -5212,12 +6038,50 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
         </div>
       )}
 
+      {showSelectedActionsModal && (
+        <SelectedProductsActionsModal
+          count={selectedProductIds.length}
+          onClose={() => setShowSelectedActionsModal(false)}
+          onChoose={chooseSelectedMarketplaceAction}
+        />
+      )}
+
+      {selectedStatusCheck && (
+        <SelectedProductsStatusModal
+          products={selectedStatusProducts}
+          marketplace={selectedStatusCheck}
+          onPost={postSelectedStatusProduct}
+          onClose={() => {
+            void refreshEtsyChips();
+            void refreshEbayChips();
+            setSelectedStatusCheck(null);
+            setShowSelectedActionsModal(true);
+          }}
+        />
+      )}
+
       {/* Etsy bulk sync (Phase 2) */}
       {showEtsyBulkModal && (
         <EtsyBulkSyncModal
+          productIds={selectedStatusPostTarget ? [selectedStatusPostTarget.productId] : selectedBulkRun ? selectedProductIds : undefined}
+          onClose={handleEtsyBulkClose}
+        />
+      )}
+
+      {showEtsyPublishModal && (
+        <EtsyBulkPublishModal
           onClose={() => {
-            setShowEtsyBulkModal(false);
-            void refreshEtsyChips(); // a bulk run likely changed several rows
+            setShowEtsyPublishModal(false);
+            void refreshEtsyChips();
+          }}
+        />
+      )}
+
+      {showEtsyRepairModal && (
+        <EtsyBulkRepairModal
+          onClose={() => {
+            setShowEtsyRepairModal(false);
+            void refreshEtsyChips();
           }}
         />
       )}
@@ -5225,10 +6089,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       {/* eBay bulk sync */}
       {showEbayBulkModal && (
         <EbayBulkSyncModal
-          onClose={() => {
-            setShowEbayBulkModal(false);
-            void refreshEbayChips(); // a bulk run likely changed several rows
-          }}
+          productIds={selectedStatusPostTarget ? [selectedStatusPostTarget.productId] : selectedBulkRun ? selectedProductIds : undefined}
+          onClose={handleEbayBulkClose}
         />
       )}
 
@@ -5256,16 +6118,27 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               Delete product?
             </h2>
             <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-              &ldquo;{deleteTarget.title}&rdquo; will be permanently removed.
+              {normalizeProductStatus(deleteTarget.status) === 'archived' ? (
+                <>
+                  &ldquo;{deleteTarget.title}&rdquo; will be permanently removed. Existing order and invoice snapshots will be retained.
+                </>
+              ) : (
+                <>
+                  &ldquo;{deleteTarget.title}&rdquo; will be permanently removed if it has no order history. Products with order history are archived first.
+                </>
+              )}
             </p>
             <div className="flex gap-3 justify-end">
               <button type="button" onClick={() => setDeleteTarget(null)} className="outline-button text-sm">
                 Cancel
               </button>
               <button type="button" onClick={handleDelete}
+                disabled={loadingProductId === deleteTarget.id}
                 className="text-sm font-bold px-4 py-2"
                 style={{ background: 'var(--color-error)', color: '#fff', fontFamily: 'var(--font-label)' }}>
-                Delete
+                {loadingProductId === deleteTarget.id
+                  ? 'Loading...'
+                  : normalizeProductStatus(deleteTarget.status) === 'archived' ? 'Delete permanently' : 'Delete'}
               </button>
             </div>
           </div>

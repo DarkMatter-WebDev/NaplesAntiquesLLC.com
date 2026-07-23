@@ -6,9 +6,10 @@ import Link from 'next/link';
 import { useWishlist, type WishlistItem } from '@/context/WishlistContext';
 import type { CartItem } from '@/context/CartContext';
 import CartButton from '@/components/shop/CartButton';
-import { isProductSold, productImagePaddingBackground, type Product, type SpotData } from '@/types/product';
+import { getProductSoldPriceLock, isProductSold, productImagePaddingBackground, type Product, type SpotData } from '@/types/product';
 import { calcSpotPriceValue, formatUsdPrice } from '@/lib/pricing';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
+import { useHideSoldItemPrices } from '@/hooks/useHideSoldItemPrices';
 
 const GOLD = '#735c00';
 const BORDER = '#d8d0c2';
@@ -17,6 +18,7 @@ export default function WishlistDrawer({ locale }: { locale: string }) {
   const { items, drawerOpen, closeDrawer } = useWishlist();
   const isEs = locale === 'es';
   const prefix = isEs ? '/es' : '';
+  const hideSoldItemPrices = useHideSoldItemPrices(drawerOpen);
 
   // Live spot data for computing saved-item prices. Fetched lazily the first time
   // the drawer opens with at least one spot-linked item, so the saved list shows
@@ -105,7 +107,7 @@ export default function WishlistDrawer({ locale }: { locale: string }) {
             </div>
           ) : (
             items.map((item) => (
-              <DrawerItem key={item.id} item={item} isEs={isEs} prefix={prefix} spot={spot} />
+              <DrawerItem key={item.id} item={item} isEs={isEs} prefix={prefix} spot={spot} hideSoldItemPrices={hideSoldItemPrices} />
             ))
           )}
         </div>
@@ -143,15 +145,18 @@ function DrawerItem({
   isEs,
   prefix,
   spot,
+  hideSoldItemPrices,
 }: {
   item: WishlistItem;
   isEs: boolean;
   prefix: string;
   spot: SpotData | null;
+  hideSoldItemPrices: boolean;
 }) {
   const { remove } = useWishlist();
   const title = isEs && item.title_es ? item.title_es : item.title;
   const isSold = isProductSold(item.status);
+  const lockedPrice = getProductSoldPriceLock(item);
   const imageFrameBackground = productImagePaddingBackground(item.image_padding);
   const image = normalizeLegacyLocalImageUrl(item.image);
 
@@ -174,7 +179,11 @@ function DrawerItem({
     : null;
 
   const priceLabel =
-    item.price_mode === 'manual'
+    hideSoldItemPrices && isSold
+      ? (isEs ? 'Vendido' : 'Sold')
+      : lockedPrice != null
+      ? formatUsdPrice(lockedPrice)
+      : item.price_mode === 'manual'
       ? (item.manual_price_label ?? (isEs ? 'Consultar precio' : 'Ask for price'))
       : spotPrice != null
         ? formatUsdPrice(spotPrice)
@@ -237,7 +246,7 @@ function DrawerItem({
       <div className="flex-1 min-w-0 flex flex-col gap-1">
         <Link
           href={`${prefix}/shop/${item.id}`}
-          className="text-xs font-bold leading-snug hover:underline underline-offset-2 line-clamp-2"
+          className="hover-underline-grow text-xs font-bold leading-snug line-clamp-2"
           style={{ color: 'var(--color-on-surface)', fontFamily: 'var(--font-headline)' }}
         >
           {title}

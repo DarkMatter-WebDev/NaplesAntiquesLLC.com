@@ -2,15 +2,12 @@ import type { Metadata } from 'next';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import PaymentClient from '@/components/checkout/PaymentClient';
+import { getSecondaryPageMetadata } from '@/lib/secondary-page-metadata';
 
-export const metadata: Metadata = {
-  title: 'Payment | Naples Estate Jewelry',
-  description: 'Payment for Naples Estate Jewelry shop items.',
-  robots: {
-    index: false,
-    follow: false,
-  },
-};
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  return getSecondaryPageMetadata('payment', locale);
+}
 
 export const dynamic = 'force-dynamic';
 

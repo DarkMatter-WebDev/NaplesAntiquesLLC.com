@@ -55,7 +55,9 @@ discretion and a personal relationship over a storefront transaction.
   deployed on Netlify with `@netlify/plugin-nextjs`.
 - **Payments**: PayPal (JS SDK on the client, Orders API v2 on the server) wired
   into `/checkout`. No card data touches our servers; totals are computed
-  server-side. Currently sandbox (`PAYPAL_ENV=sandbox`).
+  server-side. `PAYPAL_ENV` selects sandbox or live and must match the client
+  ID/secret set. Netlify environment values are the operating configuration;
+  local `.env.local` is not authoritative.
 - **Hosting**: Netlify (`base = "next-app"`, publish `.next`).
 - **Email / marketing**: Resend-backed inquiry/order flow plus Supabase-backed
   subscriber and admin marketing surfaces in the Next app.
@@ -71,8 +73,13 @@ discretion and a personal relationship over a storefront transaction.
 - **Host**: Netlify, configured by root `netlify.toml` with
   `base = "next-app"` and `publish = ".next"`.
 - **Primary domain**: `naplesestatejewelry.co`
-- **Related domains** (listed as `sameAs`): `naplesjewelrybuyers.com`,
-  `naplesestatejewelry.com`.
+- **Related domains** (listed as `sameAs`): `naplesjewelrybuyers.com` — a
+  separate, live, actively-run buy-side landing site with its own
+  LocalBusiness/FAQPage schema (confirmed 2026-07-11). `naplesestatejewelry.com`
+  is **not owned** — confirmed 2026-07-11 it's a parked GoDaddy domain listed
+  for sale ($2,100); do not list it as `sameAs` unless it's actually
+  acquired. Worth considering a defensive purchase given how closely it
+  matches the brand name.
 - **Source**: `https://github.com/DarkMatter-WebDev/NaplesAntiquesLLC.com`.
 - **Deploy flow**: root `netlify.toml` sets `base = "next-app"`, runs
   `npm run build`, and publishes `.next`.

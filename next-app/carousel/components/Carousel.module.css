@@ -27,8 +27,17 @@
   pointer-events: none;
 }
 
+/* Freeze the ring as soon as a pointer enters the carousel scene. This gives
+   the user a stable target before a moving card reaches the pointer, so its
+   projected hit area cannot shift between pointerdown and click. */
+.scene:hover .ring { animation-play-state: paused; }
+
 /* Browsers inherit pointer-events: none from .ring, so re-enable on cards. */
 .card { pointer-events: auto; }
+
+/* The back half can project a large invisible plane during the 3D rotation.
+   It must never intercept clicks intended for a front-facing thumbnail. */
+.card[data-carousel-facing="back"] { pointer-events: none; }
 
 @keyframes ry { to { rotate: y 1turn; } }
 

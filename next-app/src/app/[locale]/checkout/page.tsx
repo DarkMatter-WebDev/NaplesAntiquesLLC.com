@@ -2,15 +2,20 @@ import type { Metadata } from 'next';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import CheckoutClient from '@/components/checkout/CheckoutClient';
+import { alternatesFor } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Checkout | Naples Estate Jewelry',
-  description: 'Checkout for Naples Estate Jewelry shop items.',
-  robots: {
-    index: false,
-    follow: false,
-  },
-};
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
+  const isEs = locale === 'es';
+  return {
+    title: isEs ? 'Finalizar Compra' : 'Checkout',
+    description: isEs
+      ? 'Finalice la compra de sus artículos de Naples Estate Jewelry.'
+      : 'Checkout for Naples Estate Jewelry shop items.',
+    alternates: alternatesFor('/checkout', locale),
+    robots: { index: false, follow: false },
+  };
+}
 
 interface Props {
   params: Promise<{ locale: string }>;

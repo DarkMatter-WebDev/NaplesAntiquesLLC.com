@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/service';
-import { capturePayPalOrder, paypalConfigured } from '@/lib/paypal';
+import { capturePayPalOrder, getPayPalOrderCapture, paypalConfigured, type PayPalCaptureResult } from '@/lib/paypal';
 import { finalizePaidOrder, notifyItemConflict } from '@/lib/order-finalize';
 import { handleProductStatusChange as handleEtsyProductStatusChange } from '@/lib/etsy/sync';
 import { handleProductStatusChange as handleEbayProductStatusChange } from '@/lib/ebay/sync';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -13,6 +14,11 @@ const CURRENCY = 'USD';
 const AMOUNT_TOLERANCE = 0.01;
 
 export async function POST(req: Request) {
+  const ip = getClientIp(req);
+  if (!(await checkRateLimit(`capture-order:${ip}`, 30, 3600))) {
+    return NextResponse.json({ error: 'Too many requests. Please try again in a bit.' }, { status: 429 });
+  }
+
   if (!paypalConfigured()) {
     return NextResponse.json({ error: 'PayPal is not configured.' }, { status: 503 });
   }
@@ -28,7 +34,7 @@ export async function POST(req: Request) {
   // Find the internal order this PayPal order belongs to.
   const { data: order, error: orderError } = await service
     .from('orders')
-    .select('id, order_number, total, payment_status, paypal_capture_id, user_id, customer_name, customer_email, subtotal, tax, shipping_fee, discount')
+    .select('id, order_number, total, payment_status, paypal_capture_id, payment_response, user_id, customer_name, customer_email, subtotal, tax, shipping_fee, discount')
     .eq('paypal_order_id', paypalOrderId)
     .maybeSingle();
 
@@ -40,16 +46,46 @@ export async function POST(req: Request) {
   // payment_status='paid' (the final state); a non-paid order that happens to carry
   // a capture id is a prior mismatch/manual-review case and must not report success.
   if (order.payment_status === 'paid') {
+    await finalizePaidOrder(service, order.id);
     return NextResponse.json({ success: true, orderId: order.id, orderNumber: order.order_number, alreadyPaid: true });
+  }
+  if (order.payment_status === 'partially_refunded' || order.payment_status === 'refunded') {
+    return NextResponse.json({ error: 'This payment has already been refunded.' }, { status: 409 });
   }
 
   // Capture server-side.
-  let capture;
+  let capture: PayPalCaptureResult;
   try {
     capture = await capturePayPalOrder(paypalOrderId);
   } catch (err) {
     console.error('PayPal capture error:', err);
-    return NextResponse.json({ error: 'Payment could not be captured.' }, { status: 502 });
+    try {
+      const recovered = await getPayPalOrderCapture(paypalOrderId);
+      if (recovered.status === 'COMPLETED' && recovered.captureId) {
+        capture = recovered;
+      } else if (recovered.captureId) {
+        return NextResponse.json(
+          {
+            error: 'PayPal is still resolving this payment. Do not submit it again.',
+            paymentStatusUnknown: true,
+            orderId: order.id,
+          },
+          { status: 502 },
+        );
+      } else {
+        return NextResponse.json({ error: 'Payment could not be captured.' }, { status: 502 });
+      }
+    } catch (recoveryError) {
+      console.error('PayPal capture recovery lookup error:', recoveryError);
+      return NextResponse.json(
+        {
+          error: 'PayPal did not confirm the payment status. Do not submit it again until it is reviewed.',
+          paymentStatusUnknown: true,
+          orderId: order.id,
+        },
+        { status: 502 },
+      );
+    }
   }
 
   if (capture.status !== 'COMPLETED' || !capture.captureId) {
@@ -68,7 +104,7 @@ export async function POST(req: Request) {
   if (!amountOk || !currencyOk) {
     // Money was captured but does not match the order. Do NOT auto-fulfill —
     // record the capture details and flag for manual review.
-    await service
+    const { data: mismatchOrder, error: mismatchRecordError } = await service
       .from('orders')
       .update({
         payment_status: 'pending',
@@ -79,7 +115,21 @@ export async function POST(req: Request) {
           `PayPal amount/currency mismatch — captured ` +
           `${capture.capturedAmount} ${capture.capturedCurrency}, expected ${expectedTotal} ${CURRENCY}. Manual review required.`,
       })
-      .eq('id', order.id);
+      .eq('id', order.id)
+      .select('id')
+      .maybeSingle();
+
+    if (mismatchRecordError || !mismatchOrder) {
+      console.error('PayPal mismatch capture persistence error:', mismatchRecordError);
+      return NextResponse.json(
+        {
+          error: 'Payment was captured, but the order requires manual reconciliation. Do not submit payment again.',
+          paymentCaptured: true,
+          orderId: order.id,
+        },
+        { status: 500 },
+      );
+    }
 
     await service.from('admin_notifications').insert({
       type: 'order',
@@ -88,7 +138,41 @@ export async function POST(req: Request) {
       order_id: order.id,
     });
 
-    return NextResponse.json({ error: 'Payment amount did not match the order. Our team will follow up.' }, { status: 409 });
+    return NextResponse.json(
+      {
+        error: 'Payment amount did not match the order. Our team will follow up.',
+        paymentCaptured: true,
+        orderId: order.id,
+      },
+      { status: 409 },
+    );
+  }
+
+  // Persist the external money movement before attempting inventory/order
+  // finalization. If the RPC fails, retries can see the capture and must not
+  // create a second payable PayPal order.
+  const { data: captureOrder, error: captureRecordError } = await service
+    .from('orders')
+    .update({
+      payment_status: 'pending',
+      payment_reference: capture.captureId,
+      paypal_capture_id: capture.captureId,
+      payment_response: capture.raw as object,
+    })
+    .eq('id', order.id)
+    .select('id')
+    .maybeSingle();
+
+  if (captureRecordError || !captureOrder) {
+    console.error('PayPal capture persistence error:', captureRecordError);
+    return NextResponse.json(
+      {
+        error: 'Payment was captured, but the order update is still pending. Do not submit payment again.',
+        paymentCaptured: true,
+        orderId: order.id,
+      },
+      { status: 500 },
+    );
   }
 
   // Mark paid and sell the items (atomic + idempotent). The RPC also locks product
@@ -102,7 +186,14 @@ export async function POST(req: Request) {
 
   if (rpcError) {
     console.error('capture_paypal_order RPC error:', rpcError);
-    return NextResponse.json({ error: 'Payment captured but order update failed. Our team will follow up.' }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'Payment was captured, but the order update is still pending. Do not submit payment again.',
+        paymentCaptured: true,
+        orderId: order.id,
+      },
+      { status: 500 },
+    );
   }
 
   const result = Array.isArray(rpcData) ? rpcData[0] : rpcData;
@@ -114,9 +205,15 @@ export async function POST(req: Request) {
     await notifyItemConflict(service, {
       id: order.id,
       orderNumber: (result?.order_number as string | undefined) ?? order.order_number,
+      captureId: capture.captureId,
     });
     return NextResponse.json(
-      { error: 'Sorry, one or more items in your order were just purchased by another buyer. Our team will contact you to process a full refund.' },
+      {
+        error: 'Sorry, one or more items in your order were just purchased by another buyer. Our team will contact you to process a full refund.',
+        paymentCaptured: true,
+        itemConflict: true,
+        orderId: order.id,
+      },
       { status: 409 },
     );
   }

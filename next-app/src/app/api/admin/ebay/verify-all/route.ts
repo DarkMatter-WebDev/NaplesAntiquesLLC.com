@@ -7,9 +7,38 @@ import { checkAllListingStatuses } from '@/lib/ebay/sync';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-export async function POST() {
+export async function POST(req: Request) {
   const { error } = await requireAdmin();
   if (error) return error;
-  const result = await checkAllListingStatuses();
-  return NextResponse.json(result);
+
+  const body = await req.json().catch(() => null);
+  const rawProductIds = body && typeof body === 'object' && 'productIds' in body
+    ? (body as { productIds?: unknown }).productIds
+    : undefined;
+  if (rawProductIds !== undefined && (
+    !Array.isArray(rawProductIds)
+    || rawProductIds.some((id) => typeof id !== 'string' || !id.trim())
+  )) {
+    return NextResponse.json(
+      { error: { code: 'invalid_product_ids', message: 'productIds must be an array of non-empty strings.' } },
+      { status: 400 },
+    );
+  }
+  const productIds = rawProductIds === undefined
+    ? undefined
+    : Array.from(new Set((rawProductIds as string[]).map((id) => id.trim())));
+  if (productIds && productIds.length > 250) {
+    return NextResponse.json(
+      { error: { code: 'too_many_products', message: 'A maximum of 250 products can be checked at once.' } },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const result = await checkAllListingStatuses(productIds);
+    return NextResponse.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Could not check eBay statuses.';
+    return NextResponse.json({ error: { code: 'verify_failed', message } }, { status: 500 });
+  }
 }

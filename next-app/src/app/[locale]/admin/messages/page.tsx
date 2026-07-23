@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
+import { getVerifiedUser } from '@/lib/auth-claims';
 import MessagesPanel, { type AdminNotification } from '@/components/admin/MessagesPanel';
 import AdminHeader from '@/components/admin/AdminHeader';
 
@@ -34,7 +35,7 @@ export default async function AdminMessagesPage({ params, searchParams }: Props)
   const adminBasePath = isEs ? '/es/admin' : '/admin';
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getVerifiedUser(supabase);
 
   if (!user) {
     redirect(isEs ? '/es/account/sign-in' : '/account/sign-in');

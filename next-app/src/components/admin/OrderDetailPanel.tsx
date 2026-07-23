@@ -7,15 +7,21 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Order, OrderItem, FulfillmentStatus, OrderStatus } from '@/types/sales';
 import { formatCurrency, formatOrderDate, formatPublicPurity, orderStatusLabel } from '@/types/sales';
-import { formatProductItemYear } from '@/types/product';
+import { formatProductItemYear, type ProductStatus } from '@/types/product';
 import { buildInvoiceEmailContent, invoiceNumberForOrder, isOrderPaid, withInvoiceLineDiscounts } from '@/lib/order-invoice-email';
 import { buildFulfillmentUpdateEmailContent } from '@/lib/order-fulfillment-email';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
-import { adminRevalidateProducts } from '@/app/actions/admin-products';
+import { adminUpdateProductsStatus } from '@/app/actions/admin-products';
 
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
 const FULFILLMENT_MARK_STATUSES: FulfillmentStatus[] = ['packed', 'shipped', 'picked_up'];
+const ORDER_EMAIL_FROM_ADDRESS = 'noreply@naplesestatejewelry.co';
+
+function emailInitiatorLabel(value: string | null) {
+  if (!value) return 'Automatic send';
+  return /^Automatic(?:\s|$)/i.test(value) ? value : `Initiated by ${value}`;
+}
 
 /** Format a stored address jsonb ({line1,line2,city,state,postal_code,country}) into display lines. */
 function formatOrderAddress(address: unknown): string | null {
@@ -55,6 +61,7 @@ interface Props {
   adminEmail: string | null;
   locale: string;
   recycleBinSupported?: boolean;
+  trackingSupported?: boolean;
 }
 
 export default function OrderDetailPanel({
@@ -64,6 +71,7 @@ export default function OrderDetailPanel({
   adminEmail,
   locale,
   recycleBinSupported = true,
+  trackingSupported = true,
 }: Props) {
   const router = useRouter();
   const supabase = createClient();
@@ -78,10 +86,9 @@ export default function OrderDetailPanel({
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showFullRefundConfirm, setShowFullRefundConfirm] = useState(false);
   const [showPartialRefund, setShowPartialRefund] = useState(false);
-  const [partialRefundAmount, setPartialRefundAmount] = useState(
-    order.refund_amount != null ? String(order.refund_amount) : '',
-  );
+  const [partialRefundAmount, setPartialRefundAmount] = useState('');
   const [showEmailInvoice, setShowEmailInvoice] = useState(false);
   const [emailRecipient, setEmailRecipient] = useState(order.customer_email ?? '');
   const [emailSending, setEmailSending] = useState(false);
@@ -93,11 +100,16 @@ export default function OrderDetailPanel({
   const [emailUpdateRecipient, setEmailUpdateRecipient] = useState(order.customer_email ?? '');
   const [emailUpdateSending, setEmailUpdateSending] = useState(false);
   const [emailUpdateMessage, setEmailUpdateMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [shippingCarrier, setShippingCarrier] = useState(order.shipping_carrier ?? '');
+  const [trackingNumber, setTrackingNumber] = useState(order.tracking_number ?? '');
   const [itemDiscounts, setItemDiscounts] = useState<Record<string, string>>(() =>
     Object.fromEntries(initialOrder.order_items.map((item) => [item.id, String(item.discount ?? 0)])),
   );
 
   const orderIsPaid = isOrderPaid(order);
+  const isPayPalOrder = order.payment_method === 'paypal';
+  const refundedAmount = Number(order.refund_amount ?? 0);
+  const remainingRefundAmount = Math.max(Number(order.total) - refundedAmount, 0);
   const invoiceDocLabel = orderIsPaid ? 'Receipt' : 'Invoice';
   const productIds = order.order_items.map((item) => item.product_id).filter(Boolean) as string[];
   const latestInvoice = invoices[0] ?? null;
@@ -110,9 +122,9 @@ export default function OrderDetailPanel({
   const editedLineDiscount = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[item.id]) || 0, orderItemLineSubtotal(item)), 0);
   const orderLevelDiscount = Math.max(order.discount - persistedLineDiscount, 0);
   const editedTotalDiscount = orderLevelDiscount + editedLineDiscount;
-  const taxableBeforeDiscount = Math.max(order.subtotal - order.discount, 0);
+  const taxableBeforeDiscount = Math.max(order.subtotal - order.discount, 0) + order.shipping_fee;
   const taxRate = taxableBeforeDiscount > 0 ? order.tax / taxableBeforeDiscount : 0;
-  const editedTax = Math.max(order.subtotal - editedTotalDiscount, 0) * taxRate;
+  const editedTax = (Math.max(order.subtotal - editedTotalDiscount, 0) + order.shipping_fee) * taxRate;
   const editedTotal = Math.max(order.subtotal - editedTotalDiscount, 0) + editedTax + order.shipping_fee;
 
   async function updateOrder(updates: Partial<Order>, action: string) {
@@ -130,17 +142,20 @@ export default function OrderDetailPanel({
     return true;
   }
 
-  async function updateProducts(status: string) {
+  async function updateProducts(status: ProductStatus) {
     if (productIds.length === 0) return true;
-    const { error } = await supabase.from('products').update({ status }).in('id', productIds);
-    if (error) {
-      setMessage({ text: error.message, ok: false });
+    const soldPrices = status === 'sold'
+      ? Object.fromEntries(order.order_items
+          .filter((item): item is OrderItem & { product_id: string } => Boolean(item.product_id))
+          .map((item) => [item.product_id, Number(item.price_snapshot)]))
+      : undefined;
+    const result = await adminUpdateProductsStatus(productIds, status, soldPrices);
+    if (result.error) {
+      setMessage({ text: result.error, ok: false });
       return false;
     }
-    // Purge the shop-gallery cache — this write happens via the browser client,
-    // so no server route revalidates the tag for us. Without it the public
-    // gallery keeps the old status for up to 5 minutes.
-    await adminRevalidateProducts(productIds);
+    // The server action also purges product/shop caches and coordinates
+    // marketplace lifecycle handling for the affected products.
     return true;
   }
 
@@ -183,33 +198,99 @@ export default function OrderDetailPanel({
     }
   }
 
-  async function markRefunded() {
-    const ok = await updateOrder({ payment_status: 'refunded', order_status: 'refunded' }, 'refunded');
-    if (ok) {
-      setMessage({ text: 'Order marked refunded. Products were not returned to available automatically.', ok: true });
+  async function refundPayPalOrder(targetRefundAmount: number, action: string) {
+    setSaving(action);
+    setMessage(null);
+    const response = await fetch(`/api/admin/orders/${order.id}/refund`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetRefundAmount }),
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok) {
+      setMessage({
+        text: result?.error ?? 'Could not complete the PayPal refund.',
+        ok: false,
+      });
+      setSaving(null);
+      return false;
     }
+
+    if (result?.pending) {
+      setMessage({ text: result.message ?? 'The PayPal refund is pending.', ok: true });
+    } else {
+      const nextRefundAmount = Number(result?.refundAmount ?? targetRefundAmount);
+      const nextPaymentStatus = result?.paymentStatus === 'refunded' ? 'refunded' : 'partially_refunded';
+      setOrder((current) => ({
+        ...current,
+        refund_amount: nextRefundAmount,
+        payment_status: nextPaymentStatus,
+        order_status: nextPaymentStatus === 'refunded' ? 'refunded' : current.order_status,
+      }));
+      setMessage({
+        text: `${formatCurrency(nextRefundAmount)} has now been refunded through PayPal. Products were not returned to inventory automatically.`,
+        ok: true,
+      });
+      router.refresh();
+    }
+    setSaving(null);
+    return true;
+  }
+
+  async function markRefunded() {
+    if (isPayPalOrder) {
+      const ok = await refundPayPalOrder(order.total, 'refunded');
+      if (ok) setShowFullRefundConfirm(false);
+      return;
+    }
+    const ok = await updateOrder({
+      payment_status: 'refunded',
+      order_status: 'refunded',
+      refund_amount: order.total,
+    }, 'refunded');
+    if (ok) setMessage({ text: 'Order marked refunded. Products were not returned to available automatically.', ok: true });
   }
 
   async function markPartiallyRefunded() {
-    const amount = parseFloat(partialRefundAmount);
-    if (!Number.isFinite(amount) || amount <= 0) {
+    const additionalAmount = parseFloat(partialRefundAmount);
+    if (!Number.isFinite(additionalAmount) || additionalAmount <= 0) {
       setMessage({ text: 'Enter a valid refund amount greater than zero.', ok: false });
       return;
     }
-    if (amount > order.total) {
-      setMessage({ text: `Refund amount cannot exceed the order total (${formatCurrency(order.total)}).`, ok: false });
+    if (additionalAmount > remainingRefundAmount) {
+      setMessage({ text: `Additional refund cannot exceed ${formatCurrency(remainingRefundAmount)}.`, ok: false });
       return;
     }
-    const ok = await updateOrder({ payment_status: 'partially_refunded', refund_amount: amount }, 'partial-refund');
+    const targetRefundAmount = refundedAmount + additionalAmount;
+    const ok = isPayPalOrder
+      ? await refundPayPalOrder(targetRefundAmount, 'partial-refund')
+      : await updateOrder({ payment_status: 'partially_refunded', refund_amount: targetRefundAmount }, 'partial-refund');
     if (ok) {
-      setPartialRefundAmount(String(amount));
+      setPartialRefundAmount('');
       setShowPartialRefund(false);
-      setMessage({ text: `Order marked partially refunded — ${formatCurrency(amount)} refunded.`, ok: true });
+      if (!isPayPalOrder) {
+        setMessage({ text: `Order marked partially refunded - ${formatCurrency(targetRefundAmount)} refunded in total.`, ok: true });
+      }
+    }
+  }
+
+  function openFulfillmentUpdate(status: FulfillmentStatus) {
+    setPendingFulfillmentStatus(status);
+    setNotifyCustomerOnFulfillment(true);
+    setMessage(null);
+    if (status === 'shipped') {
+      setShippingCarrier(order.shipping_carrier ?? '');
+      setTrackingNumber(order.tracking_number ?? '');
     }
   }
 
   async function updateFulfillment(status: FulfillmentStatus) {
-    const ok = await updateOrder({ fulfillment_status: status }, status);
+    const updates: Partial<Order> = { fulfillment_status: status };
+    if (status === 'shipped' && trackingSupported) {
+      updates.shipping_carrier = shippingCarrier.trim() || null;
+      updates.tracking_number = trackingNumber.trim() || null;
+    }
+    const ok = await updateOrder(updates, status);
     if (ok) setMessage({ text: `Fulfillment marked ${orderStatusLabel(status)}.`, ok: true });
     return ok;
   }
@@ -217,10 +298,18 @@ export default function OrderDetailPanel({
   async function confirmFulfillmentUpdate() {
     if (!pendingFulfillmentStatus) return;
     const status = pendingFulfillmentStatus;
+    if (status === 'shipped' && !trackingSupported) {
+      setMessage({
+        text: 'Shipping details are not available until the order tracking database migration is applied.',
+        ok: false,
+      });
+      return;
+    }
     const shouldNotify = notifyCustomerOnFulfillment;
     const ok = await updateFulfillment(status);
+    if (!ok) return;
     setPendingFulfillmentStatus(null);
-    if (ok && shouldNotify) {
+    if (shouldNotify) {
       setEmailUpdateStatus(status);
       setEmailUpdateRecipient(order.customer_email ?? '');
       setEmailUpdateMessage(null);
@@ -465,7 +554,7 @@ export default function OrderDetailPanel({
     <main className="px-4 md:px-8 py-8">
       <div className="max-w-[1300px] mx-auto">
         <div className="mb-6">
-          <Link href={`${adminBasePath}/orders`} className="text-xs font-bold uppercase tracking-widest hover:underline" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+          <Link href={`${adminBasePath}/orders`} className="hover-underline-grow text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
             Back to Orders
           </Link>
         </div>
@@ -507,14 +596,34 @@ export default function OrderDetailPanel({
               </button>
               <button type="button" onClick={markPaid} disabled={saving === 'paid' || order.payment_status === 'paid'} className="gold-button text-sm disabled:opacity-50">Mark Paid</button>
               <button type="button" onClick={markUnpaid} disabled={saving === 'unpaid' || order.payment_status === 'unpaid'} className="outline-button text-sm disabled:opacity-50">Mark Unpaid</button>
-              <button type="button" onClick={markRefunded} disabled={saving === 'refunded' || order.payment_status === 'refunded'} className="outline-button text-sm disabled:opacity-50">Mark Refunded</button>
               <button
                 type="button"
-                onClick={() => { setShowPartialRefund((v) => !v); setMessage(null); }}
-                disabled={saving === 'partial-refund'}
+                onClick={() => {
+                  if (isPayPalOrder) {
+                    setShowFullRefundConfirm(true);
+                    setShowPartialRefund(false);
+                    setMessage(null);
+                  } else {
+                    void markRefunded();
+                  }
+                }}
+                disabled={saving === 'refunded' || order.payment_status === 'refunded' || remainingRefundAmount <= 0}
                 className="outline-button text-sm disabled:opacity-50"
               >
-                Mark Partially Refunded
+                {isPayPalOrder ? 'Refund in PayPal' : 'Mark Refunded'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPartialRefund((value) => !value);
+                  setShowFullRefundConfirm(false);
+                  setPartialRefundAmount('');
+                  setMessage(null);
+                }}
+                disabled={saving === 'partial-refund' || remainingRefundAmount <= 0}
+                className="outline-button text-sm disabled:opacity-50"
+              >
+                {isPayPalOrder ? 'Partial PayPal Refund' : 'Mark Partially Refunded'}
               </button>
               {order.order_status === 'cancelled' && (
                 <button
@@ -600,17 +709,36 @@ export default function OrderDetailPanel({
                 </button>
               </div>
             )}
+            {showFullRefundConfirm && (
+              <div className="flex flex-wrap items-center gap-3 border px-4 py-3" style={{ borderColor: 'var(--color-error)', background: 'white' }}>
+                <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>
+                  Refund the remaining {formatCurrency(remainingRefundAmount)} through PayPal? This moves real money and does not restore inventory.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void markRefunded()}
+                  disabled={saving === 'refunded'}
+                  className="outline-button text-sm disabled:opacity-50"
+                  style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}
+                >
+                  {saving === 'refunded' ? 'Refunding...' : 'Confirm PayPal Refund'}
+                </button>
+                <button type="button" onClick={() => setShowFullRefundConfirm(false)} className="outline-button text-sm">
+                  Keep Payment
+                </button>
+              </div>
+            )}
             {showPartialRefund && (
               <div className="flex flex-wrap items-center gap-3 border px-4 py-3" style={{ borderColor: BORDER, background: 'white' }}>
                 <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-                  Refund amount
+                  Additional refund
                   <input
                     autoFocus
                     type="number"
                     className="form-field text-sm"
                     style={{ width: '7rem' }}
                     min="0.01"
-                    max={order.total}
+                    max={remainingRefundAmount}
                     step="0.01"
                     value={partialRefundAmount}
                     onChange={(e) => setPartialRefundAmount(e.target.value)}
@@ -618,7 +746,7 @@ export default function OrderDetailPanel({
                   />
                 </label>
                 <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                  max {formatCurrency(order.total)}
+                  {formatCurrency(refundedAmount)} refunded; max additional {formatCurrency(remainingRefundAmount)}
                 </span>
                 <button
                   type="button"
@@ -626,7 +754,7 @@ export default function OrderDetailPanel({
                   disabled={saving === 'partial-refund'}
                   className="gold-button text-sm disabled:opacity-50"
                 >
-                  {saving === 'partial-refund' ? 'Saving…' : 'Confirm'}
+                  {saving === 'partial-refund' ? 'Refunding...' : (isPayPalOrder ? 'Refund in PayPal' : 'Confirm')}
                 </button>
                 <button
                   type="button"
@@ -728,7 +856,7 @@ export default function OrderDetailPanel({
                         </td>
                         <td className="px-4 py-3">
                           {item.product_id ? (
-                            <Link href={`${shopBasePath}/${item.product_id}?returnTo=${encodeURIComponent(orderReturnPath)}`} className="text-xs font-bold uppercase tracking-wide hover:underline" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                            <Link href={`${shopBasePath}/${item.product_id}?returnTo=${encodeURIComponent(orderReturnPath)}`} className="hover-underline-grow text-xs font-bold uppercase tracking-wide" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
                               Open
                             </Link>
                           ) : '-'}
@@ -754,20 +882,32 @@ export default function OrderDetailPanel({
               <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>Fulfillment</h2>
               <div className="flex flex-wrap gap-2">
                 {FULFILLMENT_MARK_STATUSES.includes(order.fulfillment_status) ? (
-                  <button
-                    type="button"
-                    onClick={() => updateFulfillment('pending')}
-                    disabled={saving === 'pending'}
-                    className="outline-button text-sm disabled:opacity-50"
-                  >
-                    Unmark {orderStatusLabel(order.fulfillment_status)}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => updateFulfillment('pending')}
+                      disabled={saving === 'pending'}
+                      className="outline-button text-sm disabled:opacity-50"
+                    >
+                      Unmark {orderStatusLabel(order.fulfillment_status)}
+                    </button>
+                    {order.fulfillment_status === 'shipped' && trackingSupported && (
+                      <button
+                        type="button"
+                        onClick={() => openFulfillmentUpdate('shipped')}
+                        disabled={saving === 'shipped'}
+                        className="outline-button text-sm disabled:opacity-50"
+                      >
+                        {order.shipping_carrier || order.tracking_number ? 'Edit Shipping Details' : 'Add Shipping Details'}
+                      </button>
+                    )}
+                  </>
                 ) : (
                   FULFILLMENT_MARK_STATUSES.map((status) => (
                     <button
                       key={status}
                       type="button"
-                      onClick={() => { setPendingFulfillmentStatus(status); setNotifyCustomerOnFulfillment(true); setMessage(null); }}
+                      onClick={() => openFulfillmentUpdate(status)}
                       disabled={saving === status}
                       className="outline-button text-sm disabled:opacity-50"
                     >
@@ -776,34 +916,92 @@ export default function OrderDetailPanel({
                   ))
                 )}
               </div>
+              {(order.shipping_carrier || order.tracking_number) && (
+                <dl className="mt-4 grid gap-3 border-t pt-4 text-sm sm:grid-cols-2" style={{ borderColor: BORDER }}>
+                  {order.shipping_carrier && (
+                    <div>
+                      <dt className="form-label">Carrier</dt>
+                      <dd className="mt-1 font-semibold" style={{ color: 'var(--color-on-surface)' }}>{order.shipping_carrier}</dd>
+                    </div>
+                  )}
+                  {order.tracking_number && (
+                    <div>
+                      <dt className="form-label">Tracking Number</dt>
+                      <dd className="mt-1 break-all font-semibold" style={{ color: 'var(--color-on-surface)' }}>{order.tracking_number}</dd>
+                    </div>
+                  )}
+                </dl>
+              )}
               {pendingFulfillmentStatus && (
-                <div className="mt-3 flex flex-wrap items-center gap-3 border px-4 py-3" style={{ borderColor: BORDER, background: 'var(--color-surface-container-low)' }}>
-                  <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>
-                    Mark this order as {orderStatusLabel(pendingFulfillmentStatus)}?
-                  </span>
-                  <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-                    <input
-                      type="checkbox"
-                      checked={notifyCustomerOnFulfillment}
-                      onChange={(event) => setNotifyCustomerOnFulfillment(event.target.checked)}
-                    />
-                    Update customer via email
-                  </label>
-                  <button
-                    type="button"
-                    onClick={confirmFulfillmentUpdate}
-                    disabled={saving === pendingFulfillmentStatus}
-                    className="gold-button text-sm disabled:opacity-50"
-                  >
-                    {saving === pendingFulfillmentStatus ? 'Saving…' : 'OK'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingFulfillmentStatus(null)}
-                    className="outline-button text-sm"
-                  >
-                    Cancel
-                  </button>
+                <div className="mt-3 grid gap-4 border px-4 py-4" style={{ borderColor: BORDER, background: 'var(--color-surface-container-low)' }}>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-sm" style={{ color: 'var(--color-on-surface)' }}>
+                      Mark this order as {orderStatusLabel(pendingFulfillmentStatus)}?
+                    </span>
+                    <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      <input
+                        type="checkbox"
+                        checked={notifyCustomerOnFulfillment}
+                        onChange={(event) => setNotifyCustomerOnFulfillment(event.target.checked)}
+                      />
+                      Update customer via email
+                    </label>
+                  </div>
+                  {pendingFulfillmentStatus === 'shipped' && trackingSupported && (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="grid gap-1">
+                        <span className="form-label">Carrier</span>
+                        <input
+                          className="form-field"
+                          type="text"
+                          list="shipping-carrier-options"
+                          maxLength={100}
+                          value={shippingCarrier}
+                          onChange={(event) => setShippingCarrier(event.target.value)}
+                          placeholder="UPS, USPS, FedEx..."
+                        />
+                        <datalist id="shipping-carrier-options">
+                          <option value="USPS" />
+                          <option value="UPS" />
+                          <option value="FedEx" />
+                          <option value="DHL" />
+                        </datalist>
+                      </label>
+                      <label className="grid gap-1">
+                        <span className="form-label">Tracking Number</span>
+                        <input
+                          className="form-field"
+                          type="text"
+                          maxLength={200}
+                          value={trackingNumber}
+                          onChange={(event) => setTrackingNumber(event.target.value)}
+                          placeholder="Enter tracking number"
+                        />
+                      </label>
+                    </div>
+                  )}
+                  {pendingFulfillmentStatus === 'shipped' && !trackingSupported && (
+                    <p className="text-sm font-semibold" style={{ color: 'var(--color-error)' }}>
+                      Apply supabase/order-shipping-tracking-2026-07.sql before saving shipment details.
+                    </p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={confirmFulfillmentUpdate}
+                      disabled={saving === pendingFulfillmentStatus || (pendingFulfillmentStatus === 'shipped' && !trackingSupported)}
+                      className="gold-button text-sm disabled:opacity-50"
+                    >
+                      {saving === pendingFulfillmentStatus ? 'Saving…' : 'Save Fulfillment'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPendingFulfillmentStatus(null)}
+                      className="outline-button text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
             </section>
@@ -901,7 +1099,7 @@ export default function OrderDetailPanel({
                       </p>
                     )}
                     <p className="mt-0.5 text-[0.68rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
-                      {email.sent_by_email ? `Sent by ${email.sent_by_email}` : 'Sent automatically'}
+                      From {ORDER_EMAIL_FROM_ADDRESS} &middot; {emailInitiatorLabel(email.sent_by_email)}
                     </p>
                   </li>
                 ))}

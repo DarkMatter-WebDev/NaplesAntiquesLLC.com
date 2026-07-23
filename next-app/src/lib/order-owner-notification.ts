@@ -212,15 +212,18 @@ export async function sendNewOrderOwnerNotification(opts: {
 
     const { Resend } = await import('resend');
     const resend = new Resend(resendKey);
-    await resend.emails.send({
-      from: 'Naples Estate Jewelry <noreply@naplesestatejewelry.co>',
-      to: ownerNotificationRecipient(),
-      // Let the owner reply straight to the buyer from the notification.
-      replyTo: order.customer_email ? String(order.customer_email) : undefined,
-      subject,
-      html,
-      text,
-    });
+    await resend.emails.send(
+      {
+        from: 'Naples Estate Jewelry <noreply@naplesestatejewelry.co>',
+        to: ownerNotificationRecipient(),
+        // Let the owner reply straight to the buyer from the notification.
+        replyTo: order.customer_email ? String(order.customer_email) : undefined,
+        subject,
+        html,
+        text,
+      },
+      { idempotencyKey: `order-${order.id}-owner-notification` },
+    );
   } catch (err) {
     console.error('Owner new-order notification error:', err);
   }

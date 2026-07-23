@@ -75,7 +75,14 @@ export interface Product {
   jewelry_type: ProductJewelryType | string | null;
   chain_type: string | null;
   length: string | null;
+  // Physical chain/band width in millimeters. Optional during the migration
+  // rollout; meaningful only for Necklace and Bracelet products.
+  width_mm?: number | null;
   pricing_multiplier: number | null;
+  // Final site price captured when the item becomes Sold. The database clears
+  // it when the item returns to Available, allowing live/manual pricing to
+  // resume. Optional until the sold-price-lock migration is applied.
+  sold_price?: number | null;
   // Whether the product page shows the scrap/melt-value + spot-per-oz callout
   // (and the matching "own gold/silver, put it toward this piece" line). Off
   // for items that aren't 100% precious metal, where a full-weight melt value
@@ -230,6 +237,15 @@ export function normalizeProductStatus(status: ProductStatus | string | null | u
   if (value === 'sold') return 'sold';
   if (value === 'archived') return 'archived';
   return 'available';
+}
+
+export function getProductSoldPriceLock(
+  product: Pick<Product, 'status' | 'sold_price'>,
+): number | null {
+  if (normalizeProductStatus(product.status) === 'available') return null;
+  if (product.sold_price == null) return null;
+  const value = Number(product.sold_price);
+  return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 // Legacy/pre-migration rows and any row fetched before the column existed have
@@ -504,13 +520,28 @@ export function productSupportsLinkType(jewelryType: string | null | undefined):
   return normalized === 'Necklace' || normalized === 'Bracelet';
 }
 
-export function normalizeProductLengthSizeValue(value: string | null | undefined): string {
+export function normalizeProductWidthMm(value: string | number | null | undefined): number | null {
+  if (value == null || String(value).trim() === '') return null;
+  const numeric = typeof value === 'number' ? value : Number(String(value).trim().replace(/\s*mm$/i, ''));
+  if (!Number.isFinite(numeric) || numeric <= 0 || numeric > 1000) return null;
+  return Math.round((numeric + Number.EPSILON) * 100) / 100;
+}
+
+export function productWidthDisplay(
+  product: Pick<Product, 'width_mm' | 'title' | 'title_es' | 'chain_type' | 'tags' | 'tags_es' | 'jewelry_type' | 'product_type'>,
+): string | null {
+  if (!productSupportsLinkType(inferProductJewelryType(product))) return null;
+  const width = normalizeProductWidthMm(product.width_mm);
+  return width == null ? null : `${width.toLocaleString('en-US', { maximumFractionDigits: 2 })} mm`;
+}
+
+export function normalizeProductLengthSizeValue(value: string | number | null | undefined): string {
   const raw = String(value ?? '').trim().replace(/\s+/g, ' ');
   if (!raw) return '';
   const numericMeasurement = raw.match(/^(\d+(?:\.\d+)?)\s*(?:in(?:ch(?:es?)?)?\.?|")?$/i);
-  if (numericMeasurement) return numericMeasurement[1];
+  if (numericMeasurement) return String(Number(numericMeasurement[1]));
   const ringSize = raw.match(/^size\s*:?\s*(\d+(?:\.\d+)?)$/i);
-  return ringSize ? ringSize[1] : raw;
+  return ringSize ? String(Number(ringSize[1])) : raw;
 }
 
 export function productLengthSizeDisplay(

@@ -19,6 +19,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   useTransition,
   type ReactNode,
@@ -28,6 +29,7 @@ import { useLinkStatus } from 'next/link';
 
 interface ShopNavigationContextValue {
   isPending: boolean;
+  getSearchParams: (fallback: string) => URLSearchParams;
   push: (href: string, options?: { scroll?: boolean }) => void;
   reportLinkPending: (pending: boolean) => void;
 }
@@ -38,9 +40,23 @@ export function ShopNavigationProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [isTransitionPending, startTransition] = useTransition();
   const [isLinkPending, setIsLinkPending] = useState(false);
+  const pendingHrefRef = useRef<string | null>(null);
+
+  const getSearchParams = useCallback((fallback: string) => {
+    const source = pendingHrefRef.current;
+    if (source != null) {
+      const query = source.includes('?') ? source.split('?')[1].split('#')[0] : '';
+      return new URLSearchParams(query);
+    }
+    return new URLSearchParams(fallback);
+  }, []);
 
   const push = useCallback(
     (href: string, options?: { scroll?: boolean }) => {
+      const currentHref = typeof window === 'undefined'
+        ? null
+        : `${window.location.pathname}${window.location.search}`;
+      pendingHrefRef.current = href === currentHref ? null : href;
       startTransition(() => {
         router.push(href, options);
       });
@@ -52,8 +68,13 @@ export function ShopNavigationProvider({ children }: { children: ReactNode }) {
     setIsLinkPending(pending);
   }, []);
 
+  useEffect(() => {
+    if (!isTransitionPending) pendingHrefRef.current = null;
+  }, [isTransitionPending]);
+
   const value: ShopNavigationContextValue = {
     isPending: isTransitionPending || isLinkPending,
+    getSearchParams,
     push,
     reportLinkPending,
   };
@@ -87,50 +108,45 @@ export function LinkPendingBridge() {
   return null;
 }
 
-const SPINNER_SHOW_DELAY_MS = 150;
-
-// Debounced so an instant (prefetched) navigation never flashes a spinner —
-// it only appears once a change has genuinely been loading for a moment, and
-// disappears the instant the new content is ready.
+// Show immediately so every filter, sort, view, and pagination click receives
+// visible acknowledgement while its navigation is in flight.
 export function ShopLoadingOverlay() {
   const { isPending } = useShopNavigation();
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (!isPending) return;
-    const timer = setTimeout(() => setVisible(true), SPINNER_SHOW_DELAY_MS);
-    return () => {
-      clearTimeout(timer);
-      setVisible(false);
-    };
-  }, [isPending]);
 
   return (
     <div
-      className={`shop-loading-overlay${visible ? ' is-visible' : ''}`}
+      className={`shop-loading-overlay${isPending ? ' is-visible' : ''}`}
       role="status"
       aria-live="polite"
-      aria-hidden={!visible}
+      aria-hidden={!isPending}
     >
       <span className="shop-loading-spinner" aria-hidden="true" />
       <span className="shop-loading-overlay-sr-only">
-        {visible ? 'Loading…' : ''}
+        {isPending ? 'Loading...' : ''}
       </span>
       <style>{`
         .shop-loading-overlay {
-          position: absolute;
-          inset: 0;
-          z-index: 20;
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          z-index: 70;
           display: flex;
           align-items: center;
           justify-content: center;
-          background: rgba(249, 249, 247, 0.55);
+          width: 3.25rem;
+          height: 3.25rem;
+          border: 1px solid rgba(115, 92, 0, 0.18);
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.96);
+          box-shadow: 0 16px 38px rgba(42, 34, 12, 0.18);
           opacity: 0;
+          transform: translate(-50%, -50%) scale(0.92);
+          transition: opacity 140ms ease, transform 140ms ease;
           pointer-events: none;
-          transition: opacity 120ms ease;
         }
         .shop-loading-overlay.is-visible {
           opacity: 1;
+          transform: translate(-50%, -50%) scale(1);
         }
         .shop-loading-overlay-sr-only {
           position: absolute;
@@ -152,6 +168,9 @@ export function ShopLoadingOverlay() {
           animation: shop-loading-spin 0.65s linear infinite;
         }
         @media (prefers-reduced-motion: reduce) {
+          .shop-loading-overlay {
+            transition: opacity 140ms ease;
+          }
           .shop-loading-spinner {
             animation-duration: 1.6s;
           }

@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
+import { getVerifiedUser } from '@/lib/auth-claims';
 import OrderDetailPanel from '@/components/admin/OrderDetailPanel';
 import AdminHeader from '@/components/admin/AdminHeader';
 import type { Order, OrderItem } from '@/types/sales';
@@ -25,6 +26,8 @@ const ORDER_DETAIL_COLUMNS = [
   'payment_method',
   'payment_reference',
   'shipping_method',
+  'shipping_carrier',
+  'tracking_number',
   'shipping_address',
   'billing_address',
   'internal_notes',
@@ -35,19 +38,32 @@ const ORDER_DETAIL_COLUMNS = [
   'updated_at',
   'order_items(id, order_id, product_id, inventory_number, title_snapshot, item_year_snapshot, metal_snapshot, purity_snapshot, gram_weight_snapshot, price_snapshot, quantity, discount, image_snapshot, created_at)',
 ].join(', ');
-// item_year_snapshot and quantity are both migration-added order_items columns; a
-// DB missing either predates the relevant migration, so strip them together.
-const ORDER_DETAIL_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT = ORDER_DETAIL_COLUMNS
-  .replace('item_year_snapshot, ', '')
-  .replace('quantity, ', '');
-const ORDER_DETAIL_COLUMNS_WITHOUT_REFUND_AMOUNT = ORDER_DETAIL_COLUMNS.replace('refund_amount, ', '');
-const ORDER_DETAIL_COLUMNS_WITHOUT_BOTH = ORDER_DETAIL_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT.replace('refund_amount, ', '');
-const ORDER_DETAIL_COLUMNS_WITHOUT_DELETED_AT = ORDER_DETAIL_COLUMNS.replace('deleted_at, ', '');
-const ORDER_DETAIL_COLUMNS_WITHOUT_DELETED_AT_ITEM_YEAR = ORDER_DETAIL_COLUMNS_WITHOUT_DELETED_AT
-  .replace('item_year_snapshot, ', '')
-  .replace('quantity, ', '');
-const ORDER_DETAIL_COLUMNS_WITHOUT_DELETED_AT_REFUND = ORDER_DETAIL_COLUMNS_WITHOUT_DELETED_AT.replace('refund_amount, ', '');
-const ORDER_DETAIL_COLUMNS_WITHOUT_DELETED_AT_BOTH = ORDER_DETAIL_COLUMNS_WITHOUT_DELETED_AT_ITEM_YEAR.replace('refund_amount, ', '');
+
+type OrderColumnSupport = {
+  tracking: boolean;
+  itemYearAndQuantity: boolean;
+  refundAmount: boolean;
+  deletedAt: boolean;
+};
+
+function getOrderDetailColumns(support: OrderColumnSupport) {
+  let columns = ORDER_DETAIL_COLUMNS;
+  if (!support.tracking) {
+    columns = columns
+      .replace('shipping_carrier, ', '')
+      .replace('tracking_number, ', '');
+  }
+  // item_year_snapshot and quantity were added together; a database missing
+  // either predates that migration, so strip them as a pair.
+  if (!support.itemYearAndQuantity) {
+    columns = columns
+      .replace('item_year_snapshot, ', '')
+      .replace('quantity, ', '');
+  }
+  if (!support.refundAmount) columns = columns.replace('refund_amount, ', '');
+  if (!support.deletedAt) columns = columns.replace('deleted_at, ', '');
+  return columns;
+}
 
 function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
   return Boolean(error?.message?.toLowerCase().includes('item_year'))
@@ -60,6 +76,11 @@ function isMissingRefundAmountError(error: { message?: string | null } | null | 
 
 function isMissingDeletedAtColumnError(error: { message?: string | null } | null | undefined) {
   return Boolean(error?.message?.toLowerCase().includes('deleted_at'));
+}
+
+function isMissingTrackingColumnError(error: { message?: string | null } | null | undefined) {
+  const message = error?.message?.toLowerCase() ?? '';
+  return message.includes('shipping_carrier') || message.includes('tracking_number');
 }
 
 interface Props {
@@ -90,7 +111,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
   const adminBasePath = isEs ? '/es/admin' : '/admin';
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getVerifiedUser(supabase);
 
   if (!user) {
     redirect(isEs ? '/es/account/sign-in' : '/account/sign-in');
@@ -106,7 +127,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
     redirect(isEs ? '/es/account' : '/account');
   }
 
-  const [orderResult, { data: invoices }, { count: unreadMessagesCount }, orderEmailsResult] = await Promise.all([
+  const [initialOrderResult, { data: invoices }, { count: unreadMessagesCount }, orderEmailsResult] = await Promise.all([
     supabase
       .from('orders')
       .select(ORDER_DETAIL_COLUMNS)
@@ -129,45 +150,44 @@ export default async function AdminOrderDetailPage({ params }: Props) {
       .order('created_at', { ascending: false }),
   ]);
   const orderEmails = (orderEmailsResult?.data ?? []) as OrderEmail[];
-  let order = orderResult.data;
-  let recycleBinSupported = !orderResult.error;
-  if (isMissingItemYearColumnError(orderResult.error)) {
-    const fallback = await supabase
-      .from('orders')
-      .select(ORDER_DETAIL_COLUMNS_WITHOUT_ITEM_YEAR_SNAPSHOT)
-      .eq('id', id)
-      .single();
-    order = fallback.data;
-    recycleBinSupported = !fallback.error;
-    if (isMissingRefundAmountError(fallback.error)) {
-      const fallback2 = await supabase
-        .from('orders')
-        .select(ORDER_DETAIL_COLUMNS_WITHOUT_BOTH)
-        .eq('id', id)
-        .single();
-      order = fallback2.data;
-      recycleBinSupported = !fallback2.error;
+  const columnSupport: OrderColumnSupport = {
+    tracking: true,
+    itemYearAndQuantity: true,
+    refundAmount: true,
+    deletedAt: true,
+  };
+  let orderResult = initialOrderResult;
+
+  for (let attempt = 0; orderResult.error && attempt < 4; attempt += 1) {
+    let changed = false;
+    if (columnSupport.tracking && isMissingTrackingColumnError(orderResult.error)) {
+      columnSupport.tracking = false;
+      changed = true;
     }
-  } else if (isMissingRefundAmountError(orderResult.error)) {
-    const fallback = await supabase
+    if (columnSupport.itemYearAndQuantity && isMissingItemYearColumnError(orderResult.error)) {
+      columnSupport.itemYearAndQuantity = false;
+      changed = true;
+    }
+    if (columnSupport.refundAmount && isMissingRefundAmountError(orderResult.error)) {
+      columnSupport.refundAmount = false;
+      changed = true;
+    }
+    if (columnSupport.deletedAt && isMissingDeletedAtColumnError(orderResult.error)) {
+      columnSupport.deletedAt = false;
+      changed = true;
+    }
+    if (!changed) break;
+
+    orderResult = await supabase
       .from('orders')
-      .select(ORDER_DETAIL_COLUMNS_WITHOUT_REFUND_AMOUNT)
+      .select(getOrderDetailColumns(columnSupport))
       .eq('id', id)
       .single();
-    order = fallback.data;
-    recycleBinSupported = !fallback.error;
-  } else if (isMissingDeletedAtColumnError(orderResult.error)) {
-    recycleBinSupported = false;
-    const selectColumns = isMissingItemYearColumnError(orderResult.error)
-      ? (isMissingRefundAmountError(orderResult.error) ? ORDER_DETAIL_COLUMNS_WITHOUT_DELETED_AT_BOTH : ORDER_DETAIL_COLUMNS_WITHOUT_DELETED_AT_ITEM_YEAR)
-      : (isMissingRefundAmountError(orderResult.error) ? ORDER_DETAIL_COLUMNS_WITHOUT_DELETED_AT_REFUND : ORDER_DETAIL_COLUMNS_WITHOUT_DELETED_AT);
-    const fallback = await supabase
-      .from('orders')
-      .select(selectColumns)
-      .eq('id', id)
-      .single();
-    order = fallback.data;
   }
+
+  const order = orderResult.data;
+  const recycleBinSupported = columnSupport.deletedAt && !orderResult.error;
+  const trackingSupported = columnSupport.tracking && !orderResult.error;
 
   if (!order) notFound();
 
@@ -187,6 +207,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
         adminEmail={user.email ?? null}
         locale={locale}
         recycleBinSupported={recycleBinSupported}
+        trackingSupported={trackingSupported}
       />
     </div>
   );

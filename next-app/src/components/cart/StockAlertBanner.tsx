@@ -64,7 +64,7 @@ export default function StockAlertBanner({
           type="button"
           onClick={onDismiss}
           aria-label={isEs ? 'Descartar' : 'Dismiss'}
-          className="flex-shrink-0"
+          className="stock-alert-dismiss flex-shrink-0"
           style={{ color: GOLD, lineHeight: 1 }}
         >
           <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '1rem' }}>close</span>

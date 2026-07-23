@@ -86,7 +86,7 @@ export default function SiteFooter({ locale = 'en' }: Props) {
               <Link
                 key={href}
                 href={href}
-                className="w-fit py-0.5 text-xs leading-tight transition-colors hover:underline md:py-0 md:text-sm md:underline-offset-2"
+                className="hover-underline-grow w-fit py-0.5 text-xs leading-tight md:py-0 md:text-sm"
                 style={{ color: 'var(--color-on-surface-variant)' }}
               >
                 {label}
@@ -105,7 +105,7 @@ export default function SiteFooter({ locale = 'en' }: Props) {
               <Link
                 key={href}
                 href={href}
-                className="justify-self-center py-0.5 text-[0.68rem] leading-tight transition-colors hover:underline md:w-fit md:justify-self-auto md:py-0 md:text-sm md:underline-offset-2"
+                className="hover-underline-grow justify-self-center py-0.5 text-[0.68rem] leading-tight md:w-fit md:justify-self-auto md:py-0 md:text-sm"
                 style={{ color: 'var(--color-on-surface-variant)' }}
               >
                 {label}
@@ -124,7 +124,7 @@ export default function SiteFooter({ locale = 'en' }: Props) {
               <Link
                 key={href}
                 href={href}
-                className="justify-self-center py-0.5 text-center text-[0.68rem] leading-tight transition-colors hover:underline md:w-fit md:justify-self-auto md:py-0 md:text-left md:text-sm md:underline-offset-2"
+                className="hover-underline-grow justify-self-center py-0.5 text-center text-[0.68rem] leading-tight md:w-fit md:justify-self-auto md:py-0 md:text-left md:text-sm"
                 style={{ color: 'var(--color-on-surface-variant)' }}
               >
                 {label}
@@ -149,7 +149,7 @@ export default function SiteFooter({ locale = 'en' }: Props) {
               <Link
                 key={a.slug}
                 href={p(`/sell/${a.slug}`)}
-                className="text-[0.68rem] leading-tight transition-colors hover:underline md:text-xs md:underline-offset-2"
+                className="hover-underline-grow text-[0.68rem] leading-tight md:text-xs"
                 style={{ color: 'var(--color-on-surface-variant)' }}
               >
                 {isEs ? `Vender en ${a.city}` : `Sell in ${a.city}`}

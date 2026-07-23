@@ -9,7 +9,7 @@ const SORT_OPTIONS = [
   { value: 'price-asc', label: 'Price: low to high', labelEs: 'Precio: menor a mayor' },
   { value: 'price-desc', label: 'Price: high to low', labelEs: 'Precio: mayor a menor' },
   { value: 'weight-asc', label: 'Weight: low to high', labelEs: 'Peso: menor a mayor' },
-  { value: 'weight-desc', label: 'Weight: high to low', labelEs: 'Peso: mayor a mayor' },
+  { value: 'weight-desc', label: 'Weight: high to low', labelEs: 'Peso: mayor a menor' },
   { value: 'brand-asc', label: 'Brand: A to Z', labelEs: 'Marca: A a Z' },
   { value: 'brand-desc', label: 'Brand: Z to A', labelEs: 'Marca: Z a A' },
 ] as const;
@@ -29,13 +29,13 @@ export default function ShopSortSelect({
   labelStyle,
   selectStyle,
 }: Props) {
-  const { push } = useShopNavigation();
+  const { getSearchParams, push } = useShopNavigation();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isEs = locale === 'es';
 
   function updateSort(value: string) {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = getSearchParams(searchParams.toString());
     if (value) {
       params.set('sort', value);
     } else {

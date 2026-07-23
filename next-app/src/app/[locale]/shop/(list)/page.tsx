@@ -19,8 +19,9 @@ import {
   type ProductStatus,
 } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
-import { fetchShowSoldItems } from '@/lib/shop-settings';
-import { calcSpotPriceValue } from '@/lib/pricing';
+import { fetchShopVisibilitySettings } from '@/lib/shop-settings';
+import { getProductPriceValue } from '@/lib/pricing';
+import { compactShopCardProductImages } from '@/lib/shop-card-images';
 import ShopProductGrid from '@/components/shop/ShopProductGrid';
 import ShopFilters from '@/components/shop/ShopFilters';
 import ShopSortSelect from '@/components/shop/ShopSortSelect';
@@ -32,12 +33,24 @@ import ScriptTagWarningGuard from '@/components/shop/ScriptTagWarningGuard';
 import { JEWELRY_ERA_MIN_YEAR, jewelryEraMaxYear, parseYearFilter } from '@/lib/jewelry-eras';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
+import {
+  filterAvailableShopItemTypeOptions,
+  isShopJewelryItemType,
+  normalizeShopFilterState,
+  normalizeShopLengthInches,
+  normalizeShopWidthRanges,
+  productMatchesShopLengthInches,
+  productMatchesShopWidthRanges,
+} from '@/lib/shop-filter-state';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
+  const isEs = locale === 'es';
   return {
-    title: 'Shop Estate Jewelry in Naples, FL',
-    description: 'Browse estate gold jewelry, chains, bracelets, and rings with live gold-spot pricing on every piece.',
+    title: isEs ? 'Comprar Joyería de Patrimonio en Naples, FL' : 'Shop Estate Jewelry in Naples, FL',
+    description: isEs
+      ? 'Explore joyería de oro, cadenas, pulseras y anillos de patrimonio con precios vinculados al valor spot del oro.'
+      : 'Browse estate gold jewelry, chains, bracelets, and rings with live gold-spot pricing on every piece.',
     alternates: alternatesFor('/shop', locale),
   };
 }
@@ -55,6 +68,7 @@ interface Props {
     itemType?: string;
     chainType?: string;
     length?: string | string[];
+    width?: string | string[];
     gender?: string;
     brand?: string;
     q?: string;
@@ -112,8 +126,6 @@ const ITEM_TYPE_VALUES: Record<string, ReturnType<typeof inferProductJewelryType
 // coins, bullion, silverware, and any tableware/hollowware type (spoons, trays,
 // goblets, cups, etc.) — belongs to the "Sterling Silver" group. The split is
 // binary: anything that is not a jewelry/watch type falls into Sterling Silver.
-const JEWELRY_ITEM_TYPES = new Set(['necklace', 'bracelet', 'earrings', 'ring', 'pendant', 'charm', 'brooch', 'cufflinks', 'watch']);
-
 function slugifyItemType(value: string): string {
   return value
     .trim()
@@ -132,8 +144,8 @@ function productMatchesItemGroup(product: Product, itemGroup: string | undefined
   if (!itemGroup) return true;
   const typeKey = getProductItemTypeKey(product);
   if (!typeKey) return false;
-  if (itemGroup === 'jewelry') return JEWELRY_ITEM_TYPES.has(typeKey);
-  if (itemGroup === 'everything-else') return !JEWELRY_ITEM_TYPES.has(typeKey);
+  if (itemGroup === 'jewelry') return isShopJewelryItemType(typeKey);
+  if (itemGroup === 'everything-else') return !isShopJewelryItemType(typeKey);
   return true;
 }
 
@@ -163,7 +175,14 @@ function getShopItemTypeOptions(products: Product[]) {
     .filter((option): option is { value: string; label: string; labelEs: string } => Boolean(option));
   const uniqueDynamic = Array.from(new Map(dynamic.map((option) => [option.value, option])).values())
     .sort((a, b) => a.label.localeCompare(b.label));
-  return [...knownOrder.map((value) => knownOptions[value]), ...uniqueDynamic];
+  const presentItemTypes = products
+    .map(getProductItemTypeKey)
+    .filter((value): value is string => Boolean(value));
+  const availableKnownOptions = filterAvailableShopItemTypeOptions(
+    knownOrder.map((value) => knownOptions[value]),
+    presentItemTypes,
+  );
+  return [...availableKnownOptions, ...uniqueDynamic];
 }
 
 function getProductLinkType(product: Product): string {
@@ -179,14 +198,6 @@ function getAllowedLengthValues(itemType: string | undefined): string[] {
   if (itemType === 'necklace') return NECKLACE_LENGTH_VALUES;
   if (itemType === 'bracelet') return BRACELET_LENGTH_VALUES;
   return [];
-}
-
-function normalizeLengths(length: string | string[] | undefined): string[] {
-  const values = Array.isArray(length) ? length : length ? [length] : [];
-  return values
-    .flatMap((value) => value.split(','))
-    .map((value) => value.trim())
-    .filter(Boolean);
 }
 
 function getEffectiveMetalColor(metal: string | undefined, metalColor: string | undefined): string | undefined {
@@ -222,10 +233,8 @@ function parsePriceLabel(value: string | null): number | null {
 }
 
 function getSortablePrice(product: Product, spotData: Awaited<ReturnType<typeof fetchSpotData>>): number | null {
-  if (product.price_mode === 'spot-multiplier') {
-    return calcSpotPriceValue(product, spotData);
-  }
-  return parsePriceLabel(product.manual_price_label ?? product.price_label);
+  return getProductPriceValue(product, spotData)
+    ?? parsePriceLabel(product.manual_price_label ?? product.price_label);
 }
 
 function compareNullableNumbers(
@@ -264,7 +273,9 @@ const SHOP_PRODUCT_COLUMNS = [
   'jewelry_type',
   'chain_type',
   'length',
+  'width_mm',
   'pricing_multiplier',
+  'sold_price',
   'status',
   'images',
   'image_urls',
@@ -279,7 +290,7 @@ const SHOP_PRODUCT_COLUMNS = [
 ].join(', ');
 const SHOP_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR = SHOP_PRODUCT_COLUMNS
   .split(', ')
-  .filter((column) => column !== 'item_year' && column !== 'quantity')
+  .filter((column) => column !== 'item_year' && column !== 'quantity' && column !== 'sold_price' && column !== 'width_mm')
   .join(', ');
 
 // Narrow column set for the facet-only catalog fetch (Brand + Item Type dropdown
@@ -305,7 +316,9 @@ const SHOP_FACET_COLUMNS = [
 
 function isMissingItemYearColumnError(error: { message?: string | null } | null | undefined) {
   return Boolean(error?.message?.toLowerCase().includes('item_year'))
-    || Boolean(error?.message?.toLowerCase().includes('quantity'));
+    || Boolean(error?.message?.toLowerCase().includes('quantity'))
+    || Boolean(error?.message?.toLowerCase().includes('sold_price'))
+    || Boolean(error?.message?.toLowerCase().includes('width_mm'));
 }
 
 // The catalog read is the single most expensive part of a cold /shop render: a
@@ -326,11 +339,11 @@ async function queryShopCatalog(filterKey: ShopCatalogFilterKey, columns: string
   const supabase = createPublicClient();
 
   // Admin-controlled: when "show sold items" is off, the gallery lists available
-  // pieces only. Defaults to showing sold (fetchShowSoldItems degrades to true if
+  // pieces only. Defaults to showing sold (the settings read degrades to true if
   // the setting/table is missing). This read is inside the cached function; the
   // admin toggle busts the `shop-catalog` tag so a change takes effect promptly.
-  const showSoldItems = await fetchShowSoldItems(supabase);
-  const visibleStatuses = showSoldItems
+  const visibility = await fetchShopVisibilitySettings(supabase);
+  const visibleStatuses = visibility.showSoldItems
     ? [...PUBLIC_SHOP_PRODUCT_STATUSES]
     : [...AVAILABLE_ONLY_SHOP_PRODUCT_STATUSES];
 
@@ -373,7 +386,7 @@ async function queryShopCatalog(filterKey: ShopCatalogFilterKey, columns: string
   if (isMissingItemYearColumnError(productResult.error)) {
     const fallback = await buildProductQuery(columnsWithoutItemYear);
     products = (fallback.data as unknown[] | null)?.map(
-      (product) => ({ ...(product as Record<string, unknown>), item_year: null, quantity: 1 }),
+      (product) => ({ ...(product as Record<string, unknown>), item_year: null, quantity: 1, sold_price: null, width_mm: null }),
     ) ?? null;
     errorMessage = fallback.error?.message ?? null;
   }
@@ -382,6 +395,7 @@ async function queryShopCatalog(filterKey: ShopCatalogFilterKey, columns: string
     products: (products ?? []) as unknown[],
     errorMessage,
     totalInventoryCount: totalInventoryResult.count ?? null,
+    hideSoldItemPrices: visibility.hideSoldItemPrices,
   };
 }
 
@@ -429,9 +443,7 @@ export async function renderShopPage({
   // A bare /shop (no category selected) shows everything across both groups —
   // neither Jewelry & Watches nor Sterling Silver is preselected. Only the
   // Sterling Silver group forces the metal scope to silver.
-  const filters = rawFilters.itemGroup === 'everything-else' && !rawFilters.metal
-    ? { ...rawFilters, metal: 'silver' }
-    : rawFilters;
+  let filters = normalizeShopFilterState(rawFilters);
   const selectedMetalColor = getEffectiveMetalColor(filters.metal, filters.metalColor ?? filters.metalType);
 
   // The DB-level filter set that defines this catalog read. The cached loader is
@@ -487,19 +499,20 @@ export async function renderShopPage({
     (catalogIsUnfiltered ? catalog : facetCatalog)!.products as unknown as Product[]
   ).filter(isVisibleInPublicGallery);
   const itemTypeOptions = getShopItemTypeOptions(facetProducts);
-  const brandScopeProducts = facetProducts.filter((product) => {
-    if (!productMatchesItemGroup(product, filters.itemGroup)) return false;
-    if (filters.itemGroup === 'everything-else') return productMatchesBroadMetal(product, 'silver');
-    return true;
-  });
+  if (filters.itemType && !itemTypeOptions.some((option) => option.value === filters.itemType)) {
+    filters = { ...filters, itemType: undefined, chainType: undefined, length: undefined, width: undefined };
+  }
   const brandOptions = Array.from(new Set(
-    brandScopeProducts
+    facetProducts
       .map((product) => product.brand?.trim())
       .filter(Boolean) as string[],
-  )).sort((a, b) => a.localeCompare(b));
-  const selectedLengths = normalizeLengths(filters.length);
-  const allowedLengthValues = getAllowedLengthValues(filters.itemType);
-  const effectiveSelectedLengths = selectedLengths.filter((length) => allowedLengthValues.includes(length));
+  ));
+  if (filters.brand && !brandOptions.includes(filters.brand)) brandOptions.push(filters.brand);
+  brandOptions.sort((a, b) => a.localeCompare(b));
+  const selectedLengthInches = normalizeShopLengthInches(filters.length);
+  const allowedLengthInches = normalizeShopLengthInches(getAllowedLengthValues(filters.itemType));
+  const effectiveSelectedLengths = selectedLengthInches.filter((length) => allowedLengthInches.includes(length));
+  const effectiveSelectedWidthRanges = normalizeShopWidthRanges(filters.width);
   const publicPrices = collectionProducts
     .map((product) => getSortablePrice(product, spotData))
     .filter((price): price is number => price != null && Number.isFinite(price));
@@ -580,8 +593,9 @@ export async function renderShopPage({
     }
     if (effectiveSelectedLengths.length > 0) {
       const lenTag = p.length ?? (p.tags ?? []).find((t: string) => t.startsWith('len:'))?.slice(4);
-      if (!lenTag || !effectiveSelectedLengths.includes(lenTag)) return false;
+      if (!productMatchesShopLengthInches(lenTag, effectiveSelectedLengths)) return false;
     }
+    if (!productMatchesShopWidthRanges(p.width_mm, effectiveSelectedWidthRanges)) return false;
     if (filters.gender && filters.itemGroup !== 'everything-else') {
       const g = p.gender ?? 'Unisex';
       // Unisex items appear in all gender categories
@@ -638,7 +652,9 @@ export async function renderShopPage({
   const totalPages = Math.max(1, Math.ceil(sorted.length / perPage));
   const currentPage = Math.min(parsePage(filters.page), totalPages);
   const startIndex = (currentPage - 1) * perPage;
-  const paginatedProducts = sorted.slice(startIndex, startIndex + perPage);
+  const paginatedProducts = sorted
+    .slice(startIndex, startIndex + perPage)
+    .map(compactShopCardProductImages);
   const showingStart = sorted.length === 0 ? 0 : startIndex + 1;
   const showingEnd = startIndex + paginatedProducts.length;
 
@@ -949,6 +965,7 @@ export async function renderShopPage({
                       products={paginatedProducts}
                       spotData={spotData}
                       locale={locale}
+                      hideSoldItemPrices={catalog.hideSoldItemPrices}
                       variant={isModern ? 'modern' : 'classic'}
                       view={view}
                     />
@@ -1223,6 +1240,26 @@ export async function renderShopPage({
               font-weight: 800;
               outline: none;
             }
+            @media (max-width: 440px) {
+              .shop-gallery-toolbar {
+                align-items: stretch;
+                flex-wrap: wrap;
+              }
+              .shop-toolbar-left {
+                flex: 1 1 100%;
+                justify-content: space-between;
+                width: 100%;
+              }
+              .shop-gallery-sort {
+                flex: 1 1 100%;
+                width: 100%;
+              }
+              .shop-gallery-toolbar .shop-gallery-sort select {
+                min-width: 0;
+                width: auto;
+                flex: 1;
+              }
+            }
             .shop-filter-sidebar {
               min-width: 0;
             }
@@ -1283,6 +1320,22 @@ export async function renderShopPage({
                 position: sticky;
                 top: 6.5rem;
                 align-self: start;
+                max-height: calc(100vh - 7.5rem);
+                max-height: calc(100dvh - 7.5rem);
+                overflow-y: auto;
+                scrollbar-color: rgba(115, 92, 0, 0.34) transparent;
+                scrollbar-gutter: stable;
+                scrollbar-width: thin;
+              }
+              .shop-filter-sidebar::-webkit-scrollbar {
+                width: 0.45rem;
+              }
+              .shop-filter-sidebar::-webkit-scrollbar-thumb {
+                border-radius: 999px;
+                background: rgba(115, 92, 0, 0.34);
+              }
+              .shop-filter-sidebar::-webkit-scrollbar-track {
+                background: transparent;
               }
               /* Gender is handled by the sidebar buttons, so hide the redundant toggle */
               .modern-shop-page .shop-gender-tabs {

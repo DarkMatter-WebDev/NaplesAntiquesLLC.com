@@ -8,6 +8,11 @@ export interface FulfillmentUpdateEmailContent {
   text: string;
 }
 
+type FulfillmentEmailOrder = Pick<
+  Order,
+  'order_number' | 'customer_name' | 'shipping_carrier' | 'tracking_number'
+>;
+
 const STATUS_MESSAGES: Record<FulfillmentStatus, string> = {
   pending: 'Your order is being prepared.',
   packed: 'Your order has been packed and is being prepared for its next step.',
@@ -17,7 +22,7 @@ const STATUS_MESSAGES: Record<FulfillmentStatus, string> = {
 };
 
 export function buildFulfillmentUpdateEmailContent(
-  order: Pick<Order, 'order_number' | 'customer_name'>,
+  order: FulfillmentEmailOrder,
   status: FulfillmentStatus,
 ): FulfillmentUpdateEmailContent {
   const customerName = order.customer_name || 'there';
@@ -28,6 +33,20 @@ export function buildFulfillmentUpdateEmailContent(
   // Sent from a no-reply address, so don't invite replies — direct to phone/text.
   const note = 'Call or text us at (239) 404-8505 with any questions.';
   const closing = 'Thank you, NaplesEstateJewelry.co';
+  const shippingCarrier = order.shipping_carrier?.trim() || null;
+  const trackingNumber = order.tracking_number?.trim() || null;
+  const shipmentText = [
+    shippingCarrier ? `Carrier: ${shippingCarrier}` : null,
+    trackingNumber ? `Tracking number: ${trackingNumber}` : null,
+  ].filter((line): line is string => Boolean(line));
+  const shipmentHtml = shippingCarrier || trackingNumber
+    ? `
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 20px;background:#f8f6ef;border:1px solid #d5c697;">
+        ${shippingCarrier ? `<tr><td style="padding:12px 14px 4px;color:#746b5b;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Carrier</td><td style="padding:12px 14px 4px;color:#1d1a14;font-size:14px;font-weight:700;text-align:right;">${escapeHtml(shippingCarrier)}</td></tr>` : ''}
+        ${trackingNumber ? `<tr><td style="padding:4px 14px 12px;color:#746b5b;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Tracking number</td><td style="padding:4px 14px 12px;color:#1d1a14;font-size:14px;font-weight:700;text-align:right;word-break:break-all;">${escapeHtml(trackingNumber)}</td></tr>` : ''}
+      </table>
+    `
+    : '';
 
   const text = [
     greeting,
@@ -36,6 +55,7 @@ export function buildFulfillmentUpdateEmailContent(
     '',
     `Order: ${order.order_number}`,
     `Status: ${statusLabel}`,
+    ...shipmentText,
     '',
     note,
     closing,
@@ -60,6 +80,7 @@ export function buildFulfillmentUpdateEmailContent(
                 <td style="padding:26px 30px;">
                   <p style="margin:0 0 14px;font-size:15px;line-height:1.55;">${escapeHtml(greeting)}</p>
                   <p style="margin:0 0 20px;font-size:15px;line-height:1.55;">${escapeHtml(message)}</p>
+                  ${shipmentHtml}
                   <p style="margin:0 0 18px;font-size:15px;line-height:1.55;">${escapeHtml(note)}</p>
                   <p style="margin:0;font-size:15px;line-height:1.55;">${escapeHtml(closing)}</p>
                   ${buildOrderEmailFooterHtml()}

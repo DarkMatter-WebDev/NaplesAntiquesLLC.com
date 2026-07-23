@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from 'react';
 
+type VisibilitySetting = 'showSoldItems' | 'hideSoldItemPrices';
+
 export default function AdminShopVisibilityPanel() {
   const [showSoldItems, setShowSoldItems] = useState(true);
+  const [hideSoldItemPrices, setHideSoldItemPrices] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
@@ -15,7 +18,10 @@ export default function AdminShopVisibilityPanel() {
         const res = await fetch('/api/admin/shop-settings');
         const data = await res.json().catch(() => null);
         if (!res.ok) throw new Error(data?.error || 'Failed to load shop settings.');
-        if (!cancelled) setShowSoldItems(data.showSoldItems ?? true);
+        if (!cancelled) {
+          setShowSoldItems(data.showSoldItems ?? true);
+          setHideSoldItemPrices(data.hideSoldItemPrices ?? false);
+        }
       } catch (err) {
         if (!cancelled) setNotice({ text: err instanceof Error ? err.message : 'Failed to load shop settings.', ok: false });
       } finally {
@@ -25,32 +31,54 @@ export default function AdminShopVisibilityPanel() {
     return () => { cancelled = true; };
   }, []);
 
-  const save = async (nextValue: boolean) => {
+  const save = async (setting: VisibilitySetting, nextValue: boolean) => {
     setSaving(true);
-    const previous = showSoldItems;
-    setShowSoldItems(nextValue); // optimistic
+    const previous = { showSoldItems, hideSoldItemPrices };
+    if (setting === 'showSoldItems') setShowSoldItems(nextValue);
+    else setHideSoldItemPrices(nextValue);
+
     try {
       const res = await fetch('/api/admin/shop-settings', {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ showSoldItems: nextValue }),
+        body: JSON.stringify({ [setting]: nextValue }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || 'Failed to save.');
-      setShowSoldItems(data.showSoldItems ?? nextValue);
+
+      const nextShowSoldItems = data.showSoldItems ?? (setting === 'showSoldItems' ? nextValue : showSoldItems);
+      const nextHideSoldItemPrices = data.hideSoldItemPrices ?? (setting === 'hideSoldItemPrices' ? nextValue : hideSoldItemPrices);
+      setShowSoldItems(nextShowSoldItems);
+      setHideSoldItemPrices(nextHideSoldItemPrices);
       setNotice({
-        text: (data.showSoldItems ?? nextValue)
-          ? 'Sold items are now shown in the shop.'
-          : 'Sold items are now hidden from the shop.',
+        text: setting === 'showSoldItems'
+          ? nextShowSoldItems
+            ? 'Sold items are now shown in the shop.'
+            : 'Sold items are now hidden from the shop.'
+          : nextHideSoldItemPrices
+            ? 'Sold item prices are now replaced with "Sold."'
+            : 'Sold items now display their saved prices.',
         ok: true,
       });
       window.setTimeout(() => setNotice(null), 3500);
     } catch (err) {
-      setShowSoldItems(previous); // revert on failure
+      setShowSoldItems(previous.showSoldItems);
+      setHideSoldItemPrices(previous.hideSoldItemPrices);
       setNotice({ text: err instanceof Error ? err.message : 'Failed to save.', ok: false });
     } finally {
       setSaving(false);
     }
+  };
+
+  const checkboxStyle = {
+    accentColor: '#a98208',
+    width: '1.05rem',
+    height: '1.05rem',
+    cursor: loading || saving ? 'not-allowed' : 'pointer',
+  };
+  const labelStyle = {
+    cursor: loading || saving ? 'default' : 'pointer',
+    color: 'var(--color-on-surface)',
   };
 
   return (
@@ -63,8 +91,8 @@ export default function AdminShopVisibilityPanel() {
           Shop Visibility
         </h2>
         <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-          Choose whether sold items stay visible to buyers in the public shop gallery, or are hidden so only
-          available pieces show. Available items are always shown.
+          Choose whether sold items remain in the public shop and whether buyers can see their saved selling prices.
+          Available items are always shown with prices.
         </p>
       </div>
       <div className="p-5 flex flex-col gap-4">
@@ -83,26 +111,49 @@ export default function AdminShopVisibilityPanel() {
           </div>
         )}
 
-        <label className="flex items-start gap-3 text-sm" style={{ cursor: loading || saving ? 'default' : 'pointer', color: 'var(--color-on-surface)' }}>
-          <input
-            type="checkbox"
-            checked={showSoldItems}
-            onChange={(e) => void save(e.target.checked)}
-            disabled={loading || saving}
-            className="mt-0.5"
-            style={{ accentColor: '#a98208', width: '1.05rem', height: '1.05rem', cursor: loading || saving ? 'not-allowed' : 'pointer' }}
-          />
-          <span>
-            <span className="font-bold">Show sold items in the shop gallery</span>
-            <span className="block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-              {loading
-                ? 'Loading…'
-                : showSoldItems
-                  ? 'Sold pieces are shown to buyers (marked “Sold”).'
-                  : 'Sold pieces are hidden — buyers see only available pieces.'}
+        <div className="grid gap-4 md:grid-cols-2 md:gap-8">
+          <label className="flex items-start gap-3 text-sm" style={labelStyle}>
+            <input
+              type="checkbox"
+              checked={showSoldItems}
+              onChange={(event) => void save('showSoldItems', event.target.checked)}
+              disabled={loading || saving}
+              className="mt-0.5"
+              style={checkboxStyle}
+            />
+            <span>
+              <span className="font-bold">Show sold items in the shop gallery</span>
+              <span className="block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                {loading
+                  ? 'Loading...'
+                  : showSoldItems
+                    ? 'Sold pieces are shown to buyers and marked "Sold."'
+                    : 'Sold pieces are hidden; buyers see only available pieces.'}
+              </span>
             </span>
-          </span>
-        </label>
+          </label>
+
+          <label className="flex items-start gap-3 text-sm" style={labelStyle}>
+            <input
+              type="checkbox"
+              checked={hideSoldItemPrices}
+              onChange={(event) => void save('hideSoldItemPrices', event.target.checked)}
+              disabled={loading || saving}
+              className="mt-0.5"
+              style={checkboxStyle}
+            />
+            <span>
+              <span className="font-bold">Hide prices on sold items</span>
+              <span className="block text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                {loading
+                  ? 'Loading...'
+                  : hideSoldItemPrices
+                    ? 'Sold pieces display "Sold" instead of a price.'
+                    : 'Sold pieces display their saved selling price.'}
+              </span>
+            </span>
+          </label>
+        </div>
       </div>
     </section>
   );

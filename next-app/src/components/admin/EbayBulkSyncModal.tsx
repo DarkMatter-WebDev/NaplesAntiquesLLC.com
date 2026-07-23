@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import SelectedMarketplaceReviewFlow from './SelectedMarketplaceReviewFlow';
 
 interface EligibilitySummary {
   total: number;
@@ -31,7 +32,10 @@ function errorMessage(data: unknown, fallback: string): string {
 }
 
 /** Bulk action mirroring EtsyBulkSyncModal: pre-flight summary -> confirm -> drain the queue with progress -> stop-after-current cancel. */
-export default function EbayBulkSyncModal({ onClose }: { onClose: () => void }) {
+export default function EbayBulkSyncModal({ onClose, productIds }: { onClose: (completed?: boolean) => void; productIds?: string[] }) {
+  const selectedProductIds = productIds?.length ? productIds : null;
+  const selectedRun = selectedProductIds !== null;
+  const selectedCount = selectedProductIds?.length ?? 0;
   const [phase, setPhase] = useState<'summary' | 'running' | 'done'>('summary');
   const [summary, setSummary] = useState<EligibilitySummary | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
@@ -41,6 +45,7 @@ export default function EbayBulkSyncModal({ onClose }: { onClose: () => void }) 
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<string | null>(null);
+  const [selectedFlow, setSelectedFlow] = useState<'choice' | 'review'>('choice');
   const cancelledRef = useRef(false);
 
   // No setState before the first await (react-hooks/set-state-in-effect) —
@@ -58,9 +63,21 @@ export default function EbayBulkSyncModal({ onClose }: { onClose: () => void }) 
   }, []);
 
   useEffect(() => {
+    if (selectedRun) return;
     const run = async () => { await loadSummary(); };
     void run();
-  }, [loadSummary]);
+  }, [loadSummary, selectedRun]);
+
+  if (selectedRun && selectedFlow === 'review') {
+    return (
+      <SelectedMarketplaceReviewFlow
+        marketplace="ebay"
+        productIds={selectedProductIds ?? []}
+        onBack={() => setSelectedFlow('choice')}
+        onClose={onClose}
+      />
+    );
+  }
 
   // "Check eBay statuses" — reconcile every linked listing's local state to
   // what eBay actually reports (read-only; no content re-pushed).
@@ -68,7 +85,15 @@ export default function EbayBulkSyncModal({ onClose }: { onClose: () => void }) 
     setChecking(true);
     setCheckResult(null);
     try {
-      const res = await fetch('/api/admin/ebay/verify-all', { method: 'POST' });
+      const res = await fetch('/api/admin/ebay/verify-all', {
+        method: 'POST',
+        ...(selectedRun
+          ? {
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ productIds: selectedProductIds }),
+            }
+          : {}),
+      });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data) throw new Error(errorMessage(data, 'Could not check eBay statuses.'));
       setCheckResult(
@@ -91,7 +116,9 @@ export default function EbayBulkSyncModal({ onClose }: { onClose: () => void }) 
       const enqueueRes = await fetch('/api/admin/ebay/sync-batch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'enqueue-all-eligible' }),
+        body: JSON.stringify(selectedRun
+          ? { action: 'enqueue', productIds: selectedProductIds }
+          : { action: 'enqueue-all-eligible' }),
       });
       const enqueueData = await enqueueRes.json().catch(() => null);
       if (!enqueueRes.ok) throw new Error(errorMessage(enqueueData, 'Could not queue products.'));
@@ -135,17 +162,22 @@ export default function EbayBulkSyncModal({ onClose }: { onClose: () => void }) 
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
-      <div className="w-full max-w-md border bg-white p-5 flex flex-col gap-4" style={{ borderColor: 'var(--color-outline-variant)' }}>
+    <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto whitespace-normal p-4 sm:items-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
+      <div className="min-w-0 w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto border bg-white p-5 flex flex-col gap-4 [overflow-wrap:anywhere]" style={{ borderColor: 'var(--color-outline-variant)' }}>
         <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-          Sync all to eBay
+          {selectedRun ? `Sync ${selectedCount} selected to eBay` : 'Sync all to eBay'}
         </h3>
 
         {phase === 'summary' && (
           <>
-            {summaryError && <p className="text-sm" style={{ color: 'var(--color-error)' }}>{summaryError}</p>}
-            {!summaryError && !summary && <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>Checking eligibility…</p>}
-            {summary && (
+            {selectedRun && (
+              <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                Ready to queue <strong style={{ color: 'var(--color-primary)' }}>{selectedCount}</strong> selected product{selectedCount === 1 ? '' : 's'} on eBay.
+              </p>
+            )}
+            {!selectedRun && summaryError && <p className="text-sm" style={{ color: 'var(--color-error)' }}>{summaryError}</p>}
+            {!selectedRun && !summaryError && !summary && <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>Checking eligibility…</p>}
+            {!selectedRun && summary && (
               <div className="text-sm flex flex-col gap-1" style={{ color: 'var(--color-on-surface-variant)' }}>
                 <p>
                   <strong style={{ color: 'var(--color-primary)' }}>{summary.eligible} eligible</strong> · {summary.ineligible} ineligible ·{' '}
@@ -166,7 +198,7 @@ export default function EbayBulkSyncModal({ onClose }: { onClose: () => void }) 
                 )}
               </div>
             )}
-            {summary && summary.errors > 0 && (
+            {!selectedRun && summary && summary.errors > 0 && (
               <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
                 {summary.errors} item{summary.errors === 1 ? '' : 's'} in an error state. If a past sync hiccup left them errored but they&apos;re
                 actually fine on eBay, click <strong>Check eBay statuses</strong> to reconcile them (read-only). Or click <strong>Start</strong> to
@@ -178,22 +210,54 @@ export default function EbayBulkSyncModal({ onClose }: { onClose: () => void }) 
               Queues every eligible item and prepares it on eBay (or publishes it live, if auto-publish is on). This can take a while for a full
               catalog — feel free to leave this open, or check Settings → eBay Sync later for progress.
             </p>
-            <div className="flex justify-end gap-2 flex-wrap">
-              <button type="button" onClick={onClose} disabled={checking} className="outline-button text-sm">
-                Cancel
-              </button>
-              <button type="button" onClick={() => void checkAll()} disabled={checking} className="outline-button text-sm disabled:opacity-50">
-                {checking ? 'Checking…' : 'Check eBay statuses'}
-              </button>
-              <button
-                type="button"
-                onClick={() => void start()}
-                disabled={checking || !summary || (summary.eligible === 0 && summary.errors === 0)}
-                className="gold-button text-sm disabled:opacity-50"
-              >
-                Start
-              </button>
-            </div>
+            {selectedRun ? (
+              <>
+                <p className="form-label">Choose sync method</p>
+                <div className="grid gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void start()}
+                    disabled={checking || selectedCount === 0}
+                    className="gold-button justify-center text-sm disabled:opacity-50"
+                  >
+                    Sync immediately
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFlow('review')}
+                    disabled={checking || selectedCount === 0}
+                    className="outline-button justify-center text-sm disabled:opacity-50"
+                  >
+                    Review and submit one by one
+                  </button>
+                </div>
+                <div className="flex justify-end gap-2 flex-wrap">
+                  <button type="button" onClick={() => onClose(false)} disabled={checking} className="outline-button text-sm">
+                    Cancel
+                  </button>
+                  <button type="button" onClick={() => void checkAll()} disabled={checking} className="outline-button text-sm disabled:opacity-50">
+                    {checking ? 'Checking…' : 'Check selected eBay statuses'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-end gap-2 flex-wrap">
+                <button type="button" onClick={() => onClose(false)} disabled={checking} className="outline-button text-sm">
+                  Cancel
+                </button>
+                <button type="button" onClick={() => void checkAll()} disabled={checking} className="outline-button text-sm disabled:opacity-50">
+                  {checking ? 'Checking…' : 'Check eBay statuses'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void start()}
+                  disabled={checking || !summary || (summary.eligible === 0 && summary.errors === 0)}
+                  className="gold-button text-sm disabled:opacity-50"
+                >
+                  Start
+                </button>
+              </div>
+            )}
           </>
         )}
 
@@ -221,7 +285,7 @@ export default function EbayBulkSyncModal({ onClose }: { onClose: () => void }) 
               </p>
             )}
             <div className="flex justify-end">
-              <button type="button" onClick={onClose} className="gold-button text-sm">
+              <button type="button" onClick={() => onClose(!error && !cancelledRef.current)} className="gold-button text-sm">
                 Close
               </button>
             </div>

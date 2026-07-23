@@ -1,6 +1,11 @@
 import crypto from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: vi.fn().mockResolvedValue(true),
+  getClientIp: vi.fn().mockReturnValue('192.0.2.1'),
+}));
+
 const ORIGINAL_ENV = { ...process.env };
 
 describe('computeChallengeResponse — exact hash algorithm', () => {

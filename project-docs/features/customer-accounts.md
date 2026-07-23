@@ -5,6 +5,9 @@
 Customer accounts support sign-in, editable customer profile/contact/address
 details, saved favorites, and cart-related state. Accounts are backed by
 Supabase Auth and Postgres. Setup instructions live in `ACCOUNT_SETUP.md`.
+Account form submissions expose immediate saving/loading states. Sign-out also
+switches to a disabled localized busy label before awaiting Supabase and
+navigating home, preventing duplicate requests during a slow response.
 
 ## Key Files
 
@@ -15,6 +18,8 @@ Supabase Auth and Postgres. Setup instructions live in `ACCOUNT_SETUP.md`.
   `next-app/src/app/[locale]/account/sign-up/page.tsx` - auth entry points.
 - `next-app/src/components/checkout/CheckoutClient.tsx` - checkout prefill from
   saved profile data.
+- `next-app/src/components/admin/DeleteUserButton.tsx` - admin account deletion
+  confirmation and destructive action.
 - `next-app/src/lib/supabase/client.ts` and
   `next-app/src/lib/supabase/server.ts` - browser/server Supabase clients.
 - `supabase/schema.sql` - tables, triggers, RLS.
@@ -53,6 +58,14 @@ triggers auto-creation of a profile + empty cart.
 
 `profiles.is_vip` can be set manually in Supabase for future private pricing
 flows. `profiles.is_admin` grants access to the admin routes.
+
+## Admin Account Deletion
+
+The Admin Users table exposes account deletion only for non-admin rows. Its
+confirmation is portaled to `document.body` so table whitespace and overflow
+styles cannot leak into the dialog. Long names, emails, warnings, and returned
+errors wrap within the card; the card is bounded by the dynamic viewport and
+its actions stack on narrow phones.
 
 ## Setup Reminders
 

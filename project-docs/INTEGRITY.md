@@ -1,72 +1,101 @@
-# Integrity Rules & Pre-Publish Checklist
+# Integrity Rules And Pre-Publish Checklist
 
-> Current rules for the Next.js app. Last updated: **2026-06-20**.
+> Current rules for the Next.js app. Last reconciled: **2026-07-23**.
 
-## Commands
+## Verification Commands
 
 Run from `next-app/`:
 
 ```bash
-npm run build
+npm test -- --run
 npm run lint
+npm run build
+npm audit --omit=dev
 ```
 
-`npm run build` is the required publish gate. `npm run lint` should run when
-touching TypeScript, React components, routing, or shared UI behavior.
+`npm run build` is the publish gate and must exit 0. The current named
+`renderShopPage` route-export failure is documented technical debt, not a
+passing build.
 
 ## Rules
 
-### 1. Keep the runtime under `next-app/`
+### Keep one runtime
 
-The parent folder should contain deployment config, docs, Supabase SQL, and
-setup notes. It should not regain root `*.html`, `scripts/`, `assets/`,
-`tools/check-integrity.mjs`, or `netlify/functions/` as runtime code.
+App code and public assets live in `next-app/`. Root static HTML/scripts/assets
+and root Netlify Functions must not return.
 
-### 2. Keep Supabase as the product source
+### Keep product schema synchronized
 
-The shop pages read from Supabase `products`. Product schema changes must be
-reflected in:
+Supabase `products` is the catalog source. Every product-column change updates
+the relevant `supabase/*.sql`, `src/types/product.ts`, selected query columns,
+admin/public UI, tests, and docs.
 
-- `supabase/*.sql`
-- `next-app/src/types/product.ts`
-- shop/admin/product UI that reads or writes the changed field
+### Preserve IDs and lifecycle
 
-### 3. Preserve product ids
+Product IDs are permanent route/saved-state keys. Prefer Draft/Archived/Sold
+over renaming or deletion. Permanent deletion is explicit and cleans owned
+Storage/Stream resources.
 
-Product ids are URLs and saved-state keys. Do not rename them casually. Mark an
-item sold/unavailable or add a new product instead.
+### Keep media ownership clear
 
-### 4. Keep image storage boundaries clear
+Product rows contain URL/path metadata only. New images go to Supabase Storage
+with WebP/downscale/cache defaults. Video bytes go only to Cloudflare Stream.
+Cleanup is reference-aware, dry-run-first, and provider-first where required.
 
-Hard-coded paths like `/assets/images/pages/trust.webp` must resolve inside
-`next-app/public/assets`. Supabase Storage URLs are allowed for uploaded product
-images and are covered by `next.config.ts` remote image patterns.
+### Keep checkout authoritative
 
-Never store product image bytes as base64/data-URI payloads in `products.images`
-or `products.image_urls`. Those columns are URL/path arrays only. New uploaded
-inventory photos should go to Supabase Storage bucket `product-images`; local
-product photos are legacy or deliberate app-bundled assets.
+Never trust browser amounts, shipping fees, method labels, country/state/ZIP,
+or product availability. Recompute them with `checkout-pricing.ts`,
+`checkout-shipping.ts`, and `us-address.ts`. PayPal breakdown and stored order
+totals must reconcile exactly to cents.
 
-### 5. Keep EN/ES routes together
+Current tax behavior is 6% on merchandise plus charged shipping for Florida
+taxable orders, and $0 Florida tax for non-Florida destinations. Do not add
+county or other-state tax rules without reviewed jurisdiction requirements.
 
-When adding a page, ensure it behaves correctly for both locale prefixes. Update
-`next-app/messages/en.json` and `next-app/messages/es.json` for shared strings.
-Check sitemap behavior if the page should be indexed.
+### Keep public writes behind the app
 
-### 6. Never commit secrets
+Apply edge plus distributed route limits before expensive/provider work.
+Service-role access stays server-side. Public subscriber/account/inquiry/
+checkout mutations pass through validated Next routes rather than directly
+executable database RPCs.
 
-Keep `.env`, `.env.local`, service-role keys, Resend keys, and private
-credentials out of commits. Record only where credentials live.
+### Keep EN/ES behavior paired
 
-## Pre-publish checklist
+Changed user-facing routes, metadata, messages, filters, validation, legal copy,
+and transactional content must be checked in both languages.
 
-- [ ] `npm run build` passes from `next-app/`.
-- [ ] `npm run lint` passes or any existing lint debt is documented.
-- [ ] New/changed local images live under `next-app/public/assets`.
-- [ ] New uploaded product images live in Supabase Storage, not as database
-      blobs/base64 strings.
-- [ ] Supabase schema/type/UI changes are kept in sync.
-- [ ] EN and ES routes render for changed user-facing pages.
-- [ ] Root `netlify.toml` still points to `base = "next-app"`.
-- [ ] `project-docs/CURRENT_STATUS.md`, `TASKS.md`, and `CHANGELOG.md` are
-      updated for meaningful changes.
+### Never store secrets in project files
+
+Keep `.env`, `.env.local`, provider keys, service-role keys, and webhook secrets
+out of project memory and source. Document only variable names and dashboard/
+password-manager locations. Netlify is the operating environment source.
+
+### Keep memory bounded
+
+Update present state in `CURRENT_STATUS.md`, open work in `TASKS.md`, durable
+rationale in `DECISIONS.md`, and chronology in `CHANGELOG.md`. Do not append
+the same session report to all four files.
+
+## Pre-Publish Checklist
+
+- [ ] `npm test -- --run` passes.
+- [ ] `npm run lint` passes.
+- [ ] `npm run build` exits 0.
+- [ ] `npm audit --omit=dev` has no unresolved production vulnerability.
+- [ ] EN and ES render correctly for changed customer-facing behavior.
+- [ ] Responsive checks cover 320px mobile, tablet, short desktop, and wide
+      desktop without page-level overflow or unreachable controls.
+- [ ] New local assets live under `next-app/public/assets`; loose root source
+      artwork has an explicit temporary reason.
+- [ ] Product/media changes preserve Storage/Stream ownership and cleanup.
+- [ ] Schema/type/query/UI changes are synchronized.
+- [ ] Checkout changes are tested for Local Pickup, Florida shipping,
+      non-Florida shipping, invalid address/method tampering, and exact cents.
+- [ ] Public mutation changes preserve edge/distributed limits and server-only
+      secrets.
+- [ ] Root `netlify.toml` still builds from `next-app`.
+- [ ] Production SQL/environment/manual steps are called out in `TASKS.md`.
+- [ ] `CURRENT_STATUS.md`, `TASKS.md`, `DECISIONS.md`, and `CHANGELOG.md` reflect
+      the resulting state without duplicating full history.
+

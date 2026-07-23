@@ -6,10 +6,12 @@ import SiteFooter from '@/components/layout/SiteFooter';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
+  const isEs = locale === 'es';
   return {
-    title: 'Consignment & Auctions',
-    description:
-      'Auction guidance for estate jewelry, antiques, coins, watches, art, and high-value collections in Naples and Southwest Florida.',
+    title: isEs ? 'Consignación y Subastas' : 'Consignment & Auctions',
+    description: isEs
+      ? 'Orientación sobre subastas de joyería de patrimonio, antigüedades, monedas, relojes, arte y colecciones de alto valor en Naples y el suroeste de Florida.'
+      : 'Auction guidance for estate jewelry, antiques, coins, watches, art, and high-value collections in Naples and Southwest Florida.',
     alternates: alternatesFor('/auctions', locale),
   };
 }

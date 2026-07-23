@@ -143,7 +143,7 @@ begin
     raise exception 'Order % not found.', p_order_id using errcode = 'P0002';
   end if;
 
-  if existing.payment_status = 'paid' then
+  if existing.payment_status in ('paid', 'partially_refunded', 'refunded') then
     return query select existing.id, existing.order_number, true, false;
     return;
   end if;
@@ -151,10 +151,11 @@ begin
   -- Lock the product rows to prevent two concurrent captures from overselling
   -- the same item. The second caller blocks here until the first transaction commits.
   perform 1
-  from public.products p
-  join public.order_items oi on oi.product_id = p.id
-  where oi.order_id = p_order_id and oi.product_id is not null
-  for update;
+    from public.products p
+    join public.order_items oi on oi.product_id = p.id
+   where oi.order_id = p_order_id and oi.product_id is not null
+   order by p.id
+   for update;
 
   -- After acquiring locks, check whether any line can no longer be fully
   -- fulfilled: the product isn't 'available', or its remaining stock is less
@@ -172,13 +173,17 @@ begin
 
   if conflicted_titles is not null then
     -- Another buyer took the remaining stock first. Flag this order for admin
-    -- review + manual refund.
+    -- review + refund. Keep the capture reference even though fulfillment lost
+    -- the inventory race so the payment can be refunded safely.
     update public.orders
     set payment_status  = 'failed',
+        payment_reference = p_capture_id,
+        paypal_capture_id = p_capture_id,
         internal_notes  = coalesce(internal_notes || ' | ', '') ||
                           'Payment captured but item(s) no longer in sufficient stock: ' ||
-                          conflicted_titles || '. Manual PayPal refund required.',
-        payment_response = p_payment_response
+                          conflicted_titles || '. PayPal refund required.',
+        payment_response = p_payment_response,
+        paid_at = coalesce(paid_at, now())
     where id = p_order_id;
 
     return query select existing.id, existing.order_number, false, true;
@@ -204,6 +209,10 @@ begin
       status            = case
                             when coalesce(p.quantity, 1) - coalesce(oi.quantity, 1) <= 0 then 'sold'
                             else p.status
+                          end,
+      sold_price        = case
+                            when coalesce(p.quantity, 1) - coalesce(oi.quantity, 1) <= 0 then oi.price_snapshot
+                            else p.sold_price
                           end,
       reserved_until    = null,
       reserved_order_id = null

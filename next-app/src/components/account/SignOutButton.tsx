@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
@@ -11,21 +12,30 @@ interface Props {
 
 export default function SignOutButton({ label, locale, className }: Props) {
   const router = useRouter();
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push(locale === 'es' ? '/es' : '/');
-    router.refresh();
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      router.push(locale === 'es' ? '/es' : '/');
+      router.refresh();
+    } catch {
+      setIsSigningOut(false);
+    }
   }
 
   return (
     <button
       type="button"
       onClick={handleSignOut}
+      disabled={isSigningOut}
+      aria-busy={isSigningOut}
       className={['outline-button text-sm', className].filter(Boolean).join(' ')}
     >
-      {label}
+      {isSigningOut ? (locale === 'es' ? 'Cerrando sesion...' : 'Signing out...') : label}
     </button>
   );
 }
