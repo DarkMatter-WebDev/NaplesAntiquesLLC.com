@@ -6,12 +6,20 @@ import {
   normalizeShopFilterState,
   normalizeShopLengthInches,
   normalizeShopSearchQuery,
+  normalizeShopStatusFilter,
   normalizeShopWidthRanges,
   productMatchesShopLengthInches,
   productMatchesShopWidthRanges,
 } from '@/lib/shop-filter-state';
 
 describe('shop filter state', () => {
+  it('defaults the mutually exclusive inventory status to available', () => {
+    expect(normalizeShopStatusFilter(undefined)).toBe('available');
+    expect(normalizeShopStatusFilter('available')).toBe('available');
+    expect(normalizeShopStatusFilter('unexpected')).toBe('available');
+    expect(normalizeShopStatusFilter('Sold')).toBe('sold');
+  });
+
   it('trims storefront search text and removes whitespace-only queries', () => {
     expect(normalizeShopFilterState({ q: '  Tiffany  ' })).toEqual({ q: 'Tiffany' });
     expect(normalizeShopFilterState({ q: '   ' })).toEqual({});

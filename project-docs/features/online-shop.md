@@ -1,6 +1,6 @@
 ﻿# Feature: Online Shop
 
-> Current Next.js/Supabase shop behavior. Last updated: **2026-07-23**.
+> Current Next.js/Supabase shop behavior. Last updated: **2026-07-24**.
 
 ## Summary
 
@@ -149,8 +149,12 @@ listing without purity/weight/multiplier inputs.
   from list view and single-image cards and removes its transition for reduced
   motion.
 - Filters are URL-backed and include item group/type, metal, metal color,
-  purity, brand, gender, length/size, width, price range, availability, sort,
+  purity, brand, gender, length/size, width, price range, status, sort,
   and pagination.
+- Status is a mutually exclusive Available/Sold radio pair. Available is the
+  default for bare, cleared, and invalid URLs and is not counted as an extra
+  active filter. Sold is selected only explicitly and is preserved as
+  `?status=sold`. Spanish uses `Disponible` / `Vendido`.
 - Necklace and Bracelet reveal their Link Type, Length, and Width controls
   immediately below Item Type and before Brand. Length accepts current readable
   URL values plus unitless, decimal-equivalent, `inches`, and quoted legacy

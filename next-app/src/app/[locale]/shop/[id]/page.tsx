@@ -30,6 +30,7 @@ import { calcSpotMeltValue, formatUsdPrice, getStorefrontDisplayPrice, purityToF
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import ProductImageGallery from '@/components/shop/ProductImageGallery';
+import ProductBackLink from '@/components/shop/ProductBackLink';
 import WishlistButton from '@/components/shop/WishlistButton';
 import type { WishlistItem } from '@/context/WishlistContext';
 import CartButton from '@/components/shop/CartButton';
@@ -526,13 +527,15 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
 
         {/* Back to shop */}
         <div className="max-w-7xl mx-auto px-4 md:px-8 mb-6">
-          <Link
+          <ProductBackLink
             href={backHref}
+            productId={p.id}
+            shopHref={shopHref}
             className="hover-underline-grow inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest"
             style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
           >
             ← {backLabel}
-          </Link>
+          </ProductBackLink>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 md:px-8">

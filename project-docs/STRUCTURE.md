@@ -113,13 +113,12 @@ let additional loose app assets accumulate at root.
     `CHANGELOG.md` is the only full-history memory file.
 14. Do not run git commands in this source-of-truth folder.
 
-## Current Known Build Issue
+## Current Build Structure
 
-`npm run build` currently compiles the application, then Next's generated route
-contract rejects the named `renderShopPage` export in
-`src/app/[locale]/shop/(list)/page.tsx`. Until the shared renderer leaves the
-route module and the command exits 0, production build verification is not
-complete.
+`src/app/[locale]/shop/(list)/page.tsx` remains a thin Next route entry with
+only supported route exports. The reusable implementation lives beside it in
+`shop-page-renderer.tsx` and is shared with `/shop-modern`. The production build
+completed successfully on 2026-07-27.
 
 ## Cleanup Notes
 
@@ -131,4 +130,3 @@ complete.
   not startup memory.
 - The remaining legacy local-only product-image migration is tracked in
   `TASKS.md`.
-

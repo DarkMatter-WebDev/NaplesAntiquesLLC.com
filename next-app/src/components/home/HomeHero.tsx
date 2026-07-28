@@ -11,27 +11,17 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Carousel } from '../../../carousel/components/Carousel';
 import {
-  fetchSelectedItems,
-  fetchSettings,
   type CarouselItem,
   type CarouselSettings,
 } from '../../../carousel/lib/carouselData';
-import { DEFAULT_BG, DEFAULT_VISIBLE_COUNT } from '../../../carousel/lib/carouselConfig';
+import { DEFAULT_BG } from '../../../carousel/lib/carouselConfig';
 import HomeSubscriberForm from './HomeSubscriberForm';
 
 type Props = {
   locale: string;
-  fallbackItems: CarouselItem[];
+  initialItems: CarouselItem[];
+  initialSettings: CarouselSettings;
 };
-
-const FALLBACK_SETTINGS: CarouselSettings = {
-  showPrice: false,
-  bgColor: DEFAULT_BG,
-  visibleCountDesktop: DEFAULT_VISIBLE_COUNT,
-  visibleCountMobile: 4,
-};
-
-const HARD_FALLBACK_REVEAL_MS = 4500;
 
 // Matches the carousel's mobile breakpoint in the <style> below.
 const MOBILE_QUERY = '(max-width: 640px)';
@@ -65,46 +55,15 @@ const DARK_THEME: CSSProperties = {
   '--hero-btn-bg': 'rgba(212, 175, 55, 0.14)',
 } as CSSProperties;
 
-export default function HomeHero({ locale, fallbackItems }: Props) {
+export default function HomeHero({ locale, initialItems, initialSettings }: Props) {
   const isEs = locale === 'es';
   const storeHref = isEs ? '/es/shop' : '/shop';
 
   const sectionRef = useRef<HTMLElement>(null);
-  const [selectedItems, setSelectedItems] = useState<CarouselItem[]>([]);
-  const [settings, setSettings] = useState<CarouselSettings>(FALLBACK_SETTINGS);
-  const [carouselDataSettled, setCarouselDataSettled] = useState(false);
   const [heroReady, setHeroReady] = useState(false);
   // Only the text theme lives in React state (it flips rarely); the background
   // is set imperatively every frame to avoid a re-render per frame.
   const [dark, setDark] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    let dataSettledMarked = false;
-    const markDataSettled = () => {
-      if (cancelled || dataSettledMarked) return;
-      dataSettledMarked = true;
-      setCarouselDataSettled(true);
-    };
-    const fallbackTimer = window.setTimeout(markDataSettled, HARD_FALLBACK_REVEAL_MS);
-
-    Promise.allSettled([fetchSelectedItems(), fetchSettings()]).then(
-      ([itemsResult, settingsResult]) => {
-        if (cancelled) return;
-        window.clearTimeout(fallbackTimer);
-        if (dataSettledMarked) return;
-        if (itemsResult.status === 'fulfilled') setSelectedItems(itemsResult.value);
-        // Only the price flag comes from settings now; each photo carries its
-        // own background (white or black group).
-        if (settingsResult.status === 'fulfilled') setSettings(settingsResult.value);
-        markDataSettled();
-      },
-    );
-    return () => {
-      cancelled = true;
-      window.clearTimeout(fallbackTimer);
-    };
-  }, []);
 
   // Seed the section background before the first frame so there's no flash.
   useEffect(() => {
@@ -120,19 +79,18 @@ export default function HomeHero({ locale, fallbackItems }: Props) {
     mq.addEventListener('change', update);
     return () => mq.removeEventListener('change', update);
   }, []);
-  const visibleCount = isMobile ? settings.visibleCountMobile : settings.visibleCountDesktop;
+  const visibleCount = isMobile
+    ? initialSettings.visibleCountMobile
+    : initialSettings.visibleCountDesktop;
 
-  const items = selectedItems.length > 0 ? selectedItems : fallbackItems;
   // Render in the admin's curated order (position). The background sweep follows
   // each photo's own bg color as it reaches the front.
   const localizedItems = useMemo(
-    () => items.map((item) => withLocaleHref(item, locale)),
-    [items, locale],
+    () => initialItems.map((item) => withLocaleHref(item, locale)),
+    [initialItems, locale],
   );
 
   useEffect(() => {
-    if (!carouselDataSettled) return;
-
     let cancelled = false;
     let readyMarked = false;
 
@@ -171,7 +129,7 @@ export default function HomeHero({ locale, fallbackItems }: Props) {
       cancelled = true;
       window.clearTimeout(fallbackTimer);
     };
-  }, [carouselDataSettled, localizedItems, visibleCount]);
+  }, [localizedItems, visibleCount]);
 
   // Flip the text theme to match the photo centered behind the headline.
   const handleFrontItem = useCallback(
@@ -212,7 +170,7 @@ export default function HomeHero({ locale, fallbackItems }: Props) {
       <div className="home-carousel-theme">
         <Carousel
           items={localizedItems}
-          showPrice={settings.showPrice}
+          showPrice={initialSettings.showPrice}
           bg={DEFAULT_BG}
           cardWidth={15.5}
           perspective={35}

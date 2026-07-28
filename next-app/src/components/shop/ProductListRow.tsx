@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -26,6 +26,7 @@ import type { WishlistItem } from '@/context/WishlistContext';
 import CartButton from '@/components/shop/CartButton';
 import type { CartItem } from '@/context/CartContext';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
+import { rememberShopReturn } from '@/lib/shop-return';
 
 interface Props {
   product: Product;
@@ -64,6 +65,9 @@ export default function ProductListRow({ product, spotData, locale, hideSoldItem
   const stockQuantity = normalizeProductQuantity(product.quantity);
   const brand = product.brand?.trim() ?? '';
   const linkTypeLabel = getProductLinkTypeLabel(product);
+  const rememberReturnPosition = useCallback(() => {
+    rememberShopReturn(product.id);
+  }, [product.id]);
 
   const cartItem: CartItem = {
     id: product.id,
@@ -111,7 +115,7 @@ export default function ProductListRow({ product, spotData, locale, hideSoldItem
 
   return (
     <article className="shop-list-row">
-      <Link href={href} prefetch={false} className="shop-list-thumb" style={{ background: imageFrameBackground }}>
+      <Link href={href} prefetch={false} className="shop-list-thumb" style={{ background: imageFrameBackground }} onClick={rememberReturnPosition}>
         {thumb ? (
           <Image
             src={thumb}
@@ -147,7 +151,7 @@ export default function ProductListRow({ product, spotData, locale, hideSoldItem
           </span>
           <span className="shop-list-metal">{metalLabel}</span>
         </div>
-        <Link href={href} prefetch={false} className="shop-list-title-link">
+        <Link href={href} prefetch={false} className="shop-list-title-link" onClick={rememberReturnPosition}>
           <h3 className="shop-list-title hover-underline-grow">{title}</h3>
         </Link>
         <div className="shop-list-meta">

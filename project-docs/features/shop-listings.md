@@ -1,7 +1,7 @@
 # Feature: Shop Listings - Product Runbook
 
 > How to add, edit, audit, and retire listings in the current Next.js/Supabase
-> shop. Last updated: **2026-07-22**.
+> shop. Last updated: **2026-07-24**.
 
 ## Source Of Truth
 
@@ -62,9 +62,39 @@ Keep these fields especially consistent:
    `length` column and legacy `len:` tag are written.
 9. Verify the product on `/shop` and `/shop/[id]`.
 
-The Smart Listing Assistant uses the same length normalizer. Its non-overridable
-field contract accepts plain or inch-suffixed transcript evidence but requires
-one bare numeric output, including when an admin has saved a custom AI prompt.
+### Smart Listing Assistant
+
+The assistant is an iterative draft workflow:
+
+1. Add at least one photo, then type or speak the initial item details.
+2. Generate the first draft. Only high-confidence descriptive values going
+   into blank fields are applied automatically. Sensitive facts, uncertain
+   values, and anything that would replace an existing value remain pending.
+3. Read the assistant's explanation, warnings, and targeted clarification
+   questions. Review each pending card with Accept Proposed or Keep Existing;
+   Accept All / Keep All are available for deliberate bulk review.
+4. Use Read Aloud on any assistant turn, or enable automatic read-aloud. The
+   server uses an OpenAI-generated voice when configured and the browser falls
+   back to its built-in device voice when that service is unavailable.
+5. Type or speak answers and requested changes, then choose Send Feedback &
+   Update Listing. Repeat until the listing is ready.
+6. Use Undo Last AI Update when needed, review the normal listing fields, and
+   save through the standard editor action.
+
+Each turn uses the current form as its baseline, so manual edits and supported
+earlier values are preserved unless the admin asks to change them or stronger
+evidence contradicts them. Conversation context is bounded and exists only
+while that product editor is open; opening another Add/Edit editor resets it.
+No conversation is stored in Supabase.
+
+The same non-overridable safeguards apply on every turn. Buyer-facing copy
+cannot promote seller guesses as facts. Length accepts plain or inch-suffixed
+evidence but is normalized to one bare numeric value. Width is populated only
+for necklaces/bracelets and only from explicit reliable evidence. AI changes
+are never persisted until the admin saves the listing normally. The server,
+not the model prompt, determines which fields can auto-apply: any overwrite,
+low/medium/missing-confidence value, chain/measurement/purity/pricing fact, or
+other sensitive change requires explicit confirmation first.
 
 ## Edit A Listing
 

@@ -1,8 +1,8 @@
 ﻿# Architecture
 
 > Update whenever significant structural changes occur. Last updated:
-> **2026-07-23** after checkout address/shipping/tax centralization and memory
-> reconciliation.
+> **2026-07-24** after making the homepage carousel payload
+> server-authoritative.
 
 ## System Design
 
@@ -123,10 +123,14 @@ once; the curated list cycles through), photos carry a per-photo **White/Black
 group** that drives a **swept** hero background, images go through `next/image`
 with an off-screen preloader, and an `IntersectionObserver` pauses it offscreen.
 Admin curation is at `/admin/settings` â†’ `Store Carousel Hero`, backed by
-`next-app/carousel/lib/carouselData.ts`. The
-hero reads `carousel_selection` + `carousel_settings` on the client and falls back
-to hardcoded items if the tables are absent/empty. Setup SQL: `next-app/carousel/
-sql/setup.sql` (+ `add-per-item-bg.sql`, `add-visible-count.sql`,
+`next-app/carousel/lib/carouselData.ts`. The localized homepage reads
+`carousel_selection` + `carousel_settings` through
+`next-app/src/lib/home-carousel-server.ts`, caches the combined payload for
+five minutes under the `home-carousel` tag, and passes that one initial set to
+`HomeHero`. Successful Admin saves call the authenticated carousel revalidation
+route; hardcoded products are used only when the server query fails or the
+selection is empty. Setup SQL: `next-app/carousel/sql/setup.sql` (+
+`add-per-item-bg.sql`, `add-visible-count.sql`,
 `add-visible-count-mobile.sql`). Full detail: `project-docs/features/carousel-hero.md`.
 
 ## Customer-Facing Reveal Motion
@@ -144,8 +148,8 @@ images should not block the whole gallery. Shared CSS lives in
 and print. The home carousel hero carries `data-customer-reveal-skip` because
 the 3D carousel depends on unmodified ancestor transform/filter state and its
 own admin-driven visible-count/windowing behavior. `HomeHero` owns a local
-top-down readiness fade instead: after carousel data/settings settle and the
-visible ring image URLs plus fonts are ready, the headline fades in first, the
+top-down readiness fade instead: after the server-provided visible ring image
+URLs plus fonts are ready, the headline fades in first, the
 carousel layer second, and the subscriber/actions layer last while preserving
 the existing centered `translateX(-50%)` transforms.
 
@@ -576,8 +580,10 @@ Account routes live under `next-app/src/app/[locale]/account/`.
 The Product Admin Add/Edit drawer includes an integrated AI Listing Assistant
 that accepts typed text or browser speech-recognition transcript text, requests
 a structured product draft from the server, previews returned fields, and
-applies them into the current form state. It does not write directly to
-Supabase; the normal product Save flow remains the persistence step. The older
+applies only server-approved safe fields into the current form state. Pending
+overwrites, sensitive facts, and uncertain values require explicit admin
+accept/keep decisions. It does not write directly to Supabase; the normal
+product Save flow remains the persistence step. The older
 manual Quick Fill workflow is currently disabled in the editor UI
 (`SHOW_QUICK_FILL = false` in `AdminShell.tsx`), but its parser and gated panel
 still live in `AdminShell.tsx` so it can be restored without carrying a stale
@@ -591,11 +597,17 @@ The trust boundary is:
 
 - `next-app/src/app/api/admin/ai-product-fill/route.ts` verifies the signed-in
   Supabase user is an admin, validates transcript/images, rate-limits per admin
-  user, calls the provider-neutral draft function, coerces the result, and
-  returns structured JSON.
+  user, calls the provider-neutral draft function, coerces the result, compares
+  it with the current form, and returns structured JSON containing auto-apply
+  fields plus pending confirmation changes.
+- `next-app/src/app/api/admin/ai-speech/route.ts` verifies the same admin
+  boundary, validates and rate-limits response text, and streams OpenAI speech
+  audio without exposing the API key to the browser.
 - `next-app/src/lib/ai-product-schema.ts` owns the provider-neutral schema,
-  accepted field keys, enum coercion, warnings, and confidence/uncertainty
-  shape.
+  accepted field keys, enum coercion, warnings, confidence/uncertainty shape,
+  and the deterministic field-review classifier.
+- `next-app/src/lib/ai-speech.ts` owns provider-independent speech-text
+  validation. Browser device speech is a client-side availability fallback.
 - `next-app/src/lib/ai-product-provider.ts` is the only file that may read AI
   API keys, know provider names/model names, construct provider requests, parse
   provider-specific responses, or store the default extraction prompt
@@ -638,7 +650,9 @@ OPENAI_API_KEY=... or ANTHROPIC_API_KEY=... or GOOGLE_AI_API_KEY=...
 Optional controls include `AI_MODEL_FAST`, `AI_MODEL_ACCURATE`,
 `AI_MODEL_PREMIUM`, `AI_MAX_IMAGES`, `AI_MAX_IMAGE_BYTES`,
 `AI_RATE_LIMIT_HOURLY`, `AI_RATE_LIMIT_DAILY`, `AI_TIMEOUT_MS`, and
-`AI_MAX_OUTPUT_TOKENS`.
+`AI_MAX_OUTPUT_TOKENS`. Read-aloud uses `OPENAI_API_KEY` even when another
+listing provider is selected; optional `OPENAI_TTS_MODEL` and
+`OPENAI_TTS_VOICE` override the defaults (`gpt-4o-mini-tts` and `marin`).
 
 ## Deployment
 
@@ -669,7 +683,8 @@ npm run build
 Run `npm run lint` when touching TypeScript, React components, routing, or
 shared UI behavior.
 
-Current known build state: compilation succeeds, then Next's generated route
-contract rejects the named `renderShopPage` export from
-`src/app/[locale]/shop/(list)/page.tsx`. Treat this as a build blocker until the
-shared renderer is moved out of the route module and `npm run build` exits 0.
+Current build state: `src/app/[locale]/shop/(list)/page.tsx` is a thin route
+entry containing only valid Next exports. Shared rendering and metadata logic
+live in the colocated `shop-page-renderer.tsx`, which is also reused by
+`/shop-modern`. On 2026-07-27, Next.js 16.2.12 completed TypeScript, generated
+all 419 static pages, and exited 0.

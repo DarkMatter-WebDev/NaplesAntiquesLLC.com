@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { renderShopPage } from '@/app/[locale]/shop/(list)/page';
+import { renderShopPage } from '@/app/[locale]/shop/(list)/shop-page-renderer';
 
 interface Props {
   params: Promise<{ locale: string }>;

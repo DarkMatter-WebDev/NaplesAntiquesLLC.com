@@ -1,4 +1,13 @@
-import { PRODUCT_AUTOFILL_SCHEMA, type ProductAutofillProviderResult } from '@/lib/ai-product-schema';
+import {
+  PRODUCT_AUTOFILL_SCHEMA,
+  type ProductAutofillFields,
+  type ProductAutofillProviderResult,
+} from '@/lib/ai-product-schema';
+
+export type AiListingConversationMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
 
 export type GenerateProductDraftInput = {
   transcript: string;
@@ -6,6 +15,9 @@ export type GenerateProductDraftInput = {
   origin?: string;
   schema: typeof PRODUCT_AUTOFILL_SCHEMA;
   mode?: 'fast' | 'accurate' | 'premium';
+  iteration?: 'initial' | 'refine';
+  conversation?: AiListingConversationMessage[];
+  currentFields?: ProductAutofillFields;
   /**
    * The saved AI prompt (from the ai_settings table), when the admin has edited
    * it. When omitted or blank, the built-in starting prompt below is used. There
@@ -24,7 +36,7 @@ export type GenerateProductDraftOutput = {
   };
 };
 
-export const PROMPT_VERSION = 'product-listing-extraction-v16';
+export const PROMPT_VERSION = 'product-listing-confirmation-v18';
 const DEFAULT_TIMEOUT_MS = 30000;
 
 // Anthropic has no `response_format` JSON mode and (for some models) rejects assistant
@@ -40,8 +52,10 @@ const ANTHROPIC_OUTPUT_TOOL = {
       warnings: { type: 'array', items: { type: 'string' } },
       uncertainties: { type: 'array', items: { type: 'string' } },
       confidence: { type: 'object' },
+      assistant_message: { type: 'string' },
+      follow_up_questions: { type: 'array', items: { type: 'string' } },
     },
-    required: ['fields'],
+    required: ['fields', 'confidence', 'assistant_message', 'follow_up_questions'],
   },
 } as const;
 
@@ -51,6 +65,15 @@ export const CURRENT_PRODUCT_FIELD_CONTRACT = `CURRENT PRODUCT FIELD CONTRACT (N
 
 export const BUYER_FACING_COPY_GUARDRAILS = `BUYER-FACING COPY FIREWALL (NON-OVERRIDABLE):
 The fields title, description, and public_notes are shown directly to buyers. Never include, repeat, paraphrase, or attribute a seller suggestion, opinion, guess, requested wording, or unverified identification in any of those fields. This includes claims introduced with phrases such as "I think", "I believe", "probably", "possibly", "looks like", or "the seller says", as well as unsupported claims about brand, karat, gemstone identity, authenticity, age, provenance, or condition. Treat an uncertain seller statement as a suggestion, not as a fact. If a suggestion cannot be cleanly separated from an objective fact, omit the claim from buyer-facing fields and preserve it only as one concise warning or uncertainty for the admin to review. Objective seller-stated facts and clear visible markings may still be stated directly when they are appropriate for the field.`;
+
+export const ITERATIVE_LISTING_CONTRACT = `ITERATIVE LISTING CONVERSATION (NON-OVERRIDABLE):
+- You may receive currentListingFields, prior conversation turns, and latestUserInput. Treat currentListingFields as the listing baseline. Preserve supported existing values unless the latest user input explicitly asks to change them or stronger evidence proves they are wrong.
+- Treat every user turn as additional evidence or revision instructions. Assistant turns are context only and are never independent evidence for a product fact.
+- Return the COMPLETE revised fields object on every turn, including every schema field as a key. Do not return only the changed fields.
+- Return confidence for EVERY non-null field. Use high only for directly stated, clearly marked, or unmistakable visual facts; use medium or low whenever interpretation or uncertainty remains.
+- assistant_message must briefly explain what you updated, what you could not safely determine, and any important conflict that needs review. Speak directly to the admin in clear, helpful plain text. Do not use Markdown, headings, asterisks, or numbered/bulleted formatting.
+- follow_up_questions must contain concise, answerable questions for important applicable fields that remain unsupported, any conflicting evidence, or any instruction that is too ambiguous to apply. Ask only questions whose answers could improve this listing; do not ask about inapplicable fields. Return [] when nothing important remains.
+- Never claim the listing is complete when a required pricing fact is still missing.`;
 
 export const PRODUCT_EXTRACTION_SYSTEM_PROMPT = `You are a careful estate-catalog assistant for Naples Estate Jewelry. You help an admin populate intake fields from item photos plus an optional spoken or typed description. The catalog covers fine jewelry, gold, and sterling silver — including sterling/estate tableware, flatware, and holloware (goblets, trays, salvers, platters, bowls, candlesticks, pitchers, teapots, forks, spoons, knives, ladles, salad servers, tomato servers, serving sets, etc.). You are interpretive but not imaginative: organize messy input, classify the item form from photos, and write useful titles and descriptions — but never invent unsupported facts. Think like a careful catalog assistant, not a salesperson, appraiser, or inventory manager.
 
@@ -95,7 +118,7 @@ Use transcript evidence for factual claims, visible evidence for classification,
 
 OUTPUT FORMAT — respond with a single raw JSON object (no markdown, no code fences), shaped EXACTLY like this:
 {"fields": { <every field name from schema.fields>: <value or null> }, "warnings": [<string>], "uncertainties": [<string>], "confidence": { <field name>: "low" | "medium" | "high" }}
-Put EVERY extracted value INSIDE the "fields" object — never at the top level. Include each schema field key in "fields", using null when unsupported. "warnings", "uncertainties", and "confidence" are optional.`;
+Put EVERY extracted value INSIDE the "fields" object — never at the top level. Include each schema field key in "fields", using null when unsupported. "warnings" and "uncertainties" are optional. "confidence" is required for every non-null field.`;
 
 type PreparedImage = {
   dataUrl: string;
@@ -121,25 +144,31 @@ function providerConfig(mode?: GenerateProductDraftInput['mode']) {
 /** The one active prompt: the saved value when set, else the built-in starting prompt. */
 export function buildProductSystemPrompt(systemPrompt?: string): string {
   const basePrompt = systemPrompt?.trim() || PRODUCT_EXTRACTION_SYSTEM_PROMPT;
-  return `${basePrompt}\n\n${CURRENT_PRODUCT_FIELD_CONTRACT}\n\n${BUYER_FACING_COPY_GUARDRAILS}`;
+  return `${basePrompt}\n\n${CURRENT_PRODUCT_FIELD_CONTRACT}\n\n${ITERATIVE_LISTING_CONTRACT}\n\n${BUYER_FACING_COPY_GUARDRAILS}`;
 }
 
 function resolveSystemPrompt(input: GenerateProductDraftInput): string {
   return buildProductSystemPrompt(input.systemPrompt);
 }
 
-function buildUserPrompt(input: GenerateProductDraftInput) {
+export function buildProductUserPrompt(input: GenerateProductDraftInput) {
   return JSON.stringify({
-    task: 'extract_product_listing_fields',
+    task: input.iteration === 'refine'
+      ? 'refine_product_listing_from_feedback'
+      : 'extract_product_listing_fields',
     promptVersion: PROMPT_VERSION,
     schema: input.schema,
-    transcript: input.transcript,
+    latestUserInput: input.transcript,
+    currentListingFields: input.currentFields ?? null,
+    conversation: input.conversation ?? [],
     imageCount: input.images.length,
     respondWith: {
       fields: 'object — include EVERY name from schema.fields as a key, with its value or null',
       warnings: 'string[] (optional)',
       uncertainties: 'string[] (optional)',
-      confidence: 'object — filled field name -> "low" | "medium" | "high" (optional)',
+      confidence: 'object — EVERY non-null field name -> "low" | "medium" | "high" (required)',
+      assistant_message: 'string — concise update for the admin',
+      follow_up_questions: 'string[] — important questions that would improve or complete the listing',
     },
   });
 }
@@ -252,7 +281,7 @@ async function callOpenAi(input: GenerateProductDraftInput, model: string): Prom
         {
           role: 'user',
           content: [
-            { type: 'text', text: buildUserPrompt(input) },
+            { type: 'text', text: buildProductUserPrompt(input) },
             ...images.map((image) => ({ type: 'image_url', image_url: { url: image.dataUrl } })),
           ],
         },
@@ -287,7 +316,7 @@ async function callAnthropic(input: GenerateProductDraftInput, model: string): P
         {
           role: 'user',
           content: [
-            { type: 'text', text: buildUserPrompt(input) },
+            { type: 'text', text: buildProductUserPrompt(input) },
             ...images.map((image) => ({
               type: 'image',
               source: { type: 'base64', media_type: image.mimeType, data: image.base64 },
@@ -329,7 +358,7 @@ async function callGoogle(input: GenerateProductDraftInput, model: string): Prom
       contents: [{
         role: 'user',
         parts: [
-          { text: buildUserPrompt(input) },
+          { text: buildProductUserPrompt(input) },
           ...images.map((image) => ({ inlineData: { mimeType: image.mimeType, data: image.base64 } })),
         ],
       }],
@@ -353,7 +382,7 @@ async function callLocal(input: GenerateProductDraftInput, model: string): Promi
     {
       model,
       system: systemPrompt,
-      prompt: buildUserPrompt(input),
+      prompt: buildProductUserPrompt(input),
       images: images.map((image) => ({ dataUrl: image.dataUrl, mimeType: image.mimeType })),
       schema: input.schema,
     },

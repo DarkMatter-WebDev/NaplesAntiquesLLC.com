@@ -4,7 +4,7 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-07-23**.
+> compaction. Last reconciled: **2026-07-24**.
 
 ## Repository And Memory
 
@@ -93,6 +93,21 @@ catalog values and may include admin-created custom types.
 Public browse shows Available and optionally Sold products. Draft,
 Pending Payment, and Archived remain private. Sold-price masking is a display/
 structured-data policy and never erases product/order price history.
+
+The public status filter always selects exactly one state. Available is the
+default for bare, cleared, or invalid shop URLs; Sold inventory is shown only
+after the shopper explicitly selects Sold. Available is the baseline rather
+than an extra active-filter count.
+
+### Homepage carousel uses one server-authoritative initial payload
+
+The localized homepage reads `carousel_selection` and `carousel_settings` on
+the server and renders that result into the initial HTML. `HomeHero` must not
+perform a second client-side selection/settings fetch after hydration. The
+read is cached for five minutes under the `home-carousel` tag; successful
+Admin carousel saves invalidate that tag immediately. Bundled carousel products
+remain a resilience fallback only when the server read fails or returns no
+selected products.
 
 ### Optimize cards before introducing virtualization
 
@@ -184,6 +199,34 @@ not be presented as fact in title, description, or public notes. Objective
 facts and visible markings may be used; unresolved uncertainty remains an
 admin-facing warning.
 
+### AI listing refinement is conversational but remains a draft
+
+The open product editor owns the AI conversation. Every turn sends the current
+form as the baseline plus a bounded set of prior turns, returns a complete
+revised field set, explains changes, and asks only relevant clarification
+questions. Current supported values are preserved unless the admin requests a
+change or stronger evidence contradicts them.
+
+Conversation state resets when a different Add/Edit editor opens and is not
+stored in product rows. AI revisions update only the unsaved form; the normal
+Save action remains the sole persistence boundary. The buyer-copy firewall and
+explicit-only measurement rules apply on every refinement turn.
+
+### AI review safety is application-enforced
+
+The model prompt is guidance, not the confirmation boundary. After coercion,
+the server compares every returned field with the current form. Only a
+high-confidence, non-sensitive value added to a blank field may auto-apply.
+Every replacement of an existing value, low/medium/missing-confidence value,
+and chain, measurement, purity, or pricing fact stays pending until the admin
+accepts it. Warnings, uncertainties, and unchanged values without high
+confidence generate explicit clarification questions.
+
+Read-aloud is admin-only. The server may use OpenAI's speech endpoint with the
+server-held key; the browser falls back to its device voice when unavailable.
+The UI identifies playback as an AI-generated voice, and speech is never stored
+with the product or conversation.
+
 ### Spanish regeneration is explicit and fill-only
 
 The Edit Listing action generates Spanish values only for blank Spanish fields.
@@ -256,6 +299,19 @@ not enter production.
 No secret values are documented or committed. Netlify owns current operating
 environment values; local `.env.local` is not authoritative.
 
+### Security remediation must preserve a working supported toolchain
+
+Production dependency safety is measured with the deployed tree and
+`npm audit --omit=dev`, then verified by tests, lint, and a complete production
+build. A full-audit finding in development-only lint tooling is still tracked,
+but an audit tool's forced major downgrade/upgrade must not replace a supported
+toolchain with one that fails at startup.
+
+As of 2026-07-27, production uses patched Next.js, PostCSS, and Sharp versions
+and audits cleanly. Stable `eslint-config-next` still bundles React lint plugins
+that reject ESLint 10, so the working ESLint 9 line remains until upstream
+stable compatibility lands.
+
 ## Compliance And Marketing
 
 Account registration records policy acceptance. Newsletter subscribers are
@@ -272,6 +328,17 @@ preference update before deployment.
 Customer text actions use one left-to-right underline reveal for hover and
 keyboard focus, with reduced-motion support. Persistent content underlines and
 selected indicators remain unchanged.
+
+Customer page-reveal animations must never gate the visibility of a product
+page on offscreen or lazy-loaded gallery thumbnails. The shared reveal ignores
+lazy images and has a short fallback, so primary content remains visible even
+if a non-lazy media resource stalls; deferred media may load afterward.
+
+When a buyer opens a product from the shop, preserve the exact localized shop
+URL and vertical position in tab-scoped session storage. Back to Shop restores
+that recorded context only for the same product and shop URL; direct product
+entries retain the ordinary `/shop` fallback. This avoids polluting shareable
+product URLs with transient navigation state.
 
 Desktop interactive controls should expose a small, consistent hover lift or
 color/background reaction plus press feedback. Mobile-only controls are not

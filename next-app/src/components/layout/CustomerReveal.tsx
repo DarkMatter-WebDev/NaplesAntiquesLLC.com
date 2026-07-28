@@ -36,6 +36,7 @@ const EXCLUDE_SELECTOR = [
 ].join(',');
 
 const BACKGROUND_URL_PATTERN = /url\((?:"([^"]+)"|'([^']+)'|([^)"']+))\)/g;
+const REVEAL_MEDIA_TIMEOUT_MS = 1400;
 
 function backgroundUrlsFor(element: Element) {
   const urls = new Set<string>();
@@ -82,14 +83,31 @@ function revealElement(element: HTMLElement, index: number) {
   element.dataset.customerReveal = 'pending';
   element.style.setProperty('--customer-reveal-delay', `${Math.min(index, 7) * 70}ms`);
 
-  const imagePromises = Array.from(element.querySelectorAll('img')).map(waitForImage);
+  // Lazy images are intentionally allowed to remain offscreen and unloaded.
+  // Waiting for them here can hide an otherwise ready page indefinitely (for
+  // example, a horizontally scrollable product thumbnail gallery on mobile).
+  const imagePromises = Array.from(element.querySelectorAll('img'))
+    .filter((image) => image.loading !== 'lazy')
+    .map(waitForImage);
   const backgroundPromises = backgroundUrlsFor(element).map(waitForBackground);
   const fontsReady = 'fonts' in document ? document.fonts.ready.catch(() => undefined) : Promise.resolve();
+  let hasRevealed = false;
 
-  Promise.allSettled([...imagePromises, ...backgroundPromises, fontsReady]).then(() => {
+  const reveal = () => {
+    if (hasRevealed) return;
+    hasRevealed = true;
     window.requestAnimationFrame(() => {
       element.dataset.customerReveal = 'visible';
     });
+  };
+
+  // A decorative animation may delay content briefly, but must never become a
+  // permanent visibility gate when a network resource is slow or unavailable.
+  const fallbackTimer = window.setTimeout(reveal, REVEAL_MEDIA_TIMEOUT_MS);
+
+  Promise.allSettled([...imagePromises, ...backgroundPromises, fontsReady]).then(() => {
+    window.clearTimeout(fallbackTimer);
+    reveal();
   });
 }
 

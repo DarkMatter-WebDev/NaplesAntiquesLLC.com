@@ -21,9 +21,9 @@
 | **Primary contact** | Chris — (239) 404-8505 |
 | **Primary domain** | `naplesestatejewelry.co` |
 | **Related domains** | `naplesjewelrybuyers.com` (live, separate site). `naplesestatejewelry.com` is NOT owned — parked/for sale on GoDaddy, confirmed 2026-07-11 |
-| **Hosting** | Netlify (Next.js via `@netlify/plugin-nextjs`) — site name/ID: _TBD_ |
+| **Hosting** | Netlify (Next.js via `@netlify/plugin-nextjs`) — site slug: `naplesantiques`; site ID still _TBD_ |
 | **GitHub repo** | `https://github.com/DarkMatter-WebDev/NaplesAntiquesLLC.com` (owner: DarkMatter-WebDev) |
-| **Netlify site** | _TBD — confirm Netlify team + site slug_ |
+| **Netlify site** | `naplesantiques` — team still _TBD_ |
 | **DNS / registrar** | _TBD_ |
 | **Maintenance plan** | _TBD — define scope, cadence, response time_ |
 | **Billing status** | _TBD_ |
@@ -62,7 +62,7 @@
 ### Outstanding requests
 
 - Confirm production Supabase auth redirect URLs match the live domain.
-- Provide/confirm Netlify site name, DNS registrar, and maintenance-plan details
+- Confirm the Netlify team/site ID, DNS registrar, and maintenance-plan details
   to complete this record.
 
 ### Notes

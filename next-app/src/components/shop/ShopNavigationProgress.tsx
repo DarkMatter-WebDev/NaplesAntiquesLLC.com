@@ -26,6 +26,7 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLinkStatus } from 'next/link';
+import { clearRequestedShopReturn, readRequestedShopReturn } from '@/lib/shop-return';
 
 interface ShopNavigationContextValue {
   isPending: boolean;
@@ -104,6 +105,30 @@ export function LinkPendingBridge() {
     reportLinkPending(pending);
     return () => reportLinkPending(false);
   }, [pending, reportLinkPending]);
+
+  return null;
+}
+
+// Product-detail navigation records the exact shop URL and scroll offset before
+// leaving the catalog. Restore it only after an explicit Back to Shop action.
+export function ShopScrollRestoration() {
+  useEffect(() => {
+    const scrollY = readRequestedShopReturn();
+    if (scrollY == null) return;
+
+    let secondFrame: number | undefined;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        window.scrollTo(0, scrollY);
+        clearRequestedShopReturn();
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    };
+  }, []);
 
   return null;
 }

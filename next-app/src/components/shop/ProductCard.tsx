@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { formatProductItemYear, inferProductJewelryType, isProductPurchasable, isProductSold, normalizeProductQuantity, normalizeProductStatus, productImagePaddingBackground, productImagePaddingForImage, productLengthSizeDisplay, productMetalVariantLabel, productStatusLabel, productSupportsLinkType, productWidthDisplay, type Product, type SpotData } from '@/types/product';
@@ -11,6 +11,7 @@ import CartButton from '@/components/shop/CartButton';
 import type { CartItem } from '@/context/CartContext';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 import { getMountedProductImageIndexes } from '@/lib/shop-card-images';
+import { rememberShopReturn } from '@/lib/shop-return';
 
 interface Props {
   product: Product;
@@ -77,6 +78,9 @@ export default function ProductCard({
     () => getMountedProductImageIndexes(images.length, safeActiveImageIndex, hasCarouselInteraction),
     [hasCarouselInteraction, images.length, safeActiveImageIndex],
   );
+  const rememberReturnPosition = useCallback(() => {
+    rememberShopReturn(product.id);
+  }, [product.id]);
 
   const cartItem: CartItem = {
     id: product.id,
@@ -239,7 +243,7 @@ export default function ProductCard({
         )}
 
         {activeImage ? (
-          <Link href={href} prefetch={false} className="absolute inset-0">
+          <Link href={href} prefetch={false} className="absolute inset-0" onClick={rememberReturnPosition}>
             {mountedImageIndexes.map((index) => {
               const image = images[index];
               return (
@@ -351,7 +355,7 @@ export default function ProductCard({
           {metalLabel}
         </span>
 
-        <Link href={href} prefetch={false} className="group/title">
+        <Link href={href} prefetch={false} className="group/title" onClick={rememberReturnPosition}>
           <h3
             className="hover-underline-grow font-bold text-[0.98rem] leading-snug mt-0.5 line-clamp-3"
             style={{

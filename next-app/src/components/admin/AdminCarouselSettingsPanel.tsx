@@ -224,7 +224,20 @@ export default function AdminCarouselSettingsPanel() {
       });
       setVisibleCountDesktop(String(desktop));
       setVisibleCountMobile(String(mobile));
-      showNotice('Carousel hero settings saved.');
+      let storefrontRefreshed = false;
+      try {
+        const response = await fetch('/api/admin/carousel/revalidate', { method: 'POST' });
+        storefrontRefreshed = response.ok;
+      } catch {
+        // The database save succeeded. The server cache also expires on its
+        // five-minute timer, so a revalidation hiccup should not report the
+        // whole save as failed.
+      }
+      showNotice(
+        storefrontRefreshed
+          ? 'Carousel hero settings saved and the storefront cache was refreshed.'
+          : 'Carousel hero settings saved. The storefront may take up to five minutes to refresh.',
+      );
     } catch (error) {
       showNotice(getErrorMessage(error), false);
     } finally {

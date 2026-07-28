@@ -4,6 +4,7 @@ export type ShopItemGroup = 'jewelry' | 'everything-else';
 
 export interface ShopFilterState {
   [key: string]: string | string[] | undefined;
+  status?: string;
   itemGroup?: string;
   itemType?: string;
   chainType?: string;
@@ -51,6 +52,13 @@ const VALID_SORTS = new Set([
   'brand-asc',
   'brand-desc',
 ]);
+
+export type ShopStatusFilter = 'available' | 'sold';
+
+/** The public shop always displays exactly one inventory status. */
+export function normalizeShopStatusFilter(value: string | undefined): ShopStatusFilter {
+  return value?.trim().toLowerCase() === 'sold' ? 'sold' : 'available';
+}
 
 export function isShopJewelryItemType(itemType: string | undefined): boolean {
   return Boolean(itemType && SHOP_JEWELRY_ITEM_TYPES.has(itemType));

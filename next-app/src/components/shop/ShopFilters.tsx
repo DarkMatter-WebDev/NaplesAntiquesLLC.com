@@ -178,6 +178,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
   const currentItemGroup = getExplicitShopItemGroup(currentFilters.itemGroup);
   const showMetalFilter = currentItemGroup !== 'everything-else';
   const showGenderFilter = currentItemGroup !== 'everything-else';
+  const selectedStatus = currentFilters.status?.toLowerCase() === 'sold' ? 'sold' : 'available';
   const [filtersOpen, setFiltersOpen] = useState(false);
   const selectedPriceSource = `${selectedPriceMin}:${selectedPriceMax}`;
   const [draftPrice, setDraftPrice] = useState({
@@ -313,7 +314,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
     currentFilters.metal ||
     visibleMetalColor ||
     currentFilters.purity ||
-    currentFilters.status ||
+    selectedStatus === 'sold' ||
     currentFilters.itemType ||
     (showLinkTypeFilter && currentFilters.chainType) ||
     visibleSelectedLengths.length > 0 ||
@@ -330,7 +331,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
     currentFilters.metal,
     visibleMetalColor,
     currentFilters.purity,
-    currentFilters.status,
+    selectedStatus === 'sold' ? 'sold' : undefined,
     currentFilters.itemType,
     showLinkTypeFilter ? currentFilters.chainType : undefined,
     ...visibleSelectedLengths,
@@ -1005,18 +1006,27 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
             </div>
           )}
 
-          {/* Available only toggle */}
-          <div className="shop-available-row" style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.5rem' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.8125rem', fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}>
-              <input
-                type="checkbox"
-                checked={currentFilters.status === 'available' || currentFilters.status === 'Available'}
-                onChange={(e) => updateFilter('status', e.target.checked ? 'available' : '')}
-                style={{ accentColor: '#735c00', width: '0.9rem', height: '0.9rem' }}
-              />
-              {isEs ? 'Solo disponibles' : 'Available only'}
-            </label>
-          </div>
+          {/* Exactly one public inventory status is active at a time. */}
+          <fieldset
+            className="shop-status-row"
+            aria-label={isEs ? 'Estado del inventario' : 'Inventory status'}
+          >
+            {([
+              { value: 'available', label: isEs ? 'Disponible' : 'Available' },
+              { value: 'sold', label: isEs ? 'Vendido' : 'Sold' },
+            ] as const).map((option) => (
+              <label key={option.value} className="shop-status-option">
+                <input
+                  type="radio"
+                  name="shop-status"
+                  value={option.value}
+                  checked={selectedStatus === option.value}
+                  onChange={() => updateFilter('status', option.value)}
+                />
+                <span>{option.label}</span>
+              </label>
+            ))}
+          </fieldset>
 
           <div className="shop-apply-filters-row">
             <button
@@ -1390,7 +1400,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
             width: 100%;
             min-width: 0 !important;
           }
-          .shop-available-row {
+          .shop-status-row {
             justify-content: flex-start !important;
           }
           .shop-apply-filters-row {
@@ -1484,7 +1494,30 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
           background-color: #ffffff !important;
           box-shadow: 0 8px 18px rgba(42, 34, 12, 0.04);
         }
-        .shop-filters-modern .shop-available-row {
+        .shop-status-row {
+          display: flex;
+          justify-content: center;
+          gap: 1.25rem;
+          margin: 0 0 0.5rem;
+          padding: 0;
+          border: 0;
+        }
+        .shop-status-option {
+          display: flex;
+          align-items: center;
+          gap: 0.45rem;
+          color: var(--color-on-surface-variant);
+          cursor: pointer;
+          font-family: var(--font-label);
+          font-size: 0.8125rem;
+        }
+        .shop-status-option input {
+          width: 0.9rem;
+          height: 0.9rem;
+          accent-color: #735c00;
+          cursor: pointer;
+        }
+        .shop-filters-modern .shop-status-row {
           padding-top: 0.1rem;
         }
         .shop-filters-modern > div:last-of-type {

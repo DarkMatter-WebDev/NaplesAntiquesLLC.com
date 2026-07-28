@@ -7,6 +7,7 @@ import { CardGrid, PageContainer, Section } from '@/components/layout/Responsive
 import HomeHero from '@/components/home/HomeHero';
 import HomeBootSplash from '@/components/home/HomeBootSplash';
 import ServiceIconCanvas from '@/components/home/ServiceIconCanvas';
+import { getHomeCarouselPayload } from '@/lib/home-carousel-server';
 import type { CarouselItem } from '../../../../carousel/lib/carouselData';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -45,10 +46,7 @@ export default async function HomePage({ params }: Props) {
   const evalHref = isEs ? '/es/free-evaluation' : '/free-evaluation';
   const contactHref = isEs ? '/es/contact' : '/contact';
 
-  const fallbackItems = HOME_CAROUSEL_FALLBACK.map((item) => ({
-    ...item,
-    href: item.href ? `${isEs ? '/es' : ''}${item.href}` : null,
-  }));
+  const carousel = await getHomeCarouselPayload(HOME_CAROUSEL_FALLBACK);
 
   return (
     <>
@@ -58,7 +56,7 @@ export default async function HomePage({ params }: Props) {
       <main className="flex flex-col pt-16">
 
         {/* Hero — 3D carousel as full-bleed background, color-fading per photo */}
-        <HomeHero locale={locale} fallbackItems={fallbackItems} />
+        <HomeHero locale={locale} initialItems={carousel.items} initialSettings={carousel.settings} />
 
         {/* Services strip */}
         <Section

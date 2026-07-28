@@ -1,5 +1,229 @@
 # Changelog
 
+## 2026-07-28 - Audited equal Available and Sold shop counts
+
+- Reproduced Silver + Everything Else with Available and Sold selected in the
+  local preview. Both views report `29 of 127 pieces` and paginate as
+  `Showing 1-24 of 29`.
+- Confirmed the URLs, selected radios, product status badges, first products,
+  and price ranges all change correctly between the two views. The current
+  catalog genuinely contains 29 matching products in each status.
+- Verified in source that status participates in the database query, cache key,
+  and final in-memory filter. The numerator is the filtered result count; the
+  denominator deliberately remains the whole visible public inventory.
+- No application code, database data, or production configuration changed.
+
+## 2026-07-28 - Verified all security SQL after owner rerun
+
+- Re-ran the live read-only Supabase privilege and catalog probes after the
+  owner applied the scripts again. Both subscriber RPCs and the rate-limit RPC
+  are blocked for `anon`/`authenticated` and remain executable by
+  `service_role`.
+- Confirmed the rate-limit function is `SECURITY DEFINER`, pins
+  `search_path=public`, contains parameter validation, upsert behavior, and the
+  current deterministic one-percent/one-day cleanup, and has
+  `rate_limits_window_start_idx`.
+- Reconfirmed all seven internal product columns are unreadable to
+  `authenticated` while `products.id` remains readable. Every final verification
+  boolean returned true.
+- The owner deferred the currently missing Cloudflare Stream, OpenAI
+  server-voice, and scheduled-Etsy variables because those features are not
+  priorities for this deployment.
+- No application code or additional production state was changed during this
+  verification.
+
+## 2026-07-28 - Audited live SQL hardening and Netlify variable names
+
+- Ran read-only production catalog/privilege probes in Supabase. The
+  authenticated product internal-column hardening is fully applied.
+  Subscriber hardening is incomplete because the subscribe RPC remains
+  executable by `anon` and `authenticated`, although unsubscribe is blocked.
+  Rate-limit execution grants, `SECURITY DEFINER`, and `search_path=public` are
+  correct, but the latest cleanup logic and supporting index are absent.
+- Inspected the `naplesantiques` Netlify environment-variable configuration by
+  key name only; no values were revealed or recorded. Core Supabase, URL,
+  email, PayPal, Anthropic AI, Etsy, and eBay entries are present. The four
+  documented Cloudflare Stream variables, `OPENAI_API_KEY`, and
+  `ETSY_CRON_SECRET` are absent, with the latter two affecting only
+  server-generated read-aloud and optional scheduled Etsy price pushes.
+- No application code, database rows, database definitions, environment
+  variables, or deployed site content were changed.
+
+## 2026-07-27 - Cleared production build and dependency blockers
+
+- Revalidated the findings before editing against current Next.js guidance,
+  GitHub advisories, live npm registry versions, a fresh production audit, and
+  the current failing build.
+- Moved the reusable shop renderer and metadata helper out of the special
+  `page.tsx` route module into colocated `shop-page-renderer.tsx`. The route now
+  exposes only valid Next exports, while `/shop-modern` imports the shared
+  renderer directly.
+- Updated Next.js and `eslint-config-next` to 16.2.12 and Sharp to 0.35.3.
+  Production overrides pin PostCSS 8.5.23 and Sharp 0.35.3 throughout nested
+  dependencies, including Next's bundled image dependency.
+- Confirmed `npm audit --omit=dev` reports zero vulnerabilities. The full audit
+  retains nine development-only findings through ESLint 9's old matching
+  stack. The suggested ESLint 10 upgrade was tested, rejected, and reverted
+  because Next's stable React lint plugins fail at rule startup; the supported
+  ESLint 9 configuration passes.
+- All 452 tests and lint passed. Next.js completed TypeScript, generated all 419
+  static pages, and exited 0. English/Spanish shop routes, `/shop-modern`, the
+  affected multi-image detail page, checkout, contact, auth redirect, and metal
+  prices returned expected responses. Desktop shop and 390px product-detail
+  browser checks found no console warnings/errors or horizontal overflow.
+
+## 2026-07-27 - Audited manual-deploy readiness without code changes
+
+- Ran the full 452-test suite and lint; both passed.
+- Re-ran the exact Netlify build command. Compilation succeeded, but Next's
+  generated route contract still rejected the named `renderShopPage` export
+  from the shop route module, so the project is not deploy-ready.
+- Re-ran production and full dependency audits. The production audit reported
+  high-severity findings in Next.js 16.2.10, PostCSS 8.5.15, and Sharp 0.34.5;
+  the full audit reported 14 high-severity findings including development
+  tooling.
+- A parallel cold-preview probe reproduced the intermittent development JSON
+  parse failure. Both translation JSON files validated, and after a clean
+  preview restart, sequential checks returned 200 for English/Spanish home and
+  shop, the affected multi-image detail page, checkout, contact, and metal
+  prices; Admin correctly redirected to sign-in. Mobile-user-agent checks also
+  returned the expected shop/detail content without a server-error response.
+- No application code, configuration, database, or site content changed.
+
+## 2026-07-24 - Added AI change confirmation and read-aloud
+
+- Added an application-enforced review classifier after every AI listing
+  response. Only high-confidence descriptive values entering blank fields can
+  auto-apply; every overwrite, sensitive fact, and low/medium/missing-confidence
+  value remains pending until the admin chooses Accept Proposed.
+- Added per-field Current/Proposed review cards, Keep Existing, Accept Proposed,
+  Keep All, and Accept All controls. Warnings, uncertainties, and unchanged
+  values without high confidence now produce deterministic clarification
+  questions rather than relying only on model behavior.
+- Updated prompt v18 to require confidence for every populated field while
+  keeping the server-side classifier authoritative.
+- Added Read Aloud/Stop to every assistant response plus an optional persisted
+  automatic-play preference. The authenticated `/api/admin/ai-speech` route
+  streams `gpt-4o-mini-tts` audio with the `marin` default voice and keeps the
+  API key server-side; the browser falls back to its built-in voice if the
+  service is unavailable.
+- A live Admin test produced two overwrite proposals and confirmed neither
+  changed the form initially. Accepting one changed only that field, keeping
+  the other preserved its original value, Undo restored the accepted field,
+  and read-aloud exposed working playback/Stop controls through the local
+  device fallback. The test draft was closed without saving.
+- Eighteen focused tests and all 452 tests passed; lint passed. `npm run build`
+  compiled successfully before the unchanged `renderShopPage` route-contract
+  error stopped type checking.
+
+## 2026-07-24 - Replaced Available-only toggle with status radios
+
+- Replaced the public shop's `Available only` checkbox with mutually exclusive
+  `Available` and `Sold` radio controls (`Disponible` / `Vendido` in Spanish).
+- A missing, invalid, or Available status now resolves to Available-only
+  inventory; Sold inventory appears only when the shopper explicitly selects
+  Sold. Clear Filters therefore returns to Available rather than showing both
+  statuses.
+- Available is not counted as an extra active filter because it is the shop's
+  default state; Sold is counted and remains URL-backed as `?status=sold`.
+- Browser checks confirmed the default, Available → Sold → Available round
+  trip, exclusive checked state, matching results, and Spanish labels.
+- The focused 18-test filter suite, all 443 tests, and lint passed.
+  `npm run build` compiled successfully before the unchanged
+  `renderShopPage` route-contract error stopped type checking.
+
+## 2026-07-24 - Made homepage carousel server-authoritative
+
+- Moved the public homepage carousel selection/settings read into the server
+  render. The first HTML now contains the current Supabase-curated products,
+  and `HomeHero` no longer fetches a second image set after hydration.
+- Kept the six bundled products strictly as a server-query/empty-selection
+  fallback, so a Supabase outage can still render a usable hero without
+  introducing a normal-load handoff.
+- Added a five-minute tagged server cache and an authenticated admin
+  revalidation endpoint. Saving carousel settings now expires that cache
+  immediately; a failed invalidation still self-recovers within five minutes.
+- Added three payload-resolution regression tests. Six preview reloads all
+  started with the curated Rolex item and never contained the fallback name or
+  path; direct initial-HTML inspection confirmed the same. The preview console
+  had no warnings/errors.
+- `npm run lint` passed and the full suite passed all 442 tests.
+  `npm run build` compiled successfully before the unchanged
+  `renderShopPage` route-contract error stopped type checking.
+
+## 2026-07-24 - Audited homepage carousel image handoff
+
+- Confirmed the homepage does not currently load from one authoritative image
+  set. Initial HTML renders six hard-coded fallback products, then client-side
+  Supabase reads replace them with the current admin-curated selection.
+- Eight local reload traces showed the fallback DOM for 296–828 ms, always at
+  opacity 0 under normal-motion settings before the curated set appeared.
+- The deployed homepage reproduced the same sequence. Its Netlify-cached
+  initial HTML contained fallback names and no current curated Rolex image,
+  while the settled browser showed the curated set.
+- Reduced-motion CSS bypasses the hidden/loading state, providing a concrete
+  path for the fallback set to flash before replacement. Browser cache may
+  affect timing, but it is not the root cause.
+- Audit only: no application code, configuration, database rows, or carousel
+  settings changed. Tests, lint, and build were not rerun.
+
+## 2026-07-24 - Added iterative AI listing feedback
+
+- Converted the Smart Listing Assistant from one-shot generation into a
+  multi-turn conversation inside Add/Edit Listing.
+- Every turn now sends the current form as its baseline, returns a complete
+  revised draft, explains changes and limitations, and asks targeted questions
+  for missing required or conflicting facts.
+- Typed and spoken follow-up replies can repeatedly revise the listing. Undo
+  restores the form before the latest AI turn, and opening another listing
+  clears the conversation so product context cannot leak.
+- The conversation is bounded request context only; no schema or database
+  storage was added, and nothing persists until the admin uses the normal Save
+  action.
+- A real two-turn Admin preview asked four relevant questions, accepted the
+  answers, preserved requested values, and shortened the description. Nine
+  focused tests, all 439 tests, and lint passed. The production build compiled
+  before the unchanged `renderShopPage` route-contract error stopped type
+  checking.
+
+## 2026-07-24 - Restored shop position from product details
+
+- Product links in both gallery and list shop views now remember the exact
+  localized shop URL and scroll position for the active browser tab.
+- Back to Shop returns to that remembered page, filters, and position when the
+  buyer came from the same shop product; direct detail-page entries continue to
+  use the normal shop fallback.
+- Focused return-state tests passed (2), `npm test -- --run` passed all 437
+  tests, `npm run lint` passed, and a browser check returned from page 2 to
+  1,150px. `npm run build` compiled before the unchanged `renderShopPage`
+  route-contract error stopped type checking.
+
+## 2026-07-24 - Fixed customer-page reveal deadlock
+
+- Updated the shared customer reveal to ignore intentionally lazy images and
+  reveal after 1.4 seconds even when a non-lazy image or background stalls.
+- The 15-image Egyptian silver tray now remains visible at 390px while
+  offscreen thumbnails remain deferred.
+- Audited 28 public English/Spanish routes at 390px: no pending/hidden reveal
+  containers and no browser console warnings/errors.
+- `npm run lint` and `npm test -- --run` (435 tests) passed. `npm run build`
+  compiled successfully before the unchanged `renderShopPage` route-contract
+  error stopped type checking.
+
+## 2026-07-24 - Confirmed local development preview
+
+- Started the Next.js development server at `http://localhost:3000`.
+- Browser smoke-checked the homepage and `/shop`; both rendered successfully.
+- No source, database, or customer-data changes were made.
+
+## 2026-07-24 - Diagnosed mobile product-detail blank state
+
+- Reproduced the affected product at a 390px viewport.
+- Confirmed the route returned HTTP 200 with no browser console errors.
+- Found the shared customer-reveal wrapper waiting on offscreen lazy gallery
+  thumbnails, leaving the product content at `opacity: 0` after the initial
+  flash. No source, database, or customer-data changes were made.
+
 ## 2026-07-23 - Removed Admin Products summary cards
 
 Removed the shared Admin Products block that displayed the Total, Available,

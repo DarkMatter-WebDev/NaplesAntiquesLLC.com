@@ -37,16 +37,21 @@ route directly to `/shop`; the retired `/store` chooser route no longer exists.
 - `next-app/carousel/lib/carouselConfig.ts` — table/column mapping, `DEFAULT_BG`,
   `DEFAULT_VISIBLE_COUNT` / `MIN_VISIBLE_COUNT` / `MAX_VISIBLE_COUNT`.
 - `next-app/src/components/home/HomeHero.tsx` — the hero section. Owns the
-  imperative background paint + text theme, groups items into blocks, picks the
-  desktop/mobile visible count via `matchMedia`, and lays out the split overlay
-  (headline up top, sign-up form + Buy/Sell/Trade down low).
+  imperative background paint + text theme, uses the server-provided initial
+  payload, picks the desktop/mobile visible count via `matchMedia`, and lays out
+  the split overlay (headline up top, sign-up form + Buy/Sell/Trade down low).
+- `next-app/src/lib/home-carousel-server.ts` — public server read for the
+  curated selection/settings, optional-column compatibility, five-minute
+  tagged cache, and fallback resolution.
+- `next-app/src/lib/home-carousel-payload.ts` — pure one-payload resolver and
+  fallback settings used by the server read and regression tests.
 - `next-app/src/components/home/HomeSubscriberForm.tsx` — sign-up form; inputs use
   a solid light fill so they stay legible over both white and black hero phases.
 - `next-app/src/components/admin/AdminCarouselSettingsPanel.tsx` — admin curation:
   product search, ordered selection, per-photo White/Black group, show-price,
   desktop/mobile visible counts, and a live preview (mirrors the home sweep).
-- `next-app/src/app/[locale]/(home)/page.tsx` — passes locale + fallback items to
-  `HomeHero`.
+- `next-app/src/app/[locale]/(home)/page.tsx` — resolves and passes the
+  authoritative initial items/settings to `HomeHero`.
 
 ## Data Model (Supabase)
 
@@ -90,6 +95,15 @@ exact same optimized variant ahead of time.
 **Offscreen pause.** An `IntersectionObserver` on the scene toggles the ring's
 `animationPlayState` and starts/stops the rAF loop with visibility.
 
+**Initial payload + cache.** The localized Server Component resolves
+`carousel_selection` and `carousel_settings` before rendering `HomeHero`.
+`unstable_cache` keeps that combined public read for five minutes under the
+`home-carousel` tag. The client receives that one set in the initial HTML and
+does not refetch or replace it after hydration. Saving carousel settings calls
+the authenticated `/api/admin/carousel/revalidate` endpoint to expire the tag
+immediately. Bundled products appear only if the server query fails or the
+curated selection is empty.
+
 ## Admin Controls (`/admin/settings` → Store Carousel Hero)
 
 - Search + add/remove products; reorder with ↑/↓; per-row **White/Black** group
@@ -97,8 +111,9 @@ exact same optimized variant ahead of time.
 - **Show price on carousel** toggle.
 - **Cards visible at once** — separate **Desktop** and **Mobile** number fields
   (3–12). The preview uses the desktop value.
-- Save persists selection (with per-photo bg) + settings. The panel lives in a
-  wider `max-w-[1800px]` container so the two tables extend on widescreen.
+- Save persists selection (with per-photo bg) + settings and invalidates the
+  public carousel cache. The panel lives in a wider `max-w-[1800px]` container
+  so the two tables extend on widescreen.
 
 ## Migrations
 
@@ -122,6 +137,9 @@ persist; mobile count mirrors desktop), but nothing breaks.
 
 ## Gotchas
 
+- Do not reintroduce a client-side selection/settings bootstrap in `HomeHero`.
+  The server-provided payload is deliberately the only set present before and
+  after hydration; local products are resilience assets, not a staging set.
 - The dev preview runs the tab **hidden** (rAF + CSS animation frozen) and reports
   a 0px viewport — verify motion, the desktop breakpoint, and live sizing in a real
   browser, not the embedded preview.
