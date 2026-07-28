@@ -9,11 +9,21 @@ interface Props {
   onDark?: boolean;
 }
 
+const BUSINESS_TIME_ZONE = 'America/New_York';
+
 export function formatRemaining(ms: number): string {
   const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+export function formatUpdateTime(nextUpdateAt: number, locale: string): string {
+  return new Intl.DateTimeFormat(locale === 'es' ? 'es-US' : 'en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: BUSINESS_TIME_ZONE,
+  }).format(new Date(nextUpdateAt));
 }
 
 export default function PriceUpdateTicker({ nextUpdateAt, locale, onDark = false }: Props) {
@@ -29,12 +39,10 @@ export default function PriceUpdateTicker({ nextUpdateAt, locale, onDark = false
     };
   }, []);
 
-  const updateTime = useMemo(() => (
-    new Intl.DateTimeFormat(locale === 'es' ? 'es-US' : 'en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(new Date(nextUpdateAt))
-  ), [locale, nextUpdateAt]);
+  const updateTime = useMemo(
+    () => formatUpdateTime(nextUpdateAt, locale),
+    [locale, nextUpdateAt],
+  );
 
   return (
     <p

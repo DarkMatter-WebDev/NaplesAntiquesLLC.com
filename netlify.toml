@@ -20,9 +20,11 @@
   package = "@netlify/plugin-nextjs"
 
 # ---------------------------------------------------------------------------
-# Bot / scanner hardening — return 410 Gone for common probe paths so they are
-# not handed to the Next.js server. force = true ensures these win over the
-# framework catch-all. Evaluated before the legacy redirects below.
+# Bot / scanner hardening — the narrowly scoped
+# next-app/netlify/edge-functions/blocked-probes.ts handler returns 410 before
+# framework routing or redirects run. Keep these forced redirects as a
+# defense-in-depth fallback for platforms/builds that do not execute the edge
+# handler.
 # ---------------------------------------------------------------------------
 [[redirects]]
   from = "/wp-admin/*"

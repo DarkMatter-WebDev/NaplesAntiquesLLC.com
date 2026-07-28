@@ -80,6 +80,7 @@ let additional loose app assets accumulate at root.
 | eBay integration | `src/lib/ebay/`, eBay API routes, `ebay-sync-plan/`, and `features/ebay-sync.md` |
 | Distributed rate limits | `next-app/src/lib/rate-limit.ts` and hardening SQL |
 | Broad API edge limit | `next-app/netlify/edge-functions/api-rate-limit.ts` |
+| Blocked scanner probes | `next-app/netlify/edge-functions/blocked-probes.ts` with fallback rules in root `netlify.toml` |
 | Public-shop cache invalidation | `next-app/src/app/actions/admin-products.ts` |
 | Supabase clients | `next-app/src/lib/supabase/client.ts` and `server.ts` |
 | Translations | `next-app/messages/en.json` and `es.json` |

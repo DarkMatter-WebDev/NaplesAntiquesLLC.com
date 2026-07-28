@@ -14,9 +14,13 @@
   customer accounts, PayPal checkout, admin inventory/order tools, Etsy sync,
   eBay sync, and AI-assisted product entry.
 - Local development currently serves the app at `http://localhost:3000`.
-- Local source contains several changes newer than the last confirmed live-site
-  review. Deployment parity must not be assumed until the next Netlify deploy
-  and production smoke test.
+- The 2026-07-28 Netlify deployment is live and received a read-only production
+  smoke test covering the main English/Spanish storefront, affected mobile
+  product detail, checkout, forms, integrations, admin shell, headers, caching,
+  redirects, robots, and sitemap.
+- Local source is now one fix set ahead of that deployment: deterministic
+  Eastern-time product price-update labels and an edge-level 410 response for
+  common scanner probes. Manual deployment and live re-verification remain.
 
 ## Storefront
 
@@ -158,8 +162,10 @@
   column remains readable.
 - Admin routes require an authenticated admin profile. Browser clients use only
   public Supabase credentials; service-role access remains server-only.
-- CSP, HSTS, frame blocking, referrer, permissions, nosniff, and
-  cross-domain-policy headers are configured in Next and root Netlify config.
+- The deployed site returns the enforcing CSP, HSTS, frame blocking, referrer,
+  permissions, nosniff, and cross-domain-policy headers. HTTP and `www`
+  canonicalize to the HTTPS apex domain; fingerprinted Next assets return
+  one-year immutable caching.
 - Next.js is 16.2.12, PostCSS is overridden to 8.5.23, and Sharp is 0.35.3
   throughout the installed production tree. The production-only audit reports
   zero vulnerabilities.
@@ -169,8 +175,13 @@
   plugins bundled by `eslint-config-next@16.2.12` do not support it; lint fails
   at rule startup. This is not part of the deployed dependency tree. Monitor
   upstream stable tooling rather than forcing an incompatible major upgrade.
-- **Still pending:** deploy the 2026-07-21 application security changes and
-  verify the live response headers and Netlify Edge function behavior.
+- Common sensitive-path probes expose no content. `/config.json` returns the
+  configured 410; WordPress, XML-RPC, `.env`, and `.git` probes currently
+  resolve to Netlify/Next 404 responses instead of the intended 410. Local
+  source now adds a narrowly scoped `blocked-probes` edge response before
+  framework routing, while retaining the redirects as fallback. The deployed
+  statuses remain unchanged until the next manual deployment. Rate-limit
+  exhaustion was not intentionally triggered in production.
 
 ## Database And Deployment
 
@@ -211,6 +222,29 @@ Latest app verification for the current UI-maintenance pass:
   static pages generated, and the command exited 0.
 - Recent browser checks covered shop routes, filtering, responsive overflow,
   image loading, checkout address validation, and Florida/non-Florida totals.
+- 2026-07-28 production smoke test: live security headers, apex/HTTPS
+  redirects, immutable Next-asset caching, robots, and the 120-URL sitemap
+  passed. English/Spanish home and shop routes, Available/Sold inventory,
+  Silver + Everything Else counts, checkout/PayPal rendering, TradingView,
+  contact/evaluation forms, the signed-in Admin Products shell, and the AI
+  listing-assistant controls rendered without data writes or submissions. The
+  previously affected Egyptian tray remained visible at 390x844 with all
+  customer-reveal containers visible. Back to Shop restored page 2 and the
+  recorded card position. The hero used one server-authoritative product set;
+  later per-slot changes were the carousel's intentional back-of-ring cycling.
+- The same live test found one reproducible non-blocking React hydration error
+  on product details because Netlify formatted the update clock in UTC while
+  the browser used Eastern time. Local source now formats that clock explicitly
+  in `America/New_York`. English desktop/mobile and Spanish local checks hydrate
+  cleanly with no console warnings/errors; production remains on the old
+  behavior until the next manual deployment.
+- 2026-07-28 post-fix verification: five focused tests passed, the full suite
+  passed all 455 tests, lint passed, and the Next.js 16.2.12 production build
+  completed TypeScript and all 419 static pages. The affected English product
+  passed desktop and 390x844 browser checks with visible reveal containers,
+  Add to Cart, Eastern-time ticker output, and no warnings/errors; the Spanish
+  product passed the same hydration check. The edge response unit coverage
+  confirms all configured probe patterns return cacheable, non-indexable 410.
 - 2026-07-23 desktop hover-affordance pass: `npm run lint` passed; desktop
   homepage and shop preview checks confirmed the new controls have pointer
   cursors and transition rules. The dev server remains available at
@@ -312,8 +346,9 @@ alter SQL, saved customer/product data, orders, or payments.
 
 ## Immediate Priorities
 
-1. Deploy and verify the pending application security hardening and live
-   response headers. The three security SQL scripts are already verified.
+1. Manually deploy the product-clock and blocked-probe fixes, then verify the
+   live English/Spanish product console at desktop/mobile and confirm every
+   configured probe returns 410.
 2. Complete accountant review for Florida county surtax and any non-Florida
    nexus registrations before changing tax collection.
 3. Run the controlled PayPal recovery/refund/race matrix in the configured

@@ -1,8 +1,7 @@
 ﻿# Architecture
 
 > Update whenever significant structural changes occur. Last updated:
-> **2026-07-24** after making the homepage carousel payload
-> server-authoritative.
+> **2026-07-28** after adding pre-routing scanner-probe handling.
 
 ## System Design
 
@@ -13,6 +12,11 @@ Netlify with `@netlify/plugin-nextjs`.
 domain limit before `/api/*` reaches Next.js. Sensitive public routes then use
 the distributed Supabase counter in `next-app/src/lib/rate-limit.ts` for tighter
 endpoint-specific windows.
+
+`next-app/netlify/edge-functions/blocked-probes.ts` terminates only the listed
+WordPress, XML-RPC, `.env`, `config.json`, and `.git` scanner paths with a 410
+before framework routing. Root `netlify.toml` retains equivalent forced
+redirects as a fallback.
 
 ```text
 Browser

@@ -5,10 +5,11 @@
 
 ## In Progress
 
-- **Deploy the 2026-07-21 security hardening.** Publish the updated Next/Netlify
-  app, confirm Netlify accepts `netlify/edge-functions/api-rate-limit.ts`, and
-  verify live CSP, HSTS, X-Frame-Options, Referrer-Policy,
-  Permissions-Policy, nosniff, and cross-domain-policy headers.
+- **Deploy and verify the 2026-07-28 production follow-up fixes.** Local source
+  now fixes the product-detail hydration mismatch with an explicit
+  `America/New_York` clock and returns scanner probes from a pre-routing edge
+  handler. After the owner's manual deployment, repeat live English/Spanish
+  desktop/mobile console checks and confirm all configured probes return 410.
 
 ## High Priority Backlog
 
@@ -59,8 +60,9 @@
   service-role and Resend configuration.
 - Verify duplicate account sign-up, reset-password redirects, and production
   Supabase Auth redirect URLs.
-- Verify live security headers, cache behavior, and retired WordPress probes
-  returning 410 after the next deploy.
+- After the next manual deployment, verify retired WordPress/XML-RPC/dotfile
+  probes all return the new edge-level 410 rather than the current mixed
+  404/410 responses.
 
 ## Business And Content
 
@@ -112,6 +114,21 @@
 
 ## Recently Completed
 
+- **2026-07-28:** fixed the production product-detail hydration mismatch by
+  formatting the price-update clock explicitly in `America/New_York`. Added a
+  narrowly scoped Netlify Edge handler so blocked WordPress/XML-RPC/dotfile
+  probes return 410 before Next routing. Five focused tests, all 455 tests,
+  lint, and the complete 419-page production build passed. English desktop,
+  390px mobile, and Spanish product checks showed visible content and no
+  console warnings/errors. Manual deployment/live verification remains.
+- **2026-07-28:** completed a read-only production smoke test after deployment.
+  Security headers, HTTPS/apex redirects, static caching, robots/sitemap,
+  English/Spanish storefront routes, Available/Sold filtering, the previously
+  affected 390px product detail, Back to Shop context, checkout/PayPal
+  rendering, TradingView, contact/evaluation forms, signed-in Admin, and the AI
+  assistant UI passed without orders, submissions, or saved changes. One
+  recoverable product-detail hydration mismatch and nonuniform 404/410 probe
+  statuses were recorded for follow-up.
 - **2026-07-28:** audited the repeated `29 of 127 pieces` label for Silver +
   Everything Else without changing code. Available and Sold each genuinely
   return 29 distinct matching products, both paginate as 1-24 of 29, and show

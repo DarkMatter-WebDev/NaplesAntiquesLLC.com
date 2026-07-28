@@ -1,5 +1,51 @@
 # Changelog
 
+## 2026-07-28 - Fixed production product hydration and probe statuses
+
+- Made `PriceUpdateTicker` format its scheduled update clock explicitly in the
+  Naples business time zone, `America/New_York`. Server HTML and browser
+  hydration now produce the same English/Spanish clock text instead of
+  Netlify UTC versus browser-local output.
+- Added deterministic English and Spanish clock regression coverage.
+- Added `netlify/edge-functions/blocked-probes.ts`, scoped only to the existing
+  WordPress, XML-RPC, `.env`, `config.json`, and `.git` scanner paths. It returns
+  a cacheable, non-indexable 410 before framework routing; the existing forced
+  redirects remain as defense-in-depth fallback.
+- Added edge-response coverage for every configured path and response contract.
+- Verification passed: five focused tests, all 455 tests, lint, and the full
+  Next.js 16.2.12 production build with TypeScript and 419 generated static
+  pages. The affected English product passed desktop and 390x844 browser checks
+  with visible content, Add to Cart, Eastern-time ticker output, and no console
+  warnings/errors; Spanish also hydrated cleanly.
+- No SQL, environment values, orders, forms, listings, or production data
+  changed. Manual deployment and live verification remain.
+
+## 2026-07-28 - Verified the production deployment
+
+- Ran a read-only production smoke test after the owner deployed. Confirmed the
+  enforcing CSP, HSTS, frame/referrer/permissions/nosniff/cross-domain headers,
+  HTTP and `www` canonical redirects, immutable Next asset caching, robots, and
+  the 120-URL sitemap.
+- Verified English and Spanish home/shop routes, Available/Sold inventory,
+  Silver + Everything Else counts, the previously affected Egyptian tray at a
+  390x844 viewport, page/position-aware Back to Shop, checkout and PayPal
+  rendering, TradingView, contact/evaluation forms, signed-in Admin Products,
+  and the Smart Listing Assistant controls. No order, form, AI request, listing
+  save, or production-data mutation was performed.
+- Confirmed the homepage receives one server-authoritative curated set. Product
+  changes after the carousel begins spinning are the intended windowed-ring
+  cycling, not a fallback-to-curated hydration swap.
+- Found a reproducible recoverable React hydration error on product details:
+  `PriceUpdateTicker` formats the server-rendered update time in Netlify UTC
+  and the hydrated time in the browser's local zone. The affected product
+  remains visible, but an explicit shared time zone is now tracked as a
+  follow-up.
+- Sensitive probe paths exposed no content. `/config.json` returned the
+  configured 410; WordPress, XML-RPC, `.env`, and `.git` probes returned 404,
+  so consistent 410 handling remains optional cleanup.
+- Documentation only; no application code, orders, forms, listings, or
+  production data changed.
+
 ## 2026-07-28 - Audited equal Available and Sold shop counts
 
 - Reproduced Silver + Everything Else with Available and Sold selected in the
