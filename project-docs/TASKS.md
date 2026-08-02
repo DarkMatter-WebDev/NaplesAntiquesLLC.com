@@ -34,19 +34,48 @@
      `https://naplesestatejewelry.com`; added redirect URLs
      `https://naplesestatejewelry.com/**` and the bare origin (10 total;
      `.co` entries kept for transition) — `ACCOUNT_SETUP.md` updated.
-  5. **Owner: deploy** (rides with the pending 2026-07-31/08-01 batch), then
-     smoke-test: `.com` home/shop/product, `.co/anything` → 301 → `.com`,
-     checkout/PayPal, sitemap.xml on `.com`.
-  6. **After deploy — re-register external endpoints on `.com`:** PayPal
-     webhook (`/api/paypal/webhook`, then match `PAYPAL_WEBHOOK_ID` if it
-     changes), eBay account-deletion endpoint + auth accepted/declined URLs +
-     privacy URL, Etsy OAuth callback, and the Meta app's site/privacy URLs
-     if listed. After all are moved, the `/api/*` carve-out in `netlify.toml`
-     can be removed (optional cleanup).
-  7. **After deploy — Google Search Console:** add the `.com` property (the
-     existing HTML-tag token verifies it), submit the sitemap, run Change of
-     Address `.co` → `.com`, and fold the naplesantiquesllc recovery into the
-     same target.
+  5. ✅ DONE 2026-08-01 — **Deployed and production-verified**: `.com` home
+     200, `.co/shop?metal=gold` → 301 → `.com` (path+query preserved),
+     naplesantiquesllc.com → 301 straight to `.com`, `.co/api/*` carve-out
+     serves 200 (webhooks safe), sitemap all-`.com` with zero auction URLs.
+     Found one gap: the page-retirement redirects (`/auctions`,
+     `/auction-terms`, `/vendor-terms`) 404'd because unforced netlify.toml
+     rules never fire under the Next runtime — `force = true` added to all
+     six rules, **rides the NEXT deploy** (until then those three retired
+     URLs 404; harmless but deploy soon).
+  6. ✅ DONE 2026-08-01 (evening) — external endpoints re-registered on
+     `.com` via the owner's signed-in Chrome:
+     - **PayPal**: live webhook URL edited in place → "Webhook updated
+       successfully"; **same webhook ID 3KC08673A81031414**, so
+       `PAYPAL_WEBHOOK_ID` in Netlify needs NO change; tracked events
+       untouched.
+     - **eBay**: account-deletion endpoint → `.com` ("settings successfully
+       saved" — the challenge validated against production, proving the
+       `.com` site URL end-to-end) + "A test notification was sent
+       successfully"; auth accepted/declined URLs + privacy URL → `.com`;
+       BONUS FIX: the endpoint-down notify email was the nonexistent
+       `info@naplesestatejewelry.com` mailbox — corrected to
+       `info@naplesestatejewelry.co`.
+     - **Etsy**: `.com` callback ADDED alongside the kept `.co` + localhost
+       callbacks (verified persisted after reload).
+     - NOT done: the Meta app's site/privacy URL fields (if any) were not
+       reviewed — check `developers.facebook.com` app settings when
+       convenient; Instagram/Facebook posting itself is unaffected (it
+       builds links from `SITE_URL`). The `/api/*` carve-out in
+       `netlify.toml` can now be removed in a future cleanup, after a week
+       or two of confirmed webhook traffic on `.com`.
+  7. ✅ DONE 2026-08-01 (evening) — Google Search Console: the site's
+     HTML-tag token turned out to belong to the `.co` property's
+     verification (tag verify failed), so the `.com` URL-prefix property was
+     verified via a **DNS TXT record added in GoDaddy**
+     (`google-site-verification=…` on the `.com` apex — do not delete it);
+     sitemap submitted on the `.com` property (**Success, 115 pages
+     discovered**); **Change of Address `.co` → `.com` validated and
+     confirmed** — both required checks passed (the "sample pages" warning
+     was the retired-page 404s from step 5); GSC now shows "This site is
+     currently moving" dated August 2, 2026. Keep both properties and the
+     301s in place for at least 6 months (180 days) while Google migrates
+     the index.
 - ⚠️ **Deploy urgency (2026-08-01): the LIVE Facebook post for product 21
   carries `Shop: https://naplesestatejewelry.co/p/21`, and the `/p/` short-link
   route only exists in this batch — the link 404s in production until the next

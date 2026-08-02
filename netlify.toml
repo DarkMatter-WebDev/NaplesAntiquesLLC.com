@@ -234,15 +234,20 @@
 
 # Auctions page retired 2026-08-01 (owner decision: Shop is a direct nav link
 # with no submenu). The URL was indexed/sitemapped, so 301 it to the shop.
+# force = true is REQUIRED on these: the Next.js runtime serves every path
+# (returning its own 404 for retired routes), so unforced rules never fire —
+# confirmed live 2026-08-01 when the unforced version 404'd in production.
 [[redirects]]
   from = "/auctions"
   to = "/shop"
   status = 301
+  force = true
 
 [[redirects]]
   from = "/es/auctions"
   to = "/es/shop"
   status = 301
+  force = true
 
 # Auction Terms + Vendor Terms legal pages retired with it (nothing links to
 # them once the auctions page and the footer entry are gone); both were
@@ -251,21 +256,25 @@
   from = "/auction-terms"
   to = "/terms"
   status = 301
+  force = true
 
 [[redirects]]
   from = "/es/auction-terms"
   to = "/es/terms"
   status = 301
+  force = true
 
 [[redirects]]
   from = "/vendor-terms"
   to = "/terms"
   status = 301
+  force = true
 
 [[redirects]]
   from = "/es/vendor-terms"
   to = "/es/terms"
   status = 301
+  force = true
 
 [[redirects]]
   from = "/shop-:splat"

@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-08-01 (late) - Deploy verified; PayPal/eBay/Etsy re-registered on .com; GSC Change of Address confirmed
+
+The owner deployed the batch; production verification and the external
+re-registration runbook (TASKS steps 5-7) were completed the same evening via
+the owner's signed-in Chrome. Full detail lives in the ⚠️ domain-switch item
+in `TASKS.md`; highlights:
+
+- **Production checks**: `.co` and naplesantiquesllc.com 301 to `.com`
+  path-preservingly, `.co/api/*` carve-out serves 200, sitemap is all-`.com`.
+  One gap found and fixed in source: the three page-retirement redirects
+  were unforced and never fire under the Next runtime (the deployed
+  `/auctions` 404'd instead of 301ing) — `force = true` added to all six
+  rules in root `netlify.toml`; **needs the next deploy**.
+- **PayPal**: webhook URL edited in place → same webhook ID
+  `3KC08673A81031414` (no `PAYPAL_WEBHOOK_ID` change needed).
+- **eBay**: account-deletion endpoint re-registered (challenge validated +
+  test notification delivered), auth accepted/declined + privacy URLs →
+  `.com`, and the endpoint-down notify email corrected from the nonexistent
+  `info@naplesestatejewelry.com` to the real `info@naplesestatejewelry.co`.
+- **Etsy**: `.com` callback added alongside the kept `.co`/localhost ones.
+- **Search Console**: `.com` URL-prefix property verified via a GoDaddy DNS
+  TXT record (the on-site HTML tag belongs to the `.co` property's
+  verification and failed for `.com`); sitemap submitted (Success, 115 pages
+  discovered); **Change of Address `.co` → `.com` validated (both required
+  checks green) and CONFIRMED** — GSC shows "This site is currently moving"
+  dated August 2, 2026. Keep both properties + 301s for 180 days.
+- Not covered: the Meta app's site/privacy URL fields (posting is
+  unaffected); `/api/*` carve-out removal deferred until webhook traffic on
+  `.com` is confirmed for a while.
+
 ## 2026-08-01 - Legal copy scrubbed of auction/vendor and "if enabled" language (owner-approved, case by case)
 
 Owner requested a scan for auction/vendor mentions and aspirational
