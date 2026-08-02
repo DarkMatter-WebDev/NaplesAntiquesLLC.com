@@ -23,6 +23,33 @@ function shouldRefreshSupabaseSession(pathname: string) {
   return SESSION_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
+// Pages retired 2026-08-01 (auctions + the two aspirational legal pages).
+// These MUST be answered here, before the locale rewrite below, and cannot
+// live in netlify.toml or next.config.ts `redirects()`: on Netlify this proxy
+// runs as an edge function ahead of BOTH the Netlify redirect engine and the
+// Next.js server, so a bare `/auctions` is rewritten to a dead `/en/auctions`
+// and 404s before any redirect rule is consulted. (`next dev` honours the
+// config redirects, so this gap only shows in production — verify retired
+// URLs against the deployed site, never just locally.)
+const RETIRED_PATHS: Record<string, string> = {
+  '/auctions': '/shop',
+  '/auction-terms': '/terms',
+  '/vendor-terms': '/terms',
+};
+
+function retiredPageRedirect(request: NextRequest): NextResponse | null {
+  const pathname = request.nextUrl.pathname;
+  const isEs = pathname === '/es' || pathname.startsWith('/es/');
+  // Compare on the locale-less path so /auctions, /en/auctions and
+  // /es/auctions all resolve to the same rule.
+  const bare = isEs ? pathname.slice(3) : pathname.replace(/^\/en(?=\/|$)/, '');
+  const destination = RETIRED_PATHS[bare];
+  if (!destination) return null;
+  const url = request.nextUrl.clone();
+  url.pathname = isEs ? `/es${destination}` : destination;
+  return NextResponse.redirect(url, 308);
+}
+
 async function refreshSupabaseSession(request: NextRequest, response: NextResponse) {
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -50,6 +77,11 @@ async function refreshSupabaseSession(request: NextRequest, response: NextRespon
 
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+  // Retired pages first — see RETIRED_PATHS. Nothing below may run for these.
+  const retired = retiredPageRedirect(request);
+  if (retired) return retired;
+
   const needsSessionRefresh = shouldRefreshSupabaseSession(pathname);
 
   // Next 16 currently re-runs proxy for next-intl's internal default-locale

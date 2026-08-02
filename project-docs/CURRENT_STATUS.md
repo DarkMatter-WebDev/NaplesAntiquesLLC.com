@@ -16,26 +16,28 @@ the sitemap is all-`.com`, and core routes return 200. The domain migration
 is complete end to end including PayPal/eBay/Etsy re-registration and a
 confirmed Google Change of Address — see `TASKS.md` and `CHANGELOG.md`.
 
-> ⚠️ **Two fixes are committed locally and awaiting the NEXT deploy**
-> (588/588 tests, tsc, lint, 438-page build all green):
-> **(1) Etsy shipping-tier provisioning** — Etsy rejects the profile create
-> with a 400 unless each destination carries a delivery-day window, so
-> `MarketplaceShippingTier` now supplies `minDeliveryDays`/`maxDeliveryDays`
-> from the shared tier table. eBay's seven policies are already provisioned;
-> Etsy's wait on this. **(2) English retired-page redirects** — `/auctions`,
-> `/auction-terms`, `/vendor-terms` still 404 while their `/es/*` twins 301,
-> because the next-intl proxy handles locale-less paths before Netlify's
-> redirect engine; the rules moved into `next.config.ts` `redirects()`.
-> Neither breaks anything live — the marketplaces keep quoting their existing
-> default shipping, and the three retired URLs simply 404 instead of 301.
+> ✅ **Marketplace shipping tiers are fully provisioned on BOTH marketplaces**
+> (eBay 2026-08-01, Etsy 2026-08-02 after its delivery-days fix deployed) —
+> seven objects each, ids in `TASKS.md`.
+>
+> ⚠️ **One fix awaits the next deploy: the English retired-page redirects.**
+> `/auctions`, `/auction-terms`, `/vendor-terms` still 404 in production
+> while their `/es/*` twins redirect. Two earlier attempts (forced
+> netlify.toml rules, then `next.config.ts` redirects) failed because the
+> cause was misdiagnosed: on Netlify the next-intl proxy runs as an edge
+> function ahead of both the redirect engine and the Next.js server, and
+> rewrites `/auctions` to a dead `/en/auctions`. Now handled by
+> `RETIRED_PATHS` in `src/proxy.ts` before the locale rewrite; verified
+> locally with no regressions (588/588 tests, tsc, lint, 438-page build).
+> Nothing is broken live — those three URLs simply 404 instead of 308.
 
 1. Value-based shipping tiers (checkout + server) with coded checkout errors.
 2. Four-step checkout wizard (Summary → Delivery → Contact → Review & Pay)
    with the sign-in/guest entry dialog.
 3. Marketplace shipping-tier extension (Etsy/eBay; SQL migration applied
-   2026-07-30). **eBay provisioned 2026-08-01** — 7 fulfillment policies,
-   one per distinct fee. Etsy provisioning awaits the delivery-days fix noted
-   above.
+   2026-07-30). **Both provisioned** — 7 eBay fulfillment policies
+   (2026-08-01) and 7 Etsy shipping profiles (2026-08-02), one per distinct
+   fee. Listing-level verification is still open.
 4. eBay account-change listing-state reset admin action.
 5. naplesantiquesllc.com SEO recovery 301 redirects (DNS/alias/cert already
    live; redirects activate on deploy).

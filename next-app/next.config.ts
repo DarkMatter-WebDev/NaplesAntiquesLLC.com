@@ -100,22 +100,11 @@ const nextConfig: NextConfig = {
       rules.push({ source: p, destination: '/shop', permanent: false });
       rules.push({ source: `/es${p}`, destination: '/es/shop', permanent: false });
     }
-    // Retired pages (2026-08-01): the auctions page and the two aspirational
-    // legal pages. These MUST live here rather than in netlify.toml — the
-    // next-intl proxy handles locale-less paths (`/auctions`) inside the
-    // framework before Netlify's redirect engine sees them, so even a forced
-    // Netlify rule never fires for the English URLs (the `/es/*` ones did
-    // work, which is what exposed the split). Config redirects run ahead of
-    // the proxy, so these catch both locales. The netlify.toml rules stay as
-    // a defense-in-depth fallback.
-    for (const [retired, dest] of Object.entries({
-      '/auctions': '/shop',
-      '/auction-terms': '/terms',
-      '/vendor-terms': '/terms',
-    })) {
-      rules.push({ source: retired, destination: dest, permanent: true });
-      rules.push({ source: `/es${retired}`, destination: `/es${dest}`, permanent: true });
-    }
+    // NOTE: redirects for RETIRED pages (/auctions, /auction-terms,
+    // /vendor-terms) deliberately do NOT live here. On Netlify the next-intl
+    // proxy runs as an edge function ahead of the Next.js server, so config
+    // redirects never fire for locale-less paths — they are handled in
+    // src/proxy.ts (RETIRED_PATHS) instead.
     // Re-slug the six auto-named "new-listing-0X" products to keyword URLs. Pairs
     // with supabase/reslug-new-listing-products-2026-07.sql (run the SQL and deploy
     // this together — the SQL renames the product ids these redirects point to).

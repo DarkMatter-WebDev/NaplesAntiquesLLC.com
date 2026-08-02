@@ -234,9 +234,12 @@
 
 # Auctions page retired 2026-08-01 (owner decision: Shop is a direct nav link
 # with no submenu). The URL was indexed/sitemapped, so 301 it to the shop.
-# force = true is REQUIRED on these: the Next.js runtime serves every path
-# (returning its own 404 for retired routes), so unforced rules never fire —
-# confirmed live 2026-08-01 when the unforced version 404'd in production.
+#
+# ⚠️ These rules only ever fire for the `/es/*` variants. The next-intl proxy
+# runs as a Netlify edge function AHEAD of this redirect engine and rewrites
+# locale-less paths (`/auctions` -> `/en/auctions`), so the bare English URLs
+# never reach here. The authoritative handler for all retired pages is
+# RETIRED_PATHS in next-app/src/proxy.ts; these stay only as a fallback.
 [[redirects]]
   from = "/auctions"
   to = "/shop"

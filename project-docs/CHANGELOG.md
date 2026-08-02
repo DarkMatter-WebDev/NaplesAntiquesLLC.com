@@ -1,5 +1,41 @@
 # Changelog
 
+## 2026-08-02 - Etsy tiers provisioned; retired-page redirect root-caused to the edge proxy
+
+- **Etsy tiered shipping: PROVISIONED.** After the delivery-days fix
+  deployed (`main@5028f21`), the action returned HTTP 200 — seven shipping
+  profiles created, zero warnings: `fee-19` → `312257322074`, `fee-25` →
+  `312257322442`, `fee-29` → `312311477117`, `fee-35` → `312257322688`,
+  `fee-59` → `312311477379`, `fee-99` → `312257323028`, `fee-165` →
+  `312311477843`. Confirmed persisted: the sync log reads "Provisioned 7
+  shipping-tier profiles (7 created, 0 updated, 0 unchanged)" and all seven
+  "NEJ Insured Shipping $N" entries appear in the Etsy profile dropdown.
+  **Both marketplaces are now fully provisioned.**
+- **Retired-page redirects: correctly root-caused on the third attempt.**
+  The English URLs kept 404ing while `/es/*` worked. Two prior fixes were
+  based on a wrong model of the request path:
+  1. `force = true` on the netlify.toml rules — no effect.
+  2. `next.config.ts` `redirects()` — passed in `next dev`, no effect in
+     production. **`next dev` does not reproduce Netlify's edge-middleware
+     ordering**, which is what made this look fixed twice.
+  The real cause: on Netlify the next-intl proxy is deployed as an edge
+  function that runs ahead of BOTH the Netlify redirect engine and the
+  Next.js server. It rewrites locale-less paths — `/auctions` →
+  `/en/auctions`, a route that no longer exists — so the 404 is produced
+  before any redirect layer is reached. `/es/auctions` escapes only because
+  it is already locale-prefixed.
+  Fix: `RETIRED_PATHS` + `retiredPageRedirect()` at the top of
+  `src/proxy.ts`, returning a 308 before the locale rewrite and normalising
+  `/x`, `/en/x`, and `/es/x` to one rule. The `next.config.ts` block was
+  **removed** (a layer that silently does nothing is worse than no layer) and
+  both it and `netlify.toml` now carry comments pointing at the proxy as the
+  authoritative handler.
+  Verified locally: all three EN + all three ES + `/en/auctions` return 308
+  to the right destinations, with `/cart` (307), `/p/21` (302), and every
+  live page unchanged. 588/588 tests, tsc, lint, 438-page build all exit 0.
+  **Still needs one deploy**, and must be re-checked against production —
+  not locally — once it ships.
+
 ## 2026-08-01 (post-deploy) - eBay tiers provisioned; Etsy provisioning bug fixed; scheduled functions verified
 
 Owner deployed, then asked for the remaining runbook items to be worked

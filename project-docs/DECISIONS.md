@@ -32,6 +32,26 @@ The old static root site is retired. Root `netlify.toml` builds with
 `base = "next-app"` and publishes `.next`. Do not recreate root HTML, scripts,
 assets, or Netlify Functions as an alternate runtime.
 
+### Redirects for locale-less paths belong in proxy.ts, not netlify.toml or next.config.ts
+
+On Netlify the next-intl proxy (`src/proxy.ts`) is deployed as an **edge
+function that runs before both the Netlify redirect engine and the Next.js
+server**. It rewrites every locale-less path to `/en/...`, so a request for a
+route that no longer exists 404s before any redirect layer is consulted.
+Consequences, learned the hard way on the retired `/auctions`,
+`/auction-terms`, and `/vendor-terms` pages (three attempts, 2026-08-01/02):
+
+- `netlify.toml` redirects — including `force = true` — never fire for bare
+  English URLs. They DO fire for `/es/*`, which is why a broken fix can look
+  half-working and mislead the diagnosis.
+- `next.config.ts` `redirects()` never fire either, **but they do work under
+  `next dev`** — so a local test will pass while production still 404s.
+- The only reliable layer is `proxy.ts` itself, ahead of the locale rewrite
+  (see `RETIRED_PATHS`). Normalise `/x`, `/en/x`, and `/es/x` to one rule.
+
+Rule: any redirect for a path the app no longer serves goes in `proxy.ts`,
+and is verified **against the deployed site**, never only locally.
+
 ### The primary domain is naplesestatejewelry.com; email stays on .co
 
 Owner decision 2026-08-01, after buying the `.com`: the canonical web domain

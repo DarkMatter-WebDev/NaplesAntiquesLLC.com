@@ -80,27 +80,26 @@
      currently moving" dated August 2, 2026. Keep both properties and the
      301s in place for at least 6 months (180 days) while Google migrates
      the index.
-- ⚠️ **PENDING NEXT DEPLOY — two source fixes are committed locally but not
-  live** (verified 588/588 tests, tsc, lint, 438-page build):
-  1. **Etsy shipping-tier provisioning fix.** The live provisioning action
-     fails with `400 — "For the entry with destination to US: You must
-     provide either a carrier and mail class or min/max delivery days."`
-     Etsy requires a delivery window on every shipping-profile destination
-     and the create payload only sent *processing* time. `MarketplaceShippingTier`
-     now carries `minDeliveryDays`/`maxDeliveryDays` derived from the shared
-     tier table (Priority-only tiers 1-5 days; the $99 and $165 tiers quote
-     the slower Registered 2-10 window because the $99 fee spans a Registered
-     band and must not over-promise). **Etsy tiers stay unprovisioned until
-     this deploys** — eBay is already done, and both syncs keep using their
-     existing single default profile/policy meanwhile, so nothing is broken.
-  2. **English retired-page redirects.** `/auctions`, `/auction-terms`, and
-     `/vendor-terms` still 404 in production while the `/es/*` twins 301
-     correctly. Cause: the next-intl proxy handles locale-less paths inside
-     the framework before Netlify's redirect engine runs, so even a forced
-     Netlify rule never fires for the bare English URLs. Fixed by moving the
-     rules into `next.config.ts` `redirects()` (which runs ahead of the
-     proxy and covers both locales); the netlify.toml rules stay as a
-     fallback.
+- ⚠️ **PENDING NEXT DEPLOY — English retired-page redirects (attempt 3).**
+  `/auctions`, `/auction-terms`, and `/vendor-terms` still 404 in production
+  while their `/es/*` twins redirect fine. Two earlier fixes failed because
+  the root cause was misdiagnosed twice:
+  - `force = true` in `netlify.toml` — no effect on the English URLs.
+  - `next.config.ts` `redirects()` — worked in `next dev`, **no effect in
+    production** (removed again; a layer that silently does nothing is worse
+    than none).
+  **Actual cause:** on Netlify the next-intl proxy runs as an edge function
+  ahead of BOTH the Netlify redirect engine and the Next.js server. It
+  rewrites locale-less paths (`/auctions` → `/en/auctions`, which does not
+  exist) and 404s before any redirect layer is consulted. `/es/*` escapes
+  because it is already locale-prefixed. **Fix:** `RETIRED_PATHS` +
+  `retiredPageRedirect()` at the top of `src/proxy.ts`, returning a 308
+  before the locale rewrite. Verified locally on all six URLs plus
+  `/en/auctions`, with `/cart`, `/p/21`, and every live page unaffected;
+  588/588 tests, tsc, lint, 438-page build green.
+  **Lesson for future redirect work: `next dev` does NOT reproduce Netlify's
+  edge-middleware ordering — always verify retired URLs against the deployed
+  site.**
 - **Owner: first "Publish to both" is staged.** Product 28 (vintage 10K
   diamond ring) is prepared on BOTH channels with the final caption format and
   the fixed card — open either panel → "Publish to both…" → review →
@@ -115,37 +114,37 @@
   the Admin Settings last-run cards and summary logs. **Not run unattended:**
   a price push writes to live marketplace listings. Etsy's daily toggle is
   enabled; eBay's stays disabled until after its test run.
-- **Owner: verify one tier-shipped listing per marketplace.** eBay's seven
-  fulfillment policies are provisioned (2026-08-01); Etsy's follow the deploy
-  above. Then: eBay — expect tier-priced listings to flag `out_of_date` on the
-  next status scan, review-first publish one update, and confirm the offer's
-  shipping cost on eBay; Etsy — run one Sync Updates on a listing and confirm
-  its shipping profile switched to the tier profile (sync log action
-  `shipping_tier`).
+- **Owner: verify one tier-shipped listing per marketplace.** BOTH
+  marketplaces are now provisioned (eBay and Etsy, 2026-08-01/02 — see the
+  backlog item for ids). Remaining: eBay — expect tier-priced listings to
+  flag `out_of_date` on the next status scan, review-first publish one
+  update, and confirm the offer's shipping cost on eBay; Etsy — run one Sync
+  Updates on a listing and confirm its shipping profile switched to the tier
+  profile (sync log action `shipping_tier`).
 - **Owner: spot-check production once at leisure** — checkout wizard, a
   $5,000+ item (Express hidden, Registered note), spot-pill refresh, and the
   product weight spec.
 
 ## High Priority Backlog
 
-- **Marketplace shipping tiers — eBay LIVE, Etsy pending one deploy.**
-  Steps 1-2 (SQL migration, deploy) are done. Step 3 status:
-  - ✅ **eBay provisioned 2026-08-01**: seven fulfillment policies created,
-    one per distinct fee — `fee-19` → `252701344026`, `fee-25` →
-    `252701345026`, `fee-29` → `252701346026`, `fee-35` → `252701347026`,
-    `fee-59` → `252701348026`, `fee-99` → `252701349026`, `fee-165` →
-    `252701350026`. Sync log: "Provisioned 7 shipping-tier policies
-    (7 created, 0 updated)."
-  - ⏳ **Etsy blocked on the delivery-days fix** in "Pending Next Deploy";
-    click "Provision tiered shipping profiles" once that ships. The attempt
-    failed cleanly — Etsy rejected the very first create, so no partial
-    profiles or mapping rows exist (only error rows in the sync log).
+- ✅ **Marketplace shipping tiers — BOTH MARKETPLACES PROVISIONED.**
+  Steps 1-3 of the runbook are complete:
+  - **eBay (2026-08-01)**: seven fulfillment policies — `fee-19` →
+    `252701344026`, `fee-25` → `252701345026`, `fee-29` → `252701346026`,
+    `fee-35` → `252701347026`, `fee-59` → `252701348026`, `fee-99` →
+    `252701349026`, `fee-165` → `252701350026`. Log: "Provisioned 7
+    shipping-tier policies (7 created, 0 updated)."
+  - **Etsy (2026-08-02, after the delivery-days fix deployed)**: seven
+    shipping profiles — `fee-19` → `312257322074`, `fee-25` →
+    `312257322442`, `fee-29` → `312311477117`, `fee-35` → `312257322688`,
+    `fee-59` → `312311477379`, `fee-99` → `312257323028`, `fee-165` →
+    `312311477843`. Log: "Provisioned 7 shipping-tier profiles (7 created,
+    0 updated, 0 unchanged)", zero warnings, and all seven "NEJ Insured
+    Shipping $N" profiles now appear in the Etsy shipping-profile dropdown.
   Both actions are idempotent (matched by the canonical "NEJ Insured
   Shipping $N" label, which depends on the fee alone); re-running after a fee
-  change re-aligns costs. Until Etsy is provisioned, its sync keeps today's
-  single default profile — nothing is broken, listings just quote the old
-  flat rate. Verification of one listing per marketplace is tracked in
-  "In Progress".
+  change re-aligns costs. Step 4 — verifying one listing per marketplace —
+  is tracked in "In Progress".
 - **Phase 2 shipping (deferred): explore Parcel Pro / JM Shipping Solution /
   FedEx Declared Value Advantage** for cheaper $2,500+ insurance and a fast
   fully insured option above $5,000 (USPS-only phase ships $5,000+ via
