@@ -93,6 +93,11 @@ export async function POST() {
             min_processing_time: 1,
             max_processing_time: 3,
             destination_country_iso: 'US',
+            // Etsy rejects a destination that has neither a carrier + mail
+            // class nor a delivery-day window. Days come from the shared tier
+            // table so Etsy's quoted transit can never drift from the site's.
+            min_delivery_days: tier.minDeliveryDays,
+            max_delivery_days: tier.maxDeliveryDays,
           },
         });
         profileId = res.data.shipping_profile_id;

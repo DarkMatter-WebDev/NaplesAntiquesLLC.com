@@ -1,5 +1,53 @@
 # Changelog
 
+## 2026-08-01 (post-deploy) - eBay tiers provisioned; Etsy provisioning bug fixed; scheduled functions verified
+
+Owner deployed, then asked for the remaining runbook items to be worked
+through. Results:
+
+- **eBay tiered shipping: PROVISIONED.** Seven fulfillment policies created,
+  one per distinct fee (`fee-19` `252701344026` … `fee-165` `252701350026`);
+  sync log records "Provisioned 7 shipping-tier policies (7 created, 0
+  updated)."
+- **Etsy tiered shipping: real bug found, fixed, awaiting deploy.** The live
+  action returned `400 — "For the entry with destination to US: You must
+  provide either a carrier and mail class or min/max delivery days."` The
+  create payload sent `min/max_processing_time` but no *delivery* window,
+  which Etsy requires on every shipping-profile destination. Fix:
+  `MarketplaceShippingTier` gained `minDeliveryDays`/`maxDeliveryDays`
+  derived inside `checkout-shipping.ts` from the existing tier table, so
+  Etsy's quoted transit can never drift from the site's promise — tiers that
+  travel only Priority quote 1-5 business days, while the $99 and $165 tiers
+  quote the slower Registered 2-10 window (the $99 fee spans both a Priority
+  band and a Registered band, and the shared object must not over-promise on
+  the slower one). `marketplaceShippingTierLabel()` was narrowed to
+  `Pick<…,'fee'>` so the provisioning idempotency key can never shift when
+  unrelated tier fields change. The failed attempts left **no partial state**
+  (Etsy rejected the first create, before any profile or mapping row).
+- **English retired-page redirects fixed.** `/auctions`, `/auction-terms`,
+  `/vendor-terms` 404'd in production while their `/es/*` twins 301'd — the
+  next-intl proxy handles locale-less paths inside the framework before
+  Netlify's redirect engine runs, so even `force = true` never fired for the
+  bare English URLs. Moved into `next.config.ts` `redirects()`, which runs
+  ahead of the proxy and covers both locales; netlify.toml rules kept as a
+  fallback. Verified locally: all six now 308 with existing redirects
+  (`/cart`, `/shop.html`) and live pages unaffected.
+- **All five Netlify scheduled functions verified** with Scheduled badges and
+  correct next-execution times — `etsy-price-push`, `ebay-price-push`,
+  `instagram-drip`, `facebook-drip`, `instagram-token-refresh`. This closed
+  the same "confirm after deploy" item duplicated across three doc sections.
+- **Production post-deploy verification**: Facebook `/p/21` short link 302s
+  to the product page (resolving the multi-day deploy-urgency item), redirects
+  and the `/api/*` carve-out behave, sitemap is all-`.com`, core routes 200,
+  and Admin Settings shows `Site URL: https://naplesestatejewelry.com` with
+  sender addresses correctly still on `.co`.
+- `TASKS.md` and `CURRENT_STATUS.md` fully reconciled against live production
+  rather than carried forward on assumption.
+
+Verified: 588/588 tests, `npx tsc --noEmit`, `npm run lint`, and the 438-page
+production build all exit 0 (three test expectations updated for the new tier
+fields, which also locks in the Registered-window rule as coverage).
+
 ## 2026-08-01 (late) - Deploy verified; PayPal/eBay/Etsy re-registered on .com; GSC Change of Address confirmed
 
 The owner deployed the batch; production verification and the external

@@ -140,12 +140,13 @@ describe('marketplace shipping tiers', () => {
   });
 
   it('resolves a listing price to its tier identity', () => {
-    expect(getMarketplaceShippingTier(49)).toEqual({ key: 'fee-19', fee: 19 });
+    expect(getMarketplaceShippingTier(49)).toEqual({ key: 'fee-19', fee: 19, minDeliveryDays: 1, maxDeliveryDays: 5 });
     // Both $99 bands ($2,500-$4,999 Priority and $5,000+ Registered) share one
-    // marketplace tier object.
-    expect(getMarketplaceShippingTier(3000)).toEqual({ key: 'fee-99', fee: 99 });
-    expect(getMarketplaceShippingTier(8203)).toEqual({ key: 'fee-99', fee: 99 });
-    expect(getMarketplaceShippingTier(34999)).toEqual({ key: 'fee-165', fee: 165 });
+    // marketplace tier object — so it must quote the SLOWER Registered window
+    // (2-10 business days) rather than over-promise Priority transit.
+    expect(getMarketplaceShippingTier(3000)).toEqual({ key: 'fee-99', fee: 99, minDeliveryDays: 2, maxDeliveryDays: 10 });
+    expect(getMarketplaceShippingTier(8203)).toEqual({ key: 'fee-99', fee: 99, minDeliveryDays: 2, maxDeliveryDays: 10 });
+    expect(getMarketplaceShippingTier(34999)).toEqual({ key: 'fee-165', fee: 165, minDeliveryDays: 2, maxDeliveryDays: 10 });
     expect(getMarketplaceShippingTier(0)).toBeNull();
   });
 });

@@ -1,12 +1,16 @@
 # Tasks
 
 > Open work only, plus a short recent-completions record. Full completed history
-> lives in `CHANGELOG.md`. Last reconciled: **2026-08-01**.
+> lives in `CHANGELOG.md`. Last reconciled: **2026-08-01, after the deploy** —
+> every "before/after the next deploy" item below was re-checked against live
+> production, not carried forward on assumption.
 
 ## In Progress
 
-- ⚠️ **Domain switch to naplesestatejewelry.com (2026-08-01) — code AND
-  external wiring DONE; deploy, then finish steps 5-7.** The owner bought the
+- ✅ **Domain switch to naplesestatejewelry.com — COMPLETE (2026-08-01).**
+  All seven steps below are done and production-verified; the only follow-ups
+  are the two small items in "Pending Next Deploy" and "Business And Content".
+  The owner bought the
   `.com` and decided the switch (business email stays on `.co` — `.co` MX
   never touched). The entire codebase now canonicalizes on
   `https://naplesestatejewelry.com`: metadata/OG, sitemap, robots, JSON-LD,
@@ -58,12 +62,12 @@
        `info@naplesestatejewelry.co`.
      - **Etsy**: `.com` callback ADDED alongside the kept `.co` + localhost
        callbacks (verified persisted after reload).
-     - NOT done: the Meta app's site/privacy URL fields (if any) were not
-       reviewed — check `developers.facebook.com` app settings when
-       convenient; Instagram/Facebook posting itself is unaffected (it
-       builds links from `SITE_URL`). The `/api/*` carve-out in
-       `netlify.toml` can now be removed in a future cleanup, after a week
-       or two of confirmed webhook traffic on `.com`.
+     - ✅ **Meta app checked 2026-08-01 — nothing to change.** The "Naples
+       Estate Jewelry Social" app's basic settings carry no site or privacy
+       URL for either domain (only Facebook defaults); its contact email is
+       `info@naplesestatejewelry.co`, which is correct and stays.
+     - The `/api/*` carve-out in `netlify.toml` can be removed in a future
+       cleanup, after a week or two of confirmed webhook traffic on `.com`.
   7. ✅ DONE 2026-08-01 (evening) — Google Search Console: the site's
      HTML-tag token turned out to belong to the `.co` property's
      verification (tag verify failed), so the `.com` URL-prefix property was
@@ -76,76 +80,72 @@
      currently moving" dated August 2, 2026. Keep both properties and the
      301s in place for at least 6 months (180 days) while Google migrates
      the index.
-- ⚠️ **Deploy urgency (2026-08-01): the LIVE Facebook post for product 21
-  carries `Shop: https://naplesestatejewelry.co/p/21`, and the `/p/` short-link
-  route only exists in this batch — the link 404s in production until the next
-  deploy.** The 2026-08-01 social work (caption restructure, card fixes,
-  publish-to-both, copy-curation, discard, `/api/admin/social/copy-curation`,
-  `/p/[code]`) rides the same deploy as the 2026-07-31 batch below; latest
-  local verification 588/588 tests + 438-page build (444 → 438 after the
-  auctions + auction-terms + vendor-terms page removals; 592 → 588 tests
-  from the removed pages' parameterized metadata tests).
+- ⚠️ **PENDING NEXT DEPLOY — two source fixes are committed locally but not
+  live** (verified 588/588 tests, tsc, lint, 438-page build):
+  1. **Etsy shipping-tier provisioning fix.** The live provisioning action
+     fails with `400 — "For the entry with destination to US: You must
+     provide either a carrier and mail class or min/max delivery days."`
+     Etsy requires a delivery window on every shipping-profile destination
+     and the create payload only sent *processing* time. `MarketplaceShippingTier`
+     now carries `minDeliveryDays`/`maxDeliveryDays` derived from the shared
+     tier table (Priority-only tiers 1-5 days; the $99 and $165 tiers quote
+     the slower Registered 2-10 window because the $99 fee spans a Registered
+     band and must not over-promise). **Etsy tiers stay unprovisioned until
+     this deploys** — eBay is already done, and both syncs keep using their
+     existing single default profile/policy meanwhile, so nothing is broken.
+  2. **English retired-page redirects.** `/auctions`, `/auction-terms`, and
+     `/vendor-terms` still 404 in production while the `/es/*` twins 301
+     correctly. Cause: the next-intl proxy handles locale-less paths inside
+     the framework before Netlify's redirect engine runs, so even a forced
+     Netlify rule never fires for the bare English URLs. Fixed by moving the
+     rules into `next.config.ts` `redirects()` (which runs ahead of the
+     proxy and covers both locales); the netlify.toml rules stay as a
+     fallback.
 - **Owner: first "Publish to both" is staged.** Product 28 (vintage 10K
   diamond ring) is prepared on BOTH channels with the final caption format and
   the fixed card — open either panel → "Publish to both…" → review →
-  one click. Publishes Instagram first, then Facebook.
-- ✅ **RESOLVED 2026-08-01 — Instagram Shop-link domain.** The `.com` is now
-  the primary domain (see the DEPLOY GATE item above), so the typeable
-  `Shop: NaplesEstateJewelry.com/p/N` caption line is correct as-is. The only
-  remaining rule: do not publish the first Instagram post until the `.com` is
-  wired and the batch is deployed (captions are permanent; the link must
-  resolve). Facebook's clickable link builds from `SITE_URL`, so it emits
-  `.com` automatically once the env var is updated.
-- **Owner: test and deploy the 2026-07-31 batch, then run the post-deploy
-  runbook.** The owner is testing on the LAN dev server
-  (http://10.0.0.208:3002) before the final deploy. The batch contents are
-  listed in `CURRENT_STATUS.md` ("Pending Deployment"). Remaining owner
-  checks before deploy: the checkout wizard on the tablet (including the
-  sign-in/guest entry dialog, which only shows signed-out), and confirming
-  the iPad hydration error is gone after a refresh. After deploying:
-  1. Verify `https://naplesantiquesllc.com/shop?metal=gold` 301-redirects to
-     the same path on naplesestatejewelry.com (retargeted 2026-08-01 from
-     `.co` straight to the new primary), then do the Search Console
-     steps (verify both domains, submit sitemap, Change of Address old→new,
-     request indexing on top product pages).
-  2. Click "Provision tiered shipping profiles" (Etsy) and "Provision tiered
-     shipping policies" (eBay) in Admin → Settings (the
-     marketplace-shipping-tiers SQL is already applied), then verify one
-     tier-shipped listing per marketplace per the runbook item below.
-  3. Spot-check production: checkout wizard, a $5,000+ item (Express hidden,
-     Registered note), spot-pill refresh, product weight spec.
-   4. When done testing locally, kill the PID listening on port 3002 to stop
-      the detached LAN dev server.
-- **Deploy and production-verify marketplace price automation.** The local
-  implementation is complete. After the owner's manual deployment, confirm
-  Netlify lists `etsy-price-push` and `ebay-price-push` with Scheduled badges,
-  run each once from the Functions page, and verify the Admin Settings
-  last-run cards plus summary logs. Etsy's live daily toggle is enabled;
-  eBay's is currently disabled and should be enabled only after its test run.
-  Local Etsy secret readiness and rejection of a secretless request are
-  verified. Both scheduled wrappers also passed an isolated localhost-stub
-  harness, and the optimized app passed a local production-runtime smoke test;
-  the remaining checks require the published Netlify runtime.
+  one click. Publishes Instagram first, then Facebook. Both the `.com` domain
+  and the `/p/[code]` short link are now live and verified, so the caption's
+  typeable `Shop: NaplesEstateJewelry.com/p/N` line resolves correctly —
+  the constraint that was blocking the first Instagram publish is cleared.
+- **Owner: run each price-push function once, then check the last-run cards.**
+  `etsy-price-push` and `ebay-price-push` are confirmed live with Scheduled
+  badges (verified 2026-08-01 — see Recently Completed). What remains is a
+  deliberate manual run from the Netlify Functions page plus verification of
+  the Admin Settings last-run cards and summary logs. **Not run unattended:**
+  a price push writes to live marketplace listings. Etsy's daily toggle is
+  enabled; eBay's stays disabled until after its test run.
+- **Owner: verify one tier-shipped listing per marketplace.** eBay's seven
+  fulfillment policies are provisioned (2026-08-01); Etsy's follow the deploy
+  above. Then: eBay — expect tier-priced listings to flag `out_of_date` on the
+  next status scan, review-first publish one update, and confirm the offer's
+  shipping cost on eBay; Etsy — run one Sync Updates on a listing and confirm
+  its shipping profile switched to the tier profile (sync log action
+  `shipping_tier`).
+- **Owner: spot-check production once at leisure** — checkout wizard, a
+  $5,000+ item (Express hidden, Registered note), spot-pill refresh, and the
+  product weight spec.
 
 ## High Priority Backlog
 
-- **Deploy and provision the marketplace shipping tiers (owner runbook).**
-  The Etsy/eBay shipping extension is code-complete and locally verified but
-  NOT live until these owner steps run, in order:
-  1. Run `supabase/marketplace-shipping-tiers-2026-07.sql` in the Supabase
-     SQL Editor (the provisioning actions refuse to run without it — checked
-     before any external object is created).
-  2. Deploy the app.
-  3. In Admin → Settings → Etsy Sync, click "Provision tiered shipping
-     profiles"; in eBay Sync, click "Provision tiered shipping policies".
-     Both are idempotent (match by the canonical "NEJ Insured Shipping $N"
-     names; re-running after a fee change re-aligns costs).
-  4. Verify one listing per marketplace: eBay — expect tier-priced listings
-     to flag out_of_date on the next status scan, then review-first publish
-     the update and confirm the offer's shipping cost on eBay; Etsy — run one
-     Sync Updates on a listing and confirm its shipping profile switched to
-     the tier profile (sync log action `shipping_tier`).
-  Until provisioned, both syncs keep today's single default profile/policy.
+- **Marketplace shipping tiers — eBay LIVE, Etsy pending one deploy.**
+  Steps 1-2 (SQL migration, deploy) are done. Step 3 status:
+  - ✅ **eBay provisioned 2026-08-01**: seven fulfillment policies created,
+    one per distinct fee — `fee-19` → `252701344026`, `fee-25` →
+    `252701345026`, `fee-29` → `252701346026`, `fee-35` → `252701347026`,
+    `fee-59` → `252701348026`, `fee-99` → `252701349026`, `fee-165` →
+    `252701350026`. Sync log: "Provisioned 7 shipping-tier policies
+    (7 created, 0 updated)."
+  - ⏳ **Etsy blocked on the delivery-days fix** in "Pending Next Deploy";
+    click "Provision tiered shipping profiles" once that ships. The attempt
+    failed cleanly — Etsy rejected the very first create, so no partial
+    profiles or mapping rows exist (only error rows in the sync log).
+  Both actions are idempotent (matched by the canonical "NEJ Insured
+  Shipping $N" label, which depends on the fee alone); re-running after a fee
+  change re-aligns costs. Until Etsy is provisioned, its sync keeps today's
+  single default profile — nothing is broken, listings just quote the old
+  flat rate. Verification of one listing per marketplace is tracked in
+  "In Progress".
 - **Phase 2 shipping (deferred): explore Parcel Pro / JM Shipping Solution /
   FedEx Declared Value Advantage** for cheaper $2,500+ insurance and a fast
   fully insured option above $5,000 (USPS-only phase ships $5,000+ via
@@ -211,11 +211,11 @@
   saves and Prepare uses it (image 6 saved on product 21).
 - ✅ `social-card-background-2026-08.sql` applied 2026-08-01; the card
   background choice (Auto/White/Black/Cream) saves in both panels.
-- **After the next deploy:** confirm Netlify lists `facebook-drip` with a
-  Scheduled badge (14:40/22:40 UTC, 20 min after the Instagram drip), and
-  re-verify one prepare in production (fonts must trace into
-  `/api/admin/facebook/**` and `/api/admin/card-preview` — checked in the local
-  build, worth one production confirmation).
+- ✅ Done 2026-08-01: Netlify lists **`facebook-drip` with a Scheduled badge**
+  (next execution 10:40 AM Eastern = the documented 14:40 UTC).
+- **Still worth one production confirmation:** re-verify one prepare in
+  production (fonts must trace into `/api/admin/facebook/**` and
+  `/api/admin/card-preview` — checked in the local build, unverified live).
 
 ## Instagram Posting (Phases 1-2 built — see features/instagram-posting-plan.md)
 
@@ -270,8 +270,10 @@
   Instagram app. Any flow must therefore be: flag as out of date → tell the
   owner which post to delete by hand (with permalink) → "Forget this post" →
   re-prepare and publish fresh.
-- After deploying, confirm Netlify lists `instagram-token-refresh` (Mondays
-  12:15 UTC) and `instagram-drip` (14:20/22:20 UTC) with Scheduled badges.
+- ✅ Done 2026-08-01: Netlify lists **`instagram-token-refresh`** (next
+  execution Aug 3, 8:15 AM Eastern = Mondays 12:15 UTC) and
+  **`instagram-drip`** (10:20 AM Eastern = 14:20 UTC), both with Scheduled
+  badges.
 
 ## Business And Content
 
@@ -346,6 +348,29 @@
 
 ## Recently Completed
 
+- **2026-08-01 (post-deploy verification):** confirmed against live
+  production — the Facebook post's `Shop:` short link `/p/21` now **302s to
+  the product page** (the multi-day deploy-urgency item, resolved); `.co` and
+  naplesantiquesllc.com 301 path-preservingly to `.com`; the `.co/api/*`
+  carve-out serves 200 so webhooks stay safe; the sitemap is all-`.com` with
+  zero auction URLs; core routes (home/shop/terms/checkout) all 200; and the
+  brand/splash wordmarks render `.com` with no `Jewelry.Co` text remaining.
+  Two gaps found and fixed in source (see "Pending Next Deploy"): the Etsy
+  provisioning 400 and the English retired-page redirects.
+- **2026-08-01:** **eBay tiered shipping policies provisioned** — 7 created,
+  ids recorded in the backlog item above. Etsy attempted and cleanly
+  rejected (no partial state).
+- **2026-08-01:** verified **all five Netlify scheduled functions carry
+  Scheduled badges** with correct next-execution times: `etsy-price-push`
+  (11:15 UTC), `ebay-price-push` (11:45 UTC), `instagram-drip` (14:20 UTC),
+  `facebook-drip` (14:40 UTC), and `instagram-token-refresh` (Mon 12:15 UTC).
+  This closed the same "confirm after deploy" item that appeared separately
+  in the price-automation, Facebook, and Instagram sections.
+- **2026-08-01:** domain switch completed end to end — code sweep, GoDaddy
+  DNS, Netlify primary + cert, env vars, Supabase Auth, PayPal/eBay/Etsy
+  endpoint re-registration, and the Google Search Console `.com` property +
+  sitemap + confirmed Change of Address. Full detail in the domain item above
+  and `CHANGELOG.md`.
 - **2026-07-31:** ran a read-only customer-facing viewport test pass over this
   session's features in a fresh browser tab (authoritative console). Pages:
   EN/ES home, EN/ES shop, EN/ES product detail, contact, empty + loaded

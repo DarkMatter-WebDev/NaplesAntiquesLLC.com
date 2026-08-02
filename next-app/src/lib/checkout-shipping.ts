@@ -155,10 +155,25 @@ export function getMarketplaceStandardShippingFee(itemPrice: number): number | n
   return tierFee(STANDARD_SHIPPING_TIERS, itemPrice);
 }
 
+/** USPS Priority transit for insured standard shipments below the Registered threshold. */
+const PRIORITY_DELIVERY_DAYS = { min: 1, max: 5 } as const;
+/** Registered Mail is slower; the site promises 2-10 business days (see getShippingServiceNote). */
+const REGISTERED_DELIVERY_DAYS = { min: 2, max: 10 } as const;
+
 export type MarketplaceShippingTier = {
   /** Stable identity used to key provisioned marketplace shipping objects. */
   key: string;
   fee: number;
+  /**
+   * Buyer-facing transit estimate in business days. Etsy REQUIRES either this
+   * pair or a carrier + mail class on every shipping-profile destination
+   * (it rejects the create with "You must provide either a carrier and mail
+   * class or min/max delivery days" otherwise), and eBay quotes the same
+   * window. Carrier-agnostic days are used so no marketplace-specific carrier
+   * id has to be looked up or kept in sync.
+   */
+  minDeliveryDays: number;
+  maxDeliveryDays: number;
 };
 
 /**
@@ -168,7 +183,18 @@ export type MarketplaceShippingTier = {
  */
 export const MARKETPLACE_SHIPPING_TIERS: readonly MarketplaceShippingTier[] = Array.from(
   new Set(STANDARD_SHIPPING_TIERS.map((tier) => tier.fee)),
-).sort((a, b) => a - b).map((fee) => ({ key: `fee-${fee}`, fee }));
+).sort((a, b) => a - b).map((fee) => {
+  // One profile per DISTINCT fee, so a fee covering any band at/above the
+  // Registered threshold must quote the slower Registered window: the $99 fee
+  // spans both a Priority band ($2,500-$5,000) and a Registered band
+  // ($5,000-$15,000), and the shared object must not over-promise on the
+  // slower one.
+  const travelsRegistered = STANDARD_SHIPPING_TIERS.some(
+    (tier) => tier.fee === fee && tier.min >= REGISTERED_MAIL_MIN_SUBTOTAL,
+  );
+  const days = travelsRegistered ? REGISTERED_DELIVERY_DAYS : PRIORITY_DELIVERY_DAYS;
+  return { key: `fee-${fee}`, fee, minDeliveryDays: days.min, maxDeliveryDays: days.max };
+});
 
 /**
  * The marketplace shipping tier for one listing priced at `itemPrice`, or

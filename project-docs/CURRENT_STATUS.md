@@ -4,41 +4,38 @@
 > detail belongs in `CHANGELOG.md`; durable rationale belongs in `DECISIONS.md`.
 > Last reconciled: **2026-08-01**.
 
-## ⚠️ Pending Deployment (owner testing before final deploy)
+## ✅ Shipped 2026-08-01 (deployed and production-verified)
 
-Local source is ahead of production by the 2026-07-30/31 batch below PLUS the
-entire 2026-08-01 social batch (items 11-14) PLUS the 2026-08-01 domain switch
-(item 15). Latest local verification:
-**588/588 tests, TypeScript, lint, 438-page production build** (444 → 438
-after the auctions + auction-terms + vendor-terms page removals, item 16;
-test count 592 → 588 from the removed pages' parameterized metadata tests)
-(see
-`CHANGELOG.md`). **Deploy urgency: the LIVE Facebook post's clickable
-`Shop: …/p/21` link 404s in production until this deploys** — the `/p/[code]`
-short-link route is part of this batch.
+The entire batch below — the 2026-07-30/31 work, the 2026-08-01 social batch
+(items 11-14), the domain switch (item 15), and the page retirements
+(item 16) — is **live**. Verified against production after deploy: the
+Facebook post's `Shop: …/p/21` short link 302s to the product page (the
+long-standing deploy-urgency item), `.co` and naplesantiquesllc.com 301
+path-preservingly to `.com`, the `.co/api/*` carve-out serves 200,
+the sitemap is all-`.com`, and core routes return 200. The domain migration
+is complete end to end including PayPal/eBay/Etsy re-registration and a
+confirmed Google Change of Address — see `TASKS.md` and `CHANGELOG.md`.
 
-> ✅ **DOMAIN-SWITCH DEPLOY GATE CLEARED (2026-08-01, same session).** The
-> batch switches the primary domain to `naplesestatejewelry.com`, and all
-> prerequisite wiring is DONE and browser-verified: GoDaddy `.com` DNS →
-> Netlify (A @ 75.2.60.5, CNAME www; the pre-existing GoDaddy Connect-Domain
-> **302 forwarding to `.co` was found and removed** — same broken product as
-> the old naplesantiquesllc.com setup), `.com` + www added in Netlify and
-> `.com` set as PRIMARY (`www.naplesestatejewelry.co` re-added as an alias
-> after the flip dropped it), cert reissued for all six hosts,
-> `NEXT_PUBLIC_SITE_URL`/`SITE_URL` env vars → `.com`, Supabase Auth Site
-> URL → `.com` with both `.com` redirect URLs added (`.co` kept).
-> `https://naplesestatejewelry.com/shop` loads with a valid cert;
-> `https://naplesestatejewelry.co` still serves normally until the deploy
-> activates its 301s. **Deploying the batch is now safe.** After deploy:
-> re-register PayPal/eBay/Etsy endpoints on `.com` + Search Console (steps
-> 5-7 of the runbook in `TASKS.md`). Business email stays on `.co` — `.co`
-> MX records were never touched.
+> ⚠️ **Two fixes are committed locally and awaiting the NEXT deploy**
+> (588/588 tests, tsc, lint, 438-page build all green):
+> **(1) Etsy shipping-tier provisioning** — Etsy rejects the profile create
+> with a 400 unless each destination carries a delivery-day window, so
+> `MarketplaceShippingTier` now supplies `minDeliveryDays`/`maxDeliveryDays`
+> from the shared tier table. eBay's seven policies are already provisioned;
+> Etsy's wait on this. **(2) English retired-page redirects** — `/auctions`,
+> `/auction-terms`, `/vendor-terms` still 404 while their `/es/*` twins 301,
+> because the next-intl proxy handles locale-less paths before Netlify's
+> redirect engine; the rules moved into `next.config.ts` `redirects()`.
+> Neither breaks anything live — the marketplaces keep quoting their existing
+> default shipping, and the three retired URLs simply 404 instead of 301.
 
 1. Value-based shipping tiers (checkout + server) with coded checkout errors.
 2. Four-step checkout wizard (Summary → Delivery → Contact → Review & Pay)
    with the sign-in/guest entry dialog.
-3. Marketplace shipping-tier extension (Etsy/eBay; needs owner provisioning
-   after deploy — SQL migration already applied in production 2026-07-30).
+3. Marketplace shipping-tier extension (Etsy/eBay; SQL migration applied
+   2026-07-30). **eBay provisioned 2026-08-01** — 7 fulfillment policies,
+   one per distinct fee. Etsy provisioning awaits the delivery-days fix noted
+   above.
 4. eBay account-change listing-state reset admin action.
 5. naplesantiquesllc.com SEO recovery 301 redirects (DNS/alias/cert already
    live; redirects activate on deploy).

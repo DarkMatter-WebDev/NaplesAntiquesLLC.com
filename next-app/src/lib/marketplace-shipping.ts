@@ -16,8 +16,13 @@ import {
 
 export type ShippingTierMarketplace = 'etsy' | 'ebay';
 
-/** Canonical display/object name for a provisioned tier, stable across runs. */
-export function marketplaceShippingTierLabel(tier: MarketplaceShippingTier): string {
+/**
+ * Canonical display/object name for a provisioned tier, stable across runs.
+ * Takes only the fee on purpose: this string is the idempotency key that
+ * matches existing Etsy profiles / eBay policies, so it must never shift when
+ * unrelated tier fields (delivery-day window, etc.) change.
+ */
+export function marketplaceShippingTierLabel(tier: Pick<MarketplaceShippingTier, 'fee'>): string {
   return `NEJ Insured Shipping $${tier.fee}`;
 }
 
