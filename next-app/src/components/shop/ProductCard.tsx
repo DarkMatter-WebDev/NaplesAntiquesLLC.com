@@ -1,0 +1,837 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { formatProductItemYear, inferProductJewelryType, isProductPurchasable, isProductSold, normalizeProductQuantity, normalizeProductStatus, productImagePaddingBackground, productImagePaddingForImage, productLengthSizeDisplay, productMetalVariantLabel, productStatusLabel, productSupportsLinkType, productWidthDisplay, type Product, type SpotData } from '@/types/product';
+import { getStorefrontDisplayPrice } from '@/lib/pricing';
+import WishlistButton from '@/components/shop/WishlistButton';
+import type { WishlistItem } from '@/context/WishlistContext';
+import CartButton from '@/components/shop/CartButton';
+import type { CartItem } from '@/context/CartContext';
+import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
+import { getMountedProductImageIndexes } from '@/lib/shop-card-images';
+import { rememberShopReturn } from '@/lib/shop-return';
+import { AppIcon } from '@/components/AppIcon';
+
+interface Props {
+  product: Product;
+  spotData: SpotData | null;
+  locale: string;
+  hideSoldItemPrices?: boolean;
+  variant?: 'classic' | 'modern';
+  prioritizeImage?: boolean;
+  includeModernStyles?: boolean;
+}
+
+export default function ProductCard({
+  product,
+  spotData,
+  locale,
+  hideSoldItemPrices = false,
+  variant = 'classic',
+  prioritizeImage = false,
+  includeModernStyles = false,
+}: Props) {
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [isImageHovering, setIsImageHovering] = useState(false);
+  const [isImageArrowHovering, setIsImageArrowHovering] = useState(false);
+  const [hasCarouselInteraction, setHasCarouselInteraction] = useState(false);
+  const isEs = locale === 'es';
+  const title = isEs && product.title_es ? product.title_es : product.title;
+  const price = getStorefrontDisplayPrice(product, spotData, hideSoldItemPrices, locale);
+  const metalLabel = productMetalVariantLabel(product.metal_variant, product.category, locale);
+  const purityLabel = formatPurity(product, isEs);
+  const purityChipStyle = getPurityChipStyle(product);
+  const weightLabel = formatWeight(product.gram_weight ?? product.weight_grams);
+  const lengthLabel = formatLengthChip(productLengthSizeDisplay(product));
+  const widthLabel = productWidthDisplay(product);
+  const itemDateLabel = formatProductItemYear(product.item_year);
+  const images = useMemo(
+    () =>
+      (product.image_urls?.length ? product.image_urls : product.images ?? [])
+        .map((image) => normalizeLegacyLocalImageUrl(image))
+        .filter((image): image is string => Boolean(image)),
+    [product.image_urls, product.images],
+  );
+  const thumb = images[0] ?? null;
+  const safeActiveImageIndex = activeImageIndex < images.length ? activeImageIndex : 0;
+  const activeImage = images[safeActiveImageIndex] ?? thumb;
+  const hasMultipleImages = images.length > 1;
+  const canShowPreviousImage = hasMultipleImages && safeActiveImageIndex > 0;
+  const canShowNextImage = hasMultipleImages && safeActiveImageIndex < images.length - 1;
+  const imageFrameBackground = productImagePaddingBackground(productImagePaddingForImage(product.image_padding, product.image_padding_by_image, activeImage, safeActiveImageIndex));
+  const thumbPadding = productImagePaddingForImage(product.image_padding, product.image_padding_by_image, thumb, 0);
+  const href = locale === 'es' ? `/es/shop/${product.id}` : `/shop/${product.id}`;
+  const normalizedStatus = normalizeProductStatus(product.status);
+  const isSold = isProductSold(product.status);
+  const isSoldPriceHidden = isSold && hideSoldItemPrices;
+  const isPurchasable = isProductPurchasable(product.status, product.quantity);
+  const stockQuantity = normalizeProductQuantity(product.quantity);
+  const isModern = variant === 'modern';
+  const brand = product.brand?.trim() ?? '';
+  const fallbackFlagLabel = getProductCardFlagFallback(product);
+  const flagLabel = brand || fallbackFlagLabel;
+  const isBrandFlag = brand.length > 0;
+  const flagFitClass = getProductCardFlagFitClass(flagLabel);
+  const showBrandTag = flagLabel.length > 0 && safeActiveImageIndex === 0 && !isImageArrowHovering;
+  const mountedImageIndexes = useMemo(
+    () => getMountedProductImageIndexes(images.length, safeActiveImageIndex, hasCarouselInteraction),
+    [hasCarouselInteraction, images.length, safeActiveImageIndex],
+  );
+  const rememberReturnPosition = useCallback(() => {
+    rememberShopReturn(product.id);
+  }, [product.id]);
+
+  const cartItem: CartItem = {
+    id: product.id,
+    title: product.title,
+    title_es: product.title_es,
+    description: product.description,
+    description_es: product.description_es,
+    public_notes: product.public_notes,
+    image: thumb,
+    image_padding: thumbPadding,
+    status: normalizedStatus,
+    stockQuantity: product.quantity,
+    priceLabel: price,
+    category: product.category,
+    metal_type: product.metal_type,
+    metal_variant: product.metal_variant,
+    purity: product.purity,
+    weight_grams: product.weight_grams,
+    gram_weight: product.gram_weight,
+    product_type: product.product_type,
+    jewelry_type: product.jewelry_type,
+    chain_type: product.chain_type,
+    length: product.length,
+    brand: product.brand,
+    item_year: product.item_year,
+    tags: product.tags,
+    tags_es: product.tags_es,
+    gender: product.gender,
+  };
+
+  const wishlistItem: WishlistItem = {
+    id: product.id,
+    title: product.title,
+    title_es: product.title_es,
+    image: thumb,
+    image_padding: thumbPadding,
+    status: normalizedStatus,
+    price_mode: product.price_mode,
+    purity: product.purity,
+    weight_grams: product.weight_grams,
+    pricing_multiplier: product.pricing_multiplier,
+    manual_price_label: product.manual_price_label,
+    sold_price: product.sold_price,
+  };
+
+  useEffect(() => {
+    if (!isImageHovering || isImageArrowHovering || !canShowNextImage) return;
+    const timer = window.setInterval(() => {
+      setActiveImageIndex((current) => Math.min(current + 1, images.length - 1));
+    }, 1150);
+    return () => window.clearInterval(timer);
+  }, [canShowNextImage, images.length, isImageHovering, isImageArrowHovering]);
+
+  useEffect(() => {
+    if (isImageHovering || activeImageIndex === 0) return;
+    const timer = window.setTimeout(() => {
+      setActiveImageIndex(0);
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [activeImageIndex, isImageHovering]);
+
+  const showPreviousImage = () => {
+    if (!canShowPreviousImage) return;
+    setHasCarouselInteraction(true);
+    setActiveImageIndex((current) => Math.max(current - 1, 0));
+  };
+
+  const showNextImage = () => {
+    if (!canShowNextImage) return;
+    setHasCarouselInteraction(true);
+    setActiveImageIndex((current) => Math.min(current + 1, images.length - 1));
+  };
+
+  return (
+    <article
+      className={`group relative flex flex-col overflow-hidden ${
+        isModern
+          ? 'modern-product-card bg-white'
+          : 'bg-[color:var(--color-surface-container-lowest)] border border-[color:var(--color-outline-variant)]'
+      }`}
+      style={isModern ? {
+        border: '1px solid rgba(115, 92, 0, 0.12)',
+        borderRadius: '8px',
+        boxShadow: '0 12px 32px rgba(42, 34, 12, 0.10)',
+      } : undefined}
+    >
+
+      {/* Image */}
+      <div
+        className={`relative aspect-square overflow-hidden ${isModern ? 'modern-product-image' : ''}`}
+        style={{ background: imageFrameBackground }}
+        onPointerEnter={() => {
+          setHasCarouselInteraction(true);
+          setIsImageHovering(true);
+        }}
+        onPointerLeave={() => setIsImageHovering(false)}
+      >
+        {isSold && (
+          <div
+            className="shop-card-status-tag absolute top-3 left-3 z-10 text-[0.6rem] font-bold tracking-widest uppercase px-2 py-0.5"
+            style={{
+              background: isModern ? '#1f2321' : 'var(--color-on-surface)',
+              color: 'var(--color-surface)',
+              borderRadius: isModern ? '4px' : undefined,
+            }}
+          >
+            {isEs ? 'Vendido' : 'Sold'}
+          </div>
+        )}
+        {!isSold && (
+          <div
+            className="shop-card-status-tag shop-card-status-available absolute top-3 left-3 z-10 text-[0.6rem] font-bold tracking-widest uppercase px-2 py-0.5"
+            style={{
+              background: isPurchasable ? (isModern ? 'linear-gradient(135deg, #d5a820, #ad8507)' : 'var(--color-primary)') : '#8a5a00',
+              color: isModern ? '#fffdf7' : 'var(--color-on-primary)',
+              borderRadius: isModern ? '4px' : undefined,
+              boxShadow: isModern ? '0 8px 18px rgba(115, 92, 0, 0.16)' : undefined,
+            }}
+          >
+            {isPurchasable
+              ? stockQuantity > 1
+                ? (isEs ? `${stockQuantity} disponibles` : `${stockQuantity} in stock`)
+                : (isEs ? 'Disponible' : 'Available')
+              : productStatusLabel(product.status)}
+          </div>
+        )}
+        {/* Cart icon button — mobile only, top-left (replaces Available tag on small screens) */}
+        {isPurchasable && (
+          <div className="shop-card-cart-icon-wrap absolute top-2 left-2 z-10">
+            <CartButton item={cartItem} variant="icon" locale={locale} />
+          </div>
+        )}
+
+        {/* Wishlist button — top-right of image */}
+        <div className="shop-card-wishlist-wrap absolute top-2 right-2 z-10">
+          <WishlistButton item={wishlistItem} variant="icon" locale={locale} />
+        </div>
+
+        {showBrandTag && (
+          <div
+            className={`shop-card-brand-tag ${isBrandFlag ? 'shop-card-brand-tag-brand' : 'shop-card-brand-tag-link'} ${flagFitClass} absolute bottom-2 left-2 z-10 max-w-[70%] truncate px-2.5 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.16em] transition-opacity duration-150`}
+            style={{
+              background: isBrandFlag
+                ? 'linear-gradient(135deg, rgba(255, 253, 246, 0.96), rgba(246, 232, 184, 0.94))'
+                : 'rgba(255, 252, 246, 0.92)',
+              border: isBrandFlag
+                ? '1px solid rgba(181, 137, 12, 0.42)'
+                : '1px solid rgba(115, 92, 0, 0.22)',
+              borderRadius: isModern ? '6px' : undefined,
+              color: 'var(--color-primary)',
+              fontFamily: 'var(--font-label)',
+              boxShadow: isBrandFlag
+                ? '0 7px 18px rgba(42, 34, 12, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.82)'
+                : '0 6px 16px rgba(42, 34, 12, 0.14)',
+              textShadow: isBrandFlag ? '0 1px 0 rgba(255, 255, 255, 0.72)' : undefined,
+            }}
+          >
+            {flagLabel}
+          </div>
+        )}
+
+        {activeImage ? (
+          <Link href={href} prefetch={false} className="absolute inset-0" onClick={rememberReturnPosition}>
+            {mountedImageIndexes.map((index) => {
+              const image = images[index];
+              return (
+              <Image
+                key={`${product.id}-${index}-${image}`}
+                src={image}
+                alt={index === safeActiveImageIndex ? title : ''}
+                fill
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1719px) 25vw, (max-width: 1959px) 20vw, (max-width: 2319px) 16vw, 14vw"
+                className={`pointer-events-none object-contain object-center transition-opacity duration-700 ease-in-out ${
+                  index === safeActiveImageIndex ? 'opacity-100' : 'opacity-0'
+                }`}
+                // The first cover image of an above-the-fold card is the LCP
+                // candidate: `priority` emits a preload link + fetchpriority=high.
+                // Later (hover-carousel) images stay lazy so they don't compete.
+                priority={prioritizeImage && index === 0}
+                loading={prioritizeImage && index === 0 ? undefined : 'lazy'}
+                // Local assets in the static folder aren't in remotePatterns; unoptimized for those
+                unoptimized={image.startsWith('/assets/')}
+              />
+              );
+            })}
+          </Link>
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-[#735c00]/35">
+            <AppIcon name="image"  style={{ fontSize: '2rem' }} aria-hidden="true" />
+          </div>
+        )}
+        {isModern && hasMultipleImages && (
+          <div
+            className={`shop-card-image-progress ${isImageHovering ? 'is-visible' : ''}`}
+            data-current-image={safeActiveImageIndex + 1}
+            data-image-count={images.length}
+            aria-hidden="true"
+          >
+            <span
+              className="shop-card-image-progress-fill"
+              style={{ transform: `scaleX(${(safeActiveImageIndex + 1) / images.length})` }}
+            />
+          </div>
+        )}
+        {hasMultipleImages && (
+          <>
+            {canShowPreviousImage && (
+              <button
+                type="button"
+                aria-label={isEs ? 'Imagen anterior' : 'Previous image'}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  showPreviousImage();
+                }}
+                onPointerEnter={() => setIsImageArrowHovering(true)}
+                onPointerLeave={() => setIsImageArrowHovering(false)}
+                onFocus={() => setIsImageArrowHovering(true)}
+                onBlur={() => setIsImageArrowHovering(false)}
+                className="shop-card-image-arrow absolute bottom-2 left-2 z-20 inline-flex h-6 w-6 items-center justify-center border text-sm font-bold transition-colors"
+                style={{
+                  borderColor: 'rgba(115, 92, 0, 0.3)',
+                  background: 'rgba(255, 252, 246, 0.9)',
+                  color: 'var(--color-primary)',
+                  boxShadow: '0 3px 10px rgba(0,0,0,0.12)',
+                }}
+              >
+                &lsaquo;
+              </button>
+            )}
+            {canShowNextImage && (
+              <button
+                type="button"
+                aria-label={isEs ? 'Imagen siguiente' : 'Next image'}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  showNextImage();
+                }}
+                onPointerEnter={() => setIsImageArrowHovering(true)}
+                onPointerLeave={() => setIsImageArrowHovering(false)}
+                onFocus={() => setIsImageArrowHovering(true)}
+                onBlur={() => setIsImageArrowHovering(false)}
+                className="shop-card-image-arrow absolute bottom-2 right-2 z-20 inline-flex h-6 w-6 items-center justify-center border text-sm font-bold transition-colors"
+                style={{
+                  borderColor: 'rgba(115, 92, 0, 0.3)',
+                  background: 'rgba(255, 252, 246, 0.9)',
+                  color: 'var(--color-primary)',
+                  boxShadow: '0 3px 10px rgba(0,0,0,0.12)',
+                }}
+              >
+                &rsaquo;
+              </button>
+            )}
+          </>
+        )}
+        {isModern && (
+          <div className="modern-card-hover-title" aria-hidden="true">
+            {title}
+          </div>
+        )}
+      </div>
+
+      {/* Body */}
+      <div className="modern-card-body flex flex-col flex-1 p-4 gap-1.5">
+        <span
+          className="text-[0.62rem] font-bold uppercase tracking-[0.28em]"
+          style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+        >
+          {metalLabel}
+        </span>
+
+        <Link href={href} prefetch={false} className="group/title" onClick={rememberReturnPosition}>
+          <h3
+            className="hover-underline-grow font-bold text-[0.98rem] leading-snug mt-0.5 line-clamp-3"
+            style={{
+              fontFamily: 'var(--font-headline)',
+              color: 'var(--color-on-surface)',
+              minHeight: 'calc(1.375em * 3)',
+            }}
+          >
+            {title}
+          </h3>
+        </Link>
+
+        {!isModern && itemDateLabel && (
+          <p
+            className="modern-card-date text-[0.66rem] font-semibold uppercase tracking-[0.16em]"
+            style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+          >
+            <span className="normal-case">Ca.</span> {itemDateLabel}
+          </p>
+        )}
+
+        <p
+          className={`mt-1 flex items-baseline gap-2 px-2 py-1.5 ${isModern ? 'modern-price-row' : 'border-y'}`}
+          style={{
+            position: isModern ? 'relative' : undefined,
+            background: isModern ? 'linear-gradient(135deg, rgba(255, 250, 238, 0.92), rgba(249, 244, 232, 0.96))' : 'rgba(194, 155, 45, 0.06)',
+            borderColor: 'rgba(115, 92, 0, 0.18)',
+            borderTop: isModern ? '1px solid rgba(115, 92, 0, 0.14)' : undefined,
+            borderBottom: isModern ? '1px solid rgba(115, 92, 0, 0.14)' : undefined,
+            borderRadius: isModern ? '6px' : undefined,
+            fontFamily: 'var(--font-label)',
+          }}
+        >
+          {isModern && itemDateLabel && (
+            <span
+              className="modern-card-date text-[0.66rem] font-semibold uppercase tracking-[0.16em]"
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--color-on-surface-variant)',
+                fontFamily: 'var(--font-label)',
+              }}
+            >
+              <span className="normal-case">Ca.</span> {itemDateLabel}
+            </span>
+          )}
+          <span
+            className="modern-price-label text-[0.68rem] font-extrabold uppercase tracking-widest"
+            style={{ color: 'var(--color-on-surface-variant)' }}
+          >
+            {isSoldPriceHidden ? (isEs ? 'Estado' : 'Status') : (isEs ? 'Tu precio' : 'Your price')}
+          </span>
+          <span
+            className="modern-price-value text-base font-extrabold uppercase tracking-wide"
+            style={{ color: 'var(--color-primary)' }}
+          >
+            {price}
+          </span>
+          {widthLabel && (
+            <span
+              className={`product-card-width text-[0.66rem] font-bold whitespace-nowrap ${isModern ? 'modern-card-width' : 'ml-auto'}`}
+              style={{ color: 'var(--color-on-surface-variant)' }}
+              aria-label={`${isEs ? 'Ancho' : 'Width'}: ${widthLabel}`}
+            >
+              {widthLabel}
+            </span>
+          )}
+        </p>
+        <div
+          className="grid grid-cols-3 gap-1 text-[0.68rem] font-bold leading-none"
+          style={{ fontFamily: 'var(--font-label)' }}
+        >
+          <span
+            className="inline-flex min-w-0 items-center justify-center whitespace-nowrap rounded-full border px-1.5 py-1"
+            style={{
+              background: purityChipStyle.background,
+              borderColor: purityChipStyle.borderColor,
+              color: purityChipStyle.color,
+            }}
+          >
+            {purityLabel}
+          </span>
+          <span
+            className="inline-flex min-w-0 items-center justify-center whitespace-nowrap rounded-full border px-1.5 py-1"
+            style={{
+              background: 'rgba(72, 65, 52, 0.07)',
+              borderColor: 'rgba(72, 65, 52, 0.18)',
+              color: 'var(--color-on-surface-variant)',
+            }}
+          >
+            {weightLabel}
+          </span>
+          <span
+            className="inline-flex min-w-0 items-center justify-center whitespace-nowrap rounded-full border px-1.5 py-1"
+            style={{
+              background: lengthLabel ? 'rgba(139, 85, 36, 0.08)' : 'transparent',
+              borderColor: lengthLabel ? 'rgba(139, 85, 36, 0.2)' : 'transparent',
+              color: '#7a4a1f',
+              visibility: lengthLabel ? 'visible' : 'hidden',
+            }}
+          >
+            {lengthLabel ?? ''}
+          </span>
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-wrap gap-2 mt-auto pt-3">
+          <CartButton item={cartItem} variant="card" locale={locale} includeCardStyles={includeModernStyles} />
+        </div>
+      </div>
+      {isModern && includeModernStyles && (
+        <style>{`
+          .shop-card-image-arrow {
+            transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease, transform 100ms ease;
+          }
+          .shop-card-image-arrow:active {
+            transform: scale(0.8);
+            transition-duration: 0.05s;
+          }
+          .shop-card-image-progress {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 25;
+            height: 3px;
+            overflow: hidden;
+            background: transparent;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 160ms ease;
+          }
+          .modern-product-image:hover .shop-card-image-progress,
+          .shop-card-image-progress.is-visible {
+            opacity: 1;
+          }
+          .shop-card-image-progress-fill {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: #d2a51e;
+            box-shadow: 0 0 8px rgba(255, 235, 157, 0.6);
+            transform-origin: left center;
+            transition: transform 700ms ease-in-out;
+          }
+          .modern-product-card {
+            transition:
+              transform 180ms ease,
+              box-shadow 180ms ease,
+              border-color 180ms ease;
+          }
+          .modern-product-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(181, 137, 12, 0.26) !important;
+            box-shadow: 0 18px 44px rgba(42, 34, 12, 0.14) !important;
+          }
+          .modern-product-card .modern-product-image {
+            border-radius: var(--radius-xl);
+          }
+          .modern-product-card .shop-card-cart-button {
+            border-radius: 999px;
+            border-color: rgba(181, 137, 12, 0.38) !important;
+            background: rgba(255, 253, 248, 0.86);
+          }
+          .modern-product-card .shop-card-cart-button:hover {
+            background: linear-gradient(135deg, #d9ad2f, #b98c09);
+            color: #fffdf7;
+          }
+          /* Compact card body — applied at all breakpoints (mobile, tablet, desktop) */
+          .modern-product-card .modern-card-body {
+            padding: 0.3rem 0.6rem 0.6rem;
+            gap: 0.2rem;
+          }
+          /* Hide the metal label ("YELLOW GOLD") and the product title */
+          .modern-product-card .modern-card-body > span:first-child,
+          .modern-product-card .modern-card-body > a {
+            display: none;
+          }
+          /* Price floats on the white card — no cream background or borders */
+          .modern-product-card .modern-price-row {
+            margin-top: 0;
+            padding: 0 0.45rem;
+            gap: 0.35rem;
+            line-height: 1.1;
+            justify-content: center;
+            background: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+          }
+          .modern-product-card .modern-price-label {
+            display: none;
+          }
+          .modern-product-card .modern-price-value {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 0.92rem;
+            font-weight: 700;
+            letter-spacing: 0.005em;
+            text-transform: none;
+            font-variant-numeric: tabular-nums;
+          }
+          .modern-product-card .modern-card-width {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.66rem;
+            font-variant-numeric: tabular-nums;
+          }
+          /* Compact spec chips (purity / weight / length) */
+          .modern-product-card .modern-card-body > .grid span {
+            padding-top: 0.22rem;
+            padding-bottom: 0.22rem;
+          }
+          @media (max-width: 640px) {
+            .shop-card-status-tag {
+              top: 0.28rem !important;
+              left: 0.28rem !important;
+              padding: 0.08rem 0.24rem !important;
+              font-size: 0.38rem !important;
+              letter-spacing: 0.05em !important;
+              border-radius: 2px !important;
+              box-shadow: 0 3px 7px rgba(115, 92, 0, 0.12) !important;
+            }
+            .shop-card-wishlist-wrap {
+              top: 0.32rem !important;
+              right: 0.32rem !important;
+            }
+            .shop-card-wishlist-button {
+              width: 1.8rem !important;
+              height: 1.8rem !important;
+              box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12) !important;
+            }
+            .shop-card-wishlist-button [data-wishlist-icon="true"] {
+              font-size: 15px !important;
+            }
+            .shop-card-image-arrow {
+              width: 1.15rem !important;
+              height: 1.15rem !important;
+              bottom: 0.35rem !important;
+              font-size: 0.7rem !important;
+              line-height: 1 !important;
+              box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
+            }
+            .shop-card-image-arrow.left-2 {
+              left: 0.35rem !important;
+            }
+            .shop-card-image-arrow.right-2 {
+              right: 0.35rem !important;
+            }
+          }
+          .shop-card-brand-tag-link {
+            padding-top: 0.22rem !important;
+            padding-bottom: 0.22rem !important;
+            font-size: 0.56rem !important;
+            line-height: 1 !important;
+            letter-spacing: 0.12em !important;
+          }
+          @media (max-width: 640px) {
+            .shop-card-brand-tag-link {
+              bottom: 0.28rem !important;
+              left: 0.28rem !important;
+              padding: 0.1rem 0.28rem !important;
+              font-size: 0.46rem !important;
+              letter-spacing: 0.05em !important;
+              border-radius: 2px !important;
+            }
+            .shop-card-brand-tag-fit-medium {
+              font-size: 0.42rem !important;
+              letter-spacing: 0.03em !important;
+            }
+            .shop-card-brand-tag-fit-long {
+              font-size: 0.38rem !important;
+              letter-spacing: 0.01em !important;
+              padding-left: 0.22rem !important;
+              padding-right: 0.22rem !important;
+            }
+          }
+          @media (max-width: 640px) {
+            .shop-card-brand-tag-brand {
+              bottom: 0.28rem !important;
+              left: 0.28rem !important;
+              max-width: 62% !important;
+              padding: 0.1rem 0.28rem !important;
+              font-size: 0.46rem !important;
+              line-height: 1 !important;
+              letter-spacing: 0.05em !important;
+              border-radius: 2px !important;
+              box-shadow: 0 3px 7px rgba(42, 34, 12, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.72) !important;
+            }
+          }
+          @media (max-width: 640px) {
+            .modern-product-card .modern-card-body {
+              padding-left: 0.35rem;
+              padding-right: 0.35rem;
+            }
+            .modern-product-card .modern-card-body > .grid {
+              gap: 0.08rem;
+              font-size: 0.58rem;
+            }
+            .modern-product-card .modern-card-body > .grid span {
+              padding-left: 0.08rem;
+              padding-right: 0.08rem;
+            }
+            /* Hide bottom cart button row on mobile — cart icon is in the image instead */
+            .modern-product-card .modern-card-body > .flex:last-child {
+              display: none !important;
+            }
+            /* Hide date label on mobile */
+            .modern-product-card .modern-card-date {
+              display: none;
+            }
+            /* Hide the Available text tag on mobile — replaced by cart icon */
+            .shop-card-status-available {
+              display: none !important;
+            }
+            /* Show cart icon button on mobile */
+            .shop-card-cart-icon-wrap {
+              display: flex;
+            }
+            .shop-card-cart-icon-button {
+              width: 1.8rem !important;
+              height: 1.8rem !important;
+              box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12) !important;
+            }
+            .shop-card-cart-icon-button [data-cart-icon="true"] {
+              font-size: 14px !important;
+            }
+            /* Expand the mobile tap target for the two corner icon buttons
+               without enlarging the visible icon. A transparent overlay grows
+               the clickable area to ~44px (from ~28px) and, because it extends
+               past the card corner where the image container clips it, the
+               entire corner of the card image reliably taps the button. */
+            .shop-card-cart-icon-button,
+            .shop-card-wishlist-button {
+              position: relative;
+            }
+            .shop-card-cart-icon-button::before,
+            .shop-card-wishlist-button::before {
+              content: '';
+              position: absolute;
+              inset: -0.85rem;
+              border-radius: 999px;
+            }
+          }
+          /* Cart icon button — hidden on tablet/desktop, visible on mobile */
+          @media (min-width: 641px) {
+            .shop-card-cart-icon-wrap {
+              display: none;
+            }
+          }
+          /* Tighten the action row above the Add button */
+          .modern-product-card .modern-card-body > .flex:last-child {
+            padding-top: 0.4rem;
+          }
+          /* Title hover tooltip — desktop only (title is hidden in the card body) */
+          .modern-card-hover-title {
+            display: none;
+          }
+          @media (min-width: 1024px) {
+            .modern-card-hover-title {
+              display: block;
+              position: absolute;
+              left: 0.7rem;
+              right: 0.7rem;
+              bottom: 0.7rem;
+              padding: 0.5rem 0.75rem;
+              border-radius: var(--radius-lg);
+              background: rgba(24, 19, 9, 0.86);
+              backdrop-filter: blur(3px);
+              color: #fffdf7;
+              font-family: var(--font-headline);
+              font-size: 0.74rem;
+              font-weight: 600;
+              line-height: 1.3;
+              text-align: center;
+              opacity: 0;
+              transform: translateY(8px);
+              transition: opacity 200ms ease, transform 200ms ease;
+              pointer-events: none;
+              z-index: 15;
+              box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
+            }
+            .modern-product-card:hover .modern-card-hover-title {
+              opacity: 1;
+              transform: translateY(0);
+            }
+            .modern-product-card:hover .shop-card-brand-tag,
+            .modern-product-card:focus-within .shop-card-brand-tag {
+              opacity: 0;
+            }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .modern-product-card,
+            .modern-product-card:hover,
+            .shop-card-image-arrow,
+            .shop-card-image-progress,
+            .shop-card-image-progress-fill {
+              transition: none;
+              transform: none;
+              filter: none;
+            }
+            .shop-card-image-arrow:active {
+              transform: none;
+            }
+          }
+        `}</style>
+      )}
+    </article>
+  );
+}
+
+function formatPurity(product: Product, isEs: boolean): string {
+  if (!product.purity) return isEs ? 'No indicado' : 'Not listed';
+  if (product.category === 'Silver' && product.purity >= 100) {
+    return `${product.purity}`;
+  }
+  return `${product.purity}K`;
+}
+
+function getPurityChipStyle(product: Product) {
+  if (!product.purity || product.category !== 'Gold' || product.purity > 24) {
+    return {
+      background: 'rgba(194, 155, 45, 0.1)',
+      borderColor: 'rgba(115, 92, 0, 0.22)',
+      color: 'var(--color-primary)',
+    };
+  }
+
+  const karat = Math.min(24, Math.max(10, product.purity));
+  const intensity = (karat - 10) / 12;
+  const fillPercent = Math.round(18 + intensity * 42);
+  const borderPercent = Math.round(32 + intensity * 38);
+
+  return {
+    background: `color-mix(in srgb, #ffd84d ${fillPercent}%, var(--color-background))`,
+    borderColor: `color-mix(in srgb, #c99800 ${borderPercent}%, rgba(115, 92, 0, 0.22))`,
+    color: karat >= 18 ? '#6f4e00' : karat >= 14 ? '#735c00' : '#6f622f',
+  };
+}
+
+function formatWeight(weight: number | null): string {
+  if (!weight) return '—';
+  const maximumFractionDigits = weight >= 100 ? 1 : weight >= 10 ? 1 : 2;
+  return `${new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: weight % 1 === 0 ? 0 : maximumFractionDigits,
+  }).format(weight)}g`;
+}
+
+function formatLengthChip(value: string | null): string | null {
+  if (!value) return null;
+  const ringSize = value.match(/^Size:\s*(.+)$/i);
+  if (ringSize) return `Sz ${ringSize[1]}`;
+
+  const inchValue = value.match(/^(\d+(?:\.\d+)?)\s*in$/i);
+  if (!inchValue) return value;
+
+  const numeric = Number(inchValue[1]);
+  if (!Number.isFinite(numeric)) return value;
+  const compact = numeric >= 10
+    ? Math.round(numeric)
+    : Number.isInteger(numeric) ? numeric : Number(numeric.toFixed(1));
+  return `${compact}in`;
+}
+
+function getProductCardFlagFallback(product: Product): string {
+  const jewelryType = inferProductJewelryType(product);
+  if (!productSupportsLinkType(jewelryType)) return '';
+
+  const linkType = product.chain_type ?? (product.tags ?? []).find((tag) => tag.startsWith('ct:'))?.slice(3) ?? '';
+  return linkType.trim();
+}
+
+function getProductCardFlagFitClass(label: string): string {
+  const length = label.trim().length;
+  if (length >= 18) return 'shop-card-brand-tag-fit-long';
+  if (length >= 13) return 'shop-card-brand-tag-fit-medium';
+  return '';
+}

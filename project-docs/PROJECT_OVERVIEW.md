@@ -1,0 +1,117 @@
+﻿# Project Overview
+
+> **Read this file first** when starting a new session. It is the highest-level
+> summary of the project. For the live state of work, read `CURRENT_STATUS.md`.
+
+## Project Purpose
+
+Marketing + commerce website for **Naples Estate Jewelry** (legal
+entity: *Naples Antiques LLC*). The site does two jobs:
+
+1. **Lead generation** for a private, mobile, appointment-only buying service —
+   the owner travels to clients throughout Southwest Florida to evaluate and buy
+   estate jewelry, gold, sterling silver, diamonds, watches, antiques, coins, and
+   full estates.
+2. **Online shop** that sells curated estate jewelry (currently solid-gold chains,
+   bracelets, and rings) with live, gold-spot-based pricing.
+
+## Business Goals
+
+- Generate qualified seller leads (people looking to sell jewelry/estates) via
+  phone calls, the "Submit Your Item" form, and newsletter signups.
+- Build trust and authority (private, discreet, knowledgeable, local) to win
+  business against pawn shops and national mail-in buyers.
+- Sell estate inventory directly online at fair, transparent, spot-linked prices.
+- Capture and retain customers via accounts, saved favorites, and saved carts.
+- Rank locally in SEO for estate jewelry / gold / silver / antique buying across
+  Naples, Marco Island, Bonita Springs, Estero, Fort Myers, and Cape Coral.
+
+## Target Audience
+
+- **Sellers**: Southwest Florida residents (often retirees / estate executors /
+  downsizing families) holding inherited jewelry, gold, silver, or full estates.
+- **Buyers**: shoppers looking for solid-gold chains and estate pieces priced
+  close to melt value with transparent, live pricing.
+
+Primary persona is affluent, 50+, in the Naples/Fort Myers area, who values
+discretion and a personal relationship over a storefront transaction.
+
+## Owner / Contact
+
+- **Owner**: Chris (15+ years experience, born and raised in Naples).
+- **Phone / text**: (239) 404-8505
+- **Service model**: mobile, appointment-only, no physical storefront.
+- **Service area**: Naples, Marco Island, Bonita Springs, Estero, Fort Myers,
+  Cape Coral, and nearby Southwest Florida communities.
+
+## Tech Stack
+
+- **Frontend**: Next.js app in `next-app/` using the App Router, React,
+  TypeScript, Tailwind, and `next-intl` for EN/ES routes.
+- **Auth + data**: Supabase (Postgres + Auth) for customer accounts, profiles,
+  favorites/wishlist behavior, inquiries, admin data, and products. Project ref:
+  `evzluixourmsefwdsieu`.
+- **Server/API**: Next route handlers for metal pricing, inquiries, and checkout,
+  deployed on Netlify with `@netlify/plugin-nextjs`.
+- **Payments**: PayPal (JS SDK on the client, Orders API v2 on the server) wired
+  into `/checkout`. No card data touches our servers; totals are computed
+  server-side. `PAYPAL_ENV` selects sandbox or live and must match the client
+  ID/secret set. Netlify environment values are the operating configuration;
+  local `.env.local` is not authoritative.
+- **Hosting**: Netlify (`base = "next-app"`, publish `.next`).
+- **Email / marketing**: Resend-backed inquiry/order flow plus Supabase-backed
+  subscriber and admin marketing surfaces in the Next app.
+- **Product catalog**: Supabase `products` table, with local image paths under
+  `next-app/public/assets` for legacy/app-bundled assets and newer uploaded
+  images via Supabase Storage. Product rows store image URL/path strings, not
+  binary image payloads.
+- **Legacy note**: the old root static HTML site and vanilla scripts were
+  removed on 2026-06-13. See `LEGACY_REMOVAL_REPORT.md`.
+
+## Deployment Details
+
+- **Host**: Netlify, configured by root `netlify.toml` with
+  `base = "next-app"` and `publish = ".next"`.
+- **Primary domain**: `naplesestatejewelry.com` (owner bought the `.com` and
+  decided the switch 2026-08-01; all app canonicals/sitemap/schema/email
+  branding now emit `.com`). The external wiring is DONE and verified
+  (GoDaddy DNS → Netlify, `.com` is the Netlify PRIMARY with cert, env vars
+  and Supabase Auth updated) — `https://naplesestatejewelry.com` serves the
+  live site. Remaining: deploy the pending batch, then re-register
+  PayPal/eBay/Etsy endpoints and Search Console on `.com` — see `TASKS.md`.
+- **Legacy domain**: `naplesestatejewelry.co` stays a Netlify alias with
+  path-preserving 301s to `.com` (rules in root `netlify.toml`, with an
+  `/api/*` carve-out until external webhooks re-register on `.com`).
+  **Business email stays on `.co`** (`info@` / `chris@` /
+  `noreply@naplesestatejewelry.co`) — owner decision; never touch the `.co`
+  MX records.
+- **Related domains** (listed as `sameAs`): `naplesjewelrybuyers.com` — a
+  separate, live, actively-run buy-side landing site with its own
+  LocalBusiness/FAQPage schema (confirmed 2026-07-11).
+- **Source**: `https://github.com/DarkMatter-WebDev/NaplesAntiquesLLC.com`.
+- **Deploy flow**: root `netlify.toml` sets `base = "next-app"`, runs
+  `npm run build`, and publishes `.next`.
+- See `CLIENTS.md` for hosting/repo/credential reference locations.
+
+## High-Level Summary
+
+A fast, SEO-optimized Next.js site with a luxury "editorial" visual theme. Most
+pages are marketing/trust content. The dynamic surfaces are:
+
+- the **shop** (`/shop`, `/shop/[id]`) backed by Supabase products and priced
+  live against metal spot,
+- **online checkout + payments** (`/checkout`) via PayPal (Orders API v2) —
+  creates the order and captures payment server-side, with no inventory hold
+  (whoever pays first gets the one-of-one item); see `features/paypal-checkout.md`,
+- **customer accounts** backed by Supabase,
+- **admin, orders, and inquiries** backed by Supabase/Next route handlers,
+- **marketplace + social syndication** run from Admin: Etsy and eBay listing
+  sync, and review-first auto-posting to Instagram and Facebook with a
+  generated ad card (see `features/*.md`),
+- localized EN/ES routes powered by `next-intl`.
+
+Site credit: every page's footer ends with a thin full-width banner linking
+"Website built by SuretteSystems.com" (localized in Spanish) to
+`https://surettesystems.com` (added 2026-07-31). The earlier Dark Matter Web
+Services references were deliberately removed from the app before that;
+`CLIENTS.md` retains the historical client/hosting tracking context.

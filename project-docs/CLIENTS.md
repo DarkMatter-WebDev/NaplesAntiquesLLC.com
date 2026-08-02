@@ -1,0 +1,106 @@
+﻿# Clients — Dark Matter Web Services
+
+> Client tracking for Dark Matter Web Services (`darkmatterwebdev.com`).
+>
+> **Purpose:** a reference roster for current and future clients. Add one section
+> per client as you take them on, using the **template at the bottom** of this
+> file. The Naples entry below is the first real example.
+>
+> **NEVER store actual passwords, secret keys, or service-role keys in this
+> file.** Record only *where* credentials live (password manager entry name,
+> environment variable name, dashboard owner, etc.). The Supabase **anon** key is
+> public by design and may appear in the site's client config.
+
+---
+
+## Naples Estate Jewelry
+
+| Field | Value |
+|-------|-------|
+| **Client / business** | Naples Estate Jewelry (legal entity: Naples Antiques LLC) |
+| **Primary contact** | Chris — (239) 404-8505 |
+| **Primary domain** | `naplesestatejewelry.com` (owner bought it and switched 2026-08-01; GoDaddy DNS + Netlify primary/cert wired and live the same day — see `TASKS.md` for the post-deploy steps) |
+| **Related domains** | `naplesestatejewelry.co` — the former primary; stays owned as a Netlify alias 301-ing to `.com`, and **hosts the business email** (`info@`/`chris@`/`noreply@naplesestatejewelry.co` — email deliberately did NOT move). `naplesjewelrybuyers.com` (live, separate site). `naplesantiquesllc.com` — owned, GoDaddy-registered (auto-renews Mar 2027), former brand domain; since 2026-07-30 a Netlify alias (apex + www) that 301s to the primary domain for SEO recovery |
+| **Hosting** | Netlify (Next.js via `@netlify/plugin-nextjs`) — site slug: `naplesantiques`; site ID still _TBD_ |
+| **GitHub repo** | `https://github.com/DarkMatter-WebDev/NaplesAntiquesLLC.com` (owner: DarkMatter-WebDev) |
+| **Netlify site** | `naplesantiques` — team slug `rcman12589` (owner's account) |
+| **DNS / registrar** | GoDaddy (confirmed 2026-07-30 for `naplesantiquesllc.com`; owner account, domain privacy on). Primary-domain DNS points at Netlify (apex A 75.2.60.5) |
+| **Maintenance plan** | _TBD — define scope, cadence, response time_ |
+| **Billing status** | _TBD_ |
+
+### Hosting details
+
+- Netlify is connected at the parent project folder, but root `netlify.toml`
+  builds from `next-app` and publishes `.next`.
+- Metal pricing and inquiry handling are Next route handlers, not root Netlify
+  Functions.
+- Netlify needs the same environment variables used by the Next app, including
+  Supabase public values and any server-only email key.
+
+### Third-party services
+
+| Service | Use | Account / dashboard owner | Where credentials live |
+|---------|-----|---------------------------|------------------------|
+| **Supabase** | Auth, Postgres data, products, inquiries, saved state, and Storage bucket `product-images` (project ref `evzluixourmsefwdsieu`) | _TBD_ | public anon key in `NEXT_PUBLIC_SUPABASE_ANON_KEY`; **service-role key** (if any) -> store reference only, never in repo |
+| **gold-api.com** | Live gold spot price (XAU) | _TBD (public endpoint, no key currently)_ | n/a |
+| **Resend** | Inquiry email from the Next app when configured | _TBD_ | `RESEND_API_KEY` in local/Netlify env only |
+| **Cloudflare Stream** | Direct resumable product-video upload, processing, playback, and MP4 generation | _TBD_ | account id/customer code plus API token/webhook secret in Netlify env only; never store values here |
+| **Domain registrar** | DNS for the domains above | _TBD_ | _TBD_ |
+
+### Credential locations (references only)
+
+- Supabase project dashboard login: _TBD (password manager entry)_
+- Netlify account login: _TBD_
+- Resend login/API owner: _TBD_
+- Domain registrar login: _TBD_
+- `.env` / `.env.local` are gitignored and must never be committed.
+- Cloudflare Stream credentials: Netlify environment variables
+  `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_STREAM_API_TOKEN`,
+  `CLOUDFLARE_STREAM_CUSTOMER_CODE`, and
+  `CLOUDFLARE_STREAM_WEBHOOK_SECRET` (values intentionally not documented).
+
+### Outstanding requests
+
+- Confirm production Supabase auth redirect URLs match the live domain.
+- Confirm the Netlify team/site ID, DNS registrar, and maintenance-plan details
+  to complete this record.
+
+### Notes
+
+- Site built and maintained by Dark Matter Web Services.
+- Local dev runs on Windows / PowerShell. This source-of-truth folder has no git
+  workflow even if incidental metadata is present; the owner handles version
+  control manually in a separate folder.
+
+---
+
+## Template — copy for each new client
+
+```
+## <Client / business name>
+
+| Field | Value |
+|-------|-------|
+| **Client / business** | |
+| **Primary contact** | |
+| **Primary domain** | |
+| **Related domains** | |
+| **Hosting** | |
+| **GitHub repo** | |
+| **Netlify site** | |
+| **DNS / registrar** | |
+| **Maintenance plan** | |
+| **Billing status** | |
+
+### Third-party services
+| Service | Use | Account owner | Where credentials live (reference only) |
+|---------|-----|---------------|------------------------------------------|
+| | | | |
+
+### Outstanding requests
+-
+
+### Notes
+-
+```
+
