@@ -12,6 +12,18 @@ export interface CircularThumbnailItem<T> {
   copy: ThumbnailCopy;
 }
 
+/**
+ * Edge clones per side. Must satisfy the widest layout: with 6 visible cards
+ * the active card sits in slot 3 (2 cards lead it), so the LAST original
+ * needs 3 cards after it, and the forward-wrap target (the first `after`
+ * clone) needs 3 more after itself — 4 trailing clones. The backward mirror
+ * needs 3 leading. With fewer clones the desired scrollLeft exceeds the
+ * track's maximum, the browser clamps every animation frame, and boundary
+ * navigation visibly freezes ("stutters") instead of flowing — which is
+ * exactly what happened with the previous 2-per-side clones.
+ */
+export const THUMBNAIL_CLONES_PER_SIDE = 4;
+
 export function buildCircularThumbnailItems<T>(items: readonly T[]): CircularThumbnailItem<T>[] {
   const originals = items.map((item, logicalIndex) => ({
     item,
@@ -21,12 +33,13 @@ export function buildCircularThumbnailItems<T>(items: readonly T[]): CircularThu
 
   if (items.length < 2) return originals;
 
-  const before = items.slice(-2).map((item, offset) => ({
+  const cloneCount = Math.min(items.length, THUMBNAIL_CLONES_PER_SIDE);
+  const before = items.slice(-cloneCount).map((item, offset) => ({
     item,
-    logicalIndex: items.length - 2 + offset,
+    logicalIndex: items.length - cloneCount + offset,
     copy: 'before' as const,
   }));
-  const after = items.slice(0, 2).map((item, logicalIndex) => ({
+  const after = items.slice(0, cloneCount).map((item, logicalIndex) => ({
     item,
     logicalIndex,
     copy: 'after' as const,

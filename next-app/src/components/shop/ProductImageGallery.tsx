@@ -66,13 +66,18 @@ function positionThumbnailPair(
     Math.round((track.clientWidth - inlinePadding * 2 + gap) / (targetRect.width + gap)),
   );
   const targetContentLeft = track.scrollLeft + targetRect.left - trackRect.left;
-  const left = getWholeThumbnailScrollLeft(
+  // Clamp to the physically scrollable range. An unreachable target would
+  // otherwise freeze the eased animation against the browser's own clamp for
+  // its whole duration (the boundary "stutter"); clamping first means the
+  // distance and duration always describe motion that can actually happen.
+  const maxScrollLeft = Math.max(0, track.scrollWidth - track.clientWidth);
+  const left = Math.min(maxScrollLeft, Math.max(0, getWholeThumbnailScrollLeft(
     targetContentLeft,
     visibleCount,
     targetRect.width,
     gap,
     inlinePadding,
-  );
+  )));
   cancelThumbnailTrackAnimation(track);
 
   if (behavior === 'auto') {
@@ -123,6 +128,7 @@ function fitWholeThumbnailCards(track: HTMLDivElement, inlinePadding: number) {
   // Clear the previous snapped width before measuring the space currently
   // offered by the responsive parent.
   track.style.width = '';
+  track.style.flexShrink = '';
   const nextThumbnail = thumbnail.nextElementSibling as HTMLElement | null;
   const measuredGap = nextThumbnail
     ? nextThumbnail.getBoundingClientRect().left - thumbnail.getBoundingClientRect().right
@@ -131,13 +137,31 @@ function fitWholeThumbnailCards(track: HTMLDivElement, inlinePadding: number) {
   const gap = Number.isFinite(measuredGap)
     ? Math.max(0, measuredGap)
     : Number.parseFloat(thumbnailParentStyle.columnGap || thumbnailParentStyle.gap) || 0;
+  // clientWidth is integer-ROUNDED, so a fractional available width (423.6px
+  // happens whenever the fluid parent lands off-pixel) can round UP — the
+  // snapped width then exceeds the real space by under a pixel, flexbox
+  // squeezes the track back down, and the last card's right border hangs in
+  // the missing fraction and gets clipped. Floor the fractional truth instead.
+  const availableWidth = Math.floor(track.getBoundingClientRect().width);
+  // Never show more slots than there are real images: with `visibleCount`
+  // capped at the original count, every scroll target (including both wrap
+  // clones) stays within the physically scrollable range, keeping boundary
+  // motion smooth for small collections too.
+  const originalCount = track.querySelectorAll('[data-thumbnail-copy="original"]').length;
   const { trackWidth } = getWholeThumbnailTrackLayout(
-    track.clientWidth,
+    availableWidth,
     thumbnail.getBoundingClientRect().width,
     gap,
     inlinePadding,
+    Math.max(1, Math.min(6, originalCount)),
   );
   track.style.width = `${trackWidth}px`;
+  // The snapped width is exact by construction — never let the flex algorithm
+  // shave sub-pixels off it (that clips the last card's right border).
+  track.style.flexShrink = '0';
+  // Enables the CSS that soft-fades a partial trailing card during the
+  // pre-hydration window, before this fit has ever run.
+  track.dataset.thumbnailFit = 'true';
 }
 
 function useCircularThumbnailTrack(

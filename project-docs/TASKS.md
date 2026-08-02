@@ -80,26 +80,36 @@
      currently moving" dated August 2, 2026. Keep both properties and the
      301s in place for at least 6 months (180 days) while Google migrates
      the index.
-- ⚠️ **PENDING NEXT DEPLOY — English retired-page redirects (attempt 3).**
-  `/auctions`, `/auction-terms`, and `/vendor-terms` still 404 in production
-  while their `/es/*` twins redirect fine. Two earlier fixes failed because
-  the root cause was misdiagnosed twice:
-  - `force = true` in `netlify.toml` — no effect on the English URLs.
-  - `next.config.ts` `redirects()` — worked in `next dev`, **no effect in
-    production** (removed again; a layer that silently does nothing is worse
-    than none).
-  **Actual cause:** on Netlify the next-intl proxy runs as an edge function
-  ahead of BOTH the Netlify redirect engine and the Next.js server. It
-  rewrites locale-less paths (`/auctions` → `/en/auctions`, which does not
-  exist) and 404s before any redirect layer is consulted. `/es/*` escapes
-  because it is already locale-prefixed. **Fix:** `RETIRED_PATHS` +
-  `retiredPageRedirect()` at the top of `src/proxy.ts`, returning a 308
-  before the locale rewrite. Verified locally on all six URLs plus
-  `/en/auctions`, with `/cart`, `/p/21`, and every live page unaffected;
-  588/588 tests, tsc, lint, 438-page build green.
-  **Lesson for future redirect work: `next dev` does NOT reproduce Netlify's
-  edge-middleware ordering — always verify retired URLs against the deployed
-  site.**
+- ✅ **Retired-page redirects are LIVE** (verified in production 2026-08-02):
+  `/auctions` → `/shop`, `/auction-terms` and `/vendor-terms` → `/terms`,
+  all 308, single hop, in both locales plus `/en/*`. Live pages unaffected.
+- ⚠️ **PENDING NEXT DEPLOY — thumbnail-rail border + wrap-stutter fix.**
+  Owner-reported: the last visible thumbnail's right border was clipped
+  (fractional-width flex squeeze, plus the un-snapped pre-hydration state),
+  and boundary navigation froze/jumped near the last images and the wrap
+  (2 edge clones where the 6-visible layout needs 4; unreachable scroll
+  targets clamped by the browser). Fixed in the shared gallery code — all
+  product pages + lightbox. Full detail in `CHANGELOG.md` 2026-08-02;
+  verified in-browser (uniform 72px strides through both wraps, active card
+  locked in slot 3, zero sub-pixel squeeze); 598/598 tests incl. a new
+  reachability invariant sweeping every collection size.
+- ⚠️ **PENDING NEXT DEPLOY — the other 22 redirects, same root cause.**
+  Verifying the auctions fix exposed that **every English-side redirect had
+  been dead in production**, returning 404 while its `/es/*` twin worked:
+  the 12 legacy static-site `.html` URLs (`/index.html`, `/shop.html`,
+  `/about.html`, …), `/cart`, `/wishlist`, `/saved`, `/account/saved`, and
+  the 6 re-slugged product URLs (`/shop/new-listing-0X`). This was NOT caused
+  by recent work — the proxy has swallowed them for as long as it has
+  existed. The `.html` and re-slug URLs are the ones most likely to still be
+  indexed or linked, so they were losing link equity.
+  **Fix:** all of them consolidated into `src/lib/legacy-redirects.ts` and
+  served by `src/proxy.ts` before the locale rewrite, with 308 for
+  equity-carrying URLs and 307 for drawer-only ones; `next.config.ts`
+  `redirects()` removed entirely. Covered by 8 new tests (596 total), and
+  verified locally across both locales with no regressions.
+  **Verify against production after deploying** — `next dev` does not
+  reproduce Netlify's edge ordering, which is what hid this in the first
+  place. Spot-check `/shop.html`, `/cart`, and `/shop/new-listing-04`.
 - **Owner: first "Publish to both" is staged.** Product 28 (vintage 10K
   diamond ring) is prepared on BOTH channels with the final caption format and
   the fixed card — open either panel → "Publish to both…" → review →

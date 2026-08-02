@@ -1,5 +1,95 @@
 # Changelog
 
+## 2026-08-02 - Thumbnail rail: clipped right border fixed + boundary-wrap stutter eliminated
+
+Owner reported two defects on product detail pages, both root-caused with
+live measurements and fixed in the SHARED gallery code
+(`ProductImageGallery.tsx` + `lib/product-gallery-thumbnails.ts`), so the fix
+applies to every product page and the lightbox identically.
+
+**1. Last visible thumbnail missing its right border.** Two real causes:
+- *Persistent (fractional widths):* the whole-card fit measured
+  `track.clientWidth`, which is integer-ROUNDED — a fractional available
+  width (e.g. 423.59px) rounds UP to 424, the snapped `width: 424px` exceeds
+  the real space, and `flex-shrink: 1` squeezes the box back down, clipping
+  the last card's 2px right border in the missing fraction (reproduced
+  exactly in-browser: styleWidth 424 vs rectWidth 423.59). Fixed by flooring
+  `getBoundingClientRect().width` and setting `flex-shrink: 0` on the
+  snapped track (squeeze now measures 0.00).
+- *Page load (pre-hydration):* the server-rendered track has no width snap
+  at all — it fills its row and hard-clips a partial card mid-border at
+  almost any width (this is the state in the owner's screenshot). New CSS
+  soft-fades the trailing 48px of the track until the fit sets
+  `data-thumbnail-fit`, so the pre-JS state reads as an intentional
+  "more to scroll" hint instead of a broken border.
+
+**2. Boundary "stutter" approaching the last images and the wrap.** Driven
+empirically: clicks through indices 1-7 stride 72px cleanly, but index 8
+wanted scrollLeft 576 with the track's max at 504, and the forward-wrap
+clone wanted 648 — the browser clamps every animation frame, so the rail
+visibly FROZE for the full eased duration (twice), then the invisible reset
+jumped the active card two slots. Cause: only 2 edge clones per side, while
+the 6-visible layout needs up to 4 trailing / 3 leading. Fixes:
+- Clones per side raised to `min(itemCount, 4)` (`THUMBNAIL_CLONES_PER_SIDE`).
+- `visibleCount` now capped at the original count, which makes every scroll
+  target (both wraps included) exactly reachable for EVERY collection size
+  ≥ 2 — proven by a new invariant test sweeping 2-12 originals × 2-6 visible.
+- Belt-and-braces: targets are clamped to the scrollable range before
+  animating, so any residual unreachable target animates its reachable part
+  instead of freezing.
+
+Verified in-browser after the changes: full forward loop + both wraps show
+uniform 72px strides with the active card locked in slot 3 at every step
+(previously slots drifted 2→4 at the boundary), backward wrap from index 0
+animates, the lightbox rail strides identically, and the fractional-width
+squeeze is gone. 598/598 tests (2 new), tsc, lint, and the 438-page build
+all exit 0. The stale-CSS moment during dev was the documented Turbopack
+cache gotcha (cleared with `.next`). **Rides the next deploy** together with
+the legacy-redirects consolidation.
+
+## 2026-08-02 - Retired redirects live; found and fixed 22 more dead redirects (long-standing)
+
+- **Retired-page redirects verified LIVE in production**: `/auctions` →
+  `/shop`, `/auction-terms` + `/vendor-terms` → `/terms`, all 308 in one
+  hop, in both locales and via `/en/*`. The proxy-level fix works.
+- **Then the same check exposed a much wider, pre-existing bug.** `/cart`
+  returned 404 in production, and testing outward showed **all 22
+  English-side redirects were dead** — every one returning 404 while its
+  `/es/*` twin worked correctly:
+  - the 12 legacy static-site URLs (`/index.html`, `/shop.html`,
+    `/about.html`, `/contact.html`, `/free-evaluation.html`,
+    `/estate-jewelry.html`, `/gold-services.html`, `/silver-services.html`,
+    `/bullion.html`, `/faq.html`, `/privacy.html`, `/estate-services.html`)
+  - `/cart`, `/wishlist`, `/saved`, `/account/saved`
+  - the 6 re-slugged product URLs (`/shop/new-listing-01…06`)
+  This was **not** caused by recent work — the next-intl proxy has swallowed
+  these for as long as it has existed, and the working `/es/*` twins hid it.
+  The `.html` and re-slug URLs are precisely the ones likely to still be
+  indexed or linked from the pre-Next.js site, so they were 404ing away real
+  link equity.
+- **Fix — one source of truth.** New `src/lib/legacy-redirects.ts` holds
+  every legacy/retired path as locale-less keys with a `permanent` flag;
+  `resolveLegacyRedirect()` normalises `/x`, `/en/x`, and `/es/x` to a single
+  rule and re-prefixes Spanish destinations (including the `/es/index.html`
+  → `/es` root case). `src/proxy.ts` serves them before the locale rewrite:
+  **308** for equity-carrying URLs (legacy pages, retired pages, re-slugs),
+  **307** for drawer-only URLs that were never real pages (`/cart`,
+  `/wishlist`, `/saved`). `next.config.ts` `redirects()` was **deleted
+  outright** — on this platform it is a layer that silently does nothing —
+  along with the now-unused `HTML_PAGES` constant, and both it and
+  `netlify.toml` carry comments pointing at the proxy as authoritative.
+- **New coverage**: `legacy-redirects.test.ts` (8 tests) pins locale
+  normalisation, the `/es` root case, 308-vs-307 intent, that live routes are
+  untouched, and that no redirect points at another redirect (no chains).
+  596/596 tests, tsc, lint, 438-page build all exit 0.
+- **Google Search Console: no action needed or possible.** The sitemap is
+  already current — 115 URLs, zero auction/vendor entries — and the copy
+  submitted on 2026-08-01 was taken *after* those removals, with GSC
+  reporting exactly "115 pages discovered". The `.com` Page-indexing report
+  still reads "Processing data, check again in a day or so" (property is one
+  day old), so there are no 404 issues to validate yet; the Change of Address
+  banner confirms the move is active. Re-check in a few days once data lands.
+
 ## 2026-08-02 - Etsy tiers provisioned; retired-page redirect root-caused to the edge proxy
 
 - **Etsy tiered shipping: PROVISIONED.** After the delivery-days fix

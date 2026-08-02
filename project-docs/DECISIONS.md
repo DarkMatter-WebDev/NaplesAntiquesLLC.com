@@ -32,25 +32,36 @@ The old static root site is retired. Root `netlify.toml` builds with
 `base = "next-app"` and publishes `.next`. Do not recreate root HTML, scripts,
 assets, or Netlify Functions as an alternate runtime.
 
-### Redirects for locale-less paths belong in proxy.ts, not netlify.toml or next.config.ts
+### All legacy/retired redirects live in lib/legacy-redirects.ts, served by proxy.ts
 
 On Netlify the next-intl proxy (`src/proxy.ts`) is deployed as an **edge
 function that runs before both the Netlify redirect engine and the Next.js
 server**. It rewrites every locale-less path to `/en/...`, so a request for a
 route that no longer exists 404s before any redirect layer is consulted.
-Consequences, learned the hard way on the retired `/auctions`,
-`/auction-terms`, and `/vendor-terms` pages (three attempts, 2026-08-01/02):
+
+This silently broke **all 22 English-side redirects** — the 12 legacy
+static-site `.html` URLs, `/cart`, `/wishlist`, `/saved`, `/account/saved`,
+and the 6 re-slugged product URLs — for as long as the proxy has existed.
+Every `/es/*` twin worked, which is exactly what made it invisible. Found
+2026-08-02 while verifying the retired `/auctions` page (three attempts to
+fix that one taught the same lesson three times).
 
 - `netlify.toml` redirects — including `force = true` — never fire for bare
-  English URLs. They DO fire for `/es/*`, which is why a broken fix can look
-  half-working and mislead the diagnosis.
+  English URLs. They DO fire for `/es/*`, so a broken fix looks half-working.
 - `next.config.ts` `redirects()` never fire either, **but they do work under
-  `next dev`** — so a local test will pass while production still 404s.
-- The only reliable layer is `proxy.ts` itself, ahead of the locale rewrite
-  (see `RETIRED_PATHS`). Normalise `/x`, `/en/x`, and `/es/x` to one rule.
+  `next dev`** — a local test passes while production still 404s. The
+  `redirects()` block was removed entirely for this reason.
+- The only reliable layer is `proxy.ts`, ahead of the locale rewrite.
 
-Rule: any redirect for a path the app no longer serves goes in `proxy.ts`,
-and is verified **against the deployed site**, never only locally.
+Rules:
+1. Every path the app no longer serves goes in `src/lib/legacy-redirects.ts`
+   (locale-less keys; `resolveLegacyRedirect` normalises `/x`, `/en/x`, and
+   `/es/x` to one rule and re-prefixes Spanish destinations).
+2. Use `permanent: true` (308) when the URL carries link equity — legacy
+   pages, retired pages, re-slugged products — and `false` (307) for
+   convenience URLs that were never real pages (drawers like `/cart`).
+3. Never re-add `redirects()` to `next.config.ts`.
+4. Verify redirects **against the deployed site**, never only locally.
 
 ### The primary domain is naplesestatejewelry.com; email stays on .co
 

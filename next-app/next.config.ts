@@ -29,21 +29,6 @@ const SECURITY_HEADERS = [
   { key: 'X-Permitted-Cross-Domain-Policies', value: 'none' },
 ] as const;
 
-const HTML_PAGES = [
-  'index',
-  'shop',
-  'about',
-  'contact',
-  'free-evaluation',
-  'estate-jewelry',
-  'gold-services',
-  'silver-services',
-  'bullion',
-  'faq',
-  'privacy',
-  'estate-services',
-] as const;
-
 const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
@@ -83,45 +68,13 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  async redirects() {
-    const rules = [];
-    for (const page of HTML_PAGES) {
-      const dest = page === 'index' ? '/' : `/${page}`;
-      rules.push({ source: `/${page}.html`, destination: dest, permanent: true });
-      rules.push({ source: `/es/${page}.html`, destination: page === 'index' ? '/es' : `/es/${page}`, permanent: true });
-    }
-    // Habitual /cart typing should land somewhere real, not 404. /cart is a
-    // drawer (no page), so send it to the shop. (`/sell` is now a real hub page
-    // — the buy-side local landing pages live at /sell and /sell/[city].)
-    rules.push({ source: '/cart', destination: '/shop', permanent: false });
-    rules.push({ source: '/es/cart', destination: '/es/shop', permanent: false });
-    // Saved items / wishlist are a drawer (no page); keep these URLs off 404.
-    for (const p of ['/wishlist', '/saved', '/account/saved']) {
-      rules.push({ source: p, destination: '/shop', permanent: false });
-      rules.push({ source: `/es${p}`, destination: '/es/shop', permanent: false });
-    }
-    // NOTE: redirects for RETIRED pages (/auctions, /auction-terms,
-    // /vendor-terms) deliberately do NOT live here. On Netlify the next-intl
-    // proxy runs as an edge function ahead of the Next.js server, so config
-    // redirects never fire for locale-less paths — they are handled in
-    // src/proxy.ts (RETIRED_PATHS) instead.
-    // Re-slug the six auto-named "new-listing-0X" products to keyword URLs. Pairs
-    // with supabase/reslug-new-listing-products-2026-07.sql (run the SQL and deploy
-    // this together — the SQL renames the product ids these redirects point to).
-    const reslug: Record<string, string> = {
-      'new-listing-01': 'italian-14k-two-tone-cuban-link-ring-station-necklace',
-      'new-listing-02': '14k-gold-round-box-link-chain-necklace',
-      'new-listing-03': '10k-gold-monaco-cuban-link-necklace',
-      'new-listing-04': '14k-gold-rope-chain-necklace',
-      'new-listing-05': '10k-gold-rope-chain-necklace',
-      'new-listing-06': '14k-gold-semi-solid-cuban-link-chain-necklace',
-    };
-    for (const [oldId, newId] of Object.entries(reslug)) {
-      rules.push({ source: `/shop/${oldId}`, destination: `/shop/${newId}`, permanent: true });
-      rules.push({ source: `/es/shop/${oldId}`, destination: `/es/shop/${newId}`, permanent: true });
-    }
-    return rules;
-  },
+  // NOTE: there is deliberately no `redirects()` here. On Netlify the
+  // next-intl proxy runs as an edge function ahead of the Next.js server and
+  // rewrites locale-less paths to `/en/...`, so config redirects NEVER fire
+  // for English URLs — only the `/es/*` twins ever reached them, which hid
+  // 22 dead redirects in production until 2026-08-02. Every legacy/retired
+  // path now lives in src/lib/legacy-redirects.ts and is served by
+  // src/proxy.ts before the locale rewrite. Do not re-add rules here.
   images: {
     // AVIF first (smaller at the same visual quality), WebP fallback. The
     // browser gets whichever it supports; both are served at the requested

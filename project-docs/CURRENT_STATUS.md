@@ -20,16 +20,22 @@ confirmed Google Change of Address — see `TASKS.md` and `CHANGELOG.md`.
 > (eBay 2026-08-01, Etsy 2026-08-02 after its delivery-days fix deployed) —
 > seven objects each, ids in `TASKS.md`.
 >
-> ⚠️ **One fix awaits the next deploy: the English retired-page redirects.**
-> `/auctions`, `/auction-terms`, `/vendor-terms` still 404 in production
-> while their `/es/*` twins redirect. Two earlier attempts (forced
-> netlify.toml rules, then `next.config.ts` redirects) failed because the
-> cause was misdiagnosed: on Netlify the next-intl proxy runs as an edge
-> function ahead of both the redirect engine and the Next.js server, and
-> rewrites `/auctions` to a dead `/en/auctions`. Now handled by
-> `RETIRED_PATHS` in `src/proxy.ts` before the locale rewrite; verified
-> locally with no regressions (588/588 tests, tsc, lint, 438-page build).
-> Nothing is broken live — those three URLs simply 404 instead of 308.
+> ✅ **Retired-page redirects are live** (production-verified 2026-08-02):
+> `/auctions` → `/shop`, `/auction-terms` + `/vendor-terms` → `/terms`, 308,
+> both locales.
+>
+> ⚠️ **One fix awaits the next deploy: the other 22 legacy redirects.**
+> Verifying the above exposed that **every English-side redirect was dead in
+> production** (404) while its `/es/*` twin worked — the 12 legacy `.html`
+> URLs, `/cart`, `/wishlist`, `/saved`, `/account/saved`, and the 6
+> re-slugged product URLs. Long-standing, not caused by recent work: on
+> Netlify the next-intl proxy is an edge function that rewrites locale-less
+> paths to `/en/...` before any redirect layer runs. All of them now live in
+> `src/lib/legacy-redirects.ts`, served by `src/proxy.ts` ahead of the locale
+> rewrite (308 for equity-carrying URLs, 307 for drawer URLs);
+> `next.config.ts` `redirects()` removed. 596/596 tests (8 new), tsc, lint,
+> 438-page build green. **Re-verify against production after deploy** — local
+> dev cannot reproduce the ordering that caused this.
 
 1. Value-based shipping tiers (checkout + server) with coded checkout errors.
 2. Four-step checkout wizard (Summary → Delivery → Contact → Review & Pay)

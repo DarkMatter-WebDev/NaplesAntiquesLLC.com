@@ -398,6 +398,15 @@ button:focus-visible > .hover-underline-grow,
 .product-gallery-thumbnail-track::-webkit-scrollbar {
   display: none;
 }
+/* Until the client-side fit snaps the track to whole cards (it sets
+   data-thumbnail-fit), the server-rendered track simply fills its row and the
+   last visible card is cut mid-border at almost any width. Soft-fade that
+   trailing edge so the pre-hydration state reads as an intentional "more to
+   scroll" hint instead of a hard-clipped border. */
+.product-gallery-thumbnail-track:not([data-thumbnail-fit]) {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
+}
 
 .account-tabs button,
 .account-tabs a,
