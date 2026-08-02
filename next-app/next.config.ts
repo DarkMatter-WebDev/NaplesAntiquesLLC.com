@@ -47,12 +47,25 @@ const HTML_PAGES = [
 const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
+  // The Instagram card renders its type with Satori, which needs the actual
+  // font bytes at runtime. Nothing imports these files, so tracing cannot infer
+  // them and the serverless bundle would ship without them — every card render
+  // would then fail with ENOENT. Keep this in sync with FONT_DIR in
+  // src/lib/instagram/card.ts.
+  outputFileTracingIncludes: {
+    '/api/admin/instagram/**': ['./src/assets/fonts/**'],
+    // Facebook prepare renders the same generated card, so it needs the same
+    // font files in its serverless bundle.
+    '/api/admin/facebook/**': ['./src/assets/fonts/**'],
+    // On-demand card rendering for the panels' "Generate card" button.
+    '/api/admin/card-preview': ['./src/assets/fonts/**'],
+  },
   // Dev-only: lets `npm run dev` (which already binds 0.0.0.0) accept requests
   // from this machine's LAN IP too, not just localhost — needed so hot-reload
   // and internal /_next asset requests aren't blocked when testing from a
   // phone/tablet at http://<your-LAN-IP>:3000. No effect on production/builds.
   // If your LAN IP changes (DHCP), update it here or just add another entry.
-  allowedDevOrigins: ['192.168.119.224', '192.168.119.*'],
+  allowedDevOrigins: ['192.168.119.224', '192.168.119.*', '10.0.0.208', '10.0.0.*'],
   async headers() {
     return [
       {
