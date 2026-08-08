@@ -49,6 +49,8 @@ beforeEach(() => {
   delete process.env.DEEPFIELD_SYNC_URL;
   delete process.env.DEEPFIELD_SYNC_TOKEN;
   delete process.env.DEEPFIELD_SYNC_DRY_RUN;
+  // Keep retry backoff out of the suite's wall-clock.
+  process.env.DEEPFIELD_SYNC_RETRY_DELAY_MS = '0';
   selectIn.mockReset();
   selectIn.mockResolvedValue({ data: [productRow('a')], error: null });
   fetchMock = vi.fn().mockResolvedValue({
@@ -152,15 +154,63 @@ describe('deep field sync when configured', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('batches at 25 per request', async () => {
+  // Superseded 2026-08-08: this used to assert 25 products per request, which
+  // is Deep Field's advertised cap but is NOT reachable in production. The
+  // receiver copies images synchronously at ~1.2s each, so 25 products (~190
+  // images) is ~4 minutes in one HTTP call and dies at a gateway timeout.
+  // Batching is now budgeted by IMAGE count, capped at 3 products.
+  it('caps products per request even when they carry no images', async () => {
     selectIn.mockResolvedValue({
       data: Array.from({ length: 53 }, (_, i) => productRow(`p${i}`)),
       error: null,
     });
     await syncProductsToDeepField(Array.from({ length: 53 }, (_, i) => `p${i}`));
-    expect(fetchMock).toHaveBeenCalledTimes(3);
     const sizes = fetchMock.mock.calls.map((c) => JSON.parse(c[1].body).products.length);
-    expect(sizes).toEqual([25, 25, 3]);
+    expect(Math.max(...sizes)).toBeLessThanOrEqual(3);
+    expect(sizes.reduce((a, b) => a + b, 0)).toBe(53);
+  });
+
+  it('splits on the IMAGE budget, not the product count', async () => {
+    // 7 + 14 + 17 is the exact group that timed out during the bulk import.
+    const withImages = (id: string, n: number) => ({
+      ...productRow(id),
+      images: Array.from({ length: n }, (_, i) => `https://example.test/${id}-${i}.webp`),
+    });
+    selectIn.mockResolvedValue({
+      data: [withImages('a', 7), withImages('b', 14), withImages('c', 17)],
+      error: null,
+    });
+    await syncProductsToDeepField(['a', 'b', 'c']);
+
+    const batches = fetchMock.mock.calls.map((c) => JSON.parse(c[1].body).products);
+    expect(batches.length).toBeGreaterThan(1);
+    for (const batch of batches) {
+      const images = batch.reduce(
+        (n: number, p: { images: string[] }) => n + p.images.length, 0,
+      );
+      // Within budget, or a single oversized product on its own.
+      expect(images <= 18 || batch.length === 1).toBe(true);
+    }
+    // Nothing dropped.
+    expect(batches.flat().map((p: { id: string }) => p.id).sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('retries a 5xx and succeeds without the caller ever knowing', async () => {
+    fetchMock
+      .mockResolvedValueOnce({ ok: false, status: 504, text: async () => 'gateway timeout' })
+      .mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ imported: 1, failed: 0, success: true, results: [] }),
+      });
+    await expect(syncProductsToDeepField(['a'])).resolves.toBeUndefined();
+    expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('does NOT retry a 4xx, because a rejection will not fix itself', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 400, text: async () => 'bad request' });
+    await syncProductsToDeepField(['a']);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

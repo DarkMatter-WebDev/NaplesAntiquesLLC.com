@@ -1416,6 +1416,16 @@ async function loadPriceProducts(service: SupabaseClient, productIds: string[]):
   return new Map(((data ?? []) as unknown as Product[]).map((product) => [product.id, product]));
 }
 
+/**
+ * Consecutive price-push failures before a listing stops being retried.
+ *
+ * The manual "push prices" button runs one bounded batch and the client polls
+ * until done. A failed listing keeps its old `last_pushed_price`, so it stays a
+ * candidate and is re-attempted on every poll — 33 broken listings produced 139
+ * error rows in a single run (2026-08-08). A successful push clears the count.
+ */
+export const MAX_PRICE_PUSH_ATTEMPTS = 3;
+
 export function planEbayPricePush(
   listings: EbayListingRow[],
   products: Map<string, Product>,
@@ -1434,6 +1444,32 @@ export function planEbayPricePush(
     }
     const product = products.get(listing.product_id);
     if (!product) {
+      skipped += 1;
+      continue;
+    }
+    // A SOLD product's listing is already withdrawn on eBay (quantity pushed to
+    // 0 by the auto-delist path), and eBay rejects a price update on an ended
+    // or zero-quantity offer with HTTP 400. But the listing row stays
+    // `out_of_date` forever — it genuinely is out of date, it is just also dead
+    // — so the sync_state filter alone keeps re-selecting it every run.
+    //
+    // Measured 2026-08-08: of 33 products that always failed the price push,
+    // 32 were `sold` with `last_pushed_qty = 0`. That is ~33 guaranteed eBay
+    // 400s per run, every run, forever.
+    //
+    // Keyed on CURRENT product status, deliberately, rather than marking the
+    // listing dead: relisting a sold item flips it back to `available` and it
+    // becomes a candidate again on the next run with no manual repair.
+    if (normalizeProductStatus(product.status) !== 'available') {
+      skipped += 1;
+      continue;
+    }
+    // Backstop for anything the status check does not catch (one of the 33 was
+    // `available`). A listing that has failed repeatedly is almost certainly
+    // broken on eBay's side, and retrying it every run burns API quota to
+    // produce the same error. A successful push resets the counter, so this
+    // un-sticks itself the moment the underlying problem is fixed.
+    if ((listing.error_count ?? 0) >= MAX_PRICE_PUSH_ATTEMPTS) {
       skipped += 1;
       continue;
     }
@@ -1459,7 +1495,13 @@ async function recordEbayPricePushSuccess(
   service: SupabaseClient,
   candidate: EbayPricePushCandidate,
 ): Promise<void> {
-  await upsertListing(service, candidate.listing.product_id, { last_pushed_price: candidate.price });
+  // Clearing the counter is what makes the backoff self-healing: once whatever
+  // was wrong on eBay is fixed and one push lands, the listing is eligible again.
+  await upsertListing(service, candidate.listing.product_id, {
+    last_pushed_price: candidate.price,
+    error_count: 0,
+    last_error: null,
+  });
   await insertSyncLog(service, {
     product_id: candidate.listing.product_id,
     listing_id: candidate.listing.ebay_listing_id,
@@ -1475,15 +1517,47 @@ async function recordEbayPricePushFailure(
   err: unknown,
 ): Promise<void> {
   const message = err instanceof EbayApiError ? err.operatorMessage : err instanceof Error ? err.message : 'Price push failed.';
+  // Persist the API detail, not just the operator sentence.
+  //
+  // `EbayApiError.detail` is redacted at construction specifically so it is
+  // safe to store here, and `mapErrorResponse` notes it is "often the only
+  // place the SPECIFIC reason behind a generic top-level message shows up".
+  // It was being dropped, which is why a real investigation (2026-08-08) found
+  // 140 rows all reading `eBay API error (HTTP 400).` and no cause: eBay
+  // returned a 400 whose envelope carried no top-level message, so the operator
+  // string fell back to the generic form and the useful part was discarded.
+  const detail = err instanceof EbayApiError
+    ? {
+      status: err.status,
+      code: err.code,
+      errorId: err.errorId,
+      category: err.category,
+      retryable: err.retryable,
+      response: err.detail,
+      offerId: candidate.listing.ebay_offer_id,
+      sku: candidate.listing.ebay_sku,
+      attemptedPrice: candidate.price,
+    }
+    : { message: String(err).slice(0, 500), offerId: candidate.listing.ebay_offer_id };
+
   // Rotate the failed row behind untouched rows without changing its pushed
   // price, so a single bad offer cannot block the rest of a manual run.
-  await upsertListing(service, candidate.listing.product_id, {}).catch(() => {});
+  //
+  // Also COUNT the failure. This was a no-op patch `{}` before, so
+  // `error_count` never moved off 0 and nothing could ever back off — every
+  // broken listing was retried on every poll forever. `last_error` gives the
+  // admin panel something to show besides a bare count.
+  await upsertListing(service, candidate.listing.product_id, {
+    error_count: (candidate.listing.error_count ?? 0) + 1,
+    last_error: message.slice(0, 500),
+  }).catch(() => {});
   await insertSyncLog(service, {
     product_id: candidate.listing.product_id,
     listing_id: candidate.listing.ebay_listing_id,
     action: 'price_push',
     outcome: 'error',
     message,
+    detail,
   });
 }
 

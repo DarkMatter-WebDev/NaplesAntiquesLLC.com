@@ -1401,6 +1401,13 @@ async function loadPriceProducts(service: SupabaseClient, productIds: string[]):
   return new Map(((data ?? []) as unknown as Product[]).map((product) => [product.id, product]));
 }
 
+/**
+ * Consecutive price-push failures before a listing stops being retried.
+ * Mirrors the eBay ceiling; see that constant for the incident behind it.
+ * A successful push clears the count, so this un-sticks itself.
+ */
+export const MAX_PRICE_PUSH_ATTEMPTS = 3;
+
 function planEtsyPricePush(
   rows: EtsyListingRow[],
   products: Map<string, Product>,
@@ -1419,6 +1426,23 @@ function planEtsyPricePush(
     }
     const product = products.get(row.product_id);
     if (!product) {
+      skipped += 1;
+      continue;
+    }
+    // Defence in depth, mirroring the eBay planner. Today this changes nothing:
+    // Etsy's auto-delist moves a sold product's listing to `delisted`, which is
+    // outside this function's selection, so 0 of the 90 current candidates are
+    // non-available (measured 2026-08-08). eBay leaves them `out_of_date` and
+    // therefore selected, which is exactly how it ended up sending ~33
+    // guaranteed-400 price updates on withdrawn listings every run.
+    //
+    // The protection here is against the delist step failing or being skipped:
+    // without this check, Etsy inherits the same failure mode silently.
+    if (normalizeProductStatus(product.status) !== 'available') {
+      skipped += 1;
+      continue;
+    }
+    if ((row.error_count ?? 0) >= MAX_PRICE_PUSH_ATTEMPTS) {
       skipped += 1;
       continue;
     }
@@ -1497,9 +1521,12 @@ async function pushEtsyPriceCandidates(params: {
         });
       }
 
+      // Clearing the counter is what makes the attempt ceiling self-healing.
       await upsertListing(params.service, candidate.row.product_id, {
         last_pushed_price: candidate.price,
         last_synced_at: new Date().toISOString(),
+        error_count: 0,
+        last_error: null,
       });
       await insertSyncLog(params.service, {
         product_id: candidate.row.product_id,
@@ -1512,15 +1539,38 @@ async function pushEtsyPriceCandidates(params: {
     } catch (err) {
       failed += 1;
       const message = err instanceof EtsyApiError ? err.operatorMessage : err instanceof Error ? err.message : 'Price push failed.';
+      // Persist the API detail, not just the operator sentence. EtsyApiError
+      // documents `detail` as "Redacted response detail — safe to store in
+      // etsy_sync_log.detail", and it was being dropped. The eBay twin had the
+      // same hole, which is why a real investigation found 140 log rows all
+      // reading `eBay API error (HTTP 400).` with no recoverable cause.
+      const detail = err instanceof EtsyApiError
+        ? {
+          status: err.status,
+          code: err.code,
+          response: err.detail,
+          listingId: candidate.row.etsy_listing_id,
+          attemptedPrice: candidate.price,
+        }
+        : { message: String(err).slice(0, 500), listingId: candidate.row.etsy_listing_id };
+
       // Rotate failures behind untouched rows without pretending the price was
       // pushed, so one bad listing cannot starve the rest of the catalog.
-      await upsertListing(params.service, candidate.row.product_id, {}).catch(() => {});
+      //
+      // Also COUNT the failure. This was a no-op `{}` patch, so `error_count`
+      // never moved off 0 and the attempt ceiling could never engage — a
+      // permanently broken listing was retried on every single run.
+      await upsertListing(params.service, candidate.row.product_id, {
+        error_count: (candidate.row.error_count ?? 0) + 1,
+        last_error: message.slice(0, 500),
+      }).catch(() => {});
       await insertSyncLog(params.service, {
         product_id: candidate.row.product_id,
         listing_id: candidate.row.etsy_listing_id,
         action: 'price_push',
         outcome: 'error',
         message,
+        detail,
       });
     }
   }

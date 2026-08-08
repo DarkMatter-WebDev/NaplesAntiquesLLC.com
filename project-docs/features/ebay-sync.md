@@ -393,6 +393,22 @@ price/quantity only (`bulkUpdatePriceQuantity`). `fulfillmentPolicyId` travels
 on the full offer body, so only a `runSyncStep` update applies a new tier
 policy. A shipping-policy change therefore requires deliberate batched syncs.
 
+**Price-push eligibility (2026-08-08).** `planEbayPricePush` skips a listing
+when any of these hold, in addition to the existing write-block and
+missing-offer checks:
+
+- the product's **current status is not `available`** — a sold product's listing
+  stays `out_of_date` forever while its offer is already withdrawn (quantity 0),
+  so every push is a guaranteed HTTP 400. This was 36 of 124 listings and ~33
+  failures per run. Keyed on live product status, so relisting revives it.
+- `error_count >= MAX_PRICE_PUSH_ATTEMPTS` (3). A successful push resets the
+  count, so the ceiling un-sticks itself once the underlying problem is fixed.
+
+Failures now increment `error_count`, set `last_error`, and persist the eBay
+`detail` (status, code, errorId, category, response, offer id, SKU, attempted
+price). Before this they wrote a no-op `{}` patch and logged only the operator
+sentence, which is why 140 rows read `eBay API error (HTTP 400).` with no cause.
+
 ## Current constraints and verification
 
 - The account-deletion webhook, production keyset, OAuth, previews, controlled

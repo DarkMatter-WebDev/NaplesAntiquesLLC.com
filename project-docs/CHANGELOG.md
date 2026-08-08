@@ -1,5 +1,99 @@
 # Changelog
 
+## 2026-08-08 - Daily marketplace price pushes: why they never ran, and four fixes
+
+Owner: "eBay and Etsy price updates are not pushing." Investigation found the
+scheduling was fine and three separate defects underneath it.
+
+**The schedule was never the problem.** Both Netlify scheduled functions
+(`netlify/functions/{etsy,ebay}-price-push.mts`) are deployed and correctly
+registered — Etsy `15 11 * * *` (7:15 a.m. EDT), eBay `45 11 * * *` (7:45 a.m.),
+both POSTing to the cron-secret-guarded route, both secrets present in Netlify.
+
+**They had simply never run.** Zero `scheduled_price_push` rows in either
+sync log, ever — and that log records a row even when the job SKIPS ("not
+connected", "pushes disabled"), so zero rows means the route was never reached.
+Netlify's own function log was empty against a 24-hour retention window while
+that day's slot had passed six hours earlier. Most likely cause: production ran
+the Aug 2 build until the 10:16 a.m. deploy, and the 7:15 slot passed three
+hours before it. First genuine run is the following morning.
+
+**eBay was also switched off.** `ebay_connection.price_push_enabled` was
+`false` (the column default); Etsy's was `true`. Owner-fixed via the admin
+toggle — no code change.
+
+### Fix 1 — sold products were being price-pushed forever (eBay)
+
+`pushPricesBatch` selects `sync_state IN ('published','out_of_date')` and
+`planEbayPricePush` never checked **product status**. A sold product's listing
+stays `out_of_date` permanently — it genuinely is out of date, it is just also
+dead — so it was re-selected on every run. Its eBay offer is already withdrawn
+(quantity pushed to 0 by auto-delist), and eBay rejects a price update on an
+ended/zero-quantity offer with HTTP 400.
+
+Measured: of 33 products that always failed, **32 were `sold` with
+`last_pushed_qty = 0`**. Candidate pool now drops **124 → 88**, and all 36
+removed are sold.
+
+Keyed on **current product status**, deliberately, not by marking the listing
+dead: relisting flips the product back to `available` and it becomes a candidate
+again with no manual repair. Counted as `skipped`, not `blocked` — `blocked`
+marks the whole run a warning, and a sold item is a normal non-candidate.
+
+### Fix 2 — "139 failed" was 33 products retried, and nothing could back off
+
+The manual button runs one bounded batch while the client polls to completion. A
+failed listing keeps its old `last_pushed_price`, stays a candidate, and is
+retried every poll; the UI sums failures across polls. 33 real failures became
+**139 error rows in one run** (61 pushes actually succeeded).
+
+`error_count` existed for exactly this but never moved, because the failure path
+called `upsertListing(service, id, {})` — a literal **no-op patch**. It now
+increments on failure and resets to 0 on success, and the planner skips listings
+at `MAX_PRICE_PUSH_ATTEMPTS` (3). Self-healing: one good push clears it.
+
+### Fix 3 — the cause was captured and then thrown away (both providers)
+
+All 140 failure rows read `eBay API error (HTTP 400).` with no detail. That
+string is `mapErrorResponse`'s fallback for a 400 whose envelope carries no
+top-level message — and the failure recorder logged only `operatorMessage`,
+discarding `err.detail`, the field both `EbayApiError` and `EtsyApiError`
+document as *"redacted response detail — safe to store in a sync-log row"* and
+which `mapErrorResponse` calls *"often the only place the SPECIFIC reason shows
+up"*. Failures now persist status, code, errorId, category, the eBay/Etsy
+response, plus offer id, SKU and attempted price.
+
+### Fix 4 — Etsy parity
+
+Etsy has the same three defects, inlined in `pushEtsyPriceCandidates` rather
+than in a named function (which is why a search for `recordEtsyPricePushFailure`
+found nothing — an earlier note that Etsy "may not log failures at all" was
+wrong).
+
+**Etsy is clean today for an accidental reason:** its auto-delist moves a sold
+product's listing to `delisted`, which sits outside the price-push selection.
+Verified live — 0 of its 90 candidates are non-available, versus 36 of eBay's
+124. So Etsy is protected by a side effect of a different code path, not by
+anything in its own planner. If that delist step ever fails, Etsy inherits the
+identical failure mode silently. All three fixes applied there too.
+
+### Verified after the fixes (owner re-ran both from the dev preview)
+
+- **Etsy: 72 pushed, 0 errors**, plus 21 `shipping_tier` follow-ups (only the
+  listings whose new price crossed a tier boundary).
+- **eBay: 0 pushed, 1 blocked — and that is correct.** Recomputing every
+  eligible listing's target price against `last_pushed_price`: **87 of 88 already
+  match** (the earlier run pushed them before hitting the sold-item wall), so
+  there was nothing to do. The 36 sold listings produced **zero** errors this
+  time, against 139 an hour earlier.
+- The 1 blocked is `antique-georgian-…-82`, held back by `isEbayWriteBlocked`:
+  relisted manually on eBay and no longer attached to the app-managed offer. It
+  is also the one genuinely stale price — **$861.29 stored vs $984.82 target** —
+  and cannot be fixed from here; it needs reattaching on eBay.
+
+13 new tests. Gate: `npx tsc --noEmit` clean, `npm run lint` clean,
+**805/805 tests**, clean `npm run build`.
+
 ## 2026-08-08 - Hero carousels snap harder on touch devices
 
 Owner: on phones and tablets, where the hero is scrolled with a finger, each

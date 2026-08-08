@@ -486,9 +486,35 @@ inert**. See `features/deepfield-sync.md`.
 - Two available products have no `ebay_listings` row at all (90 available
   products, 88 linked). Confirm that is intentional (never listed) rather than a
   dropped link.
-- **Run each price-push Scheduled Function once deliberately** from Netlify,
-  then confirm the Admin Settings last-run card and summary log. Etsy's daily
-  toggle is enabled; keep eBay disabled until its controlled run passes.
+- ✅ **Daily price pushes diagnosed and fixed 2026-08-08** (full write-up in
+  CHANGELOG). Summary of what changed and what is now true:
+  - The Netlify schedules were never broken — Etsy 7:15 a.m. EDT, eBay 7:45 a.m.,
+    both deployed, both cron secrets present. They had simply **never run**: zero
+    `scheduled_price_push` rows ever, in a log that records even skips.
+  - `ebay_connection.price_push_enabled` was `false` (column default). Owner
+    enabled it via the admin toggle.
+  - **Sold products were permanent price-push candidates on eBay** — their
+    listing stays `out_of_date` while the eBay offer is already withdrawn, so
+    every push was a guaranteed HTTP 400. Candidate pool now **124 → 88**.
+  - `error_count` never incremented (the failure path passed a no-op `{}`
+    patch), so nothing could back off — 33 broken listings produced 139 error
+    rows in one run. Now increments, resets on success, ceiling of 3.
+  - Failure logs discarded `err.detail`, which is why 140 rows all read
+    `eBay API error (HTTP 400).` with no cause. Now persisted for both providers.
+  - Etsy had the same three defects but is clean in practice because auto-delist
+    moves sold listings to `delisted`, outside the selection. Fixed anyway — that
+    protection is a side effect of another code path, not its own planner.
+- 🔴 **DEPLOY BEFORE THE NEXT 7:15/7:45 a.m. EDT RUN.** These fixes are in the
+  undeployed batch. Production still has the old code, so eBay's first scheduled
+  run will repeat the ~33 guaranteed failures. Etsy is unaffected either way.
+- ◻️ **After the first real scheduled run, confirm both sync logs** — expect an
+  `scheduled_price_push` row per provider (the first ever) and, for eBay,
+  roughly 88 eligible with 0 failures.
+- ◻️ **`antique-georgian-…-82` needs manual repair on eBay.** Held back by
+  `isEbayWriteBlocked` — relisted manually and no longer attached to the
+  app-managed offer. It is the one genuinely stale price: **$861.29 stored vs
+  $984.82 target**. Cannot be fixed from the app; reattach it on eBay.
+- **Verify the Admin Settings last-run card** after that first scheduled run.
 - **Verify one tier-shipped listing per marketplace.** On eBay, let a boundary
   change flag the listing `out_of_date`, review-first publish one update, and
   confirm the fulfillment-policy charge. On Etsy, Sync Updates on one listing

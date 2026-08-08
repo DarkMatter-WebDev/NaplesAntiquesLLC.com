@@ -357,6 +357,23 @@ Five additive tables, RLS-enabled with **no** anon/authenticated policies
 documents `webhook_events` reuse for it but explicitly scopes it out of this
 build.
 
+**Price-push eligibility (2026-08-08).** `planEtsyPricePush` now also skips a
+listing when the product's current status is not `available`, or when
+`error_count >= MAX_PRICE_PUSH_ATTEMPTS` (3, reset by a successful push).
+
+This is **defence in depth on Etsy, not a live fix**: Etsy's auto-delist moves a
+sold product's listing to `delisted`, which sits outside the price-push
+selection, so 0 of its 90 candidates were non-available when this was measured.
+The eBay twin leaves them `out_of_date` — inside its selection — which is how
+eBay ended up sending ~33 guaranteed-400 price updates every run. Etsy's
+protection is a side effect of a different code path, so it is now checked here
+explicitly too.
+
+Failures also increment `error_count`, set `last_error`, and persist the Etsy
+`detail` (status, code, response, listing id, attempted price). Previously the
+failure path wrote a no-op `{}` patch and dropped `err.detail`, the field
+`EtsyApiError` documents as safe to store in `etsy_sync_log.detail`.
+
 ## Admin UX
 
 - **`/admin/settings` → Etsy Sync panel** (`EtsySettingsPanel.tsx`):

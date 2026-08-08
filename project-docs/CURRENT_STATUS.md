@@ -184,6 +184,18 @@
   and bounded observable daily price-push infrastructure.
 - Seven insured-shipping tiers are provisioned on **both** marketplaces. One
   controlled listing update per marketplace still needs owner verification.
+- **Daily price pushes: schedules were always correct but had never run** (zero
+  `scheduled_price_push` rows ever, in a log that records even skips). eBay's
+  `price_push_enabled` was also `false`; the owner enabled it 2026-08-08. Three
+  code defects fixed the same day — sold products were permanent eBay
+  price-push candidates and produced ~33 guaranteed HTTP 400s per run
+  (pool 124 → 88), `error_count` never incremented so nothing could back off
+  (33 failures became 139 error rows in one run), and `err.detail` was
+  discarded so every failure logged an unusable generic message. Etsy carried
+  the same defects but is clean in practice because its auto-delist moves sold
+  listings outside the selection; fixed there too. **Undeployed — production
+  still runs the old code, so eBay's next 7:45 a.m. EDT cron will repeat the
+  failures until this ships.**
 - **Deep Field Gallery** is a one-way outbound product push to a separate site,
   server-side only, sharing nothing but a bearer token — no Supabase credential
   crosses in either direction and NEJ never touches the Deep Field database.

@@ -4,15 +4,49 @@ import { fetchSpotData } from '@/lib/spot-price';
 import type { Product } from '@/types/product';
 import { buildDeepFieldPayload, type DeepFieldProductPayload } from './payload';
 
-/** Deep Field's receiver caps a request at 25 products. */
-const BATCH_SIZE = 25;
+/**
+ * Deep Field's receiver caps a request at 25 products, but that cap is NOT
+ * reachable in production and product count is the wrong unit anyway.
+ *
+ * The receiver copies every image synchronously inside the request at roughly
+ * 1.2s each, so wall-clock scales with IMAGES, not products — and NEJ's
+ * images-per-product range from 2 to 19 (avg 7.6, with 31 products at 10 or
+ * more). Measured during the 2026-08-08 bulk import: a 3-product batch carrying
+ * 17 images succeeded while a 3-product batch carrying 38 images died at a
+ * gateway "Inactivity Timeout". 25 products is ~190 images ≈ 4 minutes in one
+ * HTTP call, which no gateway allows.
+ *
+ * So batches are budgeted by image count. A single product is never split, so
+ * the largest product defines the worst case.
+ *
+ * This matters for live sync too, not just the bulk import: a bulk status
+ * change in admin can hand this function 25+ ids at once.
+ */
+const IMAGE_BUDGET_PER_REQUEST = 18;
+const MAX_PRODUCTS_PER_REQUEST = 3;
 
 /**
- * Deep Field copies every image synchronously before responding, so a full
- * batch legitimately takes minutes. This is fire-and-forget, so a generous
- * ceiling costs nothing — it only bounds a hung socket.
+ * Bounds a hung socket. Generous because a legitimate batch still takes tens of
+ * seconds, and this is fire-and-forget so waiting costs nothing.
  */
-const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
+const REQUEST_TIMEOUT_MS = 2 * 60 * 1000;
+
+/**
+ * Transient-failure retries per batch.
+ *
+ * Live sync has no durable queue — by design, since the alternative is a table
+ * and a worker, and a partner outage must never fail a customer's payment. A
+ * couple of in-process retries covers the common case (a blip, a cold start, a
+ * gateway hiccup) without that machinery. It does NOT survive a process
+ * restart, and that limit is deliberate and documented for Deep Field.
+ */
+const MAX_ATTEMPTS = 3;
+/**
+ * Overridable so tests do not spend real seconds asleep — three retrying cases
+ * added ~10s to the suite otherwise. Unset in every real environment, where the
+ * 1500ms default applies.
+ */
+const RETRY_BASE_DELAY_MS = Number(process.env.DEEPFIELD_SYNC_RETRY_DELAY_MS ?? 1500);
 
 /** Archived is NEJ's soft-delete. Never push soft-deleted rows to a partner. */
 const EXCLUDED_STATUSES = new Set(['archived']);
@@ -48,11 +82,37 @@ export function isDeepFieldSyncConfigured(): boolean {
   return getConfig() != null;
 }
 
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+/**
+ * Group payloads so each request stays inside the image budget. Exported for
+ * testing — the sizing rule is the whole point and needs to be pinned.
+ */
+export function chunkByImageBudget(
+  items: DeepFieldProductPayload[],
+  imageBudget = IMAGE_BUDGET_PER_REQUEST,
+  maxProducts = MAX_PRODUCTS_PER_REQUEST,
+): DeepFieldProductPayload[][] {
+  const out: DeepFieldProductPayload[][] = [];
+  let current: DeepFieldProductPayload[] = [];
+  let currentImages = 0;
+
+  for (const item of items) {
+    const images = item.images?.length ?? 0;
+    // A product is never split across requests, so an oversized single product
+    // ships alone rather than being dropped or truncated.
+    if (current.length > 0
+      && (currentImages + images > imageBudget || current.length >= maxProducts)) {
+      out.push(current);
+      current = [];
+      currentImages = 0;
+    }
+    current.push(item);
+    currentImages += images;
+  }
+  if (current.length > 0) out.push(current);
   return out;
 }
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function postBatch(
   url: string,
@@ -106,6 +166,44 @@ async function postBatch(
   }
 }
 
+/** A failure worth retrying: the request never got a verdict, or the server
+ *  said it could not answer right now. A 4xx is a verdict — retrying repeats it. */
+function isRetryable(result: DeepFieldBatchResult): boolean {
+  if (result.status == null) return true; // network error, abort, DNS, socket
+  return result.status >= 500 || result.status === 408 || result.status === 429;
+}
+
+/** Send one batch, retrying only transient failures. Never throws. */
+async function postBatchWithRetry(
+  url: string,
+  token: string,
+  products: DeepFieldProductPayload[],
+  dryRun: boolean,
+): Promise<DeepFieldBatchResult> {
+  let last: DeepFieldBatchResult = {
+    ok: false, status: null, warnings: [], error: 'not attempted',
+  };
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    try {
+      last = await postBatch(url, token, products, dryRun);
+    } catch (error) {
+      last = { ok: false, status: null, warnings: [], error: String(error).slice(0, 500) };
+    }
+    if (last.ok || !isRetryable(last)) return last;
+
+    if (attempt < MAX_ATTEMPTS) {
+      const delay = RETRY_BASE_DELAY_MS * attempt; // linear; the caller is not waiting on us
+      console.warn(
+        `[deepfield] attempt ${attempt}/${MAX_ATTEMPTS} failed `
+        + `(HTTP ${last.status ?? 'network'}); retrying in ${delay}ms`,
+      );
+      await sleep(delay);
+    }
+  }
+  return last;
+}
+
 /**
  * Push the given products to Deep Field.
  *
@@ -155,15 +253,19 @@ export async function syncProductsToDeepField(productIds: string[]): Promise<voi
     }
     if (payloads.length === 0) return;
 
-    for (const batch of chunk(payloads, BATCH_SIZE)) {
-      const result = await postBatch(config.url, config.token, batch, config.dryRun);
+    for (const batch of chunkByImageBudget(payloads)) {
+      const result = await postBatchWithRetry(config.url, config.token, batch, config.dryRun);
       const label = config.dryRun ? 'dry-run ' : '';
       if (!result.ok) {
+        const images = batch.reduce((n, p) => n + (p.images?.length ?? 0), 0);
         console.error(
-          `[deepfield] ${label}batch of ${batch.length} failed: HTTP ${result.status} ${result.error ?? ''}`,
+          `[deepfield] ${label}batch of ${batch.length} product(s)/${images} image(s) failed after `
+          + `${MAX_ATTEMPTS} attempt(s): HTTP ${result.status ?? 'network'} ${result.error ?? ''}`,
         );
         // Later batches are independent products; keep going rather than
-        // abandoning them because one batch failed.
+        // abandoning them because one batch failed. There is no durable queue,
+        // so these products are simply not delivered — Deep Field reconciles
+        // them via the id-list endpoint (api/integrations/deepfield/product-ids).
         continue;
       }
       if (result.failed) {

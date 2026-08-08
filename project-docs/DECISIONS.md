@@ -1211,6 +1211,38 @@ uses verified batches of at most 25 and isolates a failed mixed batch so one
 offer cannot starve later listings. Admin Settings exposes secret readiness and
 the latest scheduled result; no new database table is required.
 
+**Three rules added 2026-08-08 after the price push turned out to be generating
+~33 guaranteed API rejections per run:**
+
+1. **Eligibility is decided by CURRENT PRODUCT STATUS, not by listing sync
+   state alone.** A sold product's listing legitimately stays `out_of_date`
+   forever while its marketplace offer is already withdrawn, so a sync-state
+   filter re-selects it every run and the marketplace rejects every write. Check
+   `normalizeProductStatus(product.status) !== 'available'` and skip. Key it on
+   live status, never on a "dead" flag written to the listing — relisting must
+   revive it with no manual repair.
+
+   Note eBay and Etsy differ here by accident, not design: Etsy's auto-delist
+   moves sold listings to `delisted` (outside its selection) while eBay's leaves
+   them `out_of_date` (inside it). Do not rely on that; both planners now check
+   status explicitly.
+
+2. **A failure path must actually record the failure.** Both providers called
+   `upsertListing(service, id, {})` — a no-op patch — so `error_count` never
+   left 0 and the retry ceiling could never engage. The manual button polls to
+   completion and a failed listing stays a candidate, so 33 broken listings
+   produced 139 error rows in a single run. Increment on failure, **reset to 0
+   on success** (that is what makes the ceiling self-healing), and skip at the
+   ceiling.
+
+3. **Persist `err.detail`, not just the operator sentence.** Both
+   `EbayApiError` and `EtsyApiError` carry a pre-redacted `detail` documented as
+   safe for a sync-log row, and both failure paths were dropping it — leaving
+   140 rows reading `eBay API error (HTTP 400).` with no recoverable cause,
+   because that string is only the FALLBACK for an envelope with no top-level
+   message. A generic operator message is a signal the real reason is in
+   `detail`.
+
 ### Etsy queue progress is durable
 
 Bounded image requests retain queue ownership after intermediate states. Normal
