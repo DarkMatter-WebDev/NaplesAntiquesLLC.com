@@ -6,9 +6,6 @@ import { FACEBOOK_MAX_HASHTAGS } from '@/lib/facebook/client';
 
 export const runtime = 'nodejs';
 
-/** The owner's own drip cap; Facebook imposes no comparable hard limit. */
-const MAX_DAILY_POST_LIMIT = 25;
-
 export async function PATCH(req: Request) {
   const { error } = await requireAdmin();
   if (error) return error;
@@ -24,17 +21,6 @@ export async function PATCH(req: Request) {
   if (typeof body.captionIncludePrice === 'boolean') patch.caption_include_price = body.captionIncludePrice;
   if (typeof body.captionSpanishLine === 'boolean') patch.caption_spanish_line = body.captionSpanishLine;
   if (typeof body.soldCommentEnabled === 'boolean') patch.sold_comment_enabled = body.soldCommentEnabled;
-
-  if (body.dailyPostLimit !== undefined) {
-    const limit = Number(body.dailyPostLimit);
-    if (!Number.isFinite(limit) || limit < 1 || limit > MAX_DAILY_POST_LIMIT) {
-      return NextResponse.json(
-        { error: `Daily post limit must be between 1 and ${MAX_DAILY_POST_LIMIT}.` },
-        { status: 400 },
-      );
-    }
-    patch.daily_post_limit = Math.floor(limit);
-  }
 
   if (body.captionCta !== undefined) {
     const cta = body.captionCta === null ? null : String(body.captionCta).trim();
@@ -82,7 +68,6 @@ export async function PATCH(req: Request) {
   return NextResponse.json({
     policy: {
       autoPublish: connection?.auto_publish ?? false,
-      dailyPostLimit: connection?.daily_post_limit ?? 2,
       captionIncludePrice: connection?.caption_include_price ?? true,
       captionSpanishLine: connection?.caption_spanish_line ?? true,
       captionCta: connection?.caption_cta ?? null,

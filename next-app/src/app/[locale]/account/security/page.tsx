@@ -52,7 +52,7 @@ export default async function AccountSecurityPage({ params }: Props) {
       <SiteHeader />
       <main className="account-page pt-24 md:pt-28 pb-0 min-h-screen">
         <section className="account-hero px-4 md:px-8">
-          <div className="account-hero-inner max-w-6xl mx-auto">
+          <div className="account-hero-inner ultrawide-page max-w-6xl mx-auto">
             <div className="account-hero-copy">
               <p
                 className="text-[0.65rem] font-bold uppercase tracking-[0.35em] mb-3"
@@ -75,7 +75,7 @@ export default async function AccountSecurityPage({ params }: Props) {
           </div>
         </section>
 
-        <div className="account-content max-w-6xl mx-auto px-4 md:px-8">
+        <div className="account-content ultrawide-page max-w-6xl mx-auto px-4 md:px-8">
           <AccountTabs activeSection="security" locale={locale} />
 
           <section className="account-dashboard-grid">

@@ -120,7 +120,7 @@ export default async function AdminUserInvoicesPage({ params }: Props) {
       />
 
       <main className="px-4 md:px-8 py-8">
-        <div className="max-w-[1200px] mx-auto">
+        <div className="ultrawide-page-medium max-w-[1200px] mx-auto">
           <div className="mb-6">
             <Link href={`${adminBasePath}/users`} className="hover-underline-grow text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
               Back to Users

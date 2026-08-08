@@ -160,6 +160,24 @@ export function hasProductImagePadding(value: string | null | undefined): boolea
   return normalizeProductImagePaddingValue(value) !== 'none';
 }
 
+/**
+ * Whether a resolved image-padding background is dark enough to need light
+ * foreground treatment. Drives the product page's dark theme and the gallery's
+ * edge-navigation tone, which must agree — a per-image dark padding on an
+ * otherwise light page still needs a dark scrim behind its arrows.
+ * Anything that is not a plain 6-digit hex (e.g. a CSS var fallback) reads light.
+ */
+export function isDarkProductBackground(hex: string): boolean {
+  const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!match) return false;
+  const int = parseInt(match[1], 16);
+  const r = (int >> 16) & 255;
+  const g = (int >> 8) & 255;
+  const b = int & 255;
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return luminance < 0.4;
+}
+
 export function productImagePaddingBackground(value: string | null | undefined): string {
   const normalized = normalizeProductImagePaddingValue(value);
   if (isProductImagePaddingCustomColor(normalized)) return normalized;
@@ -498,6 +516,37 @@ export function inferProductJewelryType(product: Pick<Product, 'title' | 'title_
     if (JEWELRY_TYPE_KEYWORDS[type.value].some((keyword) => text.includes(keyword))) return type.value;
   }
   return 'Other';
+}
+
+/**
+ * The wearable-jewelry half of the catalog's jewelry/everything-else split.
+ * Everything not listed here — Coin, Bullion, Silverware, Other — is the
+ * "everything else" side. This is the canonical set: the shop's Jewelry &
+ * Watches category filter and the hero carousel's random lineups both classify
+ * from it, and `shop-filter-state.test.ts` asserts the shop's slug list stays
+ * in step, so the two can never drift apart.
+ */
+export const PRODUCT_WEARABLE_JEWELRY_TYPES: readonly ProductJewelryType[] = [
+  'Necklace',
+  'Bracelet',
+  'Ring',
+  'Pendant',
+  'Charm',
+  'Earrings',
+  'Brooch',
+  'Cufflinks',
+  'Watch',
+];
+
+const WEARABLE_JEWELRY_TYPE_SET = new Set<string>(PRODUCT_WEARABLE_JEWELRY_TYPES);
+
+/** Whether a product reads as wearable jewelry rather than coins/bullion/flatware. */
+export function isProductJewelryItem(
+  product: Pick<Product, 'title' | 'title_es' | 'chain_type' | 'tags' | 'tags_es' | 'jewelry_type'> & {
+    product_type?: string | null;
+  },
+): boolean {
+  return WEARABLE_JEWELRY_TYPE_SET.has(inferProductJewelryType(product));
 }
 
 export function productJewelryTypeLabel(value: string | null | undefined, locale = 'en'): string {

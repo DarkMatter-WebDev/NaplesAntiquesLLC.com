@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { NormalizedRect } from './backdrop';
+import { getSocialUnqueuedSyncState } from '@/lib/social-workflow';
 
 /**
  * Typed CRUD over the instagram_* tables. Service-role client only — every
@@ -30,7 +31,6 @@ export interface InstagramConnectionRow {
   token_expires_at: string | null;
   token_refreshed_at: string | null;
   auto_publish: boolean;
-  daily_post_limit: number;
   caption_include_price: boolean;
   caption_spanish_line: boolean;
   caption_cta: string | null;
@@ -76,6 +76,7 @@ export interface InstagramPostRow {
   sold_comment_id: string | null;
   sold_comment_at: string | null;
   queued_at: string | null;
+  scheduled_for: string | null;
   last_error: string | null;
   error_count: number;
   created_at: string;
@@ -85,7 +86,7 @@ export interface InstagramPostRow {
 /** Columns safe to send to the browser — never the encrypted token. */
 const CONNECTION_PUBLIC_COLUMNS =
   'id, status, ig_user_id, username, account_type, scopes, token_expires_at, token_refreshed_at, ' +
-  'auto_publish, daily_post_limit, caption_include_price, caption_spanish_line, caption_cta, ' +
+  'auto_publish, caption_include_price, caption_spanish_line, caption_cta, ' +
   'base_hashtags, sold_comment_enabled, sold_comment_text, connected_at, updated_at';
 
 export type InstagramConnectionPublic = Omit<InstagramConnectionRow, 'access_token_enc'>;
@@ -166,26 +167,32 @@ export async function upsertPost(
   return (data as InstagramPostRow) ?? null;
 }
 
-/** Queue a product for the drip. Idempotent: re-queuing keeps the original position. */
+/** Queue or reschedule a product while preserving its original approval time. */
 export async function queueProduct(
   service: SupabaseClient,
   productId: string,
+  scheduledFor: Date,
 ): Promise<InstagramPostRow | null> {
   const existing = await getPost(service, productId);
-  if (existing?.queued_at && existing.sync_state !== 'error') return existing;
   return upsertPost(service, productId, {
     sync_state: 'pending',
-    queued_at: new Date().toISOString(),
+    queued_at: existing?.queued_at ?? new Date().toISOString(),
+    scheduled_for: scheduledFor.toISOString(),
     last_error: null,
     error_count: 0,
   });
 }
 
 export async function unqueueProduct(service: SupabaseClient, productId: string): Promise<void> {
-  await upsertPost(service, productId, { queued_at: null, sync_state: 'pending' });
+  const existing = await getPost(service, productId);
+  await upsertPost(service, productId, {
+    queued_at: null,
+    scheduled_for: null,
+    sync_state: getSocialUnqueuedSyncState(existing?.posted_caption, existing?.rendition_paths),
+  });
 }
 
-/** Products approved and waiting, oldest first — the drip order. */
+/** Products approved and waiting, earliest scheduled time first. */
 export async function listQueuedPosts(
   service: SupabaseClient,
   limit = 50,
@@ -195,6 +202,7 @@ export async function listQueuedPosts(
     .select('*')
     .in('sync_state', ['pending', 'review'])
     .not('queued_at', 'is', null)
+    .order('scheduled_for', { ascending: true, nullsFirst: false })
     .order('queued_at', { ascending: true })
     .limit(limit);
   return (data as InstagramPostRow[]) ?? [];

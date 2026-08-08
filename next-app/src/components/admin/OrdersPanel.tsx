@@ -420,7 +420,7 @@ export default function OrdersPanel({
 
   return (
     <main className="px-4 md:px-8 py-6 md:py-8">
-      <div className="max-w-[1500px] mx-auto">
+      <div className="ultrawide-page max-w-[1500px] mx-auto">
         <div className="mb-6 md:mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-[0.65rem] font-bold uppercase tracking-[0.35em] mb-3"

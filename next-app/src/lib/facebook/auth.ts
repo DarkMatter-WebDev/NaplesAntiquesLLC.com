@@ -2,19 +2,93 @@ import 'server-only';
 
 import crypto from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { FacebookApiError, fetchPageProfile } from './client';
+import {
+  FacebookApiError,
+  type FacebookAccessTokenMetadata,
+  fetchFacebookAccessTokenMetadata,
+  fetchPageProfile,
+  isFacebookPostReadPermissionError,
+  verifyPagePostReadAccess,
+} from './client';
 
 /**
- * Facebook Page token lifecycle — dramatically simpler than Instagram's.
+ * Facebook Page token lifecycle.
  *
- * The owner pastes a PAGE access token (generated in the Graph API Explorer or
- * from a Business system user). A page token derived from a long-lived user
- * token DOES NOT EXPIRE, so there is no refresh window, no minimum refresh age,
- * and no scheduled refresh function. The only failure mode is invalidation
- * (password change, permission revocation, app removal), which surfaces as an
- * invalid_token API error at call time; callers then mark the connection
- * needs_reauth and the owner pastes a fresh token.
+ * Meta can issue either finite or non-expiring Page tokens depending on how
+ * the upstream User/System User token was obtained. Candidate tokens are
+ * inspected before storage; short-lived tokens are rejected and any longer
+ * finite expiry is recorded truthfully for the operator.
  */
+
+export const FACEBOOK_APP_ID = process.env.FACEBOOK_APP_ID ?? '1551269126645242';
+export const FACEBOOK_MIN_TOKEN_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
+
+function facebookAppAccessToken(): string {
+  const secret = process.env.FACEBOOK_APP_SECRET?.trim();
+  if (!secret) {
+    throw new FacebookApiError({
+      status: 503,
+      code: 'token_inspection_not_configured',
+      operatorMessage:
+        'Facebook token lifetime validation is not configured. Add FACEBOOK_APP_SECRET to the server environment before connecting a Page.',
+      retryable: false,
+    });
+  }
+  return `${FACEBOOK_APP_ID}|${secret}`;
+}
+
+export function facebookTokenInspectionConfigured(): boolean {
+  return Boolean(FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET?.trim());
+}
+
+export function assessFacebookAccessTokenMetadata(params: {
+  metadata: FacebookAccessTokenMetadata;
+  expectedAppId?: string;
+  now?: Date;
+}): { tokenExpiresAt: string | null } {
+  const { metadata, expectedAppId = FACEBOOK_APP_ID, now = new Date() } = params;
+
+  if (metadata.is_valid !== true) {
+    throw new FacebookApiError({
+      status: 401,
+      code: 'invalid_token',
+      operatorMessage: 'Facebook reports that this Page token is not valid. Generate a fresh token and try again.',
+      retryable: false,
+    });
+  }
+
+  if (metadata.app_id && metadata.app_id !== expectedAppId) {
+    throw new FacebookApiError({
+      status: 409,
+      code: 'wrong_app',
+      operatorMessage:
+        'That Page token was generated for a different Meta app. Generate it with the Naples Estate Jewelry Social app.',
+      retryable: false,
+    });
+  }
+
+  const finiteExpiries = [metadata.expires_at, metadata.data_access_expires_at]
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0)
+    .map((value) => value * 1000);
+  const expiresAtMs = finiteExpiries.length > 0 ? Math.min(...finiteExpiries) : null;
+
+  if (expiresAtMs !== null && expiresAtMs - now.getTime() < FACEBOOK_MIN_TOKEN_LIFETIME_MS) {
+    const expiresAt = new Date(expiresAtMs);
+    const alreadyExpired = expiresAtMs <= now.getTime();
+    throw new FacebookApiError({
+      status: 400,
+      code: alreadyExpired ? 'invalid_token' : 'short_lived_token',
+      operatorMessage: alreadyExpired
+        ? 'That Facebook Page token has already expired. Generate a fresh long-lived Page token.'
+        : `That Facebook Page token expires on ${expiresAt.toISOString()}. Generate a long-lived Page token with at least 30 days remaining.`,
+      retryable: false,
+    });
+  }
+
+  return {
+    tokenExpiresAt: expiresAtMs === null ? null : new Date(expiresAtMs).toISOString(),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Token encryption at rest (AES-256-GCM), identical scheme to Instagram/Etsy/
@@ -65,6 +139,7 @@ export function facebookTokenEncryptionConfigured(): boolean {
 export async function verifyPastedPageToken(token: string): Promise<{
   pageId: string;
   pageName: string | null;
+  tokenExpiresAt: string | null;
 }> {
   const trimmed = token.trim();
   if (!trimmed) throw new Error('Paste the Facebook Page access token before saving.');
@@ -89,16 +164,37 @@ export async function verifyPastedPageToken(token: string): Promise<{
     });
   }
 
+  try {
+    await verifyPagePostReadAccess(String(profile.id), trimmed);
+  } catch (err) {
+    if (isFacebookPostReadPermissionError(err)) {
+      throw new FacebookApiError({
+        status: 403,
+        code: 'missing_read_permission',
+        operatorMessage:
+          'That Page token cannot read posts. Generate it with pages_read_engagement so published statuses can be refreshed.',
+        retryable: false,
+      });
+    }
+    throw err;
+  }
+
+  const metadata = await fetchFacebookAccessTokenMetadata(trimmed, facebookAppAccessToken());
+  const lifetime = assessFacebookAccessTokenMetadata({ metadata });
+
   return {
     pageId: String(profile.id),
     pageName: profile.name ?? null,
+    tokenExpiresAt: lifetime.tokenExpiresAt,
   };
 }
 
 /**
  * Decrypt the stored token for use in an API call. Returns null when there is
  * nothing usable, so callers fail closed rather than attempting an
- * unauthenticated write. No refresh step: page tokens do not expire.
+ * unauthenticated write. There is no Facebook refresh endpoint in this owner
+ * flow; a finite token's exact expiration is tracked and a rejected/expired
+ * token requires a fresh validated paste.
  */
 export async function ensurePageAccessToken(
   service: SupabaseClient,
@@ -124,7 +220,7 @@ export async function ensurePageAccessToken(
 /**
  * Mark the connection as needing a fresh paste. Called by sync paths when
  * Facebook rejects the stored token — the page-token equivalent of Instagram's
- * expiry handling, except it only ever happens on explicit invalidation.
+ * expiry handling. This covers expiration as well as explicit invalidation.
  */
 export async function markNeedsReauth(service: SupabaseClient): Promise<void> {
   await service

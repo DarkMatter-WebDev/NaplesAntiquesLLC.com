@@ -16,7 +16,9 @@ const MAX_EMAIL = 320;
 const MAX_MESSAGE = 5000;
 
 const OWNER_EMAIL = 'rcman12589@gmail.com';
-const FROM = 'Naples Estate Jewelry <noreply@naplesestatejewelry.co>';
+// Sending domain is naplesestatejewelry.com in Resend (migrated 2026-08-05); the
+// .co domain is no longer verified there, so a .co From address will not send.
+const FROM = 'Naples Estate Jewelry <noreply@naplesestatejewelry.com>';
 
 type InquiryKind = 'free-evaluation' | 'submit-item' | 'product-inquiry';
 

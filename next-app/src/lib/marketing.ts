@@ -166,12 +166,18 @@ export async function getMarketingSettings(): Promise<MarketingSettings> {
     .eq('id', true)
     .maybeSingle();
 
+  // From addresses must sit on Resend's verified sending domain, which is
+  // naplesestatejewelry.com as of 2026-08-05 — .co was removed from the account.
+  // NOTE: any MARKETING_*/EMAIL_FROM/RESEND_FROM override set in Netlify wins over
+  // these defaults, so a stale .co value there will still break sending.
   const noReplyFromAddress = process.env.MARKETING_NOREPLY_FROM
     || process.env.EMAIL_FROM
     || process.env.RESEND_FROM
-    || 'Naples Estate Jewelry <noreply@naplesestatejewelry.co>';
+    || 'Naples Estate Jewelry <noreply@naplesestatejewelry.com>';
   const chrisFromAddress = process.env.MARKETING_CHRIS_FROM
-    || 'Chris at Naples Estate Jewelry <chris@naplesestatejewelry.co>';
+    || 'Chris at Naples Estate Jewelry <chris@naplesestatejewelry.com>';
+  // Reply-To is not constrained by the sending domain, so it stays on the .co
+  // mailbox that is known to be live and monitored.
   const chrisReplyTo = process.env.MARKETING_CHRIS_REPLY_TO || 'chris@naplesestatejewelry.co';
 
   return {

@@ -190,7 +190,7 @@ export default async function AdminMarketingPage({ params }: Props) {
       />
 
       <main className="px-4 md:px-8 py-8">
-        <div className="mx-auto max-w-[1800px]">
+        <div className="ultrawide-page-wide mx-auto max-w-[1800px]">
           <div className="mb-8">
             <p className="mb-3 text-[0.65rem] font-bold uppercase tracking-[0.35em]" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
               Marketing

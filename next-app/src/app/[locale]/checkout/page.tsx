@@ -32,7 +32,7 @@ export default async function CheckoutPage({ params }: Props) {
   return (
     <>
       <SiteHeader />
-      <main className="pt-16">
+      <main className="site-header-offset">
         <CheckoutClient locale={locale} paypalClientId={paypalClientId} />
       </main>
       <SiteFooter locale={locale} />

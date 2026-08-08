@@ -12,8 +12,8 @@ entity: *Naples Antiques LLC*). The site does two jobs:
    the owner travels to clients throughout Southwest Florida to evaluate and buy
    estate jewelry, gold, sterling silver, diamonds, watches, antiques, coins, and
    full estates.
-2. **Online shop** that sells curated estate jewelry (currently solid-gold chains,
-   bracelets, and rings) with live, gold-spot-based pricing.
+2. **Online shop** that sells curated estate jewelry across chains, bracelets,
+   rings, pendants, brooches, and other pieces with live metal-spot-based pricing.
 
 ## Business Goals
 
@@ -66,7 +66,7 @@ discretion and a personal relationship over a storefront transaction.
   images via Supabase Storage. Product rows store image URL/path strings, not
   binary image payloads.
 - **Legacy note**: the old root static HTML site and vanilla scripts were
-  removed on 2026-06-13. See `LEGACY_REMOVAL_REPORT.md`.
+  removed on 2026-06-13. The Next.js app is the only active runtime.
 
 ## Deployment Details
 
@@ -77,14 +77,23 @@ discretion and a personal relationship over a storefront transaction.
   branding now emit `.com`). The external wiring is DONE and verified
   (GoDaddy DNS → Netlify, `.com` is the Netlify PRIMARY with cert, env vars
   and Supabase Auth updated) — `https://naplesestatejewelry.com` serves the
-  live site. Remaining: deploy the pending batch, then re-register
-  PayPal/eBay/Etsy endpoints and Search Console on `.com` — see `TASKS.md`.
+  live site. PayPal/eBay/Etsy registrations, Search Console, sitemap, and
+  Google Change of Address are complete. A newer locally verified application
+  batch still awaits deployment and production smoke testing — see `TASKS.md`.
 - **Legacy domain**: `naplesestatejewelry.co` stays a Netlify alias with
-  path-preserving 301s to `.com` (rules in root `netlify.toml`, with an
-  `/api/*` carve-out until external webhooks re-register on `.com`).
-  **Business email stays on `.co`** (`info@` / `chris@` /
-  `noreply@naplesestatejewelry.co`) — owner decision; never touch the `.co`
-  MX records.
+  path-preserving 301s to `.com` (host redirects live in `proxy.ts` so legacy
+  links resolve in ONE hop; `netlify.toml` keeps the host rules for paths outside
+  the proxy matcher, plus an `/api/*` carve-out — a **200 rewrite, not a
+  redirect** — for backward-compatible external webhook callbacks).
+- **Email is split across the two domains — do not "unify" it:**
+  - **Mailboxes stay on `.co`.** `info@` / `chris@naplesestatejewelry.co` are the
+    real, monitored inboxes; never touch the `.co` MX records. Contact addresses
+    shown on the site and Reply-To values stay `.co`.
+  - **Senders must be `.com`.** Since 2026-08-05, Resend's only verified sending
+    domain is `naplesestatejewelry.com`, so every outbound From address is
+    `@naplesestatejewelry.com`. A `.co` From address will not send at all.
+    `info@naplesestatejewelry.com` is also a live Workspace mailbox and is the
+    Reply-To on customer receipts.
 - **Related domains** (listed as `sameAs`): `naplesjewelrybuyers.com` — a
   separate, live, actively-run buy-side landing site with its own
   LocalBusiness/FAQPage schema (confirmed 2026-07-11).

@@ -2,9 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   bulkPriceQuantityFailureMessage,
   drainQueueCore,
+  EBAY_BULK_ENQUEUE_LIMIT,
+  EBAY_WRITE_BLOCKED_PRODUCT_IDS,
+  isEbayWriteBlocked,
   offerBody,
   planEbayPricePush,
   reconcileEbayStateFromOffer,
+  RELISTED_LISTING_WARNING,
+  resolveFreshnessScanAction,
   resolveEbayRelistChain,
   selectExistingFixedPriceOfferId,
   shouldPushPrice,
@@ -213,6 +218,106 @@ describe('manual bulk price planning', () => {
       'product-29',
       'product-30',
     ]);
+  });
+});
+
+describe('eBay write-block guard', () => {
+  const listingRow = (overrides: Partial<EbayListingRow> = {}): EbayListingRow => ({
+    product_id: 'some-product',
+    ebay_sku: 'some-product',
+    ebay_offer_id: 'offer-1',
+    ebay_listing_id: 'listing-1',
+    sync_state: 'published',
+    content_hash: null,
+    last_pushed_price: 100,
+    last_pushed_qty: 1,
+    category_id: null,
+    last_error: null,
+    error_count: 0,
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  });
+
+  it('pins inventory #82 so the block survives last_error being rewritten', () => {
+    const [blockedId] = [...EBAY_WRITE_BLOCKED_PRODUCT_IDS];
+    expect(blockedId).toContain('-82');
+    // The original guard inferred the block from this exact warning string.
+    expect(isEbayWriteBlocked(blockedId, listingRow({ product_id: blockedId, last_error: RELISTED_LISTING_WARNING }))).toBe(true);
+    // A cleared or replaced last_error must NOT unblock it.
+    expect(isEbayWriteBlocked(blockedId, listingRow({ product_id: blockedId, last_error: null }))).toBe(true);
+    expect(isEbayWriteBlocked(blockedId, listingRow({ product_id: blockedId, last_error: 'Some other error' }))).toBe(true);
+    // Missing listing state must not unblock it either.
+    expect(isEbayWriteBlocked(blockedId, null)).toBe(true);
+  });
+
+  it('still blocks any detached relist, and leaves ordinary listings writable', () => {
+    expect(isEbayWriteBlocked('ordinary', listingRow({ last_error: RELISTED_LISTING_WARNING }))).toBe(true);
+    expect(isEbayWriteBlocked('ordinary', listingRow())).toBe(false);
+  });
+
+  it('keeps a write-blocked listing out of the price-push plan', () => {
+    const [blockedId] = [...EBAY_WRITE_BLOCKED_PRODUCT_IDS];
+    const listings: EbayListingRow[] = [
+      listingRow({ product_id: blockedId, ebay_sku: blockedId, last_error: null }),
+      listingRow({ product_id: 'ordinary', ebay_sku: 'ordinary' }),
+    ];
+    const products = new Map<string, Product>(
+      listings.map((listing) => [
+        listing.product_id,
+        {
+          id: listing.product_id,
+          category: 'Gold',
+          price_mode: 'manual',
+          manual_price_label: '$500',
+          asking_price: 500,
+          status: 'available',
+          sold_price: null,
+        } as Product,
+      ]),
+    );
+    const spotData: SpotData = { goldPerTroyOz: 3300, silverPerTroyOz: 35, fetchedAt: Date.now(), source: 'api' };
+
+    const plan = planEbayPricePush(listings, products, spotData, 0, null);
+
+    expect(plan.candidates.map((candidate) => candidate.listing.product_id)).toEqual(['ordinary']);
+    expect(plan.blocked).toBe(1);
+  });
+});
+
+describe('freshness scan — sold listings are never flagged out_of_date', () => {
+  const row = (sync_state: string, last_pushed_qty: number | null) =>
+    ({ sync_state, last_pushed_qty }) as Pick<EbayListingRow, 'sync_state' | 'last_pushed_qty'>;
+
+  it('never hashes a sold piece (the bug that flagged 36 hidden listings)', () => {
+    // Before the fix these were hashed against the new tier shipping policy and
+    // flipped to out_of_date, losing the state that says "hidden because sold".
+    expect(resolveFreshnessScanAction(row('hidden_oos', 0), 'sold')).toBe('skip');
+    expect(resolveFreshnessScanAction(row('published', 1), 'sold')).toBe('skip');
+    expect(resolveFreshnessScanAction(row('hidden_oos', 0), 'archived')).toBe('skip');
+  });
+
+  it('repairs a mis-flagged hidden row, but only with proof the hide succeeded', () => {
+    // last_pushed_qty === 0 is written by hideListingQuantityZero and never
+    // touched by the scan, so it is the durable evidence.
+    expect(resolveFreshnessScanAction(row('out_of_date', 0), 'sold')).toBe('repair-hidden');
+    // Just sold, auto-hide not run yet: still real work, must not be relabelled.
+    expect(resolveFreshnessScanAction(row('out_of_date', 1), 'sold')).toBe('skip');
+    expect(resolveFreshnessScanAction(row('out_of_date', null), 'sold')).toBe('skip');
+  });
+
+  it('still hashes available listings, and skips ones already flagged', () => {
+    expect(resolveFreshnessScanAction(row('published', 1), 'available')).toBe('hash');
+    expect(resolveFreshnessScanAction(row('hidden_oos', 0), 'available')).toBe('hash');
+    expect(resolveFreshnessScanAction(row('out_of_date', 1), 'available')).toBe('skip');
+  });
+});
+
+describe('bulk enqueue cap', () => {
+  it('bounds one bulk run so a blanket re-sync cannot rewrite the whole catalog', () => {
+    // The cap is the standing "never blanket re-sync" rule made mechanical.
+    expect(EBAY_BULK_ENQUEUE_LIMIT).toBeGreaterThan(0);
+    expect(EBAY_BULK_ENQUEUE_LIMIT).toBeLessThanOrEqual(25);
   });
 });
 

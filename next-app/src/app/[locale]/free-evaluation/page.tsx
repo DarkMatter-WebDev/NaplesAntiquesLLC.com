@@ -87,7 +87,7 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
   return (
     <>
       <SiteHeader />
-      <main className="pt-16">
+      <main className="site-header-offset">
 
         {/* Hero with inline form */}
         <section className="relative overflow-hidden" style={{ background: '#0e0f0f' }}>
@@ -168,7 +168,7 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
 
         {/* What We Evaluate */}
         <section className="py-16 md:py-24" style={{ background: 'var(--color-surface-container-low)' }}>
-          <div className="container mx-auto px-6 md:px-8 max-w-6xl">
+          <div className="ultrawide-page container mx-auto px-6 md:px-8 max-w-6xl">
             <div className="text-center mb-12">
               <span
                 className="text-xs font-bold uppercase tracking-[0.4em]"

@@ -153,7 +153,7 @@ export default function AdminSettingsPanel() {
 
   return (
     <main className="px-4 md:px-8 py-8">
-      <div className="max-w-[1100px] mx-auto">
+      <div className="ultrawide-page-medium max-w-[1100px] mx-auto">
         <div className="mb-8">
           <p
             className="text-[0.65rem] font-bold uppercase tracking-[0.35em] mb-3"
@@ -348,7 +348,7 @@ export default function AdminSettingsPanel() {
 
       {/* Carousel panel gets a wider container so its two tables can use the
           full width on widescreen, only stacking below the lg breakpoint. */}
-      <div className="max-w-[1800px] mx-auto">
+      <div className="ultrawide-page-wide max-w-[1800px] mx-auto">
         <AdminCarouselSettingsPanel />
       </div>
     </main>

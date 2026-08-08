@@ -14,11 +14,11 @@ interface StatusResponse {
     expiresAt: string | null;
     refreshedAt: string | null;
     encryptionKeyConfigured: boolean;
+    lifetimeValidationConfigured: boolean;
     dripCronSecretConfigured: boolean;
   };
   policy: {
     autoPublish: boolean;
-    dailyPostLimit: number;
     captionIncludePrice: boolean;
     captionSpanishLine: boolean;
     captionCta: string | null;
@@ -48,6 +48,7 @@ export default function FacebookSettingsPanel() {
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const [tokenInput, setTokenInput] = useState('');
   const [connecting, setConnecting] = useState(false);
+  const [replacingToken, setReplacingToken] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [savingPolicy, setSavingPolicy] = useState(false);
@@ -95,6 +96,7 @@ export default function FacebookSettingsPanel() {
       if (!res.ok) throw new Error(data?.error || 'Could not verify that token.');
       // Clear immediately: the token must not linger in a form field.
       setTokenInput('');
+      setReplacingToken(false);
       showNotice(`Connected ${data?.page?.pageName ?? 'Page'}.`);
       await loadStatus();
     } catch (err) {
@@ -187,15 +189,29 @@ export default function FacebookSettingsPanel() {
           </div>
         )}
 
+        {!loading && status && !status.token.lifetimeValidationConfigured && (
+          <div
+            className="px-3 py-2 text-xs font-medium"
+            style={{
+              background: 'color-mix(in srgb, var(--color-error) 10%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--color-error) 28%, transparent)',
+              color: 'var(--color-error)',
+            }}
+          >
+            FACEBOOK_APP_SECRET is not set in the server environment, so Facebook token expiration cannot be checked
+            safely yet.
+          </div>
+        )}
+
         {!loading && status && !status.connected && (
           <div className="flex flex-col gap-3">
             <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
               Not connected. In the Meta <strong>Graph API Explorer</strong>, pick the{' '}
               <strong>Naples Estate Jewelry Social</strong> app, grant <code>pages_show_list</code>,{' '}
               <code>pages_read_engagement</code>, <code>pages_manage_posts</code> and{' '}
-              <code>pages_manage_engagement</code>, switch &ldquo;User or Page&rdquo; to the business Page, then copy
-              that <strong>Page</strong> access token and paste it here. It is encrypted before storage, and Page tokens
-              do not expire.
+              <code>pages_manage_engagement</code>, derive the business Page token from a long-lived User token, then
+              paste that <strong>Page</strong> token here. It is encrypted before storage, and its Meta-reported
+              expiration is checked before it can replace the connection.
             </p>
             <label className="flex flex-col gap-1">
               <span className="text-[0.7rem] font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)' }}>
@@ -214,7 +230,11 @@ export default function FacebookSettingsPanel() {
             <button
               type="button"
               onClick={connect}
-              disabled={connecting || !status.token.encryptionKeyConfigured}
+              disabled={
+                connecting ||
+                !status.token.encryptionKeyConfigured ||
+                !status.token.lifetimeValidationConfigured
+              }
               className="gold-button w-fit text-sm disabled:opacity-50"
             >
               {connecting ? 'Verifying…' : 'Connect Facebook Page'}
@@ -245,9 +265,74 @@ export default function FacebookSettingsPanel() {
               <span style={{ color: 'var(--color-on-surface-variant)' }}>
                 {status.token.expiresAt
                   ? `Token valid until ${new Date(status.token.expiresAt).toLocaleDateString()}`
-                  : 'Page token — does not expire'}
+                  : 'Meta reports no finite token expiration'}
               </span>
             </div>
+
+            {!replacingToken ? (
+              <button
+                type="button"
+                onClick={() => setReplacingToken(true)}
+                className="outline-button w-fit text-xs"
+              >
+                Replace Page token
+              </button>
+            ) : (
+              <div
+                className="flex max-w-2xl flex-col gap-3 border p-4"
+                style={{ borderColor: 'var(--color-outline-variant)' }}
+              >
+                <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  Paste a Page token with <code>pages_read_engagement</code>,{' '}
+                  <code>pages_manage_posts</code>, and <code>pages_manage_engagement</code>.
+                  The current token stays active unless the replacement passes every check.
+                </p>
+                <label className="flex flex-col gap-1">
+                  <span
+                    className="text-[0.7rem] font-bold uppercase tracking-wide"
+                    style={{ color: 'var(--color-on-surface-variant)' }}
+                  >
+                    Replacement Page access token
+                  </span>
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="form-field text-sm font-mono"
+                    value={tokenInput}
+                    onChange={(event) => setTokenInput(event.target.value)}
+                    placeholder="EAA…"
+                  />
+                </label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={connect}
+                    disabled={
+                      connecting ||
+                      !tokenInput.trim() ||
+                      !status.token.encryptionKeyConfigured ||
+                      !status.token.lifetimeValidationConfigured
+                    }
+                    className="gold-button w-fit text-xs disabled:opacity-50"
+                  >
+                    {connecting ? 'Verifying…' : 'Verify & replace token'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTokenInput('');
+                      setReplacingToken(false);
+                    }}
+                    disabled={connecting}
+                    className="text-xs font-bold uppercase tracking-wide disabled:opacity-50"
+                    style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
 
             {!status.token.dripCronSecretConfigured && (
               <p className="text-xs" style={{ color: 'var(--color-error)' }}>
@@ -290,21 +375,6 @@ export default function FacebookSettingsPanel() {
                 </span>
               </label>
 
-              <label className="flex items-center gap-2 text-sm">
-                <span style={{ color: 'var(--color-on-surface)' }}>Posts per day</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={25}
-                  className="form-field w-20 text-sm"
-                  defaultValue={status.policy.dailyPostLimit}
-                  disabled={savingPolicy}
-                  onBlur={(event) => {
-                    const value = Number(event.target.value);
-                    if (value !== status.policy.dailyPostLimit) void savePolicy({ dailyPostLimit: value });
-                  }}
-                />
-              </label>
             </div>
 
             <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>

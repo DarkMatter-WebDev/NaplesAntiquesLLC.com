@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useCart, type CartItem } from '@/context/CartContext';
-import OrderSummary from '@/components/checkout/OrderSummary';
+import OrderSummary, { OrderTotals } from '@/components/checkout/OrderSummary';
 import PayPalCheckoutButton from '@/components/checkout/PayPalCheckoutButton';
 import StockAlertBanner from '@/components/cart/StockAlertBanner';
 import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
@@ -31,12 +31,13 @@ import { AppIcon } from '@/components/AppIcon';
 
 const GOLD = '#735c00';
 
-// Step-based checkout flow (owner request 2026-07-31): order summary ->
-// delivery choice -> contact/address -> review & pay. With PayPal's
-// capture-on-approve design, "place order" IS the Pay Now inside PayPal's
-// window, so the final step is the full review plus the PayPal buttons.
-type CheckoutStep = 'summary' | 'delivery' | 'contact' | 'review';
-const CHECKOUT_STEPS: readonly CheckoutStep[] = ['summary', 'delivery', 'contact', 'review'];
+// Single-page two-column checkout (owner request 2026-08-04, modelled on a
+// mainstream retail checkout): everything the buyer must decide sits in the
+// left column (Shipping, then Payment), while a sticky right rail carries the
+// order summary, the totals, and the pay controls. This replaced the earlier
+// four-step wizard. With PayPal's capture-on-approve design, "place order" IS
+// the Pay Now inside PayPal's window, so the PayPal buttons sit directly under
+// the total — the buyer always sees the final amount before paying.
 const AUTH_CHOICE_KEY = 'nej-checkout-auth-choice';
 
 type CartProductInfo = Pick<
@@ -76,7 +77,7 @@ interface CustomerInfo {
 }
 
 export default function CheckoutClient({ locale, paypalClientId }: { locale: string; paypalClientId?: string | null }) {
-  const { items, remove, clear, setQuantity, refreshAvailability, stockAlerts, dismissStockAlerts } = useCart();
+  const { items, remove, clear, setQuantity, refreshAvailability, stockAlerts, dismissStockAlerts, openDrawer } = useCart();
   const isEs = locale === 'es';
   const hideSoldItemPrices = useHideSoldItemPrices(true);
   const prefix = isEs ? '/es' : '';
@@ -117,13 +118,6 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     createClient().auth.getUser().then(({ data }) => setIsGuest(!data.user)).catch(() => {});
   }, []);
 
-  // Step machine. `maxStepReached` unlocks the indicator for revisiting any
-  // step the buyer already completed without re-walking the Continue gates.
-  const [step, setStep] = useState<CheckoutStep>('summary');
-  const [maxStepReached, setMaxStepReached] = useState(0);
-  // Missing-fields hint under the contact step's Continue, shown only after a
-  // blocked attempt (not while the buyer is still typing).
-  const [contactHint, setContactHint] = useState(false);
   // Entry sign-in/guest prompt. Starts dismissed and is re-enabled on mount
   // for signed-out visitors who haven't chosen "guest" this tab (sessionStorage
   // is unavailable during SSR, so this must not participate in hydration).
@@ -148,16 +142,6 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
       /* ignore */
     }
   };
-
-  const goToStep = (next: CheckoutStep) => {
-    setStep(next);
-    setMaxStepReached((reached) => Math.max(reached, CHECKOUT_STEPS.indexOf(next)));
-  };
-
-  // Each step change starts at the top of the page, like a page navigation.
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'auto' });
-  }, [step]);
 
   // Re-check live stock when the checkout page loads (and whenever the cart
   // changes), so an item that sold out while it sat in the cart is caught here —
@@ -496,9 +480,16 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     <div className="checkout-page">
       <div className="checkout-shell">
       <section className="checkout-hero">
-        <Link href={`${prefix}/shop`} className="hover-underline-grow text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-          {isEs ? '< Volver a la tienda' : '< Back to shop'}
-        </Link>
+        {/* The cart is a drawer, not a route — so "Back to cart" reopens it
+            over this page rather than navigating away and losing progress. */}
+        <button
+          type="button"
+          onClick={openDrawer}
+          className="hover-underline-grow text-xs font-bold uppercase tracking-widest"
+          style={{ color: GOLD, fontFamily: 'var(--font-label)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+        >
+          {isEs ? '< Volver al carrito' : '< Back to cart'}
+        </button>
         <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold mt-1 mb-0 md:mt-4 md:mb-3" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
           {isEs ? 'Finalizar Compra' : 'Checkout'}
         </h1>
@@ -536,48 +527,17 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
         </div>
       )}
 
-      {/* Step flow (owner request 2026-07-31): Summary -> Delivery -> Contact ->
-          Review & Pay. The indicator lets the buyer revisit any completed step;
-          future steps unlock through each step's Continue gate. */}
-      <nav className="checkout-steps" aria-label={isEs ? 'Pasos de compra' : 'Checkout steps'}>
-        {CHECKOUT_STEPS.map((stepId, index) => {
-          const labels: Record<CheckoutStep, string> = {
-            summary: isEs ? 'Resumen' : 'Summary',
-            delivery: isEs ? 'Entrega' : 'Delivery',
-            contact: isEs ? 'Contacto' : 'Contact',
-            review: isEs ? 'Revisar y pagar' : 'Review & Pay',
-          };
-          const unlocked = index <= maxStepReached;
-          const current = stepId === step;
-          return (
-            <button
-              key={stepId}
-              type="button"
-              disabled={!unlocked || current}
-              aria-current={current ? 'step' : undefined}
-              onClick={() => unlocked && setStep(stepId)}
-              className="checkout-step-chip"
-              data-state={current ? 'current' : unlocked ? 'done' : 'todo'}
-            >
-              <span className="checkout-step-num">{index + 1}</span>
-              {labels[stepId]}
-            </button>
-          );
-        })}
-      </nav>
+      <StockAlertBanner alerts={stockAlerts} isEs={isEs} onDismiss={dismissStockAlerts} />
 
-      <div className="checkout-step-flow">
-        <StockAlertBanner alerts={stockAlerts} isEs={isEs} onDismiss={dismissStockAlerts} />
+      <div className="checkout-layout">
+        <div className="checkout-main">
 
-        {step === 'contact' && (
-        <div className="checkout-contact-panel">
+        {/* ------------------------------ Shipping ------------------------------ */}
+        <section className="checkout-contact-panel">
           <div className="checkout-panel-heading">
-            <AppIcon name="person"  aria-hidden="true" />
+            <AppIcon name="inventory_2"  aria-hidden="true" />
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-                {isEs ? 'Datos de contacto' : 'Contact Details'}
-              </p>
-              <h2>{isEs ? 'Información de contacto' : 'Contact information'}</h2>
+              <h2>{isEs ? 'Envío' : 'Shipping'}</h2>
             </div>
           </div>
           {isGuest && (
@@ -592,229 +552,13 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
               {isEs ? ' para un pago más rápido — opcional.' : ' for faster checkout — optional.'}
             </p>
           )}
-          <div className="responsive-form-grid">
-            <div>
-              <label className="form-label">{isEs ? 'Nombre completo' : 'Full Name'} *</label>
-              <input required className="form-field" value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} />
-            </div>
-            <div>
-              <label className="form-label">{isEs ? 'Teléfono' : 'Phone'} *</label>
-              <input required type="tel" className="form-field" value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} />
-            </div>
-          </div>
-          <div>
-            <label className="form-label">{isEs ? 'Correo electrónico' : 'Email'} *</label>
-            <input required type="email" className="form-field" autoComplete="email" value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} />
-          </div>
 
-          <div className="checkout-address-fields">
-            {needsShipping ? (
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-                  {isEs ? 'Dirección' : 'Address'}
-                </p>
-                <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                  {isEs
-                    ? 'Enviaremos su pedido a esta dirección. ¿Prefiere recogerlo en persona? Elija Recogida local en el paso Entrega.'
-                    : 'We’ll ship your order to this address. Prefer to pick it up in person? Choose Local Pickup in the Delivery step.'}
-                </p>
-              </div>
-            ) : (
-              // Local pickup: address isn't needed, so tuck it behind an accordion
-              // the buyer can open if they'd still like to add one.
-              <button
-                type="button"
-                onClick={() => setAddressExpanded((open) => !open)}
-                aria-expanded={addressExpanded}
-                aria-controls="checkout-address-inputs"
-                className="checkout-address-toggle"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '0.5rem',
-                  width: '100%',
-                  padding: '0.7rem 0.85rem',
-                  border: '1px solid rgba(216, 208, 194, 0.94)',
-                  borderRadius: 'var(--radius-lg)',
-                  background: 'rgba(255, 253, 248, 0.9)',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                <span className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-                  {isEs ? 'Dirección (opcional)' : 'Address (optional)'}
-                </span>
-                <AppIcon name={addressExpanded ? 'expand_less' : 'expand_more'}  aria-hidden="true" style={{ fontSize: '20px', color: GOLD, lineHeight: 1 }} />
-              </button>
-            )}
-            {(needsShipping || addressExpanded) && (
-              <div id="checkout-address-inputs" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div>
-                  <label className="form-label">{isEs ? 'Dirección' : 'Street Address'}{needsShipping ? ' *' : ''}</label>
-                  <input required={needsShipping} className="form-field" autoComplete="address-line1" value={customer.address_line1} onChange={(e) => setCustomer({ ...customer, address_line1: e.target.value })} />
-                </div>
-                <div>
-                  <label className="form-label">{isEs ? 'Apartamento, suite, etc. (opcional)' : 'Apartment, suite, etc. (optional)'}</label>
-                  <input className="form-field" autoComplete="address-line2" value={customer.address_line2} onChange={(e) => setCustomer({ ...customer, address_line2: e.target.value })} />
-                </div>
-                <div className="responsive-form-grid">
-                  <div>
-                    <label className="form-label">{isEs ? 'Ciudad' : 'City'}{needsShipping ? ' *' : ''}</label>
-                    <input required={needsShipping} className="form-field" autoComplete="address-level2" value={customer.city} onChange={(e) => setCustomer({ ...customer, city: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="form-label">{isEs ? 'Estado' : 'State'}{needsShipping ? ' *' : ''}</label>
-                    <select
-                      required={needsShipping}
-                      className="form-field"
-                      autoComplete="address-level1"
-                      value={customer.state}
-                      onChange={(e) => setCustomer({ ...customer, state: e.target.value })}
-                    >
-                      <option value="">{isEs ? 'Seleccione un estado' : 'Select a state'}</option>
-                      {US_STATES.map(([code, name]) => (
-                        <option key={code} value={code}>{name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="responsive-form-grid">
-                  <div>
-                    <label className="form-label">{isEs ? 'Código postal' : 'ZIP / Postal Code'}{needsShipping ? ' *' : ''}</label>
-                    <input
-                      required={needsShipping}
-                      className="form-field"
-                      autoComplete="postal-code"
-                      inputMode="numeric"
-                      maxLength={10}
-                      pattern="[0-9]{5}(-[0-9]{4})?"
-                      placeholder="12345"
-                      value={customer.postal_code}
-                      aria-invalid={needsShipping && customer.postal_code.trim() !== '' && normalizedShippingZip === null}
-                      aria-describedby={
-                        needsShipping && customer.postal_code.trim() !== '' && normalizedShippingZip === null
-                          ? 'checkout-zip-error'
-                          : undefined
-                      }
-                      onChange={(e) => {
-                        const entered = e.target.value;
-                        setCustomer({
-                          ...customer,
-                          postal_code: normalizeUsZip(entered) ?? entered,
-                        });
-                      }}
-                    />
-                    {needsShipping && customer.postal_code.trim() !== '' && normalizedShippingZip === null && (
-                      <p id="checkout-zip-error" role="alert" className="mt-1 text-xs" style={{ color: 'var(--color-error)' }}>
-                        {isEs
-                          ? 'Ingrese un código postal de EE. UU. válido (12345 o 12345-6789).'
-                          : 'Enter a valid U.S. ZIP code (12345 or 12345-6789).'}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="form-label">{isEs ? 'País' : 'Country'}</label>
-                    <input
-                      readOnly
-                      className="form-field"
-                      autoComplete="country-name"
-                      value="United States"
-                      aria-describedby="checkout-country-note"
-                    />
-                    <p id="checkout-country-note" className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                      {isEs ? 'Actualmente solo enviamos dentro de Estados Unidos.' : 'We currently ship only within the United States.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label className="form-label">{isEs ? 'Notas (opcional)' : 'Notes (optional)'}</label>
-            <textarea rows={4} className="form-field resize-none" value={customer.notes} onChange={(e) => setCustomer({ ...customer, notes: e.target.value })} />
-          </div>
-
-          <FormPrivacyNotice locale={locale} />
-
-          {contactHint && !(contactReady && shippingAddressReady) && (
-            <p role="alert" className="text-sm font-semibold" style={{ color: 'var(--color-error)' }}>
-              {isEs ? 'Complete: ' : 'Please complete: '}
-              {missingFieldLabels.join(', ')}
-            </p>
-          )}
-          <div className="checkout-step-nav">
-            <button type="button" className="outline-button" onClick={() => goToStep('delivery')}>
-              {isEs ? '< Entrega' : '< Delivery'}
-            </button>
-            <button
-              type="button"
-              className="gold-button"
-              onClick={() => {
-                if (contactReady && shippingAddressReady) {
-                  setContactHint(false);
-                  goToStep('review');
-                } else {
-                  setContactHint(true);
-                }
-              }}
-            >
-              {isEs ? 'Continuar a revisar y pagar' : 'Continue to Review & Pay'}
-            </button>
-          </div>
-        </div>
-        )}
-
-        {step === 'summary' && (
-        <div className="checkout-contact-panel">
-          <div className="checkout-panel-heading">
-            <AppIcon name="shopping_bag"  aria-hidden="true" />
-            <div>
-              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-                {isEs ? 'Paso 1' : 'Step 1'}
-              </p>
-              <h2>{isEs ? 'Resumen del pedido' : 'Order summary'}</h2>
-            </div>
-          </div>
-          <OrderSummary
-            items={summaryItems}
-            isEs={isEs}
-            prefix={prefix}
-            shippingMethod={effectiveShippingMethod}
-            shippingState={customer.state}
-            onRemove={remove}
-            onSetQuantity={setQuantity}
-            variant="expanded"
-            showAvailability
-            hideSoldItemPrices={hideSoldItemPrices}
-          />
-          {hasUnavailableItem && (
-            <p role="alert" className="text-sm font-semibold" style={{ color: 'var(--color-error)' }}>
-              {isEs
-                ? 'Elimine los artículos no disponibles arriba para continuar.'
-                : 'Remove the unavailable items above to continue.'}
-            </p>
-          )}
-          <div className="checkout-step-nav">
-            <span aria-hidden="true" />
-            <button type="button" className="gold-button" disabled={hasUnavailableItem} onClick={() => goToStep('delivery')}>
-              {isEs ? 'Continuar a entrega' : 'Continue to Delivery'}
-            </button>
-          </div>
-        </div>
-        )}
-
-        {step === 'delivery' && (
-        <div className="checkout-contact-panel">
-          <div className="checkout-panel-heading">
-            <AppIcon name="inventory_2"  aria-hidden="true" />
-            <div>
-              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-                {isEs ? 'Paso 2' : 'Step 2'}
-              </p>
-              <h2>{isEs ? 'Entrega, envío o recogida' : 'Delivery, shipping, or pickup'}</h2>
-            </div>
+          {/* Delivery method comes FIRST (owner request 2026-08-04): it decides
+              whether a shipping address is required at all, so asking it before
+              the address stops a Local Pickup buyer from filling in an address
+              they never needed. */}
+          <div className="checkout-subhead" style={{ marginTop: 0 }}>
+            {isEs ? 'Método de entrega' : 'Delivery method'}
           </div>
           <div role="radiogroup" aria-label={isEs ? 'Método de entrega' : 'Delivery method'} className="checkout-delivery-options">
             {CHECKOUT_SHIPPING_OPTIONS
@@ -823,7 +567,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
                 const fee = getCheckoutShippingFee(option.value, cartSubtotal) ?? 0;
                 const selected = effectiveShippingMethod === option.value;
                 const description = option.value === 'local-pickup'
-                  ? (isEs ? 'Recogida en persona con cita en el área de Naples.' : 'In-person pickup by appointment in the Naples area.')
+                  ? (isEs ? 'Recogida en persona con cita en el área de Naples. No se necesita dirección de envío.' : 'In-person pickup by appointment in the Naples area. No shipping address needed.')
                   : option.value === 'express-overnight-insured'
                     ? (isEs ? 'Entrega al día siguiente, totalmente asegurada.' : 'Next-day delivery, fully insured.')
                     : (isEs ? 'Envío totalmente asegurado con firma de entrega.' : 'Fully insured shipping with delivery signature.');
@@ -862,173 +606,292 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
                 : 'Overnight shipping is unavailable for orders of $5,000 or more (carrier insurance limit).'}
             </p>
           )}
-          <div className="checkout-step-nav">
-            <button type="button" className="outline-button" onClick={() => goToStep('summary')}>
-              {isEs ? '< Resumen' : '< Summary'}
-            </button>
-            <button type="button" className="gold-button" onClick={() => goToStep('contact')}>
-              {isEs ? 'Continuar a contacto' : 'Continue to Contact'}
-            </button>
-          </div>
-        </div>
-        )}
 
-        {step === 'review' && (
-        <div className="checkout-contact-panel checkout-payment-panel">
-          <div className="checkout-panel-heading">
-            <AppIcon name="payments"  aria-hidden="true" />
-            <div>
-              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-                {isEs ? 'Paso 4' : 'Step 4'}
-              </p>
-              <h2>{isEs ? 'Revise y pague' : 'Review and pay'}</h2>
-            </div>
+          <div className="checkout-subhead">
+            {isEs ? 'Datos de contacto' : 'Contact details'}
           </div>
-
-          <div className="checkout-review-recap">
+          <div className="responsive-form-grid">
             <div>
-              <p className="checkout-recap-title">{isEs ? 'Entrega' : 'Delivery'}</p>
-              <p className="text-sm" style={{ color: 'var(--color-on-surface)' }}>
-                {(() => {
-                  const selected = CHECKOUT_SHIPPING_OPTIONS.find((option) => option.value === effectiveShippingMethod);
-                  const fee = getCheckoutShippingFee(effectiveShippingMethod, cartSubtotal) ?? 0;
-                  return `${selected ? (isEs ? selected.labelEs : selected.labelEn) : effectiveShippingMethod} — ${formatCheckoutCurrency(fee)}`;
-                })()}
-              </p>
-              <button type="button" className="checkout-recap-edit" onClick={() => goToStep('delivery')}>
-                {isEs ? 'Editar' : 'Edit'}
-              </button>
+              <label className="form-label" htmlFor="checkout-name">{isEs ? 'Nombre completo' : 'Full Name'} *</label>
+              <input id="checkout-name" required className="form-field" autoComplete="name" value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} />
             </div>
             <div>
-              <p className="checkout-recap-title">{isEs ? 'Contacto' : 'Contact'}</p>
-              <p className="text-sm" style={{ color: 'var(--color-on-surface)' }}>{customer.name}</p>
-              <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>{customer.phone} · {customer.email}</p>
-              {needsShipping && (
-                <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-                  {[customer.address_line1, customer.address_line2, customer.city, customer.state, customer.postal_code].filter(Boolean).join(', ')}
+              <label className="form-label" htmlFor="checkout-phone">{isEs ? 'Teléfono' : 'Phone'} *</label>
+              <input id="checkout-phone" required type="tel" className="form-field" autoComplete="tel" value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} />
+            </div>
+          </div>
+          <div>
+            <label className="form-label" htmlFor="checkout-email">{isEs ? 'Correo electrónico' : 'Email'} *</label>
+            <input id="checkout-email" required type="email" className="form-field" autoComplete="email" value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} />
+          </div>
+
+          <div className="checkout-address-fields">
+            {needsShipping ? (
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                  {isEs ? 'Dirección' : 'Address'}
                 </p>
-              )}
-              <button type="button" className="checkout-recap-edit" onClick={() => goToStep('contact')}>
-                {isEs ? 'Editar' : 'Edit'}
+                <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  {isEs
+                    ? 'Enviaremos su pedido a esta dirección. ¿Prefiere recogerlo en persona? Elija Recogida local arriba.'
+                    : 'We’ll ship your order to this address. Prefer to pick it up in person? Choose Local Pickup above.'}
+                </p>
+              </div>
+            ) : (
+              // Local pickup: address isn't needed, so tuck it behind an accordion
+              // the buyer can open if they'd still like to add one.
+              <button
+                type="button"
+                onClick={() => setAddressExpanded((open) => !open)}
+                aria-expanded={addressExpanded}
+                aria-controls="checkout-address-inputs"
+                className="checkout-address-toggle"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.5rem',
+                  width: '100%',
+                  padding: '0.7rem 0.85rem',
+                  border: '1px solid rgba(216, 208, 194, 0.94)',
+                  borderRadius: 'var(--radius-lg)',
+                  background: 'rgba(255, 253, 248, 0.9)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <span className="text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+                  {isEs ? 'Dirección (opcional)' : 'Address (optional)'}
+                </span>
+                <AppIcon name={addressExpanded ? 'expand_less' : 'expand_more'}  aria-hidden="true" style={{ fontSize: '20px', color: GOLD, lineHeight: 1 }} />
+              </button>
+            )}
+            {(needsShipping || addressExpanded) && (
+              <div id="checkout-address-inputs" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label className="form-label" htmlFor="checkout-address1">{isEs ? 'Dirección' : 'Street Address'}{needsShipping ? ' *' : ''}</label>
+                  <input id="checkout-address1" required={needsShipping} className="form-field" autoComplete="address-line1" value={customer.address_line1} onChange={(e) => setCustomer({ ...customer, address_line1: e.target.value })} />
+                </div>
+                <div>
+                  <label className="form-label" htmlFor="checkout-address2">{isEs ? 'Apartamento, suite, etc. (opcional)' : 'Apartment, suite, etc. (optional)'}</label>
+                  <input id="checkout-address2" className="form-field" autoComplete="address-line2" value={customer.address_line2} onChange={(e) => setCustomer({ ...customer, address_line2: e.target.value })} />
+                </div>
+                <div className="responsive-form-grid">
+                  <div>
+                    <label className="form-label" htmlFor="checkout-city">{isEs ? 'Ciudad' : 'City'}{needsShipping ? ' *' : ''}</label>
+                    <input id="checkout-city" required={needsShipping} className="form-field" autoComplete="address-level2" value={customer.city} onChange={(e) => setCustomer({ ...customer, city: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="form-label" htmlFor="checkout-state">{isEs ? 'Estado' : 'State'}{needsShipping ? ' *' : ''}</label>
+                    <select
+                      id="checkout-state"
+                      required={needsShipping}
+                      className="form-field"
+                      autoComplete="address-level1"
+                      value={customer.state}
+                      onChange={(e) => setCustomer({ ...customer, state: e.target.value })}
+                    >
+                      <option value="">{isEs ? 'Seleccione un estado' : 'Select a state'}</option>
+                      {US_STATES.map(([code, name]) => (
+                        <option key={code} value={code}>{name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="responsive-form-grid">
+                  <div>
+                    <label className="form-label" htmlFor="checkout-zip">{isEs ? 'Código postal' : 'ZIP / Postal Code'}{needsShipping ? ' *' : ''}</label>
+                    <input
+                      id="checkout-zip"
+                      required={needsShipping}
+                      className="form-field"
+                      autoComplete="postal-code"
+                      inputMode="numeric"
+                      maxLength={10}
+                      pattern="[0-9]{5}(-[0-9]{4})?"
+                      placeholder="12345"
+                      value={customer.postal_code}
+                      aria-invalid={needsShipping && customer.postal_code.trim() !== '' && normalizedShippingZip === null}
+                      aria-describedby={
+                        needsShipping && customer.postal_code.trim() !== '' && normalizedShippingZip === null
+                          ? 'checkout-zip-error'
+                          : undefined
+                      }
+                      onChange={(e) => {
+                        const entered = e.target.value;
+                        setCustomer({
+                          ...customer,
+                          postal_code: normalizeUsZip(entered) ?? entered,
+                        });
+                      }}
+                    />
+                    {needsShipping && customer.postal_code.trim() !== '' && normalizedShippingZip === null && (
+                      <p id="checkout-zip-error" role="alert" className="mt-1 text-xs" style={{ color: 'var(--color-error)' }}>
+                        {isEs
+                          ? 'Ingrese un código postal de EE. UU. válido (12345 o 12345-6789).'
+                          : 'Enter a valid U.S. ZIP code (12345 or 12345-6789).'}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="form-label" htmlFor="checkout-country">{isEs ? 'País' : 'Country'}</label>
+                    <input
+                      id="checkout-country"
+                      readOnly
+                      className="form-field"
+                      autoComplete="country-name"
+                      value="United States"
+                      aria-describedby="checkout-country-note"
+                    />
+                    <p id="checkout-country-note" className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      {isEs ? 'Actualmente solo enviamos dentro de Estados Unidos.' : 'We currently ship only within the United States.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <FormPrivacyNotice locale={locale} />
+        </section>
+        </div>
+
+        {/* --------------------------- Order summary --------------------------- */}
+        <aside className="checkout-aside">
+          <div className="checkout-summary-card">
+            <div className="checkout-summary-head">
+              <h2 className="checkout-summary-title">
+                {isEs ? 'Resumen del pedido' : 'Order summary'}
+              </h2>
+              <button
+                type="button"
+                onClick={openDrawer}
+                className="checkout-recap-edit"
+                style={{ marginTop: 0 }}
+              >
+                {isEs ? 'Editar carrito' : 'Edit cart'}
               </button>
             </div>
-          </div>
 
-          <OrderSummary
-            items={summaryItems}
-            isEs={isEs}
-            prefix={prefix}
-            shippingMethod={effectiveShippingMethod}
-            shippingState={customer.state}
-            onRemove={remove}
-            onSetQuantity={setQuantity}
-            variant="expanded"
-            showAvailability
-            hideSoldItemPrices={hideSoldItemPrices}
-          />
-
-          <p className="text-xs leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
-            {isEs ? 'Antes de pagar, revise nuestras ' : 'Before paying, please review our '}
-            <Link href={`${prefix}/returns-refunds`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
-              {isEs ? 'Devoluciones' : 'Returns & Refunds'}
-            </Link>
-            {', '}
-            <Link href={`${prefix}/shipping`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
-              {isEs ? 'Envíos' : 'Shipping'}
-            </Link>
-            {isEs ? ', ' : ', '}
-            <Link href={`${prefix}/terms`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
-              {isEs ? 'Términos' : 'Terms'}
-            </Link>
-            {isEs ? ' y ' : ', and '}
-            <Link href={`${prefix}/privacy`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
-              {isEs ? 'Privacidad' : 'Privacy Policy'}
-            </Link>
-            .
-          </p>
-
-          <div
-            className="checkout-confirm-box"
-            style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '0.75rem',
-              padding: '1rem 1.1rem',
-              border: '1px solid rgba(216, 208, 194, 0.94)',
-              borderRadius: 'var(--radius-lg)',
-              background: 'rgba(255, 253, 248, 0.9)',
-            }}
-          >
-            <input
-              type="checkbox"
-              id="checkout-confirm-info"
-              checked={infoConfirmed}
-              onChange={(e) => setInfoConfirmed(e.target.checked)}
-              className="mt-1"
-              style={{ accentColor: GOLD, width: '1.05rem', height: '1.05rem', flexShrink: 0, cursor: 'pointer' }}
-            />
-            <label
-              htmlFor="checkout-confirm-info"
-              className="text-sm leading-relaxed"
-              style={{ color: 'var(--color-on-surface)', cursor: 'pointer' }}
-            >
-              {isEs
-                ? 'Confirmo que he revisado mi pedido y que mis datos de contacto, dirección de envío y demás información anterior son correctos antes de proceder al pago.'
-                : 'I confirm that I have reviewed my order and that my contact details, shipping address, and other information above are correct before proceeding to payment.'}
-            </label>
-          </div>
-
-          {hasUnavailableItem ? (
-            <div
-              role="alert"
-              className="flex items-start gap-2 text-sm"
-              style={{
-                padding: '0.75rem 0.85rem',
-                border: '1px solid color-mix(in srgb, var(--color-error) 45%, transparent)',
-                background: 'color-mix(in srgb, var(--color-error) 9%, transparent)',
-                borderRadius: 'var(--radius-lg)',
-                color: 'var(--color-error)',
-                fontWeight: 600,
-              }}
-            >
-              <AppIcon name="error"  aria-hidden="true" style={{ fontSize: '1.15rem', lineHeight: 1.25, flexShrink: 0 }} />
-              <span>
-                {isEs
-                  ? `Ya no está disponible: ${unavailableItems.map((i) => i.title_es || i.title).join(', ')}. Elimínelo de su pedido arriba para continuar con el pago.`
-                  : `No longer available: ${unavailableItems.map((i) => i.title).join(', ')}. Please remove it from your order above to continue to payment.`}
-              </span>
+            {/* Items sit at the TOP of the summary, above the totals — the
+                standard checkout order (Shopify/Stripe): the buyer confirms
+                what they're buying, then what it costs, then pays. */}
+            <div className="checkout-summary-items">
+              <OrderSummary
+                items={summaryItems}
+                isEs={isEs}
+                prefix={prefix}
+                shippingMethod={effectiveShippingMethod}
+                shippingState={customer.state}
+                onRemove={remove}
+                onSetQuantity={setQuantity}
+                variant="expanded"
+                showAvailability
+                hideSoldItemPrices={hideSoldItemPrices}
+                showTotals={false}
+                bare
+                heading={null}
+              />
             </div>
-          ) : paypalClientId ? (
-            <PayPalCheckoutButton
-              clientId={paypalClientId}
-              ready={payReady}
+
+            <OrderTotals
+              items={summaryItems}
               isEs={isEs}
-              missingFields={missingFieldLabels}
-              needsInfoConfirmation={!infoConfirmed}
-              getPayload={buildPayPalPayload}
-              onOrderId={(id) => {
-                orderIdRef.current = id;
-                orderPayloadKeyRef.current = cartPayloadKey;
-              }}
-              // A create-order/capture error can mean an item just sold out — re-check
-              // live stock so the summary + this button reflect it immediately.
-              onAvailabilityIssue={() => { void refreshAvailability(); }}
-              onSuccess={({ orderNumber }) => {
-                // Snapshot the order for the printable confirmation, THEN clear the
-                // cart (clearing empties `items`, so capture the summary first).
-                setCreatedOrder({ orderNumber, items: summaryItems, shippingMethod: effectiveShippingMethod, customer });
-                clear();
-              }}
+              shippingMethod={effectiveShippingMethod}
+              shippingState={customer.state}
+              hideSoldItemPrices={hideSoldItemPrices}
             />
-          ) : (
-            <p className="text-sm" style={{ color: 'var(--color-error)' }}>
-              {isEs
-                ? 'El pago en línea no está disponible en este momento. Llámenos al (239) 404-8505.'
-                : 'Online payment is unavailable right now. Please call us at (239) 404-8505.'}
+
+            <p className="text-xs leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
+              {isEs ? 'Al realizar un pedido, confirma que ha leído y acepta nuestras ' : 'By placing an order, you confirm you have read and agree to our '}
+              <Link href={`${prefix}/returns-refunds`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
+                {isEs ? 'Devoluciones' : 'Returns & Refunds'}
+              </Link>
+              {', '}
+              <Link href={`${prefix}/shipping`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
+                {isEs ? 'Envíos' : 'Shipping'}
+              </Link>
+              {', '}
+              <Link href={`${prefix}/terms`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
+                {isEs ? 'Términos' : 'Terms'}
+              </Link>
+              {isEs ? ' y ' : ', and '}
+              <Link href={`${prefix}/privacy`} className="font-bold underline underline-offset-2" style={{ color: GOLD }}>
+                {isEs ? 'Privacidad' : 'Privacy Policy'}
+              </Link>
+              .
             </p>
-          )}
-        </div>
-        )}
+
+            <div className="checkout-confirm-box">
+              <input
+                type="checkbox"
+                id="checkout-confirm-info"
+                checked={infoConfirmed}
+                onChange={(e) => setInfoConfirmed(e.target.checked)}
+                style={{ accentColor: GOLD, width: '1.05rem', height: '1.05rem', flexShrink: 0, cursor: 'pointer', marginTop: '0.15rem' }}
+              />
+              <label
+                htmlFor="checkout-confirm-info"
+                className="text-xs leading-relaxed"
+                style={{ color: 'var(--color-on-surface)', cursor: 'pointer' }}
+              >
+                {isEs
+                  ? 'Confirmo que he revisado mi pedido y que mis datos de contacto y dirección de envío son correctos.'
+                  : 'I confirm that I have reviewed my order and that my contact details and shipping address are correct.'}
+              </label>
+            </div>
+
+            {hasUnavailableItem ? (
+              <div
+                role="alert"
+                className="flex items-start gap-2 text-sm"
+                style={{
+                  padding: '0.75rem 0.85rem',
+                  border: '1px solid color-mix(in srgb, var(--color-error) 45%, transparent)',
+                  background: 'color-mix(in srgb, var(--color-error) 9%, transparent)',
+                  borderRadius: 'var(--radius-lg)',
+                  color: 'var(--color-error)',
+                  fontWeight: 600,
+                }}
+              >
+                <AppIcon name="error"  aria-hidden="true" style={{ fontSize: '1.15rem', lineHeight: 1.25, flexShrink: 0 }} />
+                <span>
+                  {isEs
+                    ? `Ya no está disponible: ${unavailableItems.map((i) => i.title_es || i.title).join(', ')}. Elimínelo de su pedido para continuar con el pago.`
+                    : `No longer available: ${unavailableItems.map((i) => i.title).join(', ')}. Please remove it from your order to continue to payment.`}
+                </span>
+              </div>
+            ) : paypalClientId ? (
+              <PayPalCheckoutButton
+                clientId={paypalClientId}
+                ready={payReady}
+                isEs={isEs}
+                missingFields={missingFieldLabels}
+                needsInfoConfirmation={!infoConfirmed}
+                getPayload={buildPayPalPayload}
+                onOrderId={(id) => {
+                  orderIdRef.current = id;
+                  orderPayloadKeyRef.current = cartPayloadKey;
+                }}
+                // A create-order/capture error can mean an item just sold out — re-check
+                // live stock so the summary + this button reflect it immediately.
+                onAvailabilityIssue={() => { void refreshAvailability(); }}
+                onSuccess={({ orderNumber }) => {
+                  // Snapshot the order for the printable confirmation, THEN clear the
+                  // cart (clearing empties `items`, so capture the summary first).
+                  setCreatedOrder({ orderNumber, items: summaryItems, shippingMethod: effectiveShippingMethod, customer });
+                  clear();
+                }}
+              />
+            ) : (
+              <p className="text-sm" style={{ color: 'var(--color-error)' }}>
+                {isEs
+                  ? 'El pago en línea no está disponible en este momento. Llámenos al (239) 404-8505.'
+                  : 'Online payment is unavailable right now. Please call us at (239) 404-8505.'}
+              </p>
+            )}
+          </div>
+        </aside>
       </div>
       </div>
 
@@ -1042,9 +905,110 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
         }
         .checkout-shell {
           width: 100%;
-          max-width: 1160px;
+          max-width: 1280px;
           margin: 0 auto;
           padding-inline: clamp(1rem, 4vw, 2rem);
+        }
+        /* Two columns from 1024px: decisions on the left, money on the right.
+           Below that they stack, summary last, so a phone reads the form first
+           and lands on the pay controls at the end. */
+        .checkout-layout {
+          display: grid;
+          gap: 1.25rem;
+          /* Columns STRETCH to the row height on purpose: the summary card is
+             sticky, and a sticky element only travels within its containing
+             block. A content-sized (align-items:start) rail would give it zero
+             travel and it would scroll away like static content. */
+          align-items: stretch;
+        }
+        @media (min-width: 1024px) {
+          .checkout-layout {
+            grid-template-columns: minmax(0, 1fr) minmax(20rem, 23rem);
+            gap: 1.5rem;
+          }
+        }
+        .checkout-main {
+          display: flex;
+          flex-direction: column;
+          gap: 1.25rem;
+          min-width: 0;
+        }
+        .checkout-aside {
+          display: flex;
+          flex-direction: column;
+          gap: 1.25rem;
+          min-width: 0;
+        }
+        @media (min-width: 1024px) {
+          .checkout-summary-card {
+            position: sticky;
+            top: 5.5rem;
+            /* A sticky box taller than the viewport pins its top and leaves its
+               bottom permanently unreachable — which would strand the pay
+               button on a long cart. Bounding the card to the viewport and
+               letting it scroll internally keeps every control reachable. */
+            max-height: calc(100svh - 7rem);
+            overflow-y: auto;
+          }
+        }
+        .checkout-summary-card {
+          display: flex;
+          flex-direction: column;
+          gap: 0.9rem;
+          padding: clamp(1.1rem, 2.4vw, 1.4rem);
+          border: 1px solid rgba(216, 208, 194, 0.94);
+          background: rgba(255, 255, 255, 0.92);
+          box-shadow: 0 14px 36px rgba(75, 60, 24, 0.07);
+        }
+        .checkout-summary-head {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 0.75rem;
+        }
+        .checkout-summary-title {
+          margin: 0;
+          font-family: var(--font-headline);
+          font-size: 1.35rem;
+          color: var(--color-on-surface);
+        }
+        /* One scroll region only — the rail itself (see .checkout-aside). A
+           second nested scroller here would fight it for wheel events. */
+        .checkout-summary-items {
+          padding-bottom: 0.9rem;
+          border-bottom: 1px solid rgba(216, 208, 194, 0.94);
+        }
+        .checkout-subhead {
+          margin-top: 0.35rem;
+          font-size: 0.68rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          color: ${GOLD};
+          font-family: var(--font-label);
+        }
+        .checkout-method-card {
+          display: flex;
+          gap: 0.75rem;
+          padding: 0.9rem 1rem;
+          border: 1px solid rgba(216, 208, 194, 0.94);
+          border-radius: var(--radius-lg);
+          background: rgba(255, 253, 248, 0.9);
+        }
+        .checkout-method-card[data-selected='true'] {
+          border-color: #b5890c;
+          box-shadow: 0 0 0 1px #b5890c inset;
+        }
+        .checkout-method-mark {
+          display: inline-flex;
+          width: 2rem;
+          height: 2rem;
+          flex-shrink: 0;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          background: rgba(212, 175, 55, 0.14);
+          color: ${GOLD};
         }
         .checkout-hero {
           margin-bottom: 1.5rem;
@@ -1061,67 +1025,6 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
             margin-bottom: 0.85rem;
             padding: 0.75rem 1.1rem;
           }
-        }
-        .checkout-steps {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.5rem;
-          max-width: 54rem;
-          margin: 0 auto 1.25rem;
-        }
-        .checkout-step-chip {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.45rem;
-          padding: 0.45rem 0.8rem 0.45rem 0.5rem;
-          border: 1px solid rgba(216, 208, 194, 0.94);
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.86);
-          font-size: 0.68rem;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: var(--color-on-surface-variant);
-          font-family: var(--font-label);
-          cursor: pointer;
-        }
-        .checkout-step-chip[data-state='current'] {
-          border-color: #b5890c;
-          color: #735c00;
-          background: rgba(212, 175, 55, 0.14);
-          cursor: default;
-        }
-        .checkout-step-chip[data-state='done'] {
-          color: #735c00;
-        }
-        .checkout-step-chip[data-state='todo'] {
-          opacity: 0.55;
-          cursor: default;
-        }
-        .checkout-step-num {
-          display: inline-flex;
-          width: 1.35rem;
-          height: 1.35rem;
-          border-radius: 999px;
-          align-items: center;
-          justify-content: center;
-          background: rgba(115, 92, 0, 0.1);
-          font-size: 0.68rem;
-        }
-        .checkout-step-flow {
-          display: flex;
-          flex-direction: column;
-          gap: 1.25rem;
-          max-width: 54rem;
-          margin: 0 auto;
-          width: 100%;
-        }
-        .checkout-step-nav {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 0.75rem;
-          margin-top: 0.5rem;
         }
         .checkout-delivery-options {
           display: flex;
@@ -1162,27 +1065,14 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
           box-shadow: 0 24px 64px rgba(42, 34, 12, 0.25);
           border-radius: var(--radius-lg);
         }
-        .checkout-review-recap {
-          display: grid;
-          gap: 0.9rem;
-          padding: 0.9rem 1rem;
+        .checkout-confirm-box {
+          display: flex;
+          align-items: flex-start;
+          gap: 0.7rem;
+          padding: 0.8rem 0.9rem;
           border: 1px solid rgba(216, 208, 194, 0.94);
           border-radius: var(--radius-lg);
           background: rgba(255, 253, 248, 0.9);
-        }
-        @media (min-width: 640px) {
-          .checkout-review-recap {
-            grid-template-columns: 1fr 1fr;
-          }
-        }
-        .checkout-recap-title {
-          font-size: 0.68rem;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.1em;
-          color: #735c00;
-          font-family: var(--font-label);
-          margin-bottom: 0.2rem;
         }
         .checkout-recap-edit {
           margin-top: 0.35rem;
@@ -1218,11 +1108,6 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
           align-items: center;
           gap: 0.85rem;
           padding-bottom: 0.35rem;
-        }
-        @media (min-width: 1024px) {
-          .checkout-step-flow {
-            gap: 1.5rem;
-          }
         }
         .checkout-panel-heading > .app-icon {
           display: inline-flex;

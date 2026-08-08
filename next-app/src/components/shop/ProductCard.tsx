@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { formatProductItemYear, inferProductJewelryType, isProductPurchasable, isProductSold, normalizeProductQuantity, normalizeProductStatus, productImagePaddingBackground, productImagePaddingForImage, productLengthSizeDisplay, productMetalVariantLabel, productStatusLabel, productSupportsLinkType, productWidthDisplay, type Product, type SpotData } from '@/types/product';
 import { getStorefrontDisplayPrice } from '@/lib/pricing';
+import { formatLengthChip, formatPurity, formatWeight, getPurityChipStyle } from '@/lib/product-spec-chips';
 import WishlistButton from '@/components/shop/WishlistButton';
 import type { WishlistItem } from '@/context/WishlistContext';
 import CartButton from '@/components/shop/CartButton';
@@ -44,7 +45,7 @@ export default function ProductCard({
   const purityLabel = formatPurity(product, isEs);
   const purityChipStyle = getPurityChipStyle(product);
   const weightLabel = formatWeight(product.gram_weight ?? product.weight_grams);
-  const lengthLabel = formatLengthChip(productLengthSizeDisplay(product));
+  const lengthLabel = formatLengthChip(productLengthSizeDisplay(product), isEs);
   const widthLabel = productWidthDisplay(product);
   const itemDateLabel = formatProductItemYear(product.item_year);
   const images = useMemo(
@@ -768,58 +769,9 @@ export default function ProductCard({
   );
 }
 
-function formatPurity(product: Product, isEs: boolean): string {
-  if (!product.purity) return isEs ? 'No indicado' : 'Not listed';
-  if (product.category === 'Silver' && product.purity >= 100) {
-    return `${product.purity}`;
-  }
-  return `${product.purity}K`;
-}
 
-function getPurityChipStyle(product: Product) {
-  if (!product.purity || product.category !== 'Gold' || product.purity > 24) {
-    return {
-      background: 'rgba(194, 155, 45, 0.1)',
-      borderColor: 'rgba(115, 92, 0, 0.22)',
-      color: 'var(--color-primary)',
-    };
-  }
 
-  const karat = Math.min(24, Math.max(10, product.purity));
-  const intensity = (karat - 10) / 12;
-  const fillPercent = Math.round(18 + intensity * 42);
-  const borderPercent = Math.round(32 + intensity * 38);
 
-  return {
-    background: `color-mix(in srgb, #ffd84d ${fillPercent}%, var(--color-background))`,
-    borderColor: `color-mix(in srgb, #c99800 ${borderPercent}%, rgba(115, 92, 0, 0.22))`,
-    color: karat >= 18 ? '#6f4e00' : karat >= 14 ? '#735c00' : '#6f622f',
-  };
-}
-
-function formatWeight(weight: number | null): string {
-  if (!weight) return '—';
-  const maximumFractionDigits = weight >= 100 ? 1 : weight >= 10 ? 1 : 2;
-  return `${new Intl.NumberFormat('en-US', {
-    maximumFractionDigits: weight % 1 === 0 ? 0 : maximumFractionDigits,
-  }).format(weight)}g`;
-}
-
-function formatLengthChip(value: string | null): string | null {
-  if (!value) return null;
-  const ringSize = value.match(/^Size:\s*(.+)$/i);
-  if (ringSize) return `Sz ${ringSize[1]}`;
-
-  const inchValue = value.match(/^(\d+(?:\.\d+)?)\s*in$/i);
-  if (!inchValue) return value;
-
-  const numeric = Number(inchValue[1]);
-  if (!Number.isFinite(numeric)) return value;
-  const compact = numeric >= 10
-    ? Math.round(numeric)
-    : Number.isInteger(numeric) ? numeric : Number(numeric.toFixed(1));
-  return `${compact}in`;
-}
 
 function getProductCardFlagFallback(product: Product): string {
   const jewelryType = inferProductJewelryType(product);

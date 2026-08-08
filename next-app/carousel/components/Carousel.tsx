@@ -34,6 +34,24 @@ type Props = {
   bg?: string;
   /** Seconds per full rotation. */
   spin?: number;
+  /**
+   * Spin the ring the opposite way, so photos flow LEFT-TO-RIGHT across the
+   * front instead of the default right-to-left. Used by the hero's second
+   * slideshow. The per-frame sample corrects its derived angle and its
+   * hidden-back crossing test to match the reversed animation.
+   */
+  reverse?: boolean;
+  /**
+   * Hard pause from the owner, for callers that already know whether this
+   * carousel is on screen. The IntersectionObserver below cannot be made
+   * airtight inside the pinned hero stack: a pane's box always grazes the
+   * viewport there, so `isIntersecting` never flips and the `0` threshold can
+   * never fire — a pane sliding from ratio 0.004 to 0 crosses no rung and would
+   * keep spinning offscreen. `HomeHeroStack` computes on/offscreen exactly
+   * (it is the thing applying the transforms), so it passes it in.
+   * When true the ring and the per-frame loop stop regardless of geometry.
+   */
+  paused?: boolean;
   /** Base card width in em. */
   cardWidth?: number;
   /** Card aspect ratio, e.g. "1 / 1" (square, default) or "7 / 10" (portrait). */
@@ -66,6 +84,16 @@ type Props = {
 };
 
 const WHITE = "#ffffff";
+
+/**
+ * Thresholds for the offscreen-pause observer. A single `0` threshold only
+ * fires when `isIntersecting` flips, which never happens for a pane inside the
+ * pinned hero stack — so the observer fired once per mount and the pause guard
+ * was dead. The ladder is deliberately dense near zero, because that is where a
+ * pane enters and leaves; the coarse upper rungs just avoid needless callbacks
+ * while a slideshow sits fully on screen.
+ */
+const VISIBILITY_THRESHOLDS = [0, 0.005, 0.01, 0.02, 0.04, 0.08, 0.15, 0.3, 0.6, 1];
 
 /** The per-photo background color, defaulting to white when unset. */
 function itemBg(item: CarouselItem | undefined): string {
@@ -120,6 +148,8 @@ export function Carousel({
   showPrice,
   bg,
   spin = 32,
+  reverse = false,
+  paused = false,
   cardWidth = 17.5,
   aspect = "1 / 1",
   perspective = 35,
@@ -195,6 +225,18 @@ export function Carousel({
   const slotItemsRef = useRef(slotItems);
   const windowKeyRef = useRef(windowKey);
   const prevSlotAnglesRef = useRef<number[]>([]);
+  // The ring's CSS animation + its duration, cached. `getAnimations()` allocates
+  // an array and its `getComputedTiming()` was being called twice per frame, per
+  // carousel. The Animation object is stable for the life of the animation, so
+  // it is re-queried only when the cache is empty or the cached one has gone
+  // idle (which is what a restarted/replaced animation looks like).
+  const ringAnimRef = useRef<{ anim: Animation; duration: number } | null>(null);
+  // Last facing/z-index written per slot, so unchanged frames skip the DOM write
+  // entirely. These were written for every card on every frame, which is a style
+  // invalidation per card per frame for values that change only a few times a
+  // second.
+  const prevFacingRef = useRef<string[]>([]);
+  const prevZRef = useRef<string[]>([]);
   const lastFrontKeyRef = useRef("");
   const startedAtRef = useRef(0);
 
@@ -222,6 +264,12 @@ export function Carousel({
     slotItemsRef.current = initialSlotItems;
     prevSlotAnglesRef.current = [];
     lastFrontKeyRef.current = "";
+    // The write-on-change caches below must be cleared with the window: the
+    // cards are re-created for the new key, so a stale cache would make the loop
+    // skip the write a fresh card still needs.
+    prevFacingRef.current = [];
+    prevZRef.current = [];
+    ringAnimRef.current = null;
     startedAtRef.current = typeof performance !== "undefined" ? performance.now() : 0;
   }, [windowKey, initialSlotItems]);
 
@@ -239,18 +287,34 @@ export function Carousel({
     if (!ring || n === 0 || ev === 0) return;
 
     let ringAngle = 0;
-    const anims = ring.getAnimations?.() ?? [];
-    const anim = anims.find((a) => {
-      const d = a.effect?.getComputedTiming?.().duration;
-      return typeof d === "number" && d > 0;
-    });
-    if (anim && anim.currentTime != null) {
-      const duration = Number(anim.effect!.getComputedTiming().duration);
-      ringAngle = (((Number(anim.currentTime) % duration) + duration) % duration / duration) * 360;
+    let cached = ringAnimRef.current;
+    // Re-query only when there is nothing cached or the cached animation is no
+    // longer live; otherwise reuse it. `playState` is a cheap property read,
+    // unlike getAnimations() + getComputedTiming() every frame.
+    if (!cached || cached.anim.playState === "idle") {
+      const anims = ring.getAnimations?.() ?? [];
+      const found = anims.find((a) => {
+        const d = a.effect?.getComputedTiming?.().duration;
+        return typeof d === "number" && d > 0;
+      });
+      cached = found
+        ? { anim: found, duration: Number(found.effect!.getComputedTiming().duration) }
+        : null;
+      ringAnimRef.current = cached;
+    }
+    if (cached && cached.anim.currentTime != null) {
+      const { duration } = cached;
+      ringAngle =
+        (((Number(cached.anim.currentTime) % duration) + duration) % duration / duration) * 360;
     } else {
       const elapsed = (performance.now() - startedAtRef.current) / 1000;
       ringAngle = (elapsed / spin) * 360;
     }
+    // animation-direction: reverse negates the applied rotation, but the
+    // animation clock above still counts forward — mirror the angle so all
+    // geometry below (front card, backface, sweep, windowing) matches what is
+    // actually on screen.
+    if (reverse) ringAngle = (360 - (ringAngle % 360)) % 360;
 
     const step = 360 / ev;
     const cycle = n > ev;
@@ -271,10 +335,22 @@ export function Carousel({
       const depth = Math.cos(rad);
       const isFrontFacing = depth > 0;
       if (card) {
-        card.dataset.carouselFacing = isFrontFacing ? "front" : "back";
+        // Write only on change. The values are identical across most frames, and
+        // an unconditional write invalidates style for every card every frame.
+        // The z-index is already quantised by the Math.round below, so it holds
+        // steady for several frames at a time.
+        const facing = isFrontFacing ? "front" : "back";
+        if (prevFacingRef.current[p] !== facing) {
+          prevFacingRef.current[p] = facing;
+          card.dataset.carouselFacing = facing;
+        }
         // When front cards overlap in projection, the card closest to the
         // viewer must win hit testing just as it wins visual stacking.
-        card.style.zIndex = isFrontFacing ? String(Math.round((depth + 1) * 100)) : "-1";
+        const z = isFrontFacing ? String(Math.round((depth + 1) * 100)) : "-1";
+        if (prevZRef.current[p] !== z) {
+          prevZRef.current[p] = z;
+          card.style.zIndex = z;
+        }
       }
       if (isFrontFacing) {
         const score = Math.abs(Math.sin(rad)); // 0 = dead center
@@ -284,8 +360,11 @@ export function Carousel({
         }
       }
       // Advance this slot's photo as it crosses the hidden back (180deg).
+      // Angles grow over time on a forward ring and shrink on a reversed one,
+      // so the crossing is detected in the matching direction.
       const pa = prev[p];
-      if (cycle && pa != null && pa < 180 && a >= 180) {
+      const crossedBack = reverse ? pa != null && pa >= 180 && a < 180 : pa != null && pa < 180 && a >= 180;
+      if (cycle && crossedBack) {
         if (!nextSlots) nextSlots = slots.slice();
         nextSlots[p] = (slots[p] + ev) % n;
       }
@@ -310,7 +389,7 @@ export function Carousel({
       const visibleItems = slots.map((idx) => items[idx]);
       onBg(computeSweepBackground(visibleItems, ringAngle, itemBg(front)));
     }
-  }, [spin]);
+  }, [spin, reverse]);
 
   // Continuous tracking while the animation runs — but only while the carousel
   // is on screen. An IntersectionObserver pauses the CSS spin and stops the rAF
@@ -336,15 +415,41 @@ export function Carousel({
       cancelAnimationFrame(raf);
     };
 
+    // NOTE (2026-08-06): this guard was silently dead inside the pinned hero
+    // stack, measured rather than assumed. Two separate reasons, both required
+    // fixing — either alone still leaves every slideshow running forever:
+    //
+    //   1. `entry.isIntersecting` is TRUE for a ZERO-AREA intersection. Every
+    //      pane's scene box grazes the viewport at all times inside the sticky,
+    //      overflow-hidden frame, so it reported `true` at every scroll position
+    //      for every pane — it never once returned false. Gate on real
+    //      intersected AREA instead.
+    //   2. With `threshold: 0` the observer fires only when `isIntersecting`
+    //      flips. Since it never flipped, the callback ran exactly ONCE per
+    //      mount and never again. A threshold ladder makes it re-fire as a pane
+    //      crosses, so pausing/resuming actually tracks the crossing.
+    //
+    // Measured effect: 3 rAF loops at every scroll position -> 1 while a
+    // slideshow is holding, 2 only mid-crossing (when both really are visible).
+    // An explicit `paused` from the owner wins outright: stop and do not even
+    // observe, so no late geometry callback can restart an offscreen ring.
+    if (paused) {
+      const ring = ringRef.current;
+      if (ring) ring.style.animationPlayState = 'paused';
+      stop();
+      return stop;
+    }
+
     const io = new IntersectionObserver(
       ([entry]) => {
-        const visible = entry.isIntersecting;
+        const { width, height } = entry.intersectionRect;
+        const visible = width > 0 && height > 0;
         const ring = ringRef.current;
         if (ring) ring.style.animationPlayState = visible ? 'running' : 'paused';
         if (visible) start();
         else stop();
       },
-      { threshold: 0 },
+      { threshold: VISIBILITY_THRESHOLDS },
     );
     io.observe(scene);
 
@@ -353,7 +458,7 @@ export function Carousel({
       stop();
     };
     // data.length so the observer (re)attaches when the ring first mounts (0 -> N).
-  }, [sample, data.length]);
+  }, [sample, data.length, paused]);
 
   // Fire immediately whenever the items change (initial paint, a recolor, or
   // reduced-motion where rAF may not advance) so the background is correct even
@@ -410,7 +515,11 @@ export function Carousel({
 
   return (
     <div ref={sceneRef} className={styles.scene} style={sceneStyle} aria-label="Featured jewelry carousel">
-      <div ref={ringRef} className={styles.ring} style={{ "--n": effectiveVisible } as CSSProperties}>
+      <div
+        ref={ringRef}
+        className={styles.ring}
+        style={{ "--n": effectiveVisible, animationDirection: reverse ? "reverse" : undefined } as CSSProperties}
+      >
         {slotItems.map((itemIndex, slot) => {
           const item = data[itemIndex];
           if (!item) return null;

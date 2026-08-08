@@ -16,8 +16,8 @@ import 'server-only';
  *     ~24h, so ids are checkpointed with an expiry like Instagram's containers.
  *   * Posts CAN be deleted (DELETE /{post-id}) and their text edited. Instagram
  *     allows neither.
- *   * There is no queryable publishing quota; the owner's own daily limit is
- *     the only cap.
+ *   * There is no queryable publishing quota. Queue workers use only a bounded
+ *     per-invocation batch for operational safety, not a daily post cap.
  */
 
 const FACEBOOK_GRAPH_BASE = 'https://graph.facebook.com';
@@ -33,7 +33,8 @@ export const FACEBOOK_MAX_PHOTO_ITEMS = 9;
 /** Facebook's post-body limit. Practically unreachable for our captions. */
 export const FACEBOOK_MAX_CAPTION_CHARS = 63206;
 /** Hashtag ceiling kept identical to Instagram's so shared tags behave the same. */
-export const FACEBOOK_MAX_HASHTAGS = 30;
+/** Keep Facebook copy conversational: use only the first few relevant tags. */
+export const FACEBOOK_MAX_HASHTAGS = 3;
 /** Unpublished photos are only attachable for about a day. */
 export const FACEBOOK_PHOTO_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -62,12 +63,80 @@ export class FacebookApiError extends Error {
 }
 
 /**
+ * Meta uses error 100/subcode 33 for a post id that no longer resolves. The
+ * wording also mentions permissions, so callers MUST prove the Page token is
+ * still healthy before treating this as a remotely deleted post.
+ */
+export function isFacebookPostMissingError(err: unknown): boolean {
+  if (!(err instanceof FacebookApiError)) return false;
+  const metaCode = err.detail?.code;
+  const metaSubcode = err.detail?.subcode;
+  return (
+    metaCode === 100 &&
+    (metaSubcode === 33 ||
+      /unsupported get request|does not exist|cannot be loaded/i.test(err.operatorMessage))
+  );
+}
+
+/** A Page token that can publish may still lack permission to read posts back. */
+export function isFacebookPostReadPermissionError(err: unknown): boolean {
+  if (!(err instanceof FacebookApiError)) return false;
+  return (
+    err.detail?.code === 10 ||
+    /pages_read_engagement|Page Public Content Access/i.test(err.operatorMessage)
+  );
+}
+
+/** Meta's retry response when a prior request already consumed the photo ids. */
+export function isFacebookPhotoAlreadyPostedError(err: unknown): boolean {
+  const message =
+    typeof err === 'string'
+      ? err
+      : err instanceof FacebookApiError
+        ? err.operatorMessage
+        : err instanceof Error
+          ? err.message
+          : '';
+  return /photos? (?:were|was|are) already posted/i.test(message);
+}
+
+/**
+ * New Page Experience permalinks can expose a Page actor id that differs from
+ * the Page id returned when the post was created. Meta may later require the
+ * public actor id when reading a deleted post back, so keep the stored id first
+ * and add the permalink-derived composite id as a narrowly validated fallback.
+ */
+export function facebookPostReadCandidates(
+  storedPostId: string,
+  permalink: string | null,
+): string[] {
+  const candidates = [storedPostId];
+  if (!permalink) return candidates;
+
+  try {
+    const url = new URL(permalink);
+    if (!/(^|\.)facebook\.com$/i.test(url.hostname)) return candidates;
+
+    const match = url.pathname.match(/^\/(\d+)\/posts\/(\d+)\/?$/);
+    if (!match) return candidates;
+
+    const derived = `${match[1]}_${match[2]}`;
+    if (derived !== storedPostId) candidates.push(derived);
+  } catch {
+    // An old or malformed permalink must never interfere with the stored id.
+  }
+
+  return candidates;
+}
+
+/**
  * Access tokens must never reach a log line or an operator-facing message.
  * Facebook tokens are the classic "EAA…" form.
  */
 export function redactFacebookSecrets(value: string): string {
   return value
     .replace(/access_token=[^&\s]+/gi, 'access_token=[redacted]')
+    .replace(/input_token=[^&\s]+/gi, 'input_token=[redacted]')
     .replace(/EAA[A-Za-z0-9]{20,}/g, '[redacted-token]');
 }
 
@@ -213,11 +282,64 @@ export interface FacebookPageProfile {
  * Page access token, /me IS the Page. `category` doubles as the page-vs-user
  * discriminator: user nodes have no category field.
  */
+export interface FacebookAccessTokenMetadata {
+  app_id?: string;
+  application?: string;
+  data_access_expires_at?: number;
+  expires_at?: number;
+  is_valid?: boolean;
+  issued_at?: number;
+  scopes?: string[];
+  type?: string;
+  user_id?: string;
+}
+
+/**
+ * Inspect a candidate Page token with a server-only App access token. A normal
+ * Page/profile probe only proves that a token works at this instant; Meta's
+ * debug endpoint is what exposes a finite expiry before we persist it.
+ */
+export async function fetchFacebookAccessTokenMetadata(
+  inputToken: string,
+  appAccessToken: string,
+): Promise<FacebookAccessTokenMetadata> {
+  const response = await facebookFetch<{ data?: FacebookAccessTokenMetadata }>({
+    path: '/debug_token',
+    accessToken: appAccessToken,
+    params: { input_token: inputToken },
+    maxAttempts: 1,
+  });
+
+  if (!response.data) {
+    throw new FacebookApiError({
+      status: 502,
+      code: 'token_inspection_failed',
+      operatorMessage: 'Facebook did not return token lifetime information. Try generating the token again.',
+      retryable: false,
+    });
+  }
+
+  return response.data;
+}
+
 export async function fetchPageProfile(accessToken: string): Promise<FacebookPageProfile> {
   return facebookFetch<FacebookPageProfile>({
     path: '/me',
     accessToken,
     params: { fields: 'id,name,category' },
+  });
+}
+
+/** Read-only connection probe for the permission used by status reconciliation. */
+export async function verifyPagePostReadAccess(
+  pageId: string,
+  accessToken: string,
+): Promise<void> {
+  await facebookFetch<{ data?: Array<{ id: string }> }>({
+    path: `/${pageId}/feed`,
+    accessToken,
+    params: { fields: 'id', limit: 1 },
+    maxAttempts: 1,
   });
 }
 
@@ -270,6 +392,43 @@ export interface FacebookPost {
   permalink_url?: string;
   created_time?: string;
   message?: string;
+}
+
+/** Recent Page feed entries used to recover a publish that succeeded remotely. */
+export async function fetchRecentPagePosts(params: {
+  pageId: string;
+  accessToken: string;
+  since: Date;
+}): Promise<FacebookPost[]> {
+  const response = await facebookFetch<{ data?: FacebookPost[] }>({
+    path: `/${params.pageId}/feed`,
+    accessToken: params.accessToken,
+    params: {
+      fields: 'id,permalink_url,created_time,message',
+      limit: 50,
+      since: Math.floor(params.since.getTime() / 1000),
+    },
+    maxAttempts: 1,
+  });
+  return response.data ?? [];
+}
+
+/**
+ * Exact copy + time matching is intentionally strict: a recovery may mark a
+ * local row Published only when one unambiguous Page post fits the checkpoint.
+ */
+export function findSingleRecentFacebookPostByExactMessage(
+  posts: FacebookPost[],
+  message: string,
+  since: Date,
+): FacebookPost | null {
+  const sinceMs = since.getTime();
+  const matches = posts.filter((post) => {
+    if (post.message !== message || !post.created_time) return false;
+    const createdMs = new Date(post.created_time).getTime();
+    return Number.isFinite(createdMs) && createdMs >= sinceMs;
+  });
+  return matches.length === 1 ? matches[0] : null;
 }
 
 /** Read back a published post — our proof that publishing actually worked. */

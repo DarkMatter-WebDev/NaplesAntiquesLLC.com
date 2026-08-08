@@ -338,6 +338,10 @@ function CartView({
             <span>Subtotal</span>
             <span>{subtotal > 0 ? formatCheckoutCurrency(subtotal) : '-'}{hasUnknown ? '*' : ''}</span>
           </div>
+          <div className="flex justify-between gap-3">
+            <span>{isEs ? 'Envío' : 'Shipping'}</span>
+            <span className="text-right">{isEs ? 'Calculado al finalizar la compra' : 'Calculated at checkout'}</span>
+          </div>
           <div className="flex justify-between">
             <span>{isEs ? `Impuesto FL (${FL_TAX_RATE_LABEL})` : `FL Sales Tax (${FL_TAX_RATE_LABEL})`}</span>
             <span>{subtotal > 0 ? formatCheckoutCurrency(tax) : '-'}</span>
@@ -354,11 +358,6 @@ function CartView({
               * {isEs ? 'Algunos artículos requieren confirmación de precio.' : 'Some items require price confirmation.'}
             </p>
           )}
-          <p className="text-[0.6rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
-            {isEs
-              ? 'Los precios spot pueden variar. El impuesto es estimado; el envío se calcula al finalizar la compra.'
-              : 'Spot prices may vary. Tax is an estimate; shipping is calculated at checkout.'}
-          </p>
         </div>
       </div>
 

@@ -7,6 +7,7 @@ import { WishlistProvider } from '@/context/WishlistContext';
 import { CartProvider } from '@/context/CartContext';
 import CookieNotice from '@/components/legal/CookieNotice';
 import CustomerReveal from '@/components/layout/CustomerReveal';
+import SocialBackgroundPublishProvider from '@/components/admin/SocialBackgroundPublishProvider';
 import { jsonLdHtml } from '@/lib/json-ld';
 
 interface Props {
@@ -105,10 +106,12 @@ export default async function LocaleLayout({ children, params }: Props) {
               WishlistContext, so this order is safe. */}
           <CartProvider locale={locale}>
             <WishlistProvider locale={locale}>
-              <div data-customer-reveal-root className="contents">
-                {children}
-                <CustomerReveal />
-              </div>
+              <SocialBackgroundPublishProvider>
+                <div data-customer-reveal-root className="contents">
+                  {children}
+                  <CustomerReveal />
+                </div>
+              </SocialBackgroundPublishProvider>
               <CookieNotice locale={locale} />
             </WishlistProvider>
           </CartProvider>

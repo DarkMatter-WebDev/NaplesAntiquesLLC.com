@@ -67,7 +67,7 @@ export default async function AdminSubscribersPage({ params }: Props) {
       />
 
       <main className="px-4 md:px-8 py-8">
-        <div className="max-w-[1200px] mx-auto">
+        <div className="ultrawide-page-medium max-w-[1200px] mx-auto">
           <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
               <p

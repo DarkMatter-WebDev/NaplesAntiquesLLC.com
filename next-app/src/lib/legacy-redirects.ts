@@ -51,12 +51,21 @@ export const LEGACY_REDIRECTS: Record<string, LegacyRedirect> = {
   '/privacy.html': { to: '/privacy', permanent: true },
   '/estate-services.html': { to: '/estate-services', permanent: true },
 
-  // Six auto-named products re-slugged to keyword URLs. Pairs with
+  // Auto-named products re-slugged to keyword URLs. Pairs with
   // supabase/reslug-new-listing-products-2026-07.sql.
+  //
+  // `new-listing-04` (-> `14k-gold-rope-chain-necklace`) is deliberately
+  // ABSENT: the owner deleted that listing, so the destination 404s. A rule
+  // pointing at a deleted product is worse than no rule — it turns an honest
+  // "gone" into a redirect that dead-ends, and Google treats such hops as soft
+  // 404s anyway. Without the rule the URL 404s exactly like every other
+  // deleted listing, and the 404 page offers Browse Shop / Go Home.
+  //
+  // Same applies if any destination below is ever deleted: remove its line
+  // rather than re-point it at an unrelated product.
   '/shop/new-listing-01': { to: '/shop/italian-14k-two-tone-cuban-link-ring-station-necklace', permanent: true },
   '/shop/new-listing-02': { to: '/shop/14k-gold-round-box-link-chain-necklace', permanent: true },
   '/shop/new-listing-03': { to: '/shop/10k-gold-monaco-cuban-link-necklace', permanent: true },
-  '/shop/new-listing-04': { to: '/shop/14k-gold-rope-chain-necklace', permanent: true },
   '/shop/new-listing-05': { to: '/shop/10k-gold-rope-chain-necklace', permanent: true },
   '/shop/new-listing-06': { to: '/shop/14k-gold-semi-solid-cuban-link-chain-necklace', permanent: true },
 };

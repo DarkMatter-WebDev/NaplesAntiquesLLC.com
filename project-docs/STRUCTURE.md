@@ -1,7 +1,7 @@
 # Structure And Build Integrity
 
 > Canonical project map and single sources of truth. Last reconciled:
-> **2026-08-01**.
+> **2026-08-03**.
 
 ## Runtime Shape
 
@@ -27,8 +27,6 @@ NaplesEstateJewelry.co/
 |-- ACCOUNT_SETUP.md
 |-- CLAUDE.md
 |-- netlify.toml
-|-- ebay-sync-plan/
-|-- etsy-sync-plan/
 |-- project-docs/
 |   |-- features/
 |   |-- PROJECT_OVERVIEW.md
@@ -79,11 +77,13 @@ let additional loose app assets accumulate at root.
 | Shipping methods and fees | `next-app/src/lib/checkout-shipping.ts` |
 | U.S. address normalization | `next-app/src/lib/us-address.ts` |
 | PayPal integration | `src/lib/paypal*.ts`, PayPal API routes, and `features/paypal-checkout.md` |
-| Etsy integration | `src/lib/etsy/`, Etsy API routes, `etsy-sync-plan/`, and `features/etsy-sync.md` |
-| eBay integration | `src/lib/ebay/`, eBay API routes, `ebay-sync-plan/`, and `features/ebay-sync.md` |
-| Instagram posting | `src/lib/instagram/`, `/api/admin/instagram/*`, and `features/instagram-posting-plan.md` |
+| Etsy integration | `src/lib/etsy/`, Etsy API routes, and `features/etsy-sync.md` |
+| eBay integration | `src/lib/ebay/`, eBay API routes, and `features/ebay-sync.md` |
+| Instagram posting | `src/lib/instagram/`, `/api/admin/instagram/*`, and `features/instagram-posting.md` |
 | Facebook posting | `src/lib/facebook/`, `/api/admin/facebook/*`, and `features/facebook-posting.md` |
+| Deep Field Gallery product push (outbound, one-way) | `src/lib/deepfield/{payload,sync}.ts`, hooked from `app/actions/admin-products.ts` + `api/paypal/{capture-order,webhook}`, and `features/deepfield-sync.md`. No API route of its own — NEJ is the sender, never a receiver |
 | Social captions/card/renditions (shared by both channels) | `src/lib/instagram/{mapping,card,images,backdrop}.ts` + fonts in `src/assets/fonts` |
+| Social queue scheduling + background publishing | `src/app/[locale]/admin/social-queues/`, `[locale]/layout.tsx`, `components/admin/{SocialQueuesDashboard,SocialQueueRowActions,SocialScheduleModal,SocialBackgroundPublishProvider}.tsx`, `src/lib/{social-queue-schedule,social-background-publish}.ts`, channel sync APIs/stores, Netlify drip functions, and `supabase/social-scheduled-posting-2026-08.sql` |
 | Short product links (`/p/<inventory#>`) | `next-app/src/app/p/[code]/route.ts` |
 | Distributed rate limits | `next-app/src/lib/rate-limit.ts` and hardening SQL |
 | Broad API edge limit | `next-app/netlify/edge-functions/api-rate-limit.ts` |
@@ -126,15 +126,13 @@ let additional loose app assets accumulate at root.
 `src/app/[locale]/shop/(list)/page.tsx` remains a thin Next route entry with
 only supported route exports. The reusable implementation lives beside it in
 `shop-page-renderer.tsx` and is shared with `/shop-modern`. The production build
-completed successfully on 2026-07-27.
+completed successfully on 2026-08-03: 443 pages, with TypeScript and lint also
+passing.
 
 ## Cleanup Notes
 
 - Generated `.next`, `*.tsbuildinfo`, logs, caches, and dependency folders are
   disposable and must remain ignored.
-- Marketplace plan folders are active references from code, SQL, and runbooks;
-  they are not stale planning debris.
-- `LEGACY_REMOVAL_REPORT.md` and `COMPLIANCE_AUDIT.md` are retained evidence,
-  not startup memory.
+- `COMPLIANCE_AUDIT.md` is retained point-in-time evidence, not startup memory.
 - The remaining legacy local-only product-image migration is tracked in
   `TASKS.md`.

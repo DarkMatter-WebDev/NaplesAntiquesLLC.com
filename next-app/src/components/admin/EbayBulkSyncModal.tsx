@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import SelectedMarketplaceReviewFlow from './SelectedMarketplaceReviewFlow';
+import { EBAY_BULK_ENQUEUE_LIMIT } from '@/lib/ebay/guards';
 
 interface EligibilitySummary {
   total: number;
@@ -40,6 +41,8 @@ export default function EbayBulkSyncModal({ onClose, productIds }: { onClose: (c
   const [summary, setSummary] = useState<EligibilitySummary | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [queued, setQueued] = useState<number | null>(null);
+  // Batch cap / write-block notice from the enqueue response.
+  const [batchNotice, setBatchNotice] = useState<string | null>(null);
   const [processed, setProcessed] = useState(0);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -123,6 +126,24 @@ export default function EbayBulkSyncModal({ onClose, productIds }: { onClose: (c
       const enqueueData = await enqueueRes.json().catch(() => null);
       if (!enqueueRes.ok) throw new Error(errorMessage(enqueueData, 'Could not queue products.'));
       setQueued(enqueueData.queued ?? 0);
+      // Surface the batch cap and any write-blocked items instead of letting a
+      // partial run look complete (never blanket re-sync — run this again for
+      // the next batch).
+      setBatchNotice(
+        [
+          enqueueData.withheld
+            ? `${enqueueData.withheld} more eligible item${enqueueData.withheld === 1 ? '' : 's'} withheld this run — run this again after reviewing the results on eBay.`
+            : null,
+          enqueueData.notAvailable
+            ? `${enqueueData.notAvailable} item${enqueueData.notAvailable === 1 ? '' : 's'} skipped — no longer available for sale.`
+            : null,
+          enqueueData.blocked
+            ? `${enqueueData.blocked} write-blocked item${enqueueData.blocked === 1 ? '' : 's'} skipped.`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' ') || null,
+      );
 
       let done = false;
       // Stall guard: if 'remaining' stops shrinking across several polls, the
@@ -207,8 +228,9 @@ export default function EbayBulkSyncModal({ onClose, productIds }: { onClose: (c
             )}
             {checkResult && <p className="text-xs" style={{ color: 'var(--color-primary)' }}>{checkResult}</p>}
             <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-              Queues every eligible item and prepares it on eBay (or publishes it live, if auto-publish is on). This can take a while for a full
-              catalog — feel free to leave this open, or check Settings → eBay Sync later for progress.
+              Queues eligible items and prepares them on eBay (or publishes them live, if auto-publish is on). Each run is capped at{' '}
+              <strong>{EBAY_BULK_ENQUEUE_LIMIT}</strong> items so a large catalog is rewritten in reviewable batches rather than all at once — run
+              this again for the next batch after spot-checking the results on eBay.
             </p>
             {selectedRun ? (
               <>
@@ -282,6 +304,19 @@ export default function EbayBulkSyncModal({ onClose, productIds }: { onClose: (c
               <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
                 Done — processed {processed} product{processed === 1 ? '' : 's'}. Check each item&apos;s eBay status in its drawer, or Settings →
                 eBay Sync for the activity log.
+              </p>
+            )}
+            {batchNotice && (
+              <p
+                className="text-sm"
+                style={{
+                  padding: '0.6rem 0.75rem',
+                  border: '1px solid color-mix(in srgb, var(--color-primary) 35%, transparent)',
+                  background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)',
+                  color: 'var(--color-on-surface)',
+                }}
+              >
+                {batchNotice}
               </p>
             )}
             <div className="flex justify-end">

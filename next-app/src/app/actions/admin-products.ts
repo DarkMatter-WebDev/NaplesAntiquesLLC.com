@@ -5,6 +5,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { requireAdmin } from '@/lib/admin-auth';
 import { handleProductStatusChange as handleEtsyProductStatusChange, scanAndMarkOutOfDate as scanEtsyOutOfDate } from '@/lib/etsy/sync';
 import { handleProductStatusChange as handleEbayProductStatusChange, scanAndMarkOutOfDate as scanEbayOutOfDate } from '@/lib/ebay/sync';
+import { queueDeepFieldSync } from '@/lib/deepfield/sync';
 import { normalizeProductStatus, type Product, type ProductStatus } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
 import { getProductPriceValue } from '@/lib/pricing';
@@ -179,6 +180,10 @@ export async function adminRevalidateProducts(ids: string[]): Promise<void> {
   // single-product save instead of re-hashing the whole catalog.
   void scanEtsyOutOfDate(ids).catch(() => {});
   void scanEbayOutOfDate(ids).catch(() => {});
+  // One-way push to Deep Field Gallery, on the same chokepoint and with the
+  // same fire-and-forget contract as the marketplace hooks above. Covers every
+  // admin write: create, edit, archive, delete, and bulk status changes.
+  queueDeepFieldSync(ids);
 }
 
 export async function adminRevalidateProduct(id: string): Promise<void> {
@@ -195,4 +200,5 @@ export async function adminRevalidateProduct(id: string): Promise<void> {
   void handleEbayProductStatusChange([id]).catch(() => {});
   void scanEtsyOutOfDate([id]).catch(() => {});
   void scanEbayOutOfDate([id]).catch(() => {});
+  queueDeepFieldSync([id]);
 }

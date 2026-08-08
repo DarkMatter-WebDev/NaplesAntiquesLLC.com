@@ -89,7 +89,7 @@ export default async function FaqPage({ params }: Props) {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(faqLd) }} />
       <SiteHeader />
-      <main className="pt-16">
+      <main className="site-header-offset">
 
         {/* Header */}
         <section className="pt-12 pb-16 md:pt-16 md:pb-24 border-b border-[#d0c5af]">

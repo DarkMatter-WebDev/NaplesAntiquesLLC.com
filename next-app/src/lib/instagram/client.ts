@@ -52,6 +52,22 @@ export class InstagramApiError extends Error {
 }
 
 /**
+ * Meta uses error 100/subcode 33 when published media no longer resolves. The
+ * message is intentionally not sufficient on its own because it can also
+ * mention permissions; reconciliation must separately verify the account.
+ */
+export function isInstagramMediaMissingError(err: unknown): boolean {
+  if (!(err instanceof InstagramApiError)) return false;
+  const metaCode = err.detail?.code;
+  const metaSubcode = err.detail?.subcode;
+  return (
+    metaCode === 100 &&
+    (metaSubcode === 33 ||
+      /unsupported get request|does not exist|cannot be loaded/i.test(err.operatorMessage))
+  );
+}
+
+/**
  * Access tokens must never reach a log line or an operator-facing message.
  * Everything that gets logged or surfaced goes through this first.
  */

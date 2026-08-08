@@ -296,3 +296,11 @@ export async function ensureFreshAccessToken(
 
   return { accessToken, igUserId: String(connection.ig_user_id) };
 }
+
+/** Mark a token rejected by a normal Graph request as needing reconnection. */
+export async function markNeedsReauth(service: SupabaseClient): Promise<void> {
+  await service
+    .from('instagram_connection')
+    .update({ status: 'needs_reauth', updated_at: new Date().toISOString() })
+    .eq('id', 1);
+}

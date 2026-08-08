@@ -6,8 +6,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 /**
- * Scheduled drip: publish up to the owner's configured daily limit from the
- * approved queue, oldest first.
+ * Scheduled worker: publish the next bounded batch of due posts.
  *
  * Only products an admin explicitly queued are eligible, so this can never
  * surprise the feed with something unreviewed.

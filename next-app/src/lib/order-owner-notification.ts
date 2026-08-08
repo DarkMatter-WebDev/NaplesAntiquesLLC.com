@@ -214,7 +214,7 @@ export async function sendNewOrderOwnerNotification(opts: {
     const resend = new Resend(resendKey);
     await resend.emails.send(
       {
-        from: 'Naples Estate Jewelry <noreply@naplesestatejewelry.co>',
+        from: 'Naples Estate Jewelry <noreply@naplesestatejewelry.com>',
         to: ownerNotificationRecipient(),
         // Let the owner reply straight to the buyer from the notification.
         replyTo: order.customer_email ? String(order.customer_email) : undefined,

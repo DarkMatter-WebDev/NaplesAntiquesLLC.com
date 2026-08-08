@@ -38,7 +38,6 @@ export async function GET() {
     },
     policy: {
       autoPublish: connection?.auto_publish ?? false,
-      dailyPostLimit: connection?.daily_post_limit ?? 2,
       captionIncludePrice: connection?.caption_include_price ?? true,
       captionSpanishLine: connection?.caption_spanish_line ?? true,
       captionCta: connection?.caption_cta ?? null,

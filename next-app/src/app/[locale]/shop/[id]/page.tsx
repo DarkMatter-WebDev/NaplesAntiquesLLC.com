@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { createPublicClient } from '@/lib/supabase/public';
 import {
   inferProductJewelryType,
+  isDarkProductBackground,
   formatProductItemYear,
   isProductPurchasable,
   isProductSold,
@@ -19,6 +20,7 @@ import {
   productMetalVariantLabel,
   productStatusLabel,
   productSupportsLinkType,
+  productWidthDisplay,
   shouldShowSpotPrice,
   resolveAdvertisedTradeInPrice,
   type Product,
@@ -36,7 +38,10 @@ import type { WishlistItem } from '@/context/WishlistContext';
 import CartButton from '@/components/shop/CartButton';
 import type { CartItem } from '@/context/CartContext';
 import PriceUpdateTicker from '@/components/shop/PriceUpdateTicker';
+import { ProductPolicyAccordions, ProductTrustBadges } from '@/components/shop/ProductTrustSections';
+import RelatedProductsStrip from '@/components/shop/RelatedProductsStrip';
 import SpotRefreshPill from '@/components/shop/SpotRefreshPill';
+import TestimonialsSection from '@/components/home/TestimonialsSection';
 import { createServiceClient } from '@/lib/supabase/service';
 import { getProductVideo, toPublicProductVideo } from '@/lib/product-video-store';
 import { AppIcon } from '@/components/AppIcon';
@@ -75,6 +80,7 @@ const PRODUCT_DETAIL_COLUMNS = [
   'jewelry_type',
   'chain_type',
   'length',
+  'width_mm',
   'status',
   'images',
   'image_urls',
@@ -106,6 +112,7 @@ const OPTIONAL_PRODUCT_DETAIL_COLUMNS = [
   'special_price_override_percent',
   'quantity',
   'sold_price',
+  'width_mm',
 ];
 
 const PRODUCT_DETAIL_COLUMNS_REQUIRED = PRODUCT_DETAIL_COLUMNS
@@ -148,6 +155,7 @@ const fetchPublicProduct = cache(async (id: string) => {
             special_price_override_percent: null,
             sold_price: null,
             quantity: 1,
+            width_mm: null,
           } as Product
         : null,
       error: fallback.error,
@@ -240,19 +248,6 @@ function formatKarat(purity: number): string {
   return `${purity}%`;
 }
 
-// Whether a resolved page background (always a hex once padding is applied) is
-// dark enough to need light text — drives the "dark theme" product pages.
-function isDarkColor(hex: string): boolean {
-  const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!match) return false;
-  const int = parseInt(match[1], 16);
-  const r = (int >> 16) & 255;
-  const g = (int >> 8) & 255;
-  const b = int & 255;
-  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-  return luminance < 0.4;
-}
-
 function formatInventoryReference(value: string | number | null | undefined): string | null {
   if (value == null || value === '') return null;
   const normalized = String(value).trim().replace(/^#\s*/, '');
@@ -324,7 +319,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   // Dark-background items get a "dark theme": page text/borders/accents lighten
   // automatically by overriding the color tokens on <main>. Light-backed controls
   // are restored via the `.product-page-dark` rules in globals.css.
-  const isDarkPage = isDarkColor(pageBackground);
+  const isDarkPage = isDarkProductBackground(pageBackground);
   const mainStyle: CSSProperties & Record<string, string> = { background: pageBackground };
   if (isDarkPage) {
     mainStyle['--color-on-surface'] = '#f2f2f0';
@@ -400,6 +395,12 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
 
   specs.push({ label: isEs ? 'Tipo de producto' : 'Product Type', value: productJewelryTypeLabel(jewelryType, locale) });
   if (chainType) specs.push({ label: isEs ? 'Tipo de enlace' : 'Link Type', value: chainType });
+  // Chain/band width, shown just above Length so the cross-section reads before
+  // the wearable length. productWidthDisplay owns the "Necklace and Bracelet
+  // only" rule (the same call the shop cards make), so the two surfaces cannot
+  // disagree about which pieces have a width.
+  const widthLabel = productWidthDisplay(p);
+  if (widthLabel) specs.push({ label: isEs ? 'Ancho' : 'Width', value: widthLabel });
   if (buyerLengthSpecValue) specs.push({
     label: jewelryType === 'Ring' ? (isEs ? 'Talla' : 'Size') : (isEs ? 'Largo' : 'Length'),
     value: buyerLengthSpecValue,
@@ -525,7 +526,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
       <main className={`pt-24 md:pt-28 pb-20${isDarkPage ? ' product-page-dark' : ''}`} style={mainStyle}>
 
         {/* Back to shop */}
-        <div className="max-w-7xl mx-auto px-4 md:px-8 mb-6">
+        <div className="ultrawide-page-wide max-w-7xl mx-auto px-4 md:px-8 mb-6">
           <ProductBackLink
             href={backHref}
             productId={p.id}
@@ -537,27 +538,45 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
           </ProductBackLink>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 md:px-8">
-          <div className="grid md:grid-cols-2 gap-10 lg:gap-16">
+        <div className="ultrawide-page-wide max-w-7xl mx-auto px-4 md:px-8">
+          {/* Product layout. DOM order IS the reading order — gallery, then
+              title/price, description, specifications, notes, policies — so the
+              two wrappers below need no `order` juggling: flattening them on a
+              phone reproduces exactly this sequence.
+
+              From md up (see `.product-detail-layout` in globals.css) the info
+              wrapper occupies column 2 spanning both rows, while column 1 holds
+              the gallery in row 1 and the aside (notes + policy accordions) in
+              row 2 — so the space under the photo carries content instead of
+              whitespace (owner request 2026-08-04, columns swapped
+              2026-08-04). */}
+          <div className="product-detail-layout">
 
             {/* Gallery */}
-            <ProductImageGallery
-              images={productImages}
-              title={title}
-              imagePadding={p.image_padding}
-              imagePaddingByImage={p.image_padding_by_image}
-              video={productVideo}
-              locale={locale}
-            />
+            <div className="product-detail-media">
+              <ProductImageGallery
+                images={productImages}
+                title={title}
+                imagePadding={p.image_padding}
+                imagePaddingByImage={p.image_padding_by_image}
+                video={productVideo}
+                locale={locale}
+              />
+            </div>
 
-            {/* Info */}
-            <div className="flex flex-col gap-5">
+            {/* Info column: purchase panel, description, specifications */}
+            <div className="product-detail-column-info">
+
+            {/* Purchase panel. Its own query container: the price/value tiles
+                and the action buttons size against THIS column's width, which
+                is unrelated to the viewport's. */}
+            <div className="product-buy-panel flex flex-col gap-5">
 
               {/* Category + status */}
               <div className="flex flex-col gap-2">
                 {inventoryReference && (
                   <p
-                    className="text-[0.62rem] font-bold uppercase tracking-[0.22em]"
+                    className="text-[0.6875rem] font-bold uppercase tracking-[0.22em]"
                     style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
                   >
                     {isEs ? 'Artículo #' : 'Item #'}{inventoryReference}
@@ -565,7 +584,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                 )}
                 <div className="product-detail-summary-row flex flex-wrap items-center gap-3">
                   <span
-                    className="text-[0.6rem] font-bold uppercase tracking-widest px-2 py-0.5"
+                    className="text-[0.6875rem] font-bold uppercase tracking-widest px-2 py-0.5"
                     style={{
                       background: isPurchasable
                         ? (isDarkPage ? '#e9c349' : 'var(--color-primary)')
@@ -579,7 +598,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                   </span>
                   <span className="product-detail-summary-specs inline-flex items-center gap-3 whitespace-nowrap">
                     <span
-                      className="text-[0.62rem] font-bold uppercase tracking-[0.3em]"
+                      className="text-[0.6875rem] font-bold uppercase tracking-[0.3em]"
                       style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
                     >
                       {metalLabel}
@@ -587,7 +606,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                     </span>
                     {localizedBuyerLength && (
                       <span
-                        className="text-[0.62rem] font-bold uppercase tracking-[0.3em]"
+                        className="text-[0.6875rem] font-bold uppercase tracking-[0.3em]"
                         style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
                       >
                         &middot; {localizedBuyerLength}
@@ -616,7 +635,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                 {isPurchasable ? (
                   <p
                     className="flex items-center gap-1 mt-1.5"
-                    style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                    style={{ fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
                   >
                     <AppIcon name="check_circle" className="text-sm" style={{ color: 'var(--color-primary)', fontVariationSettings: "'FILL' 1" }} aria-hidden="true" />
                     {isEs ? 'Este es su precio' : 'This is your price'}
@@ -625,7 +644,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                 {isPurchasable && stockQuantity > 1 && (
                   <p
                     className="mt-1"
-                    style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+                    style={{ fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
                   >
                     {isEs ? `${stockQuantity} unidades disponibles` : `${stockQuantity} units in stock`}
                   </p>
@@ -633,13 +652,13 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                 {!isPurchasable && (
                   <p
                     className="mt-1.5"
-                    style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                    style={{ fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
                   >
                     {isSold ? (isEs ? 'Vendido — pieza única' : 'Sold — one of a kind') : productStatusLabel(p.status)}
                   </p>
                 )}
                 {isPurchasable ? (
-                  <div className="flex flex-wrap gap-3 pt-3">
+                  <div className="product-cta-grid mt-3">
                     <CartButton item={cartItem} variant="detail" locale={locale} />
                     <WishlistButton item={wishlistItem} variant="button" locale={locale} />
                     <Link href={`${contactHref}?item=${encodeURIComponent(p.title)}`} className="outline-button">
@@ -650,7 +669,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                     </a>
                   </div>
                 ) : (
-                  <div className="flex flex-wrap gap-3 pt-3">
+                  <div className="product-cta-grid product-cta-grid-pair mt-3">
                     <Link href={`${contactHref}?item=${encodeURIComponent(p.title)}`} className="outline-button">
                       {isEs ? 'Consultar pieza similar' : 'Inquire about a similar piece'}
                     </Link>
@@ -660,7 +679,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                   </div>
                 )}
                 {isPurchasable && (
-                  <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.6875rem] font-semibold uppercase tracking-[0.12em]" style={{ color: 'var(--color-on-surface-variant)' }}>
                     <span>✓ {isEs ? 'Envío asegurado' : 'Ships fully insured'}</span>
                     <span>✓ {isEs ? 'Autenticidad garantizada' : 'Authenticity guaranteed'}</span>
                   </p>
@@ -684,9 +703,9 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                       borderRadius: '8px',
                     }}
                   >
-                    <div className="grid gap-1.5 sm:grid-cols-2">
+                    <div className="product-value-tiles">
                       <div
-                        className="px-3 py-2.5"
+                        className="product-value-tile"
                         style={{
                           background: 'linear-gradient(135deg, #faf5e3 0%, #f1e8c9 100%)',
                           border: '1px solid #ecdfb6',
@@ -695,7 +714,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                         }}
                       >
                         <span
-                          className="block text-[0.58rem] font-bold uppercase tracking-[0.12em]"
+                          className="product-value-tile-label block font-bold uppercase tracking-[0.12em]"
                           style={{ color: '#8a7634', fontFamily: 'var(--font-label)' }}
                         >
                           {isEs
@@ -703,7 +722,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                             : `Scrap ${p.category === 'Silver' ? 'silver' : 'gold'} value`}
                         </span>
                         <span
-                          className="mt-1 block text-[0.95rem] font-extrabold"
+                          className="product-value-tile-value mt-1 block font-extrabold"
                           style={{ color: '#735c00', fontFamily: 'var(--font-label)' }}
                         >
                           {scrapValue}
@@ -715,29 +734,40 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                           label={isEs ? 'Basado en spot' : 'Based on spot'}
                           ariaLabel={isEs ? 'Precio spot en vivo por onza troy' : 'Live spot price per troy ounce'}
                           display={`${spotValueLabel}/oz`}
+                          // Same fluid clamps as `.product-value-tile*`, inline
+                          // because the pill takes style props rather than a
+                          // className. Keep the two in step.
                           containerStyle={{
                             border: '1px solid #e2e6ec',
                             background: '#f4f7fb',
                             borderRadius: '8px',
-                            padding: '0.625rem 0.75rem',
+                            padding: 'clamp(0.4rem, 0.26rem + 1cqi, 0.625rem) clamp(0.45rem, 0.23rem + 1.45cqi, 0.75rem)',
                             textAlign: 'left',
                           }}
                           labelStyle={{
                             display: 'block',
                             color: '#6b7280',
                             fontFamily: 'var(--font-label)',
-                            fontSize: '0.58rem',
+                            fontSize: 'clamp(0.625rem, 0.56rem + 0.36cqi, 0.6875rem)',
                             fontWeight: 700,
                             textTransform: 'uppercase',
                             letterSpacing: '0.12em',
+                            // NOT nowrap. The grid tracks are minmax(0, 1fr), so
+                            // an unbreakable label punches straight out of its
+                            // track: in Spanish "BASADO EN SPOT" pushed the tile
+                            // row 43px past a 320px viewport and took the whole
+                            // page into horizontal scroll. English never showed
+                            // it because "Based on spot" happens to fit. The
+                            // price below keeps nowrap — a number must not break.
                           }}
                           priceStyle={{
                             display: 'block',
                             marginTop: '0.25rem',
                             color: '#374151',
                             fontFamily: 'var(--font-label)',
-                            fontSize: '0.95rem',
+                            fontSize: 'clamp(0.78rem, 0.676rem + 0.76cqi, 0.95rem)',
                             fontWeight: 800,
+                            whiteSpace: 'nowrap',
                           }}
                         />
                       )}
@@ -774,64 +804,75 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                         disabled site-wide for hydration safety, so tappable
                         numbers must be real anchors. */}
                     {isEs ? (
-                      <>¿Tienes oro o plata? Aplícalo a esta pieza y paga desde <strong style={{ color: '#735c00' }}>{tradeInValue}</strong> — llama al <a href="tel:2394048505" style={{ color: '#735c00', fontWeight: 700, whiteSpace: 'nowrap' }}>(239) 404-8505</a>.</>
+                      <>¿Tienes oro o plata? Aplícalo a esta pieza y paga desde <strong style={{ color: '#735c00' }}>{tradeInValue}</strong> — llama al <a href="tel:2394048505" style={{ color: '#735c00', fontWeight: 700, whiteSpace: 'nowrap' }}>(239) 404-8505</a>. <Link href={isEs ? '/es/trade-in' : '/trade-in'} style={{ color: '#735c00', fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: '2px' }}>Cómo funciona</Link></>
                     ) : (
-                      <>Own gold or silver? Put it toward this piece and pay as little as <strong style={{ color: '#735c00' }}>{tradeInValue}</strong> — call <a href="tel:2394048505" style={{ color: '#735c00', fontWeight: 700, whiteSpace: 'nowrap' }}>(239) 404-8505</a>.</>
+                      <>Own gold or silver? Put it toward this piece and pay as little as <strong style={{ color: '#735c00' }}>{tradeInValue}</strong> — call <a href="tel:2394048505" style={{ color: '#735c00', fontWeight: 700, whiteSpace: 'nowrap' }}>(239) 404-8505</a>. <Link href={isEs ? '/es/trade-in' : '/trade-in'} style={{ color: '#735c00', fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: '2px' }}>How it works</Link></>
                     )}
                   </p>
                 </div>
               )}
 
-              {/* Description */}
-              {description && (
-                <p className="text-sm leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
-                  {description}
+            </div>
+            {/* end purchase panel */}
+
+            {/* Description */}
+            {description && (
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
+                {description}
+              </p>
+            )}
+
+            {/* Specifications */}
+            {visibleSpecs.length > 0 && (
+              <div className="border-t pt-4" style={{ borderColor: 'var(--color-outline-variant)' }}>
+                <p
+                  className="text-[0.6875rem] font-bold uppercase tracking-[0.2em] mb-3"
+                  style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+                >
+                  {isEs ? 'Especificaciones' : 'Specifications'}
                 </p>
-              )}
+                <dl className="flex flex-col gap-2">
+                  {visibleSpecs.map(({ label, value }) => (
+                    <div key={label} className="flex gap-3 text-sm">
+                      <dt
+                        className="w-20 flex-shrink-0 font-semibold text-xs normal-case tracking-wide pt-px"
+                        style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+                      >
+                        {label}
+                      </dt>
+                      <dd style={{ color: 'var(--color-on-surface)' }}>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
 
-              {/* Specifications */}
-              {visibleSpecs.length > 0 && (
-                <div className="border-t pt-4" style={{ borderColor: 'var(--color-outline-variant)' }}>
-                  <p
-                    className="text-[0.62rem] font-bold uppercase tracking-[0.2em] mb-3"
-                    style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
-                  >
-                    {isEs ? 'Especificaciones' : 'Specifications'}
-                  </p>
-                  <dl className="flex flex-col gap-2">
-                    {visibleSpecs.map(({ label, value }) => (
-                      <div key={label} className="flex gap-3 text-sm">
-                        <dt
-                          className="w-20 flex-shrink-0 font-semibold text-xs normal-case tracking-wide pt-px"
-                          style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
-                        >
-                          {label}
-                        </dt>
-                        <dd style={{ color: 'var(--color-on-surface)' }}>{value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </div>
-              )}
+            {!isPurchasable && (
+              <div>
+                <p className="text-sm mb-3" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  {isEs
+                    ? 'Este artículo ya fue vendido. Contáctenos para piezas similares.'
+                    : 'This item has been sold. Contact us for similar pieces.'}
+                </p>
+                <Link href={contactHref} className="outline-button">
+                  {isEs ? 'Consultar piezas similares' : 'Ask About Similar Pieces'}
+                </Link>
+              </div>
+            )}
 
-              {!isPurchasable && (
-                <div>
-                  <p className="text-sm mb-3" style={{ color: 'var(--color-on-surface-variant)' }}>
-                    {isEs
-                      ? 'Este artículo ya fue vendido. Contáctenos para piezas similares.'
-                      : 'This item has been sold. Contact us for similar pieces.'}
-                  </p>
-                  <Link href={contactHref} className="outline-button">
-                    {isEs ? 'Consultar piezas similares' : 'Ask About Similar Pieces'}
-                  </Link>
-                </div>
-              )}
+            </div>
+            {/* end info column */}
+
+            {/* Aside: notes + policy accordions. One wrapper rather than two grid
+                items so a product with no Notes does not leave an empty track's
+                gutter under the gallery. */}
+            <div className="product-detail-column-aside">
 
               {/* Public notes */}
               {publicNotes && (
                 <div className="border-t pt-4" style={{ borderColor: 'var(--color-outline-variant)' }}>
                   <p
-                    className="text-[0.62rem] font-bold uppercase tracking-[0.2em] mb-3"
+                    className="text-[0.6875rem] font-bold uppercase tracking-[0.2em] mb-3"
                     style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
                   >
                     {isEs ? 'Notas' : 'Notes'}
@@ -842,11 +883,21 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                 </div>
               )}
 
-
+              {/* Policy accordions (2026-08-04) */}
+              <ProductPolicyAccordions isEs={isEs} prefix={isEs ? '/es' : ''} />
 
             </div>
           </div>
+
+          {/* Trust strip — full width beneath both columns (2026-08-04) */}
+          <ProductTrustBadges isEs={isEs} />
         </div>
+
+        {/* "You might also like" — same-category available pieces (2026-08-04) */}
+        <RelatedProductsStrip current={p} spotData={spotData} locale={locale} />
+
+        {/* Curated Google reviews — same list as the homepage (2026-08-04) */}
+        <TestimonialsSection locale={locale} compact />
       </main>
       <SiteFooter locale={locale} />
     </>

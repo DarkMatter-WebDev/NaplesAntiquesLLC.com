@@ -3,15 +3,24 @@
 import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import AdminModal from './AdminModal';
+import SocialScheduleModal, { type SocialScheduleValues } from './SocialScheduleModal';
+import {
+  canQueueBothSocialChannels,
+  otherSocialPublishChannel,
+  selectCrossChannelCaptionOpening,
+  socialCaptionOpeningsMatch,
+  type SocialPublishChannel,
+  type SocialCombinedChannelStatus,
+} from '@/lib/social-publish-both';
 
 /**
- * Review-and-publish surface for BOTH social channels at once, opened from
+ * Review, queue, and publish surface for BOTH social channels at once, opened from
  * either product panel ("Publish to both…").
  *
  * Read-only by design: captions and slides are shown side by side for one
  * final review, but all editing (lineup, crops, card) stays in the per-channel
- * panels. The one action here besides Publish is a per-channel Prepare, since
- * publishing requires prepared renditions on each channel.
+ * panels. Prepare and the three explicit cross-channel sync choices rebuild
+ * the destination review without publishing anything.
  *
  * Publish order is Instagram first, deliberately: it is the permanent channel
  * (no API delete or edit) with the most failure modes (quota, async container
@@ -22,22 +31,26 @@ import AdminModal from './AdminModal';
  * is not asked to babysit the container poll.
  */
 
-type Channel = 'instagram' | 'facebook';
+type Channel = SocialPublishChannel;
+type CrossChannelSyncMode = 'wording' | 'photos' | 'both';
 const CHANNELS: Channel[] = ['instagram', 'facebook'];
 const LABELS: Record<Channel, string> = { instagram: 'Instagram', facebook: 'Facebook' };
 
 interface ChannelPreview {
   /** Caption (Instagram) / message (Facebook) — unified here. */
   text: string;
+  captionOpening: string;
   renditionUrls: string[];
   renditionIsCard: boolean[];
   blockedReason: string | null;
   warnings: string[];
   syncState: string | null;
   permalink: string | null;
+  queuedAt: string | null;
+  scheduledFor: string | null;
 }
 
-type ChannelStatus = 'loading' | 'ready' | 'published' | 'needs-prepare' | 'blocked';
+type ChannelStatus = SocialCombinedChannelStatus;
 
 interface ChannelResult {
   ok: boolean;
@@ -49,6 +62,7 @@ function statusOf(p: ChannelPreview | null): ChannelStatus {
   if (!p) return 'loading';
   if (p.syncState === 'published') return 'published';
   if (p.blockedReason) return 'blocked';
+  if (p.queuedAt) return 'queued';
   if (p.syncState === 'review' && p.renditionUrls.length > 0) return 'ready';
   return 'needs-prepare';
 }
@@ -56,6 +70,7 @@ function statusOf(p: ChannelPreview | null): ChannelStatus {
 const STATUS_LABELS: Record<ChannelStatus, string> = {
   loading: 'Loading…',
   ready: 'Ready to publish',
+  queued: 'In posting queue',
   published: 'Already published',
   'needs-prepare': 'Needs prepare',
   blocked: 'Blocked',
@@ -63,12 +78,15 @@ const STATUS_LABELS: Record<ChannelStatus, string> = {
 
 export default function SocialPublishBothModal({
   productId,
+  sourceChannel,
   onClose,
   onDone,
 }: {
   productId: string;
+  /** The manager page that opened this modal; its reviewed setup is the sync source. */
+  sourceChannel: Channel;
   onClose: () => void;
-  /** Called after a publish run so the opening panel can refresh its state. */
+  /** Called after a queue or publish run so the opening panel can refresh its state. */
   onDone: () => void;
 }) {
   const [previews, setPreviews] = useState<Record<Channel, ChannelPreview | null>>({
@@ -77,9 +95,11 @@ export default function SocialPublishBothModal({
   });
   const [loadError, setLoadError] = useState<string | null>(null);
   const [preparing, setPreparing] = useState<Channel | null>(null);
-  const [phase, setPhase] = useState<'review' | 'publishing' | 'done'>('review');
+  const [phase, setPhase] = useState<'review' | 'queuing' | 'publishing' | 'done'>('review');
+  const [completedAction, setCompletedAction] = useState<'queue' | 'publish' | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
   const [results, setResults] = useState<Partial<Record<Channel, ChannelResult>>>({});
+  const [showSchedule, setShowSchedule] = useState(false);
 
   const loadChannel = useCallback(
     async (channel: Channel) => {
@@ -92,12 +112,15 @@ export default function SocialPublishBothModal({
       if (!res.ok) throw new Error(data?.error || `Could not load the ${LABELS[channel]} preview.`);
       const preview: ChannelPreview = {
         text: String(data?.caption ?? data?.message ?? ''),
+        captionOpening: String(data?.captionOpening ?? ''),
         renditionUrls: Array.isArray(data?.renditionUrls) ? data.renditionUrls : [],
         renditionIsCard: Array.isArray(data?.renditionIsCard) ? data.renditionIsCard : [],
         blockedReason: data?.blockedReason ?? null,
         warnings: Array.isArray(data?.warnings) ? data.warnings : [],
         syncState: data?.current?.syncState ?? null,
         permalink: data?.current?.permalink ?? null,
+        queuedAt: data?.current?.queuedAt ?? null,
+        scheduledFor: data?.current?.scheduledFor ?? null,
       };
       setPreviews((prev) => ({ ...prev, [channel]: preview }));
     },
@@ -115,13 +138,36 @@ export default function SocialPublishBothModal({
     void run();
   }, [loadChannel]);
 
-  const prepare = async (channel: Channel) => {
+  const prepare = async (channel: Channel, mode: CrossChannelSyncMode = 'both') => {
     setPreparing(channel);
+    setLoadError(null);
     try {
-      const res = await fetch(`/api/admin/${channel}/sync`, {
+      const sourceChannel = otherSocialPublishChannel(channel);
+      const sourceIsReady = statusOf(previews[sourceChannel]) === 'ready';
+      // A ready source is authoritative for whichever parts the operator
+      // explicitly selects. The server rebuilds target renditions after
+      // applying that wording/photo choice.
+      const captionOpening = selectCrossChannelCaptionOpening({
+        targetOpening: previews[channel]?.captionOpening,
+        sourceOpening: previews[sourceChannel]?.captionOpening,
+        sourceIsReady,
+      });
+      const res = await fetch(
+        sourceIsReady
+          ? '/api/admin/social/prepare-from-channel'
+          : `/api/admin/${channel}/sync`,
+        {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId, action: 'prepare' }),
+        body: JSON.stringify({
+          productId,
+          ...(sourceIsReady
+            ? { from: sourceChannel, mode }
+            : {
+                action: 'prepare',
+                ...(captionOpening ? { captionOpening } : {}),
+              }),
+        }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.message || data?.error || 'Prepare failed.');
@@ -162,13 +208,49 @@ export default function SocialPublishBothModal({
     };
   };
 
+  const queueChannel = async (channel: Channel, scheduledFor: string): Promise<ChannelResult> => {
+    try {
+      const res = await fetch(`/api/admin/${channel}/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId, action: 'queue', scheduledFor }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || data?.queued !== true) {
+        return {
+          ok: false,
+          message: data?.message || data?.error || 'Could not add this channel to its posting queue.',
+          permalink: null,
+        };
+      }
+      return { ok: true, message: `Scheduled for ${new Date(scheduledFor).toLocaleString()}.`, permalink: null };
+    } catch (err) {
+      return {
+        ok: false,
+        message: err instanceof Error ? err.message : 'Could not add this channel to its posting queue.',
+        permalink: null,
+      };
+    }
+  };
+
   const statuses: Record<Channel, ChannelStatus> = {
     instagram: statusOf(previews.instagram),
     facebook: statusOf(previews.facebook),
   };
-  const toPublish = CHANNELS.filter((channel) => statuses[channel] === 'ready');
+  const bothReady = CHANNELS.every((channel) => statuses[channel] === 'ready');
+  const readyCaptionsMismatch = bothReady && !socialCaptionOpeningsMatch(
+    previews.instagram?.captionOpening,
+    previews.facebook?.captionOpening,
+  );
+  const canQueueBoth = canQueueBothSocialChannels(statuses, !readyCaptionsMismatch);
+  const alignmentTarget = otherSocialPublishChannel(sourceChannel);
+  const toPublish = readyCaptionsMismatch
+    ? []
+    : CHANNELS.filter((channel) => statuses[channel] === 'ready');
   const publishLabel =
-    toPublish.length === 2
+    readyCaptionsMismatch
+      ? 'Sync wording before publishing'
+      : toPublish.length === 2
       ? 'Yes, publish to both'
       : toPublish.length === 1
         ? `Yes, publish to ${LABELS[toPublish[0]]}`
@@ -176,6 +258,7 @@ export default function SocialPublishBothModal({
 
   const runPublish = async () => {
     setPhase('publishing');
+    setCompletedAction('publish');
     const out: Partial<Record<Channel, ChannelResult>> = {};
 
     if (toPublish.includes('instagram')) {
@@ -202,9 +285,50 @@ export default function SocialPublishBothModal({
     onDone();
   };
 
+  const runQueueBoth = async (scheduledFor: SocialScheduleValues): Promise<boolean> => {
+    setPhase('queuing');
+    setCompletedAction('queue');
+    setProgress('Adding Instagram and Facebook to their posting queues…');
+
+    const queuedResults = await Promise.all(
+      CHANNELS.map(async (channel) => [
+        channel,
+        await queueChannel(channel, scheduledFor[channel]!),
+      ] as const),
+    );
+    const nextResults = Object.fromEntries(queuedResults) as Record<Channel, ChannelResult>;
+    setResults(nextResults);
+    const queuedAt = new Date().toISOString();
+    setPreviews((current) => ({
+      instagram: nextResults.instagram.ok && current.instagram
+        ? { ...current.instagram, syncState: 'pending', queuedAt, scheduledFor: scheduledFor.instagram ?? null }
+        : current.instagram,
+      facebook: nextResults.facebook.ok && current.facebook
+        ? { ...current.facebook, syncState: 'pending', queuedAt, scheduledFor: scheduledFor.facebook ?? null }
+        : current.facebook,
+    }));
+    setProgress(null);
+    setPhase('done');
+    onDone();
+    return true;
+  };
+
   return (
-    <AdminModal title="Publish to both channels" onClose={onClose} maxWidth="max-w-3xl">
+    <AdminModal title="Publish or queue both channels" onClose={onClose} maxWidth="max-w-3xl">
       <div className="flex flex-col gap-4">
+        {showSchedule && (
+          <SocialScheduleModal
+            channels={CHANNELS}
+            initialScheduledFor={{
+              instagram: previews.instagram?.scheduledFor ?? null,
+              facebook: previews.facebook?.scheduledFor ?? null,
+            }}
+            title="Schedule both social posts"
+            confirmLabel="Schedule both posts"
+            onClose={() => setShowSchedule(false)}
+            onConfirm={runQueueBoth}
+          />
+        )}
         {loadError && (
           <p className="text-xs font-semibold" style={{ color: 'var(--color-error)' }}>
             {loadError}
@@ -215,6 +339,9 @@ export default function SocialPublishBothModal({
           {CHANNELS.map((channel) => {
             const p = previews[channel];
             const status = statuses[channel];
+            const sourceChannel = otherSocialPublishChannel(channel);
+            const usesSourceSetup = statusOf(previews[sourceChannel]) === 'ready'
+              && Boolean(previews[sourceChannel]?.captionOpening.trim());
             return (
               <div
                 key={channel}
@@ -232,7 +359,7 @@ export default function SocialPublishBothModal({
                     className="text-[0.62rem] font-bold uppercase tracking-wide"
                     style={{
                       color:
-                        status === 'ready' || status === 'published'
+                        status === 'ready' || status === 'queued' || status === 'published'
                           ? 'var(--color-primary)'
                           : status === 'blocked'
                             ? 'var(--color-error)'
@@ -251,6 +378,7 @@ export default function SocialPublishBothModal({
                 ) : (
                   <>
                     <pre
+                      key={`${channel}:${p.text}`}
                       className="max-h-44 overflow-auto whitespace-pre-wrap border p-2 text-[0.66rem] leading-relaxed"
                       style={{
                         borderColor: 'var(--color-outline-variant)',
@@ -301,8 +429,43 @@ export default function SocialPublishBothModal({
                         disabled={preparing !== null}
                         className="outline-button self-start text-xs disabled:opacity-50"
                       >
-                        {preparing === channel ? 'Preparing…' : `Prepare ${LABELS[channel]}`}
+                        {preparing === channel
+                          ? 'Preparing…'
+                          : `Prepare ${LABELS[channel]}${usesSourceSetup
+                            ? ` from ${LABELS[sourceChannel]} setup`
+                            : ''}`}
                       </button>
+                    )}
+
+                    {bothReady && channel === alignmentTarget && phase === 'review' && (
+                      <div
+                        className="flex flex-col gap-2 border-t pt-2"
+                        style={{ borderColor: 'var(--color-outline-variant)' }}
+                      >
+                        <p
+                          className="text-[0.66rem] font-semibold"
+                          style={{ color: 'var(--color-on-surface-variant)' }}
+                        >
+                          Copy from {LABELS[sourceChannel]} to {LABELS[channel]}:
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {([
+                            ['wording', 'Sync wording'],
+                            ['photos', 'Sync photos'],
+                            ['both', 'Sync wording & photos'],
+                          ] as const).map(([syncMode, label]) => (
+                            <button
+                              key={syncMode}
+                              type="button"
+                              onClick={() => prepare(channel, syncMode)}
+                              disabled={preparing !== null}
+                              className="outline-button text-xs disabled:opacity-50"
+                            >
+                              {preparing === channel ? 'Syncing…' : label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     )}
 
                     {status === 'published' && p.permalink && (
@@ -349,8 +512,15 @@ export default function SocialPublishBothModal({
           </p>
         )}
 
+        {readyCaptionsMismatch && phase === 'review' && (
+          <p className="text-xs font-semibold" style={{ color: 'var(--color-error)' }}>
+            The reviewed opening sentences do not match. Use Sync wording or Sync wording &amp;
+            photos before publishing or queueing both.
+          </p>
+        )}
+
         <div
-          className="flex flex-wrap items-center justify-between gap-2 border-t pt-3"
+          className="flex flex-col gap-3 border-t pt-3"
           style={{ borderColor: 'var(--color-outline-variant)' }}
         >
           {phase !== 'done' ? (
@@ -358,21 +528,39 @@ export default function SocialPublishBothModal({
               <span className="text-xs font-semibold" style={{ color: 'var(--color-error)' }}>
                 Publishes publicly. Instagram posts cannot be edited or deleted afterwards.
               </span>
-              <button
-                type="button"
-                onClick={runPublish}
-                disabled={phase !== 'review' || toPublish.length === 0 || preparing !== null}
-                className="gold-button text-sm disabled:opacity-50"
-              >
-                {phase === 'publishing' ? 'Publishing…' : publishLabel}
-              </button>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSchedule(true)}
+                  disabled={phase !== 'review' || !canQueueBoth || preparing !== null}
+                  className="outline-button text-sm disabled:opacity-50"
+                >
+                  {phase === 'queuing'
+                    ? 'Adding to queues…'
+                    : readyCaptionsMismatch
+                      ? 'Sync wording before queueing'
+                      : !bothReady
+                        ? 'Prepare both before queueing'
+                        : 'Schedule both posts'}
+                </button>
+                <button
+                  type="button"
+                  onClick={runPublish}
+                  disabled={phase !== 'review' || toPublish.length === 0 || preparing !== null}
+                  className="gold-button text-sm disabled:opacity-50"
+                >
+                  {phase === 'publishing' ? 'Publishing…' : publishLabel}
+                </button>
+              </div>
             </>
           ) : (
             <>
               <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                Done — each channel&rsquo;s result is shown above.
+                {completedAction === 'queue'
+                  ? 'Done — each channel’s queue result is shown above.'
+                  : 'Done — each channel’s publish result is shown above.'}
               </span>
-              <button type="button" onClick={onClose} className="gold-button text-sm">
+              <button type="button" onClick={onClose} className="gold-button self-end text-sm">
                 Close
               </button>
             </>

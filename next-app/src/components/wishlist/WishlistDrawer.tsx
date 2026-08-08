@@ -48,9 +48,16 @@ export default function WishlistDrawer({ locale }: { locale: string }) {
         />
       )}
 
-      {/* Panel — always mounted, slides in/out via transform */}
+      {/* Panel — always mounted, slides in/out via transform.
+          The width MUST stay capped at the viewport (this is `max-w-sm` plus a
+          100vw clamp, matching CartDrawer's `min(28rem,100vw)`). Because the
+          panel is always in the DOM and parked at translateX(100%), a panel
+          wider than the screen sits that much past the right edge and drags the
+          document into horizontal scroll — and since it is also `w-full`, it
+          then measures against the document it just widened, so the overflow
+          feeds itself. Plain `max-w-sm` did exactly that below ~384px. */}
       <div
-        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-sm flex flex-col shadow-2xl transition-transform duration-300"
+        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-[min(24rem,100vw)] flex flex-col shadow-2xl transition-transform duration-300"
         style={{
           background: 'var(--color-background)',
           borderLeft: `1px solid ${BORDER}`,

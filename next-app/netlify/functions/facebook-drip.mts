@@ -7,10 +7,10 @@ function requiredEnvironment(name: string): string {
 /**
  * Facebook drip posting.
  *
- * Runs twice a day; each run publishes at most the owner's configured daily
- * limit minus whatever already went out in the trailing 24 hours, so the
- * cadence is governed by the setting in Admin -> Settings, not by how often
- * this fires. Only admin-approved products are eligible.
+ * Runs only at UTC hours that cover the seven allowed Eastern posting slots in
+ * both EDT and EST. The due-row query prevents an early post on the extra DST
+ * coverage hours. Each invocation processes a bounded due batch; there is no
+ * local daily cap.
  */
 export default async function facebookDripSchedule(): Promise<void> {
   const siteUrl = process.env.URL || process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL;
@@ -30,10 +30,9 @@ export default async function facebookDripSchedule(): Promise<void> {
   console.log(`Facebook drip completed: ${body.slice(0, 1_000)}`);
 }
 
-// Netlify schedules run in UTC. 14:40 and 22:40 UTC = 10:40am and 6:40pm EDT —
-// the same engagement windows as the Instagram drip (14:20/22:20), offset by
-// twenty minutes so the two channels never publish simultaneously and the
-// Etsy/eBay price pushes (11:15/11:45) stay clear.
+// Noon/2pm/4pm/6pm/8pm/10pm/midnight ET map to 16/18/20/22/00/02/04 UTC
+// in EDT and 17/19/21/23/01/03/05 UTC in EST. The due-row query makes this
+// broader union safe year-round.
 export const config = {
-  schedule: '40 14,22 * * *',
+  schedule: '0 0-5,16-23 * * *',
 };

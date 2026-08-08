@@ -1,26 +1,23 @@
 # Feature: Etsy Sync
 
-> **Shipping tiers (built 2026-07-30, awaiting owner provisioning):** listing
+> **Shipping tiers (built 2026-07-30, provisioned 2026-08-02):** listing
 > shipping now follows the site's value-based tiers. Settings → Etsy Sync has
 > a "Provision tiered shipping profiles" action that creates/updates one Etsy
 > shipping profile per distinct tier fee ($19–$165, canonical titles
 > "NEJ Insured Shipping $N", origin ZIP 34116) and maps them in
-> `marketplace_shipping_profiles` (run
-> `supabase/marketplace-shipping-tiers-2026-07.sql` first). Once provisioned:
+> `marketplace_shipping_profiles` (`supabase/marketplace-shipping-tiers-2026-07.sql`
+> is applied). Current behavior:
 > new drafts are created with the price-band profile, update/price-only syncs
 > reconcile the profile off the existing listing GET (PATCH only on change,
 > logged as `shipping_tier`), and bulk/scheduled price pushes re-profile only
-> when a price crosses a tier boundary. Unprovisioned tiers fall back to the
-> connection's single default profile — live behavior is unchanged until the
-> owner provisions. See `features/shipping-tiers-plan.md`.
+> when a price crosses a tier boundary. Missing mappings still fail safely to
+> the connection's default profile. All seven profile IDs are recorded in
+> `features/shipping-tiers.md`; one controlled listing update remains open.
 
-> Status: **Phase 1 + Phase 2 built and CONFIRMED LIVE end to end** (owner,
-> 2026-07-09 — see "Verification status" below for the full history). Built
-> 2026-07-08 per `etsy-sync-plan/BUILD-PROMPT.md`, following the 17-doc plan
-> in `etsy-sync-plan/` as the source of truth. Phase 3 (Etsy order webhooks)
-> is out of scope and not built. **Before doing anything live, read
-> `etsy-sync-plan/OWNER-SETUP.md`** — it has the complete ordered owner
-> checklist; this doc is technical reference, not a runbook.
+> Status: **Phase 1 + Phase 2 built and confirmed live end to end.** Phase 3
+> (Etsy order webhooks) is out of scope and not built. This document is the
+> current technical contract and operator runbook; implementation history lives
+> in `project-docs/CHANGELOG.md`.
 
 ## What this is
 
@@ -106,13 +103,35 @@ admin-driven sales channel. Nothing on Etsy is ever authoritative for catalog
 data; the only planned Etsy → us data flow (order events) is Phase 3, which is
 explicitly out of scope for this build.
 
+## Operator setup and recovery
+
+- Required Netlify variables are `ETSY_API_KEY`, `ETSY_SHARED_SECRET`,
+  `ETSY_TOKEN_ENC_KEY`, and `ETSY_REDIRECT_URI`. `ETSY_CRON_SECRET` is required
+  only for scheduled price pushes. Never record their values in the project.
+- The redirect URI must exactly match the Etsy app registration and the deployed
+  callback. Every API request uses `x-api-key: <keystring>:<shared-secret>`;
+  omitting the shared secret makes every provider call fail.
+- Wearable length and ring size sync by default. Set
+  `ETSY_SYNC_BRACELET_LENGTH=false` or `ETSY_SYNC_RING_SIZE=false` only to
+  disable those mappings.
+- After connecting in Admin Settings, select the shop shipping profile, return
+  policy, and readiness state before the first sync. Use Preview first, create a
+  draft, verify title/category/properties/photos/price on Etsy, and activate only
+  after review.
+- Disconnecting clears local credentials but never deletes remote listings.
+  Sold/delist/relist automation remains best-effort and should be checked through
+  the per-product status and sync log after any ambiguous provider response.
+- Listings must not steer buyers off Etsy. The mapper is allowlist-based so
+  private acquisition, cost, minimum-price, internal-note, and spot-snapshot
+  fields cannot enter provider payloads.
+
 ## Module layout
 
 ```text
 next-app/src/lib/etsy/
   client.ts   fetch wrapper: x-api-key + bearer auth, ~4 req/s throttle,
               429/5xx backoff (1s/2s/4s), typed EtsyApiError with an
-              operator-facing message per etsy-sync-plan/11-error-handling.md
+              redacted operator-facing messages
   auth.ts     OAuth 2.0 + PKCE (connect/callback), AES-256-GCM token
               encryption (key: ETSY_TOKEN_ENC_KEY, SHA-256-derived so any
               non-empty string works), refresh-on-demand with rotation and a
@@ -406,7 +425,7 @@ bulk enqueue/drain, auto-delist/relist wired into
 `adminRevalidateProduct(s)`/PayPal capture/webhook, and a daily scheduled
 price push gated by a ≥1%-of-last-pushed-price threshold (Q4).
 
-## Field mapping highlights (full table: `etsy-sync-plan/02-field-mapping.md`)
+## Field mapping highlights
 
 - **Vintage fallback (Q2):** `item_year` more than 20 years old maps to its
   real decade bucket; missing or newer than the cutoff pushes as `1990s`
@@ -424,74 +443,21 @@ price push gated by a ≥1%-of-last-pushed-price threshold (Q4).
 - **Eligibility (Q7):** everything `available` syncs, including Coin/Bullion;
   a per-item Etsy rejection is a warning, never a batch-blocking failure.
 
-## Build-time resolutions and known gaps
+## Current constraints and verification
 
-See `project-docs/CHANGELOG.md` (2026-07-08, "Etsy sync build-time
-resolutions" and "even later — two real auth bugs found and fixed") for the
-full list and reasoning. Headline items:
-
-- **`when_made` enum confirmed** against the live OpenAPI spec (19 values,
-  pinned verbatim in `mapping.ts`) — more precise than the plan's original
-  guess for the 2000–2006 bucket.
-- **Two real auth bugs found and fixed from a full local spec copy:** the
-  `x-api-key` header must be `keystring:shared_secret` (not the keystring
-  alone — the plan and the first build pass got this wrong, and it broke
-  every single API call with `"Shared secret is required in x-api-key
-  header"`), and the API host is `openapi.etsy.com`, not `api.etsy.com`.
-  **`ETSY_SHARED_SECRET` is required from day one**, not Phase-3-only.
-  Fixed in `next-app/src/lib/etsy/client.ts`/`auth.ts` and subsequently
-  confirmed through the live Phase 1/2 flow.
-- **Taxonomy leaf IDs are now pinned** (2026-07-08, real
-  `getSellerTaxonomyNodes` call — the fix above, confirmed live). 6 of 12
-  product types are exact category matches; 6 are marked
-  `approximate: true` in `ETSY_TAXONOMY_MAP` because Etsy has no generic/
-  plain leaf for that product type (e.g. no "chain necklace" or "bullion"
-  category exists at all) — the dry-run preview flags these non-blockingly
-  so the owner can review/override the pick. Pre-flight no longer blocks on
-  this.
-- **Two `TODO(etsy-verify)` items remain** (down from four — the readiness-
-  state endpoint path and the image-rerank question were both confirmed
-  against the full spec): image upload size/format caps, and rate-limit
-  response header names. Neither appears anywhere in the machine-readable
-  spec, likely prose-only (seller-help docs).
-- **Daily price automation is implemented locally and awaits manual
-  deployment.** `netlify/functions/etsy-price-push.mts` runs at 11:15 UTC and
-  calls the secret-guarded route. The route bulk-loads pricing inputs, refuses
-  fallback/missing-metal spot values, processes oldest eligible rows within a
-  fixed time budget, and records a `scheduled_price_push` summary. Admin
-  Settings shows secret readiness and the last scheduled outcome. The owner
-  reports `ETSY_CRON_SECRET` is entered in Netlify; verify the Scheduled badge
-  and use `Run now` after deployment.
-
-## Verification status
-
-**Confirmed live end to end (owner, 2026-07-09).** Every item on the
-original remaining checklist is now confirmed working in production,
-including the previously-open token refresh, scheduled price push,
-delist/relist, resume-after-interrupt, and multi-product dry-run. See
-`project-docs/CHANGELOG.md` entries dated 2026-07-08 through 2026-07-10 for the full
-incident-by-incident history (bracelet length "Gray" bug + fix, image
-pipeline hardening, necklace sync + Necklace→Chains mapping, ring size, the
-22-ineligible-silver-items taxonomy fallback, bulk-sync runaway +
-error-visibility fixes, tag/markup/price-push refinements).
-
-**Done, confirmed live (2026-07-08, sessions 1-2):** `supabase/etsy-sync.sql`
-ran successfully; **Connect Etsy** OAuth round-trip succeeded on the first
-real attempt (verified directly against Supabase, not just "no error
-shown"); taxonomy IDs are pinned from a real `getSellerTaxonomyNodes` call;
-a first real draft synced end-to-end (bracelet
-`heavy-italian-14k-yellow-gold-cuban-link-bracelet-53-91g-21`, now
-`draft_review` on Etsy) after fixing two real bugs found only by driving a
-live sync (missing `readiness_state_id`, a retry-from-error state-machine
-gap — see CHANGELOG.md "session 2"). `npx tsc --noEmit`, `npm run lint`
-(0 problems), `npm run build` all pass. **69 unit tests pass** (`npm run
-test`) covering mapping rules (title/tags/materials/properties/when_made/
-price/allowlist), image transcode, image-diff planning, price-push
-threshold logic, and the bulk-drain orchestration loop. (Test count grew
-through session 11 as new mapping/tag/reconciliation logic landed — see
-`CHANGELOG.md` for the running total.)
-
-**Owner/developer next steps:** the original live checklist is complete.
-Ongoing work is normal admin operation plus observing the fixed cumulative
-image counter during the next deliberate image upload. Use the Etsy drawer or
-the channel-specific Actions-modal controls for selected/bulk work.
+- The API host is `openapi.etsy.com`; `x-api-key` must contain both the keystring
+  and shared secret. OAuth, token refresh, draft creation, image upload,
+  activation, delist/relist, interruption recovery, and multi-product dry-run
+  have all been exercised live.
+- Taxonomy leaves are pinned from the seller taxonomy. Approximate category
+  matches are disclosed in Preview so the owner can review them before sync.
+- Two provider-contract details remain intentionally explicit:
+  `TODO(etsy-verify)` still covers image-upload size/format caps and rate-limit
+  response-header names because neither is present in Etsy's machine-readable
+  specification.
+- The scheduled price function runs at 11:15 UTC, fails closed when relevant
+  spot data is missing/fallback, and records a `scheduled_price_push` summary.
+  The production Scheduled badge is confirmed; the deliberate live **Run now**
+  and Admin last-run-card check remain in `TASKS.md`.
+- Use the Etsy drawer or channel-specific Actions controls for normal and bulk
+  work. The full incident and verification history remains in `CHANGELOG.md`.

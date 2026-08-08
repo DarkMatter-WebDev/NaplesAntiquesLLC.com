@@ -38,7 +38,7 @@ export default async function SilverServicesPage({ params }: Props) {
   return (
     <>
       <SiteHeader />
-      <main className="pt-16">
+      <main className="site-header-offset">
 
         {/* Hero */}
         <section className="relative h-[640px] flex items-center overflow-hidden">
@@ -53,7 +53,7 @@ export default async function SilverServicesPage({ params }: Props) {
             />
             <div className="absolute inset-0 bg-gradient-to-r from-[#f9f9f7] via-[#f9f9f7]/60 to-transparent" />
           </div>
-          <div className="relative z-10 max-w-[1440px] mx-auto px-4 md:px-8 w-full">
+          <div className="ultrawide-page relative z-10 max-w-[1440px] mx-auto px-4 md:px-8 w-full">
             <div className="max-w-2xl">
               <span className="text-[#735c00] text-xs font-bold uppercase tracking-[0.2em] mb-4 block">
                 {isEs ? 'Servicios de Plata Privados' : 'Private Silver Estate Services'}
@@ -88,7 +88,7 @@ export default async function SilverServicesPage({ params }: Props) {
 
         {/* Silver Spot Reference */}
         <section className="py-16 bg-[#f3f3f3] border-y border-[#d0c5af]">
-          <div className="max-w-[1440px] mx-auto px-4 md:px-8">
+          <div className="ultrawide-page max-w-[1440px] mx-auto px-4 md:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
               <div className="lg:col-span-5">
                 <span className="text-xs font-bold text-[#735c00] uppercase tracking-[0.2em] mb-4 block">
@@ -126,7 +126,7 @@ export default async function SilverServicesPage({ params }: Props) {
         </section>
 
         {/* Identifying Silver Guide */}
-        <section className="py-20 max-w-[1440px] mx-auto px-4 md:px-8">
+        <section className="ultrawide-page py-20 max-w-[1440px] mx-auto px-4 md:px-8">
           <div className="text-center mb-20">
             <h2 className="font-[family-name:var(--font-headline)] text-3xl md:text-4xl font-bold mb-4">
               {isEs ? 'Identificando la Plata: Una Guía Profesional' : 'Identifying Silver: A Professional Guide'}
@@ -210,7 +210,7 @@ export default async function SilverServicesPage({ params }: Props) {
 
         {/* Scientific Testing Method */}
         <section className="bg-[#2f3131] text-white py-20">
-          <div className="max-w-[1440px] mx-auto px-4 md:px-8">
+          <div className="ultrawide-page max-w-[1440px] mx-auto px-4 md:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-1">
                 <h2 className="font-[family-name:var(--font-headline)] text-3xl font-bold mb-6">
@@ -250,7 +250,7 @@ export default async function SilverServicesPage({ params }: Props) {
         </section>
 
         {/* Fine Silver Estate Services Gallery */}
-        <section className="py-20 max-w-[1440px] mx-auto px-4 md:px-8">
+        <section className="ultrawide-page py-20 max-w-[1440px] mx-auto px-4 md:px-8">
           <div className="mb-12 flex items-end justify-between">
             <div>
               <h2 className="font-[family-name:var(--font-headline)] text-3xl md:text-4xl font-bold">

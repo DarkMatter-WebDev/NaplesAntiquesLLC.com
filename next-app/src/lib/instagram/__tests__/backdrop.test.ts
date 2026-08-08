@@ -5,6 +5,7 @@ import {
   applyCropRect,
   clampRect,
   detectBackdrop,
+  detectBorderBackdrop,
   pickContentBoxMode,
   toHexColor,
 } from '../backdrop';
@@ -62,6 +63,31 @@ describe('detectBackdrop', () => {
 
     expect(backdrop.rgb).toEqual([255, 255, 255]);
     expect(backdrop.isDark).toBe(false);
+  });
+});
+
+describe('detectBorderBackdrop', () => {
+  it('keeps a cream sweep when a tight product crop touches one corner', async () => {
+    const image = await makeImage(
+      `<rect width="400" height="300" fill="${CREAM}"/>` +
+        `<rect x="0" y="220" width="120" height="80" fill="${GOLD}"/>`,
+    );
+
+    const corners = await detectBackdrop(image);
+    const border = await detectBorderBackdrop(image);
+
+    expect(corners.uniform).toBe(false);
+    expect(border.uniform).toBe(true);
+    expect(toHexColor(border.rgb)).toBe('#fbf8f3');
+  });
+
+  it('still rejects a genuinely mixed border', async () => {
+    const image = await makeImage(
+      '<rect width="200" height="300" fill="rgb(20,20,20)"/>' +
+        '<rect x="200" width="200" height="300" fill="rgb(240,240,240)"/>',
+    );
+
+    expect((await detectBorderBackdrop(image)).uniform).toBe(false);
   });
 });
 

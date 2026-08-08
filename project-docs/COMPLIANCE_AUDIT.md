@@ -7,13 +7,18 @@
 > current Next.js app in `next-app/`, public routes, account registration,
 > checkout, contact/evaluation forms, newsletter signup, footer,
 > cookies/storage, Supabase-backed data flows, and policy pages.
+>
+> **2026-08-03 reconciliation note:** this remains point-in-time audit evidence,
+> not the live task list. Retired auction/vendor surfaces have been removed from
+> the summary below. Current counsel, tax, consent, and production-verification
+> work is tracked only in `TASKS.md`.
 
 ## Summary
 
-The site now has a small-business compliance foundation suitable for the current
-Florida-based estate jewelry, antiques, ecommerce, account, auction-guidance, and
-future vendor/marketplace direction. The implementation is not a legal opinion
-and should be reviewed by the business owner and counsel before relying on it.
+The site has a small-business compliance foundation for its Florida-based estate
+jewelry ecommerce, account, inquiry, and marketing flows. The implementation is
+not a legal opinion and should be reviewed by the business owner and counsel
+before relying on it.
 
 ## What Exists
 
@@ -45,21 +50,16 @@ and should be reviewed by the business owner and counsel before relying on it.
   tracking pixels.
 - **Cookies/storage:** Supabase auth cookies, `NEXT_LOCALE`, cart/favorites
   `localStorage`, cookie notice `localStorage`, and normal hosting logs.
-- **Auction flow:** `/auctions` is informational/consultative, not a live bidding
-  platform.
-- **Vendor flow:** no public vendor registration exists.
 
 ## What Was Missing and Added
 
 | Item | Prior State | Added | Risk Before |
 |------|-------------|-------|-------------|
-| Terms of Service | Missing | `/terms` with ecommerce/account/auction/vendor baseline terms | High |
+| Terms of Service | Missing | `/terms` with ecommerce/account terms | High |
 | Cookie Preferences | Missing | `/cookie-preferences` and reset/accept controls | Medium |
 | Accessibility Statement | Missing | `/accessibility` with feedback path and improvement commitments | Medium |
 | Returns & Refunds | Missing | `/returns-refunds`, linked from footer and checkout | High |
 | Shipping Policy | Missing | `/shipping`, linked from footer and checkout | Medium |
-| Auction Terms | Missing | `/auction-terms`, linked from footer and `/auctions` | Medium |
-| Vendor Terms | Missing | `/vendor-terms` baseline for future vendor flow | Low now, higher before launch |
 | Cookie notice | Missing | Essential-cookie/storage notice with Privacy/Preferences links | Medium |
 | Account consent | Missing | Single required Terms/Privacy checkbox and Auth metadata | High |
 | Durable consent schema | Missing | `supabase/compliance-consent.sql` plus base schema updates for Terms/Privacy timestamps and accepted version | High |
@@ -70,20 +70,12 @@ and should be reviewed by the business owner and counsel before relying on it.
 
 ## Remaining Recommendations
 
-- Owner/counsel should review Privacy, Terms, Returns/Refunds, Shipping, Auction
-  Terms, and Vendor Terms before production reliance.
-- Run `supabase/compliance-consent.sql` and the updated
-  `supabase/homepage-subscribers.sql` changes in the live Supabase project.
+- Owner/counsel should review Privacy, Terms, Returns/Refunds, and Shipping before
+  production reliance.
 - Add unsubscribe links to any future marketing email templates before sending
   campaigns.
 - If Google Analytics, Meta Pixel, Clarity, Hotjar, or other non-essential
   tracking is added later, update `/privacy`, `/cookie-preferences`, and the
   cookie UI before enabling it.
-- **Done:** PayPal is integrated on `/checkout` (Orders API v2) and has been
-  live in production since 2026-07-09. Card details are collected on PayPal's
-  hosted UI, keeping the site out of PCI card-data scope (see
-  `features/paypal-checkout.md`). The `/payment` placeholder page was removed
-  on 2026-07-30.
 - Continue accessibility review on product image alt text, modal focus behavior,
   carousel motion, keyboard navigation, and color contrast as new UI ships.
-- Confirm production HTTPS and Supabase Auth redirect URLs in Netlify/Supabase.

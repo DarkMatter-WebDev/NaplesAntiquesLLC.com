@@ -46,7 +46,7 @@ export default async function GoldServicesPage({ params }: Props) {
   return (
     <>
       <SiteHeader />
-      <main className="pt-16">
+      <main className="site-header-offset">
 
         {/* Hero */}
         <section className="relative h-[640px] flex items-center bg-[#1a1c1c] overflow-hidden">
@@ -60,7 +60,7 @@ export default async function GoldServicesPage({ params }: Props) {
               priority
             />
           </div>
-          <div className="relative z-10 max-w-[1440px] mx-auto px-4 md:px-8 w-full">
+          <div className="ultrawide-page relative z-10 max-w-[1440px] mx-auto px-4 md:px-8 w-full">
             <div className="max-w-2xl">
               <span className="text-[#e9c349] font-[family-name:var(--font-body)] text-xs font-bold tracking-[0.2em] uppercase block mb-4">
                 {isEs ? 'Adquisiciones de Oro Privadas' : 'Private Gold Acquisitions'}
@@ -96,7 +96,7 @@ export default async function GoldServicesPage({ params }: Props) {
 
         {/* Gold Spot Reference */}
         <section className="py-16 bg-[#f3f3f3] border-y border-[#d0c5af]">
-          <div className="max-w-[1440px] mx-auto px-4 md:px-8">
+          <div className="ultrawide-page max-w-[1440px] mx-auto px-4 md:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
               <div className="lg:col-span-5">
                 <span className="text-xs font-bold text-[#735c00] uppercase tracking-[0.2em] mb-4 block">
@@ -134,7 +134,7 @@ export default async function GoldServicesPage({ params }: Props) {
         </section>
 
         {/* Items We Acquire */}
-        <section className="py-20 max-w-[1440px] mx-auto px-4 md:px-8">
+        <section className="ultrawide-page py-20 max-w-[1440px] mx-auto px-4 md:px-8">
           <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-8">
             <div className="max-w-xl">
               <h2 className="font-[family-name:var(--font-headline)] text-3xl md:text-4xl font-bold text-[#1a1c1c] mb-4">
@@ -186,7 +186,7 @@ export default async function GoldServicesPage({ params }: Props) {
         </section>
 
         {/* Decoding Gold Markings */}
-        <section className="py-20 max-w-[1440px] mx-auto px-4 md:px-8">
+        <section className="ultrawide-page py-20 max-w-[1440px] mx-auto px-4 md:px-8">
           <div className="text-center mb-16">
             <h2 className="font-[family-name:var(--font-headline)] text-3xl md:text-4xl font-bold text-[#1a1c1c] mb-4">
               {isEs ? 'Marcas del Oro' : 'Decoding Gold Markings'}
@@ -219,7 +219,7 @@ export default async function GoldServicesPage({ params }: Props) {
 
         {/* Unmarked / Vintage Gold */}
         <section className="bg-[#f3f3f3] py-20">
-          <div className="max-w-[1440px] mx-auto px-4 md:px-8">
+          <div className="ultrawide-page max-w-[1440px] mx-auto px-4 md:px-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
               <div>
                 <h2 className="font-[family-name:var(--font-headline)] text-3xl md:text-4xl font-bold mb-6">

@@ -551,6 +551,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
               placeholder={isEs
                 ? 'Buscar oro, cadena, pulsera, collar, anillo…'
                 : 'Search gold, chain, bracelet, necklace, ring…'}
+              aria-label={isEs ? 'Buscar productos' : 'Search products'}
               onChange={(e) => updateFilter('q', e.target.value)}
               style={{
                 width: '100%',
@@ -621,9 +622,13 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
             {showGenderFilter && (
               <div>
                 <label style={labelStyle}>{isEs ? 'Género' : 'Gender'}</label>
+                {/* aria-label rather than htmlFor: this filter bar renders twice
+                    (desktop rail + mobile sheet), so ids would collide. The
+                    adjacent <label> is visual only and names nothing without it. */}
                 <select
                   value={currentFilters.gender ?? ''}
                   onChange={(e) => updateFilter('gender', e.target.value)}
+                  aria-label={isEs ? 'Género' : 'Gender'}
                   style={selectStyle}
                 >
                   <option value="">{isEs ? 'Todos' : 'All'}</option>
@@ -640,6 +645,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
               <select
                 value={visibleItemType}
                 onChange={(e) => updateItemTypeFilter(e.target.value)}
+                aria-label={isEs ? 'Artículo' : 'Item Type'}
                 style={selectStyle}
               >
                 <option value="">{isEs ? 'Todos' : 'All items'}</option>
@@ -658,6 +664,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
                 <select
                   value={currentFilters.chainType ?? ''}
                   onChange={(e) => updateFilter('chainType', e.target.value)}
+                  aria-label={isEs ? 'Tipo de enlace' : 'Link Type'}
                   style={selectStyle}
                 >
                   <option value="">{isEs ? 'Todos los enlaces' : 'All link types'}</option>
@@ -831,6 +838,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
               <select
                 value={currentFilters.brand ?? ''}
                 onChange={(e) => updateFilter('brand', e.target.value)}
+                aria-label={isEs ? 'Marca' : 'Brand'}
                 style={selectStyle}
               >
                 <option value="">{isEs ? 'Todas las marcas' : 'All brands'}</option>
@@ -846,6 +854,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
                 <select
                   value={currentFilters.metal ?? ''}
                   onChange={(e) => updateMetalFilter(e.target.value)}
+                  aria-label={isEs ? 'Metal' : 'Metal'}
                   style={selectStyle}
                 >
                   {!silverwareOnlyMetal && <option value="">{isEs ? 'Todos los metales' : 'All metals'}</option>}
@@ -860,6 +869,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
               <label style={labelStyle}>{isEs ? 'Color del metal' : 'Metal Color'}</label>
               <select
                 value={visibleMetalColor ?? ''}
+                aria-label={isEs ? 'Color del metal' : 'Metal Color'}
                 onChange={(e) => {
                   const params = liveSearchParams();
                   if (e.target.value) {
@@ -887,6 +897,7 @@ export default function ShopFilters({ locale, currentFilters, brandOptions, filt
               <select
                 value={visiblePurity}
                 onChange={(e) => updateFilter('purity', e.target.value)}
+                aria-label={isEs ? 'Pureza' : 'Purity'}
                 style={selectStyle}
               >
                 <option value="">{isEs ? 'Todas' : 'All purities'}</option>

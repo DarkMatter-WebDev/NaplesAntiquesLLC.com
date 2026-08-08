@@ -1,8 +1,8 @@
 ﻿# Architecture
 
 > Update whenever significant structural changes occur. Last updated:
-> **2026-08-01** after the social auto-posting channels (Instagram + Facebook)
-> went live.
+> **2026-08-03** after the seven-slot scheduler, responsive queue controls, and
+> session-close documentation reconciliation.
 
 ## System Design
 
@@ -18,6 +18,20 @@ endpoint-specific windows.
 WordPress, XML-RPC, `.env`, `config.json`, and `.git` scanner paths with a 410
 before framework routing. Root `netlify.toml` retains equivalent forced
 redirects as a fallback.
+
+**Request ordering (established by measurement 2026-08-05): `next-app/src/proxy.ts`
+runs BEFORE `netlify.toml` redirect rules.** The proxy rewrites `/shop` to
+`/en/shop`, and the netlify rule then splats that already-rewritten path — which
+is why host-level redirects for the legacy domains (`naplesestatejewelry.co`,
+`naplesantiquesllc.com`, and their `www.` variants) live in the proxy, above the
+locale rewrite. Placing them only in `netlify.toml` produced two hops per legacy
+link (`.co/shop` → `.com/en/shop` → `/shop`).
+
+The netlify host rules are still required and must stay: paths outside the
+proxy's matcher (`/api/*`, `robots.txt`, `sitemap`) never reach the proxy. That
+exclusion is load-bearing for the `.co/api/*` carve-out, which must remain a
+**200 rewrite** because webhook POSTs from Resend, PayPal, and eBay do not follow
+redirects.
 
 `next-app/netlify/functions/etsy-price-push.mts` and
 `ebay-price-push.mts` are staggered UTC daily Scheduled Functions. They read
@@ -104,6 +118,21 @@ Current route families include:
   `/admin/inquiries`, `/admin/subscribers`, `/admin/marketing`,
   `/admin/settings`, `/admin/users`, `/admin/users/[id]/invoices`,
   `/admin/orders/[id]/invoice`, and `/admin/orders/[id]/print`
+
+## Responsive Canvas Tiers
+
+`globals.css` owns three opt-in ultra-wide canvas classes, activated only at
+2000px+: `ultrawide-page-medium` (1600px), `ultrawide-page` (1800px), and
+`ultrawide-page-wide` (2200px), each bounded by `calc(100vw - 6rem)`. Shared
+`PageContainer` content/wide/full modes select these automatically; explicit
+shop, account, admin, marketplace-manager, service, sell, bullion, and footer
+canvases opt in at their route/component boundary.
+
+This is intentionally not a global rewrite of every `max-w-*` utility. Prose,
+auth forms, checkout steps, confirmation/editor dialogs, and other focused
+tasks keep their existing readable widths. `ultrawide-layout.test.ts` audits
+all TSX sources so every future 6xl/7xl or established 1200-1800px large
+canvas must opt into one of the tiers.
 
 ## Compliance Foundation
 
@@ -431,9 +460,8 @@ component were removed on 2026-07-30). Full runbook:
 ## Etsy Sync (Phase 1/2 live)
 
 One-way push (Supabase `products` → an Etsy shop, as a secondary sales
-channel). Full plan: `etsy-sync-plan/` (17 docs); full build report: owner
-checklist in `etsy-sync-plan/OWNER-SETUP.md`; feature detail:
-`project-docs/features/etsy-sync.md`.
+channel). The current technical contract, operator setup, and verification
+limits live in `project-docs/features/etsy-sync.md`.
 
 - **Module:** `next-app/src/lib/etsy/` — `client.ts` (fetch wrapper: x-api-key
   + bearer, throttle, 429/5xx backoff, typed `EtsyApiError`), `auth.ts` (OAuth
@@ -463,7 +491,7 @@ checklist in `etsy-sync-plan/OWNER-SETUP.md`; feature detail:
   (bulk pre-flight counts), `price-push` (Phase 2 scheduled push — guarded by
   a shared secret header, not an admin session, since a cron has no browser
   session). Phase 3's `/api/webhooks/etsy` (Etsy order ingest) is
-  deliberately **not built** — out of scope per the plan.
+  deliberately **not built** and remains out of scope.
 - **Admin UI:** `EtsySettingsPanel.tsx` (composed into `/admin/settings` —
   connect/disconnect, shipping/return/readiness dropdowns, sync policy
   toggles, recent activity log), a per-product Etsy status chip + drawer
@@ -483,14 +511,14 @@ checklist in `etsy-sync-plan/OWNER-SETUP.md`; feature detail:
   Two `TODO(etsy-verify)` items remain because Etsy's machine-readable spec
   does not publish them: image upload caps and rate-limit response-header
   names. The daily Scheduled Function now calls the trigger-agnostic route at
-  11:15 UTC; its first production `Run now` check remains pending deployment.
+  11:15 UTC; its Scheduled badge is production-confirmed, while the first
+  deliberate production `Run now` plus Admin last-run-card check remains open.
 
 ## eBay Sync (partially live-verified)
 
 One-way push (Supabase `products` → an eBay listing, as a secondary sales
-channel), deliberately mirroring the Etsy Sync shape above. Full plan:
-`ebay-sync-plan/` (18 docs); owner checklist:
-`ebay-sync-plan/OWNER-SETUP.md`; feature detail:
+channel), deliberately mirroring the Etsy Sync shape above. The current
+technical contract, operator setup, and verification limits live in
 `project-docs/features/ebay-sync.md`.
 
 - **Module:** `next-app/src/lib/ebay/` — `client.ts` (fetch wrapper: Bearer
@@ -527,7 +555,7 @@ channel), deliberately mirroring the Etsy Sync shape above. Full plan:
   (cron-secret-guarded), `push-prices`. Plus the Phase 0 compliance webhook
   `/api/webhooks/ebay-account-deletion` (GET challenge echo, POST
   signature-verified ack, reuses `webhook_events` for idempotency). Phase
-  3's order-ingest route is deliberately **not built** — out of scope per Q15.
+  3's order-ingest route is deliberately **not built** and remains out of scope.
 - **Admin UI:** `EbaySettingsPanel.tsx` (composed into `/admin/settings` next
   to `EtsySettingsPanel` — connect/disconnect, 5 policy fields incl. the
   Q16 express-shipping picker + threshold, markup save/stale-callout/
@@ -561,33 +589,120 @@ channel), deliberately mirroring the Etsy Sync shape above. Full plan:
   silver, and the catalog's verified Fashion leaves are pinned; unsupported
   future Fashion types still fail preflight rather than guessing. Remaining
   `TODO(ebay-verify)` items include some allowed aspect values, sandbox-host
-  assumptions, multi-SKU price batching, and plan-level account details. The
+  assumptions, and multi-SKU price batching. The
   external relist for inventory #82 remains intentionally write-blocked.
 
-## Social Auto-Posting: Instagram + Facebook (live 2026-08-01)
+## Social Auto-Posting: Instagram + Facebook (fixed scheduling added 2026-08-02)
 
 Two mirrored channels under `src/lib/instagram/` and `src/lib/facebook/`, each
 with its own API client (`graph.instagram.com` Instagram-User token with weekly
-refresh cron vs `graph.facebook.com` never-expiring Page token), AES-256-GCM
+refresh cron vs `graph.facebook.com` Page token with connect-time lifetime
+inspection and no automatic refresh endpoint), AES-256-GCM
 token storage, typed store (`instagram_posts`/`facebook_posts` +
 connection/sync-log tables, RLS deny-all, service-role only), pure
-product→post mapper, and a review-first prepare → review → publish/queue state
-machine. Scheduled Netlify drips publish from the approved queue only
-(Instagram 14:20/22:20, Facebook 14:40/22:40 UTC; 2/day per channel).
+product→post mapper, and a review-first curate → prepare → review →
+publish/queue state machine. `lib/social-workflow.ts` computes the shared
+owner-facing stage from persisted preparation, unsaved lineup changes, and an
+edited caption opening; it prevents downstream actions from jumping past a
+stale setup. A queue approval stores both the audit time (`queued_at`) and a
+distinct intended publication time (`scheduled_for`). The shared scheduler
+allows only noon, 2 PM, 4 PM, 6 PM, 8 PM, 10 PM, and midnight in
+`America/New_York`; both the UI and queue APIs enforce those choices.
+
+Scheduled Netlify drips run on the hour using the union of UTC hours required
+for the seven Eastern slots in both EDT and EST. Workers select only rows where
+`scheduled_for <= now()`, ordered by `scheduled_for` and then `queued_at`, and
+process at most 25 due rows per invocation as a runtime-safety batch. There is no
+local daily post cap; Instagram's provider-enforced 100-per-rolling-24-hour quota
+is still checked by its publish step. Extra DST-covering invocations therefore
+cannot publish early. `/admin/social-queues` is the cross-channel read
+model: its server page reads the two scheduled queues, connection policies,
+recent published timestamps and last drip activity, then
+`components/admin/SocialQueuesDashboard.tsx` renders independent channel
+sections plus channel-local ready-row selection and its bulk confirmation.
+The same server page selects the 12 newest published receipts per channel plus
+only their referenced product summaries. `SocialLatestPostsModal.tsx` renders
+that bounded view and delegates comment, refresh, manage, and delete actions to
+the existing guarded channel routes; comment routes call the shared channel
+clients and audit outcomes without storing owner-written comment bodies.
+`components/admin/SocialScheduleModal.tsx` is the shared date/slot editor;
+`SocialQueueRowActions.tsx` handles edit, reschedule, and remove and hands a
+confirmed immediate publish to `SocialBackgroundPublishProvider`. That
+row action component also owns a two-column responsive sizing contract so its
+labels cannot overflow when the table is viewed in a compact browser pane. The
+provider is mounted once in `[locale]/layout.tsx`, so its task/widget survives
+ordinary route navigation. `lib/social-background-publish.ts` owns both the
+bounded channel request/processing loop and the sequential same-channel batch
+runner. The provider owns the single-task guard, current/total progress,
+persistent stop-and-resume failure state, five-second success notification, and
+post-success `router.refresh()`. `lib/social-queue-schedule.ts`
+owns Eastern slot conversion, default
+selection, display labels, and server validation. Queue insertion writes the
+prepared approval state as `pending`, so both drip queries accept `pending` and
+`review` rows with both queue timestamps; the publish step still validates that
+caption and renditions exist before any public write.
+
+Facebook candidate tokens are inspected through Meta `/debug_token` using the
+server-only `FACEBOOK_APP_SECRET` before encrypted storage. They must be valid
+for the Naples Estate Jewelry Social app and have either no finite expiration
+or at least 30 days remaining; longer finite expiry is persisted for truthful
+Settings display. Connection fails closed when inspection is not configured.
 
 Deliberately SHARED between the channels (one fix lands on both):
 
-- Pure caption helpers in `lib/instagram/mapping.ts` (`buildPublicSpecLine`,
-  `formatSpotBasis`, `buildHashtags`, lineup resolution). Both captions use one
-  structure — Available now! → title → specs → price sentence with spot basis,
-  uniform blank-line rhythm, no description, no inventory number — differing
-  only where the platforms force it (clickable vs typeable `Shop:` short link
-  `/p/<inventory#>`, served by `src/app/p/[code]/route.ts`).
+- Caption opening generation and validation in
+  `lib/social-caption-opening.ts`, backed by the configured provider through
+  `lib/ai-product-provider.ts`, plus pure caption helpers in
+  `lib/instagram/mapping.ts` (`buildPublicSpecLine`, `formatSpotBasis`,
+  `buildHashtags`, lineup resolution). Both captions use one structure — one
+  short opening sentence combining availability + the title → specs
+  → price sentence with spot basis, uniform blank-line rhythm, no description,
+  no inventory number — differing
+  only where the platforms force it (Facebook's clickable `Shop:` URL versus
+  Instagram's adjacent `Store link in bio` + typeable `Item:` short-link block,
+  served by `src/app/p/[code]/route.ts`, and hashtag volume).
+  `buildHashtags` preserves relevance order for both, but the Facebook mapper
+  slices the result to `FACEBOOK_MAX_HASHTAGS = 3`; Instagram keeps its own
+  larger platform limit.
+  `SocialPublishBothModal` delegates cross-channel opener selection to
+  `lib/social-publish-both.ts`: when one side is ready and the other needs
+  Prepare, `/api/admin/social/prepare-from-channel` reads the ready side's
+  stored review caption server-side. The target Prepare copies that full body
+  and `adaptSocialCaptionForTarget` substitutes only the destination link block
+  and final hashtag line. The
+  modal receives its opening manager as
+  `sourceChannel`; a ready/ready opener mismatch disables publishing and exposes
+  a target re-prepare action, preventing older divergent drafts from slipping
+  through the combined publish flow.
+  Preview loads are deterministic and do not call AI. The admin explicitly
+  enters optional direction, selects one of six shared direction presets, and
+  generates/regenerates through the preview route, or edits the opening field;
+  the full preview changes locally and publishing
+  stays hidden until Prepare stores the draft. Direction is session-only style
+  guidance, limited to 400 characters, and is never posted or persisted.
+  AI/browser text is treated as untrusted and must pass the shared structural
+  validator. The provider uses a moderately creative temperature (`0.78`) and
+  requires a conversational thought plus varied structure, not a title rewrite
+  with “available now.” Generated text must identify the product but may
+  paraphrase the catalog title naturally; both generated and edited paths reject “our,”
+  links, hashtags, inventory numbers, quotes, extra sentences, and stale
+  availability claims. Direct Prepare without a candidate uses the safe
+  fallback and never triggers a model call.
+  Both product panels turn the state into a guided UI: curation and caption
+  changes must be saved into a fresh prepared upload before review, queue, or
+  publishing actions appear. **Save & prepare** combines lineup persistence
+  and rendition generation, and preserves a local caption draft across the
+  lineup reload. The card-preview endpoint is not surfaced in this operator
+  path: Prepare produces the single real card, then review exposes it.
 - The rendition/card engine (`lib/instagram/images.ts`, `card.ts`,
   `backdrop.ts`): square 1080 JPEGs padded in the photo's own backdrop colour,
   and a generated Satori-typeset ad card (vendored static TTFs under
   `src/assets/fonts`, traced via `outputFileTracingIncludes`) that leads every
   post and REPLACES its source photo in the slides. Auto-crops never upscale.
+  `components/admin/PreparedSlideViewer.tsx` is the shared ordered full-size
+  prepared-slide review window: both panels pass their rendition URLs/card
+  flags into it, and it supplies previous/next and keyboard navigation without
+  giving the popup any publish or draft-mutation capability.
 
 Deliberately SEPARATE: per-channel Storage prefixes
 (`instagram-renditions/` / `facebook-renditions/`, both in the Storage GC
@@ -597,13 +712,28 @@ files the other references. Cross-channel operator tools bridge the seam:
 `/api/admin/social/copy-curation` (explicit copy, refused onto live posts),
 a shared `SocialPublishBothModal` (Instagram publishes first — permanent
 channel — then Facebook), and per-channel discard (drops the draft, keeps
-curation). Ten admin routes per channel plus shared `card-preview` and
-crop-suggest endpoints; operator panels are mirrored per product.
+curation). Per-channel admin routes now include a `refresh-status` read-back
+endpoint, plus shared `card-preview` and crop-suggest endpoints; operator
+panels are mirrored per product.
 
 Key API asymmetry: Instagram posts can never be edited or deleted through the
 API (review-first is load-bearing; removal is manual + "forget"); Facebook
 delete genuinely works. Meta's linked-account auto-crossposting does not apply
 to API-published posts, so the channels never double-post.
+
+Published state is reconciled on manager open and on demand. Each channel reads
+its stored remote id, then treats Meta's missing-object error as deletion only
+after a same-token `/me` probe confirms the expected Page/account. Confirmed
+deletions reuse the local forget cleanup (state `deleted`, remote ids and queued
+metadata cleared, rendition objects removed). All ambiguous failures preserve
+`published`. Facebook token connection additionally probes `/{pageId}/feed`
+with `fields=id&limit=1`, making `pages_read_engagement` a validated connection
+requirement rather than a setup note only. Connected-token replacement is
+transactional at the application level: verify Page profile + feed read + exact
+same-Page id first, then overwrite the encrypted token. For New Page Experience
+posts, refresh may derive a second composite read id from a numeric Facebook
+permalink when the stored id is ambiguous; deletion still requires same-Page
+profile and feed-read proof before local cleanup.
 
 ## Public-shop cache invalidation (2026-07-02)
 
@@ -626,7 +756,10 @@ Supabase Auth is configured through:
 - `next-app/src/lib/supabase/server.ts`
 - `next-app/src/lib/supabase/public.ts` for anonymous server-side public reads.
 - `next-app/src/proxy.ts`, which refreshes Supabase sessions during routing only
-  for user-state route prefixes.
+  for user-state route prefixes. It also owns, in this order: legacy-HOST 301s to
+  the canonical `.com` origin, then retired-path redirects
+  (`lib/legacy-redirects.ts`), then the locale rewrite. The order matters — see
+  the request-ordering note near the top of this document.
 
 Protected admin pages and shared admin server actions use
 `next-app/src/lib/auth-claims.ts` to verify the JWT with Supabase `getClaims()`.
@@ -755,5 +888,5 @@ shared UI behavior.
 Current build state: `src/app/[locale]/shop/(list)/page.tsx` is a thin route
 entry containing only valid Next exports. Shared rendering and metadata logic
 live in the colocated `shop-page-renderer.tsx`, which is also reused by
-`/shop-modern`. On 2026-07-27, Next.js 16.2.12 completed TypeScript, generated
-all 419 static pages, and exited 0.
+`/shop-modern`. On 2026-08-03, Next.js 16.2.12 completed TypeScript, generated
+all 443 pages, and exited 0; all 696 tests and lint passed in the same session.

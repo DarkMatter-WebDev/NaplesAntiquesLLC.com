@@ -7,7 +7,7 @@ import {
   verifyPastedPageToken,
 } from '@/lib/facebook/auth';
 import { FacebookApiError } from '@/lib/facebook/client';
-import { insertSyncLog, updateConnection } from '@/lib/facebook/store';
+import { getConnection, insertSyncLog, updateConnection } from '@/lib/facebook/store';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -45,6 +45,18 @@ export async function POST(req: Request) {
 
   try {
     const page = await verifyPastedPageToken(rawToken);
+    const existing = await getConnection(service);
+    if (
+      existing?.page_id &&
+      existing.page_id !== page.pageId
+    ) {
+      throw new FacebookApiError({
+        status: 409,
+        code: 'wrong_page',
+        operatorMessage: `That token belongs to ${page.pageName ?? page.pageId}, not the currently connected Page. The existing token was kept.`,
+        retryable: false,
+      });
+    }
     const now = new Date();
 
     await updateConnection(service, {
@@ -52,8 +64,7 @@ export async function POST(req: Request) {
       page_id: page.pageId,
       page_name: page.pageName,
       access_token_enc: encryptToken(rawToken),
-      // Page tokens do not expire; kept null so the UI says so honestly.
-      token_expires_at: null,
+      token_expires_at: page.tokenExpiresAt,
       token_refreshed_at: now.toISOString(),
       connected_at: now.toISOString(),
     });

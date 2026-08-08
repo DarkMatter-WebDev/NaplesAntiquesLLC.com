@@ -5,7 +5,7 @@ import {
   buildFacebookPost,
   computeFacebookContentHash,
 } from '../mapping';
-import { FACEBOOK_MAX_PHOTO_ITEMS } from '../client';
+import { FACEBOOK_MAX_HASHTAGS, FACEBOOK_MAX_PHOTO_ITEMS } from '../client';
 
 const SITE_URL = 'https://naplesestatejewelry.com';
 
@@ -88,12 +88,60 @@ describe('buildFacebookPost', () => {
     expect(post.message).toContain('53.91g');
   });
 
-  it('opens with a bare hook, then title, then specs, then the price sentence', () => {
+  it('uses only a few relevant hashtags instead of Instagram-sized clusters', () => {
+    const post = buildFacebookPost({
+      product: makeProduct({
+        brand: 'MilOr',
+        tags: ['vintage', 'gift', 'statement'],
+      }),
+      spotData: LIVE_SPOT,
+      siteUrl: SITE_URL,
+    });
+    const hashtags = post.message.match(/#[a-z0-9]+/gi) ?? [];
+
+    expect(hashtags).toEqual(['#bracelet', '#milor', '#vintage']);
+    expect(hashtags).toHaveLength(FACEBOOK_MAX_HASHTAGS);
+  });
+
+  it('uses the canonical Tiffany brand hashtag', () => {
+    const post = buildFacebookPost({
+      product: makeProduct({ brand: 'Tiffany & Co.', tags: ['#tiffanyco'] }),
+      spotData: LIVE_SPOT,
+      siteUrl: SITE_URL,
+    });
+
+    expect(post.message).toContain('#tiffanyandco');
+    expect(post.message).not.toMatch(/#tiffanyco\b/);
+  });
+
+  it('combines availability and title in one opening sentence, then shows specs and price', () => {
     const post = buildFacebookPost({ product: makeProduct(), spotData: LIVE_SPOT, siteUrl: SITE_URL });
     expect(post.quotedPrice).toBeGreaterThan(0);
     expect(post.message).toMatch(
-      /^Available now!\n\nHeavy Italian 14K Yellow Gold Cuban Link Bracelet\n\n14K Yellow Gold · 53\.91g[^\n]*\n\n≈ \$[\d,]+ at time of posting \(based on \$4,044\/oz gold spot\)\./,
+      /^Available now: Heavy Italian 14K Yellow Gold Cuban Link Bracelet\.\n\n14K Yellow Gold · 53\.91g[^\n]*\n\n≈ \$[\d,]+ at time of posting \(based on \$4,044\/oz gold spot\)\./,
     );
+  });
+
+  it('uses a validated AI-assisted opening verbatim', () => {
+    const opening = 'We’re delighted to share the Heavy Italian 14K Yellow Gold Cuban Link Bracelet, available now.';
+    const post = buildFacebookPost({
+      product: makeProduct(),
+      spotData: LIVE_SPOT,
+      siteUrl: SITE_URL,
+      captionOpening: opening,
+    });
+    expect(post.message.startsWith(`${opening}\n\n14K Yellow Gold`)).toBe(true);
+  });
+
+  it('uses an admin-edited opener without requiring the full catalog title', () => {
+    const opening = 'This heavy Italian bracelet is available now.';
+    const post = buildFacebookPost({
+      product: makeProduct(),
+      spotData: LIVE_SPOT,
+      siteUrl: SITE_URL,
+      captionOpening: opening,
+    });
+    expect(post.message.startsWith(`${opening}\n\n14K Yellow Gold`)).toBe(true);
   });
 
   it('keeps a uniform one-blank-line rhythm — no adjacent content lines anywhere', () => {
@@ -115,14 +163,14 @@ describe('buildFacebookPost', () => {
     expect(post.message).toMatch(/≈ \$[\d,]+ at time of posting \(based on .*\)\./);
   });
 
-  it('says Available now! alone when the price is omitted', () => {
+  it('keeps the combined availability/title opener when the price is omitted', () => {
     const post = buildFacebookPost({
       product: makeProduct(),
       spotData: LIVE_SPOT,
       siteUrl: SITE_URL,
       settings: { includePrice: false },
     });
-    expect(post.message).toMatch(/Available now!/);
+    expect(post.message).toContain('Available now: Heavy Italian 14K Yellow Gold Cuban Link Bracelet.');
     expect(post.message).not.toMatch(/at time of posting/);
   });
 

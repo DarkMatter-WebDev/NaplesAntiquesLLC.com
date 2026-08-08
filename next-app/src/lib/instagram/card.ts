@@ -311,6 +311,20 @@ async function renderTextLayer(content: CardContent, palette: Palette): Promise<
       // shifts a centred line left by one space. Nudge it back.
       paddingLeft: 7.5,
     }),
+    textNode('NOW AVAILABLE', {
+      position: 'absolute',
+      top: 768,
+      width: '100%',
+      justifyContent: 'center',
+      color: palette.accent,
+      fontFamily: 'Hanken',
+      fontSize: 15,
+      fontWeight: 600,
+      letterSpacing: 4.2,
+      // Keep true optical centering after Satori spaces the final glyph.
+      paddingLeft: 4.2,
+      opacity: 0.9,
+    }),
     textNode(line1, {
       position: 'absolute',
       top: 800,

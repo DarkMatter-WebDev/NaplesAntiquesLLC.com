@@ -6,8 +6,8 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 /**
- * Scheduled drip: publish up to the owner's configured daily limit from the
- * approved queue, oldest first. Only products an admin explicitly queued are
+ * Scheduled worker: publish the next bounded batch of due posts. Only products
+ * an admin explicitly queued are
  * eligible, so this can never surprise the Page with something unreviewed.
  *
  * No admin browser session exists when a cron calls this, so it is gated by a

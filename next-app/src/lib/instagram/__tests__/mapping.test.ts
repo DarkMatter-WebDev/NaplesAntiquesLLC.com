@@ -161,6 +161,20 @@ describe('buildHashtags', () => {
     expect(tags.filter((t) => t === 'estatejewelry')).toHaveLength(1);
   });
 
+  it('always canonicalizes direct Tiffany brand hashtags to tiffanyandco', () => {
+    const tags = buildHashtags(
+      makeProduct({
+        brand: 'Tiffany & Co.',
+        tags: ['Tiffany', '#tiffanyco', 'Tiffany and Company'],
+      }),
+      ['tiffanyandco'],
+    );
+
+    expect(tags.filter((tag) => tag === 'tiffanyandco')).toHaveLength(1);
+    expect(tags).not.toContain('tiffany');
+    expect(tags).not.toContain('tiffanyco');
+  });
+
   it('strips punctuation and drops fragments shorter than three characters', () => {
     const tags = buildHashtags(makeProduct({ tags: ['14k!', 'a', 'ok'] }), []);
     expect(tags).toContain('14k');
@@ -244,19 +258,41 @@ describe('buildInstagramPost', () => {
     expect(post.quotedPrice).toBeGreaterThan(0);
   });
 
-  it('opens with a bare hook, then title, then specs, then the price sentence — same order as Facebook', () => {
+  it('combines availability and title in one opening sentence, then shows specs and price', () => {
     const post = buildInstagramPost({ product: makeProduct(), spotData: LIVE_SPOT });
     expect(post.caption).toMatch(
-      /^Available now!\n\nHeavy Italian 14K Yellow Gold Cuban Link Bracelet\n\n14K Yellow Gold · 53\.91g[^\n]*\n\n≈ \$[\d,]+ at time of posting \(based on \$4,044\/oz gold spot\)\./,
+      /^Available now: Heavy Italian 14K Yellow Gold Cuban Link Bracelet\.\n\n14K Yellow Gold · 53\.91g[^\n]*\n\n≈ \$[\d,]+ at time of posting \(based on \$4,044\/oz gold spot\)\./,
     );
   });
 
-  it('keeps a uniform one-blank-line rhythm — no adjacent content lines anywhere', () => {
+  it('uses a validated AI-assisted opening verbatim', () => {
+    const opening = 'We’re delighted to share the Heavy Italian 14K Yellow Gold Cuban Link Bracelet, available now.';
+    const post = buildInstagramPost({
+      product: makeProduct(),
+      spotData: LIVE_SPOT,
+      captionOpening: opening,
+    });
+    expect(post.caption.startsWith(`${opening}\n\n14K Yellow Gold`)).toBe(true);
+  });
+
+  it('uses an admin-edited opener without requiring the full catalog title', () => {
+    const opening = 'This heavy Italian bracelet is available now.';
+    const post = buildInstagramPost({
+      product: makeProduct(),
+      spotData: LIVE_SPOT,
+      captionOpening: opening,
+    });
+    expect(post.caption.startsWith(`${opening}\n\n14K Yellow Gold`)).toBe(true);
+  });
+
+  it('keeps blank-line rhythm everywhere except the intentional Store/Item pair', () => {
     const post = buildInstagramPost({ product: makeProduct(), spotData: LIVE_SPOT });
     const rows = post.caption.split('\n');
     for (let i = 1; i < rows.length; i += 1) {
-      // Two non-empty lines in a row would be a tight cluster.
-      expect(rows[i - 1] !== '' && rows[i] !== '').toBe(false);
+      if (rows[i - 1] !== '' && rows[i] !== '') {
+        expect(rows[i - 1]).toBe('Store link in bio');
+        expect(rows[i]).toMatch(/^Item: /);
+      }
     }
   });
 
@@ -286,9 +322,10 @@ describe('buildInstagramPost', () => {
     expect(post.caption).toContain('53.91g');
   });
 
-  it('carries a typeable short Shop link — Instagram never linkifies, so it is for human eyes', () => {
+  it('stacks the link-in-bio direction directly above the typeable item path', () => {
     const post = buildInstagramPost({ product: makeProduct(), spotData: LIVE_SPOT });
-    expect(post.caption).toContain('Shop: NaplesEstateJewelry.com/p/21');
+    expect(post.caption).toContain('\n\nStore link in bio\nItem: NaplesEstateJewelry.com/p/21\n\n');
+    expect(post.caption).not.toContain('Shop: NaplesEstateJewelry.com');
   });
 
   it('falls back to the bare storefront domain when there is no inventory number', () => {
@@ -296,7 +333,7 @@ describe('buildInstagramPost', () => {
       product: makeProduct({ inventory_number: null }),
       spotData: LIVE_SPOT,
     });
-    expect(post.caption).toContain('Shop: NaplesEstateJewelry.com');
+    expect(post.caption).toContain('Store link in bio\nItem: NaplesEstateJewelry.com');
     expect(post.caption).not.toContain('/p/');
   });
 

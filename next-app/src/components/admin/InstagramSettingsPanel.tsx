@@ -20,7 +20,6 @@ interface StatusResponse {
   };
   policy: {
     autoPublish: boolean;
-    dailyPostLimit: number;
     captionIncludePrice: boolean;
     captionSpanishLine: boolean;
     captionCta: string | null;
@@ -300,21 +299,6 @@ export default function InstagramSettingsPanel() {
                 </span>
               </label>
 
-              <label className="flex items-center gap-2 text-sm">
-                <span style={{ color: 'var(--color-on-surface)' }}>Posts per day</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={25}
-                  className="form-field w-20 text-sm"
-                  defaultValue={status.policy.dailyPostLimit}
-                  disabled={savingPolicy}
-                  onBlur={(event) => {
-                    const value = Number(event.target.value);
-                    if (value !== status.policy.dailyPostLimit) void savePolicy({ dailyPostLimit: value });
-                  }}
-                />
-              </label>
             </div>
 
             <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>

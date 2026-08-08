@@ -24,14 +24,22 @@ describe('legacy redirect resolution', () => {
   });
 
   it('re-slugs renamed products in both locales', () => {
-    expect(resolveLegacyRedirect('/shop/new-listing-04')).toEqual({
-      destination: '/shop/14k-gold-rope-chain-necklace',
+    expect(resolveLegacyRedirect('/shop/new-listing-05')).toEqual({
+      destination: '/shop/10k-gold-rope-chain-necklace',
       permanent: true,
     });
-    expect(resolveLegacyRedirect('/es/shop/new-listing-04')).toEqual({
-      destination: '/es/shop/14k-gold-rope-chain-necklace',
+    expect(resolveLegacyRedirect('/es/shop/new-listing-05')).toEqual({
+      destination: '/es/shop/10k-gold-rope-chain-necklace',
       permanent: true,
     });
+  });
+
+  it('has no rule for a product the owner deleted — it must 404, not dead-end via a redirect', () => {
+    // new-listing-04's target was deleted 2026-08 (owner-confirmed). Re-adding
+    // a rule here would send visitors to a 404 through a redirect, which is
+    // worse than an honest 404 and reads as a soft 404 to search engines.
+    expect(resolveLegacyRedirect('/shop/new-listing-04')).toBeNull();
+    expect(resolveLegacyRedirect('/es/shop/new-listing-04')).toBeNull();
   });
 
   it('uses 308 for SEO consolidation and 307 for convenience-only URLs', () => {

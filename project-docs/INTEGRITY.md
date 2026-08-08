@@ -1,21 +1,21 @@
 # Integrity Rules And Pre-Publish Checklist
 
-> Current rules for the Next.js app. Last reconciled: **2026-07-23**.
+> Current rules for the Next.js app. Last reconciled: **2026-08-03**.
 
 ## Verification Commands
 
 Run from `next-app/`:
 
 ```bash
-npm test -- --run
+npm test -- --maxWorkers=4
+npx tsc --noEmit
 npm run lint
 npm run build
 npm audit --omit=dev
 ```
 
-`npm run build` is the publish gate and must exit 0. The current named
-`renderShopPage` route-export failure is documented technical debt, not a
-passing build.
+`npm run build` is the publish gate and must exit 0. Current local baseline:
+696/696 tests, TypeScript, lint, and a 443-page production build pass.
 
 ## Rules
 
@@ -79,7 +79,8 @@ the same session report to all four files.
 
 ## Pre-Publish Checklist
 
-- [ ] `npm test -- --run` passes.
+- [ ] `npm test -- --maxWorkers=4` passes.
+- [ ] `npx tsc --noEmit` passes.
 - [ ] `npm run lint` passes.
 - [ ] `npm run build` exits 0.
 - [ ] `npm audit --omit=dev` has no unresolved production vulnerability.
@@ -98,4 +99,3 @@ the same session report to all four files.
 - [ ] Production SQL/environment/manual steps are called out in `TASKS.md`.
 - [ ] `CURRENT_STATUS.md`, `TASKS.md`, `DECISIONS.md`, and `CHANGELOG.md` reflect
       the resulting state without duplicating full history.
-

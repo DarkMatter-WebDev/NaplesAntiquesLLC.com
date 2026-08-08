@@ -24,6 +24,7 @@ export async function GET(req: Request) {
       permalink: row.permalink,
       postedAt: row.posted_at,
       queuedAt: row.queued_at,
+      scheduledFor: row.scheduled_for,
       soldCommentAt: row.sold_comment_at,
       lastError: row.last_error,
     })),

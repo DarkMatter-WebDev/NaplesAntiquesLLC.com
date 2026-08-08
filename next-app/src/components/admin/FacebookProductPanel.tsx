@@ -1,16 +1,32 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 // The crop editor is channel-agnostic (it analyzes product photos, not posts)
 // and is shared with the Instagram panel on purpose — one crop UX everywhere.
 import InstagramCropEditor, { type CropRect } from './InstagramCropEditor';
+import {
+  hasSquareCanvas,
+  SocialSquareFramingImage,
+  type SocialSquareFraming,
+} from './SocialSquareFramingPreview';
 import AdminModal from './AdminModal';
+import PreparedSlideViewer from './PreparedSlideViewer';
 import SocialPublishBothModal from './SocialPublishBothModal';
+import SocialScheduleModal from './SocialScheduleModal';
+import { getSocialWorkflowStage } from '@/lib/social-workflow';
+import SocialCaptionOpeningEditor, {
+  replaceSocialCaptionOpening,
+} from './SocialCaptionOpeningEditor';
 
 interface PreviewResponse {
   message: string;
   messageLength: number;
+  captionOpening: string;
+  captionOpeningGeneratedByAi: boolean;
+  captionOpeningIsDefault: boolean;
+  captionOpeningPrepared: boolean;
   imageCount: number;
   imageUrls: string[];
   renditionUrls: string[];
@@ -18,6 +34,8 @@ interface PreviewResponse {
   renditionIsCard: boolean[];
   /** Ordered source images that will be posted. */
   lineup: string[];
+  /** Renderer-matched contain-to-square framing for each source image. */
+  imageFraming: Record<string, SocialSquareFraming>;
   /** Product photos deliberately left out of the post. */
   notIncluded: string[];
   hasCustomLineup: boolean;
@@ -39,6 +57,8 @@ interface PreviewResponse {
     permalink: string | null;
     postedAt: string | null;
     queuedAt: string | null;
+    scheduledFor: string | null;
+    lastError: string | null;
   } | null;
 }
 
@@ -68,11 +88,17 @@ function stateTone(state: string): string {
 export default function FacebookProductPanel({ productId }: { productId: string }) {
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<null | 'prepare' | 'publish' | 'queue' | 'remove' | 'discard'>(null);
+  const [busy, setBusy] = useState<null | 'prepare' | 'publish' | 'queue' | 'remove' | 'forget' | 'discard' | 'status'>(null);
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
+  const [statusFeedback, setStatusFeedback] = useState<{
+    text: string;
+    tone: 'success' | 'neutral';
+    settingsLink?: boolean;
+  } | null>(null);
   const [confirmPublish, setConfirmPublish] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [confirmForget, setConfirmForget] = useState(false);
   // Draft lineup being edited. `null` means "not editing" — edits stay local
   // until Save, so a mis-click never silently changes what would be published.
   const [draftLineup, setDraftLineup] = useState<string[] | null>(null);
@@ -83,23 +109,29 @@ export default function FacebookProductPanel({ productId }: { productId: string 
   // Same sentinel pattern; `null` = auto-detect, a hex string forces it.
   const [draftCardBackground, setDraftCardBackground] = useState<string | null | undefined>(undefined);
   const [savingLineup, setSavingLineup] = useState(false);
-  // Object URL of an on-demand card render, shown in a pop-up window.
-  const [cardPreviewUrl, setCardPreviewUrl] = useState<string | null>(null);
-  const [showCardModal, setShowCardModal] = useState(false);
-  const [generatingCard, setGeneratingCard] = useState(false);
+  // These are deliberate navigation states, not unsaved data. A review only
+  // exposes its final output until the owner explicitly chooses to edit it.
+  const [editingSetup, setEditingSetup] = useState(false);
+  const [editingCaption, setEditingCaption] = useState(false);
   // The thumbnail the single action toolbar operates on.
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
-  // Prepared slide opened full-size in a pop-up window (site convention).
-  const [enlargedSlide, setEnlargedSlide] = useState<{ url: string; label: string } | null>(null);
+  // Prepared-slide index opened in the shared full-size review pop-up.
+  const [enlargedSlideIndex, setEnlargedSlideIndex] = useState<number | null>(null);
   const [showPublishBoth, setShowPublishBoth] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
   const [copying, setCopying] = useState(false);
+  const [captionOpeningDirection, setCaptionOpeningDirection] = useState('');
+  const [captionOpeningDraft, setCaptionOpeningDraft] = useState('');
+  const [captionOpeningCanRegenerate, setCaptionOpeningCanRegenerate] = useState(false);
+  const [generatingCaptionOpening, setGeneratingCaptionOpening] = useState(false);
+  const autoStatusCheckedProduct = useRef<string | null>(null);
 
   const showNotice = (text: string, ok = true) => {
     setNotice({ text, ok });
     window.setTimeout(() => setNotice(null), 6000);
   };
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ preserveCaptionDraft = false }: { preserveCaptionDraft?: boolean } = {}) => {
     try {
       const res = await fetch('/api/admin/facebook/preview', {
         method: 'POST',
@@ -108,9 +140,18 @@ export default function FacebookProductPanel({ productId }: { productId: string 
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || 'Could not load the Facebook preview.');
-      setPreview(data as PreviewResponse);
+      const nextPreview = data as PreviewResponse;
+      setPreview(nextPreview);
+      if (!preserveCaptionDraft) {
+        setCaptionOpeningDraft(nextPreview.captionOpening);
+        setCaptionOpeningCanRegenerate(
+          nextPreview.captionOpeningGeneratedByAi || !nextPreview.captionOpeningIsDefault,
+        );
+      }
+      return nextPreview;
     } catch (err) {
       showNotice(err instanceof Error ? err.message : 'Could not load the Facebook preview.', false);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -120,18 +161,112 @@ export default function FacebookProductPanel({ productId }: { productId: string 
     // Wrapped so the first setState lands after an await, not synchronously in
     // the effect body (react-hooks/set-state-in-effect).
     const run = async () => {
-      await load();
+      if (autoStatusCheckedProduct.current === productId) return;
+      autoStatusCheckedProduct.current = productId;
+      const initial = await load();
+      if (initial?.current?.syncState !== 'published') return;
+
+      // Reconcile once whenever a published manager opens. Failures are kept
+      // quiet here because the explicit button below gives the operator a
+      // deliberate retry and actionable feedback.
+      const res = await fetch('/api/admin/facebook/refresh-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId }),
+      }).catch(() => null);
+      if (!res?.ok) return;
+      const result = await res.json().catch(() => null);
+      if (result?.changed) {
+        await load();
+        setStatusFeedback({ text: 'Facebook status updated to Removed.', tone: 'success' });
+      }
     };
     void run();
-  }, [load]);
+  }, [load, productId]);
 
-  const runAction = async (action: 'prepare' | 'publish' | 'queue' | 'unqueue') => {
+  const refreshRemoteStatus = async () => {
+    setBusy('status');
+    setStatusFeedback(null);
+    try {
+      const res = await fetch('/api/admin/facebook/refresh-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId }),
+      });
+      const result = await res.json().catch(() => null);
+      if (!res.ok) {
+        if (result?.reason === 'permission') {
+          setStatusFeedback({
+            text: 'Couldn’t check this post yet. The Facebook connection needs post-reading access.',
+            tone: 'neutral',
+            settingsLink: true,
+          });
+        } else {
+          setStatusFeedback({
+            text: 'Facebook couldn’t be reached, so the saved status was left unchanged.',
+            tone: 'neutral',
+          });
+        }
+        return;
+      }
+      await load();
+      setStatusFeedback({
+        text: result.changed ? 'Facebook status updated to Removed.' : 'Facebook status is up to date.',
+        tone: 'success',
+      });
+    } catch {
+      setStatusFeedback({
+        text: 'Facebook couldn’t be reached, so the saved status was left unchanged.',
+        tone: 'neutral',
+      });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const generateCaptionOpening = async () => {
+    setGeneratingCaptionOpening(true);
+    try {
+      const res = await fetch('/api/admin/facebook/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId,
+          generateCaptionOpening: true,
+          captionOpeningDirection,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || 'Could not generate an AI opening.');
+      const nextPreview = data as PreviewResponse;
+      setPreview(nextPreview);
+      setCaptionOpeningDraft(nextPreview.captionOpening);
+      setCaptionOpeningCanRegenerate(true);
+      if (nextPreview.warnings.length > 0) showNotice(nextPreview.warnings.join(' '), false);
+    } catch (err) {
+      showNotice(err instanceof Error ? err.message : 'Could not generate an AI opening.', false);
+    } finally {
+      setGeneratingCaptionOpening(false);
+    }
+  };
+
+  const runAction = async (
+    action: 'prepare' | 'publish' | 'queue' | 'unqueue',
+    scheduledFor?: string,
+  ) => {
     setBusy(action === 'unqueue' ? 'queue' : action);
     try {
       const res = await fetch('/api/admin/facebook/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId, action }),
+        body: JSON.stringify({
+          productId,
+          action,
+          ...(action === 'prepare' && captionOpeningDraft
+            ? { captionOpening: captionOpeningDraft }
+            : {}),
+          ...(action === 'queue' && scheduledFor ? { scheduledFor } : {}),
+        }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.message || data?.error || 'That action failed.');
@@ -139,8 +274,13 @@ export default function FacebookProductPanel({ productId }: { productId: string 
       if (data?.warnings?.length) showNotice(data.warnings.join(' '), true);
       setConfirmPublish(false);
       await load();
+      return true;
     } catch (err) {
       showNotice(err instanceof Error ? err.message : 'That action failed.', false);
+      // The server may have persisted an error/recovery checkpoint. Never leave
+      // the pre-click Review screen visible after the request completes.
+      await load({ preserveCaptionDraft: true });
+      return false;
     } finally {
       setBusy(null);
     }
@@ -208,6 +348,26 @@ export default function FacebookProductPanel({ productId }: { productId: string 
     }
   };
 
+  const clearRemovedPost = async () => {
+    setBusy('forget');
+    try {
+      const res = await fetch('/api/admin/facebook/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId, confirm: true, mode: 'forget' }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.message || data?.error || 'Could not clear the record.');
+      setConfirmForget(false);
+      showNotice('Marked Removed. Nothing was deleted from Facebook.', true);
+      await load();
+    } catch (err) {
+      showNotice(err instanceof Error ? err.message : 'Could not clear the record.', false);
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const saveLineup = async (
     urls: string[],
     crops: Record<string, CropRect>,
@@ -235,48 +395,24 @@ export default function FacebookProductPanel({ productId }: { productId: string 
       setDraftCrops(null);
       setDraftCardSource(undefined);
       setDraftCardBackground(undefined);
-      showNotice('Image lineup saved. Prepare again to rebuild the images.');
-      await load();
+      await load({ preserveCaptionDraft: true });
+      return true;
     } catch (err) {
       showNotice(err instanceof Error ? err.message : 'Could not save the image lineup.', false);
+      return false;
     } finally {
       setSavingLineup(false);
     }
   };
 
-  const generateCardPreview = async (sourceUrl: string | null, background: string | null) => {
-    setGeneratingCard(true);
-    try {
-      const res = await fetch('/api/admin/card-preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productId,
-          ...(sourceUrl ? { imageUrl: sourceUrl } : {}),
-          ...(background ? { background } : {}),
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error || 'Could not render the card.');
-      }
-      const blob = await res.blob();
-      setCardPreviewUrl((previous) => {
-        if (previous) URL.revokeObjectURL(previous);
-        return URL.createObjectURL(blob);
-      });
-      // Site convention: results open in a pop-up window, never inline.
-      setShowCardModal(true);
-    } catch (err) {
-      showNotice(err instanceof Error ? err.message : 'Could not render the card.', false);
-    } finally {
-      setGeneratingCard(false);
-    }
-  };
-
   const state = preview?.current?.syncState ?? null;
   const isPublished = state === 'published';
-  const canPublish = state === 'review' && !preview?.blockedReason;
+  const captionOpeningDirty = preview
+    ? captionOpeningDraft !== preview.captionOpening || !preview.captionOpeningPrepared
+    : false;
+  const displayedMessage = preview
+    ? replaceSocialCaptionOpening(preview.message, captionOpeningDraft)
+    : '';
 
   const shownLineup = draftLineup ?? preview?.lineup ?? [];
   const shownExcluded = draftLineup
@@ -296,7 +432,58 @@ export default function FacebookProductPanel({ productId }: { productId: string 
     draftCrops !== null ||
     draftCardSource !== undefined ||
     draftCardBackground !== undefined;
+  const hasPreparedUpload = Boolean(preview?.renditionUrls.length) && !lineupDirty;
+  const workflowStage = getSocialWorkflowStage({
+    isPublished,
+    lineupDirty,
+    hasPreparedUpload,
+    captionOpeningDirty,
+    isEditingSetup: editingSetup,
+    isEditingCaption: editingCaption,
+  });
+  const canPublish = (state === 'review' || state === 'error')
+    && workflowStage === 'review'
+    && !preview?.blockedReason;
+  const isInterruptedPublishRecovery = state === 'error'
+    && /photos? (?:were|was|are) already posted/i.test(preview?.current?.lastError ?? '');
+  const canManageQueue = workflowStage === 'review';
   const selectedIndex = selectedUrl ? shownLineup.indexOf(selectedUrl) : -1;
+  const hasLocalCaptionChanges = Boolean(
+    preview && (captionOpeningDraft !== preview.captionOpening || captionOpeningDirection.trim() || editingCaption),
+  );
+  const canResetSetupChanges = lineupDirty || editingSetup || hasLocalCaptionChanges;
+
+  const resetSetupChanges = () => {
+    setDraftLineup(null);
+    setDraftCrops(null);
+    setCropping(null);
+    setDraftCardSource(undefined);
+    setDraftCardBackground(undefined);
+    setSelectedUrl(null);
+    setCaptionOpeningDirection('');
+    setCaptionOpeningDraft(preview?.captionOpening ?? '');
+    setCaptionOpeningCanRegenerate(
+      Boolean(preview?.captionOpeningGeneratedByAi || !preview?.captionOpeningIsDefault),
+    );
+    setEditingSetup(false);
+    setEditingCaption(false);
+  };
+
+  // A saved lineup is a pipeline detail, not a second task for the owner.
+  // This one deliberate action persists any local curation, then creates the
+  // immutable prepared upload from precisely that saved setup and caption.
+  const prepareCurrentSetup = async () => {
+    if (busy !== null || savingLineup || preview?.blockedReason) return;
+    if (lineupDirty) {
+      const saved = await saveLineup(shownLineup, shownCrops, draftCardSource, draftCardBackground);
+      if (!saved) return;
+    }
+    const prepared = await runAction('prepare');
+    if (prepared) {
+      setEditingSetup(false);
+      setEditingCaption(false);
+    }
+  };
 
   const setCrop = (url: string, rect: CropRect | null) => {
     const next = { ...shownCrops };
@@ -392,6 +579,20 @@ export default function FacebookProductPanel({ productId }: { productId: string 
         </div>
       )}
 
+      {!loading && state === 'error' && preview?.current?.lastError && (
+        <div
+          className="px-3 py-2 text-xs font-medium"
+          role="status"
+          style={{
+            background: 'color-mix(in srgb, var(--color-error) 10%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--color-error) 28%, transparent)',
+            color: 'var(--color-error)',
+          }}
+        >
+          Last publish attempt: {preview.current.lastError}
+        </div>
+      )}
+
       {!loading && preview && preview.warnings.length > 0 && (
         <ul className="flex flex-col gap-1 text-xs" style={{ color: '#8a6400' }}>
           {preview.warnings.map((warning) => (
@@ -421,12 +622,87 @@ export default function FacebookProductPanel({ productId }: { productId: string 
             </p>
           )}
 
-          <div>
+          {isPublished && (
+            <button
+              type="button"
+              onClick={refreshRemoteStatus}
+              disabled={busy !== null}
+              className="outline-button w-fit text-xs disabled:opacity-50"
+            >
+              {busy === 'status' ? 'Checking Facebook…' : 'Refresh Facebook status'}
+            </button>
+          )}
+
+          {statusFeedback && (
+            <p
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
+              role="status"
+              style={{
+                color:
+                  statusFeedback.tone === 'success'
+                    ? 'var(--color-primary)'
+                    : 'var(--color-on-surface-variant)',
+              }}
+            >
+              <span>{statusFeedback.text}</span>
+              {statusFeedback.settingsLink && (
+                <Link
+                  href="/admin/settings"
+                  className="hover-underline-grow font-bold"
+                  style={{ color: 'var(--color-primary)' }}
+                >
+                  Update connection →
+                </Link>
+              )}
+            </p>
+          )}
+
+          {!isPublished && (
+            <div
+              className="border px-3 py-2"
+              style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}
+            >
+              <p className="text-[0.65rem] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
+                {workflowStage === 'curate'
+                  ? 'Step 1 of 3 · curate photos and card'
+                  : workflowStage === 'prepare' || workflowStage === 'update'
+                    ? 'Step 2 of 3 · prepare the upload'
+                    : workflowStage === 'review'
+                      ? 'Step 3 of 3 · review before publishing'
+                      : 'Published'}
+              </p>
+              <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                {workflowStage === 'curate'
+                  ? 'Finish the photo setup, then use Save & prepare. Publishing stays unavailable until that completes.'
+                  : workflowStage === 'review'
+                    ? 'Review the prepared slides and post text. Queue or publish only when this review is current.'
+                    : workflowStage === 'update'
+                      ? 'The post text has changed. Update the prepared upload before reviewing, queueing, or publishing.'
+                      : 'Your saved photo setup is ready. Prepare once to build the final slides and lock the post text for review.'}
+              </p>
+            </div>
+          )}
+
+          {(workflowStage === 'curate' || workflowStage === 'update') && (
+            <SocialCaptionOpeningEditor
+              directionValue={captionOpeningDirection}
+              onDirectionChange={setCaptionOpeningDirection}
+              value={captionOpeningDraft}
+              onChange={setCaptionOpeningDraft}
+              onGenerate={generateCaptionOpening}
+              generating={generatingCaptionOpening}
+              canRegenerate={captionOpeningCanRegenerate}
+              disabled={isPublished || busy !== null}
+              needsPrepare={captionOpeningDirty}
+            />
+          )}
+
+          {workflowStage !== 'prepare' && <div>
             <p
               className="mb-1 text-[0.65rem] font-bold uppercase tracking-[0.2em]"
               style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
             >
-              Post preview · {preview.messageLength} characters · shop link included
+              Post preview · {displayedMessage.length} characters · shop link included
             </p>
             <pre
               className="max-h-72 overflow-auto whitespace-pre-wrap border p-3 text-xs leading-relaxed"
@@ -437,16 +713,16 @@ export default function FacebookProductPanel({ productId }: { productId: string 
                 fontFamily: 'ui-monospace, monospace',
               }}
             >
-              {preview.message}
+              {displayedMessage}
             </pre>
             <p className="mt-1 text-[0.68rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
               The Shop line renders as a clickable link on Facebook. Posts can be removed later, but review before
               publishing anyway — a live post is public immediately.
             </p>
-          </div>
+          </div>}
 
           {/* ---- Image lineup editor ------------------------------------ */}
-          <div>
+          {workflowStage === 'curate' && <div>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <p
                 className="text-[0.65rem] font-bold uppercase tracking-[0.2em]"
@@ -454,7 +730,7 @@ export default function FacebookProductPanel({ productId }: { productId: string 
               >
                 Photos · {shownLineup.length} of max 9
               </p>
-              {!lineupDirty && (
+              {!lineupDirty && !editingSetup && !captionOpeningDirty && !editingCaption && (
                 <button
                   type="button"
                   onClick={copyCuration}
@@ -464,32 +740,6 @@ export default function FacebookProductPanel({ productId }: { productId: string 
                 >
                   {copying ? 'Copying…' : 'Copy setup to Instagram'}
                 </button>
-              )}
-              {lineupDirty && (
-                <span className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => saveLineup(shownLineup, shownCrops, draftCardSource, draftCardBackground)}
-                    disabled={savingLineup || shownLineup.length === 0}
-                    className="gold-button text-xs disabled:opacity-50"
-                  >
-                    {savingLineup ? 'Saving…' : 'Save lineup'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDraftLineup(null);
-                      setDraftCrops(null);
-                      setCropping(null);
-                      setDraftCardSource(undefined);
-                      setDraftCardBackground(undefined);
-                    }}
-                    className="text-xs font-bold uppercase tracking-wide"
-                    style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
-                  >
-                    Cancel
-                  </button>
-                </span>
               )}
             </div>
 
@@ -529,13 +779,10 @@ export default function FacebookProductPanel({ productId }: { productId: string 
                             : undefined,
                       }}
                     >
-                      <Image
-                        src={url}
-                        alt={`Post position ${index + 1}`}
-                        fill
-                        sizes="96px"
-                        className="object-cover"
-                        unoptimized={url.startsWith('/assets/')}
+                      <SocialSquareFramingImage
+                        imageUrl={url}
+                        crop={shownCrops[url]}
+                        framing={preview.imageFraming[url]}
                       />
                       <span
                         className="absolute left-0 top-0 px-1 text-[0.6rem] font-bold"
@@ -562,6 +809,15 @@ export default function FacebookProductPanel({ productId }: { productId: string 
                           title="This image is cropped for this post"
                         >
                           Crop
+                        </span>
+                      )}
+                      {hasSquareCanvas(preview.imageFraming[url], shownCrops[url]) && (
+                        <span
+                          className="absolute bottom-0 left-0 px-1 text-[0.55rem] font-bold uppercase"
+                          style={{ background: '#1c1815', color: '#fff' }}
+                          title="Prepared framing preserves the full image on a square canvas"
+                        >
+                          Canvas
                         </span>
                       )}
                     </button>
@@ -645,8 +901,7 @@ export default function FacebookProductPanel({ productId }: { productId: string 
                     <button
                       type="button"
                       onClick={() => removeImage(selectedIndex)}
-                      className="text-xs font-bold uppercase tracking-wide"
-                      style={{ color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}
+                      className="outline-button social-danger-button text-xs"
                     >
                       Remove
                     </button>
@@ -671,95 +926,24 @@ export default function FacebookProductPanel({ productId }: { productId: string 
                     <option value="#fbf8f3">Cream</option>
                   </select>
                 </label>
-                <button
-                  type="button"
-                  onClick={() => generateCardPreview(effectiveCardSource, shownCardBackground)}
-                  disabled={generatingCard}
-                  className="gold-button text-xs disabled:opacity-50"
-                >
-                  {generatingCard ? 'Generating…' : 'Generate card'}
-                </button>
               </div>
             )}
-
             {/* ---- Pop-up windows (site convention: never expand inline) - */}
             {cropping && !isPublished && (
               <AdminModal
                 title={`Crop photo ${shownLineup.indexOf(cropping) + 1}`}
                 onClose={() => setCropping(null)}
-                maxWidth="max-w-xl"
+                maxWidth="max-w-3xl"
               >
                 <InstagramCropEditor
                   productId={productId}
                   imageUrl={cropping}
                   value={shownCrops[cropping] ?? null}
+                  framing={preview.imageFraming[cropping]}
                   onChange={(next) => setCrop(cropping, next)}
                   onClose={() => setCropping(null)}
                 />
               </AdminModal>
-            )}
-
-            {showCardModal && cardPreviewUrl && (
-              <AdminModal
-                title="Generated card"
-                onClose={() => setShowCardModal(false)}
-                maxWidth="max-w-md"
-              >
-                <div className="flex flex-col gap-3">
-                  {/* Object URL from an ephemeral render — next/image cannot
-                      optimize blob: sources, so a plain img is correct here. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={cardPreviewUrl} alt="Generated card preview" className="block w-full border" style={{ borderColor: 'var(--color-outline-variant)' }} />
-                  <p className="text-[0.68rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
-                    Built from the photo marked CARD
-                    {lineupDirty ? ' — including unsaved choices' : ''}. Nothing is posted or stored;
-                    Prepare builds the real slide.
-                  </p>
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => generateCardPreview(effectiveCardSource, shownCardBackground)}
-                      disabled={generatingCard}
-                      className="outline-button text-xs disabled:opacity-50"
-                    >
-                      {generatingCard ? 'Generating…' : 'Regenerate'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowCardModal(false)}
-                      className="gold-button text-xs"
-                    >
-                      Done
-                    </button>
-                  </div>
-                </div>
-              </AdminModal>
-            )}
-
-            {enlargedSlide && (
-              <AdminModal
-                title={enlargedSlide.label}
-                onClose={() => setEnlargedSlide(null)}
-                maxWidth="max-w-xl"
-              >
-                <div className="relative w-full" style={{ aspectRatio: '1 / 1' }}>
-                  <Image
-                    src={enlargedSlide.url}
-                    alt={enlargedSlide.label}
-                    fill
-                    sizes="(max-width: 640px) 100vw, 576px"
-                    className="object-contain"
-                  />
-                </div>
-              </AdminModal>
-            )}
-
-            {showPublishBoth && (
-              <SocialPublishBothModal
-                productId={productId}
-                onClose={() => setShowPublishBoth(false)}
-                onDone={() => void load()}
-              />
             )}
 
             {!isPublished && shownExcluded.length > 0 && (
@@ -804,12 +988,64 @@ export default function FacebookProductPanel({ productId }: { productId: string 
 
             {lineupDirty && (
               <p className="mt-2 text-xs" style={{ color: '#8a6400' }}>
-                Unsaved image changes. Save the lineup, then Prepare to rebuild the images.
+                Photo setup has changed. Save &amp; prepare to create a fresh upload from these choices.
               </p>
             )}
-          </div>
 
-          {preview.renditionUrls.length > 0 && !lineupDirty && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-4" style={{ borderColor: 'var(--color-outline-variant)' }}>
+              <p className="mr-auto text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                Save &amp; prepare uses the photo marked CARD to create the final card as slide 1. You will review that finished first slide before publishing.
+              </p>
+              <button
+                type="button"
+                onClick={() => void prepareCurrentSetup()}
+                disabled={savingLineup || busy !== null || shownLineup.length === 0}
+                className="gold-button text-sm disabled:opacity-50"
+              >
+                {savingLineup ? 'Saving setup…' : busy === 'prepare' ? 'Preparing…' : 'Save & prepare'}
+              </button>
+              {canResetSetupChanges && (
+                <button
+                  type="button"
+                  onClick={resetSetupChanges}
+                  className="outline-button text-sm"
+                >
+                  Reset changes
+                </button>
+              )}
+            </div>
+          </div>}
+
+          {enlargedSlideIndex !== null && (
+            <PreparedSlideViewer
+              slides={preview.renditionUrls}
+              renditionIsCard={preview.renditionIsCard}
+              initialIndex={enlargedSlideIndex}
+              onClose={() => setEnlargedSlideIndex(null)}
+            />
+          )}
+
+          {showPublishBoth && (
+            <SocialPublishBothModal
+              productId={productId}
+              sourceChannel="facebook"
+              onClose={() => setShowPublishBoth(false)}
+              onDone={() => void load()}
+            />
+          )}
+
+          {showSchedule && (
+            <SocialScheduleModal
+              channels={['facebook']}
+              initialScheduledFor={{ facebook: preview.current?.scheduledFor ?? null }}
+              title={preview.current?.queuedAt ? 'Change Facebook posting time' : 'Schedule Facebook post'}
+              confirmLabel={preview.current?.queuedAt ? 'Save new time' : 'Schedule post'}
+              onClose={() => setShowSchedule(false)}
+              onConfirm={async (values) => runAction('queue', values.facebook)}
+            />
+          )}
+
+          {workflowStage === 'review' && preview.renditionUrls.length > 0 && !lineupDirty && (
             <div>
               <p
                 className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.2em]"
@@ -822,14 +1058,7 @@ export default function FacebookProductPanel({ productId }: { productId: string 
                   <button
                     key={url}
                     type="button"
-                    onClick={() =>
-                      setEnlargedSlide({
-                        url,
-                        label: preview.renditionIsCard?.[index]
-                          ? `Slide ${index + 1} · generated card`
-                          : `Slide ${index + 1}`,
-                      })
-                    }
+                    onClick={() => setEnlargedSlideIndex(index)}
                     className="relative h-20 w-20 cursor-zoom-in overflow-hidden border"
                     style={{
                       borderColor: preview.renditionIsCard?.[index]
@@ -854,14 +1083,69 @@ export default function FacebookProductPanel({ productId }: { productId: string 
           )}
 
           <div className="flex flex-wrap items-center gap-2 border-t pt-4" style={{ borderColor: 'var(--color-outline-variant)' }}>
-            <button
-              type="button"
-              onClick={() => runAction('prepare')}
-              disabled={busy !== null || Boolean(preview.blockedReason)}
-              className="outline-button text-sm disabled:opacity-50"
-            >
-              {busy === 'prepare' ? 'Preparing…' : isPublished ? 'Re-prepare' : 'Prepare images & post'}
-            </button>
+            {workflowStage === 'prepare' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setEditingSetup(true)}
+                  disabled={busy !== null}
+                  className="outline-button text-sm disabled:opacity-50"
+                >
+                  Edit photo &amp; caption setup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void prepareCurrentSetup()}
+                  disabled={busy !== null || savingLineup || Boolean(preview.blockedReason)}
+                  className="gold-button text-sm disabled:opacity-50"
+                >
+                  {busy === 'prepare' ? 'Preparing…' : 'Prepare images & post'}
+                </button>
+              </>
+            )}
+
+            {workflowStage === 'update' && (
+              <button
+                type="button"
+                onClick={() => void prepareCurrentSetup()}
+                disabled={busy !== null || Boolean(preview.blockedReason)}
+                className="gold-button text-sm disabled:opacity-50"
+              >
+                {busy === 'prepare' ? 'Updating…' : 'Update prepared upload'}
+              </button>
+            )}
+
+            {workflowStage === 'published' && (
+              <button
+                type="button"
+                onClick={() => void prepareCurrentSetup()}
+                disabled={busy !== null || savingLineup || Boolean(preview.blockedReason)}
+                className="outline-button text-sm disabled:opacity-50"
+              >
+                {busy === 'prepare' ? 'Preparing…' : 'Re-prepare'}
+              </button>
+            )}
+
+            {workflowStage === 'review' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setEditingCaption(true)}
+                  disabled={busy !== null}
+                  className="outline-button text-sm disabled:opacity-50"
+                >
+                  Edit caption
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingSetup(true)}
+                  disabled={busy !== null}
+                  className="outline-button text-sm disabled:opacity-50"
+                >
+                  Edit photos &amp; card
+                </button>
+              </>
+            )}
 
             {canPublish && !confirmPublish && (
               <>
@@ -871,7 +1155,11 @@ export default function FacebookProductPanel({ productId }: { productId: string 
                   disabled={busy !== null}
                   className="gold-button text-sm disabled:opacity-50"
                 >
-                  Publish to Facebook
+                  {isInterruptedPublishRecovery
+                    ? 'Recover published Facebook post'
+                    : state === 'error'
+                      ? 'Retry publishing to Facebook'
+                      : 'Publish to Facebook'}
                 </button>
                 <button
                   type="button"
@@ -887,7 +1175,9 @@ export default function FacebookProductPanel({ productId }: { productId: string 
             {canPublish && confirmPublish && (
               <>
                 <span className="text-xs font-semibold" style={{ color: 'var(--color-error)' }}>
-                  Publish now? The post goes public on the Page immediately.
+                  {isInterruptedPublishRecovery
+                    ? 'Find the completed Page post and repair its local status. This will not create another post.'
+                    : 'Publish now? The post goes public on the Page immediately.'}
                 </span>
                 <button
                   type="button"
@@ -895,43 +1185,64 @@ export default function FacebookProductPanel({ productId }: { productId: string 
                   disabled={busy !== null}
                   className="gold-button text-sm disabled:opacity-50"
                 >
-                  {busy === 'publish' ? 'Publishing…' : 'Yes, publish'}
+                  {busy === 'publish'
+                    ? (isInterruptedPublishRecovery ? 'Recovering…' : 'Publishing…')
+                    : (isInterruptedPublishRecovery ? 'Yes, recover' : 'Yes, publish')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmPublish(false)}
-                  className="text-xs font-bold uppercase tracking-wide"
-                  style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                  className="outline-button text-sm"
                 >
                   Cancel
                 </button>
               </>
             )}
 
-            {!isPublished && (
+            {!isPublished && canManageQueue && !preview.current?.queuedAt && (
               <button
                 type="button"
-                onClick={() => runAction(preview.current?.queuedAt ? 'unqueue' : 'queue')}
+                onClick={() => setShowSchedule(true)}
                 disabled={busy !== null || Boolean(preview.blockedReason)}
                 className="outline-button text-sm disabled:opacity-50"
               >
-                {preview.current?.queuedAt ? 'Remove from posting queue' : 'Add to posting queue'}
+                Schedule to posting queue
               </button>
             )}
 
-            {!isPublished && preview.renditionUrls.length > 0 && !confirmDiscard && (
+            {!isPublished && canManageQueue && preview.current?.queuedAt && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowSchedule(true)}
+                  disabled={busy !== null || Boolean(preview.blockedReason)}
+                  className="outline-button text-sm disabled:opacity-50"
+                >
+                  Change scheduled time
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void runAction('unqueue')}
+                  disabled={busy !== null}
+                  className="outline-button social-danger-button text-sm disabled:opacity-50"
+                >
+                  {busy === 'queue' ? 'Removing…' : 'Remove from posting queue'}
+                </button>
+              </>
+            )}
+
+            {workflowStage === 'review' && !confirmDiscard && (
               <button
                 type="button"
                 onClick={() => setConfirmDiscard(true)}
                 disabled={busy !== null}
-                className="text-xs font-bold uppercase tracking-wide disabled:opacity-50"
-                style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                className="outline-button social-danger-button text-sm disabled:opacity-50"
               >
                 Discard prepared upload
               </button>
             )}
 
-            {!isPublished && confirmDiscard && (
+            {workflowStage === 'review' && confirmDiscard && (
               <>
                 <span className="text-xs font-semibold" style={{ color: 'var(--color-error)' }}>
                   Delete the prepared slides and post text? Your lineup, crops and card choices are kept.
@@ -940,31 +1251,39 @@ export default function FacebookProductPanel({ productId }: { productId: string 
                   type="button"
                   onClick={discardDraft}
                   disabled={busy !== null}
-                  className="outline-button text-sm disabled:opacity-50"
+                  className="outline-button social-danger-button text-sm disabled:opacity-50"
                 >
                   {busy === 'discard' ? 'Discarding…' : 'Yes, discard'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmDiscard(false)}
-                  className="text-xs font-bold uppercase tracking-wide"
-                  style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                  className="outline-button text-sm"
                 >
                   Cancel
                 </button>
               </>
             )}
 
-            {isPublished && !confirmRemove && (
-              <button
-                type="button"
-                onClick={() => setConfirmRemove(true)}
-                disabled={busy !== null}
-                className="text-xs font-bold uppercase tracking-wide disabled:opacity-50"
-                style={{ color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}
-              >
-                Remove post
-              </button>
+            {isPublished && !confirmRemove && !confirmForget && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setConfirmRemove(true)}
+                  disabled={busy !== null}
+                  className="outline-button social-danger-button text-sm disabled:opacity-50"
+                >
+                  Remove post
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmForget(true)}
+                  disabled={busy !== null}
+                  className="outline-button text-sm disabled:opacity-50"
+                >
+                  Already removed on Facebook
+                </button>
+              </>
             )}
 
             {isPublished && confirmRemove && (
@@ -976,16 +1295,37 @@ export default function FacebookProductPanel({ productId }: { productId: string 
                   type="button"
                   onClick={removePost}
                   disabled={busy !== null}
-                  className="text-xs font-bold uppercase tracking-wide disabled:opacity-50"
-                  style={{ color: 'var(--color-error)', fontFamily: 'var(--font-label)' }}
+                  className="outline-button social-danger-button text-sm disabled:opacity-50"
                 >
                   {busy === 'remove' ? 'Working…' : 'Yes, delete it'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmRemove(false)}
-                  className="text-xs font-bold uppercase tracking-wide"
-                  style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                  className="outline-button text-sm"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+
+            {isPublished && confirmForget && (
+              <>
+                <span className="text-xs font-semibold" style={{ color: 'var(--color-on-surface)' }}>
+                  Confirm the post is already gone from Facebook. This only marks it Removed here and clears its prepared files.
+                </span>
+                <button
+                  type="button"
+                  onClick={clearRemovedPost}
+                  disabled={busy !== null}
+                  className="outline-button social-danger-button text-sm disabled:opacity-50"
+                >
+                  {busy === 'forget' ? 'Clearing…' : 'Yes, mark Removed'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmForget(false)}
+                  className="outline-button text-sm"
                 >
                   Cancel
                 </button>
@@ -995,8 +1335,14 @@ export default function FacebookProductPanel({ productId }: { productId: string 
 
           {preview.current?.queuedAt && !isPublished && (
             <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-              In the posting queue since {new Date(preview.current.queuedAt).toLocaleString()}. The scheduled
-              drip publishes approved items oldest first.
+              Scheduled for {preview.current.scheduledFor
+                ? new Date(preview.current.scheduledFor).toLocaleString([], {
+                    dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/New_York',
+                  })
+                : 'a time that still needs to be selected'}. Added to the queue{' '}
+              {new Date(preview.current.queuedAt).toLocaleString([], {
+                dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/New_York',
+              })} ET.
             </p>
           )}
         </>

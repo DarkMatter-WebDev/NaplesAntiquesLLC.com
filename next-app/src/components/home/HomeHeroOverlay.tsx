@@ -1,0 +1,293 @@
+'use client';
+
+// Static hero overlay: the headline, sign-up form, CTA buttons, and the top
+// legibility halo. HomeHeroStack pins ONE of these over the two parallax
+// slideshow panes, so while scrolling swaps the slideshows underneath, this
+// layer stays exactly where it is until the whole frame breaks free.
+//
+// The light/dark text theme is controlled by the stack via the `dark` prop
+// (driven by whichever slideshow currently dominates the frame); the elements
+// transition between the two token sets.
+
+import Link from 'next/link';
+import { useEffect, useState, type CSSProperties } from 'react';
+import HomeSubscriberForm from './HomeSubscriberForm';
+
+type Props = {
+  locale: string;
+  dark: boolean;
+};
+
+// Theme tokens consumed by the overlay; the elements transition between them.
+const LIGHT_THEME: CSSProperties = {
+  '--hero-fade': '255, 253, 247',
+  '--hero-text': '#17130c',
+  '--hero-eyebrow': '#8f6c06',
+  '--hero-btn-color': '#7a5800',
+  '--hero-btn-border': 'rgba(139, 103, 0, 0.55)',
+  '--hero-btn-bg': 'rgba(180, 130, 0, 0.10)',
+} as CSSProperties;
+
+const DARK_THEME: CSSProperties = {
+  '--hero-fade': '5, 5, 5',
+  '--hero-text': '#f9f9f7',
+  '--hero-eyebrow': '#e9c349',
+  '--hero-btn-color': '#e9c349',
+  '--hero-btn-border': 'rgba(233, 195, 73, 0.72)',
+  '--hero-btn-bg': 'rgba(212, 175, 55, 0.14)',
+} as CSSProperties;
+
+export default function HomeHeroOverlay({ locale, dark }: Props) {
+  const isEs = locale === 'es';
+  const storeHref = isEs ? '/es/shop' : '/shop';
+
+  // Reveal after fonts settle (mirrors the slideshow's is-ready fade timing);
+  // a short fallback guarantees the text can never stay hidden.
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    let marked = false;
+    const mark = () => {
+      if (cancelled || marked) return;
+      marked = true;
+      window.requestAnimationFrame(() => {
+        if (!cancelled) setReady(true);
+      });
+    };
+    const fallbackTimer = window.setTimeout(mark, 1500);
+    const fontsReady =
+      'fonts' in document ? document.fonts.ready.catch(() => undefined) : Promise.resolve();
+    Promise.resolve(fontsReady).then(() => {
+      window.clearTimeout(fallbackTimer);
+      mark();
+    });
+    return () => {
+      cancelled = true;
+      window.clearTimeout(fallbackTimer);
+    };
+  }, []);
+
+  const theme = dark ? DARK_THEME : LIGHT_THEME;
+
+  const buttons = [
+    { href: storeHref, label: isEs ? 'Comprar' : 'Buy' },
+    { href: isEs ? '/es/estate-jewelry' : '/estate-jewelry', label: isEs ? 'Vender' : 'Sell' },
+    { href: isEs ? '/es/contact' : '/contact', label: isEs ? 'Intercambiar' : 'Trade' },
+  ];
+
+  return (
+    <div
+      className={`home-hero-overlay ${ready ? 'is-ready' : ''}`}
+      style={theme}
+      data-customer-reveal-skip
+    >
+      {/* Top halo for text legibility — two layers cross-fade so the color
+          change is smooth (gradients can't transition; opacity can). */}
+      <div className="home-top-fade home-top-fade--light" style={{ opacity: dark ? 0 : 1 }} aria-hidden="true" />
+      <div className="home-top-fade home-top-fade--dark" style={{ opacity: dark ? 1 : 0 }} aria-hidden="true" />
+
+      {/* Headline — centered in the top half, above the rotating pieces */}
+      <div className="home-hero-top">
+        <span
+          className="text-[0.75rem] font-bold uppercase tracking-[0.3em] block"
+          style={{ color: 'var(--hero-eyebrow)', fontFamily: 'var(--font-label)' }}
+        >
+          {isEs ? 'Joyería de Patrimonio y Relojes' : 'Curated Estate Jewelry & Watches'}
+        </span>
+        <h1
+          className="font-normal tracking-normal"
+          style={{ fontFamily: 'var(--font-headline)', color: 'var(--hero-text)' }}
+        >
+          {isEs ? 'Rara. Auténtica. Atemporal.' : 'Rare. Authentic. Timeless.'}
+        </h1>
+      </div>
+
+      {/* Sign-up + actions — centered in the open space below the pieces */}
+      <div className="home-hero-bottom">
+        <div className="flex w-full justify-center px-2" style={{ pointerEvents: 'auto' }}>
+          <HomeSubscriberForm locale={locale} />
+        </div>
+        <div className="flex flex-wrap justify-center gap-4 md:gap-5" style={{ pointerEvents: 'auto' }}>
+          {buttons.map(({ href, label }) => (
+            <Link
+              key={label}
+              href={href}
+              className="hero-cta inline-flex justify-center min-w-[9rem] md:min-w-[10rem] border px-8 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest"
+              style={{
+                background: 'var(--hero-btn-bg)',
+                borderColor: 'var(--hero-btn-border)',
+                color: 'var(--hero-btn-color)',
+                fontFamily: 'var(--font-label)',
+                boxShadow: '0 0 18px rgba(212,175,55,0.12)',
+                backdropFilter: 'blur(3px)',
+              }}
+            >
+              {label}
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      <style>{`
+        /* The overlay is a pinned, click-transparent layer over the slideshow
+           panes; the form and CTA wrappers opt back into pointer events. */
+        .home-hero-overlay {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+
+        .home-hero-overlay .home-hero-top,
+        .home-hero-overlay .home-hero-bottom {
+          opacity: 0;
+        }
+
+        .home-hero-overlay.is-ready .home-hero-top {
+          animation: home-hero-top-fade-in 720ms cubic-bezier(0.2, 0.8, 0.2, 1) 80ms both;
+        }
+
+        .home-hero-overlay.is-ready .home-hero-bottom {
+          animation: home-hero-bottom-fade-in 720ms cubic-bezier(0.2, 0.8, 0.2, 1) 500ms both;
+        }
+
+        @keyframes home-hero-top-fade-in {
+          from {
+            opacity: 0;
+            filter: blur(6px);
+            transform: translateX(-50%) translateY(14px);
+          }
+          to {
+            opacity: 1;
+            filter: blur(0);
+            transform: translateX(-50%) translateY(0);
+          }
+        }
+
+        @keyframes home-hero-bottom-fade-in {
+          from {
+            opacity: 0;
+            filter: blur(6px);
+            transform: translateX(-50%) translateY(18px);
+          }
+          to {
+            opacity: 1;
+            filter: blur(0);
+            transform: translateX(-50%) translateY(0);
+          }
+        }
+
+        /* Top halo layers (cross-faded via inline opacity) */
+        .home-top-fade {
+          position: absolute;
+          inset: 0;
+          z-index: 4;
+          pointer-events: none;
+          transition: opacity 0.8s ease;
+        }
+        .home-top-fade--light {
+          background:
+            radial-gradient(ellipse 80% 55% at 50% 0%,
+              rgba(255, 253, 247, 0.65) 0%, rgba(255, 253, 247, 0.25) 60%, transparent 100%),
+            linear-gradient(to bottom, rgba(255, 253, 247, 0.35) 0%, transparent 45%);
+        }
+        .home-top-fade--dark {
+          background:
+            radial-gradient(ellipse 80% 55% at 50% 0%,
+              rgba(5, 5, 5, 0.65) 0%, rgba(5, 5, 5, 0.25) 60%, transparent 100%),
+            linear-gradient(to bottom, rgba(5, 5, 5, 0.35) 0%, transparent 45%);
+        }
+
+        /* Headline block — centered within the TOP HALF of the hero. */
+        .home-hero-top {
+          position: absolute;
+          left: 50%;
+          top: 0;
+          height: 50%;
+          width: min(92vw, 52rem);
+          transform: translateX(-50%);
+          z-index: 5;
+          pointer-events: none;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 0 1rem;
+        }
+
+        /* Sign-up + actions — centered in the open space BELOW the pieces. */
+        .home-hero-bottom {
+          position: absolute;
+          left: 50%;
+          bottom: clamp(5rem, 15svh, 10rem);
+          width: min(92vw, 52rem);
+          transform: translateX(-50%);
+          z-index: 5;
+          pointer-events: none;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 1.5rem;
+        }
+
+        /* Smooth color cross-fade in sync with the background */
+        .home-hero-top span,
+        .home-hero-top h1 {
+          transition: color 0.8s ease, text-shadow 0.8s ease;
+        }
+        .hero-cta {
+          transition: background 0.8s ease, border-color 0.8s ease, color 0.8s ease, scale 0.2s ease;
+        }
+        .hero-cta:hover { scale: 1.04; }
+
+        .home-hero-top > span {
+          margin-bottom: 1.25rem;
+        }
+
+        .home-hero-top h1 {
+          font-size: clamp(2.4rem, 8vw, 5.75rem);
+          line-height: 0.95;
+          margin: 0;
+          text-shadow: 0 2px 24px rgba(var(--hero-fade), 0.9);
+        }
+
+        @media (max-width: 640px) {
+          /* Headline near the top (nudged down a touch). */
+          .home-hero-top {
+            top: clamp(3rem, 11svh, 6rem);
+            height: auto;
+            justify-content: flex-start;
+          }
+
+          .home-hero-top > span {
+            margin-bottom: 0.6rem;
+          }
+
+          .home-hero-top h1 {
+            font-size: clamp(1.9rem, 7vw, 2.5rem);
+          }
+
+          /* Sign-up + actions anchored to the bottom of the hero so the Trade
+             button always stays inside it (with a small gap before the next
+             section) regardless of viewport height / browser-chrome changes. */
+          .home-hero-bottom {
+            top: auto;
+            bottom: clamp(1rem, 3svh, 2rem);
+            gap: 0.85rem;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .home-hero-overlay .home-hero-top,
+          .home-hero-overlay .home-hero-bottom {
+            opacity: 1;
+            filter: none;
+            animation: none !important;
+            transform: translateX(-50%);
+          }
+        }
+      `}</style>
+    </div>
+  );
+}

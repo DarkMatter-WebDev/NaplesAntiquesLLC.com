@@ -7,10 +7,11 @@ import { AppIcon } from '@/components/AppIcon';
 
 const GOLD = '#735c00';
 
-export type AdminSection = 'products' | 'orders' | 'buyers' | 'messages' | 'subscribers' | 'marketing' | 'users' | 'settings';
+export type AdminSection = 'products' | 'social-queues' | 'orders' | 'buyers' | 'messages' | 'subscribers' | 'marketing' | 'users' | 'settings';
 
 const SECTION_LABELS: Record<AdminSection, string> = {
   products: 'Products',
+  'social-queues': 'Social Queues',
   orders: 'Orders',
   buyers: 'Buyers',
   messages: 'Messages',
@@ -231,6 +232,9 @@ export default function AdminHeader({
       </span>
       <AdminNavItem href={adminBasePath} active={active === 'products'} products>
         Products
+      </AdminNavItem>
+      <AdminNavItem href={`${adminBasePath}/social-queues`} active={active === 'social-queues'}>
+        Social Queues
       </AdminNavItem>
       <AdminOrdersLink
         href={`${adminBasePath}/orders`}

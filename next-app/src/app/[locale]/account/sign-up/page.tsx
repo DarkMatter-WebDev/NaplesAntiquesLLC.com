@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import SiteHeader from '@/components/layout/SiteHeader';
 import { createClient } from '@/lib/supabase/client';
 import { AppIcon } from '@/components/AppIcon';
+import PasswordInput from '@/components/account/PasswordInput';
 
 const MODERN_AUTH_STYLES = `
   .modern-auth-page {
@@ -60,50 +61,10 @@ const MODERN_AUTH_STYLES = `
   .modern-auth-submit:disabled {
     cursor: default;
   }
-  .modern-password-field {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: stretch;
-    border: 1px solid var(--color-outline-variant);
-    border-radius: var(--radius-lg);
-    background: #ffffff;
-    overflow: hidden;
-    transition: border-color 160ms ease, box-shadow 160ms ease;
-  }
-  .modern-password-field:focus-within {
-    border-color: #a98208;
-    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.16);
-  }
-  .modern-password-input {
-    min-width: 0;
-    border: 0;
-    background: transparent;
-    color: var(--color-on-surface);
-    outline: none;
-    padding: 0.78rem 0.9rem;
-    font-size: 0.95rem;
-  }
-  .modern-password-toggle {
-    min-width: 4.4rem;
-    border: 0;
-    border-left: 1px solid var(--color-outline-variant);
-    background: #fbfaf6;
-    color: #735c00;
-    cursor: pointer;
-    font-family: var(--font-label);
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    transition: background 160ms ease, color 160ms ease;
-    border-radius: var(--radius-lg);
-  }
-  .modern-password-toggle:hover,
-  .modern-password-toggle:focus-visible {
-    background: rgba(212, 175, 55, 0.14);
-    color: #5f4b00;
-    outline: none;
-  }
+  /* Password fields use the shared .password-field utility in globals.css
+     (see components/account/PasswordInput.tsx) — the old .modern-password-*
+     block lived here and rendered a differently sized input than the email
+     field directly above it. */
   .modern-auth-alert {
     display: flex;
     flex-direction: column;
@@ -167,8 +128,6 @@ export default function SignUpPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [fullName, setFullName] = useState('');
   const [acceptedPolicies, setAcceptedPolicies] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -346,54 +305,31 @@ export default function SignUpPage() {
 
             <div>
               <label className="form-label" htmlFor="password">{isEs ? 'Contraseña' : 'Password'}</label>
-              <div className="modern-password-field">
-                <input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  minLength={6}
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  className="modern-password-input"
-                  placeholder={isEs ? 'Mín. 6 caracteres' : 'Min. 6 characters'}
-                />
-                <button
-                  type="button"
-                  className="modern-password-toggle"
-                  aria-label={showPassword ? (isEs ? 'Ocultar contraseña' : 'Hide password') : (isEs ? 'Mostrar contraseña' : 'Show password')}
-                  aria-pressed={showPassword}
-                  onClick={() => setShowPassword((current) => !current)}
-                >
-                  {showPassword ? (isEs ? 'Ocultar' : 'Hide') : (isEs ? 'Mostrar' : 'Show')}
-                </button>
-              </div>
+              <PasswordInput
+                id="password"
+                required
+                minLength={6}
+                autoComplete="new-password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder={isEs ? 'Mín. 6 caracteres' : 'Min. 6 characters'}
+                isEs={isEs}
+              />
             </div>
 
             <div>
               <label className="form-label" htmlFor="confirmPassword">{isEs ? 'Confirmar contraseña' : 'Confirm Password'}</label>
-              <div className="modern-password-field">
-                <input
-                  id="confirmPassword"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  required
-                  minLength={6}
-                  autoComplete="new-password"
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  className="modern-password-input"
-                  placeholder={isEs ? 'Reingrese la contraseña' : 'Re-enter password'}
-                />
-                <button
-                  type="button"
-                  className="modern-password-toggle"
-                  aria-label={showConfirmPassword ? (isEs ? 'Ocultar confirmación' : 'Hide confirm password') : (isEs ? 'Mostrar confirmación' : 'Show confirm password')}
-                  aria-pressed={showConfirmPassword}
-                  onClick={() => setShowConfirmPassword((current) => !current)}
-                >
-                  {showConfirmPassword ? (isEs ? 'Ocultar' : 'Hide') : (isEs ? 'Mostrar' : 'Show')}
-                </button>
-              </div>
+              <PasswordInput
+                id="confirmPassword"
+                confirm
+                required
+                minLength={6}
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                placeholder={isEs ? 'Reingrese la contraseña' : 'Re-enter password'}
+                isEs={isEs}
+              />
             </div>
 
             <label className="flex items-start gap-3 text-sm leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>

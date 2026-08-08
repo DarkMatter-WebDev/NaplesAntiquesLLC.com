@@ -109,7 +109,10 @@ export async function sendOrderInvoiceEmail(opts: {
     const resend = new Resend(resendKey);
     const result = await resend.emails.send(
       {
-        from: 'Naples Estate Jewelry <noreply@naplesestatejewelry.co>',
+        from: 'Naples Estate Jewelry <noreply@naplesestatejewelry.com>',
+        // Customers do reply to receipts; point those at a monitored mailbox
+        // instead of the unattended no-reply sender.
+        replyTo: 'info@naplesestatejewelry.com',
         to: recipient,
         subject: content.subject,
         html: content.html,

@@ -53,6 +53,7 @@ export default function ShopSortSelect({
         <select
           value={currentSort ?? ''}
           onChange={(event) => updateSort(event.target.value)}
+          aria-label={isEs ? 'Ordenar' : 'Sort'}
           style={selectStyle}
         >
           {SORT_OPTIONS.map((option) => (

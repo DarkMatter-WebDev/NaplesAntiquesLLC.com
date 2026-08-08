@@ -169,9 +169,10 @@ const HEADER_STYLES = `
   }
   @media (max-width: 349px) {
     .site-header-row {
+      /* No padding-block here: the header's height comes from
+         --site-header-height and this row centers inside it. */
       --site-header-action-icon-size: 17px;
       gap: 0.1875rem;
-      padding-block: 0.625rem;
       padding-inline: 0.5rem;
     }
     .site-header-actions {
@@ -211,11 +212,12 @@ const HEADER_STYLES = `
     border-top: 1px solid rgba(115, 92, 0, 0.12);
     border-radius: 0 0 14px 14px;
     box-shadow: 0 24px 44px rgba(42, 34, 12, 0.12);
+    /* Opaque base under the warm tint — the panel overlays page content. */
     background:
       radial-gradient(circle at 92% 0%, rgba(220, 188, 96, 0.12), transparent 16rem),
-      rgba(252, 251, 247, 0.98);
+      #fcfbf7;
     overflow: hidden;
-    max-height: calc(100svh - 3.5rem);
+    max-height: calc(100svh - var(--site-header-height));
     overflow-y: auto;
     overscroll-behavior: contain;
   }
@@ -288,6 +290,23 @@ export default function SiteHeader() {
 
   const normalizedPathname = pathname.replace(/^\/(?:en|es)(?=\/|$)/, '') || '/';
 
+  // Clicking Home while ALREADY on the homepage returns the visitor to the top.
+  // Next's <Link> no-ops when the href matches the current route, so without
+  // this the button looks broken — especially on this site, where the pinned
+  // hero means "back to the top" is a real destination rather than just a
+  // scroll position. Locale-agnostic: normalizedPathname has the /en|/es prefix
+  // stripped, so it covers '/' and '/es' alike.
+  const onHomePage = normalizedPathname === '/';
+
+  function handleHomeClick(event: React.MouseEvent<HTMLAnchorElement>) {
+    if (!onHomePage) return; // elsewhere, let it navigate normally
+    // Never hijack a modified click — those mean "open in a new tab/window".
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    event.preventDefault();
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+
   const altLocale = locale === 'en' ? 'es' : 'en';
   const altPath = normalizedPathname.replace(/^(?!\/)/, '/');
   const altHref = altLocale === 'es' ? `/es${altPath === '/' ? '' : altPath}` : altPath;
@@ -297,6 +316,7 @@ export default function SiteHeader() {
     { key: 'goldServices' as const, path: '/gold-services' },
     { key: 'silverServices' as const, path: '/silver-services' },
     { key: 'bullion' as const, path: '/bullion' },
+    { key: 'tradeIn' as const, path: '/trade-in' },
   ];
 
   const ABOUT_ITEMS = [
@@ -320,17 +340,29 @@ export default function SiteHeader() {
 
   return (
     <header
-      className="fixed top-0 w-full z-50 backdrop-blur-sm"
+      className="fixed top-0 w-full z-50"
       style={{
-        background: 'rgba(249,249,247,0.95)',
+        // Fully opaque, not a 0.95 wash + backdrop blur: page content scrolling
+        // under a fixed header must never ghost through it. The blur went with
+        // it — with nothing translucent left to soften, it only cost a
+        // compositing layer on every scroll frame.
+        background: '#f9f9f7',
         borderBottom: '1px solid rgba(115,92,0,0.12)',
         boxShadow: '0 6px 24px rgba(42,34,12,0.05)',
+        // The header takes its height FROM the shared token rather than
+        // growing to fit its padding — that is what makes --site-header-height
+        // authoritative, so every page offset and sticky top derived from it is
+        // exact by construction. box-sizing: border-box means the 1px border is
+        // included, so the token is the true occupied space. The row below
+        // centers within it; see globals.css for the content-height budget.
+        height: 'var(--site-header-height)',
       }}
     >
-      <div className="site-header-row flex w-full items-center justify-between gap-3 px-[clamp(0.75rem,2vw,2rem)] py-3 md:py-4">
+      <div className="site-header-row flex h-full w-full items-center justify-between gap-3 px-[clamp(0.75rem,2vw,2rem)]">
 
-        {/* Brand */}
-        <Link href={href('/')} className="flex items-center gap-2 min-w-0 shrink overflow-hidden">
+        {/* Brand — same home-link behaviour as the Home nav item: on the
+            homepage it returns to the top rather than doing nothing. */}
+        <Link href={href('/')} onClick={handleHomeClick} className="flex items-center gap-2 min-w-0 shrink overflow-hidden">
           <Image
             src="/assets/images/branding/nav-logo.webp"
             alt="Naples Estate Jewelry Logo"
@@ -357,7 +389,7 @@ export default function SiteHeader() {
 
         {/* Desktop nav — 2xl and up */}
         <nav className="hidden xl:flex items-center justify-center gap-[clamp(0.8rem,1.3vw,1.35rem)]" style={{ fontFamily: 'var(--font-label)' }}>
-            <Link href={href('/')} className={navLinkBase} data-active={isActive('/') ? 'true' : 'false'} style={{ color: SECONDARY }}>{t('home')}</Link>
+            <Link href={href('/')} onClick={handleHomeClick} className={navLinkBase} data-active={isActive('/') ? 'true' : 'false'} style={{ color: SECONDARY }}>{t('home')}</Link>
             {/* Shop is a direct link — no submenu (auctions page removed 2026-08-01) */}
             <Link href={href('/shop')} className={navLinkBase} data-active={isActive('/shop') ? 'true' : 'false'} style={{ color: SECONDARY }}>{t('shop')}</Link>
 
@@ -548,7 +580,16 @@ export default function SiteHeader() {
         <div className="mobile-menu-panel xl:hidden">
           <div className="flex flex-col px-4 py-3" style={{ fontFamily: 'var(--font-label)' }}>
 
-            <MobileLink href={href('/')} onClick={closeAll} style={{ color: GOLD }}>{t('home')}</MobileLink>
+            <MobileLink
+              href={href('/')}
+              onClick={(event) => {
+                closeAll();
+                handleHomeClick(event);
+              }}
+              style={{ color: GOLD }}
+            >
+              {t('home')}
+            </MobileLink>
             {/* Shop is a direct link — no submenu (auctions page removed 2026-08-01) */}
             <MobileLink href={href('/shop')} onClick={closeAll}>{t('shop')}</MobileLink>
 
@@ -677,7 +718,8 @@ function MobileLink({
   style,
 }: {
   href: string;
-  onClick: () => void;
+  /** Receives the event so a handler can preventDefault (see handleHomeClick). */
+  onClick: (event: React.MouseEvent<HTMLAnchorElement>) => void;
   children: React.ReactNode;
   style?: React.CSSProperties;
 }) {

@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import { getConnection, getRecentSyncLog, listQueuedPosts } from '@/lib/facebook/store';
-import { facebookTokenEncryptionConfigured } from '@/lib/facebook/auth';
+import {
+  facebookTokenEncryptionConfigured,
+  facebookTokenInspectionConfigured,
+} from '@/lib/facebook/auth';
 
 export const runtime = 'nodejs';
 
@@ -24,15 +27,14 @@ export async function GET() {
       connectedAt: connection?.connected_at ?? null,
     },
     token: {
-      // Null is the healthy state: page tokens do not expire.
       expiresAt: connection?.token_expires_at ?? null,
       refreshedAt: connection?.token_refreshed_at ?? null,
       encryptionKeyConfigured: facebookTokenEncryptionConfigured(),
+      lifetimeValidationConfigured: facebookTokenInspectionConfigured(),
       dripCronSecretConfigured: Boolean(process.env.FACEBOOK_CRON_SECRET),
     },
     policy: {
       autoPublish: connection?.auto_publish ?? false,
-      dailyPostLimit: connection?.daily_post_limit ?? 2,
       captionIncludePrice: connection?.caption_include_price ?? true,
       captionSpanishLine: connection?.caption_spanish_line ?? true,
       captionCta: connection?.caption_cta ?? null,

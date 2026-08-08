@@ -1,6 +1,6 @@
 # Feature: Spanish Localization
 
-> Current EN/ES localization model. Last updated: **2026-06-20**.
+> Current EN/ES localization model. Last updated: **2026-08-03**.
 
 ## Status
 
@@ -94,9 +94,8 @@ For changed public pages:
 | Appointment | Cita |
 | Free evaluation | Evaluacion gratuita |
 
-Brand/proper nouns such as Rolex, Tiffany, Cartier, Naples Estate Jewelry &
-Antiques, and Dark Matter Web Services stay as-is unless the owner requests
-otherwise.
+Brand/proper nouns such as Rolex, Tiffany & Co., Cartier, Naples Estate Jewelry,
+and Surette Systems stay as-is unless the owner requests otherwise.
 
 ## Remaining Review
 

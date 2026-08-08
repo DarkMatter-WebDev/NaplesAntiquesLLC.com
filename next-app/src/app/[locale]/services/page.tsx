@@ -47,7 +47,7 @@ export default async function ServicesPage({ params }: Props) {
   return (
     <>
       <SiteHeader />
-      <main className="pt-16">
+      <main className="site-header-offset">
         <section
           className="py-16 md:py-24 border-b"
           style={{ background: 'var(--color-surface-container-low)', borderColor: 'var(--color-outline-variant)' }}
@@ -74,7 +74,7 @@ export default async function ServicesPage({ params }: Props) {
         </section>
 
         <section className="py-14 md:py-20">
-          <div className="container mx-auto px-6 md:px-8 max-w-5xl">
+          <div className="ultrawide-page-medium container mx-auto px-6 md:px-8 max-w-5xl">
             <div className="grid md:grid-cols-2 gap-5 md:gap-6">
               {options.map((option) => (
                 <article

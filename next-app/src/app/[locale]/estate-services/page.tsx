@@ -89,7 +89,7 @@ export default async function EstateServicesPage({ params }: Props) {
   return (
     <>
       <SiteHeader />
-      <main className="pt-16">
+      <main className="site-header-offset">
 
         {/* Hero */}
         <section className="relative pt-14 pb-20 md:pt-20 md:pb-28 overflow-hidden border-b border-[#d0c5af]">
@@ -139,7 +139,7 @@ export default async function EstateServicesPage({ params }: Props) {
 
         {/* When Families Call Us */}
         <section className="py-16 md:py-24 bg-[#f3f3f3]">
-          <div className="max-w-5xl mx-auto px-6 md:px-8">
+          <div className="ultrawide-page-medium max-w-5xl mx-auto px-6 md:px-8">
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-4xl font-[family-name:var(--font-headline)] font-bold mb-6 tracking-tight">
                 {isEs ? 'Cuando las Familias Nos Llaman' : 'When Families Call Us'}

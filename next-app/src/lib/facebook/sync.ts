@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { SOCIAL_SCHEDULED_DRIP_BATCH_SIZE } from '@/lib/social-queue-schedule';
 import type { Product } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
 import { getSiteUrl } from '@/lib/order-email-branding';
@@ -11,10 +12,24 @@ import {
   createFeedPost,
   createUnpublishedPhoto,
   deleteFacebookPost,
+  facebookPostReadCandidates,
+  fetchRecentPagePosts,
+  fetchPageProfile,
   fetchPost,
+  findSingleRecentFacebookPostByExactMessage,
+  isFacebookPhotoAlreadyPostedError,
+  isFacebookPostMissingError,
+  isFacebookPostReadPermissionError,
+  verifyPagePostReadAccess,
 } from './client';
 import { ensurePageAccessToken, markNeedsReauth } from './auth';
 import { buildFacebookPost, computeFacebookContentHash } from './mapping';
+import {
+  extractSocialCaptionOpening,
+  fallbackSocialCaptionOpening,
+  validateEditedSocialCaptionOpening,
+} from '@/lib/social-caption-opening';
+import { adaptSocialCaptionForTarget } from '@/lib/social-publish-both';
 import { buildFacebookRenditions, deleteRenditions } from './images';
 import {
   getConnection,
@@ -45,6 +60,14 @@ export interface SyncStepResult {
   message: string;
   permalink?: string | null;
   warnings?: string[];
+}
+
+export interface FacebookStatusCheckResult {
+  checked: boolean;
+  changed: boolean;
+  syncState: FacebookPostRow['sync_state'] | null;
+  message: string;
+  reason?: 'not_recorded' | 'not_published' | 'missing_remote_id' | 'not_connected' | 'permission' | 'unavailable';
 }
 
 async function loadProduct(service: SupabaseClient, productId: string): Promise<Product | null> {
@@ -94,6 +117,8 @@ async function recordAuthError(
 export async function runPrepareStep(
   service: SupabaseClient,
   productId: string,
+  captionOpeningCandidate?: unknown,
+  captionTemplateCandidate?: string,
 ): Promise<SyncStepResult> {
   const product = await loadProduct(service, productId);
   if (!product) return recordError(service, productId, 'prepare', 'Product not found.');
@@ -101,11 +126,26 @@ export async function runPrepareStep(
   const connection = await getConnection(service);
   const spotData = await fetchSpotData();
   const existing = await getPost(service, productId);
+  const captionTemplate = captionTemplateCandidate?.trim() || null;
+  const opening = captionTemplate
+    ? extractSocialCaptionOpening(captionTemplate, product)
+    : captionOpeningCandidate === undefined
+      ? fallbackSocialCaptionOpening(product)
+      : validateEditedSocialCaptionOpening(captionOpeningCandidate, product);
+  if (!opening) {
+    return recordError(
+      service,
+      productId,
+      'prepare',
+      'The opening must be one short sentence without “our,” links, hashtags, inventory numbers, quotes, or an unavailable-item claim.',
+    );
+  }
 
   const post = buildFacebookPost({
     product,
     spotData,
     siteUrl: getSiteUrl(),
+    captionOpening: opening,
     imageSelection: existing?.image_selection ?? null,
     settings: {
       includePrice: connection?.caption_include_price ?? true,
@@ -118,6 +158,9 @@ export async function runPrepareStep(
   if (post.blockedReason) {
     return recordError(service, productId, 'prepare', post.blockedReason);
   }
+  const preparedMessage = captionTemplate
+    ? adaptSocialCaptionForTarget(captionTemplate, post.message)
+    : post.message;
 
   try {
     const { renditions, warnings: renditionWarnings } = await buildFacebookRenditions({
@@ -129,7 +172,10 @@ export async function runPrepareStep(
       cardSourceUrl: existing?.card_source_url ?? null,
       cardBackground: existing?.card_background ?? null,
     });
-    const warnings = [...post.warnings, ...renditionWarnings];
+    const warnings = [
+      ...post.warnings,
+      ...renditionWarnings,
+    ];
 
     // Replace, don't accumulate: the previous renditions are now unreferenced.
     if (existing?.rendition_paths?.length) {
@@ -142,9 +188,9 @@ export async function runPrepareStep(
     await upsertPost(service, productId, {
       sync_state: 'review',
       rendition_paths: renditions.map((r) => r.path),
-      posted_caption: post.message,
+      posted_caption: preparedMessage,
       posted_price: post.quotedPrice,
-      content_hash: computeFacebookContentHash(post),
+      content_hash: computeFacebookContentHash({ ...post, message: preparedMessage }),
       // Any previously-created unpublished photos are void now that images changed.
       photo_ids: [],
       photos_expire_at: null,
@@ -177,6 +223,81 @@ function photosUsable(row: FacebookPostRow | null): boolean {
   if (!row?.photos_expire_at || !row.photo_ids?.length) return false;
   // 30-minute safety margin so we never attach a photo that expires mid-call.
   return new Date(row.photos_expire_at).getTime() - Date.now() > 30 * 60 * 1000;
+}
+
+/** The unpublished-photo checkpoint begins one TTL before its saved expiry. */
+function photoCheckpointStartedAt(row: FacebookPostRow): Date {
+  const expiryMs = row.photos_expire_at ? new Date(row.photos_expire_at).getTime() : Number.NaN;
+  return new Date(
+    Number.isFinite(expiryMs)
+      ? expiryMs - FACEBOOK_PHOTO_TTL_MS - 60_000
+      : Date.now() - 2 * 60 * 60 * 1000,
+  );
+}
+
+async function savePublishedPost(params: {
+  service: SupabaseClient;
+  productId: string;
+  postId: string;
+  permalink: string | null;
+  recovered: boolean;
+  postedAt?: string | null;
+}): Promise<SyncStepResult> {
+  await upsertPost(params.service, params.productId, {
+    sync_state: 'published',
+    fb_post_id: params.postId,
+    permalink: params.permalink,
+    posted_at: params.postedAt ? new Date(params.postedAt).toISOString() : new Date().toISOString(),
+    queued_at: null,
+    scheduled_for: null,
+    photo_ids: [],
+    photos_expire_at: null,
+    last_error: null,
+    error_count: 0,
+  });
+
+  await insertSyncLog(params.service, {
+    product_id: params.productId,
+    post_id: params.postId,
+    action: 'publish',
+    outcome: 'ok',
+    message: params.recovered
+      ? `Recovered the Facebook post after the remote publish completed (${params.permalink ?? params.postId}).`
+      : `Published to Facebook${params.permalink ? ` (${params.permalink})` : ''}.`,
+  });
+  await pruneOldSyncLogs(params.service);
+
+  return {
+    done: true,
+    state: 'published',
+    message: params.recovered ? 'Facebook post found and marked Published.' : 'Published to Facebook.',
+    permalink: params.permalink,
+  };
+}
+
+async function recoverPublishedPost(
+  service: SupabaseClient,
+  productId: string,
+  row: FacebookPostRow,
+  auth: { pageId: string; accessToken: string },
+): Promise<SyncStepResult | null> {
+  if (!row.posted_caption || !row.photo_ids?.length) return null;
+  const since = photoCheckpointStartedAt(row);
+  const recentPosts = await fetchRecentPagePosts({
+    pageId: auth.pageId,
+    accessToken: auth.accessToken,
+    since,
+  });
+  const match = findSingleRecentFacebookPostByExactMessage(recentPosts, row.posted_caption, since);
+  if (!match) return null;
+  return savePublishedPost({
+    service,
+    productId,
+    postId: match.id,
+    permalink: match.permalink_url ?? null,
+    recovered: true,
+    postedAt: match.created_time ?? null,
+  });
 }
 
 /**
@@ -213,6 +334,22 @@ export async function runPublishStep(
   }
 
   try {
+    // If Meta completed an earlier feed request but the server stopped before
+    // its local commit, the photo checkpoint remains. Recover that one exact
+    // Page post before attempting another public write.
+    if (row.photo_ids?.length) {
+      const recovered = await recoverPublishedPost(service, productId, row, auth).catch(() => null);
+      if (recovered) return recovered;
+      if (isFacebookPhotoAlreadyPostedError(row.last_error)) {
+        return recordError(
+          service,
+          productId,
+          'publish',
+          'Facebook says these prepared photos were already posted, but the matching Page post could not be verified automatically.',
+        );
+      }
+    }
+
     // Public URLs for the already-uploaded renditions.
     const imageUrls = row.rendition_paths.map((path) => {
       const { data } = service.storage.from('product-images').getPublicUrl(path);
@@ -248,20 +385,29 @@ export async function runPublishStep(
       photoIds,
     });
 
-    // Verify by reading it back — proof the post really exists.
-    const post = await fetchPost(postId, auth.accessToken).catch(() => null);
-
+    // Commit Meta's receipt immediately. Permalink lookup is useful but must not
+    // sit between a successful public write and the durable local state change.
     await upsertPost(service, productId, {
       sync_state: 'published',
       fb_post_id: postId,
-      permalink: post?.permalink_url ?? null,
+      permalink: null,
       posted_at: new Date().toISOString(),
       queued_at: null,
+      scheduled_for: null,
       photo_ids: [],
       photos_expire_at: null,
       last_error: null,
       error_count: 0,
     });
+
+    // Verify by reading it back — proof the post really exists.
+    const post = await fetchPost(postId, auth.accessToken).catch(() => null);
+
+    if (post?.permalink_url) {
+      // The durable receipt above is authoritative. A best-effort permalink
+      // enrichment must never turn a real public post back into an error state.
+      await upsertPost(service, productId, { permalink: post.permalink_url }).catch(() => null);
+    }
 
     await insertSyncLog(service, {
       product_id: productId,
@@ -282,6 +428,13 @@ export async function runPublishStep(
     if (err instanceof FacebookApiError && err.code === 'invalid_token') {
       return recordAuthError(service, productId, 'publish', err);
     }
+    if (isFacebookPhotoAlreadyPostedError(err)) {
+      const latest = await getPost(service, productId);
+      if (latest) {
+        const recovered = await recoverPublishedPost(service, productId, latest, auth).catch(() => null);
+        if (recovered) return recovered;
+      }
+    }
     const message =
       err instanceof FacebookApiError
         ? err.operatorMessage
@@ -296,9 +449,10 @@ export async function runSyncStep(
   service: SupabaseClient,
   productId: string,
   mode: FacebookSyncMode,
+  captionOpeningCandidate?: unknown,
 ): Promise<SyncStepResult> {
   return mode === 'prepare'
-    ? runPrepareStep(service, productId)
+    ? runPrepareStep(service, productId, captionOpeningCandidate)
     : runPublishStep(service, productId);
 }
 
@@ -357,6 +511,47 @@ export async function markPostSold(
   }
 }
 
+/** Add an owner-written comment to one currently published Facebook post. */
+export async function addPostComment(
+  service: SupabaseClient,
+  productId: string,
+  comment: string,
+): Promise<{ commented: boolean; message: string; commentId?: string }> {
+  const row = await getPost(service, productId);
+  if (!row?.fb_post_id || row.sync_state !== 'published') {
+    return { commented: false, message: 'No published Facebook post for this product.' };
+  }
+
+  const auth = await ensurePageAccessToken(service);
+  if (!auth) return { commented: false, message: 'Facebook is not connected.' };
+
+  try {
+    const commentId = await createComment({
+      postId: row.fb_post_id,
+      accessToken: auth.accessToken,
+      message: comment,
+    });
+    await insertSyncLog(service, {
+      product_id: productId,
+      post_id: row.fb_post_id,
+      action: 'comment',
+      outcome: 'ok',
+      message: 'Added an owner-written comment to the Facebook post.',
+    });
+    return { commented: true, commentId, message: 'Comment posted to Facebook.' };
+  } catch (err) {
+    const message = err instanceof FacebookApiError ? err.operatorMessage : 'Could not comment on the post.';
+    await insertSyncLog(service, {
+      product_id: productId,
+      post_id: row.fb_post_id,
+      action: 'comment',
+      outcome: 'error',
+      message,
+    });
+    return { commented: false, message };
+  }
+}
+
 /**
  * Remove a published post. Unlike Instagram, Facebook's API genuinely supports
  * this, so there is no manual-delete detour: the post is deleted remotely, then
@@ -396,6 +591,151 @@ export async function deletePost(
 }
 
 /**
+ * Reconcile one locally published post against Facebook.
+ *
+ * A missing-object response is not trusted by itself: Meta uses the same
+ * wording for some permission failures. We only clear local state after /me
+ * proves the stored Page token is valid and still belongs to the same Page.
+ */
+export async function refreshPostStatus(
+  service: SupabaseClient,
+  productId: string,
+): Promise<FacebookStatusCheckResult> {
+  const row = await getPost(service, productId);
+  if (!row) {
+    return {
+      checked: false,
+      changed: false,
+      syncState: null,
+      message: 'No Facebook post is recorded for this product.',
+      reason: 'not_recorded',
+    };
+  }
+  if (row.sync_state !== 'published') {
+    return {
+      checked: false,
+      changed: false,
+      syncState: row.sync_state,
+      message: 'This Facebook post is not marked published, so no remote check was needed.',
+      reason: 'not_published',
+    };
+  }
+  if (!row.fb_post_id) {
+    return {
+      checked: false,
+      changed: false,
+      syncState: row.sync_state,
+      message: 'The published Facebook record has no remote post id. Its status was not changed.',
+      reason: 'missing_remote_id',
+    };
+  }
+
+  const auth = await ensurePageAccessToken(service);
+  if (!auth) {
+    return {
+      checked: false,
+      changed: false,
+      syncState: row.sync_state,
+      message: 'Facebook is not connected. Reconnect it before refreshing this status.',
+      reason: 'not_connected',
+    };
+  }
+
+  let err: unknown;
+  for (const candidateId of facebookPostReadCandidates(row.fb_post_id, row.permalink)) {
+    try {
+      const remote = await fetchPost(candidateId, auth.accessToken);
+      const postPatch: Partial<FacebookPostRow> = {};
+      if (candidateId !== row.fb_post_id) postPatch.fb_post_id = candidateId;
+      if (remote.permalink_url && remote.permalink_url !== row.permalink) {
+        postPatch.permalink = remote.permalink_url;
+      }
+      if (Object.keys(postPatch).length > 0) {
+        await upsertPost(service, productId, postPatch);
+      }
+      return {
+        checked: true,
+        changed: false,
+        syncState: 'published',
+        message: 'Facebook confirms this post is still published.',
+      };
+    } catch (candidateError) {
+      err = candidateError;
+      if (
+        !isFacebookPostMissingError(candidateError) &&
+        !isFacebookPostReadPermissionError(candidateError)
+      ) {
+        break;
+      }
+    }
+  }
+
+  try {
+    if (err instanceof FacebookApiError && err.code === 'invalid_token') {
+      await markNeedsReauth(service);
+    }
+
+    if (isFacebookPostMissingError(err)) {
+      try {
+        const [page] = await Promise.all([
+          fetchPageProfile(auth.accessToken),
+          verifyPagePostReadAccess(auth.pageId, auth.accessToken),
+        ]);
+        if (String(page.id) === auth.pageId && page.category) {
+          const message =
+            'Facebook no longer reports this post. Its local status was changed to Removed.';
+          await forgetPost(service, productId, message, 'status_check');
+          return { checked: true, changed: true, syncState: 'deleted', message };
+        }
+      } catch (profileError) {
+        if (profileError instanceof FacebookApiError && profileError.code === 'invalid_token') {
+          await markNeedsReauth(service);
+        }
+      }
+    }
+
+    const message = isFacebookPostReadPermissionError(err)
+      ? 'Facebook cannot verify published posts with the current Page token. Reconnect Facebook with pages_read_engagement, or use “Already removed on Facebook” if you deleted this post manually.'
+      : err instanceof FacebookApiError
+        ? `Facebook could not confirm this post: ${err.operatorMessage}`
+        : 'Facebook could not confirm this post. Its local status was not changed.';
+    await insertSyncLog(service, {
+      product_id: productId,
+      post_id: row.fb_post_id,
+      action: 'status_check',
+      outcome: 'warning',
+      message,
+    });
+    return {
+      checked: false,
+      changed: false,
+      syncState: row.sync_state,
+      message,
+      reason: isFacebookPostReadPermissionError(err) ? 'permission' : 'unavailable',
+    };
+  } catch (unexpectedError) {
+    const message =
+      unexpectedError instanceof FacebookApiError
+        ? `Facebook could not confirm this post: ${unexpectedError.operatorMessage}`
+        : 'Facebook could not confirm this post. Its local status was not changed.';
+    await insertSyncLog(service, {
+      product_id: productId,
+      post_id: row.fb_post_id,
+      action: 'status_check',
+      outcome: 'warning',
+      message,
+    });
+    return {
+      checked: false,
+      changed: false,
+      syncState: row.sync_state,
+      message,
+      reason: 'unavailable',
+    };
+  }
+}
+
+/**
  * Clear local state for a post and delete its renditions, without touching
  * Facebook. Used by the delete path above, and directly when the operator
  * removed the post by hand on Facebook.
@@ -404,6 +744,7 @@ export async function forgetPost(
   service: SupabaseClient,
   productId: string,
   logMessage = 'Cleared the local Facebook record.',
+  logAction = 'forget',
 ): Promise<{ forgotten: boolean; message: string }> {
   const row = await getPost(service, productId);
   if (!row) return { forgotten: false, message: 'No Facebook post recorded for this product.' };
@@ -417,12 +758,13 @@ export async function forgetPost(
     photo_ids: [],
     photos_expire_at: null,
     queued_at: null,
+    scheduled_for: null,
     sold_comment_id: null,
     sold_comment_at: null,
   });
   await insertSyncLog(service, {
     product_id: productId,
-    action: 'forget',
+    action: logAction,
     outcome: 'ok',
     message: logMessage,
   });
@@ -465,6 +807,7 @@ export async function discardPrepared(
     photo_ids: [],
     photos_expire_at: null,
     queued_at: null,
+    scheduled_for: null,
     last_error: null,
     error_count: 0,
   });
@@ -482,8 +825,9 @@ export async function discardPrepared(
 }
 
 /**
- * Drip runner: publish up to the configured daily limit from the approved
- * queue, oldest first. Only ever touches products an admin explicitly queued.
+ * Drip runner: publish the next bounded batch from the approved due queue,
+ * earliest scheduled time first. The batch bound protects one worker
+ * invocation; it is not a per-day limit. Only admin-approved rows qualify.
  */
 export async function runScheduledDrip(service: SupabaseClient): Promise<{
   published: number;
@@ -495,26 +839,16 @@ export async function runScheduledDrip(service: SupabaseClient): Promise<{
     return { published: 0, skipped: 0, message: 'Facebook is not connected.' };
   }
 
-  const dailyLimit = connection.daily_post_limit ?? 2;
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const { count: postedToday } = await service
-    .from('facebook_posts')
-    .select('product_id', { count: 'exact', head: true })
-    .eq('sync_state', 'published')
-    .gte('posted_at', since.toISOString());
-
-  const remaining = Math.max(0, dailyLimit - (postedToday ?? 0));
-  if (remaining === 0) {
-    return { published: 0, skipped: 0, message: `Daily limit of ${dailyLimit} already met.` };
-  }
-
   const { data: queued } = await service
     .from('facebook_posts')
     .select('*')
-    .in('sync_state', ['review'])
+    .in('sync_state', ['pending', 'review'])
     .not('queued_at', 'is', null)
+    .not('scheduled_for', 'is', null)
+    .lte('scheduled_for', new Date().toISOString())
+    .order('scheduled_for', { ascending: true })
     .order('queued_at', { ascending: true })
-    .limit(remaining);
+    .limit(SOCIAL_SCHEDULED_DRIP_BATCH_SIZE);
 
   let published = 0;
   let skipped = 0;
@@ -526,7 +860,7 @@ export async function runScheduledDrip(service: SupabaseClient): Promise<{
     else skipped += 1;
   }
 
-  const message = `Drip run complete: ${published} published, ${skipped} skipped.`;
+  const message = `Scheduled queue check complete: ${published} published, ${skipped} skipped.`;
   await insertSyncLog(service, {
     action: 'scheduled_drip',
     outcome: skipped > 0 && published === 0 ? 'warning' : 'ok',

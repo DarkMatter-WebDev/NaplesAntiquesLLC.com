@@ -20,16 +20,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: { code: 'invalid_json', message: 'Invalid JSON body.' } }, { status: 400 });
   }
 
+  // Both enqueue paths return a flat envelope: `queued` stays the number the
+  // UI already reads, with `blocked` (write-blocked ids), `notAvailable` (sold
+  // or otherwise unsellable) and `withheld` (held back by
+  // EBAY_BULK_ENQUEUE_LIMIT) alongside it so a capped or filtered batch is
+  // visible rather than silently truncated.
   if (body.action === 'enqueue') {
     if (!Array.isArray(body.productIds) || body.productIds.length === 0) {
       return NextResponse.json({ error: { code: 'missing_product_ids', message: 'productIds is required.' } }, { status: 400 });
     }
-    const queued = await enqueueProducts(body.productIds);
-    return NextResponse.json({ queued });
+    return NextResponse.json(await enqueueProducts(body.productIds));
   }
   if (body.action === 'enqueue-all-eligible') {
-    const queued = await enqueueAllEligible();
-    return NextResponse.json({ queued });
+    return NextResponse.json(await enqueueAllEligible());
   }
   if (body.action === 'drain') {
     const result = await drainQueue();

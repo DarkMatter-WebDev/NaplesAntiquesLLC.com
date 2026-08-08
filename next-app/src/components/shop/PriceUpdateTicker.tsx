@@ -62,7 +62,14 @@ export default function PriceUpdateTicker({ nextUpdateAt, lastUpdatedAt = null, 
         borderColor: onDark ? 'rgba(255,255,255,0.16)' : '#e2e6ec',
         color: onDark ? 'rgba(255,255,255,0.72)' : '#6b7280',
         fontFamily: 'var(--font-label)',
-        fontSize: 'clamp(0.5rem, 2.5vw, 0.62rem)',
+        // Ceiling raised 2026-08-05 (0.62rem -> 0.6875rem) with the rest of the
+        // product page's small type. The 0.5rem MINIMUM has to stay: this line is
+        // whiteSpace:nowrap (so the countdown does not reflow every second), and
+        // at a 320px viewport the Spanish string "ÚLTIMA ACTUALIZACIÓN … ACTUALIZA
+        // EN …" only fits at 8px. Raising the floor to 10px pushed the whole
+        // document into horizontal scroll. Wider viewports still gain the larger
+        // size via the 2.5vw term.
+        fontSize: 'clamp(0.5rem, 2.5vw, 0.6875rem)',
         letterSpacing: '0.1em',
         lineHeight: 1.35,
         whiteSpace: 'nowrap',

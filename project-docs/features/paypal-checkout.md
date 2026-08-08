@@ -63,7 +63,7 @@ the remaining owner-run live recovery/refund/race test matrix in `TASKS.md`.
 
    `lib/checkout-shipping.ts` is the sole definition of shipping methods and
    fees. As of 2026-07-30 fees are value-based tiers keyed to the order's
-   merchandise subtotal (see `features/shipping-tiers-plan.md`): Local Pickup
+   merchandise subtotal (see `features/shipping-tiers.md`): Local Pickup
    $0; Standard Insured $19-$165 across eight bands (USPS Registered Mail at
    $5,000+, stated as 2-10 business days); Express Overnight $55/$79/$119 and
    not offered at $5,000+ (USPS insurance cap — the server rejects it with a
@@ -353,12 +353,10 @@ dev server (env is read at boot).
 2. Set the four env vars in Netlify.
 3. Register the webhook at `https://naplesestatejewelry.com/api/paypal/webhook`
    (capture completed/declined/refunded/reversed, refund pending/failed, and
-   dispute created); match `PAYPAL_WEBHOOK_ID`. ⚠️ Domain-switch note
-   (2026-08-01): the LIVE webhook is still registered on the legacy
-   `.co` URL. The `.co` host keeps serving `/api/*` directly (carve-out in
-   root `netlify.toml`), so it keeps working — but re-register it on `.com`
-   as part of the domain migration (see `TASKS.md`), then update
-   `PAYPAL_WEBHOOK_ID` if PayPal issues a new webhook id.
+   dispute created); match `PAYPAL_WEBHOOK_ID`. Domain-switch status
+   (completed 2026-08-01): the live webhook URL was updated in place to `.com`
+   and retained the same stored webhook ID, so no environment change was
+   required. The `.co/api/*` carve-out remains for backward compatibility.
 4. Sandbox test matrix: success, cancel, declined capture, duplicate webhook,
    failed-then-retried webhook, ambiguous capture-response recovery,
    capture/local-RPC recovery, refund pending/failed, blocked overlapping target,

@@ -7,7 +7,8 @@ import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 export const runtime = 'nodejs';
 
 const OWNER_EMAIL = 'rcman12589@gmail.com';
-const FROM = 'Naples Estate Jewelry <noreply@naplesestatejewelry.co>';
+// Resend's verified sending domain is naplesestatejewelry.com (migrated 2026-08-05).
+const FROM = 'Naples Estate Jewelry <noreply@naplesestatejewelry.com>';
 
 const MAX_NAME = 200;
 const MAX_EMAIL = 320;

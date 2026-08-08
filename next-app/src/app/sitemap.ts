@@ -22,6 +22,7 @@ const STATIC_PAGES = [
   { path: '/gold-services', priority: 0.8, changeFrequency: 'monthly' },
   { path: '/silver-services', priority: 0.7, changeFrequency: 'monthly' },
   { path: '/bullion', priority: 0.7, changeFrequency: 'weekly' },
+  { path: '/trade-in', priority: 0.8, changeFrequency: 'monthly' },
   { path: '/faq', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/estate-services', priority: 0.8, changeFrequency: 'monthly' },
   { path: '/privacy', priority: 0.3, changeFrequency: 'yearly' },

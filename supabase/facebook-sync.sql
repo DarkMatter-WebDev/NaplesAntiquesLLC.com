@@ -43,7 +43,6 @@ create table if not exists public.facebook_connection (
 
   -- Posting policy (owner-editable in Admin -> Settings -> Facebook).
   auto_publish            boolean not null default false, -- review-first, like every channel
-  daily_post_limit        int     not null default 2,
   caption_include_price   boolean not null default true,  -- "≈ $X at time of posting"
   caption_spanish_line    boolean not null default true,
   caption_cta             text,                           -- trailing call-to-action line
@@ -104,7 +103,8 @@ create table if not exists public.facebook_posts (
   sold_comment_id       text,
   sold_comment_at       timestamptz,
 
-  queued_at             timestamptz,           -- drip ordering: oldest first
+  queued_at             timestamptz,           -- when the admin approved this queue entry
+  scheduled_for         timestamptz,           -- target publish time; worker never posts early
   last_error            text,                  -- redacted, operator-facing
   error_count           int not null default 0,
   created_at            timestamptz not null default now(),
@@ -116,6 +116,9 @@ create index if not exists facebook_posts_sync_state_idx
 create index if not exists facebook_posts_queued_at_idx
   on public.facebook_posts (queued_at)
   where queued_at is not null;
+create index if not exists facebook_posts_scheduled_for_idx
+  on public.facebook_posts (scheduled_for, queued_at)
+  where queued_at is not null and scheduled_for is not null;
 
 alter table public.facebook_posts enable row level security;
 -- No policies: service-role only.

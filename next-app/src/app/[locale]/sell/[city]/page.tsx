@@ -208,11 +208,11 @@ export default async function SellCityPage({ params }: Props) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(breadcrumbLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(faqLd) }} />
       <SiteHeader />
-      <main className="pt-16">
+      <main className="site-header-offset">
 
         {/* Hero */}
         <section className="relative flex min-h-[520px] items-center overflow-hidden bg-[#1a1c1c]">
-          <div className="relative z-10 mx-auto w-full max-w-[1440px] px-4 md:px-8">
+          <div className="ultrawide-page relative z-10 mx-auto w-full max-w-[1440px] px-4 md:px-8">
             <div className="max-w-3xl">
               <span className="mb-4 block text-xs font-bold uppercase tracking-[0.2em] text-[#e9c349]" style={{ fontFamily: 'var(--font-label)' }}>
                 {isEs ? `Comprador en ${area.city}, ${area.region}` : `${area.city}, ${area.region} Buyer`}
@@ -258,7 +258,7 @@ export default async function SellCityPage({ params }: Props) {
         </section>
 
         {/* What we buy */}
-        <section className="mx-auto max-w-[1440px] px-4 py-20 md:px-8">
+        <section className="ultrawide-page mx-auto max-w-[1440px] px-4 py-20 md:px-8">
           <div className="mb-12 max-w-2xl">
             <h2 className="mb-4 text-3xl font-bold text-[#1a1c1c] md:text-4xl" style={{ fontFamily: 'var(--font-headline)' }}>
               {isEs ? `Qué Compramos en ${area.city}` : `What We Buy in ${area.city}`}
@@ -284,7 +284,7 @@ export default async function SellCityPage({ params }: Props) {
 
         {/* How it works */}
         <section className="bg-[#f3f3f3] py-20">
-          <div className="mx-auto max-w-[1440px] px-4 md:px-8">
+          <div className="ultrawide-page mx-auto max-w-[1440px] px-4 md:px-8">
             <h2 className="mb-12 text-center text-3xl font-bold text-[#1a1c1c] md:text-4xl" style={{ fontFamily: 'var(--font-headline)' }}>
               {isEs ? 'Cómo Funciona' : 'How Selling to Us Works'}
             </h2>
@@ -326,7 +326,7 @@ export default async function SellCityPage({ params }: Props) {
 
         {/* Other areas */}
         <section className="border-t border-[#d0c5af] bg-[#f3f3f3] py-16">
-          <div className="mx-auto max-w-[1440px] px-4 md:px-8">
+          <div className="ultrawide-page mx-auto max-w-[1440px] px-4 md:px-8">
             <h2 className="mb-6 text-center text-2xl font-bold text-[#1a1c1c] md:text-3xl" style={{ fontFamily: 'var(--font-headline)' }}>
               {isEs ? 'Otras Áreas que Servimos' : 'Other Areas We Serve'}
             </h2>

@@ -104,7 +104,7 @@ export default function MarketingSettingsPanel() {
         </label>
         <div className="grid gap-2 text-xs md:grid-cols-3" style={{ color: 'var(--color-on-surface-variant)' }}>
           <span><strong>Site URL:</strong> {settings?.siteUrl ?? 'https://naplesestatejewelry.com'}</span>
-          <span><strong>Chris sender:</strong> {settings?.senderProfiles?.chris?.fromAddress ?? 'Chris at Naples Estate Jewelry <chris@naplesestatejewelry.co>'}</span>
+          <span><strong>Chris sender:</strong> {settings?.senderProfiles?.chris?.fromAddress ?? 'Chris at Naples Estate Jewelry <chris@naplesestatejewelry.com>'}</span>
           <span><strong>Transport:</strong> {settings?.transport ?? 'direct'}</span>
           <span className="md:col-span-3">
             <strong>Reply-To:</strong> {settings?.senderProfiles?.chris?.replyTo ?? 'chris@naplesestatejewelry.co'} | <strong>No-reply:</strong> {settings?.senderProfiles?.no_reply?.fromAddress ?? settings?.fromAddress ?? 'Not configured'}

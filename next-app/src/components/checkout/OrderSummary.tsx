@@ -47,6 +47,113 @@ function purchaseQty(item: CartItem): number {
   return Math.max(1, normalizeProductQuantity(item.purchaseQuantity));
 }
 
+/**
+ * The one place checkout money is derived for display. Both the item-list
+ * summary and the standalone totals card read from this, so a change to the
+ * estimate can never land on one surface and not the other. The server
+ * recomputes all of it authoritatively at order time (checkout-pricing.ts).
+ */
+export function computeOrderTotals({
+  items,
+  shippingMethod,
+  shippingState,
+  hideSoldItemPrices = false,
+}: {
+  items: CartItem[];
+  shippingMethod: string;
+  shippingState?: string;
+  hideSoldItemPrices?: boolean;
+}) {
+  const lineTotals = items.map((i) => {
+    if (hideSoldItemPrices && isProductSold(i.status)) return null;
+    const unit = parsePrice(i.priceLabel);
+    return unit === null ? null : unit * purchaseQty(i);
+  });
+  const knownLineTotals = lineTotals.filter((p): p is number => p !== null);
+  const hasUnknown = knownLineTotals.length < lineTotals.length;
+  const subtotal = round2(knownLineTotals.reduce((a, b) => a + b, 0));
+  const selectedShipping = getCheckoutShippingOption(shippingMethod) ?? CHECKOUT_SHIPPING_OPTIONS[0];
+  // Value-based tier fee. Fall back to the default method's fee while the
+  // parent snaps an unavailable selection (Express at $5,000+) back to default.
+  const shipping = getCheckoutShippingFee(selectedShipping.value, subtotal)
+    ?? getCheckoutShippingFee(DEFAULT_SHIPPING_METHOD, subtotal)
+    ?? 0;
+  const tax = chargesFlSalesTax(shippingMethod, shippingState)
+    ? calculateFlSalesTax(subtotal, shipping)
+    : 0;
+  const total = round2(subtotal + tax + shipping);
+  return { subtotal, shipping, tax, total, hasUnknown, selectedShipping };
+}
+
+/**
+ * Totals rows on their own, for the checkout page's sticky summary card where
+ * the item list lives in a separate panel. Mirrors the row order used inside
+ * OrderSummary: Subtotal -> Shipping method -> Shipping Cost -> Tax -> Total.
+ */
+export function OrderTotals({
+  items,
+  isEs,
+  shippingMethod,
+  shippingState,
+  hideSoldItemPrices = false,
+}: {
+  items: CartItem[];
+  isEs: boolean;
+  shippingMethod: string;
+  shippingState?: string;
+  hideSoldItemPrices?: boolean;
+}) {
+  const { subtotal, shipping, tax, total, hasUnknown, selectedShipping } = computeOrderTotals({
+    items,
+    shippingMethod,
+    shippingState,
+    hideSoldItemPrices,
+  });
+  const serviceNote = getShippingServiceNote(selectedShipping.value, subtotal, isEs);
+
+  return (
+    <div className="checkout-totals" style={{ fontFamily: 'var(--font-label)' }}>
+      <div className="checkout-total-row">
+        <span>Subtotal</span>
+        <span>{subtotal > 0 ? formatCheckoutCurrency(subtotal) : '-'}{hasUnknown ? '*' : ''}</span>
+      </div>
+      <div className="checkout-total-row">
+        <span>{isEs ? 'Envío' : 'Shipping'}</span>
+        <span style={{ color: 'var(--color-on-surface)', textAlign: 'right' }}>
+          {isEs ? selectedShipping.labelEs : selectedShipping.labelEn}
+        </span>
+      </div>
+      <div className="checkout-total-row">
+        <span>{isEs ? 'Costo de envío' : 'Shipping Cost'}</span>
+        <span>{formatCheckoutCurrency(shipping)}</span>
+      </div>
+      {/* Tax renders AFTER shipping (owner request 2026-07-31): Florida tax is
+          charged on merchandise + charged shipping, so listing it below the
+          shipping cost makes that base visually obvious. */}
+      <div className="checkout-total-row">
+        <span>
+          {tax > 0
+            ? (isEs ? `Impuesto FL (${FL_TAX_RATE_LABEL})` : `FL Sales Tax (${FL_TAX_RATE_LABEL})`)
+            : (isEs ? 'Impuesto FL' : 'FL Sales Tax')}
+        </span>
+        <span>{subtotal > 0 ? formatCheckoutCurrency(tax) : '-'}</span>
+      </div>
+      <div className="checkout-total-row checkout-total-row--grand">
+        <span>{isEs ? 'Total a pagar' : 'Total due'}</span>
+        <span style={{ color: GOLD }}>{subtotal > 0 ? formatCheckoutCurrency(total) : '-'}</span>
+      </div>
+      {serviceNote && (
+        <p className="checkout-total-note">{serviceNote}</p>
+      )}
+      {hasUnknown && (
+        <p className="checkout-total-note">
+          * {isEs ? 'Algunos artículos requieren confirmación de precio.' : 'Some items require price confirmation.'}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function OrderSummary({
   items,
   isEs,
@@ -59,6 +166,10 @@ export default function OrderSummary({
   variant = 'compact',
   showAvailability = false,
   hideSoldItemPrices = false,
+  showTotals = true,
+  heading,
+  headingAction,
+  bare = false,
 }: {
   items: CartItem[];
   isEs: boolean;
@@ -77,49 +188,48 @@ export default function OrderSummary({
   showAvailability?: boolean;
   /** Mask prices for sold items on live customer-facing summaries. */
   hideSoldItemPrices?: boolean;
+  /** Off when the totals live in a separate card (the checkout summary panel). */
+  showTotals?: boolean;
+  /** Override the panel heading text; null omits the heading row entirely
+   *  (for use inside a card that already provides its own title). */
+  heading?: string | null;
+  /** Optional control rendered opposite the heading (e.g. "Edit cart"). */
+  headingAction?: React.ReactNode;
+  /** Drop the panel's own border/background — for use inside another card. */
+  bare?: boolean;
 }) {
-  const lineTotals = items.map((i) => {
-    if (hideSoldItemPrices && isProductSold(i.status)) return null;
-    const unit = parsePrice(i.priceLabel);
-    return unit === null ? null : unit * purchaseQty(i);
+  const { subtotal, shipping, tax, total, hasUnknown, selectedShipping } = computeOrderTotals({
+    items,
+    shippingMethod,
+    shippingState,
+    hideSoldItemPrices,
   });
-  const knownLineTotals = lineTotals.filter((p): p is number => p !== null);
-  const hasUnknown = knownLineTotals.length < lineTotals.length;
-  const subtotal = round2(knownLineTotals.reduce((a, b) => a + b, 0));
-  const selectedShipping = getCheckoutShippingOption(shippingMethod) ?? CHECKOUT_SHIPPING_OPTIONS[0];
-  // Value-based tier fee. Fall back to the default method's fee while the
-  // parent snaps an unavailable selection (Express at $5,000+) back to default.
-  const shipping = getCheckoutShippingFee(selectedShipping.value, subtotal)
-    ?? getCheckoutShippingFee(DEFAULT_SHIPPING_METHOD, subtotal)
-    ?? 0;
   const serviceNote = getShippingServiceNote(selectedShipping.value, subtotal, isEs);
-  const tax = chargesFlSalesTax(shippingMethod, shippingState)
-    ? calculateFlSalesTax(subtotal, shipping)
-    : 0;
-  const total = round2(subtotal + tax + shipping);
 
   const expanded = variant === 'expanded';
 
   return (
     <aside
-      className={`border ${expanded ? 'p-4 md:p-6' : 'p-4 md:p-5 lg:sticky lg:top-24'}`}
-      style={{
+      className={bare ? '' : `border ${expanded ? 'p-4 md:p-6' : 'p-4 md:p-5 lg:sticky lg:top-24'}`}
+      style={bare ? undefined : {
         borderColor: BORDER,
         background: expanded ? 'rgba(255, 255, 255, 0.9)' : 'var(--color-surface-container-lowest)',
         boxShadow: expanded ? '0 16px 42px rgba(75, 60, 24, 0.08)' : undefined,
       }}
     >
-      <div className={expanded ? 'mb-3 flex flex-row items-baseline justify-between gap-2' : ''}>
-        <h2 className={`${expanded ? 'text-base' : 'text-sm'} font-bold uppercase tracking-widest ${expanded ? '' : 'mb-4'}`} style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-          {isEs ? 'Resumen' : 'Order Summary'}
-        </h2>
-        {expanded && (
-          <p className="text-xs flex-shrink-0" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
-            {items.length} {isEs ? (items.length === 1 ? 'artículo' : 'artículos') : (items.length === 1 ? 'item' : 'items')}
-          </p>
-        )}
-      </div>
-      <div className={`${expanded ? 'grid gap-3 mb-4' : 'flex flex-col gap-3 mb-5'}`}>
+      {heading !== null && (
+        <div className={expanded ? 'mb-3 flex flex-row items-baseline justify-between gap-2' : ''}>
+          <h2 className={`${expanded ? 'text-base' : 'text-sm'} font-bold uppercase tracking-widest ${expanded ? '' : 'mb-4'}`} style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
+            {heading ?? (isEs ? 'Resumen' : 'Order Summary')}
+          </h2>
+          {headingAction ?? (expanded && (
+            <p className="text-xs flex-shrink-0" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+              {items.length} {isEs ? (items.length === 1 ? 'artículo' : 'artículos') : (items.length === 1 ? 'item' : 'items')}
+            </p>
+          ))}
+        </div>
+      )}
+      <div className={`${expanded ? 'grid gap-3' : 'flex flex-col gap-3'} ${showTotals ? (expanded ? 'mb-4' : 'mb-5') : ''}`}>
         {items.map((item) => (
           <SummaryRow
             key={item.id}
@@ -134,6 +244,7 @@ export default function OrderSummary({
           />
         ))}
       </div>
+      {showTotals && (
       <div className={`${expanded ? 'ml-auto max-w-md rounded-2xl bg-[rgba(255,253,248,0.78)] px-3.5 py-3 shadow-[0_12px_34px_rgba(38,28,6,0.05)]' : ''} flex flex-col gap-1 text-xs border-t pt-3`} style={{ borderColor: BORDER, fontFamily: 'var(--font-label)', color: 'var(--color-on-surface-variant)' }}>
         <div className="flex justify-between">
           <span>Subtotal</span>
@@ -207,6 +318,7 @@ export default function OrderSummary({
           <span style={{ color: GOLD }}>{subtotal > 0 ? formatCheckoutCurrency(total) : '-'}</span>
         </div>
       </div>
+      )}
     </aside>
   );
 }

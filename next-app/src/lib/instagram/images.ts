@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSiteUrl } from '@/lib/order-email-branding';
 import { PRODUCT_IMAGES_BUCKET } from '@/lib/product-image-storage';
-import { applyCropRect, detectBackdrop, toHexColor, type NormalizedRect } from './backdrop';
+import { applyCropRect, detectBorderBackdrop, toHexColor, type NormalizedRect } from './backdrop';
 import { renderInstagramCard, type CardContent } from './card';
 
 /**
@@ -37,6 +37,95 @@ const RENDITION_EDGE_PX = 1080;
 const JPEG_QUALITY = 85;
 /** Meta rejects very large fetches; our square 1080 JPEGs land far below this. */
 const MAX_SOURCE_BYTES = 25 * 1024 * 1024;
+
+/**
+ * The client-safe facts needed to draw a source photo exactly as its prepared
+ * square rendition will be framed. The raw RGB tuple stays server-side.
+ */
+export interface SquareImageFraming {
+  sourceAspect: number;
+  canvasColor: string;
+  hasCanvas: boolean;
+}
+
+interface ResolvedSquareImageFraming extends SquareImageFraming {
+  backgroundRgb: [number, number, number];
+}
+
+/**
+ * Resolve the source dimensions and the same backdrop used by the square JPEG
+ * renderer. Keeping this calculation shared prevents the editor from
+ * promising a white (or cropped) preview that Prepare later changes.
+ */
+async function resolveSquareImageFraming(input: Buffer): Promise<ResolvedSquareImageFraming> {
+  const [metadata, backdrop] = await Promise.all([
+    sharp(input).metadata(),
+    // A tight product crop can put jewelry in one or two corners even though
+    // the surrounding sweep is still uniform. The border median ignores those
+    // isolated touches and matches the actual dominant canvas colour.
+    detectBorderBackdrop(input),
+  ]);
+  if (!metadata.width || !metadata.height) {
+    throw new Error('Could not determine image dimensions for square framing.');
+  }
+
+  const backgroundRgb: [number, number, number] = backdrop.uniform ? backdrop.rgb : [255, 255, 255];
+  const canvasColor = backdrop.uniform ? toHexColor(backdrop.rgb) : '#ffffff';
+  const sourceAspect = metadata.width / metadata.height;
+
+  return {
+    sourceAspect,
+    canvasColor,
+    hasCanvas: Math.abs(sourceAspect - 1) > 0.001,
+    backgroundRgb,
+  };
+}
+
+export async function getSquareImageFraming(input: Buffer): Promise<SquareImageFraming> {
+  const framing = await resolveSquareImageFraming(input);
+  return {
+    sourceAspect: framing.sourceAspect,
+    canvasColor: framing.canvasColor,
+    hasCanvas: framing.hasCanvas,
+  };
+}
+
+/**
+ * Best-effort framing metadata for the editable lineup. A broken legacy image
+ * should still let the owner edit the rest of the lineup; Prepare will report
+ * that source's actual error if it remains selected.
+ */
+export async function getLineupSquareImageFraming(
+  imageUrls: string[],
+  crops?: Record<string, NormalizedRect> | null,
+): Promise<Record<string, SquareImageFraming>> {
+  const entries = await Promise.all(imageUrls.map(async (url) => {
+    try {
+      const source = await fetchImageBytes(url);
+      const sourceMetadata = await sharp(source).metadata();
+      if (!sourceMetadata.width || !sourceMetadata.height) {
+        throw new Error('Could not determine source image dimensions.');
+      }
+      const framedSource = crops?.[url] ? await applyCropRect(source, crops[url]) : source;
+      const preparedFraming = await getSquareImageFraming(framedSource);
+      const sourceAspect = sourceMetadata.width / sourceMetadata.height;
+      const crop = crops?.[url];
+      const cropAspect = sourceAspect * (crop?.w ?? 1) / (crop?.h ?? 1);
+      return [url, {
+        ...preparedFraming,
+        // Keep the original aspect client-side so an unsaved crop can update
+        // the thumbnail immediately, before the owner chooses Save & prepare.
+        sourceAspect,
+        hasCanvas: Math.abs(cropAspect - 1) > 0.001,
+      }] as const;
+    } catch (error) {
+      console.warn('Could not load square framing preview:', url, error instanceof Error ? error.message : error);
+      return null;
+    }
+  }));
+
+  return Object.fromEntries(entries.filter((entry): entry is readonly [string, SquareImageFraming] => entry !== null));
+}
 
 /**
  * Legacy product photos can be a bare same-origin path ("/assets/images/..."),
@@ -73,21 +162,21 @@ export async function fetchImageBytes(url: string): Promise<Buffer> {
  * pure-black shot got ~92px of white down each side (19 products affected,
  * measured 2026-08-01). Matching the sweep makes the padding disappear on both.
  *
- * White stays the fallback for a non-uniform frame (contextual/lifestyle shots),
- * where there is no single backdrop colour to match and a sampled corner would
- * just be an arbitrary pick from the scene.
+ * White stays the fallback for a genuinely non-uniform border
+ * (contextual/lifestyle shots), where there is no single backdrop colour to
+ * match. Border-median detection prevents a tight studio crop from being
+ * misclassified merely because the jewelry reaches one corner.
  */
 export async function renderSquareJpeg(input: Buffer): Promise<Buffer> {
-  const backdrop = await detectBackdrop(input);
-  const padHex = backdrop.uniform ? toHexColor(backdrop.rgb) : '#ffffff';
-  const [r, g, b] = backdrop.uniform ? backdrop.rgb : [255, 255, 255];
+  const framing = await resolveSquareImageFraming(input);
+  const [r, g, b] = framing.backgroundRgb;
 
   return sharp(input)
     .resize(RENDITION_EDGE_PX, RENDITION_EDGE_PX, {
       fit: 'contain',
       background: { r, g, b, alpha: 1 },
     })
-    .flatten({ background: padHex })
+    .flatten({ background: framing.canvasColor })
     .toColorspace('srgb')
     .jpeg({ quality: JPEG_QUALITY, chromaSubsampling: '4:4:4', mozjpeg: true })
     .toBuffer();

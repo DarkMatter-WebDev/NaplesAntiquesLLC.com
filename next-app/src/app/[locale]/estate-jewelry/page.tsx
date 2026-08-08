@@ -27,7 +27,7 @@ export default async function EstateJewelryPage({ params }: Props) {
   return (
     <>
       <SiteHeader />
-      <main className="pt-16">
+      <main className="site-header-offset">
 
         {/* Hero */}
         <section
@@ -86,7 +86,7 @@ export default async function EstateJewelryPage({ params }: Props) {
 
         {/* Multidimensional Approach */}
         <section className="py-20 md:py-28" style={{ background: 'var(--color-background)' }}>
-          <div className="container mx-auto px-6 md:px-12 max-w-6xl">
+          <div className="ultrawide-page container mx-auto px-6 md:px-12 max-w-6xl">
             <div className="mb-16 text-center max-w-3xl mx-auto">
               <h2
                 className="text-3xl md:text-4xl font-bold mb-6 tracking-tight"
@@ -156,7 +156,7 @@ export default async function EstateJewelryPage({ params }: Props) {
 
         {/* Private Consultation */}
         <section className="py-20 md:py-28" style={{ background: '#1a1c1c', color: 'white' }}>
-          <div className="container mx-auto px-6 md:px-12 max-w-6xl">
+          <div className="ultrawide-page container mx-auto px-6 md:px-12 max-w-6xl">
             <div className="grid md:grid-cols-2 gap-12 items-center">
               <div>
                 <span
@@ -235,7 +235,7 @@ export default async function EstateJewelryPage({ params }: Props) {
 
         {/* Items We Buy */}
         <section className="py-20 md:py-28" style={{ background: 'var(--color-background)' }}>
-          <div className="container mx-auto px-6 md:px-12 max-w-6xl">
+          <div className="ultrawide-page container mx-auto px-6 md:px-12 max-w-6xl">
             <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-4">
               <div className="max-w-xl">
                 <h2

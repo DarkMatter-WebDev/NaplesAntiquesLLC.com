@@ -5,6 +5,7 @@ import { capturePayPalOrder, getPayPalOrderCapture, paypalConfigured, type PayPa
 import { finalizePaidOrder, notifyItemConflict } from '@/lib/order-finalize';
 import { handleProductStatusChange as handleEtsyProductStatusChange } from '@/lib/etsy/sync';
 import { handleProductStatusChange as handleEbayProductStatusChange } from '@/lib/ebay/sync';
+import { queueDeepFieldSync } from '@/lib/deepfield/sync';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -230,6 +231,12 @@ export async function POST(req: Request) {
   const capturedProductIds = (capturedItems ?? []).map((item) => item.product_id).filter((id): id is string => Boolean(id));
   void handleEtsyProductStatusChange(capturedProductIds).catch(() => {});
   void handleEbayProductStatusChange(capturedProductIds).catch(() => {});
+  // Deep Field mirrors the sold flip too. The status change happens inside the
+  // capture_paypal_order database function, so this HTTP path is the only place
+  // application code learns about it — adminRevalidateProduct(s) is never called
+  // here, and hooking only there would leave Deep Field showing sold items as
+  // available. Fire-and-forget: never block the buyer's confirmation.
+  queueDeepFieldSync(capturedProductIds);
 
   // Invoice upsert (idempotent) + auto receipt email. Shared with the webhook
   // backstop so a browser-death capture still produces both. Best-effort — the

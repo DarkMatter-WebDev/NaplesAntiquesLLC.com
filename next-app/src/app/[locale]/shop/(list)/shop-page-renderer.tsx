@@ -733,7 +733,7 @@ export async function renderShopPage({
     return (
       <>
         <SiteHeader />
-        <main className="pt-28 md:pt-32 pb-16 px-4 md:px-8 max-w-7xl mx-auto">
+        <main className="ultrawide-page-wide pt-28 md:pt-32 pb-16 px-4 md:px-8 max-w-7xl mx-auto">
           <p style={{ color: 'var(--color-error)' }}>Failed to load products. Please try again.</p>
         </main>
       </>

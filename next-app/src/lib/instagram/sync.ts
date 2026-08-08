@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { SOCIAL_SCHEDULED_DRIP_BATCH_SIZE } from '@/lib/social-queue-schedule';
 import type { Product } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
 import {
@@ -11,12 +12,20 @@ import {
   createComment,
   createImageContainer,
   fetchContainerStatus,
+  fetchInstagramProfile,
   fetchMedia,
   fetchPublishingLimit,
   instagramFetch,
+  isInstagramMediaMissingError,
 } from './client';
-import { ensureFreshAccessToken } from './auth';
+import { ensureFreshAccessToken, markNeedsReauth } from './auth';
 import { buildInstagramPost, computeInstagramContentHash } from './mapping';
+import {
+  extractSocialCaptionOpening,
+  fallbackSocialCaptionOpening,
+  validateEditedSocialCaptionOpening,
+} from '@/lib/social-caption-opening';
+import { adaptSocialCaptionForTarget } from '@/lib/social-publish-both';
 import { buildRenditions, deleteRenditions } from './images';
 import {
   getConnection,
@@ -47,6 +56,14 @@ export interface SyncStepResult {
   message: string;
   permalink?: string | null;
   warnings?: string[];
+}
+
+export interface InstagramStatusCheckResult {
+  checked: boolean;
+  changed: boolean;
+  syncState: InstagramPostRow['sync_state'] | null;
+  message: string;
+  reason?: 'not_recorded' | 'not_published' | 'missing_remote_id' | 'not_connected' | 'unavailable';
 }
 
 async function loadProduct(service: SupabaseClient, productId: string): Promise<Product | null> {
@@ -80,6 +97,8 @@ async function recordError(
 export async function runPrepareStep(
   service: SupabaseClient,
   productId: string,
+  captionOpeningCandidate?: unknown,
+  captionTemplateCandidate?: string,
 ): Promise<SyncStepResult> {
   const product = await loadProduct(service, productId);
   if (!product) return recordError(service, productId, 'prepare', 'Product not found.');
@@ -87,10 +106,25 @@ export async function runPrepareStep(
   const connection = await getConnection(service);
   const spotData = await fetchSpotData();
   const existingForLineup = await getPost(service, productId);
+  const captionTemplate = captionTemplateCandidate?.trim() || null;
+  const opening = captionTemplate
+    ? extractSocialCaptionOpening(captionTemplate, product)
+    : captionOpeningCandidate === undefined
+      ? fallbackSocialCaptionOpening(product)
+      : validateEditedSocialCaptionOpening(captionOpeningCandidate, product);
+  if (!opening) {
+    return recordError(
+      service,
+      productId,
+      'prepare',
+      'The opening must be one short sentence without “our,” links, hashtags, inventory numbers, quotes, or an unavailable-item claim.',
+    );
+  }
 
   const post = buildInstagramPost({
     product,
     spotData,
+    captionOpening: opening,
     imageSelection: existingForLineup?.image_selection ?? null,
     settings: {
       includePrice: connection?.caption_include_price ?? true,
@@ -103,6 +137,9 @@ export async function runPrepareStep(
   if (post.blockedReason) {
     return recordError(service, productId, 'prepare', post.blockedReason);
   }
+  const preparedCaption = captionTemplate
+    ? adaptSocialCaptionForTarget(captionTemplate, post.caption)
+    : post.caption;
 
   const existing = existingForLineup;
 
@@ -116,7 +153,10 @@ export async function runPrepareStep(
       cardSourceUrl: existing?.card_source_url ?? null,
       cardBackground: existing?.card_background ?? null,
     });
-    const warnings = [...post.warnings, ...renditionWarnings];
+    const warnings = [
+      ...post.warnings,
+      ...renditionWarnings,
+    ];
 
     // Replace, don't accumulate: the previous renditions are now unreferenced.
     if (existing?.rendition_paths?.length) {
@@ -129,9 +169,9 @@ export async function runPrepareStep(
     await upsertPost(service, productId, {
       sync_state: 'review',
       rendition_paths: renditions.map((r) => r.path),
-      posted_caption: post.caption,
+      posted_caption: preparedCaption,
       posted_price: post.quotedPrice,
-      content_hash: computeInstagramContentHash(post),
+      content_hash: computeInstagramContentHash({ ...post, caption: preparedCaption }),
       // Any previously-created containers are void now that images changed.
       child_container_ids: [],
       carousel_container_id: null,
@@ -298,6 +338,7 @@ export async function runPublishStep(
       permalink: media?.permalink ?? null,
       posted_at: new Date().toISOString(),
       queued_at: null,
+      scheduled_for: null,
       child_container_ids: [],
       carousel_container_id: null,
       container_expires_at: null,
@@ -335,9 +376,10 @@ export async function runSyncStep(
   service: SupabaseClient,
   productId: string,
   mode: InstagramSyncMode,
+  captionOpeningCandidate?: unknown,
 ): Promise<SyncStepResult> {
   return mode === 'prepare'
-    ? runPrepareStep(service, productId)
+    ? runPrepareStep(service, productId, captionOpeningCandidate)
     : runPublishStep(service, productId);
 }
 
@@ -391,6 +433,47 @@ export async function markPostSold(
     await insertSyncLog(service, {
       product_id: productId,
       action: 'sold_comment',
+      outcome: 'error',
+      message,
+    });
+    return { commented: false, message };
+  }
+}
+
+/** Add an owner-written comment to one currently published Instagram post. */
+export async function addPostComment(
+  service: SupabaseClient,
+  productId: string,
+  comment: string,
+): Promise<{ commented: boolean; message: string; commentId?: string }> {
+  const row = await getPost(service, productId);
+  if (!row?.ig_media_id || row.sync_state !== 'published') {
+    return { commented: false, message: 'No published Instagram post for this product.' };
+  }
+
+  const auth = await ensureFreshAccessToken(service);
+  if (!auth) return { commented: false, message: 'Instagram is not connected.' };
+
+  try {
+    const commentId = await createComment({
+      mediaId: row.ig_media_id,
+      accessToken: auth.accessToken,
+      message: comment,
+    });
+    await insertSyncLog(service, {
+      product_id: productId,
+      media_id: row.ig_media_id,
+      action: 'comment',
+      outcome: 'ok',
+      message: 'Added an owner-written comment to the Instagram post.',
+    });
+    return { commented: true, commentId, message: 'Comment posted to Instagram.' };
+  } catch (err) {
+    const message = err instanceof InstagramApiError ? err.operatorMessage : 'Could not comment on the post.';
+    await insertSyncLog(service, {
+      product_id: productId,
+      media_id: row.ig_media_id,
+      action: 'comment',
       outcome: 'error',
       message,
     });
@@ -474,6 +557,108 @@ export async function deletePost(
 }
 
 /**
+ * Reconcile one locally published post against Instagram. A missing-media
+ * response only becomes Removed after /me proves the account token is healthy
+ * and still belongs to the same Instagram account.
+ */
+export async function refreshPostStatus(
+  service: SupabaseClient,
+  productId: string,
+): Promise<InstagramStatusCheckResult> {
+  const row = await getPost(service, productId);
+  if (!row) {
+    return {
+      checked: false,
+      changed: false,
+      syncState: null,
+      message: 'No Instagram post is recorded for this product.',
+      reason: 'not_recorded',
+    };
+  }
+  if (row.sync_state !== 'published') {
+    return {
+      checked: false,
+      changed: false,
+      syncState: row.sync_state,
+      message: 'This Instagram post is not marked published, so no remote check was needed.',
+      reason: 'not_published',
+    };
+  }
+  if (!row.ig_media_id) {
+    return {
+      checked: false,
+      changed: false,
+      syncState: row.sync_state,
+      message: 'The published Instagram record has no remote media id. Its status was not changed.',
+      reason: 'missing_remote_id',
+    };
+  }
+
+  const auth = await ensureFreshAccessToken(service);
+  if (!auth) {
+    return {
+      checked: false,
+      changed: false,
+      syncState: row.sync_state,
+      message: 'Instagram is not connected. Reconnect it before refreshing this status.',
+      reason: 'not_connected',
+    };
+  }
+
+  try {
+    const remote = await fetchMedia(row.ig_media_id, auth.accessToken);
+    if (remote.permalink && remote.permalink !== row.permalink) {
+      await upsertPost(service, productId, { permalink: remote.permalink });
+    }
+    return {
+      checked: true,
+      changed: false,
+      syncState: 'published',
+      message: 'Instagram confirms this post is still published.',
+    };
+  } catch (err) {
+    if (err instanceof InstagramApiError && err.code === 'invalid_token') {
+      await markNeedsReauth(service);
+    }
+
+    if (isInstagramMediaMissingError(err)) {
+      try {
+        const profile = await fetchInstagramProfile(auth.accessToken);
+        if (String(profile.id) === auth.igUserId) {
+          const message =
+            'Instagram no longer reports this post. Its local status was changed to Removed.';
+          await forgetPost(service, productId, message, 'status_check');
+          return { checked: true, changed: true, syncState: 'deleted', message };
+        }
+      } catch (profileError) {
+        if (profileError instanceof InstagramApiError && profileError.code === 'invalid_token') {
+          await markNeedsReauth(service);
+        }
+      }
+    }
+
+    const message =
+      err instanceof InstagramApiError
+        ? `Instagram could not confirm this post: ${err.operatorMessage}`
+        : 'Instagram could not confirm this post. Its local status was not changed.';
+    await insertSyncLog(service, {
+      product_id: productId,
+      media_id: row.ig_media_id,
+      action: 'status_check',
+      outcome: 'warning',
+      message,
+    });
+    return {
+      checked: false,
+      changed: false,
+      syncState: row.sync_state,
+      message,
+      reason: 'unavailable',
+    };
+  }
+}
+
+/**
  * Clear local state for a post and delete its renditions, without touching
  * Instagram. Used after the operator has deleted a post by hand, and by the
  * successful delete path above.
@@ -482,6 +667,7 @@ export async function forgetPost(
   service: SupabaseClient,
   productId: string,
   logMessage = 'Cleared the local Instagram record; the post was removed manually.',
+  logAction = 'forget',
 ): Promise<{ forgotten: boolean; message: string }> {
   const row = await getPost(service, productId);
   if (!row) return { forgotten: false, message: 'No Instagram post recorded for this product.' };
@@ -496,12 +682,13 @@ export async function forgetPost(
     carousel_container_id: null,
     container_expires_at: null,
     queued_at: null,
+    scheduled_for: null,
     sold_comment_id: null,
     sold_comment_at: null,
   });
   await insertSyncLog(service, {
     product_id: productId,
-    action: 'forget',
+    action: logAction,
     outcome: 'ok',
     message: logMessage,
   });
@@ -547,6 +734,7 @@ export async function discardPrepared(
     carousel_container_id: null,
     container_expires_at: null,
     queued_at: null,
+    scheduled_for: null,
     last_error: null,
     error_count: 0,
   });
@@ -564,8 +752,9 @@ export async function discardPrepared(
 }
 
 /**
- * Drip runner: publish up to the configured daily limit from the approved
- * queue, oldest first. Only ever touches products an admin explicitly queued.
+ * Scheduled runner: publish the next bounded batch of due, approved posts.
+ * Future posts and legacy rows without a scheduled time stay untouched. The
+ * batch bound protects one worker invocation; it is not a per-day limit.
  */
 export async function runScheduledDrip(service: SupabaseClient): Promise<{
   published: number;
@@ -577,26 +766,16 @@ export async function runScheduledDrip(service: SupabaseClient): Promise<{
     return { published: 0, skipped: 0, message: 'Instagram is not connected.' };
   }
 
-  const dailyLimit = connection.daily_post_limit ?? 2;
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const { count: postedToday } = await service
-    .from('instagram_posts')
-    .select('product_id', { count: 'exact', head: true })
-    .eq('sync_state', 'published')
-    .gte('posted_at', since.toISOString());
-
-  const remaining = Math.max(0, dailyLimit - (postedToday ?? 0));
-  if (remaining === 0) {
-    return { published: 0, skipped: 0, message: `Daily limit of ${dailyLimit} already met.` };
-  }
-
   const { data: queued } = await service
     .from('instagram_posts')
     .select('*')
-    .in('sync_state', ['review'])
+    .in('sync_state', ['pending', 'review'])
     .not('queued_at', 'is', null)
+    .not('scheduled_for', 'is', null)
+    .lte('scheduled_for', new Date().toISOString())
+    .order('scheduled_for', { ascending: true })
     .order('queued_at', { ascending: true })
-    .limit(remaining);
+    .limit(SOCIAL_SCHEDULED_DRIP_BATCH_SIZE);
 
   let published = 0;
   let skipped = 0;
@@ -608,7 +787,7 @@ export async function runScheduledDrip(service: SupabaseClient): Promise<{
     else skipped += 1;
   }
 
-  const message = `Drip run complete: ${published} published, ${skipped} skipped.`;
+  const message = `Scheduled queue check complete: ${published} published, ${skipped} skipped.`;
   await insertSyncLog(service, {
     action: 'scheduled_drip',
     outcome: skipped > 0 && published === 0 ? 'warning' : 'ok',

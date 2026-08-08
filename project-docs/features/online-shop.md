@@ -1,6 +1,6 @@
 ﻿# Feature: Online Shop
 
-> Current Next.js/Supabase shop behavior. Last updated: **2026-07-31**.
+> Current Next.js/Supabase shop behavior. Last updated: **2026-08-03**.
 
 ## Summary
 

@@ -1,7 +1,7 @@
 # Naples Estate Jewelry - Next App
 
-This is the active Next.js App Router application for Naples Estate Jewelry &
-Antiques. The parent repository contains project docs, Supabase SQL, and Netlify
+This is the active Next.js App Router application for Naples Estate Jewelry.
+The parent project folder contains project docs, Supabase SQL, and Netlify
 configuration; runtime app code lives here.
 
 ## Development

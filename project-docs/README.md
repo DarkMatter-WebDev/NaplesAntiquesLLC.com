@@ -19,14 +19,12 @@ docs and evidence-backed verification.
 | `ARCHITECTURE.md` | System design, folder structure, DB schema, integrations, auth, hosting. |
 | `STRUCTURE.md` | Canonical repo map + structural **invariants** that keep the site consistent. |
 | `INTEGRITY.md` | Next.js integrity rules + pre-publish checklist. |
-| `LEGACY_REMOVAL_REPORT.md` | 2026-06-13 audit separating current Next.js app files from legacy static-site cleanup candidates. |
 | `COMPLIANCE_AUDIT.md` | 2026-06-19 website compliance audit and implementation report. |
 | `DECISIONS.md` | Current durable technical/design/business decisions and rationale. |
 | `TASKS.md` | Open work plus a short recent-completions summary. |
 | `CHANGELOG.md` | The one full-history, dated log of meaningful changes. |
-| `CLIENTS.md` | Dark Matter Web Services client/hosting/maintenance tracking (no secrets). |
+| `CLIENTS.md` | Client/hosting/maintenance tracking for Surette Systems (no secrets). |
 | `features/` | One file per feature with deeper detail. |
-| `meetings/` | Dated notes (`YYYY-MM-DD-notes.md`). |
 
 ## Session Startup Behavior
 

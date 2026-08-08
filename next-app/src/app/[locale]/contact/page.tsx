@@ -33,7 +33,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
   return (
     <>
       <SiteHeader />
-      <main className="pt-16">
+      <main className="site-header-offset">
 
         {inquiryItem ? (
           <>

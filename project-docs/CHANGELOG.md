@@ -1,5 +1,3764 @@
 # Changelog
 
+## 2026-08-08 - Pre-deploy customer-facing audit: form labels fixed, sync safety locked
+
+Full customer-facing pass before deploy, driven from the browser rather than by
+reading code.
+
+**Fixed — 18 form controls had no accessible name.** A screen reader announced
+the shop filters as bare "combo box" with no indication of what they filter.
+`/shop` had **16** (search + 7 selects, rendered twice for the desktop rail and
+mobile sheet); the homepage signup had **2** (name + email, placeholder-only —
+a placeholder is not an accessible name: it is not exposed as one by every AT
+and it vanishes on input). WCAG 4.1.2 / 3.3.2.
+
+Fixed with `aria-label`, deliberately NOT `htmlFor`/`id`: the filter bar renders
+twice per page, so ids would collide and produce a worse defect than the one
+being fixed. The visible `<label>` elements were left alone — they are correct
+visually, they simply were not associated. Homepage inputs also gained
+`autoComplete="name"` / `"email"`. Verified live: **0 unnamed controls** on both
+pages, and control geometry is byte-identical (255x44 / 319x44), so nothing moved.
+
+**Locked — the Deep Field sync is provably inert until configured.** 14 new
+tests covering the property this deploy depends on: with `DEEPFIELD_SYNC_URL` /
+`DEEPFIELD_SYNC_TOKEN` unset, no fetch AND no database read happens (the config
+check precedes `createServiceClient()`); one var alone is still inert; archived
+products are never pushed; batching is 25; internal fields never appear in the
+serialized body; and network, database, and non-2xx failures all resolve rather
+than throw into an order capture.
+
+**Verified clean, recorded so it is not re-audited:**
+
+- Hero at rest: pane A full-bleed and unmasked, B and C parked offscreen and
+  `inert`. At the locked end: C full-bleed and interactive, A and B inert at
+  opacity 0. Reduced motion clears all three masks.
+- Zero horizontal overflow at 375px across six scroll positions.
+- 18 routes probed: all 200 or a correct redirect; `/nonexistent` returns a real
+  404.
+- Zero console errors; every network request 200/304.
+- No heading-level skips on `/`, `/es`, `/shop`, `/checkout`, `/contact`, `/sell`.
+- Every image has an `alt` attribute.
+- **No secret VALUE from `.env.local` appears in the client bundle** — scanned
+  all 71 client chunks against all 36 server-side keys by value, not by name.
+  (`FACEBOOK_APP_SECRET` matches by NAME only, inside an admin error-message
+  string. `SITE_URL` and `EMAIL_FROM` are public by definition.)
+- Email end-state: **zero `.co` senders** in compiled output, 35 files carry the
+  `.com` sender.
+- The Deep Field token exists only in `next-app/.env.local`, which is gitignored
+  (`next-app/.gitignore:37`); no `.env` file is tracked by git.
+
+**Fixed — the owner's personal `@aol.com` address no longer ships in the public
+client bundle.** `ADMIN_EMAIL` in `carousel/lib/carouselConfig.ts` was imported
+by `carouselData.ts`'s `isCurrentUserAdmin()`, a client-side module, so the
+literal address compiled into the browser bundle — readable by anyone viewing
+source, harvestable by spam bots.
+
+I initially recommended deferring this as too risky for deploy day, then checked
+instead of assuming and reversed: that client check is the THIRD gate and the
+weakest. `admin/settings/page.tsx` already redirects non-admins server-side on
+`profiles.is_admin`, and `is_carousel_admin()` in the database enforces every
+write. `AdminCarouselSettingsPanel` renders in exactly one place, behind that
+server gate — so the email comparison was re-proving something already proven,
+at the cost of publishing a personal address.
+
+`isCurrentUserAdmin()` now reads `profiles.is_admin`, the signal the rest of the
+app already uses. Correct in both directions under the live policy in
+`supabase/admin-profile-read-policy.sql` (SELECT via `is_admin_user(auth.uid())`):
+an admin reads their own row → true; a non-admin reads zero rows → false. The
+constant is deleted, with a comment in its place saying why not to reintroduce
+one — anything in `carousel/lib/` reaches the browser.
+
+Verified: **zero occurrences of the address anywhere in `.next`**, and the
+value-based scan now reports `ORDER_NOTIFY_EMAIL` clean. `carousel/sql/setup.sql`
+is untouched and keeps the email database-side, where it never reaches a bundle.
+Server gate re-confirmed: anonymous `/admin`, `/admin/settings`, and
+`/es/admin/settings` all redirect to sign-in.
+
+**Not verifiable without credentials:** that the panel still renders for a
+signed-in admin. Flagged in TASKS as an owner check.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **750/750 tests** (up from
+736), clean `npm run build` from scratch.
+
+## 2026-08-08 - Black→white slideshow handover: gray wash and hard line both gone
+
+Owner still saw a flat gray band with a hard bottom edge as the all-black
+slideshow left and the all-white one arrived. Two distinct defects, both
+measured before touching anything.
+
+**1. The gray was the fade itself.** `opacity` applies to the WHOLE pane. Pane
+A's backdrop is pure black and the frame behind it is white, so a
+partly-transparent pane A does not read as leaving — it reads as a flat gray
+rectangle. Measured at p=0.35: pane A occupied 27% of the frame at opacity 0.36,
+compositing to a uniform `rgb(163,163,163)` with the photos washed out inside
+it. No value of `FADE_TAIL` fixes this; black fading over white passes through
+every gray on the way. The fade was being applied to an AREA when it needed to
+be applied to an EDGE.
+
+So the dissolve became spatial — `A_EXIT_DISSOLVE_PCT = 40`, a bottom-anchored
+mask sized to reach past the arriving pane's top edge and on into the visible
+band above it — and `FADE_TAIL` dropped 0.75 → 0.45, where it only takes out the
+last of the pane at the very end. Pane A now sits at 1.00 opacity through
+p=0.26 and 0.86 at p=0.30 (was 0.52), so it reads as a photograph rather than a
+smear.
+
+**2. The hard line was the ARRIVING pane's top edge, not the departing pane's
+bottom.** Its feather was `(1 - e) * EDGE_FEATHER_PCT` — widest when the
+arriving pane is barely on screen and narrowest mid-crossing, which is exactly
+backwards, since mid-crossing is when the seam is most exposed. At p=0.35 it had
+collapsed to ~2% of pane height (~25px) against a 326px band of high-contrast
+gray. Now `4e(1-e) * 14`, peaking mid-crossing and still zero at both ends so
+resting and locked panes stay full-bleed.
+
+**A real bug surfaced while fixing this.** The mask code carried
+`if (t2 > 0) … else …`, justified by a comment asserting "the phases cannot
+overlap — PHASE_1_END is before PHASE_2_START". That is false and has been since
+the crossings were deliberately overlapped so motion never stops:
+`PHASE_2_START` is **0.39**, `PHASE_1_END` is **0.61**. For p in [0.39, 0.61]
+pane B is arriving and departing at once, but got only one mask — so its top
+feather snapped to zero the instant phase 2 opened. Measured as an instant
+12.56% → 0 jump mid-crossing. The old 2% feather made it subtle; the new 14% one
+made it obvious. Replaced `setEdgeFeather` with `setPaneMask(pane, topPct,
+bottomPct)` emitting one gradient carrying both edges. Largest single-step change
+in B's top feather across the whole crossing is now **1.46%** per 0.02 of scroll,
+and `bTop`/`bBot` correctly coexist through the overlap.
+
+Removed as dead: `EDGE_FEATHER_PCT`, `FEATHER_OVERLAP_SHARE`, `featherFor()`.
+Their "the feather must stay inside the overlap" invariant belonged to the era
+when arriving panes descended and could expose uncovered frame; with panes
+rising, the departing pane covers everything above the arriving pane's top edge
+for the whole crossing, so a wide feather always lands on a photograph. That
+clamp was what capped the join at a 2–5% ramp — narrow enough to read as a line,
+which is what the owner kept seeing.
+
+Verified by measurement across p=0.20→0.70 in 0.02 steps (all three mask widths
+monotonic, no discontinuity) and by screenshot at p=0.28 and p=0.35.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **736/736 tests**, clean
+`npm run build`.
+
+## 2026-08-08 - One-way product sync to Deep Field Gallery
+
+Products now push from NEJ to **Deep Field Gallery**, a separate site with its
+own database. One direction only, server-side only, and the sole credential
+crossing the boundary is a shared bearer token — no Supabase key moves either
+way, and NEJ never touches the Deep Field database.
+
+**Initial bulk import, done first and verified before any code shipped.** 128
+products (130 rows minus the two archived `test-item-*`) in 6 batches of ≤25,
+974 images. All six returned HTTP 200, `failed: 0`, and the id reconciliation
+was exact: 128 sent, 128 acknowledged, 0 missing, 0 unexpected, 0 remapped.
+One transient `502` on a single image in batch 4 was cleared by re-sending that
+product.
+
+**Live hooks** (`src/lib/deepfield/{payload,sync}.ts`), wired into every path
+that can change product state:
+
+- `adminRevalidateProduct` / `adminRevalidateProducts` — the existing chokepoint
+  Etsy and eBay already use, covering create/edit/archive/delete/bulk status.
+- `paypal/capture-order` and `paypal/webhook` — the checkout sold-flip. These
+  are **not** redundant: the flip happens inside the `capture_paypal_order`
+  Postgres function, so no application code observes it and
+  `adminRevalidateProduct(s)` is never called there. Hooking only the admin
+  path would leave Deep Field advertising sold items as available.
+
+Confirmed against the schema that no other path needs a hook — under the
+no-reservation checkout, only `capture_paypal_order` writes product
+`status`/`quantity`; denials, cancels, and refunds leave `products` untouched.
+
+Three things worth recording as decisions rather than details:
+
+1. **The field list is an allow-list, guarded twice.** A column added to
+   `products` later is excluded by default rather than silently shipped to
+   another company. A second assert against `DEEPFIELD_FORBIDDEN_FIELDS` throws
+   rather than leaks, and the caller treats a throw as "skip this product".
+2. **`price_label` is deliberately not sent.** It is a dead column — nothing
+   renders it, every save writes null — but stale values survive on ~19 rows
+   including `"$0.00"` on a product that sells for $450. Found while verifying
+   pricing; sending it would have invited a wrong price on day one.
+3. **Fail-closed on spot pricing.** ~60 of 128 products are spot-multiplier with
+   no stored price at all — the price is a render-time computation. When live
+   metal pricing is unavailable those ship a **null** price with a reason, never
+   a fallback-rate guess, matching the rule `getMarketplaceSpotPriceError`
+   already enforces for marketplace writes. Manual and sold-locked prices are
+   unaffected, so a spot outage degrades instead of blocking.
+
+`src/lib/pricing.ts` is imported rather than reimplemented, so the two price
+paths cannot drift. Verified two ways: unit tests reproduce the live storefront
+to the cent (`$5,489.17` / melt `$4,391.34` against a rendered `$5,489` /
+`$4,391`), and a throwaway parity test confirmed the app module emits payloads
+**byte-identical** to the one-off import script across all 128 products, so what
+ships live is exactly what Deep Field already accepted.
+
+Inert until `DEEPFIELD_SYNC_URL` and `DEEPFIELD_SYNC_TOKEN` are set on **NEJ's**
+Netlify site (server-only, no `NEXT_PUBLIC_`). Nothing has been sent to
+production Deep Field.
+
+**`DEEPFIELD_SYNC_DRY_RUN=true`** added so a non-production environment can
+behave exactly like production without side effects — it runs the whole path
+(read, payload build, field-policy assert, batching, auth, HTTP round trip) and
+tells the receiver to validate and discard. This matters because local dev
+shares production's Supabase database: an admin save in dev is a real product
+change, so testing the hooks against the live receiver would otherwise write
+real rows and copy real images into the live gallery. Verified against the live
+receiver — dry run returns `imageCopyMode: "dry_run"`, `copiedImageCount: 0`,
+`wouldCopyImageCount: 9`; live returns the inverse. Only the exact string
+`true` enables it, so a typo fails toward normal behavior rather than silently
+disabling a production sync.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **736/736 tests** (up from
+720; 16 new), clean `npm run build`.
+
+See `project-docs/features/deepfield-sync.md`.
+
+## 2026-08-07 - Departing slideshow fades out; black bar on the black→white handover gone
+
+Owner: a solid black bar was left at the top of the frame as the all-black
+slideshow scrolled out and the all-white one arrived.
+
+**Diagnosed, not guessed.** Measured through the crossing: at p=0.50 pane A's
+bottom edge sat at 25.6% while pane B's top was still at 8%, leaving an 8%-tall
+band of pane A at the top of the frame at **full opacity**. The reason that band
+reads as a bar rather than as a photograph leaving is that it is EMPTY: the
+departing pane only travels `PANE_A_TRAVEL` (85%), and its ring left the top of
+the frame long before, so the strip still in view is bare backdrop.
+
+Two changes, both needed:
+
+1. **The departing pane now fades over the tail of its exit** (`FADE_TAIL = 0.4`,
+   so the last 40% of its travel). The band dissolves instead of sliding out. It
+   starts late deliberately: for most of the crossing the arriving pane's
+   feathered top still blends over a SOLID photograph, and only the empty
+   remainder fades.
+2. **The frame now paints the DOMINANT pane's backdrop, not always hero A's.**
+   Fading the departing pane is useless on its own — whatever it vacates reveals
+   the frame, and the frame was still mirroring the OUTGOING black directly above
+   the INCOMING white slideshow. Following the dominant pane means the vacated
+   strip already matches what is arriving.
+
+Measured at the exact reported point (p=0.50): the strip's pane-A opacity went
+**1.0 → 0.31** over a **white** frame instead of black, so it reads as a soft
+wash rather than a hard bar. Across the fade: 0.83 → 0.50 → 0.31 → 0.20 → 0.01
+as the strip shrinks 33% → 18% → 8% → 0.
+
+**Checked the risk the second change introduces:** switching the backdrop on
+dominance rather than blending could show a black→white jump if the frame were
+ever visible at that instant. It is not — opaque pane coverage measured **100% at
+every dominance flip** (p=0.295/0.305/0.315 and 0.685/0.695/0.705), so the switch
+happens entirely behind the panes.
+
+`FADE_TAIL` then went **0.4 -> 0.65 -> 0.75** on request, to start the fade
+sooner so the leaving slideshow is nearly invisible by the time only its empty
+tail is left. A LONGER tail means an EARLIER start, so opacity is lower once the
+strip appears. Measured across the crossing:
+
+| scroll p | exposed strip | opacity @ 0.4 | opacity @ 0.65 | opacity @ 0.75 |
+|---|---|---|---|---|
+| 0.30 | 57.2% | — | — | 0.764 |
+| 0.35 | 45.0% | — | — | 0.601 |
+| 0.40 | 33.1% | 0.83 | 0.51 | **0.441** |
+| 0.46 | 18.5% | 0.50 | 0.31 | **0.265** |
+| 0.50 | 8% | 0.31 | 0.19 | **0.167** |
+| 0.53 | 0% | 0.20 | 0.12 | **0.105** |
+
+Against the original 1.00 at p=0.50, the bar is now a faint tint — confirmed
+visually at that scroll position, where the band is barely separable from the
+white behind it. The trade, stated in the constant's comment: the departing
+slideshow is already part-transparent mid-crossing while a third of it is still
+on screen (~0.44 at p=0.40), so the handover reads as a CROSSFADE rather than one
+layer sliding over another.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **720/720 tests**, clean
+`npm run build`.
+
+## 2026-08-07 - Home nav returns to the top when already on the homepage
+
+Next's `<Link>` no-ops when its href matches the current route, so clicking Home
+from the homepage did nothing and read as a broken button. It now scrolls back to
+the top. That matters more here than on a typical site: the pinned hero means the
+top is a real destination, not just a scroll position.
+
+Applied to both the desktop nav link and the mobile menu link in `SiteHeader`.
+The mobile one closes the menu first, then scrolls.
+
+Details worth keeping:
+- **Locale-agnostic.** The check uses the existing `normalizedPathname`, which
+  already has the `/en|/es` prefix stripped, so it covers `/` and `/es` without a
+  second code path. Verified on both — the ES click keeps the URL at `/es`.
+- **Modified clicks are not hijacked.** Ctrl/Cmd/Shift/Alt clicks and non-primary
+  buttons fall through to normal link behaviour, so "open in new tab" still works.
+- **Honours `prefers-reduced-motion`** — jumps instead of easing.
+- `MobileLink`'s `onClick` prop was widened from `() => void` to receive the
+  event, since the handler needs `preventDefault`.
+
+Verified in the browser: homepage 2600 -> 0 with the URL unchanged; `/es`
+2400 -> 0 with `/es` preserved; mobile 2200 -> 0 with the menu closing; and the
+regression case — clicking Home from `/shop` still NAVIGATES to `/` rather than
+scrolling that page to the top.
+
+The brand logo, which is also a home link, uses the same handler (added straight
+after, on request) so all three home affordances behave identically. Verified:
+logo on the homepage 2500 -> 0 with the URL unchanged, and from `/contact` it
+still navigates to `/`.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **720/720 tests**, clean
+`npm run build`.
+
+## 2026-08-07 - Black swatch set on the three untagged carousel rows
+
+Data fix to accompany the code fallback below, done through the admin panel so it
+went through the normal save path rather than a direct write.
+
+Set the Black background swatch on `carousel_selection` rows 11-13 in the UI
+(DB positions 10-12): Vintage 14K Gold Oval Rolo Link, 10K Gold Semi-Solid Cuban
+Link, 10K Gold Miami Cuban Link. `carousel_selection` now has **0 rows with a
+NULL `bg_color`**, down from 3.
+
+Rows were identified by matching the UI's row labels against DB positions rather
+than trusting swatch order — an earlier attempt to identify them by climbing the
+DOM was unreliable and collapsed four separate rows onto one product. Clicks were
+confirmed registered before saving by comparing computed swatch styling against a
+known-black row (`border: 2px solid rgb(115, 92, 0)`) versus an untouched one.
+
+Verified after saving that nothing else moved: positions 0-9 kept their original
+values (`#ffffff`, `#fbf8f2`, `#fbf7f2`, `#000000`), all three `selection_mode*`
+stayed `manual`, visible counts and `show_price` unchanged, and both other
+lineups untouched.
+
+**Checked before saving, because the panel saves everything at once:** TASKS.md
+warned that the DB held `random_gold_jewelry` / `random_silver_jewelry` and that
+the first Save All Slideshows would flip both to `manual` and switch the
+storefront off random draws. That flip had already happened — all three modes
+already read `manual` — so the save was safe. That stale warning has been
+removed from TASKS.md.
+
+`carousel_selection_alt` still has all 10 rows NULL. Left as-is deliberately:
+those are white-backdrop silver pieces, and the code fallback below now resolves
+them from the product's own padding, so it is no longer a latent bug.
+
+## 2026-08-07 - Curated carousel cards fall back to the product's own backdrop
+
+Owner reported white padding around some black-backdrop photos in the hero, with
+two neighbouring cards rendering correctly for comparison.
+
+**Cause: three curated rows had no `bg_color`.** In `carousel_selection`,
+positions 10-12 (`14k-oval-link-chain-necklace-01`,
+`10k-semi-solid-cuban-link-6mm-chain-necklace-01`, `10k-cuban-link-chain-01`)
+stored NULL. `Carousel.tsx` only sets `--card-bg` when `bgColor` is truthy and
+the CSS falls back to the global white `--bg`, so a black-backdrop photograph got
+white letterbox bars. The two correct cards (positions 8-9) had `#000000` set.
+
+**Why nothing caught it.** A fallback that reads the product's own stored padding
+already existed — `paddingBgForProductRow()` — and its comment describes this
+exact symptom. But it was wired only into the RANDOM draw path, on an assumption
+stated in `PRODUCT_PADDING_COLUMNS`: *"The curated query does not need them — a
+curated entry stores its White/Black group on the selection row."* That holds
+only as long as whoever adds a row sets the swatch. These three did not, and the
+curated path had no safety net at all.
+
+The data to resolve it was already present: all five products carry
+`image_padding = "black"`, the same field the product pages use.
+
+**Fix:** the curated query now requests `PRODUCT_PADDING_COLUMNS` and falls back
+to `paddingBgForProductRow()` when the selection row has no opinion. Applied in
+BOTH `src/lib/home-carousel-server.ts` (what the live hero reads) and
+`carousel/lib/carouselData.ts` (the admin preview) so the preview cannot disagree
+with the storefront. The resolver is per-image aware, which matters here —
+`10k-cuban-link-chain-01` has an `image_padding_by_image` entry marking one
+specific image white.
+
+Verified against live data: the previously-NULL cards now render
+`--card-bg: #000000` / `rgb(0, 0, 0)`, identical to the two that were already
+correct. A curated row that sets the swatch still wins; only NULL falls through.
+
+**Latent case also covered:** all 10 rows of `carousel_selection_alt` are NULL.
+Invisible today because those are white-backdrop silver pieces, but the first
+dark-backdrop item added there would have hit the same bug. It now resolves from
+the product instead.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **720/720 tests**, clean
+`npm run build`.
+
+## 2026-08-07 - Final hold removed; the hero has no stationary stretch left
+
+Owner: no pause at the third carousel before scrolling on to the page. That was
+the final hold — `PHASE_2_END -> 1` was 0.08 of the runway with nothing moving.
+
+`PHASE_2_END` is now exactly **1**, so C reaches flush on the same frame the
+runway ends and the sticky frame unpins. C's ease-out and the page beginning to
+scroll away now coincide, so on-screen motion is continuous: as C's own travel
+decelerates, the whole frame starts moving instead.
+
+The other two phase values were **solved rather than guessed**, because pinning
+the end point while keeping both existing invariants (equal crossing lengths L,
+overlap ratio 0.36) fully determines them:
+
+```
+PHASE_1_END = L,  PHASE_2_START = 1 - L,  overlap = 2L - 1
+(2L - 1)/L = 0.36  ->  L = 1/1.64 = 0.61
+```
+
+So `PHASE_1_END 0.56 -> 0.61`, `PHASE_2_START 0.36 -> 0.39`, `PHASE_2_END
+0.92 -> 1`. Both crossings remain exactly 0.61 long, overlap 0.22, ratio 0.361,
+handover slope still 1.38/1.50 = 92%.
+
+Measured tail of the runway, speed as a percentage of peak:
+
+```
+0.85:84%  0.867:85%  0.883:79%  0.9:75%  0.917:72%
+0.933:63%  0.95:57%  0.967:47%  0.983:38%  1:26%
+```
+
+**Zero dead steps** (previously it flatlined to 0% from ~0.95 onward). It is
+still moving at 26% of peak as the frame releases.
+
+Confirmed C does still land flush and full-bleed: `translate3d(0px, 0%, 0px)`,
+offset 0px, mask `none`, reached within ~40px of scroll past the nominal runway
+end — the last few pixels of its travel now happen as the frame is releasing
+rather than before it.
+
+Note during this change `npx tsc --noEmit` reported an error in
+`.next/dev/types/validator.ts`, a generated dev-cache file rather than source.
+Clearing `.next` resolved it — the documented Turbopack stale-cache gotcha, worth
+recognising before chasing a phantom type error.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **720/720 tests**, clean
+`npm run build`.
+
+## 2026-08-06 - Hero crossings made symmetric; handover dip largely removed
+
+Owner reported the handovers still pausing slightly and the spacing between the
+first, second and third slideshows looking inconsistent. Both were real and both
+were measurable in the phase constants.
+
+**The inconsistency was unequal crossing lengths.** Crossing 1 ran 0 -> 0.47
+(0.47) and crossing 2 ran 0.36 -> 0.90 (0.54) — 15% longer, so the two handovers
+moved at different speeds and the gap between slideshows changed from one to the
+next. Now both are exactly 0.56.
+
+**The pause was the overlap RATIO, not the overlap itself.** Smoothstep's
+derivative is zero at both ends, so what matters is how far into its curve the
+incoming crossing is when the outgoing one finishes. At the old ratio of 0.20 it
+was still on the flat part — slope 0.97 out of a possible 1.50, ~65% — and the
+dip was perceptible. At 0.36 it is 1.38/1.50, ~92%.
+
+`PHASE_1_END 0.47 -> 0.56`, `PHASE_2_START` unchanged at 0.36,
+`PHASE_2_END 0.90 -> 0.92`.
+
+Measured over 60 samples of the full runway, speed as a percentage of peak:
+
+```
+0.017:3%   0.067:32%  0.117:64%  0.167:85%  0.217:98%  0.267:91%
+0.317:80%  0.367:87%  0.417:90%  0.467:78%  0.517:84%  0.567:99%
+0.617:94%  0.667:85%  0.717:80%  0.767:80%  0.817:74%  0.867:58%
+0.917:26%  0.967:0%
+```
+
+After p=0.17 it never drops below 74%, including straight through the handover
+band (87 / 90 / 78 / 84%). The only slow zones left are the ease-in from rest at
+the start and C decelerating into the final hold at the end — both intentional.
+
+Ring separation between the two crossings also converged: **68.4% vs 66.8%**, a
+1.6-point difference (previously 62.4 vs 66.7, 4.3 points), so the spacing now
+reads the same at each handover.
+
+**Still present by design, flagged for the owner:** each arriving carousel's ring
+leads and then returns to centre as it locks (the `4e(1-e)` ring pull), which
+reads as a slight settle. That counter-motion IS the mechanism that tightens the
+carousels vertically — softening it means giving back some of that tightening.
+Likewise the final hold (0.08 of the runway) is what lets C sit composed before
+the frame unpins.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **720/720 tests**, clean
+`npm run build`.
+
+## 2026-08-06 - Hero carousels pulled together vertically during a crossing
+
+Owner: tighten the three carousels closer vertically, overlay them if possible.
+
+This is a different axis from the pane-seam work below, and pane overlap could
+never have achieved it. Each pane is full-frame with its ring centred, so
+consecutive RINGS sit ~one frame apart no matter how far the panes overlap — the
+photographs themselves never came near each other, which is what "tighten the
+carousels" was about.
+
+Measured first: a ring box spans **14.9%-85.1%** of the frame, so it is ~70% tall
+with ~15% headroom either side. Two rings must therefore be closer than 70% apart
+to overlay at all.
+
+**A constant lift cannot reach that**, and the headroom is why: lift an arriving
+pane's ring more than ~15% and it pokes into frame while its pane is still parked
+below at rest. That ceiling bottoms out around 75% separation — just short of
+touching.
+
+So the pull peaks MID-CROSSING and is zero at both ends: `4e(1 - e)` is 0 at e=0,
+1 at e=0.5, 0 at e=1. At rest and when locked the composition is exactly as
+designed and nothing peeks; only while a crossing is running do the rings lean
+toward each other. The departing pane's ring trails (pulled down), the arriving
+pane's leads (pulled up), and B carries one term from each crossing.
+
+Measured across the runway at `RING_PULL_PCT = 15`:
+
+| | before | after |
+|---|---|---|
+| ring separation, crossing 1 | ~92% (min) | **62.4%** |
+| ring separation, crossing 2 | ~92% | **66.7%** |
+| overlap threshold (ring height) | 70.2% | 70.2% |
+| arriving rings at rest | below frame | **116%** — still below, 16% margin |
+
+Both crossings now dip under the ring height, so the photo bands genuinely
+overlay rather than merely approaching.
+
+Note the ring bounding box breathes by a few percent as the ring rotates (cards
+are 3D-transformed, so the projected box changes), which is why these figures
+carry a little noise. The per-card boxes are unusable for this — they project to
+±3600% — so measure the ring box, never the cards.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **720/720 tests**, clean
+`npm run build`.
+
+## 2026-08-06 - Hero seam overlap widened, feather clamped to it
+
+Owner could still see the transitions. Two changes, plus a real bug the first one
+exposed.
+
+`PANE_A_TRAVEL` **95 -> 85**: the arriving pane now overlaps the departing one by
+~15% of a frame (~180px at 1200px) instead of ~5% (~60px).
+
+`EDGE_FEATHER` **2rem -> 5.3% of pane height**, and re-expressed in percent
+rather than rem so it lives in the same units as the overlap and cannot drift
+with root font size. A wider, softer ramp is what actually stops the boundary
+reading as a line; the extra overlap is what gives it room.
+
+**The bug: the feather could exceed the overlap, and it always did so early in a
+crossing.** The feather is widest as a pane STARTS arriving (`(1 - e) * WIDTH`)
+while the overlap is smallest then (`e * (100 - PANE_A_TRAVEL)`) — they run in
+opposite directions. Working it through, the feather exceeded the overlap for all
+`e < 0.26`, spilling the fade past the departing pane onto backdrop near the frame
+edge. An earlier check had missed this by comparing the feather against the
+*maximum* overlap rather than the live one.
+
+`featherFor(natural, e)` now clamps every edge to 70% of the overlap actually
+available at that instant. Verified across 41 sample points spanning the whole
+runway: **0 violations**. The clamp does real work — at p=0.13 it holds the
+feather to 15px inside a 21px overlap where the uncapped value would have been
+~49px.
+
+Frame coverage re-measured after widening the overlap (the departing pane now
+stops 15% short of clearing): **100% at every position, zero holes.**
+
+**Honest limit, for the record:** the remaining visible transition is largely
+content, not geometry. Slideshow A is a black-backdrop lineup and B is a
+white-backdrop one, so the join is a genuine change of subject matter. Overlap and
+feathering soften it; they cannot make two different backdrop colours read as
+continuous. The levers left are curatorial (group lineups by backdrop so
+neighbours match) rather than mechanical.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **720/720 tests**, clean
+`npm run build`.
+
+## 2026-08-06 - Hero crossings overlap; the mid-hero pause is gone
+
+With the mount hitch fixed the remaining stutter was perceptual — the frame
+genuinely stopped between crossings. Owner: overlap them so it never stops.
+
+`PHASE_2_START` is now BEFORE `PHASE_1_END` (0.36 vs 0.47), so the second
+crossing is already under way while the first finishes. There is no hold between
+them; B sweeps THROUGH flush instead of resting there.
+
+**The overlap has to be generous, for a non-obvious reason.** Smoothstep's
+derivative is zero at BOTH ends, so merely butting the crossings
+(`PHASE_2_START == PHASE_1_END`) hands over from a term decelerating to zero to a
+term accelerating from zero — the velocity still touches nothing and it still
+reads as a pause. The overlap is sized so t2 is already ~0.2 in when t1 reaches
+1, where its derivative is substantial. Ratio to preserve if these are re-tuned:
+`(PHASE_1_END - PHASE_2_START) / (PHASE_2_END - PHASE_2_START)` ≈ 0.2.
+
+Measured pane motion per equal scroll step across the handover band (p 0.36-0.50):
+
+```
+4.48  3.96  3.79  4.02  3.83  3.88  3.52  3.38  2.91
+```
+
+Never below **54% of peak** — no stall. The only near-zero readings in the whole
+runway are at p=0.017/0.033, which is the intended ease-in from rest at the very
+start, not a mid-hero stop.
+
+Re-verified the guarantees that the new geometry could have broken: frame
+coverage is **100% at every scroll position with zero holes** (three panes now
+move simultaneously in the overlap band), and nothing is ever frozen while
+visible.
+
+**Accepted tradeoff, stated plainly:** during the overlap band (~11% of the
+runway) **3 rAF loops run** where 2 ran before, because all three crossing clocks
+are active so the phase-based liveness test marks all three panes live — even
+though only 1-2 are on screen. At rest it is still 1 loop, which is what the
+offscreen-pause work was really for. Tightening this would need a
+coverage-aware liveness test rather than a phase-based one; not worth the
+complexity for an 11% band unless it shows up in profiling.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **720/720 tests**, clean
+`npm run build`.
+
+## 2026-08-06 - Hero stutter traced to slideshow C mounting mid-scroll
+
+Owner still read a stutter between carousels after the runway was compressed.
+Profiled instead of guessed: a scripted 240-frame scroll through the whole hero,
+recording frame time against scroll progress.
+
+**Result was unambiguous — one long frame in the entire scroll, and it was the
+frame slideshow C mounted.** 41.4ms against a 16.7ms median (~2.5 dropped
+frames), at p=0.146, with `cMountedAtProgress` reporting the identical 0.146.
+Nothing else in the scroll exceeded the threshold, so this was not general jank
+or the hold: it was one carousel's React render, ring construction and image
+decode landing inside a crossing.
+
+C armed from **inside the scroll handler** at `p > 0.12`, while B armed off the
+critical path on idle/scroll-intent. That split made sense when the runway was
+290svh and C's crossing was two screens away; at 110svh anyone who scrolls at all
+reaches C almost immediately, so deferring it bought nothing and cost a hitch.
+
+C now arms one idle callback after B — off the scroll path, and staggered so the
+two mounts never share a frame.
+
+Re-profiled on a cold load under identical conditions:
+
+| | before | after |
+|---|---|---|
+| long frames in the scroll | **1** | **0** |
+| worst frame | 41.4ms | 27.1ms (below the flag threshold) |
+| median frame | 16.7ms | 16.7ms |
+| C mounted during scroll | yes, at p=0.146 | no — before scroll starts |
+
+Confirmed the earlier offscreen-pause work survives the earlier mount: all three
+rings are now in the DOM from the start, but only **1 runs at rest**, 2 only
+during a crossing, 0 frozen-while-visible. C mounts already paused, so mounting
+it sooner costs nothing at runtime.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean (two warnings this
+introduced — a stray `eslint-disable` and a missing `armedC` dep — were fixed
+rather than suppressed), **720/720 tests**, clean `npm run build`.
+
+## 2026-08-06 - Hero runway compressed to ~1 screen of scroll
+
+Owner asked to compact all three slideshows into the hero. Clarified first, since
+the readings differed materially — merging the three lineups into one ring,
+layering three rings at once, or keeping the sequential handover but compressing
+it. Owner chose to keep the handover and compress it hard.
+
+Runway `290svh -> 110svh`. That is the only change: the runway is purely the
+scroll BUDGET, and each pane still travels exactly one frame height, so shrinking
+it speeds the choreography up rather than shortening it. The `PHASE_*` fractions
+divide whatever budget is set, so they needed no re-tuning.
+
+Measured on a 1206px frame: the whole handover now takes **1.17 screens of
+scroll** (was ~2.9), and panes move at **2.14x scroll speed** (was roughly 1:1).
+That ratio is the thing to feel out — the constant is a single number in the
+`.home-hero-stack` height, documented in place with which direction does what.
+
+Re-verified after compressing, because a smaller budget could have broken either
+guarantee: frame coverage is **100% at every scroll position** (no holes — the
+overlap still covers the departing pane's 5% remainder), and the offscreen-pause
+work still holds at **1-2 loops matching the on-screen count, zero
+frozen-while-visible**.
+
+Also corrected three stale comments this run of changes had left behind, all of
+which contradicted the code: the file header still said arriving panes "descend
+from ABOVE" and instructed "keep them descending"; the `EDGE_FEATHER_REM` note
+still claimed the panes "butt exactly" and treated `PANE_A_TRAVEL != 100` as
+hypothetical when it is now 95; and the travel-cache comment still cited 290svh.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **720/720 tests**, clean
+`npm run build`.
+
+## 2026-08-06 - Hero handovers eased, holds shortened, seams overlapped
+
+Owner: the handover "pauses", and the area between slideshows should be tighter,
+overlapping slightly if needed. Three changes.
+
+**The pause had two causes, and the less obvious one mattered more.** The holds
+were long — 0.19 of the runway each against 0.31 crossings, so ~38% of the scroll
+had nothing moving. But `t` was also used raw, so a pane travelled at constant
+speed and then hit its clamp dead. That velocity discontinuity reads as a jolt
+into the hold however short the hold is, so shortening alone would not have fixed
+it. Added a smoothstep `ease(t) = t²(3−2t)` driving everything visual.
+
+Measured velocity of pane B through crossing 1, per equal scroll step:
+
+```
+0.45 → 2.42 → 4.32 → 5.91 → 7.11 → 8.18 → 8.88 → 9.19 → 9.39 (peak)
+     → 9.21 → 8.64 → 7.96 → 6.83 → 5.54 → 3.88 → 1.92 → 0.17 → 0
+```
+
+A clean bell: it accelerates away from rest and decelerates into the lock instead
+of running flat and stopping dead. Phases retuned to `0.40 / 0.48 / 0.88`, cutting
+dead scroll from **0.38 to 0.20** of the runway.
+
+The eased values drive transforms and feathers only. The raw `t` still drives the
+inert/live thresholds and the dominant-pane handover — those test which phase we
+are in, and easing would only blur the boundary.
+
+**`PANE_A_TRAVEL` 100 → 95** closes the join. The seam is
+`t × (PANE_A_TRAVEL − 100)`, so 95 makes the arriving pane overlap the departing
+one by ~5% of a frame (measured: 0 → −8 → −28 → −49 → **−60px** on a 1206px
+frame, on both crossings). That overlap is the point: the arriving pane's
+feathered top edge now blends over the outgoing PHOTOGRAPH rather than fading out
+to backdrop, which is what made the join read as empty space.
+
+At 95 the departing pane never fully clears the frame — it stops 5% short. That is
+safe only because the arriving pane is flush and higher in the stack by then, so
+the remainder is covered. **Verified rather than assumed:** frame coverage
+measured at **100% across all 11 scroll positions**, no holes (a 1px sliver at
+p=1 is sub-pixel rounding).
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **720/720 tests**, clean
+`npm run build`.
+
+## 2026-08-06 - Hero slideshows 2 and 3 now rise from below
+
+Owner request: instead of the second and third slideshows descending from above,
+they scroll up from the bottom "like normal". The hero now reads as one
+continuous upward scroll — a pane exits up and the next rises to take its place.
+
+Transforms: B is `(1 - t1) * 100 - t2 * PANE_A_TRAVEL`, C is `(1 - t2) * 100`
+(previously `(t1 - 1) * 100 …` and `(t2 - 1) * 100`). The CSS resting transforms
+for panes B and C moved from `translate3d(0,-100%,0)` to `+100%` to match what
+the handler computes at t=0 — a mismatch there makes a pane jump on the first
+frame after hydration.
+
+**The feather had to change with it, and that was the substantive part.** The two
+sides of a crossing are now different edges: the departing pane's BOTTOM leads it
+out, the arriving pane's TOP climbs in. B takes `top` while rising and `bottom`
+once it is leaving; the phases cannot overlap, so one mask at a time suffices.
+
+`EDGE_FEATHER_REM` also had to drop from **9rem to 2rem**. At `PANE_A_TRAVEL = 100`
+the panes now butt exactly — the departing bottom edge and arriving top edge
+travel together, measured at a gap of **0 through both crossings** (1205 → 852 →
+640 → 269 → 36 → 0 for A→B, and likewise for B→C). The old 9rem existed to make a
+real uncovered gap read as backdrop; carried onto a 0-gap seam, the two feathers
+combined washed ~290px of a ~1200px frame out to the backdrop — visible in a
+screenshot as a pale band across the hero, the exact artifact the feather exists
+to prevent. 2rem keeps a soft join without reading as a hole.
+
+Verified by measuring the seam at 10 scroll positions (gap 0 throughout both
+crossings), that masks switch correctly (B `top` → none while locked → `bottom`),
+that C rests at 100% below the frame, and visually mid-crossing.
+
+Noted for the record: DECISIONS previously recorded a rise-from-below variant
+trialled and reverted on 2026-08-04. Flagged to the owner before implementing;
+the direction has now been chosen deliberately, and the entry has been rewritten
+so a future session does not "restore" the descending version from the old note.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **720/720 tests**, clean
+`npm run build`.
+
+## 2026-08-06 - Hero per-frame work trimmed (no behaviour change)
+
+Follow-up to the pause fix below. Three pure-waste removals in the per-frame
+path; none alters what is drawn, only how often the browser is asked to redo
+work it has already done.
+
+1. **Per-card `dataset` + `zIndex` written on change only.** `sample()` set
+   `card.dataset.carouselFacing` and `card.style.zIndex` for every card on every
+   frame — a style invalidation per card per frame for values that change a few
+   times a second (the z-index is already quantised by its `Math.round`). Now
+   compared against the last written value first. ~6 cards × 2 writes × 60fps per
+   carousel becomes a handful of writes per second.
+2. **The ring's `Animation` and its duration are cached.** `ring.getAnimations()`
+   allocated an array every frame and `getComputedTiming()` ran twice. The
+   Animation object is stable for its lifetime, so it is re-queried only when the
+   cache is empty or the cached one has gone `idle` — which is exactly what a
+   restarted or replaced animation looks like.
+3. **`HomeHeroStack` caches the scroll `travel`.** It read `runway.offsetHeight`
+   and `frame.offsetHeight` — two forced layouts — on every scroll frame, for a
+   value derived purely from viewport units (`calc(100svh…) + 290svh`). Now
+   measured once and invalidated by a `remeasure` handler on resize and on
+   `prefers-reduced-motion` change.
+
+All three caches are cleared with the window key, because the cards are
+re-created for a new key and a stale cache would make the loop skip a write a
+fresh card still needs.
+
+Verified unchanged after the edits: the background sweep still moves (gradient
+stops measured shifting 8.5% → 0%, 34.5% → 20.9% over 2s), card facings and
+z-indexes still update over time with correct depth ordering
+(`-1,-1,-1,122,168,196,198,173,130,-1,-1,-1`), pause behaviour holds at **1.51
+average loops with zero frozen-while-visible**, and a dispatched `resize`
+re-measures `travel` correctly with panes still returning to
+`translate3d(0px, 0%, 0px)` at rest — proving the cache cannot wedge.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **720/720 tests**, clean
+`npm run build`.
+
+## 2026-08-06 - Hero slideshows: offscreen panes no longer animate
+
+Owner reported a stutter on the second and third slideshows. Measured rather than
+guessed, and the cause was that **all three carousels ran permanently** — at every
+scroll position, whether on screen or not.
+
+**The pause guard was dead, for two independent reasons.** `Carousel.tsx` paused
+offscreen rings via an `IntersectionObserver`, but inside the pinned hero stack:
+
+1. **`entry.isIntersecting` is `true` for a ZERO-AREA intersection.** Every pane's
+   scene box grazes the viewport inside the sticky `overflow:hidden` frame, so it
+   returned `true` for all three panes at every scroll position — measured, it
+   never once returned `false`.
+2. **With `threshold: 0` the observer only fires when `isIntersecting` flips.**
+   Since it never flipped, the callback ran **exactly once per mount**. Probed
+   directly: a `threshold: 0` observer fired 1 time across a full scroll, while a
+   21-rung ladder on the same element fired 5 times with real ratios.
+
+Either alone keeps every slideshow spinning forever, so both needed fixing.
+
+**Fix, in two layers.** The observer now uses a threshold ladder (dense near zero,
+where panes actually enter and leave) and gates on real `intersectionRect` area
+instead of the boolean. That alone got 3.0 → 2.0 average loops, but not to 1: a
+pane sliding from ratio 0.004 to 0 crosses no rung, so geometry cannot be made
+airtight here. `HomeHeroStack` already knows exactly which panes are offscreen —
+it applies the transforms — so it now drives a `paused` prop through `HomeHero`
+into `Carousel`, derived from the same conditions that already set `inert`. State
+is written **only on a transition**, so a full scroll costs a handful of
+re-renders, not one per frame.
+
+Measured across 11 scroll positions, clip-aware (intersecting each ring against
+the frame's clip band, not just the viewport — the naive test reproduces the exact
+`isIntersecting` false-positive that caused the bug):
+
+| | before | after |
+|---|---|---|
+| average concurrent rAF loops | **3.0** | **1.55** |
+| at rest (nothing crossing) | 3 | **1** |
+| peak | 3 | 2 (only mid-crossing, where both panes really are visible) |
+| frozen while visible | — | **0** |
+
+One pane still spins briefly offscreen at p≈0.55: slideshow C arms at the very
+start of its crossing, on the same threshold that already governs `inert`, so it
+is spun up before sliding in rather than popping in frozen. That is intended.
+
+Verified: `npx tsc --noEmit` clean, `npm run lint` clean, **720/720 tests**, clean
+`npm run build`, and the hero renders correctly (ring spinning, swept background,
+overlay intact).
+
+## 2026-08-06 - Pre-deploy sign-off for the email-migration batch
+
+Batch boundary. Everything below dated 2026-08-05 ships together, and the deploy
+is what restores outbound email — production still sends from `.co`, which is no
+longer a verified Resend domain.
+
+**What is in the batch:** the Resend `.co` → `.com` sending-domain migration (DNS,
+code, and the Netlify `EMAIL_FROM` override), checkout form labels and
+autocomplete, single-hop legacy-host redirects, homepage heading order, Spanish
+chip units, an 11px floor on product-page label type, and a viewport cap on the
+wishlist drawer.
+
+**Verification run against a clean-from-scratch build** (`.next` deleted first,
+not incremental):
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | clean |
+| `npm run lint` | clean |
+| `npx vitest run` | **720/720** |
+| `npm run build` | exit 0 · **449/449 static pages** |
+| Artifact | `BUILD_ID`, `server/`, `static/`, `prerender-manifest.json`, 58 prerendered `.html` |
+| `next start` smoke | 38 route/locale combos all 200 (only `/es/` → 308, correct) |
+| Legacy host | `.co/shop` → 301 `.com/shop`, single hop, no `/en` |
+| Webhook carve-out | `POST .co/api/webhooks/resend` → **401**, not redirected |
+| Compiled senders | zero `.co`; 19 files carry `.com` |
+| DKIM / SPF / MX | all resolve on the authoritative nameserver |
+| Workspace mail | root still **5 Google MX**, exactly **1 `v=spf1`** |
+| Resend | `naplesestatejewelry.com` **Verified** |
+| Repo hygiene | no stray artifacts; `.env` / `.next` / `node_modules` gitignored |
+
+**Two caveats stated rather than glossed:** local builds ran on Node v24 while
+Netlify pins Node 20 (no `engines` declared), so the green build is strong
+evidence but not identical conditions; and a test send must be confirmed **in the
+inbox**, because `p=quarantine` spam-folders DKIM faults silently rather than
+erroring.
+
+## 2026-08-05 - Wishlist drawer capped to the viewport
+
+Found while diagnosing the small-text work, pre-existing. `CartDrawer` caps itself
+with `max-w-[min(28rem,100vw)]`; `WishlistDrawer` used `w-full max-w-sm` (384px)
+with **no viewport cap**, so on any screen under ~384px the panel was wider than
+the screen.
+
+That matters because the panel is *always mounted* and parked at
+`translateX(100%)` rather than unmounted — a panel wider than the screen therefore
+sits that much past the right edge and drags the document into horizontal scroll.
+And because it is also `w-full`, it then measures against the document it just
+widened, so the overflow feeds itself: at a 320px viewport it settled at 343px.
+
+Changed to `max-w-[min(24rem,100vw)]`, mirroring the cart's idiom while keeping
+the wishlist's own 24rem design width rather than adopting the cart's 28rem.
+
+Verified across the boundary, in Spanish (the longer headings):
+
+| Viewport | Wishlist | Cart | Page overflow |
+|---|---|---|---|
+| 320 | 320 (capped) | 320 (capped) | none |
+| 375 | 375 (capped) | 375 (capped) | none |
+| 420 | **384** (design width) | 420 (capped) | none |
+| 1271 | 384 | 448 | none |
+
+The cap engages below the design width and correctly disengages above it. Also
+opened the drawer at 320px both empty and holding an item: full-width, nothing
+clipped (`scrollWidth === clientWidth`), header count, thumbnail, 2-line title
+clamp, price, and both footer CTAs all render.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **720/720 tests**, clean
+`npm run build`.
+
+## 2026-08-05 - Product-page small text lifted to an 11px floor
+
+The last open audit finding. Product pages rendered **46 distinct text elements
+below 11px at a 1271px desktop viewport**, and not only decorative chrome:
+"Scrap gold value" and "Based on spot" at 9.3px, "This is your price" at 9.6px,
+"Item #", the metal/length line, "Specifications", "Shipping & Returns" and the
+trust ticks at 9.9px. For a buyer audience that skews older, price-context text at
+9.3px is a real readability problem on the page that has to close the sale.
+
+Floor set to **11px (0.6875rem)** — large enough to read comfortably, small enough
+that these uppercase letterspaced labels still read as labels. Now **15 elements
+under 11px, none of them product-page content**: what remains is footer headings
+and button labels at 10.4–10.88px (`text-xs`), which are standard sizes.
+
+Changed: 10 size tokens on `shop/[id]/page.tsx` (7 class tokens + 3 inline
+`fontSize`), `.product-value-tile-label` and the inline twin feeding
+`SpotRefreshPill` (the file's own comment says "keep the two in step" — only
+raising the class would have split them), `ProductTrustSections`, and the
+`related-product-chips` clamp.
+
+**Three things went wrong on the way, all caught by measuring rather than looking:**
+
+*Raising the chip cap did nothing.* At the ~244px container these cards get, the
+preferred value already resolved to 9.9px — below the old cap, not clamped by it.
+The slope is the lever that moves the common case, so `2.69cqi -> 3.13cqi`. The
+lower bound was deliberately left alone: it is what lets the pills shrink instead
+of wrapping, and never wrapping is a hard requirement. Confirmed the change is an
+improvement at both ends — 11px vs 9.9px on desktop, 7.37px vs 6.81px in the
+tightest 4-up case — with one chip row at every width in both locales.
+
+*A Spanish-only tile overflow.* The spot pill's label was `whiteSpace: nowrap`
+inside `minmax(0, 1fr)` grid tracks, so "BASADO EN SPOT" punched straight out of
+its track once enlarged. `nowrap` removed from the label; the price below keeps it,
+because a number must not break. English never showed this — "Based on spot"
+happens to fit.
+
+*A real regression I introduced.* Raising the `price-update-ticker` floor from
+0.5rem to 0.625rem pushed the whole document into horizontal scroll at 320px in
+Spanish: that line is `whiteSpace: nowrap` so the countdown does not reflow every
+second, and "ÚLTIMA ACTUALIZACIÓN … ACTUALIZA EN …" only fits at 8px there. The
+floor is back to 0.5rem and the ceiling keeps the raise, so wider viewports still
+gain. Found by binary-searching the DOM for the element whose removal cleared the
+overflow — the first two suspects (value tiles, then the off-canvas drawers) were
+both symptoms of a wide document rather than its cause.
+
+Verified at 320 / 375 / 768 / desktop in **both locales**: no page overflow, value
+tiles still side by side and unclipped, chips still one row.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **720/720 tests**, clean
+`npm run build`.
+
+## 2026-08-05 - Netlify EMAIL_FROM moved to .com (deploy blocker cleared)
+
+`lib/marketing.ts:173-176` resolves the no-reply sender as
+`MARKETING_NOREPLY_FROM || EMAIL_FROM || RESEND_FROM || <code default>`, so an env
+override wins over the corrected default. Netlify held
+`EMAIL_FROM=noreply@naplesestatejewelry.co` in **all five deploy contexts**
+(Production, Deploy Previews, Branch deploys, Preview Server & Agent Runners,
+Local development). Marketing campaigns would therefore have kept sending from the
+now-unverified `.co` domain and failed — silently, and only for marketing, since
+every transactional path uses a hardcoded literal that is already `.com`.
+
+Set to `Naples Estate Jewelry <noreply@naplesestatejewelry.com>`, matching the code
+default exactly so behavior is identical whether the variable stays or is removed
+later. The display-name form was chosen deliberately after confirming
+`marketing.ts:246` passes the value straight to Resend's `from`, the same shape the
+transactional literals already use.
+
+Verified byte-exact in the field before saving (55 chars, no `.co` substring, key
+unchanged) and confirmed across all five contexts afterward.
+
+The rest of the precedence chain was checked rather than assumed: filtering the
+Netlify env list showed **no** `MARKETING_NOREPLY_FROM`, `RESEND_FROM`, or
+`MARKETING_CHRIS_FROM`, so nothing else can override. The only other marketing
+variable is `MARKETING_TRANSPORT=direct`. `MARKETING_CHRIS_REPLY_TO` is unset too,
+so the intentional `.co` Reply-To default stands.
+
+`.env.local` was updated to match in the same session so local previews behave like
+production. Because it holds secrets, it was edited surgically rather than read
+into context: a backup was taken outside the project, a single regex replaced only
+the `EMAIL_FROM` line, and the result was verified by diffing against the backup —
+**exactly 1 of 83 lines changed**, all 36 keys intact, no BOM introduced, CRLF
+preserved. The backup was then deleted rather than left sitting around with
+credentials in it.
+
+The parse was verified through `@next/env`, the loader Next itself uses, because
+the value is unquoted yet contains spaces and angle brackets: it resolves to the
+exact 55-character string with no stray quotes. That check also confirmed locally
+what the Netlify list showed — `MARKETING_NOREPLY_FROM`, `RESEND_FROM`, and
+`MARKETING_CHRIS_FROM` are all unset, so nothing shadows it.
+
+One caveat worth remembering: the Netlify change applies to the **next deploy**,
+not the currently-running build, which still carries `.co` hardcoded in its
+transactional senders.
+
+## 2026-08-05 - Spanish spec chips now use localized length units
+
+Found in the production-build pass. On a Spanish product page the spec table read
+`Largo 7.75 pulg` while the related-strip chip directly beneath it read `7.3in`,
+and ring sizes read `Sz 7` rather than `Talla 7`. `formatLengthChip`
+(`lib/product-spec-chips.ts`) hardcoded `in`/`Sz` and took no locale argument.
+
+It now takes `isEs` and mirrors the mapping the product page's spec table already
+performs (`shop/[id]/page.tsx:366`: `in` → ` pulg`, `Size:` → `Talla: `). All
+three callers pass it — `ProductCard`, `ProductListRow`, `RelatedProductsStrip` —
+each of which already had `isEs` in scope.
+
+**`formatWeight` was deliberately left alone.** The tempting change is to switch
+its `en-US` to `es-ES`, but that would print `53,91g` on a chip sitting beside a
+spec table that renders `53.91 gramos en total`. The site's Spanish copy uses
+period decimals throughout, so localizing the separator would have created a new
+inconsistency rather than removing one. The `g` unit is identical in both
+languages, as are `mm` and `K`, so length and ring size were the only gaps.
+
+**The layout risk was the real work here.** `pulg` is four characters against
+`in`'s two, and `Talla 10.5` is far longer than `Sz 10.5` — against a standing
+requirement that these chips never wrap to a second line. Verified by measuring
+chip row counts rather than eyeballing:
+
+- Spanish product page at **320px**: all four cards one chip row, no clipping, no
+  page overflow, chips shrunk to 9.92px by the container query.
+- Spanish at **768px** (4-up, 152px cards — the narrowest per-card case): all one
+  row, unclipped.
+- Spanish shop grid at 320px with the worst case `Talla 10.5`: one row, unclipped.
+- English at desktop measured before and after: identical (`7.3in`, one row), so
+  the change is Spanish-only.
+
+Confirmed the original defect is gone: spec table `Largo 7.75 pulg` now matches
+chips `7.3 pulg / 6.8 pulg / 6 pulg / 24 pulg`, with zero English units left.
+
+Gate: `npx tsc --noEmit` clean (which is also what proved no caller was missed),
+`npm run lint` clean, **720/720 tests**, clean `npm run build`.
+
+## 2026-08-05 - Legacy-host redirects collapsed to one hop; homepage heading order fixed
+
+**The redirect bug was not where the audit first said it was.** The finding was
+attributed to `netlify.toml:84`, but that rule targets `/:splat` and contains no
+`/en` — and a search confirmed one `netlify.toml`, no `_redirects`, and no `/en`
+in any redirect target. A discriminating probe against production settled it:
+
+| Path | In proxy matcher? | Production redirect target |
+|---|---|---|
+| `/robots.txt` | excluded | `.com/robots.txt` ✓ |
+| `/sitemap.xml` | excluded | `.com/sitemap.xml` ✓ |
+| `/shop` | **included** | `.com/`**`en`**`/shop` ✗ |
+| `/about` | **included** | `.com/`**`en`**`/about` ✗ |
+
+Only proxy-matched paths gained the `/en`. **`proxy.ts` runs before the Netlify
+redirect**, rewrites `/shop` → `/en/shop`, and the netlify rule then splats the
+already-localized path; next-intl 307s the `/en` straight back off. Two hops for
+every legacy link, defeating the "hop once, never twice" intent documented at
+`netlify.toml:36` and `:65`. This was live in the current code, not a stale-deploy
+artifact.
+
+Fixed at the source: `proxy.ts` now 301s the four legacy hosts
+(`naplesestatejewelry.co`, `www.` variant, `naplesantiquesllc.com`, `www.`
+variant) to the canonical `.com` origin **before** the locale rewrite. Ordered
+ahead of `legacyRedirect()` so retired-path and locale rules are then evaluated
+once, on `.com` only.
+
+Netlify's host rules were deliberately left in place. Paths outside the proxy
+matcher never reach the new code and keep using them — which is required, because
+the `.co/api/*` carve-out must stay a **200 rewrite**: webhook POSTs from Resend,
+PayPal, and eBay do not follow 301s.
+
+Verified against the running app by sending legacy `Host` headers. Every legacy
+host now emits a single 301 straight to `.com/<path>` with no `/en`; query
+strings survive (`/shop?sort=price`); `/es/shop` is preserved. The canonical host
+and `localhost` are unaffected (200). Critically, **no `/api` path redirects** —
+`POST .co/api/webhooks/resend` still returns 401 (signature rejection intact),
+eBay 400, metal-prices 200, so the webhooks are safe.
+
+**Homepage heading order.** The outline was `H1,H3,H3,H3,H2,…` — the three intro
+cards ("We Buy Gold", "We Sell Jewelry", "Direct Contact") were `h3` with no
+parent `h2`, so heading-based screen-reader navigation implied a section that did
+not exist. They are top-level page sections, so they are now `h2`. Size is
+carried by `text-xl`, so this is semantic only — verified computed font-size is
+still 20px and the order is now `H1,H2,H2,…` with **zero level skips**.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **720/720 tests**, clean
+`npm run build` (dev server stopped first, per DECISIONS.md).
+
+## 2026-08-05 - Checkout form fields given real labels and autocomplete
+
+Found during a pre-deploy customer-facing audit. On `/checkout`, **9 of 12 form
+controls had no programmatic label**: the markup was
+`<div><label class="form-label">Phone *</label><input type="tel"></div>` — a
+sibling `<label>` with no `htmlFor`, not wrapping the input. `input.labels.length`
+was 0 for name, phone, email, street, apt, city, state, ZIP, and country, so a
+screen reader announced "edit, blank" on the payment page, and clicking a visible
+label did not focus its field.
+
+Fixed by adding `id`/`htmlFor` pairs (`checkout-name`, `checkout-phone`,
+`checkout-email`, `checkout-address1`, `checkout-address2`, `checkout-city`,
+`checkout-state`, `checkout-zip`, `checkout-country`) — matching the naming
+already used by `checkout-confirm-info` and `checkout-delivery-method`.
+
+Also added the two missing `autoComplete` values: **`name`** and **`tel`**. Every
+address field already had one, so browser autofill worked for email and the whole
+address block but stopped dead at the two fields most likely to be typed on a
+phone. That is WCAG 1.3.5 and, more practically, friction at the point of sale.
+
+The ZIP field's existing `aria-invalid` / `aria-describedby` / `role="alert"`
+error wiring was left intact.
+
+**Scope was checked, not assumed.** `CheckoutClient.tsx` had 9 `form-label`
+occurrences against 1 `htmlFor`. The contact, free-evaluation, and sign-in forms
+were each measured in the browser and were already fully labeled with correct
+autocomplete — so this was isolated to the single highest-stakes page, not a
+repo-wide pattern.
+
+Verified in the browser on the running app, both locales: 12/12 controls labeled,
+0 missing autocomplete, **no duplicate ids**, and `label.click()` now moves focus
+to the matching input. The Local Pickup path (which conditionally unmounts the
+address block) was re-checked and yields 6 controls, 0 unlabeled, no duplicate
+ids. No console errors. Rendering is visually unchanged — this is a semantics
+fix only.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **720/720 tests**, and a
+clean `npm run build` (dev server stopped first this time, per DECISIONS.md).
+
+## 2026-08-05 - Resend sending domain moved from .co to .com
+
+Resend's account is on the **Free plan, which allows exactly one sending
+domain**, so this was a swap, not a coexistence: `naplesestatejewelry.co` had to
+be deleted before `naplesestatejewelry.com` could be added. Owner performed the
+delete (the type-to-confirm dialog is an irreversible action and was declined by
+the permission layer for the agent). New domain id
+`bd08d8e7-ca8d-47a5-b28e-d8d608cd772c`, us-east-1, **Verified** — "ready to send
+emails" — about 15 minutes after the records went in.
+
+**Three DNS records added at GoDaddy** (16 → 19 records), all verified against
+the authoritative nameserver `ns29.domaincontrol.com`, not just GoDaddy's UI:
+
+| Type | Name | Value | Priority |
+|---|---|---|---|
+| TXT | `resend._domainkey` | `p=MIGfMA0GCSqGSIb3…wIDAQAB` (216-char RSA key) | — |
+| MX | `send` | `feedback-smtp.us-east-1.amazonses.com` | 10 |
+| TXT | `send` | `v=spf1 include:amazonses.com ~all` | — |
+
+**Two hazards were live here, and both were avoided deliberately.**
+
+*The root SPF.* `.com` already carries a root `v=spf1` pointing through
+GoDaddy's merge indirection (`dc-aa8e722993._spfm`) to `_spf.google.com`. A
+second root `v=spf1` is a permanent `permerror` that would have broken the live
+Google Workspace mail. Resend's default Custom Return-Path of `send` puts its
+SPF on `send.naplesestatejewelry.com` instead, so the root was never touched —
+confirmed after the fact: root still resolves to exactly one `v=spf1`.
+
+*The receiving MX.* Resend also displays `MX @ inbound-smtp.us-east-1.amazonaws.com`
+priority 0 under "Enable Receiving" (toggled off). **It was deliberately not
+added.** At the root with priority 0 it would outrank all five Google Workspace
+MX records and hijack every inbound message for the domain, killing `info@`.
+Post-change verification confirms the root still has exactly the five Google MX.
+
+**Manual setup was used over Resend's "Auto configure"** precisely because
+auto-configure takes an OAuth grant to write DNS and such tools can rewrite the
+root SPF — the one thing that had to stay untouched here.
+
+**DMARC alignment checked, because it matters at `p=quarantine`.** A wrong DKIM
+record fails *silently* (delivered to spam, no error). DKIM signs as
+`naplesestatejewelry.com`, and the return-path `send.naplesestatejewelry.com`
+shares the organizational domain, satisfying `aspf=r`. Both should pass. The
+DKIM value was taken from the `aria-label` on Resend's copy button — the visible
+table text is middle-truncated with `[…]` and would have been guesswork.
+
+**Code: From addresses moved to `.com`; Reply-To deliberately did not.** A From
+address must sit on the verified sending domain or the send fails. Reply-To has
+no such constraint, so it stays on `chris@naplesestatejewelry.co`, a mailbox
+known to be live. Changed: `api/inquire`, `api/contact-message`, `lib/marketing.ts`
+(both sender profiles), `lib/order-owner-notification.ts`, `lib/order-invoice-mailer.ts`,
+`api/admin/orders/[id]/email-update`, and the admin display fallbacks in
+`OrderDetailPanel`, `MarketingSettingsPanel`, `MarketingComposer`.
+
+Customer-facing receipts and fulfillment updates gained
+`replyTo: 'info@naplesestatejewelry.com'` (owner confirmed that mailbox is live).
+They previously had no Reply-To at all, so customer replies went to an
+unattended no-reply address.
+
+**Contact/display addresses were left on `.co`** — the footer mailto, account
+dashboard, and schema.org `email` fields. Those are live mailboxes and are not
+senders; the standing rule against rewriting them still holds.
+
+⚠️ **`lib/marketing.ts` reads `MARKETING_NOREPLY_FROM` / `EMAIL_FROM` /
+`RESEND_FROM` before falling back to the code default.** If any of those is set
+to a `.co` address in Netlify, marketing sending still breaks after deploy. Not
+checkable from here — Netlify is authoritative and `.env.local` is stale.
+
+The Resend webhook survived the domain deletion (it is account-level) and is
+still Enabled, but still points at `https://naplesestatejewelry.co/api/...`.
+That keeps working: `netlify.toml:78-81` serves `.co/api/*` as a **200 rewrite,
+not a redirect**, which is exactly why that carve-out exists. Re-registering it
+on `.com` stays optional cleanup.
+
+Tracking metrics were **not** re-enabled. On `.co` click/open tracking was on,
+but Resend now implements it as a `links.` tracking subdomain that redirects
+every link in every email — including receipt links — through it, and it needs
+another DNS record. That is a behavior change beyond a domain swap, so it was
+left for the owner to decide.
+
+Verified: `npx tsc --noEmit` clean, `npm run lint` clean, `npm run build` clean,
+plus authoritative-DNS checks of all three new records and of the untouched root
+MX / root SPF / DMARC.
+
+**Email is down until this is deployed** — the code still shipping in production
+sends from `.co`, which is no longer a verified domain. Checkout is unaffected:
+`order-finalize.ts` catches send failures and `order-owner-notification.ts`
+never throws. Missed receipts re-send from Admin → Orders.
+
+## 2026-08-05 - Fourth Google review added (Cristian Reatiga)
+
+Owner supplied a new 5-star Google review; added verbatim to
+`src/lib/testimonials.ts`, so the homepage section and the product-page band
+both pick it up from the one list.
+
+The trailing emoji are kept. The file's rule is verbatim, and stripping them
+would be editing a customer's words — flagged to the owner rather than decided
+silently. Not a Local Guide (profile reads "1 review · 1 photo"), so the meta is
+"Google review". The Spanish string is our translation, as with the other three.
+
+**The review could not be retrieved automatically.** Browser navigation to
+Google was denied by the pane, `WebFetch` on the Maps listing returned no review
+text (Maps renders reviews client-side), and a web search surfaced only
+paraphrases of two reviews already on file. The Business Profile dashboard needs
+an authenticated session. Rather than paste a search snippet — a paraphrase
+attributed to a named customer — the text was requested from the owner. Worth
+remembering next time: **Google review text is not machine-readable from here;
+ask for it.**
+
+**Layout consequence, fixed.** The section was a hardcoded 3-up, so a fourth
+card became an orphan on its own row. Column counts are now pinned to 1 / 2 / 4
+(`.testimonial-grid`) — dropping the shared auto-fit's 3, which it chose in the
+~850-1150px band. Measured: 375px → 1+1+1+1, 952px → 2+2, 1160px and 1440px →
+4. No orphan and no overflow at any of them. The ladder assumes an EVEN count;
+a fifth review brings the orphan back.
+
+Verified in both locales and on a dark product page, where the new card still
+gets the `product-light-surface` reset (quote at 17.12:1 on white).
+`npx tsc --noEmit`, `npm run lint`, 720/720 tests, 449-page build.
+
+## 2026-08-05 - Thumbnail-rail chevrons lose their square frame
+
+Owner request: remove the square border around the two chevrons either side of
+the product-page thumbnail lineup. They are now bare glyphs.
+
+The white fill went with the border, not just for looks — on a dark product page
+it printed a white square either side of the rail. The 40px box is kept as the
+TAP TARGET, so nothing about what you can hit changed; only the frame is gone.
+
+Feedback moved from a border/background swap to a scale (1.15 on hover, 0.92 on
+press, disabled under reduced motion). That reads the same whether
+`--color-primary` is the deep gold of a light page or the light gold of a dark
+one — a colour-shift hover would have had to be written twice.
+
+Verified: computed border `0px`, background transparent, tap target still
+40×40, both buttons still navigate, and the chevron sits at 12.37:1 on a dark
+page. `npx tsc --noEmit`, `npm run lint`, 720/720 tests, 449-page build.
+
+## 2026-08-05 - Swipe the product photo; edge bars are tablet-and-up only
+
+Owner request: drop the side bars on mobile and let the visitor swipe the main
+image instead; keep the bars on tablet, and give tablet the swipe too.
+
+- **Bars hide below 768px.** A phone frame is only ~344px wide, so two 44px bars
+  claim a quarter of it permanently; a swipe costs no space at all. From 768px
+  the bars return and run alongside the swipe.
+- **Swipe changes photo**, left for next and right for previous, with a
+  threshold of `max(40px, 12% of the frame)` so the gesture feels the same on a
+  344px phone frame and a 576px tablet one.
+- **Touch pointers only.** A mouse drag stays a plain click, so the lightbox,
+  text selection and the existing cursor-proximity bar reveal are untouched.
+- `touch-action: pan-y pinch-zoom` on the frame: horizontal gestures reach the
+  handler while vertical scrolling AND pinch-zoom stay with the browser. `none`
+  would take all three; `auto` would let the browser eat the horizontal drag.
+
+Two details that decide whether this feels right:
+
+- A swipe must not also open the lightbox. The browser still fires a click after
+  the gesture, and to that handler a swipe is indistinguishable from a tap, so a
+  drag sets a one-shot suppression flag.
+- That suppression covers ANY drag over ~10px, not just a committed horizontal
+  one. Browsers usually swallow the click themselves once a touch turns into a
+  scroll, but relying on that left a vertical drag opening the lightbox in
+  testing — worth not depending on.
+
+Direction commitment needs the drag to be both >10px sideways and more sideways
+than vertical, so a page scroll that starts on the photo still scrolls.
+
+Verified by dispatching real pointer sequences. Mobile (388px): swipe left →
+next, swipe right → previous, 20px drag → nothing, vertical drag → nothing and
+no lightbox, plain tap → lightbox. Tablet (820px): bars visible at 44px, bar
+click still navigates, and both swipe directions work. Boundary exact — bars
+hidden at 767px, present at 768px. Desktop (1440px): a mouse drag does not
+navigate and the proximity reveal still tracks. `npx tsc --noEmit`,
+`npm run lint`, 720/720 tests, 449-page build.
+
+## 2026-08-05 - Gallery bars read on any photo, not just the first one
+
+Owner report: from the second photo on, the photo appeared to be painted over
+the two side panels.
+
+**The bars were never underneath.** Hit-testing at the bar's centre returned the
+chevron, and the bars carry a z-index while the images carry none. What actually
+happened is that the bar's tint was chosen from the frame's PADDING colour,
+while the bar sits mostly over the PHOTO — and from the second image on those
+two routinely disagree. Measured on the rope chain: frame padding `rgb(0,0,0)`
+(so the bar picked a white scrim) with a photo whose backdrop is
+`rgb(239,237,232)`. The white scrim vanished over the cream photo and survived
+only in the black padding bands above and below it, which reads exactly like the
+photo covering the panel.
+
+**Fix: one scrim that needs no knowledge of what is behind it.** It moves the
+backdrop in both directions at once — `backdrop-filter: blur(2px)
+brightness(0.82)` darkens light content while `rgba(255,255,255,0.16)` lifts
+dark content. Composites measured near 205 over a cream photo and near 41 over
+black, so the strip is a clear translucent band either way. The chevron is white
+with a dark halo for the same reason: one treatment that survives both. The
+`data-tone` attribute and its light/dark scrim pair are gone, along with the
+gallery's `isDarkProductBackground` import — there is nothing left to guess.
+
+The blur is doing real work beyond visibility: content behind the panel is
+softened, which reads as "this is an overlay" rather than part of the photo.
+
+z-index raised 10 → 30 as explicit headroom over every layer in the frame
+(both gallery images, the cross-fade layer, the video iframe).
+
+Verified across the cases that previously disagreed: photo 1 of a black-padded
+product (black padding + black photo), photo 2 of the same product (black
+padding + cream photo — the reported case), a light-padded product's photo 1
+(cream + cream), and its lifestyle photo (cream padding + mid-dark photo). The
+bar is a continuous full-height translucent strip in all four, and hit-testing
+confirms it stays on top. `npx tsc --noEmit`, `npm run lint`, 720/720 tests,
+449-page build.
+
+## 2026-08-04 - Homepage announcement bar holds one line
+
+Owner request: on a phone the bar broke onto two lines and the strip doubled in
+height. It must never wrap; the text shrinks to fit instead.
+
+It was `flex-wrap` at a fixed 0.62rem. It is now `nowrap` with a fluid size,
+`clamp(0.4rem, 1.934vw + 0.013rem, 0.62rem)`. Letter-spacing stays in `em`, so
+the generous 0.22em tracking — about a third of the strip's width at full size —
+shrinks with the type instead of being what forces the break. Bar height on a
+375px phone: **55px → 31px**.
+
+Two things only measurement would have caught:
+
+- **Spanish is the binding case**, not English ("Recogida local gratis en
+  Naples"). A ramp fitted to English overflowed Spanish by 14px at 320px. The
+  clamp is fitted to Spanish; English simply carries more slack (35px vs 9px at
+  320).
+- **The third item's reveal point had to move from `sm` (640px) to 780px.** At
+  700px the Spanish trio needs ~727px of text and overflowed by 49. Revealing it
+  earlier would force the other two to shrink to accommodate it, which is a worse
+  trade than showing it slightly later.
+
+Measured, both locales, one line and no overflow at every width: 320, 375, 430,
+700, 780, 1440. Slack at the tightest points — ES 320: 9px, ES 375: 13px,
+ES 430: 16px, ES 780 (three items): 14px. `npx tsc --noEmit`, `npm run lint`,
+720/720 tests, 449-page build.
+
+## 2026-08-04 - Dark product pages: unreadable text on the light cards below the fold
+
+Owner report, with a screenshot of the Spanish reviews band on a dark-theme
+product page: the review text was barely visible.
+
+**Cause.** A product whose first photo is shot on black flips four colour tokens
+to a dark palette on `<main>`. That is correct for content sitting on the black
+page — but two components below the fold paint their OWN light background and
+still inherited the dark palette's near-white text:
+
+- the related-product cards (`--color-surface-container-lowest`, i.e. white)
+- the review cards (`bg-white`)
+
+So `#f2f2f0` text landed on `#ffffff`. Measured contrast **1.12:1** on every
+card title and every review quote — effectively invisible. (The screenshot
+looked grey-on-black rather than white-on-white because it caught the cards
+mid-reveal, while the whole card was still fading up from transparent.)
+
+**Fix.** `:root` now captures the light palette once via `var()`
+(`--color-on-surface-light` and friends) — resolved against `:root`, so they
+keep the light values no matter what a descendant overrides, and `@theme` stays
+the single source of the hexes. A new `.product-page-dark .product-light-surface`
+rule restores those four tokens, and the two components opt in with a
+`product-light-surface` class. Nothing was hardcoded in the components, and the
+light-theme page — where both components were already correct — is untouched.
+
+**Audited rather than eyeballed.** A contrast pass over every text node in
+`<main>` (effective background resolved through the ancestor stack, alpha
+composited, WCAG AA thresholds with the large-text exception):
+
+| Page | Before | After |
+|---|---|---|
+| Dark product page (EN) | **21 failures** | **0** |
+| Dark product page (ES) | — | **0** |
+| Light product page | 0 | 0 |
+| Homepage review cards | pass | pass, values unchanged (17.12 / 9.36) |
+
+Two things the auditor had to get right, both of which produced false positives
+first time round: `color(srgb …)` computed values are 0-1 floats, not 0-255, and
+text over a CSS gradient (the scrap-value tile) cannot be evaluated from
+`backgroundColor` alone and must be skipped rather than reported.
+
+**Known and unchanged:** the decorative ★★★★★ row is `#e9c349` on white, 1.7:1.
+It is `aria-hidden` so it is not a WCAG text failure, and it renders identically
+in both themes and on the homepage — changing it is a brand-colour decision, not
+a theme bug, so it was left alone.
+
+## 2026-08-04 - Trust badges and policy accordions centre when they stack
+
+Owner request: wherever the three trust badges stack into a column, they and the
+policy accordions above them should be centred rather than left-anchored.
+
+The badges were already centred at `sm` and up but flipped to `items-start`
+below it — i.e. left-anchored in exactly the stacked layout where a centred
+column reads best. They are now centred unconditionally, which changes nothing
+at `sm`+ and fixes the stacked case.
+
+The Shipping & Returns / Condition & Wear / Payment Options accordions now
+centre their title and body below 640px. The title and chevron centre together
+as a pair rather than the title centring while the chevron stays pinned to the
+right, which would read as an accident rather than a centred layout.
+
+640px is deliberately the same breakpoint the badge grid uses, so the two bands
+always agree — verified at the boundary: at 640px the badges are 3-up and the
+accordions are left-aligned with the chevron right (`space-between`, body
+`start`); at 639px the badges are one column and the accordions are centred
+(`center`, body `center`). Both flip together.
+
+Checked at 320, 376, 639, 640 and 768 in both locales, including all three
+Spanish accordions. `npx tsc --noEmit`, `npm run lint`, 720/720 tests, 449-page
+build.
+
+## 2026-08-04 - Gallery bars fade in with cursor proximity
+
+Owner request: rather than appearing only on hover, each bar should fade up as
+the cursor approaches its side and be fully solid once the pointer is over it —
+with the clickable area unchanged.
+
+`ProductImageGallery` now tracks the pointer across the frame and writes two
+custom properties on it (`--edge-prev-reveal` / `--edge-next-reveal`); each bar
+reads its own. The ramp reaches 28% of the frame width inward from the bar's
+inner edge and uses a smoothstep curve, so the bar is barely there at the far
+end and firms up quickly near the edge.
+
+**The clickable area is deliberately unchanged** — only the reveal ramps. That
+separation is the whole point: the bar can advertise itself from a distance
+without widening the region that steals a click meant for the lightbox.
+
+Measured on a 576px frame (bar 63px, ramp 160px), cursor distance from the left
+edge → reveal: 40% → 0, 35% → 0.06, 30% → 0.24, 25% → 0.50, 20% → 0.76,
+15% → 0.95, 11% and inward → 1.00. The right side mirrors it exactly, and the
+opposite bar stays at 0 throughout.
+
+Two implementation details worth keeping:
+
+- Moves are coalesced to one paint per animation frame, but the pointer x lives
+  in a ref rather than being captured in the scheduled callback — otherwise the
+  frame paints where the cursor *was* when the frame was requested, not where it
+  is now.
+- `pointerleave` cancels any queued frame before resetting. `requestAnimationFrame`
+  does not run while a tab is hidden, so a stale frame could otherwise land later
+  and re-light a bar the pointer had already left.
+
+Mouse only: a touch device keeps the CSS `(hover: none)` treatment, and writing
+an inline value would override it permanently after a single tap. Verified — a
+touch drag across the photo writes no inline vars and the bars stay at 0.85. The
+`:hover` rule is retained as the pre-hydration/no-JS fallback.
+
+Clicking is unaffected: from a proximity-lit state, a bar click still advances
+without opening the lightbox, and a centre click still opens the lightbox.
+`npx tsc --noEmit`, `npm run lint`, 720/720 tests, 449-page build.
+
+## 2026-08-04 - Gallery bars: flat, thinner, edge-hugging, revealed per side
+
+Owner feedback on the bars introduced earlier the same day — the fade made it
+unclear where each bar actually was, they were wide enough that a click aimed at
+the piece (expecting the lightbox) could land on one, and both lit up together.
+
+- **Flat instead of faded.** The gradient dissolved toward the centre, so the
+  strip had no visible end. The scrim is now a uniform tint with a 1px hairline
+  down its inner edge, giving the bar a definite beginning and end.
+- **Thinner and hard against the edge.** From 28% (144px on a 576px frame) to
+  `clamp(2.75rem, 11%, 4.25rem)` — 63px on desktop, 44px at phone size. 44px is
+  the floor because that is a usable tap target.
+- **The lightbox keeps the middle.** Probing a click across the frame width, the
+  centre 15%–85% now opens the lightbox at both 376px and 1440px; it was
+  28%–72% before, which is what made mis-clicks easy.
+- **Per-bar reveal.** The frame-wide hover rule is gone; each bar reveals on its
+  own hover, so the highlight follows the side the pointer is near.
+
+Chevrons dropped 34px → 28px to sit correctly in the narrower bar.
+
+Verified in the running app: clicking a bar advances the photo and does not open
+the lightbox; clicking the centre opens the lightbox and does not advance;
+Escape still closes. Dark-backdrop products keep their light scrim and hairline.
+`npx tsc --noEmit`, `npm run lint`, 720/720 tests, 449-page build.
+
+## 2026-08-04 - Gallery edge navigation is a full-height bar, not a floating circle
+
+Owner request: make it obvious that the whole side of the photo advances it.
+
+The hit area already WAS the full height of the frame and 28% of its width — the
+only thing drawn was a 44px circle, so the control looked far smaller than it
+was and nothing suggested the rest of the strip did anything. The bar now IS the
+hit area: full height, flush to the frame edge, chevron centred vertically.
+Measured at 1440 it is 144×576 inside a 576×576 frame; at 376 it is 96×341.
+
+Two details that took a second pass:
+
+- **The scrim is a tint, not the frame's colour.** The first attempt faded white
+  to transparent, which is invisible over the near-white sweep most of the
+  catalog is shot on — leaving a floating chevron again, i.e. the original
+  problem. It is now a warm `rgba(110,92,40,…)` wash on light frames and a white
+  wash on dark ones, fading toward the centre so the strip reads without
+  covering the product.
+- **Tone follows the FRAME, not the page theme.** A black-padded image can sit
+  on an otherwise light product page, where a white scrim reads as a veil. The
+  frame carries `data-tone`, and the chevron colour is pinned per tone rather
+  than using `--color-primary` — on a dark-padded image on a light page that
+  token is still the deep gold, which disappears against a dark scrim.
+
+Touch devices now show the bars permanently at 0.85 opacity: a hover-only
+affordance is invisible on exactly the devices that most need it.
+
+`isDarkColor` moved out of the product page into `types/product.ts` as
+`isDarkProductBackground` so the page theme and the gallery tone cannot disagree
+about what counts as dark.
+
+Verified in the running app: six clicks spread down both bars (5%, 50%, 95% of
+their height) all advance the photo and none open the lightbox — including one
+that landed on the chevron SVG, the case fixed earlier today. Tone switches
+correctly on a black-backdrop product. The lightbox's own arrows are separate
+markup and untouched. `npx tsc --noEmit`, `npm run lint`, 720/720 tests,
+449-page build. The desktop hover reveal is verified by rule inspection, not a
+synthetic hover — CSS `:hover` cannot be triggered by `dispatchEvent`.
+
+## 2026-08-04 - Purchase panel: value tiles pair up, buy actions become a flush grid
+
+Owner report, with a screenshot of the Spanish page: the scrap-value and
+based-on-spot tiles were stacked on two lines with obvious room to sit side by
+side, and the action buttons were "spread out" rather than neatly arranged.
+
+**Root cause of the stacking:** the tiles used `sm:grid-cols-2`, a **640px
+VIEWPORT** query, while the thing that decides whether two tiles fit is the INFO
+COLUMN — 576px on a 1440 desktop, 325px at 768, and full-width on a phone. So a
+343px-wide phone column (plenty of room) stacked them, while a 325px tablet
+column (less room) crammed them side by side. Exactly inverted.
+
+The purchase panel is now its own `container-type: inline-size` query container
+and everything inside sizes against it:
+
+- **Value tiles** are always two across. Their type and padding are `cqi`-based
+  clamps, so they compact their frames instead of wrapping — the value reads
+  15.2px on a 576px panel and 13.0px on a 288px one, with nothing clipped at any
+  width. On a 375px phone the pair now occupies 54px instead of ~123px stacked.
+- **Buy actions** moved from a wrapping flex row to a grid that is flush
+  edge-to-edge in both of its modes. Previously the row left a ragged right edge
+  everywhere: ~100px of trailing slack on desktop, and a staggered two-line
+  arrangement on a phone (Add to Cart + Save, then Inquire + Call against dead
+  space). Now: a panel of 470px or more gets one row of four with Add to Cart
+  weighted `1.5fr`; anything narrower gets Add to Cart full-width above three
+  equal columns. Horizontal padding is a `cqi` clamp so labels compact rather
+  than break, and 470px is measured, not guessed — a 1180px iPad Pro yields a
+  519px panel, so the threshold has to sit below that.
+- The sold-item panel has two actions, one of which is a sentence ("Inquire
+  about a similar piece"). Pairing those at 320px clipped the label, so that
+  variant stacks to one full-width column until the panel reaches 500px.
+
+Swept at 320, 375, 430, 640, 768, 900, 1024, 1180, 1440 in both locales and on a
+sold item: value tiles on one row at every width, no clipped label, no button
+wrapping to a second line, both grids flush to the panel's right edge, and no
+horizontal page overflow. Spanish is the stress case (`Agregar al carrito`,
+`Consultar`) and passes at 320px with 91px cells.
+
+`npx tsc --noEmit`, `npm run lint`, 720/720 tests, 449-page build. Desktop was
+verified by measurement rather than screenshot: the Browser pane's native width
+is 376px in this environment, so emulated desktop widths capture scaled down.
+
+## 2026-08-04 - Gallery magnifier removed; gallery arrows no longer open the lightbox
+
+**Magnifier removed** at every viewport (owner request). Gone from
+`ProductImageGallery`: the `ZOOM`/`PANEL`/`MOBILE_PANEL`/`EDGE_DEAD_ZONE`
+constants, the `ZoomState` type and state, `updateZoom`, the pointer
+move/down/leave/up/cancel handlers on both the main image and the lightbox, the
+two lens squares, the portaled magnifier panel, four now-unused refs, and the
+`hoverToMagnify` label in both locales. Full-size viewing is the lightbox, which
+the main image's click already opens.
+
+Two side effects worth keeping:
+
+- The main frame's `touch-action` goes back to `auto`. It was `none` so the
+  magnifier could claim touch drags, which meant a vertical swipe starting on
+  the photo did not scroll the page.
+- Its cursor is now `zoom-in` rather than `crosshair`, which describes what the
+  click actually does, and the lightbox frame is back to the default cursor.
+
+**Arrow-opens-lightbox bug fixed.** Clicking a prev/next arrow on the main photo
+also opened the lightbox. `openLightbox` did guard against it —
+`e.target instanceof HTMLElement && e.target.closest('.product-gallery-edge-button')`
+— but the visible chevron is an inline SVG, and **an SVGElement is not an
+`HTMLElement`**, so the guard silently skipped and the click fell through to the
+frame underneath. Confirmed in the browser: the clicked target reports
+`instanceof Element === true`, `instanceof HTMLElement === false`.
+
+Fixed on both sides: the guard now tests `instanceof Element` (SVG included),
+and each edge button stops propagation itself via `handleEdgeNavigation` — the
+old `onPointerDown` stopPropagation never helped, because `click` is a separate
+event that still bubbled.
+
+Verified in the running app at 1440px and 375px: five consecutive arrow clicks
+on the SVG chevron advance the photo every time and never open the lightbox;
+clicking the photo still opens it; Escape still closes it; the lightbox's own
+arrows still navigate. Zero photo-backed fixed panels appear on mouse hover or
+on a touch press-and-drag, in the page or in the lightbox. `npx tsc --noEmit`,
+`npm run lint`, 720/720 tests, 449-page build.
+
+## 2026-08-04 - Related strip: uniform wrap, smaller mobile title, 1-up on thin phones
+
+Three owner refinements to the "You might also like" cards.
+
+**1. Wrapping below the price is now all-or-nothing.** A row where some cards
+kept the pills beside the price and others dropped them looked accidental. Cards
+in a strip are always the same width, so one card-width threshold decides it for
+every card at once: `@container (max-width: 180px) { .related-product-chips
+{ flex-basis: 100% } }`. Above it every card shares the price line, below it
+every card stacks. 180px sits just under the narrowest card at which the worst
+case — widest pill row plus a long price — still fits, so the guarantee holds
+without being needlessly conservative. The previously mixed widths (880px was
+3/4, 430px 3/4, 375px 1/4) are now 0/4 uniformly.
+
+**2. The mobile title shrinks with the card.** It was a flat `text-sm` (14px)
+regardless of card width, which dominated a narrow 2-up card. It is now
+`clamp(0.6rem, 0.39rem + 3.16cqi, 0.875rem)` on the same container as the pills:
+unchanged at 13.95px on a 244px desktop card, down to 10.33px on the 130px card
+of a 2-up 375px phone.
+
+**3. One card per row at 360px and below.** A 2-up card there is ~122px of
+content — the owner's "very thin and not good looking". The grid moved off
+Tailwind utilities into `.related-product-grid` so the three column counts read
+in one place: 1 column, 2 from 361px, 4 from 768px. The thin-phone case is now
+the *best*-looking rather than the worst — a 360px phone gets a 286px card with
+the full 14px title and full-size pills back on the price line.
+
+Measured across 320-1440px. **Zero multi-line pill rows, zero overflows, and
+zero mixed-wrap rows at every width**; the page never scrolls horizontally:
+
+| viewport | cols | card content | title | pills | on price line |
+|---|---|---|---|---|---|
+| 1440 / 1280 | 4 | 244px | 13.95px | 9.92px | 4/4 |
+| 1024 | 4 | 192px | 12.32px | 8.53px | 4/4 |
+| 960 | 4 | 176px | 11.81px | 8.10px | 0/4 |
+| 880 | 4 | 156px | 11.18px | 7.56px | 0/4 |
+| 768 | 4 | 128px | 10.29px | 6.81px | 0/4 |
+| 640 | 2 | 262px | 14px | 9.92px | 4/4 |
+| 430 | 2 | 157px | 11.20px | 7.58px | 0/4 |
+| 375 | 2 | 130px | 10.33px | 6.84px | 0/4 |
+| 360 / 320 | 1 | 286 / 246px | 14px | 9.92px | 4/4 |
+
+**Noted, not changed:** at 768-900px the strip is 4-up on cards of 128-156px —
+narrower than the 2-up cards at 360px that prompted the single-column request.
+Moving the 4-up breakpoint from `md` to `lg` would fix it, but that is a tablet
+layout change the owner has not asked for.
+
+## 2026-08-04 - Related-strip pills hold one line and prefer the price's
+
+Owner rules for the pills added earlier the same day: they must NEVER wrap onto
+a second line, they should share the price's line whenever they fit, and they
+should shrink dynamically to keep sharing it as far down as possible.
+
+Three mechanisms, in order:
+
+1. **One line, always.** `flex-wrap: nowrap` on the pill row, `flex: 0 0 auto`
+   on each pill.
+2. **Beside the price when it fits.** Price and pills sit in one
+   `flex-wrap: wrap` row. The pill group is a SINGLE flex item, so it either fits
+   beside the price or moves below it whole — it can never split.
+3. **Shrink to keep sharing.** The card is a `container-type: inline-size` query
+   container and the pill type is `clamp(0.38rem, 0.21rem + 2.69cqi, 0.62rem)`,
+   with every internal length in `em` so one clamp scales padding and gaps too.
+   The price/pills gap is fluid on the same principle.
+
+The card, not the viewport, is the container on purpose: the strip is 4-up on
+desktop and 2-up on phones, so a 640px viewport actually gives WIDER cards
+(262px) than a 900px one (156px) — a viewport media query would size pills for
+the wrong box, and indeed the measured pill size is non-monotonic in viewport
+width while being perfectly monotonic in card width.
+
+The clamp slope was fitted to measured widths, twice: the first attempt sized
+against the card's border box and came out ~6% small at desktop, because `cqi`
+resolves against the CONTENT box. Refitted, desktop pills are byte-identical to
+their original 0.62rem.
+
+Measured across 320-1440px — **zero multi-line pill rows and zero overflows at
+every width**, page never scrolls horizontally:
+
+| viewport | card content | pill size | on the price line |
+|---|---|---|---|
+| 1440 / 1280 | 244px | 9.92px | 4/4 |
+| 960 | 176px | 8.10px | 4/4 |
+| 880 | 156px | 7.56px | 3/4 |
+| 820 | 141px | 7.16px | 1/4 |
+| 640 (2-up) | 262px | 9.92px | 4/4 |
+| 430 | 157px | 7.58px | 3/4 |
+| 375 | 130px | 6.84px | 1/4 |
+| 320 | 102px | 6.10px | 0/4 (98px row in 102px) |
+
+Where a card drops its pills below the price, that is the "only when needed"
+case: at 820px keeping the widest row beside the price would need ~6.1px type,
+and the floor is deliberately ~6.1px so 320px still fits `10K 119.4g 24in 9mm`
+on one line. Cards in the same strip can differ — a 3-pill card keeps the price
+line where a 4-pill neighbour drops — which is inherent to a per-card fit rule.
+
+## 2026-08-04 - Related-strip cards carry the at-a-glance specs
+
+Owner request: show width on the "You Might Also Like" cards, plus the other
+critical specs. Those cards previously showed only image, title, and price.
+
+They now carry the same four chips the shop cards use — **purity, weight,
+length, width** — in the same visual language, so a piece reads identically
+wherever it appears. Purity and weight always show (weight prints an em dash
+when unset); length and width appear only when the piece has them, with width
+still restricted to necklaces and bracelets by `productWidthDisplay`. Every chip
+carries an `aria-label` naming its spec, since "5mm" alone means nothing to a
+screen reader. Localized: Pureza / Peso / Largo (Talla for rings) / Ancho.
+
+**The chip formatters were extracted rather than copied.** `formatPurity`,
+`getPurityChipStyle`, `formatWeight`, and `formatLengthChip` already existed as
+byte-identical private copies in BOTH `ProductCard` and `ProductListRow`
+(verified with a diff — only a trailing newline differed). The strip would have
+been the third copy, at which point a fix to one would silently miss the others.
+They now live once in `src/lib/product-spec-chips.ts`, a plain directive-free
+module so the two client components and this server component can all import it,
+along with the two shared chip treatments. Width deliberately has no formatter
+there: `productWidthDisplay` in `types/product.ts` owns its formatting AND its
+Necklace/Bracelet rule together.
+
+The strip's query gained `length` and `width_mm`. Because the strip fails soft —
+any query error removes the whole section rather than one chip — `width_mm` gets
+an explicit retry without it on an un-migrated database.
+
+Verified on the running site: cards show e.g. `14K / 4.68g / 7.3in / 5mm`, a
+bracelet with no stored width correctly shows three chips, and the Spanish strip
+reads `Pureza / Peso / Largo / Ancho`. At 375px the chips wrap to two lines
+inside the card with no overflow. Shop grid and list views re-checked after the
+extraction — purity gradients, weights, lengths, and width chips all unchanged.
+`npx tsc --noEmit`, `npm run lint`, 720/720 tests, 449-page build.
+
+## 2026-08-04 - Chain width joins the product-page specifications
+
+Owner request: the shop gallery cards already show a chain/band width in
+millimetres; the product page's Specifications list did not. It now carries a
+**Width** row (**Ancho** in Spanish), between Link Type and Length so the
+cross-section reads before the wearable length.
+
+It calls the existing `productWidthDisplay` — the same function the shop cards
+and list rows use — rather than reimplementing the rule, so the "Necklace and
+Bracelet only" contract lives in exactly one place and the two surfaces cannot
+disagree about which pieces have a width or how it is formatted.
+
+`width_mm` also had to join the product detail query, which did not select it.
+It went into the OPTIONAL column set with the other later-migration columns, so
+an un-migrated database still renders the page (retry without them, backfill
+null) instead of 500ing.
+
+Verified against the running site: bracelet 12.2 mm and necklace 7.5 mm both
+show; a ring and a pendant show no Width row; the Spanish page reads
+`Ancho = 12.2 mm`. Cross-checked 20 products' gallery card against their page
+specs — **0 disagreements**, including the nulls. `npx tsc --noEmit`,
+`npm run lint`, 720/720 tests, 449-page build.
+
+## 2026-08-04 - Random carousel cards paint their own backdrop
+
+Owner report, from the hero: two black-backdrop photos, one with rounded corners
+and one with square ones.
+
+**What was actually happening.** The rounding is on the CARD, not the photo.
+`.card` and `.img` both carry `border-radius: 1.5em` (24px), but `.img` is
+`object-fit: contain` — the radius rounds the *element box* while the photo is
+letterboxed inside it. So the corner treatment depends entirely on the bar
+width: under 24px the photo's corners fall inside the rounded region and get
+clipped; at 24px or more its own square corners sit clear of it. The card is a
+fixed square and the source photos are every ratio (448×336, 448×484, 448×541,
+448×716), so it varied per photo. Measured live: black photos at 36px and 78px
+bars read sharp, black photos at 15px and 5px read rounded.
+
+**Why it was visible at all** — the real defect. Every card was painting white
+padding, including behind pure-black photos. `--card-bg` is meant to come from
+the photo's own White/Black group, but the live slideshows run from a random
+draw, and both random paths mapped rows through a `normalize()` that hardcoded
+`bgColor: null`. Curated entries store `bg_color` on the selection row; a draw
+has no such row, so every drawn card fell back to the global white.
+
+**Fix.** A drawn card now takes its background from the product's own
+`image_padding` / `image_padding_by_image` — the same stored field that paints
+its product page — via `paddingBgForProductRow` in `carouselConfig.ts`. No
+sampling, no schema change, no admin step. Applied to both draw paths: the
+storefront (`fetchRandomLineupItems`) and the admin's Random fill
+(`fetchRandomSampleItems`), whose panel also stopped forcing `#ffffff` on every
+drawn piece. An unset padding still returns null and inherits the global colour.
+
+With the padding matching the photo, the letterbox bars are invisible and a card
+reads as one rounded tile whatever its aspect ratio — so the contain-fit seam
+stops mattering rather than being worked around. Verified on the live hero: 21
+of 21 cards now match their photo's backdrop (0 mismatches, versus 4 black
+photos on white cards before), including one product's custom `#fbf8f2` cream.
+
+Side effect worth knowing: the hero's swept background now genuinely sweeps
+dark as black-backdrop pieces come round, because that sweep is driven by the
+same per-photo colour. That is the designed behaviour — curated lineups have
+always done it — but it was invisible while every random card claimed white.
+
+## 2026-08-04 - Product columns swapped: specs right, notes + policies left
+
+Owner request, refining the layout restructure below: put Specifications in the
+RIGHT column under the description, and move Notes plus the three
+Shipping/Condition/Payment accordions to the LEFT column under the photo, with
+clear blank space before the three-icon trust strip.
+
+Column contents are now:
+
+- **column 1** — gallery, then notes + policy accordions
+- **column 2** — purchase panel, description, specifications
+
+This turned out to simplify the implementation rather than complicate it. DOM
+order is now literally the reading order (gallery → purchase panel →
+description → specifications → sold note → notes → policies), so the inline
+`order: 1..7` values from the first pass were **deleted** — flattening the
+wrappers on a phone reproduces that sequence by itself. The aside is one wrapper
+rather than two grid items so a product with no Notes does not leave an empty
+track whose gutter still prints under the gallery (verified on a no-notes item:
+32px gap, not 64px).
+
+Balance is essentially unchanged: both columns land within 46px of each other at
+1440 (947 vs 901) and within 19px at 1280.
+
+The trust strip gained `mt-12` + `pt-8`, giving 48px of blank space between the
+columns' end and its divider, then 33px before the icons — measured identical at
+every width from 375 to 2560.
+
+Verified: `npx tsc --noEmit`, `npm run lint`, 720/720 tests, a 449-page build,
+and browser measurement at 375, 768, 912, 1024, 1180, 1440, 1999, 2000, 2560
+(no horizontal overflow anywhere), plus a no-notes product and the Spanish page.
+
+## 2026-08-04 - Product detail fills the space under the photo
+
+Owner report, with a screenshot: on every two-column viewport the info column
+ran far past the bottom of the gallery, leaving the whole lower half of the
+photo column empty. Measured at 1440px: the gallery's content ended at 660px
+while the row was 1337px tall — **677px of dead whitespace**.
+
+**The fix.** The Specifications table now renders under the gallery, and the
+three trust badges became a full-width band beneath both columns instead of a
+cramped 3-up inside a half-width column. Nothing was removed and no wording
+changed; only placement.
+
+The split is not arbitrary — it is the balanced one. With the gallery (660) and
+purchase panel (538) fixed at the top of their columns, the movable blocks are
+description (91), notes (89), policies (146) and specs (232). Sending specs
+left and the rest right lands both columns on 924px exactly at 1440/1280/1920.
+
+**DOM order is unchanged and still semantic**: gallery → purchase panel →
+description → notes → policies → specs. The h1 and price are never pushed
+behind a spec table for screen readers or crawlers. Two CSS modes reconcile
+that with the two visual layouts (`.product-detail-layout` in `globals.css`):
+
+- Below md the info wrapper is `display: contents`, so every block becomes a
+  sibling in one flat stack and inline `order` values 1-7 reproduce the exact
+  original phone order (specs still between description and notes). Verified at
+  375px: gallery → panel → description → specs → notes → policies, 40px under
+  the gallery and 20px between blocks, same as before.
+- From md up the wrapper is a real column in grid column 2 spanning both rows,
+  the gallery is in row 1 and the specs in row 2.
+
+`grid-template-rows: auto 1fr` is load-bearing: an item spanning tracks only
+grows the *flexible* ones, so the info column's surplus lands in row 2 and row 1
+stays exactly as tall as the gallery. Two auto rows split the surplus and reopen
+a gap under the photo — that was tried first.
+
+**Ultra-wide inverts the roles, so the rule is mirrored.** At 2000px+ the
+`ultrawide-page-wide` tier doubles the columns: the square gallery becomes the
+taller column (~1120px) while the info column shrinks as its text stops
+wrapping (~790px). Specs under the gallery there stacked onto the *already
+tallest* column and made the band ~260px taller than before this work — a real
+regression, caught by measuring rather than by looking at 1440 only. At 2000px+
+the spec table therefore moves into the short column under the info stack and
+the gallery spans both rows, so the band is exactly as tall as the gallery.
+
+Measured band height, this product, before → after: 768px 1402→1150,
+1024px 1293→1041, 1280/1440/1920px 1337→924, 2400px 1352→1120.
+
+**Known residual:** at 768-1023px the purchase panel alone (632-696px, from CTA
+buttons and the scrap/spot boxes wrapping in a ~325-440px column) is taller than
+gallery + specs, so 296-477px remains under the left column. Moving notes or the
+accordions left as well would close it there but unbalance 1200px+, where the
+columns are currently exact. No content-independent split fixes both; the band
+still shrank ~250px at those widths.
+
+`ProductTrustSections.tsx` now exports `ProductPolicyAccordions` and
+`ProductTrustBadges` separately, because the two halves are placed differently.
+
+Verified: `npx tsc --noEmit`, `npm run lint`, 720/720 tests, a 449-page
+production build, and browser measurement at 375, 768, 912, 1024, 1180, 1280,
+1440, 1999, 2000, 2400 and 2560 (no horizontal overflow at any width), plus a
+sold item, a Spanish product page, and a product with no Notes block.
+
+## 2026-08-04 - Opaque site header, and one token for its height
+
+Owner report: the header was slightly translucent with page elements showing
+through, and the homepage announcement bar looked short on top padding — "or
+maybe it's slightly hidden behind the header." It was hidden, and measuring it
+turned up a site-wide off-by-9px.
+
+**Opacity.** The header was `rgba(249,249,247,0.95)` over `backdrop-blur-sm`;
+it is now a flat `#f9f9f7`. The blur went with it — with nothing translucent
+left to soften it only cost a compositing layer on every scroll frame. The
+mobile menu panel had the same problem (`rgba(252,251,247,0.98)`, product
+photos faintly bleeding through) and is now `#fcfbf7`.
+
+**Height.** `main` reserved `pt-16` (64px) against a header that measured 73px
+at md and up, so the first 9px of page content sat behind it on every page. Only
+the announcement bar exposed it: with 8px of padding it had nothing to spare,
+while every other page opens with a section carrying `pt-12`+ that absorbed the
+overlap unnoticed.
+
+The first pass padded the bar, which fixed the symptom locally. This entry is
+the root fix: `--site-header-height` (3.5rem phones / 4.5rem md+) is now the
+single source of truth, and — the part that makes it stick — **the header takes
+its height from the token** rather than growing to fit its padding. The token
+cannot drift from the rendered header because the header is defined by it.
+
+Converted to derive from the token: 15 `<main className="pt-16">` page offsets
+(now `.site-header-offset`), `HomeHeroStack`'s sticky `top`, frame height,
+scroll runway and reduced-motion height, `HomeHero`'s three full-height rules,
+and the mobile menu panel's `max-height` (which had drifted furthest, at
+`3.5rem` on a 73px header). Pages using `pt-20`/`pt-24`/`pt-28` were left alone
+— those mean "header plus breathing room", not "exactly the header".
+
+The announcement bar's asymmetric `pt-5` workaround is reverted to a symmetric
+`py-2.5`; with the reservation correct, its top edge is genuinely visible.
+
+Guarded by `site-header-height.test.ts`, which fails if a hardcoded `pt-16`
+main, `top: 4rem`, or `calc(100svh - 4rem)` reappears — the drift happened one
+hardcoded offset at a time, so the guard is what prevents a repeat.
+
+Browser-verified at 920px, 375px and 330px: header height, `main` padding, and
+the announcement bar's top all read identical values (72/72/72 and 56/56/56),
+zero overlap; hero sticky top and frame height track the token; header row
+content (32px phones, 40px logo) fits inside the fixed height at every width
+including the <350px tier, whose now-redundant `padding-block` was removed.
+
+Verification: `npx tsc --noEmit`, lint, 720/720 tests (3 new), and `npm run
+build` passed. No console errors.
+
+## 2026-08-04 - The eBay out-of-date count was inflated by a sold-item scan bug
+
+Owner challenge to the entry below: "we should only have about 90 items, not
+123 — some may be already sold." Correct, and it exposed a real bug rather than
+a miscount.
+
+`scanAndMarkOutOfDate` selected `['published', 'hidden_oos']` and flagged any
+hash mismatch as `out_of_date` — including `hidden_oos` rows, which are sold
+pieces deliberately quantity-zeroed on eBay. When the tier shipping policy
+entered the content hash, all 36 sold-and-hidden listings mismatched and were
+flipped, destroying the state that records "hidden on eBay because it sold" and
+inflating the campaign by a third. Live cross-tab confirmed it: 87 `out_of_date`
+× available, 36 `out_of_date` × sold, 1 `published`. All 36 have a successful
+`hide_oos` log entry, so they were genuinely hidden before the scan clobbered
+them.
+
+The flag is meaningless for these rows either way: `out_of_date` means "needs a
+content push", and pushing a sold piece is exactly what must never happen — so
+hashing one can only produce a false positive.
+
+Fixed by a pure, unit-tested `resolveFreshnessScanAction(listing,
+productStatus)` returning `hash` / `skip` / `repair-hidden`:
+
+- Any non-`available` product is skipped — never hashed, never flagged.
+- A row already `out_of_date` and available is skipped (re-hashing would only
+  rewrite the same value).
+- `repair-hidden` restores a mis-flagged row to `hidden_oos`, gated on
+  `last_pushed_qty === 0`. That column is written by `hideListingQuantityZero()`
+  and never touched by the scan, so it is durable proof the hide really
+  happened — which separates a mis-flagged hidden row from a just-sold row whose
+  auto-hide has not run yet. The latter must stay visible as work to do, not be
+  relabelled as already hidden.
+
+The repair needs no manual SQL: the scan runs on every eligibility-summary load,
+so opening the bulk-sync modal after deploy fixes the rows. Dry run against live
+data confirmed all 36 qualify and none are ambiguous, leaving **87
+`out_of_date`, all available** — matching the ~90 the owner expected (90
+available products, 88 with eBay rows).
+
+Also noted for follow-up: two available products have no `ebay_listings` row at
+all.
+
+Verification: `npx tsc --noEmit`, lint, 717/717 tests (3 new), and `npm run
+build` passed.
+
+## 2026-08-04 - eBay bulk-write guards, ahead of the shipping-policy re-sync
+
+**Diagnosis first (read-only, no code changed).** The owner asked why every
+eBay listing had gone out of date. The flag is correct, not a bug:
+`resolveFulfillmentPolicyId`'s result is deliberately part of
+`computeContentHash()`, and the seven tier policies provisioned 2026-08-02
+03:34 UTC (`252701344026`–`252701350026`) replaced the legacy
+`252363241026`/`252363247026`. The first freshness scan afterward — 2026-08-04
+21:09 UTC, triggered by `/api/admin/ebay/eligibility-summary` — hashed every
+listing against the new policy ids and correctly flagged the 123 that predate
+them. The single still-`published` listing was created 21:05 the same day, after
+provisioning. No eBay sync code had changed since July 30, and the live eBay
+listings themselves are untouched — they genuinely still carry the old shipping
+policy.
+
+The diagnosis also established that **the daily price push can never clear the
+flag**: it sends price/quantity only (`bulkUpdatePriceQuantity`), while
+`fulfillmentPolicyId` travels on the full offer body. Only a `runSyncStep`
+update applies a new tier policy, which means deliberate batched syncs — exactly
+the operation the standing cautions warn about. So the guards were built first.
+
+Three filters now run before any bulk enqueue stages a write:
+
+- **Pinned write-block.** Inventory #82's product id is pinned in
+  `EBAY_WRITE_BLOCKED_PRODUCT_IDS`. The previous guard inferred the block from
+  `last_error` still equalling `RELISTED_LISTING_WARNING` — true today, but gone
+  the moment a different error, a manual clear, or a partial sync overwrites
+  that column, at which point a batch run would have written to a listing that
+  is live through an unattached external relist. `isEbayWriteBlocked()` asks
+  both questions and replaced the old check at all five write paths
+  (`runSyncStep`, `publishLiveStep`, `priceOnlyStep`, `runDelist`,
+  `planEbayPricePush`).
+- **Availability.** Non-`available` products are dropped before queueing. They
+  fail pre-flight anyway, but only after flipping to `error` and writing a log
+  line each; 36 of the 123 flagged listings are sold, and they would have buried
+  the genuine failures.
+- **Batch cap.** `EBAY_BULK_ENQUEUE_LIMIT = 25` makes "never blanket re-sync"
+  mechanical rather than a rule someone has to remember at the moment of
+  clicking. It lives in a new client-safe `lib/ebay/guards.ts` so the modal can
+  state the same number the server enforces.
+
+`enqueueProducts`/`enqueueAllEligible` now return `{ queued, blocked,
+notAvailable, withheld }`, and the bulk-sync modal states the cap up front and
+the withheld/skipped counts afterward — a capped batch can no longer read as a
+finished job.
+
+Live read-only counts (2026-08-04): 123 `out_of_date` + 1 `published`; of the
+123, 1 is the pinned block, 86 are available and writable, 36 are sold. **The 36
+sold ones turned out to be a scan bug, not a real flag** — see the entry above;
+the campaign is 86 items ≈ 4 capped runs either way.
+
+**No live eBay write was performed.** Applying the policies is owner-run from
+the deployed admin (`TASKS.md`), starting with one item from its product drawer
+verified against eBay before any batch.
+
+Verification: `npx tsc --noEmit`, lint, 714/714 tests (4 new guard tests), and
+the `npm run build` page render all passed.
+
+## 2026-08-04 - Admin filters panel collapses to Status plus a More toggle
+
+Owner request: expanding Filters exposed eleven dropdowns at once (two full
+rows). The panel now shows only **Status** — the everyday filter — with the
+remaining ten behind a **More / Fewer** toggle, turning the panel into a
+single compact row by default.
+
+The control list is unchanged; it is filtered to `label === 'Status'` while
+collapsed, so expanded order and every filter's behavior stay exactly as they
+were. Because a hidden filter could otherwise silently narrow the table, the
+toggle carries a count of active hidden filters (e.g. **More (1)**), and the
+existing Clear-filters button still appears whenever anything is set.
+
+Verification: `npx tsc --noEmit`, lint, 710/710 tests, and the 447-page
+`npm run build` passed. Browser-verified on the live admin table: opening
+Filters renders one select labelled Status plus "More"; expanding restores all
+ten labels in original order with the button reading "Fewer" and
+`aria-expanded` tracking state; setting Metal = gold then collapsing showed
+"More (1)" with Clear still offered. Filter state was restored via Clear
+afterward.
+
+## 2026-08-04 - Admin drag-reorder auto-scrolls at the table edges
+
+Owner report: dragging a product row above the top of the inventory table did
+nothing, so a row could not be moved to a position outside the current scroll
+window without dropping it, scrolling, and dragging again.
+
+While a row is being dragged, the table now pans whenever the pointer enters a
+72px zone at the top or bottom edge, ramping from a gentle creep at the inner
+boundary to a full 18px/frame once the pointer passes the edge entirely — so
+holding the row off the top of the table runs it up to the beginning.
+
+The `dragover` listener is bound to the DOCUMENT rather than the scroll
+container on purpose: HTML5 drag events fire on whatever element sits under
+the pointer, so once the pointer leaves the table (exactly the reported case)
+a container-scoped listener would never fire again. The rAF loop is created
+and torn down by the `draggedProductId` effect, so it cannot outlive a drag.
+
+Verification: `npx tsc --noEmit` (after clearing the dev server's stale
+`.next/dev` types), lint, 710/710 tests, and the 447-page `npm run build`
+passed. Browser-verified against the live admin table with synthetic drag
+events: holding above the top edge scrolled 3000 → 1812 in 1.2s (full speed);
+holding below the bottom edge scrolled 0 → 1278; the pointer parked mid-table
+moved it 0px; 12px inside the top edge crept -140px in 600ms (vs ~-660px at
+full speed), confirming the ramp; and scrolling stopped immediately on
+dragend and stayed stopped under continued dragover events. No `drop` event
+was dispatched, so no reorder was written.
+
+## 2026-08-04 - Related-items strip; admin reorder upsert bug fixed; FAQ tweak
+
+Fifth and final item from the mels-treasures.com backlog, plus a live bug the
+owner hit mid-session.
+
+**"You Might Also Like"** (`src/components/shop/RelatedProductsStrip.tsx`):
+every product page now shows up to four same-category available pieces
+between the trust sections and the reviews band. One lean query (only the
+card/pricing columns, limit 24 candidates), ranked same-inferred-jewelry-type
+first so a bracelet suggests bracelets, prices computed with the page's
+already-fetched spot data via `getStorefrontDisplayPrice`, lazy images with
+accurate `sizes`, deterministic order, and a query failure renders nothing
+rather than breaking the page. The strip runs inside the page's existing
+300-second revalidation. The ultra-wide source guard correctly failed the
+first version for using `max-w-6xl` without a tier — fixed by opting into the
+standard `ultrawide-page` tier.
+
+**Admin reorder bug (found live by the owner):** drag-reorder failed with
+"null value in column title violates not-null constraint". Root cause: the
+reorder upserted `{id, sort_order}` rows — if any listed id had gone stale
+(deleted in another tab/session since page load), the upsert's INSERT path
+tried to create a half-empty product row, and only the NOT NULL constraint
+blocked it. The write is now UPDATE-only in chunks of 15 (a stale id becomes
+a harmless no-op), and the completion notice reports how many listed items no
+longer exist so the owner knows to reload. Not exercised against the live
+table (a reorder writes real sort_order values); the owner's next drag after
+reloading the admin page is the natural verification.
+
+**Homepage FAQ correction (owner):** "How are your prices set?" now says MOST
+pieces are priced against the live metals market and some carry a set price —
+both locales.
+
+Verification: `npx tsc --noEmit`, lint, 710/710 tests (after the ultra-wide
+guard fix), and the 447-page `npm run build` passed. Browser-verified: EN
+product page shows 4 ranked cards (3 bracelets + 1 chain for a bracelet,
+prices $717-$8,168) positioned between trust sections and reviews; ES shows
+the paired heading with `/es/`-prefixed hrefs; mobile is 2 columns, no
+overflow, all images `loading="lazy"`; the FAQ answer change verified in both
+locales.
+
+## 2026-08-04 - Homepage story block, education section, FAQs, announcement bar
+
+Fourth item from the mels-treasures.com backlog. The homepage gained four
+pieces, all bilingual and inline in `(home)/page.tsx`:
+
+- **Announcement bar** — thin dark strip with gold small-caps ("Fully insured
+  U.S. shipping · Free local pickup in Naples · Live spot-linked pricing").
+  Deliberately at the top of the page content, NOT inside the fixed header:
+  the 4rem header height is load-bearing (hero runway math, sticky offsets),
+  so the bar scrolls away naturally and nothing else moves. Static text, no
+  marquee, `data-customer-reveal-skip`. The third item hides below `sm` so
+  the bar stays ≤2 short lines on phones (measured 50px at 375px ES, 31px
+  desktop).
+- **Meet the Owner** — photo (`pages/chris.webp`) beside the founder story:
+  Naples-born, 15+ years, appointment-only mobile model, deal directly with
+  the person who answers the phone. Links to /about and tel:.
+- **Why Buy Estate Gold?** — education block: character/patina, one-of-one
+  rescue-from-melt framing, and the live spot-linked transparent-pricing
+  angle. Links to /shop.
+- **Top FAQs** — four native `<details>` accordions (buying service, insured
+  shipping, local pickup viewing, spot-linked pricing — each answer restates
+  live policy only) with a "View all FAQs" link to /faq.
+
+Section order: hero → services → Meet the Owner → Why Estate → FAQs →
+testimonials → call CTA.
+
+Verification: `npx tsc --noEmit`, lint, 710/710 tests, and the 447-page
+`npm run build` passed. Browser-verified in both locales (announcement bar,
+owner block with photo, education block, 4 working accordions, locale-correct
+/about, /faq, tel links; measured section order) and at 375px (no horizontal
+overflow; bar trimmed to two items). One verification note: `innerText`
+reflects CSS `text-transform: uppercase`, so text assertions on small-caps
+content must be case-insensitive — an initial false failure was exactly that.
+
+## 2026-08-04 - Named trade-in program page; trust-strip breathing room
+
+Third item from the mels-treasures.com backlog (their "Gold Exchange
+Program"): the store's existing trade-in service now has a NAME and a page —
+**Gold & Silver Trade-In Program** at `/trade-in` (localized, SSG, in the
+sitemap at 0.8; the build grew 445 → 447 pages). The page presents only live
+behavior: text photos or book an appointment, tested/weighed in front of you
+against live spot, value applied as credit toward any piece or a cash offer
+instead — no invented terms or percentages. Sections: hero (gold.webp,
+"Trade It, Don't Melt It"), three steps, a callout tying the program to the
+"Own gold or silver?" line on every product page, a sustainability blurb, and
+a CTA row (Free Evaluation / call / shop).
+
+Wiring: the Sell menu gained a Trade-In Program entry (`nav.tradeIn` in both
+message files), the footer's Sell to Us column links it, and every product
+page's trade-in line now ends with a "How it works" link to the page.
+
+Also, per owner feedback on task 1: the product-page trust strip gained
+`mb-10` so the three badges have breathing room before the following section
+divider (measured 40px).
+
+Verification: `npx tsc --noEmit`, lint, 710/710 tests, and the 447-page
+`npm run build` passed (rerun cleanly after a piped `Select-Object -First`
+polluted the first run's exit code; the route list shows /en/trade-in and
+/es/trade-in). Browser-verified: EN and ES pages render the paired h1,
+sections, and CTAs with locale-correct links; header and footer carry the new
+entry in ES; the product-page line shows the "How it works" link; badge-to-
+divider gap measured at 40px.
+
+## 2026-08-04 - Testimonials centralized and surfaced on product pages
+
+Second item from the mels-treasures.com backlog — with a correction: that
+review claimed we displayed no customer reviews, but the homepage already
+carried three verbatim Google reviews (Nolan Olivier, Onur, Yisel Perez),
+bilingual, hardcoded inline. The reviewer (this assistant) had only ever
+inspected the pinned hero, never the homepage's lower sections.
+
+So the task became consolidation + reach: the three real reviews moved to
+`src/lib/testimonials.ts` — now the single curated list, with an explicit
+never-invent-a-quote rule in its header — rendered by a shared
+`TestimonialsSection` (`src/components/home/TestimonialsSection.tsx`, server
+component, renders nothing if the list is ever emptied). The homepage uses it
+with identical content and styling to the old inline block, and product detail
+pages now show the same reviews as a `compact` band (smaller heading, tighter
+rhythm) between the trust sections and the footer. Adding a future review is
+one entry in one file, and every surface updates together.
+
+Verification: `npx tsc --noEmit`, lint, 710/710 tests, and the 445-page
+`npm run build` passed. Browser-verified: homepage EN shows the same three
+cards/heading/footnote as before extraction; product page EN shows the compact
+band below the trust sections; ES on both surfaces shows the paired
+translations ("De Confianza en el Suroeste de Florida", "Reseña de Google");
+mobile stacks to one column with no horizontal overflow.
+
+## 2026-08-04 - Product pages gained policy accordions and a trust strip
+
+First item from the mels-treasures.com UX backlog. Every product page now ends
+with `ProductTrustSections` (`src/components/shop/ProductTrustSections.tsx`):
+three native `<details>` accordions — **Shipping & Returns** (short summary
+linking to the full `/shipping` and `/returns-refunds` pages, so policy text
+lives in one place and cannot drift), **Condition & Wear** (honest estate-wear
+expectations), and **Payment Options** (PayPal card/balance, Pay Later on
+qualifying purchases, free local pickup with a tappable tel: anchor per the
+iOS format-detection rule) — followed by a three-badge trust strip:
+Sustainably Sourced / Fully Insured Shipping / Local Pickup in Naples. The
+component is server-rendered with zero client JS (native details/summary),
+fully bilingual, and renders on sold pages too. One AppIcon mapping was added
+(`recycling` → Recycle) for the sustainability badge.
+
+Verification: `npx tsc --noEmit`, lint, 710/710 tests (icon-integrity guard
+passes with the new mapping), and the 445-page `npm run build` passed.
+Browser-verified: EN page shows the three accordions with working
+`/shipping` + `/returns-refunds` links and the badge trio; ES page shows the
+paired titles with `/es/`-prefixed links and the tel anchor; first accordion
+opens and closes; mobile (375px) stacks badges to one column with no
+horizontal overflow.
+
+## 2026-08-04 - Competitive UX review of mels-treasures.com (no code changes)
+
+At the owner's request, browsed mels-treasures.com end to end — homepage,
+menus, a product page with its accordions, the consolidated Policy & Shipping
+page, cart, and the Shopify checkout — and compiled improvement
+recommendations for our storefront. No project code was touched. The
+actionable list was recorded in `TASKS.md` under "UX Backlog From The
+mels-treasures.com Review"; headline items are on-product Shipping & Returns
+accordions, a sustainably-sourced trust strip, a named trade-in program page,
+testimonials, related-items strips, and homepage story/FAQ blocks. The
+temporary cart item added on their site during the checkout walkthrough was
+removed (cart cleared to 0) before leaving.
+
+## 2026-08-04 - Moved the random-fill section below the two curation lists
+
+The "Fill … with random items" panel moved from above the lineup tabs to below
+the product picker and the slideshow order list, so it reads as an action on
+the two lists rather than a setting that precedes them. Its copy was updated
+for the new position: the buttons are followed by "drawn from the **{list}**
+list above" (tracking the All/Available/Sold checkbox live), and the body now
+says it replaces the order **above** rather than the lineup below. Layout only
+— no behavior change.
+
+Verification: `npx tsc --noEmit`, lint, 710/710 tests, and the 445-page
+`npm run build` passed. Signed-in browser QA by measured page offsets: the
+fill section now renders below both the picker and the order heading and above
+Live preview; its list-name label followed every checkbox change
+(Available → Sold → All → Available); its legend tracked the active lineup
+tab; and a Gold-jewelry draw from the new position still filled Slideshow 3
+with 10 rows. Nothing was saved.
+
+## 2026-08-04 - Carousel curation can work from All / Available / Sold lists
+
+The Store Carousel Hero picker gained a status choice — three mutually
+exclusive checkboxes: **All items**, **Available items** (default), **Sold
+items**. The chosen list drives both the search picker and the three random
+fill buttons, so the admin picks a list, optionally draws a random lineup from
+it, then tweaks and reorders as usual. "All" spans exactly the two public
+statuses; draft/pending-payment/archived never appear anywhere in the panel.
+
+To make sold pieces actually render on the homepage, the storefront curated
+fetch (both the server payload copy and the client fallback copy) now admits
+`available` OR `sold` instead of available-only. A sold card behaves like any
+other — it links to its product page, where the shopper sees it is sold — and
+its `priceLabel` is nulled at fetch so a sold price can never appear in the
+hero, matching the sold-price masking policy. The legacy server-side random
+modes remain available-only. Sold pieces wear a red SOLD chip in the picker
+and the order list, the panel's initial catalog load fetches all public
+statuses so a saved sold piece resolves its thumbnail regardless of the active
+list, and a hint under the checkboxes explains the click-through behavior when
+a sold list is active.
+
+Also fixed in passing: the client-side missing-table tolerance in
+`fetchSelectedItems` / `fetchSelectionEntries` still said `lineup === "alt"`,
+so the unmigrated THIRD table threw a "Third slideshow lineup failed to load"
+notice on panel open instead of reading as empty (the notice self-clears in
+4.2s, which is why earlier QA missed it). Both now use `lineup !== "primary"`,
+matching the server copy.
+
+Verification: `npx tsc --noEmit`, lint, 710/710 tests, and the 445-page
+`npm run build` passed. Signed-in browser QA, all unsaved: default state
+Available/78 unchanged; Sold list settled at 36 items, every row chipped;
+All list at 114 with 38 chips; exactly one box checked at every step; adding a
+sold piece put a SOLD-chipped row 14 in the order list and removing it
+restored 13; a Silver-jewelry random fill with the Sold list active drew
+exactly the 2 sold silver jewelry pieces, both chipped. No database write
+occurred; storefront rendering of a SAVED sold piece is an owner smoke item.
+
+## 2026-08-04 - Picker hides pieces already in the active lineup
+
+Owner request after a verification pass: anything already in the slideshow's
+lineup now leaves the available-products list instead of staying visible with a
+✓. The list is derived (`products` minus the current `selectedIds`), so a piece
+returns the moment it is removed from the order list, and switching lineup tabs
+recomputes it per lineup with no second list to keep in sync. The now-dead
+selected checkmark and highlight styling were removed, each remaining row shows
+a `+` affordance, and the counter reads "N available · N in lineup". The
+all-taken empty state names the lineup and says how to bring a piece back.
+
+Context: duplicates were already structurally impossible — the picker was a
+toggle guarded by an `includes` check, so clicking a selected piece removed it
+rather than adding a second copy. This change is about clarity, not a defect.
+
+Verification: `npx tsc --noEmit`, lint, 710/710 tests, and the 445-page
+`npm run build` passed. Signed-in browser QA: on Slideshow 1 the counter read
+78 available / 13 in lineup with no ✓ anywhere; adding a piece moved it to
+77/14 and it vanished from the picker; removing it restored 78/13 and it
+reappeared; a random Non-jewelry fill of Slideshow 3 went 89/0 → 79/10 with
+**zero** drawn pieces left showing in the picker; and switching back to
+Slideshow 1 correctly showed its own 78/13 rather than Slideshow 3's numbers.
+Nothing was saved.
+
+## 2026-08-04 - Random draws now fill the editable lineup instead of rotating
+
+Owner asked that choosing a random scope immediately populate the list so the
+drawn pieces and their order can be adjusted. That is incompatible with the
+previous behaviour by construction: a live random mode re-drew server-side on
+every cache rebuild, so any arrangement the admin made would have been thrown
+away. Random therefore became a **fill action** — a curated starting point
+rather than a rotating source.
+
+The three mode radios were replaced by three buttons — **Gold jewelry**,
+**Silver jewelry**, **Non-jewelry items** — that each replace the active
+slideshow's lineup with a fresh draw of up to 10 available pieces. The drawn
+set lands in the ordinary editable list (reorder, recolor, remove, add) and is
+merged into the picker catalog first so thumbnails and titles render even for
+pieces outside the loaded page. Drawing again gives a different set. The manual
+editors no longer dim, the preview no longer shows a separate "random sample",
+and every save writes `selection_mode*` as `manual`.
+
+The server-side random resolution and the mode columns were left in place and
+still honour a stored random value, so nothing breaks half-migrated; nothing in
+the UI sets one, so a legacy stored mode converts to `manual` on the next save.
+If a live rotating source is ever wanted again, it must not also be editable.
+
+Verification: `npx tsc --noEmit`, lint, 710/710 tests, and the 445-page
+`npm run build` passed. Signed-in browser QA on the (empty) Slideshow 3:
+**Non-jewelry items** drew 10 rows into the editable list with the notice
+"Slideshow 3 filled with 10 random non-jewelry items", the tab count went
+0 → 10, the drawn pieces were correctly non-jewelry (silver tazza, teaspoons,
+decanter label, carving knife), Move down reordered row 1 with row 2, Remove
+took the list to 9, and the live preview followed at 9 images. Nothing was
+saved — the draw was left unsaved so no database write occurred.
+
+## 2026-08-04 - Added a third hero slideshow
+
+The hero now hands over between THREE slideshows instead of two: A exits while
+B descends, B holds, B exits while C descends, C holds, then the frame
+releases. Every pane exits upward and every arriving pane descends from above,
+so both crossings look identical. C spins right-to-left like A (only B is
+reversed), giving an A→B→C alternation of ring direction.
+
+The runway grew from 170svh to 290svh to carry two crossings and two holds,
+and the single `CROSSING_END` constant was replaced by three phase boundaries
+(`PHASE_1_END` 0.31, `PHASE_2_START` 0.5, `PHASE_2_END` 0.81) driving two
+independent crossing clocks. B is the only pane that both arrives and departs,
+so its transform carries both terms and its feather takes whichever crossing
+is currently moving it (`max(1 - t1, t2)`); a pane is inert whenever it is
+offscreen, which for B means before it arrives and again after it leaves.
+
+C follows the second slideshow's pattern end to end: its own curated lineup in
+a new twin table `carousel_selection_third`, its own item-source mode in
+`carousel_settings.selection_mode_third`, its own Slideshow 3 tab in Admin
+Settings, and the same mirror-Slideshow-1 fallback when its lineup is empty or
+its table unmigrated. Both live in one new migration,
+`next-app/carousel/sql/add-third-lineup.sql` — **must be run manually in
+Supabase**. `saveSettings` now reports `thirdModePersisted` separately so a
+half-migrated database names the right SQL file, and the per-lineup save
+warnings were folded into one list. The cached payload key moved to v4 and
+carries `thirdItems`; the admin panel's labels are derived from the lineup list
+rather than hardcoded pairs, and its button now reads **Save All Slideshows**.
+
+C mounts later than B — B still arms on first scroll intent or idle, while C
+waits until scroll progress passes 12% — so a visitor who never scrolls past
+the first hold never pays for it, and server HTML still carries exactly one
+carousel.
+
+Verification: `npx tsc --noEmit`, lint, 710/710 tests, and the 445-page
+`npm run build` passed. Browser-walked the whole runway: at rest A fills with B
+and C parked above and inert and C unmounted; mid A→B both live and C mounted;
+B locked with A inert; hold B unchanged; mid B→C with B and C both live and A
+inert; C locked with A and B inert; hold C unchanged. Computed
+`animation-direction` confirmed A normal, B reverse, C normal.
+
+## 2026-08-04 - Matched pane speeds; random lineups split three ways
+
+Reverted the hero's speed differential: `PANE_A_TRAVEL` is back to 100, so both
+panes travel exactly one frame height and move at matching speeds. The constant
+stays as the single depth control (above 100 A outruns B) with its rationale in
+place, since it has now been trialled in both directions.
+
+The carousel's random-population choices changed from two metal-only options to
+three: **Random gold jewelry**, **Random silver jewelry**, and **Random
+non-jewelry items**. Non-jewelry spans both metals deliberately — it is the
+catalog's "everything else" (coins, bullion, silverware, other), which is not a
+metal-first choice. Stored values are now `random_gold_jewelry`,
+`random_silver_jewelry`, `random_non_jewelry`; the superseded `random_gold` /
+`random_silver` map forward to their `_jewelry` equivalents so a setting saved
+earlier keeps drawing randomly instead of silently reverting to its curated
+lineup.
+
+The jewelry/non-jewelry split reuses the shop's existing Jewelry & Watches
+rule rather than inventing a second one. Because that split is inferred in
+application code from type/tags (not a column), the draw pushes only the metal
+constraint to the database and applies the jewelry test in code; the random
+query requests the extra inference columns while the curated query keeps its
+lean projection. `isProductJewelryItem` and `PRODUCT_WEARABLE_JEWELRY_TYPES`
+now live beside `inferProductJewelryType` in `types/product.ts` as the
+canonical set, `SHOP_JEWELRY_ITEM_TYPE_KEYS` was exported, and a new test
+asserts the two lists stay in step so shop and carousel cannot drift apart.
+
+Verification: `npx tsc --noEmit`, lint, **710/710** tests (7 new covering mode
+normalization, legacy forward-mapping, scope resolution, the shop/carousel
+drift guard, and jewelry classification), and the 445-page `npm run build`
+passed.
+
+Two things were NOT verified in the browser this round and are listed in
+`TASKS.md`: the hero's matched-speed motion (the Browser pane was hidden, so
+`document.hidden` suspended `requestAnimationFrame` and the rAF-throttled
+scroll handler could not run), and the admin panel's three radio options (the
+signed-in admin session had expired and signing in is the owner's to do).
+
+## 2026-08-04 - Reverted slideshow B to descending; kept the parallax depth
+
+The rise-from-below trial was reverted at the owner's request: B again waits
+above the pinned frame and descends into place, opposite A's upward exit. The
+speed differential added during the trial was deliberately KEPT — A still
+travels 135% of a frame height to B's fixed 100%, so the departing layer
+reads as nearer the viewer.
+
+Because both panes move upward relative to their own boxes, each one's BOTTOM
+edge is the boundary sweeping through open frame in this configuration, so
+B's feather moved from its top edge back to its bottom and A's stayed on its
+bottom. Both still reach zero where the edge is offscreen or flush, keeping
+the resting and locked heroes full-bleed.
+
+Verification: `npx tsc --noEmit`, lint, 703/703 tests, and the 445-page
+`npm run build` passed. Browser-measured: B parks at -99.9% (above the frame)
+and descends to 0 by the end of the crossing while A runs to -134.9%, holding
+the 1.35 ratio; at rest A is unmasked and covers the frame with B above and
+inert; at hold B is unmasked and covers it with A gone and inert; scrolling
+back restores the resting state exactly.
+
+## 2026-08-04 - Hero slideshow B now rises from below, slower than A
+
+Owner trial, then kept: slideshow B enters from BELOW the pinned frame and
+rises into place instead of descending from above. Reversing it alone made the
+two panes tile edge to edge and travel at the same rate, which read as one
+rigid filmstrip rather than parallax — so at the owner's direction A now
+travels further over the same scroll (`PANE_A_TRAVEL`, 135% of a frame height
+vs B's fixed 100%). B's travel cannot change: it must be fully offscreen at
+rest and exactly flush when locked. The faster departing layer reads as nearer
+the viewer.
+
+That differential opens a band between A's trailing edge and B's leading edge,
+so both boundaries are now feathered by a shared `setEdgeFeather` helper, each
+reaching zero where its edge is offscreen or flush — A unmasked at rest (a
+feather there would fade the resting hero's bottom edge), B unmasked once
+locked. The frame continues to paint A's live swept background, so the band
+reads as backdrop the pieces have flown off rather than a hole.
+
+Verification: `npx tsc --noEmit`, lint, 703/703 tests, and the 445-page
+`npm run build` passed. Browser-measured across the runway: A/B travel ratio
+held at exactly 1.35 (at p=0.3, A moved 67.5% of a frame height to B's 50%),
+the visible band peaked near 25% mid-crossing and closed to zero at lock, and
+both endpoints were confirmed full-bleed — at rest A unmasked and covering the
+frame with B parked below and inert, at hold B unmasked and covering with A
+gone and inert, and scrolling back restored the resting state exactly.
+
+Note on an earlier verification gap: while the Browser pane was hidden,
+`document.hidden` was true and the browser suspended `requestAnimationFrame`,
+so the rAF-throttled scroll handler could not run and DOM probes read frozen
+transforms. That was a measurement artifact, not a defect; all motion figures
+above were taken with the pane compositing.
+
+## 2026-08-04 - Dropped the Payment card; items moved atop the order summary
+
+The *Payment* card was removed: PayPal is the only method, so a card whose
+only job was to announce that was noise — the buyer chooses PayPal-vs-card
+inside PayPal's own buttons. Its privacy notice moved to the foot of the
+Shipping card (the form it actually describes), and with one card left in the
+column the Step 1 / Step 2 eyebrows were dropped too.
+
+Items moved from a separate card at the bottom of the rail into the top of
+the **Order summary** card, above the totals — the near-universal checkout
+order (Shopify, Stripe Checkout): confirm what you're buying, then what it
+costs, then pay. **Edit cart** moved up beside the summary heading.
+`OrderSummary` gained `heading={null}` to render item rows with no heading of
+their own inside a card that already has a title.
+
+Fixed a latent sticky bug found while measuring the merged rail: the summary
+was 1004px against a 900px viewport, and a sticky box taller than the viewport
+pins its top and leaves its bottom — the pay button — permanently unreachable.
+The rail also never actually stuck, because `align-items: start` made it
+content-sized and gave sticky zero travel. Now the grid stretches, the sticky
+element is the card inside the rail rather than the rail itself, and the card
+is capped at `calc(100svh - 7rem)` with internal scroll.
+
+Verification: `npx tsc --noEmit`, lint, 703/703 tests, and the 445-page
+`npm run build` passed. Browser-verified in both locales at 1440x900 and
+375px: one left card (Shipping / Envío), no Step or Paso eyebrows, privacy
+notice retained, summary children in the order head → items → totals → terms →
+confirm → pay, sticky computed at top 88px with 205px of travel and no
+overflow-clipping ancestor, card fits the viewport and scrolls internally with
+the pay area reachable, and on mobile the card falls back to static with no
+height cap and no horizontal overflow.
+
+## 2026-08-04 - Delivery method moved above the address; Notes box removed
+
+Two owner refinements to the new checkout. The **Notes (optional)** textarea
+was removed from the Payment card; `customer.notes` stays in state and in the
+PayPal payload as an empty string, so the server contract and order records
+are unchanged and only the input is gone.
+
+The **Delivery method** radio group moved to the very top of the Shipping
+card, above contact details and the address, because it decides whether a
+shipping address is required at all — a Local Pickup buyer was previously
+filling in an address before reaching the control that made it unnecessary.
+Local Pickup's description now says "No shipping address needed," the address
+hint's pointer flipped from "below" to "above," and a **Contact details**
+subhead was added so the card reads Delivery → Contact → Address.
+
+Verification: `npx tsc --noEmit`, lint, 703/703 tests, and the 445-page
+`npm run build` passed. Browser-verified in both locales: subheads render in
+the order Delivery method → Contact details, the delivery block sits above the
+address block by measured offset, selecting Local Pickup collapses the address
+into the optional accordion and drops shipping to $0.00 while Full Name /
+Phone / Email remain the only required fields, and no textarea remains on the
+page.
+
+## 2026-08-04 - Checkout rebuilt as a single-page two-column layout
+
+Owner supplied a mainstream retail checkout as the model. The four-step
+wizard (Summary → Delivery → Contact → Review & Pay, plus its step-chip
+indicator) was replaced by one page with everything visible: a left column
+holding **Shipping** (contact fields, address, delivery radio cards with live
+tier fees) and **Payment** (PayPal method card, notes, privacy notice), and a
+right rail — sticky from 1024px — holding **Order summary** (totals, policy
+links, confirmation checkbox, PayPal buttons under the total) and **Items**
+with an **Edit cart** control. Columns stack below 1024px with the summary
+last. The header link changed from *Back to shop* to **Back to cart** and
+reopens the cart drawer over the page instead of navigating away and
+discarding entered details; *Edit cart* opens the same drawer.
+
+`OrderSummary.tsx` gained an exported `computeOrderTotals` plus an
+`OrderTotals` card so the totals rail and the item list derive money from one
+place; `OrderSummary` itself now takes `showTotals` / `heading` /
+`headingAction` / `bare` so it can render as the items panel inside another
+card. Row order in the new card reads Subtotal → Shipping → Shipping Cost →
+FL Sales Tax → **Total due**. Nothing beneath the presentation layer changed:
+payReady gating, the confirmation checkbox as a hard gate, missing-field
+messaging, effective-shipping-method derivation, order-id reuse, capture
+recovery, and the printable confirmation screen are all as before.
+
+Verification: `npx tsc --noEmit`, lint, 703/703 tests, and the 445-page
+`npm run build` passed. The icon-integrity guard correctly rejected a
+`local_shipping` AppIcon name that is not mapped (switched to the mapped
+`inventory_2`) — the guard did its job. Browser-verified in both locales: the
+two-column layout renders, Back to cart and Edit cart open the drawer without
+losing form state, the pay gate showed "Complete the required details" until
+address + checkbox were satisfied and then enabled the PayPal buttons, FL tax
+computed on merchandise + shipping ($502.74 on $8,379 = 6%), total due
+reconciled to $8,881.74, and at 375px the columns stack with no horizontal
+overflow. No payment was submitted.
+
+## 2026-08-04 - Cart drawer totals show an explicit Shipping row
+
+The cart drawer's totals block now lists **Shipping — Calculated at checkout**
+between Subtotal and FL Sales Tax (`Envío — Calculado al finalizar la compra`
+in Spanish), and the small disclaimer that sat under Est. Total ("Spot prices
+may vary. Tax is an estimate; shipping is calculated at checkout.") was
+removed — the new row states the shipping half directly. The conditional
+`*` price-confirmation note was deliberately kept, since deleting it would
+orphan the asterisk that `hasUnknown` still renders on the subtotal.
+
+Verification: `npx tsc --noEmit`, lint, 703/703 tests, and the 445-page
+`npm run build` passed. Browser-verified in both locales with a 4-item cart:
+row order reads Subtotal → Shipping → FL Sales Tax → Est. Total, the old note
+is absent, and at a 320px viewport the longer Spanish value stays on one line
+with no horizontal overflow.
+
+## 2026-08-04 - Random gold/silver lineup modes for both hero slideshows
+
+Each slideshow's admin control gained a three-way item source: **Manual
+lineup / Random gold items / Random silver items**, persisted as
+`carousel_settings.selection_mode` / `selection_mode_alt`
+(`next-app/carousel/sql/add-random-lineup-modes.sql` — **must be run manually
+in Supabase**; unknown/missing values fail closed to manual). In a random
+mode the cached home payload (key bumped to v3) draws up to 10 random
+available products of that `products.category` ('Gold' | 'Silver') from a
+bounded 200-candidate pool per rebuild — so the lineup refreshes itself every
+~5 minutes and on every admin save, sold items dropping out automatically.
+Curated selection tables are untouched by random modes; switching back to
+Manual restores the saved lineup exactly. Random items carry no per-photo
+color curation and inherit the white arc.
+
+Panel behavior: the radio sits under the lineup tabs; in a random mode the
+product picker and order list dim and become inert (visible-count inputs stay
+active), and the live preview shows a locally shuffled sample labeled
+"(random sample)". `saveSettings` now reports whether the mode columns
+persisted so a pre-migration save warns "Random mode was NOT saved: run
+carousel/sql/add-random-lineup-modes.sql" instead of silently dropping the
+toggle.
+
+Also confirmed in passing: the owner ran add-second-lineup.sql —
+`carousel_selection_alt` holds a live 10-item Slideshow 2 lineup, and the
+homepage scroll reveal renders it distinctly from Slideshow 1.
+
+Verification: `npx tsc --noEmit`, lint (after satisfying the React Compiler
+rules: `showNotice` hoisted into a `useCallback` above its first effect
+reference), 703/703 tests (payload fixtures extended with modes), and the
+445-page `npm run build` passed. Browser-verified signed-in: radios load from
+settings (Manual pre-migration), Random silver on Slideshow 2 and Random gold
+on Slideshow 1 each rendered a 10-item sample preview with the manual editors
+dimmed at 0.45/pointer-events none while count inputs stayed active, and
+switching back restored the curated state without saving. No database writes
+were made during QA.
+
+## 2026-08-04 - Second slideshow's ring now spins the opposite way
+
+Owner asked for the second slideshow's photos to flow left-to-right across the
+front (the default ring flows right-to-left). `Carousel` gained a `reverse`
+prop: it sets `animation-direction: reverse` on the ring, mirrors the angle
+the per-frame sample derives from the animation clock (the clock still counts
+forward while the applied rotation is negated), and flips the hidden-back
+crossing test (angles shrink on a reversed ring), so the front-card theme,
+backface hit-testing, background sweep, and infinite-window photo cycling all
+stay correct. `HomeHero` passes it through as `reverseSpin`, set only on the
+stack's pane B. An earlier misread that briefly reversed pane B's VERTICAL
+travel (rise-from-below) was fully reverted; B still descends from above.
+
+Verification: `npx tsc --noEmit`, lint, 703/703 tests, and the 445-page
+`npm run build` passed. Browser-verified: computed ring rotation deltas show
+pane A advancing + and pane B advancing − simultaneously; both rings cycled 3
+photo swaps in 12s (windowing intact in both directions); sweep/theme correct
+at the hold; pane B's descend-from-above travel and feather restored.
+
+## 2026-08-03 - Second hero slideshow got its own lineup + admin control
+
+The scroll-revealed second slideshow can now show a different set of pieces.
+New twin table `public.carousel_selection_alt`
+(`next-app/carousel/sql/add-second-lineup.sql` — **must be run manually in
+Supabase**) mirrors `carousel_selection` exactly; a twin table rather than a
+slot column so the live table's `product_id` primary key is untouched and one
+product may appear in both lineups. `carouselData.ts` reads/writes take a
+`lineup` ('primary' | 'alt') parameter; alt reads return [] while the table is
+unmigrated. The cached home payload (key bumped to v2, same `home-carousel`
+tag) fetches both lineups; an empty alt lineup makes slideshow B mirror
+slideshow A, which is also the fallback and pre-migration behavior.
+
+Admin Settings' Store Carousel Hero panel gained Slideshow 1 / Slideshow 2
+tabs over the shared product picker; each lineup keeps independent selection,
+order, and White/Black grouping, and one **Save Both Slideshows** action
+writes both plus settings. If the alt table is missing, the save reports
+"Slideshow 1 and settings saved" plus exactly which SQL file to run.
+
+Perf: slideshow B is no longer mounted with the page. It arms on first scroll
+intent (scroll/wheel/touch) or `requestIdleCallback` (2.5s timeout),
+whichever comes first — server HTML carries exactly one carousel, and initial
+load fetches only lineup A's images. Reduced motion never arms it. Combined
+with the ring's existing IntersectionObserver pause, at most one carousel
+animates except during the visible crossing itself.
+
+Verification: `npx tsc --noEmit`, `npm run lint` (clean), 703/703 tests
+(payload test extended for `altItems`), and the 445-page `npm run build`
+passed. Browser-verified: SSR HTML contains one carousel and an empty pane B;
+B arms and crosses with its own ring; signed-in Admin Settings shows working
+tabs with lineup isolation (edits to Slideshow 2 left Slideshow 1's 13 rows
+untouched; test edits reverted unsaved, no database write).
+
+## 2026-08-03 - Softened the descending slideshow's leading edge
+
+The second slideshow's bottom boundary cut a hard line (plus the section's
+own `border-b`) across the pinned frame during the crossing. Two changes: the
+hero's bottom separator moved off the slideshow sections onto
+`.home-hero-stack-frame`, so no border line ever sweeps through mid-frame, and
+pane B now gets a scroll-driven `mask-image` feather on its leading edge —
+`(1 − t) × 9rem` tall, so the blend is widest at entry and shrinks to nothing
+as B locks in, restoring the full-bleed hero for the hold and release. The
+mask is removed under reduced motion and at rest. Pane A needs no feather: the
+frame background mirrors A's swept background each scroll frame, so A's edge
+meets an identical color.
+
+Verification: `npx tsc --noEmit`, `npm run lint`, 702/702 tests, and the
+445-page `npm run build` passed after clearing a corrupt generated
+`.next/dev/types/validator.ts` (dev-server cache artifact, disposable).
+Browser-verified: soft blend at t≈0.45 where the owner's annotation showed the
+hard edge, and mask cleared (full bleed) at the hold.
+
+## 2026-08-03 - Hero text/form now stay pinned; only the slideshows parallax
+
+Refined the hero stack per owner direction: the headline, "Get first look"
+sign-up, CTA buttons, and legibility halo no longer ride pane A out of the
+frame. `HomeHero` was reduced to the slideshow pane only (carousel + swept
+background + spinner, reporting its centered photo's light/dark arc through a
+new `onThemeChange` callback; the `decorative` prop is gone), and the overlay
+content moved to a new `HomeHeroOverlay`
+(`next-app/src/components/home/HomeHeroOverlay.tsx`). `HomeHeroStack` now
+composes two slideshow panes plus one pinned overlay layer (z-index 3,
+pointer-events pass-through) that stays exactly in place while the slideshows
+cross beneath it, and scrolls away with the frame at release. The overlay's
+text theme follows the dominant slideshow (pane A before the crossing
+midpoint, pane B after). Reduced motion now collapses the runway to the frame
+height (no travel, pane B hidden) instead of unsticking the frame.
+
+Verification: `npx tsc --noEmit`, `npm run lint`, 702/702 tests, and the
+445-page `npm run build` passed. Browser-verified on desktop and 375px mobile:
+headline stayed at viewport y=64 through mid-crossing (panes at ±50%) and hold
+(A −100% inert / B locked), text+slideshow released together (frame and
+headline both at −363px past the runway), and scroll-back restored the initial
+state.
+
+## 2026-08-03 - Homepage hero became a scroll-pinned two-slideshow parallax stack
+
+The homepage hero now renders through `HomeHeroStack`
+(`next-app/src/components/home/HomeHeroStack.tsx`): a scroll runway
+(hero height + 170svh) whose sticky, overflow-hidden frame pins the hero below
+the header. Scroll progress drives a two-layer parallax — pane A (the existing
+live hero with headline, sign-up, and CTAs) slides up and away while pane B, an
+identical decorative copy of the slideshow (new `decorative` prop on `HomeHero`
+renders carousel/sweep/halo only), descends from above in the opposite
+direction. B locks into the frame at 60% of the runway, holds through the
+remainder, then the sticky frame releases and the slideshow scrolls away
+normally with the page. Transforms are written imperatively per rAF-throttled
+scroll event; a pane is `inert` only while fully offscreen, so the page keeps
+one interactive hero, one h1, and one subscribe form. The frame paints hero A's
+current swept background so the uncovered wedge below the crossing panes reads
+as canvas. `prefers-reduced-motion` collapses the stack to the original single
+static hero via CSS only.
+
+Verification: `npx tsc --noEmit`, `npm run lint`, 702/702 tests, and the
+445-page `npm run build` passed. Browser-verified on desktop and 375px mobile:
+initial state, mid-crossing (A −50%/B −50%), hold (A −100%/B 0%, A inert),
+sticky release into the services strip, and scroll-back restoration.
+
+## 2026-08-03 - Made Latest Posts channel sections collapsible
+
+The Instagram and Facebook headers inside the **Latest Posts** modal are now
+independent, full-width disclosure controls. Both channels open expanded by
+default; clicking either header collapses its complete post grid or empty state
+down to one compact row with the current item count and a directional chevron.
+The controls expose `aria-expanded` and `aria-controls`, and their state remains
+intact while the owner temporarily enters a comment or removal confirmation.
+
+Verification: the focused Social Queues test passed 8/8; the full suite passed
+702/702; `npx tsc --noEmit`, `npm run lint`, and the 445-page `npm run build`
+passed. The production preview was restarted on port 3002. No provider mutation
+or database change was involved.
+
+## 2026-08-03 - Added Latest Posts management to Social Queues
+
+Added a **Latest Posts** button and wide admin modal backed by the 12 newest
+rows still marked published in each channel. The bounded server query reuses
+the queue page's minimal product-summary lookup. Each post offers its live link,
+local manager, and conservative remote status refresh.
+
+Added admin-only, 1,000-character-bounded owner comment routes for Instagram
+and Facebook. They reuse the same authenticated comment clients already used
+for SOLD markers, record only audit outcomes, and never persist comment text.
+Facebook posts can be permanently removed through the existing delete path
+after an explicit destructive confirmation. Instagram instead exposes **Open
+to remove**, truthfully requiring removal in Instagram followed by Refresh
+status. No database migration or new environment value is required.
+
+Verification: focused Social Queues/background tests passed 13/13; the full
+suite passed 702/702; `npx tsc --noEmit`, `npm run lint`, and the 445-page
+`npm run build` passed. The production preview was restarted on port 3002.
+Signed-in visual interaction remains a manual smoke item because browser
+automation's localhost URL policy blocked the final reload; no comment, delete,
+refresh, or external post action was submitted during QA.
+
+## 2026-08-03 - Added selected-row bulk publishing to Social Queues
+
+Added independent row selection to the Instagram and Facebook queue sections.
+Only connected, fully prepared rows are selectable; each section offers
+**Select all ready** and one **Post selected now** confirmation that lists the
+chosen products and repeats the channel's publishing warning.
+
+The route-persistent background provider now accepts a same-channel batch and
+posts it sequentially in visible queue order through the existing receipt-safe
+single-post API. Only one individual post or batch runs per tab. Progress shows
+the current and completed counts; the first failure stops the sequence, and
+retry resumes at the failed item rather than intentionally reposting completed
+entries. No new database schema, environment value, or production SQL step is
+required.
+
+Verification: focused queue/background-publish tests passed 11/11; the full
+suite passed 700/700; `npx tsc --noEmit`, `npm run lint`, and the 443-page
+`npm run build` passed. Signed-in browser QA loaded both current empty-channel
+states with no runtime console errors. Because neither queue contained a row,
+QA did not create a reservation or public post merely to exercise selection.
+
+## 2026-08-03 - Removed the social queue daily limit
+
+Removed the owner-configured daily post limit from the Instagram and Facebook
+queue pipeline. Connection reads, settings/status APIs, admin settings, queue
+dashboard, database bootstrap schemas, and scheduled workers no longer expose
+or enforce `daily_post_limit`. Existing production columns may remain safely as
+unused data; no production SQL migration is required.
+
+Each scheduled worker invocation is still bounded to 25 due rows to protect a
+single runtime, and later invocations continue any remainder. This is not a
+daily quota. Instagram continues to honor Meta's provider-enforced rolling
+publishing limit when the provider reports it; Facebook has no corresponding
+local or queryable daily cap.
+
+Verification: targeted social queue/background-publish tests (10/10), full test
+suite (697/697), `npx tsc --noEmit`, `npm run lint`, and a 443-page
+`npm run build` all passed. Signed-in browser QA confirmed that Social Queues
+and Admin Settings no longer display the removed daily-limit controls.
+
+## 2026-08-03 - Retired stale planning and handoff documentation
+
+Completed the owner-approved deletion pass after a read-only documentation
+audit. Removed 41 superseded Markdown files: both 19-file Etsy/eBay planning
+folders, the obsolete carousel implementation handoff, the completed legacy
+removal report, and the kickoff meeting snapshot. The three empty plan/meeting
+directories were removed afterward. Historical references remain in older
+changelog entries as chronology, not live links or instructions.
+
+Before deletion, current provider configuration, recovery sequencing,
+compliance boundaries, state behavior, and remaining verification limits were
+consolidated into `features/etsy-sync.md` and `features/ebay-sync.md`. The
+Instagram 699-line plan/build log was replaced by a concise current posting
+contract and renamed `features/instagram-posting.md`. The 195-line shipping
+research plan was replaced by the current tier tables, marketplace IDs,
+operating rules, and deferred high-value option, then renamed
+`features/shipping-tiers.md`.
+`AGENTS.md`, the project index, overview, structure map, architecture, decisions,
+status, tasks, compliance audit, and Next app README were reconciled to the new
+documentation set. No application code, SQL, provider state, or secrets changed.
+
+## 2026-08-03 - Project memory reconciled for session close
+
+Completed a full `project-docs/` consistency audit after the social scheduling
+and responsive-queue work. `CURRENT_STATUS.md` was reduced from 1,012 lines of
+mixed session history to a 142-line deployment/system snapshot. `TASKS.md` was
+reduced from 1,000 lines to a 168-line actionable backlog plus a short recent-
+completion summary. Historical implementation detail remains in this changelog;
+operational provider IDs remain in their feature runbooks.
+
+Corrected stale current-state claims across overview, integrity, structure,
+architecture, clients, compliance, localization, online-shop, Instagram,
+Facebook, Etsy, eBay, and shipping-tier documents. The reconciled memory now
+records: `.com` migration and external registrations complete; the newer local
+batch still awaiting deploy/smoke; 696-test/443-page build baseline; Surette
+Systems as current service identity; applied social/card and marketplace
+shipping schema; all 14 marketplace tier objects provisioned; seven Eastern
+social slots; and the remaining owner/provider work in one current task list.
+
+No application or database state changed during this documentation pass. The
+same session's application verification remained green: 696/696 tests,
+TypeScript, lint, and the 443-page production build.
+
+## 2026-08-03 - Social queue buttons stay contained and scheduling gains noon, 2 PM, and 4 PM
+
+Reworked each Social Queues action cell into a two-column grid with a 160px
+minimum and fluid type, tracking, padding, gap, and edit-icon sizing. The grid
+can still grow to the established desktop width, but no longer collapses to a
+width smaller than its labels. Signed-in measurements at both 900px and 600px
+viewports confirmed **Edit post**, **Post now**, **Change time**, and **Remove**
+all keep their scroll widths within their own button boundaries.
+
+Expanded the one shared Eastern posting allowlist from four to seven choices:
+**noon, 2 PM, 4 PM, 6 PM, 8 PM, 10 PM, and midnight**. The default-next-slot
+calculation, fixed picker, owner copy, server validation, dashboard worker
+summary, and regression tests now consume that same ordered list. Both Netlify
+drip schedules expanded from `0 0-5,22-23 * * *` to `0 0-5,16-23 * * *`, the
+UTC-hour union covering all seven slots in EDT and EST. Workers still require
+`scheduled_for <= now()`, so extra daylight-saving coverage cannot publish a
+reservation early.
+
+Signed-in QA opened item 39's Instagram **Change time** modal and confirmed all
+seven choices with its existing 6 PM value selected, then cancelled without a
+write. No schedule, queue state, or public post changed. Verification: 696/696
+tests, `npx tsc --noEmit`, full lint, and the 443-page production build pass.
+
+## 2026-08-03 - Social setup clarifies that the generated card is slide 1
+
+Replaced the mirrored Instagram/Facebook setup note “You will review that actual
+card next,” which could imply that the generated card follows the product
+photos. Both panels now say Save & prepare uses the CARD-marked photo to create
+the final card **as slide 1**, and that the owner reviews that finished first
+slide before publishing.
+
+Signed-in Instagram verification on item 39 showed the corrected setup note;
+the existing prepared-review label independently read “first is the card.” The
+edit view was opened read-only and nothing was saved or re-prepared. `npx tsc
+--noEmit` and full lint pass.
+
+## 2026-08-02 - Social Post now becomes a navigable background task
+
+Added a gold **Post now** button directly beside **Edit post** on every ready,
+connected Instagram and Facebook queue row. The four row controls use a stable
+two-column layout so the two primary actions remain together while **Change
+time** and **Remove** form the second row. Unprepared or disconnected rows keep
+Post now visible but disabled with an explanatory tooltip.
+
+Post now opens a channel-specific Admin modal before any write. It names the
+product and channel, says the scheduled reservation will be bypassed and the
+post becomes public immediately, and repeats Instagram's no-edit/no-API-delete
+limitation where applicable. Confirmation now closes that dialog immediately
+and hands the existing admin sync contract to a single route-persistent provider
+mounted in the locale layout. The owner can navigate normally while the fetch
+and any bounded Instagram processing continuation remain active.
+
+A lower-right widget animates in from the confirmation with a warm gold orbital
+spinner. Its compact state names the channel and says it is working in the
+background; clicking expands product name, live provider message, and a
+Minimize action. Success swaps the spinner for a green check, expands as a small
+notification, refreshes the current route, and closes after five seconds. An
+error turns red and remains available with Dismiss and receipt-safe Try again.
+Only one publish runs at a time in a tab. Daily limits and other non-processing
+states stop immediately instead of being retried; only the explicit
+`publishing` state may continue, up to four bounded requests.
+
+The two midnight item 10 reservations had already left the queue by the later
+signed-in browser pass, so QA did not manufacture another queue entry or risk a
+duplicate post. Instead, the exact production widget markup/styles were rendered
+through a temporary local preview, visually verified at desktop size, and then
+the preview file and empty directory were removed. Dedicated tests cover
+processing→published continuation, no-retry daily-limit behavior, error
+surfacing, and route-persistent provider placement. Verification: 696/696 tests,
+`npx tsc --noEmit`, full lint, and the 443-page production build all pass.
+
+## 2026-08-02 - Social queues gain fixed evening scheduling and row controls
+
+Replaced the advisory twice-daily FIFO projection with an explicit scheduling
+pipeline. Instagram and Facebook can now be scheduled only for **6 PM, 8 PM,
+10 PM, or midnight Eastern**. A shared date-and-slot modal appears from each
+channel manager, the combined review's new **Schedule both posts** action, and
+the queue dashboard's **Change time** action. It defaults to the next valid
+slot, treats midnight as the end of the selected date, and never exposes a
+free-form minute picker.
+
+The queue endpoints independently validate that the requested instant is one of
+those four `America/New_York` slots, is still in the future, and is not more
+than twelve months away. New `scheduled_for` columns hold the intended posting
+time while `queued_at` remains the original approval audit time. Rescheduling
+preserves `queued_at`; removing a queue entry clears both timestamps but keeps
+the prepared caption and renditions. The Social Queues page now orders by the
+scheduled reservation, shows both timestamps and timing state, and gives every
+row **Edit post**, **Change time**, and confirmed **Remove** controls.
+
+Both Netlify drip functions now run on the hour across the UTC-hour union that
+covers all four Eastern slots in EDT and EST. Their store queries claim only
+rows with `scheduled_for <= now()`, ordered by scheduled time and then approval
+time. Extra daylight-saving coverage cannot publish early, and the existing
+rolling daily cap can delay but never advance a reservation.
+
+Added `supabase/social-scheduled-posting-2026-08.sql` plus the same schema
+contract in the canonical Instagram/Facebook SQL. The migration adds/indexes
+both columns, safely moves existing queued rows to future allowed evening slots
+instead of making them immediately due, and updates Instagram's atomic claim
+helper. The owner applied it on 2026-08-02. A signed-in dashboard refresh then
+loaded both channels successfully, reported both schedulers Ready, and showed
+the existing Instagram and Facebook item 10 rows scheduled for Aug 3 midnight
+EDT with their original Aug 2 9:23 PM EDT queue timestamps intact. The
+Instagram reschedule modal also read that value and exposed only the four fixed
+slots; it was cancelled without saving. Nothing was published or mutated.
+
+Signed-in browser verification confirmed the four-option picker, Eastern-Time
+copy, and midnight explanation without saving queue state or publishing.
+Verification: 692/692 tests pass with `npm test -- --maxWorkers=4`; `npx tsc
+--noEmit`, `npm run lint -- --no-cache`, and the 443-page `npm run build` all
+pass.
+
+## 2026-08-02 - Admin gains a unified Social Media Queues dashboard
+
+Added **Social Queues** as a first-class main Admin tab and built the dynamic
+`/admin/social-queues` route. The dashboard keeps the two channel queues
+separate and oldest-first while showing one owner-facing overview: connected
+account/Page, scheduler readiness, daily post cap, trailing-24-hour post usage,
+Eastern run times, next/last scheduled run, latest result, and the total across
+both channels.
+
+Every queue entry shows its channel position, product photo/title/inventory
+number/status, preparation readiness, exact Eastern queued time, elapsed wait,
+and an estimated publish window. The projection simulates the real twice-daily
+UTC schedules and rolling 24-hour cap, including already-published posts; copy
+labels it advisory because manual posts, failures, or setting changes can move
+the result. Each row links directly to its Instagram/Facebook manager and an
+outlined Refresh action reloads the server state in place. Queries select only
+the dashboard columns and cap each queue at 200 rows.
+
+Queue-row Manage links carry the allowlisted `returnTo=social-queues` origin.
+The shared marketplace manager then labels its outlined return action **Back to
+Social Queues**, targets the queue dashboard, highlights Social Queues in the
+Admin header, and preserves the origin across Instagram/Facebook (or other
+marketplace) tabs. Direct manager URLs without that exact origin retain **Back
+to Products**, so the existing product workflow does not change.
+
+While tracing the displayed schedule, found and fixed a pre-existing state
+contract mismatch: `queueProduct` writes `sync_state = pending`, but both
+scheduled drips selected only `review`, so a visibly queued prepared post could
+never drain. Both drips now accept `pending` and `review`, with a source guard
+and pure schedule-projection tests. The signed-in ultra-wide preview showed item
+10 in both local queues, the exact queued time, and correctly offset Instagram
+(10:20 AM ET) / Facebook (10:40 AM ET) projections. Refresh was exercised; no
+queue entry was changed and nothing was published.
+
+Verification: 689/689 tests pass with `npm test -- --maxWorkers=4`; the eBay
+sanitize test that timed out once under unrestricted worker contention also
+passed alone; `npx tsc --noEmit`, `npm run lint -- --no-cache`, and the 443-page
+`npm run build` all pass.
+
+## 2026-08-02 - Combined social review can queue both channels
+
+The shared Instagram/Facebook review modal is now titled **Publish or queue
+both channels** and places an outlined **Add both to posting queue** action
+beside the gold public-publish action. Queueing is allowed only when both final
+reviews exist and their opening sentences match. It calls each channel's
+existing queue contract without invoking either publish path, reports the two
+results independently, and changes each successful channel label to **In
+posting queue**. The public-post warning remains visually separate above the
+two grouped actions.
+
+The signed-in item 10 test uncovered an older Instagram-only queue regression:
+`sync_state = pending` made the preview ignore its stored prepared caption,
+replace the conversational opener with the fallback, mark the review stale,
+and hide the unqueue control. Prepared-caption selection is now based on the
+stored caption plus prepared renditions, not the transient queue state, and is
+shared with Facebook through `getPreparedSocialCaption`. The reviewed caption
+therefore stays byte-for-byte stable while queued.
+
+Unqueue had a companion state bug on both channels: it cleared `queued_at` but
+always left `sync_state = pending`, hiding normal Publish controls even when the
+caption and renditions were still fully prepared. It now restores `review` when
+those prepared assets exist and uses `pending` only for an actually unprepared
+post.
+
+Item 10 was added to both local posting queues through the new modal, both
+success states and the preserved Instagram review were verified, then both
+queue entries were removed. No post was published and the product's final queue
+state is unchanged. Verification: 682/682 tests, `npx tsc --noEmit`, full lint,
+and the 441-page production build all pass.
+
+## 2026-08-02 - Generated social cards add a centered availability eyebrow
+
+The shared Instagram/Facebook lead-card renderer now places a small,
+letter-spaced **NOW AVAILABLE** line in the card accent color directly above
+the item title. It is fixed presentation copy rather than another operator
+setting, so both channels receive the same hierarchy on every newly generated
+card while captions remain unchanged.
+
+Item 10's prepared Instagram upload was regenerated locally and its dark card
+was inspected in the signed-in full-size slide viewer. The label is centered,
+clears the two-line title, and does not disturb the photo, specifications, or
+price. No post was published. Verification: 679/679 tests,
+`npx tsc --noEmit`, full lint, and the 441-page production build all pass.
+
+## 2026-08-02 - Facebook publish receipt recovery prevents duplicate posts
+
+Investigated item 26 after Facebook showed the new post but the manager returned
+to its Publish review. The audit row proved Meta had consumed all six prepared
+photo ids and the retry logged "These photos were already posted." A read-only
+Page-feed check found exactly one post with the prepared caption, created at
+8:20:07 PM, while the local row still had no `fb_post_id`.
+
+The publish path now commits Meta's returned post id immediately, before its
+optional read-back/permalink enrichment. When a request was interrupted inside
+that remaining narrow window, a retry with checkpointed photos reads the recent
+Page feed and accepts only one exact caption match created after the photo
+checkpoint. Missing or multiple matches never change local state or create a
+second post. Meta's consumed-photo error gets the same recovery attempt and
+otherwise fails closed.
+
+Prepared captions now remain the source of truth in review, publishing, error,
+and published states. Failed UI actions reload the persisted row instead of
+leaving the pre-click Publish screen visible. A recoverable consumed-photo error
+shows its saved message and a dedicated **Recover published Facebook post**
+confirmation that explains no new post will be created.
+
+The signed-in manager used that exact recovery flow to repair item 26. It now
+shows Published, the live Facebook permalink, and the original 8:20:07 PM post
+time; the remote Page still has the one verified matching post. Verification:
+679/679 tests, `npx tsc --noEmit`, full lint, the 441-page production build, and
+the final signed-in browser reload all pass.
+
+## 2026-08-02 - Facebook app secret configured and Page reconnected
+
+Configured the server-only `FACEBOOK_APP_SECRET` in gitignored
+`next-app/.env.local` and in all five Netlify deploy contexts, then restarted
+the local Next development server. No credential value was logged or added to
+project memory.
+
+Using the signed-in Meta session, exchanged the short-lived User credential,
+derived the **Naples Estate Jewelry** Page token, and inspected it through Meta
+before connection. The metadata confirmed the expected Page id, PAGE token type,
+Naples Estate Jewelry Social app id, valid state, and data-access limit of
+2026-10-31. The signed-in local Settings flow then stored the token through the
+normal encrypted connection route and displayed **Connected to Naples Estate
+Jewelry** with **Token valid until 10/31/2026**. Recent activity recorded the
+successful connection. No Instagram or Facebook post was published during this
+configuration pass. The Netlify secret is ready for the next deployment; this
+session did not trigger a production deploy.
+
+## 2026-08-02 - Facebook connection now rejects short-lived Page tokens
+
+The Page token rotated earlier on 2026-08-02 passed the existing Page-profile
+and feed-read probes but Meta later rejected it with error 190: its session had
+expired roughly five hours before the attempted publish. The old validator only
+proved that a token worked at paste time, then unconditionally stored
+`token_expires_at = null` and told the operator that Page tokens do not expire.
+
+Facebook connection now calls Meta's server-only `/debug_token` endpoint before
+any candidate can replace the stored credential. The response must be valid,
+belong to the Naples Estate Jewelry Social app, and either report no finite
+expiration or have at least 30 days remaining. The earliest positive
+`expires_at` / `data_access_expires_at` value is persisted and shown in Settings;
+same-day/short-lived, expired, invalid, and wrong-app candidates fail without
+changing the connection. Same-Page protection now also remains active while the
+stored connection is in `needs_reauth`, rather than only while `connected`.
+Token error redaction covers both `access_token` and `input_token` query values.
+
+Admin Settings no longer claims all Page tokens are non-expiring. It explains
+that the Page token must be derived from a long-lived User token, reports a
+finite date when Meta supplies one, and otherwise says only that Meta reported
+no finite expiration. Connection/replacement is disabled until the existing
+encryption key and new server-only `FACEBOOK_APP_SECRET` are configured. The
+Meta app id defaults to the documented public Naples Estate Jewelry Social app
+id and may be overridden with `FACEBOOK_APP_ID`.
+
+At that point, the signed-in local Settings panel was browser-verified with the
+secret absent: it showed the explicit configuration warning and kept Connect
+disabled instead of accepting another uninspected token. Verification:
+676/676 tests, `npx tsc --noEmit`, `npm run lint -- --no-cache`, and the complete
+441-page production build all pass. That same-day configuration was completed
+later in the entry above: the app secret was added without documenting its
+value, local dev was restarted, and the Page was reconnected. No post was
+republished during that setup; the Instagram post from the failed two-channel
+attempt was already live.
+
+## 2026-08-02 - Card generation is now inseparable from social preparation
+
+### Follow-up: Tiffany hashtags always use #tiffanyandco
+
+The shared Instagram/Facebook hashtag builder now canonicalizes direct Tiffany
+brand variants - `Tiffany`, `Tiffany & Co.`, `#tiffanyco`, `tiffanyandco`, and
+the full company-name forms - to one deduplicated **`#tiffanyandco`** tag. This
+applies to product brands, product tags, and configured base hashtags, so neither
+channel can generate the shorter legacy spelling on its next Prepare. Existing
+prepared captions remain byte-for-byte review artifacts until explicitly
+re-prepared. Item 26's Instagram draft was therefore re-prepared through the
+normal owner action, then **Sync wording** refreshed its Facebook draft while
+preserving Facebook photos. The combined review now shows `#tiffanyandco` on
+both channels; nothing was published. Added Instagram normalization and
+Facebook final-caption regressions. Verified with
+`npx tsc --noEmit`, `npm run lint -- --no-cache`, `npm test -- --run` (668/668),
+and `npm run build` (441 pages), all passing.
+
+### Follow-up: social sync is split into wording, photos, or both
+
+Replaced the misleading ready-to-ready **Match wording** action with three
+explicit source-to-target controls in **Publish to both**: **Sync wording**,
+**Sync photos**, and **Sync wording & photos**. Wording-only re-prepares the
+destination with its existing lineup/crops/card choices; photo-only copies the
+source photo curation but deliberately reuses the destination's reviewed
+caption; combined sync copies both. Missing-channel Prepare still defaults to
+the full source setup and now says so. The signed-in Instagram modal was checked
+at desktop width: all three buttons render cleanly with an explicit
+`Copy from Instagram to Facebook` direction, and no sync or publish was run.
+Added separate route regressions for wording-only and photo-only preservation.
+Verified with `npx tsc --noEmit`, `npm run lint -- --no-cache`,
+`npm test -- --run` (666/666), and `npm run build` (441 pages), all passing.
+
+### Follow-up: cross-channel preparation now carries the photo setup
+
+The **Publish to both** flow previously copied the ready channel's reviewed
+caption but rebuilt the destination from its older independent photo settings.
+Preparing Instagram from Facebook, or Facebook from Instagram, now first copies
+the ordered lineup, exclusions, crops, card source, and card background, then
+generates the destination's own fresh renditions. The direct **Copy setup** API
+and combined preparation route now share one server-only implementation, so
+stale product-image filtering, live-target protection, platform upload
+invalidation, and sync logging cannot drift. Added pure curation sanitization
+coverage plus route tests for both directions and copy-before-prepare ordering.
+Verified with `npx tsc --noEmit`, `npm run lint -- --no-cache`,
+`npm test -- --run` (664/664), and `npm run build` (441 pages), all passing.
+
+### Follow-up: social-caption dashes now follow the spaced house style
+
+The shared Instagram/Facebook opener normalizer now converts unspaced em or en
+dashes such as `bracelet—and` to `bracelet — and`, with exactly one space on
+each side. This applies to AI output, deterministic fallback text, extracted
+prepared captions, and admin edits; compound-word hyphens remain unchanged.
+The AI instruction now requests the same punctuation style before normalization
+is needed. Added the exact em-dash regression plus en-dash coverage. Verified
+with `npx tsc --noEmit`, `npm run lint -- --no-cache`, `npm test -- --run`
+(658/658), and `npm run build` (441 pages), all passing.
+
+### Follow-up: fixed Photo 4's false white canvas and crop-preview mismatch
+
+Item 26's fourth social photo exposed two separate problems. Its tight bracelet
+crop reached one lower corner, so four-corner backdrop detection reported a
+75-point disagreement and incorrectly fell back to white; the dominant border
+median measured the actual uniform cream sweep as `#fbf8f2` with zero spread.
+Square framing and rendition generation now share that border-median detector,
+while genuinely mixed borders still fall back safely. The Instagram/Facebook
+crop modal now places the editable **Source crop** beside a live square
+**Prepared post preview**. Full frame explicitly explains that it adds matching
+canvas; **Fill square** immediately changes the preview to no added canvas
+before Apply. A signed-in local item-26 check verified both states without
+applying a crop, saving, or re-preparing. Added three regressions for tight-crop
+and mixed-border detection plus renderer canvas selection. Verified with
+`npx tsc --noEmit`, `npm run lint -- --no-cache`, `npm test -- --run` (657/657),
+and `npm run build` (441 pages), all passing.
+
+### Follow-up: social lineup framing now mirrors the prepared rendition
+
+Instagram and Facebook curation thumbnails now use the same post-crop framing
+calculation and sampled canvas color as `renderSquareJpeg`, so portrait and
+landscape photos visibly match their prepared square rendition before Save &
+prepare. A **Canvas** label identifies intentional contain padding and the
+existing **Crop** label identifies a stored or local crop. The incorrect
+hardcoded-white side preview was removed rather than retained as a competing
+representation. The crop dialog keeps the deliberate editable **Fill square**
+starting point. Normalized the remaining social workflow Cancel, confirmation,
+and destructive actions to the shared outline/danger button treatments. Added
+a renderer-parity image test. Verified with `npx tsc --noEmit`,
+`npm run lint -- --no-cache`, `npm test -- --run` (654/654), and `npm run build`
+(441 pages), all passing.
+
+### Follow-up: square framing is clear before social preparation
+
+Selected Instagram and Facebook curation photos now display a compact
+**Prepared square framing** preview that mirrors the renderer's
+contain-to-square composition, exposing letterboxing before the owner saves.
+The existing crop dialog gained **Fill square**: it starts a centered square
+crop but leaves all edges draggable and requires the normal Apply / Save &
+prepare path, so it never silently crops, saves, or replaces a prepared upload.
+Added four geometry regressions for landscape/portrait crops, contained canvas
+placement, and source alignment. A separate signed-in local Instagram check
+selected Photo 4, showed the preflight preview, opened Crop, and verified the
+editable Fill square affordance without saving or re-preparing anything.
+`npx tsc --noEmit`, lint, the full 653/653 test suite, and the 441-page
+production build pass.
+
+### Follow-up: Tiffany social openers use the complete house name
+
+The shared social opener path now tells the AI to use **Tiffany & Co.** and
+normalizes any `Tiffany`, `Tiffany and Co.`, or already-canonical variant to
+that complete form when the product identifies Tiffany. This applies to AI,
+fallback, and manually edited social opener text before either Instagram or
+Facebook preview is assembled. The sentence validator recognizes the period in
+`Co.` as an abbreviation rather than a second sentence. Added a regression
+case reproducing the shortened generated opener. Focused 11/11 social-opening
+tests, TypeScript, lint, the full 649/649 suite, and the 441-page production
+build pass.
+
+### Follow-up: preparation follows, rather than precedes, photo setup
+
+Moved the sole **Save & prepare** action (and the conditional outlined **Reset
+changes** control) out of the Photos heading and to the end of the full
+photo/card setup in both managers. This makes the visible order match the
+required owner flow: select/reorder/crop/choose the card first, then save and
+prepare the final upload. Removed the duplicate lower-page instruction so it
+cannot compete with the one completion action. A fresh signed-in local
+Instagram inspection confirmed the button appears after all photo and Card bg
+controls. `npx tsc --noEmit`, `npm run lint -- --no-cache`, the full suite
+(648/648), and the 441-page production build pass.
+
+### Follow-up: reset makes its scope explicit
+
+Replaced the setup-row's bare **Cancel** text with the shared outlined-button
+form **Reset changes**. It now restores every local setup input—not just the
+photo lineup—including crops, card source/background, AI direction, and caption
+opening, and is hidden until there is an actual unsaved edit to discard. Browser
+verification filled a temporary opener, clicked Reset changes, observed the
+original opener return, and confirmed the control disappeared; no draft was
+saved.
+
+Removed the independent **Generate card** preview/modal from both social
+managers. It looked like a completed workflow step even though it only rendered
+an ephemeral image and had not created a prepared upload. **Save & prepare**
+is now the only path that makes the real card, and that card appears first in
+the review step. Saved/unprepared, setup-edit, caption-edit, and review states
+now expose only their appropriate controls; review requires an explicit Edit
+caption or Edit photos & card choice before those inputs reappear.
+
+The shared workflow regression matrix now covers explicit setup and caption
+editing states as well as dirty/published states. Verification: local signed-in
+Instagram and Facebook checks showed a stale caption has no card/publish
+shortcut; an unprepared caption change returns to Step 1 with **Save &
+prepare**. No draft, prepare, or publish operation was performed. `npx tsc
+--noEmit`, `npm run lint -- --no-cache`, the full suite (648/648), and the
+441-page production build pass.
+
+## 2026-08-02 - Social preparation now follows a guided owner workflow
+
+Both Manage Instagram and Manage Facebook now guide the owner through
+**curate → Save & prepare → review → queue/publish**, rather than exposing
+separate internal save and preparation steps alongside downstream actions. The
+new shared pure `lib/social-workflow.ts` stage helper is covered by five
+regression cases. A changed lineup makes the current prepared upload stale and
+hides queue, Publish to both, publish, and discard; a caption-opening edit
+shows **Update prepared upload** for the same reason. The action that formerly
+only saved a lineup now saves it and immediately creates the final upload.
+
+Saving photo choices also keeps an in-progress caption draft intact rather than
+reloading older preview text over it. No database, API, environment, prepare,
+or publish operation was performed during verification.
+
+Verification: local signed-in browser inspection confirmed a complete
+Instagram review stage and a Facebook preparation stage where only **Prepare
+images & post** remained (no queue/publish/discard controls). `npx tsc
+--noEmit`, `npm run lint -- --no-cache`, the full test suite (645/645 at that
+time), and the
+complete 441-page production build pass.
+
+## 2026-08-02 - Prepared social slides can be reviewed in sequence
+
+Prepared upload thumbnails on both Instagram and Facebook now open one shared
+`PreparedSlideViewer` rather than a one-image-only modal. The full-size review
+has visible previous/next arrows, left/right keyboard navigation, an ordered
+slide count, and disabled end controls. It is strictly review-only: the
+verified product 26 prepared Instagram upload was not changed.
+
+The social image-toolbar **Remove** and action-row **Discard prepared upload**
+controls now use the established outlined-button form with lift/press feedback
+and a red destructive hover/focus treatment instead of bare text.
+
+Verification: browser check in the signed-in product-26 Instagram manager
+(slide 1 → slide 2), full suite 640/640, `npx tsc --noEmit`,
+`npm run lint -- --no-cache`, and the complete 441-page production build. No
+schema, environment, prepare, or publish change.
+
+## 2026-08-02 - Instagram captions use a stacked link-in-bio item block
+
+Replaced Instagram's single `Shop:` caption line with two adjacent lines:
+`Store link in bio` and `Item: NaplesEstateJewelry.com/p/{inventory#}`. The two
+lines have no blank line between them, while the caption keeps its established
+single blank line above the block and below it before the CTA. Products without
+an inventory number fall back to `Item: NaplesEstateJewelry.com`.
+
+Cross-channel preparation now adapts the reviewed caption's platform-specific
+link block as well as its hashtag footer. Facebook → Instagram inserts the new
+two-line block; Instagram → Facebook restores the clickable full `Shop:` URL.
+All other reviewed wording remains intact. Existing prepared captions remain
+immutable and need an explicit re-Prepare to receive the new format. No post was
+prepared or published during verification.
+
+Verification: focused social mapping tests 87/87, full suite 640/640,
+`npx tsc --noEmit`, `npm run lint -- --no-cache`, and the complete 441-page
+production build. No schema or environment change was required.
+
+## 2026-08-02 - Publish-to-both preparation keeps reviewed wording aligned
+
+Fixed the combined **Publish to both** modal so preparing the missing channel
+uses the already-ready channel's reviewed opening sentence. Previously the
+modal sent the target channel's own preview opener, which commonly restored the
+deterministic `Available now: {title}.` text and lost the AI/admin wording the
+owner had just reviewed on the source side. The behavior is symmetrical:
+Facebook can seed Instagram and Instagram can seed Facebook.
+
+The transfer was then extended to the complete reviewed caption, not just the
+opener: CTA, specs, price sentence, Spanish line, spacing, and all other wording
+are copied from the source. The destination mapper substitutes its
+platform-specific link block and final hashtag line. A dedicated admin-only
+`/api/admin/social/prepare-from-channel` route reads the source caption from its
+stored `review` row, so the browser never supplies trusted caption text. The
+Prepare button states which channel supplies the wording, and the preview
+remounts after a text change so it returns to the top.
+
+Live inspection then exposed an existing ready/ready mismatch on product 21:
+Facebook held the reviewed heritage opener while Instagram still held its older
+deterministic opener. The modal now detects this state, disables combined
+publishing, identifies the mismatch, and offers one explicit **Match … wording**
+button. The manager page that opened the modal is authoritative, so opening from
+Facebook matches Instagram to Facebook and opening from Instagram does the
+reverse. Verification did not click that button, so the owner's prepared drafts
+were not changed.
+
+Added five pure regression tests for ready-source selection, target fallback,
+bidirectional channel mapping, mismatch detection, and target-specific caption
+adaptation. Verification at the time: targeted social tests 85/85, full suite
+638/638, `npx tsc --noEmit`,
+`npm run lint -- --no-cache`, and the
+complete 441-page production build. No schema or environment change was
+required; no channel was prepared or published during verification.
+
+## 2026-08-02 - Facebook hashtags reduced to three
+
+Kept hashtags on Facebook, but changed the channel cap from 30 to three so Page
+posts retain useful discovery labels without looking like Instagram caption
+copies. The existing shared builder already orders the most relevant signals
+first—product type, jewelry type, brand, product tags, then configured base
+tags—and removes duplicates and internal taxonomy, so Facebook simply takes the
+first three. Instagram's independent hashtag behavior is unchanged.
+
+Added a Facebook mapping regression test proving both the exact relevance order
+and the three-tag ceiling. Verification: focused Facebook + Instagram mapping
+tests 80/80, full suite 633/633, `npx tsc --noEmit`,
+`npm run lint -- --no-cache`, and the complete 440-page production build. No
+schema or environment change was required.
+
+## 2026-08-02 - Optional AI opener direction + natural “This…” voice
+
+Reworked the shared Facebook/Instagram opener control into a two-stage flow.
+The first field is now blank **Optional AI direction** (400 characters) for
+tone/emphasis suggestions; the second field remains the actual editable opening
+sentence. Leaving direction blank and skipping Generate preserves the existing
+deterministic `Available now: {title}.` copy exactly. Generate becomes
+Regenerate after use, retains the direction for refinement, and never persists
+or publishes the guidance itself.
+
+Added a shared **Suggest AI direction** menu with six one-click options on both
+channels: warm/conversational, heritage/craftsmanship, history/character,
+holiday gifting, collector appeal, and styling/wearability. A selection only
+fills the existing session-only direction field, so the admin can refine it
+before generating and nothing new is persisted or posted.
+
+The provider prompt no longer forces the catalog title verbatim. It now prefers
+conversational “This…” wording and explicitly avoids mechanical “The {full
+title} is now available” constructions. Generated text may shorten the title
+naturally but must overlap a meaningful product term, so vague copy such as
+“This one is available now” is rejected. Existing safety rules remain: one
+sentence, 260 characters, no “our,” links, hashtags, inventory numbers, quotes,
+extra sentences, fabricated facts, or stale availability claims.
+
+After a live check showed that generation still changed too little, the prompt
+was strengthened to require a genuine conversational thought—an observation,
+feeling, question, invitation, or reason to pause—and explicitly reject a mere
+title rewrite followed by availability. Sentence structure is intentionally
+varied and provider temperature is now `0.78`. A signed-in Facebook smoke test
+with the warm/conversational direction produced: “If you've ever wanted a heavy
+14k yellow gold Cuban link bracelet that truly has presence on the wrist, this
+one is available now.” The shared suggestion control was also verified in the
+Instagram manager. Nothing was Prepared or published.
+
+Live signed-in browser verification covered both managers on product 21. Blank
+generation produced “This heavy 14K yellow gold Cuban link bracelet is
+available now”; steering toward Italian origin produced “This heavy Italian
+14k yellow gold Cuban link bracelet is available now” on both channels. Nothing
+was Prepared or published. Verification: 632/632 tests,
+`npx tsc --noEmit`, `npm run lint -- --no-cache`, and the complete 440-page
+production build. No schema or environment change was required.
+
+## 2026-08-02 - Safe Facebook token rotation + New Page Experience status fallback
+
+Added an in-place **Replace Page token** flow to Admin Settings. The current
+token remains active while the candidate is verified; a replacement must
+resolve to a Page, pass the Page-feed read probe, and match the already
+connected Page id exactly. A valid token for another managed Page is rejected
+without changing the connection. No token value is logged or documented.
+
+The owner generated the correct **Naples Estate Jewelry Co.** Page token with
+the required read/publish permissions and rotated it successfully in the local
+admin. The first real refresh exposed a Meta New Page Experience edge case:
+the stored API post id was prefixed with the Page id, while the public permalink
+used a different Page actor id. The stored form returned code 10 after the post
+had been manually deleted; the permalink-derived composite form returned the
+expected missing-object response. Refresh now tries that strictly numeric,
+Facebook-hosted permalink fallback and still requires both same-Page `/me` and
+a fresh Page-feed read before changing Published to Removed.
+
+Live signed-in verification on product 21 proved the full path: replacement
+accepted for Page `1236201566238924`, manual refresh changed the deleted post to
+Removed, and the prepared renditions/local remote metadata were cleared. Full
+verification: 629/629 tests, `npx tsc --noEmit`, and
+`npm run lint -- --no-cache`; `npm run build` completed all 440 static pages.
+No schema or environment change was required.
+
+## 2026-08-02 - Instagram + Facebook published-status reconciliation
+
+Published social state is no longer treated as permanent after an owner deletes
+a post directly on Meta. Both product managers now make one remote read when a
+locally Published panel opens and expose **Refresh Instagram/Facebook status**.
+Confirmed remote absence changes the local record to Removed, clears remote and
+queue metadata, and deletes the prepared rendition objects. Each channel also
+offers **Already removed on Instagram/Facebook** as an explicit local-only
+recovery path.
+
+The reconciliation is deliberately conservative. Meta's error 100/subcode 33
+can mean a missing object or a permission problem, so it is accepted as deletion
+only after a second `/me` probe proves the token is healthy and still belongs to
+the expected Page/account. Invalid tokens, missing permission, rate limits,
+network failures, and ambiguous errors preserve Published and return actionable
+feedback. New Facebook Page-token connections now prove
+`pages_read_engagement` with a one-item feed read before storing the token.
+
+Live signed-in browser verification on product 21 proved the Facebook button,
+the local-only recovery control, and fail-closed behavior. The stored token can
+publish but Meta returned code 10 for post read-back; the panel retained
+Published and now explains that the token needs `pages_read_engagement`. The
+Instagram manager loaded cleanly; product 21 is not published on that channel,
+so status controls correctly remained hidden. Verification: 627/627 tests (8
+new client classification tests), `npx tsc --noEmit`, `npm run lint -- --no-cache`,
+and the complete 440-page production build pass. No schema or environment
+change is required.
+
+Follow-up UX refinement: Refresh no longer routes a permission or network
+limitation through the panel-wide red action-error banner. Feedback stays under
+the button: “status is up to date” for an unchanged successful read, an
+immediate Removed badge for a confirmed deletion, or a quiet neutral note when
+Meta cannot check. Facebook's permission note includes a small **Update
+connection →** link. Live browser verification confirmed the current code-10
+response now renders in that contained treatment.
+
+## 2026-08-02 - Site-wide ultra-wide canvas expansion
+
+Audited every route/component max-width rather than widening only the Manage
+Instagram example. Added three opt-in canvas tiers in `globals.css`, active at
+2000px+: medium 1600px, standard 1800px, and wide 2200px, all bounded by the
+viewport minus 6rem so ultra-wide screens retain intentional outer gutters.
+`PageContainer` content/wide/full modes now select a tier automatically.
+
+Applied the tiers across 27 source files and 52 canvas instances: shared home,
+about and contact layouts; Shop and product detail; account dashboard/security;
+Admin buyers, subscribers, users, invoices, marketing, settings, messages,
+orders and order detail; all four marketplace manager pages (including Manage
+Instagram/Facebook); gold/silver/estate services, estate jewelry, sell + city
+pages, bullion, free evaluation, services, and the footer. Admin Products was
+already independently fluid from 2100px and retains that specialized table
+behavior.
+
+The expansion is deliberately selective. Legal/FAQ prose, authentication
+cards, checkout steps, confirmation/editor dialogs, and other focused task
+surfaces keep their existing readable widths. A new source-integrity test
+fails if a future 6xl/7xl or established 1200-1800px large canvas omits an
+ultra-wide tier, and also asserts that legal/auth surfaces stay narrow.
+
+Verification: 619/619 tests, `npx tsc --noEmit`, `npm run lint`, and the full
+438-page production build pass. The local browser tab remained on a cached
+connection-error page after the dev server restart, so representative visual
+spot-checks are recorded as a post-deploy/manual refresh step rather than
+claimed as complete.
+
+## 2026-08-02 - AI-assisted personable openers for both social channels
+
+Instagram and Facebook captions now begin with one short, personable sentence
+instead of separate `Available now!` and title paragraphs. Preview loads are
+deterministic (`Available now: {title}.`) and make no model call. Each panel has
+a shared editable **Opening sentence** control: **Generate AI opener** calls the
+already-configured provider on demand, then becomes **Regenerate AI opener**;
+typing directly in the field rewrites the full caption preview and character
+count immediately. Unsaved wording hides the publish controls and says Prepare
+is required. Prepare sends the exact draft back for server validation/storage,
+so reviewed and published copy cannot drift. Direct Prepare calls never invoke
+AI and use the safe fallback when no opening was supplied.
+
+The new shared `social-caption-opening.ts` boundary treats all model/browser
+text as untrusted: generated output requires the exact current title; deliberate
+admin edits may paraphrase it; both paths require one line/one sentence with a
+260-character hard cap and reject “our,” links, hashtags, inventory numbers,
+quotes, extra sentences, or stale availability claims. Invalid AI output or
+provider failure keeps the safe deterministic fallback with a preview warning. Only
+the opener is AI-written; specs, spot-linked price language, Spanish line,
+links, CTA, hashtags, image curation, and publication behavior remain
+deterministic. No schema, migration, model, or environment change is required.
+
+Existing prepared captions remain untouched by design. Product 28's staged
+Instagram/Facebook drafts must be explicitly re-prepared after deployment to
+adopt the new opener. Verification: 86 focused social tests, all 616 tests,
+`npx tsc --noEmit`, `npm run lint`, and the complete 438-page production build
+pass. Signed-in browser verification on product 21 proved the default state,
+live manual edit (`This heavy Italian bracelet is available now.`), immediate
+preview/count update, a real provider generation, and the Generate → Regenerate
+transition. Nothing was prepared or published during that check.
+
+## 2026-08-02 - Admin Products fills wide and ultra-wide table space
+
+Owner reported a blank white strip at the far right of the Admin Products
+inventory table on a wide desktop. Browser measurement at a 2209px viewport
+confirmed the scroll area was 2103px wide while the table stopped at its
+1960px 2XL minimum, leaving 143px unused after the action chevron.
+
+Added a wide-only rule in `components/admin/AdminShell.tsx`: from 2100px
+upward, the inline table becomes width-fluid, the Brand header/body/footer
+cells share a fluid 150-220px width target, and automatic table layout spreads
+the remaining surplus through the other flexible columns. The mobile
+full-screen table and every viewport below 2100px retain their existing fixed
+widths and horizontal scrolling.
+
+Measured browser results:
+- 2209px: table 2103px = scroll viewport 2103px, 0px trailing gap; Brand
+  187.42px (was 95px).
+- 2100px: table 2003px = scroll viewport 2003px, 0px trailing gap.
+- 1920px: unchanged 1960px table with horizontal scroll and 95px Brand.
+
+Visual inspection confirmed the right-side white strip is gone and the
+additional spacing remains balanced. Verification: 605/605 tests, lint, and
+the complete 438-page production build pass. The port-3002 preview was stopped
+for the build and restarted afterward.
+
+## 2026-08-02 - All 7 account password fields normalized to one shared toggle
+
+Owner asked to extend the sign-in toggle to the other password fields. The
+audit found the account area had **three different treatments** across seven
+inputs, not simply "some missing a toggle":
+
+| Page | Fields | Before |
+|---|---|---|
+| sign-in | 1 | eye toggle (added earlier today) |
+| sign-up | 2 | text **Show/Hide** button in a bordered segment (`.modern-password-*`) |
+| reset-password (update mode) | 2 | same text Show/Hide variant |
+| Change Password (AccountDashboard) | 2 | **no toggle at all** |
+
+The text-button variant also used its own padding (0.78rem) and font-size
+(0.95rem), so on the sign-up page the password inputs were visibly a
+different size from the email field directly above them.
+
+**New shared component** `components/account/PasswordInput.tsx` — renders the
+input + eye toggle over the existing `.password-field` utility, forwards all
+standard input props, and takes `isEs` and `confirm`. All seven fields now
+route through it; the per-page `.modern-password-*` CSS blocks were deleted
+from both auth pages, and the local `showPassword`/`showConfirmPassword`
+state disappeared with them (state now lives in the component).
+
+Details worth keeping:
+- `confirm` gives the second field a distinct label ("Show confirm password" /
+  "Mostrar confirmación") — two buttons both announcing "Show password" are
+  ambiguous when tabbing.
+- `useId()` fallback guarantees an input id, so `aria-controls` is never
+  dangling on the dashboard fields, which wrap their input in a `<label>` and
+  passed no id.
+- Admin token fields (Instagram/Facebook) deliberately keep plain
+  `type="password"` — those are pasted secrets, not user passwords.
+
+**New tests** (`password-input.test.ts`, 6): masked-by-default with
+`aria-pressed="false"` while the label still reads "Show", distinct confirm
+labels, both locales, id/`aria-controls` always paired, caller props
+forwarded, plus a **source guard** asserting no file outside the component
+(and the two allowed admin panels) declares `type="password"` — so the site
+cannot drift back to three treatments.
+
+Verified in-browser at desktop and 375px, EN + ES: sign-in and both sign-up
+fields toggle independently with correct labels and `aria-controls`, zero
+`.modern-password-field` nodes remain, and sign-up's password inputs now
+match the email field exactly (padding, font-size, height all equal).
+605/605 tests, tsc, lint, and the production build exit 0.
+
+**Not visually verified** (unreachable without credentials I will not enter):
+the two Change Password fields and the two reset-password *update-mode*
+fields — the latter needs a live recovery token. Both use the identical
+component and are covered by the tests and the build. Worth an owner
+eyeball after deploy.
+
+## 2026-08-02 - Show/hide password toggle on the account sign-in page
+
+Owner request. The sign-in password field
+(`src/app/[locale]/account/sign-in/page.tsx`) now has an eye toggle that
+switches the input between `password` and `text`.
+
+- **New shared CSS utility** `.password-field` / `.password-field__toggle` in
+  `globals.css`, placed beside `.form-field` / `.clearable-field` so the
+  sign-up, reset-password, and security pages can reuse it rather than
+  re-implementing. The input reserves a 2.9rem right pad so long passwords
+  never run under the button, and `::-ms-reveal` is suppressed (Edge would
+  otherwise render a second eye beside ours).
+- **New icon**: `visibility_off` → Lucide `EyeOff` registered in
+  `AppIcon.tsx` (`visibility` → `Eye` already existed). The icon-integrity
+  test enforces that every statically named icon is mapped, so this had to be
+  registered rather than inlined.
+- **Accessibility**: the button carries `aria-pressed` (state) plus
+  `aria-controls="password"`, and its `aria-label`/`title` flip between
+  Show/Hide — so the label never claims the password is visible when it is
+  not. Bilingual (Mostrar/Ocultar contraseña). Focus-visible ring, and the
+  pressed state stays gold without hover.
+
+Verified in-browser at desktop and 375px, both locales: toggle flips
+`type` password↔text and back, `aria-pressed` and both labels update, the
+button sits inside the field (4.8px inset), is vertically centred (0px
+offset), clears the text by 5.6px, presents a 36×36 tap target in a 44px
+field, and causes no horizontal overflow. 599/599 tests, tsc, lint, and the
+production build all exit 0.
+
+**Not applied elsewhere yet** — the sign-up, reset-password, and account
+security password fields still have no toggle. The utility is ready if the
+owner wants it there too.
+
+## 2026-08-02 (post-deploy) - Live redirect spot-check: 27 of 28 restored, one data mismatch found
+
+Swept every redirect class against production after the deploy.
+
+**Working (all verified 200 at the end of the chain):**
+- Retired pages, EN + ES — 6/6 at 308, single hop.
+- Legacy static-site `.html` URLs — 12/12 at 308 (`/index.html` → `/`, etc.).
+  These were 404ing before this deploy.
+- Drawer URLs (`/cart`, `/wishlist`, `/saved`, `/account/saved`) — 4/4 at 307,
+  correctly temporary rather than permanent.
+- Re-slugged products — 5 of 6 at 308 to a live product page.
+- ES twins of every class — all correct, `/es/index.html` → `/es` (not `/es/`).
+- Domain level: `.co`, `www.co`, naplesantiquesllc.com + www, and http→https
+  all 301 to `.com` with query strings preserved; the `.co/api/*` carve-out
+  still serves 200 (webhooks safe).
+- No regressions: home, shop, terms, privacy, about, contact, sell,
+  sell/[city], free-evaluation, checkout, /es routes, /p/21, sitemap, robots
+  all unchanged.
+
+**One defect found and resolved:** `/shop/new-listing-04` 308'd to
+`/shop/14k-gold-rope-chain-necklace`, which 404s in both locales. Owner
+confirmed that listing was **deleted** a few days earlier (the similarly
+named `14k-infinity-rope-chain-necklace-01`, Item #9, is a different piece).
+The rule was removed rather than re-pointed, so the URL now returns an honest
+404 like any other deleted listing, with the 404 page's Browse Shop / Go Home
+actions as the way forward. Regression test asserts the rule stays absent,
+and the "delete the line, never re-point it" rule is recorded in
+`DECISIONS.md`.
+
+**Deletion-related health check (all clear):** every one of the 115 live
+sitemap URLs returns 200, so no deleted listing is still being advertised to
+Google — the sitemap is generated from the database and drops removed
+products automatically. No sitemap resubmission or GSC action is required
+when listings are deleted.
+
+**One minor inefficiency noted (not fixed):** host-level redirects land on
+`/en/`-prefixed paths (`.co/shop` → `.com/en/shop` → `/shop`), because the
+edge proxy rewrites the path before the Netlify host rule captures `:splat`.
+It self-corrects in one extra hop and every canonical tag is right (`/shop`,
+never `/en/shop`), and the sitemap contains zero `/en/` URLs — so this costs
+one redirect hop, nothing more. Could be collapsed by handling the host
+redirect inside `proxy.ts`; deliberately deferred as an optimisation.
+
 ## 2026-08-02 - Thumbnail rail: clipped right border fixed + boundary-wrap stutter eliminated
 
 Owner reported two defects on product detail pages, both root-caused with
@@ -187,8 +3946,8 @@ in `TASKS.md`; highlights:
   were unforced and never fire under the Next runtime (the deployed
   `/auctions` 404'd instead of 301ing) — `force = true` added to all six
   rules in root `netlify.toml`; **needs the next deploy**.
-- **PayPal**: webhook URL edited in place → same webhook ID
-  `3KC08673A81031414` (no `PAYPAL_WEBHOOK_ID` change needed).
+- **PayPal**: webhook URL edited in place → same stored webhook ID (no
+  `PAYPAL_WEBHOOK_ID` environment change needed; value intentionally omitted).
 - **eBay**: account-deletion endpoint re-registered (challenge validated +
   test notification delivered), auth accepted/declined + privacy URLs →
   `.com`, and the endpoint-down notify email corrected from the nonexistent
@@ -683,7 +4442,8 @@ the note. 582 tests, tsc, lint, and the 443-page build pass.
 
 **Facebook posting is live-proven.** Owner steps completed same-day: ran
 `facebook-sync.sql`, copied both env vars to Netlify, and connected the
-**Naples Estate Jewelry Co.** Page with a never-expiring Page token. The token
+**Naples Estate Jewelry Co.** Page with a token believed to be non-expiring at
+the time (Meta later proved the 2026-08-02 replacement was finite). The token
 journey had three real-world snags, all resolved and worth remembering:
 
 - The Instagram-type Meta app offered no `pages_*` permissions until the
@@ -696,7 +4456,9 @@ journey had three real-world snags, all resolved and worth remembering:
 - The Explorer's "Page Access Tokens" dropdown and `me/accounts` do NOT list the
   business-owned Page even when fully granted (Granular Scopes proved the grant).
   The working path: extend the user token in the Access Token Debugger (60-day),
-  then `GET /{page-id}?fields=access_token` — that page token never expires.
+  then `GET /{page-id}?fields=access_token`. The original runbook assumed that
+  derived token was permanent; the 2026-08-02 lifetime guard now verifies the
+  actual Meta metadata rather than relying on that assumption.
 
 Live test through the operator UI (visible browser walkthrough): prepare (10
 slides, card leading) → publish (photos checkpointed, `attached_media` feed
@@ -740,8 +4502,10 @@ Instagram drip so the channels never publish simultaneously).
 
 Where Facebook's API differs from Instagram's, the build leans into it:
 
-- **Page tokens do not expire** → no refresh cron at all; `needs_reauth` only on
-  explicit invalidation. Connect validates the paste is a PAGE token (Page nodes
+- **Facebook has no refresh cron in this owner flow.** Connect now validates the
+  token lifetime before storage; the original implementation assumed Page
+  tokens did not expire and only handled explicit invalidation. Connect also
+  validates the paste is a PAGE token (Page nodes
   carry `category`; user nodes don't) and says exactly what to re-copy if not.
 - **Publishing is synchronous** → unpublished photos (`published=false`,
   checkpointed with a 24h expiry like IG's containers) + one `feed` post with

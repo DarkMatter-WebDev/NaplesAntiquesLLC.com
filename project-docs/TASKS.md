@@ -1,751 +1,679 @@
 # Tasks
 
-> Open work only, plus a short recent-completions record. Full completed history
-> lives in `CHANGELOG.md`. Last reconciled: **2026-08-01, after the deploy** —
-> every "before/after the next deploy" item below was re-checked against live
-> production, not carried forward on assumption.
+> Actionable open work plus a short recent-completions summary. Full history is
+> in `CHANGELOG.md`. Last reconciled: **2026-08-08**.
 
-## In Progress
+## ✅ Pre-Deploy Sign-Off — 2026-08-06
 
-- ✅ **Domain switch to naplesestatejewelry.com — COMPLETE (2026-08-01).**
-  All seven steps below are done and production-verified; the only follow-ups
-  are the two small items in "Pending Next Deploy" and "Business And Content".
-  The owner bought the
-  `.com` and decided the switch (business email stays on `.co` — `.co` MX
-  never touched). The entire codebase now canonicalizes on
-  `https://naplesestatejewelry.com`: metadata/OG, sitemap, robots, JSON-LD,
-  legal copy, header/footer/checkout branding, order/marketing email branding
-  and fallbacks, test fixtures, and root `netlify.toml` (naplesantiquesllc
-  301s retargeted to `.com`; new `.co`→`.com` path-preserving 301s with an
-  `/api/*` carve-out so PayPal/eBay/Etsy endpoints registered on `.co` keep
-  answering until re-registered).
-  1. ✅ DONE 2026-08-01 — GoDaddy: found and REMOVED the pre-existing
-     Connect-Domain **302 forwarding `.com` → `.co`** (same broken GoDaddy
-     product as the old naplesantiquesllc.com setup; it also held the DNS
-     records locked), then set apex A → `75.2.60.5` (600s TTL) and
-     `www` CNAME → `naplesantiques.netlify.app`. `.co` DNS untouched.
-  2. ✅ DONE 2026-08-01 — Netlify: `.com` + `www.com` added and DNS-verified,
-     `.com` set as PRIMARY (`www.com` auto-redirects; `.co` now an alias;
-     `www.naplesestatejewelry.co` re-added as an alias because the primary
-     flip silently dropped it), Let's Encrypt cert reissued covering all
-     hosts. Browser-verified: `https://naplesestatejewelry.com/shop` serves
-     with a valid cert; `https://naplesestatejewelry.co` still serves
-     normally (its 301s activate on deploy).
-  3. ✅ DONE 2026-08-01 — Netlify env: `NEXT_PUBLIC_SITE_URL` (all four
-     contexts) and `SITE_URL` (all scopes) → `https://naplesestatejewelry.com`.
-     Takes effect on the next deploy.
-  4. ✅ DONE 2026-08-01 — Supabase Auth URL configuration: Site URL →
-     `https://naplesestatejewelry.com`; added redirect URLs
-     `https://naplesestatejewelry.com/**` and the bare origin (10 total;
-     `.co` entries kept for transition) — `ACCOUNT_SETUP.md` updated.
-  5. ✅ DONE 2026-08-01 — **Deployed and production-verified**: `.com` home
-     200, `.co/shop?metal=gold` → 301 → `.com` (path+query preserved),
-     naplesantiquesllc.com → 301 straight to `.com`, `.co/api/*` carve-out
-     serves 200 (webhooks safe), sitemap all-`.com` with zero auction URLs.
-     Found one gap: the page-retirement redirects (`/auctions`,
-     `/auction-terms`, `/vendor-terms`) 404'd because unforced netlify.toml
-     rules never fire under the Next runtime — `force = true` added to all
-     six rules, **rides the NEXT deploy** (until then those three retired
-     URLs 404; harmless but deploy soon).
-  6. ✅ DONE 2026-08-01 (evening) — external endpoints re-registered on
-     `.com` via the owner's signed-in Chrome:
-     - **PayPal**: live webhook URL edited in place → "Webhook updated
-       successfully"; **same webhook ID 3KC08673A81031414**, so
-       `PAYPAL_WEBHOOK_ID` in Netlify needs NO change; tracked events
-       untouched.
-     - **eBay**: account-deletion endpoint → `.com` ("settings successfully
-       saved" — the challenge validated against production, proving the
-       `.com` site URL end-to-end) + "A test notification was sent
-       successfully"; auth accepted/declined URLs + privacy URL → `.com`;
-       BONUS FIX: the endpoint-down notify email was the nonexistent
-       `info@naplesestatejewelry.com` mailbox — corrected to
-       `info@naplesestatejewelry.co`.
-     - **Etsy**: `.com` callback ADDED alongside the kept `.co` + localhost
-       callbacks (verified persisted after reload).
-     - ✅ **Meta app checked 2026-08-01 — nothing to change.** The "Naples
-       Estate Jewelry Social" app's basic settings carry no site or privacy
-       URL for either domain (only Facebook defaults); its contact email is
-       `info@naplesestatejewelry.co`, which is correct and stays.
-     - The `/api/*` carve-out in `netlify.toml` can be removed in a future
-       cleanup, after a week or two of confirmed webhook traffic on `.com`.
-  7. ✅ DONE 2026-08-01 (evening) — Google Search Console: the site's
-     HTML-tag token turned out to belong to the `.co` property's
-     verification (tag verify failed), so the `.com` URL-prefix property was
-     verified via a **DNS TXT record added in GoDaddy**
-     (`google-site-verification=…` on the `.com` apex — do not delete it);
-     sitemap submitted on the `.com` property (**Success, 115 pages
-     discovered**); **Change of Address `.co` → `.com` validated and
-     confirmed** — both required checks passed (the "sample pages" warning
-     was the retired-page 404s from step 5); GSC now shows "This site is
-     currently moving" dated August 2, 2026. Keep both properties and the
-     301s in place for at least 6 months (180 days) while Google migrates
-     the index.
-- ✅ **Retired-page redirects are LIVE** (verified in production 2026-08-02):
-  `/auctions` → `/shop`, `/auction-terms` and `/vendor-terms` → `/terms`,
-  all 308, single hop, in both locales plus `/en/*`. Live pages unaffected.
-- ⚠️ **PENDING NEXT DEPLOY — thumbnail-rail border + wrap-stutter fix.**
-  Owner-reported: the last visible thumbnail's right border was clipped
-  (fractional-width flex squeeze, plus the un-snapped pre-hydration state),
-  and boundary navigation froze/jumped near the last images and the wrap
-  (2 edge clones where the 6-visible layout needs 4; unreachable scroll
-  targets clamped by the browser). Fixed in the shared gallery code — all
-  product pages + lightbox. Full detail in `CHANGELOG.md` 2026-08-02;
-  verified in-browser (uniform 72px strides through both wraps, active card
-  locked in slot 3, zero sub-pixel squeeze); 598/598 tests incl. a new
-  reachability invariant sweeping every collection size.
-- ⚠️ **PENDING NEXT DEPLOY — the other 22 redirects, same root cause.**
-  Verifying the auctions fix exposed that **every English-side redirect had
-  been dead in production**, returning 404 while its `/es/*` twin worked:
-  the 12 legacy static-site `.html` URLs (`/index.html`, `/shop.html`,
-  `/about.html`, …), `/cart`, `/wishlist`, `/saved`, `/account/saved`, and
-  the 6 re-slugged product URLs (`/shop/new-listing-0X`). This was NOT caused
-  by recent work — the proxy has swallowed them for as long as it has
-  existed. The `.html` and re-slug URLs are the ones most likely to still be
-  indexed or linked, so they were losing link equity.
-  **Fix:** all of them consolidated into `src/lib/legacy-redirects.ts` and
-  served by `src/proxy.ts` before the locale rewrite, with 308 for
-  equity-carrying URLs and 307 for drawer-only ones; `next.config.ts`
-  `redirects()` removed entirely. Covered by 8 new tests (596 total), and
-  verified locally across both locales with no regressions.
-  **Verify against production after deploying** — `next dev` does not
-  reproduce Netlify's edge ordering, which is what hid this in the first
-  place. Spot-check `/shop.html`, `/cart`, and `/shop/new-listing-04`.
-- **Owner: first "Publish to both" is staged.** Product 28 (vintage 10K
-  diamond ring) is prepared on BOTH channels with the final caption format and
-  the fixed card — open either panel → "Publish to both…" → review →
-  one click. Publishes Instagram first, then Facebook. Both the `.com` domain
-  and the `/p/[code]` short link are now live and verified, so the caption's
-  typeable `Shop: NaplesEstateJewelry.com/p/N` line resolves correctly —
-  the constraint that was blocking the first Instagram publish is cleared.
-- **Owner: run each price-push function once, then check the last-run cards.**
-  `etsy-price-push` and `ebay-price-push` are confirmed live with Scheduled
-  badges (verified 2026-08-01 — see Recently Completed). What remains is a
-  deliberate manual run from the Netlify Functions page plus verification of
-  the Admin Settings last-run cards and summary logs. **Not run unattended:**
-  a price push writes to live marketplace listings. Etsy's daily toggle is
-  enabled; eBay's stays disabled until after its test run.
-- **Owner: verify one tier-shipped listing per marketplace.** BOTH
-  marketplaces are now provisioned (eBay and Etsy, 2026-08-01/02 — see the
-  backlog item for ids). Remaining: eBay — expect tier-priced listings to
-  flag `out_of_date` on the next status scan, review-first publish one
-  update, and confirm the offer's shipping cost on eBay; Etsy — run one Sync
-  Updates on a listing and confirm its shipping profile switched to the tier
-  profile (sync log action `shipping_tier`).
-- **Owner: spot-check production once at leisure** — checkout wizard, a
-  $5,000+ item (Express hidden, Registered note), spot-pill refresh, and the
-  product weight spec.
+Final pre-flight run against a **clean build from scratch** (`.next` deleted
+first), not an incremental one:
 
-## High Priority Backlog
+- `npx tsc --noEmit` clean · `npm run lint` clean · **720/720 tests** ·
+  `npm run build` exit 0, compiled successfully, **449/449 static pages**.
+  Artifact verified present: `BUILD_ID`, `server/`, `static/`,
+  `prerender-manifest.json`, 58 prerendered `.html`.
+- **Production-mode smoke** (`next start`): 38 route/locale combos all 200; the
+  only non-200 is `/es/` → 308 trailing-slash normalization, which is correct.
+- **Legacy host still single-hop**: `.co/shop` → 301 `.com/shop`, no `/en`.
+- **Webhook carve-out intact**: `POST .co/api/webhooks/resend` → **401**, not a
+  redirect.
+- **Email end-state**: zero `.co` senders in the compiled output, 19 files carry
+  the `.com` sender; DKIM/SPF/MX all resolve on the authoritative nameserver;
+  root still has **5 Google MX and exactly 1 `v=spf1`**, so Workspace mail is
+  untouched. Resend shows `naplesestatejewelry.com` **Verified**.
+- **Repo-ready**: no stray `.bak/.tmp/.log/.orig` artifacts anywhere outside
+  `node_modules`/`.next`; `.env`, `.next`, `node_modules` all gitignored;
+  `.env.local` `EMAIL_FROM` is the `.com` value.
 
-- ✅ **Marketplace shipping tiers — BOTH MARKETPLACES PROVISIONED.**
-  Steps 1-3 of the runbook are complete:
-  - **eBay (2026-08-01)**: seven fulfillment policies — `fee-19` →
-    `252701344026`, `fee-25` → `252701345026`, `fee-29` → `252701346026`,
-    `fee-35` → `252701347026`, `fee-59` → `252701348026`, `fee-99` →
-    `252701349026`, `fee-165` → `252701350026`. Log: "Provisioned 7
-    shipping-tier policies (7 created, 0 updated)."
-  - **Etsy (2026-08-02, after the delivery-days fix deployed)**: seven
-    shipping profiles — `fee-19` → `312257322074`, `fee-25` →
-    `312257322442`, `fee-29` → `312311477117`, `fee-35` → `312257322688`,
-    `fee-59` → `312311477379`, `fee-99` → `312257323028`, `fee-165` →
-    `312311477843`. Log: "Provisioned 7 shipping-tier profiles (7 created,
-    0 updated, 0 unchanged)", zero warnings, and all seven "NEJ Insured
-    Shipping $N" profiles now appear in the Etsy shipping-profile dropdown.
-  Both actions are idempotent (matched by the canonical "NEJ Insured
-  Shipping $N" label, which depends on the fee alone); re-running after a fee
-  change re-aligns costs. Step 4 — verifying one listing per marketplace —
-  is tracked in "In Progress".
-- **Phase 2 shipping (deferred): explore Parcel Pro / JM Shipping Solution /
-  FedEx Declared Value Advantage** for cheaper $2,500+ insurance and a fast
-  fully insured option above $5,000 (USPS-only phase ships $5,000+ via
-  Registered Mail, 2-10 days). Quote/account-based; owner signup required.
-  Operational rules until then: never insure jewelry through ShipStation's
-  ParcelGuard/Shipsurance, never declare over $1,000 on standard FedEx for
-  jewelry/watches, ship Registered in plain boxes with kraft paper tape.
-- **Complete destination-tax design after accountant review.** Keep the current
-  6% Florida-only policy until reviewed. Remaining design includes destination
-  county/rate lookup, Florida's per-item $5,000 discretionary-surtax cap,
-  registered nexus states, pre-address estimate wording, and PayPal end-to-end
-  jurisdiction cases. Do not collect another state's tax before registration.
-- **Run the controlled PayPal recovery matrix.** Cover create retry, normal and
-  ambiguous capture, local-finalization failure/retry, duplicate/retried
-  webhooks, two-buyer conflict, declined capture, pending/failed refunds,
-  idempotent partial/full refunds, locked shipped address, Local Pickup, invoice
-  creation, receipt history, and printable guest confirmation.
-- **Fix eBay sold-hidden freshness scanning.** Opening bulk eBay summary can
-  hash a `hidden_oos` sold product and incorrectly mark it `out_of_date`.
-  Preserve sold-hidden lifecycle and add regression coverage.
-- **Reattach eBay inventory #82 deliberately.** Listing `800354878200` is a live
-  external relist not attached to stored offer `204558136011`. Keep app-side
-  writes blocked until an owner-approved migration/end-and-republish path is
+**Cleared to deploy.**
+
+### Deploy-day checklist (owner-owned)
+
+1. **Copy this folder to the repo folder and deploy.** Outbound email is failing
+   in production right now; this deploy is what fixes it.
+2. **Watch the Netlify build log.** Local builds ran on **Node v24**; Netlify
+   pins **NODE_VERSION = 20** and `package.json` declares no `engines`. Production
+   has built on 20 all along, so risk is low — but a local green build is not
+   literally proof of theirs.
+3. **Test send, then OPEN THE INBOX.** Submit the contact form and confirm the
+   mail arrives in the inbox, not spam. DMARC is `p=quarantine`, so a DKIM or
+   alignment fault delivers to spam **without erroring** — a green "sent" in
+   Resend's log is not the check that matters. This is the single most important
+   post-deploy step.
+4. ✅ **The manual SQL is done** — `add-third-lineup.sql` verified applied
+   2026-08-06. No database step is outstanding.
+
+Nothing else in this batch needs a manual step. `EMAIL_FROM` is already corrected
+in Netlify (all five deploy contexts) and in `.env.local`.
+
+## ✅ Deploy Blocker Found AND Cleared 2026-08-05 (production-build pass)
+
+- **`EMAIL_FROM` in Netlify would have silently defeated the marketing half of the
+  email migration — now fixed.** `lib/marketing.ts:173-176` reads
+  `MARKETING_NOREPLY_FROM || EMAIL_FROM || RESEND_FROM` **before** the corrected
+  code default. Netlify held `EMAIL_FROM=noreply@naplesestatejewelry.co` in **all
+  five deploy contexts** (Production, Deploy Previews, Branch deploys, Preview
+  Server & Agent Runners, Local development), so marketing campaigns would have
+  kept sending from the now-unverified `.co` domain and failing.
+
+  **Changed 2026-08-05** to `Naples Estate Jewelry <noreply@naplesestatejewelry.com>`
+  — matching the code default exactly, so behavior is identical whether the
+  variable is present or removed. Verified byte-exact before saving and confirmed
+  across all five contexts after.
+
+  The rest of the precedence chain was checked and is **unset**, so nothing else
+  can override: no `MARKETING_NOREPLY_FROM`, no `RESEND_FROM`, no
+  `MARKETING_CHRIS_FROM`. The only other marketing variable is
+  `MARKETING_TRANSPORT=direct`. `MARKETING_CHRIS_REPLY_TO` is also unset, so the
+  intentional `.co` Reply-To default applies.
+
+  Blast radius had been marketing only — every transactional path uses a
+  hardcoded literal that is already `.com`.
+
+  ✅ **`.env.local` updated to match** (2026-08-05), so local previews behave like
+  production. Edited surgically without reading the file into context: exactly one
+  of 83 lines changed, all 36 keys intact, no BOM introduced, CRLF preserved, and
+  the value confirmed through `@next/env` — Next's own loader — to parse as the
+  exact 55-character string with no stray quotes despite being unquoted with
+  spaces and angle brackets. The file is gitignored and never deploys.
+
+  Note: the Netlify change takes effect with the next deploy; it does not
+  retroactively fix the currently-deployed build, which still carries `.co`
+  hardcoded in its transactional senders.
+
+## Open Findings From The 2026-08-05 Pre-Deploy Audit
+
+A read-only customer-facing audit ran against the dev server plus live probes of
+production. Four of the five findings have since been fixed (see CHANGELOG:
+checkout labels + autocomplete, legacy-host redirect hops, homepage heading
+order). One remains open, and it is a design judgment call, not a defect.
+
+- ✅ **Legacy `.co` two-hop redirects — FIXED 2026-08-05** in `proxy.ts` (not
+  `netlify.toml`, where the audit first misattributed it). Root cause: the proxy
+  runs before the Netlify rule and prefixes `/en`. Now a single 301 per legacy
+  host. **Verify after deploy** with auto-redirect disabled: `.co/shop` should
+  give exactly one 301 to `.com/shop`, and `POST .co/api/webhooks/resend` must
+  still return 401 — a 301 there would break the live webhooks.
+- ✅ **Homepage heading skip — FIXED 2026-08-05.** The three intro cards are now
+  `h2`; outline is `H1,H2,H2,…` with zero level skips, visually unchanged.
+- ✅ **Spanish chip units — FIXED 2026-08-05.** `formatLengthChip` now takes
+  `isEs` and renders ` pulg` / `Talla`, matching the spec table. `formatWeight`
+  was intentionally NOT localized — the site uses period decimals in Spanish, so
+  `es-ES` would print `53,91g` beside a table reading `53.91 gramos`. No-wrap
+  behavior re-verified by measurement at 320px and 768px in both languages.
+- ✅ **Product-page small text — FIXED 2026-08-05.** 11px floor applied; 46 → 15
+  elements under 11px at desktop, and none of the remainder is product-page
+  content (footer headings and `text-xs` buttons at 10.4–10.88px). See CHANGELOG
+  for the three issues surfaced along the way, including a horizontal-scroll
+  regression this introduced and then corrected.
+
+- ✅ **Wishlist drawer viewport cap — FIXED 2026-08-05.** Was `w-full max-w-sm`
+  with no viewport cap, so below ~384px the always-mounted, off-canvas-parked
+  panel dragged the document into horizontal scroll. Now
+  `max-w-[min(24rem,100vw)]`, mirroring `CartDrawer`. Verified the cap engages
+  below the design width and disengages above it, with the drawer opened both
+  empty and holding an item at 320px.
+
+  ⚠️ **Invariant for any future off-canvas panel:** if it is always mounted and
+  hidden via `translateX(100%)` rather than unmounted, its width MUST be capped at
+  the viewport, or it extends the document by its own overflow — which then feeds
+  back into its own `w-full` measurement.
+
+**Verified healthy, no action needed** (recorded so it is not re-audited): server
+authoritative pricing with `$0`/negative rejection and a stale-spot guard
+(`checkout-pricing.ts`); no `cost_basis`/keys/JWTs in public HTML; rate limits on
+every public endpoint plus honeypots on all three public forms; production
+security headers live and CSP **enforcing**; `.co/api/*` carve-out intact
+(`POST .co/api/webhooks/resend` → **401, not 301**, so the Resend webhook works
+and rejects unsigned payloads); zero horizontal overflow at 320px; dark-theme
+contrast clean across the 9-of-20 products that use it; robots/sitemap contain
+zero `.co` URLs; 404s return a real 404.
+
+**Second pass, 2026-08-05, against the PRODUCTION build (`next start`), not dev** —
+this is the gap that earlier passes had left open. All clean: 46 route/locale
+combos with no 4xx/5xx (only correct 3xx: trailing-slash normalization and the
+auth gate); all 23 legacy redirects resolve to 200 destinations with no soft-404
+dead ends, and the deliberately-omitted `new-listing-04` still 404s; `/p/`
+shortlinks resolve and fall back to `/shop`; the new proxy host-redirect is
+single-hop on every legacy host and **does not loop** on the canonical host, `www`,
+`netlify.app`, or deploy-preview hosts; `/api/*` still never redirects; zero
+console errors on home/product/checkout; no `localhost` in any canonical/og:url/
+og:image across 14 pages; and no `noreply@…co` survives anywhere in the compiled
+output (19 files carry the `.com` sender; the 11 `chris@…co` hits are the
+intentional Reply-To).
+
+**CSP was pre-verified rather than left to post-deploy.** Every browser-loaded
+origin is already allowlisted: `supabase.co` + `www.paypal.com` on `/checkout`,
+`s3.tradingview.com` + `www.tradingview-widget.com` on `/gold-services`. The
+pending batch introduces no new external origin, so the enforcing CSP is safe —
+which resolves the "verify after deploy" note at `netlify.toml:168`.
+
+⚠️ **Local checkout loads a LIVE PayPal client ID** from `.env.local`
+(`AamwcjQe…`). Do not click PayPal buttons on localhost — it can create real
+orders.
+
+⚠️ **Build-verification caveat:** local Node is **v24.16.0** while Netlify pins
+**NODE_VERSION = "20"** and `package.json` declares no `engines`. Local green
+builds are therefore strong but not identical to the production build.
+
+## ✅ Fixed From The 2026-08-08 Pre-Deploy Audit
+
+- ✅ **Owner's personal `@aol.com` address no longer ships in the public client
+  bundle — FIXED 2026-08-08.** `ADMIN_EMAIL` was imported by a client-side module
+  (`carouselData.ts`'s `isCurrentUserAdmin()`), so the literal address compiled
+  into the browser bundle where it was readable by anyone viewing source.
+  `isCurrentUserAdmin()` now reads `profiles.is_admin`; the constant is deleted.
+  Verified: **0 occurrences in `.next` at all**, and a value-based scan of all 71
+  client chunks against all 36 server-side keys reports `ORDER_NOTIFY_EMAIL`
+  clean. (`SITE_URL` and `EMAIL_FROM` still match by value and are public by
+  definition — the site's own domain and its `noreply@` sender.)
+
+  ⚠️ **OWNER: confirm the carousel panel still loads.** Sign in and open
+  **Admin → Settings → Store Carousel Hero**. It should render the curation
+  table, not "not authorized". This is the one behavior I could not verify —
+  it needs an authenticated admin session and I have no credentials.
+
+  If it shows "not authorized", the account's `profiles.is_admin` is not `true`
+  — check that row rather than reverting; the server page gate uses the same
+  signal, so you would not have reached the page at all.
+
+  Untouched on purpose: `carousel/sql/setup.sql:24` still hard-codes the email in
+  `is_carousel_admin()`. That is database-side, never reaches a browser, and
+  remains the real enforcement for every write.
+
+## Deep Field Gallery Sync
+
+Bulk import is **done and verified**; the live hooks are **code complete but
+inert**. See `features/deepfield-sync.md`.
+
+- ⚠️ **OWNER: set two Netlify env vars to activate the live sync.** They go on
+  **NEJ's** Netlify site, not Deep Field's — NEJ is the sender and the only side
+  that reads them. Until they are set, `syncProductsToDeepField` returns
+  immediately and nothing is pushed.
+  - `DEEPFIELD_SYNC_URL` = `https://deepfieldgallery.com/api/integrations/naples/products`
+  - `DEEPFIELD_SYNC_TOKEN` = the shared bearer token — the **same value** Deep
+    Field stores as `NAPLES_PRODUCT_SYNC_SECRET`.
+  - **Server-only. Never add a `NEXT_PUBLIC_` variant** — that would publish the
+    token in the browser bundle.
+  - Optional `DEEPFIELD_SYNC_DRY_RUN=true` runs the full path without writing.
+    Set it on **Deploy Previews and Branch deploys**, or a preview build will
+    push real products to the live gallery.
+- ✅ **`.env.local` is DONE (2026-08-08).** All three keys appended to
+  `next-app/.env.local`, pointed at the **local** receiver
+  (`http://127.0.0.1:3000/...`) with `DEEPFIELD_SYNC_DRY_RUN=false`. Edited
+  surgically without reading the file into context: 36 → 39 keys, zero original
+  keys lost, original bytes preserved byte-for-byte, CRLF and no-BOM intact.
+  Confirmed through `@next/env` — Next's own loader — that the token parses as
+  77 chars with no quotes or whitespace, fingerprint `d58afd7efa5a`, matching
+  the token that authenticated the 128-product import. File is gitignored
+  (`next-app/.gitignore:37`) and never deploys.
+- ⚠️ **Local dev shares production's Supabase database.** If `.env.local` is ever
+  repointed at production Deep Field, set `DEEPFIELD_SYNC_DRY_RUN=true` first or
+  local admin saves write real rows and copy real images into the live gallery.
+- ⚠️ **Production Deep Field has received nothing.** The 128-product import went
+  to `http://127.0.0.1:3000` only. Re-running against
+  `https://deepfieldgallery.com` is a separate, owner-approved step.
+- 🔎 **Deep Field side to confirm** (theirs to check — NEJ must not inspect their
+  database or storage):
+  - Whether the batch-4 image that first failed with `502` is now present.
+    `copiedImageCount` reported 6 of 6 *while* warning one upload failed, so that
+    counter is not proof of storage.
+  - Whether duplicate storage objects exist. Batches 2 and 3 were each sent
+    twice (a client-side `fetch` header timeout, since fixed), and the single
+    product re-send re-copied all 6 of its images.
+  - That pricing resolved: `heavy-italian-…-53-91g-21` → **$5,489** (live
+    spot-multiplier) and `18k-heraldic-cross-band-ring-01` → **$1,980.94**
+    (locked `sold_price`).
+- ◻️ **No deletion signal exists.** NEJ supports a hard delete and leaves no
+  tombstone, so Deep Field cannot learn about removals from the push alone. A
+  periodic full-id reconciliation is the only fix; not built.
+
+## Next Deployment And Production Smoke
+
+- ✅ **`add-third-lineup.sql` HAS BEEN RUN — verified 2026-08-06** by probing the
+  live database (project `evzluixourmsefwdsieu`). No manual SQL is outstanding.
+  - `carousel_selection_third` returns **200** for anon SELECT (was absent).
+  - `carousel_settings.selection_mode_third` returns **200** and holds its
+    `'manual'` default (previously **400 — column missing**).
+  - RLS landed correctly: anon INSERT is refused **401 / `42501` insufficient
+    privilege**, i.e. the write GRANT was properly withheld from `anon`. Probed
+    with a non-existent `product_id` so the FK would have rejected the row even
+    had RLS been permissive — the check could not create data.
+  - PostgREST schema cache reloaded (the 200s prove it).
+- ✅ `add-random-lineup-modes.sql` **has been run** — verified 2026-08-04 by
+  probing the live database: `selection_mode` and `selection_mode_alt` both
+  return 200, `selection_mode_third` returns 400 (missing). An earlier note
+  here claiming it was still pending was stale.
+- ✅ **That mode flip has already happened — verified 2026-08-07.** All three
+  modes now read `manual` (`selection_mode`, `selection_mode_alt`,
+  `selection_mode_third`), so the storefront is drawing the curated 13/10/10
+  lineups, not random. The earlier warning here — that the DB held
+  `random_gold_jewelry` / `random_silver_jewelry` and the next Save All
+  Slideshows would switch them — is spent and has been removed so it does not
+  read as still pending. Use the fill buttons to reseed if the random look is
+  ever wanted again.
+- ✅ `add-second-lineup.sql` was run by the owner (verified 2026-08-04:
+  `carousel_selection_alt` exists and holds a 10-item curated Slideshow 2
+  lineup that renders on the scroll reveal).
+- **Deploy the locally verified batch.** Current local gate: 720/720 tests,
+  `npx tsc --noEmit`, full lint, and a 449-page build.
+- After deployment, verify these focused surfaces against production:
+  - `/admin/social-queues`: seven Eastern choices, responsive row actions,
+    individual and selected-row background **Post now**, change/remove
+    confirmation, both worker-health summaries, and **Latest Posts** view/
+    manage/refresh/comment/removal controls. Confirm both channel headers fully
+    collapse and independently reopen their sections. Do not comment, remove,
+    or publish merely for QA.
+  - One Instagram and one Facebook manager: guided step order, Save & prepare,
+    generated card as slide 1 with **NOW AVAILABLE**, exact prepared framing,
+    slide viewer arrows, AI opener controls, and wording/photo/both sync.
+  - One remotely deleted social post: Refresh status should mark it Removed only
+    when Meta confirms absence; an ambiguous read must retain Published.
+  - Admin Products at 2100px+: no right-side table gap; Brand expands first.
+  - Manage Instagram, Shop, a product, My Account, Admin Orders, and a service
+    page at 2000px+: application/grid canvases expand while prose, checkout,
+    auth cards, and dialogs remain readable.
+  - Purchase panel: on a phone and a tablet confirm the scrap-value and
+    based-on-spot tiles sit side by side (never stacked), and that the buy
+    buttons form a flush block — one row of four on a wide column, or Add to
+    Cart full width above Save/Inquire/Call on a narrow one. Check a sold item
+    too (its two buttons stack until the column is wide), and Spanish.
+  - Dark-theme product page (one whose first photo is on a black backdrop, e.g.
+    `/shop/10k-gold-rope-chain-necklace`): scroll to "You Might Also Like" and
+    the reviews band and confirm the card text is dark-on-white and fully
+    legible, in both locales. Compare against a light-backdrop product to be
+    sure nothing there changed.
+  - Product detail two-column fill: open a product at ~1280-1440 and confirm
+    column 1 reads gallery → Notes → the three policy accordions while column 2
+    reads price panel → description → Specifications, both columns ending
+    together, clear blank space before the three trust icons, and the icons
+    spanning the full page width. On a phone (below 640px) confirm the stacked
+    trust badges AND the three policy accordions are centred, and that at 640px+
+    the badges go 3-up while the accordion titles return to the left with their
+    chevrons on the right. Confirm the phone layout still reads
+    gallery → price → description → specs → notes → policies. Also check one
+    ultra-wide screen (2000px+), where the notes/accordions aside should
+    instead sit under the info column, and one Spanish product page.
+  - Product specifications: confirm a necklace and a bracelet each show a
+    **Width** row in mm (Ancho in Spanish) matching their shop-card chip, and
+    that a ring/pendant shows no Width row.
+  - "You Might Also Like" cards: confirm each shows purity / weight / length /
+    width chips matching that piece's shop card, and that a piece with no stored
+    width shows only three. The pills must stay on ONE line at every width —
+    check a phone (they shrink and sit under the price) and a desktop (they sit
+    beside the price) — must never spill outside the card, and within one strip
+    must either ALL sit beside the price or ALL sit below it, never a mix. Below
+    361px the strip should show one card per row at full title/pill size.
+  - Homepage carousel backdrops: confirm black-backdrop photos render as solid
+    rounded black cards with no white bars or square photo corners, and that
+    the hero's swept background now goes dark as those pieces come round
+    (expected — the sweep follows the same per-photo colour).
+  - Product gallery/lightbox: no clipped thumbnail border or wrap stutter.
+    Confirm the hover/touch magnifier is gone everywhere, that tapping a
+    prev/next arrow on the main photo changes the image WITHOUT opening the
+    lightbox, that clicking the photo itself still opens it, and that a vertical
+    swipe starting on the photo scrolls the page on a real phone. The arrows are
+    now narrow full-height bars hugging each side, present only from 768px up.
+    On a real PHONE confirm there are no bars and that swiping the photo changes
+    it (left = next, right = previous), that a vertical swipe still scrolls the
+    page, and that a tap still opens the lightbox. On a real TABLET confirm the
+    bars are there AND the swipe works. On desktop confirm each bar
+    fades UP as the cursor approaches that side (independently — the far bar
+    stays hidden) and is solid once the pointer is over it, that they are
+    permanently
+    visible on a phone, legible on both a white-backdrop and a black-backdrop
+    product, advance the photo when clicked near the top or bottom of the bar
+    rather than on the chevron, and that clicking the middle of the photo opens
+    the lightbox rather than catching a bar. Step through EVERY photo of a
+    product whose first image is on black: the bars must stay visible as a
+    continuous strip on each one, including photos whose backdrop differs from
+    the frame's padding colour.
+  - `/account/sign-in`, `/account/sign-up`, My Account Change Password, and a
+    real reset-password link: every password field uses the shared eye toggle.
+  - Redirect smoke: `/shop.html` and `/cart` redirect correctly;
+    `/shop/new-listing-04` intentionally 404s because its listing was deleted.
+  - Checkout two-column layout, a $5,000+ item, spot refresh, and product
+    weight/specs. Confirm the sticky summary rail, Back to cart / Edit cart
+    reopening the drawer without losing entered details, the confirmation
+    checkbox still gating the PayPal buttons, and Local Pickup hiding the
+    required address.
+  - Homepage hero parallax stack: text/form/CTAs stay pinned through the
+    crossing and hold, only slideshows move, sticky release carries text and
+    slideshow away together, scroll-back restores, offscreen pane is inert,
+    overlay theme flips with the dominant slideshow, and the reduced-motion
+    single-hero fallback works on a real device.
+  - Second slideshow lineup: confirm the scroll reveal shows the curated
+    Slideshow 2 lineup (and that clearing it falls back to mirroring
+    Slideshow 1). Confirm slideshow B's photos flow left-to-right (opposite
+    of A) and still cycle through the full lineup.
+  - Random fill: on each slideshow tab try Gold jewelry / Silver jewelry /
+    Non-jewelry items, adjust the drawn order, then **Save All Slideshows**
+    and confirm the homepage shows exactly that saved arrangement (it should
+    NOT re-randomize on the next cache refresh).
+  - Sold pieces in slideshows (**not yet exercised end-to-end** — verifying
+    storefront rendering requires saving a sold piece, a live DB write left
+    to the owner): switch the picker to Sold items, add one sold piece, Save
+    All Slideshows, and confirm the hero renders it with NO price caption and
+    that clicking its card lands on the product page showing Sold. Also
+    confirm the All/Available/Sold checkboxes scope both the picker and the
+    random fill buttons.
+  - **Not verified locally, needs a look:** the hero's matched pane speeds
+    (`PANE_A_TRAVEL` at 100). Scroll the homepage and confirm A and B move
+    together through the crossing with no gap opening between them.
+  - Header height token: page content now starts exactly at the header's bottom
+    edge (measured 72/72 desktop, 56/56 mobile) instead of 9px behind it. On a
+    real device check a few converted pages — `/`, `/about`, `/faq`,
+    `/checkout`, `/contact` — plus the hero pin and the mobile menu panel's
+    scroll height. Mobile page tops sit 8px higher than before (56px reserved
+    vs the old 64px) because the reservation now matches the real 56px header.
+- Reconfirm that production build and development server are never writing
+  `.next` concurrently; stop local dev before a manual production build.
+
+## Checkout, Tax, Orders, And Email
+
+- **Complete accountant review before changing tax.** Keep the current 6%
+  Florida-only policy. Review destination county rate lookup, Florida's
+  per-item $5,000 discretionary-surtax cap, registered nexus states, estimate
+  wording, and PayPal jurisdiction cases.
+- **Run the controlled PayPal matrix** in the configured environment: create
+  retry, successful/declined/ambiguous capture, local-finalization retry,
+  duplicate webhooks, two-buyer race, partial/full/idempotent refunds,
+  pending/failed refund states, locked shipped address, Local Pickup, invoice,
+  guest confirmation, and receipt history.
+- Verify one shipped PayPal order retains the exact approved shipping address
+  and one Local Pickup order omits shipping.
+- Verify Available → Sold → Available sold-price locking on a deliberate item;
+  separately review the three legacy manually sold rows without order snapshots.
+- Print one invoice on the affected physical laser printer.
+- Verify shipment carrier/tracking save plus fulfillment email, paid/manual
+  invoice rows, automatic/manual Email History, order restore/permanent delete,
+  Reopen Order, and Messages recycle-bin behavior.
+- Verify production inquiry/contact/free-evaluation uploads and Resend delivery,
+  including Spanish public notes and image attachments.
+- Verify duplicate sign-up and reset-password redirects against production
+  Supabase Auth settings.
+
+## Etsy And eBay
+
+- **🔴 OWNER ACTION — apply the new shipping policies to the 123 flagged eBay
+  listings, in batches, from the deployed admin.** The 2026-08-01/02 tier
+  policies (`252701344026`–`252701350026`) are part of the eBay content hash, so
+  every listing created before them is correctly flagged `out_of_date`; the
+  daily price push can never clear it because it only sends price/quantity
+  (`bulkUpdatePriceQuantity`, [sync.ts:1443](next-app/src/lib/ebay/sync.ts:1443)).
+  Only a full offer update carries `fulfillmentPolicyId`. The real campaign is
+  **86 items ≈ 4 runs** of the capped bulk sync (87 available listings are
+  flagged; #82 is write-blocked). Sequence: sync **one** item from its product
+  drawer first, confirm on eBay that the shipping shown is the new tier, then
+  run Sync all to eBay once per batch, spot-checking between runs. Guards now
+  enforce the cautions automatically — see `features/ebay-sync.md`.
+- ✅ **Sold-hidden freshness bug fixed** (was listed below as open). The scan
+  hashed `hidden_oos` rows, so the new tier policy flipped all 36 sold-and-
+  hidden listings to `out_of_date` — that is why the count read 123 instead of
+  the expected ~90. `resolveFreshnessScanAction` now skips any non-available
+  product and repairs the mis-flagged rows back to `hidden_oos`. **Repair runs
+  automatically on the next freshness scan** (any `/api/admin/ebay/eligibility-
+  summary` load, i.e. opening the eBay bulk-sync modal) once this is deployed;
+  no manual SQL. Verified by dry run 2026-08-04: all 36 qualify
+  (`last_pushed_qty === 0`), leaving 87 `out_of_date`, all available.
+- Two available products have no `ebay_listings` row at all (90 available
+  products, 88 linked). Confirm that is intentional (never listed) rather than a
+  dropped link.
+- **Run each price-push Scheduled Function once deliberately** from Netlify,
+  then confirm the Admin Settings last-run card and summary log. Etsy's daily
+  toggle is enabled; keep eBay disabled until its controlled run passes.
+- **Verify one tier-shipped listing per marketplace.** On eBay, let a boundary
+  change flag the listing `out_of_date`, review-first publish one update, and
+  confirm the fulfillment-policy charge. On Etsy, Sync Updates on one listing
+  and confirm the expected tier profile plus `shipping_tier` log action.
+  Provisioned policy/profile IDs are recorded in
+  `features/shipping-tiers.md`.
+- ✅ Fixed 2026-08-04: the eBay sold-hidden freshness scan no longer hashes a
+  `hidden_oos` sold item into `out_of_date`, and repairs rows it previously
+  mis-flagged. Covered by three `resolveFreshnessScanAction` tests. Confirm the
+  repair landed after deploy: sold pieces should read Hidden, not Out of date.
+- Keep eBay inventory #82 / listing `800354878200` write-blocked until an
+  owner-approved reattachment or end-and-republish migration is tested against
+  stored offer `204558136011`. This is now enforced in code by
+  `EBAY_WRITE_BLOCKED_PRODUCT_IDS`
+  ([sync.ts:62](next-app/src/lib/ebay/sync.ts:62)) — removing that entry is the
+  only way to unblock it, and it must not be removed before that migration is
   tested.
-- **Complete remaining controlled marketplace checks.** Inventory #53's
-  out-of-date/policy transition has since been live-verified. Publish eBay
-  #83/#84 only if desired; do not blanket re-sync, sync sold #6, or manage #82
-  before reattachment. Observe Etsy's fixed cumulative image counter during the
-  next real image upload.
-- **Run the scoped eBay webhook-payload scrub only after fresh confirmation.**
-  The read-only audit found 10,922 old account-deletion events with identifiers.
-  Dry-run/count, update only the audited event type, then prove no
-  `payload.notification.data` remains. This is destructive database work.
+- Complete the remaining controlled checks: publish eBay #83/#84 only if
+  desired, never blanket re-sync, never sync sold #6, and observe Etsy's fixed
+  cumulative image counter on the next genuine image upload. The first two are
+  now mechanical: `EBAY_BULK_ENQUEUE_LIMIT = 25`
+  ([guards.ts:12](next-app/src/lib/ebay/guards.ts:12)) bounds every bulk run,
+  and `enqueueProducts` drops non-available products before queueing.
+- Only after fresh confirmation, perform the scoped eBay account-deletion event
+  scrub. Re-run the dry count, update only the audited event type, and prove no
+  `payload.notification.data` identifiers remain. This is destructive database
+  work and must follow the backup/dry-run rules.
+- Resolve the remaining provider-spec verification notes documented in
+  `features/etsy-sync.md` and `features/ebay-sync.md`; fail closed when a live
+  provider contract is unknown.
 
-## Production And Owner Verification
+## Instagram And Facebook
 
-- Verify one shipped PayPal order keeps the exact checkout address locked in
-  PayPal, and one Local Pickup checkout omits shipping.
-- Verify Available -> Sold -> Available sold-price locking on a deliberate
-  product; separately review the three legacy manually sold rows without order
-  snapshots.
-- Print one invoice on the affected physical laser printer after deployment.
-- Verify shipment carrier/tracking save and the corresponding Resend email.
-- Verify a paid test order and one new manual order create/update invoice rows.
-- Verify explicit inventory restore, order recycle-bin restore/permanent delete,
-  Reopen Order, and Messages recycle-bin behavior while signed in.
-- Verify order Email History for automatic paid receipt plus manual receipt and
-  fulfillment messages.
-- Verify inquiry/message image attachments, Spanish public notes, item year
-  snapshots, and the migrated WebP listing paths on deliberate records.
-- Verify contact/free-evaluation email and upload flow with production
-  service-role and Resend configuration.
-- Verify duplicate account sign-up, reset-password redirects, and production
-  Supabase Auth redirect URLs.
+- After deployment, re-prepare one product per channel so new card/caption/
+  framing behavior is proven on fresh renditions. Review only; publish solely
+  when the owner intends a public post.
+- Before Meta's reported **2026-10-31** Facebook data-access limit, derive and
+  validate a replacement Page token through Settings. Rotation must preserve
+  the old credential until the replacement passes app, Page, read-access, and
+  lifetime checks.
+- Delete the 2026-08-01 Instagram test post for item 21 manually if it is still
+  live (`instagram.com/p/Dbf7lhNoN-T/`), then use **Already removed on
+  Instagram** or Refresh status to reconcile local state. Instagram's API
+  cannot delete it.
+- Reset item 21's test lineup if desired; verification left 8 of 9 images and a
+  promoted cover. Nothing depends on that arrangement.
+- Wire the existing idempotent `markPostSold()` helper into the
+  Available → Sold transition only after a controlled live test.
+- Add social out-of-date detection. Instagram changes must flag the owner to
+  delete/forget/re-prepare rather than claiming API deletion is possible.
+- Consider bulk social queueing only if the per-product, review-first flow proves
+  too slow in practice.
+- Treat AI on-model imagery as an optional research project: run the fidelity
+  bake-off and decide disclosure policy before writing implementation code.
 
-## Facebook Posting (LIVE-VERIFIED 2026-08-01 — see features/facebook-posting.md)
+## UX Backlog From The mels-treasures.com Review (2026-08-04)
 
-- ✅ Done 2026-08-01: SQL applied, env vars in Netlify, Page connected
-  (never-expiring token via use-case addition → consent → debugger extend →
-  page-token derivation; runbook details in `CHANGELOG.md`), and the full
-  prepare → publish → API-delete loop proven through the operator UI.
-- ✅ `social-card-source-2026-08.sql` applied 2026-08-01; card-image choice
-  saves and Prepare uses it (image 6 saved on product 21).
-- ✅ `social-card-background-2026-08.sql` applied 2026-08-01; the card
-  background choice (Auto/White/Black/Cream) saves in both panels.
-- ✅ Done 2026-08-01: Netlify lists **`facebook-drip` with a Scheduled badge**
-  (next execution 10:40 AM Eastern = the documented 14:40 UTC).
-- **Still worth one production confirmation:** re-verify one prepare in
-  production (fonts must trace into `/api/admin/facebook/**` and
-  `/api/admin/card-preview` — checked in the local build, unverified live).
+> Owner-requested competitive review; recommendations only, no code yet.
+> Priorities the owner explicitly named: on-product shipping/returns
+> dropdowns and "sustainably sourced" trust messaging.
 
-## Instagram Posting (Phases 1-2 built — see features/instagram-posting-plan.md)
+- ✅ **Product page accordions + trust strip** — DONE 2026-08-04
+  (`ProductTrustSections.tsx`: Shipping & Returns / Condition & Wear /
+  Payment Options accordions plus the Sustainably Sourced / Fully Insured /
+  Local Pickup badge trio; see CHANGELOG). Production smoke: open one product
+  page per locale and expand all three accordions.
+- ✅ **Name the trade-in program** — DONE 2026-08-04. `/trade-in` (Gold &
+  Silver Trade-In Program), localized, in the sitemap, linked from the Sell
+  menu, footer, and every product page's trade-in line ("How it works").
+  Production smoke: load both locales and click through from a product page.
+- ✅ **Customer reviews/testimonials** — DONE 2026-08-04. (Correction: the
+  homepage already showed three real Google reviews; the review's "we display
+  none" was wrong.) The reviews now live once in `src/lib/testimonials.ts`
+  and render on the homepage and as a compact band on every product page via
+  the shared `TestimonialsSection`. To add a review, append a verbatim entry
+  to that file — never invent or paraphrase a quote. **Google review text
+  cannot be fetched from here** (the browser pane blocks google.com, Maps
+  renders reviews client-side so WebFetch sees nothing, and search returns only
+  paraphrases) — ask the owner to paste the text and reviewer name, and whether
+  Google badges them a Local Guide. The grid is pinned to 1/2/4 columns and so
+  assumes an EVEN count; a fifth review will need that ladder revisited.
+  Currently four (Cristian Reatiga added 2026-08-05). Per-product reviews
+  remain a possible later step.
+- **Spanish review translations want a native-speaker check**, including the
+  newest (`Cristian Reatiga`). The English is the customer's own wording; the
+  Spanish is ours.
+- ✅ **Related items ("You might also like")** — DONE 2026-08-04.
+  Same-category available pieces, same-type-first ranking, lean query, lazy
+  images, spot-computed prices. Production smoke: open a product page in both
+  locales and click a related card.
+- **Admin reorder needs one live verification:** the drag-reorder write was
+  changed from upsert to UPDATE-only after a live "null value in column
+  title" failure (2026-08-04, see CHANGELOG). Reload Admin Products and
+  perform one drag; expect "Inventory order saved" — possibly with a note
+  that N listed items no longer exist, which means reload to refresh the
+  list. While there, confirm the new edge auto-scroll with a real mouse drag
+  (hold a row above the top of the table; it should run up to the beginning).
+- ✅ **Homepage story + education + FAQs + announcement bar** — DONE
+  2026-08-04. Meet the Owner (chris.webp + story), Why Buy Estate Gold?,
+  four FAQ accordions linking to /faq, and a static announcement bar at the
+  top of the homepage content (not the fixed header — its 4rem height is
+  load-bearing). Production smoke: load both locales, open an accordion, and
+  confirm the bar shows two items on a phone, three from 780px, and stays on
+  ONE line at every width in BOTH locales (Spanish is the tight one).
+- **Cart add-on/upsell (optional):** Mel sells a $29 tarot add-on and shows a
+  cross-sell strip in the cart. A local-flavor equivalent (gift wrap,
+  handwritten appraisal card) plus a "Discover something new" strip is a
+  possible later experiment.
+- **Keep (already at parity or better):** single-page checkout shape, guest
+  checkout, insured shipping tiers with clear method descriptions (clearer
+  than Mel's tariff prose), live spot pricing + scrap value (unique to us),
+  INQUIRE/CALL direct-contact actions, "Taxes/shipping calculated at
+  checkout"-style transparency (ours shows real numbers earlier than theirs).
 
-- ✅ Done 2026-08-01: `supabase/instagram-image-crops-2026-08.sql` applied by
-  owner (crop saves work), and the generated ad card is verified end to end —
-  `renderInstagramCard` ran live (Prepare on inventory #21, card badged `CARD`,
-  backdrop auto-detection pixel-verified, and generated cards led the live
-  Facebook post). Card render failure still degrades to photos-only with a
-  prepare warning, never a block.
-- **Note (2026-08-01): the Instagram caption format changed** to match
-  Facebook's (Available now! → title → specs → price sentence with spot basis;
-  no description, no inventory number, typeable `Shop:` short link). Captions
-  are immutable, so this simply applies to the next Prepare/publish — any
-  previously prepared-but-unpublished caption should be re-prepared first.
-- **Owner: reset the test product's Instagram lineup if desired.** Verifying the
-  editor on inventory #21 left it with 8 of 9 images and a promoted cover
-  (original order not preserved). Add the excluded photo back and reorder in
-  the panel, then Prepare — nothing depends on the current arrangement.
-- **Photography standard: shoot silver on black, not white.** Measured
-  2026-08-01: silver on white is the hardest case for any background removal —
-  7-12% of the product sits within 25 luminance of the backdrop (those are the
-  polished highlights). Silver on black is trivial. Gold is fine on either.
-  Costs nothing and permanently removes the hard case for the compositing
-  plan (`features/instagram-posting-plan.md` §8c).
-- **AI on-model image: run the fidelity bake-off before any build.** Plan is in
-  `features/instagram-posting-plan.md` §8b. Pick 5-8 hard pieces (chain, ring,
-  earrings, bracelet, one with distinctive wear), run them by hand through 2-3
-  providers, and score product fidelity against the real photos. Claude cannot
-  generate images, so this adds a new third-party dependency. Abandoning the
-  feature is a legitimate outcome. Decide the AI-imagery disclosure policy
-  (recommended: label it and never make it the only image) before any public post.
-- **Owner: delete the test post by hand.** The 2026-08-01 live test published
-  `instagram.com/p/Dbf7lhNoN-T/` (inventory #21 bracelet). Instagram's API
-  cannot delete posts, so it must be removed in the Instagram app. Its caption
-  contains the since-fixed "Inventory #21" auto-linked hashtag, so it is worth
-  removing rather than keeping. Nothing in the app depends on it.
-- Connection is **live and verified**: `@naples_estate_jewelry`, BUSINESS
-  account, token valid to 2026-09-30 with the weekly refresh armed. The full
-  publish path (renditions → carousel → publish → verify) is proven end to end.
-- **Optional: bulk Instagram queueing.** The per-product panel, row chips,
-  editor-drawer section, and Actions-modal card are all built. What is missing
-  is a multi-select "queue these N products" flow like the Etsy/eBay bulk
-  modals. With a 2/day drip and review-first captions, queueing a handful at a
-  time from the per-product panel may well be enough — build this only if the
-  one-at-a-time flow proves tedious in practice.
-- **Wire the sold auto-comment to the status change.** `markPostSold()` is
-  implemented and idempotent but is not yet called from the available→sold
-  transition.
-- **Add out-of-date detection — but note the API cannot delete.** `content_hash`
-  is stored per post and nothing compares it yet. The originally planned
-  automatic delete-and-repost is NOT possible: removal is a manual step in the
-  Instagram app. Any flow must therefore be: flag as out of date → tell the
-  owner which post to delete by hand (with permalink) → "Forget this post" →
-  re-prepare and publish fresh.
-- ✅ Done 2026-08-01: Netlify lists **`instagram-token-refresh`** (next
-  execution Aug 3, 8:15 AM Eastern = Mondays 12:15 UTC) and
-  **`instagram-drip`** (10:20 AM Eastern = 14:20 UTC), both with Scheduled
-  badges.
+## Business, Content, And Operations
 
-## Business And Content
+- Complete Google Business Profile video verification; duplicate draft profiles
+  are already removed.
+- Have owner/counsel review Privacy, Terms, Returns/Refunds, Shipping,
+  Accessibility, and cookie disclosures.
+- Confirm Resend sending-domain SPF/DKIM and intended From identities.
+- **🟡 Resend `.co` → `.com` migration — DONE in Resend, GoDaddy, and code.
+  BLOCKED ON DEPLOY, and email is DOWN until then.**
 
-- ✅ **SUPERSEDED 2026-08-01 — `naplesestatejewelry.com` wiring.** The owner
-  decided the opposite of the "301 to `.co`" default considered here: `.com`
-  is now the PRIMARY domain and `.co` 301s to it (email stays on `.co`). The
-  full migration runbook is the ⚠️ DEPLOY GATE item at the top of this file;
-  the code side is complete.
-- **Finish the naplesantiquesllc.com SEO recovery (step 1 done 2026-07-30).**
-  Background: the app was previously indexed under naplesantiquesllc.com; a
-  broken GoDaddy forwarding product (HTTPS failed, paths dropped) left those
-  results stale while naplesestatejewelry.co sits mostly unindexed (~7 of
-  120 sitemap URLs). Completed 2026-07-30 with the owner: removed the
-  GoDaddy Connect Domain forwarding, repointed the apex A record to Netlify
-  (75.2.60.5, DNS already propagating), added apex + www as Netlify domain
-  aliases (Let's Encrypt cert provisioning), and added path-preserving
-  301 rules for both hosts/schemes to root `netlify.toml` (top of the
-  redirect list). Remaining: 1) deploy so the 301s go live (until then the
-  old domain serves the site with correct canonicals), 2) verify
-  `https://naplesantiquesllc.com/shop?metal=gold` returns a 301 to the same
-  path on the primary domain, 3) Google Search Console — verify both
-  domains, submit the sitemap, run Change of Address old → new, request
-  indexing for key product pages.
-- Complete Google Business Profile video verification. The two duplicate draft
-  profiles are already deleted.
-- Have the owner/counsel review Privacy, Terms, Returns, Shipping, and
-  Accessibility policies before relying on them. (The Auction Terms and
-  Vendor Terms pages were retired 2026-08-01 with the auctions page; both
-  URLs 301 to /terms.)
-- Confirm Resend sending-domain/SPF/DKIM support for the intended From
-  identities.
-- Complete `CLIENTS.md` unknowns: Netlify site/team/slug, DNS registrar,
-  maintenance plan, billing status, and credential-reference owners.
-- Correct duplicate live inventory #21 if it still exists.
+  Completed 2026-08-05: `.co` deleted (owner), `.com` added and **Verified**
+  (id `bd08d8e7-ca8d-47a5-b28e-d8d608cd772c`, us-east-1), three DNS records
+  added at GoDaddy and confirmed against the authoritative nameserver, and every
+  hardcoded From address moved to `.com`. Full detail in CHANGELOG 2026-08-05.
+  Verified: `npx tsc --noEmit`, `npm run lint`, `npm run build` all clean.
+
+  **Remaining, in order:**
+
+  1. **DEPLOY.** Production still runs the old code, which sends from `.co` — no
+     longer a verified domain, so **all outbound email is failing right now**.
+     This is the whole outage. Checkout still works (`order-finalize.ts`
+     catches; `order-owner-notification.ts` never throws); missed receipts
+     re-send from Admin → Orders.
+  2. **Check Netlify env for stale `.co` sender overrides.** `lib/marketing.ts`
+     reads `MARKETING_NOREPLY_FROM`, `EMAIL_FROM`, `RESEND_FROM`, and
+     `MARKETING_CHRIS_FROM` *before* the code default. A `.co` value in any of
+     them still breaks marketing sending after deploy. Netlify is authoritative;
+     `.env.local` is stale and cannot answer this.
+  3. **Test send + inbox check — mandatory, not optional.** DMARC is at
+     `p=quarantine`, so a DKIM/alignment problem lands mail in spam *silently*
+     rather than erroring. Submit the contact form and confirm the mail reaches
+     the inbox, not the spam folder. Owner-owned (live testing is post-deploy).
+
+  **Deliberately not done, owner's call:**
+
+  - **Tracking metrics not re-enabled.** `.co` had click/open tracking on, but
+    Resend now implements it as a `links.` tracking subdomain that redirects
+    every link in every email — receipts included — through it, plus another DNS
+    record. That is a behavior change beyond a domain swap.
+  - **Resend webhook still registered on `.co`** and still Enabled; it survived
+    the domain deletion because webhooks are account-level. It keeps working:
+    `netlify.toml:78-81` serves `.co/api/*` as a **200 rewrite, not a redirect**.
+    Re-registering on `.com` is optional cleanup.
+  - **Contact/display addresses stay on `.co`** (footer mailto, account
+    dashboard, schema.org `email`), as does **Reply-To** for marketing
+    (`chris@naplesestatejewelry.co`) — live mailboxes, and not senders, so the
+    verified-domain constraint does not apply to them.
+
+  Supersedes the 2026-08-01 DECISIONS entry that email stays on `.co`: the
+  *sending* domain is now `.com`; the *mailboxes* are unchanged.
+- Complete `CLIENTS.md` unknowns: Netlify site ID, service/dashboard owners,
+  password-manager references, maintenance scope, billing status, and production
+  Supabase Auth redirects.
+- Resolve duplicate live inventory #21 if it still exists.
 - Decide whether root `banner.png` should replace the current eBay banner after
-  removing the remaining visible website address. Do not connect either banner
-  to live eBay descriptions until it is policy-safe.
+  removing every off-eBay website/contact reference. Do not publish either
+  banner until policy-safe.
+- Native-speaker review of Spanish marketing/product/legal copy remains useful.
 
 ## Deferred And Optional
 
-- Optionally add a `[locale]/[...rest]` catch-all so unmatched Spanish URLs
-  render the localized 404 (with header/footer) instead of the root English
-  shell. Both shells now carry correct `Page Not Found` metadata and noindex;
-  this would only localize the body copy for `/es/*` misses.
-- Finish Cloudflare Stream deployment only when product video becomes a
-  priority: configure the four documented Netlify variables, reconcile the
-  Stream webhook, run the device matrix in `features/product-videos.md`, and
-  validate one real MP4 on controlled Etsy/eBay listings before enabling
-  marketplace video writes.
-- Add `OPENAI_API_KEY` only if server-generated read-aloud is desired; the
-  device voice remains the fallback.
-- Investigate the intermittent development JSON parse failure if it appears
-  outside cold-start/hot-reload timing. The 2026-07-27 audit reproduced it
-  during a parallel cold preview probe across several routes; both translation
-  JSON files validated, and a clean restart plus sequential route checks passed.
-- Monitor stable `eslint-config-next` and React lint-plugin releases for ESLint
-  10 compatibility. The full audit's nine findings are confined to ESLint 9's
-  development-only `minimatch@3` / `brace-expansion@1` chain. Do not force
-  ESLint 10 while the stable Next lint plugins fail at rule startup; keep the
-  production audit at zero and retest when upstream support lands.
-- Profile Admin Products pagination/virtualization only if production timings
-  show the 83-row working table remains slow.
-- Migrate the remaining legacy local-only product photos to Supabase Storage.
-- Optionally optimize the remaining near-guideline local image assets.
-- Consider relocating real `node_modules` content outside OneDrive only if sync
-  overhead remains noticeable.
-- Evaluate Next.js 16.3 when stable for the upstream Windows Turbopack cache fix.
-- Add basic analytics only with a corresponding consent/policy update.
-- Expand catalog categories when inventory is ready.
-- Confirm whether production metal-price traffic needs a keyed provider or a
-  stronger rate-limit/fallback plan.
+- Phase 2 high-value shipping: evaluate Parcel Pro, JM Shipping Solution, or
+  FedEx Declared Value Advantage after owner quotes/account setup. Until then,
+  retain the documented USPS Registered Mail rules for $5,000+ shipments.
+- Finish Cloudflare Stream deployment only when video is a priority: configure
+  the four documented Netlify variables, reconcile the webhook, run the device
+  matrix, and validate one controlled Etsy/eBay MP4 before enabling marketplace
+  video writes.
+- Migrate remaining legacy local-only product photos to Supabase Storage and
+  optionally optimize the remaining near-guideline assets.
+- Add a localized catch-all only if Spanish 404 body localization is worth the
+  extra route; existing 404 metadata/noindex behavior is correct.
+- Add `OPENAI_API_KEY` only if server-generated read-aloud is desired; device
+  speech remains the fallback.
+- Revisit ESLint 10 only when the stable Next lint stack supports it. Keep the
+  production audit clean and do not force an incompatible dev-only upgrade.
+- Profile Admin Products virtualization only if production timing shows the
+  current table is slow. Consider moving dependencies outside OneDrive only if
+  synchronization overhead remains material.
+- Evaluate Next.js 16.3 when stable, add analytics only with consent/policy
+  updates, expand catalog categories as inventory warrants, and revisit a keyed
+  metal provider only if production traffic justifies it.
 
 ## Recently Completed
 
-- **2026-08-01 (post-deploy verification):** confirmed against live
-  production — the Facebook post's `Shop:` short link `/p/21` now **302s to
-  the product page** (the multi-day deploy-urgency item, resolved); `.co` and
-  naplesantiquesllc.com 301 path-preservingly to `.com`; the `.co/api/*`
-  carve-out serves 200 so webhooks stay safe; the sitemap is all-`.com` with
-  zero auction URLs; core routes (home/shop/terms/checkout) all 200; and the
-  brand/splash wordmarks render `.com` with no `Jewelry.Co` text remaining.
-  Two gaps found and fixed in source (see "Pending Next Deploy"): the Etsy
-  provisioning 400 and the English retired-page redirects.
-- **2026-08-01:** **eBay tiered shipping policies provisioned** — 7 created,
-  ids recorded in the backlog item above. Etsy attempted and cleanly
-  rejected (no partial state).
-- **2026-08-01:** verified **all five Netlify scheduled functions carry
-  Scheduled badges** with correct next-execution times: `etsy-price-push`
-  (11:15 UTC), `ebay-price-push` (11:45 UTC), `instagram-drip` (14:20 UTC),
-  `facebook-drip` (14:40 UTC), and `instagram-token-refresh` (Mon 12:15 UTC).
-  This closed the same "confirm after deploy" item that appeared separately
-  in the price-automation, Facebook, and Instagram sections.
-- **2026-08-01:** domain switch completed end to end — code sweep, GoDaddy
-  DNS, Netlify primary + cert, env vars, Supabase Auth, PayPal/eBay/Etsy
-  endpoint re-registration, and the Google Search Console `.com` property +
-  sitemap + confirmed Change of Address. Full detail in the domain item above
-  and `CHANGELOG.md`.
-- **2026-07-31:** ran a read-only customer-facing viewport test pass over this
-  session's features in a fresh browser tab (authoritative console). Pages:
-  EN/ES home, EN/ES shop, EN/ES product detail, contact, empty + loaded
-  checkout wizard, privacy, account orders tab + order dialog, root and
-  localized 404. Widths: 320/350/375/390/768/1024/1440 (subset per page,
-  320 everywhere). All pages: zero horizontal overflow, zero pending reveal
-  containers, SuretteSystems banner single-line and lowermost in both
-  locales (9.6px font at 320, 41px strip), EN and ES product tickers
-  one-line at 320, localized weight specs, 404 titles/noindex/actions
-  correct, account dialog fits 375 with no `internal_notes` in the payload,
-  checkout wizard correct at 320/768 ($5,210 tier total + Registered Mail
-  note). Zero console errors across the entire run; no code changed; test
-  cart cleared.
-- **2026-07-31:** moved the Items-table summary into a `tfoot` row on the
-  admin order detail page: Save Line Discounts on the left, Line discounts
-  to its right, and New total starting exactly in the Unit Price column
-  (pixel-verified shared left edge). Fresh-tab console clean; 492 tests,
-  TypeScript, lint, and the 420-page build passed.
-- **2026-07-31:** restructured the admin order-detail Items table to
-  Inventory | Photo | Item | Melt | Unit Price | Qty | Discount: removed
-  Date/Metal/Purity/Weight and the Open column (the title is now the product
-  link), added a row-height thumbnail and a live melt estimate (linked
-  product rows + spot via `calcSpotMeltValue`), tightened padding, and
-  narrowed the discount input to 80px. Also recovered from a corrupted
-  `.next` dev cache that 404'd admin orders routes and broke `tsc` in
-  generated route types (deleted `.next`, rebuilt). Final state verified
-  signed-in with a fresh-tab zero-error console; 492 tests, TypeScript,
-  lint, and the 420-page build passed.
-- **2026-07-31:** made desktop Admin Orders rows clickable (opens the order
-  detail like View; trash view and in-row controls keep their own behavior)
-  and removed admin-only `internal_notes` from the customer account order
-  query, where it was fetched unrendered into the customer's client payload.
-  Signed-in row-click navigation and the internal_notes-free account payload
-  verified pre- and post-build; all 492 tests, TypeScript, lint, and the
-  production build passed with a clean port-3002 restart.
-- **2026-07-31:** added the site-credit footer banner and fixed the root 404
-  title. Every page's footer now ends with a thin full-width strip linking
-  "Website built by SuretteSystems.com" / "Sitio web creado por
-  SuretteSystems.com" to `https://surettesystems.com` (new tab, `noopener`).
-  The Dark Matter credit was previously removed deliberately; the stale
-  `PROJECT_OVERVIEW.md` claim is corrected. The root `not-found.tsx` (all
-  unmatched URLs, including `/es/*`) now exports `Page Not Found` metadata
-  plus noindex instead of inheriting the home title; `notFound()` calls inside
-  the locale segment already had correct localized metadata. Verified via HTTP
-  title/robots probes and EN/ES browser checks; all 492 tests, TypeScript,
-  lint, and the 420-page production build passed, followed by a clean
-  port-3002 restart re-check.
-- **2026-07-31:** hardened the customer page-reveal so the pending→visible flip
-  no longer depends solely on `requestAnimationFrame`. Hidden documents
-  (background tabs, prerendering, non-compositing webviews) suspend rAF and
-  left product pages at opacity 0 with clicks blocked until the page became
-  visible; the reveal now commits immediately while hidden and keeps a bounded
-  500 ms backstop while visible. Verified in a hidden in-app pane (previously
-  stuck `pending` with Add to Cart unclickable; now `visible` with the same
-  click landing); all 492 tests, TypeScript, lint, and the production build
-  passed, followed by a clean port-3002 restart.
-- **2026-07-31:** compacted the mobile Admin Products controls by removing the
-  standalone search row, placing Search first inside the expanded Filters
-  panel, and moving the visible/total count into the table utility row directly
-  right of **Reset view to drag reorder**. The mobile Filters badge includes an
-  active search, and the toolbar/table margins, gaps, and utility-row padding
-  are tighter. Signed-in checks covered 320px inline/full-screen tables, search
-  open/collapse/state/count behavior, 390px mobile, and the unchanged 768px
-  desktop toolbar. All 492 tests, TypeScript, lint, and the complete 420-page
-  production build passed; the restarted port-3002 server repeated the 320px
-  placement and filter-expansion checks.
-- **2026-07-31:** removed the drag-reorder instruction sentence from both the
-  compact and full-screen mobile Admin product tables. When filters or sorting
-  disable reordering, the useful **Reset view to drag reorder** action remains;
-  when there is no mobile action/status to show, the instruction strip is
-  removed entirely. The sentence remains visible at the 768px desktop boundary.
-  Signed-in 320px inline/popup and 768px checks passed, as did all 492 tests,
-  TypeScript, lint, and the complete 420-page production build. The port-3002
-  dev server was cleanly restarted afterward.
-- **2026-07-31:** kept each product image visible while horizontally scrolling
-  the full-screen mobile Admin product table. Inventory number and title now
-  scroll away with the statistics, while selection, image, and row actions
-  remain pinned; the image still opens the correct product-actions dialog.
-  Signed-in checks covered 320/390/767px at a 900px horizontal offset with the
-  image fixed at 36-100px, inventory/title fully offscreen, and no document
-  overflow; the unchanged 768px inline table retains all desktop identity pins.
-  All 492 tests, TypeScript, lint, and the 420-page production build passed,
-  followed by a clean server restart and fresh 320px verification.
-- **2026-07-31:** compacted the mobile **Open Product Table** launcher and
-  placed it directly beside **Add Product**, with search retaining a dedicated
-  full-width row. At 320px the controls measure approximately 151px and 125px
-  and fit without document overflow; 390px also renders cleanly, while the
-  launcher remains hidden in the unchanged 768px desktop toolbar. The button
-  still opens the full-screen table, and Escape closes it and returns focus to
-  the launcher. All 492 tests, TypeScript, lint, and the 420-page production
-  build passed; the restarted server repeated the 320px check with zero browser
-  errors.
-- **2026-07-31:** moved the authenticated administrator's Admin Panel access
-  card above Account Overview at mobile widths. The shared localized card has
-  mutually exclusive mobile and rail placements, so English/Spanish render one
-  visible card: first after the tabs through 700px, and in the original side
-  rail from 701px upward. Signed-in checks covered 320/390/700/701/768/1024px;
-  all 492 tests, TypeScript, lint, and the 420-page build passed, followed by a
-  clean server restart and error-free 390px/768px smoke checks.
-- **2026-07-31:** added the mobile-only **Open Product Table** mode to Admin
-  Products. The same inventory table expands into a dynamic-viewport dialog
-  with 2D touch scrolling, a visible Close control, Escape handling, body-scroll
-  locking, and automatic dismissal at desktop size. Full-screen mobile drops
-  the oversized middle-column pinning so all 1,698px of the table can pan while
-  selection and row actions remain accessible. A later refinement pins only
-  the image from the product-identity group. Signed-in browser checks covered
-  320/390/767px mobile, full horizontal travel through eBay/actions, row-action
-  handoff, and the unchanged 768px inline table. All 492 tests, TypeScript,
-  lint, and the 420-page production build passed; the restarted server repeated
-  the mobile/desktop checks with zero browser errors.
-- **2026-07-31:** kept the complete product price-update ticker on one line at
-  every supported width. The label now uses fluid 8-9.92px type, tighter
-  tracking, and explicit no-wrap behavior instead of dropping the final time
-  suffix onto a second line. English and the longer Spanish copy passed live
-  browser checks at 320px and in the 768px two-column layout. All 492 tests,
-  TypeScript, lint, and the 420-page build passed; the cleanly restarted
-  port-3002 server passed fresh English/Spanish smoke checks with no errors.
-- **2026-07-31:** replaced product-detail/lightbox thumbnail swaps with a
-  deterministic eased sideways flow. One-card advances now expose continuous
-  intermediate positions over about 300 ms; rapid clicks continue from the
-  current offset, resize correction cannot interrupt active motion, and both
-  circular directions animate through their edge clone before the invisible
-  reset. Frame traces, a full nine-image loop, reverse wrap, rapid double click,
-  and lightbox checks passed at 320px with whole-card resting positions. All
-  492 tests, TypeScript, lint, and the 420-page build passed; the restarted
-  fresh-tab smoke test had nine distinct offsets and zero runtime errors.
-- **2026-07-31:** made product-detail and lightbox thumbnail rails show only
-  whole cards by snapping both viewport widths and scroll positions to exact
-  card/gap increments; full circular loops still keep active + next visible.
-  Also added a sub-350px header scale (28px call/cart, 24px menu, proportional
-  glyph/badge sizing) while preserving every English/Spanish action and the
-  full brand. Browser checks covered 320-1440px rails, page/lightbox nine-image
-  loops, and EN/ES 320px headers with no partial cards or page overflow. All
-  492 tests, TypeScript, lint, and the 420-page build passed, followed by a
-  clean port-3002 restart.
-- **2026-07-31:** fixed the thin-mobile product-summary wrap by grouping
-  metal/purity and length into one no-wrap specification unit. The availability
-  badge may occupy its own line, but the specifications now move together
-  instead of orphaning only the length. English/Spanish checks passed at
-  320/350/375/390/768/1024px with no overflow; all 489 tests, TypeScript, lint,
-  and the 420-page build passed, followed by a clean port-3002 restart and
-  post-build browser smoke test.
-- **2026-07-31:** rebuilt the product-detail and lightbox thumbnail rails as
-  responsive circular carousels. Active + next thumbnails stay visible,
-  forward/reverse end wraps animate through hidden edge clones and reset
-  invisibly, and keyboard/touch/reduced-motion/localized behavior is preserved.
-  Verified English/Spanish, main/lightbox, rapid clicks, keyboard, both wrap
-  directions, and 320/375/768/1024/1440px widths with no page overflow; all
-  489 tests, TypeScript, lint, and the 420-page build passed. The port-3002 dev
-  server was restarted after the build and the full wrap passed again.
-- **2026-07-31:** recovered the dev preview from a build/dev `.next` collision
-  that mixed old server HTML with the new header client bundle. Restarted the
-  port-3002 server cleanly; `/`, `/es`, and `/shop` return current markup and
-  the homepage hydrates with zero console issues. Future production builds must
-  run only while the dev server is stopped.
-- **2026-07-31:** fixed the full header brand clipping at thin mobile widths by
-  compacting only the sub-400px gaps/padding and using fluid mobile brand type.
-  English passed at 320/350/375/400px and Spanish at 320px with no header or
-  page overflow; lint, all 485 tests, and the 420-page build passed.
-- **2026-07-31:** full checkout/storefront UX day, all verified green
-  (485 tests, TypeScript, lint, production build after every change):
-  pre-deploy shipping sweep + the three coded-checkout-error fixes; tax
-  moved after shipping in summaries; the checkout page rebuilt as a
-  four-step wizard with a sign-in/guest entry dialog; tap-to-refresh spot
-  pills (shop + product pages) with portaled timestamped notes; product
-  ticker gained "Last updated"; the live iPad hydration error was
-  root-caused to iOS phone-number auto-linking and fixed site-wide via
-  format-detection metadata (verified on all page types); product Weight
-  spec simplified to written-out total grams, properly localized. Also:
-  LAN-accessible detached dev server arranged for owner device testing,
-  and the naplesantiquesllc.com SEO recovery step 1 (GoDaddy forwarding
-  removed, DNS → Netlify, aliases + cert, 301 rules pending deploy).
-- **2026-07-30:** added the eBay account-change reset action (Settings →
-  eBay Sync): dry-run summary first, explicit confirm deletes all local
-  `ebay_listings` rows + the orders cursor, logged to `ebay_sync_log`, eBay
-  listings untouched. Preview verified the dry run against the real 123
-  records and cancelled without deleting; 482 tests, TypeScript, lint, and
-  the build passed. Account-change runbook documented in
-  `features/ebay-sync.md`.
-- **2026-07-30:** extended the shipping tiers to Etsy and eBay (code-complete;
-  owner provisioning pending — see the runbook above). New shared
-  `marketplace_shipping_profiles` mapping table + SQL, idempotent
-  admin provisioning actions in both Settings panels, eBay tier-policy
-  resolution ahead of the legacy standard/express pair with the policy id
-  kept in the content hash, Etsy tier profiles applied at draft creation and
-  reconciled on update/price paths (boundary crossings only on bulk pushes),
-  and fail-closed fallbacks to the existing defaults everywhere. 480 tests,
-  TypeScript, lint, and the production build passed; both admin buttons
-  render in the signed-in settings preview.
-- **2026-07-30:** implemented the owner-approved value-based shipping tiers.
-  `checkout-shipping.ts` now prices by merchandise subtotal (Standard $19 to
-  $165 across eight bands, Registered Mail wording at $5,000+; Express
-  $55/$79/$119, hidden and server-rejected at $5,000+; Local Pickup $0),
-  `buildOrderDraft` resolves the fee after the subtotal, the checkout
-  selector shows live per-option fees with bilingual service notes, and a
-  tested marketplace scaffold awaits the Etsy/eBay shipping sync. Browser
-  checks: $49 item ships at $19; $5,176 item shows $99 + Registered note
-  with Express absent; FL tax $316.50 on the tiered total; tampered Express
-  request rejected 400. All 470 tests, TypeScript, lint, and the production
-  build passed.
-- **2026-07-30:** moved the "Item added" popup's ✕ dismiss control from the
-  bottom-left of the actions row to the popup's top-right corner (borderless
-  gold, title padded so English and Spanish labels never collide). Go to Cart
-  and Clear Cart now stack full-width. Verified in both locales with zero
-  console errors; 462 tests, lint, and the production build passed.
-- **2026-07-30:** changed the header cart icon's has-items state from a solid
-  filled glyph to a readable outline with a 22% translucent gold interior tint
-  (gold color and count badge unchanged; empty state untouched). Browser
-  verification of both states passed with zero console errors; 462 tests,
-  lint, and the production build passed.
-- **2026-07-30:** ran a read-only production-readiness debugging session after
-  the `/payment` removal. Full suite green (462/462 tests, TypeScript, lint,
-  0-vulnerability production audit, complete build). Browser walkthrough of
-  home/shop/product/checkout showed zero console and server errors; checkout
-  totals matched policy for non-FL, Local Pickup, and FL-destination cases;
-  the PayPal SDK/buttons rendered with the not-ready gate blocking payment (no
-  order created, nothing purchased); Spanish and 375px mobile passed.
-  Production probes returned 200 + CSP/HSTS on all key routes; production
-  `/payment` remains live until the next deploy.
-- **2026-07-30:** removed the orphaned pre-PayPal `/payment` placeholder page,
-  its `PaymentClient` component, and all references (secondary-page metadata +
-  test, proxy session prefixes, robots disallows), and fixed the payment doc
-  drift: `features/paypal-checkout.md` now records live status since
-  2026-07-09, the completed go-live checklist, and the `cancel-order` route;
-  `ARCHITECTURE.md`/`COMPLIANCE_AUDIT.md` now record the retired 410 manual
-  order endpoint and removed placeholder. 462/462 tests, TypeScript, lint, and
-  the production build passed; browser checks confirmed `/payment` 404s while
-  `/checkout` renders cleanly.
-- **2026-07-30:** completed a read-only pre-deployment audit of the entire
-  PayPal checkout system with zero code changes. Confirmed in current source:
-  server-authoritative pricing and guards, single shipping catalog, U.S.-only
-  address revalidation, reconciled PayPal breakdowns, deterministic request
-  IDs, capture-evidence-first finalization, recovery/do-not-pay-again locking,
-  row-locked race conflict handling, fail-closed webhook verification with
-  idempotent claims, gated admin refunds, and immediate shop-cache expiration.
-  463/463 tests, TypeScript, lint, and the 419-page production build all
-  passed. Non-blocking findings: remove the orphaned `/payment` placeholder
-  page, and fix the stale "Status: sandbox" header plus missing cancel-order
-  route in `features/paypal-checkout.md`. The live recovery/refund/race matrix
-  remains the one outstanding owner-controlled payment test.
-- **2026-07-29:** implemented safe marketplace price automation. Etsy/eBay
-  writes now reject fallback or missing relevant-metal spot quotes, scheduled
-  runs are time-bounded and batched, eBay's manual action filters completed
-  prices before each 25-item batch, mixed bulk failures fall back to isolated
-  writes, and Admin Settings shows cron-secret readiness plus the last
-  scheduled result. Added staggered daily Netlify functions. All 463 tests,
-  TypeScript, lint, the production audit, and the 419-page build passed.
-- **2026-07-29:** permanently removed the Material Symbols ligature-font
-  failure mode. Migrated all icon rendering to the shared inline-SVG `AppIcon`
-  component with Lucide React 1.27.0, removed decorative listing-editor icons,
-  deleted the font preload/assets/subsetting script, and added source guards
-  against reintroduction or unmapped static icons. All 458 tests, lint, the
-  zero-vulnerability production dependency audit, the 419-page production
-  build, and four sequential local route probes passed.
-- **2026-07-28:** production-verified the deployed product-clock and
-  blocked-probe fixes. English and Spanish product details passed desktop and
-  390x844 checks with Eastern-time ticker labels, visible reveal containers,
-  purchase controls, and zero console warnings/errors. Nine WordPress,
-  XML-RPC, `.env`, `config.json`, and `.git` variants all returned the expected
-  five-byte plain-text 410 response; product security headers remained present.
-- **2026-07-28:** fixed the production product-detail hydration mismatch by
-  formatting the price-update clock explicitly in `America/New_York`. Added a
-  narrowly scoped Netlify Edge handler so blocked WordPress/XML-RPC/dotfile
-  probes return 410 before Next routing. Five focused tests, all 455 tests,
-  lint, and the complete 419-page production build passed. English desktop,
-  390px mobile, and Spanish product checks showed visible content and no
-  console warnings/errors.
-- **2026-07-28:** completed a read-only production smoke test after deployment.
-  Security headers, HTTPS/apex redirects, static caching, robots/sitemap,
-  English/Spanish storefront routes, Available/Sold filtering, the previously
-  affected 390px product detail, Back to Shop context, checkout/PayPal
-  rendering, TradingView, contact/evaluation forms, signed-in Admin, and the AI
-  assistant UI passed without orders, submissions, or saved changes. One
-  recoverable product-detail hydration mismatch and nonuniform 404/410 probe
-  statuses were recorded for follow-up.
-- **2026-07-28:** audited the repeated `29 of 127 pieces` label for Silver +
-  Everything Else without changing code. Available and Sold each genuinely
-  return 29 distinct matching products, both paginate as 1-24 of 29, and show
-  status-appropriate cards and price ranges. The denominator intentionally
-  represents all 127 visible public products.
-- **2026-07-28:** verified all three security SQL scripts against production
-  after the owner re-ran them. Both subscriber RPCs and the rate-limit RPC are
-  blocked for `anon`/`authenticated` and allowed for `service_role`; the
-  rate-limit function has `SECURITY DEFINER`, `search_path=public`, the current
-  deterministic cleanup body, and its supporting index. All seven internal
-  product columns remain blocked while `products.id` remains readable.
-- **2026-07-27:** removed the production build and dependency blockers after
-  revalidating them against current Next documentation, official advisories,
-  and the live npm registry. The shared shop renderer now lives outside
-  `page.tsx`; Next/ESLint config is 16.2.12, Sharp is 0.35.3, and production
-  overrides pin patched PostCSS/Sharp throughout the tree. Production audit,
-  lint, all 452 tests, the complete 419-page build, public route smoke checks,
-  and desktop/mobile browser checks passed.
-- **2026-07-24:** added deterministic confirmation and read-aloud to the Smart
-  Listing Assistant. Overwrites, sensitive facts, and any low/medium/missing
-  confidence value stay pending until accepted; warnings and uncertain
-  unchanged values force clarification questions. Admin-only OpenAI speech
-  includes device-voice fallback, Read Aloud/Stop, and optional automatic
-  playback. Live accept/keep/undo/read-aloud checks passed without saving a
-  listing, as did 18 focused tests, all 452 tests, and lint; build remains
-  blocked only by the existing `renderShopPage` route-contract error.
-- **2026-07-24:** replaced the public shop's Available-only checkbox with
-  mutually exclusive Available/Sold radios. Available is the default for bare
-  and invalid URLs; Sold is explicit and URL-backed. English/Spanish browser
-  checks, 18 focused tests, all 443 tests, and lint passed; build remains
-  blocked only by the existing `renderShopPage` route-contract error.
-- **2026-07-24:** eliminated the homepage carousel's fallback-to-curated
-  hydration swap. The server now renders one cached curated payload into the
-  initial HTML, while local products remain a true failure/empty-selection
-  fallback. Admin saves invalidate the tagged cache immediately. Three focused
-  tests, all 442 tests, lint, initial-HTML inspection, and six repeated preview
-  reloads passed; build remains blocked only by the existing `renderShopPage`
-  route-contract error.
-- **2026-07-24:** changed the Smart Listing Assistant from a one-shot fill into
-  an iterative conversation. It now explains each revision, asks targeted
-  questions for unsupported or conflicting details, accepts repeated typed or
-  spoken follow-up input, and revises the current form without auto-saving.
-  A real two-turn Admin preview passed, as did 9 focused tests, all 439 tests,
-  and lint; build remains blocked only by the existing `renderShopPage`
-  route-contract error.
-- **2026-07-24:** made Back to Shop return buyers to the exact shop page,
-  filters, language, and vertical position they had before opening a product.
-  This is session-scoped, applies to gallery and list product links, and
-  safely falls back to the normal shop route for direct entries. Focused tests,
-  all 437 tests, lint, and a page-2 browser return check passed; build remains
-  blocked only by the existing `renderShopPage` route-contract error.
-- **2026-07-24:** fixed the shared customer-reveal deadlock that could hide
-  multi-image product pages on mobile. Lazy images no longer block visibility,
-  and a 1.4-second fallback prevents any slow media resource from leaving a
-  customer page hidden. The affected 15-image product and 27 additional
-  English/Spanish public routes passed 390px browser checks with no
-  pending/hidden reveal containers or console errors. Lint and all 435 tests
-  passed; build compiled but remains blocked by the existing
-  `renderShopPage` route-contract error.
-- **2026-07-24:** confirmed the local Next.js development preview starts at
-  `http://localhost:3000`; homepage and `/shop` browser smoke checks passed.
-
-- **2026-07-23:** added and desktop-verified hover/press affordances for
-  storefront, account, contact, cart, and checkout controls; mobile-only
-  controls were intentionally excluded. Lint passed; the known
-  `renderShopPage` build blocker remains.
-- **2026-07-23:** removed the pale yellow hover fill from the desktop Saved
-  Items and Cart nav icons while retaining non-color hover/press feedback.
-- **2026-07-23:** refined those nav icons to move only the glyph on hover and
-  press; the surrounding button no longer lifts or casts a shadow.
-- **2026-07-23:** removed the Total, Available, and Sold inventory summary
-  cards from Admin Products at the shared component level for every viewport.
-  Lint passed; build compilation succeeded but the known route-contract error
-  remains.
-- **2026-07-23:** locked the Admin Products shell to the dynamic viewport and
-  kept only the product-table wrapper scrollable, preventing page-level scroll
-  on desktop, tablet, and mobile layouts.
-- **2026-07-23:** centralized U.S.-only address validation and the three
-  checkout shipping rates; owner policy now taxes charged shipping for Florida
-  orders while non-Florida Florida-tax remains $0.
-- **2026-07-23:** completed a no-write shop thumbnail-delivery audit.
-- **2026-07-22:** added necklace/bracelet width storage, admin/AI intake,
-  gallery/list display, and conditional public filters; SQL was applied and
-  verified.
-- **2026-07-22:** normalized product length input and fixed legacy/current
-  length filter matching.
-- **2026-07-22:** fixed responsive filter access, narrow toolbar overflow, and
-  pagination gaps; added gallery image progress and the optimized nav logo.
-- **2026-07-21:** hardened API abuse controls and dependency overrides; last
-  audits reported zero vulnerabilities.
-- **2026-07-21:** repaired Etsy's resumable multi-image queue and recovered all
-  affected linked rows.
-- **2026-07-20:** applied and verified PayPal hardening, product-video schema,
-  sold-price locking, shipment tracking, and current order-email schema.
+- **2026-08-04:** each hero slideshow gained a Manual / Random gold / Random
+  silver item-source radio in Admin Settings. Random modes draw
+  `RANDOM_LINEUP_SIZE` (10) available pieces of that `products.category`
+  server-side on each cache rebuild; curated lineups are preserved beneath
+  the toggle. Pending: the manual add-random-lineup-modes.sql run flagged
+  above.
+- **2026-08-03:** the second hero slideshow gained its own admin-curated
+  lineup (twin table `carousel_selection_alt`, Slideshow 1/2 tabs in Admin
+  Settings, Save Both Slideshows) with mirror-fallback when empty, plus a
+  deferred mount so initial page load carries exactly one carousel. Pending:
+  the manual add-second-lineup.sql run flagged above.
+- **2026-08-03:** the homepage hero became a scroll-pinned two-slideshow
+  parallax stack, then refined so the headline/sign-up/CTA overlay
+  (`HomeHeroOverlay`) stays pinned while only the slideshows (`HomeHero`
+  panes) cross in opposite directions, hold, and break free with the frame.
+  Verified locally (tsc, lint, 702/702, 445-page build, browser walkthrough
+  desktop + mobile).
+- **2026-08-03:** Instagram and Facebook inside **Latest Posts** now collapse
+  independently from their full-width accessible headers, leaving a compact
+  count-and-chevron row while the hidden channel is out of the way.
+- **2026-08-03:** Social Queues gained a **Latest Posts** modal for the 12 newest
+  live receipts per channel, with view/manage links, conservative refresh,
+  public comment composition, confirmed Facebook deletion, and manual
+  Instagram-removal guidance.
+- **2026-08-03:** Social Queues now supports independent Instagram/Facebook row
+  selection and one-confirmation **Post selected now**. Batches publish
+  sequentially through the existing receipt-safe channel paths and stop/resume
+  at a failed item without repeating completed posts.
+- **2026-08-03:** removed the owner-configured daily limit from both social
+  queues. Settings, status responses, dashboard copy, and worker scheduling no
+  longer expose or enforce a local daily cap; each worker invocation retains a
+  25-row safety batch, and Instagram still respects Meta's provider quota.
+- **2026-08-03:** documentation cleanup removed 41 superseded planning,
+  kickoff, legacy-audit, and handoff files. Current Etsy/eBay operator guidance
+  was consolidated into the feature runbooks; Instagram and shipping plans were
+  reduced to current contracts.
+- **2026-08-03:** social queue buttons now keep their content inside a responsive
+  two-column grid at 600px/900px, and all scheduling surfaces share seven
+  Eastern slots: noon, 2, 4, 6, 8, 10, and midnight.
+- **2026-08-03:** social setup copy now says the generated CARD image becomes
+  slide 1, eliminating the prior order ambiguity.
+- **2026-08-02:** route-persistent background **Post now**, full Social Queues
+  dashboard/edit-return path, fixed scheduling, queue-both, guided preparation,
+  exact photo framing/crop preview, slide viewer, AI opener controls, cross-
+  channel wording/photo sync, conservative status refresh, and Facebook
+  interrupted-publish recovery were completed locally.
+- **2026-08-02:** Facebook app secret was configured in local and all Netlify
+  contexts; a Page token passed same-Page, read-access, app, and lifetime checks.
+- **2026-08-02:** Etsy's seven insured-shipping profiles were provisioned after
+  its delivery-days fix; eBay's seven policies were provisioned 2026-08-01.
+- **2026-08-01:** `.com` became the live primary domain. DNS, redirects, cert,
+  environments, external endpoints, sitemap, Search Console, and Change of
+  Address were completed and production-verified; email deliberately stayed on
+  `.co`.
+- **2026-08-01:** all five marketplace/social Netlify functions showed Scheduled
+  badges, and core `.com` routes plus legacy-domain redirects were verified.

@@ -8,6 +8,36 @@ const intl = createIntlMiddleware(routing);
 const INTERNAL_LOCALE_HEADER = 'x-naples-internal-locale';
 const NEXT_INTL_LOCALE_HEADER = 'X-NEXT-INTL-LOCALE';
 
+const CANONICAL_ORIGIN = 'https://naplesestatejewelry.com';
+
+// Legacy hosts that must 301 to the canonical .com origin. netlify.toml also
+// redirects these, but this proxy runs FIRST and rewrites /shop -> /en/shop
+// below, so the netlify rule then splats the already-localized path and emits
+// .com/en/shop — which next-intl immediately 307s back to /shop. That is two
+// hops for every legacy link, defeating the "hop once, never twice" intent
+// documented in netlify.toml. Redirecting here, before the locale rewrite,
+// keeps it to one.
+//
+// Paths outside this proxy's matcher (/api/*, robots.txt, sitemap) never reach
+// here and keep using the netlify.toml rules, which already resolve in one hop.
+// That is deliberate: the .co/api/* carve-out must stay a 200 rewrite because
+// external webhook POSTs (Resend, PayPal, eBay) do not follow 301s.
+const LEGACY_HOSTS = new Set([
+  'naplesestatejewelry.co',
+  'www.naplesestatejewelry.co',
+  'naplesantiquesllc.com',
+  'www.naplesantiquesllc.com',
+]);
+
+function canonicalHostRedirect(request: NextRequest): NextResponse | null {
+  const host = (request.headers.get('host') ?? '').toLowerCase().split(':')[0];
+  if (!LEGACY_HOSTS.has(host)) return null;
+  return NextResponse.redirect(
+    `${CANONICAL_ORIGIN}${request.nextUrl.pathname}${request.nextUrl.search}`,
+    301,
+  );
+}
+
 const SESSION_PATH_PREFIXES = [
   '/account',
   '/admin',
@@ -63,7 +93,13 @@ async function refreshSupabaseSession(request: NextRequest, response: NextRespon
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // Legacy/retired paths first — nothing below may run for these.
+  // Legacy HOSTS first, so the visitor lands on the canonical origin in one hop
+  // and every rule below (retired paths, locale) is then evaluated exactly once,
+  // on .com only.
+  const hostRedirect = canonicalHostRedirect(request);
+  if (hostRedirect) return hostRedirect;
+
+  // Legacy/retired paths next — nothing below may run for these.
   const legacy = legacyRedirect(request);
   if (legacy) return legacy;
 

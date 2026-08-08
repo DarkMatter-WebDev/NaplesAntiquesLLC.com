@@ -3,6 +3,7 @@ import { getProductImages, getProductMetal, getProductWeight } from '@/lib/sales
 import { formatPublicPurity } from '@/types/sales';
 import { getMarketplaceSpotPriceError, getProductPriceValue } from '@/lib/pricing';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
+import { fallbackSocialCaptionOpening, normalizeSocialCaptionOpening } from '@/lib/social-caption-opening';
 import {
   INSTAGRAM_MAX_CAPTION_CHARS,
   INSTAGRAM_MAX_CAROUSEL_ITEMS,
@@ -232,6 +233,18 @@ function toHashtag(value: string): string | null {
     .replace(/[̀-ͯ]/g, '')
     .replace(/[^A-Za-z0-9]/g, '')
     .toLowerCase();
+  // House style: every direct Tiffany brand-tag variant collapses to the one
+  // explicit public spelling requested by the owner. This also repairs legacy
+  // configured tags such as #tiffanyco instead of letting both variants appear.
+  if (
+    cleaned === 'tiffany'
+    || cleaned === 'tiffanyco'
+    || cleaned === 'tiffanyandco'
+    || cleaned === 'tiffanycompany'
+    || cleaned === 'tiffanyandcompany'
+  ) {
+    return 'tiffanyandco';
+  }
   return cleaned.length >= 3 ? cleaned : null;
 }
 
@@ -279,6 +292,8 @@ export function buildHashtags(product: Product, baseHashtags: string[]): string[
 export function buildInstagramPost(params: {
   product: Product;
   spotData: SpotData | null;
+  /** AI-generated and server-validated opening from the review/prepare flow. */
+  captionOpening?: string | null;
   settings?: Partial<InstagramCaptionSettings>;
   /** Operator's Instagram-only ordered lineup; null means product order. */
   imageSelection?: string[] | null;
@@ -344,9 +359,9 @@ export function buildInstagramPost(params: {
   }
 
   // ---- Caption ------------------------------------------------------------
-  // Mirrors the Facebook message structure line for line (owner, 2026-08-01):
-  // a bare "Available now!" hook opens the post, the title follows, the spec
-  // line carries the facts, and the price sentence closes the facts block —
+  // Mirrors the Facebook message structure line for line: one short,
+  // personable sentence combines the availability hook and exact title, the
+  // spec line carries the facts, and the price sentence closes the facts block —
   // with exactly one blank line between EVERY line (uniform rhythm) and no
   // description body. Spot-linked prices carry their basis in parentheses so
   // "at time of posting" reads as a fact, not a hedge.
@@ -357,13 +372,13 @@ export function buildInstagramPost(params: {
       : null;
 
   const lines: string[] = [];
-  // Only claimed while the product really is available; a queued post that
-  // publishes after a sale would otherwise open with a lie.
-  if (product.status === 'available') {
-    lines.push('Available now!');
-    lines.push('');
-  }
-  lines.push(product.title.trim());
+  // Revalidate even server-generated text here so direct callers and tests
+  // cannot accidentally publish a stale title or availability claim.
+  const captionOpening = normalizeSocialCaptionOpening(params.captionOpening, product, {
+    requireExactTitle: false,
+  })
+    ?? fallbackSocialCaptionOpening(product);
+  lines.push(captionOpening);
   lines.push('');
 
   const specLine = buildPublicSpecLine(product);
@@ -385,15 +400,16 @@ export function buildInstagramPost(params: {
     }
   }
 
-  // Instagram never linkifies caption URLs, so unlike Facebook's clickable
-  // Shop line this is a TYPEABLE short link for human eyes — brand-case host,
-  // no protocol, short enough to remember. It also replaces the inventory
-  // number as the way a buyer pins down exactly which piece this is.
+  // Instagram never linkifies caption URLs. Point people to the profile's live
+  // store link, then keep this item's typeable short path directly underneath.
+  // The two lines intentionally have no blank line between them; the normal
+  // caption spacing still surrounds the block.
   lines.push('');
+  lines.push('Store link in bio');
   lines.push(
     product.inventory_number != null
-      ? `Shop: NaplesEstateJewelry.com/p/${product.inventory_number}`
-      : 'Shop: NaplesEstateJewelry.com',
+      ? `Item: NaplesEstateJewelry.com/p/${product.inventory_number}`
+      : 'Item: NaplesEstateJewelry.com',
   );
 
   if (settings.cta) {

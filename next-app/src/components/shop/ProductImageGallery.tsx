@@ -16,12 +16,10 @@ import {
 import { productThumbnailLoading } from '@/lib/storefront-image-loading';
 import { AppIcon } from '@/components/AppIcon';
 
-const ZOOM = 3;    // magnification
-const PANEL = 220; // floating zoom box size px
-const MOBILE_PANEL = 190;
-// A small non-interactive border around each image where the magnifier does not
-// activate, so the prev/next buttons at the edges stay usable.
-const EDGE_DEAD_ZONE = 44;
+// The hover/touch magnifier was removed on 2026-08-04 (owner request) at every
+// viewport. Full-size viewing is the lightbox, which is what the main image's
+// click already opens. Anything reintroducing a magnifier also has to bring back
+// the edge dead-zone it needed to keep the prev/next buttons usable.
 const thumbnailAnimationFrames = new WeakMap<HTMLDivElement, number>();
 
 function cancelThumbnailTrackAnimation(track: HTMLDivElement) {
@@ -260,30 +258,10 @@ interface Props {
   locale?: string;
 }
 
-interface ZoomState {
-  source: 'main' | 'lightbox'; // which image is being magnified
-  lensX: number;
-  lensY: number;
-  lensSize: number;   // matches the magnified region (panelSize / ZOOM)
-  panelLeft: number;  // viewport x for the floating box
-  panelTop: number;   // viewport y for the floating box
-  panelSize: number;
-  bgX: number;
-  bgY: number;
-  bw: number;
-  bh: number;
-}
-
 export default function ProductImageGallery({ images, title, imagePadding = null, imagePaddingByImage = null, video = null, locale = 'en' }: Props) {
   const [active, setActive] = useState(0);
   const [videoSelected, setVideoSelected] = useState(false);
-  const [zoom, setZoom] = useState<ZoomState | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
-  const lightboxContainerRef = useRef<HTMLDivElement>(null);
-  const lightboxImageRef = useRef<HTMLImageElement>(null);
-  const touchZoomingRef = useRef(false);
   // Cross-fade between image switches: the outgoing image stays underneath while
   // the new one fades in on top, then is cleared when the fade completes.
   const [prevImage, setPrevImage] = useState<string | null>(null);
@@ -303,7 +281,6 @@ export default function ProductImageGallery({ images, title, imagePadding = null
     fullSizeViewer: `${title} - visor de imagen en tamaño completo`,
     closeImageViewer: 'Cerrar visor de imágenes',
     close: 'Cerrar',
-    hoverToMagnify: 'Pase el cursor para ampliar',
     previousImage: 'Imagen anterior',
     nextImage: 'Imagen siguiente',
   } : {
@@ -318,7 +295,6 @@ export default function ProductImageGallery({ images, title, imagePadding = null
     fullSizeViewer: `${title} - full size image viewer`,
     closeImageViewer: 'Close image viewer',
     close: 'Close',
-    hoverToMagnify: 'Hover to magnify',
     previousImage: 'Previous image',
     nextImage: 'Next image',
   };
@@ -341,38 +317,29 @@ export default function ProductImageGallery({ images, title, imagePadding = null
     prepareNavigation: prepareLightboxThumbnailNavigation,
   } = useCircularThumbnailTrack(images.length, active, lightboxOpen, 8);
 
-  const closeZoom = useCallback(() => {
-    touchZoomingRef.current = false;
-    setZoom(null);
-  }, []);
-
   const moveToImage = useCallback((index: number) => {
-    closeZoom();
     setVideoSelected(false);
     setActive(index);
-  }, [closeZoom]);
+  }, []);
 
   const moveToVideo = useCallback(() => {
-    closeZoom();
     setLightboxOpen(false);
     setVideoSelected(true);
-  }, [closeZoom]);
+  }, []);
 
   const showPreviousImage = useCallback(() => {
-    closeZoom();
     const targetIndex = (active - 1 + images.length) % images.length;
     prepareLightboxThumbnailNavigation(getThumbnailLoopDirection(active, targetIndex, images.length));
     prepareMediaThumbnailNavigation(null);
     setActive(targetIndex);
-  }, [active, closeZoom, images.length, prepareLightboxThumbnailNavigation, prepareMediaThumbnailNavigation]);
+  }, [active, images.length, prepareLightboxThumbnailNavigation, prepareMediaThumbnailNavigation]);
 
   const showNextImage = useCallback(() => {
-    closeZoom();
     const targetIndex = (active + 1) % images.length;
     prepareLightboxThumbnailNavigation(getThumbnailLoopDirection(active, targetIndex, images.length));
     prepareMediaThumbnailNavigation(null);
     setActive(targetIndex);
-  }, [active, closeZoom, images.length, prepareLightboxThumbnailNavigation, prepareMediaThumbnailNavigation]);
+  }, [active, images.length, prepareLightboxThumbnailNavigation, prepareMediaThumbnailNavigation]);
 
   const showPreviousMedia = useCallback(() => {
     const currentIndex = videoSelected ? mediaItems.findIndex((item) => item.type === 'video') : mediaItems.findIndex((item) => item.type === 'image' && item.index === active);
@@ -394,20 +361,30 @@ export default function ProductImageGallery({ images, title, imagePadding = null
     else if (target) moveToImage(target.index);
   }, [active, mediaItems, moveToImage, moveToVideo, prepareLightboxThumbnailNavigation, prepareMediaThumbnailNavigation, videoSelected]);
 
+  // A finished swipe must not also open the lightbox: the browser still fires a
+  // click after the gesture, and to that handler a swipe is indistinguishable
+  // from a tap.
+  const suppressNextClick = useRef(false);
+
   const openLightbox = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (videoSelected) return;
-    // Ignore clicks that land on the prev/next edge buttons.
-    if (e.target instanceof HTMLElement && e.target.closest('.product-gallery-edge-button')) return;
-    closeZoom();
+    if (suppressNextClick.current) {
+      suppressNextClick.current = false;
+      return;
+    }
+    // Ignore clicks that land on the prev/next edge buttons. `Element`, NOT
+    // `HTMLElement`: the chevron inside each button is an inline SVG, and an
+    // SVGElement fails an `instanceof HTMLElement` test — which is exactly why
+    // clicking the visible arrow used to fall through and open the lightbox
+    // (fixed 2026-08-04). The buttons also stop propagation themselves; this
+    // stays as the backstop for a click landing on the button's padding.
+    if (e.target instanceof Element && e.target.closest('.product-gallery-edge-button')) return;
     setLightboxOpen(true);
-  }, [closeZoom, videoSelected]);
+  }, [videoSelected]);
 
-  // Closing the lightbox also clears any active magnifier — the zoom panel
-  // renders outside the lightbox portal, so it would otherwise linger.
   const closeLightbox = useCallback(() => {
-    closeZoom();
     setLightboxOpen(false);
-  }, [closeZoom]);
+  }, []);
 
   // While the lightbox is open: lock body scroll and wire Esc / arrow keys.
   useEffect(() => {
@@ -435,117 +412,139 @@ export default function ProductImageGallery({ images, title, imagePadding = null
     return () => window.clearTimeout(timer);
   }, [prevImage]);
 
-  const updateZoom = useCallback((
-    clientX: number,
-    clientY: number,
-    mode: 'mouse' | 'touch',
-    container: HTMLDivElement | null,
-    img: HTMLImageElement | null,
-    source: 'main' | 'lightbox',
-  ) => {
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    let imageLeft = rect.left;
-    let imageTop = rect.top;
-    let imageWidth = rect.width;
-    let imageHeight = rect.height;
-
-    if (img?.naturalWidth && img.naturalHeight) {
-      const frameRatio = rect.width / rect.height;
-      const imageRatio = img.naturalWidth / img.naturalHeight;
-
-      if (imageRatio > frameRatio) {
-        imageWidth = rect.width;
-        imageHeight = rect.width / imageRatio;
-        imageTop = rect.top + (rect.height - imageHeight) / 2;
-      } else {
-        imageHeight = rect.height;
-        imageWidth = rect.height * imageRatio;
-        imageLeft = rect.left + (rect.width - imageWidth) / 2;
-      }
-    }
-
-    const x = Math.max(0, Math.min(clientX - imageLeft, imageWidth));
-    const y = Math.max(0, Math.min(clientY - imageTop, imageHeight));
-
-    const panelSize = mode === 'touch'
-      ? Math.min(MOBILE_PANEL, Math.max(150, window.innerWidth - 32))
-      : PANEL;
-    // The lens marks exactly the region the panel magnifies (panelSize / ZOOM),
-    // so the on-image highlight and the zoomed view stay in alignment.
-    const lensSize = panelSize / ZOOM;
-    const lensX = imageLeft - rect.left + x - lensSize / 2;
-    const lensY = imageTop - rect.top + y - lensSize / 2;
-
-    // Center the magnifier on the cursor (a magnifying glass), clamped to the
-    // viewport so it stays fully on-screen near the edges.
-    let panelLeft = clientX - panelSize / 2;
-    let panelTop = clientY - panelSize / 2;
-    if (panelLeft < 8) panelLeft = 8;
-    else if (panelLeft + panelSize > window.innerWidth - 8) panelLeft = window.innerWidth - 8 - panelSize;
-    if (panelTop < 8) panelTop = 8;
-    else if (panelTop + panelSize > window.innerHeight - 8) panelTop = window.innerHeight - 8 - panelSize;
-
-    // Center the hovered point in the zoom box
-    const bw = imageWidth * ZOOM;
-    const bh = imageHeight * ZOOM;
-    const bgX = -(x * ZOOM - panelSize / 2);
-    const bgY = -(y * ZOOM - panelSize / 2);
-
-    setZoom({ source, lensX, lensY, lensSize, panelLeft, panelTop, panelSize, bgX, bgY, bw, bh });
+  // An edge arrow navigates and nothing else: the main image sits under it and
+  // opens the lightbox on click, so the button must not let that click bubble.
+  const handleEdgeNavigation = useCallback((e: React.MouseEvent<HTMLButtonElement>, move: () => void) => {
+    e.stopPropagation();
+    move();
   }, []);
 
-  const handleZoomPointerMove = useCallback((
-    e: React.PointerEvent<HTMLDivElement>,
-    container: HTMLDivElement | null,
-    img: HTMLImageElement | null,
-    source: 'main' | 'lightbox',
-  ) => {
-    if (!container) return;
-    // Non-interactive perimeter: don't magnify within a small margin of the image
-    // edges, so the prev/next buttons at the sides stay usable without the
-    // magnifier fighting them. (Clicking the edge buttons still navigates.)
-    const rect = container.getBoundingClientRect();
-    if (
-      e.clientX < rect.left + EDGE_DEAD_ZONE || e.clientX > rect.right - EDGE_DEAD_ZONE ||
-      e.clientY < rect.top + EDGE_DEAD_ZONE || e.clientY > rect.bottom - EDGE_DEAD_ZONE
-    ) {
-      closeZoom();
+  /**
+   * Fade each edge bar in as the cursor approaches ITS side (owner request
+   * 2026-08-04), reaching solid once the pointer is actually over the bar.
+   * Writes two custom properties on the frame; the bars read their own one, so
+   * this is a single element to update per move.
+   *
+   * The CLICKABLE area is unchanged — only the reveal ramps. That separation is
+   * the point: the bar can advertise itself from a distance without widening
+   * the region that steals a click meant for the lightbox.
+   */
+  const revealFrameRef = useRef<HTMLDivElement>(null);
+  const revealFrameId = useRef<number | null>(null);
+
+  const paintEdgeReveal = useCallback((clientX: number | null) => {
+    const frame = revealFrameRef.current;
+    if (!frame) return;
+    if (clientX == null) {
+      frame.style.setProperty('--edge-prev-reveal', '0');
+      frame.style.setProperty('--edge-next-reveal', '0');
       return;
     }
+    const rect = frame.getBoundingClientRect();
+    if (!rect.width) return;
+    const barWidth = frame
+      .querySelector<HTMLElement>('.product-gallery-edge-next')
+      ?.getBoundingClientRect().width ?? 0;
+    // The ramp reaches this far INWARD from the bar's inner edge. Proportional
+    // so a 576px frame and a 344px one feel the same.
+    const ramp = rect.width * 0.28;
+    const reveal = (distanceFromEdge: number) => {
+      const inward = distanceFromEdge - barWidth;
+      if (inward <= 0) return 1;
+      if (inward >= ramp) return 0;
+      const t = 1 - inward / ramp;
+      return t * t * (3 - 2 * t); // smoothstep: faint far out, firm up close
+    };
+    const x = clientX - rect.left;
+    frame.style.setProperty('--edge-prev-reveal', reveal(x).toFixed(3));
+    frame.style.setProperty('--edge-next-reveal', reveal(rect.width - x).toFixed(3));
+  }, []);
 
-    if (e.pointerType === 'mouse') {
-      updateZoom(e.clientX, e.clientY, 'mouse', container, img, source);
+  const pendingRevealX = useRef<number | null>(null);
+
+  /**
+   * Swipe the main image to change photo (owner request 2026-08-05). This is
+   * the ONLY on-image control below 768px, where the edge bars are hidden; from
+   * 768px up it runs alongside them.
+   *
+   * Touch pointers only — a mouse drag stays a plain click so the lightbox and
+   * text selection behave as before.
+   */
+  const swipe = useRef<{ x: number; y: number; id: number; horizontal: boolean; moved: boolean } | null>(null);
+
+  const handleFramePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse' || videoSelected || !hasMultipleMedia) return;
+    swipe.current = { x: e.clientX, y: e.clientY, id: e.pointerId, horizontal: false, moved: false };
+  }, [hasMultipleMedia, videoSelected]);
+
+  const handleFramePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const gesture = swipe.current;
+    if (gesture && e.pointerId === gesture.id) {
+      // Commit to "this is a swipe" only once the movement is clearly sideways,
+      // so a vertical scroll that starts on the photo still scrolls the page.
+      const dx = e.clientX - gesture.x;
+      const dy = e.clientY - gesture.y;
+      if (Math.hypot(dx, dy) > 10) gesture.moved = true;
+      if (!gesture.horizontal && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+        gesture.horizontal = true;
+      }
       return;
     }
+    // Mouse only. A touch device keeps the CSS `(hover: none)` treatment, and
+    // writing an inline value here would override it permanently after one tap.
+    if (e.pointerType !== 'mouse') return;
+    // Always record the LATEST position, then coalesce to one paint per frame.
+    // Storing it in a ref rather than capturing it in the callback matters: the
+    // scheduled frame must paint where the cursor is now, not where it was when
+    // the frame was first requested.
+    pendingRevealX.current = e.clientX;
+    if (revealFrameId.current !== null) return;
+    revealFrameId.current = window.requestAnimationFrame(() => {
+      revealFrameId.current = null;
+      paintEdgeReveal(pendingRevealX.current);
+    });
+  }, [paintEdgeReveal]);
 
-    if (touchZoomingRef.current) {
-      e.preventDefault();
-      updateZoom(e.clientX, e.clientY, 'touch', container, img, source);
+  const handleFramePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const gesture = swipe.current;
+    swipe.current = null;
+    if (!gesture || e.pointerId !== gesture.id) return;
+    // ANY drag swallows the click that follows — horizontal or not, and even a
+    // horizontal one too short to advance. The visitor dragged, they did not
+    // tap, so the lightbox must not open. Browsers usually suppress the click
+    // themselves once a touch becomes a scroll, but that is not something to
+    // depend on.
+    if (gesture.moved) suppressNextClick.current = true;
+    if (!gesture.horizontal) return;
+    const dx = e.clientX - gesture.x;
+    const frameWidth = revealFrameRef.current?.getBoundingClientRect().width ?? 0;
+    // Proportional, with a floor, so the gesture feels the same on a 344px
+    // phone frame and a 576px tablet one.
+    if (Math.abs(dx) < Math.max(40, frameWidth * 0.12)) return;
+    if (dx < 0) showNextMedia();
+    else showPreviousMedia();
+  }, [showNextMedia, showPreviousMedia]);
+
+  const handleFramePointerCancel = useCallback(() => {
+    swipe.current = null;
+  }, []);
+
+  const handleFramePointerLeave = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'mouse') return;
+    // Cancel any queued paint, or it would re-light the bar just after the
+    // pointer left (rAF does not run while the tab is hidden, so a stale frame
+    // can land much later).
+    if (revealFrameId.current !== null) {
+      window.cancelAnimationFrame(revealFrameId.current);
+      revealFrameId.current = null;
     }
-  }, [closeZoom, updateZoom]);
+    pendingRevealX.current = null;
+    paintEdgeReveal(null);
+  }, [paintEdgeReveal]);
 
-  const handleNavigationPointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    closeZoom();
-  }, [closeZoom]);
-
-  const handleZoomPointerDown = useCallback((
-    e: React.PointerEvent<HTMLDivElement>,
-    container: HTMLDivElement | null,
-    img: HTMLImageElement | null,
-    source: 'main' | 'lightbox',
-  ) => {
-    if (e.pointerType === 'mouse') return;
-    e.preventDefault();
-    touchZoomingRef.current = true;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    updateZoom(e.clientX, e.clientY, 'touch', container, img, source);
-  }, [updateZoom]);
-
-  const handlePointerLeave = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType === 'mouse') closeZoom();
-  }, [closeZoom]);
+  useEffect(() => () => {
+    if (revealFrameId.current !== null) window.cancelAnimationFrame(revealFrameId.current);
+  }, []);
 
   if (!images.length) {
     return (
@@ -578,17 +577,25 @@ export default function ProductImageGallery({ images, title, imagePadding = null
   return (
     <div className="flex flex-col gap-3">
       {/* Main image */}
+      {/* `pan-y pinch-zoom` hands horizontal gestures to the swipe handler while
+          leaving vertical scrolling AND pinch-zoom to the browser — a plain
+          `none` would take all three, and `auto` would let the browser consume
+          the horizontal drag before we see it. */}
       <div
-        ref={containerRef}
-        className="relative aspect-square overflow-hidden"
-        style={{ background: videoSelected ? '#0b0b0b' : imageFrameBackground, cursor: videoSelected ? 'default' : 'crosshair', touchAction: videoSelected ? 'auto' : 'none' }}
+        ref={revealFrameRef}
+        onPointerDown={handleFramePointerDown}
+        onPointerMove={handleFramePointerMove}
+        onPointerUp={handleFramePointerUp}
+        onPointerCancel={handleFramePointerCancel}
+        onPointerLeave={handleFramePointerLeave}
+        className="product-gallery-frame relative aspect-square overflow-hidden"
+        style={{
+          background: videoSelected ? '#0b0b0b' : imageFrameBackground,
+          cursor: videoSelected ? 'default' : 'zoom-in',
+          touchAction: videoSelected ? 'auto' : 'pan-y pinch-zoom',
+        }}
         title={videoSelected ? labels.productVideo : labels.viewFullSize}
         onClick={openLightbox}
-        onPointerDown={(e) => handleZoomPointerDown(e, containerRef.current, imageRef.current, 'main')}
-        onPointerMove={(e) => handleZoomPointerMove(e, containerRef.current, imageRef.current, 'main')}
-        onPointerLeave={handlePointerLeave}
-        onPointerUp={closeZoom}
-        onPointerCancel={closeZoom}
       >
         {videoSelected && video ? (
           <iframe
@@ -613,7 +620,6 @@ export default function ProductImageGallery({ images, title, imagePadding = null
         )}
         <Image
           key={current}
-          ref={imageRef}
           src={current}
           alt={title}
           fill
@@ -627,55 +633,30 @@ export default function ProductImageGallery({ images, title, imagePadding = null
 
         {hasMultipleMedia && (
           <>
+            {/* Full-height bars, not floating circles: the hit area has always
+                been the whole side of the frame, so the bar draws exactly what
+                is clickable. */}
             <button
               type="button"
-              className="product-gallery-edge-button product-gallery-edge-prev absolute left-0 top-0 z-10 flex h-full w-[28%] items-center justify-start px-3 text-[var(--color-primary)] opacity-0 transition-opacity hover:opacity-100 focus:opacity-100"
-              onPointerDown={handleNavigationPointerDown}
-              onClick={showPreviousMedia}
+              className="product-gallery-edge-button product-gallery-edge-prev"
+              onClick={(e) => handleEdgeNavigation(e, showPreviousMedia)}
               aria-label={labels.previousMedia}
               title={labels.previousMedia}
             >
-              <span
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(115,92,0,0.28)] bg-white/85 shadow-sm backdrop-blur"
-                aria-hidden="true"
-              >
-                <AppIcon name="chevron_left" className="text-[30px] leading-none" />
-              </span>
+              <AppIcon name="chevron_left" className="product-gallery-edge-chevron" aria-hidden="true" />
             </button>
             <button
               type="button"
-              className="product-gallery-edge-button product-gallery-edge-next absolute right-0 top-0 z-10 flex h-full w-[28%] items-center justify-end px-3 text-[var(--color-primary)] opacity-0 transition-opacity hover:opacity-100 focus:opacity-100"
-              onPointerDown={handleNavigationPointerDown}
-              onClick={showNextMedia}
+              className="product-gallery-edge-button product-gallery-edge-next"
+              onClick={(e) => handleEdgeNavigation(e, showNextMedia)}
               aria-label={labels.nextMedia}
               title={labels.nextMedia}
             >
-              <span
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(115,92,0,0.28)] bg-white/85 shadow-sm backdrop-blur"
-                aria-hidden="true"
-              >
-                <AppIcon name="chevron_right" className="text-[30px] leading-none" />
-              </span>
+              <AppIcon name="chevron_right" className="product-gallery-edge-chevron" aria-hidden="true" />
             </button>
           </>
         )}
 
-        {/* Lens square */}
-        {!videoSelected && zoom && zoom.source === 'main' && (
-          <div
-            style={{
-              position: 'absolute',
-              left: zoom.lensX,
-              top: zoom.lensY,
-              width: zoom.lensSize,
-              height: zoom.lensSize,
-              border: '2px solid rgba(115,92,0,0.65)',
-              background: 'rgba(255,255,255,0.12)',
-              pointerEvents: 'none',
-              boxSizing: 'border-box',
-            }}
-          />
-        )}
       </div>
 
       {/* Thumbnails */}
@@ -684,7 +665,7 @@ export default function ProductImageGallery({ images, title, imagePadding = null
           <button
             type="button"
             onClick={showPreviousMedia}
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center border border-[var(--color-outline-variant)] bg-white text-[var(--color-primary)] transition-colors hover:border-[var(--color-primary)] hover:bg-[rgba(212,160,23,0.08)]"
+            className="product-gallery-thumb-nav"
             aria-label={labels.previousMediaThumbnail}
             title={labels.previousMedia}
           >
@@ -765,39 +746,13 @@ export default function ProductImageGallery({ images, title, imagePadding = null
           <button
             type="button"
             onClick={showNextMedia}
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center border border-[var(--color-outline-variant)] bg-white text-[var(--color-primary)] transition-colors hover:border-[var(--color-primary)] hover:bg-[rgba(212,160,23,0.08)]"
+            className="product-gallery-thumb-nav"
             aria-label={labels.nextMediaThumbnail}
             title={labels.nextMedia}
           >
             <AppIcon name="chevron_right" className="text-2xl" aria-hidden="true" />
           </button>
         </div>
-      )}
-
-      {/* Zoom panel — portaled to <body> so its position: fixed is relative to
-          the viewport. (An ancestor with any transform would otherwise become the
-          containing block, offsetting the panel by that ancestor's position — an
-          offset that grows with screen width via the centered max-width wrapper.) */}
-      {zoom && typeof document !== 'undefined' && createPortal(
-        <div
-          style={{
-            position: 'fixed',
-            left: zoom.panelLeft,
-            top: zoom.panelTop,
-            width: zoom.panelSize,
-            height: zoom.panelSize,
-            backgroundImage: `url(${current})`,
-            backgroundSize: `${zoom.bw}px ${zoom.bh}px`,
-            backgroundPosition: `${zoom.bgX}px ${zoom.bgY}px`,
-            backgroundRepeat: 'no-repeat',
-            border: zoom.source === 'lightbox' ? '1px solid rgba(255,255,255,0.45)' : '1px solid rgba(115,92,0,0.28)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
-            // Sit above the lightbox overlay (z-1000) when magnifying it.
-            zIndex: zoom.source === 'lightbox' ? 1001 : 50,
-            pointerEvents: 'none',
-          }}
-        />,
-        document.body,
       )}
 
       {/* Full-size lightbox — portaled to body so ancestor transforms don't
@@ -825,17 +780,7 @@ export default function ProductImageGallery({ images, title, imagePadding = null
             className="relative flex flex-1 items-center justify-center px-4 pt-16 pb-4"
             onClick={(e) => { if (e.target === e.currentTarget) closeLightbox(); }}
           >
-            <div
-              ref={lightboxContainerRef}
-              className="relative h-full w-full max-w-5xl"
-              style={{ cursor: 'crosshair', touchAction: 'none' }}
-              title={labels.hoverToMagnify}
-              onPointerDown={(e) => handleZoomPointerDown(e, lightboxContainerRef.current, lightboxImageRef.current, 'lightbox')}
-              onPointerMove={(e) => handleZoomPointerMove(e, lightboxContainerRef.current, lightboxImageRef.current, 'lightbox')}
-              onPointerLeave={handlePointerLeave}
-              onPointerUp={closeZoom}
-              onPointerCancel={closeZoom}
-            >
+            <div className="relative h-full w-full max-w-5xl">
               {fadingFrom && (
                 <Image
                   key={`lb-prev-${fadingFrom}`}
@@ -850,7 +795,6 @@ export default function ProductImageGallery({ images, title, imagePadding = null
               )}
               <Image
                 key={current}
-                ref={lightboxImageRef}
                 src={current}
                 alt={title}
                 fill
@@ -858,22 +802,6 @@ export default function ProductImageGallery({ images, title, imagePadding = null
                 className="object-contain object-center product-gallery-fade-in"
                 unoptimized={current.startsWith('/assets/')}
               />
-              {/* Lens square */}
-              {zoom && zoom.source === 'lightbox' && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: zoom.lensX,
-                    top: zoom.lensY,
-                    width: zoom.lensSize,
-                    height: zoom.lensSize,
-                    border: '2px solid rgba(255,255,255,0.7)',
-                    background: 'rgba(255,255,255,0.12)',
-                    pointerEvents: 'none',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              )}
             </div>
 
             {hasMultipleImages && (

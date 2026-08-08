@@ -6,6 +6,7 @@ import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import { createClient } from '@/lib/supabase/client';
 import { AppIcon } from '@/components/AppIcon';
+import PasswordInput from '@/components/account/PasswordInput';
 
 // Map raw Supabase auth errors to friendly, human copy so shoppers never see
 // developer-facing strings like "Invalid login credentials".
@@ -104,15 +105,14 @@ export default function SignInPage() {
 
             <div>
               <label className="form-label" htmlFor="password">{isEs ? 'Contraseña' : 'Password'}</label>
-              <input
+              <PasswordInput
                 id="password"
-                type="password"
                 required
                 autoComplete="current-password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                className="form-field w-full"
                 placeholder={isEs ? 'Ingrese su contraseña' : 'Enter your password'}
+                isEs={isEs}
               />
               <div className="mt-2 text-right">
                 <Link

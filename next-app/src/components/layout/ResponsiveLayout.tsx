@@ -4,9 +4,9 @@ type MaxWidth = 'narrow' | 'content' | 'wide' | 'full';
 
 const maxWidthClass: Record<MaxWidth, string> = {
   narrow: 'max-w-4xl',
-  content: 'max-w-6xl',
-  wide: 'max-w-7xl',
-  full: 'max-w-[2400px]',
+  content: 'max-w-6xl ultrawide-page',
+  wide: 'max-w-7xl ultrawide-page-wide',
+  full: 'max-w-[2400px] ultrawide-page-wide',
 };
 
 interface BoxProps {

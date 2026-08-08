@@ -4,7 +4,7 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-08-01**.
+> compaction. Last reconciled: **2026-08-06**.
 
 ## Repository And Memory
 
@@ -22,7 +22,13 @@ caches in the root.
 `CURRENT_STATUS.md` describes the present system, `TASKS.md` contains open work,
 and this file contains decisions still governing the project. Detailed
 chronology belongs only in `CHANGELOG.md`; feature-specific implementation
-detail belongs in `features/` or the Etsy/eBay plan folders.
+detail belongs in `features/`.
+
+Completed build prompts, proposed schemas/routes, rollout plans, kickoff notes,
+and handoff reports are removed after their durable operating rules are merged
+into the current feature documents. Historical names and chronology may remain
+in `CHANGELOG.md`, but stale planning folders must never compete with current
+code, applied SQL, `TASKS.md`, or feature runbooks as a source of truth.
 
 ## Application Architecture
 
@@ -57,24 +63,97 @@ Rules:
 1. Every path the app no longer serves goes in `src/lib/legacy-redirects.ts`
    (locale-less keys; `resolveLegacyRedirect` normalises `/x`, `/en/x`, and
    `/es/x` to one rule and re-prefixes Spanish destinations).
+1a. **A deleted listing gets its redirect line DELETED, never re-pointed.**
+   This is a one-of-a-kind estate inventory, so products are removed
+   routinely and a 404 is the honest, correct answer for a piece that is
+   genuinely gone — search engines drop it naturally, and the 404 page
+   already offers Browse Shop / Go Home. Re-pointing an old product URL at a
+   *different* product misleads the visitor, and redirecting to a page that
+   itself 404s is strictly worse than the plain 404 (search engines read the
+   hop as a soft 404). The sitemap is generated from the database, so
+   deleted products drop out of it automatically — no sitemap action needed.
 2. Use `permanent: true` (308) when the URL carries link equity — legacy
    pages, retired pages, re-slugged products — and `false` (307) for
    convenience URLs that were never real pages (drawers like `/cart`).
 3. Never re-add `redirects()` to `next.config.ts`.
 4. Verify redirects **against the deployed site**, never only locally.
 
-### The primary domain is naplesestatejewelry.com; email stays on .co
+### The primary domain is naplesestatejewelry.com; mailboxes stay on .co
 
 Owner decision 2026-08-01, after buying the `.com`: the canonical web domain
 is `https://naplesestatejewelry.com`. The legacy `.co` remains owned as a
 Netlify alias that 301s path-preservingly to `.com` (rules in root
 `netlify.toml`), and `naplesantiquesllc.com` redirects straight to `.com` so
-old links never hop twice. **The business email deliberately did NOT move**:
-`info@` / `chris@` / `noreply@naplesestatejewelry.co` remain the real
-mailboxes and Resend sender identities — never rewrite an
-`@naplesestatejewelry.co` address to `.com`, and never touch the `.co` MX
-records. New site-URL code must build from `NEXT_PUBLIC_SITE_URL`/`SITE_URL`
-(falling back to the `.com`), never hardcode either domain.
+old links never hop twice. New site-URL code must build from
+`NEXT_PUBLIC_SITE_URL`/`SITE_URL` (falling back to the `.com`), never hardcode
+either domain.
+
+**Email: separate the mailbox from the sender — they now live on different
+domains.** The original 2026-08-01 decision kept everything on `.co`. That was
+amended 2026-08-05 (see the entry below), so the rule is now:
+
+- **Mailboxes stay on `.co`.** `info@` / `chris@naplesestatejewelry.co` are the
+  real, monitored inboxes. Never touch the `.co` MX records, and do not rewrite
+  a `.co` address that is a *contact* address (footer mailto, account dashboard,
+  schema.org `email`) or a *Reply-To*.
+- **Senders must be `.com`.** A From address must sit on Resend's verified
+  sending domain, which is `naplesestatejewelry.com`. A `.co` From address will
+  not send at all.
+
+### Resend's sending domain moved to .com because the Free plan allows only one
+
+Owner decision 2026-08-05, amending the email half of the entry above. The
+`.com` had become the brand domain everywhere else, and Resend's **Free plan
+permits exactly one sending domain** — adding `.com` alongside `.co` was
+rejected outright, and running both would have meant Pro at $20/mo. The owner
+chose to swap rather than pay, accepting an outage window on the reasoning that
+no meaningful email traffic was expected.
+
+The swap is destructive by construction: `.co` had to be *deleted* before `.com`
+could be added, so there is no overlap and no rollback that does not repeat the
+outage. Two things make that tolerable and should be remembered before touching
+email again: a failed send never breaks checkout (`order-finalize.ts` catches;
+`order-owner-notification.ts` never throws), and missed receipts re-send from
+Admin → Orders.
+
+**The `.com` zone is shared with live Google Workspace mail, so email DNS work
+there is not routine.** It already carries five Workspace MX records, a root
+`v=spf1` behind GoDaddy's `_spfm` merge indirection, and DMARC at
+`p=quarantine`. Consequences that outlive this migration:
+
+- **Never add a second root `v=spf1`** — two SPF records is a permanent
+  `permerror` that breaks the Workspace mail. Keep provider SPF on a subdomain
+  (Resend's is on `send`, via its default Custom Return-Path).
+- **Never add a root MX for a sending provider.** Resend displays an
+  `inbound-smtp…` MX at `@` priority 0 under "Enable Receiving"; at priority 0 it
+  would outrank all five Google MX and hijack the domain's inbound mail.
+- **`p=quarantine` means DKIM mistakes fail silently** — mail is accepted and
+  spam-foldered rather than erroring. Any change to email DNS needs a test send
+  *and an inbox check*, not just a green "Verified" badge.
+- **Prefer manual DNS entry over Resend's "Auto configure"**, which takes an
+  OAuth grant to write DNS and can rewrite the root SPF.
+
+### proxy.ts runs BEFORE netlify.toml redirects — host redirects belong in the proxy
+
+Established 2026-08-05 by probing production. Only paths *inside* the proxy
+matcher picked up a `/en` prefix in their redirect target (`/shop` →
+`.com/en/shop`) while excluded paths did not (`/robots.txt` → `.com/robots.txt`).
+That proves ordering: **the proxy rewrites the path first, and netlify.toml
+redirect rules then splat the already-rewritten path.**
+
+Consequences to preserve:
+
+- **Host-level redirects must live in `proxy.ts`, above the locale rewrite.** Put
+  them only in `netlify.toml` and every legacy link costs two hops — the rule
+  splats `/en/...`, then next-intl 307s the `/en` off again.
+- **The netlify.toml host rules must stay anyway.** Paths excluded from the proxy
+  matcher (`/api/*`, `robots.txt`, `sitemap`) never reach the proxy and rely on
+  them.
+- **Never let `/api/*` on a legacy host become a 301.** The `.co/api/*` carve-out
+  must remain a **200 rewrite**: webhook POSTs from Resend, PayPal, and eBay do
+  not follow redirects. The proxy matcher already excludes `api/`; keep it that
+  way. Regression test: `POST https://naplesestatejewelry.co/api/webhooks/resend`
+  must return 401 (signature rejection), never 301.
 
 ### Development and production builds never run concurrently
 
@@ -112,6 +191,51 @@ test must continue rejecting legacy font infrastructure and unmapped static
 
 ## Product Data And Media
 
+### Outbound partner sync sends an allow-list, fails closed on price, and never
+### crosses the credential boundary
+
+Applies to the Deep Field Gallery sync and to any future partner push.
+
+1. **Allow-list, never a deny-list.** The outbound field set is enumerated
+   explicitly (`DEEPFIELD_PRODUCT_FIELDS`), so a column added to `products`
+   later is excluded by default instead of silently shipped to another company's
+   database. A second, independent assert against a forbidden list **throws**
+   rather than dropping the field — the caller treats a throw as "skip this
+   product", which fails in the safe direction. Two mechanisms, because one
+   careless edit to the allow-list should not be enough to leak.
+
+2. **Neither side's database credential crosses the boundary.** NEJ POSTs to an
+   HTTP receiver with a shared bearer token and never connects to the partner
+   database; the partner never receives an NEJ Supabase key. Tokens are
+   server-only env vars — a `NEXT_PUBLIC_` variant would publish the token in
+   the browser bundle and must never be created.
+
+3. **Never ship a fabricated price.** ~60 of 128 products are spot-multiplier
+   with no stored price of any kind; the price is a render-time computation from
+   live metal spot. When spot is unavailable, those ship a **null** price with a
+   reason rather than a fallback-rate guess. A wrong price rendered on a partner
+   storefront is worse than a missing one. This is the same rule
+   `getMarketplaceSpotPriceError` enforces for Etsy/eBay writes. Manual and
+   sold-locked prices need no spot data, so an outage degrades rather than blocks.
+
+4. **Import `src/lib/pricing.ts`; never reimplement the formula.** Two
+   independent copies of the melt/multiplier math will drift, and the drift is
+   invisible until a partner's prices are wrong. One-off export scripts that
+   cannot import it must be parity-tested against the app module before use.
+
+5. **Partner pushes are fire-and-forget and non-throwing.** Call sites include
+   order captures. A partner outage must never fail a customer's payment or
+   block an admin save. Same contract as `handleProductStatusChange`.
+
+6. **Hook every path that changes product state, not just the admin one.** The
+   checkout sold flip happens inside the `capture_paypal_order` Postgres
+   function, so no application code observes it and `adminRevalidateProduct(s)`
+   is never called there. A sync wired only to the admin chokepoint leaves the
+   partner advertising sold items as available. Under the no-reservation
+   checkout only that function writes product `status`/`quantity` — denials,
+   cancels, and refunds do not — so the complete set is the two admin
+   revalidate helpers plus `paypal/capture-order` and `paypal/webhook`.
+
 ### Product rows store references, not media bytes
 
 Images and videos never belong in Postgres as blobs/base64. New product images
@@ -139,6 +263,83 @@ controlled Etsy and eBay test.
 and Bracelet. It stores millimeters, must be positive and no more than 1000,
 and is never estimated from photos.
 
+Every buyer-facing surface that shows a width renders it through
+`productWidthDisplay` (`types/product.ts`) — shop cards, shop list rows, the
+related-products strip, and the product page's Specifications row (**Width** /
+**Ancho**, added 2026-08-04 between Link Type and Length). That function owns
+both the Necklace/Bracelet restriction and the formatting, so a new surface must
+call it rather than read `width_mm` and format its own string; otherwise the
+surfaces can disagree about which pieces have a width. `width_mm` arrived in a
+later migration, so any query that adds it must treat it as an OPTIONAL column
+with a null-backfilling retry.
+
+The other at-a-glance chips — purity (with its karat-graded gold gradient),
+weight, and length — live once in `src/lib/product-spec-chips.ts`, together with
+the neutral and measurement chip treatments. It is a plain directive-free module
+precisely so client components (`ProductCard`, `ProductListRow`) and server
+components (`RelatedProductsStrip`) can share it. Those four functions had
+already been duplicated byte-for-byte across two components before the strip
+became a third consumer on 2026-08-04; do not copy them into a fourth surface.
+
+### Related-strip pills never wrap, and wrap uniformly when they must
+
+Owner rules, 2026-08-04. The "You might also like" pills must never break onto a
+second line; they should sit beside the price whenever they fit and drop below it
+only when they cannot; they should shrink to keep sharing that line as long as
+possible; and when they do drop, **every card in the strip drops together** — a
+row where some cards shared the price line and others did not read as a bug.
+Enforced by four things in `.related-product-*` (`globals.css`):
+
+1. `flex-wrap: nowrap` on the pill row — the hard one-line guarantee.
+2. Price and pills share one `flex-wrap: wrap` row with the pill group as a
+   SINGLE flex item, so it either fits beside the price or moves down whole.
+3. The CARD is a `container-type: inline-size` query container and the pill type
+   is a `cqi`-based `clamp()`, with every length inside a pill in `em` so one
+   clamp scales padding and gaps with it. The title uses the same container.
+4. Uniformity comes from ONE card-width threshold rather than per-card flex
+   fitting: `@container (max-width: 180px)` gives the pill group
+   `flex-basis: 100%`. Cards in a strip are always the same width, so the
+   decision is identical for all of them. The threshold must stay just under the
+   narrowest card at which the worst case (widest pill row + a long price) still
+   fits — too high and cards stack while they would have fitted; too low and a
+   long-priced card splits from its neighbours. Re-measure if pills, prices, or
+   card padding change.
+
+The container must be the card, never the viewport: the strip is 4-up on desktop
+and 2-up on phones, so a 640px viewport gives WIDER cards (262px content) than a
+900px one (156px). Pill size is non-monotonic in viewport width and monotonic in
+card width — a viewport media query would size them for the wrong box.
+
+`cqi` resolves against the container's CONTENT box, not its border box; fitting
+the slope against the card's outer width silently makes desktop pills ~6% small.
+The bounds are fitted to real measurements. Re-measure both if the pill set,
+padding, or card padding changes.
+
+**Revised 2026-08-05** when sub-11px text was lifted off the product page: the
+clamp is now `clamp(0.38rem, 0.21rem + 3.13cqi, 0.6875rem)`. Two things are worth
+remembering from that change:
+
+- **Raising the CAP alone did nothing.** At the ~244px content width these cards
+  get, the preferred value already resolved to ~0.62rem — it sat *below* the old
+  cap rather than being clamped by it, so the cap was not the binding constraint.
+  The SLOPE is the lever that moves the common case; 2.69cqi → 3.13cqi puts a
+  244px card at ~11px.
+- **The lower bound stays 0.38rem.** It is the entire no-wrap guarantee: it is
+  what lets a pill row shrink instead of breaking, at the ~102px cards a thin
+  phone produces. Raising the floor would trade a readability win for the exact
+  failure this whole entry exists to prevent. The slope change lifts wide cards
+  far more than narrow ones, so the floor's behaviour is preserved — verified at
+  320/375/768/desktop in both locales, one pill row everywhere.
+
+The strip's column counts live together in `.related-product-grid`, not in
+Tailwind utilities on the element: **1 column up to 360px, 2 from 361px, 4 from
+768px**. The single-column band exists because a 2-up card on a thin phone is
+only ~122px of content (owner: "very thin and not good looking"); below the
+threshold a card gets the full measure back, so the title and pills return to
+full size. Note the counts are not monotonic in viewport width — a 640px
+viewport gives wider cards (262px) than a 900px one (156px) — which is exactly
+why every size inside a card is driven by the container, never a media query.
+
 New Length writes normalize inch-bearing input to a bare numeric string.
 Public matching continues accepting unitless, `in`, `inches`, quoted, and
 decimal-equivalent legacy forms.
@@ -147,6 +348,221 @@ The AI assistant may extract width/length only from explicit, reliable evidence
 and must honor the same storage contracts as manual forms.
 
 ## Storefront
+
+### The fixed header's height is one token, and the header obeys it
+
+`--site-header-height` (`globals.css`) is the single source of truth for the
+space the fixed `SiteHeader` occupies: `3.5rem` on phones, `4.5rem` from md up.
+Crucially the header takes its `height` FROM the token rather than growing to
+fit its padding, so the value is authoritative by construction instead of being
+a number someone has to keep in sync with the rendered header.
+
+That inversion is the whole point. Previously the height was implicit (padding +
+logo, 57px/73px) while ~16 pages each hardcoded a `pt-16` (64px) offset and the
+hero pinned at a hardcoded `4rem`. The numbers had silently diverged, so the
+first 9px of every page's content sat behind the header — obvious on the
+homepage announcement bar, invisible elsewhere only because those pages open
+with generous section padding.
+
+Anything that must sit exactly below the header derives from the token:
+`.site-header-offset` for page tops, sticky `top`, and `calc(100svh - var(...))`
+for full-height panes. Surfaces wanting extra breathing room use their own
+larger padding rather than inflating the token. Because the header centers its
+row inside a fixed height, the token must stay at least as tall as the tallest
+row content (32px phones, 40px logo from md up). A source guard test
+(`site-header-height.test.ts`) fails the build if a hardcoded `pt-16` main,
+`top: 4rem`, or `calc(100svh - 4rem)` reappears.
+
+### The purchase panel sizes against itself, and its rows stay flush
+
+Owner request 2026-08-04: nothing in the buy panel may sit on two lines when it
+could compact onto one, and the action buttons must read as a deliberate group
+rather than a wrapped row.
+
+The panel is a `container-type: inline-size` query container
+(`.product-buy-panel`), and every size inside it is a `cqi` clamp. **Never size
+this panel's contents with a viewport media query.** The panel is 576px wide on
+a 1440 desktop, 325px at 768, and full-width on a phone, so viewport breakpoints
+invert: the old `sm:grid-cols-2` stacked the value tiles on a roomy 343px phone
+column while cramming them into a tighter 325px tablet column.
+
+- The scrap-value and live-spot tiles are ALWAYS two across; their type and
+  padding shrink with the panel instead of wrapping.
+- The buy actions are a grid, flush edge-to-edge in both modes: one row of four
+  with Add to Cart at `1.5fr` when the panel is >= 470px, otherwise Add to Cart
+  full width above three equal columns. Labels are `nowrap` with fluid
+  horizontal padding, so a tight cell compacts the frame rather than breaking
+  the label.
+- The sold-item variant is a separate case, not the same grid with two children:
+  its "Inquire about a similar piece" label is a sentence, so it stays one
+  full-width column until the panel reaches 500px.
+
+Thresholds are fitted to measurements — 470px because a 1180px iPad Pro gives a
+519px panel, and 500px because that sentence label needs ~255px of cell. Re-
+measure before changing either, and re-check Spanish, which is the long-label
+case (`Agregar al carrito`).
+
+### The product page fills the space under the photo, and DOM order stays semantic
+
+Owner request 2026-08-04: on every two-column viewport the info column ran far
+past the gallery, leaving the lower half of the photo column empty (677px of
+dead whitespace at 1440). The Specifications table therefore renders under the
+gallery, and the trust badges became a full-width band beneath both columns.
+
+Rules that must hold:
+
+Column contents (owner's arrangement, 2026-08-04):
+
+- **column 1** — gallery, then notes + the Shipping/Condition/Payment accordions
+- **column 2** — purchase panel, description, specifications
+
+Rules that must hold:
+
+1. **DOM order is the semantic order and the phone order at once** — gallery,
+   purchase panel, description, specifications, sold note, notes, policies. The
+   h1 and price are never pushed behind a spec table for screen readers or
+   crawlers, and flattening the wrappers on a phone reproduces the original
+   single-column sequence with no `order` overrides at all. Visual placement is
+   done entirely in CSS (`.product-detail-layout`, `globals.css`); do not
+   reorder the JSX to "fix" a layout problem, and do not reintroduce `order`
+   values — if a block needs one, the DOM order is wrong.
+2. Below md both wrappers are `display: contents`, so every block becomes a
+   sibling in ONE flat stack that reads in plain DOM order.
+3. From md up the info wrapper is a real column in grid column 2 spanning both
+   rows, with the gallery in row 1 of column 1 and the aside in row 2.
+   `grid-template-rows: auto 1fr` is load-bearing: an item spanning tracks grows
+   only the FLEXIBLE ones, so the info column's surplus height lands in row 2 and
+   row 1 stays exactly as tall as the gallery. Two auto rows split the surplus
+   and reopen a gap under the photo.
+   The aside is ONE wrapper, not two grid items: a product with no Notes would
+   otherwise leave an empty track whose gutter still prints under the gallery.
+4. **At 2000px+ the rule is mirrored, because the roles invert.** The
+   `ultrawide-page-wide` tier doubles the columns, so the square gallery becomes
+   the TALLER column (~1120px) while the info column shrinks as its text stops
+   wrapping (~790px). Keeping the aside under the gallery there stacks it onto
+   the already-tallest column and makes the band ~260px taller than doing
+   nothing. The aside moves into the short column under the info stack and the
+   gallery spans both rows.
+5. Which blocks move is a balance calculation, not a preference. The two column
+   heads are fixed (gallery, purchase panel); the movable blocks are description,
+   notes, policies and specs. The current split lands both columns within ~46px
+   at 1200px+. If blocks are added or resized, re-measure before changing it —
+   moving more content left closes the residual gap at 768-1023px but unbalances
+   every width above it.
+6. The trust strip keeps deliberate blank space above it (`mt-12` + `pt-8`):
+   both columns end just there, so it must not butt against the accordions or
+   the spec table.
+7. **Stacked means centred.** Below 640px the three trust badges stack into a
+   column, and both they and the policy accordions centre their content; from
+   640px up the badges are 3-up and the accordions return to a left-aligned
+   title with the chevron pushed right. One breakpoint drives both bands, so
+   moving the badge grid's breakpoint means moving the accordions' media query
+   with it or the two stop agreeing. In the centred state the accordion title
+   and chevron centre together as a pair — a centred title with a
+   right-pinned chevron reads as a mistake, not a layout.
+
+### Only on-screen slideshows animate, and the STACK decides which
+
+Established 2026-08-06 after the owner reported stutter on slideshows 2 and 3.
+All three carousels were running permanently — 3 concurrent rAF loops plus 3 CSS
+ring animations at every scroll position, including at rest when only one is
+visible.
+
+**`IntersectionObserver` alone cannot solve this inside the pinned frame**, and
+the two reasons are both easy to reintroduce:
+
+- **`isIntersecting` is `true` for a zero-area intersection.** Every pane's box
+  grazes the viewport inside the sticky `overflow:hidden` frame. Measured: it
+  returned `true` for all three panes at every scroll position — never once
+  `false`. Gate on `intersectionRect` **area**, never the boolean.
+- **`threshold: 0` only fires when `isIntersecting` flips.** Since it never
+  flipped, the callback ran once per mount and never again. Any geometry-based
+  guard here needs a threshold ladder, dense near zero.
+
+Even with both fixed, geometry gets to ~2 loops but not 1 — a pane sliding from
+ratio 0.004 to 0 crosses no rung. So `HomeHeroStack` drives a `paused` prop into
+each pane, derived from the same `t1`/`t2` conditions that set `inert`. It is the
+thing applying the transforms, so it is the only place that knows exactly.
+
+Rules to keep:
+
+1. `Carousel`'s `paused` prop wins outright — when set it stops and does not even
+   observe, so no late geometry callback can restart an offscreen ring.
+2. The stack writes the live-pane state **only on a transition**, never per
+   frame. Per-frame `setState` here would cost far more than the loops saved.
+3. Two loops during a crossing is CORRECT, not a regression — both panes are
+   genuinely on screen and must both animate.
+4. When measuring this, clip each ring against the FRAME's band, not just the
+   viewport. A naive `rect.bottom > 0` test reproduces the very false positive
+   that caused the bug and will report phantom "frozen while visible" panes.
+5. The per-frame path is write-on-change: card `dataset`/`zIndex`, the cached
+   ring `Animation` + duration, and the stack's scroll `travel`. Any new
+   per-frame work belongs behind the same discipline — compare first, write only
+   on a real change, and never call a layout-forcing reader (`offsetHeight`,
+   `getBoundingClientRect` on static geometry) or an allocating API
+   (`getAnimations()`) once per frame when the value changes only on resize.
+   **Every one of those caches must be cleared with the window key**, since the
+   cards are re-created for a new key and a stale cache silently skips a write a
+   fresh card needs.
+
+### Product-page label type has an 11px floor
+
+Set 2026-08-05 after an audit found **46 distinct text elements below 11px** on
+product pages at a 1271px desktop viewport — not only chrome, but "Scrap gold
+value" and "Based on spot" at 9.3px and "This is your price" at 9.6px. The buyer
+audience for estate jewelry skews older, and this was concentrated on the page
+that has to close the sale.
+
+The floor is **0.6875rem / 11px**: readable, while still small enough that these
+uppercase letterspaced labels read as labels rather than body copy. Applied to
+`shop/[id]/page.tsx`, `.product-value-tile-label`, `ProductTrustSections`, and
+the related-strip pills. Footer headings and `text-xs` buttons at 10.4–10.88px
+were deliberately left alone — they are standard sizes and site-wide.
+
+**Two elements are exempt, for structural reasons, not oversight:**
+
+- **`price-update-ticker` keeps a 0.5rem floor.** It is `white-space: nowrap` so
+  the countdown does not reflow every second, and at a 320px viewport the Spanish
+  string only fits at 8px. Raising its floor to 10px pushed the entire document
+  into horizontal scroll. Its ceiling still carries the raise, so wider viewports
+  gain.
+- **Related-strip pills keep their 0.38rem floor**, for the no-wrap reason
+  documented above.
+
+When raising type inside the buy panel, check `white-space` first: the value
+tiles sit in `minmax(0, 1fr)` grid tracks, so an unbreakable label does not
+compress — it punches straight out of its track. That is why the spot pill's
+LABEL is allowed to wrap while its PRICE is not.
+
+### Always-mounted off-canvas panels must cap their width at the viewport
+
+Established 2026-08-05 from a real bug. `WishlistDrawer` used `w-full max-w-sm`
+(384px) with no viewport cap, while `CartDrawer` correctly used
+`max-w-[min(28rem,100vw)]`.
+
+These panels are **always mounted** and hidden with `translateX(100%)` rather
+than unmounted. A panel wider than the screen therefore parks that much past the
+right edge and drags the document into horizontal scroll — and because it is also
+`w-full`, it then measures against the document it just widened, so the overflow
+feeds itself (it settled at 343px on a 320px viewport).
+
+Any new off-canvas panel following this pattern must cap at `min(<design>,100vw)`.
+The failure is invisible on a desktop viewport and only shows on a narrow phone,
+which is exactly why it survived until an audit measured for it.
+
+### The homepage announcement bar never wraps
+
+Owner rule 2026-08-04: the strip holds ONE line at every width. It is `nowrap`
+with a fluid `clamp()` type size, so the text compacts rather than breaking and
+doubling the bar's height (55px → 31px on a 375px phone). Letter-spacing stays
+in `em` so the 0.22em tracking — roughly a third of the strip's width at full
+size — shrinks with the type instead of forcing the break.
+
+Fit the clamp to the SPANISH strings, which are the long ones; a ramp fitted to
+English overflowed Spanish by 14px at 320px. The third item is revealed only at
+780px, where all three fit at full size in Spanish — pulling that breakpoint
+lower forces the other two to shrink to accommodate it, which is the worse
+trade. Re-measure both locales at 320 if the copy ever changes.
 
 ### `/shop` is the only storefront entry
 
@@ -162,6 +578,333 @@ The public status filter always selects exactly one state. Available is the
 default for bare, cleared, or invalid shop URLs; Sold inventory is shown only
 after the shopper explicitly selects Sold. Available is the baseline rather
 than an extra active-filter count.
+
+### The homepage hero is a scroll-pinned two-slideshow parallax stack
+
+`HomeHeroStack` pins the hero in a sticky, overflow-hidden frame while a scroll
+runway (hero height + **110svh**, compressed from 290svh on 2026-08-06) drives
+the choreography.
+
+**The runway is only the scroll BUDGET.** Each pane always travels exactly one
+frame height, so changing it changes the SPEED of the handover, never its extent:
+at 290svh a crossing spent ~90svh of scroll moving a pane ~100svh (about 1:1); at
+110svh it spends ~44svh on the same move, about 2.3x scroll speed. The `PHASE_*`
+fractions divide whatever budget is set, so they do not need re-tuning alongside
+it. Lower the number for a snappier, more parallax-y hero; raise it toward 1:1
+for a calmer one. Whenever it changes, re-check frame coverage across the runway
+— the overlap in 5b is what keeps it hole-free, and a different budget changes
+nothing about that geometry but is cheap to confirm. Only the SLIDESHOWS
+move: pane A slides up and out while an identical slideshow (pane B) descends
+in the opposite direction, locks at 60% of the runway, holds, and then the
+frame un-sticks naturally. The headline, sign-up form, CTA buttons, and
+legibility halo live in a third, pinned overlay layer that never moves until
+the frame itself releases. Rules that must hold:
+
+1. `HomeHero` is the slideshow pane only (carousel + swept background +
+   spinner); `HomeHeroOverlay` owns the headline/form/CTAs/halo. The stack
+   composes two panes plus ONE overlay, so the page always has exactly one h1,
+   one subscribe form, and one set of CTAs — never duplicate the overlay.
+2. A slideshow pane is `inert` only while fully offscreen; during the crossing
+   both stay interactive. Transforms are imperative per scroll frame, never
+   React state.
+3. The overlay's light/dark text theme follows the DOMINANT slideshow — pane A
+   below the crossing midpoint, pane B above it — fed by each pane's
+   `onThemeChange` callback.
+4a. **A departing pane FADES over the tail of its exit, and the frame paints the
+   DOMINANT pane's backdrop.** These two are a pair — either alone fails.
+
+   Because `PANE_A_TRAVEL` is below 100, the departing pane never clears the
+   frame; the strip still in view late in a crossing is bare backdrop, since its
+   ring left the top long before. At full opacity that reads as a hard bar, which
+   is exactly what the owner reported on the black→white handover (2026-08-07):
+   measured at p=0.50, an 8% band of opaque black above the arriving white
+   slideshow. Fading it (`FADE_TAIL`) dissolves the band instead of sliding it
+   out — but fading only reveals the FRAME, so the frame must already show the
+   incoming backdrop or the same black bar comes straight back.
+
+   **A whole-pane opacity fade cannot carry this on its own, and 2026-08-08
+   established why.** `opacity` applies to the entire pane, so a black pane over
+   a white frame does not read as "leaving" — it reads as a flat GRAY RECTANGLE.
+   Measured at p=0.35: 27% of the frame at opacity 0.36, compositing to a uniform
+   `rgb(163,163,163)`. Black fading over white passes through every gray on the
+   way, so no value of `FADE_TAIL` avoids it. `FADE_TAIL` went 0.4 → 0.65 → 0.75
+   chasing this before the actual diagnosis landed: **the fade was being applied
+   to an AREA when the problem was an EDGE.**
+
+   So the dissolve is spatial (`A_EXIT_DISSOLVE_PCT`, a bottom-anchored mask
+   sized to reach past the arriving pane's top edge into the band above it) and
+   `FADE_TAIL` is back to **0.45**, doing only what opacity is good at: removing
+   the last of the pane at the very end.
+
+   **Rule: reach for a mask, not opacity, whenever the fading layer is a large
+   solid area whose color differs from what is behind it.** Opacity is right only
+   for the final tail, where the area is small.
+
+   Switching the frame on dominance rather than blending is safe ONLY while the
+   panes fully cover the frame at that instant — verified 100% opaque coverage at
+   both flips. If pane travel, timing, or the fade ever change, re-check that
+   before trusting the switch, or a black→white jump becomes visible.
+
+4. The frame mirrors a pane's live swept background every scroll frame, because
+   anything the panes do not fully cover — a feathered edge, a fading one —
+   shows the frame through it. That mirroring is what makes those edges read as
+   continuous canvas rather than a hole. **It follows the DOMINANT pane** as of
+   2026-08-07; it mirrored hero A alone until then, which was correct while A was
+   the only pane that could be uncovered but became the cause of the black bar
+   once departing panes started fading (see 4a).
+5. There are THREE slideshows handing over in sequence (A→B, then B→C), with the
+   crossings overlapping and no hold between them (see 5e).
+   **Everything travels UPWARD: a pane exits up and the next RISES FROM BELOW**
+   (owner request 2026-08-06), so the hero reads as one continuous upward scroll.
+   This supersedes the 2026-08-04 arrangement where arriving panes descended from
+   above; note a rise-from-below variant had also been trialled and reverted on
+   2026-08-04, so this direction has now been chosen deliberately twice — do not
+   "restore" the descending version from the older note. B is the only pane that
+   both arrives and departs, so its transform carries both crossing terms and its
+   feather takes whichever crossing is currently moving it. Timing lives in
+   `PHASE_1_END` / `PHASE_2_START` / `PHASE_2_END`; adding or removing a slideshow
+   means re-splitting those and resizing the runway to match. Pane travel is fixed
+   at one frame height (offscreen at rest, flush when locked), so `PANE_A_TRAVEL`
+   is the only depth control: at 100 the panes move at matching speeds (the
+   owner's choice), above 100 the departing layer outruns the arriving one and
+   reads as nearer the viewer. A differential was trialled at 135 and returned
+   to 100.
+
+   The panes' resting transforms in CSS (`--b` / `--c` at `translate3d(0,100%,0)`)
+   must match the value the scroll handler computes at t=0, or a pane jumps on the
+   first frame after hydration.
+
+5c. **No slideshow may MOUNT during the scroll.** B and C both arm off the
+   critical path — B on first scroll-intent or idle, C one idle callback after B
+   — and never from inside the scroll handler. C previously armed at `p > 0.12`,
+   and profiling on 2026-08-06 found that mount was the single worst frame in the
+   entire hero scroll: 41.4ms against a 16.7ms median, on the exact frame it
+   mounted. A carousel mount is a React render plus ring construction plus image
+   decode; anywhere on the scroll path it is a visible hitch. Staggering the two
+   arms keeps them out of the same frame. Mounting early is cheap because a pane
+   mounts already `paused` (see 5d) — it is in the DOM but not animating.
+
+5f. **Pane overlap and RING separation are different axes — do not confuse them.**
+   Each pane is full-frame with its carousel centred, so consecutive rings sit
+   ~one frame apart however much the PANES overlap. `PANE_A_TRAVEL` tightens the
+   seam between panes; it does nothing about how far apart the PHOTOGRAPHS are.
+   `RING_PULL_PCT` is the control for that (owner, 2026-08-06: "tighten the three
+   carousels closer vertically").
+
+   The pull must peak mid-crossing and be zero at both ends (`4e(1 - e)`), not be
+   a constant. A ring box spans ~14.9%-85.1% of the frame — ~70% tall with ~15%
+   headroom — and a constant lift is capped by that headroom, because any more
+   makes an arriving pane's ring poke into frame while its pane is still parked
+   below at rest. That ceiling bottoms out near 75% separation, short of the ~70%
+   needed for the rings to overlay at all. Peaking mid-crossing sidesteps it
+   entirely: at rest and when locked the pull is 0, so the designed composition
+   is untouched and nothing peeks, while mid-crossing it reaches ~62%.
+
+   When measuring any of this, use the RING box, never the cards: the cards are
+   3D-transformed and project to ±3600% of the frame. Expect a few percent of
+   noise even on the ring box, since its projection breathes as the ring rotates.
+
+5e. **The two crossings OVERLAP, and the overlap size is load-bearing.**
+   `PHASE_2_START` is deliberately BEFORE `PHASE_1_END` (owner, 2026-08-06:
+   "overlap the crossings so it never stops"). There is no hold between them —
+   B sweeps through flush rather than resting there.
+
+   **There is no hold at the END either.** `PHASE_2_END` is exactly 1 (owner,
+   2026-08-07), so C reaches flush on the same frame the runway ends and the
+   sticky frame unpins; its ease-out and the page starting to scroll away
+   coincide, leaving no stationary stretch anywhere in the hero. Measured: the
+   runway tail no longer flatlines, still moving at 26% of peak at release.
+
+   Pinning the end point makes the other two values DETERMINED, not free — with
+   equal crossing lengths L and the 0.36 ratio, `(2L - 1)/L = 0.36` gives
+   L = 1/1.64 = 0.61, hence `PHASE_1_END = 0.61` and `PHASE_2_START = 0.39`.
+   Re-solve the same way rather than nudging them independently, or one of the
+   invariants silently breaks.
+
+   **Butting them is not enough.** Smoothstep's derivative is zero at BOTH ends,
+   so `PHASE_2_START == PHASE_1_END` hands over from a term decelerating to zero
+   to one accelerating from zero: the velocity still touches nothing and still
+   reads as a pause. What matters is how far into its curve the incoming crossing
+   is when the outgoing one finishes — keep
+   `(PHASE_1_END - PHASE_2_START) / (PHASE_2_END - PHASE_2_START)` near **0.36**.
+   At 0.20 the incoming crossing is still on the flat part of its curve (slope
+   0.97 of a possible 1.50) and the dip was perceptible; at 0.36 it is 1.38/1.50
+   and the handover holds ~72-90% of peak speed.
+
+   **Both crossings must also be the SAME LENGTH.** They were 0.47 and 0.54 —
+   crossing two ran 15% longer, so the handovers moved at different speeds and
+   the spacing between slideshows visibly changed from one to the next (owner,
+   2026-08-06: "dynamic distance between the first, second and third"). Equal
+   lengths brought the two crossings' minimum ring separation to within 1.6
+   points of each other.
+
+   Cost, accepted knowingly: within the overlap band all three crossing clocks
+   are active, so the phase-based liveness in 5d marks all three panes live and
+   3 rAF loops run for ~11% of the runway even though only 1-2 panes are on
+   screen. At rest it is still 1. Fixing that would need a coverage-aware
+   liveness test instead of a phase-based one.
+
+5a. **Crossings are EASED; the phase logic is not.** Scroll progress is linear, so
+   a pane driven by raw `t` moves at constant speed and then stops dead at its
+   clamp — a velocity discontinuity that reads as a jolt into the hold no matter
+   how short the hold is. That was most of what the owner reported as "pausing"
+   on 2026-08-06. `ease(t) = t²(3−2t)` drives the transforms and feathers; the
+   RAW `t` still drives the inert/live thresholds and the dominant-pane handover,
+   which test which phase we are in and would only be blurred by easing. The ease
+   must keep exact endpoints (0→0, 1→1) — the resting/locked positions, those
+   thresholds, and the CSS resting transforms all assume t=0 and t=1 land
+   precisely. Holds are deliberately short (0.20 of the runway total, from 0.38);
+   shortening them further without the easing would reintroduce the jolt.
+
+5b. **`PANE_A_TRAVEL` is the seam control, and below 100 it is load-bearing.**
+   The seam is `t × (PANE_A_TRAVEL − 100)`: above 100 leaves a real gap of open
+   frame, 100 butts exactly, below 100 the arriving pane overlaps the departing
+   one. It is 95 (owner request 2026-08-06) for a ~5%-of-frame overlap, so the
+   arriving pane's feathered top blends over the outgoing photograph instead of
+   fading to backdrop — that fade-to-backdrop is what made the join read as a
+   band of empty space. **At any value below 100 the departing pane never fully
+   clears the frame**; that is only safe because the arriving pane is flush and
+   higher in the stack by then. If the stacking order or the arrival geometry
+   ever changes, re-measure frame coverage across the whole runway before
+   trusting it — it was verified at 100% with no holes, not assumed.
+6. The two sides of a crossing feather DIFFERENT edges, because they are the two
+   halves of ONE seam: the departing pane's BOTTOM edge leads it up and out, and
+   the arriving pane's TOP edge is what climbs into the frame. Each is a
+   scroll-driven `mask-image` that reaches zero where the edge is offscreen or
+   flush — A unmasked at rest, B unmasked while locked, C unmasked once locked.
+   Those endpoints must stay full-bleed; a feather on a resting or locked edge
+   visibly fades the hero.
+
+   **THE PHASES DO OVERLAP, and a pane can be arriving and departing at the same
+   time.** `PHASE_2_START` is **0.39**; `PHASE_1_END` is **0.61**. For p in that
+   window pane B needs BOTH masks at once. An earlier `if (t2 > 0) … else …`
+   picked one, on a comment asserting the phases could not overlap — false ever
+   since the crossings were deliberately overlapped so motion never stops. The
+   effect was B's top feather snapping to zero the instant phase 2 opened,
+   measured as an instant 12.56% → 0 jump mid-crossing (2026-08-08). One
+   `setPaneMask(pane, topPct, bottomPct)` emitting a single gradient with both
+   ramps is the fix; never reintroduce a one-edge-at-a-time branch.
+
+   **Feather widths are NOT clamped to the overlap, and the old clamp was
+   actively harmful.** `EDGE_FEATHER_PCT` / `FEATHER_OVERLAP_SHARE` /
+   `featherFor()` existed for the era when arriving panes DESCENDED and opposed
+   panes could expose real uncovered frame. With panes RISING, the departing pane
+   covers everything above the arriving pane's top edge for the whole crossing,
+   so a wide feather always lands on a photograph, never on backdrop. Capping at
+   70% of a 15% overlap held the join to a 2–5% ramp — narrow enough to read as a
+   line, which is precisely the complaint it was supposed to prevent. Sizes are
+   now independent: `A_EXIT_DISSOLVE_PCT` (departing, scaled by `e`, must exceed
+   the `15 * e` gap to the arriving pane's top edge) and `B_ARRIVE_FEATHER_PCT`
+   (arriving, `4e(1-e)` so it PEAKS mid-crossing where the seam is most exposed —
+   the old `(1 - e)` profile was backwards and collapsed to ~2% exactly when it
+   mattered most).
+
+   Widths are a PERCENT of pane height, not rem, so they share units with the
+   overlap and do not drift with root font size.
+
+   **What the feather cannot fix:** if neighbouring lineups have different
+   backdrop colours (a black-backed slideshow handing to a white-backed one), the
+   join is a genuine change of content and stays visible however wide the overlap
+   or soft the ramp. That lever is curatorial — group lineups so neighbours share
+   a backdrop — not mechanical.
+
+   The hero's bottom separator border lives on the frame, never on the slideshow
+   sections, so no border sweeps mid-frame.
+7. `prefers-reduced-motion` collapses the runway to the frame height via CSS
+   alone (no travel, panes B and C hidden), so there is no hydration
+   divergence.
+8. Slideshows B and C each have their own curated lineup in a twin table
+   (`carousel_selection_alt`, `carousel_selection_third` — twins, not slot
+   columns, so each keeps its own product_id primary key and one product may
+   appear in any or all lineups). An empty or unmigrated later lineup makes
+   that slideshow mirror A — reads return [] and never fail the payload. All
+   lineups ride the one cached home payload and the `home-carousel` tag. Each
+   lineup is an explicit saved list; `carousel_settings.selection_mode` /
+   `selection_mode_alt` / `selection_mode_third` are always written `manual`.
+8a. The available-products picker hides anything already in the active
+   lineup (owner request 2026-08-04). It is derived from `products` minus the
+   current selection, never a second stored list, so removing a piece from the
+   order list returns it immediately and each lineup tab computes its own.
+   Duplicates were already impossible — the picker is a toggle guarded by an
+   `includes` check — so this is a clarity rule, not the duplicate guard.
+8b. Slideshow lineups may contain SOLD pieces (owner decision 2026-08-04).
+   The admin picker and random fills work from one of three lists — All,
+   Available (default), Sold — where "All" spans exactly the two public
+   statuses; draft/pending-payment/archived never enter a slideshow. The
+   storefront curated fetch admits available OR sold, but a sold item's
+   `priceLabel` is nulled at fetch so the hero can never caption a sold price
+   (sold-price masking policy); a sold card simply links to its product page,
+   which shows it is sold. Sold pieces wear a SOLD chip throughout the panel.
+   Keep the panel's initial catalog load on 'all' — it is what resolves
+   thumbnails for saved sold pieces while a narrower list is active.
+9. Random draws are a FILL ACTION in the admin panel, not a live source
+   (owner direction 2026-08-04). Each of the three buttons — gold jewelry,
+   silver jewelry, non-jewelry — replaces the active lineup with a fresh draw
+   that then behaves exactly like a hand-picked one: reorder it, recolor it,
+   remove or add pieces, and save. This is deliberate and the two models are
+   mutually exclusive: a mode that re-drew server-side on every cache rebuild
+   would discard the admin's arrangement, so if a live rotating source is ever
+   wanted again it must NOT also be editable. Non-jewelry spans both metals on
+   purpose: it is the catalog's "everything else" (coins, bullion, flatware),
+   not a metal-first choice. The metal constraint is pushed to the database;
+   the jewelry test is applied in code because it is inferred from type/tags
+   (`isProductJewelryItem`), the same rule behind the shop's Jewelry & Watches
+   filter — `carousel-lineup-modes.test.ts` asserts the two sets stay in step.
+   The server-side random resolution and the mode columns remain in place and
+   still honour a stored random value (legacy `random_gold` / `random_silver`
+   map forward to their `_jewelry` equivalents), but nothing in the UI sets
+   one, so any stored mode converts to `manual` on the next save.
+10. Ring direction ALTERNATES down the stack: A right-to-left, B reversed
+   (left-to-right), C right-to-left again — B is the only pane passing the
+   Carousel `reverse` prop. Reversing is not just
+   `animation-direction: reverse`: the per-frame sample must mirror its
+   clock-derived angle and flip its hidden-back crossing test, or the
+   sweep/theme/windowing silently track a mirror image. Change spin direction
+   only through that prop.
+11. The later slideshows mount deferred and in stages: B on first scroll
+   intent or idle callback, C only once scroll progress passes 12% — so a
+   visitor who never reaches the first hold never pays for C. Neither mounts
+   under reduced motion. Server HTML always carries exactly one carousel.
+   Combined with the ring's IntersectionObserver pause, at most the panes in
+   a visible crossing animate. Do not mount later panes eagerly, and do not
+   unmount panes on direction changes — remount re-decodes images and shows
+   as pop-in.
+
+### Every carousel card paints the backdrop its own photo was shot against
+
+A card is a fixed square with `border-radius: 1.5em`, but its photo is
+`object-fit: contain` — the radius rounds the element box while the photo is
+letterboxed inside it. So a photo whose bars are wider than 24px shows its own
+square corners, and a near-square photo gets clipped round. That inconsistency
+is only *visible* when the padding colour differs from the photo's backdrop, so
+the rule is: **match the padding to the photo and the seam disappears** — do not
+try to round the photo itself. `object-fit: cover` would crop clasps and
+hallmarks, and dropping the radius changes the whole hero's look.
+
+The colour comes from `paddingBgForProductRow` (`carousel/lib/carouselConfig.ts`),
+which reads the product's own `image_padding` / `image_padding_by_image` — the
+same stored field that paints the product page background. **Every path uses it**:
+the random draws (`fetchRandomLineupItems`, and the admin Random fill
+`fetchRandomSampleItems`) from 2026-08-04, and the CURATED path from 2026-08-07.
+Never reintroduce a hardcoded white default on any of them; that is what put white
+bars around black-backdrop photos. An unset padding still returns null and
+inherits the global carousel colour.
+
+**A curated selection row's White/Black group WINS when set — but must not be
+assumed set.** The curated path originally skipped the padding columns entirely
+on the reasoning that "a curated entry stores its group on the selection row".
+That is only true if whoever added the row set the swatch: three rows in
+`carousel_selection` stored NULL and painted white bars behind black chain
+photos, with no fallback on that path to catch it. The curated query now requests
+the padding columns too and falls back when `bg_color` is NULL.
+
+Keep the two readers in step — `src/lib/home-carousel-server.ts` feeds the live
+hero and `carousel/lib/carouselData.ts` feeds the admin preview. If only one gets
+the fallback, the preview and the storefront disagree about the same lineup.
+
+Consequence to expect, not a bug: the hero's swept background is driven by the
+same per-photo colour, so a random lineup containing black-backdrop pieces now
+sweeps dark as they come round, exactly as a curated mixed lineup always has.
 
 ### Homepage carousel uses one server-authoritative initial payload
 
@@ -199,15 +942,16 @@ quantity, snapshots item prices, and computes tax, shipping, and total.
 
 `checkout-shipping.ts` is the sole shipping catalog. Fees are value-based
 tiers keyed to the order's merchandise subtotal (2026-07-30 owner-approved
-plan, `features/shipping-tiers-plan.md`): Local Pickup $0; Standard Insured
+contract, `features/shipping-tiers.md`): Local Pickup $0; Standard Insured
 $19/$25/$29/$35/$59/$99/$99/$165 across eight bands with USPS Registered Mail
 at $5,000+; Express Overnight $55/$79/$119 and not offered at $5,000+ because
 USPS insurance caps there. Unknown methods and unavailable methods are
 rejected rather than falling back to free shipping or a substituted service.
 Every tier must charge above its worst-case postage + USPS carrier insurance
 cost — the store never pays shipping out of pocket. The same standard tier
-table is the future source for Etsy/eBay shipping via the exported
-marketplace scaffold (`getMarketplaceStandardShippingFee`, not yet wired).
+table drives Etsy/eBay shipping through
+`getMarketplaceStandardShippingFee`; all seven policies/profiles per channel
+are provisioned, with missing mappings retaining a safe legacy fallback.
 
 ### Shipping is U.S.-only and structurally validated
 
@@ -225,17 +969,53 @@ Florida county discretionary surtax and other-state nexus collection remain
 deferred until accountant review and registration. Existing orders are
 historical snapshots and are not retroactively recalculated.
 
-### Checkout is a four-step single-page wizard
+### Checkout is a single-page two-column layout
 
-`/checkout` flows Order Summary → Delivery (radio cards with live tier fees)
-→ Contact & Address → Review & Pay, with a step indicator that unlocks
-completed steps and a sign-in-or-guest entry dialog for signed-out visitors
-(guest choice remembered per tab). The payment controls (policies,
-confirmation checkbox, PayPal buttons) live in the final step so buyers
-always see final totals before paying. This is a presentation layer only —
-payReady gating, effective-method derivation, capture recovery, and order
-reuse are unchanged beneath it. With capture-on-approve, "Place order"
-remains PayPal's own Pay Now review; do not add a post-PayPal confirm step.
+Owner decision 2026-08-04, replacing the earlier four-step wizard (Summary →
+Delivery → Contact → Review & Pay) after the owner supplied a mainstream
+retail checkout as the model. `/checkout` now shows everything at once:
+
+- **Left column** — one *Shipping* card, ordered **delivery method → contact
+  details → address**. The delivery radio cards come first deliberately: the
+  method decides whether a shipping address is required at all, so asking it
+  last let a Local Pickup buyer fill in an address they never needed. Do not
+  reorder them back. There is no separate Payment card — PayPal is the only
+  method, so a card that just announced it was noise; the buyer picks
+  PayPal-vs-card inside PayPal's own buttons. There is no order-notes field;
+  `customer.notes` remains in the payload as an empty string so the server
+  contract is unchanged.
+- **Right rail** — one *Order summary* card: **items first**, then totals,
+  policy links, the confirmation checkbox, and the PayPal buttons. Items lead
+  because that is the near-universal checkout order (Shopify, Stripe
+  Checkout): confirm what you're buying, then what it costs, then pay. Below
+  1024px the columns stack with the summary last, so a phone reads the form
+  first and lands on the pay controls at the end.
+
+The summary card is sticky from 1024px, and three details make that work —
+change any one and it silently breaks. The grid uses `align-items: stretch`
+so the rail spans the row height (a content-sized rail gives sticky zero
+travel); the sticky element is the card *inside* the rail, not the rail
+itself; and the card carries `max-height: calc(100svh - 7rem)` with
+`overflow-y: auto`, because a sticky box taller than the viewport pins its top
+and leaves its bottom — the pay button — permanently unreachable. Keep the
+card the single scroll region; a second nested scroller on the item list
+fights it for wheel events.
+
+The page header's back link is **Back to cart** and reopens the cart drawer
+over the page — the cart is a drawer, not a route, so navigating to `/shop`
+would have discarded entered details.
+
+This remains a presentation layer only: payReady gating, effective-method
+derivation, capture recovery, and order reuse are unchanged, the confirmation
+checkbox is still a hard gate on payReady, and buyers still see the final
+total before paying because the PayPal buttons sit beneath it. With
+capture-on-approve, "Place order" remains PayPal's own Pay Now review; do not
+add a post-PayPal confirm step.
+
+Display money is derived once, by `computeOrderTotals` in `OrderSummary.tsx`,
+and shared by the item-list summary and the standalone `OrderTotals` card so
+the two surfaces cannot disagree. The server still recomputes every amount
+authoritatively (`checkout-pricing.ts`).
 
 Financial summaries list tax AFTER the shipping cost (Subtotal → Shipping →
 Shipping Cost → FL Sales Tax → Total) so the merchandise-plus-shipping
@@ -406,6 +1186,23 @@ not silently attach, end, or republish that external relist. App-side writes
 remain blocked until the stored offer/listing relationship is deliberately
 reattached.
 
+### eBay write blocks are pinned by id, and bulk runs are capped
+
+A write block inferred from mutable row data is not a block. Inventory #82's
+quarantine originally read `last_error === RELISTED_LISTING_WARNING`, which any
+later error, manual clear, or partial sync would erase — silently re-arming a
+write to a listing that is live through an unattached external relist. Blocked
+products are therefore pinned by id in `EBAY_WRITE_BLOCKED_PRODUCT_IDS`, and
+every write path asks one question, `isEbayWriteBlocked()`. Lifting a block is
+an explicit code change, reviewed with the migration that justifies it.
+
+Bulk enqueue is capped at `EBAY_BULK_ENQUEUE_LIMIT` (25) and drops
+non-`available` products before queueing. "Never blanket re-sync" is a real
+hazard — a shipping-policy or template change re-hashes the entire catalog at
+once — so it is enforced mechanically rather than left to whoever is clicking.
+The admin states the cap before a run and the withheld count after it, so a
+capped batch is never mistaken for a finished job.
+
 ### An Instagram post is effectively permanent once published
 
 Two hard limits, both confirmed live on 2026-08-01, make publishing a one-way
@@ -442,13 +1239,81 @@ Instagram auto-links "#21" into a hashtag pointing at an unrelated tag page
 Since 2026-08-01, the inventory number stays out of PUBLIC post copy entirely,
 on both channels (caption and alt text — `buildPublicSpecLine`, one shared
 strip so the rule cannot drift). The piece is identified by the `/p/<inv#>`
-short link instead: clickable full URL on Facebook, and a **typeable**
-brand-case `Shop: NaplesEstateJewelry.com/p/N` line on Instagram, where caption
+short link instead: clickable full URL on Facebook, and a two-line Instagram
+block: `Store link in bio` immediately followed by the **typeable** brand-case
+`Item: NaplesEstateJewelry.com/p/N`. There is no blank line inside that pair,
+but the normal caption blank line remains above and below it. Instagram caption
 URLs are never linkified — a dead `https://` URL there is noise, but a short
 brand-case path is something a viewer can retype. Both channels share one
-caption structure (hook → title → specs → price sentence, uniform one-blank-line
-rhythm, no description body); channel differences are limited to what the
-platforms force (link form, CTA wording).
+caption structure (opening sentence that combines availability with the item
+→ specs → price sentence, uniform one-blank-line rhythm,
+no description body); channel differences are limited to what the platforms
+force (link form, CTA wording). AI is optional and manual-only: ordinary
+preview loads and direct Prepare calls never invoke a model. The operator must
+click Generate/Regenerate, may first add up to 400 characters of optional style
+direction (typed or selected from the shared six-option suggestion menu), may
+edit the result directly, and must Prepare again before
+publishing; unsaved wording hides the publish controls. Leaving direction blank
+and skipping Generate preserves the deterministic opening exactly. AI output is
+bounded by a schema, must clearly identify the product, and must contribute a
+genuine conversational thought rather than only rewriting the title plus
+availability. It deliberately varies sentence structure and prefers natural
+“This…” phrasing over “The {full catalog title}…”. It may shorten the
+catalog title naturally, as admin edits already can. Both paths reject “our,” links,
+hashtags, inventory numbers, quotes, extra sentences, and stale availability
+claims. Failure or no manual generation uses `Available now: {title}.`
+Existing prepared captions stay immutable until explicitly re-prepared.
+
+Facebook and Instagram do not use the same hashtag volume. Both may reuse the
+same relevance ordering, but Facebook is capped at the first three tags so the
+Page copy reads naturally; Instagram retains its larger discovery-oriented set.
+This limit is enforced by the Facebook mapper, so preview, Prepare, queue, and
+publish cannot drift.
+
+Tiffany has one public social hashtag: **`#tiffanyandco`**. The shared hashtag
+normalizer maps direct Tiffany brand/company variants, including legacy
+`#tiffanyco` and bare `#tiffany`, to that spelling before deduplication. This is
+shared mapping policy, not a per-product tag edit, so Instagram and Facebook
+cannot drift.
+
+In the combined **Publish to both** review, a channel already in prepared
+`review` state is authoritative for the reviewed opening sentence. Preparing
+the missing side copies its complete stored caption body instead of rebuilding
+different wording on the target. The target mapper replaces only the
+platform-specific link block and trailing hashtag line: Facebook retains its
+clickable `Shop:` URL and three tags; Instagram receives `Store link in bio` +
+`Item:` and its larger tag set. The same operation copies the source channel's
+complete saved photo curation - ordered lineup, exclusions, crops, card source,
+and card background - then rebuilds the target channel's own rendition files.
+The copy is revalidated against current product images and invalidates staged
+platform uploads before Prepare. If neither side is ready, each
+target keeps its own preview caption.
+If both sides are already ready with different openers, publishing both is
+fail-closed. The page that opened the modal is the source of truth, and the
+operator must explicitly re-prepare the other channel with **Sync wording** or
+**Sync wording & photos**.
+The cross-channel endpoint reads the source caption from the server-side stored
+review row; browser-supplied caption bodies are never trusted.
+
+When both reviews are ready, the combined modal always names the direction and
+offers three separate operations: **Sync wording**, **Sync photos**, and **Sync
+wording & photos**. These are semantic modes, not alternate labels for one
+operation. Wording-only must not mutate destination curation. Photo-only must
+copy curation and rebuild renditions while preserving the destination's stored
+reviewed caption. Combined sync copies both. The manager page that opened the
+modal remains the source, so direction is never inferred from which caption or
+slide count happens to differ.
+
+The same combined review may queue both channels, but only when both prepared
+reviews are current and their opening sentences match. Queueing is a distinct,
+non-public action beside Publish, reuses the existing per-channel queue
+contracts, and reports each channel independently rather than implying an
+all-or-nothing database transaction. A queued post remains a prepared review:
+preview copy is selected from the stored caption and renditions, not from the
+temporary `pending` sync state, so queueing cannot make reviewed wording appear
+stale or hide the unqueue path. Unqueue restores `review` whenever that prepared
+caption and rendition set still exist; only an unprepared record returns to
+`pending`.
 
 The Instagram content hash deliberately EXCLUDES price. Spot moves daily; if
 price were hashed, every live post would flag itself out of date and invite a
@@ -477,7 +1342,10 @@ result when Instagram failed. Cross-channel curation copying
 (`/api/admin/social/copy-curation`) is verbatim-including-nulls ("make the
 other channel match this one"), re-validated against current product images,
 refused when the target post is live, and invalidates the target's prepared
-renditions exactly like a lineup save. Channel curation STORAGE stays separate
+renditions exactly like a lineup save. The combined
+`/api/admin/social/prepare-from-channel` path calls that same copy operation
+before it prepares the missing side; it never maintains a caption-only shadow
+implementation. Channel curation STORAGE stays separate
 (the copy is an explicit operator action, not a sync) — shared storage would
 let one channel's re-prepare delete files the other still references.
 
@@ -545,6 +1413,11 @@ to disagree about how many slots are free. The photo cap therefore lives in
 `buildInstagramPost` as `INSTAGRAM_MAX_PHOTO_ITEMS` (9 of Meta's 10), so the
 count an operator reviews is the count that publishes by construction.
 
+The small **NOW AVAILABLE** eyebrow immediately above the item title is also
+system-owned card presentation, not editable post content. It belongs in the
+shared renderer so Instagram and Facebook cannot drift and so the operator does
+not have to manage another field for a consistent visual hierarchy.
+
 A card render failure is **not** fatal. The photos and caption are the substance
 of a post; the card is presentation, so a failure degrades to a card-less
 carousel with a warning rather than blocking. This is deliberately the opposite
@@ -594,7 +1467,9 @@ file-for-file (schema, lib modules, routes, panels, drip) rather than
 abstracting a generic "social channel": an operator or agent who knows one
 immediately knows the other, and a change to one can never destabilise the
 other. Where the Graph API differs, the build leans into the difference instead
-of forcing parity — Page tokens do not expire (so there is no refresh cron),
+of forcing parity — Facebook has no refresh cron in this owner flow, so Page
+tokens are lifetime-inspected before storage and later re-pasted when finite or
+invalidated,
 deletion genuinely works (so there is no manual-delete detour), publishing is
 synchronous (no container polling), and links are clickable (so every post
 carries a `Shop:` product URL, which Instagram cannot have).
@@ -607,6 +1482,106 @@ but writes per-channel Storage prefixes (`instagram-renditions/` vs
 would let one channel's re-prepare delete files the other still references.
 Lineups and crops are stored per channel for the same reason: curating one
 never changes the other.
+
+### Social preparation is one owner action, not two internal pipeline actions
+
+The Instagram and Facebook manager screens treat saving a lineup and creating
+the prepared upload as one owner-level intent: **Save & prepare**. The server
+still receives the two ordered operations, but surfacing an independent card
+preview made it easy to click Done and mistakenly believe a prepared upload
+existed. There is now no manual card-generation step: preparation creates the
+real card, which first appears in review. The panels instead expose the stage derived
+by `lib/social-workflow.ts`: curate → prepare → review → publish. Unsaved
+lineup changes always win over a previous preparation, and caption edits make
+that review stale too. Queueing, combined publishing, publishing, and discard
+are unavailable until the review is current. This is deliberately UI-state
+only: no schema or API contract changed. Preserving the local caption opening
+across a lineup reload prevents the convenience save from silently discarding
+an operator's wording. Conversely, an explicit outlined **Reset changes**
+action resets every local setup value (lineup, crops, card source/background,
+AI direction, and opener) to the loaded baseline without a write. It is absent
+when there is nothing local to discard; a generic Cancel label hid that scope
+and looked inert when only a prepared-state flag remained.
+
+The action row belongs **after** the full photo/card setup, not beside the
+Photos heading. It is a completion action, not a prerequisite for choosing,
+reordering, cropping, or selecting the card image; placing it beside the
+heading falsely implied the reverse order.
+
+For social opener copy, **Tiffany & Co.** is a canonical house name rather
+than a stylistic choice. The AI is told to use it, and the shared server-side
+normalizer converts Tiffany variants in a Tiffany product's generated,
+fallback, or edited opener before the caption preview is built. Its abbreviation
+period is explicitly not treated as a second sentence. The same shared opener
+normalizer enforces the house punctuation rule for typographic dashes: em and
+en dashes have exactly one space on each side in AI, fallback, extracted, and
+admin-edited copy. Hyphens within compound words are not treated as dashes.
+
+### Social square framing lives in the editable lineup
+
+Prepared social images use contain-to-square framing so no jewelry is lost by
+an implicit crop; that can visibly add canvas around landscape or portrait
+photos. The editable lineup therefore uses the same server-side post-crop
+framing calculation and sampled canvas color that `renderSquareJpeg` uses; its
+thumbnail is the sole pre-prepare preview, with **Canvas**/**Crop** labels for
+quick scanning. This replaced the separate hardcoded-white toolbar preview,
+which could disagree with black or cream source backdrops. Canvas color is
+resolved from the median border ring, not four corners: a tight crop can put a
+bracelet or shadow in one corner while the dominant sweep remains uniform. A
+genuinely mixed border still falls back to white. The crop dialog deliberately
+shows the editable source and a separate live square **Prepared post preview**
+side by side. **Fill square** provides a centered, square crop *starting point*
+and visibly removes canvas in that output preview. It is not an automatic write
+or re-prepare, and the owner must inspect and apply it, preserving control over
+clasps and other edge details. The same shared crop UI and lineup rendering
+apply to Instagram and Facebook.
+
+### Remote social status is reconciled conservatively, never inferred
+
+A local `published` flag is not permanent truth: an owner can delete a post in
+Facebook or Instagram itself. Each published manager therefore performs one
+remote read on open and exposes an explicit refresh action. A Meta missing-id
+response is still ambiguous because its text can also describe permissions, so
+local state changes to `deleted` only after a second `/me` call proves the same
+Page/account token remains healthy and, for Facebook, a fresh one-item Page feed
+read proves the read permission still works. Facebook's New Page Experience can
+return a stored post id prefixed by the Page id while the public permalink uses
+a different Page actor id. The permalink-derived composite id is a permitted
+read-only fallback, but only for numeric `facebook.com/{actor}/posts/{post}`
+URLs and never as proof by itself. Authentication, permission, rate-limit,
+network, and other ambiguous errors must preserve `published` and surface an
+actionable message. Manual **Already removed on…** is the deliberate fallback
+when the owner knows the remote post is gone. Facebook Page-token connection
+must also prove `pages_read_engagement` by reading one feed id; a publish-only
+token is insufficient for reconciliation. A status check is a local, contained
+interaction: unchanged success or inability to check belongs beside the refresh
+button in neutral/success text, not in the panel's page-wide error banner.
+
+Facebook token rotation is validate-then-swap, never disconnect-first. A
+connected admin can paste a replacement token, but the stored token remains
+active unless the candidate passes Page profile, post-read access, exact
+same-Page-id, and Meta token-metadata checks. Same-Page protection still applies
+when the stored connection is `needs_reauth`; expiry must never make it possible
+to silently redirect future posts to another managed Page. The metadata must be
+valid for the Naples Estate Jewelry Social app. Tokens with a finite lifetime
+under 30 days are rejected; longer finite lifetimes are persisted and displayed,
+while a null expiry means only that Meta reported no finite expiration. The
+server-only `/debug_token` call requires `FACEBOOK_APP_SECRET`; when it is not
+configured, connection and rotation fail closed rather than accepting an
+uninspected credential.
+
+### Facebook publish completion is receipt-first and exactly recoverable
+
+A successful Meta feed response is the irreversible boundary. Persist its post
+id as Published immediately; permalink enrichment and audit logging are
+secondary and must never move that row back to error. If the process ends after
+Meta creates the post but before the receipt is stored, checkpointed unpublished
+photo ids authorize a read-only recovery attempt before any retry write. Recovery
+requires exactly one recent Page-feed entry whose full message equals the saved
+prepared caption and whose creation time is after the checkpoint began. Zero or
+multiple matches fail closed. A consumed-photo response is evidence to attempt
+that proof, never proof by itself and never permission to prepare fresh photos
+or create another public post.
 
 ### Do not publish off-eBay contact information
 
@@ -662,6 +1637,32 @@ preference update before deployment.
 
 ## UI Conventions
 
+### Every password field renders through components/account/PasswordInput
+
+There is exactly one password input in the customer-facing app
+(`components/account/PasswordInput.tsx`, over the `.password-field` utility
+in `globals.css`). Never hand-roll another — a source guard in
+`password-input.test.ts` fails the suite if any file outside that component
+declares `type="password"`.
+
+This rule exists because the account area had drifted into three different
+treatments across seven fields before 2026-08-02: an eye toggle on sign-in, a
+text "Show/Hide" button in a bordered segment on sign-up and reset-password
+(which also rendered a differently sized input than the email field beside
+it), and no toggle whatsoever on the dashboard's Change Password panel.
+
+The component owns the details that are easy to get wrong: right padding so
+long values never slide under the button, `::-ms-reveal` suppression so Edge
+does not render a second eye, a 36px tap target centred in the field, a
+focus-visible ring, `aria-pressed` for state (never a static label claiming
+the password is shown), `aria-controls` paired with a `useId()` fallback so
+it is never dangling, and a distinct `confirm` label so two adjacent toggles
+do not both announce "Show password". Pass `isEs` for Spanish.
+
+Exception: admin token fields (Instagram/Facebook settings) keep plain
+`type="password"` and are allow-listed in the guard — those are pasted API
+secrets, not user passwords, and intentionally offer no reveal control.
+
 ### Admin editing surfaces open in pop-up windows, never inline
 
 Owner rule (2026-08-01): when an admin action needs its own working area — a
@@ -674,6 +1675,16 @@ single toolbar acts on the selected item — per-item button clusters do not
 scale visually (a 3×2 pad under 96px thumbnails shattered into text fragments
 at moderate widths and was scrapped the same day it shipped).
 
+Prepared social-post thumbnails are the one collection exception that opens a
+focused viewer: `PreparedSlideViewer` presents their final, ordered upload
+one-at-a-time in the same AdminModal frame. It has visible previous/next
+controls plus left/right keyboard support, and disables the unavailable end
+instead of wrapping because final slide order is a review detail. Both social
+panels use this one component so the review behavior cannot drift. Destructive
+social actions use the shared outlined-button geometry and motion with a red
+hover/focus treatment; bare red text looked unrelated to the rest of the action
+row and provided no hover affordance.
+
 ### Mobile admin accounts prioritize the Admin Panel entry
 
 For authenticated administrators only, the account dashboard's Admin Panel
@@ -682,6 +1693,31 @@ Overview at 700px and below. From 701px upward, it stays in the established
 right side rail. Both placements render the same localized card component and
 must be mutually exclusive so there is exactly one visible admin entry. Regular
 customer accounts do not render either placement.
+
+### Admin Products consumes surplus width only on wide desktops
+
+The inventory table keeps its established fixed 1680/1960px minimums and
+horizontal-scrolling behavior below 2100px. At 2100px and above, when the
+scroll viewport can exceed the table's normal width, the inline table fills
+the available space instead of leaving a white strip after the action column.
+Brand gets first claim on that surplus through a fluid 150-220px target; the
+browser's automatic table layout distributes the remainder across the other
+flexible columns. Do not broaden this rule to laptop, tablet, mobile-fullscreen,
+or narrower desktop layouts.
+
+### Ultra-wide expansion is opt-in by canvas, not a global max-width override
+
+At 2000px and above, large application and grid canvases may expand through
+one of three shared tiers: 1600px (medium), 1800px (standard), or 2200px (wide),
+always retaining 3rem outer gutters. This covers the storefront, product
+detail, account dashboard, admin data surfaces, marketplace managers, public
+service/sell grids, and footer without making every centered element wider.
+
+Do not globally override Tailwind `max-w-*` classes. Long-form legal/FAQ prose,
+auth forms, checkout steps, modals, and focused sequential content depend on
+their narrower measure for readability and task clarity. New large canvases
+must explicitly choose a tier; the source guard enforces this for the standard
+large-width tokens.
 
 ### Product-summary specifications wrap as one group
 
@@ -692,6 +1728,122 @@ beneath the badge; never allow length alone to become an orphaned second line.
 This content-aware flex grouping is preferred over a viewport breakpoint
 because Spanish labels and the tablet two-column layout need different amounts
 of space.
+
+### A dark product page themes the PAGE, and light cards opt back out
+
+A product whose first photo is shot on black renders a dark variant: `<main>`
+gets `.product-page-dark` plus inline overrides of `--color-on-surface`,
+`--color-on-surface-variant`, `--color-primary` and `--color-outline-variant`.
+Every product page therefore exists in two versions, and both must be checked.
+
+The rule that keeps them correct: **the dark palette applies to content sitting
+on the dark page, never to a surface that paints its own light background.**
+Anything with a light background of its own carries `product-light-surface`,
+which restores the four tokens from the `--color-*-light` aliases captured on
+`:root`. Today that is the related-product cards and the review cards; both were
+rendering near-white text on a white card at 1.12:1 before 2026-08-04.
+
+Two supporting rules:
+
+- The light aliases are declared as `var()` of the real tokens on `:root`, not
+  as repeated hexes, so `@theme` stays the single source. They resolve against
+  `:root`, so a descendant override of the real token cannot reach them.
+- Fix theme contrast in CSS via the token layer, not by hardcoding colours in a
+  component — those components are shared with the light-theme page and the
+  homepage, where they were already correct.
+
+Verify by measurement, not by eye: audit computed contrast for every text node
+under `<main>` on BOTH a light-backdrop and a black-backdrop product, in both
+locales. Two traps when writing that audit — `color(srgb …)` values are 0-1
+floats rather than 0-255, and text over a CSS gradient cannot be judged from
+`backgroundColor` and must be skipped instead of reported.
+
+### The product gallery has no magnifier, and its arrows only navigate
+
+Owner decision 2026-08-04: the hover/touch magnifier is removed at every
+viewport. Full-size viewing is the lightbox, opened by clicking the main photo.
+Do not reintroduce a magnifier without also restoring what it required — an edge
+dead-zone so the prev/next buttons stay usable, and `touch-action: none` on the
+frame, which is what stopped a vertical swipe starting on the photo from
+scrolling the page.
+
+An edge arrow must navigate and do nothing else. The arrow sits on top of the
+frame that opens the lightbox, so the button stops propagation itself
+(`handleEdgeNavigation`) AND `openLightbox` ignores any click inside
+`.product-gallery-edge-button`. That guard must test `instanceof Element`, never
+`instanceof HTMLElement`: the visible chevron is an inline SVG and an SVGElement
+fails the HTMLElement test, which is exactly how clicking the arrow used to open
+the lightbox. Stopping propagation on `pointerdown` alone does not help either —
+`click` is a separate event that still bubbles.
+
+**The arrow is drawn as a full-height bar, and the bar IS the hit area** (owner
+request 2026-08-04). It previously drew a 44px circle inside a much larger
+invisible hit area, so the control looked far smaller than it was. Keep visual
+and hit area identical — that is the whole point.
+
+Four rules for the bar, all from owner feedback (2026-08-04/05):
+
+1. **Flat scrim, hairline inner edge — never a fade.** A gradient dissolving
+   toward the centre leaves the strip with no visible end, so nothing says where
+   the clickable area stops.
+2. **Narrow and against the edge**: `clamp(2.75rem, 11%, 4.25rem)`, i.e. 63px on
+   a 576px frame and 44px (the tap-target floor) on a phone. At the original 28%
+   a click aimed at the piece, expecting the lightbox, landed on the bar. The
+   centre 15%–85% of the frame must stay the lightbox's.
+3. **The scrim must not depend on knowing what is behind it** (2026-08-05). It
+   is ONE treatment that moves the backdrop both ways at once —
+   `backdrop-filter: brightness(0.82)` darkens light content while
+   `rgba(255,255,255,0.16)` lifts dark content — with a white, dark-haloed
+   chevron for the same reason.
+
+   Do NOT reintroduce a light/dark scrim pair chosen from the frame's padding
+   colour. That was the first design and it failed from the second photo on: the
+   bar sits over the PHOTO, and the padding and the photo routinely disagree. A
+   black-padded frame carrying a cream photo picked a white scrim, which vanished
+   over the photo and survived only in the padding bands — indistinguishable from
+   the photo being painted on top of the panel.
+
+   The blur is load-bearing too: softening what is behind the strip is what makes
+   it read as an overlay rather than part of the photo.
+4. **The bars are the top layer inside the frame** (`z-index: 30`), above both
+   gallery images, the cross-fade layer, and the video iframe.
+5. **The bars exist from 768px only** (owner decision 2026-08-05). Below that a
+   swipe replaces them: a phone frame is ~344px wide and two 44px bars claim a
+   quarter of it permanently, while a swipe costs no space. Tablet and desktop
+   keep both. This is a WIDTH query, not `(hover: none)`, so a desktop window
+   narrowed past 768px behaves like the mobile layout it is displaying.
+
+Swiping the main image changes photo on touch pointers only — a mouse drag stays
+a plain click, leaving the lightbox, text selection and the proximity reveal
+alone. Rules that keep the gesture honest:
+
+- `touch-action: pan-y pinch-zoom` on the frame. `none` would also take vertical
+  scrolling and pinch-zoom; `auto` would let the browser consume the horizontal
+  drag before the handler sees it.
+- Commit to "this is a swipe" only when the drag is both >10px sideways and more
+  sideways than vertical, so a page scroll that starts on the photo still
+  scrolls.
+- ANY drag over ~10px suppresses the click that follows, not just a committed
+  horizontal one. Browsers usually swallow that click once a touch becomes a
+  scroll, but testing showed a vertical drag opening the lightbox when the code
+  depended on it.
+
+Each bar reveals independently, and the reveal is PROXIMITY-based, not a plain
+hover (owner request 2026-08-04): the gallery tracks the pointer across the
+frame and writes `--edge-prev-reveal` / `--edge-next-reveal`, which each bar
+reads. The ramp runs 28% of the frame width inward from the bar's inner edge on
+a smoothstep curve, reaching 1 when the pointer is over the bar.
+
+**The reveal ramp and the clickable area are separate on purpose.** Widening the
+button to match the ramp would bring back the mis-click the narrow bar was
+introduced to fix; the bar advertises itself from a distance without growing.
+
+The tracking is mouse-only — an inline reveal value would permanently override
+the `(hover: none)` treatment after a single tap — and the `:hover` rule stays as
+the pre-hydration/no-JS fallback.
+
+Because the reveal is hover-based, `(hover: none)` shows the bars permanently —
+otherwise the affordance is invisible on touch, where it matters most.
 
 ### Product-detail thumbnail rails keep the active-next pair visible
 
@@ -796,3 +1948,99 @@ this keeps the header and controls static across viewport sizes.
 Async actions show immediate press feedback plus a durable loading/success/error
 state. Financial summaries always show cents. Empty or inapplicable customer
 fields are omitted rather than rendered as blank labels.
+
+### Social queues stay channel-specific inside one owner dashboard
+
+Instagram and Facebook retain separate persisted queues and independent
+scheduled order; a combined sort would imply ordering guarantees that do not
+exist across channels. The Admin **Social Queues** dashboard presents both
+sections on one route, selects only the row/product fields needed for display,
+and provides the narrow queue mutations the owner needs: edit the prepared post,
+publish it immediately, change its time, or remove it while retaining prepared
+copy. **Post now** is available only for a ready post on a connected channel and
+always crosses a confirmation boundary that names the channel, says the
+reservation will be bypassed, and repeats Instagram's irreversible edit/delete
+limitation. It must use the same receipt-safe publish state machine as the
+manager page; the dashboard never implements a second publishing path. Once
+confirmed, this work belongs to a provider mounted at the locale layout so it
+survives ordinary client-side navigation instead of trapping the owner in a
+modal. Only one social publish may run in the tab at a time. Success auto-clears
+after a short notification; failure stays visible and retry is allowed because
+the underlying Instagram/Facebook state machines are receipt/checkpoint safe.
+Hard reloads or closing the tab are not presented as durable job persistence.
+
+Bulk immediate publishing is channel-specific. The owner manually selects ready
+rows inside either Instagram or Facebook and crosses one confirmation boundary
+that lists the selected posts. The provider then calls the existing receipt-safe
+single-post state machine sequentially in the dashboard's visible queue order;
+there is no bulk provider endpoint or parallel public write. The first failure
+stops the batch. Retry resumes at that failed item, using the completed count so
+already published entries are never intentionally repeated. A running individual
+post or batch retains the one-task-per-tab lock.
+
+Recent published-post management stays receipt-led and channel-honest. The
+dashboard reads only the 12 newest rows still marked `published` per channel and
+opens them in one **Latest Posts** modal. View links and local manager links are
+non-mutating. Refresh delegates to the existing conservative remote check.
+Owner-written comments require a second compose-and-submit step, use each
+channel's existing authenticated comment client, store no comment body locally,
+and write only an audit outcome. Facebook Remove delegates to its existing
+remote-delete path behind a permanent-action confirmation. Instagram must never
+pretend API deletion exists: it opens the live post for manual removal and asks
+the owner to return and refresh status. No latest-post action gets a parallel
+provider implementation inside the dashboard.
+
+The two channel histories are independent disclosures inside that modal. Both
+load expanded so the first opening reveals the available posts, but clicking an
+Instagram or Facebook header collapses that channel's complete body to a compact
+header with its current visible count. The header itself is the accessible
+button (`aria-expanded` plus `aria-controls`); no separate small toggle target
+is used. Disclosure state belongs to the mounted modal and survives its internal
+comment/removal confirmation views, but intentionally resets when the modal is
+closed and reopened.
+
+That jump carries only the fixed `returnTo=social-queues` sentinel, never an
+arbitrary return URL. The shared manager derives the destination and label from
+that allowlisted value, preserves it across marketplace tabs, and otherwise
+falls back to Products. This gives the owner a reliable round trip without
+introducing an open-redirect surface or changing direct manager navigation.
+
+### Social posting uses seven explicit Eastern reservations
+
+The only schedulable times are **noon, 2 PM, 4 PM, 6 PM, 8 PM, 10 PM, and
+midnight** in `America/New_York`. The UI exposes a date plus that seven-value select rather
+than a free-form datetime control, and the queue API independently enforces the
+same allowlist. Midnight means the end of the selected calendar date. The next
+valid slot is the default, so the common path requires no time calculation.
+
+`scheduled_for` is the intended posting time and `queued_at` remains the audit
+timestamp for the owner's original approval. Rescheduling changes only
+`scheduled_for`. Queue dashboards and workers order by `scheduled_for`, then
+`queued_at` for deterministic ties. Removing a reservation clears both queue
+timestamps but preserves the prepared caption and renditions.
+
+Netlify cron expressions use the union of UTC hours needed to cover all seven
+Eastern slots in both EDT and EST. This deliberately creates harmless extra
+invocations around daylight-saving changes; the database due-row predicate
+(`scheduled_for <= now()`) is the authority and prevents early publication.
+There is no owner-configured daily post cap. Each worker invocation processes a
+bounded batch of at most 25 due rows to protect its runtime, and a later
+invocation continues any remainder. A transient failure, disconnected channel,
+or Instagram's provider-enforced 100-per-rolling-24-hour quota can delay a post,
+but nothing may publish before its reservation. Existing queued rows are
+backfilled to future allowed slots rather than becoming due immediately.
+
+A non-null `queued_at` plus a valid `scheduled_for` is the admin approval
+boundary. Because `queueProduct`
+uses `pending` to mark that queued prepared state while ordinary preparation
+uses `review`, scheduled drips must select both states and still rely on
+`runPublishStep` to fail closed when caption/renditions are absent. Selecting
+only `review` leaves valid queued posts permanently stranded.
+
+### Social card instructions name slide 1 explicitly
+
+The CARD badge selects the source photo for the generated advertising card; it
+does not mark a photo that will appear later in the carousel. Owner-facing setup
+copy must say that Save & prepare creates the final card **as slide 1** and that
+this finished first slide is reviewed before publishing. Avoid relative wording
+such as “review it next,” which can be read as carousel order.

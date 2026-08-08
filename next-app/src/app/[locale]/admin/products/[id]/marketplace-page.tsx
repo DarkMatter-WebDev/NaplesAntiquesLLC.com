@@ -24,13 +24,16 @@ export async function renderAdminProductMarketplacePage({
   locale,
   productId,
   marketplace,
+  returnTo,
 }: {
   locale: string;
   productId: string;
   marketplace: ProductMarketplaceName;
+  returnTo?: string;
 }) {
   const isEs = locale === 'es';
   const adminBasePath = isEs ? '/es/admin' : '/admin';
+  const returnToSocialQueues = returnTo === 'social-queues';
 
   const supabase = await createClient();
   const user = await getVerifiedUser(supabase);
@@ -69,7 +72,7 @@ export async function renderAdminProductMarketplacePage({
     <div style={{ minHeight: '100vh', background: 'var(--color-background, #fafaf8)' }}>
       <AdminHeader
         adminBasePath={adminBasePath}
-        active="products"
+        active={returnToSocialQueues ? 'social-queues' : 'products'}
         unreadMessagesCount={unreadMessagesCount ?? 0}
         userEmail={user.email}
       />
@@ -78,6 +81,7 @@ export async function renderAdminProductMarketplacePage({
         product={productResult.data as unknown as ProductMarketplaceSummary}
         marketplace={marketplace}
         locale={locale}
+        returnTo={returnToSocialQueues ? 'social-queues' : null}
       />
     </div>
   );

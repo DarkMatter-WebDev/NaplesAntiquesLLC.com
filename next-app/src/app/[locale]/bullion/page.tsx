@@ -60,7 +60,7 @@ export default async function BullionPage({ params }: Props) {
   return (
     <>
       <SiteHeader />
-      <main className="pt-16">
+      <main className="site-header-offset">
 
         {/* Hero */}
         <section className="relative overflow-hidden pt-16 pb-16 md:pt-20 md:pb-24 border-b border-white/5">
@@ -102,7 +102,7 @@ export default async function BullionPage({ params }: Props) {
 
         {/* 4-up Charts */}
         <section id="live-charts" className="py-12 md:py-20 bg-[#f3f3f3]">
-          <div className="max-w-6xl mx-auto px-6 md:px-8">
+          <div className="ultrawide-page max-w-6xl mx-auto px-6 md:px-8">
             <div className="mb-12 text-center">
               <h2 className="text-3xl md:text-4xl font-[family-name:var(--font-headline)] font-bold mb-3 tracking-tight">
                 {isEs ? 'Precios en Vivo que Referenciamos' : 'Live Prices We Reference'}

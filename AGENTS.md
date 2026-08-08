@@ -51,8 +51,6 @@ The active app lives in **`next-app/`**.
   and structural invariants.
 - `project-docs/INTEGRITY.md` - concrete integrity rules and pre-publish
   checklist.
-- `project-docs/LEGACY_REMOVAL_REPORT.md` - audit of the retired static-site
-  files removed during the Next.js transition.
 
 After app code, route, schema-contract, or config changes, verify from
 `next-app/`:

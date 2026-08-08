@@ -6,6 +6,7 @@ import { getMarketplaceShippingProfileMap } from '@/lib/marketplace-shipping';
 import type { Product, SpotData } from '@/types/product';
 import { normalizeProductQuantity, normalizeProductStatus } from '@/types/product';
 import { EbayApiError, ebayFetch, ebayTradingGetItemStatus, type EbayTradingItemStatus } from './client';
+import { EBAY_BULK_ENQUEUE_LIMIT } from './guards';
 import { ensureFreshAccessToken } from './auth';
 import {
   buildMappedPayload,
@@ -46,8 +47,48 @@ export type SyncMode = 'publish' | 'update' | 'price-only' | 'publish-live';
 export const RELISTED_LISTING_WARNING =
   'This item is live through an eBay relist that is no longer attached to the app-managed offer. Manage it on eBay until it is reattached.';
 
+/**
+ * Hard, data-independent write block. The detached-relist guard below infers
+ * its block from `last_error` still holding RELISTED_LISTING_WARNING — which is
+ * true today but evaporates the moment anything overwrites that column (a
+ * different error, a manual clear, a partial sync). For a listing the owner has
+ * deliberately quarantined, that is too fragile, so the product id is pinned
+ * here as well. Both checks must pass before any eBay write.
+ *
+ * Inventory #82 / eBay listing 800354878200: live through an external relist
+ * that is not attached to stored offer 204558136011. Writing to it could end or
+ * duplicate the live listing. Remove this entry ONLY after the owner-approved
+ * reattachment (or end-and-republish) is tested — see project-docs/TASKS.md.
+ */
+export const EBAY_WRITE_BLOCKED_PRODUCT_IDS: ReadonlySet<string> = new Set([
+  'antique-georgian-sterling-silver-handled-mug-london-1824-edward-farrell-82',
+]);
+
+export const EBAY_WRITE_BLOCKED_WARNING =
+  'This listing is write-blocked pending an owner-approved reattachment on eBay. Manage it on eBay until the block is lifted.';
+
 function isDetachedRelistedListing(listing: EbayListingRow | null): boolean {
   return listing?.last_error === RELISTED_LISTING_WARNING;
+}
+
+/**
+ * The single question every eBay write path must ask. Pinned block first so it
+ * holds even when listing state is missing or `last_error` has been rewritten.
+ */
+export function isEbayWriteBlocked(productId: string, listing: EbayListingRow | null): boolean {
+  return EBAY_WRITE_BLOCKED_PRODUCT_IDS.has(productId) || isDetachedRelistedListing(listing);
+}
+
+function writeBlockedResult(productId: string, listing: EbayListingRow | null): SyncStepResult {
+  const pinned = EBAY_WRITE_BLOCKED_PRODUCT_IDS.has(productId);
+  return {
+    done: true,
+    syncState: listing?.sync_state ?? 'pending',
+    error: {
+      code: pinned ? 'write_blocked' : 'detached_relist',
+      message: pinned ? EBAY_WRITE_BLOCKED_WARNING : RELISTED_LISTING_WARNING,
+    },
+  };
 }
 
 export interface SyncStepResult {
@@ -309,13 +350,7 @@ export async function runSyncStep(productId: string, mode: SyncMode = 'publish')
 
   if (mode === 'publish-live') return publishLiveStep(service, productId, listing);
   if (mode === 'price-only') return priceOnlyStep(service, productId, listing);
-  if (isDetachedRelistedListing(listing)) {
-    return {
-      done: true,
-      syncState: listing!.sync_state,
-      error: { code: 'detached_relist', message: RELISTED_LISTING_WARNING },
-    };
-  }
+  if (isEbayWriteBlocked(productId, listing)) return writeBlockedResult(productId, listing);
 
   const product = await loadProduct(service, productId);
   if (!product) {
@@ -552,13 +587,7 @@ async function publishLiveStep(
   productId: string,
   listing: EbayListingRow | null,
 ): Promise<SyncStepResult> {
-  if (isDetachedRelistedListing(listing)) {
-    return {
-      done: true,
-      syncState: listing!.sync_state,
-      error: { code: 'detached_relist', message: RELISTED_LISTING_WARNING },
-    };
-  }
+  if (isEbayWriteBlocked(productId, listing)) return writeBlockedResult(productId, listing);
   if (!listing?.ebay_offer_id) {
     return {
       done: true,
@@ -620,13 +649,7 @@ async function priceOnlyStep(
   productId: string,
   listing: EbayListingRow | null,
 ): Promise<SyncStepResult> {
-  if (isDetachedRelistedListing(listing)) {
-    return {
-      done: true,
-      syncState: listing!.sync_state,
-      error: { code: 'detached_relist', message: RELISTED_LISTING_WARNING },
-    };
-  }
+  if (isEbayWriteBlocked(productId, listing)) return writeBlockedResult(productId, listing);
   if (!listing?.ebay_offer_id) {
     return {
       done: true,
@@ -760,13 +783,7 @@ export async function runDelist(productId: string, action: 'hide' | 'withdraw' |
   const service = createServiceClient();
   const connectionRow = await getConnection(service);
   const listing = await getListing(service, productId);
-  if (isDetachedRelistedListing(listing)) {
-    return {
-      done: true,
-      syncState: listing!.sync_state,
-      error: { code: 'detached_relist', message: RELISTED_LISTING_WARNING },
-    };
-  }
+  if (isEbayWriteBlocked(productId, listing)) return writeBlockedResult(productId, listing);
   if (!connectionRow || connectionRow.status !== 'connected') {
     return { done: true, syncState: listing?.sync_state ?? 'pending', error: { code: 'not_connected', message: 'eBay is not connected.' } };
   }
@@ -1116,20 +1133,74 @@ export async function checkAllListingStatuses(productIds?: string[]): Promise<Ch
 // ---------------------------------------------------------------------------
 // Phase 2 — bulk queue + drain.
 // ---------------------------------------------------------------------------
-export async function enqueueProducts(productIds: string[]): Promise<number> {
+/**
+ * Largest number of listings one bulk enqueue may stage for live eBay writes.
+ * "Never blanket re-sync" is a standing project rule: a single click that
+ * rewrites the entire catalog on a live marketplace has no undo, and one bad
+ * mapping would be multiplied across every listing. Work proceeds in reviewable
+ * batches instead — drain, check the results on eBay, enqueue the next batch.
+ */
+export { EBAY_BULK_ENQUEUE_LIMIT } from './guards';
+
+export interface EnqueueResult {
+  /** Listings actually staged for a write. */
+  queued: number;
+  /** Skipped because the product id is write-blocked (e.g. inventory #82). */
+  blocked: number;
+  /** Skipped because the product is no longer available (sold/held/removed). */
+  notAvailable: number;
+  /** Eligible but withheld by EBAY_BULK_ENQUEUE_LIMIT; enqueue again for more. */
+  withheld: number;
+}
+
+/**
+ * Bounded, guarded bulk enqueue. Three filters run before anything is staged:
+ * pinned write-blocks, non-available products, then the batch cap. Together
+ * they are the mechanical form of the standing cautions — never blanket
+ * re-sync, and never write a quarantined or sold listing.
+ */
+export async function enqueueProducts(productIds: string[]): Promise<EnqueueResult> {
   const service = createServiceClient();
-  let count = 0;
-  for (const productId of productIds) {
+  // Write-blocked ids never enter the queue at all — the per-step guard would
+  // stop them anyway, but keeping them out avoids parking a permanently
+  // un-drainable row in 'pending'.
+  const blocked = productIds.filter((id) => EBAY_WRITE_BLOCKED_PRODUCT_IDS.has(id)).length;
+  const notBlocked = productIds.filter((id) => !EBAY_WRITE_BLOCKED_PRODUCT_IDS.has(id));
+
+  // Sold pieces would fail runSyncStep's pre-flight anyway ("Only available
+  // items can be published to eBay") — but only after flipping the row to
+  // 'error' and writing a log line each. A catalog-wide re-sync would bury the
+  // real failures under dozens of those, so drop them before they are queued.
+  const available = new Set<string>();
+  for (let index = 0; index < notBlocked.length; index += 200) {
+    const { data, error } = await service
+      .from('products')
+      .select('id')
+      .eq('status', 'available')
+      .in('id', notBlocked.slice(index, index + 200));
+    if (error) throw new Error(error.message);
+    for (const row of (data ?? []) as { id: string }[]) available.add(row.id);
+  }
+  const allowed = notBlocked.filter((id) => available.has(id));
+  const batch = allowed.slice(0, EBAY_BULK_ENQUEUE_LIMIT);
+
+  let queued = 0;
+  for (const productId of batch) {
     // Re-enqueuing an already-listed item as 'pending' is safe: runSyncStep's
     // effectiveMode reinterpretation treats it as an update, never a
     // re-publish, so it can never spin forever in the drain loop.
     await upsertListing(service, productId, { sync_state: 'pending', ebay_sku: productId });
-    count += 1;
+    queued += 1;
   }
-  return count;
+  return {
+    queued,
+    blocked,
+    notAvailable: notBlocked.length - allowed.length,
+    withheld: allowed.length - batch.length,
+  };
 }
 
-export async function enqueueAllEligible(): Promise<number> {
+export async function enqueueAllEligible(): Promise<EnqueueResult> {
   const service = createServiceClient();
   const { data: products } = await service.from('products').select('*').eq('status', 'available');
   const connectionRow = await getConnection(service);
@@ -1223,6 +1294,38 @@ export async function drainPublishQueue(): Promise<DrainResult> {
 // version (see admin-products.ts). Pass `productIds` to check just those
 // products (the intended per-save call shape) instead of the full catalog.
 // ---------------------------------------------------------------------------
+/**
+ * What the freshness scan should do with one row, before any hashing.
+ *
+ * A sold/hidden piece is never a content-push candidate: `out_of_date` means
+ * "this listing needs a push", and pushing a sold piece is precisely what must
+ * never happen — so hashing one can only ever produce a false flag.
+ *
+ * Until 2026-08-04 the scan hashed `hidden_oos` rows too. The tier
+ * shipping-policy change duly flipped all 36 sold-and-hidden listings to
+ * `out_of_date`, destroying the state that records "hidden on eBay because it
+ * sold" and inflating the re-sync campaign by a third.
+ *
+ * `repair-hidden` undoes exactly that. `last_pushed_qty === 0` is durable proof
+ * that `hideListingQuantityZero()` really did zero the listing on eBay (the
+ * scan never touches that column), so it separates a mis-flagged hidden row
+ * from a just-sold row whose auto-hide has not run yet — the latter must stay
+ * visible as work to do rather than be relabelled as already hidden.
+ */
+export type FreshnessScanAction = 'hash' | 'skip' | 'repair-hidden';
+
+export function resolveFreshnessScanAction(
+  listing: Pick<EbayListingRow, 'sync_state' | 'last_pushed_qty'>,
+  productStatus: string | null | undefined,
+): FreshnessScanAction {
+  if (normalizeProductStatus(productStatus) !== 'available') {
+    return listing.sync_state === 'out_of_date' && listing.last_pushed_qty === 0 ? 'repair-hidden' : 'skip';
+  }
+  // Already flagged — re-hashing would only rewrite the same value.
+  if (listing.sync_state === 'out_of_date') return 'skip';
+  return 'hash';
+}
+
 export async function scanAndMarkOutOfDate(productIds?: string[]): Promise<number> {
   const service = createServiceClient();
   const connectionRow = await getConnection(service);
@@ -1230,7 +1333,9 @@ export async function scanAndMarkOutOfDate(productIds?: string[]): Promise<numbe
   const connection = toConnectionDefaults(connectionRow);
   const spotData = await fetchSpotData().catch(() => null);
 
-  let query = service.from('ebay_listings').select('*').in('sync_state', ['published', 'hidden_oos']);
+  // 'out_of_date' is selected only so the repair branch below can see rows this
+  // scan itself mis-flagged; an already-flagged available row is skipped.
+  let query = service.from('ebay_listings').select('*').in('sync_state', ['published', 'hidden_oos', 'out_of_date']);
   if (productIds) query = query.in('product_id', productIds);
   const { data: listings } = await query;
   let flagged = 0;
@@ -1238,6 +1343,14 @@ export async function scanAndMarkOutOfDate(productIds?: string[]): Promise<numbe
   for (const listing of (listings ?? []) as EbayListingRow[]) {
     const product = await loadProduct(service, listing.product_id);
     if (!product) continue;
+
+    const action = resolveFreshnessScanAction(listing, product.status);
+    if (action === 'repair-hidden') {
+      await upsertListing(service, listing.product_id, { sync_state: 'hidden_oos' });
+      continue;
+    }
+    if (action === 'skip') continue;
+
     // The shipping policy is price-tiered and participates in the content
     // hash. During a live-spot outage, skip spot-priced rows instead of
     // falsely marking them out of date with a fallback/unknown tier.
@@ -1315,7 +1428,7 @@ export function planEbayPricePush(
   let blocked = 0;
 
   for (const listing of listings) {
-    if (isDetachedRelistedListing(listing) || !listing.ebay_offer_id) {
+    if (isEbayWriteBlocked(listing.product_id, listing) || !listing.ebay_offer_id) {
       blocked += 1;
       continue;
     }

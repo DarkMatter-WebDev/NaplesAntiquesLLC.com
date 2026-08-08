@@ -56,6 +56,51 @@
   --radius-xl: 1rem;
 }
 
+/* Light-palette originals, captured once on :root.
+   A dark product page overrides the four text tokens on <main>, so a light card
+   inside it has no way back to the light values — except through these, which
+   are resolved here against :root and therefore keep the light palette no
+   matter what a descendant overrides. Declared with var() rather than repeated
+   hexes so @theme above stays the single source of truth. */
+:root {
+  --color-on-surface-light: var(--color-on-surface);
+  --color-on-surface-variant-light: var(--color-on-surface-variant);
+  --color-primary-light: var(--color-primary);
+  --color-outline-variant-light: var(--color-outline-variant);
+}
+
+/* ── Fixed site header height ───────────────────────────────
+   Single source of truth for how much vertical space SiteHeader
+   occupies. SiteHeader sets its own `height` from this token, so the
+   value is authoritative rather than a guess that can drift from the
+   rendered header — before 2026-08-04 every page reserved 4rem
+   against a header that measured 73px, so the first 9px of page
+   content sat behind it (visible on the homepage announcement bar,
+   absorbed unnoticed elsewhere by generous section padding).
+
+   The header centers its row, so this only needs to be at least as
+   tall as the tallest content: 32px on phones (text brand + action
+   buttons), 40px from md up (where the logo appears). Lives outside
+   @theme because it varies by breakpoint.
+
+   Anything that must sit exactly below the header reads this token —
+   page offsets (.site-header-offset), sticky tops, full-height panes.
+   Surfaces that want extra breathing room use their own larger
+   padding instead of inflating this. */
+:root {
+  --site-header-height: 3.5rem; /* 56px = 32px content + 12px above/below */
+}
+@media (min-width: 768px) {
+  :root {
+    --site-header-height: 4.5rem; /* 72px = 40px logo + 16px above/below */
+  }
+}
+
+/* Reserve exactly the fixed header's space at the top of a page. */
+.site-header-offset {
+  padding-top: var(--site-header-height);
+}
+
 /* ── Base styles ──────────────────────────────────────────── */
 html {
   -webkit-font-smoothing: antialiased;
@@ -165,6 +210,32 @@ table {
   padding-inline: clamp(1rem, 4vw, 2.5rem);
 }
 
+/*
+ * Ultra-wide canvas tiers. These are opt-in because prose, forms and dialogs
+ * still need readable/task-focused widths. At 2000px+ the selected page and
+ * grid surfaces use the extra desktop space instead of remaining tablet-thin.
+ */
+.ultrawide-page-medium,
+.ultrawide-page,
+.ultrawide-page-wide {
+  width: 100%;
+  margin-inline: auto;
+}
+
+@media (min-width: 2000px) {
+  .ultrawide-page-medium {
+    max-width: min(1600px, calc(100vw - 6rem));
+  }
+
+  .ultrawide-page {
+    max-width: min(1800px, calc(100vw - 6rem));
+  }
+
+  .ultrawide-page-wide {
+    max-width: min(2200px, calc(100vw - 6rem));
+  }
+}
+
 .responsive-section {
   width: 100%;
   padding-block: clamp(3.5rem, 7vw, 7rem);
@@ -185,6 +256,28 @@ table {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 15.5rem), 1fr));
   gap: clamp(0.85rem, 2vw, 1.5rem);
+}
+
+/* Reviews grid (2026-08-05). Column counts are pinned to 1 / 2 / 4 rather than
+   left to the shared auto-fit, which chose 3 in the ~850-1150px band and stranded
+   the fourth review alone on a second row. Skipping 3 keeps the four cards
+   balanced at every width: one column, then 2x2, then a single row of four.
+
+   This ladder assumes an EVEN review count. Adding a fifth brings the orphan
+   back — at that point either add a sixth or move to a layout that centres a
+   partial last row. */
+.testimonial-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 600px) {
+  .testimonial-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1160px) {
+  .testimonial-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .responsive-form-grid {
@@ -346,6 +439,62 @@ button:focus-visible > .hover-underline-grow,
   transition-duration: 0.05s;
 }
 
+/* Destructive social actions remain visually related to outlined controls,
+   while their red hover/focus treatment keeps the consequence explicit. */
+.outline-button.social-danger-button {
+  background: rgba(186, 26, 26, 0.035);
+  border-color: color-mix(in srgb, var(--color-error) 42%, transparent);
+  color: var(--color-error);
+}
+.outline-button.social-danger-button:hover:not(:disabled) {
+  background: rgba(186, 26, 26, 0.08);
+  border-color: color-mix(in srgb, var(--color-error) 72%, transparent);
+  color: var(--color-error);
+  box-shadow: 0 12px 24px rgba(186, 26, 26, 0.12);
+}
+.outline-button.social-danger-button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-error) 72%, transparent);
+  outline-offset: 2px;
+}
+
+.prepared-slide-viewer-nav {
+  position: absolute;
+  top: 50%;
+  display: inline-flex;
+  height: 2.7rem;
+  width: 2.7rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 48%, transparent);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-primary);
+  box-shadow: 0 8px 20px rgba(38, 28, 6, 0.14);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: background 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+.prepared-slide-viewer-nav:hover:not(:disabled) {
+  background: #ffffff;
+  border-color: color-mix(in srgb, var(--color-primary) 76%, transparent);
+  box-shadow: 0 12px 24px rgba(38, 28, 6, 0.2);
+  transform: translateY(-50%) scale(1.06);
+}
+.prepared-slide-viewer-nav:active:not(:disabled) {
+  transform: translateY(-50%) scale(0.94);
+}
+.prepared-slide-viewer-nav:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.prepared-slide-viewer-nav:disabled {
+  cursor: not-allowed;
+  opacity: 0.36;
+}
+.prepared-slide-viewer-nav .app-icon {
+  font-size: 1.5rem;
+}
+
 /* Bespoke desktop/public controls keep the same small lift/press language as
    the shared buttons without forcing mobile-only controls into this pass. */
 .home-subscriber-join {
@@ -378,6 +527,529 @@ button:focus-visible > .hover-underline-grow,
   .shop-list-cart-button:active:not(:disabled) {
     transform: scale(0.94);
     transition-duration: 0.05s;
+  }
+}
+
+/* Product detail two-column layout (2026-08-04).
+
+   The problem it solves: the gallery is ~660px tall while the info column ran
+   ~1340px, so from md up the whole lower half of the photo column was dead
+   whitespace. The ASIDE — public notes plus the three policy accordions — now
+   renders under the gallery, which shortens the band to the taller of the two
+   columns instead of the info column alone (1337px -> ~950px at 1440).
+
+   Column contents (owner's arrangement):
+   - column 1: gallery, then notes + Shipping/Condition/Payment accordions
+   - column 2: purchase panel, description, specifications
+
+   DOM order IS the reading order — gallery, purchase panel, description,
+   specifications, sold note, notes, policies — so the h1 and price always lead
+   for screen readers and crawlers, and no `order` overrides are needed. Two CSS
+   modes give that one source two layouts:
+
+   - Below md both wrappers are `display: contents`, so every block becomes a
+     sibling in ONE flat stack that reads in plain DOM order.
+   - From md up the info wrapper is a real column in grid column 2 spanning both
+     rows, with the gallery in row 1 of column 1 and the aside in row 2.
+
+   `grid-template-rows: auto 1fr` is load-bearing: an item that spans tracks only
+   grows the FLEXIBLE ones in its span, so the info column's surplus height lands
+   in row 2 and row 1 stays exactly as tall as the gallery. With two auto rows
+   the surplus is split between them and a gap reopens under the photo.
+
+   The aside is ONE wrapper rather than two grid items on purpose: a product with
+   no Notes would otherwise leave an empty track whose gutter still prints under
+   the gallery. */
+.product-detail-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.product-detail-layout > .product-detail-column-info,
+.product-detail-layout > .product-detail-column-aside {
+  display: contents;
+}
+/* Mobile only: 1.25rem stack gap + 1.25rem here = the 2.5rem the gallery had
+   below it before the restructure. */
+.product-detail-layout > .product-detail-media {
+  margin-bottom: 1.25rem;
+}
+@media (min-width: 768px) {
+  .product-detail-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    align-items: start;
+    column-gap: 2.5rem;
+    row-gap: 2rem;
+  }
+  .product-detail-layout > .product-detail-media {
+    grid-column: 1;
+    grid-row: 1;
+    margin-bottom: 0;
+    min-width: 0;
+  }
+  .product-detail-layout > .product-detail-column-aside {
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    min-width: 0;
+  }
+  .product-detail-layout > .product-detail-column-info {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    min-width: 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .product-detail-layout {
+    column-gap: 4rem;
+  }
+}
+
+/* At 2000px+ the `ultrawide-page-wide` tier widens the canvas to 2200px, the
+   columns roughly double, and the roles invert: the square gallery becomes the
+   TALLER column (~1120px) while the info column shrinks as its text stops
+   wrapping (~790px). Keeping the aside under the gallery there would stack it
+   onto the already-tallest column and make the band ~260px taller than doing
+   nothing. So the same rule is applied mirrored — the aside moves into the SHORT
+   column, under the info stack, and the gallery spans both rows. The flexible
+   row still absorbs the spanning item, so the band is exactly as tall as the
+   gallery. */
+@media (min-width: 2000px) {
+  .product-detail-layout > .product-detail-media {
+    grid-row: 1 / span 2;
+  }
+  .product-detail-layout > .product-detail-column-info {
+    grid-row: 1;
+  }
+  .product-detail-layout > .product-detail-column-aside {
+    grid-column: 2;
+    grid-row: 2;
+  }
+}
+
+/* Product purchase panel (2026-08-04).
+
+   Everything here sizes against the PANEL, not the viewport. The info column is
+   576px on a 1440 desktop but 325px at 768 and full-width on a phone, so the old
+   `sm:grid-cols-2` (a 640px VIEWPORT query) had the value tiles stacked on a
+   343px-wide phone column while cramming them into a 325px tablet column — the
+   exact opposite of what each needed. */
+.product-buy-panel {
+  container-type: inline-size;
+}
+
+/* Scrap value + live spot: always side by side, never stacked. There is room
+   for both at every width once they compact, so they shrink their type and
+   padding with the panel instead of wrapping (owner request 2026-08-04). */
+.product-value-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.375rem;
+}
+.product-value-tile {
+  padding: clamp(0.4rem, 0.26rem + 1cqi, 0.625rem) clamp(0.45rem, 0.23rem + 1.45cqi, 0.75rem);
+}
+/* Floor raised 2026-08-05: this was clamp(0.5rem, …, 0.58rem) — 8px to 9.3px,
+   which is below a comfortable reading size for a buyer demographic that skews
+   older, on the tile that states what the metal is actually worth. Now 10px to
+   11px. The cqi term is kept so the two tiles still shrink together and hold one
+   line. */
+.product-value-tile-label {
+  font-size: clamp(0.625rem, 0.56rem + 0.36cqi, 0.6875rem);
+}
+.product-value-tile-value {
+  font-size: clamp(0.78rem, 0.676rem + 0.76cqi, 0.95rem);
+}
+
+/* Buy actions. Previously a wrapping flex row, which left a ragged right edge
+   at every width — ~100px of trailing slack on desktop, and a 2-line stagger on
+   a phone (Add to Cart + Save, then Inquire + Call against dead space).
+
+   It is now a grid that is flush edge-to-edge in BOTH of its two modes:
+   - narrow panel: Add to Cart spans the full width, then Save / Inquire / Call
+     as three equal columns beneath it — the standard mobile hierarchy;
+   - panel >= 470px: one row of four, with Add to Cart given the extra weight.
+
+   470px is where the four fit measured, not guessed: Add to Cart's 1.5fr cell is
+   ~149px there against a ~140px label once the fluid padding has compacted it.
+   A 1180px iPad Pro gives a 519px panel, so the threshold has to sit below that
+   or that device drops to the stacked layout for no reason.
+
+   Buttons never wrap their label: the horizontal padding is fluid so a label
+   compacts its frame rather than breaking onto a second line. */
+.product-cta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.product-cta-grid > * {
+  min-width: 0;
+  width: 100%;
+}
+/* The Add to Cart control is wrapped by CartButton (it may also hold a quantity
+   stepper), so the wrapper stretches and its button fills what is left. */
+.product-cta-grid > div {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.product-cta-grid > div > button {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.product-cta-grid :is(button, a) {
+  white-space: nowrap;
+  padding-inline: clamp(0.5rem, 0.1rem + 2.4cqi, 1.4rem);
+}
+.product-cta-grid > :first-child {
+  grid-column: 1 / -1;
+}
+@container (min-width: 470px) {
+  .product-cta-grid {
+    grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  }
+  .product-cta-grid > :first-child {
+    grid-column: auto;
+  }
+}
+/* The sold-out panel offers two actions rather than four, and one of them is a
+   sentence ("Inquire about a similar piece") rather than a one-word label. It
+   therefore needs far more room per cell than the four-action row: it stacks to
+   one full-width column and only pairs up once the panel can give each cell the
+   ~255px that label needs. Two columns at 320px clipped it. */
+.product-cta-grid.product-cta-grid-pair {
+  grid-template-columns: minmax(0, 1fr);
+}
+@container (min-width: 500px) {
+  .product-cta-grid.product-cta-grid-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .product-cta-grid.product-cta-grid-pair > :first-child {
+    grid-column: auto;
+  }
+}
+
+/* "You might also like" cards (2026-08-04).
+
+   Two rules the owner set: the spec pills must NEVER wrap onto a second line,
+   and they should share the price's line whenever they fit, dropping below it
+   only when they cannot.
+
+   `flex-wrap: nowrap` on the pill row is the hard guarantee for the first, and
+   `flex-wrap: wrap` on the row that holds price + pills gives the second: the
+   pill group is a single flex item, so it either fits beside the price or moves
+   down whole.
+
+   Staying beside the price as long as possible is why the CARD is a query
+   container. The strip is 4-up on desktop and 2-up on phones, so a viewport
+   media query would size pills for the wrong box — a 375px phone and a 1440px
+   desktop can hold cards of very different widths at the same breakpoint. Every
+   length inside a pill is in `em`, so one font-size clamp scales the padding and
+   gaps with it.
+
+   The clamp slope is fitted to measured widths, not guessed. `cqi` resolves
+   against the container's CONTENT box, so the numbers below are content widths,
+   not card widths: at 244px (4-up desktop) the pills keep their original
+   0.62rem, and at ~102px (2-up on a 320px phone) they reach ~0.38rem, where the
+   widest real row — `18K 119.4g 24in 12.2mm`, 157px at full size — still fits on
+   one line. Re-measure before changing either bound. */
+/* One card per row on thin phones. At 360px and below a 2-up card is only
+   ~122px of content — too narrow to read a title or a price comfortably — so
+   the strip goes single column and every card gets the full measure back.
+   375px and up keeps 2-up (owner: that is "regular mobile"). */
+.related-product-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+@media (min-width: 361px) {
+  .related-product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 768px) {
+  .related-product-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1.5rem;
+  }
+}
+
+.related-product-card {
+  container-type: inline-size;
+}
+
+/* The title shrinks with the card as hard as the pills do. At a 244px card it
+   is the original 0.875rem; at the ~130px card of a 2-up 375px phone it drops
+   to ~0.65rem, which is what stops a two-line title from dominating a narrow
+   card (owner request 2026-08-04). */
+.related-product-title {
+  font-size: clamp(0.6rem, 0.39rem + 3.16cqi, 0.875rem);
+  line-height: 1.3;
+}
+
+/* Wrapping below the price is ALL-OR-NOTHING across the strip (owner request
+   2026-08-04): a row where some cards keep the pills beside the price and
+   others drop them looked accidental.
+   Cards in a strip are always the same width, so a single card-width threshold
+   makes the decision identical for every card. It is set just under the
+   narrowest card at which the worst case — the widest pill row plus a long
+   price — still fits on one line, so above it every card shares and below it
+   every card stacks. Measured: pills share the price line at a 192px card and
+   the widest row no longer fits by 156px. */
+@container (max-width: 180px) {
+  .related-product-chips {
+    flex-basis: 100%;
+  }
+}
+.related-product-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  /* Fluid too, for the same reason as the pill type: on a narrow card the gap
+     between price and pills is the difference between sharing a line and not. */
+  column-gap: clamp(0.25rem, 1.6cqi, 0.5rem);
+  row-gap: 0.35rem;
+  min-width: 0;
+}
+.related-product-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.4em;
+  font-family: var(--font-label);
+  /* Raised 2026-08-05 as part of lifting sub-11px text off the product page.
+     Raising the CAP alone did nothing — at the ~244px container these cards get,
+     the preferred value already resolved to 9.9px, i.e. below the old cap rather
+     than clamped by it. The SLOPE is the lever that actually moves the common
+     case (2.69cqi -> 3.13cqi puts a 244px card at ~11px).
+
+     The lower bound stays at 0.38rem deliberately: it is what lets these pills
+     shrink instead of wrapping, and never wrapping is a hard requirement. The
+     slope change lifts wide cards far more than narrow ones, so the no-wrap
+     floor is preserved — verified at 320/400/768/900 in both locales. */
+  font-size: clamp(0.38rem, 0.21rem + 3.13cqi, 0.6875rem);
+  font-weight: 700;
+  line-height: 1;
+}
+.related-product-chip {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  padding: 0.4em 0.6em;
+}
+
+/* Gallery edge navigation (owner request 2026-08-04).
+
+   These used to draw a 44px circle floating inside a much larger invisible hit
+   area, so the control looked far smaller than it was. The bar now IS the hit
+   area: what you see is exactly what you can click.
+
+   Three things the first version got wrong (owner feedback 2026-08-04):
+
+   1. **It faded out.** A gradient that dissolves toward the centre never shows
+      where the bar ends, so the boundary of the clickable strip was guesswork.
+      The scrim is now FLAT with a hairline down its inner edge — the bar has a
+      visible beginning and end.
+   2. **It was too wide.** At 28% (144px on desktop) a click aimed at the piece
+      itself, expecting the lightbox, could land on the bar instead. It is now
+      ~11% capped at 4.25rem — 63px on a 576px frame, 44px at phone size — so it
+      hugs the edge and leaves the middle ~78% of the photo to the lightbox.
+      44px is the floor because that is a usable tap target.
+   3. **Both bars revealed together.** They now reveal independently, each on
+      its own hover, so the highlight tracks the side the pointer is actually
+      near.
+
+   The bars sit above every layer inside the frame — both gallery images
+   (including the cross-fade layer), the video iframe, and anything added later.
+   `z-index: 30` against images that carry no z-index of their own is deliberate
+   headroom, not a magic number: keep them the highest thing in the frame. */
+.product-gallery-edge-button {
+  position: absolute;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(2.75rem, 11%, 4.25rem);
+  height: 100%;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  opacity: 0;
+  /* Short: the reveal value is repainted every pointer frame, so this only has
+     to smooth the steps and animate the fade-out on leave. */
+  transition: opacity 120ms ease;
+}
+/* Each bar reads its OWN reveal value, written on the frame by the gallery's
+   pointer tracking — the bar fades up as the cursor approaches that side and is
+   solid once the pointer is over it. The `:hover` rule below still wins on its
+   own, so the bar behaves correctly before hydration and if JS never runs. */
+.product-gallery-edge-prev {
+  left: 0;
+  opacity: var(--edge-prev-reveal, 0);
+}
+.product-gallery-edge-next {
+  right: 0;
+  opacity: var(--edge-next-reveal, 0);
+}
+/* Per-bar, not frame-wide: only the side being approached lights up. */
+.product-gallery-edge-button:hover,
+.product-gallery-edge-button:focus-visible {
+  opacity: 1;
+}
+/* ONE scrim that reads on any backdrop — it must not depend on knowing what is
+   behind it (owner report 2026-08-04).
+
+   The previous version picked a light or dark tint from the frame's PADDING
+   colour. But the bar sits mostly over the PHOTO, and from the second image on
+   those two routinely disagree: a black-padded frame can carry a cream-backdrop
+   photo, and the white scrim then vanished over the photo, leaving the bar
+   visible only in the padding bands above and below it. That reads exactly like
+   the photo being painted on top of the panels, which is what was reported —
+   the bars were always on top, they just became invisible.
+
+   The fix is a scrim that moves the backdrop in BOTH directions at once:
+   `brightness()` darkens light content while the white tint lifts dark content.
+   Measured composites — over a cream photo (239) the strip lands near 205, and
+   over black (0) near 41, so it is a clearly visible band either way without
+   being heavy. */
+.product-gallery-edge-button {
+  background: rgba(255, 255, 255, 0.16);
+  -webkit-backdrop-filter: blur(2px) brightness(0.82);
+  backdrop-filter: blur(2px) brightness(0.82);
+}
+.product-gallery-edge-prev {
+  border-right: 1px solid rgba(255, 255, 255, 0.3);
+}
+.product-gallery-edge-next {
+  border-left: 1px solid rgba(255, 255, 255, 0.3);
+}
+/* White with a dark halo for the same reason: it is the one glyph treatment
+   that survives both a lifted-black and a darkened-cream strip, so the chevron
+   never depends on the padding/photo agreeing either. */
+.product-gallery-edge-chevron {
+  font-size: 28px;
+  line-height: 1;
+  flex-shrink: 0;
+  color: #ffffff;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9)) drop-shadow(0 0 4px rgba(0, 0, 0, 0.5));
+}
+/* Touch has no hover, so a hover-only affordance is invisible on exactly the
+   devices that most need it. Show the bars permanently but softened. */
+@media (hover: none) {
+  .product-gallery-edge-button {
+    opacity: 0.85;
+  }
+}
+/* Below 768px the bars are gone entirely and swiping the photo is the on-image
+   control (owner request 2026-08-05). A phone frame is only ~344px wide, so two
+   44px bars claim a quarter of it permanently; a swipe costs no space at all.
+   Tablet keeps both — the bars there sit on a frame wide enough to spare them.
+   Deliberately a width query, not `(hover: none)`: a desktop window narrowed
+   past 768px should behave like the mobile layout it is showing. */
+@media (max-width: 767.98px) {
+  .product-gallery-edge-button {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .product-gallery-edge-button {
+    transition: none;
+  }
+}
+
+/* Homepage announcement bar (owner request 2026-08-04: never two lines).
+
+   It used to be `flex-wrap` at a fixed 0.62rem, so on a phone the two items
+   broke onto two lines and the strip doubled in height. It is now `nowrap` with
+   a fluid type size, so the text compacts to stay on one line instead.
+
+   Letter-spacing stays in `em`, so the generous 0.22em tracking shrinks with the
+   type rather than being what forces the break — at full size the tracking alone
+   is about a third of the strip's width.
+
+   The third item appears only from 780px. That is where all three fit at full
+   size IN SPANISH (measured: the Spanish trio needs ~727px of text, so 710px
+   overflowed by 49). Revealing it at the old `sm` (640px) would have forced the
+   other two to shrink to accommodate it, which is a worse trade than showing it
+   a little later. Bounds below are fitted to measured text widths. */
+.home-announcement {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0 clamp(0.35rem, 1.6vw, 0.75rem);
+  padding: 0.625rem clamp(0.5rem, 2.5vw, 1rem);
+  text-align: center;
+}
+.home-announcement-item {
+  white-space: nowrap;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  /* Fitted to the SPANISH strings, which are the long ones ("Recogida local
+     gratis en Naples"); English then simply carries more slack. Fitting to
+     English instead overflowed Spanish by 14px at 320. */
+  font-size: clamp(0.4rem, 1.934vw + 0.013rem, 0.62rem);
+}
+.home-announcement-item-third {
+  display: none;
+}
+@media (min-width: 780px) {
+  .home-announcement-item-third {
+    display: inline;
+  }
+}
+.home-announcement-separator {
+  margin-right: 0.75em;
+  color: rgba(233, 195, 73, 0.45);
+}
+
+/* Thumbnail-rail prev/next: a bare chevron, no square frame (owner request
+   2026-08-05). The 40px box is kept as the TAP TARGET only — removing the
+   border and white fill must not shrink what you can hit, and the white fill
+   also had to go because it printed a white square on dark product pages.
+
+   Feedback is scale rather than a colour shift, so it reads the same whether
+   `--color-primary` is the deep gold of a light page or the light gold of a
+   dark one. */
+.product-gallery-thumb-nav {
+  display: flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: transform 150ms ease;
+}
+.product-gallery-thumb-nav:hover {
+  transform: scale(1.15);
+}
+.product-gallery-thumb-nav:active {
+  transform: scale(0.92);
+  transition-duration: 0.05s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .product-gallery-thumb-nav {
+    transition: none;
+  }
+  .product-gallery-thumb-nav:hover,
+  .product-gallery-thumb-nav:active {
+    transform: none;
   }
 }
 
@@ -442,6 +1114,36 @@ button:focus-visible > .hover-underline-grow,
   transform: translateY(-1px);
 }
 
+/* Checkout summary totals (components/checkout/OrderSummary.tsx -> OrderTotals).
+   Global rather than styled-jsx because the rows render from OrderSummary while
+   the surrounding card is styled inside CheckoutClient's scoped block. */
+.checkout-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.checkout-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  font-size: 0.82rem;
+  color: var(--color-on-surface-variant);
+}
+.checkout-total-row--grand {
+  margin-top: 0.45rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid #d8d0c2;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-on-surface);
+}
+.checkout-total-note {
+  font-size: 0.65rem;
+  line-height: 1.4;
+  color: var(--color-on-surface-variant);
+}
+
 .gold-button:disabled,
 .outline-button:disabled {
   cursor: default;
@@ -486,6 +1188,28 @@ button:not(:disabled):not(.gold-button):not(.outline-button):active {
   background: #ffffff;
   color: #735c00;
   border-color: color-mix(in srgb, #735c00 65%, transparent);
+}
+
+/* Light-surface islands inside a dark product page.
+   ------------------------------------------------
+   The dark theme flips the four text tokens on <main>, which is right for
+   content sitting on the black page. It is WRONG for anything that paints its
+   own light background: those inherit near-white text onto a white card. Two
+   components do exactly that below the fold — the related-product cards
+   (`bg` = surface-container-lowest) and the review cards (`bg-white`) — and the
+   result measured 1.12:1 on every card title and review quote, i.e. invisible.
+
+   Restoring the tokens here (rather than hardcoding colours in the components)
+   keeps one rule for every light card and leaves the light-theme page, where
+   these same components are already correct, completely untouched. Add
+   `product-light-surface` to any future card that brings its own light
+   background. */
+.product-page-dark .product-light-surface {
+  --color-on-surface: var(--color-on-surface-light);
+  --color-on-surface-variant: var(--color-on-surface-variant-light);
+  --color-primary: var(--color-primary-light);
+  --color-outline-variant: var(--color-outline-variant-light);
+  color: var(--color-on-surface-light);
 }
 
 /* Cross-fade for product gallery image switches: the incoming image fades in
@@ -555,6 +1279,53 @@ button:not(:disabled):not(.gold-button):not(.outline-button):active {
 .clearable-field__button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+/* Password field with a show/hide toggle. Shared form utility — reuse this
+   rather than re-implementing per page. */
+.password-field {
+  position: relative;
+}
+.password-field > .form-field {
+  /* Reserve the toggle's column so long passwords never run underneath it. */
+  padding-right: 2.9rem;
+}
+/* Edge/IE render their own reveal control; without this the field shows two
+   eyes side by side. */
+.password-field > .form-field::-ms-reveal,
+.password-field > .form-field::-ms-clear {
+  display: none;
+}
+.password-field__toggle {
+  position: absolute;
+  right: 0.3rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 2.25rem keeps a comfortable tap target inside the 2.6rem-tall field. */
+  width: 2.25rem;
+  height: 2.25rem;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--color-on-surface-variant);
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease;
+}
+.password-field__toggle:hover {
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+.password-field__toggle:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
+  outline-offset: 1px;
+  color: var(--color-primary);
+}
+/* Toggled-on state reads as active even without hovering. */
+.password-field__toggle[aria-pressed='true'] {
+  color: var(--color-primary);
 }
 .clearable-field--multiline .clearable-field__button {
   top: 0.7rem;
@@ -1244,6 +2015,159 @@ button:not(:disabled):not(.gold-button):not(.outline-button):active {
   .ai-recording-bars span {
     animation: none;
   }
+}
+
+/* Social publishing leaves its confirmation dialog immediately and continues
+   inside this route-persistent corner widget. */
+.social-publish-widget {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  z-index: 80;
+  width: min(22rem, calc(100vw - 2rem));
+  overflow: hidden;
+  border: 1px solid rgba(128, 104, 25, 0.45);
+  border-radius: 0.8rem;
+  background: rgba(255, 253, 247, 0.98);
+  color: var(--color-on-surface);
+  box-shadow: 0 22px 55px rgba(44, 35, 10, 0.24);
+  transform-origin: bottom right;
+  animation: social-publish-widget-arrive 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  backdrop-filter: blur(14px);
+}
+
+.social-publish-widget.is-success { border-color: rgba(56, 118, 79, 0.52); }
+.social-publish-widget.is-error { border-color: rgba(180, 35, 24, 0.48); }
+
+.social-publish-widget-summary {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 2.8rem minmax(0, 1fr) 1.1rem;
+  align-items: center;
+  gap: 0.75rem;
+  border: 0;
+  background: transparent;
+  padding: 0.8rem 0.9rem;
+  color: inherit;
+  cursor: pointer;
+}
+
+.social-publish-widget-summary strong,
+.social-publish-widget-summary small { display: block; }
+
+.social-publish-widget-summary strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-label);
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+}
+
+.social-publish-widget-summary small {
+  margin-top: 0.15rem;
+  color: var(--color-on-surface-variant);
+  font-size: 0.68rem;
+}
+
+.social-publish-orb {
+  position: relative;
+  display: inline-flex;
+  width: 2.65rem;
+  height: 2.65rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: #806819;
+  background: radial-gradient(circle, #fffdf5 35%, #efe3b7 100%);
+  box-shadow: 0 0 0 0 rgba(194, 153, 24, 0.3);
+  animation: social-publish-orb-pulse 1.8s ease-out infinite;
+}
+
+.social-publish-orb::before,
+.social-publish-orb::after {
+  content: '';
+  position: absolute;
+  inset: 0.18rem;
+  border-radius: inherit;
+  border: 2px solid transparent;
+  border-top-color: #b99119;
+  animation: social-publish-orbit 1.15s linear infinite;
+}
+
+.social-publish-orb::after {
+  inset: 0.45rem;
+  border-top-color: transparent;
+  border-bottom-color: #806819;
+  animation-duration: 1.8s;
+  animation-direction: reverse;
+}
+
+.social-publish-orb .app-icon { width: 1rem; height: 1rem; }
+
+.social-publish-widget.is-success .social-publish-orb,
+.social-publish-widget.is-error .social-publish-orb { animation: none; }
+.social-publish-widget.is-success .social-publish-orb { color: #2f7148; background: #e7f4eb; }
+.social-publish-widget.is-error .social-publish-orb { color: #b42318; background: #fce9e7; }
+
+.social-publish-widget.is-success .social-publish-orb::before,
+.social-publish-widget.is-success .social-publish-orb::after,
+.social-publish-widget.is-error .social-publish-orb::before,
+.social-publish-widget.is-error .social-publish-orb::after { display: none; }
+
+.social-publish-widget-chevron {
+  width: 1rem;
+  height: 1rem;
+  color: var(--color-on-surface-variant);
+  transition: transform 180ms ease;
+}
+
+.social-publish-widget-details {
+  border-top: 1px solid var(--color-outline-variant);
+  padding: 0.85rem 1rem 1rem;
+  color: var(--color-on-surface-variant);
+  font-size: 0.76rem;
+  line-height: 1.55;
+  animation: social-publish-details-open 180ms ease-out both;
+}
+.social-publish-widget-details p + p { margin-top: 0.45rem; }
+.social-publish-widget-product { color: var(--color-on-surface); font-weight: 700; }
+.social-publish-widget-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+@keyframes social-publish-widget-arrive {
+  from { opacity: 0; transform: translate3d(1.5rem, 1.5rem, 0) scale(0.64); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes social-publish-orbit { to { transform: rotate(360deg); } }
+@keyframes social-publish-orb-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(194, 153, 24, 0.3); }
+  70% { box-shadow: 0 0 0 0.7rem rgba(194, 153, 24, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(194, 153, 24, 0); }
+}
+@keyframes social-publish-details-open {
+  from { opacity: 0; transform: translateY(-0.35rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 520px) {
+  .social-publish-widget {
+    right: max(0.65rem, env(safe-area-inset-right));
+    bottom: max(0.65rem, env(safe-area-inset-bottom));
+    width: calc(100vw - 1.3rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .social-publish-widget,
+  .social-publish-widget-details,
+  .social-publish-orb,
+  .social-publish-orb::before,
+  .social-publish-orb::after { animation: none; }
 }
 
 /* ── Luxury skeleton loaders ──────────────────────────────────

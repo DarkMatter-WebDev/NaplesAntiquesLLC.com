@@ -2,6 +2,7 @@ import type { Product, SpotData } from '@/types/product';
 import { getProductImages } from '@/lib/sales';
 import { getMarketplaceSpotPriceError, getProductPriceValue } from '@/lib/pricing';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
+import { fallbackSocialCaptionOpening, normalizeSocialCaptionOpening } from '@/lib/social-caption-opening';
 // The pure caption builders are channel-agnostic and already unit-tested where
 // they live; importing them keeps the two channels' captions consistent by
 // construction (a spec-line fix lands on both). The API CLIENTS stay separate —
@@ -72,6 +73,8 @@ export function buildFacebookPost(params: {
   product: Product;
   spotData: SpotData | null;
   siteUrl: string;
+  /** AI-generated and server-validated opening from the review/prepare flow. */
+  captionOpening?: string | null;
   settings?: Partial<FacebookCaptionSettings>;
   /** Operator's Facebook-only ordered lineup; null means product order. */
   imageSelection?: string[] | null;
@@ -144,10 +147,9 @@ export function buildFacebookPost(params: {
       : `${base}/shop/${encodeURIComponent(product.id)}`;
 
   // ---- Message ------------------------------------------------------------
-  // Owner framing (2026-08-01): the "Available now!" hook is the very FIRST
-  // line, ahead of the title — it is what makes a scroller stop and the Shop
-  // link worth tapping. Only claimed while the product really is available; a
-  // queued post that publishes after a sale would otherwise open with a lie.
+  // The AI-assisted hook is the very first line and combines the availability
+  // message with the exact product title. It is revalidated here so a queued
+  // post can never retain a stale title or availability claim.
   // Spot-linked prices carry their basis in parentheses so "at time of
   // posting" reads as a fact, not a hedge.
   const spotBasis = formatSpotBasis(product, spotData);
@@ -156,18 +158,17 @@ export function buildFacebookPost(params: {
       ? `≈ ${formatCaptionPrice(quotedPrice)} at time of posting${spotBasis ? ` (based on ${spotBasis})` : ''}.`
       : null;
 
-  // Final structure (owner, 2026-08-01): a bare "Available now!" hook opens
-  // the post, the title follows, the spec line carries the facts, and the
-  // price sentence closes the facts block underneath the specs.
+  // Final structure: one short opening sentence, then specs and the price
+  // sentence underneath.
   // Uniform vertical rhythm (owner, 2026-08-01): exactly one blank line
   // between EVERY line of the post — no tight two-line clusters mixed with
   // spaced ones. The trailing join collapses any accidental doubles.
   const lines: string[] = [];
-  if (product.status === 'available') {
-    lines.push('Available now!');
-    lines.push('');
-  }
-  lines.push(product.title.trim());
+  const captionOpening = normalizeSocialCaptionOpening(params.captionOpening, product, {
+    requireExactTitle: false,
+  })
+    ?? fallbackSocialCaptionOpening(product);
+  lines.push(captionOpening);
   lines.push('');
 
   // Owner decision (2026-08-01): no inventory number in public post copy on

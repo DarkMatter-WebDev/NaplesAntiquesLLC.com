@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import { alternatesFor } from '@/lib/seo';
+import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import { CardGrid, PageContainer, Section } from '@/components/layout/ResponsiveLayout';
-import HomeHero from '@/components/home/HomeHero';
+import HomeHeroStack from '@/components/home/HomeHeroStack';
 import HomeBootSplash from '@/components/home/HomeBootSplash';
 import ServiceIconCanvas from '@/components/home/ServiceIconCanvas';
+import TestimonialsSection from '@/components/home/TestimonialsSection';
 import { getHomeCarouselPayload } from '@/lib/home-carousel-server';
 import type { CarouselItem } from '../../../../carousel/lib/carouselData';
 
@@ -53,10 +55,51 @@ export default async function HomePage({ params }: Props) {
       <HomeBootSplash />
       <SiteHeader />
 
-      <main className="flex flex-col pt-16">
+      <main className="site-header-offset flex flex-col">
 
-        {/* Hero — 3D carousel as full-bleed background, color-fading per photo */}
-        <HomeHero locale={locale} initialItems={carousel.items} initialSettings={carousel.settings} />
+        {/* Announcement bar — deliberately NOT inside the fixed header, which
+            is sized by --site-header-height and consumed by every page offset
+            and sticky top. This strip sits at the top of the page content and
+            scrolls away naturally. Static text, no marquee animation.
+
+            Padding is symmetric again: .site-header-offset now reserves the
+            header's real height, so this bar's top edge is genuinely visible.
+            It briefly carried an asymmetric pt-5 to work around the old 4rem
+            under-reservation, which hid its first ~9px behind the header. */}
+        <div
+          data-customer-reveal-skip
+          className="home-announcement"
+          style={{ background: '#1a1c1c' }}
+        >
+          {(isEs
+            ? ['Envío asegurado en EE. UU.', 'Recogida local gratis en Naples', 'Precios ligados al spot en vivo']
+            : ['Fully insured U.S. shipping', 'Free local pickup in Naples', 'Live spot-linked pricing']
+          ).map((item, index) => (
+            <span
+              key={item}
+              // The third item only appears from 780px, where all three fit at
+              // full size in both locales; below that it would force the other
+              // two to shrink for no reason. Spot pricing is visible all over
+              // the shop anyway. Threshold lives in `.home-announcement-item-third`.
+              className={`home-announcement-item${index === 2 ? ' home-announcement-item-third' : ''}`}
+              style={{ color: '#e9c349', fontFamily: 'var(--font-label)' }}
+            >
+              {index > 0 && <span aria-hidden="true" className="home-announcement-separator">·</span>}
+              {item}
+            </span>
+          ))}
+        </div>
+
+        {/* Hero — scroll-pinned parallax stack: three slideshows hand over in
+            sequence, each with its own admin-curated lineup (falling back to
+            the first), then the frame breaks free */}
+        <HomeHeroStack
+          locale={locale}
+          initialItems={carousel.items}
+          initialAltItems={carousel.altItems}
+          initialThirdItems={carousel.thirdItems}
+          initialSettings={carousel.settings}
+        />
 
         {/* Services strip */}
         <Section
@@ -102,12 +145,16 @@ export default async function HomePage({ params }: Props) {
                 <div className="transition duration-300 group-hover:-translate-y-0.5">
                   <ServiceIconCanvas kind={index === 0 ? 'gold' : index === 1 ? 'jewelry' : 'contact'} />
                 </div>
-                <h3
+                {/* h2, not h3: these three cards are top-level page sections
+                    with no parent h2 above them, so h3 skipped a level and left
+                    the outline implying a section that does not exist. Size is
+                    carried by text-xl, so the change is semantic only. */}
+                <h2
                   className="text-xl font-bold leading-tight"
                   style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
                 >
                   {item.title}
-                </h3>
+                </h2>
                 <p className="text-sm leading-relaxed flex-1" style={{ color: 'var(--color-on-surface-variant)' }}>
                   {item.body}
                 </p>
@@ -124,56 +171,194 @@ export default async function HomePage({ params }: Props) {
           </PageContainer>
         </Section>
 
-        {/* Testimonials — real Google reviews (verbatim). */}
+        {/* Meet the owner — the founder story block (2026-08-04, from the
+            mels-treasures.com review). Facts only: 15+ years, Naples-born,
+            mobile appointment model. */}
         <Section className="border-t" style={{ borderColor: 'var(--color-outline-variant)' }}>
-          <PageContainer>
+          <PageContainer max="content">
+            <div className="grid items-center gap-10 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+              <div className="relative mx-auto aspect-[4/5] w-full max-w-sm overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--color-outline-variant)' }}>
+                <Image
+                  src="/assets/images/pages/chris.webp"
+                  alt={isEs ? 'Chris, propietario de Naples Estate Jewelry' : 'Chris, owner of Naples Estate Jewelry'}
+                  fill
+                  sizes="(max-width: 768px) 90vw, 40vw"
+                  className="object-cover"
+                />
+              </div>
+              <div>
+                <p
+                  className="text-[0.65rem] font-bold uppercase tracking-[0.35em] mb-3"
+                  style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+                >
+                  {isEs ? 'Conozca al Propietario' : 'Meet the Owner'}
+                </p>
+                <h2
+                  className="responsive-title-lg font-bold mb-5 tracking-tight"
+                  style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
+                >
+                  Chris
+                </h2>
+                <p className="text-sm leading-relaxed mb-4" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  {isEs
+                    ? 'Nacido y criado en Naples, Chris lleva más de 15 años comprando y vendiendo joyería fina de patrimonio en el suroeste de Florida. Sin vitrina y sin intermediarios: cada evaluación es una cita privada, en su casa o en un lugar que le convenga, y cada pieza de la tienda fue seleccionada y verificada personalmente.'
+                    : 'Born and raised in Naples, Chris has spent 15+ years buying and selling fine estate jewelry across Southwest Florida. No storefront, no middlemen — every appraisal is a private appointment at your home or a place convenient to you, and every piece in the shop was personally selected and verified.'}
+                </p>
+                <p className="text-sm leading-relaxed mb-6" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  {isEs
+                    ? 'Ya sea que venda el patrimonio de una familia o busque una cadena de oro macizo a precio justo, trata directamente con la persona que responde el teléfono.'
+                    : "Whether you're selling a family estate or hunting for a solid-gold chain at an honest price, you deal directly with the person who answers the phone."}
+                </p>
+                <div className="flex flex-wrap gap-4">
+                  <Link
+                    href={isEs ? '/es/about' : '/about'}
+                    className="hover-underline-grow text-xs font-bold uppercase tracking-[0.16em]"
+                    style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+                  >
+                    {isEs ? 'Conozca más →' : 'Learn more →'}
+                  </Link>
+                  <a
+                    href="tel:2394048505"
+                    className="hover-underline-grow text-xs font-bold uppercase tracking-[0.16em]"
+                    style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+                  >
+                    {isEs ? 'Llame o envíe un mensaje →' : 'Call or text Chris →'}
+                  </a>
+                </div>
+              </div>
+            </div>
+          </PageContainer>
+        </Section>
+
+        {/* Why buy estate gold — education block */}
+        <Section
+          className="border-t text-center"
+          style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}
+        >
+          <PageContainer max="narrow">
+            <p
+              className="text-[0.65rem] font-bold uppercase tracking-[0.35em] mb-3"
+              style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+            >
+              {isEs ? '¿Por Qué Patrimonio?' : 'Why Estate?'}
+            </p>
+            <h2
+              className="responsive-title-lg font-bold mb-6 tracking-tight"
+              style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
+            >
+              {isEs ? '¿Por Qué Comprar Oro de Patrimonio?' : 'Why Buy Estate Gold?'}
+            </h2>
+            <p className="text-sm leading-relaxed mb-4" style={{ color: 'var(--color-on-surface-variant)' }}>
+              {isEs
+                ? 'El oro antiguo tiene algo especial: décadas de uso crean una calidez y un carácter que no se pueden fabricar. Cada pieza de nuestra tienda es única — rescatada de la fundición, verificada a mano y con una historia propia.'
+                : "There's something special about old gold: decades of wear create a warmth and character that simply can't be manufactured. Every piece in our shop is one of a kind — rescued from the melting pot, verified by hand, and carrying a story of its own."}
+            </p>
+            <p className="text-sm leading-relaxed mb-8" style={{ color: 'var(--color-on-surface-variant)' }}>
+              {isEs
+                ? 'Y como nuestros precios están ligados al mercado spot en vivo, paga un precio transparente cercano al valor del metal — no un margen de boutique.'
+                : "And because our prices are linked to the live spot market, you pay a transparent price close to the metal's value — not a boutique markup."}
+            </p>
+            <Link
+              href={storeHref}
+              className="hover-underline-grow text-xs font-bold uppercase tracking-[0.16em]"
+              style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+            >
+              {isEs ? 'Ver la colección →' : 'Browse the collection →'}
+            </Link>
+          </PageContainer>
+        </Section>
+
+        {/* Top FAQs — native details accordions; every answer restates live
+            policy only, and the full list lives at /faq */}
+        <Section className="border-t" style={{ borderColor: 'var(--color-outline-variant)' }}>
+          <PageContainer max="narrow">
             <p
               className="text-center text-[0.65rem] font-bold uppercase tracking-[0.35em] mb-3"
               style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
             >
-              {isEs ? 'Lo Que Dicen Los Clientes' : 'What Clients Say'}
+              {isEs ? 'Preguntas Frecuentes' : 'Frequently Asked'}
             </p>
             <h2
               className="text-center responsive-title-lg font-bold mb-10 tracking-tight"
               style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
             >
-              {isEs ? 'De Confianza en el Suroeste de Florida' : 'Trusted Across Southwest Florida'}
+              {isEs ? 'Antes de Comprar o Vender' : 'Before You Buy or Sell'}
             </h2>
-            <CardGrid className="md:grid-cols-3">
+            <div className="flex flex-col">
               {(isEs
                 ? [
-                    { quote: '¡Chris es increíble! Trabajé con él vendiendo algunos artículos. Obtuve un precio justo y preciso, y tuvo una excelente comunicación, además de ser rápido y flexible para reunirse. ¡Muy recomendable y volveré a venderle!', name: 'Nolan Olivier', meta: 'Reseña de Google' },
-                    { quote: 'Chris es el mejor, ¡siempre es muy profesional al tratar con él!', name: 'Onur', meta: 'Guía Local de Google' },
-                    { quote: 'Trabajar con esta empresa fue una experiencia excelente. Me ofrecieron un precio significativamente mejor por mi joyería de oro en comparación con otros lugares donde la había tasado. Chris fue increíblemente servicial y se tomó el tiempo de explicarme todo en detalle, lo que me hizo sentir cómoda y segura durante todo el proceso. Nunca me sentí presionada, y realmente aprecié el cuidado y la atención que brindó. Recomiendo mucho esta empresa y sin duda volveré en el futuro. ¡Gracias!', name: 'Yisel Perez', meta: 'Reseña de Google' },
+                    { q: '¿Compran joyería además de venderla?', a: 'Sí — comprar es la mitad del negocio. Evaluaciones gratuitas y privadas para oro, plata, diamantes, relojes y patrimonios completos; vamos a usted en todo el suroeste de Florida.' },
+                    { q: '¿Cómo funciona el envío?', a: 'Cada pedido enviado viaja totalmente asegurado con confirmación de firma, y los pedidos de $5,000+ se envían por USPS Registered Mail. Las tarifas según el valor se muestran al pagar.' },
+                    { q: '¿Puedo ver una pieza en persona?', a: 'Por supuesto. La recogida local con cita es gratuita en el área de Naples — elija Recogida local al pagar o llame para coordinar.' },
+                    { q: '¿Cómo fijan sus precios?', a: 'La mayoría de las piezas se calculan directamente contra el mercado de metales en vivo, con el valor de rescate junto al precio; algunas tienen un precio fijo. En ambos casos, lo que ve es transparente — no un margen arbitrario.' },
                   ]
                 : [
-                    { quote: 'Chris is amazing! Worked with him selling some items. Got a fair and accurate price, and he had great communication while being fast and flexible to meet! Highly recommend and will be selling to him again.', name: 'Nolan Olivier', meta: 'Google review' },
-                    { quote: 'Chris is the best, he is always so professional when dealing with him!', name: 'Onur', meta: 'Google Local Guide' },
-                    { quote: 'Working with this company was an excellent experience. They offered me a significantly better price for my gold jewelry compared to other places where I had it appraised. Chris was incredibly helpful and took the time to explain everything in detail, which made me feel comfortable and confident throughout the process. I never felt rushed, and I truly appreciated the care and attention he provided. I highly recommend this company and will definitely be returning in the future. Thank you!', name: 'Yisel Perez', meta: 'Google review' },
+                    { q: 'Do you buy jewelry as well as sell it?', a: 'Yes — buying is half the business. Free, private appraisals for gold, silver, diamonds, watches, and full estates; we come to you across Southwest Florida.' },
+                    { q: 'How does shipping work?', a: 'Every shipped order travels fully insured with signature confirmation, and orders of $5,000+ ship USPS Registered Mail. Value-based rates are shown at checkout.' },
+                    { q: 'Can I see a piece in person?', a: 'Absolutely. Local pickup by appointment is free in the Naples area — choose Local Pickup at checkout, or call to arrange a viewing.' },
+                    { q: 'How are your prices set?', a: 'Most pieces are priced directly against the live metals market, with the scrap value shown right beside the price; some carry a set price instead. Either way, what you see is transparent — not an arbitrary markup.' },
                   ]
-              ).map((r) => (
-                <figure
-                  key={r.name}
-                  className="flex flex-col gap-4 rounded-2xl border bg-white p-6"
-                  style={{ borderColor: 'var(--color-outline-variant)' }}
-                >
-                  <div aria-hidden="true" style={{ color: '#e9c349', letterSpacing: '0.15em' }}>
-                    ★★★★★
-                  </div>
-                  <blockquote className="text-sm leading-relaxed" style={{ color: 'var(--color-on-surface)' }}>
-                    &ldquo;{r.quote}&rdquo;
-                  </blockquote>
-                  <figcaption className="mt-auto pt-2 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                    <strong style={{ color: 'var(--color-on-surface)' }}>{r.name}</strong> · {r.meta}
-                  </figcaption>
-                </figure>
+              ).map((faq) => (
+                <details key={faq.q} className="home-faq-accordion">
+                  <summary>
+                    <span className="text-sm font-bold" style={{ color: 'var(--color-on-surface)', fontFamily: 'var(--font-headline)' }}>
+                      {faq.q}
+                    </span>
+                    <span aria-hidden="true" className="home-faq-chevron" style={{ color: 'var(--color-primary)' }}>▾</span>
+                  </summary>
+                  <p className="pb-4 pr-6 text-sm leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    {faq.a}
+                  </p>
+                </details>
               ))}
-            </CardGrid>
-            <p className="text-center mt-8 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-              {isEs ? 'Reseñas de clientes en Google.' : 'Client reviews on Google.'}
+            </div>
+            <p className="mt-8 text-center">
+              <Link
+                href={isEs ? '/es/faq' : '/faq'}
+                className="hover-underline-grow text-xs font-bold uppercase tracking-[0.16em]"
+                style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+              >
+                {isEs ? 'Ver todas las preguntas →' : 'View all FAQs →'}
+              </Link>
             </p>
           </PageContainer>
+          <style>{`
+            .home-faq-accordion {
+              border-bottom: 1px solid var(--color-outline-variant);
+            }
+            .home-faq-accordion:first-of-type {
+              border-top: 1px solid var(--color-outline-variant);
+            }
+            .home-faq-accordion > summary {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 1rem;
+              padding: 1rem 0.15rem;
+              cursor: pointer;
+              list-style: none;
+            }
+            .home-faq-accordion > summary::-webkit-details-marker {
+              display: none;
+            }
+            .home-faq-chevron {
+              flex-shrink: 0;
+              transition: transform 200ms ease;
+            }
+            .home-faq-accordion[open] .home-faq-chevron {
+              transform: rotate(180deg);
+            }
+            @media (prefers-reduced-motion: reduce) {
+              .home-faq-chevron {
+                transition: none;
+              }
+            }
+          `}</style>
         </Section>
+
+        {/* Testimonials — real Google reviews (verbatim), shared with product
+            pages via src/lib/testimonials.ts */}
+        <TestimonialsSection locale={locale} />
 
         {/* CTA */}
         <Section

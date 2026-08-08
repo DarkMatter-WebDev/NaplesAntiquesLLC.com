@@ -56,7 +56,10 @@ route directly to `/shop`; the retired `/store` chooser route no longer exists.
 ## Data Model (Supabase)
 
 - `carousel_selection` — curated list. `product_id` (FK → `products.id`),
-  `position` (order), `bg_color` (per-photo White/Black; NULL = inherit default).
+  `position` (order), `bg_color` (per-photo White/Black). **NULL no longer means
+  "inherit white"**: since 2026-08-07 a NULL falls back to the product's own
+  `image_padding`, so a black-backdrop photo added without the swatch set paints
+  black instead of showing white bars. An explicitly set swatch still wins.
 - `carousel_settings` — single row (`id = 1`). `show_price`, `bg_color` (legacy
   global default, now fixed to white), `visible_count` (desktop ring size),
   `visible_count_mobile` (mobile ring size).
@@ -92,8 +95,21 @@ and `qualities: [75, 90]`. An off-screen layer renders the upcoming batch
 (`slots.map(s => (s + ev) % n)`) with identical `sizes` so the browser fetches the
 exact same optimized variant ahead of time.
 
-**Offscreen pause.** An `IntersectionObserver` on the scene toggles the ring's
-`animationPlayState` and starts/stops the rAF loop with visibility.
+**Offscreen pause.** Two layers, because one is not enough (see DECISIONS,
+"Only on-screen slideshows animate"):
+
+- `Carousel`'s own `IntersectionObserver` gates on `intersectionRect` **area**
+  (never `isIntersecting`, which is `true` for a zero-area intersection) with a
+  threshold ladder (`threshold: 0` alone fires once and never again when the
+  boolean never flips). This covers standalone uses like the admin preview.
+- Inside the hero stack, `HomeHeroStack` passes an explicit `paused` prop through
+  `HomeHero` to `Carousel`, derived from the same conditions that set `inert`.
+  Geometry cannot be made airtight through a transformed, clipped ancestor, and
+  the stack already knows exactly which panes are offscreen.
+
+Net effect, measured across 11 scroll positions: **3.0 concurrent rAF loops → 1.55
+average, 1 at rest**, peaking at 2 only mid-crossing when both panes really are
+on screen.
 
 **Initial payload + cache.** The localized Server Component resolves
 `carousel_selection` and `carousel_settings` before rendering `HomeHero`.

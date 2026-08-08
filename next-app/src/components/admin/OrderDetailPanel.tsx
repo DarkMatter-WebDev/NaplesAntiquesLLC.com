@@ -18,7 +18,7 @@ import { AppIcon } from '@/components/AppIcon';
 const GOLD = '#735c00';
 const BORDER = 'var(--color-outline-variant)';
 const FULFILLMENT_MARK_STATUSES: FulfillmentStatus[] = ['packed', 'shipped', 'picked_up'];
-const ORDER_EMAIL_FROM_ADDRESS = 'noreply@naplesestatejewelry.co';
+const ORDER_EMAIL_FROM_ADDRESS = 'noreply@naplesestatejewelry.com';
 
 function emailInitiatorLabel(value: string | null) {
   if (!value) return 'Automatic send';
@@ -557,7 +557,7 @@ export default function OrderDetailPanel({
 
   return (
     <main className="px-4 md:px-8 py-8">
-      <div className="max-w-[1300px] mx-auto">
+      <div className="ultrawide-page max-w-[1300px] mx-auto">
         <div className="mb-6">
           <Link href={`${adminBasePath}/orders`} className="hover-underline-grow text-xs font-bold uppercase tracking-widest" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
             Back to Orders

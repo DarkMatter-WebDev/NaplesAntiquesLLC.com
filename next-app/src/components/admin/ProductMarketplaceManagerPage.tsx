@@ -50,10 +50,12 @@ export default function ProductMarketplaceManagerPage({
   product,
   marketplace,
   locale,
+  returnTo,
 }: {
   product: ProductMarketplaceSummary;
   marketplace: ProductMarketplaceName;
   locale: string;
+  returnTo?: 'social-queues' | null;
 }) {
   const adminBasePath = locale === 'es' ? '/es/admin' : '/admin';
   const images = getImages(product);
@@ -61,37 +63,41 @@ export default function ProductMarketplaceManagerPage({
   const coverPadding = productImagePaddingForImage(product.image_padding, product.image_padding_by_image, coverImage, 0);
   const productPath = `${adminBasePath}/products/${encodeURIComponent(product.id)}`;
   const activeTitle = MARKETPLACE_TITLES[marketplace];
+  const returnToSocialQueues = returnTo === 'social-queues';
+  const marketplaceQuery = returnToSocialQueues ? '?returnTo=social-queues' : '';
+  const backHref = returnToSocialQueues ? `${adminBasePath}/social-queues` : adminBasePath;
+  const backLabel = returnToSocialQueues ? 'Back to Social Queues' : 'Back to Products';
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-3 py-4 md:px-6 md:py-6">
+    <main className="ultrawide-page mx-auto flex w-full max-w-6xl flex-col gap-5 px-3 py-4 md:px-6 md:py-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link href={adminBasePath} className="outline-button text-xs">
-          Back to Products
+        <Link href={backHref} className="outline-button text-xs">
+          {backLabel}
         </Link>
         <div className="flex flex-wrap gap-2">
           <Link
-            href={`${productPath}/etsy`}
+            href={`${productPath}/etsy${marketplaceQuery}`}
             className={marketplace === 'etsy' ? 'gold-button text-xs' : 'outline-button text-xs'}
             aria-current={marketplace === 'etsy' ? 'page' : undefined}
           >
             Manage Etsy
           </Link>
           <Link
-            href={`${productPath}/ebay`}
+            href={`${productPath}/ebay${marketplaceQuery}`}
             className={marketplace === 'ebay' ? 'gold-button text-xs' : 'outline-button text-xs'}
             aria-current={marketplace === 'ebay' ? 'page' : undefined}
           >
             Manage eBay
           </Link>
           <Link
-            href={`${productPath}/instagram`}
+            href={`${productPath}/instagram${marketplaceQuery}`}
             className={marketplace === 'instagram' ? 'gold-button text-xs' : 'outline-button text-xs'}
             aria-current={marketplace === 'instagram' ? 'page' : undefined}
           >
             Manage Instagram
           </Link>
           <Link
-            href={`${productPath}/facebook`}
+            href={`${productPath}/facebook${marketplaceQuery}`}
             className={marketplace === 'facebook' ? 'gold-button text-xs' : 'outline-button text-xs'}
             aria-current={marketplace === 'facebook' ? 'page' : undefined}
           >

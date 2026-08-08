@@ -77,7 +77,10 @@ export async function POST(req: Request, { params }: Props) {
     const { Resend } = await import('resend');
     const resend = new Resend(resendKey);
     const result = await resend.emails.send({
-      from: 'Naples Estate Jewelry <noreply@naplesestatejewelry.co>',
+      from: 'Naples Estate Jewelry <noreply@naplesestatejewelry.com>',
+      // Shipping/fulfillment updates invite customer replies — route them to a
+      // monitored mailbox rather than the unattended no-reply sender.
+      replyTo: 'info@naplesestatejewelry.com',
       to: recipient,
       subject: content.subject,
       html: content.html,

@@ -29,7 +29,9 @@ export const SHOP_WIDTH_RANGE_OPTIONS = [
 
 const VALID_WIDTH_RANGES = new Set<string>(SHOP_WIDTH_RANGE_OPTIONS.map((option) => option.value));
 
-const SHOP_JEWELRY_ITEM_TYPE_KEYS = [
+/** Slug form of the wearable-jewelry split. Must stay in step with
+ *  `PRODUCT_WEARABLE_JEWELRY_TYPES` in types/product.ts — a test asserts it. */
+export const SHOP_JEWELRY_ITEM_TYPE_KEYS = [
   'necklace',
   'bracelet',
   'earrings',

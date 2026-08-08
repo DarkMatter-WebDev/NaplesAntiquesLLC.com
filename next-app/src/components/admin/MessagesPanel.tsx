@@ -154,7 +154,7 @@ export default function MessagesPanel({
 
   return (
     <main className="px-4 md:px-8 py-8">
-      <div className="max-w-5xl mx-auto">
+      <div className="ultrawide-page-medium max-w-5xl mx-auto">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-[0.65rem] font-bold uppercase tracking-[0.35em] mb-3" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>

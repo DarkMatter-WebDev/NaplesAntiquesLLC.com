@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
 import { discardPrepared, runSyncStep, type FacebookSyncMode } from '@/lib/facebook/sync';
 import { queueProduct, unqueueProduct } from '@/lib/facebook/store';
+import { validateSocialScheduledFor } from '@/lib/social-queue-schedule';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -21,6 +22,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const productId = typeof body?.productId === 'string' ? body.productId : '';
   const action = typeof body?.action === 'string' ? body.action : 'prepare';
+  const captionOpening = typeof body?.captionOpening === 'string' ? body.captionOpening : undefined;
 
   if (!productId) {
     return NextResponse.json({ error: 'A productId is required.' }, { status: 400 });
@@ -29,8 +31,18 @@ export async function POST(req: Request) {
   const service = createServiceClient();
 
   if (action === 'queue') {
-    const row = await queueProduct(service, productId);
-    return NextResponse.json({ queued: true, syncState: row?.sync_state ?? 'pending' });
+    const scheduled = validateSocialScheduledFor(body?.scheduledFor);
+    if (scheduled.error || !scheduled.date) {
+      return NextResponse.json({ error: scheduled.error }, { status: 400 });
+    }
+    const row = await queueProduct(service, productId, scheduled.date);
+    return NextResponse.json({
+      queued: true,
+      syncState: row?.sync_state ?? 'pending',
+      queuedAt: row?.queued_at ?? null,
+      scheduledFor: row?.scheduled_for ?? scheduled.date.toISOString(),
+      message: 'Facebook post scheduled.',
+    });
   }
 
   if (action === 'unqueue') {
@@ -47,6 +59,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Unknown action "${action}".` }, { status: 400 });
   }
 
-  const result = await runSyncStep(service, productId, action as FacebookSyncMode);
+  const result = await runSyncStep(service, productId, action as FacebookSyncMode, captionOpening);
   return NextResponse.json(result, { status: result.state === 'error' ? 422 : 200 });
 }

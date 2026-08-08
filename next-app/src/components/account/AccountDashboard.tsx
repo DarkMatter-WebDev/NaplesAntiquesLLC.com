@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom';
 import type { FormEvent, ReactNode } from 'react';
 import AccountProfileForm, { type CustomerProfile } from '@/components/account/AccountProfileForm';
 import SignOutButton from '@/components/account/SignOutButton';
+import PasswordInput from '@/components/account/PasswordInput';
 import { createClient } from '@/lib/supabase/client';
 import { useWishlist } from '@/context/WishlistContext';
 import { useHideSoldItemPrices } from '@/hooks/useHideSoldItemPrices';
@@ -56,7 +57,7 @@ export default function AccountDashboard({
   }
 
   return (
-    <div className="account-content max-w-6xl mx-auto px-4 md:px-8">
+    <div className="account-content ultrawide-page max-w-6xl mx-auto px-4 md:px-8">
       <AccountTabs activeSection={activeTab} locale={locale} onSelectTab={selectTab} />
 
       <section id="account-overview" className="account-dashboard-grid">
@@ -883,11 +884,22 @@ export function PasswordChangeForm({ locale }: { locale: string }) {
         <form onSubmit={handleSubmit}>
           <label>
             <span className="form-label">{isEs ? 'Nueva contraseña' : 'New Password'}</span>
-            <input className="form-field w-full" type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} />
+            <PasswordInput
+              autoComplete="new-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              isEs={isEs}
+            />
           </label>
           <label>
             <span className="form-label">{isEs ? 'Confirmar contraseña' : 'Confirm Password'}</span>
-            <input className="form-field w-full" type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+            <PasswordInput
+              confirm
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              isEs={isEs}
+            />
           </label>
           {error && <p className="account-form-error">{error}</p>}
           <button type="submit" disabled={saving} className="gold-button text-sm disabled:opacity-50">

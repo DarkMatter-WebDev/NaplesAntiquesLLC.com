@@ -2,6 +2,12 @@
 
 import { useCallback, useRef, useState } from 'react';
 import Image from 'next/image';
+import { centeredSquareCrop } from '@/lib/social-image-framing';
+import {
+  hasSquareCanvas,
+  SocialSquareFramingImage,
+  type SocialSquareFraming,
+} from './SocialSquareFramingPreview';
 
 export interface CropRect {
   x: number;
@@ -40,12 +46,14 @@ export default function InstagramCropEditor({
   productId,
   imageUrl,
   value,
+  framing,
   onChange,
   onClose,
 }: {
   productId: string;
   imageUrl: string;
   value: CropRect | null;
+  framing: SocialSquareFraming | undefined;
   onChange: (rect: CropRect | null) => void;
   onClose: () => void;
 }) {
@@ -149,6 +157,7 @@ export default function InstagramCropEditor({
 
   const isFullFrame =
     rect.x <= 0.001 && rect.y <= 0.001 && rect.w >= 0.999 && rect.h >= 0.999;
+  const currentHasCanvas = hasSquareCanvas(framing, rect);
 
   const pct = (v: number) => `${(v * 100).toFixed(3)}%`;
   const handleStyle: React.CSSProperties = {
@@ -164,75 +173,108 @@ export default function InstagramCropEditor({
   // supplies the window frame, title and close affordance.
   return (
     <div className="flex flex-col gap-3">
-      <div
-        ref={frameRef}
-        className="relative w-full max-w-md select-none"
-        style={{ aspectRatio: aspect ?? 4 / 3, touchAction: 'none' }}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-      >
-        <Image
-          src={imageUrl}
-          alt="Crop preview"
-          fill
-          sizes="448px"
-          className="object-contain"
-          unoptimized={imageUrl.startsWith('/assets/')}
-          onLoad={(event) => {
-            const img = event.currentTarget;
-            if (img.naturalWidth && img.naturalHeight) {
-              setAspect(img.naturalWidth / img.naturalHeight);
-            }
-          }}
-        />
-
-        {/* Dim everything outside the crop so the framing reads at a glance. */}
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background: 'rgba(0,0,0,0.55)',
-            clipPath: `polygon(0% 0%, 0% 100%, ${pct(rect.x)} 100%, ${pct(rect.x)} ${pct(rect.y)}, ${pct(rect.x + rect.w)} ${pct(rect.y)}, ${pct(rect.x + rect.w)} ${pct(rect.y + rect.h)}, ${pct(rect.x)} ${pct(rect.y + rect.h)}, ${pct(rect.x)} 100%, 100% 100%, 100% 0%)`,
-          }}
-        />
-
-        <div
-          onPointerDown={(event) => beginDrag(event, 'move')}
-          className="absolute cursor-move"
-          style={{
-            left: pct(rect.x),
-            top: pct(rect.y),
-            width: pct(rect.w),
-            height: pct(rect.h),
-            border: '1px solid var(--color-primary)',
-            boxShadow: '0 0 0 1px rgba(255,255,255,0.6) inset',
-            touchAction: 'none',
-          }}
-        />
-
-        {([
-          ['nw', rect.x, rect.y],
-          ['ne', rect.x + rect.w, rect.y],
-          ['sw', rect.x, rect.y + rect.h],
-          ['se', rect.x + rect.w, rect.y + rect.h],
-        ] as Array<[DragMode, number, number]>).map(([mode, cx, cy]) => (
+      <div className="grid items-start gap-4 md:grid-cols-[minmax(0,1fr)_11rem]">
+        <div>
+          <p
+            className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.16em]"
+            style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+          >
+            Source crop
+          </p>
           <div
-            key={mode}
-            role="slider"
-            tabIndex={0}
-            aria-label={`Resize crop from the ${mode} corner`}
-            aria-valuenow={Math.round(rect.w * rect.h * 100)}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            onPointerDown={(event) => beginDrag(event, mode)}
-            style={{
-              ...handleStyle,
-              left: `calc(${pct(cx)} - 8px)`,
-              top: `calc(${pct(cy)} - 8px)`,
-              cursor: mode === 'nw' || mode === 'se' ? 'nwse-resize' : 'nesw-resize',
-            }}
-          />
-        ))}
+            ref={frameRef}
+            className="relative w-full max-w-md select-none"
+            style={{ aspectRatio: aspect ?? 4 / 3, touchAction: 'none' }}
+            onPointerMove={onPointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+          >
+            <Image
+              src={imageUrl}
+              alt="Crop source"
+              fill
+              sizes="448px"
+              className="object-contain"
+              unoptimized={imageUrl.startsWith('/assets/')}
+              onLoad={(event) => {
+                const img = event.currentTarget;
+                if (img.naturalWidth && img.naturalHeight) {
+                  setAspect(img.naturalWidth / img.naturalHeight);
+                }
+              }}
+            />
+
+            {/* Dim everything outside the crop so the framing reads at a glance. */}
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background: 'rgba(0,0,0,0.55)',
+                clipPath: `polygon(0% 0%, 0% 100%, ${pct(rect.x)} 100%, ${pct(rect.x)} ${pct(rect.y)}, ${pct(rect.x + rect.w)} ${pct(rect.y)}, ${pct(rect.x + rect.w)} ${pct(rect.y + rect.h)}, ${pct(rect.x)} ${pct(rect.y + rect.h)}, ${pct(rect.x)} 100%, 100% 100%, 100% 0%)`,
+              }}
+            />
+
+            <div
+              onPointerDown={(event) => beginDrag(event, 'move')}
+              className="absolute cursor-move"
+              style={{
+                left: pct(rect.x),
+                top: pct(rect.y),
+                width: pct(rect.w),
+                height: pct(rect.h),
+                border: '1px solid var(--color-primary)',
+                boxShadow: '0 0 0 1px rgba(255,255,255,0.6) inset',
+                touchAction: 'none',
+              }}
+            />
+
+            {([
+              ['nw', rect.x, rect.y],
+              ['ne', rect.x + rect.w, rect.y],
+              ['sw', rect.x, rect.y + rect.h],
+              ['se', rect.x + rect.w, rect.y + rect.h],
+            ] as Array<[DragMode, number, number]>).map(([mode, cx, cy]) => (
+              <div
+                key={mode}
+                role="slider"
+                tabIndex={0}
+                aria-label={`Resize crop from the ${mode} corner`}
+                aria-valuenow={Math.round(rect.w * rect.h * 100)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                onPointerDown={(event) => beginDrag(event, mode)}
+                style={{
+                  ...handleStyle,
+                  left: `calc(${pct(cx)} - 8px)`,
+                  top: `calc(${pct(cy)} - 8px)`,
+                  cursor: mode === 'nw' || mode === 'se' ? 'nwse-resize' : 'nesw-resize',
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p
+            className="mb-2 text-[0.65rem] font-bold uppercase tracking-[0.16em]"
+            style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+          >
+            Prepared post preview
+          </p>
+          <div
+            className="relative aspect-square w-full overflow-hidden border"
+            style={{ borderColor: 'var(--color-outline-variant)' }}
+          >
+            <SocialSquareFramingImage imageUrl={imageUrl} crop={rect} framing={framing} />
+          </div>
+          <p
+            className="mt-2 text-[0.68rem] leading-snug"
+            style={{ color: 'var(--color-on-surface-variant)' }}
+          >
+            {currentHasCanvas
+              ? 'This framing keeps the entire photo and adds matching canvas. Choose Fill square to remove it.'
+              : 'This crop fills the prepared square with no added canvas.'}
+          </p>
+        </div>
       </div>
 
       {hint && (
@@ -253,10 +295,20 @@ export default function InstagramCropEditor({
         <button
           type="button"
           onClick={() => setRect(FULL_FRAME)}
-          className="text-xs font-bold uppercase tracking-wide"
-          style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+          className="outline-button text-xs"
         >
           Full frame
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setRect(centeredSquareCrop(aspect));
+            setHint('Started a centered square crop. Adjust it before applying so important details stay in frame.');
+          }}
+          disabled={!aspect}
+          className="outline-button text-xs disabled:opacity-50"
+        >
+          Fill square
         </button>
         <span className="flex-1" />
         <button
@@ -274,8 +326,7 @@ export default function InstagramCropEditor({
         <button
           type="button"
           onClick={onClose}
-          className="text-xs font-bold uppercase tracking-wide"
-          style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+          className="outline-button text-xs"
         >
           Cancel
         </button>

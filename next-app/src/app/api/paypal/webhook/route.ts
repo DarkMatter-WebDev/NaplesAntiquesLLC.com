@@ -6,6 +6,7 @@ import { finalizePaidOrder, notifyItemConflict } from '@/lib/order-finalize';
 import { payPalCumulativeRefund, relatedPayPalCaptureId } from '@/lib/paypal-webhook';
 import { handleProductStatusChange as handleEtsyProductStatusChange } from '@/lib/etsy/sync';
 import { handleProductStatusChange as handleEbayProductStatusChange } from '@/lib/ebay/sync';
+import { queueDeepFieldSync } from '@/lib/deepfield/sync';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -254,6 +255,9 @@ export async function POST(req: Request) {
             const capturedProductIds = (capturedItems ?? []).map((item) => item.product_id).filter((id): id is string => Boolean(id));
             void handleEtsyProductStatusChange(capturedProductIds).catch(() => {});
             void handleEbayProductStatusChange(capturedProductIds).catch(() => {});
+            // Backstop for a capture the browser never confirmed — same sold
+            // flip, so Deep Field needs it from here too.
+            queueDeepFieldSync(capturedProductIds);
           }
         }
       }

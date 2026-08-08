@@ -36,6 +36,26 @@ export type GenerateProductDraftOutput = {
   };
 };
 
+export type GenerateStructuredTextJsonInput = {
+  systemPrompt: string;
+  userPrompt: string;
+  schemaName: string;
+  schemaDescription: string;
+  schema: Record<string, unknown>;
+  mode?: GenerateProductDraftInput['mode'];
+  maxOutputTokens?: number;
+  temperature?: number;
+};
+
+export type GenerateStructuredTextJsonOutput<T extends Record<string, unknown>> = {
+  value: T;
+  meta: {
+    provider: string;
+    model: string;
+    usage?: Record<string, unknown>;
+  };
+};
+
 export const PROMPT_VERSION = 'product-listing-confirmation-v18';
 const DEFAULT_TIMEOUT_MS = 30000;
 
@@ -391,6 +411,147 @@ async function callLocal(input: GenerateProductDraftInput, model: string): Promi
     draft: parseJsonObject(data?.draft ?? data),
     meta: { provider: 'local', model, promptVersion: PROMPT_VERSION, usage: data?.usage },
   };
+}
+
+function parseStructuredTextJson<T extends Record<string, unknown>>(value: unknown): T {
+  if (value && typeof value === 'object' && !Array.isArray(value)) return value as T;
+  if (typeof value !== 'string') throw new Error('AI response did not contain structured output.');
+
+  const trimmed = value.trim().replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
+  const parse = (text: string): T | null => {
+    try {
+      const parsed = JSON.parse(text);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as T : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const direct = parse(trimmed);
+  if (direct) return direct;
+  const start = trimmed.indexOf('{');
+  const end = trimmed.lastIndexOf('}');
+  if (start !== -1 && end > start) {
+    const sliced = parse(trimmed.slice(start, end + 1));
+    if (sliced) return sliced;
+  }
+  throw new Error('AI response was not valid JSON.');
+}
+
+/**
+ * Small text-only structured call for server features outside product-field
+ * extraction. Provider credentials and model selection remain centralized in
+ * this module; callers own their narrow prompt, schema, and output validation.
+ */
+export async function generateStructuredTextJson<T extends Record<string, unknown>>(
+  input: GenerateStructuredTextJsonInput,
+): Promise<GenerateStructuredTextJsonOutput<T>> {
+  const { provider, model } = providerConfig(input.mode);
+  const maxOutputTokens = input.maxOutputTokens ?? 180;
+  const temperature = input.temperature ?? 0.35;
+
+  if (provider === 'openai') {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error('OpenAI API key is not configured.');
+    const data = await postJson(
+      'https://api.openai.com/v1/chat/completions',
+      { authorization: `Bearer ${apiKey}` },
+      {
+        model,
+        temperature,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: input.systemPrompt },
+          { role: 'user', content: input.userPrompt },
+        ],
+      },
+    );
+    return {
+      value: parseStructuredTextJson<T>(data?.choices?.[0]?.message?.content),
+      meta: { provider, model, usage: data?.usage },
+    };
+  }
+
+  if (provider === 'anthropic') {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) throw new Error('Anthropic API key is not configured.');
+    const data = await postJson(
+      'https://api.anthropic.com/v1/messages',
+      {
+        'x-api-key': apiKey,
+        'anthropic-version': process.env.ANTHROPIC_VERSION ?? '2023-06-01',
+      },
+      {
+        model,
+        max_tokens: maxOutputTokens,
+        temperature,
+        system: input.systemPrompt,
+        tools: [{
+          name: input.schemaName,
+          description: input.schemaDescription,
+          input_schema: input.schema,
+        }],
+        tool_choice: { type: 'tool', name: input.schemaName },
+        messages: [{ role: 'user', content: input.userPrompt }],
+      },
+    );
+    const toolBlock = Array.isArray(data?.content)
+      ? data.content.find((part: { type?: string }) => part?.type === 'tool_use') as { input?: unknown } | undefined
+      : undefined;
+    return {
+      value: parseStructuredTextJson<T>(toolBlock?.input),
+      meta: { provider, model, usage: data?.usage },
+    };
+  }
+
+  if (provider === 'google') {
+    const apiKey = process.env.GOOGLE_AI_API_KEY;
+    if (!apiKey) throw new Error('Google AI API key is not configured.');
+    const data = await postJson(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      {},
+      {
+        generationConfig: {
+          temperature,
+          responseMimeType: 'application/json',
+          responseSchema: input.schema,
+          maxOutputTokens,
+        },
+        systemInstruction: { parts: [{ text: input.systemPrompt }] },
+        contents: [{ role: 'user', parts: [{ text: input.userPrompt }] }],
+      },
+    );
+    const text = data?.candidates?.[0]?.content?.parts
+      ?.map((part: { text?: string }) => part.text ?? '')
+      .join('\n');
+    return {
+      value: parseStructuredTextJson<T>(text),
+      meta: { provider, model, usage: data?.usageMetadata },
+    };
+  }
+
+  if (provider === 'local' || provider === 'self-hosted' || provider === 'self_hosted') {
+    const endpoint = process.env.AI_LOCAL_ENDPOINT;
+    if (!endpoint) throw new Error('Local AI endpoint is not configured.');
+    const data = await postJson(
+      endpoint,
+      process.env.AI_LOCAL_API_KEY ? { authorization: `Bearer ${process.env.AI_LOCAL_API_KEY}` } : {},
+      {
+        model,
+        system: input.systemPrompt,
+        prompt: input.userPrompt,
+        schema: input.schema,
+        maxOutputTokens,
+        temperature,
+      },
+    );
+    return {
+      value: parseStructuredTextJson<T>(data?.value ?? data),
+      meta: { provider, model, usage: data?.usage },
+    };
+  }
+
+  throw new Error(`Unsupported AI provider: ${provider}`);
 }
 
 export async function generateProductDraft(input: GenerateProductDraftInput): Promise<GenerateProductDraftOutput> {

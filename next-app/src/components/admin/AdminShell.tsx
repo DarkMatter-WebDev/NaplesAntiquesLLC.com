@@ -1418,6 +1418,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [filterLocation, setFilterLocation] = useState('');
   const [filterFeatured, setFilterFeatured] = useState('');
   const [showTableFilters, setShowTableFilters] = useState(false);
+  // Inside the filters panel only Status shows by default; the rest sit behind
+  // a "More" toggle (owner request 2026-08-04).
+  const [showMoreTableFilters, setShowMoreTableFilters] = useState(false);
   const originalRef = useRef<ReturnType<typeof emptyProduct> | null>(null);
   const productVideoEditorRef = useRef<ProductVideoEditorHandle>(null);
   const [uploading, setUploading] = useState(false);
@@ -3873,6 +3876,22 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     filterLocation,
     filterFeatured,
   ].filter(Boolean).length;
+  // Everything except Status lives behind the "More" toggle, so an active
+  // filter could otherwise be hiding out of sight. This count is surfaced on
+  // the toggle itself (owner request 2026-08-04).
+  const activeHiddenFilterCount = [
+    filterMetal,
+    filterMetalVariant,
+    filterPurity,
+    filterCategory,
+    filterBrand,
+    filterGender,
+    filterJewelryType,
+    filterChainType,
+    filterLength,
+    filterLocation,
+    filterFeatured,
+  ].filter(Boolean).length;
   const activeMobileFilterCount = activeDropdownFilterCount + (search.trim() ? 1 : 0);
   const canDragReorder = !sortConfig && !hasActiveTableFilters && !reordering;
   const selectedFilterProductType = normalizeProductJewelryType(filterJewelryType);
@@ -3934,6 +3953,58 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setDragTargetProductId(null);
   }
 
+  // Drag auto-scroll (owner request 2026-08-04). The product table owns its own
+  // scroll (page scroll is suppressed), so dragging a row toward — or past —
+  // the top or bottom edge previously did nothing: the destination simply could
+  // not be reached without dropping, scrolling, and dragging again. While a row
+  // is being dragged, this pans the table whenever the pointer enters an edge
+  // zone, accelerating to full speed once the pointer passes the edge entirely.
+  //
+  // The dragover listener is on the DOCUMENT, not the container: HTML5 drag
+  // events fire on whatever element is under the pointer, so dragging above the
+  // table (over the toolbar or off it) would never reach a container-scoped
+  // listener — which is exactly the case the owner reported.
+  useEffect(() => {
+    if (!draggedProductId) return;
+    const container = document.getElementById('admin-product-table-scroll');
+    if (!container) return;
+
+    const EDGE_ZONE_PX = 72;
+    const MAX_SPEED_PX_PER_FRAME = 18;
+    let pointerY: number | null = null;
+    let frame = 0;
+
+    const trackPointer = (event: DragEvent) => {
+      pointerY = event.clientY;
+    };
+
+    const step = () => {
+      if (pointerY != null) {
+        const rect = container.getBoundingClientRect();
+        // Intensity ramps 0 -> 1 across the edge zone and clamps at 1 beyond
+        // the edge, so holding the pointer off the table scrolls at full speed.
+        let delta = 0;
+        if (pointerY < rect.top + EDGE_ZONE_PX) {
+          const intensity = Math.min(1, (rect.top + EDGE_ZONE_PX - pointerY) / EDGE_ZONE_PX);
+          delta = -Math.ceil(MAX_SPEED_PX_PER_FRAME * intensity);
+        } else if (pointerY > rect.bottom - EDGE_ZONE_PX) {
+          const intensity = Math.min(1, (pointerY - (rect.bottom - EDGE_ZONE_PX)) / EDGE_ZONE_PX);
+          delta = Math.ceil(MAX_SPEED_PX_PER_FRAME * intensity);
+        }
+        if (delta !== 0) container.scrollTop += delta;
+      }
+      frame = requestAnimationFrame(step);
+    };
+
+    document.addEventListener('dragover', trackPointer);
+    frame = requestAnimationFrame(step);
+
+    return () => {
+      document.removeEventListener('dragover', trackPointer);
+      cancelAnimationFrame(frame);
+    };
+  }, [draggedProductId]);
+
   async function handleProductDrop(targetProduct: Product) {
     if (!draggedProductId || draggedProductId === targetProduct.id || !canDragReorder) {
       resetRowDrag();
@@ -3966,14 +4037,34 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     const orderById = new Map(reorderedGroup.map((product, index) => [product.id, index + 1]));
 
     setReordering(true);
-    const { error } = await supabase
-      .from('products')
-      .upsert(
-        reorderedGroup.map((product, index) => ({ id: product.id, sort_order: index + 1 })),
-        { onConflict: 'id' },
+    // UPDATE-only writes — a reorder must never be able to INSERT. The
+    // previous implementation upserted {id, sort_order}: if any listed id had
+    // gone stale (deleted in another tab/session since this page loaded), the
+    // upsert's insert path tried to create a half-empty product row, and only
+    // the NOT NULL constraint on title stopped it ("Reorder failed: null value
+    // in column title", seen live 2026-08-04). With updates, a stale id is a
+    // harmless no-op that we detect and report instead.
+    const updates = reorderedGroup.map((product, index) => ({ id: product.id, sortOrder: index + 1 }));
+    const UPDATE_CHUNK_SIZE = 15;
+    let updateFailure: string | null = null;
+    const updatedIds = new Set<string>();
+    for (let start = 0; start < updates.length && !updateFailure; start += UPDATE_CHUNK_SIZE) {
+      const chunk = updates.slice(start, start + UPDATE_CHUNK_SIZE);
+      const results = await Promise.all(
+        chunk.map((row) =>
+          supabase.from('products').update({ sort_order: row.sortOrder }).eq('id', row.id).select('id'),
+        ),
       );
-    if (error) {
-      flash(`Reorder failed: ${error.message}`, false);
+      for (const [index, result] of results.entries()) {
+        if (result.error) {
+          updateFailure = result.error.message;
+          break;
+        }
+        if (result.data && result.data.length > 0) updatedIds.add(chunk[index].id);
+      }
+    }
+    if (updateFailure) {
+      flash(`Reorder failed: ${updateFailure}`, false);
       setReordering(false);
       resetRowDrag();
       return;
@@ -3986,7 +4077,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
           : product
       )
     );
-    flash('Inventory order saved');
+    const staleCount = updates.length - updatedIds.size;
+    flash(
+      staleCount > 0
+        ? `Inventory order saved. ${staleCount} listed item${staleCount === 1 ? ' no longer exists' : 's no longer exist'} in the database — reload the page to refresh this list.`
+        : 'Inventory order saved',
+    );
     setReordering(false);
     resetRowDrag();
   }
@@ -4228,7 +4324,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 label: 'Featured', value: filterFeatured, set: setFilterFeatured,
                 options: [['', 'All Items'], ['featured', 'Featured'], ['not-featured', 'Not Featured']],
               },
-            ].map(({ label, value, set, options }) => (
+            ]
+              // Status is the everyday filter and stays visible; the rest are
+              // revealed by the More toggle below (owner request 2026-08-04).
+              .filter((control) => showMoreTableFilters || control.label === 'Status')
+              .map(({ label, value, set, options }) => (
               <div key={label} className="flex flex-col gap-0.5">
                 <span className="text-[0.58rem] font-bold uppercase tracking-[0.14em]"
                   style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
@@ -4246,6 +4346,24 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 </select>
               </div>
             ))}
+
+            {/* More / Fewer toggle for the remaining filters. The count warns
+                when a hidden filter is narrowing the table. */}
+            <button
+              type="button"
+              onClick={() => setShowMoreTableFilters((open) => !open)}
+              aria-expanded={showMoreTableFilters}
+              aria-controls="admin-product-table-filters"
+              className="outline-button flex items-center gap-1.5 px-3 py-1.5 text-xs"
+            >
+              {showMoreTableFilters ? 'Fewer' : 'More'}
+              {!showMoreTableFilters && activeHiddenFilterCount > 0 && ` (${activeHiddenFilterCount})`}
+              <AppIcon
+                name={showMoreTableFilters ? 'expand_less' : 'expand_more'}
+                aria-hidden="true"
+                style={{ fontSize: '15px' }}
+              />
+            </button>
 
             {/* Clear filters */}
             {(filterStatus || filterMetal || filterMetalVariant || filterPurity || filterCategory || filterBrand || filterGender || filterJewelryType || filterChainType || filterLength || filterLocation || filterFeatured) && (
@@ -4350,6 +4468,18 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               </div>
             </>
           )}
+          <style>{`
+            @media (min-width: 2100px) {
+              #admin-product-table[data-mobile-product-table="inline"] #admin-product-table-grid {
+                width: 100%;
+              }
+
+              #admin-product-table[data-mobile-product-table="inline"] .admin-product-brand-column {
+                width: clamp(150px, 8vw, 220px);
+                max-width: none;
+              }
+            }
+          `}</style>
           <div
             className={`flex flex-shrink-0 flex-wrap items-center justify-between gap-2 border-b px-4 py-2 text-xs max-md:px-3 max-md:py-1.5${showMobileProductTable ? ' max-h-20 overflow-y-auto' : ''}`}
             style={{
@@ -4400,7 +4530,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             className="min-h-0 flex-1 overflow-auto overscroll-contain"
             style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x pan-y' }}
           >
-            <table className="w-max min-w-[1680px] 2xl:min-w-[1960px] text-sm">
+            <table id="admin-product-table-grid" className="w-max min-w-[1680px] 2xl:min-w-[1960px] text-sm">
               <thead>
                 <tr className="border-b text-left" style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}>
                   <th
@@ -4431,7 +4561,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                       <th
                         key={label || 'actions'}
                         aria-sort={active ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : undefined}
-                        className={`sticky top-0 px-2 py-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap ${isActionsColumn || frozenLeftClass ? 'z-40' : 'z-30'} ${widthClass ?? ''}${responsiveClass ? ` ${responsiveClass}` : ''}${label === 'Brand' ? ' text-center' : ''}${label === 'Title' ? ' border-r shadow-[4px_0_6px_-6px_rgba(0,0,0,0.45)]' : ''}${frozenLeftClass ? ` ${frozenLeftClass}` : ''}${isActionsColumn ? ' right-0' : ''}`}
+                        className={`sticky top-0 px-2 py-3 text-xs font-bold uppercase tracking-wide whitespace-nowrap ${isActionsColumn || frozenLeftClass ? 'z-40' : 'z-30'} ${widthClass ?? ''}${responsiveClass ? ` ${responsiveClass}` : ''}${label === 'Brand' ? ' admin-product-brand-column text-center' : ''}${label === 'Title' ? ' border-r shadow-[4px_0_6px_-6px_rgba(0,0,0,0.45)]' : ''}${frozenLeftClass ? ` ${frozenLeftClass}` : ''}${isActionsColumn ? ' right-0' : ''}`}
                         style={{
                           color: 'var(--color-on-surface-variant)',
                           fontFamily: 'var(--font-label)',
@@ -4559,7 +4689,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                       </button>
                     </td>
                     <td
-                      className="px-2 py-3 whitespace-nowrap w-[92px] max-w-[92px]"
+                      className="admin-product-brand-column px-2 py-3 whitespace-nowrap w-[92px] max-w-[92px]"
                       style={{ color: 'var(--color-on-surface-variant)' }}
                     >
                       <span className="block truncate text-center">{p.brand || '-'}</span>
@@ -4709,7 +4839,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     >
                       <span className="block truncate">Visible totals - {sortedProducts.length} rows</span>
                     </td>
-                    <td className="sticky bottom-0 px-2 py-3 w-[92px] max-w-[92px]" style={{ background: 'var(--color-surface-container)' }} />
+                    <td className="admin-product-brand-column sticky bottom-0 px-2 py-3 w-[92px] max-w-[92px]" style={{ background: 'var(--color-surface-container)' }} />
                     <td className="sticky bottom-0 px-2 py-3" style={{ background: 'var(--color-surface-container)' }} />
                     <td className="sticky bottom-0 px-2 py-3" style={{ background: 'var(--color-surface-container)' }} />
                     <td className="sticky bottom-0 hidden px-2 py-3 w-[118px] max-w-[118px] 2xl:table-cell" style={{ background: 'var(--color-surface-container)' }} />

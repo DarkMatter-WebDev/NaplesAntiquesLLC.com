@@ -68,10 +68,16 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
         className="grid gap-1.5 sm:gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_auto]"
         style={{ alignItems: 'stretch' }}
       >
+        {/* aria-label, not a visible <label>: the design is a compact inline row
+            where placeholders carry the visual cue. A placeholder is NOT an
+            accessible name — it is not exposed as one by every AT and it
+            disappears on input — so the name is supplied explicitly. */}
         <input
           value={fullName}
           onChange={(event) => setFullName(event.target.value)}
           placeholder={isEs ? 'Nombre' : 'Name'}
+          aria-label={isEs ? 'Nombre' : 'Name'}
+          autoComplete="name"
           className="h-9 min-w-0 rounded-xl border px-3 text-xs outline-none placeholder:text-black/50 sm:h-11 sm:text-sm"
           style={inputStyle}
         />
@@ -81,6 +87,8 @@ export default function HomeSubscriberForm({ locale }: { locale: string }) {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           placeholder={isEs ? 'Correo electrónico' : 'Email address'}
+          aria-label={isEs ? 'Correo electrónico' : 'Email address'}
+          autoComplete="email"
           className="h-9 min-w-0 rounded-xl border px-3 text-xs outline-none placeholder:text-black/50 sm:h-11 sm:text-sm"
           style={inputStyle}
         />

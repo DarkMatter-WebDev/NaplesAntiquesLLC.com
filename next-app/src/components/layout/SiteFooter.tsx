@@ -15,6 +15,7 @@ export default function SiteFooter({ locale = 'en' }: Props) {
     { label: isEs ? 'Vender Oro' : 'Sell Gold', href: p('/gold-services') },
     { label: isEs ? 'Vender Plata' : 'Sell Sterling Silver', href: p('/silver-services') },
     { label: isEs ? 'Vender Joyería' : 'Sell Estate Jewelry', href: p('/estate-jewelry') },
+    { label: isEs ? 'Programa de Intercambio' : 'Trade-In Program', href: p('/trade-in') },
     { label: isEs ? 'Evaluación Gratuita' : 'Free Evaluation', href: p('/free-evaluation') },
     { label: isEs ? 'Tienda' : 'Shop', href: p('/shop') },
   ];
@@ -40,7 +41,7 @@ export default function SiteFooter({ locale = 'en' }: Props) {
       className="mt-auto border-t"
       style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}
     >
-      <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 md:px-8 md:py-16">
+      <div className="ultrawide-page-wide mx-auto max-w-7xl px-4 py-4 sm:px-6 md:px-8 md:py-16">
         <div className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-4 md:gap-8">
           <div className="col-span-2 flex flex-col items-center gap-2 text-center md:col-span-1 md:items-start md:gap-3 md:text-left">
             <p
