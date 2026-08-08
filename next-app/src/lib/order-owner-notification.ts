@@ -3,12 +3,48 @@ import { formatCurrency, orderStatusLabel } from '@/types/sales';
 import { getSiteUrl } from '@/lib/order-email-branding';
 import { escapeHtml } from '@/lib/marketing-email-html';
 
-// Where the owner's new-order notifications go. Override with the env var; the
-// default is the address the owner asked for.
-export const DEFAULT_ORDER_NOTIFICATION_EMAIL = 'info@naplesestatejewelry.co';
+// Where the owner's new-order notifications go.
+//
+// This default is LIVE, not a theoretical fallback — no override is set in any
+// environment, so this address receives every new-order notification. Moved
+// .co -> .com with the rest of the contact address (owner, 2026-08-08). If
+// `info@naplesestatejewelry.com` does not receive mail in Google Workspace,
+// new-order notifications are lost silently.
+export const DEFAULT_ORDER_NOTIFICATION_EMAIL = 'info@naplesestatejewelry.com';
 
-function ownerNotificationRecipient(): string {
-  return (process.env.ORDER_NOTIFICATION_EMAIL || DEFAULT_ORDER_NOTIFICATION_EMAIL).trim();
+/**
+ * Env var names accepted as an override, in priority order.
+ *
+ * BOTH are read on purpose. Until 2026-08-08 this function read only
+ * `ORDER_NOTIFICATION_EMAIL` while every environment configured
+ * `ORDER_NOTIFY_EMAIL` — so the owner's chosen address was silently ignored for
+ * as long as it had been set, and notifications quietly used the hard-coded
+ * default instead. Nothing surfaced that, because a valid default is
+ * indistinguishable from a working override at runtime.
+ *
+ * Accepting both names makes the mismatch unable to recur. Do not narrow this
+ * back to one name.
+ */
+const ORDER_NOTIFICATION_ENV_KEYS = [
+  'ORDER_NOTIFICATION_EMAIL',
+  'ORDER_NOTIFY_EMAIL',
+] as const;
+
+export function ownerNotificationRecipient(): string {
+  const configured = ORDER_NOTIFICATION_ENV_KEYS
+    .map((key) => (process.env[key] ?? '').trim())
+    .filter(Boolean);
+
+  // Both set and disagreeing is a misconfiguration the old code could not even
+  // detect. Say so rather than silently preferring one.
+  if (configured.length > 1 && configured[0] !== configured[1]) {
+    console.warn(
+      `[order-notification] ${ORDER_NOTIFICATION_ENV_KEYS.join(' and ')} are both set and differ; `
+      + `using ${ORDER_NOTIFICATION_ENV_KEYS[0]}. Unset one to remove the ambiguity.`,
+    );
+  }
+
+  return configured[0] || DEFAULT_ORDER_NOTIFICATION_EMAIL;
 }
 
 const OWNER_ORDER_COLUMNS = [

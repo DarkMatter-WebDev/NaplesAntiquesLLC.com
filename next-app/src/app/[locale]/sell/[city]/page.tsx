@@ -169,7 +169,7 @@ export default async function SellCityPage({ params }: Props) {
     name: `Naples Estate Jewelry — ${area.city} Gold, Jewelry & Silver Buyer`,
     url: canonicalUrl,
     telephone: '+12394048505',
-    email: 'info@naplesestatejewelry.co',
+    email: 'info@naplesestatejewelry.com',
     image: 'https://naplesestatejewelry.com/assets/images/pages/trust.webp',
     logo: 'https://naplesestatejewelry.com/assets/images/branding/logo.webp',
     description: isEs ? area.introEs : area.introEn,

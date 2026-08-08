@@ -1,5 +1,128 @@
 # Changelog
 
+## 2026-08-08 - Hero carousels snap harder on touch devices
+
+Owner: on phones and tablets, where the hero is scrolled with a finger, each
+slideshow should settle into place more decisively.
+
+Touch now drives the crossings with **smootherstep** (`t³(6t²−15t+10)`) instead
+of the smoothstep used everywhere else. Both curves share exact endpoints, so
+every position the rest of the component depends on — resting, flush, locked,
+the inert/live thresholds, the CSS resting transforms — is identical either way.
+Only the path between them differs: smootherstep has zero *acceleration* as well
+as zero velocity at each end, so a pane holds nearer its locked position through
+a longer stretch of scroll and then crosses faster in the middle (peak slope
+1.875 vs 1.5). That difference is the "snap".
+
+**Gated on `(pointer: coarse)`, not a width breakpoint.** The request was
+specifically about finger scrolling, and that is what the media query asks. A
+large tablet and a small phone both qualify; a narrow desktop window does not,
+because it is still driven by a wheel — and a wheel arrives in fixed notches
+where the same curve reads as sticky rather than snappy. The query is evaluated
+live per frame with a `change` listener, so attaching a mouse or switching input
+takes effect without a reload.
+
+Verified by measurement, not by eye: on the mobile preset (touch emulated,
+`pointer: coarse` true, 5 touch points) pane A's transform matches smootherstep
+at all five sampled scroll positions to within 0.002; on desktop (`pointer:
+coarse` false, 0 touch points) it matches smoothstep at all four. 13 new tests
+pin the invariants both curves must satisfy — exact endpoints, monotonicity,
+range, midpoint symmetry, zero end velocity — plus the properties that make the
+touch curve different.
+
+**Not verifiable here:** this browser's tablet preset (768x1024) does not
+emulate touch — it reports `pointer: fine`, 0 touch points and a desktop UA — so
+it takes the desktop curve in the emulator. Real tablets report `pointer:
+coarse` and hit the same branch proven working on the mobile preset. Confirm on
+a physical tablet; a resized desktop window will not show it.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **771/771 tests** (up from
+758), clean `npm run build`.
+
+## 2026-08-08 - Public contact mailbox moved to .com
+
+`info@naplesestatejewelry.co` → `info@naplesestatejewelry.com` sitewide, so the
+address customers see matches the domain they are on. Six occurrences in five
+files:
+
+- `components/layout/SiteFooter.tsx` — visible footer text + `mailto:`
+- `components/account/AccountDashboard.tsx` — visible link + `mailto:`
+- `app/[locale]/layout.tsx` — LocalBusiness JSON-LD `email`
+- `app/[locale]/sell/[city]/page.tsx` — per-city LocalBusiness JSON-LD `email`
+- `lib/order-owner-notification.ts` — `DEFAULT_ORDER_NOTIFICATION_EMAIL`
+
+This reverses the mailbox half of the 2026-08-01 split (domain moved to `.com`,
+email stayed on `.co`). Senders were already `.com`; now the inbound address is
+too. Stale comments asserting "business mailboxes stay on the .co domain" were
+corrected rather than left to mislead.
+
+Verified in a clean production build: **zero `.co` info addresses** in compiled
+output, 284 files carry `.com`, and the JSON-LD `"email"` is
+`info@naplesestatejewelry.com` across all **264** prerendered pages.
+
+**Two things this surfaced, both recorded in TASKS and neither resolved here:**
+
+1. **Deliverability is unverified and cannot be verified from the code side.**
+   The `.com` root MX points at Google Workspace (5 records confirmed live), but
+   whether the `info@` mailbox/alias exists on `.com` is Workspace config. If it
+   does not, every customer inquiry bounces — and so do new-order notifications,
+   which use the same address.
+
+2. **A pre-existing bug — since FIXED, see below.** The order-notification
+   override never worked: the code read `ORDER_NOTIFICATION_EMAIL` (set nowhere)
+   while every environment configured `ORDER_NOTIFY_EMAIL` (read by nothing).
+
+**Follow-up the same day: the marketing Reply-To moved too.**
+`chris@naplesestatejewelry.co` → `info@naplesestatejewelry.com`, so campaign
+replies land with every other customer inquiry instead of a personal inbox.
+Three occurrences: `lib/marketing.ts:181` (the live value),
+`MarketingComposer.tsx:201`, and `MarketingSettingsPanel.tsx:110` (admin display
+fallbacks, updated so the panel does not show a stale address).
+
+Confirmed this default is genuinely live before changing it: `MARKETING_CHRIS_REPLY_TO`
+is unset, and a read of the `marketing_settings` row shows it holds only
+`mailing_address` — there are no sender-profile columns, so nothing overrides the
+hardcoded value.
+
+**Then the FROM address moved too** (owner, same day): campaigns now send from
+`Chris at Naples Estate Jewelry <info@naplesestatejewelry.com>` instead of
+`chris@naplesestatejewelry.com`. Safe because `naplesestatejewelry.com` is
+Resend's verified sending domain — any local part on it sends, and this stayed
+on that domain. Three occurrences: `marketing.ts:183` (live),
+`MarketingComposer.tsx:198`, `MarketingSettingsPanel.tsx:107`.
+
+The **display name stays personal** ("Chris at Naples Estate Jewelry"). That is
+the whole distinction between this sender profile and `no_reply`; only the
+address is shared now.
+
+From and Reply-To are consequently the same address, making the Reply-To a
+no-op by default (a reply goes to From when Reply-To is absent). Kept explicit
+rather than deleted, with a comment saying why: the two are independent knobs,
+and Reply-To is the one that can point at an outside or unverified mailbox,
+since it is not constrained by the sending domain.
+
+**No `chris@` and no `@naplesestatejewelry.co` address remains anywhere in
+shipped code** — both verified zero in a clean production build.
+
+**Order-notification env mismatch fixed.** `ownerNotificationRecipient()` now
+accepts **both** `ORDER_NOTIFICATION_EMAIL` and `ORDER_NOTIFY_EMAIL`, so a
+name mismatch cannot silently swallow the configured address again, and warns
+when both are set and disagree. The function is exported so the behavior is
+testable — 8 regression tests cover the previously-ignored name, precedence,
+the warning, whitespace-only values, and the invariant that a recipient is
+never empty.
+
+Accepting both names had a consequence worth stating: `ORDER_NOTIFY_EMAIL` was
+dead config, so making it live would have silently redirected order alerts to a
+personal `@aol.com` inbox — the opposite of the `info@` consolidation happening
+in the same session. It was therefore removed from `.env.local` (surgically:
+39 → 38 keys, no other key touched, CRLF preserved, backup taken and deleted
+after verification). **Netlify must be cleaned up by the owner** — not reachable
+from here.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **750/750 tests**, clean
+`npm run build`.
+
 ## 2026-08-08 - Pre-deploy customer-facing audit: form labels fixed, sync safety locked
 
 Full customer-facing pass before deploy, driven from the browser rather than by

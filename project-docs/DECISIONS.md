@@ -78,7 +78,7 @@ Rules:
 3. Never re-add `redirects()` to `next.config.ts`.
 4. Verify redirects **against the deployed site**, never only locally.
 
-### The primary domain is naplesestatejewelry.com; mailboxes stay on .co
+### The primary domain is naplesestatejewelry.com; all app-facing email is .com
 
 Owner decision 2026-08-01, after buying the `.com`: the canonical web domain
 is `https://naplesestatejewelry.com`. The legacy `.co` remains owned as a
@@ -88,17 +88,41 @@ old links never hop twice. New site-URL code must build from
 `NEXT_PUBLIC_SITE_URL`/`SITE_URL` (falling back to the `.com`), never hardcode
 either domain.
 
-**Email: separate the mailbox from the sender — they now live on different
-domains.** The original 2026-08-01 decision kept everything on `.co`. That was
-amended 2026-08-05 (see the entry below), so the rule is now:
+**Email: separate the mailbox from the sender.** The original 2026-08-01
+decision kept everything on `.co`. Amended 2026-08-05 (senders), then again
+2026-08-08 (the `info@` mailbox). Current rule:
 
-- **Mailboxes stay on `.co`.** `info@` / `chris@naplesestatejewelry.co` are the
-  real, monitored inboxes. Never touch the `.co` MX records, and do not rewrite
-  a `.co` address that is a *contact* address (footer mailto, account dashboard,
-  schema.org `email`) or a *Reply-To*.
+- **`info@` is on `.com`.** Moved 2026-08-08 on owner instruction so the address
+  customers see matches the domain they are on — footer, account dashboard, both
+  LocalBusiness JSON-LD blocks, and the order-notification default.
+  **This is only correct while `info@naplesestatejewelry.com` actually receives
+  mail in Google Workspace.** The `.com` root MX points at Workspace, but the
+  mailbox/alias existing there is config no code can verify; if it is missing,
+  customer inquiries AND new-order notifications bounce silently.
+- **The marketing Reply-To is `info@naplesestatejewelry.com`** (owner,
+  2026-08-08). Campaign replies land with every other customer inquiry rather
+  than in a personal inbox. Reply-To is NOT constrained by the sending domain,
+  so any monitored mailbox is valid here.
+- **Marketing campaigns send FROM
+  `Chris at Naples Estate Jewelry <info@naplesestatejewelry.com>`** (owner,
+  2026-08-08). The display name stays personal — that is what distinguishes this
+  sender profile from `no_reply`; only the address is shared. Legal because the
+  address sits on Resend's verified sending domain.
+- **From is constrained; Reply-To is not.** A From address MUST be on the
+  verified sending domain or the send fails outright. Reply-To can be any
+  mailbox, including one on an unverified domain. When changing either, check
+  which of the two you are touching — they are not interchangeable.
+- **No `chris@` and no `@naplesestatejewelry.co` address remains in shipped
+  code** as of 2026-08-08 — both verified zero in a clean production build.
+- **Never touch the `.co` MX records** regardless. The domain still carries live
+  mailboxes even though the app no longer points anyone at them.
 - **Senders must be `.com`.** A From address must sit on Resend's verified
   sending domain, which is `naplesestatejewelry.com`. A `.co` From address will
   not send at all.
+
+Superseded: this entry previously read "mailboxes stay on `.co`" and forbade
+rewriting any `.co` *contact* address. That held from 2026-08-01 to 2026-08-08
+and is why the old code comments said so; it no longer applies to `info@`.
 
 ### Resend's sending domain moved to .com because the Free plan allows only one
 
@@ -720,6 +744,20 @@ the frame itself releases. Rules that must hold:
    L = 1/1.64 = 0.61, hence `PHASE_1_END = 0.61` and `PHASE_2_START = 0.39`.
    Re-solve the same way rather than nudging them independently, or one of the
    invariants silently breaks.
+
+   **Touch uses a different curve, and the 0.36 overlap still holds.** Since
+   2026-08-08, `pointer: coarse` drives the crossings with smootherstep
+   (`t³(6t²−15t+10)`) so each slideshow snaps into place under a finger drag;
+   wheel/trackpad keeps smoothstep, where the same curve reads as sticky. The
+   overlap ratio is expressed in units of the crossing clocks, not the curve, so
+   it is unaffected — but note the touch curve's peak slope is **1.875**, not
+   1.50, so any future "fraction of peak speed" figure quoted below must be read
+   against whichever curve is active.
+
+   Both curves share EXACT endpoints. That is a hard requirement, not a nicety:
+   the resting/flush/locked positions, the inert-live thresholds and the CSS
+   resting transforms all assume t=0 and t=1 land precisely. Any replacement
+   curve must too — `src/lib/__tests__/hero-easing.test.ts` enforces it.
 
    **Butting them is not enough.** Smoothstep's derivative is zero at BOTH ends,
    so `PHASE_2_START == PHASE_1_END` hands over from a term decelerating to zero

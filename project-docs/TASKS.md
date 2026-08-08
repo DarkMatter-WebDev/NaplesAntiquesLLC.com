@@ -156,6 +156,73 @@ orders.
 **NODE_VERSION = "20"** and `package.json` declares no `engines`. Local green
 builds are therefore strong but not identical to the production build.
 
+## 🔴 Contact Address Moved To .com — TWO THINGS TO VERIFY
+
+The public contact mailbox changed `info@naplesestatejewelry.co` →
+`info@naplesestatejewelry.com` sitewide (owner, 2026-08-08), reversing the
+mailbox half of the 2026-08-01 split. Six occurrences in five files: footer,
+account dashboard, root JSON-LD, per-city JSON-LD, and the order-notification
+default.
+
+- 🔴 **OWNER: confirm `info@naplesestatejewelry.com` actually receives mail
+  BEFORE this deploys.** The `.com` root MX points at Google Workspace (5
+  records verified live), so the domain is accepted — but the `info@`
+  mailbox/alias must exist on `.com` in Workspace or every customer inquiry
+  bounces. Send a test message to it from an outside account and confirm it
+  lands. This cannot be verified from the code side.
+
+  Blast radius if it does not exist: the footer and account-page addresses are
+  the primary "contact us" path, and **new-order notifications go to this same
+  address** (see the bug below), so a missing mailbox loses both customer
+  inquiries and order alerts, silently.
+
+- ✅ **BUG FIXED 2026-08-08: the order-notification override never worked.**
+  `order-owner-notification.ts` read `ORDER_NOTIFICATION_EMAIL` (set nowhere)
+  while every environment configured `ORDER_NOTIFY_EMAIL` (read by nothing), so
+  the owner's chosen address was silently ignored and the hardcoded default was
+  always the live recipient. Invisible at runtime — a valid default is
+  indistinguishable from a working override.
+
+  `ownerNotificationRecipient()` now accepts **both** names, so the mismatch
+  cannot recur, and warns if both are set and disagree. 8 regression tests.
+  **Do not narrow it back to one name.**
+
+  `ORDER_NOTIFY_EMAIL` was removed from `.env.local` deliberately: once the code
+  started reading it, that previously-dead variable would have become live and
+  silently redirected order alerts to a personal `@aol.com` inbox — the opposite
+  of the `info@` consolidation. Removing it keeps the destination unchanged.
+
+  ⚠️ **OWNER: delete `ORDER_NOTIFY_EMAIL` from Netlify too** (all deploy
+  contexts) if it is set there. Local is done; Netlify was not reachable from
+  here. Leave it set only if you deliberately want order alerts at that personal
+  address instead of `info@naplesestatejewelry.com` — it now genuinely works
+  either way, which was not true before.
+
+- ✅ **Marketing Reply-To also moved (2026-08-08):**
+  `chris@naplesestatejewelry.co` → `info@naplesestatejewelry.com` in
+  `marketing.ts:181`, `MarketingComposer.tsx:201`,
+  `MarketingSettingsPanel.tsx:110`. Verified live before changing:
+  `MARKETING_CHRIS_REPLY_TO` unset and `marketing_settings` has no
+  sender-profile columns, so the hardcoded value was the real Reply-To.
+  **No `@naplesestatejewelry.co` address remains in shipped code** — zero in a
+  clean production build.
+
+  ⚠️ This raises the stakes on the mailbox check above: `info@…com` is now the
+  destination for footer inquiries, account-page inquiries, order notifications,
+  AND marketing campaign replies. One missing mailbox breaks all four.
+
+- ✅ **Marketing FROM also moved (2026-08-08):** campaigns now send from
+  `Chris at Naples Estate Jewelry <info@naplesestatejewelry.com>`
+  (`marketing.ts:183`, `MarketingComposer.tsx:198`,
+  `MarketingSettingsPanel.tsx:107`). Display name deliberately stays personal.
+  Safe because the address is on Resend's verified `.com` sending domain.
+  **No `chris@` address remains in shipped code** — zero in a clean build.
+
+  ⚠️ **`info@…com` is now BOTH the From and the Reply-To for campaigns**, on top
+  of footer, account page, order notifications, and JSON-LD. Bounce handling for
+  campaigns now lands there too. The mailbox check above is the single point of
+  failure for the entire email surface.
+
 ## ✅ Fixed From The 2026-08-08 Pre-Deploy Audit
 
 - ✅ **Owner's personal `@aol.com` address no longer ships in the public client

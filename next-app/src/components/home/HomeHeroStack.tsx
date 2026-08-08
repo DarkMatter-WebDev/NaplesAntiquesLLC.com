@@ -144,6 +144,22 @@ const PANE_A_TRAVEL = 85;
  */
 const ease = (t: number) => t * t * (3 - 2 * t);
 
+/**
+ * Smootherstep (quintic) — the TOUCH variant of the curve above.
+ *
+ * Same contract, same exact endpoints (0 -> 0, 1 -> 1), but its first AND second
+ * derivatives are both zero at each end rather than just the first. Practically:
+ * a pane sits at its locked position through a longer stretch of scroll, then
+ * crosses faster in the middle (peak slope 1.875 vs smoothstep's 1.5). That
+ * reads as each slideshow SNAPPING into place instead of drifting there.
+ *
+ * Touch only, on purpose (owner, 2026-08-08). A finger drag is ballistic — it
+ * flings and decays — so the extra hold at the ends lands as a deliberate
+ * settle. A mouse wheel arrives in fixed notches where the same curve reads as
+ * sticky rather than snappy, so the pointer-fine path keeps smoothstep.
+ */
+const easeSnap = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
+
 // Pull the carousel RINGS toward each other during a crossing, as a percent of
 // frame height.
 //
@@ -433,6 +449,12 @@ export default function HomeHeroStack({
     if (!runway || !frame || !paneA || !paneB || !paneC) return;
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    // `pointer: coarse` is the finger-scrolling signal, which is what the
+    // snappier curve is for — not a width breakpoint. A large tablet and a
+    // small phone both want it; a narrow desktop window does not, because it is
+    // still driven by a wheel. Read live rather than cached so plugging in a
+    // mouse or rotating into a desktop-class pointer takes effect immediately.
+    const coarsePointer = window.matchMedia('(pointer: coarse)');
 
     let raf = 0;
     let queued = false;
@@ -487,8 +509,13 @@ export default function HomeHeroStack({
       // driving the LOGIC below — inert/live thresholds and the dominant-pane
       // handover — because those are about which phase we are in, not how it
       // looks, and easing would only blur the boundary they test.
-      const e1 = ease(t1);
-      const e2 = ease(t2);
+      // Touch gets the snappier quintic; wheel/trackpad keeps smoothstep.
+      // Both share exact endpoints, so every position the rest of this function
+      // depends on (resting, flush, locked) is identical either way — only the
+      // path between them differs.
+      const curve = coarsePointer.matches ? easeSnap : ease;
+      const e1 = curve(t1);
+      const e2 = curve(t2);
 
       // Everything travels UPWARD (owner request 2026-08-06): a pane exits up
       // and the next one rises from BELOW to take its place, so the hero reads
@@ -607,11 +634,16 @@ export default function HomeHeroStack({
     window.addEventListener('scroll', schedule, { passive: true });
     window.addEventListener('resize', remeasure);
     reduceMotion.addEventListener('change', remeasure);
+    // Only the curve changes here, not the geometry, so a repaint is enough —
+    // but going through `schedule` keeps every write on the same rAF path
+    // instead of mutating styles straight from an event handler.
+    coarsePointer.addEventListener('change', schedule);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('scroll', schedule);
       window.removeEventListener('resize', remeasure);
       reduceMotion.removeEventListener('change', remeasure);
+      coarsePointer.removeEventListener('change', schedule);
     };
   }, []);
 

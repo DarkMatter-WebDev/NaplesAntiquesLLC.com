@@ -174,11 +174,22 @@ export async function getMarketingSettings(): Promise<MarketingSettings> {
     || process.env.EMAIL_FROM
     || process.env.RESEND_FROM
     || 'Naples Estate Jewelry <noreply@naplesestatejewelry.com>';
+  // The DISPLAY NAME stays personal ("Chris at …") because that is the entire
+  // point of this sender profile versus the no_reply one; only the address
+  // moved to the shared box (owner, 2026-08-08). Valid as a From because
+  // `naplesestatejewelry.com` is Resend's verified sending domain — any local
+  // part on it sends; a `.co` address would not send at all.
   const chrisFromAddress = process.env.MARKETING_CHRIS_FROM
-    || 'Chris at Naples Estate Jewelry <chris@naplesestatejewelry.com>';
-  // Reply-To is not constrained by the sending domain, so it stays on the .co
-  // mailbox that is known to be live and monitored.
-  const chrisReplyTo = process.env.MARKETING_CHRIS_REPLY_TO || 'chris@naplesestatejewelry.co';
+    || 'Chris at Naples Estate Jewelry <info@naplesestatejewelry.com>';
+  // Currently the SAME address as the From above, so it is a no-op by default:
+  // a reply goes to the From address anyway when Reply-To is absent. It is kept
+  // explicit, not deleted, because the two are independent knobs — Reply-To is
+  // not constrained by the sending domain the way From is, so this is the one
+  // that can point at an outside or unverified mailbox if that is ever wanted.
+  //
+  // This default is LIVE: MARKETING_CHRIS_REPLY_TO is unset, and
+  // `marketing_settings` has no sender-profile columns, so nothing overrides it.
+  const chrisReplyTo = process.env.MARKETING_CHRIS_REPLY_TO || 'info@naplesestatejewelry.com';
 
   return {
     mailingAddress: (data?.mailing_address || process.env.MARKETING_MAILING_ADDRESS || '').trim() || null,

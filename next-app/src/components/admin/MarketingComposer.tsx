@@ -195,10 +195,10 @@ export default function MarketingComposer() {
   const selectedSender = settings?.senderProfiles?.[senderProfile];
   const selectedFromAddress = selectedSender?.fromAddress
     ?? (senderProfile === 'chris'
-      ? 'Chris at Naples Estate Jewelry <chris@naplesestatejewelry.com>'
+      ? 'Chris at Naples Estate Jewelry <info@naplesestatejewelry.com>'
       : 'Naples Estate Jewelry <noreply@naplesestatejewelry.com>');
   const selectedReplyTo = selectedSender?.replyTo
-    ?? (senderProfile === 'chris' ? 'chris@naplesestatejewelry.co' : null);
+    ?? (senderProfile === 'chris' ? 'info@naplesestatejewelry.com' : null);
   const previewHtml = `<!doctype html>
 <html>
   <head>

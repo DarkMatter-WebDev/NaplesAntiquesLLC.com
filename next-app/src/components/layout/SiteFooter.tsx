@@ -67,11 +67,11 @@ export default function SiteFooter({ locale = 'en' }: Props) {
               (239) 404-8505
             </a>
             <a
-              href="mailto:info@naplesestatejewelry.co"
+              href="mailto:info@naplesestatejewelry.com"
               className="text-xs md:text-sm md:mt-1"
               style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
             >
-              info@naplesestatejewelry.co
+              info@naplesestatejewelry.com
             </a>
           </div>
 

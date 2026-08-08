@@ -176,7 +176,7 @@ export function AccountSupportStrip({ locale }: { locale: string }) {
         <AppIcon name="mail"  aria-hidden="true" />
         <div>
           <strong>{isEs ? 'Escríbenos' : 'Email Us'}</strong>
-          <a href="mailto:info@naplesestatejewelry.co">info@naplesestatejewelry.co</a>
+          <a href="mailto:info@naplesestatejewelry.com">info@naplesestatejewelry.com</a>
         </div>
       </div>
       <Link href={contactHref} className="gold-button text-sm account-arrow-button">

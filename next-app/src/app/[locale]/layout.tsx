@@ -24,9 +24,12 @@ const jsonLd = {
   alternateName: ['Naples Jewelry Buyers', 'Naples Gold & Silver Buyer'],
   url: 'https://naplesestatejewelry.com',
   telephone: '+12394048505',
-  // Business mailboxes stay on the .co domain (owner decision 2026-08-01: the
-  // domain switched to .com but email did not move).
-  email: 'info@naplesestatejewelry.co',
+  // The public contact mailbox moved to .com (owner, 2026-08-08), so the
+  // address customers see now matches the domain they are on. This is the
+  // INBOUND address and is only correct while `info@naplesestatejewelry.com`
+  // actually receives mail in Google Workspace — the .com root MX points at
+  // Workspace, but the mailbox/alias must exist there or inquiries bounce.
+  email: 'info@naplesestatejewelry.com',
   image: 'https://naplesestatejewelry.com/assets/images/pages/trust.webp',
   logo: 'https://naplesestatejewelry.com/assets/images/branding/logo.webp',
   description:
