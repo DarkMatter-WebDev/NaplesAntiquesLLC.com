@@ -13,7 +13,7 @@
 | **Primary contact** | Chris — (239) 404-8505 |
 | **Primary domain** | `naplesestatejewelry.com` — live Netlify primary since 2026-08-01 |
 | **Related domains** | `naplesestatejewelry.co` — former primary and current business-email domain; website 301s to `.com`. `naplesantiquesllc.com` — Netlify alias redirecting to `.com`. `naplesjewelrybuyers.com` — separate live buy-side site. |
-| **Business email** | **Mailboxes:** `info@` / `chris@naplesestatejewelry.co` (never alter `.co` MX records during site work), plus `info@naplesestatejewelry.com` on Google Workspace. **Senders:** as of 2026-08-05 all outbound From addresses are `@naplesestatejewelry.com` — Resend's verified sending domain. Do not "fix" a sender back to `.co`; it will not send |
+| **Business email** | **The monitored mailbox is `info@naplesestatejewelry.com`** on Google Workspace — owner-confirmed receiving 2026-08-09, and the single point of failure for every inbound path the site has (inquiries, order notifications, marketing Reply-To, bounce handling). `info@` / `chris@naplesestatejewelry.co` still exist but the app no longer points anyone at them; **never alter `.co` MX records during site work**. **Senders:** as of 2026-08-05 all outbound From addresses are `@naplesestatejewelry.com` — Resend's verified sending domain. Do not "fix" a sender back to `.co`; it will not send |
 | **Hosting** | Netlify site slug `naplesantiques`, team slug `rcman12589`; root `netlify.toml` builds `next-app/` and publishes `.next` |
 | **DNS / registrar** | GoDaddy; primary apex points to Netlify (`75.2.60.5`) and Netlify owns the active certificate |
 | **Supabase** | Project ref `evzluixourmsefwdsieu` |

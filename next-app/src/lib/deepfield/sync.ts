@@ -5,25 +5,52 @@ import type { Product } from '@/types/product';
 import { buildDeepFieldPayload, type DeepFieldProductPayload } from './payload';
 
 /**
- * Deep Field's receiver caps a request at 25 products, but that cap is NOT
- * reachable in production and product count is the wrong unit anyway.
+ * Batches are budgeted by IMAGE COUNT, not product count.
  *
- * The receiver copies every image synchronously inside the request at roughly
- * 1.2s each, so wall-clock scales with IMAGES, not products — and NEJ's
- * images-per-product range from 2 to 19 (avg 7.6, with 31 products at 10 or
- * more). Measured during the 2026-08-08 bulk import: a 3-product batch carrying
- * 17 images succeeded while a 3-product batch carrying 38 images died at a
- * gateway "Inactivity Timeout". 25 products is ~190 images ≈ 4 minutes in one
- * HTTP call, which no gateway allows.
+ * Deep Field's receiver advertises a 25-product cap but copies every image
+ * synchronously inside the request, so wall-clock scales with images. NEJ's
+ * images-per-product range from 2 to 19 (avg 7.6, 31 products at 10+), so
+ * product count says almost nothing about how long a request takes. A single
+ * product is never split, so the largest product defines the worst case.
  *
- * So batches are budgeted by image count. A single product is never split, so
- * the largest product defines the worst case.
+ * Applies to live sync as much as the bulk import: an admin bulk status change
+ * can hand this function 25+ ids at once.
  *
- * This matters for live sync too, not just the bulk import: a bulk status
- * change in admin can hand this function 25+ ids at once.
+ * ── Why 30 (raised from 18 on 2026-08-08) ─────────────────────────────────
+ *
+ * Measured through the live receiver after Deep Field deployed bounded
+ * concurrency: the same 19-image product went 11.6s -> 3.0s warm
+ * (0.61 -> 0.158s/image, 3.8x). Their three heaviest products — 53 images in
+ * one request — completed in 8.3-11.0s with zero failures.
+ *
+ * 30 survives the WORST combination of two unknowns, not the likely one:
+ *
+ *   TIMEOUT CEILING — unresolved. Two things are FACTS: a 21.1s request
+ *   survived, and a 38-image batch failed. The failing request's duration was
+ *   never measured, so any "it failed at ~Ns" figure is a derivation, not an
+ *   observation — an earlier such number was retracted by Deep Field after it
+ *   turned out to apply post-change rates to a pre-change event. What does
+ *   survive: Netlify documents 60s synchronous, yet even the slowest model puts
+ *   that batch near 41s, comfortably inside 60s, and it still failed. So 60s
+ *   fits none of the observations and ~26s fits all of them. Hypothesis, not
+ *   measurement. `maxDuration` cannot raise it — Netlify's limits are fixed
+ *   (60s sync / 30s scheduled / 15min background).
+ *
+ *   COLD COST — cold start is a ~9.1s FIXED cost (12.1s cold vs 3.0s warm at
+ *   19 images), NOT a per-image multiplier. But no LARGE batch has been
+ *   measured cold, so the pessimistic per-image-scaling reading cannot be
+ *   ruled out.
+ *
+ * At 30 images: 19.1s under pessimistic scaling, 13.8s under fixed-overhead —
+ * both inside even a 26s ceiling. At 40 the scaling model reaches 25.5s and the
+ * margin is gone; at 60 it is fatal under 26s. **Do not raise past 30 until the
+ * real "Task timed out after N seconds" value is known.**
+ *
+ * Effect: bulk import drops from 67 requests to 46. Live sync is unaffected —
+ * it sends one product per request.
  */
-const IMAGE_BUDGET_PER_REQUEST = 18;
-const MAX_PRODUCTS_PER_REQUEST = 3;
+export const IMAGE_BUDGET_PER_REQUEST = 30;
+export const MAX_PRODUCTS_PER_REQUEST = 3;
 
 /**
  * Bounds a hung socket. Generous because a legitimate batch still takes tens of

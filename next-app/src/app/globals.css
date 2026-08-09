@@ -258,26 +258,116 @@ table {
   gap: clamp(0.85rem, 2vw, 1.5rem);
 }
 
-/* Reviews grid (2026-08-05). Column counts are pinned to 1 / 2 / 4 rather than
-   left to the shared auto-fit, which chose 3 in the ~850-1150px band and stranded
-   the fourth review alone on a second row. Skipping 3 keeps the four cards
-   balanced at every width: one column, then 2x2, then a single row of four.
+/* Reviews grid (2026-08-05). Column counts are pinned to 2 / 4 rather than left
+   to the shared auto-fit, which chose 3 in the ~850-1150px band and stranded the
+   fourth review alone on a second row. Skipping 3 keeps the four cards balanced
+   at every width: 2x2, then a single row of four.
+
+   TWO IS THE FLOOR (owner, 2026-08-09). The ladder used to start at one column
+   below 600px; a single full-width review read as a lone testimonial rather than
+   a body of them, so the reviews now stay side by side at every width. That
+   makes a 320px phone the tight case — a 137px card — which is why
+   `.testimonial-card` below compacts its padding, type and gaps instead of
+   keeping the desktop values. Do not reintroduce a one-column band.
 
    This ladder assumes an EVEN review count. Adding a fifth brings the orphan
    back — at that point either add a sixth or move to a layout that centres a
    partial last row. */
 .testimonial-grid {
-  grid-template-columns: minmax(0, 1fr);
-}
-@media (min-width: 600px) {
-  .testimonial-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 @media (min-width: 1160px) {
   .testimonial-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+}
+
+/* A viewport clamp is safe here even though card width is NOT monotonic in
+   viewport width (the 1160px jump to four columns halves the card). The tight
+   case is the narrow phone at the BOTTOM of the range, and these ramps reach
+   their desktop maximum by ~590px — so every width at or above the jump keeps
+   exactly the padding and type it shipped with. Refit the ramps, not just the
+   caps, if the column ladder itself changes. */
+.testimonial-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.65rem, 0.2rem + 2.2vw, 1rem);
+  padding: clamp(0.625rem, 5.5vw - 0.5rem, 1.5rem);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+.testimonial-card blockquote {
+  /* Floor is 12px — above the product page's 11px label floor, which this band
+     also has to satisfy because it renders there too. */
+  font-size: clamp(0.75rem, 0.45rem + 1.5vw, 0.875rem);
+  line-height: 1.6;
+  /* Truncate to 8 lines (owner, 2026-08-09). One 480-character review was
+     running the card to ~590px at 320px while its neighbour sat at ~100px, and
+     because grid rows stretch, that one quote set the height of its whole row.
+     The clamp is a LINE count, not a character count, so it self-adjusts: at
+     1159px the cards are 508px wide and nothing truncates at all, while a
+     137px phone column trims exactly as much as it needs to. The full text
+     stays in the DOM — this is display truncation, never an edited quote. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
+  line-clamp: 8;
+  overflow: hidden;
+}
+/* Card-wide click target. `::after` stretches this link over the whole card, so
+   the affordance is one small labelled link in the accessibility tree while the
+   hit area is the entire block. Keep `position: relative` on the card above or
+   the overlay escapes to the nearest positioned ancestor and swallows the page.
+
+   ⚠️ THE CLASS NAME IS LOAD-BEARING: it must NOT contain the substring "card".
+   `CustomerReveal`'s REVEAL_SELECTOR includes `main [class*="card"]`, so a name
+   like `testimonial-card-link` gets stamped `data-customer-reveal="visible"`,
+   which applies `will-change: opacity, transform, filter` — and will-change:
+   transform makes the element a CONTAINING BLOCK. The overlay then resolves
+   `inset: 0` against the link's own 130x17 text box instead of the card, and the
+   card silently stops being clickable while still looking correct. This cost a
+   round of debugging on 2026-08-09; any future stretched-link overlay in `main`
+   needs the same care (or a `data-customer-reveal-skip` attribute). */
+.testimonial-google-link {
+  font-weight: 600;
+  font-size: clamp(0.6875rem, 0.6rem + 0.4vw, 0.75rem);
+  color: var(--color-primary);
+  text-decoration: none;
+}
+.testimonial-google-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+/* Hover affordances are pointer-only: on touch these would latch on after a tap
+   and leave the card looking permanently active. */
+@media (hover: hover) {
+  .testimonial-card:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 6px 18px rgb(0 0 0 / 0.08);
+  }
+  .testimonial-google-link:hover {
+    text-decoration: underline;
+  }
+}
+/* The focus ring belongs on the CARD, not the small link — the link's own box is
+   a short line of text at the bottom while the thing being activated is the
+   whole block. */
+.testimonial-card:has(.testimonial-google-link:focus-visible) {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.testimonial-google-link:focus-visible {
+  outline: none;
+}
+.testimonial-card figcaption {
+  font-size: clamp(0.6875rem, 0.6rem + 0.4vw, 0.75rem);
+}
+.testimonial-card .testimonial-stars {
+  font-size: clamp(0.75rem, 0.45rem + 1.5vw, 0.875rem);
+  letter-spacing: 0.15em;
 }
 
 .responsive-form-grid {

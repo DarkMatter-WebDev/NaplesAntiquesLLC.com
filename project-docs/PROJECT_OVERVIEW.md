@@ -85,15 +85,20 @@ discretion and a personal relationship over a storefront transaction.
   links resolve in ONE hop; `netlify.toml` keeps the host rules for paths outside
   the proxy matcher, plus an `/api/*` carve-out — a **200 rewrite, not a
   redirect** — for backward-compatible external webhook callbacks).
-- **Email is split across the two domains — do not "unify" it:**
-  - **Mailboxes stay on `.co`.** `info@` / `chris@naplesestatejewelry.co` are the
-    real, monitored inboxes; never touch the `.co` MX records. Contact addresses
-    shown on the site and Reply-To values stay `.co`.
+- **Email is fully `.com` — senders AND mailboxes.** (This bullet described a
+  `.co`-mailbox / `.com`-sender split until 2026-08-08, when the mailbox half was
+  reversed. Older comments and notes saying "mailboxes stay on `.co`" are stale;
+  the rule below is current.)
   - **Senders must be `.com`.** Since 2026-08-05, Resend's only verified sending
     domain is `naplesestatejewelry.com`, so every outbound From address is
     `@naplesestatejewelry.com`. A `.co` From address will not send at all.
-    `info@naplesestatejewelry.com` is also a live Workspace mailbox and is the
-    Reply-To on customer receipts.
+  - **`info@naplesestatejewelry.com` is the one monitored mailbox** — a live
+    Google Workspace inbox, owner-confirmed receiving on 2026-08-09. It is the
+    contact address shown on the site, the Reply-To on customer receipts and
+    marketing, and the order-notification default. Zero `@naplesestatejewelry.co`
+    addresses remain in shipped code; never restore one.
+  - **Never touch the `.co` MX records** regardless — that domain still carries
+    live mailboxes even though the app no longer points anyone at them.
 - **Related domains** (listed as `sameAs`): `naplesjewelrybuyers.com` — a
   separate, live, actively-run buy-side landing site with its own
   LocalBusiness/FAQPage schema (confirmed 2026-07-11).

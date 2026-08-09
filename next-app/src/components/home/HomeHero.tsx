@@ -1,18 +1,19 @@
 'use client';
 
-// Hero slideshow pane: the 3D carousel as a full-bleed background. Photos are
-// grouped into a white arc and a black arc, so the ring has two clean seams. As
-// a seam rotates toward the front, the section background sweeps (a horizontal
-// gradient driven every frame) so the incoming color leads the incoming photo
-// while the outgoing color fades off the far side.
+// Hero slideshow pane: the 3D carousel as a full-bleed background over ONE
+// solid admin-chosen color (`backgroundColor`, per slideshow). The per-photo
+// background sweep — a gradient rebuilt every frame that followed each photo's
+// backdrop to the front — was removed 2026-08-09: with mixed lineups it flipped
+// the whole hero between black and white as the ring turned. Cards still paint
+// their own photo's backdrop as padding; only the section behind them is fixed.
 //
 // This component is ONLY the slideshow (background + ring + loading spinner).
 // The static headline / sign-up / CTA layer lives in HomeHeroOverlay, and
-// HomeHeroStack composes two of these panes with one pinned overlay for the
-// scroll parallax. Which color is centered behind the headline is reported
-// outward via onThemeChange so the overlay can flip its text theme.
+// HomeHeroStack composes the panes with one pinned overlay for the scroll
+// parallax. The overlay's light/dark text theme is derived by the stack from
+// each pane's solid color — nothing is reported outward from here anymore.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Carousel } from '../../../carousel/components/Carousel';
 import {
   type CarouselItem,
@@ -24,11 +25,8 @@ type Props = {
   locale: string;
   initialItems: CarouselItem[];
   initialSettings: CarouselSettings;
-  /**
-   * Fires when the photo centered behind the headline changes between the
-   * light and dark arc. Keep the handler stable (useCallback).
-   */
-  onThemeChange?: (dark: boolean) => void;
+  /** This pane's solid background — the admin's color for this slideshow. */
+  backgroundColor?: string;
   /**
    * Spin the ring the opposite way (photos flow left-to-right across the
    * front). The stack sets this on slideshow B so the two slideshows move
@@ -47,10 +45,8 @@ type Props = {
 // Matches the carousel's mobile breakpoint in the <style> below.
 const MOBILE_QUERY = '(max-width: 640px)';
 
-function isDarkBackground(bgColor: string): boolean {
-  const n = bgColor.trim().toLowerCase();
-  return n === '#000' || n === '#000000' || n === 'black';
-}
+/** Keep in step with the .home-hero-loading opacity transition below. */
+const SPINNER_FADE_MS = 180;
 
 function withLocaleHref(item: CarouselItem, locale: string): CarouselItem {
   if (locale !== 'es' || !item.href || item.href.startsWith('/es/')) return item;
@@ -61,17 +57,12 @@ export default function HomeHero({
   locale,
   initialItems,
   initialSettings,
-  onThemeChange,
+  backgroundColor = DEFAULT_BG,
   reverseSpin = false,
   paused = false,
 }: Props) {
   const sectionRef = useRef<HTMLElement>(null);
   const [heroReady, setHeroReady] = useState(false);
-
-  // Seed the section background before the first frame so there's no flash.
-  useEffect(() => {
-    if (sectionRef.current) sectionRef.current.style.background = DEFAULT_BG;
-  }, []);
 
   // Track the mobile breakpoint so we can use a different ring size on phones.
   const [isMobile, setIsMobile] = useState(false);
@@ -86,8 +77,7 @@ export default function HomeHero({
     ? initialSettings.visibleCountMobile
     : initialSettings.visibleCountDesktop;
 
-  // Render in the admin's curated order (position). The background sweep follows
-  // each photo's own bg color as it reaches the front.
+  // Render in the admin's curated order (position).
   const localizedItems = useMemo(
     () => initialItems.map((item) => withLocaleHref(item, locale)),
     [initialItems, locale],
@@ -107,19 +97,34 @@ export default function HomeHero({
 
     const fallbackTimer = window.setTimeout(markHeroReady, 1800);
 
-    const visibleImages = localizedItems
-      .slice(0, Math.max(1, visibleCount))
-      .map((item) => item.imageUrl)
-      .filter(Boolean);
+    // Wait on the images the carousel ACTUALLY RENDERS, not on the source URLs.
+    //
+    // This used to warm each `item.imageUrl` through `new window.Image()`. But
+    // the cards display Next-OPTIMIZED variants (`/_next/image?...&w=640`), so
+    // that warmed a completely different, full-resolution file — one the page
+    // never displays. Measured on the homepage: 32 of 33 image requests had a
+    // duplicate raw-original fetch alongside them, and every armed pane repeated
+    // it for its own lineup. The gate was also waiting on the wrong files, so
+    // readiness tracked a download that had nothing to do with what was painted.
+    //
+    // Querying the DOM is safe here: children commit before parent effects run,
+    // so the Carousel's <img> elements already exist. The offscreen preloader is
+    // excluded via its aria-hidden wrapper — those are the NEXT photos to cycle
+    // in, and blocking the fade on them would hold the spinner far too long.
+    const renderedImages = sectionRef.current
+      ? Array.from(sectionRef.current.querySelectorAll('img')).filter(
+          (img) => !img.closest('[aria-hidden="true"]'),
+        )
+      : [];
 
-    const imagePromises = visibleImages.map(
-      (src) =>
-        new Promise<void>((resolve) => {
-          const image = new window.Image();
-          image.onload = () => resolve();
-          image.onerror = () => resolve();
-          image.src = src;
-        }),
+    const imagePromises = renderedImages.map(
+      (img) =>
+        img.complete
+          ? Promise.resolve()
+          : new Promise<void>((resolve) => {
+              img.addEventListener('load', () => resolve(), { once: true });
+              img.addEventListener('error', () => resolve(), { once: true });
+            }),
     );
     const fontsReady = 'fonts' in document ? document.fonts.ready.catch(() => undefined) : Promise.resolve();
 
@@ -134,16 +139,19 @@ export default function HomeHero({
     };
   }, [localizedItems, visibleCount]);
 
-  // Report the theme of the photo centered behind the headline.
-  const handleFrontItem = useCallback(
-    (item: CarouselItem) => onThemeChange?.(isDarkBackground(item.bgColor || DEFAULT_BG)),
-    [onThemeChange],
-  );
-
-  // Paint the swept background imperatively (no re-render).
-  const handleBackgroundChange = useCallback((css: string) => {
-    if (sectionRef.current) sectionRef.current.style.background = css;
-  }, []);
+  // Drop the spinner from the DOM once it has finished fading.
+  //
+  // `.is-ready` only took it to opacity 0, which leaves an 800ms infinite
+  // rotation running for the life of the page — measured: 3 still animating
+  // (one per pane) long after the hero settled. Opacity does not stop an
+  // animation; only removal or `display:none` does. Unmounting after the fade
+  // keeps the transition intact rather than snapping the spinner away.
+  const [spinnerMounted, setSpinnerMounted] = useState(true);
+  useEffect(() => {
+    if (!heroReady) return;
+    const timer = window.setTimeout(() => setSpinnerMounted(false), SPINNER_FADE_MS + 80);
+    return () => window.clearTimeout(timer);
+  }, [heroReady]);
 
   return (
     <section
@@ -152,6 +160,9 @@ export default function HomeHero({
       // during the parallax crossing, so the hero's bottom separator lives on
       // .home-hero-stack-frame instead of the slideshow section.
       className={`home-carousel-hero relative overflow-hidden ${heroReady ? 'is-ready' : ''}`}
+      // The stack reads this element's inline background to paint the pinned
+      // frame behind feathered crossing edges — keep it a plain inline style.
+      style={{ background: backgroundColor }}
       data-customer-reveal-skip
     >
       {/* Loading spinner — fills the blank spot while the carousel data/images
@@ -159,9 +170,11 @@ export default function HomeHero({
           time). Hidden outright under prefers-reduced-motion, where the
           content below is already forced to opacity 1 with no fade to wait
           for. */}
-      <div className="home-hero-loading" aria-hidden="true">
-        <span className="home-hero-spinner" />
-      </div>
+      {spinnerMounted && (
+        <div className="home-hero-loading" aria-hidden="true">
+          <span className="home-hero-spinner" />
+        </div>
+      )}
 
       {/* Carousel background */}
       <div className="home-carousel-theme">
@@ -174,16 +187,12 @@ export default function HomeHero({
           cardWidth={15.5}
           perspective={35}
           visibleCount={visibleCount}
-          onFrontItemChange={handleFrontItem}
-          onBackgroundChange={handleBackgroundChange}
         />
       </div>
 
       <style>{`
         .home-carousel-hero {
           min-height: calc(100svh - var(--site-header-height));
-          /* Background is painted per-frame (a swept gradient) by the carousel,
-             so no CSS transition here — it would lag the sweep. */
         }
 
         .home-carousel-theme {

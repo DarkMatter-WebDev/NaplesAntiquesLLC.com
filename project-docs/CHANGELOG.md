@@ -1,5 +1,478 @@
 # Changelog
 
+## 2026-08-09 (later session) - Email verification closed; reviews grid is 2-up minimum
+
+Several items: the email verification, the reviews band, the hero Trade link,
+the hero CTA layout, and the shop-card date.
+
+**Full gate run at session end, dev server stopped and `.next` deleted first**
+(so from-scratch, not incremental): `npm test` **846/846 across 87 files**,
+`npx tsc --noEmit` clean, `npm run lint` clean, `npm run build` **exit 0**,
+compiled in 10.9s, **449/449 static pages**, all build artifacts present.
+Compiled-output spot check over 1022 js/css/html files confirmed both removed
+markers at 0 and every new marker shipped, and the email invariant still holds
+(bare `.co` = 0, `aol.com` = 0, against a 138-file positive control).
+
+⚠️ **One method note from that check, worth more than the result.** The first
+scan reported 0 matches for *everything*, including strings certainly in the
+build — PowerShell 5.1's `Select-String` does not populate `.Matches` when
+`-SimpleMatch` and `-AllMatches` are combined, so the absence check was broken
+rather than clean. It would have read as a perfect pass. **Any "this string is
+gone" assertion needs a positive control through the identical scan**, or it
+proves nothing.
+
+### Email surface: the last open verification is closed
+
+- **Owner confirmed `info@naplesestatejewelry.com` receives mail.** This was the
+  one item no code could verify — the `.com` root MX points at Google Workspace,
+  but whether the `info@` mailbox/alias exists there is Workspace config. It
+  does. Closed in `TASKS.md`, and the conditional wording in `DECISIONS.md`
+  ("only correct while that mailbox receives mail") now records the confirmation
+  while keeping the dependency visible.
+- **`PROJECT_OVERVIEW.md` was carrying the superseded split.** Its deployment
+  section still read "Mailboxes stay on `.co`" and told the reader not to unify
+  the two domains — the pre-2026-08-08 rule, reversed the day the `info@` address
+  moved. It contradicted `DECISIONS.md`, `CURRENT_STATUS.md`, and the shipped
+  code, all three of which were already correct. Rewritten to the current rule
+  (fully `.com`, senders and mailboxes), with the `.co` MX prohibition kept.
+  Worth noting as a class: the startup file most likely to be read FIRST was the
+  one still describing a superseded decision.
+
+### Homepage/product reviews band: two columns is now the floor
+
+Owner request: the client review blocks must be a minimum of 2-up. The ladder
+was 1 / 2 / 4 columns (`.testimonial-grid`); the single-column band below 600px
+is removed, so it is now **2 / 4**. Three is still skipped for the original
+reason — auto-fit chose it in the ~850-1150px band and stranded the fourth
+review alone on a second row.
+
+- **The narrow phone became the tight case, so the card compacts.** At 320px a
+  2-up card is 137px wide; the shipped 24px padding and 14px quote left 89px of
+  text, roughly six characters per line. A new `.testimonial-card` class ramps
+  padding 10px -> 24px, the quote 12px -> 14px, the caption 11px -> 12px, and the
+  card's internal gap 10.4px -> 16px, all reaching their desktop maxima by
+  ~590px. The Tailwind `p-6` / `gap-4` / `text-sm` / `text-xs` utilities were
+  removed from the figure so there is one owner of these values rather than a
+  specificity race between a utility and a class.
+- **A viewport clamp is correct here even though card width is not monotonic in
+  viewport width.** The 1160px jump to four columns halves the card (508px ->
+  243px), which is normally the exact trap the container-query rules in
+  DECISIONS exist to prevent. It is safe in this one case because the tight case
+  sits at the BOTTOM of the range and the ramps top out ~570px below the jump —
+  measured at 1159px and 1160px, padding is 24px and the quote 14px on both
+  sides of it, identical to what shipped. Refit the ramps if the column ladder
+  changes.
+- **Measured, both locales:** 320px -> 2 columns, 137px cards, zero document
+  overflow, no card overflowing its own box, and the five-star row on one line
+  (115px content, 115px scroll width — it fits exactly, so re-check it if the
+  star glyphs or letter-spacing change). Spanish at 320px likewise 2-up with no
+  overflow. 1160px -> 4 columns on a single row.
+- **This band also renders on product pages** (shared `TestimonialsSection`,
+  single source), so the change lands there too — intentional, and consistent.
+  Checked on a dark-variant product page: `product-light-surface` still restores
+  the light tokens, giving `rgb(26,28,28)` quote text on white, and the caption
+  lands at exactly 11px, at the product-page floor rather than below it.
+
+### Reviews are truncated to 8 lines, and each card links to Google
+
+Owner requests, same session, after seeing the 2-up layout on a phone: the long
+reviews made the cards tall, and the blocks should link to the Google Business
+Profile (`https://share.google/KAE0mjQwhKx9EqEZ1`, new `GOOGLE_REVIEWS_URL` in
+`lib/testimonials.ts` so both surfaces share one destination).
+
+- **Truncation is CSS `-webkit-line-clamp: 8`, never a JS substring.** The full
+  verbatim quote stays in the DOM for screen readers and crawlers, which keeps
+  the "never edit a customer's words" rule in `testimonials.ts` structurally
+  true rather than merely observed. A LINE clamp also self-adjusts where a
+  character count could not: at 1159px the cards are 508px wide and nothing
+  truncates at all, while a 137px phone column trims exactly as much as it
+  needs. Card heights measured before → after: **375px 308/308/592/592 → 303
+  uniform; 1280px 498 → 342 uniform; Spanish 320px 624 → 282.**
+- **The whole card is the click target**, via a stretched `::after` on a small
+  "Read on Google" / "Leer en Google" link rather than an `<a>` wrapping the
+  figure. That keeps figure/figcaption semantics and gives the link a short
+  accessible name — wrapping would have made a 480-character quote the link
+  text. `target="_blank"` + `rel="noopener noreferrer"`, with a localized
+  `aria-label` naming the reviewer and warning of the new tab. Hover lift is
+  `@media (hover: hover)` so it cannot latch on after a tap, and the focus ring
+  is drawn on the CARD via `:has()`, not on the small link box.
+- **⚠️ The link's class name is load-bearing, and this cost a debugging round.**
+  It was first written `testimonial-card-link`; the card stayed unclickable
+  while looking perfectly correct. Cause: `CustomerReveal`'s `REVEAL_SELECTOR`
+  contains `main [class*="card"]`, so the substring "card" in the class made the
+  reveal system stamp the ANCHOR with `data-customer-reveal="visible"`, which
+  applies `will-change: opacity, transform, filter` — and `will-change:
+  transform` makes an element a **containing block**. The overlay then resolved
+  `inset: 0` against the link's own 130x17 text box instead of the card
+  (measured: `::after` was 130x17, not 155x301). Renamed to
+  `testimonial-google-link`; hit-tested at three points per card afterwards, all
+  four cards on the homepage and the product-page band. The general trap —
+  a substring selector reaching an element you did not intend, and
+  `will-change` silently redefining a containing block — is worth remembering
+  for any future stretched-link overlay inside `main`.
+- **Not verified: that the `share.google` short link resolves to the right
+  profile.** It is an opaque Google redirect and google.com is unreachable from
+  this environment. Owner should click one card on the deployed site.
+
+### Homepage hero "Trade" button points at the trade-in program
+
+The hero's third CTA (`HomeHeroOverlay`) linked to `/contact` — it predated the
+`/trade-in` page, which was added 2026-08-04 and is already linked from the Sell
+menu, the footer, and every product page's trade-in line. The hero was the last
+"Trade" affordance still bypassing the explanation and dropping visitors on a
+contact form. Now `/trade-in` and `/es/trade-in`.
+
+Verified on the dev server: the hero's three CTAs read Buy `/shop`, Sell
+`/estate-jewelry`, Trade `/trade-in` in English and `/es/shop`,
+`/es/estate-jewelry`, `/es/trade-in` in Spanish, and both destinations resolve
+(`Gold &amp; Silver Trade-In Program` / `Programa de Intercambio de Oro y Plata`)
+rather than 404.
+
+### Shop cards show the "Ca. YYYY" date on mobile again
+
+Reported as "the cards no longer show the year". Nothing was broken: the data
+was present and the element was in the DOM the whole time (48 of them, reading
+`Ca. 1960` / `Ca. 2005` / `Ca. 1995`), and it rendered normally from 641px up.
+A `@media (max-width: 640px)` rule in `ProductCard`'s style block set
+`.modern-card-date { display: none }` — a deliberate mobile-density decision
+from an earlier compaction pass, not a regression. Owner asked for it back.
+
+The rule is deleted. It fits with room to spare: on a 320px card the price row
+is 275px, the date occupies 0-56px, the price 114-161px and the width chip
+234-275px, leaving a 58px gap. The label is absolutely positioned at `left: 0`,
+so it takes no part in the row's flex layout and cannot push the price or the
+chip. Swept all 24 cards at 320px — every date visible, **zero overlaps**, no
+document overflow; the widest price on the page (`$2,360.88`, 68px) still
+clears it.
+
+**"Your price" stays hidden, and needed no change** — `.modern-price-label` is
+hidden by a rule OUTSIDE any media query
+([ProductCard.tsx:899](next-app/src/components/shop/ProductCard.tsx:899)), so it
+is suppressed at every width on modern cards. The mobile rule that also hid it
+was redundant. Worth knowing before anyone "restores" it at one breakpoint and
+wonders why nothing changes.
+
+### Hero CTAs are two-up-one-down on mobile, structurally
+
+Owner request: the three hero buttons must never stack one-per-row on a phone —
+two on the first row, one on the second.
+
+The bug was conditional, which is why it looked intermittent: as a wrapping flex
+row the arrangement was two-plus-one only while two `9rem` buttons plus the
+`1rem` gap fitted the line. At a 390px viewport they did (measured 359px of row
+against the 304px needed) and the layout was already correct; at 320px they did
+not (294px of row) and all three silently became separate rows. Nothing was
+declaring the count — it was falling out of arithmetic.
+
+Below 640px `.home-hero-actions` is now a **two-column grid**, so the count is
+decided up front and the narrowest phone gets the same arrangement as a wide
+one. The last button spans both tracks and centres at `calc(50% - 0.375rem)` —
+one track's width — so it sits under the pair at matching width instead of
+stretching double. The row is capped at `18.75rem`, which lands the columns on
+the same 144px the buttons already used rather than letting them inflate on a
+640px viewport, and `min-width: 0` on the buttons hands width control to the
+track (the `9rem` minimum would otherwise overflow its column at 320px).
+
+Above 640px nothing changed — still one flex row of three.
+
+Measured, both locales: **320px** → 141px buttons, Buy/Sell on row 1 and Trade
+centred on row 2 (centre 159.5 against the row's 160), zero document overflow;
+**640px** → 144px buttons, row capped at 300px and centred; **641px** → back to
+flex, all three on one row. Spanish is the long-label case (`Intercambiar`) and
+fits on one line at 320px with no overflow.
+
+## 2026-08-09 - Shop-card touch UX, hero touch snap, hero perf batch, and one solid background per slideshow
+
+One session, four areas, all verified locally: **846/846 tests across 87 files**
+(814 -> 846: +8 dot windowing, +7 photo focus, +13 hero snap, +3 slideshow bg,
++1 image loading, -4 net consolidations), `npx tsc --noEmit` clean, full lint
+clean. Browser-verified on the dev server at 375/700/1280px with synthetic
+touch; owner-verified on a real phone over LAN (see the firewall note in
+TASKS). **The one manual SQL (`add-slideshow-bg-colors.sql`) was run and
+verified by the owner the same day** — nothing database-side is pending.
+
+### Shop gallery cards (mobile-first UX pass)
+
+- **Bottom Add to Cart restored on mobile.** A scoped rule
+  (`display:none !important` on the card body's action row under 640px) had
+  removed it in favor of a corner cart icon; both now render. The corner icon
+  and bottom button share cart state through `CartContext`.
+- **Cart icon is a cart sitewide.** New `shopping_cart` AppIcon name
+  (Lucide `ShoppingCart`); swapped at the header button, both cart-drawer
+  spots, the checkout empty state, and the shop-tile corner icon. The three
+  admin `shopping_bag` uses stay — they are ETSY marketplace icons (paired
+  with `store` for eBay), not the customer cart.
+- **Dot indicators replaced the image progress bar.** `src/lib/shop-card-dots.ts`:
+  one dot per photo, WINDOWED at 7 (cards carry 3-12 photos, uploads allow 20,
+  against a ~166px card) — the window centres on the active photo and the
+  outermost dot on a truncated side tapers full -> medium -> small; the taper is
+  the only "more photos this way" signal. Dots are indicators only
+  (`pointer-events: none`). On pointer devices they sit on the translucent
+  scrim pill and appear on hover; on touch they are PERMANENT and FLOATING
+  (owner request) — no pill, each dot carries its own contrast: fill + hairline
+  ring + halo, because on the lightest frame (`rgb(254,248,241)`) the fill
+  alone measures 1.04:1. Dots sit on the photo's bottom edge; the brand/link
+  flag lifted above them, and the prev/next arrows moved onto the flag's
+  BASELINE (bottom-aligned, not centre-aligned — the two flag variants are 18px
+  and 24.9px tall and share only their bottom edge).
+- **Swipe changes the card photo on touch; arrows are hidden there.** The
+  gesture runs on NATIVE non-passive `touchmove` listeners, not React pointer
+  events — by spec `preventDefault` on pointermove cannot stop scrolling, so the
+  browser's own direction detection claimed the gesture first and fired
+  `pointercancel` (the reported "it tries to scroll me instead"). Decision at a
+  5px slop with a horizontal cone widened to ~51° (`atan(1.25)`), measured
+  boundary 51/52°. Vertical drags stay the browser's. A swipe suppresses the
+  trailing click one-shot; the suppression is cleared on the next touchstart —
+  a preventDefault'd swipe produces NO trailing click, and the stale flag was
+  silently swallowing the visitor's next genuine tap.
+- **A swiped card keeps its photo until another card is swiped.**
+  `src/lib/shop-card-photo-focus.ts` (plain subscribe/notify module, not
+  context): the last-swiped card holds focus; everyone else snaps back to
+  photo 1 — at most one card in the grid is ever off its cover. Chosen over a
+  revert timer (built first, replaced same-session on owner direction). A swipe
+  that cannot advance does not claim focus. Hover-cycling and the 1s
+  mouse-leave reset are now MOUSE-ONLY, and the touch/mouse mode follows the
+  most recent input rather than latching (a hybrid-device swipe used to disable
+  that card's mouse reset for the session).
+
+### Home hero: touch snap + slower handover
+
+- **One gesture advances exactly one slideshow** (`src/lib/home-hero-snap.ts` +
+  a touch handler in `HomeHeroStack`). Snap points: A at p=0, C at p=1, and B
+  SOLVED by bisection for where its transform crosses zero (p≈0.503 under the
+  touch curve) — B never rests, because the crossings deliberately overlap, so
+  its flush point is derived from the same constants/curve the scroll handler
+  uses and moves with any retune. The step is measured from where the gesture
+  BEGAN, which is what caps a hard fling at one slideshow. No snap at either
+  end (scrolling out stays free), touch-only (`pointer: coarse`), reduced
+  motion never snaps, wheel/keydown cancels an in-flight snap. The snap
+  animates `scrollTo` per frame to beat platform momentum.
+- **Slowed "way too fast" handover — two dials, not one.** `SNAP_STEP_MS`
+  400 -> 1000 (the old value fell out of a pixel formula and drifted with
+  viewport height; now progress-based and device-independent) and runway
+  110svh -> 240svh (manual-drag speed, ~0.7x vs 1:1). The snap, not the
+  runway, is what a phone user actually watches — raising the runway alone
+  would not have changed it.
+
+### Hero performance batch (audit findings 1/3/6/8)
+
+- Ready-gate waits on the RENDERED `<img>`s instead of warming raw
+  `item.imageUrl` files — that warmed full-res originals the page never
+  displays (measured: 32 of 33 image requests had a duplicate raw fetch;
+  now 0). Preloader images excluded from the gate.
+- Spinner unmounts after its fade (`.is-ready` only set opacity 0, leaving
+  three 800ms infinite animations running for the life of the page).
+- Carousel card quality 90 -> 82 (`CARD_IMAGE_QUALITY`, shared by cards and
+  preloader; `qualities: [75, 82, 90]` in next.config — Next 16 errors on
+  unlisted values). Measured with an AVIF Accept header: 22% smaller. Cards
+  only ever request w=640, so 90 bought detail at a size that cannot show it.
+- Offscreen (paused) panes no longer claim `fetchPriority: high` — the LCP
+  lane belongs to the visible hero. Eager loading kept deliberately: lazy
+  viewport tests are meaningless inside the pinned 3D frame and late decode
+  reads as pop-in.
+- Write-on-change guards on the per-frame background writes (largely
+  superseded hours later by the sweep removal below, kept where still live).
+
+### One solid background per slideshow (the sweep is gone)
+
+Owner decision, replacing the per-photo swept background entirely: a lineup
+mixing white- and black-backdrop pieces flipped the whole hero between black
+and white as the ring turned (and a regression that morning had it rendering
+gray). Now each of the three slideshows has ONE admin-chosen solid color.
+
+- Removed: `computeSweepBackground`, the `onFrontItemChange` /
+  `onBackgroundChange` per-frame callbacks, `groupByBackground` (the white/black
+  arc ordering existed only so the sweep had two seams; lineups now render in
+  curated order everywhere), and HomeHero's per-photo theme reporting. This
+  also deletes most of the hero's remaining per-frame allocation/style-write
+  work — the carousel's rAF loop now does only windowing + facing/z.
+- Added: `CarouselSettings.bgColorAlt/bgColorThird`; `normalizeSlideshowBg`
+  in `carouselConfig.ts` (pure module — carouselData instantiates the Supabase
+  client at import time and cannot be imported by tests); tiered reads/writes
+  fall back when the columns are missing, and a missing column INHERITS
+  Slideshow 1's color, so pre-migration behavior was byte-identical.
+  Cache key bumped v4 -> v5 (settings shape changed). Admin panel: a
+  "{Slideshow N} background" control (White/Black swatches + custom color
+  input) above the live preview, following the active tab; the save warns and
+  names the SQL file if the columns are missing. Overlay text theme now
+  derives from each pane's color via relative luminance (any hex, not just
+  black); the pinned frame paints the DOMINANT pane's solid color at
+  crossings (same midpoint switch as before). Per-photo White/Black groups
+  REMAIN — they paint each card's own padding.
+- `carousel/sql/add-slideshow-bg-colors.sql` — run and verified by the owner
+  2026-08-09. A crossing between two slideshows with different colors shows
+  the change at the handover midpoint; that is inherent and curatorial.
+
+### Also
+
+- `.claude/launch.json`: the dev config now passes `-p 3007` explicitly (the
+  npm script had no port flag, so the config's claimed port and the real bind
+  disagreed).
+- LAN preview for phone testing: server already binds all interfaces; a
+  Private-profile firewall rule for TCP 3007 is required and should be removed
+  after testing (commands in the session notes). ⚠️ Local dev runs LIVE
+  PayPal and production Supabase — browse on the phone, never complete a
+  PayPal flow.
+- Session-caught regressions worth remembering: a backtick inside a CSS
+  comment terminates the `<style>{\`...\`}` template literal and 500s the page;
+  the shop grid's `content-visibility: auto` makes offscreen cards report
+  zero-size rects (filter before asserting geometry); the windowed dot row
+  means dot position ≠ photo index past photo 4 (read `data-current-image`).
+
+### Docs maintenance pass (2026-08-09)
+
+`TASKS.md` **52 KB → 36 KB (-31%)** by moving closed work to this file, per the
+README rule that TASKS is an open-work queue and not an archive: the 08-06
+pre-deploy sign-off, the 08-05 `EMAIL_FROM` Netlify blocker, the five closed
+findings from the 08-05 audit, the closed `?returnTo=` item, the Deep Field
+import/env/hook confirmations, the four carousel SQL migrations (all run), the
+price-push diagnosis, and a 60-line 08-01→08-04 "Recently Completed" archive.
+Each left a dated pointer. Live warnings were deliberately KEPT and promoted:
+LIVE PayPal on localhost, dev sharing production Supabase + Deep Field, the
+Node 24-vs-20 caveat, and a "Verified Healthy — Do Not Re-Audit" list.
+
+**Six factual errors found and fixed while compressing** — the reason this pass
+was worth doing beyond size:
+
+- **`PANE_A_TRAVEL` was documented as three different wrong values.** DECISIONS
+  rule 5 said 100, rule 5b said 95, and a TASKS smoke item said 100; the code
+  is **85**. All three corrected.
+- **The hero entry was titled "two-slideshow"** and its intro still described
+  panes DESCENDING and locking with a hold — contradicting its own rule 5
+  (everything rises) and 5e (no holds anywhere). Rewritten.
+- **Rule 11 contradicted 5c** on when slideshow C arms (`p > 0.12` vs one idle
+  beat after B; 5c is correct and 11 now continues it rather than restating).
+- **Rule 5a described holds** that 5e says do not exist.
+- **Two dangling `5d` cross-references** — that content had been split into its
+  own entry; both now name it.
+- **TASKS still said contact addresses "stay on `.co`"** in the Resend section
+  while the rest of the file documented the 08-08 move to `.com`. That one
+  could have caused a `.co` address to be restored, which does not send at all.
+  Also corrected there: "email is DOWN until deploy" (shipped 08-08) and an
+  eBay header saying 123 flagged listings where its own body says 86.
+
+`DECISIONS.md` was NOT bulk-trimmed and stayed ~136 KB. Its length is mostly
+load-bearing rationale, and the earlier estimate that this pass would "roughly
+halve" the startup read was wrong — that was true of TASKS, not of DECISIONS.
+Instead the 310-line hero entry (2.5× the next largest) gained a **rule index**,
+since its labels run `1,2,3,4a,4,5,5c,5f,5e,5a,5b,…` and could not be navigated.
+`README.md` now says DECISIONS is consulted by section rather than read whole.
+
+Net startup read: **220 KB → 204 KB**.
+
+### Session-end verification (2026-08-09)
+
+Dev server stopped and `.next` DELETED first, so the build is clean from
+scratch rather than incremental:
+
+- `npm test` → **846/846 across 87 files**
+- `npx tsc --noEmit` → clean
+- `npm run lint` → clean
+- `npm run build` → **exit 0**, compiled successfully, **449/449 static
+  pages**; `BUILD_ID` / `server/` / `static/` / `prerender-manifest.json`
+  present, 58 prerendered `.html`
+- **Compiled-output check across 961 js chunks** — proving the change is in
+  what actually ships, not just in source: `shop-card-image-progress`
+  (the removed bar) = **0**; `shop-card-image-dot` and
+  `shop-card-image-dots-track` present; `shopping_cart` × 23;
+  `pan-y pinch-zoom` × 4; image `quality:82` × 3.
+- Folder scanned clean: no `.bak/.tmp/.log/.orig/.rej/.swp` and no
+  scratch/temp/debug files anywhere outside `node_modules`/`.next`. Ignore
+  rules still cover `node_modules`, `.next`, `.env`, `*.log`, `.DS_Store`,
+  `tsbuildinfo`.
+- Node here is **v24**; Netlify pins **NODE_VERSION 20** with no `engines` in
+  `package.json`, so the local green build is strong evidence but not proof of
+  theirs — watch the Netlify log.
+
+## 2026-08-08 - A constant duplicated into a user-facing string, and the tests that could not catch it
+
+Found by applying a sweep method the Deep Field team contributed: check every
+exported numeric constant against every test file that imports the constant's
+own module. Re-run and verified 2026-08-09: **27 constants x 83 test files ->
+10 candidates, 0 genuine test defects.** The candidates broke down as value
+collisions (`0.06` as a dollar
+amount in `'$0.06'`, `12` inside a `'12:00'` time-slot string, `5` inside the
+comment `// 5 PM -> 6 PM EDT`), explicit function arguments (the batching tests
+pass their budgets in deliberately), and two tests already correct —
+`expect(EXPRESS_SHIPPING_MAX_SUBTOTAL).toBe(5000)` pins the USPS insurance cap
+as external policy, and product-video's contract test is literal on purpose.
+
+The signal-to-noise is the finding: **without the "only tests importing that
+module" filter the sweep is unusable**, and even with it, 10-of-10 candidates
+were benign. The method earns its keep by being cheap to re-run, not by hit
+rate. Script deliberately kept out of the repo (scratch only), since it is a
+one-off audit tool rather than part of the suite — rebuild it from this
+description if it is ever wanted again:
+
+1. Collect `export const NAME = <number>` from every non-test `.ts`/`.tsx`.
+2. Record which modules each test file imports from.
+3. For each constant, scan only the tests importing its declaring module, and
+   flag lines containing the constant's *value* as a bare token but not its
+   *name*. Skip comment lines.
+
+Step 3's "but not its name" exclusion is what keeps derived assertions like
+`` `at least ${MIN}` `` out of the results.
+
+**The real instance was in the SOURCE, not the test:**
+
+```ts
+else if (input.durationSeconds < PRODUCT_VIDEO_MIN_DURATION_SECONDS)
+  errors.push('Video must be at least 5 seconds long.');   // <- literal
+```
+
+The comparison followed the constant; the message the customer reads did not.
+Retune the limit and the app states a number it no longer enforces. Nothing
+objected, because the test asserted the same stale literal — source and test
+were self-consistently wrong, which is why it survived. The same shape existed
+for the 150 MB size cap and the 15-second maximum. All three now interpolate.
+
+### The tests, and a vacuous one written while fixing it
+
+Rewritten with a mechanism/policy split (Deep Field's framing):
+
+- **Mechanism** tests derive boundaries from the constants (`MIN - 0.1`,
+  `MAX + 0.1`), so a retune re-baselines them automatically.
+- **Policy** test uses deliberate bare literals — `5`, `15`, `150 MB` — because
+  that is the product contract, not our tuning. When a limit changes, exactly
+  one test should object.
+
+The message test written first was **vacuous**, and the mutation that appeared
+to prove it worked was the reason it hid. See DECISIONS, *"A duplicated-constant
+defect can only be caught by reading the source"*, for the durable rule and the
+two rules for writing that kind of guard. Short version: asserting the
+returned string equals `` `...at least ${MIN}...` `` passes on the buggy code,
+because at MIN=5 the interpolated and hardcoded strings are byte-identical.
+Verified by reverting the source to a literal with MIN untouched — **all 8 tests
+stayed green.**
+
+Now checked three ways, and the outer two matter as much as the middle:
+
+| Mutation | Expected |
+|---|---|
+| message reverted to a literal, constant unchanged | source test **fails** |
+| constant retuned 5 -> 3, message left derived | only the **policy** test fails |
+| constant wrapped in arithmetic (`Math.round(...)`) | **stays quiet** |
+
+That third row is not ceremony: the first version of the check required the
+identifier immediately after `${`, which fails on correct code the moment a
+limit is divided to MB. A guard that false-alarms gets deleted by whoever hits
+it next, so false-alarm-proofing is a durability property, not politeness.
+
+### Also hardened: batching assertions that pinned nothing
+
+Nine assertions in the Deep Field batching tests were upper bounds only —
+`expect(imagesIn(b)).toBeLessThanOrEqual(18)` and similar. Every one is
+satisfied perfectly by a chunker emitting one product per batch: the caps were
+pinned, the packing was not. Added `expectSaturated()`: for every batch but the
+last, pulling in the next batch's first item must have overflowed the image
+budget or the product cap.
+
+Mutation-tested against a deliberately degenerate chunker — baseline 8 passed,
+mutant **3 failed** with *"had room for the next item — split was gratuitous"*.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **814/814 tests**, clean
+`npm run build`.
+
 ## 2026-08-08 - SECURITY: a query parameter could disclose any hidden product
 
 **Anyone could read a soft-deleted product by appending `?returnTo=/admin` to

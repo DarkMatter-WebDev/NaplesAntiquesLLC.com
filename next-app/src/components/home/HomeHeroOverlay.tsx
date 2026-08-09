@@ -72,7 +72,10 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
   const buttons = [
     { href: storeHref, label: isEs ? 'Comprar' : 'Buy' },
     { href: isEs ? '/es/estate-jewelry' : '/estate-jewelry', label: isEs ? 'Vender' : 'Sell' },
-    { href: isEs ? '/es/contact' : '/contact', label: isEs ? 'Intercambiar' : 'Trade' },
+    // Trade goes to the named program page, not /contact — the page explains
+    // how a trade-in works and carries its own contact paths, so sending
+    // people straight to a contact form skipped the explanation.
+    { href: isEs ? '/es/trade-in' : '/trade-in', label: isEs ? 'Intercambiar' : 'Trade' },
   ];
 
   return (
@@ -107,7 +110,10 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
         <div className="flex w-full justify-center px-2" style={{ pointerEvents: 'auto' }}>
           <HomeSubscriberForm locale={locale} />
         </div>
-        <div className="flex flex-wrap justify-center gap-4 md:gap-5" style={{ pointerEvents: 'auto' }}>
+        <div
+          className="home-hero-actions flex flex-wrap justify-center gap-4 md:gap-5"
+          style={{ pointerEvents: 'auto' }}
+        >
           {buttons.map(({ href, label }) => (
             <Link
               key={label}
@@ -275,6 +281,40 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
             top: auto;
             bottom: clamp(1rem, 3svh, 2rem);
             gap: 0.85rem;
+          }
+
+          /* Two up, one down — STRUCTURAL, not a side effect of what fits.
+             As a wrapping flex row this was two-plus-one only while two 9rem
+             buttons plus the 1rem gap fitted the line; below about 336px of
+             row width that failed and all three silently became separate
+             rows (measured: 294px of row at a 320px viewport against the
+             304px the pair needed). A two-column grid decides the count up
+             front, so the narrowest phone gets the same arrangement as a
+             wide one. */
+          .home-hero-actions {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.75rem;
+            /* Capped so the columns land on the same 9rem the buttons already
+               used, rather than stretching to fill a 640px viewport. */
+            width: min(100%, 18.75rem);
+            margin-inline: auto;
+          }
+
+          /* The grid track owns the width now. Without this the 9rem minimum
+             would overflow its column on a narrow phone instead of shrinking. */
+          .home-hero-actions .hero-cta {
+            min-width: 0;
+            padding-inline: 0.75rem;
+          }
+
+          /* The odd button spans both tracks and centres at ONE track's width
+             (50% of the full span, less half the gap), so it sits directly
+             under the pair at matching width rather than stretching double. */
+          .home-hero-actions .hero-cta:last-child {
+            grid-column: 1 / -1;
+            justify-self: center;
+            width: calc(50% - 0.375rem);
           }
         }
 

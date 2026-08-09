@@ -222,11 +222,31 @@ positives. Pinned with a comment at the emitting line.
 ## Gotchas
 
 - **Batch cap is 25**, enforced by the receiver — but **25 is unreachable in
-  production**. The receiver copies images synchronously inside the request, so
-  wall-clock scales with IMAGES, not products (2–19 per product, avg 7.6). A
-  3-product batch carrying 38 images died at a gateway "Inactivity Timeout"
-  while one carrying 17 succeeded. Batches are budgeted at **18 images / 3
-  products**; see `chunkByImageBudget`.
+  production**. The receiver copies images inside the request, so wall-clock
+  scales with IMAGES, not products (2–19 per product, avg 7.6). A 3-product
+  batch carrying 38 images died at a gateway "Inactivity Timeout" while one
+  carrying 17 succeeded. Batches are budgeted by
+  `IMAGE_BUDGET_PER_REQUEST` / `MAX_PRODUCTS_PER_REQUEST` in
+  `src/lib/deepfield/sync.ts`; see `chunkByImageBudget`.
+- **The image budget was raised 18 -> 30 on 2026-08-08** after Deep Field made
+  image copying concurrent (6 at a time) and reported measurements. Two
+  corrections mattered on the way to that number, both from checking rather than
+  accepting:
+  - My "1.7–2x faster" claim was measured against their *undeployed* sequential
+    code; their 404/401 evidence showed the deployed path already differed.
+    Retracted.
+  - I modelled cold cost as `0.64s/image` when it is a **~9.1s fixed** overhead
+    plus a small per-image term. Per-image models overstate small batches badly.
+
+  30 is the conservative end of the bracket. Their measurements support up to
+  ~50, which stays parked until a timeout line from their dashboard confirms the
+  real ceiling — the cost of guessing high is a gateway timeout mid-import, and
+  the cost of guessing low is a slower import nobody is waiting on.
+
+  The batching tests deliberately pass budgets in as **explicit arguments**
+  rather than importing the constants, so retuning production cannot silently
+  re-baseline them. **Known gap:** nothing currently pins the production default
+  values themselves — see TASKS.
 - **A full batch takes minutes** because Deep Field copies every image before
   responding. Node's `fetch` (undici) has a hard **5-minute header timeout** that
   is not adjustable without the undici Agent API; the one-off import script hit

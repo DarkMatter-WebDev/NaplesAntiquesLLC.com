@@ -4,7 +4,7 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-08-06**.
+> compaction. Last reconciled: **2026-08-09**.
 
 ## Repository And Memory
 
@@ -95,10 +95,12 @@ decision kept everything on `.co`. Amended 2026-08-05 (senders), then again
 - **`info@` is on `.com`.** Moved 2026-08-08 on owner instruction so the address
   customers see matches the domain they are on — footer, account dashboard, both
   LocalBusiness JSON-LD blocks, and the order-notification default.
-  **This is only correct while `info@naplesestatejewelry.com` actually receives
-  mail in Google Workspace.** The `.com` root MX points at Workspace, but the
-  mailbox/alias existing there is config no code can verify; if it is missing,
-  customer inquiries AND new-order notifications bounce silently.
+  **Owner-confirmed 2026-08-09 that the mailbox actually receives mail**, which
+  is the condition this decision depends on: the `.com` root MX points at
+  Workspace, but the mailbox/alias existing there is config no code can verify.
+  It remains a live dependency rather than a settled one — if that mailbox is
+  ever deleted or renamed, customer inquiries AND new-order notifications bounce
+  silently, with nothing in the app to signal it.
 - **The marketing Reply-To is `info@naplesestatejewelry.com`** (owner,
   2026-08-08). Campaign replies land with every other customer inquiry rather
   than in a personal inbox. Reply-To is NOT constrained by the sending domain,
@@ -558,6 +560,72 @@ tiles sit in `minmax(0, 1fr)` grid tracks, so an unbreakable label does not
 compress — it punches straight out of its track. That is why the spot pill's
 LABEL is allowed to wrap while its PRICE is not.
 
+### The reviews band is never one column, and the card compacts to allow it
+
+Owner rule 2026-08-09: the client review blocks are a **minimum of 2-up** at
+every width. The ladder is `.testimonial-grid` = **2 / 4 columns** (4 from
+1160px); the pre-existing "never 3" rule stands, because the shared auto-fit
+chose 3 in the ~850-1150px band and stranded the fourth review alone on a second
+row. Both rules together still assume an EVEN review count — a fifth brings the
+orphan back, and the answer is a sixth or a layout that centres a partial row.
+
+Removing the one-column band moves the tight case to the narrow phone: a 320px
+viewport gives a **137px card**. At the shipped 24px padding and 14px quote that
+left 89px of text, about six characters per line. So `.testimonial-card` ramps
+padding, quote size, caption size, and the card's internal gap down at narrow
+widths rather than the grid falling back to one column. **Do not "fix" a cramped
+phone card by reintroducing a single-column band** — that is the thing the owner
+asked to remove.
+
+**This is a deliberate exception to the container-query rule, and the reasoning
+is what matters if the ladder ever changes.** Card width is NOT monotonic in
+viewport width — the 1160px jump to four columns halves the card, 508px → 243px
+— which is exactly the trap the purchase-panel and related-strip entries above
+use container queries to avoid. A viewport clamp is nevertheless correct here
+because the tight case sits at the BOTTOM of the range and every ramp reaches
+its desktop maximum by ~590px, roughly 570px below the jump. Verified by
+measuring both sides of it: at 1159px and at 1160px the padding is 24px and the
+quote 14px, identical to what shipped. The moment the column ladder changes, that
+argument has to be re-made — and if a future ladder puts a narrow card at a WIDE
+viewport, switch to a container query rather than refitting the clamp.
+
+The band renders on product pages as well as the homepage (one shared
+`TestimonialsSection`), so it must keep satisfying the product page's 11px label
+floor: the caption's ramp bottoms out at exactly 0.6875rem, and the quote's at
+0.75rem.
+
+**Quotes are truncated in CSS, never in JS.** `-webkit-line-clamp: 8` on the
+blockquote, so the full verbatim review stays in the DOM for screen readers and
+crawlers and the "never edit a customer's words" rule in `lib/testimonials.ts`
+stays structurally true instead of merely observed. A LINE clamp is also the
+right unit where a character count is not: it self-adjusts to the column, so a
+508px card at 1159px truncates nothing while a 137px phone column trims exactly
+what it must. Truncation is honest only because the card links out — if the
+link is ever removed, revisit the clamp rather than leaving a quote that stops
+mid-sentence with nowhere to finish it.
+
+**Each card is a link to the Google Business Profile** (`GOOGLE_REVIEWS_URL`,
+one constant in `lib/testimonials.ts` — a second copy would eventually point
+somewhere else). The whole card is clickable via a stretched `::after` on a
+small "Read on Google" link, NOT an `<a>` wrapping the figure: wrapping would
+make a 480-character quote the link's accessible name and would flatten the
+figure/figcaption semantics. Consequences to keep: the hover lift is
+`@media (hover: hover)` so it cannot latch on after a tap, and the focus ring is
+drawn on the CARD through `:has()` because the thing being activated is the
+whole block, not the one line of link text.
+
+⚠️ **The link's class must not contain the substring "card", and the reason
+generalizes.** `CustomerReveal`'s `REVEAL_SELECTOR` includes
+`main [class*="card"]`, so a class like `testimonial-card-link` gets stamped
+`data-customer-reveal="visible"`, which applies `will-change: opacity,
+transform, filter`. **`will-change: transform` makes an element a containing
+block**, so the overlay resolved `inset: 0` against the link's own 130x17 text
+box rather than the card — the card looked perfect and was simply not
+clickable. Any stretched-link overlay added inside `main` needs either a name
+that dodges that substring selector or a `data-customer-reveal-skip` attribute,
+and any "why is my absolutely positioned overlay the wrong size" question in
+this codebase should check `will-change` on the ancestor chain first.
+
 ### Always-mounted off-canvas panels must cap their width at the viewport
 
 Established 2026-08-05 from a real bug. `WishlistDrawer` used `w-full max-w-sm`
@@ -603,96 +671,132 @@ default for bare, cleared, or invalid shop URLs; Sold inventory is shown only
 after the shopper explicitly selects Sold. Available is the baseline rather
 than an extra active-filter count.
 
-### The homepage hero is a scroll-pinned two-slideshow parallax stack
+### The homepage hero is a scroll-pinned THREE-slideshow parallax stack
 
 `HomeHeroStack` pins the hero in a sticky, overflow-hidden frame while a scroll
-runway (hero height + **110svh**, compressed from 290svh on 2026-08-06) drives
-the choreography.
+runway (hero height + **240svh**) drives the choreography. Only the SLIDESHOWS
+move: each pane exits upward while the next RISES FROM BELOW, the two crossings
+overlap so motion never stops, and the frame un-sticks as the third locks. The
+headline, sign-up form, CTA buttons, and legibility halo live in a pinned
+overlay layer that never moves until the frame itself releases.
 
 **The runway is only the scroll BUDGET.** Each pane always travels exactly one
-frame height, so changing it changes the SPEED of the handover, never its extent:
-at 290svh a crossing spent ~90svh of scroll moving a pane ~100svh (about 1:1); at
-110svh it spends ~44svh on the same move, about 2.3x scroll speed. The `PHASE_*`
-fractions divide whatever budget is set, so they do not need re-tuning alongside
-it. Lower the number for a snappier, more parallax-y hero; raise it toward 1:1
-for a calmer one. Whenever it changes, re-check frame coverage across the runway
-— the overlap in 5b is what keeps it hole-free, and a different budget changes
-nothing about that geometry but is cheap to confirm. Only the SLIDESHOWS
-move: pane A slides up and out while an identical slideshow (pane B) descends
-in the opposite direction, locks at 60% of the runway, holds, and then the
-frame un-sticks naturally. The headline, sign-up form, CTA buttons, and
-legibility halo live in a third, pinned overlay layer that never moves until
-the frame itself releases. Rules that must hold:
+frame height, so changing it changes the SPEED of the handover, never its
+extent: a crossing spans 0.61 of the runway, so scroll-per-full-pane-travel is
+`0.61 × runway`. At 240svh that is ~146svh of scroll per 100svh of pane
+movement (~0.7×, calmer than 1:1). The `PHASE_*` fractions divide whatever
+budget is set, so they do not need re-tuning alongside it. Lower it for a
+snappier, more parallax-y hero; raise it toward and past 1:1 for a calmer one.
+Whenever it changes, re-check frame coverage across the runway — the overlap in
+5b is what keeps it hole-free, and a different budget changes nothing about
+that geometry but is cheap to confirm.
 
-1. `HomeHero` is the slideshow pane only (carousel + swept background +
+**On touch the runway is only HALF the speed story.** Once the snap is driving
+(see *"On touch, the hero snaps exactly one slideshow per gesture"*), the panes
+move one frame height over `SNAP_STEP_MS`, which the runway does not affect at
+all. Changing one without the other slows only half the experience.
+
+Runway history — 290svh → 110svh (2026-08-06, "fit the handover into roughly
+one screen") → 240svh (2026-08-09, "way too fast"); the 110svh figure cost less
+than it looks because the touch snap now scrolls the runway for the visitor.
+Detail in CHANGELOG under those dates.
+
+**This is the longest entry in this file. Rule index** — the labels are
+historical and out of sequence, so use this to find the one you need. Do not
+renumber them; the labels are referenced from other rules:
+
+| | Covers |
+|---|---|
+| 1 | Pane vs overlay split — exactly one h1/form/CTA set |
+| 2 | `inert` only when fully offscreen; imperative transforms |
+| 3 | Overlay light/dark theme follows the dominant pane |
+| 4 | Frame mirrors the dominant pane's background |
+| 4a | Departing-pane fade + frame backdrop are a PAIR — **mask, not opacity** |
+| 5 | Three slideshows, everything rises upward; `PANE_A_TRAVEL` = 85 |
+| 5a | Crossings are eased; the phase logic is not |
+| 5b | `PANE_A_TRAVEL` as the seam control; re-measure coverage if changed |
+| 5c | No slideshow may MOUNT during the scroll |
+| 5e | The two crossings OVERLAP; the 0.36 ratio and equal lengths |
+| 5f | Pane overlap ≠ ring separation; `RING_PULL_PCT` |
+| 6 | Seam feathers — both edges at once, widths unclamped |
+| 7 | `prefers-reduced-motion` collapses the runway in CSS alone |
+| 8 / 8a / 8b | Twin lineup tables; picker hides selected; sold pieces allowed |
+| 9 | Random draws are a FILL action, never a live source |
+| 10 | Ring direction alternates down the stack |
+| 11 | Deferred mounting (continues 5c) |
+
+Related entries elsewhere in this file: *"Only on-screen slideshows animate"*
+(the pause/liveness rule these refer to), *"One solid background per
+slideshow"*, *"On touch, the hero snaps exactly one slideshow per gesture"*,
+and *"Every carousel card paints the backdrop its own photo was shot against"*.
+
+Rules that must hold:
+
+1. `HomeHero` is the slideshow pane only (carousel + its solid background +
    spinner); `HomeHeroOverlay` owns the headline/form/CTAs/halo. The stack
    composes two panes plus ONE overlay, so the page always has exactly one h1,
    one subscribe form, and one set of CTAs — never duplicate the overlay.
 2. A slideshow pane is `inert` only while fully offscreen; during the crossing
    both stay interactive. Transforms are imperative per scroll frame, never
    React state.
-3. The overlay's light/dark text theme follows the DOMINANT slideshow — pane A
-   below the crossing midpoint, pane B above it — fed by each pane's
-   `onThemeChange` callback.
+3. The overlay's light/dark text theme follows the DOMINANT slideshow, each
+   crossing handing over at its own midpoint. Since 2026-08-09 it is derived by
+   relative luminance from each pane's SOLID background color (static per pane),
+   not reported per-photo via an `onThemeChange` callback — that callback no
+   longer exists.
 4a. **A departing pane FADES over the tail of its exit, and the frame paints the
    DOMINANT pane's backdrop.** These two are a pair — either alone fails.
 
    Because `PANE_A_TRAVEL` is below 100, the departing pane never clears the
    frame; the strip still in view late in a crossing is bare backdrop, since its
-   ring left the top long before. At full opacity that reads as a hard bar, which
-   is exactly what the owner reported on the black→white handover (2026-08-07):
-   measured at p=0.50, an 8% band of opaque black above the arriving white
-   slideshow. Fading it (`FADE_TAIL`) dissolves the band instead of sliding it
-   out — but fading only reveals the FRAME, so the frame must already show the
-   incoming backdrop or the same black bar comes straight back.
+   ring left the top long before. At full opacity that reads as a hard bar
+   (measured at p=0.50: an 8% band of opaque black above the arriving white
+   slideshow). Fading it dissolves the band instead of sliding it out — but
+   fading only reveals the FRAME, so the frame must already show the incoming
+   backdrop or the same bar comes straight back.
 
-   **A whole-pane opacity fade cannot carry this on its own, and 2026-08-08
-   established why.** `opacity` applies to the entire pane, so a black pane over
-   a white frame does not read as "leaving" — it reads as a flat GRAY RECTANGLE.
-   Measured at p=0.35: 27% of the frame at opacity 0.36, compositing to a uniform
-   `rgb(163,163,163)`. Black fading over white passes through every gray on the
-   way, so no value of `FADE_TAIL` avoids it. `FADE_TAIL` went 0.4 → 0.65 → 0.75
-   chasing this before the actual diagnosis landed: **the fade was being applied
-   to an AREA when the problem was an EDGE.**
+   **The durable rule, and the reason it cost three attempts to find: reach for
+   a MASK, not opacity, whenever the fading layer is a large solid area whose
+   color differs from what is behind it.** `opacity` applies to the whole pane,
+   so a black pane fading over a white frame does not read as "leaving" — it
+   reads as a flat GRAY RECTANGLE (measured: 27% of the frame at opacity 0.36,
+   compositing to a uniform `rgb(163,163,163)`). Black fading over white passes
+   through every gray on the way, so NO value of `FADE_TAIL` avoids it — the
+   fade was being applied to an AREA when the problem was an EDGE.
 
    So the dissolve is spatial (`A_EXIT_DISSOLVE_PCT`, a bottom-anchored mask
-   sized to reach past the arriving pane's top edge into the band above it) and
-   `FADE_TAIL` is back to **0.45**, doing only what opacity is good at: removing
-   the last of the pane at the very end.
-
-   **Rule: reach for a mask, not opacity, whenever the fading layer is a large
-   solid area whose color differs from what is behind it.** Opacity is right only
-   for the final tail, where the area is small.
+   sized to reach past the arriving pane's top edge into the band above it), and
+   `FADE_TAIL` = **0.45** does only what opacity is good at: removing the last of
+   the pane at the very end, where the area is small. (It was tuned up to 0.75
+   chasing the gray before the diagnosis landed; CHANGELOG 2026-08-07/08.)
 
    Switching the frame on dominance rather than blending is safe ONLY while the
    panes fully cover the frame at that instant — verified 100% opaque coverage at
    both flips. If pane travel, timing, or the fade ever change, re-check that
    before trusting the switch, or a black→white jump becomes visible.
 
-4. The frame mirrors a pane's live swept background every scroll frame, because
-   anything the panes do not fully cover — a feathered edge, a fading one —
-   shows the frame through it. That mirroring is what makes those edges read as
-   continuous canvas rather than a hole. **It follows the DOMINANT pane** as of
-   2026-08-07; it mirrored hero A alone until then, which was correct while A was
-   the only pane that could be uncovered but became the cause of the black bar
-   once departing panes started fading (see 4a).
+4. The frame mirrors the DOMINANT pane's background, because anything the panes
+   do not fully cover — a feathered edge, a fading one — shows the frame
+   through it. That mirroring is what makes those edges read as continuous
+   canvas rather than a hole. It followed the dominant pane's live SWEPT
+   background from 2026-08-07 (mirroring hero A alone before that caused the
+   black bar in 4a); since 2026-08-09 the sweep is gone and it paints the
+   dominant pane's SOLID color — same dominance midpoint switch, same
+   full-coverage safety argument.
 5. There are THREE slideshows handing over in sequence (A→B, then B→C), with the
-   crossings overlapping and no hold between them (see 5e).
+   crossings overlapping and no hold anywhere (see 5e).
    **Everything travels UPWARD: a pane exits up and the next RISES FROM BELOW**
    (owner request 2026-08-06), so the hero reads as one continuous upward scroll.
-   This supersedes the 2026-08-04 arrangement where arriving panes descended from
-   above; note a rise-from-below variant had also been trialled and reverted on
-   2026-08-04, so this direction has now been chosen deliberately twice — do not
-   "restore" the descending version from the older note. B is the only pane that
+   This direction has been chosen deliberately TWICE — do not "restore" the
+   descending arrangement from any older note. B is the only pane that
    both arrives and departs, so its transform carries both crossing terms and its
    feather takes whichever crossing is currently moving it. Timing lives in
    `PHASE_1_END` / `PHASE_2_START` / `PHASE_2_END`; adding or removing a slideshow
    means re-splitting those and resizing the runway to match. Pane travel is fixed
    at one frame height (offscreen at rest, flush when locked), so `PANE_A_TRAVEL`
-   is the only depth control: at 100 the panes move at matching speeds (the
-   owner's choice), above 100 the departing layer outruns the arriving one and
-   reads as nearer the viewer. A differential was trialled at 135 and returned
-   to 100.
+   is the only depth/seam control — **currently 85** (see 5b; it was lowered
+   100 → 95 → 85 across 2026-08-06 as the owner asked the join to keep
+   tightening, and a >100 differential was trialled and reverted).
 
    The panes' resting transforms in CSS (`--b` / `--c` at `translate3d(0,100%,0)`)
    must match the value the scroll handler computes at t=0, or a pane jumps on the
@@ -706,7 +810,8 @@ the frame itself releases. Rules that must hold:
    mounted. A carousel mount is a React render plus ring construction plus image
    decode; anywhere on the scroll path it is a visible hitch. Staggering the two
    arms keeps them out of the same frame. Mounting early is cheap because a pane
-   mounts already `paused` (see 5d) — it is in the DOM but not animating.
+   mounts already `paused` (see the separate entry *"Only on-screen slideshows
+   animate, and the STACK decides which"*) — it is in the DOM but not animating.
 
 5f. **Pane overlap and RING separation are different axes — do not confuse them.**
    Each pane is full-frame with its carousel centred, so consecutive rings sit
@@ -777,7 +882,8 @@ the frame itself releases. Rules that must hold:
    points of each other.
 
    Cost, accepted knowingly: within the overlap band all three crossing clocks
-   are active, so the phase-based liveness in 5d marks all three panes live and
+   are active, so the phase-based liveness (see *"Only on-screen slideshows
+   animate"*) marks all three panes live and
    3 rAF loops run for ~11% of the runway even though only 1-2 panes are on
    screen. At rest it is still 1. Fixing that would need a coverage-aware
    liveness test instead of a phase-based one.
@@ -791,13 +897,14 @@ the frame itself releases. Rules that must hold:
    which test which phase we are in and would only be blurred by easing. The ease
    must keep exact endpoints (0→0, 1→1) — the resting/locked positions, those
    thresholds, and the CSS resting transforms all assume t=0 and t=1 land
-   precisely. Holds are deliberately short (0.20 of the runway total, from 0.38);
-   shortening them further without the easing would reintroduce the jolt.
+   precisely. (There are no holds left to jolt into — they were shortened, then
+   removed entirely when the crossings were overlapped; see 5e. The easing is
+   what makes that safe.)
 
 5b. **`PANE_A_TRAVEL` is the seam control, and below 100 it is load-bearing.**
    The seam is `t × (PANE_A_TRAVEL − 100)`: above 100 leaves a real gap of open
    frame, 100 butts exactly, below 100 the arriving pane overlaps the departing
-   one. It is 95 (owner request 2026-08-06) for a ~5%-of-frame overlap, so the
+   one. It is **85**, giving a ~15%-of-frame overlap, so the
    arriving pane's feathered top blends over the outgoing photograph instead of
    fading to backdrop — that fade-to-backdrop is what made the join read as a
    band of empty space. **At any value below 100 the departing pane never fully
@@ -896,17 +1003,14 @@ the frame itself releases. Rules that must hold:
    (left-to-right), C right-to-left again — B is the only pane passing the
    Carousel `reverse` prop. Reversing is not just
    `animation-direction: reverse`: the per-frame sample must mirror its
-   clock-derived angle and flip its hidden-back crossing test, or the
-   sweep/theme/windowing silently track a mirror image. Change spin direction
-   only through that prop.
-11. The later slideshows mount deferred and in stages: B on first scroll
-   intent or idle callback, C only once scroll progress passes 12% — so a
-   visitor who never reaches the first hold never pays for C. Neither mounts
-   under reduced motion. Server HTML always carries exactly one carousel.
-   Combined with the ring's IntersectionObserver pause, at most the panes in
-   a visible crossing animate. Do not mount later panes eagerly, and do not
-   unmount panes on direction changes — remount re-decodes images and shows
-   as pop-in.
+   clock-derived angle and flip its hidden-back crossing test, or the photo
+   windowing silently tracks a mirror image (pre-2026-08-09 the sweep and
+   theme depended on this too). Change spin direction only through that prop.
+11. Deferred mounting, continued from 5c: neither later pane mounts under
+   reduced motion, and server HTML always carries exactly one carousel.
+   Combined with the pause rule, at most the panes in a visible crossing
+   animate. Do not mount later panes eagerly, and do not unmount panes on
+   direction changes — remount re-decodes images and shows as pop-in.
 
 ### Every carousel card paints the backdrop its own photo was shot against
 
@@ -940,9 +1044,136 @@ Keep the two readers in step — `src/lib/home-carousel-server.ts` feeds the liv
 hero and `carousel/lib/carouselData.ts` feeds the admin preview. If only one gets
 the fallback, the preview and the storefront disagree about the same lineup.
 
-Consequence to expect, not a bug: the hero's swept background is driven by the
-same per-photo colour, so a random lineup containing black-backdrop pieces now
-sweeps dark as they come round, exactly as a curated mixed lineup always has.
+(A former consequence noted here — the hero's swept background following the
+same per-photo colour — is gone as of 2026-08-09: the section background is now
+one solid color per slideshow, and the per-photo colour paints ONLY the card's
+own padding. See "One solid background per slideshow".)
+
+### One solid background per slideshow — the per-photo sweep is removed
+
+Owner decision 2026-08-09, removing a feature rather than tuning it. The hero
+background used to follow each photo's backdrop to the front (a per-frame
+gradient whose seam swept as the white/black arcs rotated). With a lineup
+mixing white- and black-backdrop pieces the whole hero flipped between black
+and white as the ring turned, and a same-day regression had it rendering gray.
+The owner chose to delete the mechanism: each of the three slideshows now shows
+ONE admin-chosen solid color for its whole time on screen.
+
+Rules that must hold:
+
+1. **The color belongs to the slideshow slot, not the lineup.** `bg_color`
+   (Slideshow 1, pre-existing), `bg_color_alt`, `bg_color_third` on
+   `carousel_settings` (`add-slideshow-bg-colors.sql`, run + verified
+   2026-08-09). A missing/NULL later column INHERITS Slideshow 1's color — the
+   pre-migration inherit rule, pinned by `slideshow-bg.test.ts`. A lineup that
+   mirrors A still uses its own slot's color.
+2. **Per-photo White/Black groups stay** — they paint each CARD's padding
+   (the "match the padding to the photo" rule above). They no longer influence
+   the section background, and `groupByBackground` (white-arc/black-arc
+   ordering, which existed only so the sweep had exactly two seams) is deleted;
+   lineups render in curated order everywhere.
+3. **The overlay text theme derives from the dominant pane's color by relative
+   luminance** (`isDarkHex` in `HomeHeroStack`), not a black-only string match
+   — the admin picker accepts any hex. Static per pane; flips only at crossing
+   midpoints with the dominance handover.
+4. **A crossing between two slideshows with different colors shows the color
+   change at the handover midpoint.** Inherent and accepted — the lever is
+   curatorial (give neighbours the same color), the same stance the feather
+   rules above already take for photo content.
+5. **`normalizeSlideshowBg` lives in `carouselConfig.ts`** (pure) and is the
+   single normalizer for the admin panel, `carouselData`, and
+   `home-carousel-server` — the two readers must not disagree about settings.
+   It cannot move into `carouselData`: that module instantiates the Supabase
+   browser client at import time, which breaks any test importing it.
+6. Do not resurrect the sweep from older notes: `computeSweepBackground`, the
+   `onFrontItemChange`/`onBackgroundChange` callbacks, and per-photo theme
+   reporting are gone deliberately, and their removal is also a large chunk of
+   the hero's per-frame cost reduction (the carousel's rAF loop now does only
+   windowing + facing/z hit-testing).
+
+### On touch, the hero snaps exactly one slideshow per gesture
+
+Owner request 2026-08-09 ("each carousel should snap more strongly; one scroll
+can propel the user straight past a carousel"), plus a follow-up ("way too
+fast, slow it down a lot"). Both live in `src/lib/home-hero-snap.ts` + a touch
+handler in `HomeHeroStack`. Rules:
+
+1. **The step is measured from where the gesture BEGAN, not where it ended.**
+   That is the entire overshoot fix: a hard fling can cross most of the runway
+   before the finger lifts, and stepping from the release position would land
+   on the slideshow after next. Verified: a fling that dragged the page nearly
+   to C still settles on B.
+2. **B's snap point is SOLVED, never declared.** B never rests — the crossings
+   deliberately overlap, so B only passes through flush. Its snap point is the
+   bisected zero of its transform under the ACTIVE easing curve (touch uses
+   smootherstep, so the flush point differs from the pointer curve's). Derived
+   from the same PHASE_*/PANE_A_TRAVEL constants the scroll handler uses, so a
+   retune moves the snap point automatically; `home-hero-snap.test.ts` pins
+   flushness, monotonicity, and the one-step cap.
+3. **Two speed dials, and they are different things.** `SNAP_STEP_MS` (1000)
+   is what a phone visitor actually watches — the snap moves the panes one
+   frame height over that duration regardless of runway. The runway (240svh)
+   governs only the MANUAL drag. Changing one without the other slows half the
+   experience. The snap duration is progress-based, never pixel-based — a
+   pixel formula silently retunes itself with viewport height and runway edits
+   (the original 400ms was exactly that accident).
+4. **Touch only** (`pointer: coarse`), same signal as the snappier easing
+   curve and for the same reason: a wheel arrives in notches and hijacking it
+   fights the visitor. No snap at either runway end (leaving the hero stays
+   free), never under reduced motion, and a wheel/keydown cancels an in-flight
+   snap. The snap reasserts `scrollTo` every frame — a one-shot loses to
+   platform momentum. The momentum override is the one piece synthetic touch
+   cannot prove; it is owner-verified on a real phone.
+
+### Shop-card photos: swipe + windowed dots on touch; hover affordances are mouse-only
+
+Owner requests 2026-08-09 (dots replacing the progress bar, swipe, floating
+dots, arrows removed on touch, keep-until-another-card-is-swiped). The rules
+that must survive refactors:
+
+1. **The swipe runs on NATIVE non-passive `touchmove` listeners, not React
+   pointer events.** By spec, preventDefault on pointermove cannot stop
+   scrolling; the only levers are `touch-action` (and `pan-y` deliberately
+   permits vertical panning) and a cancelable touchmove. With pointer events
+   the browser claimed the gesture and fired pointercancel before any
+   threshold was reached. Direction locks at a 5px slop — it must beat the
+   browser's own commit — with the horizontal cone widened to ~51°
+   (`atan(1.25)`) because a thumb crossing a ~166px card always drifts.
+   Vertical gestures are never claimed; the photos are most of the grid's
+   scrollable surface.
+2. **A swipe suppresses the trailing click one-shot, and the flag is cleared
+   on the next touchstart.** A preventDefault'd swipe produces NO trailing
+   click, so nothing consumes the flag — left standing, one swipe silently
+   swallows the visitor's next genuine tap on the product.
+3. **At most one card in the grid is off its cover photo**
+   (`src/lib/shop-card-photo-focus.ts`, plain subscribe/notify — not context,
+   which would re-render the grid per swipe). The last-swiped card holds its
+   photo indefinitely; a DIFFERENT card being swiped snaps it back. A swipe
+   that cannot advance (already at an end) must not claim focus — it would
+   blank another card while visibly doing nothing. This replaced a revert
+   timer, built and discarded the same session.
+4. **Dot indicators are windowed at 7** (`src/lib/shop-card-dots.ts`): cards
+   carry up to 20 photos against a ~166px frame. The window centres on the
+   active photo; the outermost dot on a truncated side tapers, and that taper
+   is the only "more photos" signal — never drop it as decorative. Dots are
+   indicators only (`pointer-events: none`). Pointer devices: scrim pill,
+   hover-revealed. Touch: permanent and FLOATING — no pill, so each dot
+   carries its own contrast (fill + hairline ring + halo; on the lightest
+   frame the fill alone is 1.04:1, so the ring is load-bearing on white and
+   the fill on black). Position note: dot position ≠ photo index past photo 4
+   — read `data-current-image` when verifying.
+5. **Bottom chrome geometry is a matched set.** Dots sit on the photo's bottom
+   edge; the brand/link flag is lifted just above the dot row; the arrows are
+   BOTTOM-ALIGNED to the flag (the two flag variants are 18/24.9px tall and
+   share only their bottom edge, so centre-alignment is wrong for one of
+   them); arrows are `display:none` under `hover: none` — swipe + dots replace
+   them, mirroring the product page below 768px. Re-measure the set together.
+6. **Hover affordances are gated to `pointerType === 'mouse'`**, and the
+   touch/mouse mode follows the MOST RECENT input rather than latching — on a
+   hybrid device (touchscreen laptop) one early swipe would otherwise disable
+   that card's mouse-leave reset for the session. Touch fires pointerenter
+   too; ungated, a tap would start the hover auto-cycle and walk away from the
+   photo the visitor just swiped to.
 
 ### Homepage carousel uses one server-authoritative initial payload
 
@@ -1728,6 +1959,67 @@ As of 2026-07-27, production uses patched Next.js, PostCSS, and Sharp versions
 and audits cleanly. Stable `eslint-config-next` still bundles React lint plugins
 that reject ESLint 10, so the working ESLint 9 line remains until upstream
 stable compatibility lands.
+
+## Testing
+
+### A test must be able to fail; check that it can
+
+The recurring defect in this codebase is not a wrong assertion — it is a
+**missing** one, and the missing one is almost always the check that felt
+redundant. Three instances found on 2026-08-08 alone, none of which any passing
+run would ever have revealed.
+
+**Upper bounds pin nothing on their own.** Nine assertions of the form
+`expect(imagesIn(batch)).toBeLessThanOrEqual(30)` were satisfied perfectly by a
+chunker emitting one product per batch. The cap was pinned; the packing was not.
+Where a function is supposed to *fill* something, assert the fill: for every
+batch but the last, pulling in the next item must have overflowed a limit. See
+`expectSaturated()` in `src/lib/__tests__/deepfield-batching.test.ts`.
+
+**Split mechanism from policy.** Tests that verify a *rule* derive their
+boundaries from the constants (`MIN - 0.1`), so retuning re-baselines them.
+Exactly one test — the policy test — states the bare numbers, because that is
+the product contract rather than our tuning. When a limit changes, one test
+should object and the rest should stay quiet. If a retune breaks five tests,
+four of them were asserting the wrong thing.
+
+**Green is not correct.** Deep Field ran 75 passing test files over a build that
+did not compile. A suite that can only confirm is not evidence.
+
+### A duplicated-constant defect can only be caught by reading the source
+
+When a constant's value is also written as a literal somewhere else — most often
+in the user-facing message beside the check — **no behavioural assertion can
+detect it**, because while the two agree the interpolated and hardcoded strings
+are byte-identical. Asserting the returned message equals
+`` `Video must be at least ${MIN} seconds long.` `` passes on the buggy code.
+Verified: reverting the source to a literal with `MIN` untouched left all 8
+tests green.
+
+Reading the source is the only thing that distinguishes *derived* from
+*coincidentally equal*. See the commented test in
+`src/lib/__tests__/product-video.test.ts`, which greps the three limit messages
+and requires each to interpolate its constant.
+
+Two rules for writing that kind of guard:
+
+1. **Match the constant anywhere inside the interpolation**, not adjacent to
+   `${`. The size message wraps its constant in `Math.round(... / (1024*1024))`,
+   and a stricter pattern fails on correct code. A guard that false-alarms gets
+   deleted by whoever hits it next, so false-alarm-proofing is a durability
+   property, not politeness. (Deep Field hit this on all three of theirs.)
+2. **Mutate one thing at a time.** This hole hid for a full review cycle because
+   the mutation used to "prove" the test changed the constant *and* the message
+   together — which does fail, so it looked verified. One mutation testing two
+   things at once proves neither independently. Generalises to any check whose
+   setup moves more than one variable.
+
+A related class is worth naming but not auto-fixing: **UI that asserts a rule
+nothing enforces** (Deep Field found `{n}/20 photos` displayed with no 20 cap in
+code). It presents identically to a drifted constant — the number shown is not
+the number that binds — but the fix is a product decision about whether the cap
+should exist, not a code change. File it; do not invent a limit to make a label
+true.
 
 ## Compliance And Marketing
 

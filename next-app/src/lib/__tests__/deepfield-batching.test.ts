@@ -18,11 +18,44 @@ function p(id: string, images: number): DeepFieldProductPayload {
 const imagesIn = (batch: DeepFieldProductPayload[]) =>
   batch.reduce((n, x) => n + (x.images?.length ?? 0), 0);
 
+/**
+ * Asserts the chunker actually PACKS, not merely that it stays under the caps.
+ *
+ * Every `<=` assertion in this file passes trivially for a chunker that emits
+ * one product per batch — the caps are satisfied perfectly by the most
+ * degenerate possible output. Upper bounds alone pin nothing.
+ *
+ * The invariant that does: for every batch but the last, pulling in the first
+ * item of the NEXT batch must have overflowed the image budget or the product
+ * cap. If it would have fit, the split was gratuitous.
+ *
+ * (Defect class contributed by the Deep Field team, who found the same shape in
+ * their own suite: a concurrency test asserting `peak <= 6` was satisfied by a
+ * pool degraded to a single worker, so it never pinned saturation at all.)
+ */
+function expectSaturated(
+  batches: DeepFieldProductPayload[][],
+  imageBudget: number,
+  maxProducts: number,
+) {
+  for (let i = 0; i < batches.length - 1; i += 1) {
+    const batch = batches[i];
+    const nextFirst = batches[i + 1][0];
+    const wouldFit = imagesIn(batch) + (nextFirst.images?.length ?? 0) <= imageBudget
+      && batch.length < maxProducts;
+    expect(
+      wouldFit,
+      `batch ${i} (${batch.length}p/${imagesIn(batch)}img) had room for the next item — split was gratuitous`,
+    ).toBe(false);
+  }
+}
+
 describe('chunkByImageBudget', () => {
   it('keeps every batch inside the image budget when it can', () => {
     const items = [p('a', 7), p('b', 7), p('c', 7), p('d', 7)];
     const batches = chunkByImageBudget(items, 18, 3);
     for (const b of batches) expect(imagesIn(b)).toBeLessThanOrEqual(18);
+    expectSaturated(batches, 18, 3);
   });
 
   it('caps product count even when images are tiny', () => {
@@ -30,6 +63,7 @@ describe('chunkByImageBudget', () => {
     const batches = chunkByImageBudget(items, 18, 3);
     for (const b of batches) expect(b.length).toBeLessThanOrEqual(3);
     expect(batches).toHaveLength(2);
+    expectSaturated(batches, 18, 3);
   });
 
   // The exact shape that broke the bulk import: 3 products, 38 images.
@@ -40,6 +74,7 @@ describe('chunkByImageBudget', () => {
       // Either within budget, or a single oversized product on its own.
       expect(imagesIn(b) <= 18 || b.length === 1).toBe(true);
     }
+    expectSaturated(batches, 18, 3);
   });
 
   it('never splits a single product, even one over budget', () => {
@@ -77,6 +112,7 @@ describe('chunkByImageBudget', () => {
       expect(imagesIn(b) <= 18 || b.length === 1).toBe(true);
       expect(imagesIn(b)).toBeLessThanOrEqual(19); // largest single product
     }
+    expectSaturated(batches, 18, 3);
     expect(batches.flat()).toHaveLength(spread.length);
   });
 });

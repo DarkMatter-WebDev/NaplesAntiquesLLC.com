@@ -469,8 +469,8 @@ export default function SiteHeader() {
               aria-label="Cart"
             >
               {/* Has-items state keeps the outline readable: soft gold tint
-                  inside the bag instead of a solid currentColor fill. */}
-              <AppIcon name="shopping_bag"
+                  inside the cart instead of a solid currentColor fill. */}
+              <AppIcon name="shopping_cart"
                 fill={cartCount > 0 ? 'color-mix(in srgb, currentColor 22%, transparent)' : 'none'}
                 style={{
                   fontSize: 'var(--site-header-action-icon-size, 20px)',

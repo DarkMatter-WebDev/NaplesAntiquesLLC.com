@@ -7,6 +7,14 @@ describe('storefront image loading', () => {
     expect(carouselImageLoading(1)).toEqual({ loading: 'eager', fetchPriority: 'auto' });
   });
 
+  it('never lets a parked slideshow claim the LCP priority lane', () => {
+    // Hero panes B and C mount offscreen. They must still load eagerly — a card
+    // decoding as it rotates in is the pop-in the hero exists to avoid — but
+    // their front slot must not compete with the visible hero image.
+    expect(carouselImageLoading(0, true)).toEqual({ loading: 'eager', fetchPriority: 'auto' });
+    expect(carouselImageLoading(1, true)).toEqual({ loading: 'eager', fetchPriority: 'auto' });
+  });
+
   it('eager-loads only the thumbnail that duplicates the initial product hero', () => {
     expect(productThumbnailLoading(0)).toBe('eager');
     expect(productThumbnailLoading(1)).toBe('lazy');

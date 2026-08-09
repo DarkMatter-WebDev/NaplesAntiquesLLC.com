@@ -196,6 +196,22 @@ export const SETTINGS_TABLE = "carousel_settings";
 export const DEFAULT_BG = "#ffffff";
 
 /**
+ * Normalize a per-SLIDESHOW background to a solid color (2026-08-09, the
+ * solid-background-per-slideshow model that replaced the per-photo sweep).
+ * Any hex passes through lowercased; the word values map to hex; empty/null
+ * falls back — which is also the pre-migration inherit rule, where a missing
+ * bg_color_alt/bg_color_third column resolves to Slideshow 1's color.
+ */
+export function normalizeSlideshowBg(value: unknown, fallback: string): string {
+  if (value == null) return fallback;
+  const n = String(value).trim().toLowerCase();
+  if (n === "") return fallback;
+  if (n === "black") return "#000000";
+  if (n === "white") return "#ffffff";
+  return n;
+}
+
+/**
  * How many cards are on the ring at once (the windowed/infinite carousel).
  * Fewer = closer/more intimate; the rest of the list cycles through.
  */

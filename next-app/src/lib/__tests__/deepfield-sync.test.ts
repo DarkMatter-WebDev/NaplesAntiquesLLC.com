@@ -19,8 +19,10 @@ vi.mock('@/lib/spot-price', () => ({
   }),
 }));
 
-const { syncProductsToDeepField, queueDeepFieldSync, isDeepFieldSyncConfigured } =
-  await import('@/lib/deepfield/sync');
+const {
+  syncProductsToDeepField, queueDeepFieldSync, isDeepFieldSyncConfigured,
+  IMAGE_BUDGET_PER_REQUEST, MAX_PRODUCTS_PER_REQUEST,
+} = await import('@/lib/deepfield/sync');
 
 function productRow(id: string) {
   return {
@@ -197,8 +199,12 @@ describe('deep field sync when configured', () => {
     expect(sizes.reduce((a, b) => a + b, 0)).toBe(53);
   });
 
+  // Asserts against the EXPORTED budget rather than a hardcoded number. A
+  // literal here silently becomes a lie the moment the constant is retuned —
+  // which is exactly what happened when the budget moved 18 -> 30.
   it('splits on the IMAGE budget, not the product count', async () => {
-    // 7 + 14 + 17 is the exact group that timed out during the bulk import.
+    // 7 + 14 + 17 = 38, the exact group that hit a gateway timeout during the
+    // bulk import. It must never travel as one request at any sane budget.
     const withImages = (id: string, n: number) => ({
       ...productRow(id),
       images: Array.from({ length: n }, (_, i) => `https://example.test/${id}-${i}.webp`),
@@ -210,14 +216,17 @@ describe('deep field sync when configured', () => {
     await syncProductsToDeepField(['a', 'b', 'c']);
 
     const batches = fetchMock.mock.calls.map((c) => JSON.parse(c[1].body).products);
+    const imagesIn = (b: { images: string[] }[]) =>
+      b.reduce((n, p) => n + p.images.length, 0);
+
     expect(batches.length).toBeGreaterThan(1);
     for (const batch of batches) {
-      const images = batch.reduce(
-        (n: number, p: { images: string[] }) => n + p.images.length, 0,
-      );
-      // Within budget, or a single oversized product on its own.
-      expect(images <= 18 || batch.length === 1).toBe(true);
+      // Within budget, or a single oversized product travelling alone.
+      expect(imagesIn(batch) <= IMAGE_BUDGET_PER_REQUEST || batch.length === 1).toBe(true);
+      expect(batch.length).toBeLessThanOrEqual(MAX_PRODUCTS_PER_REQUEST);
     }
+    // The 38-image group is never reassembled into one request.
+    expect(batches.some((b) => imagesIn(b) === 38)).toBe(false);
     // Nothing dropped.
     expect(batches.flat().map((p: { id: string }) => p.id).sort()).toEqual(['a', 'b', 'c']);
   });

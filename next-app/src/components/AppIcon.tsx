@@ -155,6 +155,7 @@ export const APP_ICONS = {
   science: FlaskConical,
   sell: BadgeDollarSign,
   shopping_bag: ShoppingBag,
+  shopping_cart: ShoppingCart,
   star: Star,
   stop_circle: CircleStop,
   store: Store,

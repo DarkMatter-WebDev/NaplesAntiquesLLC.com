@@ -17,6 +17,7 @@ import {
   SOLD_STATUS,
   PUBLIC_CAROUSEL_STATUSES,
   normalizeSelectionMode,
+  normalizeSlideshowBg,
   paddingBgForProductRow,
   pickPrimaryImage,
   productHref,
@@ -57,23 +58,14 @@ export type SelectionEntry = { productId: string; bgColor: string | null };
 
 const C = PRODUCT_COLUMNS;
 
-/** Whether a per-item background color is black. */
-export function isBlackBg(value: string | null | undefined): boolean {
-  const n = (value ?? "").trim().toLowerCase();
-  return n === "#000000" || n === "#000" || n === "black";
-}
-
-/**
- * Order items into two contiguous arcs — every white-background photo first,
- * then every black-background photo — so the rotating ring has exactly two
- * seams. The home hero's background sweep relies on this grouping. Relative
- * order within each group is preserved.
- */
-export function groupByBackground(items: CarouselItem[]): CarouselItem[] {
-  const white = items.filter((item) => !isBlackBg(item.bgColor));
-  const black = items.filter((item) => isBlackBg(item.bgColor));
-  return [...white, ...black];
-}
+// `groupByBackground` (white arc / black arc ordering) was removed 2026-08-09
+// with the background sweep: the arcs existed so the sweeping gradient had
+// exactly two seams. With one solid background per slideshow, lineups render in
+// the admin's curated order everywhere. Per-photo White/Black groups still
+// exist — they paint each CARD's padding, which is a separate feature.
+// `normalizeSlideshowBg` lives in carouselConfig.ts (pure, no Supabase import)
+// and is re-exported here for callers that already import from this module.
+export { normalizeSlideshowBg } from "./carouselConfig";
 
 /**
  * Normalize a per-item background value to a known hex (or null = inherit).
@@ -385,7 +377,17 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
 
 export type CarouselSettings = {
   showPrice: boolean;
+  /**
+   * Solid background for Slideshow 1. Since 2026-08-09 the hero background is
+   * one admin-chosen color per slideshow — the per-photo sweep that followed
+   * each card's backdrop to the front was removed (a mixed lineup made the
+   * whole background flip black/white as the ring turned).
+   */
   bgColor: string;
+  /** Solid background for Slideshow 2. Pre-migration reads fall back to bgColor. */
+  bgColorAlt: string;
+  /** Solid background for Slideshow 3. Pre-migration reads fall back to bgColor. */
+  bgColorThird: string;
   /** Cards visible on the ring at once on desktop (windowed carousel). */
   visibleCountDesktop: number;
   /** Cards visible on the ring at once on mobile. */
@@ -401,6 +403,8 @@ export type CarouselSettings = {
 type SettingsRow = {
   show_price?: boolean;
   bg_color?: string | null;
+  bg_color_alt?: string | null;
+  bg_color_third?: string | null;
   visible_count?: number | null;
   visible_count_mobile?: number | null;
   selection_mode?: string | null;
@@ -418,9 +422,17 @@ export async function fetchSettings(): Promise<CarouselSettings> {
     supabase.from(SETTINGS_TABLE).select(cols).eq("id", 1).maybeSingle();
 
   let data: SettingsRow | null = null;
-  const withThird = await read(
-    "show_price, bg_color, visible_count, visible_count_mobile, selection_mode, selection_mode_alt, selection_mode_third",
+  // Newest tier first: the per-slideshow background columns
+  // (add-slideshow-bg-colors.sql). Each earlier tier drops the youngest
+  // columns, so the read succeeds at whatever migration level the DB is at.
+  const withBgColors = await read(
+    "show_price, bg_color, bg_color_alt, bg_color_third, visible_count, visible_count_mobile, selection_mode, selection_mode_alt, selection_mode_third",
   );
+  const withThird = withBgColors.error
+    ? await read(
+        "show_price, bg_color, visible_count, visible_count_mobile, selection_mode, selection_mode_alt, selection_mode_third",
+      )
+    : withBgColors;
   const withModes = withThird.error
     ? await read("show_price, bg_color, visible_count, visible_count_mobile, selection_mode, selection_mode_alt")
     : withThird;
@@ -445,9 +457,14 @@ export async function fetchSettings(): Promise<CarouselSettings> {
   }
 
   const desktop = normalizeVisibleCount(data?.visible_count);
+  const bgColor = normalizeSlideshowBg(data?.bg_color, DEFAULT_BG);
   return {
     showPrice: Boolean(data?.show_price),
-    bgColor: (data?.bg_color as string | null) || DEFAULT_BG,
+    bgColor,
+    // Later slideshows inherit Slideshow 1's color until their columns exist
+    // and hold a value, so pre-migration behavior is identical to today.
+    bgColorAlt: normalizeSlideshowBg(data?.bg_color_alt, bgColor),
+    bgColorThird: normalizeSlideshowBg(data?.bg_color_third, bgColor),
     visibleCountDesktop: desktop,
     visibleCountMobile: normalizeVisibleCount(data?.visible_count_mobile ?? data?.visible_count),
     selectionModePrimary: normalizeSelectionMode(data?.selection_mode),
@@ -465,8 +482,11 @@ export async function fetchSettings(): Promise<CarouselSettings> {
  */
 export async function saveSettings(
   settings: CarouselSettings,
-): Promise<{ modesPersisted: boolean; thirdModePersisted: boolean }> {
-  const base = { show_price: settings.showPrice, bg_color: settings.bgColor };
+): Promise<{ modesPersisted: boolean; thirdModePersisted: boolean; bgColorsPersisted: boolean }> {
+  const base = {
+    show_price: settings.showPrice,
+    bg_color: normalizeSlideshowBg(settings.bgColor, DEFAULT_BG),
+  };
   const desktop = normalizeVisibleCount(settings.visibleCountDesktop);
   const mobile = normalizeVisibleCount(settings.visibleCountMobile);
   const write = (payload: Record<string, unknown>) =>
@@ -475,15 +495,28 @@ export async function saveSettings(
     selection_mode: normalizeSelectionMode(settings.selectionModePrimary),
     selection_mode_alt: normalizeSelectionMode(settings.selectionModeAlt),
   };
-
-  const withThird = await write({
+  const withThirdColumns = {
     ...base,
     visible_count: desktop,
     visible_count_mobile: mobile,
     ...modeColumns,
     selection_mode_third: normalizeSelectionMode(settings.selectionModeThird),
+  };
+
+  // Newest tier: the per-slideshow background columns. When they are missing
+  // (add-slideshow-bg-colors.sql not run yet) the save still succeeds one tier
+  // down and reports bgColorsPersisted: false so the panel can say which SQL to
+  // run — Slideshow 1's color always lands, since bg_color has existed from the
+  // start.
+  const withBgColors = await write({
+    ...withThirdColumns,
+    bg_color_alt: normalizeSlideshowBg(settings.bgColorAlt, base.bg_color),
+    bg_color_third: normalizeSlideshowBg(settings.bgColorThird, base.bg_color),
   });
-  if (!withThird.error) return { modesPersisted: true, thirdModePersisted: true };
+  if (!withBgColors.error) return { modesPersisted: true, thirdModePersisted: true, bgColorsPersisted: true };
+
+  const withThird = await write(withThirdColumns);
+  if (!withThird.error) return { modesPersisted: true, thirdModePersisted: true, bgColorsPersisted: false };
 
   const withModes = await write({
     ...base,
@@ -491,15 +524,15 @@ export async function saveSettings(
     visible_count_mobile: mobile,
     ...modeColumns,
   });
-  if (!withModes.error) return { modesPersisted: true, thirdModePersisted: false };
+  if (!withModes.error) return { modesPersisted: true, thirdModePersisted: false, bgColorsPersisted: false };
 
   const full = await write({ ...base, visible_count: desktop, visible_count_mobile: mobile });
-  if (!full.error) return { modesPersisted: false, thirdModePersisted: false };
+  if (!full.error) return { modesPersisted: false, thirdModePersisted: false, bgColorsPersisted: false };
 
   const desktopOnly = await write({ ...base, visible_count: desktop });
-  if (!desktopOnly.error) return { modesPersisted: false, thirdModePersisted: false };
+  if (!desktopOnly.error) return { modesPersisted: false, thirdModePersisted: false, bgColorsPersisted: false };
 
   const legacy = await write(base);
   if (legacy.error) throw legacy.error;
-  return { modesPersisted: false, thirdModePersisted: false };
+  return { modesPersisted: false, thirdModePersisted: false, bgColorsPersisted: false };
 }

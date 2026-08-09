@@ -129,8 +129,8 @@ export default function CartDrawer({ locale }: { locale: string }) {
       >
         <div className="flex items-center justify-between border-b px-5 py-5 flex-shrink-0" style={{ borderColor: BORDER }}>
           <div className="flex items-center gap-3">
-            <AppIcon name="shopping_bag"
-              
+            <AppIcon name="shopping_cart"
+
               aria-hidden="true"
               style={{
                 width: '2.35rem',
@@ -301,7 +301,7 @@ function CartView({
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 text-center mt-16 px-6">
-        <AppIcon name="shopping_bag"  style={{ fontSize: '40px', color: 'var(--color-outline-variant)' }} />
+        <AppIcon name="shopping_cart"  style={{ fontSize: '40px', color: 'var(--color-outline-variant)' }} />
         <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
           {isEs ? 'Tu carrito está vacío.' : 'Your cart is empty.'}
         </p>

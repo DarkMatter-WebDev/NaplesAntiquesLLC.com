@@ -84,10 +84,20 @@ export function validateProductVideoFile(input: {
 }): string[] {
   const errors: string[] = [];
   if (!Number.isFinite(input.size) || input.size <= 0) errors.push('Choose a non-empty video file.');
-  if (input.size > PRODUCT_VIDEO_MAX_SIZE_BYTES) errors.push('Video must be 150 MB or smaller.');
+  // Messages are DERIVED from the same constants the comparisons use. They used
+  // to hardcode "150 MB", "5 seconds" and "15 seconds" beside a check that read
+  // the constant — so retuning a limit would have left the app telling people a
+  // number it no longer enforced, with nothing failing to say so (2026-08-08
+  // sweep for constants duplicated as literals).
+  if (input.size > PRODUCT_VIDEO_MAX_SIZE_BYTES) {
+    errors.push(`Video must be ${Math.round(PRODUCT_VIDEO_MAX_SIZE_BYTES / (1024 * 1024))} MB or smaller.`);
+  }
   if (!Number.isFinite(input.durationSeconds)) errors.push('The video duration could not be read.');
-  else if (input.durationSeconds < PRODUCT_VIDEO_MIN_DURATION_SECONDS) errors.push('Video must be at least 5 seconds long.');
-  else if (input.durationSeconds > PRODUCT_VIDEO_MAX_DURATION_SECONDS) errors.push('Video must be 15 seconds or shorter.');
+  else if (input.durationSeconds < PRODUCT_VIDEO_MIN_DURATION_SECONDS) {
+    errors.push(`Video must be at least ${PRODUCT_VIDEO_MIN_DURATION_SECONDS} seconds long.`);
+  } else if (input.durationSeconds > PRODUCT_VIDEO_MAX_DURATION_SECONDS) {
+    errors.push(`Video must be ${PRODUCT_VIDEO_MAX_DURATION_SECONDS} seconds or shorter.`);
+  }
   const extension = String(input.name ?? '').split('.').pop()?.toLowerCase();
   const commonExtension = extension === 'mov' || extension === 'mp4' || extension === 'm4v' || extension === 'quicktime';
   const videoMime = String(input.type ?? '').toLowerCase().startsWith('video/');

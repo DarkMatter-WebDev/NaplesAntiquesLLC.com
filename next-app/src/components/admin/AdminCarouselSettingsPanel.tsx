@@ -1,16 +1,16 @@
 'use client';
 
 import Image from 'next/image';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Carousel } from '../../../carousel/components/Carousel';
 import {
   fetchAllProducts,
   fetchRandomSampleItems,
   fetchSelectionEntries,
   fetchSettings,
-  groupByBackground,
   isCurrentUserAdmin,
   isMissingTable,
+  normalizeSlideshowBg,
   saveSelection,
   saveSettings,
   type CarouselItem,
@@ -27,9 +27,18 @@ import {
   MAX_VISIBLE_COUNT,
 } from '../../../carousel/lib/carouselConfig';
 
-// Each photo belongs to the White group or the Black group. The carousel
-// auto-arranges them into a white arc + a black arc for the sweeping fade.
+// Each photo belongs to the White group or the Black group — it paints that
+// card's own padding, so the frame around a photo matches the backdrop it was
+// shot against. (The background SWEEP these groups once drove was removed
+// 2026-08-09; the hero behind the cards is now one solid color per slideshow.)
 const ITEM_BG_OPTIONS = [
+  { label: 'White', value: '#ffffff' },
+  { label: 'Black', value: '#000000' },
+] as const;
+
+// Quick swatches for each slideshow's solid background; the color input beside
+// them accepts any hex.
+const SLIDESHOW_BG_SWATCHES = [
   { label: 'White', value: '#ffffff' },
   { label: 'Black', value: '#000000' },
 ] as const;
@@ -134,8 +143,15 @@ export default function AdminCarouselSettingsPanel() {
     alt: new Map(),
     third: new Map(),
   });
+  // Each slideshow's solid background color (2026-08-09, replacing the sweep).
+  const [lineupBgs, setLineupBgs] = useState<Record<CarouselLineup, string>>({
+    primary: DEFAULT_BG,
+    alt: DEFAULT_BG,
+    third: DEFAULT_BG,
+  });
   const selectedIds = selections[activeLineup];
   const itemBg = itemBgs[activeLineup];
+  const activeLineupBg = lineupBgs[activeLineup];
 
   const updateActiveIds = (updater: (current: string[]) => string[]) => {
     setSelections((current) => ({ ...current, [activeLineup]: updater(current[activeLineup]) }));
@@ -152,7 +168,6 @@ export default function AdminCarouselSettingsPanel() {
   const [visibleCountDesktop, setVisibleCountDesktop] = useState(String(DEFAULT_VISIBLE_COUNT));
   const [visibleCountMobile, setVisibleCountMobile] = useState('4');
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
 
   const showNotice = useCallback((text: string, ok = true) => {
     setNotice({ text, ok });
@@ -181,18 +196,17 @@ export default function AdminCarouselSettingsPanel() {
     [products, selectedIds],
   );
 
-  // Selected items carry their per-photo bgColor, grouped into a white arc and a
-  // black arc so the preview shows the same sweeping fade as the home hero.
+  // Selected items in the admin's curated order, each carrying its per-photo
+  // card-padding color. (No more arc grouping — that existed for the removed
+  // background sweep's two seams.)
   const previewItems = useMemo(
     () =>
-      groupByBackground(
-        selectedIds
-          .map((id) => {
-            const item = catalog.get(id);
-            return item ? { ...item, bgColor: itemBg.get(id) || DEFAULT_BG } : null;
-          })
-          .filter((item): item is CarouselItem & { bgColor: string } => item !== null),
-      ),
+      selectedIds
+        .map((id) => {
+          const item = catalog.get(id);
+          return item ? { ...item, bgColor: itemBg.get(id) || DEFAULT_BG } : null;
+        })
+        .filter((item): item is CarouselItem & { bgColor: string } => item !== null),
     [catalog, selectedIds, itemBg],
   );
 
@@ -248,10 +262,9 @@ export default function AdminCarouselSettingsPanel() {
     });
   };
 
-  // Paint the preview backdrop imperatively (the swept gradient), mirroring home.
-  const handlePreviewBackground = useCallback((css: string) => {
-    if (previewRef.current) previewRef.current.style.background = css;
-  }, []);
+  const setLineupBg = (value: string) => {
+    setLineupBgs((current) => ({ ...current, [activeLineup]: normalizeSlideshowBg(value, DEFAULT_BG) }));
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -331,6 +344,11 @@ export default function AdminCarouselSettingsPanel() {
         if (settingsResult.status === 'fulfilled') {
           setVisibleCountDesktop(String(settingsResult.value.visibleCountDesktop));
           setVisibleCountMobile(String(settingsResult.value.visibleCountMobile));
+          setLineupBgs({
+            primary: settingsResult.value.bgColor,
+            alt: settingsResult.value.bgColorAlt,
+            third: settingsResult.value.bgColorThird,
+          });
           // Selection modes are no longer surfaced: random draws seed the
           // editable lineup instead of acting as a live source, so every save
           // writes 'manual'. A legacy random value simply converts on next save.
@@ -413,19 +431,27 @@ export default function AdminCarouselSettingsPanel() {
       await saveLater('alt', 'Slideshow 2', 'carousel/sql/add-second-lineup.sql');
       await saveLater('third', 'Slideshow 3', 'carousel/sql/add-third-lineup.sql');
 
-      // bgColor is fixed to the default now that each photo sets its own.
       // Every lineup is saved as an explicit list. Random draws only seed that
       // list in the panel, so the stored mode is always manual — a live random
       // mode would re-draw server-side and discard the admin's arrangement.
-      await saveSettings({
+      const settingsResult = await saveSettings({
         showPrice: false,
-        bgColor: DEFAULT_BG,
+        bgColor: lineupBgs.primary,
+        bgColorAlt: lineupBgs.alt,
+        bgColorThird: lineupBgs.third,
         visibleCountDesktop: desktop,
         visibleCountMobile: mobile,
         selectionModePrimary: 'manual',
         selectionModeAlt: 'manual',
         selectionModeThird: 'manual',
       });
+      if (!settingsResult.bgColorsPersisted) {
+        warnings.push(
+          'Slideshow 2/3 background colors were NOT saved: their columns are missing. '
+            + 'Run carousel/sql/add-slideshow-bg-colors.sql in Supabase, then save again. '
+            + "(Slideshow 1's color did save, and the others will show it until then.)",
+        );
+      }
       const altSaveWarning = warnings.length > 0 ? warnings.join(' ') : null;
       setVisibleCountDesktop(String(desktop));
       setVisibleCountMobile(String(mobile));
@@ -796,10 +822,55 @@ export default function AdminCarouselSettingsPanel() {
                   {saving ? 'Saving...' : 'Save All Slideshows'}
                 </button>
               </div>
+
+              {/* One solid background per slideshow (replaced the per-photo
+                  sweep 2026-08-09). Follows the active lineup tab. */}
               <div
-                ref={previewRef}
+                className="mb-3 flex flex-wrap items-center gap-3 border px-3 py-2"
+                style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-lowest)' }}
+              >
+                <span className="text-sm font-semibold" style={{ color: 'var(--color-on-surface)' }}>
+                  {activeLineupLabel} background
+                </span>
+                {SLIDESHOW_BG_SWATCHES.map((option) => {
+                  const active = activeLineupBg === option.value;
+                  return (
+                    <button
+                      key={option.label}
+                      type="button"
+                      title={`${option.label} background`}
+                      aria-label={`${activeLineupLabel}: ${option.label.toLowerCase()} background`}
+                      aria-pressed={active}
+                      onClick={() => setLineupBg(option.value)}
+                      className="h-7 w-7 shrink-0"
+                      style={{
+                        background: option.value,
+                        border: active ? '2px solid var(--color-primary)' : '1px solid var(--color-outline-variant)',
+                        boxShadow: active ? '0 0 0 1px var(--color-primary)' : 'none',
+                      }}
+                    />
+                  );
+                })}
+                <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-on-surface)' }}>
+                  Custom
+                  <input
+                    type="color"
+                    // A color input only accepts #rrggbb; the state may hold
+                    // #rgb shorthand, which normalizes to a safe value here.
+                    value={/^#[0-9a-f]{6}$/i.test(activeLineupBg) ? activeLineupBg : '#ffffff'}
+                    onChange={(event) => setLineupBg(event.target.value)}
+                    aria-label={`${activeLineupLabel}: custom background color`}
+                    style={{ width: '2.6rem', height: '1.8rem', padding: 0, border: '1px solid var(--color-outline-variant)', background: 'none' }}
+                  />
+                </label>
+                <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
+                  {activeLineupBg}
+                </span>
+              </div>
+
+              <div
                 className="admin-carousel-preview overflow-hidden border"
-                style={{ borderColor: 'var(--color-outline-variant)', background: DEFAULT_BG }}
+                style={{ borderColor: 'var(--color-outline-variant)', background: activeLineupBg }}
               >
                 <Carousel
                   items={previewItems}
@@ -807,13 +878,12 @@ export default function AdminCarouselSettingsPanel() {
                   cardWidth={7}
                   perspective={20}
                   visibleCount={previewVisibleCount(visibleCountDesktop)}
-                  onBackgroundChange={handlePreviewBackground}
                 />
               </div>
               <p className="mt-2 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                Assign each photo to the <strong>White</strong> or <strong>Black</strong> group. They&apos;re
-                auto-arranged into a white arc and a black arc, and the hero background sweeps to match as each
-                group rotates to the front.
+                Each slideshow keeps this one solid background the whole time it is on screen. The
+                <strong> White</strong>/<strong>Black</strong> swatch on each photo above only paints that
+                photo&apos;s own card padding, so the frame matches the backdrop it was shot against.
               </p>
             </div>
           </div>

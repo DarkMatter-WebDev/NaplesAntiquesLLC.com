@@ -21,6 +21,8 @@ export type HomeCarouselPayload = HomeCarouselQueryResult & {
 export const HOME_CAROUSEL_FALLBACK_SETTINGS: CarouselSettings = {
   showPrice: false,
   bgColor: DEFAULT_BG,
+  bgColorAlt: DEFAULT_BG,
+  bgColorThird: DEFAULT_BG,
   visibleCountDesktop: DEFAULT_VISIBLE_COUNT,
   visibleCountMobile: 4,
   selectionModePrimary: 'manual',

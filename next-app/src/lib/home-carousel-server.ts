@@ -22,6 +22,7 @@ import {
   SETTINGS_TABLE,
   THIRD_SELECTION_TABLE,
   normalizeSelectionMode,
+  normalizeSlideshowBg,
   pickPrimaryImage,
   productHref,
   randomModeScope,
@@ -44,6 +45,8 @@ const C = PRODUCT_COLUMNS;
 type SettingsRow = {
   show_price?: boolean;
   bg_color?: string | null;
+  bg_color_alt?: string | null;
+  bg_color_third?: string | null;
   visible_count?: number | null;
   visible_count_mobile?: number | null;
   selection_mode?: string | null;
@@ -153,9 +156,18 @@ async function fetchSettings(): Promise<CarouselSettings> {
     supabase.from(SETTINGS_TABLE).select(columns).eq('id', 1).maybeSingle();
 
   let data: SettingsRow | null = null;
-  const withThird = await read(
-    'show_price, bg_color, visible_count, visible_count_mobile, selection_mode, selection_mode_alt, selection_mode_third',
+  // Newest tier first (per-slideshow backgrounds, add-slideshow-bg-colors.sql);
+  // each earlier tier drops the youngest columns. Kept in step with the same
+  // tiers in carousel/lib/carouselData.ts — the admin panel and the storefront
+  // must not disagree about the settings shape.
+  const withBgColors = await read(
+    'show_price, bg_color, bg_color_alt, bg_color_third, visible_count, visible_count_mobile, selection_mode, selection_mode_alt, selection_mode_third',
   );
+  const withThird = withBgColors.error
+    ? await read(
+        'show_price, bg_color, visible_count, visible_count_mobile, selection_mode, selection_mode_alt, selection_mode_third',
+      )
+    : withBgColors;
   const withModes = withThird.error
     ? await read('show_price, bg_color, visible_count, visible_count_mobile, selection_mode, selection_mode_alt')
     : withThird;
@@ -179,9 +191,14 @@ async function fetchSettings(): Promise<CarouselSettings> {
   }
 
   const desktop = normalizeVisibleCount(data?.visible_count);
+  const bgColor = normalizeSlideshowBg(data?.bg_color, DEFAULT_BG);
   return {
     showPrice: Boolean(data?.show_price),
-    bgColor: data?.bg_color || DEFAULT_BG,
+    bgColor,
+    // Later slideshows inherit Slideshow 1's color until their columns exist
+    // and hold a value, so pre-migration behavior is identical to today.
+    bgColorAlt: normalizeSlideshowBg(data?.bg_color_alt, bgColor),
+    bgColorThird: normalizeSlideshowBg(data?.bg_color_third, bgColor),
     visibleCountDesktop: desktop,
     visibleCountMobile: normalizeVisibleCount(data?.visible_count_mobile ?? data?.visible_count),
     selectionModePrimary: normalizeSelectionMode(data?.selection_mode),
@@ -285,7 +302,9 @@ const fetchCachedHomeCarousel = unstable_cache(
     ]);
     return { items, altItems, thirdItems, settings };
   },
-  ['home-carousel-payload-v4'],
+  // v5: CarouselSettings gained bgColorAlt/bgColorThird — a cached v4 payload
+  // would deserialize without them and paint undefined backgrounds.
+  ['home-carousel-payload-v5'],
   {
     tags: [HOME_CAROUSEL_CACHE_TAG],
     revalidate: 300,

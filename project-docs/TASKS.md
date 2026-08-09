@@ -1,185 +1,76 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-08-08**.
+> in `CHANGELOG.md`. Last reconciled: **2026-08-09**.
 
-## ✅ Pre-Deploy Sign-Off — 2026-08-06
+## Deploy-day checklist (reusable)
 
-Final pre-flight run against a **clean build from scratch** (`.next` deleted
-first), not an incremental one:
+Standing procedure for every deploy from this folder — the last run of it was
+2026-08-08, and the 2026-08-06 sign-off evidence behind it is in CHANGELOG.
 
-- `npx tsc --noEmit` clean · `npm run lint` clean · **720/720 tests** ·
-  `npm run build` exit 0, compiled successfully, **449/449 static pages**.
-  Artifact verified present: `BUILD_ID`, `server/`, `static/`,
-  `prerender-manifest.json`, 58 prerendered `.html`.
-- **Production-mode smoke** (`next start`): 38 route/locale combos all 200; the
-  only non-200 is `/es/` → 308 trailing-slash normalization, which is correct.
-- **Legacy host still single-hop**: `.co/shop` → 301 `.com/shop`, no `/en`.
-- **Webhook carve-out intact**: `POST .co/api/webhooks/resend` → **401**, not a
-  redirect.
-- **Email end-state**: zero `.co` senders in the compiled output, 19 files carry
-  the `.com` sender; DKIM/SPF/MX all resolve on the authoritative nameserver;
-  root still has **5 Google MX and exactly 1 `v=spf1`**, so Workspace mail is
-  untouched. Resend shows `naplesestatejewelry.com` **Verified**.
-- **Repo-ready**: no stray `.bak/.tmp/.log/.orig` artifacts anywhere outside
-  `node_modules`/`.next`; `.env`, `.next`, `node_modules` all gitignored;
-  `.env.local` `EMAIL_FROM` is the `.com` value.
+1. **Copy this folder to the repo folder and deploy.**
+2. **Watch the Netlify build log.** Local builds run on **Node v24**; Netlify
+   pins **NODE_VERSION = 20** and `package.json` declares no `engines`.
+   Production has built on 20 all along, so risk is low — but a local green
+   build is not literally proof of theirs.
+3. **If the deploy touches email, test send and OPEN THE INBOX.** DMARC is
+   `p=quarantine`, so a DKIM or alignment fault delivers to spam **without
+   erroring** — a green "sent" in Resend's log is not the check that matters.
+4. **Check for outstanding manual SQL** before deploying. (None is outstanding
+   as of 2026-08-09.)
 
-**Cleared to deploy.**
+Closed and moved to CHANGELOG — do not re-litigate:
 
-### Deploy-day checklist (owner-owned)
+- **2026-08-06 pre-deploy sign-off** (clean-build gate, 38-route production
+  smoke, legacy-host single-hop, webhook carve-out 401, email end-state, DNS
+  record counts). CHANGELOG 2026-08-06.
+- **2026-08-05 `EMAIL_FROM` Netlify blocker** — the marketing sender precedence
+  chain read the env var *before* the corrected code default; corrected in all
+  five deploy contexts and in `.env.local`. The durable rule (env precedence
+  can silently defeat a code-level fix) is in DECISIONS under the email
+  entries. CHANGELOG 2026-08-05.
 
-1. **Copy this folder to the repo folder and deploy.** Outbound email is failing
-   in production right now; this deploy is what fixes it.
-2. **Watch the Netlify build log.** Local builds ran on **Node v24**; Netlify
-   pins **NODE_VERSION = 20** and `package.json` declares no `engines`. Production
-   has built on 20 all along, so risk is low — but a local green build is not
-   literally proof of theirs.
-3. **Test send, then OPEN THE INBOX.** Submit the contact form and confirm the
-   mail arrives in the inbox, not spam. DMARC is `p=quarantine`, so a DKIM or
-   alignment fault delivers to spam **without erroring** — a green "sent" in
-   Resend's log is not the check that matters. This is the single most important
-   post-deploy step.
-4. ✅ **The manual SQL is done** — `add-third-lineup.sql` verified applied
-   2026-08-06. No database step is outstanding.
-
-Nothing else in this batch needs a manual step. `EMAIL_FROM` is already corrected
-in Netlify (all five deploy contexts) and in `.env.local`.
-
-## ✅ Deploy Blocker Found AND Cleared 2026-08-05 (production-build pass)
-
-- **`EMAIL_FROM` in Netlify would have silently defeated the marketing half of the
-  email migration — now fixed.** `lib/marketing.ts:173-176` reads
-  `MARKETING_NOREPLY_FROM || EMAIL_FROM || RESEND_FROM` **before** the corrected
-  code default. Netlify held `EMAIL_FROM=noreply@naplesestatejewelry.co` in **all
-  five deploy contexts** (Production, Deploy Previews, Branch deploys, Preview
-  Server & Agent Runners, Local development), so marketing campaigns would have
-  kept sending from the now-unverified `.co` domain and failing.
-
-  **Changed 2026-08-05** to `Naples Estate Jewelry <noreply@naplesestatejewelry.com>`
-  — matching the code default exactly, so behavior is identical whether the
-  variable is present or removed. Verified byte-exact before saving and confirmed
-  across all five contexts after.
-
-  The rest of the precedence chain was checked and is **unset**, so nothing else
-  can override: no `MARKETING_NOREPLY_FROM`, no `RESEND_FROM`, no
-  `MARKETING_CHRIS_FROM`. The only other marketing variable is
-  `MARKETING_TRANSPORT=direct`. `MARKETING_CHRIS_REPLY_TO` is also unset, so the
-  intentional `.co` Reply-To default applies.
-
-  Blast radius had been marketing only — every transactional path uses a
-  hardcoded literal that is already `.com`.
-
-  ✅ **`.env.local` updated to match** (2026-08-05), so local previews behave like
-  production. Edited surgically without reading the file into context: exactly one
-  of 83 lines changed, all 36 keys intact, no BOM introduced, CRLF preserved, and
-  the value confirmed through `@next/env` — Next's own loader — to parse as the
-  exact 55-character string with no stray quotes despite being unquoted with
-  spaces and angle brackets. The file is gitignored and never deploys.
-
-  Note: the Netlify change takes effect with the next deploy; it does not
-  retroactively fix the currently-deployed build, which still carries `.co`
-  hardcoded in its transactional senders.
-
-## Open Findings From The 2026-08-05 Pre-Deploy Audit
-
-A read-only customer-facing audit ran against the dev server plus live probes of
-production. Four of the five findings have since been fixed (see CHANGELOG:
-checkout labels + autocomplete, legacy-host redirect hops, homepage heading
-order). One remains open, and it is a design judgment call, not a defect.
-
-- ✅ **Legacy `.co` two-hop redirects — FIXED 2026-08-05** in `proxy.ts` (not
-  `netlify.toml`, where the audit first misattributed it). Root cause: the proxy
-  runs before the Netlify rule and prefixes `/en`. Now a single 301 per legacy
-  host. **Verify after deploy** with auto-redirect disabled: `.co/shop` should
-  give exactly one 301 to `.com/shop`, and `POST .co/api/webhooks/resend` must
-  still return 401 — a 301 there would break the live webhooks.
-- ✅ **Homepage heading skip — FIXED 2026-08-05.** The three intro cards are now
-  `h2`; outline is `H1,H2,H2,…` with zero level skips, visually unchanged.
-- ✅ **Spanish chip units — FIXED 2026-08-05.** `formatLengthChip` now takes
-  `isEs` and renders ` pulg` / `Talla`, matching the spec table. `formatWeight`
-  was intentionally NOT localized — the site uses period decimals in Spanish, so
-  `es-ES` would print `53,91g` beside a table reading `53.91 gramos`. No-wrap
-  behavior re-verified by measurement at 320px and 768px in both languages.
-- ✅ **Product-page small text — FIXED 2026-08-05.** 11px floor applied; 46 → 15
-  elements under 11px at desktop, and none of the remainder is product-page
-  content (footer headings and `text-xs` buttons at 10.4–10.88px). See CHANGELOG
-  for the three issues surfaced along the way, including a horizontal-scroll
-  regression this introduced and then corrected.
-
-- ✅ **Wishlist drawer viewport cap — FIXED 2026-08-05.** Was `w-full max-w-sm`
-  with no viewport cap, so below ~384px the always-mounted, off-canvas-parked
-  panel dragged the document into horizontal scroll. Now
-  `max-w-[min(24rem,100vw)]`, mirroring `CartDrawer`. Verified the cap engages
-  below the design width and disengages above it, with the drawer opened both
-  empty and holding an item at 320px.
-
-  ⚠️ **Invariant for any future off-canvas panel:** if it is always mounted and
-  hidden via `translateX(100%)` rather than unmounted, its width MUST be capped at
-  the viewport, or it extends the document by its own overflow — which then feeds
-  back into its own `w-full` measurement.
-
-**Verified healthy, no action needed** (recorded so it is not re-audited): server
-authoritative pricing with `$0`/negative rejection and a stale-spot guard
-(`checkout-pricing.ts`); no `cost_basis`/keys/JWTs in public HTML; rate limits on
-every public endpoint plus honeypots on all three public forms; production
-security headers live and CSP **enforcing**; `.co/api/*` carve-out intact
-(`POST .co/api/webhooks/resend` → **401, not 301**, so the Resend webhook works
-and rejects unsigned payloads); zero horizontal overflow at 320px; dark-theme
-contrast clean across the 9-of-20 products that use it; robots/sitemap contain
-zero `.co` URLs; 404s return a real 404.
-
-**Second pass, 2026-08-05, against the PRODUCTION build (`next start`), not dev** —
-this is the gap that earlier passes had left open. All clean: 46 route/locale
-combos with no 4xx/5xx (only correct 3xx: trailing-slash normalization and the
-auth gate); all 23 legacy redirects resolve to 200 destinations with no soft-404
-dead ends, and the deliberately-omitted `new-listing-04` still 404s; `/p/`
-shortlinks resolve and fall back to `/shop`; the new proxy host-redirect is
-single-hop on every legacy host and **does not loop** on the canonical host, `www`,
-`netlify.app`, or deploy-preview hosts; `/api/*` still never redirects; zero
-console errors on home/product/checkout; no `localhost` in any canonical/og:url/
-og:image across 14 pages; and no `noreply@…co` survives anywhere in the compiled
-output (19 files carry the `.com` sender; the 11 `chris@…co` hits are the
-intentional Reply-To).
-
-**CSP was pre-verified rather than left to post-deploy.** Every browser-loaded
-origin is already allowlisted: `supabase.co` + `www.paypal.com` on `/checkout`,
-`s3.tradingview.com` + `www.tradingview-widget.com` on `/gold-services`. The
-pending batch introduces no new external origin, so the enforcing CSP is safe —
-which resolves the "verify after deploy" note at `netlify.toml:168`.
+## Standing Local-Environment Warnings
 
 ⚠️ **Local checkout loads a LIVE PayPal client ID** from `.env.local`
 (`AamwcjQe…`). Do not click PayPal buttons on localhost — it can create real
-orders.
+orders. This matters most when testing on a phone over LAN, where checkout is
+two taps from any product page.
 
-⚠️ **Build-verification caveat:** local Node is **v24.16.0** while Netlify pins
-**NODE_VERSION = "20"** and `package.json` declares no `engines`. Local green
-builds are therefore strong but not identical to the production build.
+⚠️ **Local dev shares PRODUCTION Supabase**, and the Deep Field sync fires for
+real from dev (no `DEEPFIELD_SYNC_DRY_RUN` set). Any admin save from a dev
+session is a real product change.
 
-## 🔴 DEPLOY BLOCKS A LIVE SECURITY FIX
+⚠️ **Node here is v24; Netlify pins NODE_VERSION 20** with no `engines` in
+`package.json`. Local green builds are strong evidence, not proof of theirs.
 
-**Any hidden product is currently readable on production by appending
-`?returnTo=/admin` to its URL.** No session required. Reproduced on all three
-archived products; `?returnTo=/account` works identically, and `draft` /
-`pending_payment` items are equally exposed. Found by the Deep Field team in a
-port of this code.
+## Verified Healthy — Do Not Re-Audit
 
-Fixed in the working folder and verified anonymously — bare, `?returnTo=/admin`
-and `?returnTo=/account` all 404 for hidden products, visible products
-unaffected — but **the fix is undeployed, so the hole is live.**
+Recorded so these are not re-checked every session. All confirmed 2026-08-05
+against the **production build** (`next start`), and the deploy that followed
+was verified on 2026-08-06/08:
 
-This is the highest-priority item in the current batch. Full detail in
-CHANGELOG; the durable rule is in DECISIONS under *"A query parameter is never
-an authorization signal"*.
+- Server-authoritative checkout pricing with `$0`/negative rejection and a
+  stale-spot guard; no `cost_basis`/keys/JWTs in public HTML; rate limits on
+  every public endpoint plus honeypots on all three public forms; security
+  headers live with CSP **enforcing** (every browser-loaded origin allowlisted,
+  which resolved the old "verify after deploy" note at `netlify.toml:168`).
+- 46 route/locale combos with no 4xx/5xx; all 23 legacy redirects resolve to
+  200 with no soft-404 dead ends; `/p/` shortlinks resolve; the proxy host
+  redirect is single-hop on every legacy host and does not loop; `/api/*` never
+  redirects; `.co/api/webhooks/resend` returns **401, not 301** (a 301 there
+  would break the live webhooks); zero horizontal overflow at 320px; robots and
+  sitemap contain zero `.co` URLs; 404s return a real 404.
+- Five customer-facing findings from that audit were all fixed and shipped
+  (legacy two-hop redirects, homepage heading skip, Spanish chip units,
+  product-page 11px floor, wishlist drawer viewport cap). Detail in CHANGELOG
+  2026-08-05; the drawer's durable rule is in DECISIONS under *"Always-mounted
+  off-canvas panels must cap their width at the viewport"*.
+- **`?returnTo=` hidden-product disclosure** — shipped alone 2026-08-08 and
+  verified against production (28/28 anonymous probes 404). Durable rule in
+  DECISIONS under *"A query parameter is never an authorization signal"*.
 
-- ◻️ **After deploying, re-verify against production:**
-  `curl -o /dev/null -w "%{http_code}" "https://naplesestatejewelry.com/shop/test-item-111-131?returnTo=/admin"`
-  must return **404**, not 200.
-- ◻️ **Consider shipping this alone.** The current batch also carries marketplace
-  fixes, an integration change, and UI work; a security fix is easier to attribute
-  and roll back on its own.
-
-## 🔴 Contact Address Moved To .com — TWO THINGS TO VERIFY
+## ✅ Contact Address Moved To .com — CLOSED
 
 The public contact mailbox changed `info@naplesestatejewelry.co` →
 `info@naplesestatejewelry.com` sitewide (owner, 2026-08-08), reversing the
@@ -187,170 +78,152 @@ mailbox half of the 2026-08-01 split. Six occurrences in five files: footer,
 account dashboard, root JSON-LD, per-city JSON-LD, and the order-notification
 default.
 
-- 🔴 **OWNER: confirm `info@naplesestatejewelry.com` actually receives mail
-  BEFORE this deploys.** The `.com` root MX points at Google Workspace (5
-  records verified live), so the domain is accepted — but the `info@`
-  mailbox/alias must exist on `.com` in Workspace or every customer inquiry
-  bounces. Send a test message to it from an outside account and confirm it
-  lands. This cannot be verified from the code side.
+- ✅ **`info@naplesestatejewelry.com` RECEIVES MAIL — owner-confirmed
+  2026-08-09.** This was the last open verification on the email surface, and it
+  is not verifiable from the code side, so the owner's confirmation is the
+  evidence. Do not re-open or re-audit it.
 
-  Blast radius if it does not exist: the footer and account-page addresses are
-  the primary "contact us" path, and **new-order notifications go to this same
-  address** (see the bug below), so a missing mailbox loses both customer
-  inquiries and order alerts, silently.
+  Worth keeping visible because it does not stop being true: **`info@…com` is
+  the single point of failure for the entire email surface** — footer inquiries,
+  account-page inquiries, new-order notifications, marketing campaign From *and*
+  Reply-To, campaign bounce handling, and both JSON-LD blocks all route through
+  that one mailbox. If it is ever deleted or renamed in Google Workspace, all of
+  them break silently and at once.
 
-- ✅ **BUG FIXED 2026-08-08: the order-notification override never worked.**
-  `order-owner-notification.ts` read `ORDER_NOTIFICATION_EMAIL` (set nowhere)
-  while every environment configured `ORDER_NOTIFY_EMAIL` (read by nothing), so
-  the owner's chosen address was silently ignored and the hardcoded default was
-  always the live recipient. Invisible at runtime — a valid default is
-  indistinguishable from a working override.
+- ⚠️ **OWNER: delete `ORDER_NOTIFY_EMAIL` from Netlify** (all deploy contexts)
+  if it is set there. Local is already done. Background: the code used to read
+  `ORDER_NOTIFICATION_EMAIL` (set nowhere) while every environment configured
+  `ORDER_NOTIFY_EMAIL` (read by nothing), so the override silently never worked.
+  `ownerNotificationRecipient()` now accepts **both** names — do not narrow it
+  back to one — which means that previously-dead Netlify variable would become
+  live on the next deploy and redirect order alerts to a personal `@aol.com`
+  inbox. Leave it set only if you genuinely want that. Detail: CHANGELOG
+  2026-08-08.
 
-  `ownerNotificationRecipient()` now accepts **both** names, so the mismatch
-  cannot recur, and warns if both are set and disagree. 8 regression tests.
-  **Do not narrow it back to one name.**
-
-  `ORDER_NOTIFY_EMAIL` was removed from `.env.local` deliberately: once the code
-  started reading it, that previously-dead variable would have become live and
-  silently redirected order alerts to a personal `@aol.com` inbox — the opposite
-  of the `info@` consolidation. Removing it keeps the destination unchanged.
-
-  ⚠️ **OWNER: delete `ORDER_NOTIFY_EMAIL` from Netlify too** (all deploy
-  contexts) if it is set there. Local is done; Netlify was not reachable from
-  here. Leave it set only if you deliberately want order alerts at that personal
-  address instead of `info@naplesestatejewelry.com` — it now genuinely works
-  either way, which was not true before.
-
-- ✅ **Marketing Reply-To also moved (2026-08-08):**
-  `chris@naplesestatejewelry.co` → `info@naplesestatejewelry.com` in
-  `marketing.ts:181`, `MarketingComposer.tsx:201`,
-  `MarketingSettingsPanel.tsx:110`. Verified live before changing:
-  `MARKETING_CHRIS_REPLY_TO` unset and `marketing_settings` has no
-  sender-profile columns, so the hardcoded value was the real Reply-To.
-  **No `@naplesestatejewelry.co` address remains in shipped code** — zero in a
-  clean production build.
-
-  ⚠️ This raises the stakes on the mailbox check above: `info@…com` is now the
-  destination for footer inquiries, account-page inquiries, order notifications,
-  AND marketing campaign replies. One missing mailbox breaks all four.
-
-- ✅ **Marketing FROM also moved (2026-08-08):** campaigns now send from
-  `Chris at Naples Estate Jewelry <info@naplesestatejewelry.com>`
-  (`marketing.ts:183`, `MarketingComposer.tsx:198`,
-  `MarketingSettingsPanel.tsx:107`). Display name deliberately stays personal.
-  Safe because the address is on Resend's verified `.com` sending domain.
-  **No `chris@` address remains in shipped code** — zero in a clean build.
-
-  ⚠️ **`info@…com` is now BOTH the From and the Reply-To for campaigns**, on top
-  of footer, account page, order notifications, and JSON-LD. Bounce handling for
-  campaigns now lands there too. The mailbox check above is the single point of
-  failure for the entire email surface.
-
-## ✅ Fixed From The 2026-08-08 Pre-Deploy Audit
+- ✅ Closed 2026-08-08, detail in CHANGELOG: marketing Reply-To and From both
+  moved to `info@…com`; zero `@naplesestatejewelry.co` and zero `chris@`
+  addresses remain in a clean production build.
 
 - ✅ **Owner's personal `@aol.com` address no longer ships in the public client
-  bundle — FIXED 2026-08-08.** `ADMIN_EMAIL` was imported by a client-side module
-  (`carouselData.ts`'s `isCurrentUserAdmin()`), so the literal address compiled
-  into the browser bundle where it was readable by anyone viewing source.
-  `isCurrentUserAdmin()` now reads `profiles.is_admin`; the constant is deleted.
-  Verified: **0 occurrences in `.next` at all**, and a value-based scan of all 71
-  client chunks against all 36 server-side keys reports `ORDER_NOTIFY_EMAIL`
-  clean. (`SITE_URL` and `EMAIL_FROM` still match by value and are public by
-  definition — the site's own domain and its `noreply@` sender.)
-
-  ⚠️ **OWNER: confirm the carousel panel still loads.** Sign in and open
-  **Admin → Settings → Store Carousel Hero**. It should render the curation
-  table, not "not authorized". This is the one behavior I could not verify —
-  it needs an authenticated admin session and I have no credentials.
-
-  If it shows "not authorized", the account's `profiles.is_admin` is not `true`
-  — check that row rather than reverting; the server page gate uses the same
-  signal, so you would not have reached the page at all.
-
-  Untouched on purpose: `carousel/sql/setup.sql:24` still hard-codes the email in
-  `is_carousel_admin()`. That is database-side, never reaches a browser, and
-  remains the real enforcement for every write.
+  bundle** (2026-08-08). `ADMIN_EMAIL` was imported by a client-side module, so
+  it compiled into the browser bundle; `isCurrentUserAdmin()` now reads
+  `profiles.is_admin`. Verified 0 occurrences in `.next`. **Owner confirmed the
+  carousel admin panel still loads and saves — 2026-08-09**, which closes the
+  one behavior that needed an authenticated session. Note
+  `carousel/sql/setup.sql:24` still hard-codes the email in
+  `is_carousel_admin()` on purpose: database-side, never reaches a browser, and
+  it remains the real enforcement for every write.
 
 ## Deep Field Gallery Sync
 
 **LIVE.** Bulk import complete against production, live hooks armed and proven.
 See `features/deepfield-sync.md`.
 
-- ✅ **Production import done and reconciled (2026-08-08).** 128 products / 974
-  images, 67 requests, all HTTP 200, 0 failed. 128 sent, 128 acknowledged, 0
-  missing, 0 unexpected, 0 id remapping.
-- ✅ **Netlify env vars set on the NEJ project** — `DEEPFIELD_SYNC_URL` and
-  `DEEPFIELD_SYNC_TOKEN`, Builds/Functions/Runtime, all 5 deploy contexts. No
-  `DEEPFIELD_SYNC_DRY_RUN` exists, so nothing is silently no-op'd.
-- ✅ **Live hook proven end to end.** A product saved in admin logs
-  `[deepfield] synced 1 product(s)` and the receiver returns 200.
-- ✅ **`.env.local` points at PRODUCTION Deep Field** (not the local receiver),
-  so dev writes propagate exactly like production. Deliberate — dev shares
-  production Supabase, so a dev save is a real product change and must not
-  silently skip the partner.
+✅ Closed and moved to CHANGELOG 2026-08-08 / `features/deepfield-sync.md`:
+the 128-product / 974-image production import (reconciled exactly, 0 failed),
+Netlify env vars across all 5 contexts, the live hook proven end to end, the
+archived-product push, `image_count` in the feed, and Deep Field's own
+confirmations (zero duplicate storage objects, live pricing, 128 rows matching).
 
-  ⚠️ **Consequence: no environment writes to a sandbox.** Every save from
-  anywhere is real. Set `DEEPFIELD_SYNC_DRY_RUN=true` in `.env.local` if a safe
-  one is ever needed — it exercises the whole path and tells the receiver to
-  validate and discard.
+Still true and worth keeping visible:
 
-- 🔴 **UNDEPLOYED and waiting on the next deploy:**
-  - the **archived-product push** (`status: 'archived'`), so archives currently
-    reach Deep Field only by vanishing from the reconciliation feed;
-  - **`image_count`** in the reconciliation feed — Deep Field's reconciler is
-    built, forward-compatible, and reports `imageCountComparable: false` until
-    it ships;
-  - the **`returnTo` visibility fix** (see the security block at the top).
+- ⚠️ **No environment writes to a sandbox.** `.env.local` points at PRODUCTION
+  Deep Field deliberately — dev shares production Supabase, so a dev save is a
+  real product change and must not silently skip the partner. Set
+  `DEEPFIELD_SYNC_DRY_RUN=true` locally if a safe run is ever needed.
+- ⚠️ **Do not normalize the reconciliation feed's timestamp.** The raw
+  microsecond `+00:00` form is emitted deliberately (see the pinning comment at
+  the emitting line); under a rounding runtime roughly half the catalog would
+  compare as permanently stale.
 - ◻️ **Deep Field side, not yet running in production:** their hourly
   reconciliation cron is written and tested but undeployed; they poll manually.
   Until it runs, hard deletes and dropped pushes depend on someone remembering.
   Their first manual run found real drift — `test-item-111-131` displaying as
-  available after being archived here — which is exactly the class the push
-  cannot cover.
-- ✅ **Deep Field confirmed on their side:** zero duplicate storage objects
-  (content-addressed paths with `upsert: true`, so the 2–3× re-sends were
-  provably idempotent); pricing computed live from `pricing_multiplier` with the
-  sold lock holding; 128 rows matching; `jewelry_type` free text and hex
-  `image_padding` both accepted; the 9-image spoon complete.
-- ◻️ **`deleted_at` tombstone: withdrawn, do not build.** Deep Field checked
-  whether the archived-vs-hard-deleted distinction drives different behavior on
-  their side; it does not — absence produces "hide" either way. Reconciliation
-  by absence already covers both.
-- ◻️ **Re-measure the image-copy budget after Deep Field deploys.** Their
-  concurrency change (sequential → 6 parallel) is not live yet, so the 19-image
-  timings taken so far (cold 21.1s / warm avg 11.6s / best 9.1s) measured the
-  OLD sequential path. The 18-image budget stays regardless unless a
-  re-measurement plus the timeout asymmetry justifies otherwise.
+  available after being archived here — exactly the class the push cannot cover.
+- ◻️ **`deleted_at` tombstone: withdrawn, do not build.** Absence already
+  produces "hide" on their side, so reconciliation by absence covers both
+  archived and hard-deleted.
+- ◻️ **Raise the image budget 30 → ~50 only after Deep Field supplies the
+  timeout line** from their dashboard. Not urgent. (The 18 → 30 retune is in
+  the undeployed batch.)
+- ◻️ **Pin the production batching defaults.** `IMAGE_BUDGET_PER_REQUEST` and
+  `MAX_PRODUCTS_PER_REQUEST` have **no test asserting their values**. The
+  batching tests pass budgets in as explicit arguments — correct, because it
+  keeps them from silently re-baselining on a retune — but it means changing 30
+  to 300 breaks nothing. This is the *policy test* half of the mechanism/policy
+  split described in DECISIONS, and it is the same "unenforced claim" class Deep
+  Field found in their `{n}/20 photos` label. Fix is three lines in
+  `src/lib/__tests__/deepfield-batching.test.ts`:
+
+  ```ts
+  it('pins the gateway-safe production budget', () => {
+    expect(IMAGE_BUDGET_PER_REQUEST).toBe(30);
+    expect(MAX_PRODUCTS_PER_REQUEST).toBe(3);
+  });
+  ```
+
+  Found 2026-08-09 by re-running the constant sweep; deliberately left undone
+  rather than expanded into a session that was closing.
 
 ## Next Deployment And Production Smoke
 
-- ✅ **`add-third-lineup.sql` HAS BEEN RUN — verified 2026-08-06** by probing the
-  live database (project `evzluixourmsefwdsieu`). No manual SQL is outstanding.
-  - `carousel_selection_third` returns **200** for anon SELECT (was absent).
-  - `carousel_settings.selection_mode_third` returns **200** and holds its
-    `'manual'` default (previously **400 — column missing**).
-  - RLS landed correctly: anon INSERT is refused **401 / `42501` insufficient
-    privilege**, i.e. the write GRANT was properly withheld from `anon`. Probed
-    with a non-existent `product_id` so the FK would have rejected the row even
-    had RLS been permissive — the check could not create data.
-  - PostgREST schema cache reloaded (the 200s prove it).
-- ✅ `add-random-lineup-modes.sql` **has been run** — verified 2026-08-04 by
-  probing the live database: `selection_mode` and `selection_mode_alt` both
-  return 200, `selection_mode_third` returns 400 (missing). An earlier note
-  here claiming it was still pending was stale.
-- ✅ **That mode flip has already happened — verified 2026-08-07.** All three
-  modes now read `manual` (`selection_mode`, `selection_mode_alt`,
-  `selection_mode_third`), so the storefront is drawing the curated 13/10/10
-  lineups, not random. The earlier warning here — that the DB held
-  `random_gold_jewelry` / `random_silver_jewelry` and the next Save All
-  Slideshows would switch them — is spent and has been removed so it does not
-  read as still pending. Use the fill buttons to reseed if the random look is
-  ever wanted again.
-- ✅ `add-second-lineup.sql` was run by the owner (verified 2026-08-04:
-  `carousel_selection_alt` exists and holds a 10-item curated Slideshow 2
-  lineup that renders on the scroll reveal).
-- **Deploy the locally verified batch.** Current local gate: 720/720 tests,
-  `npx tsc --noEmit`, full lint, and a 449-page build.
+- ✅ **NO MANUAL SQL IS OUTSTANDING.** Every carousel migration has been run and
+  verified against the live database (project `evzluixourmsefwdsieu`):
+  `add-second-lineup.sql` and `add-random-lineup-modes.sql` (2026-08-04),
+  `add-third-lineup.sql` (2026-08-06, RLS confirmed — anon INSERT refused
+  `42501`), and `add-slideshow-bg-colors.sql` (2026-08-09, owner-run, colors
+  save and render). All three lineup modes read `manual`, so the storefront
+  draws the curated lineups rather than random draws.
+- **Deploy the batch. The full gate has passed on the COMPLETE batch** —
+  clean from-scratch `npm run build` exit 0 / 449 pages, 846/846 tests across 87
+  files, tsc and lint clean, run 2026-08-09 with the dev server stopped and
+  `.next` deleted. Exact figures, the compiled-output spot check, and the email
+  invariant re-check are in `CURRENT_STATUS.md`. Nothing needs re-running before
+  you copy and deploy.
+- **New surfaces to smoke after the NEXT deploy (2026-08-09 batch), on a real
+  phone where marked 📱:**
+  - Shop cards 📱: bottom ADD button present on every card; corner cart icon
+    (mobile) and header/drawer/checkout icons all render as a CART, not a bag;
+    swipe a card photo left/right (dots advance, vertical swipe still scrolls,
+    tap still opens the product, a swipe does NOT open it); swipe a second
+    card and confirm the first snaps back to its cover; dots float without a
+    pill on touch and stay legible on a white-backdrop piece; arrows absent on
+    touch, present on desktop aligned with the brand-flag baseline.
+  - Hero 📱: flick through the hero — each flick lands on exactly the next
+    slideshow, never past it (the momentum override is the one thing synthetic
+    touch could not prove); ~1s smooth settle; scrolling out at either end is
+    free; desktop wheel behavior unchanged.
+  - Hero backgrounds: solid per slideshow, no gradient sweep anywhere; set
+    Slideshow 1 black in Admin (its lineup is black-backdrop) and confirm the
+    overlay text flips light and the crossing shows a clean color change at
+    the midpoint; confirm the admin panel's per-tab background control saves
+    without the missing-column warning.
+  - Shop card date 📱: confirm the `Ca. YYYY` label is back at the left of the
+    price row on a phone, and that it never touches the price or the width
+    chip — check a card with a long price and one with no width chip.
+  - Hero CTAs 📱: on a real phone confirm Buy/Sell sit side by side with Trade
+    centred beneath them — never three stacked rows — and that Trade opens
+    `/trade-in` (it used to go to `/contact`). Check Spanish too, where
+    `Intercambiar` is the long label.
+  - Reviews band 📱: on a real phone confirm the client reviews sit TWO across,
+    never one, and that the quote text is comfortably readable at that size —
+    this is the judgement call the measurements cannot make for you. The long
+    reviews now clamp to 8 lines, so all four cards should be the same height.
+    Confirm Spanish too, and the band on a product page including a
+    dark-backdrop one, since it renders there from the same component.
+  - 🔴 **Reviews → Google link: click one card on the deployed site.** Every
+    card links to `https://share.google/KAE0mjQwhKx9EqEZ1` (owner-supplied).
+    It is an opaque Google redirect and google.com is unreachable from the
+    development environment, so **nothing has verified where it actually
+    lands** — confirm it opens the Naples Estate Jewelry profile with the
+    reviews visible. One constant to change if not:
+    `GOOGLE_REVIEWS_URL` in `next-app/src/lib/testimonials.ts`. While there,
+    confirm the whole card is clickable (not just the "Read on Google" line)
+    on both a phone and a desktop.
+  - Hero perf spot-checks: network tab shows NO raw-original image fetches
+    beside the `/_next/image` ones (formerly a full duplicate set), hero
+    images at `q=82`, and the loading spinner disappears from the DOM after
+    the fade rather than spinning invisibly.
 - After deployment, verify these focused surfaces against production:
   - `/admin/social-queues`: seven Eastern choices, responsive row actions,
     individual and selected-row background **Post now**, change/remove
@@ -399,9 +272,10 @@ See `features/deepfield-sync.md`.
     must either ALL sit beside the price or ALL sit below it, never a mix. Below
     361px the strip should show one card per row at full title/pill size.
   - Homepage carousel backdrops: confirm black-backdrop photos render as solid
-    rounded black cards with no white bars or square photo corners, and that
-    the hero's swept background now goes dark as those pieces come round
-    (expected — the sweep follows the same per-photo colour).
+    rounded black cards with no white bars or square photo corners. (The
+    swept-background half of this check is OBSOLETE as of 2026-08-09 — the
+    hero background is now one solid color per slideshow; see the new smoke
+    items above.)
   - Product gallery/lightbox: no clipped thumbnail border or wrap stutter.
     Confirm the hover/touch magnifier is gone everywhere, that tapping a
     prev/next arrow on the main photo changes the image WITHOUT opening the
@@ -451,9 +325,10 @@ See `features/deepfield-sync.md`.
     that clicking its card lands on the product page showing Sold. Also
     confirm the All/Available/Sold checkboxes scope both the picker and the
     random fill buttons.
-  - **Not verified locally, needs a look:** the hero's matched pane speeds
-    (`PANE_A_TRAVEL` at 100). Scroll the homepage and confirm A and B move
-    together through the crossing with no gap opening between them.
+  - Hero pane seam: `PANE_A_TRAVEL` is **85**, so the arriving pane overlaps
+    the departing one by ~15% of a frame. Scroll the homepage and confirm the
+    join reads as one continuous move with no band of empty backdrop between
+    the two slideshows.
   - Header height token: page content now starts exactly at the header's bottom
     edge (measured 72/72 desktop, 56/56 mobile) instead of 9px behind it. On a
     real device check a few converted pages — `/`, `/about`, `/faq`,
@@ -489,8 +364,10 @@ See `features/deepfield-sync.md`.
 
 ## Etsy And eBay
 
-- **🔴 OWNER ACTION — apply the new shipping policies to the 123 flagged eBay
-  listings, in batches, from the deployed admin.** The 2026-08-01/02 tier
+- **🔴 OWNER ACTION — apply the new shipping policies to the flagged eBay
+  listings, in batches, from the deployed admin.** (The count once read 123;
+  the true figure is **86 writable** — see the sold-hidden fix below.) The
+  2026-08-01/02 tier
   policies (`252701344026`–`252701350026`) are part of the eBay content hash, so
   every listing created before them is correctly flagged `out_of_date`; the
   daily price push can never clear it because it only sends price/quantity
@@ -513,28 +390,15 @@ See `features/deepfield-sync.md`.
 - Two available products have no `ebay_listings` row at all (90 available
   products, 88 linked). Confirm that is intentional (never listed) rather than a
   dropped link.
-- ✅ **Daily price pushes diagnosed and fixed 2026-08-08** (full write-up in
-  CHANGELOG). Summary of what changed and what is now true:
-  - The Netlify schedules were never broken — Etsy 7:15 a.m. EDT, eBay 7:45 a.m.,
-    both deployed, both cron secrets present. They had simply **never run**: zero
-    `scheduled_price_push` rows ever, in a log that records even skips.
-  - `ebay_connection.price_push_enabled` was `false` (column default). Owner
-    enabled it via the admin toggle.
-  - **Sold products were permanent price-push candidates on eBay** — their
-    listing stays `out_of_date` while the eBay offer is already withdrawn, so
-    every push was a guaranteed HTTP 400. Candidate pool now **124 → 88**.
-  - `error_count` never incremented (the failure path passed a no-op `{}`
-    patch), so nothing could back off — 33 broken listings produced 139 error
-    rows in one run. Now increments, resets on success, ceiling of 3.
-  - Failure logs discarded `err.detail`, which is why 140 rows all read
-    `eBay API error (HTTP 400).` with no cause. Now persisted for both providers.
-  - Etsy had the same three defects but is clean in practice because auto-delist
-    moves sold listings to `delisted`, outside the selection. Fixed anyway — that
-    protection is a side effect of another code path, not its own planner.
-- 🔴 **DEPLOY BEFORE THE NEXT 7:15/7:45 a.m. EDT RUN.** These fixes are in the
-  undeployed batch. Production still has the old code, so eBay's first scheduled
-  run will repeat the ~33 guaranteed failures. Etsy is unaffected either way.
-- ◻️ **After the first real scheduled run, confirm both sync logs** — expect an
+- ✅ **Daily price pushes diagnosed, fixed, and SHIPPED 2026-08-08.** Four
+  defects: the schedules had never actually run (zero `scheduled_price_push`
+  rows ever), `price_push_enabled` was `false` (owner enabled it), sold products
+  were permanent eBay candidates producing guaranteed HTTP 400s (pool 124 → 88),
+  `error_count` never incremented so nothing could back off, and `err.detail`
+  was discarded so every failure logged an unusable message. Etsy carried the
+  same defects but is clean in practice via auto-delist. Full write-up in
+  CHANGELOG 2026-08-08.
+- ◻️ **After the first real scheduled run, confirm both sync logs** — expect a
   `scheduled_price_push` row per provider (the first ever) and, for eBay,
   roughly 88 eligible with 0 failures.
 - ◻️ **`antique-georgian-…-82` needs manual repair on eBay.** Held back by
@@ -624,7 +488,9 @@ See `features/deepfield-sync.md`.
   Google badges them a Local Guide. The grid is pinned to 1/2/4 columns and so
   assumes an EVEN count; a fifth review will need that ladder revisited.
   Currently four (Cristian Reatiga added 2026-08-05). Per-product reviews
-  remain a possible later step.
+  remain a possible later step. **Column ladder changed 2026-08-09: the grid is
+  now 2 / 4, never 1** (owner: minimum 2-up) — the even-count assumption above
+  is unchanged. See DECISIONS, *"The reviews band is never one column"*.
 - **Spanish review translations want a native-speaker check**, including the
   newest (`Cristian Reatiga`). The English is the customer's own wording; the
   Spanish is ours.
@@ -663,49 +529,29 @@ See `features/deepfield-sync.md`.
 - Have owner/counsel review Privacy, Terms, Returns/Refunds, Shipping,
   Accessibility, and cookie disclosures.
 - Confirm Resend sending-domain SPF/DKIM and intended From identities.
-- **🟡 Resend `.co` → `.com` migration — DONE in Resend, GoDaddy, and code.
-  BLOCKED ON DEPLOY, and email is DOWN until then.**
+- ✅ **Resend `.co` → `.com` migration — COMPLETE and SHIPPED 2026-08-08.**
+  Domain swapped and Verified in Resend, DNS at GoDaddy confirmed against the
+  authoritative nameserver, every sender moved, deployed. Detail in CHANGELOG
+  2026-08-05/08.
 
-  Completed 2026-08-05: `.co` deleted (owner), `.com` added and **Verified**
-  (id `bd08d8e7-ca8d-47a5-b28e-d8d608cd772c`, us-east-1), three DNS records
-  added at GoDaddy and confirmed against the authoritative nameserver, and every
-  hardcoded From address moved to `.com`. Full detail in CHANGELOG 2026-08-05.
-  Verified: `npx tsc --noEmit`, `npm run lint`, `npm run build` all clean.
+  ⛔ **Email is now FULLY `.com` — senders AND mailboxes.** An earlier version of
+  this section said contact/display addresses "stay on `.co`"; that was reversed
+  on 2026-08-08 and is **wrong now**. Zero `@naplesestatejewelry.co` addresses
+  remain in shipped code, verified in a clean production build. **Never restore
+  a `.co` address.** (Separately and permanently: never touch the `.co` MX
+  records — that domain still carries live mailboxes.)
 
-  **Remaining, in order:**
+  Remaining, both optional and owner's call:
 
-  1. **DEPLOY.** Production still runs the old code, which sends from `.co` — no
-     longer a verified domain, so **all outbound email is failing right now**.
-     This is the whole outage. Checkout still works (`order-finalize.ts`
-     catches; `order-owner-notification.ts` never throws); missed receipts
-     re-send from Admin → Orders.
-  2. **Check Netlify env for stale `.co` sender overrides.** `lib/marketing.ts`
-     reads `MARKETING_NOREPLY_FROM`, `EMAIL_FROM`, `RESEND_FROM`, and
-     `MARKETING_CHRIS_FROM` *before* the code default. A `.co` value in any of
-     them still breaks marketing sending after deploy. Netlify is authoritative;
-     `.env.local` is stale and cannot answer this.
-  3. **Test send + inbox check — mandatory, not optional.** DMARC is at
-     `p=quarantine`, so a DKIM/alignment problem lands mail in spam *silently*
-     rather than erroring. Submit the contact form and confirm the mail reaches
-     the inbox, not the spam folder. Owner-owned (live testing is post-deploy).
-
-  **Deliberately not done, owner's call:**
-
-  - **Tracking metrics not re-enabled.** `.co` had click/open tracking on, but
-    Resend now implements it as a `links.` tracking subdomain that redirects
-    every link in every email — receipts included — through it, plus another DNS
-    record. That is a behavior change beyond a domain swap.
-  - **Resend webhook still registered on `.co`** and still Enabled; it survived
-    the domain deletion because webhooks are account-level. It keeps working:
-    `netlify.toml:78-81` serves `.co/api/*` as a **200 rewrite, not a redirect**.
-    Re-registering on `.com` is optional cleanup.
-  - **Contact/display addresses stay on `.co`** (footer mailto, account
-    dashboard, schema.org `email`), as does **Reply-To** for marketing
-    (`chris@naplesestatejewelry.co`) — live mailboxes, and not senders, so the
-    verified-domain constraint does not apply to them.
-
-  Supersedes the 2026-08-01 DECISIONS entry that email stays on `.co`: the
-  *sending* domain is now `.com`; the *mailboxes* are unchanged.
+  - **Click/open tracking not re-enabled.** Resend now implements it as a
+    `links.` tracking subdomain that redirects every link in every email —
+    receipts included — plus another DNS record. That is a behavior change
+    beyond a domain swap, not an oversight.
+  - **Resend webhook is still registered on `.co`** and still Enabled (webhooks
+    are account-level, so it survived the domain deletion). It keeps working
+    because `netlify.toml` serves `.co/api/*` as a **200 rewrite, not a
+    redirect** — do not let that become a 301. Re-registering on `.com` is
+    optional cleanup.
 - Complete `CLIENTS.md` unknowns: Netlify site ID, service/dashboard owners,
   password-manager references, maintenance scope, billing status, and production
   Supabase Auth redirects.
@@ -741,59 +587,23 @@ See `features/deepfield-sync.md`.
 
 ## Recently Completed
 
-- **2026-08-04:** each hero slideshow gained a Manual / Random gold / Random
-  silver item-source radio in Admin Settings. Random modes draw
-  `RANDOM_LINEUP_SIZE` (10) available pieces of that `products.category`
-  server-side on each cache rebuild; curated lineups are preserved beneath
-  the toggle. Pending: the manual add-random-lineup-modes.sql run flagged
-  above.
-- **2026-08-03:** the second hero slideshow gained its own admin-curated
-  lineup (twin table `carousel_selection_alt`, Slideshow 1/2 tabs in Admin
-  Settings, Save Both Slideshows) with mirror-fallback when empty, plus a
-  deferred mount so initial page load carries exactly one carousel. Pending:
-  the manual add-second-lineup.sql run flagged above.
-- **2026-08-03:** the homepage hero became a scroll-pinned two-slideshow
-  parallax stack, then refined so the headline/sign-up/CTA overlay
-  (`HomeHeroOverlay`) stays pinned while only the slideshows (`HomeHero`
-  panes) cross in opposite directions, hold, and break free with the frame.
-  Verified locally (tsc, lint, 702/702, 445-page build, browser walkthrough
-  desktop + mobile).
-- **2026-08-03:** Instagram and Facebook inside **Latest Posts** now collapse
-  independently from their full-width accessible headers, leaving a compact
-  count-and-chevron row while the hidden channel is out of the way.
-- **2026-08-03:** Social Queues gained a **Latest Posts** modal for the 12 newest
-  live receipts per channel, with view/manage links, conservative refresh,
-  public comment composition, confirmed Facebook deletion, and manual
-  Instagram-removal guidance.
-- **2026-08-03:** Social Queues now supports independent Instagram/Facebook row
-  selection and one-confirmation **Post selected now**. Batches publish
-  sequentially through the existing receipt-safe channel paths and stop/resume
-  at a failed item without repeating completed posts.
-- **2026-08-03:** removed the owner-configured daily limit from both social
-  queues. Settings, status responses, dashboard copy, and worker scheduling no
-  longer expose or enforce a local daily cap; each worker invocation retains a
-  25-row safety batch, and Instagram still respects Meta's provider quota.
-- **2026-08-03:** documentation cleanup removed 41 superseded planning,
-  kickoff, legacy-audit, and handoff files. Current Etsy/eBay operator guidance
-  was consolidated into the feature runbooks; Instagram and shipping plans were
-  reduced to current contracts.
-- **2026-08-03:** social queue buttons now keep their content inside a responsive
-  two-column grid at 600px/900px, and all scheduling surfaces share seven
-  Eastern slots: noon, 2, 4, 6, 8, 10, and midnight.
-- **2026-08-03:** social setup copy now says the generated CARD image becomes
-  slide 1, eliminating the prior order ambiguity.
-- **2026-08-02:** route-persistent background **Post now**, full Social Queues
-  dashboard/edit-return path, fixed scheduling, queue-both, guided preparation,
-  exact photo framing/crop preview, slide viewer, AI opener controls, cross-
-  channel wording/photo sync, conservative status refresh, and Facebook
-  interrupted-publish recovery were completed locally.
-- **2026-08-02:** Facebook app secret was configured in local and all Netlify
-  contexts; a Page token passed same-Page, read-access, app, and lifetime checks.
-- **2026-08-02:** Etsy's seven insured-shipping profiles were provisioned after
-  its delivery-days fix; eBay's seven policies were provisioned 2026-08-01.
-- **2026-08-01:** `.com` became the live primary domain. DNS, redirects, cert,
-  environments, external endpoints, sitemap, Search Console, and Change of
-  Address were completed and production-verified; email deliberately stayed on
-  `.co`.
-- **2026-08-01:** all five marketplace/social Netlify functions showed Scheduled
-  badges, and core `.com` routes plus legacy-domain redirects were verified.
+Headlines only — full detail lives in `CHANGELOG.md` under each date.
+
+- **2026-08-09 (undeployed):** shop-card touch overhaul, hero touch snap +
+  slower handover, hero performance batch, and one solid background per
+  slideshow replacing the per-photo sweep. This is the batch waiting to deploy.
+- **2026-08-08 (shipped):** email fully `.com`, `?returnTo=` disclosure fix,
+  Deep Field production import + live hooks, daily price-push defects fixed,
+  admin email removed from the client bundle.
+- **2026-08-06:** pre-deploy sign-off; hero runway compressed and crossings
+  overlapped so the handover never stops.
+- **2026-08-04:** hero random-fill lineups, product-page accordions + trust
+  strip, `/trade-in` page, related-products strip, homepage story/education/FAQ
+  blocks, single-page checkout.
+- **2026-08-03:** hero became a scroll-pinned multi-slideshow parallax stack;
+  Social Queues gained Latest Posts, row selection, background Post now, and
+  the seven Eastern slots; 41 superseded planning docs removed.
+- **2026-08-01/02:** `.com` became the live primary domain (DNS, redirects,
+  cert, sitemap, Search Console, Change of Address all production-verified);
+  seven insured-shipping policies/profiles provisioned on both marketplaces;
+  Facebook Page token validated.

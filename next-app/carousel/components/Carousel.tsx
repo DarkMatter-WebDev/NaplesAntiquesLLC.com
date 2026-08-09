@@ -65,25 +65,27 @@ type Props = {
    * cards pass the hidden back. Keeps the close "few-item" feel at any length.
    */
   visibleCount?: number;
-  /**
-   * Fires whenever a different card rotates into the front-CENTER position.
-   * Used to switch the hero's TEXT theme (light/dark) to match the photo
-   * currently behind the headline. Fires only when the centered color changes.
-   * Keep the handler stable (useCallback) to avoid re-subscribing each render.
-   */
-  onFrontItemChange?: (item: CarouselItem, index: number) => void;
-  /**
-   * Fires every animation frame with a CSS background value for the hero. With
-   * photos grouped into a white arc and a black arc, this is a horizontal
-   * gradient whose seam sweeps across as a block boundary rotates through the
-   * front — so the incoming color leads the incoming photo and the outgoing
-   * color fades off the far side. Apply it imperatively (set element.style) to
-   * avoid a React re-render every frame. Keep the handler stable.
-   */
-  onBackgroundChange?: (cssBackground: string) => void;
 };
 
-const WHITE = "#ffffff";
+// The per-frame background sweep (`computeSweepBackground`, and the
+// `onFrontItemChange` / `onBackgroundChange` callbacks that carried it out)
+// was removed 2026-08-09: the hero now paints ONE solid admin-chosen color per
+// slideshow instead of following each photo's backdrop to the front. A lineup
+// mixing white- and black-backdrop pieces made the whole background flip back
+// and forth as the ring turned. Per-CARD padding (`--card-bg` below) is a
+// separate feature and stays.
+
+/**
+ * Encode quality for ring cards AND the offscreen preloader — they must match,
+ * or the preloader warms a variant the card never requests and every photo is
+ * fetched twice.
+ *
+ * 90 -> 82 (2026-08-09). The cards only ever request w=640, so the source is
+ * downscaled hard before quality is applied and 90 was buying detail at a size
+ * too small to show it. Must be listed in `images.qualities` in next.config.ts;
+ * an unlisted value is served as an error rather than clamped.
+ */
+const CARD_IMAGE_QUALITY = 82;
 
 /**
  * Thresholds for the offscreen-pause observer. A single `0` threshold only
@@ -94,54 +96,6 @@ const WHITE = "#ffffff";
  * while a slideshow sits fully on screen.
  */
 const VISIBILITY_THRESHOLDS = [0, 0.005, 0.01, 0.02, 0.04, 0.08, 0.15, 0.3, 0.6, 1];
-
-/** The per-photo background color, defaulting to white when unset. */
-function itemBg(item: CarouselItem | undefined): string {
-  return item?.bgColor || WHITE;
-}
-
-/**
- * Build the hero background for the current rotation.
- *  - Solid color when the visible front arc is all one block.
- *  - A horizontal gradient when a block boundary (seam) is crossing the front:
- *    each seam is projected to a screen x (via sin of its net angle) and the
- *    incoming color fills from the side the photos enter (right), so it leads
- *    the photo's arrival while the outgoing color fades off the left.
- */
-function computeSweepBackground(
-  items: CarouselItem[],
-  ringAngle: number,
-  fallbackColor: string,
-): string {
-  const n = items.length;
-  if (n === 0) return fallbackColor;
-  const step = 360 / n;
-  const seams: { x: number; left: string; right: string }[] = [];
-  for (let a = 0; a < n; a++) {
-    const colorA = itemBg(items[a]);
-    const colorB = itemBg(items[(a + 1) % n]);
-    if (colorA === colorB) continue; // no boundary between these two
-    let theta = ringAngle + (a + 0.5) * step;
-    theta = (((theta % 360) + 540) % 360) - 180; // normalize to (-180, 180]
-    const rad = (theta * Math.PI) / 180;
-    if (Math.cos(rad) <= 0.04) continue; // seam is behind the front hemisphere
-    const x = (1 - Math.sin(rad)) / 2; // 0 = left edge, 1 = right edge
-    // item a sits at the lower angle (higher x = right); item a+1 to its left.
-    seams.push({ x, right: colorA, left: colorB });
-  }
-  if (seams.length === 0) return fallbackColor;
-  seams.sort((p, q) => p.x - q.x);
-  const BAND = 0.13; // half-width of each seam's soft blend (screen fraction)
-  const stops: string[] = [`${seams[0].left} 0%`];
-  for (const seam of seams) {
-    const lo = Math.max(0, seam.x - BAND) * 100;
-    const hi = Math.min(1, seam.x + BAND) * 100;
-    stops.push(`${seam.left} ${lo.toFixed(1)}%`);
-    stops.push(`${seam.right} ${hi.toFixed(1)}%`);
-  }
-  stops.push(`${seams[seams.length - 1].right} 100%`);
-  return `linear-gradient(to right, ${stops.join(", ")})`;
-}
 
 export function Carousel({
   items,
@@ -154,8 +108,6 @@ export function Carousel({
   aspect = "1 / 1",
   perspective = 35,
   visibleCount = 6,
-  onFrontItemChange,
-  onBackgroundChange,
 }: Props) {
   const ringRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<HTMLDivElement>(null);
@@ -220,8 +172,6 @@ export function Carousel({
   // Always-fresh refs so the single rAF loop below reads the latest values
   // without re-subscribing (re-subscribing mid-animation caused stale closures).
   const dataRef = useRef(data);
-  const onFrontItemChangeRef = useRef(onFrontItemChange);
-  const onBackgroundChangeRef = useRef(onBackgroundChange);
   const slotItemsRef = useRef(slotItems);
   const windowKeyRef = useRef(windowKey);
   const prevSlotAnglesRef = useRef<number[]>([]);
@@ -237,20 +187,11 @@ export function Carousel({
   // second.
   const prevFacingRef = useRef<string[]>([]);
   const prevZRef = useRef<string[]>([]);
-  const lastFrontKeyRef = useRef("");
   const startedAtRef = useRef(0);
 
   useEffect(() => {
     dataRef.current = data;
   }, [data]);
-
-  useEffect(() => {
-    onFrontItemChangeRef.current = onFrontItemChange;
-  }, [onFrontItemChange]);
-
-  useEffect(() => {
-    onBackgroundChangeRef.current = onBackgroundChange;
-  }, [onBackgroundChange]);
 
   useEffect(() => {
     slotItemsRef.current = slotItems;
@@ -263,7 +204,6 @@ export function Carousel({
     windowKeyRef.current = windowKey;
     slotItemsRef.current = initialSlotItems;
     prevSlotAnglesRef.current = [];
-    lastFrontKeyRef.current = "";
     // The write-on-change caches below must be cleared with the window: the
     // cards are re-created for the new key, so a stale cache would make the loop
     // skip the write a fresh card still needs.
@@ -273,15 +213,13 @@ export function Carousel({
     startedAtRef.current = typeof performance !== "undefined" ? performance.now() : 0;
   }, [windowKey, initialSlotItems]);
 
-  // Per-frame sample: advance the window as slots cross the hidden back, find
-  // the centered card (text theme), and compute the swept background. Reads the
-  // live CSS-animation clock so it stays in sync even under reduced-motion.
+  // Per-frame sample: advance the window as slots cross the hidden back, and
+  // keep each card's facing/z-index current for 3D hit testing. Reads the live
+  // CSS-animation clock so it stays in sync even under reduced-motion.
   const sample = useCallback(() => {
     const ring = ringRef.current;
     const items = dataRef.current;
     const slots = slotItemsRef.current;
-    const onFront = onFrontItemChangeRef.current;
-    const onBg = onBackgroundChangeRef.current;
     const n = items.length;
     const ev = slots.length;
     if (!ring || n === 0 || ev === 0) return;
@@ -312,21 +250,17 @@ export function Carousel({
     }
     // animation-direction: reverse negates the applied rotation, but the
     // animation clock above still counts forward — mirror the angle so all
-    // geometry below (front card, backface, sweep, windowing) matches what is
-    // actually on screen.
+    // geometry below (backface, windowing) matches what is actually on screen.
     if (reverse) ringAngle = (360 - (ringAngle % 360)) % 360;
 
     const step = 360 / ev;
     const cycle = n > ev;
     const prev = prevSlotAnglesRef.current;
-    let best = 0;
-    let bestScore = Infinity;
     let nextSlots: number[] | null = null;
 
     for (let p = 0; p < ev; p++) {
       let a = (ringAngle + p * step) % 360;
       if (a < 0) a += 360; // [0, 360)
-      // Centered, front-facing slot (for the text theme).
       const rad = (a * Math.PI) / 180;
       // A back-facing 3D card can still have a very large projected box while
       // it passes behind the camera. Keep those hidden planes out of hit
@@ -352,13 +286,6 @@ export function Carousel({
           card.style.zIndex = z;
         }
       }
-      if (isFrontFacing) {
-        const score = Math.abs(Math.sin(rad)); // 0 = dead center
-        if (score < bestScore) {
-          bestScore = score;
-          best = p;
-        }
-      }
       // Advance this slot's photo as it crosses the hidden back (180deg).
       // Angles grow over time on a forward ring and shrink on a reversed one,
       // so the crossing is detected in the matching direction.
@@ -374,20 +301,6 @@ export function Carousel({
     if (nextSlots) {
       slotItemsRef.current = nextSlots;
       setSlotItemsState({ key: windowKeyRef.current, items: nextSlots });
-    }
-
-    const front = items[slots[best]];
-
-    if (onFront) {
-      const key = `${best}:${front?.bgColor ?? ""}`;
-      if (key !== lastFrontKeyRef.current) {
-        lastFrontKeyRef.current = key;
-        onFront(front, best);
-      }
-    }
-    if (onBg) {
-      const visibleItems = slots.map((idx) => items[idx]);
-      onBg(computeSweepBackground(visibleItems, ringAngle, itemBg(front)));
     }
   }, [spin, reverse]);
 
@@ -460,8 +373,8 @@ export function Carousel({
     // data.length so the observer (re)attaches when the ring first mounts (0 -> N).
   }, [sample, data.length, paused]);
 
-  // Fire immediately whenever the items change (initial paint, a recolor, or
-  // reduced-motion where rAF may not advance) so the background is correct even
+  // Fire immediately whenever the items change (initial paint, or reduced-motion
+  // where rAF may not advance) so every card's facing/z-index is correct even
   // before the first animation frame.
   useEffect(() => {
     sample();
@@ -523,7 +436,9 @@ export function Carousel({
         {slotItems.map((itemIndex, slot) => {
           const item = data[itemIndex];
           if (!item) return null;
-          const imageLoading = carouselImageLoading(slot);
+          // `paused` is the owner's on/offscreen signal, so it doubles as the
+          // "this pane is parked" hint for fetch priority.
+          const imageLoading = carouselImageLoading(slot, paused);
           const inner = (
             <>
               <Image
@@ -535,7 +450,7 @@ export function Carousel({
                 // optimizer the display size so it ships a right-sized AVIF/WebP
                 // instead of the full-resolution original.
                 sizes="(max-width: 640px) 80vw, (max-width: 1024px) 50vw, 35vw"
-                quality={90}
+                quality={CARD_IMAGE_QUALITY}
                 loading={imageLoading.loading}
                 fetchPriority={imageLoading.fetchPriority}
                 draggable={false}
@@ -588,7 +503,7 @@ export function Carousel({
                 alt=""
                 fill
                 sizes="(max-width: 640px) 80vw, (max-width: 1024px) 50vw, 35vw"
-                quality={90}
+                quality={CARD_IMAGE_QUALITY}
               />
             </span>
           ))}

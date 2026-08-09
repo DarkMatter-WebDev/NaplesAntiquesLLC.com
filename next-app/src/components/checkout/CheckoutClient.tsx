@@ -462,7 +462,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
   if (items.length === 0) {
     return (
       <div className="max-w-xl mx-auto text-center px-6 py-16">
-        <AppIcon name="shopping_bag"  style={{ fontSize: '44px', color: 'var(--color-outline-variant)' }} />
+        <AppIcon name="shopping_cart"  style={{ fontSize: '44px', color: 'var(--color-outline-variant)' }} />
         <h1 className="text-3xl md:text-4xl font-bold mt-4 mb-4" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
           {isEs ? 'Su carrito está vacío' : 'Your Cart Is Empty'}
         </h1>

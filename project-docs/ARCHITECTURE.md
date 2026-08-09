@@ -170,7 +170,9 @@ carousel widget (`next-app/carousel`), replacing the old MP4 ring video. Storefr
 CTAs route directly to `/shop`; there is no intermediate `/store` chooser route.
 The ring is **windowed/infinite** (only an admin-set number of cards exist at
 once; the curated list cycles through), photos carry a per-photo **White/Black
-group** that drives a **swept** hero background, images go through `next/image`
+group** that paints each card's own padding, the hero behind the ring is **one
+solid admin-chosen color per slideshow** (the swept background was removed
+2026-08-09), images go through `next/image`
 with an off-screen preloader, and an `IntersectionObserver` pauses it offscreen.
 Admin curation is at `/admin/settings` â†’ `Store Carousel Hero`, backed by
 `next-app/carousel/lib/carouselData.ts`. The localized homepage reads
@@ -180,8 +182,10 @@ five minutes under the `home-carousel` tag, and passes that one initial set to
 `HomeHero`. Successful Admin saves call the authenticated carousel revalidation
 route; hardcoded products are used only when the server query fails or the
 selection is empty. Setup SQL: `next-app/carousel/sql/setup.sql` (+
-`add-per-item-bg.sql`, `add-visible-count.sql`,
-`add-visible-count-mobile.sql`). Full detail: `project-docs/features/carousel-hero.md`.
+`add-per-item-bg.sql`, `add-visible-count.sql`, `add-visible-count-mobile.sql`,
+`add-second-lineup.sql`, `add-third-lineup.sql`, `add-random-lineup-modes.sql`,
+`add-slideshow-bg-colors.sql` — all run in production as of 2026-08-09).
+Full detail: `project-docs/features/carousel-hero.md`.
 
 ## Customer-Facing Reveal Motion
 

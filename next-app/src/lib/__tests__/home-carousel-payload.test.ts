@@ -32,6 +32,8 @@ const curated: CarouselItem[] = [
 const settings: CarouselSettings = {
   showPrice: false,
   bgColor: '#ffffff',
+  bgColorAlt: '#000000',
+  bgColorThird: '#ffffff',
   visibleCountDesktop: 6,
   visibleCountMobile: 4,
   selectionModePrimary: 'manual',

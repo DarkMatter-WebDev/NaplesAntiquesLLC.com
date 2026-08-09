@@ -31,12 +31,17 @@ docs and evidence-backed verification.
 At the start of every session:
 
 1. Read root `AGENTS.md`.
-2. Read `PROJECT_OVERVIEW.md`, `CURRENT_STATUS.md`, `TASKS.md`, and
-   `DECISIONS.md`. These files are intentionally compact enough for every
-   session.
-3. Build an understanding of the project and **summarize current state** before
+2. Read `PROJECT_OVERVIEW.md` and `CURRENT_STATUS.md` in full — start with
+   CURRENT_STATUS's **"Start Here"** block, which states what is waiting and
+   where to look. Then `TASKS.md` for open work.
+3. `DECISIONS.md` is the exception to "read it all": it is ~136 KB of durable
+   rationale and is meant to be **consulted by section, not read front to
+   back**. Read the entries covering the area you are about to change — the
+   hero-stack entry carries its own rule index at the top. Its length is
+   deliberate; those entries have repeatedly prevented regressions.
+4. Build an understanding of the project and **summarize current state** before
    making changes.
-4. Ask for clarification only if required.
+5. Ask for clarification only if required.
 
 ## Session Shutdown Behavior
 

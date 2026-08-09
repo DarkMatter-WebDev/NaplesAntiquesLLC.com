@@ -2,42 +2,121 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-08-08**.
+> in `DECISIONS.md`. Last reconciled: **2026-08-09**.
+
+## Start Here (handoff, end of 2026-08-09 session)
+
+**One thing is waiting: DEPLOY.** A full UX/performance batch is finished,
+fully verified, and sitting undeployed. There is **no outstanding local work,
+no failing check, and no pending SQL** — the session's one migration
+(`add-slideshow-bg-colors.sql`) was run and confirmed by the owner.
+
+- **What's in it:** shop gallery-card touch overhaul (Add to Cart restored on
+  mobile, cart icon sitewide, windowed dot indicators, photo swipe, one-card-
+  off-cover model), homepage hero touch snap + slower handover, a hero
+  performance batch (duplicate image downloads eliminated, q82, spinner),
+  **one solid admin-chosen background per slideshow** replacing the per-photo
+  sweep, the **reviews band at a 2-column minimum, 8-line-clamped quotes,
+  and each card linking to the Google Business Profile**, the hero's
+  **Trade CTA now pointing at `/trade-in`** instead of `/contact`, and the
+  **hero CTAs held at two-up-one-down on mobile**. Full detail:
+  `CHANGELOG.md` → *2026-08-09* and *2026-08-09 (later session)*.
+- **✅ THE FULL GATE PASSED ON THE COMPLETE BATCH (2026-08-09, second run).**
+  Dev server stopped and `.next` deleted first, so this is a clean from-scratch
+  build covering every change including the reviews grid, the hero CTA layout,
+  and the shop-card date. Nothing needs re-running before you copy and deploy.
+- **To deploy:** copy this folder to the repo folder and push.
+- **Then:** work the 📱-marked smoke list in `TASKS.md` → *New surfaces to
+  smoke after the NEXT deploy*. Three of those genuinely need a real phone —
+  they are the checks this environment could not perform.
+- **Before writing hero or shop-card code**, read the three new entries in
+  `DECISIONS.md`: *One solid background per slideshow*, *On touch, the hero
+  snaps exactly one slideshow per gesture*, and *Shop-card photos: swipe +
+  windowed dots on touch*. Several older entries in that file describe the
+  removed background sweep and carry inline supersession notes — the rule is
+  the newer entry.
+- **Owner-owned items unrelated to this batch** (price-push logs, eBay #82
+  reattachment, the inbox check) are unchanged in `TASKS.md`.
 
 ## Deployment State
 
-- 🟢 **THIS BATCH IS SIGNED OFF AND READY TO DEPLOY** (pre-flight 2026-08-06 —
-  clean-from-scratch build, production-mode smoke, DNS and compiled-output
-  checks; full evidence in TASKS.md).
-- 🔴 **OUTBOUND EMAIL IS DOWN UNTIL THIS BATCH DEPLOYS — that is the one thing
-  the deploy fixes, and the reason not to sit on it.** Resend's sending domain
-  was swapped from `.co` to `.com` on 2026-08-05 (Free plan allows only one, so
-  `.co` had to be deleted). Resend, DNS, code, and the Netlify `EMAIL_FROM`
-  override are all done and verified; the *deployed* code still sends from `.co`,
-  which is no longer a verified domain, so every send currently fails.
-
-  Checkout is unaffected — send failures are caught and never throw — and missed
-  receipts re-send from Admin → Orders.
-
-  **After deploying, two steps remain and both are owner-owned:** confirm the
-  Netlify build log succeeds (local builds ran on Node v24, Netlify pins Node
-  20), then do a real test send **and open the inbox to confirm it arrived**.
-  DMARC is at `p=quarantine`, so a DKIM or alignment fault delivers to spam
-  without erroring — a green "sent" in Resend's log is not the check that matters.
+- 🟢 **The email/security/integration batch SHIPPED 2026-08-08.** Outbound email,
+  the `?returnTo=` product-disclosure fix, the Deep Field integration, the
+  eBay/Etsy price-push fixes, and the hero carousel work are all deployed. The
+  `returnTo` fix was verified against production (28/28 anonymous probes 404).
+- ✅ **The email surface is fully verified. `info@naplesestatejewelry.com`
+  receives mail — owner-confirmed 2026-08-09**, closing the last outstanding
+  check. That mailbox is the single point of failure for every inbound path
+  (footer and account inquiries, order notifications, marketing From/Reply-To,
+  bounce handling, both JSON-LD blocks), so it stays worth naming even though it
+  is no longer an open task. The standing hazard for any FUTURE email change is
+  unchanged: DMARC is at `p=quarantine`, so a DKIM or alignment fault delivers to
+  **spam without erroring** — a green "sent" in Resend's log is never the check
+  that matters, only an opened inbox is. Checkout is unaffected either way (send
+  failures are caught and never throw) and missed receipts re-send from
+  Admin → Orders.
+- 🟡 **The undeployed batch grew substantially on 2026-08-09 and is now a real
+  UX release** (still no security or delivery impact): the shop-card touch pass
+  (mobile Add to Cart restored, cart icon sitewide, dot indicators + swipe,
+  single-card-off-cover model), the hero touch snap + slowdown, the hero
+  performance batch (double-fetch fix, q82, spinner), and **one solid
+  background per slideshow** (the per-photo sweep is removed). Plus the
+  earlier small items: Deep Field image budget 18 → 30 and test hardening.
+  The one manual SQL for the batch (`add-slideshow-bg-colors.sql`) is ALREADY
+  RUN and owner-verified, so deploying is copy-and-go. See CHANGELOG
+  2026-08-09 and the smoke list in TASKS.
 - **Production:** `https://naplesestatejewelry.com` is live on Netlify. The
   `.com` domain is primary; `naplesestatejewelry.co` and
   `naplesantiquesllc.com` redirect path-preservingly to it. The `.co/api/*`
-  carve-out remains for registered external endpoints. Business **mailboxes**
-  stay on `.co`; never alter its MX records as part of website work. Outbound
-  **sender** addresses are now `@naplesestatejewelry.com`.
+  carve-out remains for registered external endpoints.
+
+  **Email is fully `.com` as of 2026-08-08** — the earlier mailbox-vs-sender
+  split is reversed. Verified 2026-08-09: **zero `@naplesestatejewelry.co`
+  addresses remain in `next-app/src`** (18 `info@…com`, 8 `noreply@…com`).
+  Contact addresses, Reply-To, schema.org `email`, and marketing campaign
+  senders are all `.com`. Do not restore a `.co` address. Still true regardless:
+  **never alter `.co` MX records as part of website work.**
 - **External domain migration:** complete. GoDaddy DNS, Netlify primary/cert,
   environment URLs, Supabase Auth, PayPal/eBay/Etsy registrations, Search
   Console, sitemap, and Google Change of Address were completed and verified.
-- **Local source-of-truth batch:** verified 2026-08-06 at **720/720 tests**,
-  `npx tsc --noEmit`, full lint, and a clean-from-scratch **449-page production
-  build**, plus a `next start` smoke of 38 route/locale combos (all 200 bar the
-  correct `/es/` 308). Still not production-reverified as a batch — that happens
-  after it ships.
+- **Local source-of-truth batch — FULL GATE PASSED 2026-08-09 (re-run at the
+  end of the later session, covering the complete batch).** Dev server stopped
+  and `.next` deleted first, so this is a clean from-scratch build, not
+  incremental:
+  - `npm test` → **846/846 across 87 files** (unchanged; the later session's
+    changes are CSS and markup, and no suite covers them)
+  - `npx tsc --noEmit` → clean
+  - `npm run lint` → clean
+  - `npm run build` → **exit 0**, compiled successfully in 10.9s,
+    **449/449 static pages**; `BUILD_ID`, `server/`, `static/`,
+    `prerender-manifest.json` all present, 56 prerendered `.html`,
+    911 js files across the tree
+  - **Compiled-output spot check** (1022 js/css/html files): removed markers
+    `Hide date label on mobile` = **0** and `testimonial-card-link` = **0**;
+    new markers all shipped — `testimonial-google-link` 5 files,
+    `home-hero-actions` 4, `-webkit-line-clamp` 4, the `share.google` URL 4,
+    `/trade-in` 80, `modern-card-date` still present in 2.
+  - **Email invariant re-confirmed:** bare `@naplesestatejewelry.co` = **0**
+    files and `aol.com` = **0**, against a control of `naplesestatejewelry`
+    matching 138 files (`info@…com` 76, `noreply@…com` 19). ⚠️ Method note
+    worth keeping: the first attempt reported 0 for *everything* because
+    PowerShell 5.1's `Select-String` does not populate `.Matches` when
+    `-SimpleMatch` and `-AllMatches` are combined. **Always run a positive
+    control through the same scan** — a broken absence check looks exactly
+    like a clean result.
+
+  The earlier session-end run of this same gate is superseded by this one. Its
+  figures were 449 pages / 846 tests / 58 prerendered `.html` / 961 js, and its
+  spot check confirmed the hero sweep's removal (`shop-card-image-progress` = 0,
+  the new dot classes present, `shopping_cart` × 23, `pan-y pinch-zoom` × 4,
+  `quality:82` × 3). The small `.html` and js deltas between the two runs are
+  ordinary build variation.
+  - ⚠️ Node here is **v24**; Netlify pins **NODE_VERSION 20** and
+    `package.json` declares no `engines`, so a green local build is strong but
+    not identical to theirs. Watch the Netlify build log.
+  The 2026-08-06 sign-off run additionally smoke-tested 38 route/locale
+  combos under `next start` (all 200 bar the correct `/es/` 308); that smoke has
+  not been re-run since, as the changes after it were test-and-docs only.
 - **Deploy workflow:** this folder has no git workflow. The owner copies it to a
   separate repository folder and handles version control/deployment manually.
 
@@ -82,6 +161,22 @@
 - `/shop` is the canonical catalog. Public visibility is Available and Sold;
   Draft, Pending Payment, and Archived remain private. Sold prices are masked
   unless a captured sale snapshot supplies the historical amount.
+- Shop gallery cards (undeployed 2026-08-09 batch): the photo carries windowed
+  DOT indicators (max 7, tapered edges when truncated; on the scrim pill +
+  hover-revealed on pointer devices, permanent and floating with per-dot
+  ring/halo contrast on touch), seated on the photo's bottom edge with the
+  brand/link flag lifted above and the prev/next arrows bottom-aligned to the
+  flag's baseline. On touch the arrows are hidden and SWIPE changes the photo
+  (native non-passive touchmove, 5px slop, ~51° horizontal cone; vertical
+  drags still scroll the page); a swiped card keeps its photo until a
+  DIFFERENT card is swiped (`shop-card-photo-focus`), so at most one card is
+  ever off its cover. Hover auto-cycling and the 1s mouse-leave reset are
+  mouse-only. Every card shows the bottom Add to Cart button at all widths
+  again (mobile also keeps the corner cart icon), and the cart icon is
+  Lucide's ShoppingCart sitewide (header, drawer, checkout empty state, tiles);
+  the admin's `shopping_bag` uses are Etsy marketplace icons and stay. The
+  **"Ca. YYYY" date shows at every width** (the mobile hide was removed
+  2026-08-09); "Your price" stays hidden at every width.
 - Product cards, gallery/lightbox, shop filters/pagination, account/favorites,
   cart return state, live spot pricing, and checkout are active. Product
   detail pages end with three policy accordions (Shipping & Returns /
@@ -89,7 +184,11 @@
   full-width Sustainably Sourced / Fully Insured / Local Pickup trust strip
   beneath both columns, and a
   compact band of the four curated Google reviews (single source:
-  `src/lib/testimonials.ts`, shared with the homepage section), preceded by a
+  `src/lib/testimonials.ts`, shared with the homepage section; the grid is
+  **2 columns minimum**, 4 from 1160px, the card compacts its padding and type
+  on a narrow phone rather than dropping to one column, quotes clamp to 8 lines
+  in CSS with the verbatim text intact in the DOM, and the whole card links out
+  to the Google Business Profile), preceded by a
   "You Might Also Like" strip of four same-category available pieces ranked
   same-type-first, each card carrying the shop cards' purity/weight/length/width
   chips from the shared `lib/product-spec-chips.ts`.
@@ -102,7 +201,11 @@
   the aside moves under the info stack instead. Below md everything collapses
   to the original single-column order. The trade-in
   service has a named page at `/trade-in` (Gold & Silver Trade-In Program),
-  linked from the Sell menu, footer, and each product page's trade-in line.
+  linked from the Sell menu, footer, each product page's trade-in line, and the
+  homepage hero's **Trade** CTA (which pointed at `/contact` until 2026-08-09).
+  Below 640px the hero's three CTAs are a two-column grid — always two up and
+  one centred below, never three stacked rows — reverting to a single flex row
+  of three from 641px.
   The homepage carries an announcement bar (top of content, not the fixed
   header) that never wraps — its type shrinks fluidly to hold one line, and its
   third item appears only from 780px. It also carries
@@ -120,28 +223,24 @@
   full-height panes derive from it and cannot drift. A source guard test rejects
   a reintroduced `pt-16` main, `top: 4rem`, or `calc(100svh - 4rem)`.
 - The homepage hero is a scroll-pinned parallax stack (`HomeHeroStack`) of
-  THREE slideshows: the headline/sign-up/CTA overlay stays pinned while A
-  slides away upward and B descends from above, B holds, B slides away and C
-  descends, C holds, then the whole frame breaks free with normal scrolling.
-  All panes travel one frame height at matching speed (`PANE_A_TRAVEL` can
-  raise the departing pane's for depth). Overlay text theme follows the
-  dominant slideshow; ring direction alternates — A and C right-to-left, B
-  reversed. Reduced motion collapses it to the single static hero. B and C
-  each have their own admin-curated lineup (Slideshow 2 / 3 tabs in Admin
-  Settings, `carousel_selection_alt` — migration run by owner, 10-item lineup
-  live — and `carousel_selection_third`, NOT yet migrated), each mirroring A
-  while its lineup is empty. B mounts on first scroll intent or idle and C
-  only once scroll progress passes 12%, so initial load carries one carousel.
-  Each slideshow's lineup can also be FILLED from a random draw — Gold
-  jewelry / Silver jewelry / Non-jewelry items, reusing the shop's Jewelry &
-  Watches classification — which replaces the list with up to 10 pieces that
-  are then edited and saved like any hand-picked lineup. Random is a starting
-  point, not a live rotating source, so saved lineups are always explicit.
-  The picker and the random fills work from a chosen status list (All /
-  Available / Sold); lineups may include sold pieces, which render in the
-  hero with no price caption and link to their product page showing Sold. App code locally verified only; not yet deployed, and
-  add-random-lineup-modes.sql / add-third-lineup.sql have NOT been run in
-  Supabase yet (see TASKS.md).
+  THREE slideshows handing over in overlapping crossings, everything traveling
+  upward (the next slideshow rises from below); the headline/sign-up/CTA
+  overlay stays pinned until the frame releases. Full choreography rules live
+  in DECISIONS. Each slideshow shows **one solid admin-chosen background
+  color** for its whole time on screen (2026-08-09, undeployed — the per-photo
+  sweep is removed; `add-slideshow-bg-colors.sql` already run and verified),
+  and the overlay's light/dark text theme derives from the dominant pane's
+  color by luminance. On TOUCH the hero SNAPS: one gesture advances exactly
+  one slideshow however hard the fling (step measured from where the gesture
+  began; B's snap point solved from the crossing constants), with a smooth
+  ~1s scroll to the next slideshow (`SNAP_STEP_MS`) and free exit at both
+  ends; wheel/desktop scrolling is untouched. Runway is 240svh (drag speed
+  ~0.7x vs 1:1). All three lineups are admin-curated (Slideshow 1/2/3 tabs;
+  all migrations run; later lineups mirror A while empty), each with its own
+  background color control; random draws FILL the editable lineup and saved
+  lineups are always explicit manual lists. Lineups may include sold pieces
+  (no price caption, product page shows Sold). B arms on first scroll intent
+  or idle, C one idle beat later, so initial load carries one carousel.
 - The local batch fixes thumbnail-rail clipping/wrap stutter, normalizes all
   seven password fields through one shared eye-toggle component, and expands
   large application canvases at ultra-wide breakpoints while preserving narrow
@@ -312,5 +411,6 @@
 4. Complete deliberate marketplace price-push, shipping-tier, eBay #82, and
    remaining provider checks without blanket writes.
 5. Finish the owner/content/credential-record items in `TASKS.md`.
-6. Set the two Deep Field env vars in Netlify to activate the live product sync,
-   then run the production import once Deep Field confirms the local results.
+6. ✅ Deep Field env vars + production import are DONE (2026-08-08; this line
+   previously listed them as pending). Remaining Deep Field items are the
+   budget-pin test and the 30→50 retune in `TASKS.md`.

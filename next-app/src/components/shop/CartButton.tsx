@@ -129,8 +129,8 @@ export default function CartButton({ item, variant = 'card', locale = 'en', incl
           cursor: canPurchase || inCart ? 'pointer' : 'not-allowed',
         }}
       >
-        <AppIcon name="shopping_bag"
-          
+        <AppIcon name="shopping_cart"
+
           aria-hidden="true"
           data-cart-icon="true"
           style={{ fontSize: '13px', lineHeight: 1, fontVariationSettings: inCart ? "'FILL' 1" : "'FILL' 0" }}

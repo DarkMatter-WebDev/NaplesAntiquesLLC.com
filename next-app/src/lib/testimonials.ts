@@ -7,6 +7,17 @@
 //
 // To add a review: append an object below — every surface updates together.
 
+/**
+ * Public Google Business Profile — the destination for every review card.
+ * One constant because both surfaces that render reviews link to it; a second
+ * copy would eventually point somewhere else.
+ *
+ * This is Google's `share.google` short form, supplied by the owner. It is an
+ * opaque redirect, so nothing here can validate it — if the cards ever land
+ * somewhere wrong, this line is the only thing to change.
+ */
+export const GOOGLE_REVIEWS_URL = 'https://share.google/KAE0mjQwhKx9EqEZ1';
+
 export interface Testimonial {
   /** Reviewer's public name as displayed on Google. */
   name: string;

@@ -30,7 +30,7 @@
 // height via CSS — no travel, no pin, panes B and C hidden — restoring the
 // original static hero.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import HomeHero from './HomeHero';
 import HomeHeroOverlay from './HomeHeroOverlay';
 import {
@@ -38,6 +38,7 @@ import {
   type CarouselSettings,
 } from '../../../carousel/lib/carouselData';
 import { DEFAULT_BG } from '../../../carousel/lib/carouselConfig';
+import { nextHeroSnapPoint, resolveHeroSnapPoints } from '@/lib/home-hero-snap';
 
 type Props = {
   locale: string;
@@ -159,6 +160,28 @@ const ease = (t: number) => t * t * (3 - 2 * t);
  * sticky rather than snappy, so the pointer-fine path keeps smoothstep.
  */
 const easeSnap = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
+
+/**
+ * How long a touch snap takes to carry the hero one whole slideshow, in ms.
+ *
+ * THIS is the speed control for the handover a visitor actually sees on a
+ * phone, not the runway. Once the snap is doing the scrolling, the panes move
+ * one frame height over exactly this duration — the runway does not enter into
+ * it, because the pane travel is fixed and only the scroll BUDGET changes.
+ *
+ * Raised 400ms -> 1000ms (owner, 2026-08-09: "way too fast, slow it down a
+ * lot"). The old figure was not a chosen value at all: it fell out of a
+ * pixel-based formula (distance x 0.85, capped at 700), so it also drifted with
+ * viewport height. Turn this one number up for a statelier handover.
+ */
+const SNAP_STEP_MS = 1000;
+
+/**
+ * Progress covered by one full slideshow step, used to scale the duration above
+ * for partial moves. A->B and B->C are each almost exactly half the runway, so
+ * this is 0.5 rather than a measured constant per step.
+ */
+const FULL_STEP_PROGRESS = 0.5;
 
 // Pull the carousel RINGS toward each other during a crossing, as a percent of
 // frame height.
@@ -286,6 +309,23 @@ function setRingPull(pane: HTMLElement, pct: number) {
 // See A_EXIT_DISSOLVE_PCT and B_ARRIVE_FEATHER_PCT above.
 
 /**
+ * Whether a slideshow's solid background reads as dark, for the overlay's text
+ * theme. Parses the hex and uses relative luminance rather than matching only
+ * pure black, because the admin color picker accepts any hex. Non-hex values
+ * (gradients cannot occur anymore; named colors are normalized upstream) fall
+ * back to light, matching the historical default.
+ */
+function isDarkHex(color: string): boolean {
+  const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim());
+  if (!match) return false;
+  const hex = match[1].length === 3 ? match[1].split('').map((c) => c + c).join('') : match[1];
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 128;
+}
+
+/**
  * Fade one edge of a pane over `pct` percent of its height. A zero/negligible
  * width removes the mask entirely rather than painting a no-op gradient, so a
  * pane at rest or locked is genuinely full-bleed (a mask-image with an alpha
@@ -327,6 +367,23 @@ export default function HomeHeroStack({
   const altItems = initialAltItems && initialAltItems.length > 0 ? initialAltItems : initialItems;
   const thirdItems = initialThirdItems && initialThirdItems.length > 0 ? initialThirdItems : initialItems;
 
+  // One solid admin-chosen background per slideshow (2026-08-09, replacing the
+  // per-photo sweep). These are STATIC for the life of the page, which is what
+  // lets the overlay theme and the frame's crossing backdrop be derived up
+  // front instead of reported per-frame by each pane. A lineup that MIRRORS A
+  // still uses its own slideshow's color — the color belongs to the slideshow
+  // slot, not the lineup (pre-migration all three read the same value anyway).
+  const paneColors = {
+    a: initialSettings.bgColor || DEFAULT_BG,
+    b: initialSettings.bgColorAlt || initialSettings.bgColor || DEFAULT_BG,
+    c: initialSettings.bgColorThird || initialSettings.bgColor || DEFAULT_BG,
+  } as const;
+  const paneDark = {
+    a: isDarkHex(paneColors.a),
+    b: isDarkHex(paneColors.b),
+    c: isDarkHex(paneColors.c),
+  } as const;
+
   // Lightweight start: the later slideshows are NOT mounted with the page. B
   // arms (and only then fetches/decodes its images and builds its ring) on the
   // first scroll intent, or during browser idle shortly after load — whichever
@@ -339,14 +396,19 @@ export default function HomeHeroStack({
   const armedCRef = useRef(false);
 
   // The overlay's text theme follows whichever slideshow currently dominates
-  // the frame — each crossing hands over at its midpoint. Each pane reports its
-  // own centered-photo theme; refs hold the latest values so the rare React
-  // state update happens only when the effective theme actually changes.
-  const [overlayDark, setOverlayDark] = useState(false);
-  const darkARef = useRef(false);
-  const darkBRef = useRef(false);
-  const darkCRef = useRef(false);
+  // the frame — each crossing hands over at its midpoint. With one solid color
+  // per slideshow the per-pane themes are STATIC (paneDark above); only the
+  // dominant pane changes with scroll. The latest-ref pattern keeps the scroll
+  // effect (mounted once, empty deps) reading current values without
+  // re-subscribing.
+  const [overlayDark, setOverlayDark] = useState(paneDark.a);
   const dominantRef = useRef<'a' | 'b' | 'c'>('a');
+  const paneColorsRef = useRef(paneColors);
+  const paneDarkRef = useRef(paneDark);
+  useEffect(() => {
+    paneColorsRef.current = paneColors;
+    paneDarkRef.current = paneDark;
+  });
 
   // Which panes are actually on screen. The carousel's own IntersectionObserver
   // cannot work this out inside the pinned frame — every pane's box grazes the
@@ -361,21 +423,6 @@ export default function HomeHeroStack({
   const [liveC, setLiveC] = useState(false);
   const liveRef = useRef({ a: true, b: false, c: false });
   const travelRef = useRef<number | null>(null);
-
-  const handleThemeA = useCallback((dark: boolean) => {
-    darkARef.current = dark;
-    if (dominantRef.current === 'a') setOverlayDark(dark);
-  }, []);
-
-  const handleThemeB = useCallback((dark: boolean) => {
-    darkBRef.current = dark;
-    if (dominantRef.current === 'b') setOverlayDark(dark);
-  }, []);
-
-  const handleThemeC = useCallback((dark: boolean) => {
-    darkCRef.current = dark;
-    if (dominantRef.current === 'c') setOverlayDark(dark);
-  }, []);
 
   // Arm slideshow B off the critical path: first user scroll intent (they are
   // heading toward the crossing) or idle time after load warms it early enough
@@ -458,6 +505,11 @@ export default function HomeHeroStack({
 
     let raf = 0;
     let queued = false;
+    // Write-on-change guard for the frame's mirrored backdrop below. Same
+    // reasoning as the pane's own background: the value is recomputed every
+    // frame but changes only as a colour seam sweeps, and this element is the
+    // full pinned viewport.
+    let lastFrameBackground = '';
 
     const apply = () => {
       queued = false;
@@ -481,7 +533,7 @@ export default function HomeHeroStack({
         if (liveRef.current.b) { liveRef.current.b = false; setLiveB(false); }
         if (liveRef.current.c) { liveRef.current.c = false; setLiveC(false); }
         dominantRef.current = 'a';
-        setOverlayDark(darkARef.current);
+        setOverlayDark(paneDarkRef.current.a);
         return;
       }
       // The sticky frame translates from 0 to (runway height - frame height)
@@ -593,7 +645,7 @@ export default function HomeHeroStack({
       const dominant = t2 >= 0.5 ? 'c' : t1 >= 0.5 ? 'b' : 'a';
 
       // A feathered or fading edge is partly transparent, so the frame is what
-      // shows through — paint it with the DOMINANT pane's live swept background.
+      // shows through — paint it with the DOMINANT pane's solid background.
       // It used to always mirror hero A, which was right when A was the only
       // pane that could be uncovered, but is wrong once a departing pane fades:
       // the strip it vacates would reveal the OUTGOING backdrop (black) directly
@@ -605,16 +657,14 @@ export default function HomeHeroStack({
       // happens at the crossing midpoint, where the two panes still cover the
       // frame completely (measured: full coverage there) — so nothing of the
       // frame is visible at the instant it changes.
-      const dominantPane = dominant === 'a' ? paneA : dominant === 'b' ? paneB : paneC;
-      const dominantHero = dominantPane.firstElementChild as HTMLElement | null;
-      const heroA = paneA.firstElementChild as HTMLElement | null;
-      frame.style.background =
-        dominantHero?.style.background || heroA?.style.background || DEFAULT_BG;
+      const nextFrameBackground = paneColorsRef.current[dominant] || DEFAULT_BG;
+      if (nextFrameBackground !== lastFrameBackground) {
+        lastFrameBackground = nextFrameBackground;
+        frame.style.background = nextFrameBackground;
+      }
       if (dominantRef.current !== dominant) {
         dominantRef.current = dominant;
-        setOverlayDark(
-          dominant === 'a' ? darkARef.current : dominant === 'b' ? darkBRef.current : darkCRef.current,
-        );
+        setOverlayDark(paneDarkRef.current[dominant]);
       }
     };
 
@@ -647,6 +697,140 @@ export default function HomeHeroStack({
     };
   }, []);
 
+  // TOUCH SNAP. Two owner requests (2026-08-09), one mechanism: each slideshow
+  // should settle into place more firmly, and starting a scroll should carry the
+  // visitor smoothly to the NEXT slideshow. Both reduce to "one gesture advances
+  // exactly one slideshow".
+  //
+  // The runway is only ~1 screen (110svh), so a single flick covers most of it —
+  // which is precisely why a scroll could sail straight past a slideshow onto
+  // the one after. The fix is not a slower runway (that would recalibrate the
+  // whole choreography); it is stepping from where the GESTURE BEGAN, so however
+  // far a fling travels it still lands on the next slideshow and no further.
+  //
+  // Touch only, deliberately. A wheel already arrives in small discrete notches
+  // and hijacking it would fight the visitor's own scrolling — the same reason
+  // the snappier easing curve is touch-only. Reduced motion never snaps, and
+  // neither end of the runway does, so scrolling out of the hero stays free.
+  useEffect(() => {
+    const runway = runwayRef.current;
+    const frame = frameRef.current;
+    if (!runway || !frame) return;
+
+    const coarsePointer = window.matchMedia('(pointer: coarse)');
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    // easeSnap, not ease: the snap only ever runs on touch, and B's flush point
+    // genuinely differs between the two curves.
+    const snapPoints = resolveHeroSnapPoints({
+      phase1End: PHASE_1_END,
+      phase2Start: PHASE_2_START,
+      phase2End: PHASE_2_END,
+      paneATravel: PANE_A_TRAVEL,
+      ease: easeSnap,
+    });
+
+    let animation = 0;
+    let startProgress: number | null = null;
+    let startY = 0;
+    let lastY = 0;
+
+    const cancelSnap = () => {
+      if (!animation) return;
+      cancelAnimationFrame(animation);
+      animation = 0;
+    };
+
+    /**
+     * Progress read from the PAGE and left unclamped, so "C is locked at the end
+     * of the runway" is distinguishable from "the visitor is far down the page".
+     * The scroll handler's own `p` is clamped to [0,1] and pins at 1 forever
+     * once the frame unpins, so it cannot answer that.
+     */
+    const readMetrics = () => {
+      const travel = runway.offsetHeight - frame.offsetHeight;
+      if (travel <= 0) return null;
+      const headerOffset = parseFloat(getComputedStyle(frame).top) || 0;
+      const pinStart = runway.getBoundingClientRect().top + window.scrollY - headerOffset;
+      return { travel, pinStart, progress: (window.scrollY - pinStart) / travel };
+    };
+
+    const animateTo = (targetY: number, progressDelta: number) => {
+      const fromY = window.scrollY;
+      const distance = targetY - fromY;
+      if (Math.abs(distance) < 2) return;
+      // Timed by PROGRESS, not pixels. The panes travel one frame height per
+      // crossing whatever the runway is set to, so a pixel-based duration would
+      // silently change how fast the slideshows move every time the runway or
+      // the viewport height changed. A progress-based one holds the handover to
+      // the same wall-clock speed on any device.
+      const duration = Math.min(
+        SNAP_STEP_MS * 1.6,
+        Math.max(320, (progressDelta / FULL_STEP_PROGRESS) * SNAP_STEP_MS),
+      );
+      const started = performance.now();
+      const step = (now: number) => {
+        const t = Math.min((now - started) / duration, 1);
+        const eased = 1 - (1 - t) ** 3; // ease-out cubic: leaves at once, settles gently
+        // Reasserting position EVERY frame is what overrides the platform's
+        // momentum scrolling, which is still running after the finger lifts.
+        // A one-shot scrollTo would simply lose to it.
+        window.scrollTo(0, fromY + distance * eased);
+        animation = t < 1 ? requestAnimationFrame(step) : 0;
+      };
+      cancelSnap();
+      animation = requestAnimationFrame(step);
+    };
+
+    const onTouchStart = (event: TouchEvent) => {
+      cancelSnap();
+      const touch = event.touches[0];
+      if (!touch) return;
+      startY = touch.clientY;
+      lastY = startY;
+      startProgress = readMetrics()?.progress ?? null;
+    };
+
+    const onTouchMove = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (touch) lastY = touch.clientY;
+    };
+
+    const onTouchEnd = () => {
+      const from = startProgress;
+      startProgress = null;
+      if (from === null || !coarsePointer.matches || reduceMotion.matches) return;
+      // Outside the pinned runway this is an ordinary page scroll; leave it be.
+      if (from < -0.05 || from > 1.05) return;
+      const dy = lastY - startY;
+      if (Math.abs(dy) < 8) return; // a tap or a stray touch, not a scroll
+      // A finger moving UP the screen scrolls the page DOWN.
+      const target = nextHeroSnapPoint(snapPoints, from, dy < 0 ? 1 : -1);
+      if (target === null) return; // at an end — let them leave the hero
+      const metrics = readMetrics();
+      if (!metrics) return;
+      animateTo(metrics.pinStart + target * metrics.travel, Math.abs(target - from));
+    };
+
+    // A wheel or a key means the visitor took over; never fight that.
+    const releaseToUser = () => cancelSnap();
+
+    window.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('touchend', onTouchEnd, { passive: true });
+    window.addEventListener('touchcancel', releaseToUser, { passive: true });
+    window.addEventListener('wheel', releaseToUser, { passive: true });
+    window.addEventListener('keydown', releaseToUser);
+    return () => {
+      cancelSnap();
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+      window.removeEventListener('touchcancel', releaseToUser);
+      window.removeEventListener('wheel', releaseToUser);
+      window.removeEventListener('keydown', releaseToUser);
+    };
+  }, []);
+
   return (
     <div ref={runwayRef} className="home-hero-stack" data-customer-reveal-skip>
       <div ref={frameRef} className="home-hero-stack-frame" data-customer-reveal-skip>
@@ -659,7 +843,7 @@ export default function HomeHeroStack({
             locale={locale}
             initialItems={initialItems}
             initialSettings={initialSettings}
-            onThemeChange={handleThemeA}
+            backgroundColor={paneColors.a}
             paused={!liveA}
         />
         </div>
@@ -674,7 +858,7 @@ export default function HomeHeroStack({
               locale={locale}
               initialItems={altItems}
               initialSettings={initialSettings}
-              onThemeChange={handleThemeB}
+              backgroundColor={paneColors.b}
               reverseSpin
               paused={!liveB}
         />
@@ -691,7 +875,7 @@ export default function HomeHeroStack({
               locale={locale}
               initialItems={thirdItems}
               initialSettings={initialSettings}
-              onThemeChange={handleThemeC}
+              backgroundColor={paneColors.c}
               paused={!liveC}
         />
           )}
@@ -709,18 +893,30 @@ export default function HomeHeroStack({
           position: relative;
           /* Frame height + scroll runway.
 
-             Compressed 290svh -> 110svh on 2026-08-06 (owner: fit the whole
-             handover into roughly one screen of scrolling). The runway is ONLY
-             the scroll budget — it does not change what the panes do, since each
-             still travels exactly one frame height. So shrinking it speeds the
-             choreography up rather than shortening it: at 290svh a crossing
-             spent ~90svh of scroll moving a pane ~100svh (about 1:1), and at
-             110svh it spends ~44svh on the same move, roughly 2.3x scroll speed.
-             That ratio is the thing to feel out — drop this number for a
-             snappier, more parallax-y hero, raise it toward 1:1 for a calmer one.
+             The runway is ONLY the scroll budget. It does not change what the
+             panes do — each still travels exactly one frame height per crossing
+             — so it sets how much SCROLL buys that travel, i.e. the speed of the
+             hero under a finger or a wheel. A crossing spans 0.61 of the runway,
+             so scroll-per-full-pane-travel is 0.61 x this number: at 110svh that
+             was 67svh of scroll for 100svh of pane movement, about 1.5x faster
+             than 1:1, and the owner reported it as far too fast on a phone.
+
+             110svh -> 240svh (owner, 2026-08-09: "way too fast, slow it down a
+             lot"), giving 146svh of scroll per 100svh of travel — roughly 0.7x,
+             comfortably calmer than 1:1 and about 2.2x slower than before. Not
+             back to the old 290svh: the hero no longer has to be scrolled by
+             hand on touch, since one flick snaps a whole slideshow, so a longer
+             runway costs the visitor far less than it did when this was
+             compressed on 2026-08-06.
+
+             NOTE this governs the MANUAL drag only. On touch the handover is
+             usually driven by the snap, whose speed is SNAP_STEP_MS and is
+             independent of this number. Changing one without the other slows
+             half the experience.
+
              The PHASE_* fractions divide whatever budget is set here, so they do
              not need re-tuning alongside it. */
-          height: calc((100svh - var(--site-header-height)) + 110svh);
+          height: calc((100svh - var(--site-header-height)) + 240svh);
         }
 
         .home-hero-stack-frame {
@@ -728,7 +924,9 @@ export default function HomeHeroStack({
           top: var(--site-header-height); /* pinned just below the fixed site header */
           height: calc(100svh - var(--site-header-height));
           overflow: hidden;
-          background: ${DEFAULT_BG};
+          /* Seeded with slideshow A's solid color (A is the resting pane); the
+             scroll handler repaints this with the dominant pane's color. */
+          background: ${paneColors.a};
           /* The hero's bottom separator lives on the frame (not the slideshow
              sections) so no border line sweeps through the crossing. */
           border-bottom: 1px solid rgba(220, 179, 54, 0.22);

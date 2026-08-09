@@ -80,9 +80,19 @@ const nextConfig: NextConfig = {
     // browser gets whichever it supports; both are served at the requested
     // display size, so a full-res source is never shipped to a small card.
     formats: ['image/avif', 'image/webp'],
-    // Next 16 only honors quality values listed here. 90 = visually lossless
-    // for the carousel; 75 is the default used by other <Image> on the site.
-    qualities: [75, 90],
+    // Next 16 only honors quality values listed here — a value not in this list
+    // is served as an error, not silently clamped. 75 is the default used by
+    // other <Image> on the site; 82 is the hero carousel (see below); 90 is
+    // retained so any remaining caller keeps working.
+    //
+    // The carousel moved 90 -> 82 on 2026-08-09. Its cards only ever request
+    // w=640 (measured), so the source is already downscaled hard before quality
+    // is applied, and 90 was buying detail at a size that cannot show it.
+    // Measured on three representative hero photos through this optimizer:
+    // 23.3/39.6/98.1 KB at q90 against 13.0/21.8/50.6 KB at q75 — i.e. quality
+    // is worth roughly half the payload here, which is the single largest
+    // mobile cost in the hero.
+    qualities: [75, 82, 90],
     remotePatterns: [
       {
         protocol: 'https',
