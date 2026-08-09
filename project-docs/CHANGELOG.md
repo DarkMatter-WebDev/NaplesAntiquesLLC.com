@@ -1,5 +1,83 @@
 # Changelog
 
+## 2026-08-08 - SECURITY: a query parameter could disclose any hidden product
+
+**Anyone could read a soft-deleted product by appending `?returnTo=/admin` to
+its URL.** No session, no cookie, nothing. Reproduced against production on all
+three archived products before the fix:
+
+```
+/shop/test-item-111-131                 -> 404
+/shop/test-item-111-131?returnTo=/admin -> 200, full page, "Archived" badge
+```
+
+`?returnTo=/account` did the same. Any `draft` or `pending_payment` product was
+equally exposed.
+
+**The gate was `!visible && !returnHref`**, where `returnHref` came from
+`safeReturnHref()` — which only checks that the string starts with `/admin` or
+`/account`. It is a BACK-LINK VALIDATOR being used as an AUTHORIZATION CHECK.
+Passing the check required knowing that `/admin` is a real path.
+
+**Found by the Deep Field team**, in a port of this same code, and reported to
+us. Their audit of their own 104 routes found this was the only instance of the
+pattern there; the equivalent sweep is now recorded in DECISIONS as a rule.
+
+**Fixed:** visibility requires a real signed-in session; `returnTo` now only
+selects the back-link label and destination.
+
+Two implementation details that matter:
+
+1. **The check must exist in BOTH `generateMetadata` and the page body.** The
+   metadata gate returns the correct 404 for a bare URL, but once a query string
+   makes the route stream, the 200 shell commits before metadata resolves — only
+   the body check actually stops content reaching the wire. Deep Field hit this
+   first and passed it on; it would have been easy to fix only the obvious half
+   and believe it was closed.
+2. **Gated on ANY signed-in session, not admin.** A `returnTo=/account` link is
+   a CUSTOMER returning from order history to a product they bought, which may
+   since have been archived. Admin-only would have broken order history. Both
+   sides settled on the same rule independently.
+
+`generateMetadata` no longer destructures `searchParams` at all — a query
+parameter must not influence disclosure, so it does not read one.
+
+Verified anonymously against every archived product: bare URL, `?returnTo=/admin`
+and `?returnTo=/account` all return **404**. Visible products are unaffected on
+all three, and the "Back to Admin" link still renders.
+
+Gate: `npx tsc --noEmit` clean, `npm run lint` clean, **810/810 tests**.
+
+## 2026-08-08 - Reconciliation feed gains image_count
+
+`/api/integrations/deepfield/product-ids` now returns `image_count` per row.
+
+It closes a real blind spot: a **partial image copy** is invisible to both of
+the other signals. Presence matches (the id is on both sides) and `updated_at`
+matches (a failed image copy does not move the watermark), so a product with
+half its photos missing reconciles as healthy. The count is the only thing that
+catches it without a full re-push.
+
+Always an integer, never omitted — including when `images` is null or malformed.
+The partner treats an absent field as "not comparable", so emitting it
+conditionally would silently disable their drift check on exactly the rows most
+likely to be broken. The `images` array itself is never emitted, only its length.
+
+Verified against the real catalog: 128 rows, `image_count` summing to **974** —
+exactly the image references delivered in the bulk import. Deep Field
+independently pre-verified their side at 974 across the same 128 ids, so the
+first run after deploy should report zero mismatches; a non-empty result will be
+a real regression rather than a cold start.
+
+**`updated_at` is emitted RAW from Postgres** — microsecond precision with a
+`+00:00` offset, not millisecond ISO. That is now pinned with a comment at the
+line itself, because the consumer persists a millisecond copy and the comparison
+depends on `Date.parse` TRUNCATING the surplus digits rather than rounding.
+Truncation is universal in practice but ECMAScript specifies only three
+fractional digits; a rounding runtime would make roughly half the catalog
+compare as permanently stale and drown real drift in false positives. Do not
+"tidy" that line to `toISOString()` in either direction.
+
 ## 2026-08-08 - Daily marketplace price pushes: why they never ran, and four fixes
 
 Owner: "eBay and Etsy price updates are not pushing." Investigation found the

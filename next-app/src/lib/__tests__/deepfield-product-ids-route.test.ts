@@ -83,9 +83,51 @@ describe('GET /api/integrations/deepfield/product-ids', () => {
     expect(legacy.status).toBe('available');
   });
 
-  it('returns id, status and updated_at — and nothing else', async () => {
+  it('returns id, status, updated_at and image_count — and nothing else', async () => {
     const body = await (await GET(req(`Bearer ${TOKEN}`))).json();
-    expect(Object.keys(body.products[0]).sort()).toEqual(['id', 'status', 'updated_at']);
+    expect(Object.keys(body.products[0]).sort())
+      .toEqual(['id', 'image_count', 'status', 'updated_at']);
+  });
+
+  // image_count lets the partner detect a PARTIAL IMAGE COPY, which neither
+  // presence nor updated_at can see — both sides carry an identical id and
+  // watermark while one is missing images.
+  it('reports image_count from the images array', async () => {
+    selectMock.mockResolvedValue({
+      data: [
+        { id: 'three', status: 'available', updated_at: 'x', images: ['a', 'b', 'c'] },
+        { id: 'none', status: 'available', updated_at: 'x', images: [] },
+      ],
+      error: null,
+    });
+    const body = await (await GET(req(`Bearer ${TOKEN}`))).json();
+    const counts = Object.fromEntries(
+      body.products.map((p: { id: string; image_count: number }) => [p.id, p.image_count]),
+    );
+    expect(counts).toEqual({ three: 3, none: 0 });
+  });
+
+  // Always a NUMBER, never omitted. The partner treats an absent field as "not
+  // comparable", so emitting nothing for a malformed row would silently disable
+  // their drift check on exactly the rows most likely to be broken.
+  it('emits 0 rather than omitting the field when images is null or malformed', async () => {
+    selectMock.mockResolvedValue({
+      data: [
+        { id: 'nullimgs', status: 'available', updated_at: 'x', images: null },
+        { id: 'notarray', status: 'available', updated_at: 'x', images: 'oops' },
+      ],
+      error: null,
+    });
+    const body = await (await GET(req(`Bearer ${TOKEN}`))).json();
+    for (const p of body.products) {
+      expect(p).toHaveProperty('image_count');
+      expect(p.image_count).toBe(0);
+    }
+  });
+
+  it('never leaks the images array itself', async () => {
+    const body = await (await GET(req(`Bearer ${TOKEN}`))).json();
+    for (const p of body.products) expect(p).not.toHaveProperty('images');
   });
 
   it('is never cached', async () => {

@@ -196,15 +196,25 @@
   listings outside the selection; fixed there too. **Undeployed — production
   still runs the old code, so eBay's next 7:45 a.m. EDT cron will repeat the
   failures until this ships.**
-- **Deep Field Gallery** is a one-way outbound product push to a separate site,
-  server-side only, sharing nothing but a bearer token — no Supabase credential
-  crosses in either direction and NEJ never touches the Deep Field database.
-  The initial 128-product / 974-image bulk import is **complete and reconciled**
-  against a local Deep Field receiver. The live fire-and-forget hooks (admin
-  save/status-change plus both checkout sold-flip paths) are **code complete but
-  inert** until `DEEPFIELD_SYNC_URL` and `DEEPFIELD_SYNC_TOKEN` are set in
-  Netlify. **Production Deep Field has received nothing.** See
-  `features/deepfield-sync.md`.
+- 🔴 **A live disclosure bug is fixed in the working folder but NOT DEPLOYED:**
+  any hidden product (archived / draft / pending_payment) is readable on
+  production by appending `?returnTo=/admin` to its URL, with no session. The
+  gate used a back-link validator as an authorization check. Found by the Deep
+  Field team in a port of this code. Highest-priority item in the batch — see
+  TASKS and the DECISIONS rule *"A query parameter is never an authorization
+  signal"*.
+- **Deep Field Gallery is LIVE.** One-way outbound product push to a separate
+  site, server-side only, sharing nothing but a bearer token — no Supabase
+  credential crosses either way and NEJ never touches their database. The
+  128-product / 974-image import into **production** is complete and reconciled
+  exactly, the Netlify vars are set, and the hook is proven end to end (a save
+  logs `[deepfield] synced 1 product(s)`). All environments write for real,
+  including local dev, deliberately — so there is no sandbox unless
+  `DEEPFIELD_SYNC_DRY_RUN=true` is set locally. Undeployed: the archived-product
+  push and `image_count`. Their hourly reconciliation cron is built but not yet
+  running, so hard deletes and dropped pushes currently depend on a manual poll.
+  The hooks fire from admin save/status-change and both checkout sold-flip
+  paths. See `features/deepfield-sync.md`.
 - All scheduled-function badges were production-confirmed. The owner has not
   yet deliberately run each live price-push function and checked its resulting
   Admin last-run card/log.

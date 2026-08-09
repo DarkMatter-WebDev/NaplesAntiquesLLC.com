@@ -145,13 +145,40 @@ describe('deep field sync when configured', () => {
     }
   });
 
-  it('never pushes archived (soft-deleted) products', async () => {
+  // Superseded 2026-08-08: this used to assert archived products were NEVER
+  // pushed. Filtering them out meant archiving a product told Deep Field
+  // nothing, so it kept showing an item the storefront had already removed,
+  // silently. Proven live with `test-item-111-131`. They are now pushed
+  // CARRYING their archived status so the partner can hide them.
+  it('pushes an archived product so the partner can hide it', async () => {
     selectIn.mockResolvedValue({
       data: [{ ...productRow('a'), status: 'archived' }],
       error: null,
     });
     await syncProductsToDeepField(['a']);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.products).toHaveLength(1);
+    expect(body.products[0].status).toBe('archived');
+    expect(body.products[0].id).toBe('a');
+  });
+
+  it('normalizes a legacy title-case status on the way out', async () => {
+    selectIn.mockResolvedValue({ data: [{ ...productRow('a'), status: 'Sold' }], error: null });
+    await syncProductsToDeepField(['a']);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).products[0].status).toBe('sold');
+  });
+
+  it('still sends an archived product alongside live ones in one batch', async () => {
+    selectIn.mockResolvedValue({
+      data: [productRow('live'), { ...productRow('gone'), status: 'archived' }],
+      error: null,
+    });
+    await syncProductsToDeepField(['live', 'gone']);
+    const sent = fetchMock.mock.calls
+      .flatMap((c) => JSON.parse(c[1].body).products)
+      .map((p: { id: string; status: string }) => [p.id, p.status]);
+    expect(sent).toEqual(expect.arrayContaining([['live', 'available'], ['gone', 'archived']]));
   });
 
   // Superseded 2026-08-08: this used to assert 25 products per request, which

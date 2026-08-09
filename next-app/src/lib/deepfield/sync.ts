@@ -46,10 +46,19 @@ const MAX_ATTEMPTS = 3;
  * added ~10s to the suite otherwise. Unset in every real environment, where the
  * 1500ms default applies.
  */
-const RETRY_BASE_DELAY_MS = Number(process.env.DEEPFIELD_SYNC_RETRY_DELAY_MS ?? 1500);
+// Read at CALL time, not module load. As a module-level const this captured
+// whatever the env held at import, which is before a test's beforeEach can set
+// it — so the override silently did nothing and three retrying tests each slept
+// through the real 1.5s/3s backoff. Reading lazily also means a deployed
+// environment can change it without a rebuild.
+const retryBaseDelayMs = () => Number(process.env.DEEPFIELD_SYNC_RETRY_DELAY_MS ?? 1500);
 
-/** Archived is NEJ's soft-delete. Never push soft-deleted rows to a partner. */
-const EXCLUDED_STATUSES = new Set(['archived']);
+// There is deliberately NO status exclusion list here any more. Archived rows
+// are pushed WITH `status: 'archived'` so the partner can hide them; filtering
+// them out silently left a deleted product live on their side. The bulk-import
+// script still excludes archived rows, because a first-time import should not
+// seed a partner with soft-deleted history — that is a different question from
+// notifying them of a change.
 
 export interface DeepFieldBatchResult {
   ok: boolean;
@@ -193,7 +202,7 @@ async function postBatchWithRetry(
     if (last.ok || !isRetryable(last)) return last;
 
     if (attempt < MAX_ATTEMPTS) {
-      const delay = RETRY_BASE_DELAY_MS * attempt; // linear; the caller is not waiting on us
+      const delay = retryBaseDelayMs() * attempt; // linear; the caller is not waiting on us
       console.warn(
         `[deepfield] attempt ${attempt}/${MAX_ATTEMPTS} failed `
         + `(HTTP ${last.status ?? 'network'}); retrying in ${delay}ms`,
@@ -237,9 +246,21 @@ export async function syncProductsToDeepField(productIds: string[]): Promise<voi
       return;
     }
 
-    const products = ((data ?? []) as Product[]).filter(
-      (product) => !EXCLUDED_STATUSES.has(String(product.status).toLowerCase()),
-    );
+    // Archived products ARE sent, carrying `status: 'archived'`, so Deep Field
+    // can hide them (owner, 2026-08-08). They used to be filtered out on the
+    // reasoning that a soft-deleted row should not be pushed to a partner —
+    // but the effect was that archiving something told Deep Field NOTHING, so
+    // it kept showing a product the storefront had already removed, with no
+    // error anywhere. Proven live with `test-item-111-131`.
+    //
+    // This does NOT remove the need for the reconciliation endpoint. Two things
+    // it still cannot cover:
+    //   - a HARD delete (AdminShell's "delete permanently"): the row is gone
+    //     before this function re-reads it, so there is nothing to send at all;
+    //   - a dropped delivery: this path is fire-and-forget with no durable
+    //     queue, so a partner outage past the retries loses the notice for good.
+    // Both are latency-free to detect via /api/integrations/deepfield/product-ids.
+    const products = (data ?? []) as Product[];
     if (products.length === 0) return;
 
     const payloads: DeepFieldProductPayload[] = [];
@@ -258,14 +279,30 @@ export async function syncProductsToDeepField(productIds: string[]): Promise<voi
       const label = config.dryRun ? 'dry-run ' : '';
       if (!result.ok) {
         const images = batch.reduce((n, p) => n + (p.images?.length ?? 0), 0);
+        // Log the PRODUCT IDS, not just a count. Without them this line says
+        // "something failed" and leaves no way to recover the specific rows —
+        // and Netlify retains function logs for only ~24h, so a count alone is
+        // unrecoverable the next day.
+        const ids = batch.map((p) => p.id).join(', ');
         console.error(
-          `[deepfield] ${label}batch of ${batch.length} product(s)/${images} image(s) failed after `
-          + `${MAX_ATTEMPTS} attempt(s): HTTP ${result.status ?? 'network'} ${result.error ?? ''}`,
+          `[deepfield] ${label}UNDELIVERED after ${MAX_ATTEMPTS} attempt(s): `
+          + `${batch.length} product(s)/${images} image(s), `
+          + `HTTP ${result.status ?? 'network'} ${result.error ?? ''} — ids: ${ids}`,
         );
         // Later batches are independent products; keep going rather than
-        // abandoning them because one batch failed. There is no durable queue,
-        // so these products are simply not delivered — Deep Field reconciles
-        // them via the id-list endpoint (api/integrations/deepfield/product-ids).
+        // abandoning them because one batch failed.
+        //
+        // ⚠️ THERE IS NO DURABLE RECORD OF THIS. Deliberately: a durable queue
+        // means a table plus a worker, and this path runs inside order captures
+        // where a partner outage must never fail a customer's payment. The
+        // consequence is that these products are simply not delivered and
+        // nothing in the app will ever notice.
+        //
+        // The intended backstop is the partner polling
+        // /api/integrations/deepfield/product-ids and comparing `updated_at`,
+        // not just presence — a dropped UPDATE leaves the id present on both
+        // sides with a stale copy on theirs. Until they do that, this log line
+        // is the only trace.
         continue;
       }
       if (result.failed) {

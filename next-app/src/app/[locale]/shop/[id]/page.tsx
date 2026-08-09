@@ -4,6 +4,8 @@ import { alternatesFor } from '@/lib/seo';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createPublicClient } from '@/lib/supabase/public';
+import { createClient } from '@/lib/supabase/server';
+import { getVerifiedUser } from '@/lib/auth-claims';
 import {
   inferProductJewelryType,
   isDarkProductBackground,
@@ -193,9 +195,11 @@ export async function generateStaticParams() {
   ]);
 }
 
-export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+// `searchParams` is deliberately NOT destructured here: metadata no longer
+// reads `returnTo`, because a query parameter must not influence whether a
+// hidden product is disclosed. Visibility is decided by the session alone.
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, id } = await params;
-  const query = searchParams ? await searchParams : {};
   const { data } = await fetchPublicProduct(id);
 
   // Throw notFound() here — before the streaming boundary (loading.tsx) commits a
@@ -203,9 +207,14 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   // soft-404. (A notFound() in the page body below would already be too late.)
   if (!data) notFound();
 
-  const returnHref = safeReturnHref(query.returnTo, locale);
   const visible = isProductVisibleInShop(data.status);
-  if (!visible && !returnHref) notFound();
+  // See viewerMaySeeHiddenProduct: the return link decides the BACK BUTTON, a
+  // session decides VISIBILITY — so `returnTo` is deliberately not read here at
+  // all any more. This gate must also exist in the page body —
+  // metadata alone returns the right 404 for a bare URL, but once a query
+  // string makes this route stream, the 200 shell commits before metadata
+  // resolves and only the body check stops the content being emitted.
+  if (!visible && !(await viewerMaySeeHiddenProduct())) notFound();
 
   const isEs = locale === 'es';
   const title = (isEs && data.title_es) ? data.title_es : data.title;
@@ -254,6 +263,31 @@ function formatInventoryReference(value: string | number | null | undefined): st
   return normalized || null;
 }
 
+/**
+ * Whether a HIDDEN product (archived / draft / pending_payment) may be rendered.
+ *
+ * A `returnTo` param alone is NOT sufficient and never was. `safeReturnHref`
+ * only checks that the string starts with /admin or /account — it is a
+ * back-link validator, not an authorization check. Until 2026-08-08 the gate
+ * was `!visible && !returnHref`, so ANY anonymous visitor could append
+ * `?returnTo=/admin` to a soft-deleted product URL and read the full page.
+ * Verified live in production against all three archived products before the
+ * fix; found by the Deep Field team in a port of this same code.
+ *
+ * Gate on a real session, not on admin: a `returnTo=/account` link is a CUSTOMER
+ * returning from their order history to a product they bought, which may since
+ * have been archived. Requiring admin would break that legitimate path.
+ */
+async function viewerMaySeeHiddenProduct(): Promise<boolean> {
+  try {
+    const supabase = await createClient();
+    return (await getVerifiedUser(supabase)) != null;
+  } catch {
+    // Fail closed: if the session cannot be established, treat as anonymous.
+    return false;
+  }
+}
+
 function safeReturnHref(value: string | undefined, locale: string): string | null {
   if (!value) return null;
   const normalized = value.trim();
@@ -293,7 +327,10 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   if (error || !product) notFound();
 
   const p = product as Product;
-  if (!isProductVisibleInShop(p.status) && !returnHref) notFound();
+  // The load-bearing half of the gate — see generateMetadata above. A streaming
+  // response has already committed a 200 by the time this runs, so this is what
+  // actually prevents a hidden product's content reaching the wire.
+  if (!isProductVisibleInShop(p.status) && !(await viewerMaySeeHiddenProduct())) notFound();
 
   const publicSettingsClient = createPublicClient();
   const [spotData, productVideo, visibility] = await Promise.all([

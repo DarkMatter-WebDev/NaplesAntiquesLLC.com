@@ -1661,6 +1661,41 @@ not a marketing banner.
 
 ## Security And Privacy
 
+### A query parameter is never an authorization signal
+
+Established 2026-08-08 after a live disclosure bug: `?returnTo=/admin` on a
+soft-deleted product URL returned the full page to an anonymous visitor. The
+gate was `!visible && !returnHref`, where `returnHref` came from a helper whose
+only job is validating that a back-link points somewhere sensible. **A
+validator that answers "is this string a plausible internal path" was standing
+in for "may this viewer see this".** Passing it required knowing that `/admin`
+exists.
+
+Rules that follow:
+
+1. **Visibility is decided by session/role. Parameters decide presentation.**
+   A `returnTo` may choose a back-link's label and destination and nothing else.
+   If a parameter's presence changes what data is disclosed, that is the bug.
+2. **Gate on the WEAKEST sufficient identity, not the strongest.** This one is
+   any signed-in user, not admin — `returnTo=/account` is a customer returning
+   from order history to a product they bought that has since been archived.
+   Requiring admin would have broken a legitimate path and invited someone to
+   loosen it again later.
+3. **A streaming route needs the check in BOTH `generateMetadata` and the page
+   body.** Metadata alone gives the correct 404 for a bare URL, but once a query
+   string makes the route stream, the 200 shell commits before metadata
+   resolves; only the body check stops content reaching the wire. Fixing the
+   obvious half looks complete and is not.
+4. **Do not read the parameter where it is not needed.** `generateMetadata` no
+   longer destructures `searchParams` at all, so the disclosure decision cannot
+   accidentally depend on one again.
+
+When this class is found, sweep for siblings rather than fixing the instance:
+every route reading a query parameter without a session/cron guard, OAuth
+callbacks that read `code`/`state` before authenticating, and list endpoints
+where a status filter from the query could widen rather than narrow a visibility
+allowlist (AND it with the allowlist, never replace it).
+
 ### Abuse controls are layered
 
 Netlify Edge provides broad per-IP `/api/*` limiting before Next runs.

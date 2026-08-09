@@ -158,9 +158,75 @@ Recommended per environment:
 | Local `.env.local` | `http://127.0.0.1:3000/...` | unset (local receiver, safe to write) |
 | Local, pointed at production | production Deep Field | **`true` — mandatory** |
 
+## Reconciliation endpoint (the correctness floor)
+
+```
+GET /api/integrations/deepfield/product-ids
+Authorization: Bearer <DEEPFIELD_SYNC_TOKEN>   ← the same token the push uses
+```
+
+Read-only, no side effects, safe to poll. Deliberately reuses the push token so
+the integration stays ONE credential in both directions.
+
+```json
+{
+  "generatedAt": "2026-08-08T18:44:17.981Z",
+  "count": 128,
+  "products": [
+    {
+      "id": "10k-cuban-link-chain-01",
+      "status": "available",
+      "updated_at": "2026-08-07T13:00:55.669721+00:00",
+      "image_count": 6
+    }
+  ]
+}
+```
+
+**Why it exists.** The push is fire-and-forget with no durable queue, and NEJ
+supports a hard delete that leaves no tombstone. Two failure classes are
+therefore invisible to the push and to NEJ itself:
+
+- a **hard delete** — the row is gone before the hook re-reads it, so no push is
+  possible by construction;
+- a **dropped delivery** — after 3 retries the change is abandoned. There is no
+  database record and no alert; the only trace is a `console.error` naming the
+  affected product ids in a Netlify log that expires in ~24h.
+
+Archived rows are excluded from the feed, so an archive is visible to the
+consumer both as an explicit push (`status: 'archived'`) and as absence here.
+Those must be idempotent on the consumer's side; they are, verified in both
+orders.
+
+**Failure modes are deliberately distinguishable from an empty catalog**, because
+"empty" would read as *delete everything*: **503** `not_configured`, **401**
+`unauthorized`, **502** `read_failed` — none carry a `products` key. Only a 200
+carrying `products` is authoritative.
+
+**`image_count`** (2026-08-08) catches a **partial image copy**, which neither
+of the other signals can see: the id matches and `updated_at` does not move when
+image copying fails. Always an integer, never omitted — including for a null or
+malformed `images` array, because the consumer treats absent as "not comparable"
+and omitting it would disable the check on exactly the rows most likely to be
+broken. The `images` array itself is never emitted.
+
+**`updated_at` is RAW Postgres output** — microsecond precision with a `+00:00`
+offset, NOT millisecond ISO. **Do not normalize it in either direction.** The
+consumer persists a millisecond copy, so the comparison relies on `Date.parse`
+TRUNCATING the surplus digits rather than rounding. Truncation is universal in
+practice, but ECMAScript specifies only three fractional digits and leaves the
+rest implementation-defined; under a rounding runtime roughly half the catalog
+would compare as permanently stale and real drift would drown in false
+positives. Pinned with a comment at the emitting line.
+
 ## Gotchas
 
-- **Batch cap is 25**, enforced by the receiver. `BATCH_SIZE` must not exceed it.
+- **Batch cap is 25**, enforced by the receiver — but **25 is unreachable in
+  production**. The receiver copies images synchronously inside the request, so
+  wall-clock scales with IMAGES, not products (2–19 per product, avg 7.6). A
+  3-product batch carrying 38 images died at a gateway "Inactivity Timeout"
+  while one carrying 17 succeeded. Batches are budgeted at **18 images / 3
+  products**; see `chunkByImageBudget`.
 - **A full batch takes minutes** because Deep Field copies every image before
   responding. Node's `fetch` (undici) has a hard **5-minute header timeout** that
   is not adjustable without the undici Agent API; the one-off import script hit
@@ -174,12 +240,34 @@ Recommended per environment:
   else.
 - Do not add a `NEXT_PUBLIC_` variant of the token under any circumstances.
 
-## Status
+## Status (2026-08-08)
 
-**Initial bulk import: complete.** 128 products / 974 images delivered to the
-local Deep Field receiver in 6 batches, all HTTP 200, 0 failed, 128/128 ids
-acknowledged with `destinationProductId === sourceProductId`. One transient
-`502 Bad Gateway` on a single image was fixed by re-sending that product.
+**Production bulk import: complete and reconciled.** 128 products / 974 images
+into production Deep Field across 67 requests, all HTTP 200, 0 failed. 128 sent,
+128 acknowledged, 0 missing, 0 unexpected, 0 id remapping. One transient
+`Bad Request` on a single image cleared on a re-send of that product.
 
-**Live hooks: code complete, unconfigured.** The env vars are not yet set, so
-the hooks are inert. Nothing has been pushed to production Deep Field.
+Getting there took three attempts and is why the image budget exists: a
+25-product run died at a gateway timeout, then a 3-product run died at batch 17
+(38 images). See Gotchas.
+
+**Live hooks: ARMED in production, and proven.** `DEEPFIELD_SYNC_URL` and
+`DEEPFIELD_SYNC_TOKEN` are set on the NEJ Netlify project across all deploy
+contexts. A product saved in admin logs `[deepfield] synced 1 product(s)` and
+the receiver returns 200 — verified end to end from local dev.
+
+Because the vars are set for **all 5 contexts**, Deploy Previews also push to
+the live gallery. Intended (dev shares production Supabase, so a dev save IS a
+real change), but it means **no environment writes to a sandbox** — set
+`DEEPFIELD_SYNC_DRY_RUN=true` locally if a safe one is ever needed.
+
+**Undeployed at time of writing:** the archived-product push, `image_count`, and
+the `returnTo` visibility fix. Until they ship, archives reach Deep Field only by
+vanishing from the reconciliation feed.
+
+**Deep Field side:** reconciliation poll built (hourly, comparing `updated_at`
+and presence, with a 20% shrink guard) but **not yet running in production** —
+they poll manually. Their first run found real drift: `test-item-111-131` was
+displaying as available after being archived on NEJ, exactly the gap the push
+could not cover. Their image copying is content-addressed with `upsert: true`,
+so the repeated import attempts produced zero duplicate objects.

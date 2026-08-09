@@ -156,6 +156,29 @@ orders.
 **NODE_VERSION = "20"** and `package.json` declares no `engines`. Local green
 builds are therefore strong but not identical to the production build.
 
+## 🔴 DEPLOY BLOCKS A LIVE SECURITY FIX
+
+**Any hidden product is currently readable on production by appending
+`?returnTo=/admin` to its URL.** No session required. Reproduced on all three
+archived products; `?returnTo=/account` works identically, and `draft` /
+`pending_payment` items are equally exposed. Found by the Deep Field team in a
+port of this code.
+
+Fixed in the working folder and verified anonymously — bare, `?returnTo=/admin`
+and `?returnTo=/account` all 404 for hidden products, visible products
+unaffected — but **the fix is undeployed, so the hole is live.**
+
+This is the highest-priority item in the current batch. Full detail in
+CHANGELOG; the durable rule is in DECISIONS under *"A query parameter is never
+an authorization signal"*.
+
+- ◻️ **After deploying, re-verify against production:**
+  `curl -o /dev/null -w "%{http_code}" "https://naplesestatejewelry.com/shop/test-item-111-131?returnTo=/admin"`
+  must return **404**, not 200.
+- ◻️ **Consider shipping this alone.** The current batch also carries marketplace
+  fixes, an integration change, and UI work; a security fix is easier to attribute
+  and roll back on its own.
+
 ## 🔴 Contact Address Moved To .com — TWO THINGS TO VERIFY
 
 The public contact mailbox changed `info@naplesestatejewelry.co` →
@@ -250,50 +273,54 @@ default.
 
 ## Deep Field Gallery Sync
 
-Bulk import is **done and verified**; the live hooks are **code complete but
-inert**. See `features/deepfield-sync.md`.
+**LIVE.** Bulk import complete against production, live hooks armed and proven.
+See `features/deepfield-sync.md`.
 
-- ⚠️ **OWNER: set two Netlify env vars to activate the live sync.** They go on
-  **NEJ's** Netlify site, not Deep Field's — NEJ is the sender and the only side
-  that reads them. Until they are set, `syncProductsToDeepField` returns
-  immediately and nothing is pushed.
-  - `DEEPFIELD_SYNC_URL` = `https://deepfieldgallery.com/api/integrations/naples/products`
-  - `DEEPFIELD_SYNC_TOKEN` = the shared bearer token — the **same value** Deep
-    Field stores as `NAPLES_PRODUCT_SYNC_SECRET`.
-  - **Server-only. Never add a `NEXT_PUBLIC_` variant** — that would publish the
-    token in the browser bundle.
-  - Optional `DEEPFIELD_SYNC_DRY_RUN=true` runs the full path without writing.
-    Set it on **Deploy Previews and Branch deploys**, or a preview build will
-    push real products to the live gallery.
-- ✅ **`.env.local` is DONE (2026-08-08).** All three keys appended to
-  `next-app/.env.local`, pointed at the **local** receiver
-  (`http://127.0.0.1:3000/...`) with `DEEPFIELD_SYNC_DRY_RUN=false`. Edited
-  surgically without reading the file into context: 36 → 39 keys, zero original
-  keys lost, original bytes preserved byte-for-byte, CRLF and no-BOM intact.
-  Confirmed through `@next/env` — Next's own loader — that the token parses as
-  77 chars with no quotes or whitespace, fingerprint `d58afd7efa5a`, matching
-  the token that authenticated the 128-product import. File is gitignored
-  (`next-app/.gitignore:37`) and never deploys.
-- ⚠️ **Local dev shares production's Supabase database.** If `.env.local` is ever
-  repointed at production Deep Field, set `DEEPFIELD_SYNC_DRY_RUN=true` first or
-  local admin saves write real rows and copy real images into the live gallery.
-- ⚠️ **Production Deep Field has received nothing.** The 128-product import went
-  to `http://127.0.0.1:3000` only. Re-running against
-  `https://deepfieldgallery.com` is a separate, owner-approved step.
-- 🔎 **Deep Field side to confirm** (theirs to check — NEJ must not inspect their
-  database or storage):
-  - Whether the batch-4 image that first failed with `502` is now present.
-    `copiedImageCount` reported 6 of 6 *while* warning one upload failed, so that
-    counter is not proof of storage.
-  - Whether duplicate storage objects exist. Batches 2 and 3 were each sent
-    twice (a client-side `fetch` header timeout, since fixed), and the single
-    product re-send re-copied all 6 of its images.
-  - That pricing resolved: `heavy-italian-…-53-91g-21` → **$5,489** (live
-    spot-multiplier) and `18k-heraldic-cross-band-ring-01` → **$1,980.94**
-    (locked `sold_price`).
-- ◻️ **No deletion signal exists.** NEJ supports a hard delete and leaves no
-  tombstone, so Deep Field cannot learn about removals from the push alone. A
-  periodic full-id reconciliation is the only fix; not built.
+- ✅ **Production import done and reconciled (2026-08-08).** 128 products / 974
+  images, 67 requests, all HTTP 200, 0 failed. 128 sent, 128 acknowledged, 0
+  missing, 0 unexpected, 0 id remapping.
+- ✅ **Netlify env vars set on the NEJ project** — `DEEPFIELD_SYNC_URL` and
+  `DEEPFIELD_SYNC_TOKEN`, Builds/Functions/Runtime, all 5 deploy contexts. No
+  `DEEPFIELD_SYNC_DRY_RUN` exists, so nothing is silently no-op'd.
+- ✅ **Live hook proven end to end.** A product saved in admin logs
+  `[deepfield] synced 1 product(s)` and the receiver returns 200.
+- ✅ **`.env.local` points at PRODUCTION Deep Field** (not the local receiver),
+  so dev writes propagate exactly like production. Deliberate — dev shares
+  production Supabase, so a dev save is a real product change and must not
+  silently skip the partner.
+
+  ⚠️ **Consequence: no environment writes to a sandbox.** Every save from
+  anywhere is real. Set `DEEPFIELD_SYNC_DRY_RUN=true` in `.env.local` if a safe
+  one is ever needed — it exercises the whole path and tells the receiver to
+  validate and discard.
+
+- 🔴 **UNDEPLOYED and waiting on the next deploy:**
+  - the **archived-product push** (`status: 'archived'`), so archives currently
+    reach Deep Field only by vanishing from the reconciliation feed;
+  - **`image_count`** in the reconciliation feed — Deep Field's reconciler is
+    built, forward-compatible, and reports `imageCountComparable: false` until
+    it ships;
+  - the **`returnTo` visibility fix** (see the security block at the top).
+- ◻️ **Deep Field side, not yet running in production:** their hourly
+  reconciliation cron is written and tested but undeployed; they poll manually.
+  Until it runs, hard deletes and dropped pushes depend on someone remembering.
+  Their first manual run found real drift — `test-item-111-131` displaying as
+  available after being archived here — which is exactly the class the push
+  cannot cover.
+- ✅ **Deep Field confirmed on their side:** zero duplicate storage objects
+  (content-addressed paths with `upsert: true`, so the 2–3× re-sends were
+  provably idempotent); pricing computed live from `pricing_multiplier` with the
+  sold lock holding; 128 rows matching; `jewelry_type` free text and hex
+  `image_padding` both accepted; the 9-image spoon complete.
+- ◻️ **`deleted_at` tombstone: withdrawn, do not build.** Deep Field checked
+  whether the archived-vs-hard-deleted distinction drives different behavior on
+  their side; it does not — absence produces "hide" either way. Reconciliation
+  by absence already covers both.
+- ◻️ **Re-measure the image-copy budget after Deep Field deploys.** Their
+  concurrency change (sequential → 6 parallel) is not live yet, so the 19-image
+  timings taken so far (cold 21.1s / warm avg 11.6s / best 9.1s) measured the
+  OLD sequential path. The 18-image budget stays regardless unless a
+  re-measurement plus the timeout asymmetry justifies otherwise.
 
 ## Next Deployment And Production Smoke
 

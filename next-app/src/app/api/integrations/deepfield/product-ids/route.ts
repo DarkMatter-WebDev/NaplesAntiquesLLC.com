@@ -63,9 +63,13 @@ export async function GET(request: NextRequest) {
   }
 
   const service = createServiceClient();
+  // `images` is selected only to derive a COUNT — the array itself is never
+  // emitted. The count lets the partner detect image drift (a partial copy),
+  // which neither presence nor `updated_at` can see: a product whose images
+  // failed to copy has an identical id and watermark on both sides.
   const { data, error } = await service
     .from('products')
-    .select('id, status, updated_at')
+    .select('id, status, updated_at, images')
     .order('id', { ascending: true });
 
   if (error) {
@@ -81,7 +85,24 @@ export async function GET(request: NextRequest) {
     .map((row) => ({
       id: row.id as string,
       status: normalizeProductStatus(row.status),
+      // Emitted RAW from Postgres — microsecond precision with a +00:00 offset
+      // (e.g. "2026-08-07T13:00:55.669721+00:00"), NOT millisecond ISO.
+      //
+      // Do not "tidy" this to `new Date(...).toISOString()`. Consumers compare
+      // this as their staleness watermark, and the Deep Field reconciler
+      // persists a millisecond copy — so the comparison depends on Date.parse
+      // TRUNCATING the surplus digits rather than rounding. Truncation is what
+      // every engine does, but ECMAScript specifies only three fractional
+      // digits and leaves more implementation-defined. Silently changing the
+      // precision here, in either direction, moves that boundary for every
+      // consumer at once; a rounding runtime would make roughly half the
+      // catalog compare as permanently stale and drown real drift in false
+      // positives. Their side pins this with tests (2026-08-08).
       updated_at: row.updated_at as string,
+      // Always a number, never omitted — the partner treats an absent field as
+      // "not comparable", so emitting it conditionally would silently disable
+      // their drift check for exactly the rows most likely to be broken.
+      image_count: Array.isArray(row.images) ? row.images.length : 0,
     }));
 
   return NextResponse.json(
