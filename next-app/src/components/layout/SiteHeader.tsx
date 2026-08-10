@@ -317,6 +317,7 @@ export default function SiteHeader() {
     { key: 'silverServices' as const, path: '/silver-services' },
     { key: 'bullion' as const, path: '/bullion' },
     { key: 'tradeIn' as const, path: '/trade-in' },
+    { key: 'freeEvaluation' as const, path: '/free-evaluation' },
   ];
 
   const ABOUT_ITEMS = [
@@ -442,11 +443,10 @@ export default function SiteHeader() {
             aria-label="Saved items"
           >
             <AppIcon name="favorite"
-              
+              fill={wishlistCount > 0 ? 'currentColor' : 'none'}
               style={{
                 fontSize: 'var(--site-header-action-icon-size, 20px)',
                 lineHeight: 1,
-                fontVariationSettings: wishlistCount > 0 ? "'FILL' 1" : "'FILL' 0",
               }}
              />
             {wishlistCount > 0 && (

@@ -7,7 +7,7 @@ import SiteFooter from '@/components/layout/SiteFooter';
 import { CardGrid, PageContainer, Section } from '@/components/layout/ResponsiveLayout';
 import HomeHeroStack from '@/components/home/HomeHeroStack';
 import HomeBootSplash from '@/components/home/HomeBootSplash';
-import ServiceIconCanvas from '@/components/home/ServiceIconCanvas';
+import ClayMark from '@/components/ClayMark';
 import TestimonialsSection from '@/components/home/TestimonialsSection';
 import { getHomeCarouselPayload } from '@/lib/home-carousel-server';
 import type { CarouselItem } from '../../../../carousel/lib/carouselData';
@@ -110,7 +110,6 @@ export default async function HomePage({ params }: Props) {
           <CardGrid className="md:grid-cols-3">
             {[
               {
-                icon: '💛',
                 title: isEs ? 'Compramos Oro' : 'We Buy Gold',
                 body: isEs
                   ? 'Evaluaciones gratuitas en el acto para todas las piezas de oro.'
@@ -119,7 +118,6 @@ export default async function HomePage({ params }: Props) {
                 cta: isEs ? 'Evaluación gratuita →' : 'Free evaluation →',
               },
               {
-                icon: '🏆',
                 title: isEs ? 'Vendemos Joyas' : 'We Sell Jewelry',
                 body: isEs
                   ? 'Cadenas, pulseras, anillos y piezas de diseñador con precios transparentes.'
@@ -128,7 +126,6 @@ export default async function HomePage({ params }: Props) {
                 cta: isEs ? 'Ver tienda →' : 'Browse shop →',
               },
               {
-                icon: '📞',
                 title: isEs ? 'Contacto Directo' : 'Direct Contact',
                 body: isEs
                   ? 'Hable con nosotros directamente — sin intermediarios.'
@@ -143,7 +140,7 @@ export default async function HomePage({ params }: Props) {
                 style={{ borderColor: 'rgba(115, 92, 0, 0.16)' }}
               >
                 <div className="transition duration-300 group-hover:-translate-y-0.5">
-                  <ServiceIconCanvas kind={index === 0 ? 'gold' : index === 1 ? 'jewelry' : 'contact'} />
+                  <ClayMark name={index === 0 ? 'goldbar' : index === 1 ? 'ring' : 'phone'} size={88} />
                 </div>
                 {/* h2, not h3: these three cards are top-level page sections
                     with no parent h2 above them, so h3 skipped a level and left

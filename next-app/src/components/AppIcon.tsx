@@ -17,6 +17,7 @@ import {
   CircleDollarSign,
   CirclePlay,
   CircleStop,
+  Coffee,
   Coins,
   Crop,
   Eye,
@@ -109,6 +110,9 @@ export const APP_ICONS = {
   description: FileText,
   diamond: Gem,
   dining: Utensils,
+  // Tea/holloware services, so the silver page stops using one Utensils icon
+  // for two different product families.
+  emoji_food_beverage: Coffee,
   draft: FilePenLine,
   drag_indicator: GripVertical,
   edit: Pencil,
@@ -199,9 +203,21 @@ export function AppIcon({
   // safely by omitting the decorative graphic.
   if (!Icon) return null;
 
-  const fontVariationSettings = style?.fontVariationSettings;
-  const shouldFill = typeof fontVariationSettings === 'string'
-    && /(?:^|[,\s])['"]?FILL['"]?\s+1(?:$|[,\s])/.test(fontVariationSettings);
+  // `fontVariationSettings` is meaningless on an SVG — it is a Material Symbols
+  // leftover — so it is stripped rather than forwarded to the DOM.
+  //
+  // It used to do more than that: a "'FILL' 1" value was translated into
+  // fill="currentColor". That bridge made sense while the icons were a variable
+  // FONT, where FILL swaps to a solid-with-knockout glyph. On a Lucide OUTLINE
+  // icon it does something quite different — it floods the shape with the
+  // current colour and the interior detail vanishes, because every internal
+  // mark is a same-coloured STROKE. A filled circle-check is a plain disc; a
+  // filled gem, watch or badge is an unreadable blob. Removed 2026-08-09 after
+  // 14 of 24 icons on /free-evaluation rendered as solid silhouettes.
+  //
+  // Icons that genuinely should be solid (a saved heart, a rating star) now say
+  // so directly with fill="currentColor" at the call site, which is explicit and
+  // cannot be triggered by a stale copy-pasted style object.
   const svgStyle = style
     ? ({ ...style, fontVariationSettings: undefined } satisfies CSSProperties)
     : undefined;
@@ -211,7 +227,7 @@ export function AppIcon({
       {...props}
       aria-hidden={ariaHidden}
       className={['app-icon', className].filter(Boolean).join(' ')}
-      fill={fill ?? (shouldFill ? 'currentColor' : 'none')}
+      fill={fill ?? 'none'}
       focusable="false"
       size="1em"
       strokeWidth={strokeWidth}

@@ -632,7 +632,10 @@ export default function ProductCard({
                 fontFamily: 'var(--font-label)',
               }}
             >
-              <span className="normal-case">Ca.</span> {itemDateLabel}
+              {/* The "Ca." prefix is its own element so a narrow card can drop
+                  it and keep the bare year in place (owner, 2026-08-09). See
+                  the @container rule in the stylesheet below. */}
+              <span className="modern-card-date-prefix normal-case">Ca.</span> {itemDateLabel}
             </span>
           )}
           <span
@@ -895,6 +898,42 @@ export default function ProductCard({
             background: none !important;
             border: none !important;
             border-radius: 0 !important;
+            /* Query container for the date rule below. It must be the ROW, not
+               the viewport: the shop grid is 1-up at 320px (273px row), 2-up by
+               390px (161px), and 4-up at 1280px (177px), so row width is NOT
+               monotonic in viewport width and a media query would size for the
+               wrong box. Safe to add here because the row is already
+               position:relative and therefore already the containing block for
+               the two absolutely positioned children.
+               (No backticks anywhere in this stylesheet — it is a template
+               literal and one would end it mid-file.) */
+            container-type: inline-size;
+          }
+          /* Three things share this row: the date (absolute, left), the price
+             (centred, in flow) and the width chip (absolute, right). "Ca. 1960"
+             is 56px and the catalog's widest price is 67px ($2,394.56), which
+             together with the 41px chip and the gaps needs about 187px of row.
+             A 2-up phone card gives 161px and a desktop card 177px, so they
+             collided — measured -9px on production, the date printing INTO the
+             price.
+
+             When it does not fit, DROP THE "Ca." PREFIX rather than reflowing
+             the date somewhere else (owner, 2026-08-09). The bare year is about
+             26px, which clears the widest price with ~29px to spare even on the
+             narrowest card, so the label stays exactly where it belongs — in
+             the left slot, on the price line — and no card changes height.
+             An earlier attempt moved the date onto its own centred line above
+             the price; it worked, but it made every card ~14px taller.
+
+             The threshold is a CONTENT width and is keyed to the WORST-CASE
+             price, because one colliding card is the bug: keeping the prefix
+             needs 2 x (56 - 7.2 + 4) + 67 = 173px, so 185px leaves margin.
+             Re-derive it if the label size, the row padding, or the widest
+             price in the catalog changes. */
+          @container (max-width: 185px) {
+            .modern-product-card .modern-card-date-prefix {
+              display: none;
+            }
           }
           .modern-product-card .modern-price-label {
             display: none;

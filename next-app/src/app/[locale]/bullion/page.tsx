@@ -7,6 +7,7 @@ import SiteFooter from '@/components/layout/SiteFooter';
 import TradingViewMini from '@/components/trading/TradingViewMini';
 import TradingViewTicker from '@/components/trading/TradingViewTicker';
 import { AppIcon } from '@/components/AppIcon';
+import ClayMark from '@/components/ClayMark';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -31,27 +32,27 @@ const CHARTS = [
 
 const PROCESS_STEPS = [
   {
-    icon: 'inventory_2',
+    mark: 'goldbar',
     titleEn: '1. Identify & Sort',
     titleEs: '1. Identificar y Clasificar',
     descEn: 'We separate bullion, coins, sterling, scrap gold, platinum, and palladium, then note maker marks, denominations, and purity stamps.',
     descEs: 'Separamos lingotes, monedas, plata esterlina, chatarra de oro, platino y paladio, luego anotamos marcas del fabricante, denominaciones y sellos de pureza.',
   },
   {
-    icon: 'scale',
+    mark: 'scale',
     titleEn: '2. Test, Weigh & Calculate',
     titleEs: '2. Probar, Pesar y Calcular',
     descEn: 'Each item is weighed and checked for purity. The offer is based on verified precious-metal content and the current live market.',
     descEs: 'Cada artículo se pesa y verifica su pureza. La oferta se basa en el contenido de metal precioso verificado y el mercado actual en vivo.',
   },
   {
-    icon: 'payments',
+    mark: 'cash',
     titleEn: '3. Clear Offer & Payment',
     titleEs: '3. Oferta Clara y Pago',
     descEn: 'We walk through the math before you decide. If the offer works for you, payment is made the same day by cash, check, or wire.',
     descEs: 'Revisamos los cálculos antes de que decida. Si la oferta le funciona, el pago se realiza el mismo día en efectivo, cheque o transferencia.',
   },
-];
+] as const;
 
 export default async function BullionPage({ params }: Props) {
   const { locale } = await params;
@@ -156,12 +157,9 @@ export default async function BullionPage({ params }: Props) {
               </p>
             </div>
             <div className="grid md:grid-cols-3 gap-6">
-              {PROCESS_STEPS.map(({ icon, titleEn, titleEs, descEn, descEs }) => (
-                <div key={icon} className="rounded-2xl border border-[#d0c5af]/60 bg-white p-6 shadow-[0_14px_38px_rgba(38,28,6,0.06)]">
-                  <AppIcon name={icon}
-                    className="text-[#735c00] block mb-3"
-                    style={{ fontSize: '2rem' }}
-                   />
+              {PROCESS_STEPS.map(({ mark, titleEn, titleEs, descEn, descEs }) => (
+                <div key={mark} className="rounded-2xl border border-[#d0c5af]/60 bg-white p-6 shadow-[0_14px_38px_rgba(38,28,6,0.06)]">
+                  <ClayMark name={mark} size={88} className="block mb-3" />
                   <h3 className="font-[family-name:var(--font-headline)] font-bold text-lg mb-2">
                     {isEs ? titleEs : titleEn}
                   </h3>
@@ -223,7 +221,7 @@ export default async function BullionPage({ params }: Props) {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 text-[#735c00] hover:text-[#1a1c1c] transition-colors text-xs uppercase tracking-widest border-b border-[#735c00]/30 hover:border-[#735c00] pb-1"
               >
-                <AppIcon name="star" className="text-base" style={{ fontVariationSettings: "'FILL' 1" }} />
+                <AppIcon name="star" className="text-base" fill="currentColor" />
                 {isEs ? 'Leer reseñas en Google' : 'Read what clients say on Google'}
                 <AppIcon name="arrow_outward" className="text-base" />
               </a>

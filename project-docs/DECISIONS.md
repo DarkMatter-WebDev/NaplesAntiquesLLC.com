@@ -215,6 +215,192 @@ nothing rather than exposing its identifier, and the icon-integrity regression
 test must continue rejecting legacy font infrastructure and unmapped static
 `AppIcon` names.
 
+**Icons are OUTLINE by default, and a solid one asks explicitly.** `AppIcon`
+renders `fill={fill ?? 'none'}`; anything that should be solid — a saved heart,
+a rating star — passes `fill="currentColor"` at the call site.
+
+⚠️ **Never reintroduce `fontVariationSettings`.** Those are Material Symbols
+variable-font axes and mean nothing to an SVG. Until 2026-08-09 `AppIcon`
+translated a `'FILL' 1` value into `fill="currentColor"`, which is right for an
+icon FONT (the axis swaps to a solid-with-knockout glyph) and badly wrong for a
+Lucide OUTLINE icon: it floods the shape, and since every interior mark is a
+same-coloured STROKE, the detail vanishes. A filled `circle-check` is a plain
+disc; a filled `gem`, `watch` or `badge-check` is a blob. It went unnoticed for
+a long time because each icon still *rendered* — 14 of 24 icons on
+`/free-evaluation` were affected before the owner reported them as "primitive".
+The test now fails the build if the property reappears anywhere outside
+`AppIcon.tsx`.
+
+### /free-evaluation is a sendable landing page, not a form page
+
+Owner framing 2026-08-09: this URL gets TEXTED to someone who does not know what
+they own. It has to explain the service before it asks for anything — the form
+in the hero read as being asked to hand over details before anything had been
+explained.
+
+- **The form lives in the SECOND block, never the hero**, under a lead-in that
+  says photos are optional. The hero ends in a `#request` anchor and the phone
+  number instead.
+- **The hero carries the explanation and Chris's photograph**, in his own voice.
+  Two columns, photo shown large — the previous full-bleed-behind-a-gradient
+  treatment hid the one image that builds trust.
+- **The sorting detail is the substance of the page**, not filler: precious
+  metal separated from plated/filled/costume, then split by purity (10k-22k, 9k,
+  sterling .925, 800/900, coin silver) with each purity weighed separately,
+  priced against live spot with the arithmetic visible, and priced piece by
+  piece for anyone unsure what to keep. Keep that specificity if the copy is
+  ever revised — vagueness is what the page exists to counter.
+
+- **Buttons use the site classes, never one-off inline styles.** `.gold-button`
+  for a primary CTA; `.outline-button` for a secondary, plus the
+  `.outline-button-on-dark` modifier on dark bands — the base variant fills
+  near-white with `--color-primary` text and is unreadable there.
+  ⚠️ **Do not paint a button with `var(--color-primary)` as a background.** It is
+  **#735c00**, a deep gold meant for text and accents; used as a fill with dark
+  text on top it reads as a disabled control. That is exactly how the
+  free-evaluation CTA ended up looking greyed out.
+- **The metal list is grouped, ascending, and open-ended** — Gold 9k→22k and up,
+  Silver .925/800/900/coin, then everything else — and closes by saying anything
+  not listed gets identified too. It exists to show the DETAIL a seller gets
+  back, so it must never read as an exhaustive list of what is accepted. The
+  purity list in the sorting section mirrors it; change them together.
+
+⚠️ **The hero image is a PLACEHOLDER with the face out of shot, and the framing
+is load-bearing.** The copy beside it is first person ("I'm Chris…"), so a
+recognisable stranger there would assert something false about who Chris is —
+misrepresentation to the customer, not just a stylistic choice. The alt text
+therefore describes the desk and the work, never a person. **When a real
+photograph of Chris replaces it, update the file and the alt text together.**
+The same rule governs any future generated imagery of people on this page.
+
+### Illustrated clay marks are IMAGES; functional UI icons stay Lucide SVG
+
+Owner direction 2026-08-09: the flat gold line icons read as generic ("so many
+websites that are vibe coded have these icons"). The `/free-evaluation` trust
+pillars and the six category tiles now use **matte-clay illustrated marks** —
+raster WebP in `public/assets/images/icons/clay-*.webp` — rendered through
+`next/image`, not `AppIcon`.
+
+Rolled out sitewide the same day: the homepage services strip and `/sell`,
+`/sell/[city]`, `/trade-in`, `/bullion`, `/gold-services`, `/silver-services`.
+**20 marks** live in `public/assets/images/icons/`.
+
+**Render them through `components/ClayMark.tsx`, never a bare `<Image>`.** It
+owns the sizing, the float shadow, the `onDark` opt-out, and the `ClayMarkName`
+union — that union is the point: a typo becomes a build error instead of a
+silently missing image, which is exactly how the old `icon: 'string'` fields
+failed. Data arrays holding a `mark` field need `as const` or the value widens
+to `string` and the union check is lost.
+
+**The boundary is what matters, not the style.** This is a carve-out for
+DECORATIVE marks only. Cart, heart, chevrons, close, form and admin icons stay
+Lucide inline SVG under the entry above, permanently: they are functional UI
+where a stock icon is correct and `currentColor` recolouring is load-bearing. Do
+not migrate them. The same applies to small glyphs sitting inline beside text —
+the `star`/`arrow_outward` link decorations, `trending_flat`, `verified`,
+`info`: those stayed Lucide in the sitewide pass on purpose.
+
+**Delete what a mark replaces.** The homepage's three service icons were drawn
+on a `<canvas>` by `ServiceIconCanvas`; that component was removed, not left
+orphaned, along with the vestigial emoji `icon` fields it had stopped reading.
+Where a mark landed inside a gold disc (`#d4af37` / `#735c00`), the disc went
+too — gold clay on a gold circle is gold on gold, and the mark's own shadow does
+what the disc was doing.
+
+Rules that must hold:
+
+1. **Generate in the proven style, then RECOLOUR — never prompt for the final
+   colour.** Asking the model directly for "gold and charcoal clay" produced a
+   conventional gold-body/grey-shackle split and lost the diagonal two-tone and
+   the hand-formed dents. The pipeline is: generate every mark from one shared
+   coral-clay prompt template → `remove_background` → apply ONE recolour to the
+   whole set. That is what makes a set look like a set; per-mark prompting
+   drifts.
+2. **The recolour is a hue rotation gated on saturation** (`hue 40, sat x0.78,
+   light x0.78, threshold 0.18` — tuning "D", chosen from a four-way ladder).
+   Pixels below the threshold are untouched, which is precisely what preserves
+   the charcoal second tone, every dent, and the soft shading. It operates on
+   the rendered pixels, so form is byte-identical to the approved sample.
+   Script: `scratchpad/build-clay.js` shape — re-derive rather than hand-edit.
+3. **Background removal takes the ambient shadow with it.** The cutout alone
+   looks pasted-on; the float comes back as a CSS `drop-shadow`, which follows
+   the alpha channel. **Only on light surfaces** — a black shadow is invisible
+   on the `#262928` tiles, so the tile marks carry no shadow at all.
+4. **Size them at 72px (pillars) / 136px (category marks), never at icon size.**
+   At the old 35-56px the clay modelling and the float both vanish and the file
+   weight buys nothing. If a future surface can only afford ~40px, use a Lucide
+   icon there instead.
+4a. **The category marks have no card behind them** (owner, 2026-08-09 — the
+   dark rectangles were removed after the marks were enlarged). They sit
+   directly on the section background, so the drop-shadow is what separates
+   them; the label colour had to move from near-white to the surface token at
+   the same time. Whitespace is now the only thing grouping a mark with its own
+   label, which is why the grid uses a much larger ROW gap than column gap.
+4b. **`.fe-icon-tile` must stay `justify-content: flex-start`.** Grid rows
+   stretch every cell to the tallest, so with centering a one-line label gains
+   slack and recentres — the marks then sit at different heights across a row.
+   Measured while the cards still existed: a negative margin intended to break
+   the top edge was silently absorbed to -6px (no overflow at all) at 390px.
+   Top-anchoring keeps all six marks on one baseline whatever the labels do.
+5. **A partial upgrade inside one grid is worse than none.** One clay mark
+   beside five flat line icons read as broken rather than better, which is why
+   all six tiles were done together. Upgrade a set wholly or not at all.
+6. Sources are 1024px cutouts; delivery is 216px WebP with alpha (5-10KB each),
+   matching the project's downscale/WebP rules.
+7a. **A hollow mark needs an optical SCALE on top of a corrected asset, and that
+   scale is a TRANSFORM.** Trimming the ring's canvas fixed its extents and it
+   still read small, because the shortfall is ink coverage: a ring is mostly
+   hole, so it carries far less visual weight than a solid goldbar or phone at
+   the same box. It settles at **1.12x** (1.05x inside the six-mark grid),
+   reached by walking 2.2 → 1.6 → 1.25 → 1.12 on review.
+
+   ⚠️ **Do not read that number as the whole correction — two separate fixes are
+   easy to conflate.** The ASSET was also re-padded from 51% to 80% canvas fill,
+   which is a 1.57x optical increase by itself. So scale 1.0 today is already
+   far larger than the state originally reported as too small, and there is real
+   headroom below 1.12 if it ever still reads big. An earlier version of this
+   entry claimed "1.0 reads as undersized"; that described the pre-trim asset and
+   is no longer true.
+
+   **Keep the grid's value at or below the global one**; if it ever exceeds it,
+   the most size-sensitive surface becomes the most boosted, which is backwards.
+
+   Three things make that safe, and each was learned by breaking it:
+
+   - **Scale with `transform`, never width/height.** Growing the box pushed the
+     mark's own heading down and broke alignment with its siblings — a 2.2x ring
+     left "We Sell Jewelry" sitting well below the other two card titles.
+   - **`transform-origin: bottom center`**, so the mark grows UPWARD into
+     whitespace and its baseline never moves. Card and grid labels stay aligned.
+   - **Any rule that restates `transform` must carry `--clay-scale` forward.**
+     `transform` is one property, so the hover tilt and the reduced-motion reset
+     would each snap a scaled mark back to 1x.
+
+   The scale lives in CSS keyed on `[data-mark]`, never inline on the component:
+   inline beats every class, and a surface must be able to dial it back. A
+   MATCHED SET cannot take what a lone mark can — at 2.2x in the category grid
+   the ring was double its neighbours and dominated the row.
+7. **Optical size is set by the ASSET's fill ratio, not by the `size` prop.**
+   Each generated mark lands with a different amount of transparent margin, so
+   equal boxes give visibly unequal marks. Measured across the set: fill ranged
+   from **51% (ring) to 89% (pricing)** of the canvas — the ring rendered ~1.6x
+   smaller than its homepage neighbours at the identical 88px box, and looked
+   undersized on all six pages it appears on.
+   **Fix the asset, never the per-page size.** Trim to the alpha bounding box,
+   rescale so the longest content edge is ~80% of the canvas, re-pad centred and
+   transparent. One edit corrects every page at once; per-page size bumps would
+   have to be repeated and would drift. Re-measure with a trim pass before
+   adding any new mark. (On Windows, read the file into a Buffer first — sharp
+   reading and writing the same path fails with an UNKNOWN open error.)
+
+**Fix the rendering before reaching for new artwork.** The reflex when icons
+look crude is to regenerate them or drop in images; here the icons were already
+correct and a one-line shim was destroying them. Generated or raster icons would
+also break this entry's first rule and cost the site a crisp vector set. Genuine
+icon problems that remain after rendering is correct are usually SEMANTIC — the
+wrong glyph for the label — and the fix is a different Lucide import, not a
+different medium.
+
 ## Product Data And Media
 
 ### Outbound partner sync sends an allow-list, fails closed on price, and never
@@ -1125,6 +1311,41 @@ handler in `HomeHeroStack`. Rules:
    platform momentum. The momentum override is the one piece synthetic touch
    cannot prove; it is owner-verified on a real phone.
 
+### A crowded shop-card date drops its "Ca." prefix — it never moves or reformats
+
+Owner rule, 2026-08-09, stated generally: **whenever the date field gets too
+crowded, remove the "Ca." to fit rather than using another format method.** It
+governs future changes to this label, not just the one that prompted it.
+
+The card's price row carries three things — the date (absolute, left), the price
+(centred, in flow) and the width chip (absolute, right). `Ca. 1960` is 55px, the
+catalog's widest price is 67px (`$2,394.56` — `$34,999` is only 55px, decimals
+are what cost width), and the chip is 41px, so keeping the prefix needs about
+187px of row. Real rows are often narrower than that, so the prefix goes.
+
+- **The prefix is its own `.modern-card-date-prefix` span** so CSS can drop it
+  without touching the year. Do not merge it back into the text node.
+- **The threshold is keyed to the WORST-CASE price, not the typical one** —
+  `2 x (55 - 7.2 + 4) + 67 ≈ 173px`, so the rule fires below 185px of content
+  width. One colliding card is the bug; CSS cannot know a given card's price
+  width, so the widest is the only safe basis. Re-derive if the label size, the
+  row padding, or the catalog's widest price changes.
+- **The query container is the ROW, never the viewport.** Row width is not
+  monotonic in viewport width — 273px at 320px (grid 1-up), 161px at 390px
+  (2-up), 201px at 472px, 177px at 1280px (4-up, a filter sidebar takes the
+  rest). A media query would size for the wrong box, and checking only the
+  extremes proves nothing about the middle. This is the same trap as the
+  purchase panel and the related-strip.
+- **Rejected: moving the date to its own line.** It was built and it collided
+  nowhere, but it added ~14px of height to every card at every width, desktop
+  included. The owner's rule is explicitly that the field shrinks in place.
+
+Two mechanical notes for anyone editing these rules: the date carries its
+positioning in a JSX inline `style` attribute, so any override needs
+`!important` **and** must reset `transform` alongside `position`; and this
+stylesheet is a template literal, so a single backtick anywhere inside it —
+including in a comment — terminates the string and 500s the route.
+
 ### Shop-card photos: swipe + windowed dots on touch; hover affordances are mouse-only
 
 Owner requests 2026-08-09 (dots replacing the progress bar, swipe, floating
@@ -2034,7 +2255,43 @@ preference update before deployment.
 
 ## UI Conventions
 
-### Every password field renders through components/account/PasswordInput
+### --color-primary is the light-surface gold; #f2ca50 is its on-dark counterpart
+
+`--color-primary` is **#735c00**. On light surfaces it passes comfortably
+(5.26–6.44:1 across `/free-evaluation`). On a dark hero it does **not** — the
+"100% Free — No Obligation" eyebrow measured **2.96:1** on #0e0f0f, below AA at
+any size, and read as a dimmed control rather than an accent.
+
+Use **#f2ca50** for gold text, borders and accents on dark surfaces (12:1 on
+#0e0f0f). That is what the `/free-evaluation` hero kicker, metal terms and trust
+chips already use, so it is a consistency win as well as a contrast one. The
+same trap produced the earlier `.gold-button` primary-CTA fix on this page.
+
+When adding gold to a dark section, check the computed contrast rather than
+assuming the token is safe — the token is correct, it is just scoped to light.
+
+### Centre wrap groups of repeated small items; leave prose-anchored rows alone
+
+A row of **pills / chips** — three or more small repeated items that wrap — gets
+`justify-center` at the widths where it actually wraps, and returns to
+`justify-start` at the breakpoint where its container becomes a left-aligned
+column (`lg` on `/free-evaluation`). A ragged tail (2 / 1 / 1) reads as a bug;
+a centred stack reads as deliberate.
+
+This does **not** extend to:
+
+- **Hero CTA rows of one or two buttons** that sit under left-aligned prose.
+  They fit on one line at 375px, so there is nothing ragged to fix, and
+  centring detaches them from the copy they belong to.
+- **Chips inside cards or prose columns** (shop cards, product detail,
+  related products). Those inherit the card's left edge on purpose.
+- **Footer link grids.** A short last column is correct list behaviour.
+
+⚠️ **Do not audit this with a `display: flex` scan.** The homepage hero's
+Buy / Sell / Trade group carries flex classes in the markup but `.home-hero-actions`
+overrides it to `display: grid` at `144px 144px`; a flex-only sweep reports the
+page clean while missing it entirely. Measure per-row left/right padding against
+the container and flag rows where the two differ.
 
 There is exactly one password input in the customer-facing app
 (`components/account/PasswordInput.tsx`, over the `.password-field` utility

@@ -7,6 +7,7 @@ import SiteFooter from '@/components/layout/SiteFooter';
 import TradingViewMini from '@/components/trading/TradingViewMini';
 import { fetchSpotData } from '@/lib/spot-price';
 import { AppIcon } from '@/components/AppIcon';
+import ClayMark from '@/components/ClayMark';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -169,10 +170,7 @@ export default async function GoldServicesPage({ params }: Props) {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <AppIcon name="diamond"
-                        className="text-[#735c00]"
-                        style={{ fontSize: '3.5rem', fontVariationSettings: "'FILL' 0, 'wght' 200" }}
-                       />
+                      <ClayMark name="ring" size={112} />
                     </div>
                   )}
                 </div>
@@ -232,9 +230,7 @@ export default async function GoldServicesPage({ params }: Props) {
                 </p>
                 <div className="space-y-8">
                   <div className="flex gap-6">
-                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#d4af37]">
-                      <AppIcon name="biotech" className="text-white text-xl" style={{ fontVariationSettings: "'FILL' 1" }} />
-                    </div>
+                    <ClayMark name="microscope" size={64} className="flex-shrink-0 block" />
                     <div>
                       <h4 className="font-[family-name:var(--font-headline)] text-lg font-bold mb-2">
                         {isEs ? 'Espectrometría XRF' : 'XRF Spectrometry'}
@@ -247,9 +243,7 @@ export default async function GoldServicesPage({ params }: Props) {
                     </div>
                   </div>
                   <div className="flex gap-6">
-                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#d4af37]">
-                      <AppIcon name="science" className="text-white text-xl" style={{ fontVariationSettings: "'FILL' 1" }} />
-                    </div>
+                    <ClayMark name="flask" size={64} className="flex-shrink-0 block" />
                     <div>
                       <h4 className="font-[family-name:var(--font-headline)] text-lg font-bold mb-2">
                         {isEs ? 'Prueba Ácida y Electrónica' : 'Acid & Electronic Testing'}
@@ -266,10 +260,7 @@ export default async function GoldServicesPage({ params }: Props) {
               <div className="relative">
                 <div className="flex aspect-[4/5] w-full items-center justify-center rounded-2xl bg-[#e8e8e8] shadow-[0_18px_54px_rgba(38,28,6,0.08)]">
                   <div className="text-center px-8">
-                    <AppIcon name="biotech"
-                      className="text-[#735c00] block mb-4"
-                      style={{ fontSize: '5rem', fontVariationSettings: "'FILL' 0, 'wght' 200" }}
-                     />
+                    <ClayMark name="microscope" size={144} className="mx-auto mb-4 block" />
                     <p className="text-sm text-[#4d4635]">
                       {isEs ? 'Pruebas de laboratorio en el sitio' : 'On-site & lab testing'}
                     </p>
@@ -291,10 +282,8 @@ export default async function GoldServicesPage({ params }: Props) {
         {/* Trust CTA */}
         <section className="bg-[#2f3131] py-24 text-center">
           <div className="max-w-2xl mx-auto px-4">
-            <AppIcon name="verified_user"
-              className="text-[#e9c349] block mb-6"
-              style={{ fontSize: '3.5rem', fontVariationSettings: "'FILL' 1" }}
-             />
+            {/* onDark: #2f3131 band — a black float shadow is invisible here. */}
+            <ClayMark name="shield" size={96} onDark className="mx-auto mb-6 block" />
             <h2 className="text-white font-[family-name:var(--font-headline)] text-3xl md:text-4xl font-bold mb-6">
               {isEs ? 'Confidencialidad y Servicio Experto' : 'Confidentiality & Expert Service'}
             </h2>

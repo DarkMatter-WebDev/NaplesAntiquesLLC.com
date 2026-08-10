@@ -674,7 +674,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                     className="flex items-center gap-1 mt-1.5"
                     style={{ fontSize: '0.6875rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
                   >
-                    <AppIcon name="check_circle" className="text-sm" style={{ color: 'var(--color-primary)', fontVariationSettings: "'FILL' 1" }} aria-hidden="true" />
+                    <AppIcon name="check_circle" className="text-sm" style={{ color: 'var(--color-primary)' }} aria-hidden="true" />
                     {isEs ? 'Este es su precio' : 'This is your price'}
                   </p>
                 ) : null}

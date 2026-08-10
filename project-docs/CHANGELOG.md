@@ -1,5 +1,592 @@
 # Changelog
 
+## 2026-08-09 (post-deploy 7) - Free Evaluation added to the Sell nav
+
+`/free-evaluation` was **not linked from the site header at all** — only from
+the footer. Added as the last entry of `SELL_ITEMS` in
+`components/layout/SiteHeader.tsx`, after Trade-In Program.
+
+One entry covers three surfaces, because `SELL_ITEMS` drives all of them: the
+desktop Sell dropdown, the mobile menu's Sell accordion, and the `isAnyActive`
+check that highlights the parent "Sell" tab. That last one is a deliberate
+side effect — the header now marks Sell as active on `/free-evaluation`, which
+is right for a sell-funnel page.
+
+No message changes were needed: `nav.freeEvaluation` already existed in both
+locales ("Free Evaluation" / "Evaluación Gratuita") from an earlier use.
+
+Verified in the running app: desktop dropdown and mobile accordion both list it
+last after Trade-In Program, Spanish resolves the `/es`-prefixed href, and the
+Sell parent reports `data-active="true"` on the page. `tsc` clean, `lint` clean,
+`npm test` **848/848**, clean `npm run build` **449/449**.
+
+## 2026-08-09 (post-deploy 6) - /free-evaluation hero given real hierarchy
+
+Owner: the hero *"reads as a solid block of text"*, and the metal labels needed
+*"a more contrasting color"*. It was five same-sized paragraphs plus a bulleted
+list, every one of them `#d8d1c2` at the same weight — nothing for the eye to
+anchor on. Now three levels, bookended bright with the structured middle
+between:
+
+- **Lede** — the "I'm Chris…" paragraph steps up to 1.125/1.3125rem in `#efe9dc`.
+- **Kicker** — a new `<h2>` ("Every piece, identified" / "Cada pieza,
+  identificada") in brand gold with a hairline running out to the column edge.
+  A real heading, so the hierarchy is in the document outline, not just the
+  pixels.
+- **Metal list moved out of the prose into its own panel** and converted from
+  `<ul>` to a `<dl>` — these are terms and their definitions, and saying so is
+  what lets the term column align. Stacked below `sm`, two columns from `sm`
+  (term column `8.5rem`), hairline separators between rows, gold left border.
+- **Trailing paragraphs differentiated**: the "something not on that list"
+  caveat is now quieter (`0.9rem`, `#b3ac9e`) because it is a footnote to the
+  panel, while the piece-by-piece pricing line closes bright to match the lede.
+  This also breaks up two paragraphs that both open "And if…".
+
+### The "100% Free — No Obligation" eyebrow was failing AA outright
+
+Separate from the terms above, and a real accessibility fix rather than a taste
+call. The pill painted itself with `var(--color-primary)` (#735c00) — the
+**light-surface** gold — on the #0e0f0f hero, measuring **2.96:1**. That is
+below AA for text at any size, and it read as dimmed rather than as an accent.
+Now #f2ca50 at **12.19:1** (measured live off computed styles), with the border
+brightened to match and a `rgba(242,202,80,0.08)` fill so the pill still reads
+as a pill.
+
+Audited the rest of the page while there: the other **13** `--color-primary`
+text nodes all sit on light backgrounds and pass at **5.26–6.44:1**, so this
+eyebrow was the only one stranded on dark. The rule to carry forward is that
+`--color-primary` is the light-surface gold and **#f2ca50 is its on-dark
+counterpart** — the same pairing the kicker, metal terms and trust chips use.
+
+### The metal terms are gold now, and the reason is contrast with the BODY text
+
+They were `#ecdcb0`, which measures **14:1** against the `#0e0f0f` hero — better
+on paper than the `#f2ca50` that replaced it (**12:1**). The problem was never
+background contrast: `#ecdcb0` sat a shade off the `#d8d1c2` body text, so the
+terms did not read as terms. The brand gold is unmistakably a different colour
+from the prose, which is the contrast that was actually missing. Do not "fix"
+this back toward cream on a WCAG reading alone.
+
+New classes in `globals.css`: `.fe-hero-lede`, `.fe-hero-kicker`,
+`.fe-hero-note`, `.fe-hero-closer`, `.fe-metal-panel`, `.fe-metal-row`,
+`.fe-metal-term`, `.fe-metal-detail`.
+
+Measured at 375 / 768 / 1280 in both locales: terms stack below `sm`, and from
+`sm` all three sit on one line beside their detail with the column aligned at
+156px — "EVERYTHING ELSE" is the longest term and clears `8.5rem` without
+wrapping. Verified `npx tsc --noEmit` clean, `npm run lint` clean, `npm test`
+**848/848**.
+
+## 2026-08-09 (post-deploy 5) - wrap groups centred on tablet / mobile
+
+Owner: *"format pills and other things like this more symmetrically on tablet
+and mobile viewport sizes. Center them."*
+
+- **`/free-evaluation` trust chips and hero CTA row are now centred below
+  `lg`** (`justify-center lg:justify-start`). The chips wrap 2 / 1 / 1 at
+  375-390px and 3 / 1 at 768px; left-aligned, that ragged tail read as broken
+  rather than deliberate. Measured after the change: every row is symmetric
+  (5/5, 65/65, 84/84 at 375px; 80/80 and 264/264 at 768px). From `lg` the hero
+  becomes two columns with everything left-aligned, so the rows follow it back.
+- **Audited every other customer-facing wrap group; nothing else needed
+  changing.** Recorded here so the next session does not redo the sweep:
+  - Homepage hero Buy / Sell / Trade is **not** a flex-wrap row — `.home-hero-actions`
+    overrides it to `display: grid` at `144px 144px`, and both rows already
+    measure 0/0 and 78/78. A flex-only scan misses it entirely.
+  - `/sell/[city]` "Other Areas We Serve" pills were already `justify-center`.
+  - Service-page hero CTAs (`/sell`, `/estate-jewelry`, `/gold-services`,
+    `/silver-services`, `/sell/[city]`) are two buttons that fit on **one** row
+    at 375px, under left-aligned prose. Nothing ragged to fix, and centring
+    them would have detached them from the copy above.
+  - Shop card, product-detail and related-product chips sit inside left-aligned
+    prose columns and cards — centring those would break the card grid.
+  - Footer Company / Legal groups are link **lists** in a CSS grid; a short last
+    column is correct list behaviour, not a ragged pill row.
+
+Verified: `npx tsc --noEmit` clean, `npm run lint` clean, `npm test` **848/848**,
+`npm run build` **compiled successfully, 449/449 static pages**, no warnings.
+
+## 2026-08-09 (post-deploy 4) - /free-evaluation rebuilt as a sendable landing page
+
+Owner framing: the page is something to TEXT to someone who does not know what
+they own, and it "felt like the form was shoved down their throat" on arrival.
+Restructured around explaining the service first.
+
+- **The form moved out of the hero into its own second block**, under a plain
+  lead-in: *"Send a request below — tell us briefly what you have and, if you
+  like, attach photos. Photos are optional."* The hero now ends in two CTAs
+  (`#request` anchor and the phone number) instead of a form.
+- **The hero is now a two-column descriptive block** — headline, three
+  paragraphs in Chris's own voice, and a photograph of him mid-evaluation. The
+  old hero was a full-bleed background image behind a heavy gradient; the new
+  one shows the photo at ~833px because the photo is the point.
+- **The metal list is grouped and ordered, and deliberately open-ended.** It
+  ran `10k, 14k, 18k, 9k, sterling .925, 800 silver, gold-filled or plated` as
+  one flat run with 9k stranded after 18k. Now three labelled lines — **Gold**
+  9k → 22k and up, **Silver** sterling .925 / European 800 and 900 / coin
+  silver, **Everything else** platinum, palladium, gold-filled, plated, costume
+  — followed by a line saying anything not on the list gets identified too. The
+  point of the sentence is to show the DETAIL a seller gets back, so it must not
+  read as an exhaustive list of what is accepted. The purity list inside the
+  sorting section was reordered to match; keep the two in step.
+- **New section: "How I Actually Sort Through Your Pieces"** — the detail the
+  owner asked for, in order: separating genuine precious metal from plated /
+  gold-filled / vermeil / costume (magnet, touchstone, acid); then by purity
+  into subcategories (10k, 14k, 18k, 22k, 9k; sterling .925, European 800/900,
+  coin silver), each weighed separately because mixing purities quietly costs
+  the seller money; then weighed on a calibrated scale against that day's live
+  spot with the arithmetic shown; and finally **piece-by-piece pricing for
+  people unsure what to keep versus sell**. Closes on the no-obligation point.
+- Both locales written in full, as required.
+
+### The hero photograph is a PLACEHOLDER, awaiting a real photo of Chris
+
+First attempt generated Chris himself, using his real headshot (`chris.webp`)
+as an identity reference to `kling_omni_image`. Owner rejected the result and
+asked for a generic placeholder until a real photograph exists. Both Chris
+renders were deleted; `evaluation-desk-placeholder.webp` (1600x1067, 109.8KB)
+replaces them.
+
+⚠️ **The placeholder is framed with the face out of shot, and that is
+load-bearing.** The copy beside it is first person — *"I'm Chris. I've spent
+15+ years…"* — so a recognisable stranger there would read as a claim about who
+Chris is. That is a misrepresentation to the customer even as a temporary
+stand-in. The alt text describes the WORK ("gold and silver pieces sorted into
+groups…") and never a person, for the same reason. **When the real photo
+arrives, swap the file and the alt text together** — the alt text is currently
+written to describe a desk, not a man.
+
+### Hero buttons moved onto the site's button classes
+
+The primary CTA looked disabled, and the cause was the colour token: it painted
+itself `background: var(--color-primary)` — which is **#735c00, the deep gold** —
+with `#1a1c1c` text on top. Dark-on-dark reads as a greyed-out control, not a
+call to action. Both hero buttons were one-off inline styles with no interaction
+states at all.
+
+They now use the existing site classes: `.gold-button` for the primary (the
+brighter `#dcb336 → #b5890c` gradient every other primary CTA uses) and a new
+`.outline-button.outline-button-on-dark` modifier for the secondary. The base
+`.outline-button` could not be used directly — it is built for light sections,
+filling near-white with `--color-primary` text, which is close to unreadable on
+this dark band. The modifier keeps its shape, sizing and motion and inverts only
+the palette, following the existing `.social-danger-button` modifier pattern.
+
+Added while there: **`:focus-visible` rings for `.gold-button` and
+`.outline-button`, which previously had none** — keyboard users got only the
+browser default, which is nearly invisible against a gold gradient. Also a
+`prefers-reduced-motion` block that drops the lift/scale on both while keeping
+the colour changes, since colour is the actual state signal.
+
+Verified with real keyboard navigation, because `:focus-visible` does not fire
+on programmatic `.focus()` — a Tab and Shift+Tab confirmed
+`matches(':focus-visible')` true on both, with the gold ring on the outline
+button and the dark ring plus halo on the gold one.
+
+⚠️ Note for later: `.gold-button` uses white text on that gradient sitewide,
+which is roughly 2-3:1 — below WCAG AA for normal text. Left alone deliberately;
+it is the established treatment on every CTA and changing it is a sitewide
+decision, not a fix to smuggle into this page.
+
+### Form centring and a removed link
+
+- **The request form is now horizontally centred.** It is capped at 540px and
+  had no auto margins — invisible while it lived in the left-aligned hero, plainly
+  off-centre once it moved into a centred section. Added `mx-auto w-full`.
+- **"Meet the team" removed** from the "You'll Deal Directly With Chris" block,
+  leaving the call CTA alone.
+
+### One regression caught by the guard
+
+`ultrawide-layout.test.ts` failed: the new hero used `max-w-6xl` without opting
+into an ultra-wide tier. The rule is that any `max-w-6xl`/`7xl` canvas must
+carry an `ultrawide-` class, and the guard exists precisely because these get
+added by hand. Fixed by adding `ultrawide-page`, matching the What We Evaluate
+section directly below it.
+
+Verified: `npx tsc --noEmit` exit 0, `npm run lint` exit 0, `npm test`
+**848/848**, hero image loading, `#request` anchor present, no document
+overflow, and the Spanish page carrying the same structure (`Traiga lo que
+tenga…`, `Envíe una solicitud abajo`, all four sorting steps).
+
+## 2026-08-09 (post-deploy 3) - Clay marks rolled out sitewide: homepage + six service pages
+
+Extends the `/free-evaluation` work below to the rest of the marketing surface,
+so the site stops looking like two different designs. **20 clay marks total**
+(9 existing + 11 new: goldbar, phone, scale, shield, microscope, flask, magnet,
+house, camera, recycle, cash), all built through the same
+generate-in-coral → cutout → single recolour → 216px WebP pipeline.
+
+### One component, not seven copies
+
+New `components/ClayMark.tsx` owns the markup, the `ClayMarkName` union, and the
+`onDark` opt-out. Pages pass a `mark` name and a size; nothing else. The union
+means a typo is a build error rather than a silently missing image — which is
+exactly how the old `icon: 'string'` fields failed.
+
+Converted: the homepage services strip and `/sell`, `/sell/[city]`,
+`/trade-in`, `/bullion`, `/gold-services`, `/silver-services`.
+
+- **`ServiceIconCanvas` is deleted.** The homepage's three service icons were
+  hand-drawn on a `<canvas>` in a client component; the clay marks replace it
+  outright, so the component and its draw routines are gone rather than left
+  orphaned. The three vestigial `icon: '💛' | '🏆' | '📞'` fields went with it —
+  they had already stopped being read.
+- **Gold discs removed wherever a mark replaced an icon inside one.** A gold
+  clay mark centred on a `#d4af37` or `#735c00` circle is gold on gold; the
+  mark's own float shadow does the lifting the disc used to.
+- **`onDark` used on three surfaces** — the `/sell/[city]` and `/gold-services`
+  `#2f3131` CTA bands and `/silver-services`' dark testing cards — where a black
+  drop-shadow is invisible and only costs paint work.
+- **Small inline icons deliberately left as Lucide**: the `star`/`arrow_outward`
+  link decorations on `/bullion` and `/faq`, `trending_flat`, and the `verified`
+  and `info` glyphs that sit inline beside text. Those are functional UI, per the
+  boundary in DECISIONS — this pass only replaced decorative marks.
+- **Dead icon entries pruned.** `link` and `crown` were added to `AppIcon`
+  earlier the same day for the semantic-fit pass, then superseded hours later by
+  clay marks; both map entries and their Lucide imports are removed. Verified
+  zero remaining references before deleting.
+
+### Two mechanical notes
+
+- `generate_image_batch` **failed all 7 jobs** when submitted together and
+  succeeded in groups of 3 — a concurrency limit, not credits (1,170 available)
+  or prompt content. Same failure mode as the earlier batch of 7.
+- The `mark` fields infer as `string` inside a plain array literal, so every
+  `ClayMark name={...}` failed to typecheck against the union. Fixed by adding
+  `as const` to the five data arrays rather than casting at each call site,
+  which keeps the union check meaningful instead of silencing it.
+
+Two marks were regenerated after review: the coins first read as a stacking toy
+of donuts, and the first ring read as a washer at small size. An open-palm
+"no cost" variant was discarded for malformed fingers.
+
+### The ring was optically undersized everywhere — fixed in the asset
+
+Reported as "make the ring icon on the homepage bigger". Measuring the alpha
+bounding box of all 20 marks showed it was not a homepage problem: fill ratios
+ranged from **51% (ring) to 89% (pricing)** of the canvas, so at an identical
+88px box the ring rendered about **1.6x smaller** than its neighbours goldbar
+(86%) and phone (78%) — and looked undersized on all six pages carrying it.
+
+Corrected in the asset rather than with a per-page size bump: trimmed to the
+content bounds, rescaled so the longest edge is 80% of the canvas, re-padded
+centred and transparent. 51% → 80% fill, 5.3KB → 10.3KB, and every page picks it
+up without touching a single `size` prop. The durable rule and the measurement
+method are in DECISIONS.
+
+**That was not enough — the shortfall is ink, not extents.** Owner still read it
+as small and asked for 2-3x. A ring is mostly hole, so it carries far less
+visual weight than a solid goldbar or phone at an identical box. Walked
+**2.2 → 1.6 → 1.25 → 1.12** across four rounds of review; the six-mark grid
+tracks it at 1.05.
+
+Worth separating, because the two corrections compound and are easy to confuse:
+the ASSET re-pad (51% → 80% fill) is itself a 1.57x optical increase, so a 1.12
+scale on top is a modest final nudge, not the bulk of the change. Scale 1.0
+today is already much larger than the original "looks small" state.
+
+Three constraints, each found by breaking it:
+
+- **The scale is a `transform`, not width/height.** Growing the layout box
+  pushed the mark's own heading down: at 2.2x, "We Sell Jewelry" sat well below
+  the other two homepage card titles. With a transform the box stays
+  sibling-sized and every heading stays on its line.
+- **`transform-origin: bottom center`**, so it grows upward into whitespace and
+  its baseline never moves.
+- **The hover tilt and the reduced-motion reset each had to carry
+  `--clay-scale` forward**, since `transform` is a single property and both were
+  restating it — either would have snapped the ring back to 1x.
+
+**A matched set cannot take what a lone mark can.** At 2.2x inside the six-mark
+category grid the ring was double its neighbours and dominated the row, so that
+surface keeps its own lower value. The scale therefore lives in CSS keyed on
+`[data-mark]`, never inline on the component — inline beats every class, and a
+surface has to be able to dial it back. Each retune was then a one-line change
+with no per-page edits, which is the whole point of keeping it in one place.
+
+Verified at the final 1.12x: homepage headings aligned on a single baseline with
+the ring at 97px against 87px siblings; category grid at 1.05. No document
+overflow. At the earlier 2.2x the `/sell` ring reached 227px and crossed into
+the section heading; it now stays well inside its card.
+
+⚠️ **The Turbopack per-rule CSS staleness struck again**, and cost a wrong
+diagnosis: `.clay-mark` and `.fe-icon-mark` both updated while the
+`@media (min-width: 640px)` block kept serving the previous
+`.fe-icon-mark.fe-icon-mark { width: 8.5rem }`, which outranked the new rule and
+pinned the ring to 136px. It looked exactly like a specificity bug. Dumping the
+served rule text and comparing it to source is what identified it; deleting
+`.next` is what fixed it.
+
+Verified: `npx tsc --noEmit` exit 0, `npm run lint` exit 0, `npm test`
+**848/848**, and a crawl of 10 routes confirming every page serves its marks —
+`/` 3, `/sell` 4, `/sell/naples` 10 (1 onDark), `/trade-in` 4, `/bullion` 3,
+`/gold-services` 4 (1 onDark), `/silver-services` 3 (3 onDark),
+`/free-evaluation` 9 — with `/es` and `/es/sell` matching their English twins.
+
+⚠️ **Still inconsistent, deliberately:** the large empty placeholder blocks from
+the original audit are untouched — `/estate-jewelry` "Professional Integrity"
+(726x726 card, 63px icon) and the two `/gold-services` cards. Those want
+photography, not marks, and remain open in TASKS.
+
+## 2026-08-09 (post-deploy 2) - Icons were rendering as solid blobs; the Material Symbols fill bridge is gone
+
+Owner reported "primitive" icons across the site — a solid gold disc for
+Gold & Chains, a featureless gem, a blank badge for Professional Integrity — and
+asked whether they should be regenerated or replaced with images.
+
+**They did not need regenerating. They were correct Lucide icons being flooded
+with colour.** `AppIcon` carried a bridge from the retired Material Symbols era:
+a `fontVariationSettings: "'FILL' 1"` style was translated into
+`fill="currentColor"`. On a variable ICON FONT that axis swaps to a
+solid-with-knockout glyph and looks right. On a Lucide OUTLINE icon it floods the
+shape, and because every interior mark is a same-coloured STROKE, all detail
+disappears — a filled `circle-check` is a plain disc, a filled `gem`, `watch` or
+`badge-check` is an unreadable blob. Measured on `/free-evaluation`: **14 of 24
+icons were rendering filled.**
+
+- **The bridge is deleted.** `AppIcon` now renders `fill={fill ?? 'none'}` and
+  still strips `fontVariationSettings` so the dead property never reaches the
+  DOM. Icons that should genuinely be solid say so at the call site with
+  `fill="currentColor"` — explicit, and impossible to trigger by copying a stale
+  style object.
+- **All 27 usages cleaned.** The saved-heart states (WishlistButton ×2,
+  SiteHeader) became `fill={saved ? 'currentColor' : 'none'}`; the two rating
+  stars (`/faq`, `/bullion`) became `fill="currentColor"`. The `CartButton`
+  in-cart fill was dropped entirely — the button already inverts its background
+  and colour for that state, so filling the cart was a redundant signal that only
+  cost readability. The remaining `'FILL' 0, 'wght' 200` leftovers were dead
+  weight and went too.
+- **Verified across 10 pages: 137 icons, 2 filled** — both the intentional
+  rating stars. Every icon name in the codebase resolves; a sweep of all 70
+  referenced names against the 87 map keys found **zero unmapped names**, so
+  nothing was silently rendering blank.
+
+### Matte-clay illustrated marks on /free-evaluation (9 assets)
+
+Owner rejected the flat Lucide look outright — "so many websites that are vibe
+coded have these icons these days" — and chose a matte-clay direction from a
+six-way style exploration (duotone geometric, solid negative-space, Bauhaus,
+oxblood woodcut, matte clay, glass gradient; the glass one rendered blank). The
+three trust pillars and all six category tiles are now clay marks.
+
+**The method mattered more than the prompts.** Prompting directly for "gold and
+charcoal clay" lost the character of the approved sample — it produced a tidy
+gold-body/grey-shackle split instead of the diagonal two-tone and thumb-pressed
+dents. What worked: generate every mark from ONE shared coral-clay prompt
+template, then recolour the whole set with a single saturation-gated hue
+rotation. Because it transforms the rendered pixels, the form is byte-identical
+to the sample and only the hue moves; the low-saturation charcoal is below the
+threshold so it survives untouched. Tuning "D" (`hue 40, sat x0.78, light x0.78`)
+was picked from a four-way ladder — the first attempt read as mustard yellow.
+
+- **9 assets**, 1024px cutouts → 216px WebP with alpha, **5.3-10.1KB each**.
+  Rendered through `next/image` at 72px (pillars, with a CSS `drop-shadow` for
+  the float) and 56px (tiles, no shadow — a black shadow is invisible on
+  `#262928`).
+- **Two marks were rejected and redone.** The original "No Cost" tag rendered as
+  an ambiguous blob with no zero; a tag-with-diagonal-slash reads correctly. The
+  first ring read as a washer at 56px; a solitaire in three-quarter view fixed
+  it. An open-palm variant was discarded outright for malformed fingers.
+- **The tile grid had to be done wholly.** A single clay chain among five flat
+  line icons read as broken, not better — that observation is what turned the
+  scope from "worst offenders" into all six.
+- **Then the marks were enlarged and the cards deleted** (owner, same session:
+  "comically oversized ... they look horrible small", then "remove the dark
+  rectangular backgrounds"). The category marks went 56px → **136px** and the
+  dark `#202323` tiles, their borders and the near-white label colour all came
+  out; the marks now float on the section background with the drop-shadow doing
+  the separating, labels in the surface token, and a much larger row gap than
+  column gap because whitespace is the only thing left grouping a mark with its
+  own label.
+- ⚠️ **One layout trap found on the way.** While the cards still existed the
+  marks were meant to break out of the top edge by a negative margin. It worked
+  at desktop and did **nothing at 390px** — measured -6px, i.e. fully inside.
+  Cause: `justify-content: center` on a grid cell that stretches to the tallest
+  sibling, so a one-line label leaves slack and the centring absorbs the
+  negative margin. It also meant marks sat at different heights depending on
+  whether a label wrapped. Fixed by top-anchoring the cell
+  (`justify-content: flex-start`), which made the offset exact and equal across
+  all six; the rule is kept now that the cards are gone because the alignment
+  half still matters.
+- `<img>` was swapped for `next/image` because the former added two
+  `@next/next/no-img-element` warnings and this project's lint baseline is
+  warning-free.
+
+Verified: `npx tsc --noEmit` exit 0, `npm run lint` exit 0 (no warnings),
+`npm test` 848/848, all 9 marks loading in both locales, zero broken images,
+no document overflow, and all six category marks aligned on one baseline per row
+at both 390px (2-up, 104px marks) and desktop (3-up, 136px). The temporary
+`/_icon-preview` review page and its `public/en/` twin were removed.
+
+⚠️ **The Turbopack CSS wedge bit again mid-session** and cost a round of
+confusion: `.fe-icon-tile`'s edit applied while `.fe-icon-mark` kept serving the
+PREVIOUS compiled rule — same file, one rule stale and one fresh, so the page
+looked half-updated and the new `filter` simply never appeared. A reload does
+not clear it. Stopping the dev server and deleting `.next` does. Worth
+remembering that a partial, per-rule staleness is possible, not just an
+all-or-nothing miss.
+
+⚠️ Two environment notes worth keeping. `generate_image_batch` failed all 7 jobs
+at once but succeeded in groups of 3 — batch size, not credits (1,170 available)
+or prompt content. And a standalone `.html` file in `public/` 404s on this
+setup: `proxy.ts`'s matcher excludes `.svg/.png/.css/.js` but **not `.html`**,
+so it gets locale-rewritten to `/en/...`; the review page had to be duplicated
+under `public/en/` to be reachable.
+
+### Semantic fixes, not new artwork
+
+With the fill bug gone the icons are clean, modern and consistent, so **no icons
+were generated and no images were substituted** — that would have broken the
+documented "all icons are inline Lucide SVG through AppIcon" rule and traded a
+crisp vector system for raster art. What remained were genuine mismatches:
+
+| Where | Was | Now | Why |
+|---|---|---|---|
+| Gold & Chains | `payments` (money) | `link` (chain links) | the tile is about chains |
+| Antiques & Heirlooms | `inventory_2` (shipping box) | `crown` | a box says nothing about heirlooms |
+| Sell Sterling Silver (`/sell`, `/sell/[city]`) | `star` | `dining` | matches how silver is drawn everywhere else |
+| Tea Services (`/silver-services`) | `dining` | `emoji_food_beverage` | both gallery cards drew the same flatware icon |
+
+Three Lucide imports added (`Link`, `Crown`, `Coffee`). The silver gallery's
+placeholder icon is now **per item** rather than one shared fallback, which is
+what made two different product families share one graphic.
+
+### Regression guard
+
+Two tests added to `app-icon-integrity.test.ts` (**846 → 848 passing**): one
+fails the build if `fontVariationSettings` reappears in any source file outside
+`AppIcon.tsx` and the test itself, and one asserts that icons render
+`fill="none"` by default, fill only when explicitly asked, and that a stale
+`'FILL' 1` style no longer produces a fill. `npx tsc --noEmit` and
+`npm run lint` both exit 0.
+
+**Not yet deployed** — ships with the shop-card date fix below.
+
+## 2026-08-09 (post-deploy) - Production verification; shop-card date collision found and fixed
+
+The 2026-08-09 batch deployed as `main@27c12e2` ("big up"), published 4:01 PM,
+built in 1m 16s. Post-deploy verification found one real regression from that
+same batch. **The fix below is NOT yet deployed — production still carries the
+collision.**
+
+### Netlify build log (deploy 27c12e2)
+
+Clean and consistent with the local gate: Next.js 16.2.12, **449/449 static
+pages** (identical to local), compiled in 12.2s, no errors. 48 redirect rules
+and 4 header rules processed with none failing, 6 functions and 3 edge functions
+deployed, 30 assets changed.
+
+⚠️ **Correction to a long-standing note.** Docs have said "Netlify pins
+NODE_VERSION 20" and treated local Node v24 as the only version gap. The build
+log shows the situation is two-sided: `NODE_VERSION` is **20.20.2** and
+`npm run build` does run on it, but `@netlify/plugin-nextjs` **cannot** execute
+on 20.20.2, so Netlify silently runs the plugin on **22.23.1** instead and warns
+about it every build. So three Node versions are in play (local 24, app build
+20.20.2, Next runtime plugin 22.23.1). Nothing is broken, but the pin is below
+what the runtime plugin supports and raising `NODE_VERSION` to 22 would remove
+the warning and align build and plugin.
+
+### Production smoke — all passing
+
+- **Redirects/webhooks:** `.co/shop` → 301 `.com/shop`, `.co/` → 301 `.com/`,
+  `naplesantiquesllc.com` → 301, `www.` → 301, all single-hop and
+  path-preserving. `POST .co/api/webhooks/resend` → **401, not 301** — the
+  carve-out that keeps live webhooks working is intact.
+- **Routes:** `/`, `/shop`, `/trade-in`, `/es/trade-in` all 200.
+- **robots/sitemap:** 200, **0** bare `.co` URLs in either, 115 sitemap URLs,
+  `/trade-in` present.
+- **Hero (390px):** CTAs render two-up-one-down (Buy/Sell on row 1, Trade
+  centred on row 2), Trade → `/trade-in`, no document overflow.
+- **Reviews (390px):** 2 columns, quotes clamped, all four cards link to
+  `share.google/KAE0mjQwhKx9EqEZ1` with `target=_blank rel="noopener
+  noreferrer"`, whole card clickable. Owner separately confirmed the link lands
+  on the right Google profile.
+
+### 🔴 Regression found: the shop-card date collided with the price
+
+**Cause: an incomplete verification on my part, not a bad change.** When the
+`Ca. YYYY` label was un-hidden on mobile earlier the same day, it was measured
+at 320px (grid 1-up, 275px price row) and at 641px, and passed with 47px of
+clearance. The band between was never checked — and that is exactly where the
+card is NARROWEST. The shop grid goes 2-up by 390px, which drops the price row
+to **161px**. Measured on production at 390px: **2 cards overlapping by -9px**
+(`Ca. 2010` printing into `$2,360.88`) and most of the rest at 2px clearance.
+
+This is the same non-monotonic trap DECISIONS documents for the purchase panel
+and the related-strip: **row width is not monotonic in viewport width**
+(320px → 273px row, 390px → 161px, 472px → 201px, 1280px → 177px), so checking
+the extremes proves nothing about the middle.
+
+The row holds three things — date (absolute left), price (centred, in flow),
+width chip (absolute right) — needing ~187px together. Fix: the row becomes a
+`container-type: inline-size` query container, and below **185px of content
+width** the date **drops its "Ca." prefix** and shows the bare year, which fits
+the left slot with room to spare (owner rule, 2026-08-09: when the date field
+gets crowded, remove the "Ca." rather than reformatting or relocating it).
+
+The "Ca." lives in its own `.modern-card-date-prefix` span precisely so CSS can
+drop it without touching the year. Measured: the label goes 55px → **30px**,
+and the separating text node collapses to nothing, so the year still sits flush
+at the slot's left edge with no leading-space artifact.
+
+**An earlier attempt moved the date onto its own centred line above the price.**
+It worked and collided nowhere, but it made every card ~14px taller — including
+at desktop, where the grid is 4×200px cards and the row is an equally narrow
+177px. Dropping the prefix keeps the row at its original 22px at every width and
+leaves the date exactly where the owner pointed at it. That approach and its
+chip-realignment rule were removed rather than left commented out.
+
+Three implementation details that each cost a cycle:
+
+1. **The container must be the ROW, not the viewport** — for the
+   non-monotonicity above. Safe to make the row a container because it was
+   already `position: relative`, so it was already the containing block for its
+   two absolute children.
+2. **An element cannot match a container query against itself.** `flex-wrap`
+   was initially set inside the `@container` block on the row — the container —
+   so it never applied. It is now unconditional, which is harmless because the
+   price is the only in-flow child until the date rejoins the flow.
+3. **`!important` is required, and `transform` must be reset with `position`.**
+   The date carries its positioning in a JSX inline `style` attribute, which
+   outranks any stylesheet rule; and `translateY(-50%)` from that same inline
+   style survives the switch to `static`, lifting the date half its height into
+   the row above if left alone.
+
+Also: I put backticks around a CSS property name inside a comment in the
+component's `<style>{...}</style>` template literal, which terminated the string
+and 500'd the route — the precise failure that file's own comment at the
+shop-card styles warns about. Both occurrences removed; no backticks remain
+between the block's delimiters.
+
+**Verified after the fix**, both locales, all 24 rendered cards per width, with
+the row height unchanged at 22px throughout:
+
+| Viewport | Row | Label | Min gap to price |
+|---|---|---|---|
+| 320px | 273px | `Ca. 1960` | 47px |
+| 390px | 161px | `1960` | 16px |
+| 472px | 201px | `Ca. 1960` | 12px |
+| 1280px | 177px | `1960` | 25px |
+
+Zero negative gaps at every width, no document overflow. `npx tsc --noEmit`
+exit 0, `npm run lint` exit 0.
+
+Note the presentation alternates with row width rather than viewport width
+(273 → 161 → 201 → 177), so the prefix comes and goes as the window is resized.
+Each state is correct for its width and every real device sits in one of them.
+
+**The 12px worst case is grounded, not assumed.** Sorting the whole available
+catalog by price descending (89 products, one page) gives a widest price element
+of **67px** (`$2,394.56`) — `$34,999` is only 55px because it has no decimals.
+A price would have to reach ~90px to reopen the collision at the tightest inline
+row, so there is real headroom.
+
+Worth recording: the desktop row is 177px, so wide-price cards were **already
+colliding at desktop before today** — the date was only ever hidden below 640px,
+never at desktop. Dropping the prefix there fixes that pre-existing overlap too,
+at no cost in height.
+
 ## 2026-08-09 (later session) - Email verification closed; reviews grid is 2-up minimum
 
 Several items: the email verification, the reviews band, the hero Trade link,

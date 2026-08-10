@@ -185,7 +185,7 @@ export default async function FaqPage({ params }: Props) {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 text-[#735c00] hover:text-[#1a1c1c] transition-colors text-xs uppercase tracking-widest border-b border-[#735c00]/30 hover:border-[#735c00] pb-1"
               >
-                <AppIcon name="star" className="text-base" style={{ fontVariationSettings: "'FILL' 1" }} />
+                <AppIcon name="star" className="text-base" fill="currentColor" />
                 {isEs ? 'Leer todas nuestras reseñas en Google' : 'Read all our reviews on Google'}
                 <AppIcon name="arrow_outward" className="text-base" />
               </a>

@@ -185,7 +185,7 @@ export default async function EstateJewelryPage({ params }: Props) {
                     isEs ? 'Pago inmediato al llegar a un acuerdo' : 'Immediate payment upon agreement',
                   ].map((item, i) => (
                     <li key={i} className="flex items-start gap-4">
-                      <AppIcon name="check_circle" className="text-sm" style={{ color: '#f2ca50', flexShrink: 0, marginTop: '0.1rem', fontVariationSettings: "'FILL' 1" }} />
+                      <AppIcon name="check_circle" className="text-sm" style={{ color: '#f2ca50', flexShrink: 0, marginTop: '0.1rem' }} />
                       <span
                         className="text-sm font-bold uppercase tracking-wide"
                         style={{ fontFamily: 'var(--font-label)', color: 'white' }}
@@ -213,7 +213,7 @@ export default async function EstateJewelryPage({ params }: Props) {
                 >
                   <AppIcon name="verified"
                     className="mb-6 block"
-                    style={{ color: 'var(--color-primary)', fontSize: '4rem', fontVariationSettings: "'FILL' 1" }}
+                    style={{ color: 'var(--color-primary)', fontSize: '4rem' }}
                     aria-hidden="true"
                    />
                   <h3

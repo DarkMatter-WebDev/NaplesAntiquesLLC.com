@@ -7,6 +7,7 @@ import SiteFooter from '@/components/layout/SiteFooter';
 import TradingViewMini from '@/components/trading/TradingViewMini';
 import { fetchSpotData } from '@/lib/spot-price';
 import { AppIcon } from '@/components/AppIcon';
+import ClayMark, { type ClayMarkName } from '@/components/ClayMark';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -22,11 +23,14 @@ interface Props {
   params: Promise<{ locale: string }>;
 }
 
+// `icon` is the placeholder shown while an item has no photograph. It is
+// per-item rather than one shared fallback, which previously drew the same
+// flatware icon beside both "Estate Flatware" and "Tea Services".
 const GALLERY_ITEMS = [
-  { key: 'flatware', titleEn: 'Estate Flatware', titleEs: 'Cubertería de Patrimonio', subEn: 'Full Sets & Individual Pieces', subEs: 'Juegos Completos y Piezas Individuales', img: null },
-  { key: 'tea', titleEn: 'Tea Services', titleEs: 'Servicios de Té', subEn: 'Holloware & Serving Trays', subEs: 'Vajilla y Bandejas', img: null },
-  { key: 'coins', titleEn: 'Bullion & Coins', titleEs: 'Lingotes y Monedas', subEn: '99.9% Pure Investment Silver', subEs: 'Plata de Inversión 99.9% Pura', img: '/assets/images/pages/bullion.webp' },
-  { key: 'jewelry', titleEn: 'Fine Jewelry', titleEs: 'Joyería Fina', subEn: 'Designer & Vintage Collections', subEs: 'Colecciones de Diseñador y Vintage', img: '/assets/images/pages/ring.jpg' },
+  { key: 'flatware', titleEn: 'Estate Flatware', titleEs: 'Cubertería de Patrimonio', subEn: 'Full Sets & Individual Pieces', subEs: 'Juegos Completos y Piezas Individuales', img: null, icon: 'dining' },
+  { key: 'tea', titleEn: 'Tea Services', titleEs: 'Servicios de Té', subEn: 'Holloware & Serving Trays', subEs: 'Vajilla y Bandejas', img: null, icon: 'emoji_food_beverage' },
+  { key: 'coins', titleEn: 'Bullion & Coins', titleEs: 'Lingotes y Monedas', subEn: '99.9% Pure Investment Silver', subEs: 'Plata de Inversión 99.9% Pura', img: '/assets/images/pages/bullion.webp', icon: 'toll' },
+  { key: 'jewelry', titleEn: 'Fine Jewelry', titleEs: 'Joyería Fina', subEn: 'Designer & Vintage Collections', subEs: 'Colecciones de Diseñador y Vintage', img: '/assets/images/pages/ring.jpg', icon: 'diamond' },
 ];
 
 export default async function SilverServicesPage({ params }: Props) {
@@ -230,14 +234,15 @@ export default async function SilverServicesPage({ params }: Props) {
               </div>
               <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
-                  { icon: 'scale', titleEn: 'Precision Weight', titleEs: 'Peso de Precisión', descEn: 'Using calibrated Ohaus scales to measure in Troy ounces and Grams for pinpoint accuracy.', descEs: 'Usando básculas Ohaus calibradas para medir en onzas Troy y gramos con precisión.' },
-                  { icon: 'iron', titleEn: 'Magnetism', titleEs: 'Magnetismo', descEn: 'Silver is non-magnetic. We use rare-earth neodymium testing to identify ferrous cores.', descEs: 'La plata no es magnética. Usamos pruebas de neodimio para identificar núcleos ferrosos.' },
-                  { icon: 'science', titleEn: 'Assay Analysis', titleEs: 'Análisis de Ensayo', descEn: 'Onsite acid testing at your appointment; offsite XRF spectrometry when exact assay documentation is needed.', descEs: 'Prueba ácida en el sitio; espectrometría XRF externa cuando se necesita documentación exacta.' },
-                ].map(({ icon, titleEn, titleEs, descEn, descEs }) => (
-                  <div key={icon} className="rounded-2xl border border-white/10 bg-white/5 p-8 shadow-[0_16px_44px_rgba(0,0,0,0.12)]">
-                    <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full bg-[#735c00]">
-                      <AppIcon name={icon} className="text-white" style={{ fontVariationSettings: "'FILL' 1" }} />
-                    </div>
+                  { mark: 'scale', titleEn: 'Precision Weight', titleEs: 'Peso de Precisión', descEn: 'Using calibrated Ohaus scales to measure in Troy ounces and Grams for pinpoint accuracy.', descEs: 'Usando básculas Ohaus calibradas para medir en onzas Troy y gramos con precisión.' },
+                  { mark: 'magnet', titleEn: 'Magnetism', titleEs: 'Magnetismo', descEn: 'Silver is non-magnetic. We use rare-earth neodymium testing to identify ferrous cores.', descEs: 'La plata no es magnética. Usamos pruebas de neodimio para identificar núcleos ferrosos.' },
+                  { mark: 'flask', titleEn: 'Assay Analysis', titleEs: 'Análisis de Ensayo', descEn: 'Onsite acid testing at your appointment; offsite XRF spectrometry when exact assay documentation is needed.', descEs: 'Prueba ácida en el sitio; espectrometría XRF externa cuando se necesita documentación exacta.' },
+                ].map(({ mark, titleEn, titleEs, descEn, descEs }) => (
+                  <div key={mark} className="rounded-2xl border border-white/10 bg-white/5 p-8 shadow-[0_16px_44px_rgba(0,0,0,0.12)]">
+                    {/* onDark: this section is a dark band, so the float shadow
+                        would be invisible. The gold disc went with the icon —
+                        gold clay on a #735c00 circle is gold on gold. */}
+                    <ClayMark name={mark as ClayMarkName} size={80} onDark className="mb-6 block" />
                     <h4 className="font-[family-name:var(--font-headline)] text-lg font-bold mb-4 text-[#e9c349]">
                       {isEs ? titleEs : titleEn}
                     </h4>
@@ -265,7 +270,7 @@ export default async function SilverServicesPage({ params }: Props) {
             <div className="hidden md:block h-px flex-grow mx-8 bg-[#d0c5af]" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {GALLERY_ITEMS.map(({ key, titleEn, titleEs, subEn, subEs, img }) => (
+            {GALLERY_ITEMS.map(({ key, titleEn, titleEs, subEn, subEs, img, icon }) => (
               <div key={key} className="group cursor-pointer">
                 <div className="mb-4 aspect-[3/4] overflow-hidden rounded-2xl bg-[#e8e8e8] shadow-[0_14px_38px_rgba(38,28,6,0.08)]">
                   {img ? (
@@ -278,9 +283,9 @@ export default async function SilverServicesPage({ params }: Props) {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <AppIcon name="dining"
+                      <AppIcon name={icon}
                         className="text-[#7f7663]"
-                        style={{ fontSize: '3rem', fontVariationSettings: "'FILL' 0, 'wght' 200" }}
+                        style={{ fontSize: '3rem' }}
                        />
                     </div>
                   )}

@@ -485,6 +485,14 @@ button:focus-visible > .hover-underline-grow,
   filter: brightness(0.98);
   transition-duration: 0.05s;
 }
+/* Keyboard focus was previously left to the browser default, which is close to
+   invisible against this gradient. The ring is dark so it reads on the gold
+   itself, with a light outer edge so it also survives on a dark section. */
+.gold-button:focus-visible {
+  outline: 2px solid #1a1c1c;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(233, 195, 73, 0.45);
+}
 
 .detail-cart-button {
   background: #0f5f46;
@@ -527,6 +535,46 @@ button:focus-visible > .hover-underline-grow,
 .outline-button:active {
   transform: scale(0.95);
   transition-duration: 0.05s;
+}
+.outline-button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-primary) 72%, transparent);
+  outline-offset: 2px;
+}
+
+/* Dark-surface variant. The base `.outline-button` is built for light sections —
+   it fills with near-white and uses the deep --color-primary (#735c00) for its
+   text, which is close to unreadable on a dark band. This keeps the same shape,
+   sizing and motion but inverts the palette to a warm gold on transparent. */
+.outline-button.outline-button-on-dark {
+  background: rgba(242, 202, 80, 0.06);
+  border-color: rgba(242, 202, 80, 0.45);
+  color: #ecdcb0;
+  box-shadow: none;
+}
+.outline-button.outline-button-on-dark:hover {
+  background: rgba(242, 202, 80, 0.14);
+  border-color: rgba(242, 202, 80, 0.85);
+  color: #f7f2e7;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.35);
+}
+.outline-button.outline-button-on-dark:focus-visible {
+  outline: 2px solid rgba(242, 202, 80, 0.9);
+  outline-offset: 2px;
+}
+
+/* Both buttons lift and scale on interaction; honour a reduced-motion request
+   while keeping the colour changes, which are the actual state signal. */
+@media (prefers-reduced-motion: reduce) {
+  .gold-button,
+  .outline-button {
+    transition: background 0.15s, color 0.15s, border-color 0.15s, filter 0.15s;
+  }
+  .gold-button:hover,
+  .outline-button:hover,
+  .gold-button:active,
+  .outline-button:active {
+    transform: none;
+  }
 }
 
 /* Destructive social actions remain visually related to outlined controls,
@@ -1422,26 +1470,211 @@ button:not(:disabled):not(.gold-button):not(.outline-button):active {
   transform: none;
 }
 
+/* ---- /free-evaluation hero prose hierarchy --------------------------------
+   Owner, 2026-08-09: the hero "reads as a solid block of text". It was five
+   same-sized paragraphs plus a bulleted list, all in one colour, so the eye had
+   nothing to anchor on. Three levels now: a brighter lede, a gold kicker that
+   opens the sorting explanation, and the metal list lifted out of the prose
+   into its own panel. The block is bookended bright (lede / closer) with the
+   structured middle between them. */
+.fe-hero-lede {
+  font-size: 1.125rem;
+  line-height: 1.6;
+  color: #efe9dc;
+}
+.fe-hero-closer {
+  color: #efe9dc;
+}
+@media (min-width: 768px) {
+  .fe-hero-lede {
+    font-size: 1.3125rem;
+  }
+}
+
+/* Small-caps section label. The hairline runs from the label out to the column
+   edge — it marks a new section without the weight of a full rule. */
+.fe-hero-kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+  font-family: var(--font-label);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #f2ca50;
+}
+.fe-hero-kicker::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: linear-gradient(to right, rgba(242, 202, 80, 0.4), rgba(242, 202, 80, 0));
+}
+
+/* The metal list is a <dl>: these are terms and their definitions, and saying so
+   is what lets the term column align. Stacked below sm, two columns from sm. */
+.fe-metal-panel {
+  border-left: 2px solid rgba(242, 202, 80, 0.5);
+  border-radius: 0 0.75rem 0.75rem 0;
+  background: linear-gradient(to right, rgba(242, 202, 80, 0.075), rgba(242, 202, 80, 0));
+  padding: 1rem 1.15rem;
+}
+.fe-metal-row {
+  display: grid;
+  gap: 0.2rem;
+}
+.fe-metal-row + .fe-metal-row {
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid rgba(236, 220, 176, 0.13);
+}
+@media (min-width: 640px) {
+  .fe-metal-row {
+    /* 8.5rem clears the longest term ("EVERYTHING ELSE") at this size and
+       tracking; anything narrower wraps it and breaks the column. */
+    grid-template-columns: 8.5rem 1fr;
+    gap: 0 1.25rem;
+    align-items: baseline;
+  }
+}
+/* Gold, not the old #ecdcb0 cream: that cream sat a shade off the #d8d1c2 body
+   text, so the terms never read as terms. 12:1 on the #0e0f0f hero. */
+.fe-metal-term {
+  font-family: var(--font-label);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #f2ca50;
+}
+.fe-metal-detail {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+@media (min-width: 768px) {
+  .fe-metal-detail {
+    font-size: 1rem;
+  }
+}
+
+/* Caveat about the list above, so it is deliberately quieter than body text. */
+.fe-hero-note {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #b3ac9e;
+}
+
 /* Dark tile used on free-evaluation category grid */
+/* No card: the dark rectangles were removed 2026-08-09 (owner). The marks and
+   their labels now sit directly on the section background, so the clay does the
+   work the box used to.
+   `justify-content: flex-start` is still load-bearing — grid rows stretch every
+   cell to the tallest, so with centering a one-line label gains slack and its
+   mark drifts down out of line with its neighbours. Top-anchoring keeps all six
+   marks on one baseline whatever their labels do. */
 .fe-icon-tile {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   text-align: center;
   text-decoration: none;
-  background: #202323;
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 4px;
-  padding: 1.5rem 1rem 1.35rem;
-  min-height: 9rem;
-  color: #f6f1e8;
-  transition: border-color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+  padding: 0 0.5rem 0.5rem;
+  color: var(--color-on-surface);
+  transition: transform 0.15s ease;
 }
-.fe-icon-tile:hover {
-  border-color: rgba(242,202,80,0.45);
-  background: #262928;
-  transform: translateY(-2px);
+
+/* Deliberately oversized clay mark (owner, 2026-08-09: "comically oversized").
+   At the original 56px these read as fussy; this large, the clay modelling and
+   the two-tone actually show.
+   The drop-shadow is what makes them read as floating rather than pasted on —
+   background removal takes the render's own ambient shadow with it. It works
+   here because these now sit on the LIGHT section background; the same shadow
+   was omitted while they sat on dark tiles, where black on #202323 is invisible. */
+/* Shared base for every clay mark (components/ClayMark.tsx). The drop-shadow is
+   what makes a cutout read as floating rather than pasted on — background
+   removal takes the render's own ambient shadow with it. It only works on light
+   surfaces, hence the --on-dark opt-out. */
+.clay-mark {
+  /* Size comes from a custom property so a stylesheet can restate it per
+     breakpoint; an inline width would beat any class and kill that. */
+  width: var(--clay-size, 6rem);
+  height: var(--clay-size, 6rem);
+  object-fit: contain;
+  filter: drop-shadow(0 8px 12px rgba(38, 28, 6, 0.22));
+  /* The optical scale is a TRANSFORM, not width/height, so it never changes the
+     layout box. Growing the box instead pushed the mark's own heading down and
+     broke alignment with its siblings — a 2.2x ring left "We Sell Jewelry"
+     sitting well below the other two card titles. Anchoring to the bottom edge
+     means the mark grows UPWARD into whitespace and its baseline never moves. */
+  transform: scale(var(--clay-scale, 1));
+  transform-origin: bottom center;
+}
+
+/* Bounding-box parity is not visual parity. A ring is mostly HOLE, so it reads
+   far lighter than a solid goldbar or phone at the same box. Trimming the asset
+   fixed its extents (51% -> 80% fill) and it still looked small, because the
+   shortfall is ink coverage, not size. */
+.clay-mark[data-mark='ring'] {
+  /* Walked down 2.2 -> 1.6 -> 1.25 -> 1.12 on review. A small correction for
+     the hollow-shape shortfall: the ring is mostly empty space, so it reads
+     lighter than a solid mark at the same box.
+
+     Note this scale is NOT the whole story, and the two are easy to conflate.
+     The asset itself was re-padded from 51% to 80% canvas fill, which is a 1.57x
+     optical increase on its own. So scale 1.0 today is already far larger than
+     the state originally reported as too small — there is real headroom below
+     this number if it still reads big. */
+  --clay-scale: 1.12;
+}
+
+.clay-mark--on-dark {
+  filter: none;
+}
+
+/* free-evaluation's category marks size responsively. Restate --clay-size only;
+   width/height stay on `.clay-mark` so the per-mark optical scale still applies. */
+.fe-icon-mark {
+  --clay-size: 6.5rem;
+  margin-bottom: 0.6rem;
+  transition: transform 0.18s ease;
+}
+
+/* The six category marks are a MATCHED SET, so the ring cannot take the boost a
+   lone mark can — at 2.2x here it was double its neighbours and dominated the
+   grid. Keep this at or below the global ring scale: if it ever exceeds it, the
+   most size-sensitive surface becomes the most boosted one, which is backwards.
+   It must also stay under the row gap, since the mark grows upward. */
+.fe-icon-mark[data-mark='ring'] {
+  --clay-scale: 1.05;
+}
+
+@media (min-width: 640px) {
+  .fe-icon-mark {
+    --clay-size: 8.5rem;
+  }
+}
+
+/* The tilt is the joke. Pointer-only: on touch it would latch after a tap and
+   leave one tile permanently askew. */
+/* Both of these restate the FULL transform, so each has to carry --clay-scale
+   forward — `transform` is one property, and dropping the scale here would snap
+   a scaled mark back to 1x on hover or under reduced motion. */
+@media (hover: hover) {
+  .fe-icon-tile:hover .fe-icon-mark {
+    transform: translateY(-5px) rotate(-5deg) scale(calc(var(--clay-scale, 1) * 1.04));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fe-icon-mark {
+    transition: none;
+  }
+  .fe-icon-tile:hover .fe-icon-mark {
+    transform: scale(var(--clay-scale, 1));
+  }
 }
 
 /* Pan animations for bullion and estate-services hero backgrounds */

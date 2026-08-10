@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
-import { AppIcon } from '@/components/AppIcon';
+import ClayMark from '@/components/ClayMark';
 
 // The named trade-in program page (2026-08-04, from the mels-treasures.com
 // review — their "Gold Exchange Program"). This page NAMES a service the store
@@ -31,7 +31,7 @@ interface Props {
 
 const STEPS = [
   {
-    icon: 'photo_camera',
+    mark: 'camera',
     titleEn: '1. Show Us What You Have',
     titleEs: '1. Muéstrenos Lo Que Tiene',
     descEn:
@@ -40,7 +40,7 @@ const STEPS = [
       'Envíe fotos de su oro o plata — cadenas rotas, aretes sueltos, anillos antiguos, cubiertos de plata esterlina, monedas — o agende una cita privada. Que esté mezclado y sin clasificar es completamente normal.',
   },
   {
-    icon: 'scale',
+    mark: 'scale',
     titleEn: '2. Tested & Valued In Front Of You',
     titleEs: '2. Probado y Valorado Frente a Usted',
     descEn:
@@ -49,7 +49,7 @@ const STEPS = [
       'Todo se prueba y pesa mientras usted observa, y se valora contra el mismo mercado spot en vivo en el que se basan los precios de nuestra tienda. Revisamos los cálculos antes de que decida.',
   },
   {
-    icon: 'diamond',
+    mark: 'ring',
     titleEn: '3. Trade Toward Any Piece',
     titleEs: '3. Intercambie Por Cualquier Pieza',
     descEn:
@@ -57,7 +57,7 @@ const STEPS = [
     descEs:
       'Su metal se convierte en crédito para cualquier pieza de la tienda — o, si prefiere vender directamente, le hacemos una oferta clara en efectivo. Usted elige, sin presión.',
   },
-];
+] as const;
 
 export default async function TradeInPage({ params }: Props) {
   const { locale } = await params;
@@ -110,9 +110,9 @@ export default async function TradeInPage({ params }: Props) {
               </h2>
             </div>
             <div className="grid md:grid-cols-3 gap-6">
-              {STEPS.map(({ icon, titleEn, titleEs, descEn, descEs }) => (
-                <div key={icon} className="rounded-2xl border border-[#d0c5af]/60 bg-white p-6 shadow-[0_14px_38px_rgba(38,28,6,0.06)]">
-                  <AppIcon name={icon} className="text-[#735c00] block mb-3" style={{ fontSize: '2rem' }} />
+              {STEPS.map(({ mark, titleEn, titleEs, descEn, descEs }) => (
+                <div key={mark} className="rounded-2xl border border-[#d0c5af]/60 bg-white p-6 shadow-[0_14px_38px_rgba(38,28,6,0.06)]">
+                  <ClayMark name={mark} size={88} className="block mb-3" />
                   <h3 className="font-[family-name:var(--font-headline)] font-bold text-lg mb-2">
                     {isEs ? titleEs : titleEn}
                   </h3>
@@ -142,12 +142,7 @@ export default async function TradeInPage({ params }: Props) {
         {/* Sustainability */}
         <section className="py-16 md:py-20 bg-[#f3f3f3]">
           <div className="max-w-3xl mx-auto px-6 md:px-8 text-center">
-            <span
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full mb-4"
-              style={{ background: 'rgba(212, 175, 55, 0.16)', color: '#735c00' }}
-            >
-              <AppIcon name="recycling" style={{ fontSize: '22px' }} />
-            </span>
+            <ClayMark name="recycle" size={80} className="mx-auto mb-4 block" />
             <h2 className="text-3xl md:text-4xl font-[family-name:var(--font-headline)] font-bold mb-4 tracking-tight">
               {isEs ? 'Oro Que Sigue Viviendo' : 'Gold That Keeps On Living'}
             </h2>

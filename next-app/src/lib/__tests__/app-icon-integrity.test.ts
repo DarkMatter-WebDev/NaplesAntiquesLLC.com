@@ -44,6 +44,46 @@ describe('inline SVG icon integrity', () => {
     expect(missing).toEqual([]);
   });
 
+  it('does not reintroduce fontVariationSettings on icons', () => {
+    // These are Material Symbols variable-font axes and mean nothing to an SVG.
+    // A "'FILL' 1" value used to be translated into fill="currentColor", which
+    // floods a Lucide OUTLINE icon and hides every interior stroke — a filled
+    // circle-check is a plain disc, a filled gem or badge is a blob. That cost
+    // 14 of 24 icons on /free-evaluation before it was found. Icons that should
+    // genuinely be solid pass fill="currentColor" explicitly instead.
+    // AppIcon.tsx still names the property in order to STRIP it, and this file
+    // names it to prove the stripping works — both are the guard, not a breach.
+    const allowed = [
+      path.join('components', 'AppIcon.tsx'),
+      path.join('__tests__', 'app-icon-integrity.test.ts'),
+    ];
+    const offenders = sourceFiles(SOURCE_ROOT)
+      .filter((file) => !allowed.some((suffix) => file.endsWith(suffix)))
+      .filter((file) => fs.readFileSync(file, 'utf8').includes('fontVariationSettings'))
+      .map((file) => path.relative(APP_ROOT, file));
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('renders outline icons by default and only fills when asked', () => {
+    const plain = renderToStaticMarkup(createElement(AppIcon, { name: 'diamond' }));
+    expect(plain).toContain('fill="none"');
+
+    const solid = renderToStaticMarkup(createElement(AppIcon, {
+      name: 'star',
+      fill: 'currentColor',
+    }));
+    expect(solid).toContain('fill="currentColor"');
+
+    // The removed bridge: a stale FILL axis must no longer produce a fill.
+    const legacy = renderToStaticMarkup(createElement(AppIcon, {
+      name: 'diamond',
+      style: { fontVariationSettings: "'FILL' 1" },
+    }));
+    expect(legacy).toContain('fill="none"');
+    expect(legacy).not.toContain('fontVariationSettings');
+  });
+
   it('renders SVG markup and never falls back to visible icon-name text', () => {
     const rendered = renderToStaticMarkup(createElement(AppIcon, {
       name: 'sync',

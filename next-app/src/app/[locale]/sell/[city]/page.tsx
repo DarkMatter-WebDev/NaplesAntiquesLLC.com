@@ -7,7 +7,7 @@ import { SERVICE_AREAS, getServiceArea } from '@/lib/service-areas';
 import { routing } from '@/i18n/routing';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
-import { AppIcon } from '@/components/AppIcon';
+import ClayMark from '@/components/ClayMark';
 
 interface Props {
   params: Promise<{ locale: string; city: string }>;
@@ -60,72 +60,72 @@ export default async function SellCityPage({ params }: Props) {
   // phrase so the page can rank for every buy-side combination.
   const whatWeBuy = [
     {
-      icon: 'paid',
+      mark: 'goldbar',
       titleEn: `Sell Gold in ${area.city}`,
       titleEs: `Vender Oro en ${area.city}`,
       descEn: `Gold buyers in ${area.city} for 10k–24k jewelry, chains, class rings, dental gold, coins, and bullion — paid by live gold-spot weight, not a flat lowball.`,
       descEs: `Compradores de oro en ${area.city} para joyería de 10k–24k, cadenas, anillos, oro dental, monedas y lingotes — pagado por peso al precio spot en vivo, sin ofertas bajas.`,
     },
     {
-      icon: 'redeem',
+      mark: 'chain',
       titleEn: `Sell Jewelry in ${area.city}`,
       titleEs: `Vender Joyería en ${area.city}`,
       descEn: `Estate and designer jewelry buyers in ${area.city} — Tiffany, Cartier, David Yurman, and unsigned heirloom pieces. We buy necklaces, bracelets, rings, and earrings.`,
       descEs: `Compradores de joyería de patrimonio y de diseñador en ${area.city} — Tiffany, Cartier, David Yurman y piezas heredadas. Compramos collares, pulseras, anillos y aretes.`,
     },
     {
-      icon: 'star',
+      mark: 'flatware',
       titleEn: `Sell Sterling Silver in ${area.city}`,
       titleEs: `Vender Plata Esterlina en ${area.city}`,
       descEn: `Sterling silver buyers in ${area.city} for flatware, tea sets, trays, holloware, and .925 jewelry. Full estates and single pieces welcome.`,
       descEs: `Compradores de plata esterlina en ${area.city} para cubiertos, juegos de té, bandejas, holloware y joyería .925. Aceptamos patrimonios completos y piezas sueltas.`,
     },
     {
-      icon: 'diamond',
+      mark: 'ring',
       titleEn: `Sell Diamonds in ${area.city}`,
       titleEs: `Vender Diamantes en ${area.city}`,
       descEn: `Diamond buyers in ${area.city} for loose stones and mounted diamonds — engagement rings, tennis bracelets, and studs, certified or not.`,
       descEs: `Compradores de diamantes en ${area.city} para piedras sueltas y montadas — anillos de compromiso, pulseras de tenis y aretes, con o sin certificado.`,
     },
     {
-      icon: 'toll',
+      mark: 'coins',
       titleEn: `Sell Coins & Bullion in ${area.city}`,
       titleEs: `Vender Monedas y Lingotes en ${area.city}`,
       descEn: `Coin and bullion buyers in ${area.city} — gold and silver Eagles, Krugerrands, Maple Leafs, sovereigns, junk silver, and bars of any mint.`,
       descEs: `Compradores de monedas y lingotes en ${area.city} — Eagles de oro y plata, Krugerrands, Maple Leafs, soberanos, plata de circulación y barras de cualquier casa de moneda.`,
     },
     {
-      icon: 'watch',
+      mark: 'watch',
       titleEn: `Sell Watches in ${area.city}`,
       titleEs: `Vender Relojes en ${area.city}`,
       descEn: `Luxury watch buyers in ${area.city} — Rolex, Omega, Cartier, and vintage timepieces, running or not, with or without box and papers.`,
       descEs: `Compradores de relojes de lujo en ${area.city} — Rolex, Omega, Cartier y relojes vintage, funcionen o no, con o sin caja y papeles.`,
     },
-  ];
+  ] as const;
 
   const steps = [
     {
-      icon: 'call',
+      mark: 'phone',
       titleEn: 'Call or request an estimate',
       titleEs: 'Llame o solicite un estimado',
       descEn: `Call (239) 404-8505 or send a few photos. We give you a ballpark before we ever meet.`,
       descEs: `Llame al (239) 404-8505 o envíe algunas fotos. Le damos una idea del valor antes de reunirnos.`,
     },
     {
-      icon: 'home',
+      mark: 'house',
       titleEn: 'We come to you',
       titleEs: 'Vamos a usted',
       descEn: `${travel} We test and weigh everything in front of you — no mailing off your valuables.`,
       descEs: `${travel} Probamos y pesamos todo frente a usted — sin enviar sus objetos de valor por correo.`,
     },
     {
-      icon: 'payments',
+      mark: 'cash',
       titleEn: 'Get paid on the spot',
       titleEs: 'Reciba su pago en el acto',
       descEn: `Accept our offer and get paid immediately. No pressure, no obligation if you decline.`,
       descEs: `Acepte nuestra oferta y reciba el pago de inmediato. Sin presión ni obligación si la rechaza.`,
     },
-  ];
+  ] as const;
 
   const faqs = [
     {
@@ -271,8 +271,8 @@ export default async function SellCityPage({ params }: Props) {
           </div>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {whatWeBuy.map((item) => (
-              <div key={item.icon} className="rounded-2xl border border-[#d0c5af] bg-white p-7 shadow-[0_14px_38px_rgba(38,28,6,0.05)] transition-all hover:-translate-y-0.5 hover:shadow-xl">
-                <AppIcon name={item.icon} className="mb-4 block text-[#735c00]" style={{ fontSize: '2.5rem', fontVariationSettings: "'FILL' 0, 'wght' 200" }} aria-hidden="true" />
+              <div key={item.mark} className="rounded-2xl border border-[#d0c5af] bg-white p-7 shadow-[0_14px_38px_rgba(38,28,6,0.05)] transition-all hover:-translate-y-0.5 hover:shadow-xl">
+                <ClayMark name={item.mark} size={88} className="mb-4 block" />
                 <h3 className="mb-2 text-lg font-bold text-[#1a1c1c]" style={{ fontFamily: 'var(--font-headline)' }}>
                   {isEs ? item.titleEs : item.titleEn}
                 </h3>
@@ -290,10 +290,11 @@ export default async function SellCityPage({ params }: Props) {
             </h2>
             <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
               {steps.map((step, i) => (
-                <div key={step.icon} className="text-center">
-                  <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#d4af37]">
-                    <AppIcon name={step.icon} className="text-white" style={{ fontSize: '1.9rem', fontVariationSettings: "'FILL' 1" }} aria-hidden="true" />
-                  </div>
+                <div key={step.mark} className="text-center">
+                  {/* The gold disc behind this went with the icon: a gold clay
+                      mark on a #d4af37 circle is gold on gold, and the mark's
+                      own float shadow does the lifting the disc used to. */}
+                  <ClayMark name={step.mark} size={88} className="mx-auto mb-5 block" />
                   <p className="mb-1 text-xs font-bold uppercase tracking-[0.2em] text-[#735c00]" style={{ fontFamily: 'var(--font-label)' }}>
                     {isEs ? `Paso ${i + 1}` : `Step ${i + 1}`}
                   </p>
@@ -348,7 +349,9 @@ export default async function SellCityPage({ params }: Props) {
         {/* Final CTA */}
         <section className="bg-[#2f3131] py-24 text-center">
           <div className="mx-auto max-w-2xl px-4">
-            <AppIcon name="verified_user" className="mb-6 block text-[#e9c349]" style={{ fontSize: '3.5rem', fontVariationSettings: "'FILL' 1" }} aria-hidden="true" />
+            {/* onDark: this band is #2f3131, where a black float shadow is
+                invisible and only costs paint work. */}
+            <ClayMark name="shield" size={96} onDark className="mx-auto mb-6 block" />
             <h2 className="mb-6 text-3xl font-bold text-white md:text-4xl" style={{ fontFamily: 'var(--font-headline)' }}>
               {isEs ? `¿Listo para vender en ${area.city}?` : `Ready to sell in ${area.city}?`}
             </h2>

@@ -2,9 +2,73 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-08-09**.
+> in `DECISIONS.md`. Last reconciled: **2026-08-10**.
 
-## Start Here (handoff, end of 2026-08-09 session)
+## Start Here (handoff, end of the 2026-08-09 → 2026-08-10 session)
+
+> **⚠️ SUPERSEDED IN PART — the batch below SHIPPED as `main@27c12e2` on
+> 2026-08-09 and production verification passed, except for ONE regression that
+> is fixed locally and awaiting a second deploy.**
+>
+> - **Deployed and verified:** hero CTAs two-up-one-down, hero Trade →
+>   `/trade-in`, reviews band 2-up with clamped quotes and Google links,
+>   redirects/webhook carve-out, robots/sitemap. Netlify build clean at
+>   449/449 pages. Detail: `CHANGELOG.md` → *2026-08-09 (post-deploy)*.
+> - 🔴 **Undeployed fix:** the shop-card `Ca. YYYY` label collides with the
+>   price on 2-up cards (measured **-9px** on production at 390px). Fixed
+>   locally with a container query on the price row that **drops the "Ca."
+>   prefix and keeps the bare year** when the row is under 185px of content
+>   width — the label stays in its left slot and no card changes height.
+>   `tsc` and `lint` clean, measured across the width ladder in both locales.
+>   **`npm run build` has now been run and is clean (449/449 pages, no
+>   warnings) — this is waiting on a redeploy only.** (`npm test` green at
+>   **848/848**.)
+> - 🔴 **Undeployed:** `/free-evaluation` **rebuilt as a sendable landing
+>   page** — form moved out of the hero into its own "Send a request below"
+>   block (photos optional), hero now explains the service in Chris's voice
+>   beside a photo of an evaluation in progress, plus a new detailed sorting
+>   section covering purity subcategories and piece-by-piece pricing. Both
+>   locales. ⚠️ The hero image is a **placeholder**
+>   (`pages/evaluation-desk-placeholder.webp`) — owner rejected the generated
+>   likeness of himself and will supply a real photo. It is framed with no
+>   identifiable face on purpose, because the copy beside it is first person.
+>   **Swap the file and its alt text together.**
+> - 🔴 **Undeployed:** **wrap groups centred below `lg`** on
+>   `/free-evaluation` (trust chips + hero CTAs). Every other customer-facing
+>   wrap group was audited and needed no change — see `CHANGELOG.md`,
+>   *2026-08-09 (post-deploy 5)*, for the list so the sweep is not redone.
+> - 🔴 **Undeployed:** **Free Evaluation is now in the header Sell nav**
+>   (last, after Trade-In Program). It was previously reachable only from the
+>   footer. One `SELL_ITEMS` entry covers the desktop dropdown, the mobile
+>   accordion, and the parent Sell tab's active state.
+> - 🔴 **Undeployed:** **the `/free-evaluation` hero prose now has hierarchy** —
+>   brighter lede, a gold `<h2>` kicker with a hairline, the metal list moved
+>   out of the prose into a `<dl>` panel with an aligned term column, and the
+>   two trailing paragraphs split into a quiet footnote and a bright closer.
+>   The metal terms went cream → brand gold; see `CHANGELOG.md`,
+>   *2026-08-09 (post-deploy 6)*, for why that is **not** a WCAG regression.
+> - 🔴 **Undeployed:** **matte-clay illustrated marks are now sitewide** — the
+>   homepage services strip, `/free-evaluation`, `/sell`, `/sell/[city]`,
+>   `/trade-in`, `/bullion`, `/gold-services` and `/silver-services`. 20 WebP
+>   assets in `public/assets/images/icons/`, rendered through
+>   `components/ClayMark.tsx`. `ServiceIconCanvas` was deleted (the homepage's
+>   canvas-drawn icons). Functional UI icons (cart, heart, chevrons, admin, and
+>   small inline glyphs) are unchanged and stay Lucide. See DECISIONS,
+>   *"Illustrated clay marks are IMAGES"*.
+> - 🔴 **Undeployed fix:** every icon rendered as a solid blob wherever a legacy
+>   `fontVariationSettings: "'FILL' 1"` style survived — the Material Symbols
+>   fill bridge in `AppIcon` flooded Lucide outline icons. Bridge deleted, all
+>   27 usages cleaned, four semantic swaps, two regression tests added. Ships
+>   with the same redeploy.
+> - 🔴 **Undeployed fix:** the `/free-evaluation` hero eyebrow ("100% Free — No
+>   Obligation") was painting itself with `--color-primary` on the near-black
+>   hero — **2.96:1, below AA**. Now the on-dark gold at **12.19:1**. The other
+>   13 `--color-primary` nodes on that page sit on light surfaces and pass
+>   (5.26–6.44:1), so the fix is scoped to the one that was broken.
+> - ⚠️ **Netlify Node correction:** `NODE_VERSION` is **20.20.2**, but
+>   `@netlify/plugin-nextjs` cannot run on it and Netlify silently executes the
+>   plugin on **22.23.1**, warning every build. Raising the pin to 22 would
+>   align them.
 
 **One thing is waiting: DEPLOY.** A full UX/performance batch is finished,
 fully verified, and sitting undeployed. There is **no outstanding local work,
@@ -21,10 +85,26 @@ no failing check, and no pending SQL** — the session's one migration
   **Trade CTA now pointing at `/trade-in`** instead of `/contact`, and the
   **hero CTAs held at two-up-one-down on mobile**. Full detail:
   `CHANGELOG.md` → *2026-08-09* and *2026-08-09 (later session)*.
-- **✅ THE FULL GATE PASSED ON THE COMPLETE BATCH (2026-08-09, second run).**
-  Dev server stopped and `.next` deleted first, so this is a clean from-scratch
-  build covering every change including the reviews grid, the hero CTA layout,
-  and the shop-card date. Nothing needs re-running before you copy and deploy.
+- **Plus the whole `/free-evaluation` + icon-system arc** added later in the
+  same session: the page rebuilt as a sendable landing page, matte-clay marks
+  sitewide, the `AppIcon` fill-bridge fix, the hero prose hierarchy, wrap
+  groups centred on tablet/mobile, the eyebrow contrast fix, and Free
+  Evaluation added to the header Sell nav. Detail: `CHANGELOG.md` →
+  *2026-08-09 (post-deploy 2)* through *(post-deploy 7)*.
+- **✅ THE FULL GATE PASSED ON THE COMPLETE BATCH — re-run last at the END of
+  the session (2026-08-10), after the final code change.** Dev server stopped
+  and `.next` deleted first, so it is a clean from-scratch build covering every
+  change in the batch. Nothing needs re-running before you copy and deploy.
+
+  | Command | Result |
+  | --- | --- |
+  | `npx tsc --noEmit` | clean, no output |
+  | `npm run lint` | clean, no findings |
+  | `npm test` | **848 passed / 848**, 87 files |
+  | `npm run build` | **compiled successfully, 449/449 static pages**, no warnings |
+
+  The gate was re-run after *every* code change in the session, not just once
+  at the end — the table above is the final run, on the final state of the tree.
 - **To deploy:** copy this folder to the repo folder and push.
 - **Then:** work the 📱-marked smoke list in `TASKS.md` → *New surfaces to
   smoke after the NEXT deploy*. Three of those genuinely need a real phone —

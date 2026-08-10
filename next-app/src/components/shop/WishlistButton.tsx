@@ -32,11 +32,10 @@ export default function WishlistButton({ item, variant = 'icon', locale = 'en' }
         aria-label={saved ? (isEs ? 'Guardado' : 'Saved') : (isEs ? 'Guardar' : 'Save')}
       >
         <AppIcon name="favorite"
-          
+          fill={saved ? 'currentColor' : 'none'}
           style={{
             fontSize: '16px',
             lineHeight: 1,
-            fontVariationSettings: saved ? "'FILL' 1" : "'FILL' 0",
           }}
          />
         {saved ? (isEs ? 'Guardado' : 'Saved') : (isEs ? 'Guardar' : 'Save')}
@@ -59,12 +58,11 @@ export default function WishlistButton({ item, variant = 'icon', locale = 'en' }
       aria-label={saved ? (isEs ? 'Quitar de guardados' : 'Remove from saved') : (isEs ? 'Guardar' : 'Save')}
     >
       <AppIcon name="favorite"
-        
+        fill={saved ? 'currentColor' : 'none'}
         data-wishlist-icon="true"
         style={{
           fontSize: '15px',
           lineHeight: 1,
-          fontVariationSettings: saved ? "'FILL' 1" : "'FILL' 0",
         }}
        />
     </button>

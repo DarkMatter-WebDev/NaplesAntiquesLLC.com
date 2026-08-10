@@ -50,7 +50,10 @@ export default function EvalForm({ locale, submitted }: Props) {
       name="free-evaluation-request"
       onSubmit={handleSubmit}
       encType="multipart/form-data"
-      className="grid gap-4 rounded-2xl border p-5 shadow-[0_22px_70px_rgba(38,28,6,0.18)] md:p-6"
+      // mx-auto: the form is capped at 540px and now sits in a centred section,
+      // so without auto margins it hugs the left edge of its container. It was
+      // only ever flush-left because it used to live in the left-aligned hero.
+      className="grid gap-4 rounded-2xl border p-5 shadow-[0_22px_70px_rgba(38,28,6,0.18)] md:p-6 mx-auto w-full"
       style={{
         background: 'rgba(255,255,255,0.9)',
         borderColor: 'rgba(115, 92, 0, 0.16)',

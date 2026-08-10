@@ -1,6 +1,24 @@
 # Feature: Lead Capture
 
-> Current lead and subscriber capture surfaces. Last updated: **2026-06-20**.
+> Current lead and subscriber capture surfaces. Last updated: **2026-08-10**.
+
+## `/free-evaluation` is the sendable lead surface (2026-08-09/10 rework)
+
+The page is built to be **texted to someone who does not know what they own**,
+so its structure is deliberate and should not be casually rearranged:
+
+- The **form is not in the hero.** It lives in a second `#request` block under
+  a plain lead-in, because the owner's read was that arriving straight into a
+  form "feels like it's shoved down their throat". The hero explains the
+  service first and ends in two CTAs (`#request` anchor and the phone number).
+- **Photos are optional.** `EvalForm` accepts a submission with either photos
+  **or** a one-line description — it only blocks when both are empty. Do not
+  make photos required; the whole pitch is "you don't need to sort anything
+  first".
+- Reachable from the header **Sell** menu (added 2026-08-09) and the footer.
+
+Submissions post to `/api/inquire` with `source: 'free-evaluation'`, same as the
+other inquiry forms below.
 
 ## Summary
 

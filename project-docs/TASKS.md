@@ -44,6 +44,17 @@ session is a real product change.
 ⚠️ **Node here is v24; Netlify pins NODE_VERSION 20** with no `engines` in
 `package.json`. Local green builds are strong evidence, not proof of theirs.
 
+⚠️ **`npm run build` and `npm run dev` share `.next`, and the dev server does
+not survive it.** Running a production build (correctly, with the dev server
+stopped) leaves production artifacts in `.next`; restarting dev on top of them
+throws `SyntaxError: Unexpected non-whitespace character after JSON` and serves
+**500s on every route**. Seen twice — position 746 and 763. It looks exactly
+like corrupted `messages/*.json`, and it is not: validate the JSON to rule that
+out (it has always passed), then **stop dev, `rm -rf .next`, restart**. The
+fix is reliable. The same wipe also clears the separate Turbopack **per-rule
+CSS staleness** bug, where one rule in a file updates while another in the same
+file keeps serving old declarations — a reload does not fix that one either.
+
 ## Verified Healthy — Do Not Re-Audit
 
 Recorded so these are not re-checked every session. All confirmed 2026-08-05
@@ -174,12 +185,68 @@ Still true and worth keeping visible:
   `42501`), and `add-slideshow-bg-colors.sql` (2026-08-09, owner-run, colors
   save and render). All three lineup modes read `manual`, so the storefront
   draws the curated lineups rather than random draws.
+- 🔴 **REDEPLOY NEEDED — shop-card date collision.** The 2026-08-09 batch
+  shipped as `main@27c12e2` and verified clean except for this: on 2-up shop
+  cards the `Ca. YYYY` label overlaps the price (measured **-9px** on production
+  at 390px, most other cards at 2px clearance). Fixed locally via a container
+  query on `.modern-price-row` that drops the "Ca." prefix below 185px of
+  content width, leaving the bare year in place; `tsc`/`lint` clean and measured
+  across 320/390/472/1280 in both locales with zero negative gaps and no change
+  in row height. **The pre-deploy gate is now GREEN:** `npm test` 848/848 and a
+  from-scratch `npm run build` (`.next` deleted, dev server stopped) compiled
+  successfully at 449/449 pages with no warnings. **This is waiting on a
+  redeploy only.** Detail: CHANGELOG *2026-08-09 (post-deploy)*.
+- ◻️ **OWNER: supply a real photograph of Chris for the /free-evaluation hero.**
+  It currently shows `evaluation-desk-placeholder.webp` — a generated desk shot
+  with the face deliberately out of frame, because the copy beside it is first
+  person and a recognisable stranger there would imply he is Chris. When the
+  real photo lands, replace the file **and** the alt text together (the alt
+  text currently describes a desk, not a person).
+- 🔴 **Same redeploy carries the /free-evaluation clay marks.** Three trust
+  pillars + six category tiles now use matte-clay WebP illustrations
+  (`public/assets/images/icons/clay-*.webp`). After deploy, look at the page on
+  a real screen in both locales and check the marks read at 72px/56px and that
+  the pillar drop-shadow looks right on the cream band. The pipeline and the
+  hard-won rules (generate-then-recolour, all-or-nothing per grid, no shadow on
+  dark) are in DECISIONS.
+  - ✅ **Rolled out sitewide** — the homepage services strip plus `/sell`,
+    `/sell/[city]`, `/trade-in`, `/bullion`, `/gold-services` and
+    `/silver-services` now use clay marks through `components/ClayMark.tsx`
+    (20 marks total). The earlier inconsistency note is closed. After deploy,
+    check each of those pages in both locales.
+  - ◻️ The large empty placeholder blocks from the audit are still untouched:
+    `/estate-jewelry` "Professional Integrity" (726x726 card, 63px icon) and the
+    two `/gold-services` cards. Those want photography, not marks.
+- 🔴 **Same redeploy carries the icon fix.** Every `AppIcon` was rendering
+  filled wherever a legacy `fontVariationSettings: "'FILL' 1"` style survived,
+  turning Lucide outline icons into solid blobs (14 of 24 on
+  `/free-evaluation`). The bridge is deleted and all 27 usages cleaned; 137
+  icons across 10 pages now show only the 2 intentional rating stars filled.
+  Four semantic swaps as well (chains, heirlooms, sterling silver ×2, tea
+  services). Guarded by two new tests (846 → 848). Detail: CHANGELOG
+  *2026-08-09 (post-deploy 2)*.
+  - ◻️ **After deploying, look at the marketing pages on a real screen.** The
+    measurements prove the icons are no longer filled; whether every glyph is
+    the RIGHT one is a judgement call — `redeem` (gift box) for "Sell Jewelry"
+    on the city pages is the one remaining choice worth a second opinion.
+- ◻️ **Consider raising Netlify `NODE_VERSION` 20 → 22.** Build log for
+  `27c12e2` warns every build: `@netlify/plugin-nextjs` cannot execute on the
+  pinned 20.20.2, so Netlify runs the plugin on 22.23.1 instead. Builds succeed;
+  this is drift, not breakage.
+- 🔴 **Same redeploy carries the /free-evaluation hero rework.** Prose
+  hierarchy (lede / gold `<h2>` kicker / `<dl>` metal panel / quiet footnote /
+  bright closer), wrap groups centred below `lg`, and the eyebrow contrast fix
+  (**2.96:1 → 12.19:1** — it was below AA). Detail: CHANGELOG *2026-08-09
+  (post-deploy 5)* and *(post-deploy 6)*.
+- 🔴 **Same redeploy carries Free Evaluation in the header Sell nav.** The page
+  was previously reachable only from the footer. Detail: CHANGELOG *2026-08-09
+  (post-deploy 7)*.
 - **Deploy the batch. The full gate has passed on the COMPLETE batch** —
-  clean from-scratch `npm run build` exit 0 / 449 pages, 846/846 tests across 87
-  files, tsc and lint clean, run 2026-08-09 with the dev server stopped and
-  `.next` deleted. Exact figures, the compiled-output spot check, and the email
-  invariant re-check are in `CURRENT_STATUS.md`. Nothing needs re-running before
-  you copy and deploy.
+  clean from-scratch `npm run build` exit 0 / 449 pages, **848/848** tests
+  across 87 files, tsc and lint clean. **Last run 2026-08-10, after the final
+  code change**, with the dev server stopped and `.next` deleted. Exact
+  figures, the compiled-output spot check, and the email invariant re-check are
+  in `CURRENT_STATUS.md`. Nothing needs re-running before you copy and deploy.
 - **New surfaces to smoke after the NEXT deploy (2026-08-09 batch), on a real
   phone where marked 📱:**
   - Shop cards 📱: bottom ADD button present on every card; corner cart icon
@@ -220,6 +287,26 @@ Still true and worth keeping visible:
     `GOOGLE_REVIEWS_URL` in `next-app/src/lib/testimonials.ts`. While there,
     confirm the whole card is clickable (not just the "Read on Google" line)
     on both a phone and a desktop.
+  - `/free-evaluation` as a landing page 📱: open it the way a customer will —
+    from a TEXTED link on a phone. The form must NOT be the first thing in
+    view; the hero should explain the service, and the form lives in the
+    "Send a request below" block underneath. Submit one real test request and
+    confirm it arrives at `info@naplesestatejewelry.com`.
+  - `/free-evaluation` hero hierarchy 📱: the block should read as lede →
+    gold kicker → metal panel → footnote → closer, not as one wall of text.
+    The three metal terms (GOLD / SILVER / EVERYTHING ELSE) sit in a left
+    column that stays aligned from `sm` up; check Spanish, where the terms are
+    shorter but the details are longer.
+  - Pills centred 📱: the `/free-evaluation` trust chips wrap 2/1/1 on a phone
+    and 3/1 on a tablet — every row should look centred, not ragged-left. This
+    is the judgement call the measurements cannot make.
+  - Eyebrow contrast 📱: "100% Free — No Obligation" should read as a bright
+    gold accent, not a dimmed/disabled label. It was **2.96:1** (below AA) and
+    is now 12.19:1 — worth confirming on a real screen in daylight.
+  - Header nav: **Free Evaluation** now appears last in the Sell dropdown
+    (desktop) and the Sell accordion (mobile), after Trade-In Program. Confirm
+    both, in both locales, and note that the parent **Sell** tab now highlights
+    while you are on `/free-evaluation` — that is intended.
   - Hero perf spot-checks: network tab shows NO raw-original image fetches
     beside the `/_next/image` ones (formerly a full duplicate set), hero
     images at `q=82`, and the loading spinner disappears from the DOM after

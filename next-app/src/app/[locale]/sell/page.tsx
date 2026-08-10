@@ -5,7 +5,7 @@ import { jsonLdHtml } from '@/lib/json-ld';
 import { SERVICE_AREAS } from '@/lib/service-areas';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
-import { AppIcon } from '@/components/AppIcon';
+import ClayMark from '@/components/ClayMark';
 
 interface Props {
   params: Promise<{ locale: string }>;
@@ -39,11 +39,11 @@ export default async function SellHubPage({ params }: Props) {
   const p = (path: string) => (isEs ? `/es${path}` : path);
 
   const buyCategories = [
-    { icon: 'paid', en: 'Sell Gold', es: 'Vender Oro', href: '/gold-services' },
-    { icon: 'star', en: 'Sell Sterling Silver', es: 'Vender Plata Esterlina', href: '/silver-services' },
-    { icon: 'diamond', en: 'Sell Estate Jewelry', es: 'Vender Joyería de Patrimonio', href: '/estate-jewelry' },
-    { icon: 'toll', en: 'Sell Coins & Bullion', es: 'Vender Monedas y Lingotes', href: '/bullion' },
-  ];
+    { mark: 'goldbar', en: 'Sell Gold', es: 'Vender Oro', href: '/gold-services' },
+    { mark: 'flatware', en: 'Sell Sterling Silver', es: 'Vender Plata Esterlina', href: '/silver-services' },
+    { mark: 'ring', en: 'Sell Estate Jewelry', es: 'Vender Joyería de Patrimonio', href: '/estate-jewelry' },
+    { mark: 'coins', en: 'Sell Coins & Bullion', es: 'Vender Monedas y Lingotes', href: '/bullion' },
+  ] as const;
 
   const breadcrumbLd = {
     '@context': 'https://schema.org',
@@ -105,7 +105,7 @@ export default async function SellHubPage({ params }: Props) {
                 href={p(c.href)}
                 className="group flex flex-col items-center rounded-2xl border border-[#d0c5af] bg-white p-8 text-center shadow-[0_14px_38px_rgba(38,28,6,0.05)] transition-all hover:-translate-y-0.5 hover:shadow-xl"
               >
-                <AppIcon name={c.icon} className="mb-4 text-[#735c00]" style={{ fontSize: '2.75rem', fontVariationSettings: "'FILL' 0, 'wght' 200" }} aria-hidden="true" />
+                <ClayMark name={c.mark} size={104} className="mb-4" />
                 <span className="text-base font-bold text-[#1a1c1c]" style={{ fontFamily: 'var(--font-headline)' }}>
                   {isEs ? c.es : c.en}
                 </span>

@@ -129,11 +129,13 @@ export default function CartButton({ item, variant = 'card', locale = 'en', incl
           cursor: canPurchase || inCart ? 'pointer' : 'not-allowed',
         }}
       >
+        {/* No fill in either state: the button already inverts its background
+            and colour when the item is in the cart, so filling the cart as well
+            is a redundant signal that only costs the icon its readability. */}
         <AppIcon name="shopping_cart"
-
           aria-hidden="true"
           data-cart-icon="true"
-          style={{ fontSize: '13px', lineHeight: 1, fontVariationSettings: inCart ? "'FILL' 1" : "'FILL' 0" }}
+          style={{ fontSize: '13px', lineHeight: 1 }}
          />
       </button>
     );
