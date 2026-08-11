@@ -1695,6 +1695,40 @@ the latest scheduled result; no new database table is required.
    message. A generic operator message is a signal the real reason is in
    `detail`.
 
+### An absent record is a fault, not a clean slate
+
+Added 2026-08-10, after discovering that **no Netlify scheduled function on this
+site has ever executed** — the two price pushes and all three social workers —
+while Admin Settings showed a green check and *"Ready for Daily at 11:45 UTC. No
+completed run has been recorded yet."* Nothing was broken in our code; the
+reassurance was.
+
+Two rules, both general:
+
+1. **Never render "has never happened" as healthy.** For anything expected on a
+   schedule, absence past its due time is the strongest possible fault signal
+   and must be shown as one. `resolvePricePushHealth`
+   (`src/lib/marketplace-price-push-health.ts`) distinguishes `disabled` (the
+   owner's choice, not a fault) from `never_run` and `overdue` (both faults), and
+   the copy names the place to look — the Netlify function log. Allow a grace
+   window (60 minutes here) so a merely late run is not flagged, but never let
+   the grace become an indefinite excuse.
+
+2. **Never derive a rare event's last occurrence from a page of recent rows.**
+   Both status routes read 25 log rows and searched them for the scheduled push.
+   One manual "Push prices now" writes ~130 `price_push` rows on Etsy and ~300 on
+   eBay, and the eBay account-deletion webhook alone has written 56k rows — so
+   the scheduled run was buried within minutes of any real activity and the card
+   silently degraded to the same "no run recorded" it shows for a dead cron. Query
+   the specific action directly (`getLastScheduledPricePush`), ordered and
+   `limit(1)`. A high-volume neighbouring action must never be able to hide a
+   low-volume one.
+
+The corollary for diagnosis: when a log that records even skips contains zero
+rows for an action, suspect the caller, not the logger. Here three independent
+code paths across two providers were all silent, which located the fault above
+the application entirely.
+
 ### Etsy queue progress is durable
 
 Bounded image requests retain queue ownership after intermediate states. Normal

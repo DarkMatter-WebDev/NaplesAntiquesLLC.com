@@ -4,6 +4,58 @@
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
 > in `DECISIONS.md`. Last reconciled: **2026-08-10**.
 
+## 🔴 No Netlify scheduled function has ever run (found 2026-08-10)
+
+**Nothing automatic is running on this site.** Not the Etsy price push, not the
+eBay price push, not the Instagram or Facebook drip workers, not the Instagram
+token refresh. Verified from both sides on 2026-08-10:
+
+- **Database:** zero `scheduled_price_push` rows across 1,538 Etsy and 56,480
+  eBay log rows; zero `scheduled_drip` rows with both social channels
+  `connected`. Every one of those code paths logs unconditionally, including
+  skips.
+- **Netlify:** the function log is empty for the last 24 hours on both
+  `ebay-price-push` and `instagram-drip` — the latter is scheduled 14 hours a day
+  and should show ~14 invocations.
+
+Ruled out: functions are deployed (6 on `main@7576826`), all five show the
+**Scheduled** badge with a *Next execution*, all four `*_CRON_SECRET` variables
+exist scoped to Functions, and 614 team credits remain. An erroring function
+would still write to Netlify's log — these are never invoked.
+
+**Manual `Run now` fails the same way**, which narrows it further. Pressing it on
+`instagram-drip` — with the due-row query verified server-side as returning `[]`
+first, so the run was a guaranteed no-op that still logs unconditionally —
+produced no `scheduled_drip` row and no Netlify log line. The Next.js Server
+Handler is also a function here and works fine, so the fault is specific to
+**scheduled** functions. **This is a platform fault, not an application bug;
+nothing in this repo can fix it — it needs a Netlify support ticket.** Detail in
+`CHANGELOG.md` 2026-08-10; owner steps in `TASKS.md` → *Etsy And eBay*.
+
+**A replacement trigger is built and waiting on four secrets.**
+`.github/workflows/scheduled-jobs.yml` runs all five jobs from GitHub Actions on
+the same cron expressions, hitting the same secret-guarded routes — the routes
+were designed trigger-agnostic, so **no application code changed**. The owner
+must add `ETSY_CRON_SECRET`, `EBAY_CRON_SECRET`, `INSTAGRAM_CRON_SECRET` and
+`FACEBOOK_CRON_SECRET` as repository secrets (the repo has none today); the
+workflow then also gives a manual **Run workflow** button per job, replacing the
+Netlify Run now that no longer works. Steps and caveats in `TASKS.md`.
+
+Confirmed 2026-08-11 that this approach works at all: an unauthenticated
+`POST https://naplesestatejewelry.com/api/admin/etsy/price-push` returns
+**401 `{"error":"Unauthorized."}`**, so the routes are reachable from outside
+Netlify.
+
+Consequences until that lands: marketplace prices move **only** when someone
+clicks "Push prices now", the Instagram/Facebook queues never drain on their
+own, and the Instagram long-lived token is not being refreshed weekly. That last
+one is the only real deadline, and it is not urgent — the token runs to
+**2026-09-30** and the renewal window is 7 days.
+
+The Admin Settings price cards no longer hide this: a never-run or overdue
+schedule renders red and names the Netlify function log, instead of the old
+green check reading *"Ready for Daily at 11:45 UTC."* (undeployed, 2026-08-10).
+
 ## Start Here (handoff, end of the 2026-08-09 → 2026-08-10 session)
 
 > **⚠️ SUPERSEDED IN PART — the batch below SHIPPED as `main@27c12e2` on
@@ -364,7 +416,9 @@ no failing check, and no pending SQL** — the session's one migration
 - Seven insured-shipping tiers are provisioned on **both** marketplaces. One
   controlled listing update per marketplace still needs owner verification.
 - **Daily price pushes: schedules were always correct but had never run** (zero
-  `scheduled_price_push` rows ever, in a log that records even skips). eBay's
+  `scheduled_price_push` rows ever, in a log that records even skips) — and as of
+  2026-08-10 they **still** never have, because Netlify is not invoking any
+  scheduled function on this site. See the red section at the top. eBay's
   `price_push_enabled` was also `false`; the owner enabled it 2026-08-08. Three
   code defects fixed the same day — sold products were permanent eBay
   price-push candidates and produced ~33 guaranteed HTTP 400s per run
@@ -394,9 +448,10 @@ no failing check, and no pending SQL** — the session's one migration
   running, so hard deletes and dropped pushes currently depend on a manual poll.
   The hooks fire from admin save/status-change and both checkout sold-flip
   paths. See `features/deepfield-sync.md`.
-- All scheduled-function badges were production-confirmed. The owner has not
-  yet deliberately run each live price-push function and checked its resulting
-  Admin last-run card/log.
+- All scheduled-function badges were production-confirmed — **but the badge only
+  proves registration, not execution.** As of 2026-08-10 none of them has ever
+  actually run; see the red section at the top of this file. Do not read a
+  Scheduled badge or a "Next execution" time as evidence that a cron works.
 - eBay inventory #82 remains write-blocked pending deliberate reattachment to
   its external relist — now enforced in code by a pinned id
   (`EBAY_WRITE_BLOCKED_PRODUCT_IDS`) rather than inferred from a `last_error`
@@ -475,7 +530,10 @@ no failing check, and no pending SQL** — the session's one migration
 - Public mutation routes use validation plus edge/distributed rate limiting;
   scanner probes are blocked. Security headers are defense in depth.
 - Netlify environment values are the operating configuration; local
-  `.env.local` is for development only.
+  `.env.local` is for development only. ⚠️ "`.env.local` is stale" is a
+  tie-breaker rule, **not a blanket fact** — on 2026-08-11 the owner confirmed
+  its four `*_CRON_SECRET` values matched Netlify's production values exactly.
+  Check before assuming a local value is wrong.
 - Generated build output, caches, logs, temp files, and dependencies remain
   ignored. No scratch artifact was left by the 2026-08-03 session.
 - Project memory has one current source per feature. The retired Etsy/eBay plan

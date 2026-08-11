@@ -48,6 +48,16 @@ export async function POST(req: Request) {
   });
 
   if (decision.action === 'skip') {
+    // Record the no-op run. A weekly job that legitimately does nothing for
+    // ~53 of every 60 days used to leave no trace at all, so "ran and correctly
+    // skipped" was indistinguishable from "never ran" — which is precisely what
+    // made this the wrong probe when the dead Netlify schedules were being
+    // diagnosed (2026-08-10). One row a week is free.
+    await insertSyncLog(service, {
+      action: 'token_refresh',
+      outcome: 'ok',
+      message: `Token refresh checked; no action needed (${decision.reason}).`,
+    });
     return NextResponse.json({ refreshed: false, reason: decision.reason });
   }
 

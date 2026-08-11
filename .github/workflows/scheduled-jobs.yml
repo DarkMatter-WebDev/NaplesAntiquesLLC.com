@@ -1,0 +1,198 @@
+# Scheduled jobs — replacement trigger for the Netlify Scheduled Functions.
+#
+# WHY THIS EXISTS
+# ---------------
+# As of 2026-08-10 none of the five Netlify scheduled functions in
+# next-app/netlify/functions/ has ever executed. They are deployed, carry the
+# Scheduled badge, show a correct "Next execution", have all four *_CRON_SECRET
+# variables scoped to Functions, and the account has credits — yet nothing runs.
+# Manual "Run now" is dead too: the dashboard's invoke API returns HTTP 202
+# Accepted and the function still never executes. This is a known, recurring
+# Netlify platform fault (same signature reported Apr 2023 → Jul 2026, including
+# a platform-wide incident on 2026-04-12 that their support fixed silently).
+#
+# The five Next routes were built trigger-agnostic and secret-header-guarded on
+# purpose — see the comment in
+# next-app/src/app/api/admin/etsy/price-push/route.ts, which names "any external
+# cron hitting this route with the secret header" as a supported trigger. So
+# this workflow needs NO application code change; it is only a different caller.
+#
+# Verified 2026-08-11: POST https://naplesestatejewelry.com/api/admin/etsy/price-push
+# with no secret returns 401 {"error":"Unauthorized."}, so the routes are
+# reachable from outside Netlify and this approach works.
+#
+# ⚠️ OVERLAP: the Netlify .mts functions are intentionally left in place so this
+# is reversible. If Netlify ever fixes the fault, BOTH triggers will fire and
+# each job will run twice a day. That is tolerable (a second price push finds
+# prices unchanged and no-ops; a second drip finds no due rows; a second token
+# refresh returns `too_young`) but untidy — when the Netlify ticket is resolved,
+# delete either this file or next-app/netlify/functions/*.mts, not both.
+#
+# ⚠️ GitHub caveats, both real:
+#   - `schedule` is best-effort. Runs are commonly 5–15 minutes late and can be
+#     dropped entirely under load. Fine for a daily price push; the social drips
+#     tolerate it because the due-row query prevents posting before a slot.
+#   - GitHub DISABLES scheduled workflows in a repository with 60 days of no
+#     activity. If these silently stop, check that first.
+#
+# SETUP (one time): add four repository secrets under
+# Settings → Secrets and variables → Actions:
+#   ETSY_CRON_SECRET, EBAY_CRON_SECRET, INSTAGRAM_CRON_SECRET, FACEBOOK_CRON_SECRET
+# Use the SAME values already set in Netlify. Each job fails loudly if its
+# secret is missing rather than silently doing nothing — the whole point.
+
+name: Scheduled jobs
+
+on:
+  schedule:
+    - cron: '15 11 * * *' # Etsy price push      — 7:15 a.m. EDT / 6:15 EST
+    - cron: '45 11 * * *' # eBay price push      — staggered 30 min after Etsy
+    - cron: '0 0-5,16-23 * * *' # Instagram + Facebook drip
+    - cron: '15 12 * * 1' # Instagram token refresh — Mondays
+  workflow_dispatch:
+    inputs:
+      job:
+        description: Which job to run now
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - etsy-price-push
+          - ebay-price-push
+          - instagram-drip
+          - facebook-drip
+          - instagram-token-refresh
+
+# No repository access is needed — these jobs only make an outbound HTTPS call.
+permissions: {}
+
+env:
+  SITE_URL: https://naplesestatejewelry.com
+
+concurrency:
+  group: scheduled-jobs-${{ github.event.schedule || inputs.job }}
+  cancel-in-progress: false
+
+jobs:
+  etsy-price-push:
+    if: github.event.schedule == '15 11 * * *' || contains(fromJSON('["all","etsy-price-push"]'), inputs.job)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST /api/admin/etsy/price-push
+        env:
+          ROUTE: /api/admin/etsy/price-push
+          SECRET_NAME: ETSY_CRON_SECRET
+          CRON_SECRET: ${{ secrets.ETSY_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::${SECRET_NAME} is not set in this repository's Actions secrets."
+            exit 1
+          fi
+          code=$(curl -sS --max-time 120 -o response.json -w '%{http_code}' \
+            -X POST "${SITE_URL}${ROUTE}" \
+            -H 'content-type: application/json' \
+            -H "x-cron-secret: ${CRON_SECRET}")
+          echo "HTTP ${code}"
+          cat response.json; echo
+          [ "${code}" -ge 200 ] && [ "${code}" -lt 300 ]
+
+  ebay-price-push:
+    if: github.event.schedule == '45 11 * * *' || contains(fromJSON('["all","ebay-price-push"]'), inputs.job)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST /api/admin/ebay/price-push
+        env:
+          ROUTE: /api/admin/ebay/price-push
+          SECRET_NAME: EBAY_CRON_SECRET
+          CRON_SECRET: ${{ secrets.EBAY_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::${SECRET_NAME} is not set in this repository's Actions secrets."
+            exit 1
+          fi
+          code=$(curl -sS --max-time 120 -o response.json -w '%{http_code}' \
+            -X POST "${SITE_URL}${ROUTE}" \
+            -H 'content-type: application/json' \
+            -H "x-cron-secret: ${CRON_SECRET}")
+          echo "HTTP ${code}"
+          cat response.json; echo
+          [ "${code}" -ge 200 ] && [ "${code}" -lt 300 ]
+
+  instagram-drip:
+    if: github.event.schedule == '0 0-5,16-23 * * *' || contains(fromJSON('["all","instagram-drip"]'), inputs.job)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST /api/admin/instagram/drip
+        env:
+          ROUTE: /api/admin/instagram/drip
+          SECRET_NAME: INSTAGRAM_CRON_SECRET
+          CRON_SECRET: ${{ secrets.INSTAGRAM_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::${SECRET_NAME} is not set in this repository's Actions secrets."
+            exit 1
+          fi
+          code=$(curl -sS --max-time 120 -o response.json -w '%{http_code}' \
+            -X POST "${SITE_URL}${ROUTE}" \
+            -H 'content-type: application/json' \
+            -H "x-cron-secret: ${CRON_SECRET}")
+          echo "HTTP ${code}"
+          cat response.json; echo
+          [ "${code}" -ge 200 ] && [ "${code}" -lt 300 ]
+
+  facebook-drip:
+    if: github.event.schedule == '0 0-5,16-23 * * *' || contains(fromJSON('["all","facebook-drip"]'), inputs.job)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST /api/admin/facebook/drip
+        env:
+          ROUTE: /api/admin/facebook/drip
+          SECRET_NAME: FACEBOOK_CRON_SECRET
+          CRON_SECRET: ${{ secrets.FACEBOOK_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::${SECRET_NAME} is not set in this repository's Actions secrets."
+            exit 1
+          fi
+          code=$(curl -sS --max-time 120 -o response.json -w '%{http_code}' \
+            -X POST "${SITE_URL}${ROUTE}" \
+            -H 'content-type: application/json' \
+            -H "x-cron-secret: ${CRON_SECRET}")
+          echo "HTTP ${code}"
+          cat response.json; echo
+          [ "${code}" -ge 200 ] && [ "${code}" -lt 300 ]
+
+  # Uses INSTAGRAM_CRON_SECRET, same as the drip — the refresh-token route is
+  # guarded by that same variable.
+  instagram-token-refresh:
+    if: github.event.schedule == '15 12 * * 1' || contains(fromJSON('["all","instagram-token-refresh"]'), inputs.job)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST /api/admin/instagram/refresh-token
+        env:
+          ROUTE: /api/admin/instagram/refresh-token
+          SECRET_NAME: INSTAGRAM_CRON_SECRET
+          CRON_SECRET: ${{ secrets.INSTAGRAM_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::${SECRET_NAME} is not set in this repository's Actions secrets."
+            exit 1
+          fi
+          code=$(curl -sS --max-time 120 -o response.json -w '%{http_code}' \
+            -X POST "${SITE_URL}${ROUTE}" \
+            -H 'content-type: application/json' \
+            -H "x-cron-secret: ${CRON_SECRET}")
+          echo "HTTP ${code}"
+          cat response.json; echo
+          [ "${code}" -ge 200 ] && [ "${code}" -lt 300 ]

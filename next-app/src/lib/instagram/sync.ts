@@ -763,7 +763,13 @@ export async function runScheduledDrip(service: SupabaseClient): Promise<{
 }> {
   const connection = await getConnection(service);
   if (connection?.status !== 'connected') {
-    return { published: 0, skipped: 0, message: 'Instagram is not connected.' };
+    // Log the skip too. This path used to return silently, which means a
+    // disconnected channel and a worker that never runs at all look identical
+    // in the log — the exact ambiguity that hid the dead Netlify schedules for
+    // weeks (see DECISIONS, "An absent record is a fault, not a clean slate").
+    const message = 'Scheduled queue check skipped because Instagram is not connected.';
+    await insertSyncLog(service, { action: 'scheduled_drip', outcome: 'warning', message });
+    return { published: 0, skipped: 0, message };
   }
 
   const { data: queued } = await service

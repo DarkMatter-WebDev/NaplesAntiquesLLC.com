@@ -2,6 +2,17 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { AppIcon } from '@/components/AppIcon';
+import {
+  describePricePushHealth,
+  type PricePushCardCopy,
+  type PricePushHealth,
+} from '@/lib/marketplace-price-push-health';
+
+const PRICE_PUSH_TONE_COLOR: Record<PricePushCardCopy['tone'], string> = {
+  ok: 'var(--color-primary)',
+  warning: '#a9760a',
+  error: 'var(--color-error)',
+};
 
 interface StatusResponse {
   connected: boolean;
@@ -14,6 +25,7 @@ interface StatusResponse {
   priceAutomation: {
     cronSecretConfigured: boolean;
     schedule: string;
+    health: PricePushHealth;
     lastRun: { createdAt: string; outcome: 'ok' | 'warning' | 'error'; message: string | null } | null;
   };
   recentActivity: { id: number; createdAt: string; productId: string | null; listingId: number | null; action: string; outcome: string; message: string | null }[];
@@ -199,6 +211,19 @@ export default function EtsySettingsPanel() {
       setDisconnecting(false);
     }
   };
+
+  const priceAutomationCopy: PricePushCardCopy | null = status
+    ? describePricePushHealth({
+        health: status.priceAutomation.health,
+        schedule: status.priceAutomation.schedule,
+        cronSecretName: 'ETSY_CRON_SECRET',
+        lastRunOutcome: status.priceAutomation.lastRun?.outcome ?? null,
+        lastRunMessage: status.priceAutomation.lastRun?.message ?? null,
+        lastRunAtLabel: status.priceAutomation.lastRun
+          ? new Date(status.priceAutomation.lastRun.createdAt).toLocaleString()
+          : null,
+      })
+    : null;
 
   return (
     <section className="mt-6 border bg-white" style={{ borderColor: 'var(--color-outline-variant)' }}>
@@ -421,41 +446,22 @@ export default function EtsySettingsPanel() {
               </div>
             </div>
 
-            <div
-              className="flex items-start gap-3 border px-3 py-3 text-xs"
-              style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}
-            >
-              <AppIcon
-                name={!status.priceAutomation.cronSecretConfigured
-                  ? 'warning'
-                  : status.priceAutomation.lastRun?.outcome === 'error'
-                    ? 'error'
-                    : status.priceAutomation.lastRun?.outcome === 'warning'
-                      ? 'warning'
-                      : 'check_circle'}
-                style={{
-                  fontSize: '18px',
-                  color: !status.priceAutomation.cronSecretConfigured || status.priceAutomation.lastRun?.outcome === 'warning'
-                    ? '#a9760a'
-                    : status.priceAutomation.lastRun?.outcome === 'error'
-                      ? 'var(--color-error)'
-                      : 'var(--color-primary)',
-                }}
-                aria-hidden="true"
-              />
-              <div>
-                <p className="font-bold">Daily price automation</p>
-                <p style={{ color: 'var(--color-on-surface-variant)' }}>
-                  {!status.priceAutomation.cronSecretConfigured
-                    ? 'Not ready: ETSY_CRON_SECRET is missing from the deployed runtime.'
-                    : !status.policy.pricePushEnabled
-                      ? `${status.priceAutomation.schedule}; currently disabled by the setting above.`
-                      : status.priceAutomation.lastRun
-                        ? `Last run ${new Date(status.priceAutomation.lastRun.createdAt).toLocaleString()}: ${status.priceAutomation.lastRun.message ?? status.priceAutomation.lastRun.outcome}.`
-                        : `Ready for ${status.priceAutomation.schedule}. No completed run has been recorded yet.`}
-                </p>
+            {priceAutomationCopy && (
+              <div
+                className="flex items-start gap-3 border px-3 py-3 text-xs"
+                style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}
+              >
+                <AppIcon
+                  name={priceAutomationCopy.icon}
+                  style={{ fontSize: '18px', color: PRICE_PUSH_TONE_COLOR[priceAutomationCopy.tone] }}
+                  aria-hidden="true"
+                />
+                <div>
+                  <p className="font-bold">Daily price automation</p>
+                  <p style={{ color: 'var(--color-on-surface-variant)' }}>{priceAutomationCopy.text}</p>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="border-t pt-4 flex flex-col gap-2" style={{ borderColor: 'var(--color-outline-variant)' }}>
               {pricesStale && !pushingPrices && (

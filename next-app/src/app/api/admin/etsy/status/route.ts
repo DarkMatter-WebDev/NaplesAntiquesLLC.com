@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
-import { getConnection, getRecentSyncLog } from '@/lib/etsy/store';
+import { getConnection, getLastScheduledPricePush, getRecentSyncLog } from '@/lib/etsy/store';
+import { resolvePricePushHealth } from '@/lib/marketplace-price-push-health';
 
 export const runtime = 'nodejs';
+
+// Matches netlify/functions/etsy-price-push.mts (`schedule: '15 11 * * *'`).
+const SCHEDULE_UTC_HOUR = 11;
+const SCHEDULE_UTC_MINUTE = 15;
 
 export async function GET() {
   const { error } = await requireAdmin();
@@ -12,7 +17,16 @@ export async function GET() {
   const service = createServiceClient();
   const connection = await getConnection(service);
   const log = await getRecentSyncLog(service, 25);
-  const lastScheduledRun = log.find((row) => row.action === 'scheduled_price_push') ?? null;
+  // Queried directly, not found inside `log` — see getLastScheduledPricePush.
+  const lastScheduledRun = await getLastScheduledPricePush(service);
+  const cronSecretConfigured = Boolean(process.env.ETSY_CRON_SECRET);
+  const health = resolvePricePushHealth({
+    enabled: connection?.price_push_enabled ?? false,
+    cronSecretConfigured,
+    lastRunAt: lastScheduledRun?.created_at ?? null,
+    scheduleUtcHour: SCHEDULE_UTC_HOUR,
+    scheduleUtcMinute: SCHEDULE_UTC_MINUTE,
+  });
 
   return NextResponse.json({
     connected: connection?.status === 'connected',
@@ -33,8 +47,9 @@ export async function GET() {
       priceMarkupPct: connection?.price_markup_pct ?? 8,
     },
     priceAutomation: {
-      cronSecretConfigured: Boolean(process.env.ETSY_CRON_SECRET),
+      cronSecretConfigured,
       schedule: 'Daily at 11:15 UTC',
+      health,
       lastRun: lastScheduledRun
         ? {
             createdAt: lastScheduledRun.created_at,

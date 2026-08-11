@@ -247,6 +247,26 @@ export async function getRecentSyncLog(service: SupabaseClient, limit = 50): Pro
   return (data as EtsySyncLogRow[]) ?? [];
 }
 
+/**
+ * The newest `scheduled_price_push` row, fetched by its own indexed query.
+ *
+ * Do NOT go back to scanning a page of `getRecentSyncLog()` for this: one manual
+ * "Push prices now" writes ~130 `price_push` rows, so a scheduled run falls out
+ * of any 25-row window within minutes and the Admin last-run card silently
+ * reverts to "no run recorded" — indistinguishable from a dead cron.
+ */
+export async function getLastScheduledPricePush(service: SupabaseClient): Promise<EtsySyncLogRow | null> {
+  const { data, error } = await service
+    .from('etsy_sync_log')
+    .select('*')
+    .eq('action', 'scheduled_price_push')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) return null;
+  return (data as EtsySyncLogRow | null) ?? null;
+}
+
 /** Opportunistic housekeeping: prune log rows older than ~90 days (no cron dependency). */
 export async function pruneOldSyncLogs(service: SupabaseClient): Promise<void> {
   const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();

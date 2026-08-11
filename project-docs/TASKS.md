@@ -3,6 +3,54 @@
 > Actionable open work plus a short recent-completions summary. Full history is
 > in `CHANGELOG.md`. Last reconciled: **2026-08-09**.
 
+## 🔴 Stray nested git repo inside `next-app/` (found 2026-08-11)
+
+`next-app/.git` is a **second, orphaned git repository** — 176K, created
+2026-08-08, its own `main` branch, **no remote configured**, and there is **no
+`.gitmodules`** at the root, so it is not a submodule. It is almost certainly an
+accidental `git init` in the wrong directory.
+
+**Why it matters:** if it reaches the repo folder, git treats `next-app/` as an
+embedded repository and will not track its contents normally — which would
+silently drop the entire application from commits. It has not broken anything
+yet only because the files under `next-app/` were already tracked individually
+before it appeared.
+
+**Recommended (owner, destructive — not done automatically):** delete
+`next-app/.git`. Nothing references it; the root repo at
+`https://github.com/DarkMatter-WebDev/NaplesAntiquesLLC.com.git` is the real one.
+Back it up first if you want to be certain it holds nothing.
+
+Related oddity worth a glance: the root `.git/config` carries
+`[submodule] active = .`, a leftover from some earlier submodule wrangling.
+
+## Copying this folder to the repo folder — exclusions that matter
+
+Do **not** copy the folder wholesale. Two directories must be excluded:
+
+1. **`.git` at the root** (345 MB). It points at `origin =
+   DarkMatter-WebDev/NaplesAntiquesLLC.com` — the same repo you push to — so
+   copying it over the destination's `.git` replaces that folder's HEAD, index,
+   refs, and stash with this folder's. Same remote, so it is recoverable, but it
+   can silently rewind the destination's working state.
+2. **`next-app/.git`** — the stray above.
+
+Optional but strongly advised: exclude `node_modules/` and `.next/`. Both are
+gitignored so they would never be committed, and skipping them turns a multi-
+minute copy into a few seconds.
+
+Dry-run first (robocopy `/L` lists without writing anything). `/XD .git` matches
+that directory name at every level, so it protects the destination's own `.git`
+from `/MIR` as well:
+
+```
+robocopy "C:\Users\rcman\OneDrive\Documents\NaplesEstateJewelry.co" "<repo folder>" /MIR /XD .git node_modules .next /L
+```
+
+Then re-run without `/L`. **After the copy, confirm `.github/workflows/` landed** —
+it is a hidden directory and some copy methods skip dotfiles. `.env.local` will
+be copied onto disk but stays gitignored and uncommitted, same as today.
+
 ## Deploy-day checklist (reusable)
 
 Standing procedure for every deploy from this folder — the last run of it was
@@ -451,6 +499,108 @@ Still true and worth keeping visible:
 
 ## Etsy And eBay
 
+- 🔴 **OWNER / NETLIFY — no scheduled function on this site has EVER run.** Not
+  the two price pushes, not the three social workers. Verified 2026-08-10 from
+  both sides: zero `scheduled_price_push` rows across 1,538 Etsy and 56,480 eBay
+  log rows, zero `scheduled_drip` rows with Instagram and Facebook both
+  `connected`, and Netlify's own function log empty for the last 24h on both
+  `ebay-price-push` and `instagram-drip` (the latter should show ~14). Already
+  ruled out — the functions ARE deployed (6 on `main@7576826`), all five carry
+  the Scheduled badge with a Next execution time, all four `*_CRON_SECRET`
+  variables exist scoped to Functions, and 614 credits remain. An erroring
+  function would still log; these are never invoked.
+  - ✅ **Run now was tried and it fails too** (2026-08-10). `instagram-drip` was
+    pressed with the due-row query verified server-side as returning `[]` first,
+    making it a guaranteed no-op that nonetheless logs unconditionally — it wrote
+    no `scheduled_drip` row and no Netlify log line. (`instagram-token-refresh`
+    was tried first and was inconclusive: the token is `not_due` until late
+    September, and that branch used to return without logging. It logs now.)
+  - **Research conclusion (2026-08-10): this is a known, recurring Netlify
+    platform bug, not a limitation and not our code.**
+    - **Not a plan gate.** Netlify's docs state scheduled functions are
+      "available on all pricing plans".
+    - **Not deprecated.** Async Workloads is an additional product, not a
+      replacement; scheduled functions are current.
+    - **Exact signature, repeatedly reported** on the Netlify forums from April
+      2023 through July 2026: Scheduled badge present, next-execution countdown
+      correct, function never fires, no errors and no logs. A **platform-wide
+      incident on 2026-04-12** matched precisely and Netlify support fixed it
+      within ~24–48h without publishing a root cause.
+    - **Ours is worse than those reports.** In every forum thread manual "Run
+      now" still worked. Here the dashboard's invoke API returns **HTTP 202
+      Accepted** (verified in the network panel, with the success toast) and the
+      function still never executes — nothing in `instagram_sync_log` 45 seconds
+      later, nothing in Netlify's log. Scheduler *and* manual invocation are both
+      dead for this site.
+  - **Fix path A — Netlify support ticket** (owner, account-level). This is the
+    proven route; they fixed the April 2026 incident. Send them: site
+    `naplesantiques`, the 202-accepted invoke that produced no execution, and
+    that the Next.js Server Handler function on the same site works fine.
+  - 🟡 **FIX PATH B IS BUILT AND WAITING ON FOUR SECRETS (2026-08-10).**
+    `.github/workflows/scheduled-jobs.yml` replaces all five Netlify schedules
+    with GitHub Actions, using the same cron expressions, the same routes, and
+    the same `x-cron-secret` header. **No application code changed.** Verified:
+    valid YAML, five jobs, four cron entries, four secrets, five routes matching
+    the `.mts` files exactly; Actions is enabled on the repo ("Allow all"), and
+    the default branch is `main` — the only branch GitHub runs schedules on.
+    - ✅ **Secrets added by the owner 2026-08-11.** `ETSY_CRON_SECRET`,
+      `EBAY_CRON_SECRET`, `INSTAGRAM_CRON_SECRET`, and `FACEBOOK_CRON_SECRET`
+      are now repository secrets on
+      `DarkMatter-WebDev/NaplesAntiquesLLC.com` (the repo previously had none).
+      **The `.env.local` copies matched Netlify's production values** — owner-
+      confirmed while adding them — so for these four variables the usual
+      "`.env.local` is stale" caution did not apply. Until the secrets existed
+      every job failed with a named error, which was deliberate.
+    - **Then test it without waiting for a cron:** Actions tab → *Scheduled
+      jobs* → **Run workflow**, and pick a single job from the dropdown. Start
+      with `instagram-token-refresh` (a `not_due` no-op that now logs) or
+      `instagram-drip` (no due rows). A successful run writes the matching row
+      to `instagram_sync_log`, which is the proof the whole chain works.
+    - ⚠️ **Check `.github/` actually survives the copy** into the repo folder.
+      It is a hidden directory; a copy method that skips dotfiles would drop it
+      silently (`.gitignore` travels today, so it should be fine).
+    - ⚠️ **Overlap is intentional and reversible.** The Netlify `.mts` functions
+      are left in place. If Netlify ever fixes the fault, both triggers fire and
+      each job runs twice daily — tolerable (the second price push finds prices
+      unchanged, the second drip finds no due rows, the second token refresh
+      returns `too_young`) but untidy. At that point delete **either** this
+      workflow **or** `next-app/netlify/functions/*.mts`, not both.
+  - ✅ **The routes are reachable from outside Netlify — verified 2026-08-11.**
+    `curl.exe -i -X POST https://naplesestatejewelry.com/api/admin/etsy/price-push`
+    returned **401 `{"error":"Unauthorized."}`**, the exact body from
+    `price-push/route.ts`. (In PowerShell use `curl.exe`; bare `curl` is an alias
+    for `Invoke-WebRequest` and rejects `-i -X POST`.)
+  - **Fix path B — move the trigger off Netlify entirely.** All five routes are
+    **already trigger-agnostic and secret-header-guarded** — see the comment in
+    `app/api/admin/etsy/price-push/route.ts`, which explicitly names "an external
+    cron hitting a secret-token-guarded internal route" as a supported option.
+    **No application code changes are required**, only a new caller:
+    - **GitHub Actions scheduled workflow** (recommended): the repo is already on
+      GitHub, it is free, the run history is visible, and the four
+      `*_CRON_SECRET` values go in repo secrets. Caveats: Actions cron is
+      best-effort and can run 5–15 min late, and GitHub disables scheduled
+      workflows in a repo with 60 days of no activity.
+    - **Supabase `pg_cron` + `pg_net`**: more punctual and already in the stack,
+      but the secret has to live in the DB/vault and runs are harder to inspect.
+    - Third-party pingers (cron-job.org, Upstash QStash) also work.
+  - ◻️ One link is still unverified: whether the cron routes are reachable from
+    outside at all. A production `POST` probe expecting a 401 was blocked by the
+    development environment's command classifier. Worth one manual
+    `curl -X POST https://naplesestatejewelry.com/api/admin/etsy/price-push`
+    — a **401 Unauthorized** is the healthy answer.
+  - Until this is resolved, **prices only move when someone clicks "Push prices
+    now"** in Admin Settings. That is the current de facto process.
+- ◻️ **The eBay sold-hidden repair has not self-healed.** As of 2026-08-10 there
+  are still 38 `out_of_date` rows on `sold` products (36 with
+  `last_pushed_qty = 0`) and **zero** `hidden_oos` rows. `repair-hidden` only
+  runs when the freshness scan does, i.e. when the eBay bulk-sync modal is
+  opened, and nobody has opened it since the fix deployed. One click fixes it;
+  confirm afterwards that sold pieces read Hidden. Available listings are 84
+  `out_of_date` + 2 `published` = **86**, which matches the campaign figure below.
+- ✅ **`ORDER_NOTIFY_EMAIL` is not set on Netlify** (checked 2026-08-10 in the
+  dashboard). The owner action recorded above under the contact-address section
+  is already satisfied — nothing to delete.
+
 - **🔴 OWNER ACTION — apply the new shipping policies to the flagged eBay
   listings, in batches, from the deployed admin.** (The count once read 123;
   the true figure is **86 writable** — see the sold-hidden fix below.) The
@@ -487,7 +637,10 @@ Still true and worth keeping visible:
   CHANGELOG 2026-08-08.
 - ◻️ **After the first real scheduled run, confirm both sync logs** — expect a
   `scheduled_price_push` row per provider (the first ever) and, for eBay,
-  roughly 88 eligible with 0 failures.
+  roughly 88 eligible with 0 failures. ⚠️ **Blocked by the Netlify scheduling
+  fault at the top of this section** — as of 2026-08-10 there has still never
+  been a scheduled run to confirm. The Admin last-run card now says so in red
+  instead of showing a green "Ready for…".
 - ◻️ **`antique-georgian-…-82` needs manual repair on eBay.** Held back by
   `isEbayWriteBlocked` — relisted manually and no longer attached to the
   app-managed offer. It is the one genuinely stale price: **$861.29 stored vs

@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { createServiceClient } from '@/lib/supabase/service';
-import { getConnection, getRecentSyncLog } from '@/lib/ebay/store';
+import { getConnection, getLastScheduledPricePush, getRecentSyncLog } from '@/lib/ebay/store';
+import { resolvePricePushHealth } from '@/lib/marketplace-price-push-health';
 
 export const runtime = 'nodejs';
+
+// Matches netlify/functions/ebay-price-push.mts (`schedule: '45 11 * * *'`).
+const SCHEDULE_UTC_HOUR = 11;
+const SCHEDULE_UTC_MINUTE = 45;
 
 export async function GET() {
   const { error } = await requireAdmin();
@@ -12,7 +17,18 @@ export async function GET() {
   const service = createServiceClient();
   const connection = await getConnection(service);
   const recentActivity = await getRecentSyncLog(service, 25, { excludeActions: ['account_deletion'] });
-  const lastScheduledRun = recentActivity.find((row) => row.action === 'scheduled_price_push') ?? null;
+  // Queried directly, not found inside `recentActivity` — see
+  // getLastScheduledPricePush. This log is the worse case of the two: the
+  // account-deletion webhook alone has written 56k rows.
+  const lastScheduledRun = await getLastScheduledPricePush(service);
+  const cronSecretConfigured = Boolean(process.env.EBAY_CRON_SECRET);
+  const health = resolvePricePushHealth({
+    enabled: connection?.price_push_enabled ?? false,
+    cronSecretConfigured,
+    lastRunAt: lastScheduledRun?.created_at ?? null,
+    scheduleUtcHour: SCHEDULE_UTC_HOUR,
+    scheduleUtcMinute: SCHEDULE_UTC_MINUTE,
+  });
 
   return NextResponse.json({
     connected: connection?.status === 'connected',
@@ -37,8 +53,9 @@ export async function GET() {
       priceMarkupPct: connection?.price_markup_pct ?? 15,
     },
     priceAutomation: {
-      cronSecretConfigured: Boolean(process.env.EBAY_CRON_SECRET),
+      cronSecretConfigured,
       schedule: 'Daily at 11:45 UTC',
+      health,
       lastRun: lastScheduledRun
         ? {
             createdAt: lastScheduledRun.created_at,

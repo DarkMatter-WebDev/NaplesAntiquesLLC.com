@@ -1,5 +1,160 @@
 # Changelog
 
+## 2026-08-10 - Netlify scheduled functions have NEVER run; price-push health surfaced
+
+### The finding
+
+**Not one of the five Netlify scheduled functions has ever executed.** This is a
+platform-level fault, not an Etsy/eBay bug — it is why the daily price pushes
+have never produced a `scheduled_price_push` row despite being correctly coded,
+correctly scheduled, and enabled on both providers.
+
+Evidence, from a read-only production query plus the Netlify dashboard:
+
+| Check | Result |
+| --- | --- |
+| `scheduled_price_push` rows, Etsy | **0** (of 1,538 log rows) |
+| `scheduled_price_push` rows, eBay | **0** (of 56,480 log rows) |
+| `scheduled_drip` rows, Instagram / Facebook | **0 each**, both connected |
+| Netlify function log, `ebay-price-push`, last 24h | "No results found" |
+| Netlify function log, `instagram-drip`, last 24h | "No results found" (expects ~14) |
+
+`runScheduledPricePush` writes a log row on **every** path including "not
+connected" and "disabled", and `runScheduledDrip` writes one whenever the
+channel is connected — so silence across three independent code paths and two
+providers cannot be a logging gap. An erroring function would still appear in
+Netlify's own log; the log is empty, so they are never invoked.
+
+Ruled out at the dashboard: all six functions are deployed ("6 functions
+deployed" on the published `main@7576826`), all five carry the **Scheduled**
+badge with a plausible *Next execution*, all four `*_CRON_SECRET` variables
+exist and are scoped to Functions, and the team has 614 credits remaining.
+Instagram drip's previous fire time (7 PM EDT) had passed 24 minutes before the
+check with nothing logged.
+
+**Run now was tried, twice, and also produced nothing.**
+
+1. `instagram-token-refresh` — inconclusive, and instructively so. The stored
+   token expires 2026-09-30 with `INSTAGRAM_REFRESH_WINDOW_MS` at 7 days, so
+   `decideTokenRefresh` correctly returned `not_due`. That branch returned
+   without logging, so "ran and correctly skipped" and "never ran" were
+   indistinguishable. Bad probe; fixed below.
+2. `instagram-drip` — **decisive.** `runScheduledDrip` writes a `scheduled_drip`
+   row unconditionally whenever the channel is connected, and Instagram is
+   connected. The due-row query was replicated server-side first and returned
+   `[]` (the one `review` row has null `queued_at` *and* null `scheduled_for`,
+   so it is excluded twice) — meaning the publish loop could not execute and the
+   run was a guaranteed no-op that still had to log. It logged nothing. Netlify's
+   own function log stayed empty too.
+
+So manual invocation fails the same way the schedule does. The Next.js Server
+Handler is also a function on this site and works fine (the site serves), so the
+fault is specific to **scheduled** functions. Owner action: this is now a Netlify
+support ticket with the evidence above; nothing in this repo can fix it.
+
+A third click, with the browser network panel open, showed the click is not the
+problem: `POST app.netlify.com/.../functions/instagram-drip/invoke` returns
+**HTTP 202 Accepted** with the success toast, and 45 seconds later there is
+still no row and no log line. Netlify accepts the invocation and never runs it.
+
+### Research: supported, not deprecated, and a known platform bug
+
+- **Not a plan gate.** Netlify's docs: scheduled functions are "available on all
+  pricing plans."
+- **Not deprecated.** Async Workloads is an additional product, not a
+  replacement.
+- **Known recurring fault.** The exact signature — Scheduled badge, correct
+  next-execution countdown, never fires, no errors, no logs — is reported on
+  Netlify's forums from April 2023 through July 2026, including a platform-wide
+  incident on **2026-04-12** that their support fixed within ~24–48h without
+  publishing a cause. In every one of those threads manual Run now still worked,
+  which makes this site's failure a strictly worse case.
+
+### Fix: the trigger moved to GitHub Actions
+
+`.github/workflows/scheduled-jobs.yml` (new) runs all five jobs — Etsy price
+push, eBay price push, Instagram drip, Facebook drip, Instagram token refresh —
+on the same cron expressions, POSTing the same routes with the same
+`x-cron-secret` header. **No application code changed**, because the routes were
+built trigger-agnostic; `etsy/price-push/route.ts` names "any external cron
+hitting this route with the secret header" as a supported trigger.
+
+Verified first that the approach is possible at all: `curl.exe -i -X POST
+https://naplesestatejewelry.com/api/admin/etsy/price-push` returns **401
+`{"error":"Unauthorized."}`** — the exact body from that route — so the routes
+are reachable from outside Netlify and only the secret is missing. (The first
+attempt failed because PowerShell aliases `curl` to `Invoke-WebRequest`; the
+real binary is `curl.exe`.)
+
+Checked in the GitHub UI: Actions is enabled ("Allow all actions and reusable
+workflows"), the default branch is `main` — the only branch GitHub runs
+schedules on, and the same branch Netlify publishes — and the repo has **no
+secrets at all** yet. The four `*_CRON_SECRET` values must be added by the owner
+before anything runs; each job fails with a named error until then, by design.
+The workflow also exposes a `workflow_dispatch` job picker, restoring the manual
+per-job trigger that Netlify's Run now no longer provides.
+
+The Netlify `.mts` functions are deliberately left in place so the change is
+reversible; if Netlify fixes the fault, delete one side or the other. Overlap is
+harmless but untidy — see the header comment in the workflow.
+
+Incidental confirmations while in the dashboard: `ORDER_NOTIFY_EMAIL` is **not**
+set on Netlify (the TASKS item asking the owner to delete it is already
+satisfied), and `FACEBOOK_APP_ID` / `GOLD_API_KEY` exist locally but not there.
+
+### The two code defects it exposed
+
+**1. The last-run card could not see a scheduled run even when one existed.**
+Both status routes fetched 25 log rows and `.find()`-ed the scheduled push
+inside that page. One manual "Push prices now" writes ~130 `price_push` rows on
+Etsy and ~300 on eBay, so a scheduled run fell out of the window within minutes
+and the card reverted to "no run recorded" — identical to a dead cron. Replaced
+with `getLastScheduledPricePush()` in both stores: an indexed
+`action=scheduled_price_push`, newest-first, `limit(1).maybeSingle()` query.
+Verified against production with the app's own client (supabase-js 2.108.1):
+zero rows returns `{data: null, error: null}`, a populated action returns the row.
+
+**2. "Never ran" rendered as a green check.** With the secret configured and the
+toggle on, the card showed `check_circle` and *"Ready for Daily at 11:45 UTC. No
+completed run has been recorded yet."* — reassuring copy for precisely the state
+the shop had been in for weeks. New `src/lib/marketplace-price-push-health.ts`
+resolves `not_configured | disabled | never_run | overdue | ok` from the
+schedule's UTC fire time and the last run, with a 60-minute grace so a merely
+late push is not flagged. `never_run` and `overdue` now render red and point at
+the Netlify function log. One shared presenter (`describePricePushHealth`)
+drives both panels, which were byte-identical ternaries in two files.
+
+A test caught a real cosmetic bug in the presenter: the stored message already
+ends with a period, so the card would have read `0 deferred..`.
+
+**3. Three silent-skip paths now log.** The same "absence is invisible" flaw
+that made the token-refresh probe useless existed in three places, all of which
+returned without writing a row:
+
+- `runScheduledDrip` (Instagram and Facebook) when the channel is not connected
+  — a disconnected channel and a worker that never runs looked identical.
+- the `refresh-token` route's `skip` branch — a weekly job that legitimately
+  does nothing for ~53 of every 60 days left no trace at all.
+
+Each now writes one row (`scheduled_drip` warning / `token_refresh` ok). Volume
+is negligible: at most one per invocation, and the refresh runs weekly.
+
+16 new tests. `tsc` clean, `lint` clean, `npm test` **864/864** (was 848), clean
+from-scratch `npm run build` **449/449** with no warnings.
+
+### Also observed, not changed
+
+The eBay sold-hidden freshness repair has **not** self-healed in production: 38
+`out_of_date` rows belong to `sold` products (36 with `last_pushed_qty = 0`) and
+there are **zero** `hidden_oos` rows. `repair-hidden` only runs when the
+eligibility-summary endpoint loads, i.e. when someone opens the eBay bulk-sync
+modal — which nobody has since the fix deployed. Available listings are 84
+`out_of_date` + 2 `published` = 86, matching the campaign figure in TASKS.
+
+The 2026-08-08 eBay price-push fix **is** live and working: all 139 failures
+date from one pre-fix run (08-08 17:09–17:14 UTC, all `detail: null`, all
+`"eBay API error (HTTP 400)."`), and the 08-10 run produced zero errors.
+
 ## 2026-08-09 (post-deploy 7) - Free Evaluation added to the Sell nav
 
 `/free-evaluation` was **not linked from the site header at all** — only from
