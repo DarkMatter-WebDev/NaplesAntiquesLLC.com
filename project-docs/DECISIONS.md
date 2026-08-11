@@ -837,10 +837,56 @@ in `em` so the 0.22em tracking — roughly a third of the strip's width at full
 size — shrinks with the type instead of forcing the break.
 
 Fit the clamp to the SPANISH strings, which are the long ones; a ramp fitted to
-English overflowed Spanish by 14px at 320px. The third item is revealed only at
-780px, where all three fit at full size in Spanish — pulling that breakpoint
-lower forces the other two to shrink to accommodate it, which is the worse
-trade. Re-measure both locales at 320 if the copy ever changes.
+English overflowed Spanish by 14px at 320px. **Re-measure both locales at 320 if
+the copy ever changes** — that is the combination that overflows.
+
+**It is a promotion, and it is a link (2026-08-11).** The strip advertises the
+free-evaluation offer as this-month-only and is an `<a>` to `/free-evaluation`
+(`/es/free-evaluation` in Spanish, via the usual
+`${locale === 'es' ? '/es' : ''}${path}` convention).
+
+Two rules for whoever edits the copy next:
+
+1. **Do not name the month.** "This month only" stays correct forever; "August"
+   is wrong on 1 September. Naming it would also have to be computed at render,
+   and the homepage is statically generated — the month would freeze at whatever
+   the last deploy was, which is worse than either option.
+2. **The trailing arrow lives outside the mapped list**, so it shows at every
+   width. It is the only cue the strip is tappable, and phones are where it is
+   most likely to be tapped.
+
+The old 780px third-item reveal is **gone** — the promo is two fragments and both
+fit everywhere. Measured at 320px, the tightest case: English 183.4px of 304px
+available (**120.6px slack**), Spanish 203.9px (**100.1px slack**), one line, no
+overflow. Reinstate the `display: none` + `@media (min-width: 780px)` pair only
+if a third fragment comes back.
+
+⚠️ **This is time-limited copy.** When the promotion ends, the strip needs new
+wording — nothing expires it automatically, by design.
+
+**The bar rides inside the pinned hero frame (2026-08-11).** Owner: it "doesn't
+scroll away until the hero txt does". It is passed to `HomeHeroStack` as a
+`banner` prop and rendered as the frame's first child, above
+`.home-hero-stack-viewport`, which now wraps the panes and the overlay.
+
+Why inside the frame rather than a second sticky element: the frame IS the
+pinned thing, so the bar and the hero text share one release point by
+construction. Any design with the bar sticky in page flow would need its own
+release offset kept permanently in sync with the hero's — two numbers that drift.
+
+The frame's own height is deliberately unchanged at `100svh - header`. That
+matters more than it looks: both the scroll progress and the touch snap step are
+`runway.offsetHeight - frame.offsetHeight`, so leaving the frame alone leaves the
+entire choreography and the one-slideshow-per-flick snap untouched. The panes
+absorb the bar's height instead — they are `inset: 0` against the new viewport
+box and their transforms are PERCENTAGES of pane height, so a shorter pane scales
+the crossing proportionally rather than desynchronising it. Do not "fix" this by
+shrinking the frame or hardcoding the bar's height; the bar's height is fluid
+with the clamp above (34.9px at 1286px, 31.2px at 375px).
+
+Measured at both widths and both locales: bar top pins at exactly the header
+height through 0/25/50/90% of the runway, then bar, frame and overlay move
+together — `barTop === frameTop` at every sample.
 
 ### `/shop` is the only storefront entry
 

@@ -1,5 +1,95 @@
 # Changelog
 
+## 2026-08-11 (later 2) - Announcement bar becomes the free-evaluation promo
+
+Owner: advertise the free-evaluation promotion, this month only, and link it to
+the free-evaluation page.
+
+The strip is now an `<a>` to `/free-evaluation` (`/es/free-evaluation` in
+Spanish) reading **"Free evaluations · This month only →"** /
+**"Evaluaciones gratuitas · Solo este mes →"**. Two owner revisions during the
+change: a third fragment ("We come to you") was drafted and removed, then
+"Free jewelry evaluation" was shortened to "Free evaluations" — the service
+covers coins, silver, watches and full estates, not only jewelry, so the shorter
+wording is also the more accurate one.
+
+Two deliberate choices:
+
+- **The month is not named.** "This month only" cannot go stale; "August" is
+  wrong on 1 September. Computing it was worse still — the homepage is
+  statically generated, so a rendered month name would freeze at the last
+  deploy.
+- **The trailing arrow sits outside the mapped list.** The old strip hid its
+  third item below 780px; an arrow attached to a hidden item would have removed
+  the only tappability cue on phones, which is where the bar is most likely to
+  be tapped.
+
+The 780px third-item reveal is gone with the copy — two fragments fit at every
+width, so there is nothing left to hide. The now-dead
+`.home-announcement-item-third` rules were removed rather than left behind, with
+a comment recording how to reinstate them.
+
+Measured per the standing rule (re-measure both locales at 320px on any copy
+change), on the final wording: English **183.4px of 304px available — 120.6px of
+slack**; Spanish **203.9px — 100.1px of slack**. One line, no overflow, arrow
+visible, bar still pinned in the hero frame at 56px. Link targets verified:
+`/free-evaluation` and `/es/free-evaluation` both HTTP 200.
+`text-decoration: none`, plus hover/`focus-visible` states and a reduced-motion
+opt-out for the arrow nudge. `tsc` clean, `lint` clean, `npm test` 864/864.
+
+One false alarm worth recording: a React "unique key prop" warning naming
+`HomeHeroStack` appeared in the console. It was **stale** — the Browser pane's
+console buffer is cumulative and survives both `console.clear()` and a reload, so
+it kept replaying a warning from an intermediate edit. A brand-new tab with an
+empty buffer loading `/es` produced only the DevTools notice and
+`[HMR] connected`. If that warning is ever seen again, check it in a fresh tab
+before chasing it.
+
+## 2026-08-11 (later) - Announcement bar pins with the hero text
+
+Owner: *"make it so this banner doesn't scroll away until the hero txt does."*
+
+The strip used to sit above `HomeHeroStack` in page flow, so it scrolled off
+within the first ~35px while the hero stayed pinned for a 240svh runway. It is
+now passed to `HomeHeroStack` as a `banner` prop and rendered as the first child
+of `.home-hero-stack-frame` — the sticky element that pins the hero. The panes
+and the overlay moved into a new `.home-hero-stack-viewport` box that takes the
+remaining height.
+
+**Why inside the frame instead of a second sticky element:** the frame is the
+pinned thing, so the bar and the hero text now share ONE release point by
+construction. A separately-stuck bar would need its own release offset kept in
+sync with the hero's forever.
+
+**What was deliberately not changed:** the frame's height stays
+`100svh - header`. Both the scroll progress and the touch snap step are computed
+as `runway.offsetHeight - frame.offsetHeight`, so leaving the frame's height
+alone leaves the crossing choreography and the one-slideshow-per-flick snap
+untouched. The panes absorb the bar's height instead, which is safe because they
+are `inset: 0` against the new viewport box and their transforms are percentages
+of pane height — a shorter pane scales proportionally.
+
+Measured (desktop 1286px and mobile 375px, both locales): bar top pins at exactly
+the header height (72 / 56) through 0, 25, 50 and 90% of the runway, then bar,
+frame and overlay release together — **`barTop === frameTop` at every sample**.
+Frame height matched `innerHeight - header` exactly at both widths (1206, 756),
+confirming the runway maths is undisturbed. Bar + viewport summed to the frame
+minus its 1px border. No horizontal overflow; the third item still appears only
+from 780px.
+
+⚠️ **Not verified here, needs a real browser:** the slideshow crossing itself.
+The dev Browser pane reports `document.hidden: true`, so `requestAnimationFrame`
+and scroll events never fire and the pane transforms stay at their resting
+values. That is the environment, not a regression — the sticky geometry above is
+pure CSS layout and measures correctly, and the 864-test suite (including the
+hero easing and snap suites) passes. Scroll the real homepage once and confirm
+the three slideshows still hand over.
+
+A JSX gotcha worth remembering: the CSS lives in a `<style>{\`...\`}</style>`
+template literal, so **backticks inside CSS comments terminate it**. Writing
+`` `travel` `` in a comment produced 28 parse errors. The file's existing
+comments avoid backticks for exactly this reason.
+
 ## 2026-08-11 - Scheduled jobs cut over to GitHub Actions and RAN
 
 Deployed, secrets added, workflow dispatched manually twice. **The automation

@@ -18,10 +18,15 @@ real run, produced rows that had never existed:
 | `instagram_sync_log` / `token_refresh` | ok — "no action needed (not_due)" |
 | `ebay_sync_log` / `scheduled_price_push` | **FIRST EVER** — "50 pushed, 67 unchanged, 1 blocked, 0 failed, 6 deferred" |
 
-42 real Etsy price updates, **zero failures**. The `warning` outcome is only
-because 16 listings were deferred by the 22-second budget; the next run picks
-them up. The `token_refresh` row exists solely because of the skip-logging added
-the same day — before that this run would have left no trace at all.
+A second dispatch at 02:47 UTC drained the deferred remainders. **Day totals:
+Etsy 58 pushed, eBay 56 pushed, 0 failures on either, 0 listings at the
+3-attempt backoff ceiling.** Etsy's final run returned outcome **`ok`** with
+`remaining: 0` — the first completely clean scheduled run in the project's
+history. eBay's stays `warning` only because inventory #82 is deliberately
+write-blocked.
+
+The `token_refresh` row exists solely because of the skip-logging added the same
+day — before that, a successful run would have left no trace at all.
 
 ✅ **`EBAY_CRON_SECRET` was rotated and eBay now works too.** Its first attempt
 failed `HTTP 401 {"code":"unauthorized","message":"Invalid cron secret."}` —
@@ -380,9 +385,16 @@ no failing check, and no pending SQL** — the session's one migration
   Below 640px the hero's three CTAs are a two-column grid — always two up and
   one centred below, never three stacked rows — reverting to a single flex row
   of three from 641px.
-  The homepage carries an announcement bar (top of content, not the fixed
-  header) that never wraps — its type shrinks fluidly to hold one line, and its
-  third item appears only from 780px. It also carries
+  The homepage carries an announcement bar that never wraps — its type shrinks
+  fluidly to hold one line. It is **not** part of the fixed header; since
+  2026-08-11 it rides INSIDE the pinned hero frame (passed to `HomeHeroStack` as
+  `banner`), so it stays put until the hero text releases and then travels away
+  with it. The frame's height is unchanged, so the hero choreography and touch
+  snap are unaffected. 🟡 **It now advertises the free-evaluation promotion
+  ("Free evaluations · This month only") and links to
+  `/free-evaluation`** — time-limited copy that needs replacing when the promo
+  ends; nothing expires it automatically. The old 780px third-item reveal was
+  removed with that change. It also carries
   a Meet the Owner story block, a Why Buy Estate Gold? education
   section, and four FAQ accordions linking to `/faq`, ordered hero →
   services → owner → education → FAQs → testimonials → call CTA. Checkout is a

@@ -57,48 +57,60 @@ export default async function HomePage({ params }: Props) {
 
       <main className="site-header-offset flex flex-col">
 
-        {/* Announcement bar — deliberately NOT inside the fixed header, which
-            is sized by --site-header-height and consumed by every page offset
-            and sticky top. This strip sits at the top of the page content and
-            scrolls away naturally. Static text, no marquee animation.
-
-            Padding is symmetric again: .site-header-offset now reserves the
-            header's real height, so this bar's top edge is genuinely visible.
-            It briefly carried an asymmetric pt-5 to work around the old 4rem
-            under-reservation, which hid its first ~9px behind the header. */}
-        <div
-          data-customer-reveal-skip
-          className="home-announcement"
-          style={{ background: '#1a1c1c' }}
-        >
-          {(isEs
-            ? ['Envío asegurado en EE. UU.', 'Recogida local gratis en Naples', 'Precios ligados al spot en vivo']
-            : ['Fully insured U.S. shipping', 'Free local pickup in Naples', 'Live spot-linked pricing']
-          ).map((item, index) => (
-            <span
-              key={item}
-              // The third item only appears from 780px, where all three fit at
-              // full size in both locales; below that it would force the other
-              // two to shrink for no reason. Spot pricing is visible all over
-              // the shop anyway. Threshold lives in `.home-announcement-item-third`.
-              className={`home-announcement-item${index === 2 ? ' home-announcement-item-third' : ''}`}
-              style={{ color: '#e9c349', fontFamily: 'var(--font-label)' }}
-            >
-              {index > 0 && <span aria-hidden="true" className="home-announcement-separator">·</span>}
-              {item}
-            </span>
-          ))}
-        </div>
-
         {/* Hero — scroll-pinned parallax stack: three slideshows hand over in
             sequence, each with its own admin-curated lineup (falling back to
-            the first), then the frame breaks free */}
+            the first), then the frame breaks free.
+
+            The announcement bar is passed IN as the hero's banner rather than
+            sitting above it in page flow (owner, 2026-08-11: it should not
+            scroll away until the hero text does). Inside the pinned frame it
+            unpins on exactly the same frame as the overlay text, with no second
+            release point to keep in sync. It is still deliberately NOT part of
+            the fixed header, which is sized by --site-header-height and consumed
+            by every page offset and sticky top. */}
         <HomeHeroStack
           locale={locale}
           initialItems={carousel.items}
           initialAltItems={carousel.altItems}
           initialThirdItems={carousel.thirdItems}
           initialSettings={carousel.settings}
+          banner={
+            <Link
+              data-customer-reveal-skip
+              className="home-announcement"
+              href={`${isEs ? '/es' : ''}/free-evaluation`}
+              // The visible text is three separated fragments, which reads as
+              // stop-start to a screen reader; this gives it one clean sentence.
+              aria-label={isEs
+                ? 'Evaluaciones gratuitas, solo este mes. Solicite la suya.'
+                : 'Free evaluations, this month only. Request yours.'}
+              style={{ background: '#1a1c1c' }}
+            >
+              {(isEs
+                ? ['Evaluaciones gratuitas', 'Solo este mes']
+                : ['Free evaluations', 'This month only']
+              ).map((item, index) => (
+                <span
+                  key={item}
+                  // Both items show at EVERY width. The old strip hid its third
+                  // item below 780px because three service claims could not fit;
+                  // this promo is two fragments and comfortably shorter than what
+                  // already fitted, so nothing needs hiding. Re-check at 320px in
+                  // BOTH locales if the copy changes — Spanish is the long one.
+                  className="home-announcement-item"
+                  style={{ color: '#e9c349', fontFamily: 'var(--font-label)' }}
+                >
+                  {index > 0 && <span aria-hidden="true" className="home-announcement-separator">·</span>}
+                  {item}
+                </span>
+              ))}
+              {/* Outside the mapped list on purpose: the third item is hidden
+                  below 780px, so an arrow tacked onto it would take the only
+                  "this is tappable" cue away from phones — where the bar is
+                  most likely to be tapped. */}
+              <span aria-hidden="true" className="home-announcement-arrow">→</span>
+            </Link>
+          }
         />
 
         {/* Services strip */}

@@ -583,9 +583,12 @@ Still true and worth keeping visible:
       secrets. Netlify remains authoritative — check, never assume.
     - ⚠️ If either cron secret is ever rotated again, it must change in **three**
       places: Netlify (+ redeploy), the GitHub Actions secret, and `.env.local`.
-  - ◻️ **Deferred listings roll to the next scheduled run** — 16 on Etsy, 6 on
-    eBay, both from the 22-second budget. The 11:15 / 11:45 UTC crons pick them
-    up; no action needed unless you want them pushed sooner.
+  - ✅ **Deferred listings cleared 2026-08-11 02:47 UTC** by a second dispatch.
+    Etsy finished `done:true, pushed:16, remaining:0` — outcome **`ok`**, the
+    first completely clean scheduled run in the project's history. eBay finished
+    `done:true, pushed:6, blocked:1, remaining:0` (`warning` solely because of
+    #82's deliberate write block). **Day totals: Etsy 58 pushed, eBay 56 pushed,
+    0 failures on either, 0 listings at the backoff ceiling.**
   - ◻️ **Confirm the crons fire on their own** at 11:15 and 11:45 UTC. Every run
     so far was manually dispatched, which exercises the same code path but not
     GitHub's scheduler. Expect a second `scheduled_price_push` row per provider.
@@ -644,6 +647,21 @@ Still true and worth keeping visible:
     — a **401 Unauthorized** is the healthy answer.
   - Until this is resolved, **prices only move when someone clicks "Push prices
     now"** in Admin Settings. That is the current de facto process.
+- ◻️ **NOT blocked by deploy — the repair can be run right now** (confirmed
+  2026-08-11). The fix has been in `src/lib/ebay/sync.ts` since 2026-08-04
+  (`resolveFreshnessScanAction`, sync.ts:1317, called from the scan at
+  sync.ts:1347), and `api/admin/ebay/eligibility-summary/route.ts:39` calls
+  `scanAndMarkOutOfDate()` on load. Netlify's **published deploy is
+  `main@a80e0f8`**, which is a wholesale copy of this source folder, so that code
+  is live. Nothing is waiting on a deploy — it is waiting on **one admin click**:
+  open Admin → Products → **Sync all to eBay**, which loads the eligibility
+  summary and triggers the scan. The repair branch fires on
+  `sync_state === 'out_of_date' && last_pushed_qty === 0`, so **36 of the 38**
+  mis-flagged rows repair automatically; the other 2 lack the qty-0 marker and
+  stay put (correctly — that marker is what proves the auto-hide actually ran).
+- ⚠️ **A newer commit `main@78af2ed` ("stage") shows CANCELED on Netlify**, so
+  `main` is ahead of production. Watch the next deploy actually reach Published
+  rather than assuming it did.
 - ◻️ **The eBay sold-hidden repair has not self-healed.** As of 2026-08-10 there
   are still 38 `out_of_date` rows on `sold` products (36 with
   `last_pushed_qty = 0`) and **zero** `hidden_oos` rows. `repair-hidden` only

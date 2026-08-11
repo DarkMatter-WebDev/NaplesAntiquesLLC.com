@@ -30,7 +30,7 @@
 // height via CSS — no travel, no pin, panes B and C hidden — restoring the
 // original static hero.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import HomeHero from './HomeHero';
 import HomeHeroOverlay from './HomeHeroOverlay';
 import {
@@ -51,6 +51,21 @@ type Props = {
   /** Same contract as initialAltItems, for slideshow C. */
   initialThirdItems?: CarouselItem[];
   initialSettings: CarouselSettings;
+  /**
+   * Announcement strip rendered INSIDE the pinned frame, above the slideshows
+   * (owner, 2026-08-11: "make it so this banner doesn't scroll away until the
+   * hero txt does").
+   *
+   * It lives here rather than above the hero in page flow precisely so the
+   * release timing needs no arithmetic: it is part of the same sticky element
+   * as the overlay text, so it unpins on exactly the same frame, by
+   * construction. Any approach that kept it a separate sticky element would
+   * have to keep two release points in sync forever.
+   *
+   * Server-rendered content passed down from the page, so it stays out of this
+   * client bundle.
+   */
+  banner?: ReactNode;
 };
 
 // The runway is walked as two OVERLAPPING crossings and nothing else, as
@@ -356,6 +371,7 @@ export default function HomeHeroStack({
   initialAltItems,
   initialThirdItems,
   initialSettings,
+  banner,
 }: Props) {
   const runwayRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -834,6 +850,12 @@ export default function HomeHeroStack({
   return (
     <div ref={runwayRef} className="home-hero-stack" data-customer-reveal-skip>
       <div ref={frameRef} className="home-hero-stack-frame" data-customer-reveal-skip>
+        {banner}
+        {/* Everything below the banner. The panes and the overlay are
+            `inset: 0` against THIS box rather than the frame, so the banner's
+            height is subtracted from the slideshow area automatically — no
+            measured offset, no CSS variable to keep in sync. */}
+        <div className="home-hero-stack-viewport">
         <div
           ref={paneARef}
           className="home-hero-stack-pane home-hero-stack-pane--a"
@@ -886,6 +908,7 @@ export default function HomeHeroStack({
         <div className="home-hero-stack-overlay" data-customer-reveal-skip>
           <HomeHeroOverlay locale={locale} dark={overlayDark} />
         </div>
+        </div>
       </div>
 
       <style>{`
@@ -930,6 +953,32 @@ export default function HomeHeroStack({
           /* The hero's bottom separator lives on the frame (not the slideshow
              sections) so no border line sweeps through the crossing. */
           border-bottom: 1px solid rgba(220, 179, 54, 0.22);
+          /* Column so the announcement banner takes its natural height at the
+             top and the slideshow viewport absorbs whatever is left. The frame's
+             OWN height is unchanged (100svh - header), which matters: both the
+             travel and the snap step are computed as
+             runway.offsetHeight - frame.offsetHeight, so the choreography and
+             the one-slideshow-per-flick snap are untouched by this. */
+          display: flex;
+          flex-direction: column;
+        }
+
+        /* The slideshow area — the frame minus the banner. Positioned, so the
+           panes' and overlay's inset:0 resolve against it. A min-height of 0
+           is required or the flex item refuses to shrink below its content. */
+        .home-hero-stack-viewport {
+          position: relative;
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow: hidden;
+        }
+
+        /* The banner must not be squeezed by the flex container: it is the one
+           thing here with an intrinsic height. */
+        .home-hero-stack-frame > .home-announcement {
+          flex: 0 0 auto;
+          position: relative;
+          z-index: 4; /* above the overlay's halo, same as it had in page flow */
         }
 
         .home-hero-stack-pane {
