@@ -1,5 +1,70 @@
 # Changelog
 
+## 2026-08-11 - Scheduled jobs cut over to GitHub Actions and RAN
+
+Deployed, secrets added, workflow dispatched manually twice. **The automation
+executed for the first time in this project's history.**
+
+Run #1 (`instagram-drip` alone, chosen because it was a provable no-op — the
+due-row query was verified as returning `[]` first, so a wrong secret would fail
+harmlessly instead of writing to a live marketplace): HTTP 200, and the
+first-ever `scheduled_drip` row appeared at 02:28:33 UTC.
+
+Run #2 (`all`): four of five jobs green.
+
+| Log | Row written |
+| --- | --- |
+| `etsy_sync_log` / `scheduled_price_push` | **FIRST EVER** — "42 pushed, 32 unchanged, 0 blocked, 0 failed, 16 deferred" |
+| `instagram_sync_log` / `scheduled_drip` | ok |
+| `facebook_sync_log` / `scheduled_drip` | ok |
+| `instagram_sync_log` / `token_refresh` | ok — "no action needed (not_due)" |
+| `ebay_sync_log` / `scheduled_price_push` | none — job failed 401 |
+
+42 real Etsy price updates with **zero failures**; `warning` reflects only the
+16 listings deferred by the 22-second budget. The `token_refresh` row exists
+solely because of the skip-logging added on 2026-08-10 — under the old code this
+successful run would have left no trace, which is precisely the ambiguity that
+hid the dead schedules for weeks.
+
+Run #3 (`ebay-price-push`, after the secret was rotated): **green, 33s.**
+`ebay_sync_log` recorded its **first-ever** `scheduled_price_push`:
+*"50 pushed, 67 unchanged, 1 blocked, 0 failed, 6 deferred."*
+
+That row is the most meaningful result of the whole arc. Before the 2026-08-08
+eligibility/backoff/detail fixes, an eBay price push produced **139 errors in a
+single run**. This one: 50 real price updates, **0 failures**, and zero listings
+left with `error_count > 0`. The single "blocked" is inventory #82, held back by
+`EBAY_WRITE_BLOCKED_PRODUCT_IDS` exactly as designed. The 2026-08-08 fixes are
+now proven in production by a scheduled run rather than inferred.
+
+**The eBay failure, and why it could not be fixed by copying:**
+`ebay-price-push` returned `HTTP 401
+{"error":{"code":"unauthorized","message":"Invalid cron secret."}}`. The
+distinction matters — "Invalid" means the GitHub secret exists but its value
+differs from Netlify's, whereas a missing secret would have failed earlier with
+the workflow's own named error.
+
+Diagnosis without exposing any value: Netlify's masked display showed production
+ending `4e67`, while `.env.local` ended `3bb6`. Different — and that is exactly
+why eBay failed while Etsy, Instagram and Facebook, whose local values *did*
+match, all succeeded.
+
+It could not be repaired by copying. Netlify marks `EBAY_CRON_SECRET` **secret in
+four of its five deploy contexts**, which is write-only: those rows carry lock
+icons instead of the reveal/copy pair, and Options offers only Edit and Delete.
+The production value is unreadable by anyone. The fix was rotation — a new value
+set in Netlify, a redeploy (env changes do not reach the running site until one),
+the same value into the GitHub secret, then rerun.
+
+**Consequence worth recording:** `.env.local` was stale for exactly one of four
+cron secrets. The standing DECISIONS rule (Netlify is authoritative; check, do
+not assume) is now backed by evidence rather than caution. A future rotation must
+touch **three** places: Netlify + redeploy, the GitHub secret, and `.env.local`.
+
+The staged repo copy that shipped this was verified byte-for-byte first: 818
+files, SHA-256 identical across the board, no `.git`, no `.env`, and the hidden
+`.github/` directory confirmed present in the repo working tree.
+
 ## 2026-08-10 - Netlify scheduled functions have NEVER run; price-push health surfaced
 
 ### The finding

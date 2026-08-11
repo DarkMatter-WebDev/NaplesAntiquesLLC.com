@@ -24,9 +24,35 @@ Back it up first if you want to be certain it holds nothing.
 Related oddity worth a glance: the root `.git/config` carries
 `[submodule] active = .`, a leftover from some earlier submodule wrangling.
 
-## Copying this folder to the repo folder — exclusions that matter
+## Copying to the repo folder — use the staging folder
 
-Do **not** copy the folder wholesale. Two directories must be excluded:
+**A ready-made, verified staging copy lives at `C:\Users\rcman\NEJ-repo-staging`**
+(built 2026-08-11, deliberately OUTSIDE this folder and outside OneDrive so it
+neither pollutes the source of truth nor triggers a sync storm). Its contents are
+exactly what belongs in the repo — copy *everything* in it into the repo folder
+with no exclusions to think about.
+
+Verified at build time: 818 files / 18.75 MB; `.github/workflows/scheduled-jobs.yml`
+present and SHA-256-identical to the source; all 5 `netlify/functions/*.mts`
+present; 489 `next-app/src`, 175 `next-app/public`, 26 `project-docs`, 72
+`supabase` files. Leak check clean — no `.git`, no `next-app/.git`, no
+`.env.local`, no `node_modules`, no `.next`, no `.pem`, no `next-env.d.ts`, no
+`tsconfig.tsbuildinfo`.
+
+⚠️ **It is a point-in-time snapshot.** Rebuild it after any further edits:
+
+```powershell
+$src="C:\Users\rcman\OneDrive\Documents\NaplesEstateJewelry.co"; $dst="C:\Users\rcman\NEJ-repo-staging"
+robocopy $src $dst /MIR /XD .git node_modules .next .turbo .cache .vercel coverage out build /XF *.log *.tmp *.bak *.orig *.tsbuildinfo next-env.d.ts .env .env.*
+```
+
+(`/MIR` is safe against `$dst` here because that folder exists only for this
+purpose. Never point `/MIR` at the real repo folder without `/XD .git`.)
+
+### Why a wholesale copy of the project root is wrong
+
+Two directories must be excluded, which is the whole reason the staging folder
+exists:
 
 1. **`.git` at the root** (345 MB). It points at `origin =
    DarkMatter-WebDev/NaplesAntiquesLLC.com` — the same repo you push to — so
@@ -536,7 +562,35 @@ Still true and worth keeping visible:
     proven route; they fixed the April 2026 incident. Send them: site
     `naplesantiques`, the 202-accepted invoke that produced no execution, and
     that the Next.js Server Handler function on the same site works fine.
-  - 🟡 **FIX PATH B IS BUILT AND WAITING ON FOUR SECRETS (2026-08-10).**
+  - 🟢 **CUT OVER AND WORKING (2026-08-11).** Deployed, secrets added, workflow
+    run manually twice. Four of five jobs succeed and wrote log rows that had
+    never existed — including the **first-ever `scheduled_price_push`** on Etsy:
+    *"42 pushed, 32 unchanged, 0 blocked, 0 failed, 16 deferred."* Zero
+    failures; the 16 deferred are the 22-second budget and roll to the next run.
+    Instagram/Facebook drips and the Instagram token refresh all logged `ok`.
+  - ✅ **`EBAY_CRON_SECRET` rotated; all five jobs now green (2026-08-11).** The
+    first eBay attempt failed `HTTP 401 {"code":"unauthorized","message":"Invalid
+    cron secret."}` — the secret existed but its value differed from Netlify's
+    (local ended `3bb6`, Netlify production ended `4e67`). It could **not** be
+    re-copied: Netlify marks that variable secret in four of five deploy
+    contexts, which is write-only (lock icons; Options offers only Edit/Delete).
+    Owner rotated it in Netlify, redeployed, updated the GitHub secret, reran:
+    **"50 pushed, 67 unchanged, 1 blocked, 0 failed, 6 deferred."** The 1 blocked
+    is inventory #82 via `EBAY_WRITE_BLOCKED_PRODUCT_IDS`, working as designed.
+    Zero listings carry `error_count > 0`. For contrast, a pre-fix eBay run
+    produced **139 errors**.
+    - ⚠️ Durable lesson: `.env.local` was stale for exactly one of four cron
+      secrets. Netlify remains authoritative — check, never assume.
+    - ⚠️ If either cron secret is ever rotated again, it must change in **three**
+      places: Netlify (+ redeploy), the GitHub Actions secret, and `.env.local`.
+  - ◻️ **Deferred listings roll to the next scheduled run** — 16 on Etsy, 6 on
+    eBay, both from the 22-second budget. The 11:15 / 11:45 UTC crons pick them
+    up; no action needed unless you want them pushed sooner.
+  - ◻️ **Confirm the crons fire on their own** at 11:15 and 11:45 UTC. Every run
+    so far was manually dispatched, which exercises the same code path but not
+    GitHub's scheduler. Expect a second `scheduled_price_push` row per provider.
+  - **Superseded detail from when this was still pending:**
+  - 🟡 **FIX PATH B WAS BUILT AND WAITING ON FOUR SECRETS (2026-08-10).**
     `.github/workflows/scheduled-jobs.yml` replaces all five Netlify schedules
     with GitHub Actions, using the same cron expressions, the same routes, and
     the same `x-cron-secret` header. **No application code changed.** Verified:

@@ -472,9 +472,17 @@ price push gated by a ≥1%-of-last-pushed-price threshold (Q4).
   `TODO(etsy-verify)` still covers image-upload size/format caps and rate-limit
   response-header names because neither is present in Etsy's machine-readable
   specification.
-- The scheduled price function runs at 11:15 UTC, fails closed when relevant
-  spot data is missing/fallback, and records a `scheduled_price_push` summary.
-  The production Scheduled badge is confirmed; the deliberate live **Run now**
-  and Admin last-run-card check remain in `TASKS.md`.
+- The daily 11:15 UTC trigger is **GitHub Actions**
+  (`.github/workflows/scheduled-jobs.yml`, job `etsy-price-push`), which POSTs
+  the `ETSY_CRON_SECRET`-guarded route. `netlify/functions/etsy-price-push.mts`
+  still exists with the same schedule but **has never once executed** — a Netlify
+  platform fault, documented in CHANGELOG 2026-08-10; it is kept only so the
+  change is reversible. ⚠️ A Netlify "Scheduled" badge and a "Next execution"
+  time prove registration, never execution — that is exactly what masked this for
+  weeks. The run fails closed when relevant spot data is missing/fallback and
+  records a `scheduled_price_push` summary.
+  🟢 **Confirmed working 2026-08-11**: first-ever `scheduled_price_push` row read
+  *"42 pushed, 32 unchanged, 0 blocked, 0 failed, 16 deferred"*. Deferred items
+  are the 22-second budget and roll into the next run.
 - Use the Etsy drawer or channel-specific Actions controls for normal and bulk
   work. The full incident and verification history remains in `CHANGELOG.md`.

@@ -1656,12 +1656,25 @@ Manual-priced items and an already-locked sold price do not depend on live spot.
 
 ### Daily marketplace price runs are bounded and observable
 
-Netlify owns one staggered daily scheduled function per marketplace. The
-secret-guarded Next routes do the actual work with a fixed time budget,
+**GitHub Actions owns the daily trigger** — one staggered job per marketplace in
+`.github/workflows/scheduled-jobs.yml` (Etsy 11:15 UTC, eBay 11:45 UTC). It
+replaced the Netlify scheduled functions on 2026-08-11 because those never
+executed even once; the `.mts` files remain only so the change is reversible.
+The trigger is deliberately interchangeable: the routes are secret-header-guarded
+and trigger-agnostic, so any external cron can drive them. **Never assume a
+scheduler works because its dashboard says it is registered** — a Netlify
+"Scheduled" badge with a correct "Next execution" time sat over a completely dead
+scheduler for weeks.
+
+The secret-guarded Next routes do the actual work with a fixed time budget,
 price-only writes, oldest-row-first rotation, and summary log records. eBay
 uses verified batches of at most 25 and isolates a failed mixed batch so one
 offer cannot starve later listings. Admin Settings exposes secret readiness and
 the latest scheduled result; no new database table is required.
+
+A rotated cron secret must be updated in **three** places or the job 401s:
+Netlify (**and then redeploy** — env changes do not reach the running site until
+a new deploy), the GitHub Actions repository secret, and `.env.local`.
 
 **Three rules added 2026-08-08 after the price push turned out to be generating
 ~33 guaranteed API rejections per run:**

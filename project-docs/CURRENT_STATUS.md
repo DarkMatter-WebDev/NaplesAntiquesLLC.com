@@ -4,6 +4,48 @@
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
 > in `DECISIONS.md`. Last reconciled: **2026-08-10**.
 
+## 🟢 Scheduled jobs now RUN — via GitHub Actions (cut over 2026-08-11)
+
+**The automation works for the first time in this project's history.** The
+GitHub Actions workflow replaced the dead Netlify schedules and, on its first
+real run, produced rows that had never existed:
+
+| Log | Result |
+| --- | --- |
+| `etsy_sync_log` / `scheduled_price_push` | **FIRST EVER** — "42 pushed, 32 unchanged, 0 blocked, 0 failed, 16 deferred" |
+| `instagram_sync_log` / `scheduled_drip` | ok — 0 published, 0 skipped |
+| `facebook_sync_log` / `scheduled_drip` | ok — 0 published, 0 skipped |
+| `instagram_sync_log` / `token_refresh` | ok — "no action needed (not_due)" |
+| `ebay_sync_log` / `scheduled_price_push` | **FIRST EVER** — "50 pushed, 67 unchanged, 1 blocked, 0 failed, 6 deferred" |
+
+42 real Etsy price updates, **zero failures**. The `warning` outcome is only
+because 16 listings were deferred by the 22-second budget; the next run picks
+them up. The `token_refresh` row exists solely because of the skip-logging added
+the same day — before that this run would have left no trace at all.
+
+✅ **`EBAY_CRON_SECRET` was rotated and eBay now works too.** Its first attempt
+failed `HTTP 401 {"code":"unauthorized","message":"Invalid cron secret."}` —
+"Invalid" rather than "not configured", so the secret existed but its value
+differed from Netlify's. It could not simply be re-copied: Netlify marks that
+variable **secret in four of five deploy contexts**, which is write-only (lock
+icons, Options offers only Edit/Delete, no reveal). The owner rotated it in
+Netlify, redeployed, updated the GitHub secret, and the rerun went green.
+
+**The eBay result is the more meaningful one.** Before the 2026-08-08 fixes an
+eBay price push produced **139 errors in a single run**. This run: **50 pushed,
+0 failed**, zero listings left with `error_count > 0`. The "1 blocked" is
+inventory #82, held back by `EBAY_WRITE_BLOCKED_PRODUCT_IDS` exactly as
+designed.
+
+⚠️ **`.env.local` was NOT in sync with Netlify for the eBay cron secret** (local
+ended `3bb6`, Netlify production ended `4e67`). That is why eBay failed while the
+other three, which did match, succeeded. Both are now the rotated value. The
+standing rule — Netlify is authoritative, check rather than assume — is evidenced
+rather than merely cautionary; do not record `.env.local` as authoritative.
+
+The Netlify functions remain deployed and still never fire; they are left in
+place only so the change is reversible. History of the fault is below.
+
 ## 🔴 No Netlify scheduled function has ever run (found 2026-08-10)
 
 **Nothing automatic is running on this site.** Not the Etsy price push, not the

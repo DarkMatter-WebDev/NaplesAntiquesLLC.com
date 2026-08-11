@@ -304,13 +304,21 @@ place).
 - **Product Admin selected Actions** — **Check eBay** reconciles only the
   selected linked offers, reports checked/updated/reset/error/skipped totals,
   refreshes eBay chips on close, and keeps the selection for a follow-up sync.
-- **Price automation:** `netlify/functions/ebay-price-push.mts` is scheduled
-  daily at 11:45 UTC and calls the existing `EBAY_CRON_SECRET`-guarded route.
-  Scheduled/manual planners bulk-load price inputs, reject fallback or missing
-  relevant-metal spot values, and use eBay's 25-entry bulk update with
-  per-item fallback for mixed failures. Admin Settings shows the last scheduled
-  result. The live eBay price-push toggle remains off until the owner enables
-  it after a controlled post-deploy `Run now` check.
+- **Price automation:** the daily 11:45 UTC trigger is **GitHub Actions**
+  (`.github/workflows/scheduled-jobs.yml`, job `ebay-price-push`), which POSTs
+  the `EBAY_CRON_SECRET`-guarded route. `netlify/functions/ebay-price-push.mts`
+  still exists with the same schedule but **has never once executed** — a Netlify
+  platform fault, documented in CHANGELOG 2026-08-10; it is kept only so the
+  change is reversible. Scheduled/manual planners bulk-load price inputs, reject
+  fallback or missing relevant-metal spot values, and use eBay's 25-entry bulk
+  update with per-item fallback for mixed failures. Admin Settings shows the last
+  scheduled result, and since 2026-08-10 a never-run or overdue schedule renders
+  as a red fault there rather than a green "Ready for…".
+  🟢 The price-push toggle is enabled and the automation is **confirmed working
+  2026-08-11**: first-ever `scheduled_price_push` row read *"50 pushed, 67
+  unchanged, 1 blocked, 0 failed, 6 deferred"* (the 1 blocked is #82). Note the
+  GitHub secret must match Netlify's `EBAY_CRON_SECRET`; a mismatch returns
+  `401 {"code":"unauthorized","message":"Invalid cron secret."}`.
 - **Not built:** a dedicated "eBay: out of date / error / not listed"
   product-table filter chip — there's no existing single-marketplace filter
   control on the Etsy side to extend, so this was skipped rather than
