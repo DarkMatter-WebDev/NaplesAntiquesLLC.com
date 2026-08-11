@@ -1460,6 +1460,60 @@ accurate `sizes`, and targeted priority are preferred before full row/card
 virtualization, because virtualization would complicate accessibility, focus,
 history, and responsive layout.
 
+### Viewport height is `svh`, and `resize` is never listened to bare
+
+Added 2026-08-11 after the owner reported the classic in-app-browser stutter:
+Instagram's and Facebook's embedded browsers hide and show their toolbar as you
+scroll, which changes `window.innerHeight` and fires `resize` continuously.
+Anything keyed to viewport height then relayouts mid-scroll and the page appears
+to stutter or reload.
+
+Two rules, and both are needed — the units alone do not stop the JavaScript from
+churning, and the guard alone does not stop CSS from resizing.
+
+1. **Use `svh`, never `dvh`, for anything sized to the viewport.** `svh` is
+   measured against FULLY-EXPANDED chrome and is stable across exactly this
+   event; `dvh` tracks the current viewport and therefore animates on every
+   toolbar transition. The worst instance was `.shop-filter-sidebar`, a sticky
+   scrollable panel on `/shop` sized `calc(100dvh - 7.5rem)` — it resized
+   continuously while scrolling. Keep a plain `vh` declaration immediately before
+   the `svh` one as the legacy fallback (the pattern `.site-loading-screen`
+   already used). Inline React styles cannot carry duplicate declarations, so
+   those use `svh` directly — universally supported since 2022.
+
+   **The one legitimate use of `dvh` is a NON-SCROLLING full-viewport shell.**
+   `AdminShell`'s root and its fullscreen overlay are `h-dvh` with
+   `overflow-hidden` and internal scrolling: the page itself never scrolls, so
+   the toolbar never auto-hides, and `dvh` fills the visible area exactly where
+   `svh` would leave a strip of dead space at the bottom. Those two stay. The
+   distinction is scrolling, not admin-vs-customer — every `max-h-[calc(100dvh-…)]`
+   on an admin modal was moved to `svh` with the rest.
+
+   This is not a new insight in this codebase: the product-editor modal already
+   chose `h-svh` for precisely this reason, and its comment
+   (`AdminShell.tsx`, "dvh grows as soon as the toolbar auto-hides") is the
+   clearest statement of the trade-off — accept a little unused space rather than
+   let a footer's Save buttons fall outside the guaranteed-visible area.
+
+2. **Subscribe through `onLayoutAffectingResize` (`lib/viewport-resize.ts`),
+   never `window.addEventListener('resize', …)` directly.** It fires only when
+   the WIDTH changed — any width change is real — or when the height moved more
+   than `VIEWPORT_CHROME_TOLERANCE_PX` (160px, clearing the 44–120px of real
+   mobile chrome while staying well under a 250–350px keyboard; a rotation is
+   caught by the width test anyway).
+
+   It anchors to the last size it ACTED on, not the last size it saw. Comparing
+   against the last event would absorb toolbar oscillation correctly but make a
+   slow drag-resize invisible — a hundred 10px steps are each under tolerance, so
+   the baseline would creep along with them and the 300px total would never
+   register.
+
+Applied to all three resize listeners in the app: the homepage hero's remeasure
+(whose geometry is entirely `svh`/`rem`-derived, so toolbar movement genuinely
+cannot change it — it was forcing a synchronous `offsetHeight` reflow per scroll
+frame), the shop grid's column count (a pure function of `innerWidth`), and the
+admin action menu's close-on-resize.
+
 ### Responsive failures are tested by width and height
 
 The desktop filter sidebar keeps its sticky layout but receives a viewport-
@@ -1787,6 +1841,74 @@ The corollary for diagnosis: when a log that records even skips contains zero
 rows for an action, suspect the caller, not the logger. Here three independent
 code paths across two providers were all silent, which located the fault above
 the application entirely.
+
+### Content freshness and price-push health are two separate signals
+
+Added 2026-08-11, after a proposal to drive the out-of-date flag off price-push
+failures — "if the price push always succeeds it should never be out of date."
+That is not how the two relate, and merging them would hide real faults:
+
+- **`out_of_date` = CONTENT drift.** `computeContentHash` covers title,
+  description, aspects, condition, category, quantity, images, and the
+  fulfillment / payment / return policies.
+- **The daily price push sends `sku`, `shipToLocationAvailability.quantity` and
+  `offers[].price`.** Nothing else. Its success path writes `last_pushed_price`,
+  `error_count` and `last_error`, and never touches `content_hash`.
+
+A successful price push therefore **cannot** clear `out_of_date`, structurally.
+When this came up, 84 available eBay listings were flagged because the
+2026-08-01/02 tier shipping policies entered the hash — while that same night's
+price push succeeded on 56 of them with zero failures. Driving the flag off price
+success would have shown all 84 as healthy while they still charged the OLD
+shipping on live listings.
+
+So the product table carries two chips per marketplace:
+
+1. the existing state chip, relabelled **"Content stale"** (from "Out of date",
+   which read as a fault and invited exactly this conflation), and
+2. a **price chip** — "Price failed" / "Price stalled" — from
+   `lib/marketplace-price-chip.ts`, which renders **nothing** when every push has
+   landed. A permanent green across 131 rows would spend attention without
+   earning it; the chip appearing at all is the signal.
+
+`MAX_PRICE_PUSH_ATTEMPTS` moved into that client-safe module and is re-exported
+by both `ebay/sync.ts` and `etsy/sync.ts` (both `server-only`), so the chip's
+"stalled" boundary cannot drift from the boundary the planners actually skip on.
+Same reasoning as `ebay/guards.ts`. Previously both files declared their own `3`.
+
+**A noisy flag is not automatically a wrong flag.** Etsy showed 1 out-of-date
+listing against eBay's 84 on identical code — the difference was an unworked
+shipping-tier backlog, not a measurement error. Clear the backlog; do not
+redefine the measurement.
+
+### A bounded bulk run must ORDER its queue, not just cap it
+
+Added 2026-08-11. `EBAY_BULK_ENQUEUE_LIMIT = 25` makes "never blanket re-sync"
+mechanical, but a cap alone does not make a backlog drain. `enqueueProducts` took
+`allowed.slice(0, LIMIT)` with no notion of which listings still needed the
+write, so the documented campaign procedure — select everything, sync, run it
+again for the next batch — re-queued the same first 25 every time. Measured: the
+second run re-pushed 21 of the same 23 listings and advanced nothing.
+
+`orderEnqueueCandidates` sorts before slicing: **stale (0) → error (1) →
+published (2)**.
+
+Three things about that shape are deliberate:
+
+- **Order, do not filter.** Excluding already-current rows would break the other
+  use of this path, where an admin selects a few live items and deliberately
+  force-re-pushes them. Sorting preserves it — with nothing stale to outrank
+  them, the selection queues as given.
+- **`error` sits in the middle.** At the front, two permanently-failing items
+  would camp at the head of every run, consume two of the 25 slots forever, and
+  climb their error count for nothing. Behind the clean backlog, they are
+  retried once there is capacity.
+- **The sort must be stable** so the caller's order survives within a group.
+  `Array.prototype.sort` guarantees this.
+
+The general rule: whenever a capped batch is meant to be run repeatedly, the cap
+decides *how much*, and the ordering decides *what* — a cap without an ordering
+is a loop that repeats its first page.
 
 ### Etsy queue progress is durable
 

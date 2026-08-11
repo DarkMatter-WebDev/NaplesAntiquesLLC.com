@@ -116,7 +116,7 @@ export default async function AccountSecurityPage({ params }: Props) {
           top: 0;
           right: 0;
           left: 0;
-          height: min(42rem, 82vh);
+          height: min(42rem, 82svh);
           pointer-events: none;
           z-index: 0;
           background:

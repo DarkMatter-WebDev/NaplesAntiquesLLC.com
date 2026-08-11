@@ -21,7 +21,7 @@ export default async function NotFound() {
     <>
       <SiteHeader />
       <main
-        className="pt-28 md:pt-32 pb-20 flex flex-col items-center justify-center text-center px-6 min-h-[60vh]"
+        className="pt-28 md:pt-32 pb-20 flex flex-col items-center justify-center text-center px-6 min-h-[60svh]"
         style={{ background: 'var(--color-background)' }}
       >
         <p

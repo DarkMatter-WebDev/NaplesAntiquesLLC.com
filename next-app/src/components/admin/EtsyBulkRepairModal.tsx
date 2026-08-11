@@ -95,7 +95,7 @@ export default function EtsyBulkRepairModal({ onClose }: { onClose: (completed?:
 
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto whitespace-normal p-4 sm:items-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
-      <div className="flex min-w-0 w-full max-w-md max-h-[calc(100dvh-2rem)] flex-col gap-4 overflow-y-auto border bg-white p-5 [overflow-wrap:anywhere]" style={{ borderColor: 'var(--color-outline-variant)' }}>
+      <div className="flex min-w-0 w-full max-w-md max-h-[calc(100svh-2rem)] flex-col gap-4 overflow-y-auto border bg-white p-5 [overflow-wrap:anywhere]" style={{ borderColor: 'var(--color-outline-variant)' }}>
         <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
           Repair all Etsy sync issues
         </h3>

@@ -1317,8 +1317,14 @@ export async function renderShopPage({
                 position: sticky;
                 top: 6.5rem;
                 align-self: start;
+                /* svh, NOT dvh. dvh tracks the CURRENT viewport, so in an
+                   in-app browser (Instagram/Facebook) this sticky, scrollable
+                   panel resized on every toolbar hide/show — i.e. continuously
+                   while scrolling — and visibly stuttered. svh is measured
+                   against fully-expanded chrome and does not move. The plain vh
+                   line stays as the fallback for anything without svh. */
                 max-height: calc(100vh - 7.5rem);
-                max-height: calc(100dvh - 7.5rem);
+                max-height: calc(100svh - 7.5rem);
                 overflow-y: auto;
                 scrollbar-color: rgba(115, 92, 0, 0.34) transparent;
                 scrollbar-gutter: stable;

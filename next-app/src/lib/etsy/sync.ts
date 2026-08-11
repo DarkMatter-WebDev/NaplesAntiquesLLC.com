@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { fetchSpotData } from '@/lib/spot-price';
 import { getMarketplaceShippingTier } from '@/lib/checkout-shipping';
 import { getMarketplaceShippingProfileMap, resolveTierExternalId } from '@/lib/marketplace-shipping';
+import { MAX_PRICE_PUSH_ATTEMPTS } from '@/lib/marketplace-price-chip';
 import type { Product, SpotData } from '@/types/product';
 import { normalizeProductJewelryType, normalizeProductQuantity, normalizeProductStatus } from '@/types/product';
 import { ensureFreshAccessToken } from './auth';
@@ -1403,10 +1404,13 @@ async function loadPriceProducts(service: SupabaseClient, productIds: string[]):
 
 /**
  * Consecutive price-push failures before a listing stops being retried.
- * Mirrors the eBay ceiling; see that constant for the incident behind it.
- * A successful push clears the count, so this un-sticks itself.
+ * See the incident behind it in `lib/marketplace-price-chip.ts`, which now owns
+ * the constant so the Product Admin price chip can state the same ceiling this
+ * planner enforces — this module is `server-only`. A successful push clears the
+ * count, so it un-sticks itself. (Both providers previously declared their own
+ * `= 3`; one source of truth means they cannot drift apart.)
  */
-export const MAX_PRICE_PUSH_ATTEMPTS = 3;
+export { MAX_PRICE_PUSH_ATTEMPTS };
 
 function planEtsyPricePush(
   rows: EtsyListingRow[],

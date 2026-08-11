@@ -7,6 +7,7 @@ import type { Product, SpotData } from '@/types/product';
 import { normalizeProductQuantity, normalizeProductStatus } from '@/types/product';
 import { EbayApiError, ebayFetch, ebayTradingGetItemStatus, type EbayTradingItemStatus } from './client';
 import { EBAY_BULK_ENQUEUE_LIMIT } from './guards';
+import { MAX_PRICE_PUSH_ATTEMPTS } from '@/lib/marketplace-price-chip';
 import { ensureFreshAccessToken } from './auth';
 import {
   buildMappedPayload,
@@ -1159,6 +1160,33 @@ export interface EnqueueResult {
  * they are the mechanical form of the standing cautions — never blanket
  * re-sync, and never write a quarantined or sold listing.
  */
+/**
+ * Where a listing sits in the enqueue queue, lowest first.
+ *
+ * 0 — needs the write: never listed, mid-flight, or content-stale.
+ * 1 — `error`: worth retrying, but only once the clean backlog is drained. Two
+ *     permanently-failing items sitting at the head of every run would eat two
+ *     of the 25 slots forever and climb their error count for nothing.
+ * 2 — `published`: already current, so it goes last and is only reached when a
+ *     run has nothing better to do (which is what makes a deliberate
+ *     force-re-push of a live selection still work).
+ */
+export function enqueueCandidatePriority(state: EbaySyncState | null | undefined): number {
+  if (state === 'published') return 2;
+  if (state === 'error') return 1;
+  return 0;
+}
+
+/** PURE: stale-first ordering for one enqueue batch. Stable within each group. */
+export function orderEnqueueCandidates(
+  productIds: string[],
+  stateByProduct: ReadonlyMap<string, EbaySyncState | null>,
+): string[] {
+  return [...productIds].sort(
+    (a, b) => enqueueCandidatePriority(stateByProduct.get(a)) - enqueueCandidatePriority(stateByProduct.get(b)),
+  );
+}
+
 export async function enqueueProducts(productIds: string[]): Promise<EnqueueResult> {
   const service = createServiceClient();
   // Write-blocked ids never enter the queue at all — the per-step guard would
@@ -1182,7 +1210,31 @@ export async function enqueueProducts(productIds: string[]): Promise<EnqueueResu
     for (const row of (data ?? []) as { id: string }[]) available.add(row.id);
   }
   const allowed = notBlocked.filter((id) => available.has(id));
-  const batch = allowed.slice(0, EBAY_BULK_ENQUEUE_LIMIT);
+
+  // Order the batch so a repeated run ADVANCES instead of redoing its own work.
+  //
+  // This used to be a bare `allowed.slice(0, LIMIT)`, which meant passing the
+  // same selection twice queued the same first 25 both times. The shipping-tier
+  // campaign is run exactly that way — "select all, sync, run it again for the
+  // next batch" — and the second run re-pushed 21 of the same 23 listings and
+  // made no progress (measured 2026-08-11).
+  //
+  // Ordering rather than FILTERING is deliberate: excluding already-current rows
+  // would break the other use of this path, where an admin selects a handful of
+  // live items and deliberately force-re-pushes them. Sorting keeps that working
+  // (nothing stale to outrank them) while making backlog runs drain properly.
+  // Array.prototype.sort is stable, so the caller's order survives within groups.
+  const listingStates = new Map<string, EbaySyncState | null>();
+  for (let index = 0; index < allowed.length; index += 200) {
+    const { data } = await service
+      .from('ebay_listings')
+      .select('product_id, sync_state')
+      .in('product_id', allowed.slice(index, index + 200));
+    for (const row of (data ?? []) as { product_id: string; sync_state: EbaySyncState | null }[]) {
+      listingStates.set(row.product_id, row.sync_state);
+    }
+  }
+  const batch = orderEnqueueCandidates(allowed, listingStates).slice(0, EBAY_BULK_ENQUEUE_LIMIT);
 
   let queued = 0;
   for (const productId of batch) {
@@ -1423,8 +1475,12 @@ async function loadPriceProducts(service: SupabaseClient, productIds: string[]):
  * until done. A failed listing keeps its old `last_pushed_price`, so it stays a
  * candidate and is re-attempted on every poll — 33 broken listings produced 139
  * error rows in a single run (2026-08-08). A successful push clears the count.
+ *
+ * Defined in `lib/marketplace-price-chip.ts` and re-exported here: this module is
+ * `server-only`, and the Product Admin price chip has to state the same ceiling
+ * the planner enforces. Same reasoning as `guards.ts` — see that file.
  */
-export const MAX_PRICE_PUSH_ATTEMPTS = 3;
+export { MAX_PRICE_PUSH_ATTEMPTS };
 
 export function planEbayPricePush(
   listings: EbayListingRow[],

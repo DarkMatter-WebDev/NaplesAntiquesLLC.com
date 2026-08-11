@@ -60,7 +60,7 @@ export default function SelectedProductsActionsModal({ count, onClose, onChoose 
       aria-labelledby="selected-products-actions-title"
     >
       <div
-        className="min-w-0 w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto border p-5 shadow-2xl [overflow-wrap:anywhere] md:p-6"
+        className="min-w-0 w-full max-w-lg max-h-[calc(100svh-2rem)] overflow-y-auto border p-5 shadow-2xl [overflow-wrap:anywhere] md:p-6"
         style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-background)' }}
         onClick={(event) => event.stopPropagation()}
       >

@@ -179,7 +179,7 @@ export default function ContactForm({ locale, submitted }: Props) {
                   className="rounded-2xl p-0"
                   style={{
                     width: 'min(42rem, calc(100vw - 2rem))',
-                    maxHeight: 'min(88vh, 48rem)',
+                    maxHeight: 'min(88svh, 48rem)',
                     overflow: 'auto',
                     border: '1px solid rgba(115, 92, 0, 0.16)',
                     background: 'rgba(255,255,255,0.96)',

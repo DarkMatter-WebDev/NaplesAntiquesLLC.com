@@ -77,7 +77,8 @@ const STATE_LABELS: Record<string, string> = {
   offer_created: 'Preparing…',
   review: 'Ready to publish',
   published: 'Live',
-  out_of_date: 'Out of date',
+  // Matches the product table's wording — this is content drift, never price.
+  out_of_date: 'Content stale',
   hidden_oos: 'Hidden (sold)',
   ended: 'Ended',
   error: 'Error',

@@ -154,7 +154,7 @@ export default function SelectedProductsStatusModal({ products, marketplace, onC
       aria-labelledby="selected-status-title"
     >
       <div
-        className={`min-w-0 w-full ${detail ? 'max-w-xl' : 'max-w-md'} max-h-[calc(100dvh-2rem)] overflow-y-auto border p-5 shadow-2xl [overflow-wrap:anywhere] md:p-6`}
+        className={`min-w-0 w-full ${detail ? 'max-w-xl' : 'max-w-md'} max-h-[calc(100svh-2rem)] overflow-y-auto border p-5 shadow-2xl [overflow-wrap:anywhere] md:p-6`}
         style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-background)' }}
       >
         {detail ? (

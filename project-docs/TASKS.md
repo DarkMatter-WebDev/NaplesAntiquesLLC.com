@@ -647,32 +647,68 @@ Still true and worth keeping visible:
     — a **401 Unauthorized** is the healthy answer.
   - Until this is resolved, **prices only move when someone clicks "Push prices
     now"** in Admin Settings. That is the current de facto process.
-- ◻️ **NOT blocked by deploy — the repair can be run right now** (confirmed
-  2026-08-11). The fix has been in `src/lib/ebay/sync.ts` since 2026-08-04
-  (`resolveFreshnessScanAction`, sync.ts:1317, called from the scan at
-  sync.ts:1347), and `api/admin/ebay/eligibility-summary/route.ts:39` calls
-  `scanAndMarkOutOfDate()` on load. Netlify's **published deploy is
-  `main@a80e0f8`**, which is a wholesale copy of this source folder, so that code
-  is live. Nothing is waiting on a deploy — it is waiting on **one admin click**:
-  open Admin → Products → **Sync all to eBay**, which loads the eligibility
-  summary and triggers the scan. The repair branch fires on
-  `sync_state === 'out_of_date' && last_pushed_qty === 0`, so **36 of the 38**
-  mis-flagged rows repair automatically; the other 2 lack the qty-0 marker and
-  stay put (correctly — that marker is what proves the auto-hide actually ran).
+- ✅ **DONE 2026-08-11 — the sold-hidden repair ran and landed exactly as
+  predicted.** It was never blocked by a deploy: the fix has been in
+  `src/lib/ebay/sync.ts` since 2026-08-04 (`resolveFreshnessScanAction`,
+  sync.ts:1317, called from the scan at sync.ts:1347), and
+  `api/admin/ebay/eligibility-summary/route.ts:39` calls `scanAndMarkOutOfDate()`
+  on load — it only ever needed one admin page-load in production.
+
+  | | Before | After |
+  | --- | --- | --- |
+  | `hidden_oos` + sold | 0 | **36** |
+  | `out_of_date` + sold | 38 | **2** |
+  | `out_of_date` + available | 84 | 84 |
+  | `published` + available | 2 | 2 |
+
+  **Trigger used:** Admin → Products → Actions → **Publish all ready to eBay**,
+  then **Cancel**. `EbayBulkPublishModal` fetches the eligibility summary from a
+  mount `useEffect`, so simply OPENING it runs the server-side scan; publishing
+  only happens on an explicit start, and the modal reported "0 listings in the
+  Ready to publish state" with the button disabled. Verified afterwards: **zero**
+  `ebay_sync_log` entries in the following 15 minutes and zero listings with
+  `error_count > 0` — the repair is a local state correction and touched nothing
+  on eBay. Use this same route if rows are ever mis-flagged again; it is safer
+  than the bulk-sync modal, which stages writes.
+
+  The 2 remaining `out_of_date` + sold rows are correct: they lack
+  `last_pushed_qty === 0`, the marker written by `hideListingQuantityZero()` that
+  proves the auto-hide actually ran. Repairing without it would be guessing.
 - ⚠️ **A newer commit `main@78af2ed` ("stage") shows CANCELED on Netlify**, so
   `main` is ahead of production. Watch the next deploy actually reach Published
   rather than assuming it did.
-- ◻️ **The eBay sold-hidden repair has not self-healed.** As of 2026-08-10 there
-  are still 38 `out_of_date` rows on `sold` products (36 with
-  `last_pushed_qty = 0`) and **zero** `hidden_oos` rows. `repair-hidden` only
-  runs when the freshness scan does, i.e. when the eBay bulk-sync modal is
-  opened, and nobody has opened it since the fix deployed. One click fixes it;
-  confirm afterwards that sold pieces read Hidden. Available listings are 84
-  `out_of_date` + 2 `published` = **86**, which matches the campaign figure below.
+- ✅ *(superseded by the entry above — closed 2026-08-11.)* The scan had never
+  run since the fix deployed, which is why 38 sold rows sat in `out_of_date` with
+  zero `hidden_oos`. Available listings remain **86** (84 `out_of_date` +
+  2 `published`), matching the campaign figure below — the repair did not touch
+  them.
 - ✅ **`ORDER_NOTIFY_EMAIL` is not set on Netlify** (checked 2026-08-10 in the
   dashboard). The owner action recorded above under the contact-address section
   is already satisfied — nothing to delete.
 
+- 🟡 **CAMPAIGN STARTED 2026-08-11 — 21 of 81 done, tier mechanism PROVEN.**
+  The controlled single-item test and a bulk-batch item were both verified on
+  the live public eBay listings: $714.80 → **$35.00 shipping** and $663.58 →
+  **$35.00 shipping**, both correct for the $600–1,000 band (policy
+  `252701347026`). **This closes the "one controlled listing update remains
+  open" gate from 2026-08-01, for both the single-item and bulk paths.** The run
+  also reported "1 write-blocked item skipped" — #82 held back as designed.
+  - ⚠️ **Do NOT re-run the campaign until this deploy lands.** The old
+    `enqueueProducts` took the first 25 of whatever was selected with no notion
+    of what still needed writing, so "select all → sync → repeat" re-pushed the
+    same items (measured: 21 of 23 repeated on the second run). Fixed in this
+    batch by `orderEnqueueCandidates` (stale → error → published). After
+    deploying, the remaining **60** finish in three runs.
+  - ◻️ **Two items need eBay-side attention**, both eBay errorId **25604**
+    ("Availability not found"):
+    `vintage-tiffany-and-co-18k-tricolor-gold-cuban-curb-link-bracelet-26` and
+    `vintage-14k-yellow-gold-patriotic-eagle-pendant-31`. Their rows are
+    identical in shape to the successes (available, qty 1, valid offer id), so
+    the condition is on eBay's inventory items, not our payload. Flagged `error`
+    with 2 of 3 retries used; listings untouched and still live. Check their
+    inventory-item availability in Seller Hub.
+  - **Remaining:** 61 `out_of_date` + available (60 writable), 2 `error`,
+    23 `published`.
 - **🔴 OWNER ACTION — apply the new shipping policies to the flagged eBay
   listings, in batches, from the deployed admin.** (The count once read 123;
   the true figure is **86 writable** — see the sold-hidden fix below.) The

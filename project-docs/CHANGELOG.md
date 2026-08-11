@@ -1,5 +1,206 @@
 # Changelog
 
+## 2026-08-11 (later 6) - Shipping-tier campaign started; bulk enqueue now advances
+
+### The campaign ran, and the tier mechanism is proven
+
+Followed the documented sequence: one controlled item first, verified on eBay,
+then batches. **21 listings now carry the correct tier shipping.** Two
+independent confirmations on the live public listings:
+
+| Item | eBay price | eBay shipping |
+| --- | --- | --- |
+| Inv #29, bumble bee ring | $714.80 | **$35.00** |
+| Motorcycle pendant charm | $663.58 | **$35.00** |
+
+Both land in the $600–1,000 band, whose tier is $35 — matching
+`STANDARD_SHIPPING_TIERS` and policy `252701347026`. **This closes the "one
+controlled listing update remains open" item that had been open since
+2026-08-01**, for the single-item path AND the bulk path.
+
+The write-block held: the run reported "1 write-blocked item skipped" (#82).
+
+### The documented plan could not have finished — fixed
+
+`TASKS.md` said to "run Sync all to eBay once per batch". That cannot work.
+`enqueueProducts` took the first 25 of whatever it was passed, with no notion of
+which listings still needed the write:
+
+```js
+const allowed = notBlocked.filter((id) => available.has(id));
+const batch = allowed.slice(0, EBAY_BULK_ENQUEUE_LIMIT);
+```
+
+Running it twice with the same "select all" therefore re-queued the same items —
+measured: batch 2 re-pushed **21 of the same 23** and advanced nothing.
+`enqueueAllEligible` shared the flaw (it filters by preflight, then calls the
+same slice).
+
+Fixed by ORDERING rather than filtering: `orderEnqueueCandidates` sorts
+stale-first (0), then `error` (1), then `published` (2), and `enqueueProducts`
+slices the cap off that. Ordering matters — filtering out current rows would
+break the other use of this path, where an admin selects a few live items and
+deliberately force-re-pushes them; sorting keeps that working because nothing
+stale outranks them. `Array.prototype.sort` is stable, so caller order survives
+within each group. `error` sits mid-priority so two permanently-failing items
+cannot camp at the head of every run and burn two of the 25 slots forever.
+
+10 tests, including the exact regression (a backlog that must advance across
+repeated runs) and the force-re-push case. `tsc` clean, `lint` clean,
+**897/897**.
+
+### Two failures, eBay-side
+
+`vintage-tiffany-and-co-...-26` and `vintage-14k-yellow-gold-patriotic-eagle-pendant-31`
+both returned eBay **errorId 25604**, "Input error. Seller Inventory Service can
+not publish the data. Availability not found." Their rows are indistinguishable
+from the successes in our data — `available`, quantity 1, valid offer id,
+`last_pushed_qty: 1` — so this is a condition on those two inventory items on
+eBay's side, not our payload. Both are flagged `error` with 2 of 3 retries used;
+their listings are untouched and still live.
+
+### State at hand-off
+
+61 listings still `out_of_date` + available (60 writable, #82 blocked), 2 in
+`error`, 23 `published`. After this deploy the remaining 60 finish in three runs
+of the bulk sync, which will now actually advance.
+
+## 2026-08-11 (later 5) - In-app-browser stutter fixed sitewide
+
+Owner: Instagram's in-app browser hides/shows its toolbar on scroll, the viewport
+height changes, anything keyed to it relayouts, and the site stutters.
+
+Surveyed every viewport-height dependency in the app — CSS units and JS resize
+listeners — and fixed both halves. Either alone would have left the stutter:
+stable units do not stop JavaScript churning, and a guarded listener does not
+stop CSS resizing.
+
+**CSS — `dvh`/`vh` → `svh`** (`svh` is measured against fully-expanded chrome and
+does not move when the toolbar does):
+
+| Surface | Was |
+| --- | --- |
+| `.shop-filter-sidebar` (`/shop`) | `calc(100dvh - 7.5rem)` — **the worst one**: a sticky, scrollable panel resizing on every toolbar transition |
+| `.checkout-page` | `100vh` with no `svh` fallback |
+| account panel + modal, account security panel | `82vh`, `min(96vh, calc(100vh - 1rem))` |
+| `error.tsx`, `not-found.tsx`, `ContactForm` | `70vh`, `60vh`, `min(88vh, 48rem)` |
+
+`.site-loading-screen` already had the correct `vh`-then-`svh` fallback and was
+left alone. Nine admin modals on `max-h-[calc(100dvh-2rem)]` were moved to `svh`
+too — the distinction that matters is scrolling, not admin-vs-customer.
+
+**Two `h-dvh` usages deliberately kept:** `AdminShell`'s root shell and its
+fullscreen overlay. Both are `overflow-hidden` with internal scrolling, so the
+page never scrolls, the toolbar never auto-hides, and `dvh` fills the visible
+area exactly where `svh` would leave dead space at the bottom.
+
+Worth noting the codebase had already reached this conclusion once: the
+product-editor modal uses `h-svh` with a comment explaining that "dvh grows as
+soon as the toolbar auto-hides", which is the same reasoning arrived at
+independently here. This change generalises it rather than introducing it.
+
+**JS — new `lib/viewport-resize.ts`** (10 tests). `onLayoutAffectingResize` fires
+only on a width change or a height change beyond `VIEWPORT_CHROME_TOLERANCE_PX`
+(160px). Replaced all three bare `resize` listeners:
+
+- `HomeHeroStack` — dropped its cached travel and forced a synchronous
+  `offsetHeight` reflow on every toolbar transition, i.e. per scroll frame in an
+  in-app browser. Its geometry is entirely `svh`/`rem`-derived, so toolbar
+  movement could never legitimately change it.
+- `ShopProductGrid` — column count is a pure function of `innerWidth`.
+- `AdminShell` action menu — scroll already closes it; the resize was a second,
+  redundant close on every scroll.
+
+**One design detail worth keeping:** the guard anchors to the last size it ACTED
+on, not the last size it saw. Comparing against the last event absorbs toolbar
+oscillation but makes a slow drag-resize invisible — a hundred 10px steps are
+each under tolerance, so the baseline creeps and the 300px total never fires.
+Caught while writing it; both behaviours are pinned by tests.
+
+Verified in the browser: `.shop-filter-sidebar` now computes to exactly
+`innerHeight - 7.5rem` (1158px at 1278px tall) from the shipped rule
+`calc(-7.5rem + 100svh)`; zero `dvh` rules apply on customer pages; hero frame
+still exactly `innerHeight - header` (744 = 800 − 56) with travel 1920.
+
+`tsc` clean, `lint` clean, `npm test` **887/887** (was 877), clean build 449/449.
+
+## 2026-08-11 (later 4) - Marketplace flags split: content freshness vs price health
+
+Owner asked for the out-of-date flag to be driven by price-push failures. Raised
+that the two are structurally unrelated — `computeContentHash` covers title,
+description, aspects, condition, category, quantity, images and the three
+policies, while the price push sends only `sku`, quantity and `offers[].price`
+and never writes `content_hash`. A successful push cannot clear `out_of_date`.
+
+Concretely: 84 available eBay listings were flagged because the tier shipping
+policies entered the hash, and that same night's push succeeded on 56 of them
+with **zero** failures. The proposed rule would have shown all 84 as healthy
+while they still charged the old shipping on live listings. Owner chose the split
+instead.
+
+**What shipped:**
+
+- New `lib/marketplace-price-chip.ts` (client-safe, pure, 13 tests):
+  `resolvePriceChipState` → `none | failing | stalled`, and `resolvePriceChip`
+  returning label/tooltip/tones or **null**. It renders nothing on the happy
+  path — a permanent green chip across 131 rows costs attention without paying
+  it back, so the chip's presence is itself the signal. The tooltip names the
+  attempt budget and includes `last_error`.
+- `MAX_PRICE_PUSH_ATTEMPTS` moved there and is re-exported by `ebay/sync.ts` and
+  `etsy/sync.ts`, which are `server-only`. Both previously declared their own
+  `= 3`; the chip's "stalled" boundary must equal the boundary the planners skip
+  on, and a test pins that.
+- `AdminShell` renders `<MarketplacePriceChip>` in both marketplace cells. The
+  local listing-map type widened from `{ sync_state }` to include the price
+  counters — no API change, the routes already `select('*')`.
+- **"Out of date" → "Content stale"** in the table and both product-drawer
+  panels; the Check-Status dialog's Etsy entry aligned to eBay's existing "Live,
+  updates needed". The Instagram/Facebook `out_of_date` labels are untouched —
+  different concept.
+
+⚠️ **The new chip is invisible right now, correctly:** zero listings have
+`error_count > 0` on either marketplace, because every push this week succeeded.
+It will appear the first time one genuinely fails, which is the point.
+
+`tsc` clean, `lint` clean, `npm test` **877/877** (was 864), clean build
+**449/449**. Output spot check: "Price failed"/"Price stalled" in 23 files,
+"Content stale" in 9.
+
+## 2026-08-11 (later 3) - eBay sold-hidden repair executed
+
+The 38 sold listings stuck in `out_of_date` since the 2026-08-04 fix are
+repaired. It was never blocked by a deploy — `resolveFreshnessScanAction` had
+been live for a week; the scan simply had not run, because it only fires when
+`/api/admin/ebay/eligibility-summary` is loaded and nobody had loaded it.
+
+| | Before | After |
+| --- | --- | --- |
+| `hidden_oos` + sold | 0 | **36** |
+| `out_of_date` + sold | 38 | **2** |
+| `out_of_date` + available | 84 | 84 |
+| `published` + available | 2 | 2 |
+
+**How it was triggered, and why that route:** Admin → Products → Actions →
+*Publish all ready to eBay*, then Cancel. `EbayBulkPublishModal` fetches the
+eligibility summary from a mount `useEffect`, so opening it runs the scan
+server-side while publishing stays behind an explicit start button — which
+reported "0 listings in the Ready to publish state" and was disabled anyway. The
+bulk-SYNC modal would have reached the same endpoint but stages writes, so the
+publish modal is the safer handle for a pure freshness scan.
+
+**Confirmed no side effects:** zero `ebay_sync_log` entries in the 15 minutes
+after, and zero listings with `error_count > 0`. The repair is a local
+`sync_state` correction and touched nothing on eBay.
+
+The 2 rows left as `out_of_date` + sold are correct — they lack
+`last_pushed_qty === 0`, the marker `hideListingQuantityZero()` writes and the
+scan never touches, which is what distinguishes a mis-flagged row from a
+just-sold row whose auto-hide has not run yet.
+
+Also confirmed while checking deploy state: Netlify's published deploy is
+`main@a80e0f8`, and a newer `main@78af2ed` ("stage") shows **Canceled** — so
+`main` can sit ahead of production. Check for Published, do not assume.
+
 ## 2026-08-11 (later 2) - Announcement bar becomes the free-evaluation promo
 
 Owner: advertise the free-evaluation promotion, this month only, and link it to
@@ -305,6 +506,7 @@ there are **zero** `hidden_oos` rows. `repair-hidden` only runs when the
 eligibility-summary endpoint loads, i.e. when someone opens the eBay bulk-sync
 modal — which nobody has since the fix deployed. Available listings are 84
 `out_of_date` + 2 `published` = 86, matching the campaign figure in TASKS.
+*(Resolved later the same day — see 2026-08-11 (later 3).)*
 
 The 2026-08-08 eBay price-push fix **is** live and working: all 139 failures
 date from one pre-fix run (08-08 17:09–17:14 UTC, all `detail: null`, all

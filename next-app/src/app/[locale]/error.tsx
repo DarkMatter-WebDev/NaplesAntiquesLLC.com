@@ -21,7 +21,7 @@ export default function Error({
   return (
     <main
       style={{
-        minHeight: '70vh',
+        minHeight: '70svh',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',

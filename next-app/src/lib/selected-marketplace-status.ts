@@ -23,7 +23,9 @@ const STATUS_LABELS: Record<Marketplace, Record<string, string>> = {
     inventory_synced: 'Draft',
     draft_review: 'Draft, needs review',
     active: 'Live',
-    out_of_date: 'Out of date',
+    // Matches the eBay entry below and the product table: the listing IS live,
+    // it is the local CONTENT that has moved on. Never a price-push signal.
+    out_of_date: 'Live, updates needed',
     delisted: 'Inactive',
     error: 'Needs attention',
   },

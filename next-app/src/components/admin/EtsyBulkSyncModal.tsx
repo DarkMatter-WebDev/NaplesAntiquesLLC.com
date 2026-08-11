@@ -151,7 +151,7 @@ export default function EtsyBulkSyncModal({ onClose, productIds }: { onClose: (c
 
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto whitespace-normal p-4 sm:items-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
-      <div className="min-w-0 w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto border bg-white p-5 flex flex-col gap-4 [overflow-wrap:anywhere]" style={{ borderColor: 'var(--color-outline-variant)' }}>
+      <div className="min-w-0 w-full max-w-md max-h-[calc(100svh-2rem)] overflow-y-auto border bg-white p-5 flex flex-col gap-4 [overflow-wrap:anywhere]" style={{ borderColor: 'var(--color-outline-variant)' }}>
         <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
           {selectedRun ? `Sync ${selectedCount} selected to Etsy` : 'Sync all to Etsy'}
         </h3>

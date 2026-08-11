@@ -4,6 +4,23 @@
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
 > in `DECISIONS.md`. Last reconciled: **2026-08-10**.
 
+## Deploy baseline
+
+**Production is `main@aeb03cc`** (published 2026-08-10 23:49). Verified live on
+that deploy: the promo banner reads "Free evaluations · This month only" and
+links to `/free-evaluation`; the old service copy is gone.
+
+⚠️ Note `main@78af2ed` ("stage") shows **Canceled** in the deploy list — it was
+superseded by `aeb03cc`, not lost. But it is a reminder: check a deploy reaches
+**Published**, never assume it did.
+
+**Undeployed at the end of this session** (both verified locally, gate green):
+
+1. **Marketplace flag split** — the product table's state chip relabelled
+   "Content stale", plus a separate price chip. See CHANGELOG *(later 4)*.
+2. **In-app-browser stutter fix** — `svh` everywhere customer-facing, and every
+   `resize` listener guarded. See CHANGELOG *(later 5)*.
+
 ## 🟢 Scheduled jobs now RUN — via GitHub Actions (cut over 2026-08-11)
 
 **The automation works for the first time in this project's history.** The
@@ -402,6 +419,16 @@ no failing check, and no pending SQL** — the session's one migration
   method → contact → address) and a sticky Order summary on the right holding
   items, totals, and the PayPal buttons, with a **Back to cart** link that
   reopens the cart drawer.
+- **In-app-browser stutter is fixed sitewide (2026-08-11, undeployed).**
+  Instagram/Facebook embedded browsers hide their toolbar on scroll, changing the
+  viewport height. All customer-facing viewport-height CSS now uses `svh` (stable
+  against that) instead of `vh`/`dvh` — the worst was `/shop`'s sticky filter
+  sidebar on `dvh` — and every `resize` listener goes through
+  `onLayoutAffectingResize` (`lib/viewport-resize.ts`), which ignores height-only
+  changes under 160px. See DECISIONS, *"Viewport height is `svh`, and `resize` is
+  never listened to bare"*. 📱 Worth confirming on a real phone inside the
+  Instagram browser — that is the one environment this cannot be reproduced in
+  locally.
 - The fixed site header is fully opaque (`#f9f9f7`, no backdrop blur; the mobile
   menu panel likewise), and its height comes from one token,
   `--site-header-height` — 3.5rem on phones, 4.5rem from md up. The header is
@@ -463,6 +490,14 @@ no failing check, and no pending SQL** — the session's one migration
 
 ## Marketplace Integrations
 
+- **The product table carries TWO chips per marketplace (2026-08-11, undeployed):**
+  the state chip, relabelled **"Content stale"** (was "Out of date"), and a
+  separate **price chip** ("Price failed" / "Price stalled") that appears only
+  when `error_count > 0`. They measure different things and must not be
+  conflated — a successful price push cannot clear content drift, because the
+  push never writes `content_hash`. See DECISIONS, *"Content freshness and
+  price-push health are two separate signals"*. The price chip is invisible today
+  because no listing has a failure, which is correct.
 - Etsy and eBay are independent, review-first one-way sales channels. Both have
   connection/settings, previews, per-item and bulk sync, status reconciliation,
   delist/relist behavior, price freshness, shipping policy/profile selection,
@@ -509,8 +544,11 @@ no failing check, and no pending SQL** — the session's one migration
 - eBay inventory #82 remains write-blocked pending deliberate reattachment to
   its external relist — now enforced in code by a pinned id
   (`EBAY_WRITE_BLOCKED_PRODUCT_IDS`) rather than inferred from a `last_error`
-  string that any later write could clear. The sold-hidden freshness bug and
-  remaining controlled marketplace checks are tracked in `TASKS.md`.
+  string that any later write could clear. ✅ **The sold-hidden freshness bug is
+  CLOSED — the repair ran 2026-08-11**, moving 36 mis-flagged rows
+  `out_of_date` → `hidden_oos` with no eBay writes; 2 remain by design (no
+  `last_pushed_qty = 0` marker). Remaining controlled marketplace checks are
+  tracked in `TASKS.md`.
 - **eBay listings are flagged `out_of_date` because the new tier fulfillment
   policies are part of the content hash.** The count read 123, which was wrong:
   the freshness scan was also hashing `hidden_oos` rows, so 36 sold-and-hidden

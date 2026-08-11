@@ -82,6 +82,8 @@ import {
   translatedSpanishTargets,
 } from '@/lib/admin-spanish-copy';
 import { AppIcon } from '@/components/AppIcon';
+import { resolvePriceChip, type PriceChipInput } from '@/lib/marketplace-price-chip';
+import { onLayoutAffectingResize } from '@/lib/viewport-resize';
 
 // Quick Fill is removed from the editor UI for now. The parser and panel still
 // live in this file behind the flag so it can be restored without a backup copy.
@@ -794,6 +796,10 @@ const PRODUCT_TABLE_FROZEN_LEFT_CLASSES: Record<string, string> = {
   Title: 'left-[170px] max-md:left-[154px]',
 };
 
+// "Out of date" read as a fault and got confused with price-push health, which
+// it has nothing to do with (see lib/marketplace-price-chip.ts). "Content stale"
+// says what actually drifted — title/description/policies/images — and sits next
+// to the separate price chip without either being mistaken for the other.
 const ETSY_CHIP_LABELS: Record<string, string> = {
   pending: 'Not listed',
   draft_created: 'Draft',
@@ -801,7 +807,7 @@ const ETSY_CHIP_LABELS: Record<string, string> = {
   inventory_synced: 'Draft',
   draft_review: 'Needs review',
   active: 'Active',
-  out_of_date: 'Out of date',
+  out_of_date: 'Content stale',
   delisted: 'Delisted',
   error: 'Error',
 };
@@ -819,11 +825,40 @@ const EBAY_CHIP_LABELS: Record<string, string> = {
   offer_created: 'Preparing…',
   review: 'Ready to publish',
   published: 'Live',
-  out_of_date: 'Out of date',
+  out_of_date: 'Content stale',
   hidden_oos: 'Hidden (sold)',
   ended: 'Ended',
   error: 'Error',
 };
+
+/**
+ * What the product table needs from an `etsy_listings` / `ebay_listings` row:
+ * the state for the freshness chip, plus the price-push counters for the chip
+ * beside it. Both providers' rows are structurally compatible.
+ */
+type MarketplaceChipRow = PriceChipInput & { sync_state: string };
+
+/**
+ * Second, independent chip: did the money actually move?
+ *
+ * Renders NOTHING on the happy path — see resolvePriceChip. The marketplace
+ * columns already carry a status chip per row across 131 rows, and a permanent
+ * green "priced OK" would spend attention without earning it. A price chip being
+ * present at all is the signal.
+ */
+function MarketplacePriceChip({ listing }: { listing: PriceChipInput | undefined }) {
+  const chip = resolvePriceChip(listing);
+  if (!chip) return null;
+  return (
+    <span
+      className="mt-1 inline-flex text-[0.6rem] font-bold uppercase tracking-widest px-2 py-0.5"
+      style={{ background: chip.bg, color: chip.fg }}
+      title={chip.tooltip}
+    >
+      {chip.label}
+    </span>
+  );
+}
 
 function ebayChipTone(state: string | undefined): { bg: string; fg: string } {
   if (state === 'error') return { bg: 'color-mix(in srgb, var(--color-error) 14%, transparent)', fg: 'var(--color-error)' };
@@ -1226,10 +1261,13 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     if (!actionMenuId) return;
     const close = () => { closeActionMenu(); };
     window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
+    // Guarded so an in-app browser's toolbar sliding away does not count as a
+    // resize. Scrolling already closes the menu via the listener above; without
+    // this, the height change would close it a second time on every scroll.
+    const stopResize = onLayoutAffectingResize(close);
     return () => {
       window.removeEventListener('scroll', close, true);
-      window.removeEventListener('resize', close);
+      stopResize();
     };
   }, [actionMenuId, closeActionMenu]);
 
@@ -1311,7 +1349,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   // Bulk map for the product table's per-row Etsy status chip — best-effort,
   // fetched once on mount; an empty map (pre-migration or not-yet-synced) just
   // renders every row as "Not listed".
-  const [etsyListingsByProduct, setEtsyListingsByProduct] = useState<Record<string, { sync_state: string }>>({});
+  // `error_count`/`last_error` feed the separate price chip. The route already
+  // returns the whole row (`select('*')`), so this only widens the local type —
+  // no API change.
+  const [etsyListingsByProduct, setEtsyListingsByProduct] = useState<Record<string, MarketplaceChipRow>>({});
   const [showEtsyBulkModal, setShowEtsyBulkModal] = useState(false);
   const [showEtsyPublishModal, setShowEtsyPublishModal] = useState(false);
   const [showEtsyRepairModal, setShowEtsyRepairModal] = useState(false);
@@ -1339,7 +1380,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   }, [refreshEtsyChips]);
   // eBay twin of the Etsy chip map above — same one-fetch-for-the-whole-table
   // pattern (never one call per row).
-  const [ebayListingsByProduct, setEbayListingsByProduct] = useState<Record<string, { sync_state: string }>>({});
+  const [ebayListingsByProduct, setEbayListingsByProduct] = useState<Record<string, MarketplaceChipRow>>({});
   const [showEbayBulkModal, setShowEbayBulkModal] = useState(false);
   const [showEbayPublishModal, setShowEbayPublishModal] = useState(false);
   const refreshEbayChips = useCallback(async () => {
@@ -4752,6 +4793,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                       >
                         {ETSY_CHIP_LABELS[etsyListingsByProduct[p.id]?.sync_state ?? 'pending'] ?? 'Not listed'}
                       </span>
+                      <MarketplacePriceChip listing={etsyListingsByProduct[p.id]} />
                     </td>
                     <td className="px-2 py-3 whitespace-nowrap">
                       <span
@@ -4760,6 +4802,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                       >
                         {EBAY_CHIP_LABELS[ebayListingsByProduct[p.id]?.sync_state ?? 'pending'] ?? 'Not listed'}
                       </span>
+                      <MarketplacePriceChip listing={ebayListingsByProduct[p.id]} />
                     </td>
                     <td className={`sticky right-0 px-1 max-md:px-0 py-3 w-[44px] min-w-[44px] max-w-[44px] max-md:w-[28px] max-md:min-w-[28px] max-md:max-w-[28px] ${actionMenuId === p.id ? 'z-30' : 'z-10'}`} style={{ background: dragTargetProductId === p.id ? 'color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-container-lowest))' : 'var(--color-surface-container-lowest)' }}>
                       <div className="relative flex justify-end">

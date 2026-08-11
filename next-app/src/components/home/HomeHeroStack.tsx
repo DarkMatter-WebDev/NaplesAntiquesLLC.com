@@ -39,6 +39,7 @@ import {
 } from '../../../carousel/lib/carouselData';
 import { DEFAULT_BG } from '../../../carousel/lib/carouselConfig';
 import { nextHeroSnapPoint, resolveHeroSnapPoints } from '@/lib/home-hero-snap';
+import { onLayoutAffectingResize } from '@/lib/viewport-resize';
 
 type Props = {
   locale: string;
@@ -698,7 +699,13 @@ export default function HomeHeroStack({
 
     apply();
     window.addEventListener('scroll', schedule, { passive: true });
-    window.addEventListener('resize', remeasure);
+    // NOT a bare resize listener. In Instagram's/Facebook's in-app browsers the
+    // toolbar hides and shows on scroll, firing resize continuously — which
+    // would drop the cached travel and force a synchronous re-measure
+    // (offsetHeight) on every frame of an ordinary scroll. The geometry here is
+    // entirely svh- and rem-derived, so toolbar movement genuinely cannot change
+    // it; only a width change or a large height change can.
+    const stopResize = onLayoutAffectingResize(remeasure);
     reduceMotion.addEventListener('change', remeasure);
     // Only the curve changes here, not the geometry, so a repaint is enough —
     // but going through `schedule` keeps every write on the same rAF path
@@ -707,7 +714,7 @@ export default function HomeHeroStack({
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('scroll', schedule);
-      window.removeEventListener('resize', remeasure);
+      stopResize();
       reduceMotion.removeEventListener('change', remeasure);
       coarsePointer.removeEventListener('change', schedule);
     };

@@ -63,7 +63,7 @@ export default function DeleteUserButton({ userId, userName, userEmail, isAdmin 
           style={{ background: 'rgba(0,0,0,0.45)' }}
           onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
         >
-          <div className="min-w-0 w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl [overflow-wrap:anywhere] sm:p-6">
+          <div className="min-w-0 w-full max-w-md max-h-[calc(100svh-2rem)] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl [overflow-wrap:anywhere] sm:p-6">
             {/* Icon */}
             <div
               className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full"

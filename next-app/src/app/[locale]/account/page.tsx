@@ -205,7 +205,7 @@ export default async function AccountPage({ params }: Props) {
           top: 0;
           right: 0;
           left: 0;
-          height: min(42rem, 82vh);
+          height: min(42rem, 82svh);
           pointer-events: none;
           z-index: 0;
           background:
@@ -444,7 +444,7 @@ export default async function AccountPage({ params }: Props) {
         .account-order-dialog {
           position: relative;
           width: min(72rem, calc(100vw - 4rem));
-          max-height: min(96vh, calc(100vh - 1rem));
+          max-height: min(96svh, calc(100svh - 1rem));
           overflow: auto;
           padding: 4.25rem 2.5rem 2.5rem;
           border: 1px solid rgba(115, 92, 0, 0.16);

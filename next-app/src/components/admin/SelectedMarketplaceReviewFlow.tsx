@@ -300,7 +300,7 @@ export default function SelectedMarketplaceReviewFlow({ marketplace, productIds,
       aria-labelledby="selected-review-title"
     >
       <div
-        className="flex min-w-0 w-full max-w-2xl max-h-[calc(100dvh-2rem)] flex-col overflow-hidden border shadow-2xl [overflow-wrap:anywhere]"
+        className="flex min-w-0 w-full max-w-2xl max-h-[calc(100svh-2rem)] flex-col overflow-hidden border shadow-2xl [overflow-wrap:anywhere]"
         style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-background)' }}
       >
         <div className="flex items-start justify-between gap-4 border-b p-5 md:p-6" style={{ borderColor: 'var(--color-outline-variant)' }}>

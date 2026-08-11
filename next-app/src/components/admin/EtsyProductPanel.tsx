@@ -70,7 +70,8 @@ const STATE_LABELS: Record<string, string> = {
   inventory_synced: 'Draft on Etsy',
   draft_review: 'Draft on Etsy — needs review',
   active: 'Active on Etsy',
-  out_of_date: 'Out of date on Etsy',
+  // Matches the product table's wording — this is content drift, never price.
+  out_of_date: 'Content stale on Etsy',
   delisted: 'Delisted',
   error: 'Error',
 };

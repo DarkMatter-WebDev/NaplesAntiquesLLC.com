@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import ProductCard from '@/components/shop/ProductCard';
 import ProductListRow from '@/components/shop/ProductListRow';
 import type { Product, SpotData } from '@/types/product';
+import { onLayoutAffectingResize } from '@/lib/viewport-resize';
 
 interface Props {
   products: Product[];
@@ -36,8 +37,11 @@ export default function ShopProductGrid({ products, spotData, locale, hideSoldIt
     };
 
     updateColumnCount();
-    window.addEventListener('resize', updateColumnCount);
-    return () => window.removeEventListener('resize', updateColumnCount);
+    // Column count is a pure function of innerWidth, so the in-app-browser
+    // toolbar sliding in and out (height-only, fires resize constantly while
+    // scrolling) can never change it. Guarding keeps this handler off the
+    // scroll path entirely instead of re-running it every frame.
+    return onLayoutAffectingResize(updateColumnCount);
   }, []);
 
   if (view === 'list') {
