@@ -81,6 +81,8 @@ export type CreatePayPalOrderInput = {
   subtotal: number;
   tax: number;
   shipping: number;
+  /** Discount code amount off merchandise. Omit or 0 when none applies. */
+  discount?: number;
   total: number;
   items: PayPalLineItem[];
   /** Our internal order reference, echoed back on the PayPal order. */
@@ -116,11 +118,11 @@ export function payPalCreateRequestId(input: CreatePayPalOrderInput): string {
 export function buildPayPalOrderRequest(input: CreatePayPalOrderInput): Record<string, unknown> {
   const currency = input.currency;
 
-  // PayPal requires item_total + tax_total + shipping to equal amount.value, and
-  // the sum of (unit_amount * quantity) to equal item_total — all as 2-decimal
-  // values. We round every component to cents first and derive value FROM those
-  // rounded parts, so the breakdown always reconciles exactly (independent
-  // rounding of an unrounded total is what triggers PayPal's 422).
+  // PayPal requires item_total + tax_total + shipping - discount to equal
+  // amount.value, and the sum of (unit_amount * quantity) to equal item_total —
+  // all as 2-decimal values. We round every component to cents first and derive
+  // value FROM those rounded parts, so the breakdown always reconciles exactly
+  // (independent rounding of an unrounded total is what triggers PayPal's 422).
   const lineItems = input.items.map((item) => ({
     name: item.name.slice(0, 127),
     quantity: Math.max(1, Math.round(Number(item.quantity || '1'))),
@@ -130,16 +132,27 @@ export function buildPayPalOrderRequest(input: CreatePayPalOrderInput): Record<s
   const itemTotal = round2(lineItems.reduce((sum, item) => sum + item.unit * item.quantity, 0));
   const taxTotal = round2(input.tax);
   const shippingTotal = round2(input.shipping);
-  const value = round2(itemTotal + taxTotal + shippingTotal);
+  // Clamp to the item total: PayPal rejects a discount larger than item_total,
+  // and a negative one outright.
+  const discountTotal = Math.min(Math.max(round2(input.discount ?? 0), 0), itemTotal);
+  const value = round2(itemTotal + taxTotal + shippingTotal - discountTotal);
+
+  const breakdown: Record<string, unknown> = {
+    item_total: { currency_code: currency, value: money(itemTotal) },
+    tax_total: { currency_code: currency, value: money(taxTotal) },
+    shipping: { currency_code: currency, value: money(shippingTotal) },
+  };
+  // Only send the key when there is a discount. An always-present "0.00"
+  // changes the request hash used for payPalCreateRequestId, which would
+  // invalidate the idempotency key of every existing undiscounted order.
+  if (discountTotal > 0) {
+    breakdown.discount = { currency_code: currency, value: money(discountTotal) };
+  }
 
   const amount: Record<string, unknown> = {
     currency_code: currency,
     value: money(value),
-    breakdown: {
-      item_total: { currency_code: currency, value: money(itemTotal) },
-      tax_total: { currency_code: currency, value: money(taxTotal) },
-      shipping: { currency_code: currency, value: money(shippingTotal) },
-    },
+    breakdown,
   };
   const purchaseUnit: Record<string, unknown> = {
     reference_id: input.referenceId,

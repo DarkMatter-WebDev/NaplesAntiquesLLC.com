@@ -24,8 +24,30 @@ function captureIdFromLinks(resource: PayPalResource): string | null {
   return null;
 }
 
+/**
+ * `PAYMENT.CAPTURE.*` events whose `resource` is a REFUND, not the capture.
+ *
+ * This distinction is the whole reason this set exists. Most PAYMENT.CAPTURE.*
+ * events (COMPLETED, DENIED, DECLINED, PENDING) deliver the capture itself, so
+ * `resource.id` IS the capture id. REFUNDED and REVERSED instead deliver a
+ * Refund object, whose `id` is the REFUND id — reading it as a capture id sends
+ * a refund id into `apply_paypal_refund`, which then correctly refuses the
+ * write with "PayPal capture % does not match order %" and the refund never
+ * gets recorded.
+ *
+ * Found 2026-08-12 by the first live refund this system had ever processed:
+ * PayPal completed it, the order stayed `paid` with a null refund_amount, and
+ * the webhook row landed as `status = 'error'`. The correct capture id was in
+ * the payload the whole time, under `links[rel="up"]` — the fall-through below
+ * already parses it, but the early return fired first and never let it.
+ */
+const REFUND_SHAPED_CAPTURE_EVENTS = new Set([
+  'PAYMENT.CAPTURE.REFUNDED',
+  'PAYMENT.CAPTURE.REVERSED',
+]);
+
 export function relatedPayPalCaptureId(eventType: string, resource: PayPalResource): string | null {
-  if (eventType.startsWith('PAYMENT.CAPTURE.')) {
+  if (eventType.startsWith('PAYMENT.CAPTURE.') && !REFUND_SHAPED_CAPTURE_EVENTS.has(eventType)) {
     return nonEmptyString(resource.id);
   }
 

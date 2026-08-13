@@ -1,4 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+// TYPE-ONLY on purpose. discount-codes.ts imports calculateDiscountAmount from
+// this file at runtime; a runtime import back would be a module cycle. `import
+// type` is erased at emit, so this stays one-directional.
+import type { AppliedDiscount, DiscountValidationResult } from '@/lib/discount-codes';
 import type { Product } from '@/types/product';
 import { isProductPurchasable, normalizeProductQuantity } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
@@ -29,6 +33,32 @@ export function chargesFlSalesTax(
 /** Round to whole cents. Used so order amounts and the PayPal breakdown agree. */
 export function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+/**
+ * THE discount calculation, for both code types. Resolves to a dollar amount
+ * rounded to cents and CLAMPED to the merchandise subtotal.
+ *
+ * The clamp is load-bearing, not defensive tidiness: a $100 fixed code against
+ * an $80 order must take $80, never $100. Without it the order carries a
+ * negative merchandise total, which breaks the $0/negative rejection rule
+ * (CODE-D01) below and produces a PayPal breakdown that cannot sum.
+ *
+ * Applies to MERCHANDISE ONLY — shipping and tax are computed after it, and the
+ * shipping tier keys off the PRE-discount subtotal (the insured value of what is
+ * actually in the box does not change because the buyer paid less for it).
+ *
+ * Lives here rather than in discount-codes.ts so that module can import it
+ * alongside round2 without creating an import cycle; it is re-exported there.
+ */
+export function calculateDiscountAmount(
+  type: 'percent' | 'fixed',
+  value: number,
+  subtotal: number,
+): number {
+  if (!(subtotal > 0) || !(value > 0)) return 0;
+  const raw = type === 'percent' ? (subtotal * value) / 100 : value;
+  return round2(Math.min(Math.max(raw, 0), subtotal));
 }
 
 /** Owner policy: Florida tax applies to taxable merchandise plus charged shipping. */
@@ -114,10 +144,22 @@ export function normalizeOrderLines(input: string[] | OrderLine[]): OrderLine[] 
 export type OrderDraft = {
   items: CheckoutOrderItem[];
   subtotal: number;
+  /** Dollars taken off merchandise. 0 when no code was applied. */
+  discount: number;
+  /** Which code produced `discount`, for the order snapshot. */
+  appliedDiscount: AppliedDiscount | null;
   tax: number;
   shippingFee: number;
   total: number;
 };
+
+/**
+ * Resolves a discount against the authoritative subtotal. Supplied by the
+ * caller (the route) rather than looked up here, because the discount_codes
+ * table is admin-only and needs the service client, while this function is
+ * given the request-scoped client. Returning null means "no code was offered".
+ */
+export type DiscountResolver = (subtotal: number) => Promise<DiscountValidationResult | null>;
 
 /**
  * Machine-readable reason for a rejected order draft. The client maps these to
@@ -129,7 +171,12 @@ export type OrderDraftErrorCode =
   | 'unavailable'
   | 'express_unavailable'
   | 'spot_unavailable'
-  | 'call_to_purchase';
+  | 'call_to_purchase'
+  // The buyer applied a discount code that is no longer usable by the time they
+  // paid (deactivated, expired, or its redemption cap filled while they shopped).
+  // Rejecting is deliberate: silently charging full price would surprise someone
+  // who is looking at a discounted total on screen.
+  | 'discount_invalid';
 
 export type OrderDraftError = { error: string; status: number; code?: OrderDraftErrorCode };
 
@@ -147,6 +194,7 @@ export async function buildOrderDraft(
   lines: string[] | OrderLine[],
   shippingMethod: string,
   shippingState?: string | null,
+  resolveDiscount?: DiscountResolver | null,
 ): Promise<OrderDraft | OrderDraftError> {
   const orderLines = normalizeOrderLines(lines);
   if (orderLines.length === 0) {
@@ -284,10 +332,32 @@ export async function buildOrderDraft(
     };
   }
 
-  const tax = chargesFlSalesTax(shippingMethod, shippingState)
-    ? calculateFlSalesTax(subtotal, shippingFee)
-    : 0;
-  const total = round2(subtotal + tax + shippingFee);
+  // Discount resolves AFTER the shipping fee deliberately. The tier and the
+  // $5,000 Express cutoff key off the PRE-discount subtotal, because they price
+  // insurance on the value of the goods in the box — which a discount does not
+  // change. Moving this above getCheckoutShippingFee would let a code drop an
+  // order under the cutoff and ship over-value goods on the cheaper service.
+  const discountResult = resolveDiscount ? await resolveDiscount(subtotal) : null;
+  if (discountResult && !discountResult.ok) {
+    return {
+      error: 'The discount code on this order is no longer valid. Please remove it and try again.',
+      status: 409,
+      code: 'discount_invalid',
+    };
+  }
+  const appliedDiscount = discountResult?.ok ? discountResult.discount : null;
+  const discount = appliedDiscount?.amount ?? 0;
 
-  return { items, subtotal, tax, shippingFee, total };
+  // Merchandise-only base. calculateDiscountAmount already clamped the discount
+  // to the subtotal, so this can never go negative.
+  const discountedMerchandise = round2(subtotal - discount);
+
+  // Florida taxes the DISCOUNTED merchandise plus charged shipping — a discount
+  // reduces the taxable base, which is the standard treatment.
+  const tax = chargesFlSalesTax(shippingMethod, shippingState)
+    ? calculateFlSalesTax(discountedMerchandise, shippingFee)
+    : 0;
+  const total = round2(discountedMerchandise + tax + shippingFee);
+
+  return { items, subtotal, discount, appliedDiscount, tax, shippingFee, total };
 }

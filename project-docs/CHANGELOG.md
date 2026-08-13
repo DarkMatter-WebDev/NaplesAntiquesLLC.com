@@ -1,4 +1,393 @@
+
 # Changelog
+
+## 2026-08-13 (later) - Pre-deploy PayPal audit: the four "refunded" orders explained
+
+Read-only audit before deploying, prompted by four orders sitting at
+`payment_status = 'refunded'` with `refund_amount = null` and zero
+`paypal_refunds` rows. Every one is a pre-go-live test artifact; **no customer
+money is involved and nothing was owed.**
+
+| Order | Amount | Environment | PayPal says |
+| --- | --- | --- | --- |
+| `NEJ-20260703-XBFR0` | $5,646.90 | **SANDBOX** | capture + order both 404 on live |
+| `NEJ-20260709-6EZ4X` | $37.10 | **SANDBOX** | capture + order both 404 on live |
+| `NEJ-20260705-SPWIC` | $1.06 | LIVE | `COMPLETED`, never refunded |
+| `NEJ-20260709-DLNY0` | $1.06 | LIVE | `COMPLETED`, never refunded |
+
+The two sandbox rows are fictional money in the live orders table — they skew
+any revenue view. The two live rows are the reverse and more interesting: the
+database claims a refund that PayPal never performed. $2.12 total, both on the
+owner's own test addresses. **Owner is deleting all four manually.**
+
+The dates explain it: PayPal went live 2026-07-09 after the credential-mismatch
+blocker, so early-July orders straddle both environments.
+
+**Also confirmed in the same pass — no real refund was ever lost.** The refund
+bug fixed on 2026-08-12 had been live for the whole life of the webhook handler,
+but no refund-type webhook has EVER been received on a real order, so there is
+nothing to repair by hand.
+
+**One errored webhook investigated and cleared:** `NEJ-20260812-P3YI5` ($114,
+a real customer) has an errored `PAYMENT.CAPTURE.COMPLETED`. Harmless — the
+receipt sent at 00:09:44 and it shipped at 02:58; the webhook fired at 00:09:47,
+three seconds after the browser path had already finalized the order. The
+webhook is a backstop that arrived late and found nothing to do.
+
+⚠️ **A method note that cost a false alarm:** an earlier version of the audit
+reported "no invoice" on all 13 paid orders. The `invoices` table returns
+`permission denied` (42501) for that key and the script swallowed the error as
+an empty result. **An absence check that cannot read its source reports the same
+thing as a clean result** — the same lesson as the 2026-08-09 `Select-String`
+incident. Run a positive control.
+
+## 2026-08-13 - Staging folder rebuilt for deploy
+
+`C:\Users\rcman\NEJ-repo-staging` rebuilt from the source of truth: **835 files
+/ 19.0 MB**, 27 files updated (9 new, 18 modified) since the 2026-08-11 build.
+
+Verified as an **exact mirror** — a two-way inventory diff between source and
+staging (applying the same exclusions) returned 0 missing and 0 extra. Per-area
+counts match: 504 `next-app/src`, 175 `next-app/public`, 27 `project-docs`, 73
+`supabase`, 1 `.github`. Leak check clean across nine categories. Hidden paths
+survived the copy (`.github/workflows/`, `.gitignore`, `.claude/`), which is the
+failure mode that has bitten this project before.
+
+The `/MIR` dry run reported **0 Extras**, so nothing in the destination was
+deleted — worth checking on every rebuild, since `/MIR` is the one flag here
+that can remove files.
+
+⚠️ **Verifying a path containing `[locale]` needs `Test-Path -LiteralPath`.**
+PowerShell treats `[...]` as a wildcard character class, so a plain `Test-Path`
+reported `app/[locale]/admin/discount-codes/page.tsx` as MISSING while the file
+was present and byte-correct. A false alarm that is easy to act on by mistake.
+
+## 2026-08-12 - Discount codes verified against a real purchase; button font bug found
+
+**The live end-to-end test passed.** A real $42.39 PayPal purchase (order
+`NEJ-20260812-RXV9C`, capture `5DH54631BL586554F`) on a temporary $49.99 test
+listing with a 20% code. 18 of 18 checks passed:
+
+| | |
+| --- | --- |
+| subtotal | $49.99 (pre-discount) |
+| discount | $10.00 (49.99 x 20% = 9.998, rounded) |
+| tax | **$2.40 — 6% of the DISCOUNTED $39.99**, not of $49.99 |
+| total | $42.39 |
+
+Also confirmed: PayPal accepted the `discount` breakdown key (no 422), all three
+`orders` snapshot columns stored, `times_used` incremented to exactly 1 inside
+`capture_paypal_order`, one redemption row written with a lowercased email, the
+product flipped to `sold` with quantity 0, and the spent code then refused with
+`reason: "exhausted"`. **This closes the one thing that could not be tested
+without a real capture — the atomic redemption.**
+
+The PayPal breakdown was proven first by creating an order WITHOUT capturing it
+(creating charges nothing), so the 422 risk was retired before any money moved.
+A test-order row from that dry run was inspected and deleted.
+
+### 🔴 Every PayPal refund silently failed to record — FIXED
+
+The test refund exposed a production bug in a path that had never run live.
+PayPal completed the $42.39 refund (fee $0.00, full amount returned), and the
+database recorded **nothing**: order still `paid`, `refund_amount` null,
+`paypal_refunds` empty, webhook row `status = 'error'`.
+
+`relatedPayPalCaptureId` returned `resource.id` for all `PAYMENT.CAPTURE.*`
+events. Correct for COMPLETED/DENIED/DECLINED/PENDING; **wrong for REFUNDED and
+REVERSED**, whose resource is a Refund object — so the refund id
+`9BE63976RW9553018` was passed as `p_capture_id` instead of the capture
+`5DH54631BL586554F`, and `apply_paypal_refund` correctly refused the write. The
+guard behaved properly; it was fed bad input.
+
+The right capture id was in the payload the whole time under `links[rel="up"]`,
+and `captureIdFromLinks` already parsed it — the early return just never let
+execution reach it.
+
+Fixed with `REFUND_SHAPED_CAPTURE_EVENTS`. Replaying the stored event through
+the corrected logic moved the order `paid / null` → **`refunded / $42.39`**,
+wrote the ledger row with the real capture id, and cleared the errored webhook.
+
+⚠️ **The unit test had asserted the bug**, pinning a REFUNDED resource id to be
+the capture id — which is why a green suite proved nothing here. Replaced with
+two regression tests built from the REAL payload, plus coverage that
+supplementary related ids outrank links. See DECISIONS, *"A PayPal
+`PAYMENT.CAPTURE.REFUNDED` resource is a REFUND, not a capture"*.
+
+### Partial refunds verified LIVE (2026-08-13)
+
+Two real partial refunds on a $1.06 test purchase (order `NEJ-20260813-JIF1F`,
+capture `90E8507987058531C`), run entirely from development — the refund objects
+were read straight from PayPal's API with the local credentials, so production's
+undeployed webhook fix was never needed.
+
+| Stage | PayPal capture | Order |
+| --- | --- | --- |
+| after $0.50 refund | `PARTIALLY_REFUNDED` | `partially_refunded`, $0.50 of $1.06, order_status still `completed` |
+| after $0.56 refund | `REFUNDED` | `refunded`, $1.06 of $1.06, order_status `refunded` |
+
+**The cumulative assumption is now PROVEN, not inferred.** Re-fetching the FIRST
+refund object after the second refund showed `amount = $0.50` but
+`total_refunded_amount = $1.06`. Had it been per-refund, every partial after the
+first would have under-applied. Also confirmed live: refund `status` is
+`COMPLETED` (not `REFUNDED`), `resource.id` is the refund id, and
+`links[rel="up"]` carries the capture — the three facts the fix reads.
+
+Net cost $0.00 — both refunds returned in full with $0.00 PayPal fee.
+
+**Two artifacts of the verification script, both worth recording:**
+
+1. Its first run pulled candidate refund ids from `webhook_events`, which spans
+   every order ever refunded, and dragged in the previous day's $42.39 refund
+   from a different capture. `apply_paypal_refund` **correctly rejected it**
+   ("capture 5DH54631BL586554F does not match order") — the guard working, not
+   failing. Fixed by filtering candidates on their own `links[rel="up"]`.
+2. Replaying from a fresh API fetch rather than the stored webhook payload left
+   the $0.50 ledger row recorded as $0.56, because `apply_paypal_refund`
+   rewrites `amount` in its upsert **before** the `applied_at` guard runs. The
+   order stayed correct at $1.06; only the ledger row drifted. Unreachable via
+   the real webhook path and deliberately not fixed — see DECISIONS.
+
+### Partial refunds verified against the real Postgres function
+
+The full refund above could not exercise the partial path — it takes the
+`incrementalAmount = cumulative - alreadyRefunded` branch and attaches to a
+`PENDING` row in `paypal_refunds`, neither of which a single full refund
+touches. Tested separately against a synthetic $100 order, driving the **real
+`apply_paypal_refund`** with payloads shaped from the genuine refund event.
+18 checks, all passing:
+
+| Step | Cumulative | Increment | Result |
+| --- | --- | --- | --- |
+| partial #1 | $30 | $30 | `partially_refunded`, order_status untouched |
+| partial #2 | $75 | $45 | attached to the **PENDING ledger row**, not `event:…` |
+| replay of #2 | $75 | $0 | skipped, no double-apply |
+| final | $100 | $25 | flips to `refunded`, order_status too |
+| over-refund | $150 | $50 | **clamps at $100**, stays `refunded` |
+
+No PayPal call and no money — the only modelled element is the payload shape,
+and PayPal's docs confirm the assumption the whole branch rests on:
+`seller_payable_breakdown.total_refunded_amount` is **cumulative across all
+partial refunds** for a capture, not per-refund.
+
+Noted and deliberately not fixed: the over-refund case writes a ledger row for
+the full increment while the order clamps, so the ledger would sum higher than
+`orders.refund_amount`. PayPal cannot refund beyond the captured amount, so
+that path is unreachable outside a synthetic test.
+
+### 🔴 Codebase-wide finding: Tailwind font utilities are dead on `<button>`
+
+The discount field's REMOVE link shipped at **16px/400** while its class read
+`text-[0.68rem] font-bold`. Cause: `globals.css:144` sets
+`button, input, select, textarea { font: inherit }` **outside any cascade
+layer**, and un-layered rules beat `@layer utilities` regardless of specificity.
+
+What makes it costly: `letter-spacing` and `text-decoration` are not in the
+`font` shorthand, so `tracking-*` and `underline` DO apply. The button renders
+half-styled and reads as intentional. Worse, the surviving `tracking-[0.14em]`
+computed against the inherited 16px, so the link was wider and larger than its
+own class specified.
+
+Fixed in both discount components by moving font properties into `style`
+(inline beats layers), matching `.checkout-recap-edit` exactly — measured
+before **16px / 400 / 2.24px / neutral**, after **11.52px / 700 / 0.9216px /
+#735c00**, byte-identical to the "Edit cart" link directly above it. Seven
+buttons corrected across `DiscountCodeField.tsx` and `DiscountCodesManager.tsx`.
+
+⚠️ **This is pre-existing and wide: ~205 button classNames across the codebase
+carry font utilities that do nothing.** The textbook fix (wrap the reset in
+`@layer base`) would restyle every one of them sitewide in a single change, so
+it was deliberately NOT done here. See DECISIONS, *"Tailwind font-size and
+font-weight utilities DO NOTHING on a `<button>`"*.
+
+`tsc` clean, `lint` clean, `npm test` **944/944**.
+
+## 2026-08-11 (later 9) - Discount codes: admin-managed percent or fixed-dollar codes
+
+New feature, owner-requested. An admin creates a code on a new **Discount Codes**
+tab; a shopper enters it at checkout and the discount comes off the merchandise
+subtotal.
+
+🔴 **REQUIRES A MANUAL SQL MIGRATION** — `supabase/discount-codes-2026-08.sql`
+must run in Supabase **before** this code deploys. Until it runs, every code
+lookup returns "not valid" (verified: the checkout field degrades gracefully and
+nothing throws), and the admin page shows a plain "run the migration" message
+instead of a raw Postgres error.
+
+**Data model.** One table with `(discount_type, discount_value)` rather than
+separate nullable percent/amount columns, so "both set" and "neither set" are
+unrepresentable rather than something the UI has to prevent. A CHECK constraint
+enforces 1-100 for `percent` and `> 0` for `fixed`. Optional per code:
+`min_order_subtotal`, `expires_at`, `max_redemptions`. `orders` gains
+`discount_code` / `discount_type` / `discount_value` snapshot columns beside the
+existing `orders.discount`, which already held the dollar amount and was
+hardcoded to `0` at `create-order/route.ts:249`.
+
+**Reuse policy (owner decision, after researching how Shopify/Stripe do it).**
+The hard control is `max_redemptions`, a global cap enforced by the database.
+"Once per email" is also implemented but is documented in code as a SPEED BUMP,
+not a guarantee: checkout allows guests, so the only identity available is the
+email typed at checkout, and a second email defeats it. Requiring an account was
+rejected — it only raises that to a second account, and costs conversions on a
+guest checkout with $700-$10,000 order values.
+
+**The redemption is atomic, and that is the whole design.** The naive
+read-check-then-increment is a TOCTOU race that lets concurrent captures both
+pass; documented cases have overshot an issued limit by 4x. Redemption is a
+single conditional statement — `update … set times_used = times_used + 1 where
+… and times_used < max_redemptions` — inside `capture_paypal_order`, in the
+transaction that already row-locks products for the two-buyer race. Zero rows
+affected IS the limit signal.
+
+An exhausted code does **not** fail the capture. The money is already taken by
+that point, so refusing would strand a paid order; the discount is honored and
+the order gets an `internal_notes` line so the overage is visible.
+
+**Order of operations, locked by tests:** shipping tier and the $5,000 Express
+cutoff key off the **pre-discount** subtotal (they price insurance on the goods
+in the box, which a discount does not change); the discount comes off
+merchandise only; Florida tax is charged on the **discounted** merchandise plus
+shipping. A fixed discount is clamped to the subtotal, so merchandise can reach
+$0 but never goes negative — shipping and its tax keep the order chargeable and
+the existing `total <= 0` rejection intact.
+
+**Enforcement.** `buildOrderDraft` recomputes the discount from the code string
+at order time via a `DiscountResolver`; the only thing crossing the wire is the
+code. `/api/checkout/discount-code` exists solely so the shopper can see the
+figure before paying and is rate-limited (20/hour/IP) because it is otherwise a
+code-enumeration oracle. A test asserts the resolver's only input is the
+server-computed subtotal.
+
+**PayPal.** `buildPayPalOrderRequest` gained a `discount` breakdown key and now
+derives `value` as `item_total + tax_total + shipping - discount`. The key is
+**omitted** rather than sent as `"0.00"` when there is no discount, because it
+feeds `payPalCreateRequestId` and an always-present key would invalidate the
+idempotency key of every existing undiscounted order.
+
+**Module structure.** `calculateDiscountAmount` lives in `checkout-pricing.ts`
+beside `round2`; `discount-codes.ts` re-exports it. `checkout-pricing.ts` imports
+the discount TYPES with `import type` only. That one-directional arrangement is
+deliberate — a runtime import back would be a module cycle. Database access is
+split into `discount-codes-server.ts` so the pure module stays importable by
+`OrderSummary` without pulling anything extra into the browser bundle.
+
+Files: `supabase/discount-codes-2026-08.sql`, `lib/discount-codes.ts`,
+`lib/discount-codes-server.ts`, `api/admin/discount-codes/route.ts`,
+`api/checkout/discount-code/route.ts`, `admin/discount-codes/page.tsx`,
+`components/admin/DiscountCodesManager.tsx`,
+`components/checkout/DiscountCodeField.tsx`, plus edits to
+`checkout-pricing.ts`, `paypal.ts`, `create-order/route.ts`, `OrderSummary.tsx`,
+`CheckoutClient.tsx`, `AdminHeader.tsx`, `checkout-error-messages.ts`.
+
+`tsc` clean, `lint` clean, `npm test` **944/944** across 94 files (was 903/903),
+clean from-scratch `npm run build` **453/453** static pages with no warnings.
+Verified in the running app: the checkout field round-trips to the API and
+renders the bilingual rejection; the admin page 307s to sign-in and the admin API
+401s when unauthenticated.
+
+## 2026-08-11 (later 8) - The two Rolexes are excluded from eBay, per item
+
+Owner: the watches are not going on eBay — "just those two items… other watches
+maybe in the future."
+
+`EBAY_EXCLUDED_PRODUCT_IDS` (`ebay/guards.ts`) holds the two product ids.
+`buildPreflightChecks` fails `eligibility` with **"This item is not listed on
+eBay per owner decision"**, and `enqueueProducts` drops them alongside
+write-blocked ids so no bulk run stages a write nobody wants.
+
+**Per item, not per category — and that distinction is the whole point.**
+Coin/Bullion are excluded by TYPE via `isEbayIneligibleProductType`, and folding
+watches in beside them would have been the tidier-looking change. It would also
+have silently blocked any watch added later, which is the opposite of what was
+asked. A test asserts an unrelated watch stays eligible, so the refactor cannot
+happen by accident.
+
+The per-item message takes precedence over the category message, since it is the
+more specific explanation of why this particular product will not sync.
+
+**Production data cleaned:** both rows sat in `sync_state = 'error'` with
+`error_count = 2` from the campaign's publish attempts. Left alone they would
+have shown a red chip forever and — because `orderEnqueueCandidates` ranks
+`error` ahead of `published` — eaten 2 of every 25 bulk slots. Reset to
+`pending` ("Not listed"), `error_count` 0, `last_error` null, after a dry run
+confirmed both had `ebay_listing_id: null` and nothing live on eBay to affect.
+**Zero listings remain in `error`.**
+
+⚠️ Until this deploys, `pending` sorts first in the enqueue order, so a bulk eBay
+run before deployment would re-attempt and re-fail them. The campaign is
+complete, so simply do not run one until this ships.
+
+Note this also answers the standing `TODO(ebay-verify)` on `mapping.ts`'s `Watch`
+entry ("add Department handling before syncing a watch") — **do not implement
+it**; see DECISIONS, "Watches are not listed on eBay".
+
+`tsc` clean, `lint` clean, `npm test` **903/903** (was 897).
+
+## 2026-08-11 (later 7) - Shipping-tier campaign COMPLETE; crons fired on their own
+
+### The campaign is done
+
+**85 of 86 available eBay listings now carry the correct tier shipping.** The one
+that does not is **#82**, which is write-blocked by design and can only be fixed
+on eBay directly.
+
+The `orderEnqueueCandidates` fix worked exactly as intended — each run cleared a
+fresh batch instead of redoing the last one:
+
+| Run | stale before → after | cleared |
+| --- | --- | --- |
+| 3 (first post-fix) | 61 → 36 | **25** |
+| 4 | 36 → 13 | **23** |
+| 5 | 13 → 1 | **12** |
+
+Final: `published` **85**, `out_of_date` 1 (#82), `hidden_oos` 36 (sold, correct).
+
+**Two tiers verified on the live public listings, not just in our data:**
+
+| Item | eBay price | Band | eBay shipping |
+| --- | --- | --- | --- |
+| Bumble bee ring | $714.80 | $600–1,000 | **$35.00** |
+| Motorcycle pendant | $663.58 | $600–1,000 | **$35.00** |
+| 10K Miami Cuban chain | $10,098.83 | $5,000–15,000 | **$99.00 "Signed"** |
+
+The "Signed" wording on the $99 one is the Registered Mail treatment that band
+requires — `MARKETPLACE_SHIPPING_TIERS`' `travelsRegistered` branch showing up
+in the real listing.
+
+### Correction: the 25604 failures were TRANSIENT, not item-specific
+
+Earlier notes said eBay errorId 25604 ("Availability not found") pointed at two
+specific inventory items. That was wrong. The failing pair **rotated every run** —
+26/31, then 29/23 — and each previously-failed item succeeded on its next
+attempt. It is an intermittent eBay-side condition at roughly 2 per 25, and a
+retry clears it. By the end of the campaign none remained.
+
+### The two Rolexes are a different, known problem
+
+`#83` and `#84` both fail deterministically with:
+
+> "A user error has occurred. The item specific **Department** is missing."
+
+Both have `ebay_listing_id: null` — they were **never published**, so they were
+never part of the shipping campaign at all. `mapping.ts` already predicted this
+at the `Watch` entry: *"31387 also REQUIRES a 'Department' aspect
+(Men's/Women's/Unisex) we don't currently map … Add Department handling before
+syncing a watch. TODO(ebay-verify)."* That comment's claim that "no Watch-type
+item exists in the catalog yet" is now stale — two do.
+
+### 🟢 The GitHub crons fired automatically for the first time
+
+The last unproven link in the automation arc closed on its own:
+
+| | Scheduled | Actual | Result |
+| --- | --- | --- | --- |
+| Etsy | 11:15 UTC | **11:54** | 11 pushed, 79 unchanged, **0 failed** |
+| eBay | 11:45 UTC | **12:27** | 1 pushed, 86 unchanged, 1 blocked, **0 failed** |
+
+39 and 42 minutes late, which is ordinary GitHub Actions best-effort scheduling
+(documented in the workflow header). Both `[ok]`/`[warning]` with zero failures —
+the eBay `warning` is only #82's deliberate block. **Scheduled marketplace price
+automation now works end to end without anyone touching it.**
 
 ## 2026-08-11 (later 6) - Shipping-tier campaign started; bulk enqueue now advances
 

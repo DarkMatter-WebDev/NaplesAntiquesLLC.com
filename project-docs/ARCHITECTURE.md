@@ -1,8 +1,8 @@
 ﻿# Architecture
 
 > Update whenever significant structural changes occur. Last updated:
-> **2026-08-03** after the seven-slot scheduler, responsive queue controls, and
-> session-close documentation reconciliation.
+> **2026-08-11** — scheduled work moved from Netlify Scheduled Functions to
+> GitHub Actions after the Netlify ones were found never to have executed.
 
 ## System Design
 
@@ -33,11 +33,23 @@ exclusion is load-bearing for the `.co/api/*` carve-out, which must remain a
 **200 rewrite** because webhook POSTs from Resend, PayPal, and eBay do not follow
 redirects.
 
-`next-app/netlify/functions/etsy-price-push.mts` and
-`ebay-price-push.mts` are staggered UTC daily Scheduled Functions. They read
-their marketplace cron secret from Netlify runtime environment variables and
-POST to the matching secret-guarded Next route. The Next route owns bounded
-provider work and writes a run-summary row to the existing marketplace log.
+**Scheduled work is triggered by GitHub Actions, not Netlify** (cut over
+2026-08-11). `.github/workflows/scheduled-jobs.yml` runs all five jobs — Etsy and
+eBay price pushes, the Instagram and Facebook drips, and the Instagram token
+refresh — on staggered UTC crons, reading each `*_CRON_SECRET` from GitHub
+repository secrets and POSTing the matching secret-guarded Next route. The Next
+route owns bounded provider work and writes a run-summary row to the existing
+marketplace log.
+
+The routes are deliberately **trigger-agnostic**: any external cron with the
+shared secret can drive them, which is what made this swap a zero-code change.
+`next-app/netlify/functions/*.mts` still exist with the same schedules but have
+**never once executed** — a Netlify platform fault, documented in CHANGELOG
+2026-08-10. They are kept only so the change is reversible; if Netlify is ever
+fixed, delete one side or the other or every job fires twice.
+
+⚠️ A Netlify "Scheduled" badge and a "Next execution" time prove registration,
+never execution. That pair sat over a completely dead scheduler for weeks.
 
 ```text
 Browser
@@ -83,7 +95,7 @@ NaplesEstateJewelry.co/
     â”œâ”€â”€ netlify.toml             # app-local Netlify config
     â”œâ”€â”€ netlify/
     â”‚   â”œâ”€â”€ edge-functions/      # API limiting and blocked probes
-    â”‚   â””â”€â”€ functions/           # daily Etsy/eBay price schedules
+    â”‚   â””â”€â”€ functions/           # legacy Netlify schedules (never ran; kept reversible)
     â”œâ”€â”€ next.config.ts
     â”œâ”€â”€ messages/                # next-intl messages
     â”œâ”€â”€ public/
@@ -116,8 +128,9 @@ Current route families include:
 - `/account`, `/account/sign-in`, `/account/sign-up`
 - `/admin`, `/admin/orders`, `/admin/orders/[id]`, `/admin/messages`,
   `/admin/inquiries`, `/admin/subscribers`, `/admin/marketing`,
-  `/admin/settings`, `/admin/users`, `/admin/users/[id]/invoices`,
-  `/admin/orders/[id]/invoice`, and `/admin/orders/[id]/print`
+  `/admin/discount-codes`, `/admin/settings`, `/admin/users`,
+  `/admin/users/[id]/invoices`, `/admin/orders/[id]/invoice`, and
+  `/admin/orders/[id]/print`
 
 ## Responsive Canvas Tiers
 
@@ -259,6 +272,14 @@ Supabase is the source for app data:
   (line1/line2/city/state/postal_code/country) are shown on the order detail page and
   the invoice email.
 - `order_items` - immutable product snapshots attached to orders (incl. `discount`).
+- `discount_codes` - admin-managed checkout codes (`supabase/discount-codes-2026-08.sql`,
+  ⚠️ **not yet applied**). Percentage or fixed-dollar, with optional minimum
+  order subtotal, expiry, and a hard `max_redemptions` cap. Admin-only under RLS;
+  never readable from the browser. Orders snapshot `discount_code` /
+  `discount_type` / `discount_value` beside the existing `orders.discount`.
+- `discount_code_redemptions` - one row per redemption, written inside
+  `capture_paypal_order`. Audit trail plus the per-email reuse lookup. See
+  `features/discount-codes.md`.
 - `invoices` - invoice headers/totals/status for order-linked billing. New
   PayPal and manual admin orders generate a draft invoice row at order creation;
   paid capture updates the same row to `paid`; the order detail page can
@@ -514,9 +535,9 @@ limits live in `project-docs/features/etsy-sync.md`.
   seller taxonomy and unknown types have an explicit reviewed fallback.
   Two `TODO(etsy-verify)` items remain because Etsy's machine-readable spec
   does not publish them: image upload caps and rate-limit response-header
-  names. The daily Scheduled Function now calls the trigger-agnostic route at
-  11:15 UTC; its Scheduled badge is production-confirmed, while the first
-  deliberate production `Run now` plus Admin last-run-card check remains open.
+  names. The daily GitHub Actions job calls the trigger-agnostic route at
+  11:15 UTC and is **confirmed firing on its own** (2026-08-11, 11 pushed / 0
+  failed). Expect it ~40 min late — GitHub cron is best-effort.
 
 ## eBay Sync (partially live-verified)
 
@@ -568,8 +589,9 @@ technical contract, operator setup, and verification limits live in
   Etsy section — dry-run preview, sync/publish-on-eBay/price-only-push,
   hide/end/restore), and `EbayBulkSyncModal.tsx` (Phase 2 "Sync all to
   eBay" with a pre-flight summary and cancellable progress).
-- **Price automation:** staggered daily Netlify functions call the
-  cron-secret-guarded Etsy/eBay routes. Both price paths fail closed on
+- **Price automation:** staggered daily GitHub Actions jobs call the
+  cron-secret-guarded Etsy/eBay routes (they replaced Netlify scheduled
+  functions, which never ran). Both price paths fail closed on
   fallback/missing relevant-metal spot data and write run summaries to their
   existing logs. Etsy uses a time-bounded oldest-first sweep; eBay plans only
   prices that still differ, updates at most 25 offers per provider call, and

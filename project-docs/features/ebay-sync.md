@@ -354,6 +354,50 @@ keywords live in title + aspects); `cost_basis`/`minimum_price`/
 Condition is fixed: `USED_EXCELLENT` (id `3000`, "Pre-owned") + one standard
 `conditionDescription` template for every item (Q5) — no per-item authoring.
 
+## Shipping-tier campaign — COMPLETE (2026-08-11)
+
+**85 of 86 available listings carry the correct tier.** The exception is #82
+(write-blocked; fixable only on eBay). Verified on the live public listings
+across two bands: $714.80 → **$35.00** ($600–1,000) and $10,098.83 → **$99.00
+"Signed"** ($5,000–15,000, where the band's Registered Mail treatment shows up in
+eBay's own wording). Both the single-item drawer path and the bulk path were
+confirmed, which closes the long-standing "one controlled listing update remains
+open" gate.
+
+Two lessons from running it, both now encoded:
+
+- **A capped bulk run also needs an ORDER.** `enqueueProducts` used to take
+  `allowed.slice(0, 25)` with no notion of what still needed writing, so "select
+  all → sync → repeat" re-queued the same 25 every time (measured: the second run
+  redid 21 of 23). `orderEnqueueCandidates` now sorts **stale → error →
+  published** before slicing. Ordering, not filtering, so a deliberate
+  force-re-push of live items still works.
+- **eBay errorId 25604 ("Availability not found") is TRANSIENT.** The failing
+  pair rotated every run and each recovered on a later attempt — roughly 2 per
+  25. Do not chase it as an item-specific defect; re-run and it clears.
+
+## Products deliberately not on eBay
+
+Two independent mechanisms, easy to confuse:
+
+| Constant | Meaning |
+| --- | --- |
+| `EBAY_WRITE_BLOCKED_PRODUCT_IDS` | Live on eBay but unsafe to write to (#82, detached relist) |
+| `EBAY_EXCLUDED_PRODUCT_IDS` | Not sold on this channel at all (#83/#84, the Rolexes) |
+
+Both are dropped by `enqueueProducts`; the excluded ids additionally fail
+pre-flight `eligibility` with "This item is not listed on eBay per owner
+decision".
+
+⚠️ **The exclusion is PER ITEM, not a `Watch` category rule** (owner: "just those
+two items… other watches maybe in the future"). Folding it into
+`isEbayIneligibleProductType` beside Coin/Bullion would silently block any future
+watch; a test pins this by asserting an unrelated watch stays eligible. Both
+Rolexes would also fail publish anyway — eBay category 31387 requires a
+`Department` aspect `mapAspects` does not send — and **that `TODO(ebay-verify)`
+is answered, not outstanding**: do not implement it. See DECISIONS, *"Watches are
+not listed on eBay"*.
+
 ## Bulk-write guards (2026-08-04)
 
 Three filters run before any bulk enqueue stages a write, in this order

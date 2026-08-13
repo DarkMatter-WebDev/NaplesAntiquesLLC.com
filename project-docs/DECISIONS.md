@@ -202,6 +202,184 @@ message files or explicitly paired localized page data. Route metadata, legal
 copy, filters, errors, and transactional/customer content must be checked in
 both locales.
 
+### `orders.payment_response` records which PayPal ENVIRONMENT a row came from
+
+Established 2026-08-13 while auditing four orders marked `refunded` with a null
+`refund_amount`. PayPal's stored response embeds its own HATEOAS links, and the
+host names the environment:
+
+- `https://api.sandbox.paypal.com` -> sandbox, fictional money
+- `https://api.paypal.com` -> live
+
+This is the reliable way to tell retroactively, and it settles questions no
+other column can. Two of those four orders ($5,646.90 and $37.10) returned 404
+for both capture and order against the live API — which alone is ambiguous (a
+deleted record? a wrong id?), but the sandbox host in `payment_response` made it
+definitive: they never existed as real money.
+
+Why this keeps mattering: PayPal went live on **2026-07-09** after the
+credential-mismatch blocker, so **orders from early July straddle both
+environments** and the live `orders` table permanently contains sandbox rows.
+Any revenue figure, reconciliation, or "what did we actually take" question must
+filter them out. Check the host before treating an early-July order as real.
+
+⚠️ **A 404 from PayPal is not proof a transaction failed.** It equally means
+"you are asking the wrong environment." Always confirm against
+`payment_response` before concluding money did or did not move.
+
+### A PayPal `PAYMENT.CAPTURE.REFUNDED` resource is a REFUND, not a capture
+
+Found 2026-08-12 by the first live refund this system had ever processed.
+PayPal completed the refund correctly, and the database recorded nothing: the
+order stayed `paid` with `refund_amount` null, `paypal_refunds` stayed empty,
+and the webhook row landed as `status = 'error'`.
+
+`relatedPayPalCaptureId` returned `resource.id` for every `PAYMENT.CAPTURE.*`
+event. That is right for COMPLETED / DENIED / DECLINED / PENDING, whose
+resource IS the capture. It is **wrong for REFUNDED and REVERSED**, whose
+resource is a Refund object — so `resource.id` is the REFUND id. That id went
+into `apply_paypal_refund` as `p_capture_id`, and the function's guard
+correctly refused the write:
+
+```
+raise exception 'PayPal capture % does not match order %.'
+```
+
+The guard was not the bug; it was fed bad input and did its job.
+
+Rules:
+
+1. **Only trust `resource.id` as a capture id for capture-shaped events.**
+   `REFUND_SHAPED_CAPTURE_EVENTS` in `lib/paypal-webhook.ts` holds the
+   exceptions. Add any future refund-shaped `PAYMENT.CAPTURE.*` event to it.
+2. **The correct capture id is already in the payload** under
+   `links[rel="up"]` → `/v2/payments/captures/<id>`, and `captureIdFromLinks`
+   has always parsed it. The early return simply prevented the fall-through
+   from ever running.
+3. **A refund's `status` is `COMPLETED`, not `REFUNDED`.** `REFUNDED` is a
+   *capture* status. Code comparing a refund resource's status against
+   `'REFUNDED'` is comparing across two different object types.
+4. **`total_refunded_amount` is CUMULATIVE for the capture, not this refund's
+   amount** — confirmed live 2026-08-13, not merely from the docs. After a
+   $0.50 then a $0.56 refund on a $1.06 capture, re-fetching the FIRST refund
+   object showed `amount = $0.50` but
+   `seller_payable_breakdown.total_refunded_amount = $1.06`. The whole
+   `incrementalAmount = cumulative - alreadyRefunded` branch depends on this;
+   if it were per-refund, every partial after the first would under-apply.
+5. **A refund object is a LIVE view, not a snapshot.** Because of 4, fetching an
+   old refund from the API returns today's cumulative, while the webhook payload
+   carries the cumulative *as of that event*. **Replay from stored webhook
+   payloads, never from a fresh API fetch** — a fetch-based replay computes an
+   increment against a total that has since moved.
+
+⚠️ **`paypal_refunds.amount` carries TWO different meanings, and that is the
+root problem — not the upsert.** Its three callers disagree:
+
+| Caller | passes as `p_amount` |
+| --- | --- |
+| `webhook/route.ts:309` (CAPTURE.REFUNDED) | the **increment** applied |
+| `webhook/route.ts:347` (REFUND.PENDING/FAILED) | that refund's **own** amount |
+| `admin/orders/[id]/refund/route.ts:115` | that refund's **own** amount |
+
+For the FIRST refund on a capture these coincide, which is why it looks fine.
+On any SUBSEQUENT partial they diverge. Two consequences follow:
+
+1. **The `PENDING`-row match can miss.** CAPTURE.REFUNDED looks for a pending
+   row matching the *increment*, but a row written by the other two paths holds
+   the *own amount*. On a second partial they differ by more than the ±$0.01
+   tolerance, so a separate `event:…` row is minted for a refund that already
+   had one.
+2. **`apply_paypal_refund` rewrites `amount` before checking `applied_at`** (set
+   at line 126, guard at line 133), so a repeat call with a different amount
+   silently rewrites the row while correctly refusing to touch the order.
+   Observed 2026-08-13: a $0.50 refund recorded as $0.56, ledger summing $1.12
+   against a correct $1.06 order.
+
+**`orders.refund_amount` is always correct regardless** — it is driven by
+PayPal's cumulative `total_refunded_amount`, so it self-corrects whatever the
+ledger says. The money is never wrong; only the audit trail can be.
+
+⚠️ **Correction to an earlier version of this entry, which claimed the real
+webhook path "cannot reach this."** That was too strong. Redelivery of the same
+event is indeed safe (same cumulative -> zero increment -> `route.ts` skips the
+RPC), but **PayPal does not guarantee webhook ORDER**. If refund #2 arrives
+before #1, #2 applies the whole cumulative and #1 is then skipped as a zero
+increment — leaving one misattributed row and one missing entirely.
+
+**Left unfixed deliberately as of 2026-08-13**, because the fix is a data-model
+decision (what does `amount` mean?) on a hardened money function requiring a new
+migration, and `paypal_refunds` currently holds **zero rows** — there is no
+drift to repair, only a shape to settle before rows accumulate. Do it as its own
+scoped work with its own tests.
+
+**Until then: reconcile against `orders.refund_amount`, never against a sum of
+`paypal_refunds.amount`.**
+
+⚠️ **The unit test asserted the bug.** It pinned
+`relatedPayPalCaptureId('PAYMENT.CAPTURE.REFUNDED', { id: 'CAPTURE-123' })` to
+return `'CAPTURE-123'`, so a full green suite proved nothing about the one path
+that mattered. The lesson generalizes past PayPal: **a test written from the
+same misreading as the code confirms the misreading.** Where a payload's shape
+is the thing in doubt, fixture the REAL provider payload — the replacement test
+uses the actual refund body from capture `5DH54631BL586554F`.
+
+This is also why the refund path survived so long: `TASKS.md` has always listed
+the controlled PayPal refund matrix as never run, and no live refund had ever
+been issued. **Provider-contract bugs do not surface from unit tests; they
+surface from one real transaction.**
+
+### Tailwind font-size and font-weight utilities DO NOTHING on a `<button>`
+
+Found 2026-08-12 when the discount field's REMOVE link shipped at 16px/400
+while its class said `text-[0.68rem] font-bold`.
+
+`globals.css:144` resets form controls:
+
+```css
+button, input, select, textarea {
+  max-width: 100%;
+  font: inherit;
+}
+```
+
+That rule is **un-layered**, and Tailwind's utilities live in
+`@layer utilities`. In the CSS cascade, un-layered rules beat every layered
+rule **regardless of specificity** — so the reset wins and any `text-*`,
+`font-bold`, or font-family utility on a button is silently discarded.
+
+**The failure mode is what makes this expensive.** `letter-spacing` and
+`text-decoration` are NOT part of the `font` shorthand, so `tracking-*` and
+`underline` still apply. A broken button therefore renders half-styled — right
+tracking, right underline, wrong size and weight — which reads as a design
+choice rather than a bug. The REMOVE link had `tracking-[0.14em]` computing
+against the inherited 16px instead of the intended 0.68rem, making it *wider
+and larger* than the class implied.
+
+**Rules:**
+
+1. **Font properties on a button go in `style`, or in real CSS.** Inline styles
+   beat cascade layers. The existing `.checkout-recap-edit` (defined in
+   CheckoutClient's styled-jsx, also un-layered) is the established pattern for
+   a small uppercase link: `0.72rem / 700 / 0.08em / #735c00 / underline
+   3px / var(--font-label)`. Match it rather than inventing new values.
+2. **Padding, margin, color, letter-spacing, text-decoration, and layout
+   utilities all work fine on buttons.** Only the `font` shorthand's properties
+   are affected — font-size, font-weight, font-family, font-style, font-variant,
+   line-height. Keep those classes off buttons entirely so the code does not
+   claim styling it is not applying.
+3. **Inputs, selects and textareas are in the same reset** and have the same
+   problem. Both discount components set input font size inline for this reason.
+4. **`<label>`, `<span>`, `<p>`, `<th>`, `<h2>` are NOT in the reset** — Tailwind
+   font utilities work normally there.
+
+⚠️ **Do not "fix" this globally without a deliberate visual review.** Wrapping
+the reset in `@layer base` would make utilities win and is the textbook fix, but
+roughly **205 button classNames across the codebase currently carry font
+utilities that do nothing**. Layering the reset would restyle all of them at
+once, sitewide, in a single change. That is a standalone project with its own
+before/after pass, not a drive-by. Until someone does it, the per-button rules
+above are the working convention.
+
 ### UI icons are inline SVG, never ligature fonts
 
 All application icons render through
@@ -447,6 +625,88 @@ Applies to the Deep Field Gallery sync and to any future partner push.
    checkout only that function writes product `status`/`quantity` — denials,
    cancels, and refunds do not — so the complete set is the two admin
    revalidate helpers plus `paypal/capture-order` and `paypal/webhook`.
+
+### Discount codes: the cap is the control, "once per email" is a speed bump
+
+Established 2026-08-11 when discount codes were built, after researching how
+Shopify and Stripe actually enforce this. The distinction below is the one thing
+to keep, because it will otherwise be reported as a bug.
+
+**A per-customer limit cannot be enforced on a guest checkout.** Shopify's "limit
+one per customer" tracks an *identifier* — the email or phone typed at checkout —
+not a person. This checkout allows guests, so a shopper reuses a "one-time" code
+by typing a different email. That is the ceiling of what is enforceable, not an
+implementation shortfall.
+
+- **`max_redemptions` is the real control.** A global cap, enforced by the
+  database, ungameable by anyone. It is what bounds financial exposure.
+- **`hasEmailRedeemedCode` is a speed bump and is commented as one.** It stops
+  casual reuse. It does not stop anyone who tries.
+- **Requiring an account was rejected, and re-proposing it should clear the same
+  bar.** It only raises the cost from "second email" to "second account", while
+  costing conversions on a guest checkout carrying $700-$10,000 orders. It buys
+  friction, not enforcement.
+
+**Redemption is one conditional UPDATE inside `capture_paypal_order`, never a
+read-then-write.** The naive sequence — read the code, check the count, apply,
+increment — is a TOCTOU race in which concurrent captures both pass the check;
+documented cases have overshot an issued limit by 4x. The statement is
+`update … set times_used = times_used + 1 where code = … and (max_redemptions is
+null or times_used < max_redemptions)`, and **zero rows affected IS the "limit
+reached" signal.** It lives in the capture function specifically because that
+transaction already row-locks products for the two-buyer race; anywhere earlier
+and the count increments for orders that are never paid.
+
+**An exhausted code does not fail a capture.** By that point the money is taken,
+so refusing would strand a paid order in an unrecoverable state. The discount is
+honored and an `internal_notes` line records it, matching how the inventory race
+is already handled.
+
+**The checkout validation route is a preview, never an authorization.**
+`/api/checkout/discount-code` exists so the shopper can see the figure before
+paying. The authoritative discount is recomputed by `buildOrderDraft` from the
+code string at order time — only the code crosses the wire, never an amount.
+This is the same rule as *"A query parameter is never an authorization signal"*.
+The route is rate-limited because an unlimited code-checking endpoint is a
+code-enumeration oracle.
+
+**Order of operations, and why each part is where it is:**
+
+1. **Shipping tier and the $5,000 Express cutoff key off the PRE-discount
+   subtotal.** They price *insurance on the goods in the box*, and a discount
+   does not change what is in the box. Computing them after would let a code drop
+   a $6,000 order under the cap and ship over-value goods on a service that
+   cannot cover them. Pinned by a test.
+2. **The discount applies to MERCHANDISE ONLY.** Shipping is never discounted.
+3. **Florida tax is charged on the DISCOUNTED merchandise plus shipping** — a
+   discount reduces the taxable base, the standard treatment.
+4. **A fixed discount is clamped to the subtotal.** A $100 code on an $80 order
+   takes $80. Merchandise may reach $0, never below; shipping and its tax keep
+   the order chargeable, so the existing `total <= 0` rejection and the PayPal
+   breakdown both stay intact.
+
+**One table, two types — `(discount_type, discount_value)`, not separate nullable
+columns.** Separate `percent`/`amount` columns make "both set" and "neither set"
+representable, and neither has a correct behavior. A CHECK constraint gives each
+type its own valid range (1-100 vs `> 0`), so the invalid states cannot exist
+rather than being something the admin UI has to remember to prevent.
+
+**A fixed-dollar code does not self-scale, which is why `min_order_subtotal`
+exists.** 15% off is proportional to the cart; `$100 OFF` is $100 off a $6,000
+chain and $100 off a $120 ring. Both Shopify and Stripe pair fixed-amount codes
+with a minimum order for this reason. The field is optional on both types.
+
+**PayPal's `discount` breakdown key is omitted, not zeroed, when unused.** The
+request object feeds `payPalCreateRequestId`, so an always-present `"0.00"` would
+change the hash and invalidate the idempotency key of every existing
+undiscounted order.
+
+**Module direction is one-way and must stay that way.** `calculateDiscountAmount`
+lives in `checkout-pricing.ts` beside `round2`; `discount-codes.ts` imports and
+re-exports it; `checkout-pricing.ts` imports the discount TYPES with `import
+type` only, which is erased at emit. A runtime import back would be a module
+cycle. Database access lives in a third module, `discount-codes-server.ts`, so
+the pure math stays importable by `OrderSummary` on the client.
 
 ### Product rows store references, not media bytes
 
@@ -1880,6 +2140,39 @@ Same reasoning as `ebay/guards.ts`. Previously both files declared their own `3`
 listing against eBay's 84 on identical code — the difference was an unworked
 shipping-tier backlog, not a measurement error. Clear the backlog; do not
 redefine the measurement.
+
+### Watches are not listed on eBay
+
+Owner decision, 2026-08-11. The catalog's two Rolexes (#83, #84) stay off eBay.
+
+This matters as a DECISION and not just a task because the code carries an open
+`TODO(ebay-verify)` that reads like unfinished work: `mapping.ts`'s `Watch` entry
+notes that eBay category 31387 (Wristwatches) requires a `Department` aspect
+(Men's/Women's/Unisex) which `mapAspects` never sends, and says to "add
+Department handling before syncing a watch". **That TODO is answered — do not
+implement it.** Both watches fail publish with *"The item specific Department is
+missing"*, and that is the correct, intended outcome rather than a bug to fix.
+
+The same TODO's aside that "no Watch-type item exists in the catalog yet" is
+stale — two do — but the conclusion is unchanged for a different reason.
+
+**Encoded PER ITEM, not per category** (owner, 2026-08-11: "just those two
+items… other watches maybe in the future"). `EBAY_EXCLUDED_PRODUCT_IDS` in
+`ebay/guards.ts` holds the two ids; `buildPreflightChecks` fails `eligibility`
+with `EBAY_EXCLUDED_REASON`, and `enqueueProducts` drops them alongside
+write-blocked ids.
+
+⚠️ **Do not convert this into a `Watch` category rule.** Coin/Bullion are
+excluded by category through `isEbayIneligibleProductType`, and it would be a
+natural-looking refactor to fold watches in beside them — but that would
+silently stop a FUTURE watch from ever syncing, which is the opposite of the
+decision. A test pins the per-item behaviour by asserting an unrelated watch is
+still eligible.
+
+Two reasons it is an exclusion rather than a bug fix: the owner does not want
+them listed, and separately they cannot publish without the Department aspect. If
+watches are ever wanted on eBay, map Department and remove the id — both halves
+are needed.
 
 ### A bounded bulk run must ORDER its queue, not just cap it
 

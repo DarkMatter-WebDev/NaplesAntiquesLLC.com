@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import type { Product, SpotData } from '@/types/product';
 import { inferProductJewelryType, normalizeProductLengthSizeValue, normalizeProductQuantity } from '@/types/product';
+import { EBAY_EXCLUDED_PRODUCT_IDS, EBAY_EXCLUDED_REASON } from './guards';
 import { getMarketplaceSpotPriceError, getProductPriceValue } from '@/lib/pricing';
 import { getMarketplaceShippingTier } from '@/lib/checkout-shipping';
 import { getSiteUrl } from '@/lib/order-email-branding';
@@ -689,11 +690,20 @@ export function buildPreflightChecks(
   });
 
   const jewelryType = inferProductJewelryType(product);
-  const ineligible = isEbayIneligibleProductType(jewelryType);
+  // Two independent reasons to be ineligible, reported through one check: a
+  // whole CATEGORY the owner keeps off eBay (Coin/Bullion), or an INDIVIDUAL
+  // item they have held back. The per-item message wins because it is the more
+  // specific explanation of why this particular product will not sync.
+  const excluded = EBAY_EXCLUDED_PRODUCT_IDS.has(product.id);
+  const ineligible = isEbayIneligibleProductType(jewelryType) || excluded;
   checks.push({
     check: 'eligibility',
     ok: !ineligible,
-    message: ineligible ? 'Coins and bullion are not synced to eBay per owner decision.' : undefined,
+    message: excluded
+      ? EBAY_EXCLUDED_REASON
+      : ineligible
+        ? 'Coins and bullion are not synced to eBay per owner decision.'
+        : undefined,
   });
 
   checks.push({

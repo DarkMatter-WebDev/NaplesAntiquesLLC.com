@@ -6,7 +6,7 @@ import { getMarketplaceShippingProfileMap } from '@/lib/marketplace-shipping';
 import type { Product, SpotData } from '@/types/product';
 import { normalizeProductQuantity, normalizeProductStatus } from '@/types/product';
 import { EbayApiError, ebayFetch, ebayTradingGetItemStatus, type EbayTradingItemStatus } from './client';
-import { EBAY_BULK_ENQUEUE_LIMIT } from './guards';
+import { EBAY_BULK_ENQUEUE_LIMIT, EBAY_EXCLUDED_PRODUCT_IDS } from './guards';
 import { MAX_PRICE_PUSH_ATTEMPTS } from '@/lib/marketplace-price-chip';
 import { ensureFreshAccessToken } from './auth';
 import {
@@ -1192,8 +1192,13 @@ export async function enqueueProducts(productIds: string[]): Promise<EnqueueResu
   // Write-blocked ids never enter the queue at all — the per-step guard would
   // stop them anyway, but keeping them out avoids parking a permanently
   // un-drainable row in 'pending'.
-  const blocked = productIds.filter((id) => EBAY_WRITE_BLOCKED_PRODUCT_IDS.has(id)).length;
-  const notBlocked = productIds.filter((id) => !EBAY_WRITE_BLOCKED_PRODUCT_IDS.has(id));
+  // Owner-excluded items are dropped here too, for the same reason: queueing
+  // one only parks a row that pre-flight will reject, and (since
+  // orderEnqueueCandidates ranks `error` ahead of `published`) it would then sit
+  // at the front of every later run burning a slot on a write nobody wants.
+  const isHeldBack = (id: string) => EBAY_WRITE_BLOCKED_PRODUCT_IDS.has(id) || EBAY_EXCLUDED_PRODUCT_IDS.has(id);
+  const blocked = productIds.filter(isHeldBack).length;
+  const notBlocked = productIds.filter((id) => !isHeldBack(id));
 
   // Sold pieces would fail runSyncStep's pre-flight anyway ("Only available
   // items can be published to eBay") — but only after flipping the row to

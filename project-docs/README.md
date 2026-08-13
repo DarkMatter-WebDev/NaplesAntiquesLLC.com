@@ -24,7 +24,7 @@ docs and evidence-backed verification.
 | `TASKS.md` | Open work plus a short recent-completions summary. |
 | `CHANGELOG.md` | The one full-history, dated log of meaningful changes. |
 | `CLIENTS.md` | Client/hosting/maintenance tracking for Surette Systems (no secrets). |
-| `features/` | One file per feature with deeper detail. |
+| `features/` | One file per feature with deeper detail (incl. `discount-codes.md`). |
 
 ## Session Startup Behavior
 

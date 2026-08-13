@@ -5,12 +5,14 @@ import Link from 'next/link';
 import type { CartItem } from '@/context/CartContext';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 import {
+  calculateDiscountAmount,
   calculateFlSalesTax,
   chargesFlSalesTax,
   FL_TAX_RATE_LABEL,
   formatCheckoutCurrency,
   round2,
 } from '@/lib/checkout-pricing';
+import { formatDiscountValue, type AppliedDiscount } from '@/lib/discount-codes';
 import { parseManualPriceLabelValue } from '@/lib/pricing';
 import {
   CHECKOUT_SHIPPING_OPTIONS,
@@ -58,11 +60,15 @@ export function computeOrderTotals({
   shippingMethod,
   shippingState,
   hideSoldItemPrices = false,
+  appliedDiscount = null,
 }: {
   items: CartItem[];
   shippingMethod: string;
   shippingState?: string;
   hideSoldItemPrices?: boolean;
+  /** Discount previewed by /api/checkout/discount-code. Display only — the
+   *  server recomputes it from the code at order time. */
+  appliedDiscount?: AppliedDiscount | null;
 }) {
   const lineTotals = items.map((i) => {
     if (hideSoldItemPrices && isProductSold(i.status)) return null;
@@ -78,11 +84,20 @@ export function computeOrderTotals({
   const shipping = getCheckoutShippingFee(selectedShipping.value, subtotal)
     ?? getCheckoutShippingFee(DEFAULT_SHIPPING_METHOD, subtotal)
     ?? 0;
-  const tax = chargesFlSalesTax(shippingMethod, shippingState)
-    ? calculateFlSalesTax(subtotal, shipping)
+  // Recomputed from the code's terms against THIS subtotal rather than reusing
+  // the previewed amount, so editing the cart after applying a code updates the
+  // figure instead of showing a stale one. Mirrors the server's order of
+  // operations exactly: shipping tier off the pre-discount subtotal, tax on the
+  // discounted merchandise plus shipping.
+  const discount = appliedDiscount
+    ? calculateDiscountAmount(appliedDiscount.type, appliedDiscount.value, subtotal)
     : 0;
-  const total = round2(subtotal + tax + shipping);
-  return { subtotal, shipping, tax, total, hasUnknown, selectedShipping };
+  const discountedMerchandise = round2(subtotal - discount);
+  const tax = chargesFlSalesTax(shippingMethod, shippingState)
+    ? calculateFlSalesTax(discountedMerchandise, shipping)
+    : 0;
+  const total = round2(discountedMerchandise + tax + shipping);
+  return { subtotal, discount, shipping, tax, total, hasUnknown, selectedShipping };
 }
 
 /**
@@ -96,18 +111,21 @@ export function OrderTotals({
   shippingMethod,
   shippingState,
   hideSoldItemPrices = false,
+  appliedDiscount = null,
 }: {
   items: CartItem[];
   isEs: boolean;
   shippingMethod: string;
   shippingState?: string;
   hideSoldItemPrices?: boolean;
+  appliedDiscount?: AppliedDiscount | null;
 }) {
-  const { subtotal, shipping, tax, total, hasUnknown, selectedShipping } = computeOrderTotals({
+  const { subtotal, discount, shipping, tax, total, hasUnknown, selectedShipping } = computeOrderTotals({
     items,
     shippingMethod,
     shippingState,
     hideSoldItemPrices,
+    appliedDiscount,
   });
   const serviceNote = getShippingServiceNote(selectedShipping.value, subtotal, isEs);
 
@@ -117,6 +135,20 @@ export function OrderTotals({
         <span>Subtotal</span>
         <span>{subtotal > 0 ? formatCheckoutCurrency(subtotal) : '-'}{hasUnknown ? '*' : ''}</span>
       </div>
+      {/* Discount sits directly under Subtotal because it comes off merchandise
+          before shipping and tax are worked out. */}
+      {discount > 0 && appliedDiscount && (
+        <div className="checkout-total-row">
+          <span>
+            {isEs ? 'Descuento' : 'Discount'} ({appliedDiscount.code}
+            {appliedDiscount.type === 'percent'
+              ? ` · ${formatDiscountValue('percent', appliedDiscount.value, isEs)}`
+              : ''}
+            )
+          </span>
+          <span style={{ color: '#2e7d32' }}>-{formatCheckoutCurrency(discount)}</span>
+        </div>
+      )}
       <div className="checkout-total-row">
         <span>{isEs ? 'Envío' : 'Shipping'}</span>
         <span style={{ color: 'var(--color-on-surface)', textAlign: 'right' }}>
@@ -170,6 +202,7 @@ export default function OrderSummary({
   heading,
   headingAction,
   bare = false,
+  appliedDiscount = null,
 }: {
   items: CartItem[];
   isEs: boolean;
@@ -197,12 +230,15 @@ export default function OrderSummary({
   headingAction?: React.ReactNode;
   /** Drop the panel's own border/background — for use inside another card. */
   bare?: boolean;
+  /** Previewed discount, for display only. See computeOrderTotals. */
+  appliedDiscount?: AppliedDiscount | null;
 }) {
-  const { subtotal, shipping, tax, total, hasUnknown, selectedShipping } = computeOrderTotals({
+  const { subtotal, discount, shipping, tax, total, hasUnknown, selectedShipping } = computeOrderTotals({
     items,
     shippingMethod,
     shippingState,
     hideSoldItemPrices,
+    appliedDiscount,
   });
   const serviceNote = getShippingServiceNote(selectedShipping.value, subtotal, isEs);
 
@@ -250,6 +286,18 @@ export default function OrderSummary({
           <span>Subtotal</span>
           <span>{subtotal > 0 ? formatCheckoutCurrency(subtotal) : '-'}{hasUnknown ? '*' : ''}</span>
         </div>
+        {discount > 0 && appliedDiscount && (
+          <div className="flex justify-between">
+            <span>
+              {isEs ? 'Descuento' : 'Discount'} ({appliedDiscount.code}
+              {appliedDiscount.type === 'percent'
+                ? ` · ${formatDiscountValue('percent', appliedDiscount.value, isEs)}`
+                : ''}
+              )
+            </span>
+            <span style={{ color: '#2e7d32' }}>-{formatCheckoutCurrency(discount)}</span>
+          </div>
+        )}
         {onShippingMethodChange ? (
           <div className="flex items-center justify-between gap-2 pt-2">
             <span>{isEs ? 'Envío' : 'Shipping'}</span>

@@ -27,17 +27,30 @@ Related oddity worth a glance: the root `.git/config` carries
 ## Copying to the repo folder — use the staging folder
 
 **A ready-made, verified staging copy lives at `C:\Users\rcman\NEJ-repo-staging`**
-(built 2026-08-11, deliberately OUTSIDE this folder and outside OneDrive so it
-neither pollutes the source of truth nor triggers a sync storm). Its contents are
-exactly what belongs in the repo — copy *everything* in it into the repo folder
-with no exclusions to think about.
+(rebuilt **2026-08-13**, deliberately OUTSIDE this folder and outside OneDrive so
+it neither pollutes the source of truth nor triggers a sync storm). Its contents
+are exactly what belongs in the repo — copy *everything* in it into the repo
+folder with no exclusions to think about.
 
-Verified at build time: 818 files / 18.75 MB; `.github/workflows/scheduled-jobs.yml`
-present and SHA-256-identical to the source; all 5 `netlify/functions/*.mts`
-present; 489 `next-app/src`, 175 `next-app/public`, 26 `project-docs`, 72
-`supabase` files. Leak check clean — no `.git`, no `next-app/.git`, no
-`.env.local`, no `node_modules`, no `.next`, no `.pem`, no `next-env.d.ts`, no
-`tsconfig.tsbuildinfo`.
+Verified at build time (2026-08-13): **835 files / 19.0 MB**, an **exact
+mirror** of the source — a two-way inventory diff returned 0 files missing and 0
+extra. Per-area: 504 `next-app/src`, 175 `next-app/public`, 27 `project-docs`,
+73 `supabase`, 1 `.github`. Hidden paths confirmed present
+(`.github/workflows/scheduled-jobs.yml`, `.gitignore`, `.claude/launch.json`).
+Leak check clean — 0 `.git`, 0 `node_modules`, 0 `.next`, 0 `.env*`, 0 `.pem`,
+0 `next-env.d.ts`, 0 `*.tsbuildinfo`, 0 `*.log`, 0 `*.bak`.
+
+Content spot-check on this batch's changes: `discount-codes-2026-08.sql`,
+`discount-codes.ts`, `discount-codes-server.ts`, both new API routes, the admin
+page and manager, `DiscountCodeField.tsx`, `features/discount-codes.md`, plus
+`REFUND_SHAPED_CAPTURE_EVENTS` (the refund fix), the PayPal `discount` breakdown
+key, `calculateDiscountAmount`, `BUTTON_LABEL_FONT` (the button font fix), and
+the Discount Codes admin tab — all present.
+
+⚠️ **Verifying a path containing `[locale]` needs `Test-Path -LiteralPath`.**
+PowerShell reads `[...]` as a wildcard character class, so a plain `Test-Path`
+reports `next-app/src/app/[locale]/...` as MISSING when the file is there. That
+false alarm is easy to act on by mistake.
 
 ⚠️ **It is a point-in-time snapshot.** Rebuild it after any further edits:
 
@@ -76,6 +89,27 @@ robocopy "C:\Users\rcman\OneDrive\Documents\NaplesEstateJewelry.co" "<repo folde
 Then re-run without `/L`. **After the copy, confirm `.github/workflows/` landed** —
 it is a hidden directory and some copy methods skip dotfiles. `.env.local` will
 be copied onto disk but stays gitignored and uncommitted, same as today.
+
+## ◻️ OWNER: delete four pre-go-live test orders
+
+Audited 2026-08-13, all confirmed against PayPal. **No customer money involved;
+nothing is owed to anyone.** Owner is deleting these manually.
+
+| Order | Amount | Environment | Why it should go |
+| --- | --- | --- | --- |
+| `NEJ-20260703-XBFR0` | $5,646.90 | SANDBOX | fictional money inflating the live orders table |
+| `NEJ-20260709-6EZ4X` | $37.10 | SANDBOX | same |
+| `NEJ-20260705-SPWIC` | $1.06 | LIVE | DB says refunded; PayPal never refunded it |
+| `NEJ-20260709-DLNY0` | $1.06 | LIVE | same |
+
+The two sandbox rows are why the live `orders` table shows revenue that never
+existed. The two live rows are the opposite error — the record claims a refund
+PayPal never performed ($2.12 total, both owner test addresses). Owner confirmed
+2026-08-13 that the live pair is fine to simply delete rather than refund.
+
+⚠️ Deleting an order also removes its `order_items`. That is correct here — the
+products involved were test data or have long since been re-listed — but do not
+generalize it to a real order.
 
 ## Deploy-day checklist (reusable)
 
@@ -250,9 +284,34 @@ Still true and worth keeping visible:
   Found 2026-08-09 by re-running the constant sweep; deliberately left undone
   rather than expanded into a session that was closing.
 
+## ✅ Discount-codes SQL — APPLIED 2026-08-12
+
+**`supabase/discount-codes-2026-08.sql` has been run in Supabase** and verified
+by a real $42.39 purchase (all 18 checks passed, CHANGELOG 2026-08-12). Nothing
+outstanding here; the notes below are kept for the deploy record.
+
+The original instruction, for reference:
+
+- **Why the order matters:** the checkout and admin code read
+  `public.discount_codes`. The failure is graceful, not catastrophic — a missing
+  table makes every code report "not valid" and the admin page shows a
+  "run the migration" message instead of a Postgres error — but no discount code
+  can work until it runs.
+- **What it does:** creates `discount_codes` and `discount_code_redemptions`,
+  adds three snapshot columns to `orders`, and **replaces `create_paypal_order`
+  and `capture_paypal_order`** (both restated in full from
+  `checkout-quantity-2026-07.sql` with the discount additions). Safe to re-run.
+- **Run it after `checkout-quantity-2026-07.sql`**, which is already applied.
+- **After running,** create one test code in Admin → Discount Codes and confirm
+  it applies at checkout. See the smoke list below.
+
+Everything else below remains true: the carousel migrations are all applied.
+
 ## Next Deployment And Production Smoke
 
-- ✅ **NO MANUAL SQL IS OUTSTANDING.** Every carousel migration has been run and
+- ⚠️ **One manual SQL IS outstanding** — the discount-codes migration above.
+  The statement below refers to the carousel work only.
+- ✅ **NO CAROUSEL SQL IS OUTSTANDING.** Every carousel migration has been run and
   verified against the live database (project `evzluixourmsefwdsieu`):
   `add-second-lineup.sql` and `add-random-lineup-modes.sql` (2026-08-04),
   `add-third-lineup.sql` (2026-08-06, RLS confirmed — anon INSERT refused
@@ -321,6 +380,33 @@ Still true and worth keeping visible:
   code change**, with the dev server stopped and `.next` deleted. Exact
   figures, the compiled-output spot check, and the email invariant re-check are
   in `CURRENT_STATUS.md`. Nothing needs re-running before you copy and deploy.
+- **Discount codes — smoke after running the SQL and deploying:**
+  - Admin → **Discount Codes**: create a percent code (e.g. `THANKYOU`, 15%) and
+    a fixed code (e.g. `FIFTY`, $50). Confirm the value field switches between a
+    `%` and a `$` prefix with the type, that a percent over 100 is refused, and
+    that a duplicate code name is refused with a readable message.
+  - Checkout: apply the percent code and confirm the discount row appears
+    **directly under Subtotal**, the total drops, and **tax is charged on the
+    discounted merchandise plus shipping** (a $1,000 order with 15% off, $35
+    shipping, FL address should read $150 off, $53.10 tax, $938.10 total).
+  - Apply the fixed code to a cart **smaller than the code** (e.g. $50 off an
+    $80 item) and confirm the discount clamps to $80, merchandise reads $0, and
+    the order is still payable for shipping + tax.
+  - **Complete one real discounted purchase.** This is the check that cannot be
+    made locally: confirm PayPal accepts the breakdown (a wrong discount key is
+    a 422 at create-order), the captured amount matches the discounted total,
+    and the code's **Used** count increments by exactly 1 in Admin.
+  - Set a code's total-uses to 1, redeem it, and confirm it then reports
+    "Limit reached" and is refused at checkout.
+  - Try the same code twice with the SAME email and confirm it is refused;
+    ⚠️ then note that a DIFFERENT email will be accepted — that is by design,
+    see DECISIONS, *"the cap is the control"*.
+  - Set a `minimum order` above the cart total and confirm the refusal names the
+    threshold, in both locales.
+  - Spanish: apply and remove a code on `/es/checkout` and confirm the discount
+    row, the applied chip, and each refusal message are Spanish.
+  - Apply a code, then edit the cart, and confirm the discount recalculates
+    against the new subtotal rather than showing a stale figure.
 - **New surfaces to smoke after the NEXT deploy (2026-08-09 batch), on a real
   phone where marked 📱:**
   - Shop cards 📱: bottom ADD button present on every card; corner cart icon
@@ -505,11 +591,52 @@ Still true and worth keeping visible:
   Florida-only policy. Review destination county rate lookup, Florida's
   per-item $5,000 discretionary-surtax cap, registered nexus states, estimate
   wording, and PayPal jurisdiction cases.
-- **Run the controlled PayPal matrix** in the configured environment: create
-  retry, successful/declined/ambiguous capture, local-finalization retry,
-  duplicate webhooks, two-buyer race, partial/full/idempotent refunds,
-  pending/failed refund states, locked shipped address, Local Pickup, invoice,
-  guest confirmation, and receipt history.
+- ✅ **Refunds — full AND partial — are verified (2026-08-12).** The first live
+  refund found that every refund silently failed to record; fixed, and a full
+  refund verified end to end against a real PayPal capture. The partial path was
+  then exercised against the **real `apply_paypal_refund` Postgres function**
+  with a synthetic $100 order — 18 checks covering the
+  `cumulative - alreadyRefunded` increment, `PENDING`-ledger attachment,
+  idempotent replay, the full-refund flip, and the over-refund clamp. Detail in
+  CHANGELOG 2026-08-12.
+  - ✅ **Live partial refunds DONE 2026-08-13.** Two real partial refunds
+    ($0.50 then $0.56 on a $1.06 purchase) confirmed the payload shape against
+    PayPal's API directly. `total_refunded_amount` is **cumulative** — proven by
+    re-fetching the first refund and seeing `amount $0.50` alongside
+    `total_refunded_amount $1.06`. Nothing here remains open.
+- ◻️ **Settle what `paypal_refunds.amount` MEANS, then fix the ledger drift.**
+  Scoped follow-up, deliberately deferred past the 2026-08-13 deploy. **Best
+  done soon: the table currently holds ZERO rows**, so this is a shape to get
+  right rather than data to repair — and that gets harder with every refund.
+  - **The root problem is not the upsert, it is the two meanings.** Three
+    callers disagree: CAPTURE.REFUNDED passes the *increment*, while
+    REFUND.PENDING/FAILED and the admin refund route pass the refund's *own
+    amount*. They coincide on a capture's FIRST refund and diverge on every
+    partial after it.
+  - Knock-ons: the `PENDING`-row match can miss on a second partial (it matches
+    on the increment, but the row holds the own amount), and
+    `apply_paypal_refund` rewrites `amount` before its `applied_at` guard.
+  - ⚠️ **Reachable via webhook ORDER, not just replay.** PayPal does not
+    guarantee ordering; refund #2 landing before #1 leaves one misattributed row
+    and one missing. An earlier note calling this "unreachable" was wrong.
+  - **`orders.refund_amount` is always correct** — driven by PayPal's cumulative
+    — so this is an audit-trail defect, never a money defect. **Until it is
+    fixed, reconcile against `orders.refund_amount`, never a SUM of
+    `paypal_refunds.amount`.**
+  - Needs a new SQL migration; see DECISIONS for the full analysis.
+  - ◻️ **Cosmetic, unreachable in practice:** an over-refund writes a
+    `paypal_refunds` row for the full increment while `orders.refund_amount`
+    clamps at the total, so the ledger would sum higher than the order. PayPal
+    cannot refund more than was captured, so this only occurs in the defensive
+    path. Left alone deliberately.
+- **Run the rest of the controlled PayPal matrix** in the configured
+  environment: create retry, successful/declined/ambiguous capture,
+  local-finalization retry, duplicate webhooks, two-buyer race,
+  partial/idempotent refunds, pending/failed refund states, locked shipped
+  address, Local Pickup, invoice, guest confirmation, and receipt history.
+  ⚠️ The refund bug is the standing argument for actually running this: it sat
+  undetected because no live refund had ever been issued, and a green unit suite
+  had asserted the broken behavior.
 - Verify one shipped PayPal order retains the exact approved shipping address
   and one Local Pickup order omits shipping.
 - Verify Available → Sold → Available sold-price locking on a deliberate item;
@@ -589,9 +716,12 @@ Still true and worth keeping visible:
     `done:true, pushed:6, blocked:1, remaining:0` (`warning` solely because of
     #82's deliberate write block). **Day totals: Etsy 58 pushed, eBay 56 pushed,
     0 failures on either, 0 listings at the backoff ceiling.**
-  - ◻️ **Confirm the crons fire on their own** at 11:15 and 11:45 UTC. Every run
-    so far was manually dispatched, which exercises the same code path but not
-    GitHub's scheduler. Expect a second `scheduled_price_push` row per provider.
+  - ✅ **The crons FIRED ON THEIR OWN, 2026-08-11 — the automation arc is closed.**
+    Etsy at **11:54 UTC** (11 pushed, 79 unchanged, 0 failed) and eBay at
+    **12:27 UTC** (1 pushed, 86 unchanged, 1 blocked, 0 failed). 39 and 42 minutes
+    after their 11:15/11:45 slots, which is ordinary GitHub Actions best-effort
+    scheduling — not a fault. Zero failures on either; eBay's `warning` outcome is
+    only #82's deliberate block. Nothing left to prove here.
   - **Superseded detail from when this was still pending:**
   - 🟡 **FIX PATH B WAS BUILT AND WAITING ON FOUR SECRETS (2026-08-10).**
     `.github/workflows/scheduled-jobs.yml` replaces all five Netlify schedules
@@ -686,7 +816,39 @@ Still true and worth keeping visible:
   dashboard). The owner action recorded above under the contact-address section
   is already satisfied — nothing to delete.
 
-- 🟡 **CAMPAIGN STARTED 2026-08-11 — 21 of 81 done, tier mechanism PROVEN.**
+- ✅ **CAMPAIGN COMPLETE 2026-08-11 — 85 of 86 available listings on the correct
+  tier.** The only one left is **#82**, write-blocked by design (fix it on eBay).
+  Post-fix runs cleared 25, 23 and 12; `published` 85, `out_of_date` 1.
+  Verified on the live public listings across two bands: $714.80 → **$35.00**,
+  $663.58 → **$35.00**, and $10,098.83 → **$99.00 "Signed"** (the Registered Mail
+  treatment the $5,000–15,000 band requires). Nothing further to do here.
+  - ⚠️ **Correction to the note below:** the eBay 25604 "Availability not found"
+    failures were **transient, not item-specific**. The failing pair rotated each
+    run (26/31 → 29/23) and every one succeeded on a later attempt. Roughly 2 per
+    25, cleared by retry. None remain.
+  - ⛔ **#83 and #84 (the two Rolexes) are NOT going on eBay — owner decision,
+    2026-08-11. Do NOT build the `Department` aspect mapping.** They fail
+    deterministically with *"The item specific Department is missing"* because
+    eBay category 31387 (Wristwatches) requires a Men's/Women's/Unisex aspect
+    `mapAspects` does not send — `mapping.ts` flags this at the `Watch` entry as
+    `TODO(ebay-verify)`. That TODO now has an answer: **not needed, we are not
+    listing watches.** Its aside that "no Watch-type item exists in the catalog
+    yet" is stale (two do), but the conclusion stands for a different reason.
+    - ✅ **Handled in code 2026-08-11 (undeployed).** `EBAY_EXCLUDED_PRODUCT_IDS`
+      (`ebay/guards.ts`) holds the two ids; pre-flight now fails `eligibility`
+      with "This item is not listed on eBay per owner decision", and
+      `enqueueProducts` drops them alongside write-blocked ids so no bulk run
+      wastes a slot on them. **Per item, deliberately — NOT a `Watch` category
+      rule**, so a future watch still syncs normally (pinned by a test).
+    - ✅ **Their stale `error` rows were reset to `pending` ("Not listed") in
+      production.** Dry-run first: both had `ebay_listing_id: null`, so nothing
+      live on eBay was affected. `error_count` → 0, `last_error` → null. Zero
+      listings remain in `error` state.
+    - ⚠️ Until this deploys, `pending` sorts FIRST in `orderEnqueueCandidates`,
+      so a bulk eBay sync run before deployment would pick them up and fail them
+      back to `error`. The campaign is finished, so just avoid bulk runs until
+      this ships.
+- 🟡 *(superseded — kept for the sequence)* **CAMPAIGN STARTED 2026-08-11 — 21 of 81 done, tier mechanism PROVEN.**
   The controlled single-item test and a bulk-batch item were both verified on
   the live public eBay listings: $714.80 → **$35.00 shipping** and $663.58 →
   **$35.00 shipping**, both correct for the $600–1,000 band (policy

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useCart, type CartItem } from '@/context/CartContext';
 import OrderSummary, { OrderTotals } from '@/components/checkout/OrderSummary';
 import PayPalCheckoutButton from '@/components/checkout/PayPalCheckoutButton';
+import DiscountCodeField from '@/components/checkout/DiscountCodeField';
+import type { AppliedDiscount } from '@/lib/discount-codes';
 import StockAlertBanner from '@/components/cart/StockAlertBanner';
 import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 import { createClient } from '@/lib/supabase/client';
@@ -86,6 +88,9 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     address_line1: '', address_line2: '', city: '', state: '', postal_code: '', country: 'United States',
   });
   const [shippingMethod, setShippingMethod] = useState<string>(DEFAULT_SHIPPING_METHOD);
+  // Previewed discount, for display only — the code string is what gets sent
+  // with the order and the server recomputes the amount from it.
+  const [appliedDiscount, setAppliedDiscount] = useState<AppliedDiscount | null>(null);
   const [infoConfirmed, setInfoConfirmed] = useState(false);
   // For Local Pickup the address is optional and hidden behind an accordion the
   // buyer can expand if they want to provide it. (Ignored when shipping is
@@ -169,10 +174,14 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     ? shippingMethod
     : DEFAULT_SHIPPING_METHOD;
 
+  // The discount code is part of the key: applying or removing one changes the
+  // amount due, so a previously created order must not be reused for it. (The
+  // server independently rejects a stale reuse, but invalidating here avoids a
+  // pointless round trip and keeps the two checks in agreement.)
   const cartPayloadKey = `${items
     .map((item) => `${item.id}:${Math.max(1, Math.floor(item.purchaseQuantity ?? 1))}`)
     .sort()
-    .join(',')}|${effectiveShippingMethod}`;
+    .join(',')}|${effectiveShippingMethod}|${appliedDiscount?.code ?? ''}`;
 
   // Invalidate the reusable order id when the cart or shipping method changes
   // after the order was created (buyer cancelled PayPal, then edited things).
@@ -233,6 +242,9 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
         country: customer.country,
       },
       shippingMethod: effectiveShippingMethod,
+      // Only the CODE is sent. The server re-reads it and recomputes the
+      // discount from its own subtotal, so no amount crosses the wire.
+      discountCode: appliedDiscount?.code ?? null,
       orderId: orderIdRef.current,
     };
   }
@@ -794,12 +806,26 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
               />
             </div>
 
+            {/* Sits between the items and the totals so the discount row it
+                produces appears directly below the subtotal it modifies. */}
+            <DiscountCodeField
+              items={summaryItems}
+              shippingMethod={effectiveShippingMethod}
+              shippingState={customer.state}
+              email={customer.email}
+              isEs={isEs}
+              applied={appliedDiscount}
+              onApplied={setAppliedDiscount}
+              onCleared={() => setAppliedDiscount(null)}
+            />
+
             <OrderTotals
               items={summaryItems}
               isEs={isEs}
               shippingMethod={effectiveShippingMethod}
               shippingState={customer.state}
               hideSoldItemPrices={hideSoldItemPrices}
+              appliedDiscount={appliedDiscount}
             />
 
             <p className="text-xs leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>

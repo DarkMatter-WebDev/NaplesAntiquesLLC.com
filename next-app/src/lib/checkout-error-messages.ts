@@ -38,6 +38,10 @@ export function checkoutErrorMessageForCode(
       return isEs
         ? 'Un artículo de su pedido aún no está disponible para compra en línea. Llámenos al (239) 404-8505 para comprarlo.'
         : 'An item in your order isn’t available for online purchase yet. Please call (239) 404-8505 to buy it.';
+    case 'discount_invalid':
+      return isEs
+        ? 'El código de descuento de este pedido ya no es válido — puede haber expirado o alcanzado su límite de usos. Quítelo con “Quitar” en su resumen e intente de nuevo.'
+        : 'The discount code on this order is no longer valid — it may have expired or reached its usage limit. Remove it with “Remove” in your order summary and try again.';
     default:
       return null;
   }

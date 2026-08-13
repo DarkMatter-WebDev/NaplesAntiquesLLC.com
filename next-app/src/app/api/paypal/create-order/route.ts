@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { buildAddressObject, generateOrderNumber } from '@/lib/sales';
 import { buildOrderDraft, isOrderDraftError, normalizeOrderLines, type OrderLine } from '@/lib/checkout-pricing';
+import { normalizeDiscountCode } from '@/lib/discount-codes';
+import { makeDiscountResolver } from '@/lib/discount-codes-server';
 import { isCheckoutShippingMethod, shippingMethodForDb } from '@/lib/checkout-shipping';
 import {
   createPayPalOrder,
@@ -78,6 +80,12 @@ export async function POST(req: Request) {
     );
   }
   const customer = body.customer ?? {};
+  // Only the CODE crosses the wire — never an amount. The resolver below
+  // re-reads the code and recomputes the discount from the server's own
+  // subtotal, so a forged `discount` field in the body has no effect.
+  const discountCode = normalizeDiscountCode(
+    typeof body.discountCode === 'string' ? body.discountCode : null,
+  );
   const shippingMethod = String(body.shippingMethod ?? 'local-pickup');
   if (!isCheckoutShippingMethod(shippingMethod)) {
     return NextResponse.json({ error: 'Invalid shipping method.' }, { status: 400 });
@@ -118,6 +126,11 @@ export async function POST(req: Request) {
   const supabase = await createClient();
   const service = createServiceClient();
 
+  // Service client: discount_codes is admin-only under RLS, so the request-scoped
+  // client cannot read it. Null when no code was submitted, which keeps an
+  // ordinary order free of any discount lookup.
+  const discountResolver = makeDiscountResolver(service, discountCode, customer.email);
+
   // ---- Retry path: reuse an existing unpaid order, re-create its PayPal order.
   // Only reuse when the stored order still matches what the buyer is paying for
   // NOW — same product set and same recomputed totals. The buyer may have edited
@@ -127,7 +140,7 @@ export async function POST(req: Request) {
   if (reuseOrderId) {
     const { data: order, error } = await service
       .from('orders')
-      .select('id, order_number, total, subtotal, tax, shipping_fee, payment_status, paypal_capture_id')
+      .select('id, order_number, total, subtotal, tax, shipping_fee, discount, discount_code, payment_status, paypal_capture_id')
       .eq('id', reuseOrderId)
       .maybeSingle();
 
@@ -162,11 +175,18 @@ export async function POST(req: Request) {
         orderLines,
         shippingMethod,
         normalizedShippingAddress?.state ?? customer.state,
+        discountResolver,
       );
+      // The discount is part of "same totals" — the buyer may have added,
+      // changed, or removed a code since the cancelled attempt, and a code can
+      // also have expired or filled its cap in the meantime. On any mismatch we
+      // fall through and rebuild, rather than re-charging the stale amount.
       sameTotals =
         !isOrderDraftError(draft) &&
         draft.subtotal === Number(order.subtotal) &&
         draft.shippingFee === Number(order.shipping_fee) &&
+        draft.discount === Number(order.discount ?? 0) &&
+        (draft.appliedDiscount?.code ?? null) === (order.discount_code ?? null) &&
         draft.total === Number(order.total);
     }
 
@@ -184,6 +204,7 @@ export async function POST(req: Request) {
           subtotal: Number(order.subtotal),
           tax: Number(order.tax),
           shipping: Number(order.shipping_fee),
+          discount: Number(order.discount ?? 0),
           total: Number(order.total),
           items: lineItems(items),
           referenceId: order.id,
@@ -225,6 +246,7 @@ export async function POST(req: Request) {
     orderLines,
     shippingMethod,
     normalizedShippingAddress?.state ?? customer.state,
+    discountResolver,
   );
   if (isOrderDraftError(draft)) {
     // `code` lets the checkout client show precise bilingual guidance instead
@@ -246,7 +268,12 @@ export async function POST(req: Request) {
     subtotal: draft.subtotal,
     tax: draft.tax,
     shipping_fee: draft.shippingFee,
-    discount: 0,
+    discount: draft.discount,
+    // Snapshot the code and its terms so a historical order still reads
+    // correctly after the code is edited, deactivated, or deleted.
+    discount_code: draft.appliedDiscount?.code ?? null,
+    discount_type: draft.appliedDiscount?.type ?? null,
+    discount_value: draft.appliedDiscount?.value ?? null,
     total: draft.total,
     payment_method: 'paypal',
     shipping_method: shippingMethodForDb(shippingMethod),
@@ -287,6 +314,7 @@ export async function POST(req: Request) {
       subtotal: draft.subtotal,
       tax: draft.tax,
       shipping: draft.shippingFee,
+      discount: draft.discount,
       total: draft.total,
       items: lineItems(draft.items),
       referenceId: orderId,

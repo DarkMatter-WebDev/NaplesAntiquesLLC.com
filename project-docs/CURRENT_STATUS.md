@@ -2,237 +2,213 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-08-10**.
+> in `DECISIONS.md`. Last reconciled: **2026-08-13**.
 
-## Deploy baseline
+## Start Here (handoff, end of the 2026-08-13 session)
 
-**Production is `main@aeb03cc`** (published 2026-08-10 23:49). Verified live on
-that deploy: the promo banner reads "Free evaluations · This month only" and
-links to `/free-evaluation`; the old service copy is gone.
+**Read this, then `TASKS.md`. Everything below is current as of 2026-08-13.**
 
-⚠️ Note `main@78af2ed` ("stage") shows **Canceled** in the deploy list — it was
-superseded by `aeb03cc`, not lost. But it is a reminder: check a deploy reaches
-**Published**, never assume it did.
+### The one action waiting: DEPLOY, then look at one page
 
-**Undeployed at the end of this session** (both verified locally, gate green):
+Everything in this batch is finished, gated, and staged. The owner deploys by
+copying `C:\Users\rcman\NEJ-repo-staging` into the repo folder (keeping that
+folder's `.git`) and pushing.
 
-1. **Marketplace flag split** — the product table's state chip relabelled
-   "Content stale", plus a separate price chip. See CHANGELOG *(later 4)*.
-2. **In-app-browser stutter fix** — `svh` everywhere customer-facing, and every
-   `resize` listener guarded. See CHANGELOG *(later 5)*.
+**Immediately after deploy, in this order:**
 
-## 🟢 Scheduled jobs now RUN — via GitHub Actions (cut over 2026-08-11)
+1. **Watch the Netlify build reach `Published`** — a previous deploy showed
+   `Canceled`. Local builds run Node v24; Netlify pins 20.
+2. 🔴 **Open Admin → Discount Codes.** This is the only surface in the batch
+   nobody has ever seen rendered — it needs an authenticated session, which the
+   development environment could not produce. The code compiles, its guards were
+   verified (307 to sign-in, 401 on the API), and its buttons use the same
+   inline-font mechanism measured working on checkout — but that is inference,
+   not observation. Create one code and confirm it looks right.
+3. **Run one discounted order end to end.** The SQL is already applied.
+4. **Confirm the first real refund records.** This is the highest-value fix in
+   the batch and the one whose automatic path is still unexercised in
+   production — every refund before this deploy failed silently.
 
-**The automation works for the first time in this project's history.** The
-GitHub Actions workflow replaced the dead Netlify schedules and, on its first
-real run, produced rows that had never existed:
+### What this session produced
 
-| Log | Result |
+- **Discount codes** — new admin tab, checkout field, percent or fixed-dollar,
+  optional minimum order / expiry / redemption cap. SQL applied, proven by a
+  real purchase.
+- 🔴 **A PayPal refund bug found and fixed** — the most consequential item here.
+  Every refund silently failed to record. Verified against one full and two
+  partial live refunds.
+- **A button font bug** — Tailwind font utilities are inert on `<button>`
+  sitewide; fixed in the discount components only.
+- **A pre-deploy PayPal audit** — the four mysterious `refunded` orders are all
+  pre-go-live test artifacts, two of them sandbox. No customer money involved.
+
+### Three things a future session should NOT re-derive
+
+- **~205 buttons across the codebase carry Tailwind font classes that do
+  nothing.** Pre-existing, understood, deliberately not fixed sitewide.
+- **Sandbox rows live permanently in the live `orders` table** (early July,
+  before the 2026-07-09 go-live). Filter by the host in `payment_response`.
+- **`paypal_refunds.amount` is not a reconciliation source.** Use
+  `orders.refund_amount`. The column holds two different meanings depending on
+  which of its three callers wrote it — a known, scoped follow-up in `TASKS.md`,
+  deferred past this deploy. The table holds zero rows today, so it is a shape
+  to settle rather than data to repair.
+
+### ✅ Discount-codes SQL applied and proven by a real purchase (2026-08-12)
+
+`supabase/discount-codes-2026-08.sql` has been run in Supabase. A real $42.39
+PayPal purchase with a 20% code passed **18 of 18 checks** — including the
+atomic redemption inside `capture_paypal_order` and PayPal accepting the
+discount breakdown, the two things that could not be verified any other way.
+No manual SQL is outstanding again. Detail: CHANGELOG 2026-08-12.
+
+✅ **Test data fully torn down 2026-08-12**, after the payment was refunded in
+PayPal (full $42.39, zero fee). Verified clean: 0 test products, 0
+`discount_codes`, 0 redemptions, 0 orders with a discount code, no orphaned
+`paypal_refunds` row, and `DEEPFIELD_SYNC_DRY_RUN` restored to `false`.
+
+🔴 **That refund exposed a real production bug, now FIXED (undeployed):
+every PayPal refund silently failed to record.** The money moved correctly but
+the order stayed `paid` with a null `refund_amount`, because a
+`PAYMENT.CAPTURE.REFUNDED` resource is a REFUND, not a capture — so the refund
+id was passed where the capture id belonged and `apply_paypal_refund` refused
+the write. See CHANGELOG 2026-08-12 and DECISIONS.
+
+✅ **Nothing needs repairing from it.** Audited 2026-08-13: **no refund-type
+webhook has ever been received on a real order**, so no customer refund was
+lost. The four orders sitting at `refunded` with a null `refund_amount` are all
+pre-go-live test artifacts — two SANDBOX ($5,646.90 and $37.10, fictional money)
+and two live $1.06 owner tests the database wrongly calls refunded. Owner is
+deleting all four; see `TASKS.md`.
+
+✅ **Refunds are verified both ways, both LIVE.** Full: end to end on a real
+$42.39 capture. Partial: two real partial refunds ($0.50 then $0.56 on a $1.06
+purchase, 2026-08-13) taking the order `paid` → `partially_refunded` →
+`refunded`, plus 18 synthetic checks covering `PENDING`-ledger attachment,
+idempotent replay and the over-refund clamp. **`total_refunded_amount` is
+confirmed CUMULATIVE** — the assumption the incremental branch rests on. The
+long-open "PayPal refund matrix" item is closed for refunds; capture races,
+disputes and invoices remain untested.
+
+⚠️ **Reconcile refunds against `orders.refund_amount`, never a SUM of
+`paypal_refunds.amount`** — the ledger amount can drift on a repeat call for an
+already-applied refund id. Unreachable from the real webhook path; see DECISIONS.
+
+### One thing is waiting: DEPLOY
+
+A batch is finished, fully verified, and sitting undeployed in
+`C:\Users\rcman\NEJ-repo-staging` — **rebuilt 2026-08-13, 835 files / 19.0 MB,
+verified as an exact mirror of this folder** (two-way inventory diff: 0 missing,
+0 extra) and leak-checked clean. Production is `main@3e30d0e`.
+
+**Nothing further is needed before deploying.** Copy the staging folder into the
+repo folder, keeping that folder's `.git`, then push.
+
+**What is in it:**
+
+1. **eBay per-item exclusion** — the two Rolexes are held out of eBay by id
+   (`EBAY_EXCLUDED_PRODUCT_IDS`). WARNING: **deploy before running any bulk eBay
+   sync** — until it lands they sort FIRST in the enqueue order and would fail
+   back to `error`.
+2. **Bulk-enqueue ordering** — `orderEnqueueCandidates` (stale -> error ->
+   published) so a repeated bulk run advances instead of redoing its first page.
+3. **Marketplace flag split** — "Content stale" plus a separate price chip.
+4. **In-app-browser stutter fix** — `svh` sitewide, guarded `resize` listeners.
+5. **Announcement banner** — pinned inside the hero frame, now the
+   free-evaluation promo, linked to `/free-evaluation`.
+6. **Discount codes** (2026-08-11) — a new admin tab plus a checkout field.
+   Percent or fixed-dollar, with optional minimum order, expiry, and a hard
+   redemption cap. Its SQL is **already applied** in Supabase, and the feature is
+   proven by a real purchase.
+7. **PayPal refund fix** (2026-08-12) — 🔴 the highest-value item in this batch.
+   Before it, **every refund silently failed to record**. Verified live on a
+   full refund and two partial refunds.
+8. **Button font fix** (2026-08-12) — Tailwind font utilities are inert on
+   `<button>` in this app; the discount components now set font properties
+   inline. Scoped to those components deliberately, not fixed sitewide.
+
+### How this folder ships
+
+There is **no git workflow here**. Copy `C:\Users\rcman\NEJ-repo-staging`
+wholesale into the repo folder (`OneDrive\Documents\GitHub\NaplesAntiquesLLC.com`),
+keeping that folder's `.git`, then push. Rebuild staging after any edit — the
+exact command is in `TASKS.md` under *Copying to the repo folder*.
+
+WARNING: **never copy the project root directly** — it contains `.git` AND a
+stray `next-app/.git`, and the latter would silently drop the whole app from
+commits. **Check the deploy reaches `Published`**; one showed `Canceled` earlier
+in this session (superseded, not lost, but do not assume).
+
+### What changed structurally this session
+
+- **GitHub Actions owns every cron now**, not Netlify. All five Netlify
+  scheduled functions had NEVER executed — a platform fault, not our code.
+  `.github/workflows/scheduled-jobs.yml` replaced them and is **confirmed firing
+  on its own**. The `.mts` files remain only so the change is reversible.
+- **The eBay shipping-tier campaign is COMPLETE** (85 of 86; #82 is
+  write-blocked by design).
+
+### Before writing code, read these DECISIONS entries
+
+- *An absent record is a fault, not a clean slate* — why a never-run schedule
+  must render red.
+- *Content freshness and price-push health are two separate signals* — do not
+  merge them; a successful price push cannot clear `out_of_date`.
+- *A bounded bulk run must ORDER its queue, not just cap it*.
+- *Watches are not listed on eBay* — do NOT implement the `Department`
+  `TODO(ebay-verify)` in `mapping.ts`; it is answered.
+- *Viewport height is `svh`, and `resize` is never listened to bare*.
+- Hero/shop-card rules: *One solid background per slideshow*, *On touch, the hero
+  snaps exactly one slideshow per gesture*, *Shop-card photos: swipe + windowed
+  dots on touch*. Older entries describing the removed background sweep carry
+  inline supersession notes — the newer entry is the rule.
+
+### Verification at session end
+
+| Command | Result |
 | --- | --- |
-| `etsy_sync_log` / `scheduled_price_push` | **FIRST EVER** — "42 pushed, 32 unchanged, 0 blocked, 0 failed, 16 deferred" |
-| `instagram_sync_log` / `scheduled_drip` | ok — 0 published, 0 skipped |
-| `facebook_sync_log` / `scheduled_drip` | ok — 0 published, 0 skipped |
-| `instagram_sync_log` / `token_refresh` | ok — "no action needed (not_due)" |
-| `ebay_sync_log` / `scheduled_price_push` | **FIRST EVER** — "50 pushed, 67 unchanged, 1 blocked, 0 failed, 6 deferred" |
+| `npx tsc --noEmit` | clean |
+| `npm run lint` | clean |
+| `npm test` | **944 passed / 944**, 94 files |
+| `npm run build` | compiled successfully, **453/453** static pages, no warnings |
 
-A second dispatch at 02:47 UTC drained the deferred remainders. **Day totals:
-Etsy 58 pushed, eBay 56 pushed, 0 failures on either, 0 listings at the
-3-attempt backoff ceiling.** Etsy's final run returned outcome **`ok`** with
-`remaining: 0` — the first completely clean scheduled run in the project's
-history. eBay's stays `warning` only because inventory #82 is deliberately
-write-blocked.
+(Re-run 2026-08-11 after the discount-codes feature; previously 903/903 across
+92 files and 449 pages. The +41 tests and +4 pages are that feature.)
 
-The `token_refresh` row exists solely because of the skip-logging added the same
-day — before that, a successful run would have left no trace at all.
+Run from `next-app/`, with the dev server stopped and `.next` deleted first.
 
-✅ **`EBAY_CRON_SECRET` was rotated and eBay now works too.** Its first attempt
-failed `HTTP 401 {"code":"unauthorized","message":"Invalid cron secret."}` —
-"Invalid" rather than "not configured", so the secret existed but its value
-differed from Netlify's. It could not simply be re-copied: Netlify marks that
-variable **secret in four of five deploy contexts**, which is write-only (lock
-icons, Options offers only Edit/Delete, no reveal). The owner rotated it in
-Netlify, redeployed, updated the GitHub secret, and the rerun went green.
+### Owner-owned, not blocking
 
-**The eBay result is the more meaningful one.** Before the 2026-08-08 fixes an
-eBay price push produced **139 errors in a single run**. This run: **50 pushed,
-0 failed**, zero listings left with `error_count > 0`. The "1 blocked" is
-inventory #82, held back by `EBAY_WRITE_BLOCKED_PRODUCT_IDS` exactly as
-designed.
+eBay **#82** reattachment, the `/free-evaluation` hero photo, and the phone-only
+checks (in-app-browser scroll, shop cards, hero flick) in `TASKS.md`.
 
-⚠️ **`.env.local` was NOT in sync with Netlify for the eBay cron secret** (local
-ended `3bb6`, Netlify production ended `4e67`). That is why eBay failed while the
-other three, which did match, succeeded. Both are now the rotated value. The
-standing rule — Netlify is authoritative, check rather than assume — is evidenced
-rather than merely cautionary; do not record `.env.local` as authoritative.
+## Marketplace Automation — current state
 
-The Netlify functions remain deployed and still never fire; they are left in
-place only so the change is reversible. History of the fault is below.
+**GitHub Actions owns every scheduled job.** All five Netlify scheduled functions
+had never once executed (a platform fault; the `.mts` files are kept only so the
+change is reversible). `.github/workflows/scheduled-jobs.yml` replaced them and is
+**confirmed firing on its own** — Etsy 11:54 UTC and eBay 12:27 UTC on
+2026-08-11, ~40 min after their slots, which is normal GitHub best-effort
+scheduling. Zero failures. Full history: CHANGELOG 2026-08-10 and 2026-08-11.
 
-## 🔴 No Netlify scheduled function has ever run (found 2026-08-10)
+**The eBay shipping-tier campaign is COMPLETE.** 85 of 86 available listings
+carry the correct tier, verified on the live listings across two bands ($35.00 at
+$600–1,000; $99.00 "Signed" at $5,000–15,000). Zero listings sit in `error`.
 
-**Nothing automatic is running on this site.** Not the Etsy price push, not the
-eBay price push, not the Instagram or Facebook drip workers, not the Instagram
-token refresh. Verified from both sides on 2026-08-10:
+Two items are deliberately not synced and are **not** open work:
 
-- **Database:** zero `scheduled_price_push` rows across 1,538 Etsy and 56,480
-  eBay log rows; zero `scheduled_drip` rows with both social channels
-  `connected`. Every one of those code paths logs unconditionally, including
-  skips.
-- **Netlify:** the function log is empty for the last 24 hours on both
-  `ebay-price-push` and `instagram-drip` — the latter is scheduled 14 hours a day
-  and should show ~14 invocations.
+- **#82** — write-blocked in code pending an owner-approved reattachment on eBay.
+  It is the one remaining `out_of_date` row and can only be fixed on eBay.
+- **#83 / #84 (the Rolexes)** — owner decided 2026-08-11 that watches are not
+  listed on eBay. Held out per item by `EBAY_EXCLUDED_PRODUCT_IDS`. ⛔ Do NOT
+  implement the `Department` `TODO(ebay-verify)` in `mapping.ts`; see DECISIONS,
+  *"Watches are not listed on eBay"*.
 
-Ruled out: functions are deployed (6 on `main@7576826`), all five show the
-**Scheduled** badge with a *Next execution*, all four `*_CRON_SECRET` variables
-exist scoped to Functions, and 614 team credits remain. An erroring function
-would still write to Netlify's log — these are never invoked.
+⚠️ **`.env.local` is not authoritative.** It was out of sync with Netlify for the
+eBay cron secret, which is exactly how that value broke. Netlify wins; check
+rather than assume. A rotated cron secret must change in three places: Netlify
+(plus a redeploy), the GitHub Actions secret, and `.env.local`.
 
-**Manual `Run now` fails the same way**, which narrows it further. Pressing it on
-`instagram-drip` — with the due-row query verified server-side as returning `[]`
-first, so the run was a guaranteed no-op that still logs unconditionally —
-produced no `scheduled_drip` row and no Netlify log line. The Next.js Server
-Handler is also a function here and works fine, so the fault is specific to
-**scheduled** functions. **This is a platform fault, not an application bug;
-nothing in this repo can fix it — it needs a Netlify support ticket.** Detail in
-`CHANGELOG.md` 2026-08-10; owner steps in `TASKS.md` → *Etsy And eBay*.
-
-**A replacement trigger is built and waiting on four secrets.**
-`.github/workflows/scheduled-jobs.yml` runs all five jobs from GitHub Actions on
-the same cron expressions, hitting the same secret-guarded routes — the routes
-were designed trigger-agnostic, so **no application code changed**. The owner
-must add `ETSY_CRON_SECRET`, `EBAY_CRON_SECRET`, `INSTAGRAM_CRON_SECRET` and
-`FACEBOOK_CRON_SECRET` as repository secrets (the repo has none today); the
-workflow then also gives a manual **Run workflow** button per job, replacing the
-Netlify Run now that no longer works. Steps and caveats in `TASKS.md`.
-
-Confirmed 2026-08-11 that this approach works at all: an unauthenticated
-`POST https://naplesestatejewelry.com/api/admin/etsy/price-push` returns
-**401 `{"error":"Unauthorized."}`**, so the routes are reachable from outside
-Netlify.
-
-Consequences until that lands: marketplace prices move **only** when someone
-clicks "Push prices now", the Instagram/Facebook queues never drain on their
-own, and the Instagram long-lived token is not being refreshed weekly. That last
-one is the only real deadline, and it is not urgent — the token runs to
-**2026-09-30** and the renewal window is 7 days.
-
-The Admin Settings price cards no longer hide this: a never-run or overdue
-schedule renders red and names the Netlify function log, instead of the old
-green check reading *"Ready for Daily at 11:45 UTC."* (undeployed, 2026-08-10).
-
-## Start Here (handoff, end of the 2026-08-09 → 2026-08-10 session)
-
-> **⚠️ SUPERSEDED IN PART — the batch below SHIPPED as `main@27c12e2` on
-> 2026-08-09 and production verification passed, except for ONE regression that
-> is fixed locally and awaiting a second deploy.**
->
-> - **Deployed and verified:** hero CTAs two-up-one-down, hero Trade →
->   `/trade-in`, reviews band 2-up with clamped quotes and Google links,
->   redirects/webhook carve-out, robots/sitemap. Netlify build clean at
->   449/449 pages. Detail: `CHANGELOG.md` → *2026-08-09 (post-deploy)*.
-> - 🔴 **Undeployed fix:** the shop-card `Ca. YYYY` label collides with the
->   price on 2-up cards (measured **-9px** on production at 390px). Fixed
->   locally with a container query on the price row that **drops the "Ca."
->   prefix and keeps the bare year** when the row is under 185px of content
->   width — the label stays in its left slot and no card changes height.
->   `tsc` and `lint` clean, measured across the width ladder in both locales.
->   **`npm run build` has now been run and is clean (449/449 pages, no
->   warnings) — this is waiting on a redeploy only.** (`npm test` green at
->   **848/848**.)
-> - 🔴 **Undeployed:** `/free-evaluation` **rebuilt as a sendable landing
->   page** — form moved out of the hero into its own "Send a request below"
->   block (photos optional), hero now explains the service in Chris's voice
->   beside a photo of an evaluation in progress, plus a new detailed sorting
->   section covering purity subcategories and piece-by-piece pricing. Both
->   locales. ⚠️ The hero image is a **placeholder**
->   (`pages/evaluation-desk-placeholder.webp`) — owner rejected the generated
->   likeness of himself and will supply a real photo. It is framed with no
->   identifiable face on purpose, because the copy beside it is first person.
->   **Swap the file and its alt text together.**
-> - 🔴 **Undeployed:** **wrap groups centred below `lg`** on
->   `/free-evaluation` (trust chips + hero CTAs). Every other customer-facing
->   wrap group was audited and needed no change — see `CHANGELOG.md`,
->   *2026-08-09 (post-deploy 5)*, for the list so the sweep is not redone.
-> - 🔴 **Undeployed:** **Free Evaluation is now in the header Sell nav**
->   (last, after Trade-In Program). It was previously reachable only from the
->   footer. One `SELL_ITEMS` entry covers the desktop dropdown, the mobile
->   accordion, and the parent Sell tab's active state.
-> - 🔴 **Undeployed:** **the `/free-evaluation` hero prose now has hierarchy** —
->   brighter lede, a gold `<h2>` kicker with a hairline, the metal list moved
->   out of the prose into a `<dl>` panel with an aligned term column, and the
->   two trailing paragraphs split into a quiet footnote and a bright closer.
->   The metal terms went cream → brand gold; see `CHANGELOG.md`,
->   *2026-08-09 (post-deploy 6)*, for why that is **not** a WCAG regression.
-> - 🔴 **Undeployed:** **matte-clay illustrated marks are now sitewide** — the
->   homepage services strip, `/free-evaluation`, `/sell`, `/sell/[city]`,
->   `/trade-in`, `/bullion`, `/gold-services` and `/silver-services`. 20 WebP
->   assets in `public/assets/images/icons/`, rendered through
->   `components/ClayMark.tsx`. `ServiceIconCanvas` was deleted (the homepage's
->   canvas-drawn icons). Functional UI icons (cart, heart, chevrons, admin, and
->   small inline glyphs) are unchanged and stay Lucide. See DECISIONS,
->   *"Illustrated clay marks are IMAGES"*.
-> - 🔴 **Undeployed fix:** every icon rendered as a solid blob wherever a legacy
->   `fontVariationSettings: "'FILL' 1"` style survived — the Material Symbols
->   fill bridge in `AppIcon` flooded Lucide outline icons. Bridge deleted, all
->   27 usages cleaned, four semantic swaps, two regression tests added. Ships
->   with the same redeploy.
-> - 🔴 **Undeployed fix:** the `/free-evaluation` hero eyebrow ("100% Free — No
->   Obligation") was painting itself with `--color-primary` on the near-black
->   hero — **2.96:1, below AA**. Now the on-dark gold at **12.19:1**. The other
->   13 `--color-primary` nodes on that page sit on light surfaces and pass
->   (5.26–6.44:1), so the fix is scoped to the one that was broken.
-> - ⚠️ **Netlify Node correction:** `NODE_VERSION` is **20.20.2**, but
->   `@netlify/plugin-nextjs` cannot run on it and Netlify silently executes the
->   plugin on **22.23.1**, warning every build. Raising the pin to 22 would
->   align them.
-
-**One thing is waiting: DEPLOY.** A full UX/performance batch is finished,
-fully verified, and sitting undeployed. There is **no outstanding local work,
-no failing check, and no pending SQL** — the session's one migration
-(`add-slideshow-bg-colors.sql`) was run and confirmed by the owner.
-
-- **What's in it:** shop gallery-card touch overhaul (Add to Cart restored on
-  mobile, cart icon sitewide, windowed dot indicators, photo swipe, one-card-
-  off-cover model), homepage hero touch snap + slower handover, a hero
-  performance batch (duplicate image downloads eliminated, q82, spinner),
-  **one solid admin-chosen background per slideshow** replacing the per-photo
-  sweep, the **reviews band at a 2-column minimum, 8-line-clamped quotes,
-  and each card linking to the Google Business Profile**, the hero's
-  **Trade CTA now pointing at `/trade-in`** instead of `/contact`, and the
-  **hero CTAs held at two-up-one-down on mobile**. Full detail:
-  `CHANGELOG.md` → *2026-08-09* and *2026-08-09 (later session)*.
-- **Plus the whole `/free-evaluation` + icon-system arc** added later in the
-  same session: the page rebuilt as a sendable landing page, matte-clay marks
-  sitewide, the `AppIcon` fill-bridge fix, the hero prose hierarchy, wrap
-  groups centred on tablet/mobile, the eyebrow contrast fix, and Free
-  Evaluation added to the header Sell nav. Detail: `CHANGELOG.md` →
-  *2026-08-09 (post-deploy 2)* through *(post-deploy 7)*.
-- **✅ THE FULL GATE PASSED ON THE COMPLETE BATCH — re-run last at the END of
-  the session (2026-08-10), after the final code change.** Dev server stopped
-  and `.next` deleted first, so it is a clean from-scratch build covering every
-  change in the batch. Nothing needs re-running before you copy and deploy.
-
-  | Command | Result |
-  | --- | --- |
-  | `npx tsc --noEmit` | clean, no output |
-  | `npm run lint` | clean, no findings |
-  | `npm test` | **848 passed / 848**, 87 files |
-  | `npm run build` | **compiled successfully, 449/449 static pages**, no warnings |
-
-  The gate was re-run after *every* code change in the session, not just once
-  at the end — the table above is the final run, on the final state of the tree.
-- **To deploy:** copy this folder to the repo folder and push.
-- **Then:** work the 📱-marked smoke list in `TASKS.md` → *New surfaces to
-  smoke after the NEXT deploy*. Three of those genuinely need a real phone —
-  they are the checks this environment could not perform.
-- **Before writing hero or shop-card code**, read the three new entries in
-  `DECISIONS.md`: *One solid background per slideshow*, *On touch, the hero
-  snaps exactly one slideshow per gesture*, and *Shop-card photos: swipe +
-  windowed dots on touch*. Several older entries in that file describe the
-  removed background sweep and carry inline supersession notes — the rule is
-  the newer entry.
-- **Owner-owned items unrelated to this batch** (price-push logs, eBay #82
-  reattachment, the inbox check) are unchanged in `TASKS.md`.
 
 ## Deployment State
 
@@ -466,6 +442,21 @@ no failing check, and no pending SQL** — the session's one migration
 - PayPal Orders API v2 owns payment. Totals, product availability, U.S. address,
   shipping method/fee, and tax are recomputed server-side. There is no inventory
   hold; the first successful capture wins one-of-one inventory.
+- **Discount codes (2026-08-11, undeployed, needs its SQL run first).** Admin →
+  **Discount Codes** creates a code that is either a percentage or a fixed
+  dollar amount off, each optionally carrying a minimum order subtotal, an
+  expiry, and a total-redemption cap. Shoppers enter it at checkout.
+  - The discount comes off **merchandise only**. Shipping tier and the $5,000
+    Express cutoff key off the **pre-discount** subtotal; Florida tax is charged
+    on the **discounted** merchandise plus shipping. A fixed discount is clamped
+    to the subtotal, so merchandise can reach $0 but never negative.
+  - **The cap is the real reuse control**, enforced by a conditional UPDATE
+    inside `capture_paypal_order`'s existing row-locked transaction. "Once per
+    email" also exists but is a **speed bump only** — guest checkout means a
+    second email defeats it, and that is a deliberate accepted limit, not a bug.
+    See DECISIONS, *"the cap is the control"*.
+  - The checkout validation route is a **preview**; the charged discount is
+    recomputed server-side in `buildOrderDraft` from the code string alone.
 - Shipping is U.S.-only. Local Pickup is free. Insured shipping uses value-based
   tiers; $5,000+ Standard uses USPS Registered Mail, and Express is unavailable
   above that coverage threshold.
@@ -634,13 +625,16 @@ no failing check, and no pending SQL** — the session's one migration
 
 ## Immediate Priorities
 
-1. Deploy the locally verified batch and run the focused production smoke list
-   in `TASKS.md`.
-2. Complete accountant review before changing Florida surtax or other-state tax.
-3. Run the controlled PayPal recovery/refund/concurrency matrix.
-4. Complete deliberate marketplace price-push, shipping-tier, eBay #82, and
-   remaining provider checks without blanket writes.
-5. Finish the owner/content/credential-record items in `TASKS.md`.
-6. ✅ Deep Field env vars + production import are DONE (2026-08-08; this line
-   previously listed them as pending). Remaining Deep Field items are the
-   budget-pin test and the 30→50 retune in `TASKS.md`.
+1. **Deploy the staged batch** (`C:\Users\rcman\NEJ-repo-staging`) and run the
+   focused production smoke list in `TASKS.md`. ⚠️ Do this **before** any bulk
+   eBay sync — see *Start Here*.
+2. Run the phone-only 📱 checks, above all the in-app-browser scroll test
+   (open a texted link inside Instagram and scroll `/` and `/shop`). It is the
+   one fix this environment could not exercise.
+3. Complete accountant review before changing Florida surtax or other-state tax.
+4. Run the controlled PayPal recovery/refund/concurrency matrix.
+5. ✅ Marketplace price-push and shipping-tier work is **DONE** (2026-08-11).
+   What remains is owner-side only: eBay **#82** reattachment on eBay itself.
+6. Finish the owner/content/credential-record items in `TASKS.md`.
+7. ✅ Deep Field env vars + production import are DONE (2026-08-08). Remaining
+   Deep Field items are the budget-pin test and the 30→50 retune in `TASKS.md`.

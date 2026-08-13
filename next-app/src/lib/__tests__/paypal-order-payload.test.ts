@@ -70,4 +70,59 @@ describe('buildPayPalOrderRequest', () => {
     expect(changed).not.toBe(first);
     expect(first.length).toBeLessThanOrEqual(38);
   });
+
+  // PayPal 422s an amount whose breakdown parts do not sum to amount.value, so
+  // the discount has to be part of that arithmetic, not applied to the total.
+  describe('discount breakdown', () => {
+    type AmountPayload = {
+      purchase_units: Array<{
+        amount: {
+          value: string;
+          breakdown: {
+            item_total: { value: string };
+            tax_total: { value: string };
+            shipping: { value: string };
+            discount?: { value: string };
+          };
+        };
+      }>;
+    };
+
+    function amountOf(input: Parameters<typeof buildPayPalOrderRequest>[0]) {
+      return (buildPayPalOrderRequest(input) as AmountPayload).purchase_units[0].amount;
+    }
+
+    it('subtracts the discount from the total and reports it in the breakdown', () => {
+      const amount = amountOf({ ...BASE_INPUT, discount: 15, total: 137 });
+
+      expect(amount.breakdown.discount).toEqual({ currency_code: 'USD', value: '15.00' });
+      expect(amount.value).toBe('137.00');
+
+      const parts =
+        Number(amount.breakdown.item_total.value)
+        + Number(amount.breakdown.tax_total.value)
+        + Number(amount.breakdown.shipping.value)
+        - Number(amount.breakdown.discount!.value);
+      expect(parts).toBeCloseTo(Number(amount.value), 2);
+    });
+
+    // Emitting "0.00" would change the request hash of every undiscounted
+    // order and invalidate its existing idempotency key.
+    it('omits the discount key entirely when there is no discount', () => {
+      expect(amountOf(BASE_INPUT).breakdown).not.toHaveProperty('discount');
+      expect(amountOf({ ...BASE_INPUT, discount: 0 }).breakdown).not.toHaveProperty('discount');
+      expect(payPalCreateRequestId({ ...BASE_INPUT, discount: 0 })).toBe(
+        payPalCreateRequestId(BASE_INPUT),
+      );
+    });
+
+    it('clamps a discount larger than the item total and never goes negative', () => {
+      const amount = amountOf({ ...BASE_INPUT, discount: 500, total: 52 });
+
+      expect(amount.breakdown.discount).toEqual({ currency_code: 'USD', value: '100.00' });
+      // Shipping and tax are still owed, so the charge stays positive.
+      expect(Number(amount.value)).toBeGreaterThan(0);
+      expect(amount.value).toBe('52.00');
+    });
+  });
 });
