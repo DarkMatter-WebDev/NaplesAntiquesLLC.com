@@ -13,6 +13,7 @@ import {
   round2,
 } from '@/lib/checkout-pricing';
 import { formatDiscountValue, type AppliedDiscount } from '@/lib/discount-codes';
+import type { OrderQuote } from '@/lib/checkout-pricing';
 import { parseManualPriceLabelValue } from '@/lib/pricing';
 import {
   CHECKOUT_SHIPPING_OPTIONS,
@@ -61,6 +62,7 @@ export function computeOrderTotals({
   shippingState,
   hideSoldItemPrices = false,
   appliedDiscount = null,
+  quote = null,
 }: {
   items: CartItem[];
   shippingMethod: string;
@@ -69,7 +71,29 @@ export function computeOrderTotals({
   /** Discount previewed by /api/checkout/discount-code. Display only — the
    *  server recomputes it from the code at order time. */
   appliedDiscount?: AppliedDiscount | null;
+  /**
+   * Authoritative figures from /api/checkout/quote. When present these are
+   * rendered VERBATIM rather than recomputed from the cart's stored price
+   * labels — 64% of the catalog is spot-linked, so a label captured at
+   * add-to-cart time drifts from the chargeable price as metal moves.
+   *
+   * The buyer must see the number they will be charged; deriving it a second
+   * time on the client is exactly how the two got to disagree.
+   */
+  quote?: OrderQuote | null;
 }) {
+  if (quote) {
+    const selected = getCheckoutShippingOption(shippingMethod) ?? CHECKOUT_SHIPPING_OPTIONS[0];
+    return {
+      subtotal: quote.subtotal,
+      discount: quote.discount,
+      shipping: quote.shippingFee,
+      tax: quote.tax,
+      total: quote.total,
+      hasUnknown: false,
+      selectedShipping: selected,
+    };
+  }
   const lineTotals = items.map((i) => {
     if (hideSoldItemPrices && isProductSold(i.status)) return null;
     const unit = parsePrice(i.priceLabel);
@@ -112,6 +136,7 @@ export function OrderTotals({
   shippingState,
   hideSoldItemPrices = false,
   appliedDiscount = null,
+  quote = null,
 }: {
   items: CartItem[];
   isEs: boolean;
@@ -119,6 +144,7 @@ export function OrderTotals({
   shippingState?: string;
   hideSoldItemPrices?: boolean;
   appliedDiscount?: AppliedDiscount | null;
+  quote?: OrderQuote | null;
 }) {
   const { subtotal, discount, shipping, tax, total, hasUnknown, selectedShipping } = computeOrderTotals({
     items,
@@ -126,6 +152,7 @@ export function OrderTotals({
     shippingState,
     hideSoldItemPrices,
     appliedDiscount,
+    quote,
   });
   const serviceNote = getShippingServiceNote(selectedShipping.value, subtotal, isEs);
 
@@ -203,6 +230,7 @@ export default function OrderSummary({
   headingAction,
   bare = false,
   appliedDiscount = null,
+  quote = null,
 }: {
   items: CartItem[];
   isEs: boolean;
@@ -232,6 +260,8 @@ export default function OrderSummary({
   bare?: boolean;
   /** Previewed discount, for display only. See computeOrderTotals. */
   appliedDiscount?: AppliedDiscount | null;
+  /** Authoritative live figures from /api/checkout/quote. */
+  quote?: OrderQuote | null;
 }) {
   const { subtotal, discount, shipping, tax, total, hasUnknown, selectedShipping } = computeOrderTotals({
     items,
@@ -239,7 +269,14 @@ export default function OrderSummary({
     shippingState,
     hideSoldItemPrices,
     appliedDiscount,
+    quote,
   });
+  // Per-line prices come from the quote too, so a line and the subtotal above
+  // it can never tell the buyer two different stories.
+  const quotedUnitPrice = (productId: string): number | null => {
+    const line = quote?.items.find((i) => i.productId === productId);
+    return line ? line.unitPrice : null;
+  };
   const serviceNote = getShippingServiceNote(selectedShipping.value, subtotal, isEs);
 
   const expanded = variant === 'expanded';
@@ -277,6 +314,7 @@ export default function OrderSummary({
             expanded={expanded}
             showAvailability={showAvailability}
             hideSoldItemPrices={hideSoldItemPrices}
+            quotedUnitPrice={quotedUnitPrice(item.id)}
           />
         ))}
       </div>
@@ -380,6 +418,7 @@ function SummaryRow({
   expanded = false,
   showAvailability = false,
   hideSoldItemPrices = false,
+  quotedUnitPrice = null,
 }: {
   item: CartItem;
   isEs: boolean;
@@ -389,6 +428,8 @@ function SummaryRow({
   expanded?: boolean;
   showAvailability?: boolean;
   hideSoldItemPrices?: boolean;
+  /** Live unit price from the server quote; overrides the cart's stored label. */
+  quotedUnitPrice?: number | null;
 }) {
   const title = isEs && item.title_es ? item.title_es : item.title;
   const circa = formatProductItemYear(item.item_year);
@@ -399,7 +440,12 @@ function SummaryRow({
   const stockCap = Math.max(1, normalizeProductQuantity(item.stockQuantity));
   const purchasable = isProductPurchasable(item.status, item.stockQuantity);
   const soldPriceHidden = hideSoldItemPrices && isProductSold(item.status);
-  const unitPrice = parsePrice(item.priceLabel);
+  // Prefer the server's live figure. The stored label is only a fallback for
+  // surfaces with no quote (the printed confirmation snapshot, the cart drawer).
+  const unitPrice = quotedUnitPrice ?? parsePrice(item.priceLabel);
+  const unitPriceLabel = quotedUnitPrice != null
+    ? formatCheckoutCurrency(quotedUnitPrice)
+    : item.priceLabel;
   const lineTotal = unitPrice === null ? null : unitPrice * qty;
   return (
     <div className={`flex gap-3 items-start ${expanded ? 'rounded-2xl border p-2 md:gap-3 md:p-2.5' : ''}`} style={expanded ? { borderColor: BORDER, background: 'rgba(255, 253, 248, 0.76)' } : undefined}>
@@ -422,7 +468,7 @@ function SummaryRow({
             {title}
           </Link>
           <p className={`${expanded ? 'text-xs' : 'text-[0.68rem]'} flex-shrink-0 font-bold`} style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-            {soldPriceHidden ? (isEs ? 'Vendido' : 'Sold') : item.priceLabel}
+            {soldPriceHidden ? (isEs ? 'Vendido' : 'Sold') : unitPriceLabel}
             {!soldPriceHidden && qty > 1 && lineTotal !== null && (
               <span style={{ color: 'var(--color-on-surface-variant)', fontWeight: 600 }}>
                 {' '}× {qty} = {formatCheckoutCurrency(lineTotal)}

@@ -604,26 +604,21 @@ Everything else below remains true: the carousel migrations are all applied.
     PayPal's API directly. `total_refunded_amount` is **cumulative** — proven by
     re-fetching the first refund and seeing `amount $0.50` alongside
     `total_refunded_amount $1.06`. Nothing here remains open.
-- ◻️ **Settle what `paypal_refunds.amount` MEANS, then fix the ledger drift.**
-  Scoped follow-up, deliberately deferred past the 2026-08-13 deploy. **Best
-  done soon: the table currently holds ZERO rows**, so this is a shape to get
-  right rather than data to repair — and that gets harder with every refund.
-  - **The root problem is not the upsert, it is the two meanings.** Three
-    callers disagree: CAPTURE.REFUNDED passes the *increment*, while
-    REFUND.PENDING/FAILED and the admin refund route pass the refund's *own
-    amount*. They coincide on a capture's FIRST refund and diverge on every
-    partial after it.
-  - Knock-ons: the `PENDING`-row match can miss on a second partial (it matches
-    on the increment, but the row holds the own amount), and
-    `apply_paypal_refund` rewrites `amount` before its `applied_at` guard.
-  - ⚠️ **Reachable via webhook ORDER, not just replay.** PayPal does not
-    guarantee ordering; refund #2 landing before #1 leaves one misattributed row
-    and one missing. An earlier note calling this "unreachable" was wrong.
-  - **`orders.refund_amount` is always correct** — driven by PayPal's cumulative
-    — so this is an audit-trail defect, never a money defect. **Until it is
-    fixed, reconcile against `orders.refund_amount`, never a SUM of
-    `paypal_refunds.amount`.**
-  - Needs a new SQL migration; see DECISIONS for the full analysis.
+- ✅ **`paypal_refunds.amount` settled 2026-08-13 — DONE.**
+  `supabase/paypal-refund-ledger-2026-08-13.sql` is **applied**. The column now
+  means *this refund's own amount* (read from the payload, never derived),
+  `orders.refund_amount` is SET from PayPal's cumulative and clamped
+  monotonically, and an applied row's amount is immutable. The ledger is keyed
+  by PayPal's real refund id, which removed the synthetic `event:<id>` key and
+  the fuzzy amount-matching that caused mis-attachment.
+  20 checks passed against the real function, including out-of-order delivery.
+  Reconciling against a SUM of `paypal_refunds.amount` is now valid.
+  - ⚠️ **The code change is UNDEPLOYED** — the migration is live but
+    `webhook/route.ts` is not. Until it deploys, the CAPTURE.REFUNDED handler
+    still sends the derived increment and the `event:<id>` key. That is not
+    harmful (the SQL's monotonic cumulative path is simply unused, and the old
+    accumulate branch still produces a correct `orders.refund_amount`), but the
+    ledger keeps the old shape until the deploy lands.
   - ◻️ **Cosmetic, unreachable in practice:** an over-refund writes a
     `paypal_refunds` row for the full increment while `orders.refund_amount`
     clamps at the total, so the ledger would sum higher than the order. PayPal

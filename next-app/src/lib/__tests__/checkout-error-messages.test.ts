@@ -65,3 +65,35 @@ describe('composeUnknownErrorMessage', () => {
     expect(composeUnknownErrorMessage(2, true).toLowerCase()).toContain('tarjeta diferente');
   });
 });
+
+describe('price_changed guidance', () => {
+  // The "you have not been charged" line is not decorative. A price-change
+  // notice appearing mid-payment otherwise reads like a bill the buyer has just
+  // been handed — which is the difference between a reassuring prompt and an
+  // alarming one.
+  it('states plainly that nothing has been charged, in both locales', () => {
+    const en = checkoutErrorMessageForCode('price_changed', false)!;
+    expect(en.toLowerCase()).toContain('have not been charged');
+
+    const es = checkoutErrorMessageForCode('price_changed', true)!;
+    expect(es.toLowerCase()).toContain('no se le ha cobrado');
+  });
+
+  it('explains WHY the price moved and what to do next', () => {
+    const en = checkoutErrorMessageForCode('price_changed', false)!;
+    expect(en.toLowerCase()).toContain('metal prices');
+    expect(en.toLowerCase()).toContain('confirmation box');
+
+    const es = checkoutErrorMessageForCode('price_changed', true)!;
+    expect(es.toLowerCase()).toContain('metales');
+    expect(es.toLowerCase()).toContain('casilla de confirmación');
+  });
+
+  it('is distinct from every other coded rejection', () => {
+    const codes = ['express_unavailable', 'spot_unavailable', 'call_to_purchase', 'discount_invalid', 'price_changed'];
+    for (const isEs of [false, true]) {
+      const messages = codes.map((c) => checkoutErrorMessageForCode(c, isEs));
+      expect(new Set(messages).size).toBe(codes.length);
+    }
+  });
+});

@@ -8,26 +8,29 @@
 
 **Read this, then `TASKS.md`. Everything below is current as of 2026-08-13.**
 
-### The one action waiting: DEPLOY, then look at one page
+### ✅ DEPLOYED AND VERIFIED IN PRODUCTION (2026-08-13)
 
-Everything in this batch is finished, gated, and staged. The owner deploys by
-copying `C:\Users\rcman\NEJ-repo-staging` into the repo folder (keeping that
-folder's `.git`) and pushing.
+The batch is live and was exercised end to end through an authenticated admin
+session in the owner's own browser.
 
-**Immediately after deploy, in this order:**
+**One bug was caught in production and fixed without a redeploy:** the admin
+Discount Codes page could READ but not WRITE —
+`permission denied for table discount_codes`. The migration granted only
+`SELECT` to `authenticated`, and Postgres checks GRANTS before RLS. Fixed by
+`supabase/discount-codes-grant-fix-2026-08-13.sql` (already run). See DECISIONS,
+*"An RLS policy without a table GRANT is a page that reads but cannot write"*.
 
-1. **Watch the Netlify build reach `Published`** — a previous deploy showed
-   `Canceled`. Local builds run Node v24; Netlify pins 20.
-2. 🔴 **Open Admin → Discount Codes.** This is the only surface in the batch
-   nobody has ever seen rendered — it needs an authenticated session, which the
-   development environment could not produce. The code compiles, its guards were
-   verified (307 to sign-in, 401 on the API), and its buttons use the same
-   inline-font mechanism measured working on checkout — but that is inference,
-   not observation. Create one code and confirm it looks right.
-3. **Run one discounted order end to end.** The SQL is already applied.
-4. **Confirm the first real refund records.** This is the highest-value fix in
-   the batch and the one whose automatic path is still unexercised in
-   production — every refund before this deploy failed silently.
+Verified working live: create / edit / deactivate / delete, the percent↔dollar
+type toggle, required-field validation, the codes table, the checkout chip and
+discount line, and the checkout validation API. Button typography confirmed —
+the font fix shipped correctly. **The pre-discount shipping-tier rule holds in
+production**: a $5,518.10 order discounted to $4,414.48 still drew the $99.00
+Registered Mail tier and still blocked Overnight. All test data removed.
+
+**One thing remains unexercised in production:** the refund fix. Every refund
+before this deploy failed to record; the corrected path has been proven locally
+against real PayPal refunds but has not yet run automatically end to end.
+**Confirm the first real refund records itself.**
 
 ### What this session produced
 
@@ -48,11 +51,10 @@ folder's `.git`) and pushing.
   nothing.** Pre-existing, understood, deliberately not fixed sitewide.
 - **Sandbox rows live permanently in the live `orders` table** (early July,
   before the 2026-07-09 go-live). Filter by the host in `payment_response`.
-- **`paypal_refunds.amount` is not a reconciliation source.** Use
-  `orders.refund_amount`. The column holds two different meanings depending on
-  which of its three callers wrote it — a known, scoped follow-up in `TASKS.md`,
-  deferred past this deploy. The table holds zero rows today, so it is a shape
-  to settle rather than data to repair.
+- **`paypal_refunds.amount` was reworked 2026-08-13** and now means *this
+  refund's own amount*; `orders.refund_amount` is SET from PayPal's cumulative.
+  Reconciling against a SUM of the ledger is valid again. ⚠️ **The SQL is
+  applied but the code change is UNDEPLOYED** — see `TASKS.md`.
 
 ### ✅ Discount-codes SQL applied and proven by a real purchase (2026-08-12)
 
@@ -126,6 +128,11 @@ repo folder, keeping that folder's `.git`, then push.
 8. **Button font fix** (2026-08-12) — Tailwind font utilities are inert on
    `<button>` in this app; the discount components now set font properties
    inline. Scoped to those components deliberately, not fixed sitewide.
+9. **Refund ledger rework** (2026-08-13) — `paypal_refunds.amount` now has one
+   meaning. **Its SQL is already applied**; the code is not.
+10. **Checkout price-drift guard** (2026-08-13) — a live quote endpoint plus a
+   `price_changed` rejection, so a buyer can never be charged a total their
+   screen did not show. No SQL.
 
 ### How this folder ships
 
@@ -442,6 +449,16 @@ rather than assume. A rotated cron secret must change in three places: Netlify
 - PayPal Orders API v2 owns payment. Totals, product availability, U.S. address,
   shipping method/fee, and tax are recomputed server-side. There is no inventory
   hold; the first successful capture wins one-of-one inventory.
+- **The buyer is never charged a total they were not shown (2026-08-13,
+  undeployed).** 64% of the catalog is spot-linked, so a cart's stored price
+  label drifts from the chargeable price as metal moves — measured at $69.33 on
+  one bracelet within a single day. Two halves: `POST /api/checkout/quote`
+  (read-only, keeps the summary showing live figures) and a `price_changed`
+  guard in `paypal/create-order` that returns **409 before creating anything**
+  when the displayed total and the authoritative total disagree by a cent or
+  more. The server always charges its own price; the client's `quotedTotal`
+  only decides whether to stop and ask. See DECISIONS, *"Never charge a total
+  the buyer was not shown"*.
 - **Discount codes (2026-08-11, undeployed, needs its SQL run first).** Admin →
   **Discount Codes** creates a code that is either a percentage or a fixed
   dollar amount off, each optionally carrying a minimum order subtotal, an

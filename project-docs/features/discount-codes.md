@@ -9,8 +9,14 @@ here — several of the choices below look arbitrary and are not.
 
 ## Status
 
-🟢 **Built, SQL applied to production, and PROVEN BY A REAL PURCHASE
-(2026-08-12).** Undeployed — the code still needs to ship.
+🟢 **LIVE IN PRODUCTION and verified end to end (2026-08-13.)** Deployed, proven
+by a real purchase, and exercised through an authenticated admin session.
+
+⚠️ **Two migrations, both applied:** `discount-codes-2026-08.sql` and
+`discount-codes-grant-fix-2026-08-13.sql`. The second exists because the first
+granted only `SELECT` to `authenticated`, so the admin page could read but not
+write. A fresh environment only needs the first (now corrected), but run both if
+in any doubt — they are idempotent.
 
 The SQL has been run. A real $42.39 PayPal purchase with a 20% code passed all
 18 checks, including the atomic redemption inside `capture_paypal_order` and

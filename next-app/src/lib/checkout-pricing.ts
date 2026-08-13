@@ -167,11 +167,76 @@ export type DiscountResolver = (subtotal: number) => Promise<DiscountValidationR
  * (which previously showed sold-out copy for the Express-over-$5,000 case and
  * dropped the call-us instruction for outage/price-confirmation cases).
  */
+/**
+ * Does the total the buyer is LOOKING AT differ from the total we would charge?
+ *
+ * Why this exists: 64% of the available catalog is `spot-multiplier`, priced as
+ * `melt x multiplier` from the live metal feed at order time. The cart stores
+ * the price LABEL captured when the item was added, the product page it came
+ * from is ISR-cached (300s), and the feed behind that is cached (300s) — so the
+ * displayed figure trails the chargeable one by however long the item sat in
+ * the cart. Measured on one real bracelet: $6,462.72 in the morning, $6,393.39
+ * a few hours later. Same code, same product, $69.33 apart.
+ *
+ * ⚠️ **`quotedTotal` is NEVER charged.** The server always charges its own
+ * computed price; this value only decides whether to stop and ask the buyer to
+ * re-confirm. That is what makes it safe to accept an unsigned price-shaped
+ * number from the client: a malicious caller claiming it displayed $1 earns a
+ * pointless confirmation prompt and cannot talk the price down. Charging the
+ * client's figure would require a signed quote and a tolerance band — a
+ * different and much larger feature.
+ *
+ * Compared in whole CENTS. Both sides are rounded upstream, but float equality
+ * would still fire on `1066.5500000000002 !== 1066.55`.
+ *
+ * A missing/unparseable quote is "no opinion", not drift — an older client or a
+ * dropped field must not be blocked by a check it cannot satisfy.
+ */
+export function quotedTotalHasDrifted(
+  quotedTotal: unknown,
+  authoritativeTotal: number,
+): boolean {
+  if (quotedTotal === null || quotedTotal === undefined || quotedTotal === '') return false;
+  const quoted = Number(quotedTotal);
+  if (!Number.isFinite(quoted)) return false;
+  return Math.round(quoted * 100) !== Math.round(authoritativeTotal * 100);
+}
+
+/** Authoritative figures returned by the quote endpoint and by a drift rejection. */
+export type OrderQuote = {
+  items: { productId: string; unitPrice: number; quantity: number; title: string }[];
+  subtotal: number;
+  discount: number;
+  tax: number;
+  shippingFee: number;
+  total: number;
+};
+
+/** Project an order draft into the wire shape shared by /quote and the guard. */
+export function toOrderQuote(draft: OrderDraft): OrderQuote {
+  return {
+    items: draft.items.map((item) => ({
+      productId: item.product_id,
+      unitPrice: item.price_snapshot,
+      quantity: item.quantity,
+      title: item.title_snapshot,
+    })),
+    subtotal: draft.subtotal,
+    discount: draft.discount,
+    tax: draft.tax,
+    shippingFee: draft.shippingFee,
+    total: draft.total,
+  };
+}
+
 export type OrderDraftErrorCode =
   | 'unavailable'
   | 'express_unavailable'
   | 'spot_unavailable'
   | 'call_to_purchase'
+  // The buyer's screen and the authoritative total disagree — metal spot moved
+  // while the item sat in the cart. Never charged; the buyer re-confirms.
+  | 'price_changed'
   // The buyer applied a discount code that is no longer usable by the time they
   // paid (deactivated, expired, or its redemption cap filled while they shopped).
   // Rejecting is deliberate: silently charging full price would surprise someone

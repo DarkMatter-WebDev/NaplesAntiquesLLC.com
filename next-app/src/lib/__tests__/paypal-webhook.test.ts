@@ -73,4 +73,55 @@ describe('payPalCumulativeRefund', () => {
       amount: { value: '100.00', currency_code: 'USD' },
     })).toBeNull();
   });
+
+  // The distinction the whole refund ledger rests on. Confirmed against live
+  // PayPal data 2026-08-13: after $0.50 then $0.56 on a $1.06 capture, the
+  // FIRST refund object reported amount $0.50 with total_refunded_amount $1.06.
+  it('reads the CUMULATIVE total, which differs from this refund\'s own amount', () => {
+    const secondPartial = {
+      id: 'REFUND-2',
+      amount: { value: '0.56', currency_code: 'USD' },
+      seller_payable_breakdown: {
+        total_refunded_amount: { value: '1.06', currency_code: 'USD' },
+      },
+    };
+
+    expect(payPalCumulativeRefund(secondPartial)).toEqual({ amount: 1.06, currency: 'USD' });
+    // `resource.amount` is this refund alone — never the running total.
+    expect(Number(secondPartial.amount.value)).toBe(0.56);
+  });
+});
+
+/**
+ * Ledger semantics, pinned as documentation rather than exercised code: the
+ * behaviour itself lives in the `apply_paypal_refund` Postgres function and is
+ * covered by an integration run against the real database. These assertions
+ * exist so the INTENT is discoverable from the test suite, and so a future
+ * change that reverts to deriving the amount reads as a contradiction here.
+ *
+ * See DECISIONS, "paypal_refunds.amount is this refund's own amount".
+ */
+describe('refund ledger semantics', () => {
+  it('derives a WRONG own-amount when an earlier refund was not yet recorded', () => {
+    // The old code did: increment = cumulative - alreadyRefunded.
+    // Out-of-order delivery makes `alreadyRefunded` stale, so the increment
+    // stops equalling the refund's own amount.
+    const ownAmount = 0.56;
+    const cumulative = 1.06;
+
+    const alreadyRefundedInOrder = 0.50;   // first refund recorded
+    const alreadyRefundedOutOfOrder = 0;   // first refund's webhook is late
+
+    expect(cumulative - alreadyRefundedInOrder).toBeCloseTo(ownAmount, 2);
+    expect(cumulative - alreadyRefundedOutOfOrder).not.toBeCloseTo(ownAmount, 2);
+  });
+
+  it('takes the own amount straight from the payload instead', () => {
+    const resource = {
+      amount: { value: '0.56', currency_code: 'USD' },
+      seller_payable_breakdown: { total_refunded_amount: { value: '1.06', currency_code: 'USD' } },
+    };
+    // No subtraction, no dependency on what was recorded before.
+    expect(Math.round(Number(resource.amount.value) * 100) / 100).toBe(0.56);
+  });
 });

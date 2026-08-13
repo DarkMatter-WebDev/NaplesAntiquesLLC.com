@@ -202,6 +202,47 @@ message files or explicitly paired localized page data. Route metadata, legal
 copy, filters, errors, and transactional/customer content must be checked in
 both locales.
 
+### An RLS policy without a table GRANT is a page that reads but cannot write
+
+Postgres checks table-level **GRANTS before it ever consults RLS**. A table with
+a perfect admin-only policy and no `insert/update/delete` grant to
+`authenticated` produces a very specific, very deceptive failure:
+
+**every read works and every write fails.**
+
+`buyers-2026-07.sql:35` has said this since July. It was ignored anyway on
+2026-08-13, when `discount-codes-2026-08.sql` shipped with only
+`grant select ... to authenticated` and reached production. The admin page
+loaded, listed codes, drew its empty state — and every create/edit/delete
+returned `permission denied for table discount_codes`.
+
+**The root misconception, worth naming precisely:** admin API routes here run on
+`requireAdmin()`'s **request-scoped** client, which is the `authenticated` role.
+They do NOT run as the service role. Only routes that explicitly call
+`createServiceClient()` bypass RLS and grants. Check which client a route uses
+before deciding what a table needs.
+
+Rules:
+
+1. **An admin-managed table needs BOTH** the admin-only RLS policy *and*
+   `grant select, insert, update, delete ... to authenticated`. The policy is
+   what narrows it to admins; the grant is what lets the statement run at all.
+   Copy the pattern from `buyers-2026-07.sql`.
+2. **`anon` gets nothing.** That part of the original migration was correct and
+   is what keeps a shopper from enumerating codes. Verified live: anon `SELECT`
+   and `INSERT` both return `42501`.
+3. **Grant only what the route actually does.** `discount_code_redemptions`
+   stays `select`-only for `authenticated` — it is written by
+   `capture_paypal_order` as service role, and the cascade from `discount_codes`
+   handles removal.
+
+⚠️ **A page that renders is not a page that works.** This bug survived every
+check that preceded it — build, typecheck, 946 tests, a production smoke of the
+route returning 307/401 — because all of them exercised the read path. The only
+thing that could have caught it was performing a write as a signed-in admin.
+**When a surface cannot be exercised authenticated before shipping, say so and
+treat it as unverified, not as probably-fine.**
+
 ### `orders.payment_response` records which PayPal ENVIRONMENT a row came from
 
 Established 2026-08-13 while auditing four orders marked `refunded` with a null
@@ -272,48 +313,54 @@ Rules:
    payloads, never from a fresh API fetch** — a fetch-based replay computes an
    increment against a total that has since moved.
 
-⚠️ **`paypal_refunds.amount` carries TWO different meanings, and that is the
-root problem — not the upsert.** Its three callers disagree:
+### `paypal_refunds.amount` is THIS refund's own amount, and the order's total
+### is SET from PayPal's cumulative
 
-| Caller | passes as `p_amount` |
-| --- | --- |
-| `webhook/route.ts:309` (CAPTURE.REFUNDED) | the **increment** applied |
-| `webhook/route.ts:347` (REFUND.PENDING/FAILED) | that refund's **own** amount |
-| `admin/orders/[id]/refund/route.ts:115` | that refund's **own** amount |
+Settled 2026-08-13 by `supabase/paypal-refund-ledger-2026-08-13.sql`, after the
+column was found carrying two different meanings depending on which of its three
+callers wrote it. They coincided on a capture's FIRST refund and diverged on
+every partial after — logging a real $0.50 refund as $0.56.
 
-For the FIRST refund on a capture these coincide, which is why it looks fine.
-On any SUBSEQUENT partial they diverge. Two consequences follow:
+**The three rules now:**
 
-1. **The `PENDING`-row match can miss.** CAPTURE.REFUNDED looks for a pending
-   row matching the *increment*, but a row written by the other two paths holds
-   the *own amount*. On a second partial they differ by more than the ±$0.01
-   tolerance, so a separate `event:…` row is minted for a refund that already
-   had one.
-2. **`apply_paypal_refund` rewrites `amount` before checking `applied_at`** (set
-   at line 126, guard at line 133), so a repeat call with a different amount
-   silently rewrites the row while correctly refusing to touch the order.
-   Observed 2026-08-13: a $0.50 refund recorded as $0.56, ledger summing $1.12
-   against a correct $1.06 order.
+1. **`amount` = this refund's own amount.** Taken directly from the payload's
+   `resource.amount.value`, never derived. The old code computed
+   `cumulative - alreadyRefunded`, which equals the own amount ONLY when every
+   earlier refund was already recorded — and **PayPal does not guarantee webhook
+   order**, so that assumption fails in ordinary operation. The true amount was
+   in the payload the whole time.
+2. **`orders.refund_amount` is SET from `total_refunded_amount`, not
+   accumulated**, and clamped monotonically. Cumulative is authoritative and
+   self-correcting: a missed or out-of-order event cannot leave an order short,
+   because the next event carries the true running total, and a late OLDER event
+   cannot walk it backwards.
+3. **An applied ledger row's `amount` is immutable.** The upsert previously
+   rewrote it before the `applied_at` guard ran, so a repeat call with different
+   figures silently rewrote history.
 
-**`orders.refund_amount` is always correct regardless** — it is driven by
-PayPal's cumulative `total_refunded_amount`, so it self-corrects whatever the
-ledger says. The money is never wrong; only the audit trail can be.
+**The ledger is keyed by PayPal's REAL refund id.** `resource.id` on a refund
+event *is* the refund id — the same one the admin refund route already stores.
+Keying on it makes redelivery idempotent by construction and completes an
+admin-initiated `PENDING` row in place. This replaced a synthetic `event:<id>`
+key plus fuzzy ±$0.01 amount-matching against pending rows, which was the actual
+mis-attachment mechanism: the webhook matched on the increment while the pending
+row held the own amount, so a second partial never matched and minted a
+duplicate. That dance existed only because the code did not realise it had the
+refund id — the same misreading behind the original refund bug above.
 
-⚠️ **Correction to an earlier version of this entry, which claimed the real
-webhook path "cannot reach this."** That was too strong. Redelivery of the same
-event is indeed safe (same cumulative -> zero increment -> `route.ts` skips the
-RPC), but **PayPal does not guarantee webhook ORDER**. If refund #2 arrives
-before #1, #2 applies the whole cumulative and #1 is then skipped as a zero
-increment — leaving one misattributed row and one missing entirely.
+**Callers without a cumulative keep accumulating.** The admin refund route and
+the `PAYMENT.REFUND.PENDING`/`FAILED` handler pass no `p_cumulative_refunded`
+(it has a DEFAULT, so their 8-argument calls resolve unchanged) and retain the
+previous behaviour — correct for them, since they act synchronously against an
+accurate current total.
 
-**Left unfixed deliberately as of 2026-08-13**, because the fix is a data-model
-decision (what does `amount` mean?) on a hardened money function requiring a new
-migration, and `paypal_refunds` currently holds **zero rows** — there is no
-drift to repair, only a shape to settle before rows accumulate. Do it as its own
-scoped work with its own tests.
+Verified against the real Postgres function: in-order partials, **out-of-order
+delivery**, hostile redelivery with different figures, the 8-argument admin
+path, and the over-refund clamp. The ledger now sums to the order total
+($1.06, previously $1.12).
 
-**Until then: reconcile against `orders.refund_amount`, never against a sum of
-`paypal_refunds.amount`.**
+⚠️ **Reconciling against a SUM of `paypal_refunds.amount` is now valid** — that
+is the point of the change. It was not before 2026-08-13.
 
 ⚠️ **The unit test asserted the bug.** It pinned
 `relatedPayPalCaptureId('PAYMENT.CAPTURE.REFUNDED', { id: 'CAPTURE-123' })` to
@@ -844,6 +891,77 @@ row inside a fixed height, the token must stay at least as tall as the tallest
 row content (32px phones, 40px logo from md up). A source guard test
 (`site-header-height.test.ts`) fails the build if a hardcoded `pt-16` main,
 `top: 4rem`, or `calc(100svh - 4rem)` reappears.
+
+### Never charge a total the buyer was not shown
+
+Established 2026-08-13. **64% of the available catalog (56 of 87) is
+`spot-multiplier`** — priced as `melt x multiplier` from the live metal feed at
+order time. Three caches sit between what the buyer sees and what the server
+charges:
+
+| Layer | Staleness |
+| --- | --- |
+| cart's stored `priceLabel` | frozen at add-to-cart — **unbounded** |
+| product page ISR | `revalidate = 300` |
+| spot feed fetch | `revalidate = 300` |
+
+Measured on one real bracelet in a single session: **$6,462.72 in the morning,
+$6,393.39 hours later — $69.33 apart**, same code, same product. The buyer's
+screen trailed the chargeable figure by however long the item sat in the cart.
+
+**Two independent halves, both required:**
+
+1. **`POST /api/checkout/quote`** — read-only, calls the same `buildOrderDraft()`
+   the order route uses and persists nothing. The checkout re-quotes whenever
+   the cart, shipping method, taxing state, or discount code changes, and
+   renders those figures instead of the cart's labels. Without it the guard
+   below fires on nearly every checkout, which trains buyers to click through it.
+2. **The `price_changed` guard** in `paypal/create-order` — the actual
+   guarantee. The client sends `quotedTotal` (the number on screen); the server
+   compares it to its own and returns **409 `price_changed`** with the new
+   figures rather than charging.
+
+**THE INVARIANT: the server always charges its own computed price.
+`quotedTotal` decides only whether to stop and ask.** That is what makes it safe
+to accept an unsigned price-shaped number from the browser — a malicious client
+claiming it displayed $1 earns a pointless confirmation prompt and can never
+talk the price down. ⚠️ **If anyone ever makes the code CHARGE the client's
+figure, that requires a signed/HMAC'd quote and a tolerance band — a different
+and much larger feature. Do not creep toward it.**
+
+Rules that must hold:
+
+- **Compare in whole CENTS** (`Math.round(a*100) !== Math.round(b*100)`). Both
+  sides are rounded upstream, but float equality rejects a matching quote on
+  `1066.5500000000002 !== 1066.55` and makes checkout impossible.
+- **A missing or unparseable `quotedTotal` is "no opinion", not drift.** An
+  older client or a dropped field must not be blocked by a check it cannot
+  satisfy; the server still charges its own price.
+- **The guard runs BEFORE any side effect** — no order row, no PayPal order, no
+  money. If it ever moves below `create_paypal_order`, every price move leaves
+  an abandoned order.
+- **Every path that starts a payment must run it.** The route has a second
+  "reuse an existing unpaid order" branch that returns early; its draft is
+  hoisted specifically so the guard can see it. Grep for early returns before
+  adding another.
+- **The client's `quotedTotal` is derived from the same `computeOrderTotals()`
+  the summary renders**, so the sent figure and the displayed figure cannot
+  disagree by construction.
+- **The quote is TAGGED with the cart state it was computed for** and ignored
+  once that tag no longer matches, so a stale quote can never render against a
+  cart the buyer has already changed.
+
+**The buyer-facing copy must say "you have not been charged."** A price-change
+notice appearing mid-payment otherwise reads like a bill they have just been
+handed. Pinned by a test in both locales.
+
+⚠️ **A residual race remains, by design.** The spot fetch is
+stale-while-revalidate, so a quote issued as the 300s window expires can serve
+the OLD price while the order moments later serves the fresh one — observed
+once during verification ($6,850.64 quoted vs $6,776.99 charged). The guard
+catches it and the buyer re-confirms, which is the correct outcome. Closing it
+entirely would mean pinning a spot snapshot across both requests, i.e. signed
+quotes.
 
 ### The purchase panel sizes against itself, and its rows stay flush
 

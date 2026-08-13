@@ -2,7 +2,15 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { buildAddressObject, generateOrderNumber } from '@/lib/sales';
-import { buildOrderDraft, isOrderDraftError, normalizeOrderLines, type OrderLine } from '@/lib/checkout-pricing';
+import {
+  buildOrderDraft,
+  isOrderDraftError,
+  normalizeOrderLines,
+  quotedTotalHasDrifted,
+  toOrderQuote,
+  type OrderDraft,
+  type OrderLine,
+} from '@/lib/checkout-pricing';
 import { normalizeDiscountCode } from '@/lib/discount-codes';
 import { makeDiscountResolver } from '@/lib/discount-codes-server';
 import { isCheckoutShippingMethod, shippingMethodForDb } from '@/lib/checkout-shipping';
@@ -86,6 +94,30 @@ export async function POST(req: Request) {
   const discountCode = normalizeDiscountCode(
     typeof body.discountCode === 'string' ? body.discountCode : null,
   );
+  // The total the buyer's screen is CURRENTLY showing. Used only to decide
+  // whether to stop and ask them to re-confirm — never to price anything. See
+  // quotedTotalHasDrifted() for why accepting this unsigned is safe.
+  const quotedTotal = body.quotedTotal;
+
+  /**
+   * Refuse to charge an amount the buyer was not shown.
+   *
+   * MUST be called before any side effect — no order row, no PayPal order, no
+   * money. Both creation paths below run it: the reuse branch previously
+   * returned early and would otherwise have skipped it entirely.
+   */
+  const priceDriftResponse = (draft: OrderDraft) => {
+    if (!quotedTotalHasDrifted(quotedTotal, draft.total)) return null;
+    return NextResponse.json(
+      {
+        error: 'The price changed while this order was open.',
+        code: 'price_changed',
+        quotedTotal: Number(quotedTotal),
+        quote: toOrderQuote(draft),
+      },
+      { status: 409 },
+    );
+  };
   const shippingMethod = String(body.shippingMethod ?? 'local-pickup');
   if (!isCheckoutShippingMethod(shippingMethod)) {
     return NextResponse.json({ error: 'Invalid shipping method.' }, { status: 400 });
@@ -167,6 +199,10 @@ export async function POST(req: Request) {
       currentLineKeys.every((key) => storedLineKeys.has(key));
 
     let sameTotals = false;
+    // Hoisted so the price-drift guard below can see it. Scoping it inside the
+    // `sameProducts` block is what let the reuse path start a payment without
+    // ever consulting the buyer's quoted total.
+    let reuseDraft: OrderDraft | null = null;
     if (sameProducts) {
       // Recompute totals from the live cart payload; catches shipping-method
       // switches (express vs priority both store as 'shipping') and price drift.
@@ -177,6 +213,7 @@ export async function POST(req: Request) {
         normalizedShippingAddress?.state ?? customer.state,
         discountResolver,
       );
+      if (!isOrderDraftError(draft)) reuseDraft = draft;
       // The discount is part of "same totals" — the buyer may have added,
       // changed, or removed a code since the cancelled attempt, and a code can
       // also have expired or filled its cap in the meantime. On any mismatch we
@@ -191,6 +228,11 @@ export async function POST(req: Request) {
     }
 
     if (sameProducts && sameTotals) {
+      // BEFORE re-creating the PayPal order — the first side effect on this
+      // path. `reuseDraft` is non-null here, since sameTotals requires it.
+      const drifted = reuseDraft ? priceDriftResponse(reuseDraft) : null;
+      if (drifted) return drifted;
+
       const items = (orderItems ?? []).map((item) => ({
         title_snapshot: item.title_snapshot,
         price_snapshot: Number(item.price_snapshot),
@@ -256,6 +298,11 @@ export async function POST(req: Request) {
   if (draft.total <= 0) {
     return NextResponse.json({ error: 'Order total must be greater than zero.' }, { status: 400 });
   }
+
+  // BEFORE the order row, the PayPal order, or any money. If this ever moves
+  // below `create_paypal_order`, every price move leaves an abandoned order.
+  const drifted = priceDriftResponse(draft);
+  if (drifted) return drifted;
 
   const { data: { user } } = await supabase.auth.getUser();
   const orderNumber = generateOrderNumber();

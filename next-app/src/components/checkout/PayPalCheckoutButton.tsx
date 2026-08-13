@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { checkoutErrorMessageForCode, composeUnknownErrorMessage, isAvailabilityError } from '@/lib/checkout-error-messages';
+import type { OrderQuote } from '@/lib/checkout-pricing';
 import { AppIcon } from '@/components/AppIcon';
 
 type PayPalButtonsActions = { resolve: () => Promise<void>; reject: () => Promise<void> };
@@ -176,6 +177,7 @@ export default function PayPalCheckoutButton({
   onOrderId,
   onSuccess,
   onAvailabilityIssue,
+  onPriceChange,
 }: {
   clientId: string;
   currency?: string;
@@ -193,6 +195,10 @@ export default function PayPalCheckoutButton({
    *  rejection, capture conflict, or a generic PayPal error) so the parent can
    *  re-check live stock and update the summary. */
   onAvailabilityIssue?: () => void;
+  /** Called when the server refused the order because the displayed total no
+   *  longer matches the chargeable one. Nothing was charged — the server
+   *  rejects before creating an order or a PayPal order. */
+  onPriceChange?: (info: { quotedTotal: number; quote: OrderQuote }) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [sdkReady, setSdkReady] = useState(false);
@@ -209,6 +215,7 @@ export default function PayPalCheckoutButton({
   const getPayloadRef = useRef(getPayload);
   const onOrderIdRef = useRef(onOrderId);
   const onSuccessRef = useRef(onSuccess);
+  const onPriceChangeRef = useRef(onPriceChange);
   // Internal order id created by the most recent create-order call. Used to
   // cancel the lingering unpaid order if the buyer abandons the PayPal window.
   const createdOrderIdRef = useRef<string | null>(null);
@@ -230,6 +237,7 @@ export default function PayPalCheckoutButton({
     missingFieldsRef.current = missingFields;
     needsInfoConfirmationRef.current = needsInfoConfirmation;
     onAvailabilityIssueRef.current = onAvailabilityIssue;
+    onPriceChangeRef.current = onPriceChange;
     captureRecoveryRequiredRef.current = captureRecoveryRequired;
   });
 
@@ -304,6 +312,12 @@ export default function PayPalCheckoutButton({
             // catch below can show precise bilingual guidance for it.
             throw Object.assign(new Error(data?.error ?? 'create-order failed'), {
               checkoutCode: typeof data?.code === 'string' ? data.code : undefined,
+              // Carried through so the page can show old -> new and force a
+              // fresh confirmation. Nothing was charged; the server refused
+              // before creating anything.
+              priceChange: data?.code === 'price_changed' && data?.quote
+                ? { quotedTotal: Number(data.quotedTotal), quote: data.quote }
+                : undefined,
             });
           }
           if (data.orderId) {
@@ -318,6 +332,15 @@ export default function PayPalCheckoutButton({
           const checkoutCode = err instanceof Error
             ? (err as Error & { checkoutCode?: string }).checkoutCode
             : undefined;
+          const priceChange = err instanceof Error
+            ? (err as Error & { priceChange?: { quotedTotal: number; quote: OrderQuote } }).priceChange
+            : undefined;
+          if (priceChange) {
+            // Hand the new figures to the page so the summary updates and the
+            // confirmation checkbox is cleared — the buyer must actively agree
+            // to the new total before any payment can start.
+            onPriceChangeRef.current?.(priceChange);
+          }
           const codedMessage = checkoutErrorMessageForCode(checkoutCode, isEsRef.current);
           if (codedMessage) {
             // A precise, non-stock rejection (Express over $5,000, spot outage,

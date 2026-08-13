@@ -281,40 +281,49 @@ export async function POST(req: Request) {
       }
 
       const alreadyRefunded = Number(refundOrder.refund_amount ?? 0);
-      const incrementalAmount = cumulativeRefund
-        ? Math.max(0, Math.round((cumulativeRefund.amount - alreadyRefunded) * 100) / 100)
-        : null;
       if (!cumulativeRefund && captureStatus !== 'REFUNDED') {
         throw new Error('Partial PayPal refund event is missing its cumulative refunded amount.');
       }
 
-      if (incrementalAmount == null || incrementalAmount > 0) {
-        let refundLedgerId = `event:${eventId}`;
-        if (incrementalAmount != null) {
-          const { data: pendingRefunds, error: pendingRefundsError } = await service
-            .from('paypal_refunds')
-            .select('paypal_refund_id, amount')
-            .eq('order_id', internalOrderId)
-            .eq('status', 'PENDING')
-            .order('created_at', { ascending: true });
-          if (pendingRefundsError && !['42P01', 'PGRST205'].includes(pendingRefundsError.code ?? '')) {
-            throw pendingRefundsError;
-          }
-          const matchingPending = pendingRefunds?.find(
-            (row) => Math.abs(Number(row.amount) - incrementalAmount) <= 0.01,
-          );
-          if (matchingPending?.paypal_refund_id) refundLedgerId = matchingPending.paypal_refund_id;
-        }
+      // THIS refund's own amount, read straight from the payload rather than
+      // derived as `cumulative - alreadyRefunded`. The derived figure is only
+      // correct when every earlier refund was already recorded, and PayPal does
+      // not guarantee webhook ORDER — so deriving it is what let a $0.50 refund
+      // get logged as $0.56. See DECISIONS, "paypal_refunds.amount is this
+      // refund's own amount".
+      const ownAmountRaw = Number((resource.amount as { value?: unknown } | undefined)?.value);
+      const ownAmount = Number.isFinite(ownAmountRaw) && ownAmountRaw > 0
+        ? Math.round(ownAmountRaw * 100) / 100
+        // Fall back to the increment only if PayPal omitted the amount, which
+        // has not been observed on a real event.
+        : cumulativeRefund
+          ? Math.max(0, Math.round((cumulativeRefund.amount - alreadyRefunded) * 100) / 100)
+          : null;
+
+      if (ownAmount == null || ownAmount > 0) {
+        // `resource.id` on a refund event IS the PayPal refund id — the same id
+        // the admin refund route stores. Keying the ledger by it means a
+        // redelivered webhook lands on the SAME row (idempotent by
+        // construction) and an admin-initiated PENDING row is completed in
+        // place. That replaces the old `event:<id>` key plus fuzzy
+        // amount-matching against pending rows, which could attach to the wrong
+        // refund on a second partial because the two sides compared different
+        // quantities.
+        const refundLedgerId = String(resource.id ?? '').trim() || `event:${eventId}`;
 
         const { error: refundError } = await service.rpc('apply_paypal_refund', {
           p_order_id: internalOrderId,
           p_refund_id: refundLedgerId,
           p_capture_id: relatedCaptureId,
-          p_amount: incrementalAmount,
+          p_amount: ownAmount,
           p_currency: cumulativeRefund?.currency ?? 'USD',
           p_status: 'COMPLETED',
           p_request_key: null,
           p_payload: event as object,
+          // Authoritative running total. The RPC SETS the order's refund_amount
+          // from this rather than accumulating, so a missed or out-of-order
+          // event self-corrects on the next one.
+          p_cumulative_refunded: cumulativeRefund?.amount ?? null,
         });
         if (refundError) {
           // Compatibility while the hardening migration is being deployed. Admin
@@ -331,7 +340,7 @@ export async function POST(req: Request) {
                   resource: {
                     ...resource,
                     amount: {
-                      value: incrementalAmount?.toFixed(2),
+                      value: ownAmount?.toFixed(2),
                       currency_code: cumulativeRefund.currency,
                     },
                   },

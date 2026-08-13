@@ -1,6 +1,170 @@
 
 # Changelog
 
+## 2026-08-13 (later 3) - Checkout price drift: the buyer is never charged an unshown total
+
+Reported as a defect fixed on a sibling site adapted from this codebase.
+**It applied here**, and was confirmed by measurement rather than inference.
+
+**Step 1 — does it apply?** Yes. **56 of 87 available products (64%)** are
+`spot-multiplier`, priced `melt x multiplier` from the live metal feed at order
+time. Static-priced (`manual`) items cannot drift; the fix is global anyway.
+
+**Step 2 — proof, not inference.** The same bracelet computed **$6,462.72** in
+the morning and **$6,393.39** hours later in this same session — $69.33 apart,
+same code, same product. The cart stores the label captured at add-to-cart
+(unbounded staleness), behind an ISR page (300s) and a spot fetch (300s).
+
+**Step 3a — `POST /api/checkout/quote`.** Read-only; calls the same
+`buildOrderDraft()` and persists nothing — no order, no PayPal order, no
+inventory hold, no discount redemption. The checkout re-quotes on any change to
+cart, shipping method, taxing state, or discount code and renders those figures.
+Verified live: a cart holding a stale `$6,462.72` label rendered **$6,393.39**
+for both the line item and the subtotal.
+
+**Step 3b — the `price_changed` guard.** The client sends `quotedTotal` (derived
+from the same `computeOrderTotals()` the summary renders, so the two cannot
+disagree); the route compares in whole cents and returns **409 `price_changed`**
+with the new figures before creating anything. The client updates the summary,
+shows old -> new, and **clears the confirmation checkbox** so the buyer must
+actively re-agree.
+
+**The invariant:** the server always charges its own price; `quotedTotal` only
+decides whether to stop and ask. A forged quote earns a pointless prompt and can
+never lower the price. See DECISIONS for why creeping toward charging the
+client's figure would require signed quotes.
+
+**Verification bar — against a running server, with database checks:**
+
+| Check | Result |
+| --- | --- |
+| stale quote | 409 `price_changed`, **orders 20 -> 20** |
+| overcharging quote (other direction) | 409, orders unchanged |
+| one-cent difference | 409, orders unchanged |
+| **matching quote** | **200, order created** — the guard is not a brick wall |
+| absent `quotedTotal` | 200 — older clients still complete |
+| quote endpoint | wrote nothing |
+
+10 unit tests on the comparison helper, **verified by mutation**: disabling the
+guard fails 6 of 10 (the 4 that survive are exactly those expecting `false`).
+Plus 3 tests pinning the "you have not been charged" copy in both locales.
+
+⚠️ **A residual race is documented and accepted.** The first verification run
+genuinely failed check 4: the spot fetch is stale-while-revalidate, so the quote
+landed as the 300s window expired and served $6,850.64 while the order served
+$6,776.99. The guard caught it — the correct outcome — and the second run passed
+all 14. Closing it entirely means pinning a spot snapshot across both requests,
+i.e. signed quotes.
+
+Also fixed while here: the quote is now **tagged with the cart state it was
+computed for** and ignored once that tag goes stale, so a quote can never render
+against a cart the buyer has already changed. (Found via a lint rule on
+`setState` in an effect, which pointed at the real bug behind it.)
+
+`tsc` clean, `lint` clean, `npm test` **962/962** (was 949).
+
+## 2026-08-13 (later 2) - Refund ledger reworked: one meaning for `amount`
+
+`supabase/paypal-refund-ledger-2026-08-13.sql` — **applied**. Code change is
+undeployed.
+
+`paypal_refunds.amount` carried two meanings depending on the caller
+(CAPTURE.REFUNDED wrote the *increment*; the admin route and REFUND.PENDING
+wrote the refund's *own amount*). They agree on a capture's first refund and
+diverge on every partial after, which is how a real $0.50 refund got logged as
+$0.56 with the ledger summing $1.12 against a correct $1.06 order.
+
+**Three decisions:**
+
+1. `amount` = **this refund's own amount**, read from `resource.amount.value`
+   rather than derived. The old `cumulative - alreadyRefunded` only equals the
+   own amount when every earlier refund was already recorded — and PayPal does
+   not guarantee webhook order. The correct figure was in the payload all along.
+2. `orders.refund_amount` is **SET from `total_refunded_amount`**, clamped
+   monotonically, instead of accumulating increments. Cumulative is
+   authoritative and self-correcting.
+3. An applied ledger row's `amount` is **immutable** — the upsert used to
+   rewrite it before the `applied_at` guard ran.
+
+**The incidental find that made it clean:** `resource.id` on a refund event IS
+the PayPal refund id, the same id the admin route stores. Keying the ledger by
+it makes redelivery idempotent by construction and completes an admin `PENDING`
+row in place — removing the synthetic `event:<id>` key and the ±$0.01
+amount-matching that was the actual mis-attachment mechanism. That workaround
+existed only because the code did not know it had the refund id, which is the
+same misreading behind the original refund bug.
+
+`p_cumulative_refunded` is a new trailing parameter **with a DEFAULT**, so the
+admin refund route and the PENDING/FAILED handler resolve unchanged on eight
+arguments and keep accumulating — correct for them, as they act synchronously
+against an accurate total.
+
+Verified against the real Postgres function, 20 checks: in-order partials,
+**out-of-order delivery** (a later event setting the full cumulative, then an
+earlier one arriving late without walking the total backwards), hostile
+redelivery with different figures, the 8-argument admin path, and the
+over-refund clamp. The ledger now sums to $1.06.
+
+`tsc` clean, `lint` clean, `npm test` **949/949** (was 946) — three new cases
+pinning that `total_refunded_amount` is cumulative and that the derived
+own-amount is wrong under out-of-order delivery.
+
+## 2026-08-13 (deployed) - Production verification, and a grant bug it caught
+
+Batch deployed; build Published. Verified in production through the owner's
+authenticated Chrome session — the first time the admin surface has ever been
+exercised signed in.
+
+### 🔴 Bug caught in production: admin could read but not write
+
+`Admin -> Discount Codes` loaded, listed, and drew its empty state perfectly,
+while every create/edit/delete failed with **`permission denied for table
+discount_codes`**.
+
+`discount-codes-2026-08.sql` granted only `SELECT` to `authenticated`. Postgres
+checks table-level GRANTS *before* RLS, and the admin API routes run on
+`requireAdmin()`'s **request-scoped** client — the `authenticated` role, not the
+service role. So reads passed and writes were refused before the admin-only RLS
+policy was ever reached.
+
+`buyers-2026-07.sql:35` documents this exact trap and was not followed.
+
+Fixed by `supabase/discount-codes-grant-fix-2026-08-13.sql` (one grant, no
+redeploy needed); the canonical migration is corrected too. Access is NOT
+widened — the admin-only policy still governs, and `anon` remains fully locked
+out (verified live: `SELECT` and `INSERT` both `42501`).
+
+### Verified working in production, post-fix
+
+| Surface | Result |
+| --- | --- |
+| Admin nav | **Discount Codes** present, correctly active |
+| Type toggle | switching to *Dollar amount off* relabels to `AMOUNT IN DOLLARS` + `$` prefix |
+| Required validation | empty percentage correctly blocks submit |
+| Create (form) | green *"Created ZZFORMTEST."*, row persisted |
+| Deactivate | green *"ZZVERIFY7K is now inactive."*, status + button flip |
+| Delete | 200, rows removed |
+| Table render | code, note, discount, minimum, used `0/1`, expires, status, actions |
+| Button typography | correct size/weight — the 2026-08-12 font fix confirmed live |
+| Checkout validation API | `20% off` -> `$1,103.62` on a $5,518.10 piece |
+| Checkout UI | chip + `REMOVE`, discount line, correct total `$4,513.48` |
+
+**The pre-discount shipping-tier rule is confirmed in production:** a $5,518.10
+order discounted to $4,414.48 still drew the **$99.00 Registered Mail tier** and
+still had Overnight blocked as over $5,000 — both keyed to the pre-discount
+subtotal, which is the insurance rule this was designed around.
+
+All test codes deleted (0 remain) and the owner's pre-existing cart was backed up
+and restored.
+
+⚠️ **Method note, the third of its kind this session.** Two intermediate
+"failures" were the verification tooling, not the app: a form submit that
+appeared to do nothing (synthetic input not registering in React state) was
+nearly reported as a broken form, when the form works correctly. Combined with
+the swallowed `permission denied` and the foreign-capture refund, the pattern is
+consistent — **when a check fails, rule out the checker before reporting the
+subject.**
+
 ## 2026-08-13 (later) - Pre-deploy PayPal audit: the four "refunded" orders explained
 
 Read-only audit before deploying, prompted by four orders sitting at

@@ -138,11 +138,25 @@ create policy "Admins read discount redemptions" on public.discount_code_redempt
   for select
   using (public.is_admin_user(auth.uid()));
 
--- No anon/authenticated grants: a shopper must never be able to enumerate
--- codes. Validation happens through the server route.
+-- ⚠️ RLS POLICIES ALONE ARE NOT ENOUGH. Postgres checks table-level GRANTS
+-- BEFORE it ever consults RLS, so `authenticated` needs the base write grant
+-- too — the admin-only policy above is what actually narrows it to admins.
+-- (Same note as `buyers-2026-07.sql`; the admin API calls run through
+-- requireAdmin()'s REQUEST-SCOPED client, which is the `authenticated` role,
+-- not the service role.)
+--
+-- Fixed 2026-08-13: this originally granted only SELECT, which let the admin
+-- page LOAD while every create/edit/delete failed with
+-- "permission denied for table discount_codes". Reads worked, so the page
+-- looked healthy — which is exactly why it survived to production.
+--
+-- `anon` gets nothing: a shopper must never enumerate codes. Code validation at
+-- checkout goes through the server route on the service client.
 revoke all on public.discount_codes from anon, authenticated;
 revoke all on public.discount_code_redemptions from anon, authenticated;
-grant select on public.discount_codes to authenticated;
+grant select, insert, update, delete on public.discount_codes to authenticated;
+-- Redemptions are written by capture_paypal_order (service role) and only READ
+-- by admin; the cascade from discount_codes handles their removal.
 grant select on public.discount_code_redemptions to authenticated;
 grant all on public.discount_codes to service_role;
 grant all on public.discount_code_redemptions to service_role;

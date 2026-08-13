@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useCart, type CartItem } from '@/context/CartContext';
-import OrderSummary, { OrderTotals } from '@/components/checkout/OrderSummary';
+import OrderSummary, { OrderTotals, computeOrderTotals } from '@/components/checkout/OrderSummary';
+import type { OrderQuote } from '@/lib/checkout-pricing';
 import PayPalCheckoutButton from '@/components/checkout/PayPalCheckoutButton';
 import DiscountCodeField from '@/components/checkout/DiscountCodeField';
 import type { AppliedDiscount } from '@/lib/discount-codes';
@@ -91,6 +92,14 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
   // Previewed discount, for display only — the code string is what gets sent
   // with the order and the server recomputes the amount from it.
   const [appliedDiscount, setAppliedDiscount] = useState<AppliedDiscount | null>(null);
+  // Authoritative live prices from /api/checkout/quote, TAGGED with the cart
+  // state they were computed for. Storing the tag lets `quote` below be a
+  // derived value: a quote whose tag no longer matches the current cart is
+  // simply not used, so the summary can never render figures belonging to a
+  // cart the buyer has already changed.
+  const [quoteState, setQuoteState] = useState<{ key: string; quote: OrderQuote } | null>(null);
+  // Set when the server refuses an order because the buyer's total had moved.
+  const [priceChange, setPriceChange] = useState<{ from: number; to: number } | null>(null);
   const [infoConfirmed, setInfoConfirmed] = useState(false);
   // For Local Pickup the address is optional and hidden behind an accordion the
   // buyer can expand if they want to provide it. (Ignored when shipping is
@@ -245,6 +254,10 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
       // Only the CODE is sent. The server re-reads it and recomputes the
       // discount from its own subtotal, so no amount crosses the wire.
       discountCode: appliedDiscount?.code ?? null,
+      // The total currently on screen. The server NEVER charges this — it only
+      // compares, and refuses with `price_changed` if its own figure differs,
+      // so the buyer can never be billed an amount they were not shown.
+      quotedTotal: displayedTotals.total,
       orderId: orderIdRef.current,
     };
   }
@@ -363,6 +376,62 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     ...item,
     ...productInfoById[item.id],
   }));
+
+  // Re-quote whenever anything that moves the price changes. Keeping the
+  // display fresh is what stops the server-side drift guard firing on nearly
+  // every checkout, which would train buyers to click through it.
+  const quoteKey = `${items
+    .map((i) => `${i.id}:${Math.max(1, Math.floor(i.purchaseQuantity ?? 1))}`)
+    .sort()
+    .join(',')}|${effectiveShippingMethod}|${normalizeUsState(customer.state) ?? ''}|${appliedDiscount?.code ?? ''}`;
+
+  // Only honour a quote computed for the CURRENT cart. Falls back to the
+  // stored labels for the moment between a change and its fresh quote.
+  const quote = quoteState?.key === quoteKey ? quoteState.quote : null;
+
+  // The figures the buyer is looking at RIGHT NOW. Derived from the same
+  // function the summary renders from, so `quotedTotal` and the on-screen total
+  // cannot disagree by construction.
+  const displayedTotals = computeOrderTotals({
+    items: summaryItems,
+    shippingMethod: effectiveShippingMethod,
+    shippingState: customer.state,
+    hideSoldItemPrices,
+    appliedDiscount,
+    quote,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (items.length === 0) return;
+      try {
+        const res = await fetch('/api/checkout/quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: items.map((i) => ({ id: i.id, quantity: Math.max(1, Math.floor(i.purchaseQuantity ?? 1)) })),
+            shippingMethod: effectiveShippingMethod,
+            shippingState: customer.state,
+            discountCode: appliedDiscount?.code ?? null,
+            email: customer.email || null,
+          }),
+        });
+        if (cancelled) return;
+        const data = await res.json().catch(() => null);
+        // A failed quote leaves the cart-label fallback in place rather than
+        // blanking the summary. The order route still recomputes authoritatively,
+        // and the drift guard still refuses to charge an unshown amount.
+        if (res.ok && data?.quote) {
+          setQuoteState({ key: quoteKey, quote: data.quote as OrderQuote });
+        }
+      } catch {
+        /* keep the previous figures */
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteKey]);
 
   // The PayPal approval round-trip swaps this page's content (full form ->
   // success screen) without a real navigation, so the browser keeps whatever
@@ -803,6 +872,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
                 showTotals={false}
                 bare
                 heading={null}
+                quote={quote}
               />
             </div>
 
@@ -819,6 +889,32 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
               onCleared={() => setAppliedDiscount(null)}
             />
 
+            {priceChange && (
+              <div
+                role="status"
+                className="text-xs leading-relaxed"
+                style={{
+                  padding: '0.7rem 0.8rem',
+                  border: '1px solid color-mix(in srgb, #735c00 45%, transparent)',
+                  background: 'color-mix(in srgb, #735c00 8%, transparent)',
+                  borderRadius: 'var(--radius-lg)',
+                  color: 'var(--color-on-surface)',
+                }}
+              >
+                <strong>{isEs ? 'El precio se actualizó.' : 'The price updated.'}</strong>{' '}
+                {isEs
+                  ? 'Los precios de los metales cambian durante el día. Su total cambió de '
+                  : 'Metal prices move through the day. Your total changed from '}
+                <strong>{formatCheckoutCurrency(priceChange.from)}</strong>
+                {isEs ? ' a ' : ' to '}
+                <strong>{formatCheckoutCurrency(priceChange.to)}</strong>.{' '}
+                <strong>{isEs ? 'NO se le ha cobrado' : 'You have not been charged'}</strong>
+                {isEs
+                  ? ' — revise el resumen actualizado y marque la casilla de confirmación para continuar.'
+                  : ' — review the updated summary and tick the confirmation box to continue.'}
+              </div>
+            )}
+
             <OrderTotals
               items={summaryItems}
               isEs={isEs}
@@ -826,6 +922,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
               shippingState={customer.state}
               hideSoldItemPrices={hideSoldItemPrices}
               appliedDiscount={appliedDiscount}
+              quote={quote}
             />
 
             <p className="text-xs leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
@@ -902,6 +999,18 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
                 // A create-order/capture error can mean an item just sold out — re-check
                 // live stock so the summary + this button reflect it immediately.
                 onAvailabilityIssue={() => { void refreshAvailability(); }}
+                // The server refused because the total moved. Nothing was
+                // charged and no order exists. Show the new figures and make
+                // the buyer re-confirm before payment can start again.
+                onPriceChange={({ quotedTotal, quote: freshQuote }) => {
+                  // Tagged with the current cart so it is honoured immediately.
+                  setQuoteState({ key: quoteKey, quote: freshQuote });
+                  setPriceChange({ from: quotedTotal, to: freshQuote.total });
+                  setInfoConfirmed(false);
+                  // A stale reusable order id would re-submit the old amount.
+                  orderIdRef.current = null;
+                  orderPayloadKeyRef.current = null;
+                }}
                 onSuccess={({ orderNumber }) => {
                   // Snapshot the order for the printable confirmation, THEN clear the
                   // cart (clearing empties `items`, so capture the summary first).

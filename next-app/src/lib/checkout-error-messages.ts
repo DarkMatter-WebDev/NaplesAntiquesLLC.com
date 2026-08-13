@@ -38,6 +38,15 @@ export function checkoutErrorMessageForCode(
       return isEs
         ? 'Un artículo de su pedido aún no está disponible para compra en línea. Llámenos al (239) 404-8505 para comprarlo.'
         : 'An item in your order isn’t available for online purchase yet. Please call (239) 404-8505 to buy it.';
+    // The amounts live in the summary banner (CheckoutClient) because only the
+    // page knows them. This message sits at the pay button, where the buyer
+    // just clicked — and the "not been charged" line is the load-bearing part:
+    // a price-change notice appearing mid-payment otherwise reads like a bill
+    // they have just been handed.
+    case 'price_changed':
+      return isEs
+        ? 'El precio se actualizó. Los precios de los metales cambian durante el día. NO se le ha cobrado — revise el resumen actualizado arriba y marque la casilla de confirmación para continuar.'
+        : 'The price updated. Metal prices move through the day. You have NOT been charged — review the updated summary above and tick the confirmation box to continue.';
     case 'discount_invalid':
       return isEs
         ? 'El código de descuento de este pedido ya no es válido — puede haber expirado o alcanzado su límite de usos. Quítelo con “Quitar” en su resumen e intente de nuevo.'
