@@ -4,7 +4,7 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-08-09**.
+> compaction. Last reconciled: **2026-08-14**.
 
 ## Repository And Memory
 
@@ -1103,13 +1103,89 @@ Rules that must hold:
    and reopen a gap under the photo.
    The aside is ONE wrapper, not two grid items: a product with no Notes would
    otherwise leave an empty track whose gutter still prints under the gallery.
-4. **At 2000px+ the rule is mirrored, because the roles invert.** The
-   `ultrawide-page-wide` tier doubles the columns, so the square gallery becomes
-   the TALLER column (~1120px) while the info column shrinks as its text stops
-   wrapping (~790px). Keeping the aside under the gallery there stacks it onto
-   the already-tallest column and makes the band ~260px taller than doing
-   nothing. The aside moves into the short column under the info stack and the
-   gallery spans both rows.
+4. **Ultrawide (2000px+) is a DIFFERENT arrangement of the same four blocks**
+   (owner request 2026-08-14), on the `ultrawide-page-medium` tier:
+
+   | | column 1 | column 2 |
+   | --- | --- | --- |
+   | row 1 | gallery | purchase panel / description / specs |
+   | row 2 | trust strip (compacted) | notes + policy accordions |
+
+   Below 2000px the md+ arrangement above is unchanged, with the trust strip
+   spanning both columns in a third row.
+
+   **Why the blocks move.** Ultrawide is the width at which the info column runs
+   OUT of content — it widens, its text stops wrapping, and it ends well above
+   the gallery column. The md+ arrangement puts the accordions under the gallery,
+   i.e. on the side that is already long, leaving the short side emptier still.
+   Putting the accordions under the specs they describe, and giving the gallery
+   the compact trust strip, spends the surplus on the column that has it. It also
+   removes the strip's full-width band from below the layout, so the whole
+   section is ~185px shorter.
+
+   **The trust strip is compacted there, and that is not cosmetic.** Its
+   `mt-12 pt-8 mb-10` exists to separate a full-width band from two columns
+   ending just above it (rule 6). Under a photo in a 736px column it is not doing
+   that job, so 2000px+ overrides the margins to 0, tightens the badge gaps and
+   drops the icon disc 36px -> 32px. The three badges still sit across one row
+   (237px each), verified in English and Spanish.
+
+   **The badges are VERTICALLY CENTRED in that row** (owner, 2026-08-14), because
+   the row is as tall as the accordions opposite and the badges would otherwise
+   leave a long empty tail beneath them. Two properties do it and both are
+   required:
+
+   - `align-self: stretch` overrides the grid's `align-items: start` so the BOX
+     fills the row. This is what keeps the strip's top rule level with the NOTES
+     rule in column 2 — centring the whole box instead would drop that rule out
+     of alignment.
+   - `align-content: center` then centres the badge row inside that taller box.
+
+   ⚠️ **`padding-top` must stay 0 here.** `align-content` centres within the
+   CONTENT box, so any top padding offsets the badges by exactly that much —
+   measured 81.6px above vs 60.6px below while the compact 1.25rem was still
+   applied, against 71.6/70.6 once removed. Centring supplies ~71px of separation
+   from the top rule on its own, so the padding has no job left. Verified to
+   adapt rather than being a fixed offset: on a product with a shorter aside the
+   box is 147.3px and the badges still centre (27.5 / 26.5).
+
+4a. **The gallery is a SQUARE in a 50/50 grid, so column WIDTH is photo HEIGHT** —
+   this is why the tier matters. On `ultrawide-page-wide` (2200px) the column
+   reached 1036px and the photo 1120px tall, which the owner reported as too big;
+   `ultrawide-page-medium` caps the column at 736px and is flat from 2000px up.
+   Capping the canvas is the right lever rather than an asymmetric grid: the equal
+   columns are what rule 5's balance calculation is fitted to, and the surplus
+   would otherwise land in a hole between the columns or a ~1310px prose column.
+
+   ⚠️ **Tier and arrangement are ONE decision.** An older 2000px+ rule mirrored
+   the aside into column 2 *with the gallery spanning both rows*, because the
+   uncapped gallery was then the TALLER column. Do not restore that shape: past
+   roughly a 900px column the gallery becomes the taller column again, and if the
+   tier is ever widened the whole arrangement has to be re-measured, not just
+   the mirror restored.
+
+4c. **Both columns are BOUNDED blocks that terminate on the same rule**
+   (owner, 2026-08-14, "better balance"). Column 2 already ended on the last
+   accordion's `border-bottom`; column 1's trust strip now carries a matching
+   `border-bottom`. Because the strip stretches to the row (4, above), the two
+   rules land level to the pixel — verified in both locales and on a dark page,
+   where both correctly pick up the overridden `--color-outline-variant`
+   (`rgba(255,255,255,0.2)`). Left as one bounded block beside one floating
+   cluster, the band read as lopsided. ⚠️ If `align-self: stretch` is ever
+   removed, remove this border with it or it will sit at an arbitrary height.
+
+4d. **The band carries `padding-bottom: 2.5rem` at ultrawide.** The old
+   full-width strip supplied that space through its own `mb-10`, which is zeroed
+   in this arrangement, so without it the last accordion's rule sat ~2px off the
+   next section's divider. It is padding on the LAYOUT rather than margin on
+   either column, so both get it and the columns still end level.
+
+4b. **Residual imbalance is expected at ultrawide and is not a bug to chase.**
+   Measured at 2000px in English: column 1 966.3px, column 2 1140.5px. The two
+   columns cannot be balanced there, because the gallery grows with column width
+   while the info column shrinks — balancing would require a column NARROWER than
+   the desktop 576px. The arrangement above chooses which side carries the slack;
+   it cannot remove it.
 5. Which blocks move is a balance calculation, not a preference. The two column
    heads are fixed (gallery, purchase panel); the movable blocks are description,
    notes, policies and specs. The current split lands both columns within ~46px
@@ -1118,7 +1194,23 @@ Rules that must hold:
    every width above it.
 6. The trust strip keeps deliberate blank space above it (`mt-12` + `pt-8`):
    both columns end just there, so it must not butt against the accordions or
-   the spec table.
+   the spec table. **This applies below 2000px only** — at ultrawide the strip
+   sits under the gallery rather than beneath both columns, so that clearance is
+   overridden (rule 4).
+
+   ⚠️ **The policy accordions draw exactly ONE rule at the top of the group, and
+   it comes from their WRAPPER.** `ProductPolicyAccordions` wraps the group in a
+   `border-t pt-4` div; the accordions themselves carry `border-bottom` only.
+   A `:first-of-type { border-top }` rule also existed until 2026-08-14 and put
+   two parallel lines 17px apart at every width. If the wrapper ever loses its
+   border, restore the first-child rule — do not add a second one.
+
+   ⚠️ **The strip is a CHILD of `.product-detail-layout`, not a following
+   sibling** (moved 2026-08-14 so ultrawide could place it in the grid). Below
+   2000px it spans the full width from a third grid row, which is visually
+   identical to the old sibling rendering — verified at 768/1280/1999px and, on a
+   phone, as the last item of the flat stack. Keep its placement in CSS; adding
+   position utilities in the JSX would break one breakpoint or the other.
 7. **Stacked means centred.** Below 640px the three trust badges stack into a
    column, and both they and the policy accordions centre their content; from
    640px up the badges are 3-up and the accordions return to a left-aligned
@@ -1171,6 +1263,21 @@ Rules to keep:
    **Every one of those caches must be cleared with the window key**, since the
    cards are re-created for a new key and a stale cache silently skips a write a
    fresh card needs.
+
+5a. **The stack's scroll handler bails on an unchanged `p`** (added 2026-08-14).
+   Everything it writes is a pure function of scroll progress, and the listener
+   is on `window`, so it fires for the WHOLE page while `p` clamps to 1 the
+   moment the frame unpins. Before the guard, every scroll frame spent below the
+   hero — services, reviews, footer — still rewrote three transforms, two
+   opacities, three mask gradients and three ring pulls to the values already on
+   the elements. Measured after: **0 pane style writes across 30 scroll steps
+   below the hero**, against **154 writes and 31 distinct pane-B transforms
+   across 31 steps through it** — so the guard drops only redundant work. The
+   reduced-motion branch has the same latch, for the same reason.
+
+   ⚠️ **`remeasure` must reset the guard** (`lastP = NaN`) alongside the cached
+   travel, or a resize, a reduced-motion flip or a pointer-type change would be
+   swallowed by an equal `p`.
 
 ### Product-page label type has an 11px floor
 
@@ -1296,9 +1403,12 @@ English overflowed Spanish by 14px at 320px. **Re-measure both locales at 320 if
 the copy ever changes** — that is the combination that overflows.
 
 **It is a promotion, and it is a link (2026-08-11).** The strip advertises the
-free-evaluation offer as this-month-only and is an `<a>` to `/free-evaluation`
+free-evaluation offer and is an `<a>` to `/free-evaluation`
 (`/es/free-evaluation` in Spanish, via the usual
-`${locale === 'es' ? '/es' : ''}${path}` convention).
+`${locale === 'es' ? '/es' : ''}${path}` convention). Copy as of 2026-08-14:
+**"Summer special · Schedule a free evaluation"** /
+**"Oferta de verano · Programe una evaluación gratuita"** (owner reword; it
+replaced "Free evaluations · This month only" wholesale).
 
 Two rules for whoever edits the copy next:
 
@@ -1306,18 +1416,50 @@ Two rules for whoever edits the copy next:
    is wrong on 1 September. Naming it would also have to be computed at render,
    and the homepage is statically generated — the month would freeze at whatever
    the last deploy was, which is worse than either option.
+
+   ⚠️ **A SEASON is the same hazard, one step weaker, and it is currently in
+   play by owner choice.** "Summer special" (2026-08-14) is wrong from roughly
+   22 September. It is a deliberate decision, not an oversight — do not "fix" it
+   back to a generic phrase — but it does mean the strip now has a real expiry
+   date rather than merely an indefinite one. The rule stands for months; a
+   season buys about a quarter and still needs a diary entry.
 2. **The trailing arrow lives outside the mapped list**, so it shows at every
    width. It is the only cue the strip is tappable, and phones are where it is
    most likely to be tapped.
+3. **The "·" is the fragment separator, produced by the markup, not typed into
+   the copy.** Each fragment is a plain string in the mapped array and
+   `.home-announcement-separator` draws the dot between them. A dash written
+   into a fragment would render as a literal character in a different colour
+   from the styled separator.
 
 The old 780px third-item reveal is **gone** — the promo is two fragments and both
-fit everywhere. Measured at 320px, the tightest case: English 183.4px of 304px
-available (**120.6px slack**), Spanish 203.9px (**100.1px slack**), one line, no
-overflow. Reinstate the `display: none` + `@media (min-width: 780px)` pair only
-if a third fragment comes back.
+fit everywhere. Reinstate the `display: none` + `@media (min-width: 780px)` pair
+only if a third fragment comes back.
 
-⚠️ **This is time-limited copy.** When the promotion ends, the strip needs new
-wording — nothing expires it automatically, by design.
+**Measured at 320px, the tightest supported width** (re-measured 2026-08-14 after
+the copy became "Summer special · Schedule a free evaluation"): English 228.3px
+of 304px available (**75.7px slack**), Spanish 273.6px (**30.4px slack**), one
+line in both, no document overflow.
+
+⚠️ **Spanish is now at ~10% headroom — the tightest this strip has ever run.**
+For scale, the original "Free evaluations · This month only" left 100.1px. Any
+further Spanish lengthening needs the type clamp REFITTED, not merely
+re-checked. This is also why the Spanish reads "Oferta de verano" rather than the
+more literal "Especial de verano": the latter is two characters longer, worth
+~11px here, which would have cut the margin to under 20px.
+
+**320px is provably the tightest case, so one measurement there is sufficient.**
+The type clamp `clamp(0.4rem, 1.934vw + 0.013rem, 0.62rem)` hits its 0.62rem cap
+at exactly 502px (verified: computed 9.9167px there). Below 502px both the type
+and the container scale with `vw`, so slack stays roughly proportional; above it
+the type is fixed while the container keeps growing, so slack only increases.
+Spanish is the binding locale at every width.
+
+⚠️ **This is time-limited copy, and since 2026-08-14 it has a concrete expiry.**
+"Summer special" reads wrong from roughly 22 September. Nothing expires it
+automatically, by design — the homepage is statically generated, so there is no
+render-time clock to hang it on. Replacing it is a manual edit someone has to
+remember.
 
 **The bar rides inside the pinned hero frame (2026-08-11).** Owner: it "doesn't
 scroll away until the hero txt does". It is passed to `HomeHeroStack` as a
@@ -1370,23 +1512,55 @@ overlay layer that never moves until the frame itself releases.
 **The runway is only the scroll BUDGET.** Each pane always travels exactly one
 frame height, so changing it changes the SPEED of the handover, never its
 extent: a crossing spans 0.61 of the runway, so scroll-per-full-pane-travel is
-`0.61 × runway`. At 240svh that is ~146svh of scroll per 100svh of pane
-movement (~0.7×, calmer than 1:1). The `PHASE_*` fractions divide whatever
-budget is set, so they do not need re-tuning alongside it. Lower it for a
-snappier, more parallax-y hero; raise it toward and past 1:1 for a calmer one.
-Whenever it changes, re-check frame coverage across the runway — the overlap in
-5b is what keeps it hole-free, and a different budget changes nothing about
-that geometry but is cheap to confirm.
+`0.61 × runway`. The `PHASE_*` fractions divide whatever budget is set, so they
+do not need re-tuning alongside it. Lower it for a snappier, more parallax-y
+hero; raise it toward and past 1:1 for a calmer one. Whenever it changes,
+re-check frame coverage across the runway — the overlap in 5b is what keeps it
+hole-free, and a different budget changes nothing about that geometry but is
+cheap to confirm.
+
+**The runway is SPLIT by pointer type since 2026-08-14** (owner: "speed up the
+scroll a tiny bit on desktop"):
+
+| Pointer | Runway | Scroll per 100svh of pane travel |
+| --- | --- | --- |
+| touch (`pointer: coarse`) | 240svh | ~146svh (~0.7x) |
+| everything else | **210svh** | **~128svh (~0.78x)** |
+
+Desktop is ~12.5% less scrolling (measured at 1500x950: 2280px of travel became
+1995px). Both are still calmer than 1:1 and both are far from the 110svh that was
+rejected as "way too fast" on 2026-08-09 — **that verdict came from a phone**,
+which is exactly why the speed-up is scoped away from touch.
+
+Two things this split brought with it, both easy to miss:
+
+1. **The CSS query is `not all and (pointer: coarse)`, the exact complement of
+   the signal the JS branches on** — not `(pointer: fine)`. A device reporting
+   `pointer: none` would otherwise take the desktop CURVE from the JS and the
+   touch RUNWAY from the CSS.
+2. ⚠️ **Pointer type is now GEOMETRY, not just curve.** The `coarsePointer`
+   change listener used to call `schedule` (repaint only) on the stated
+   reasoning that "only the curve changes here, not the geometry". That is false
+   once the runway depends on it, so it now calls `remeasure` and drops the
+   cached `travel`. A hybrid device or a plugged-in mouse would otherwise run the
+   whole choreography off a stale measurement.
+
+The desktop rule must also stay ABOVE the `prefers-reduced-motion` block, which
+collapses the same property at equal specificity and so wins on source order
+alone.
+
+Runway history — 290svh → 110svh (2026-08-06, "fit the handover into roughly
+one screen") → 240svh (2026-08-09, "way too fast") → 240 touch / 210 desktop
+(2026-08-14).
 
 **On touch the runway is only HALF the speed story.** Once the snap is driving
 (see *"On touch, the hero snaps exactly one slideshow per gesture"*), the panes
 move one frame height over `SNAP_STEP_MS`, which the runway does not affect at
 all. Changing one without the other slows only half the experience.
 
-Runway history — 290svh → 110svh (2026-08-06, "fit the handover into roughly
-one screen") → 240svh (2026-08-09, "way too fast"); the 110svh figure cost less
-than it looks because the touch snap now scrolls the runway for the visitor.
-Detail in CHANGELOG under those dates.
+(Runway history is recorded once, above. The 110svh figure cost less than it
+looks because the touch snap now scrolls the runway for the visitor. Detail in
+CHANGELOG under those dates.)
 
 **This is the longest entry in this file. Rule index** — the labels are
 historical and out of sequence, so use this to find the one you need. Do not
@@ -3069,6 +3243,20 @@ one of three shared tiers: 1600px (medium), 1800px (standard), or 2200px (wide),
 always retaining 3rem outer gutters. This covers the storefront, product
 detail, account dashboard, admin data surfaces, marketplace managers, public
 service/sell grids, and footer without making every centered element wider.
+
+**Pick the tier from what the canvas CONTAINS, not from how much room exists.**
+A canvas holding a fixed-aspect element converts width into height, so the widest
+tier is not automatically the best one. Product detail is the worked example: its
+square gallery sits in a 50/50 grid, so on the wide tier a 1036px column became a
+1120px-tall photo and the owner reported it as too big. It uses
+**`ultrawide-page-medium`** as of 2026-08-14 (gallery capped at 736px); see *"The
+product page fills the space under the photo"* rule 4, which had to change with
+it. Grid and table canvases, which absorb width without gaining height, remain
+the right fit for the wide tier.
+
+⚠️ **A page's tier lives on every wrapper in that band, so change them
+together.** The product page has two (`/shop/[id]` back-link bar and the main
+band); leaving one behind detaches the back link from the gallery's left edge.
 
 Do not globally override Tailwind `max-w-*` classes. Long-form legal/FAQ prose,
 auth forms, checkout steps, modals, and focused sequential content depend on

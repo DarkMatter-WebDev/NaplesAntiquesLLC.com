@@ -1,28 +1,59 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-08-09**.
+> in `CHANGELOG.md`. Last reconciled: **2026-08-14**.
 
-## 🔴 Stray nested git repo inside `next-app/` (found 2026-08-11)
+## 🔴 TOP OF THE LIST (2026-08-14)
 
-`next-app/.git` is a **second, orphaned git repository** — 176K, created
-2026-08-08, its own `main` branch, **no remote configured**, and there is **no
-`.gitmodules`** at the root, so it is not a submodule. It is almost certainly an
-accidental `git init` in the wrong directory.
+1. **Deploy the staged batch** — `C:\Users\rcman\NEJ-repo-staging`.
+   ✅ **REBUILT 2026-08-14 12:47** and re-verified: **839 files / 19.12 MB**, a
+   two-way inventory diff against the source returned **0 missing / 0 extra**,
+   and all 9 changed files hash-match. Leak check clean (0 `.git`, 0
+   `node_modules`, 0 `.next`, 0 `.env*`, 0 `.pem`, 0 `*.tsbuildinfo`, 0
+   `next-env.d.ts`, 0 `*.log`) against a positive control of 169 `.tsx`. Hidden
+   paths confirmed present: `.github/workflows/scheduled-jobs.yml`, `.gitignore`,
+   `.claude/launch.json`, `next-app/.npmrc`.
+   No SQL outstanding; all three migrations are applied.
+   ⚠️ It is still a point-in-time snapshot — rebuild again after any further
+   edit, using the command under *Copying to the repo folder*.
+2. **Re-measure first paint on production** (snippet below, under *After the
+   next deploy*). Baseline to beat: 533KB across 30 requests before FCP.
+3. **Confirm the first real refund records itself.** The fix is proven locally
+   against real PayPal refunds but its automatic path has never run in
+   production.
 
-**Why it matters:** if it reaches the repo folder, git treats `next-app/` as an
-embedded repository and will not track its contents normally — which would
-silently drop the entire application from commits. It has not broken anything
-yet only because the files under `next-app/` were already tracked individually
-before it appeared.
+Nothing else in this file blocks a deploy.
 
-**Recommended (owner, destructive — not done automatically):** delete
-`next-app/.git`. Nothing references it; the root repo at
+## ✅ Stray nested git repo inside `next-app/` — DELETED 2026-08-14
+
+`next-app/.git` was a **second, orphaned git repository**. Removed on owner
+instruction; nothing referenced it and the root repo at
 `https://github.com/DarkMatter-WebDev/NaplesAntiquesLLC.com.git` is the real one.
-Back it up first if you want to be certain it holds nothing.
 
-Related oddity worth a glance: the root `.git/config` carries
-`[submodule] active = .`, a leftover from some earlier submodule wrangling.
+**What it actually contained** (read off disk before deleting, not assumed): 47
+files / 101 KB, created **2026-06-12**, HEAD on its own `main`, **no remote**, no
+packed-refs, no stash, and exactly **one commit — "Initial commit from Create
+Next App"**. It was the leftover `git init` from scaffolding the app. Note the
+earlier entry here said "176K, created 2026-08-08"; both figures were wrong.
+
+**Why it mattered:** had it reached the repo folder, git would have treated
+`next-app/` as an embedded repository and stopped tracking its contents normally,
+silently dropping the entire application from commits. It never broke anything
+because the files under `next-app/` were already tracked individually, and the
+staging robocopy excludes `.git` at every level.
+
+**Backup, if it is ever wanted:**
+`C:\Users\rcman\NEJ-next-app-git-backup-2026-08-14.zip` (92.8 KB, all 47 files
+including `refs/heads/main` and both reflogs). Delete it once you are satisfied.
+
+Verified after removal: exactly one `.git` remains (the root), root repo
+unchanged at 535 files with its remote intact, and `tsc` / `npm test` 963/963 /
+`npm run build` all still clean.
+
+⚠️ Still worth a glance, unchanged: the root `.git/config` carries
+`[submodule] active = .`, a leftover from some earlier submodule wrangling. There
+is no `.gitmodules`, so it is inert — but it is why the nested repo was worth
+removing rather than ignoring.
 
 ## Copying to the repo folder — use the staging folder
 

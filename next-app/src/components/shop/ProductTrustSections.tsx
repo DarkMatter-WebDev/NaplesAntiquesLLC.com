@@ -108,9 +108,11 @@ export function ProductPolicyAccordions({ isEs, prefix }: Props) {
         .product-trust-accordion {
           border-bottom: 1px solid var(--color-outline-variant);
         }
-        .product-trust-accordion:first-of-type {
-          border-top: 1px solid var(--color-outline-variant);
-        }
+        /* NO border-top on the first accordion. The wrapper above already draws
+           one (border-t pt-4), so a rule here put two parallel lines 17px apart
+           at the top of the group — visible at every width, removed 2026-08-14.
+           If the wrapper ever loses its border, restore this one instead of
+           adding a second. */
         .product-trust-accordion > summary {
           display: flex;
           align-items: center;
@@ -205,7 +207,10 @@ export function ProductTrustBadges({ isEs }: Pick<Props, 'isEs'>) {
         // a centered stack reads best (owner request 2026-08-04).
         <div key={badge.icon} className="flex flex-col items-center gap-2 text-center">
           <span
-            className="flex h-9 w-9 items-center justify-center rounded-full"
+            // `product-trust-badge-icon` is a styling hook only: globals.css
+            // shrinks the disc when this strip is compacted under the gallery at
+            // 2000px+. The h-9/w-9 utilities remain the default everywhere else.
+            className="product-trust-badge-icon flex h-9 w-9 items-center justify-center rounded-full"
             style={{ background: 'rgba(212, 175, 55, 0.14)', color: 'var(--color-primary)' }}
           >
             <AppIcon name={badge.icon} style={{ fontSize: '18px' }} />

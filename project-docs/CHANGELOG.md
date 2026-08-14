@@ -1,6 +1,383 @@
 
 # Changelog
 
+## 2026-08-14 (cleanup) - Stray nested git repo removed from next-app/
+
+`next-app/.git`, open as a 🔴 item since 2026-08-11, deleted on owner instruction.
+
+**Inspected off disk first rather than trusting the note** — and the note was
+wrong on both figures. Actual contents: **47 files / 101 KB**, created
+**2026-06-12** (not 176K / 2026-08-08), HEAD on its own `main`, **no remote**, no
+packed-refs, no stash, and exactly **one commit: "Initial commit from Create Next
+App"**. It was the leftover `git init` from scaffolding the app in June.
+
+Confirmed safe to remove before acting: no `.gitmodules` at root (so it was an
+orphan, not a submodule), the root `.git/config` carries the correct
+`DarkMatter-WebDev/NaplesAntiquesLLC.com.git` remote, and nothing in any config
+or doc referenced the nested path.
+
+**Backed up first** to `C:\Users\rcman\NEJ-next-app-git-backup-2026-08-14.zip`
+(92.8 KB, all 47 files including `refs/heads/main` and both reflogs) — outside the
+project folder, which must stay repo-ready.
+
+Verified after: exactly one `.git` remains (the root), root repo unchanged at
+**535 files** with its remote intact, `next-app/` app files untouched, and
+`npx tsc --noEmit` clean / `npm test` **963/963** / `npm run build` exit 0.
+
+Two process notes worth keeping:
+
+- **Zip entry paths use backslashes here.** A completeness check for
+  `refs/heads/main` returned False and looked like a truncated backup; the entry
+  was present as `refs\heads\main`. Verify an archive by listing entries, not by
+  probing one guessed path.
+- **The sandbox blocks a `Remove-Item` command that merely mentions a protected
+  path.** The first attempt failed because the verification filter in the same
+  command contained a `node_modules` literal. Split destructive actions from
+  scans that name protected paths.
+
+## 2026-08-14 (hero audit) - Desktop hero sped up, and the scroll handler stops working off-screen
+
+Owner: audit the homepage hero carousel for smoothness, and speed the scroll up
+a little on desktop.
+
+### Desktop runway 240svh -> 210svh, touch untouched
+
+The runway is the scroll BUDGET: a crossing spans 0.61 of it, so it sets how much
+scroll buys a full pane travel. It is now split by pointer type.
+
+| Pointer | Runway | Scroll per 100svh of travel |
+| --- | --- | --- |
+| touch (`pointer: coarse`) | 240svh | ~146svh |
+| everything else | **210svh** | **~128svh** |
+
+Verified live: at 1500x950 desktop, travel went **2280px -> 1995px** (exactly
+210svh, ~12.5% less scrolling); switching the pane to a mobile preset flipped
+`(pointer: coarse)` true and travel back to exactly **240svh**.
+
+Touch is deliberately excluded. On a finger the handover is usually driven by the
+SNAP, whose speed is `SNAP_STEP_MS` and is independent of the runway — shortening
+it there speeds up half the experience only. The 110svh runway rejected as "way
+too fast" on 2026-08-09 was judged on a phone, which is the same reason.
+
+**Two consequences that were not obvious:**
+
+- The CSS query is `not all and (pointer: coarse)`, the exact complement of the
+  signal the JS branches on — not `(pointer: fine)`, which would disagree on a
+  `pointer: none` device.
+- 🔴 **Pointer type is now GEOMETRY, not just the easing curve.** The
+  `coarsePointer` change listener called `schedule` (repaint only) on an explicit
+  comment saying "only the curve changes here, not the geometry". True until this
+  change, false after it — it now calls `remeasure` so the cached `travel` is
+  dropped. Without that, a hybrid laptop or a plugged-in mouse would run the
+  whole choreography off a stale measurement. The matching `removeEventListener`
+  was updated too, which would otherwise have leaked the listener.
+
+### The audit's real find: the handler ran for the whole page
+
+`apply()` writes are all pure functions of scroll progress `p`, but the listener
+is on `window` and `p` CLAMPS to 1 once the frame unpins. So every scroll frame
+spent anywhere below the hero still rewrote three transforms, two opacities,
+three mask gradients and three ring pulls — to the values already on the
+elements. Same at rest (p = 0) and on any zero-delta scroll event.
+
+Added a `p`-unchanged bail, plus the same latch on the reduced-motion branch
+(which is idempotent and was re-clearing cleared styles every frame).
+
+**Measured, with the control that matters:**
+
+| | Pane style writes |
+| --- | --- |
+| 30 scroll steps BELOW the hero | **0** |
+| 31 scroll steps THROUGH the hero | **154**, across 31 distinct pane-B transforms |
+
+One unique transform per step through the hero proves the animation is still
+fully driven — the guard drops only redundant work.
+
+### Audited and found already correct — do not re-derive
+
+The `Carousel` matches every optimisation its DECISIONS entry claims: `paused`
+wins outright (stops the loop and does not even observe), the ring `Animation`
+is cached rather than re-querying `getAnimations()` per frame, and
+`dataset.carouselFacing` / `zIndex` are write-on-change. The stack already
+rAF-throttles with a `queued` guard, caches `travel` behind
+`onLayoutAffectingResize`, uses `translate3d`, and registers scroll as passive.
+
+### Stale comments corrected
+
+Two comments still described the runway as "110svh", superseded on 2026-08-09.
+One claimed the runway "is only ~1 screen", which had stopped being true and made
+the touch-snap rationale read as if it depended on a number it does not.
+
+⚠️ **I broke the build once doing this**: a backtick inside a CSS comment in the
+`<style>` template literal, the exact hazard DECISIONS documents for this file
+class. Caught by `tsc` (34 errors), fixed, and the block now carries an explicit
+no-backticks note.
+
+Verification, from `next-app/` with dev stopped and `.next` deleted:
+`npx tsc --noEmit` clean, `npm run lint` clean, `npm test` **963/963 across 95
+files**, `npm run build` exit 0 at **454/454** pages.
+
+## 2026-08-14 (last) - Ultrawide product band rearranged: accordions right, trust strip under the photo
+
+Owner request, following the gallery cap below: at ultrawide move the policy
+accordions to the right under Specifications, and compact the three-part trust
+banner and put it under the image.
+
+**New 2000px+ arrangement** (below 2000px is unchanged):
+
+| | column 1 | column 2 |
+| --- | --- | --- |
+| row 1 | gallery | purchase panel / description / specs |
+| row 2 | trust strip (compacted) | notes + policy accordions |
+
+**This also fixes the whitespace tail flagged in the entry below.** Ultrawide is
+the width at which the info column runs out of content, so the md+ arrangement
+put the accordions on the side that was already long. Measured at 2000px the
+band is 1140.5px against a 966.3px gallery column — the slack moved to the short
+side, and because the trust strip is no longer a full-width band beneath the
+layout, **the whole section is ~185px shorter**.
+
+**The trust strip moved INSIDE `.product-detail-layout`** (it was a following
+sibling) so it can be placed by the grid. Below 2000px it spans both columns from
+a new third row, which is visually identical to the old rendering — verified at
+768 / 1280 / 1999px with its original `mt-12 pt-8 mb-10` and 36px icon discs
+intact, and on a 375px phone as the last item of the flat stack with the badges
+still stacked 3-up vertically.
+
+**Compaction at 2000px+ only:** margins to 0, padding-top zeroed, column gap
+1rem -> 0.75rem, badge internal gap -> 0.375rem, icon disc 36px -> 32px. The
+generous spacing exists to separate a full-width band from two columns ending
+above it; under a photo in a 736px column it is not doing that job. The three
+badges still sit across one row at 237px each, confirmed in **both locales** —
+Spanish has the longer titles and its badges measured identical heights (92.6px)
+with no overflow. These overrides are un-layered CSS beating Tailwind's
+`@layer utilities`, so no `!important` was needed.
+
+**The badges are vertically centred in their row** (owner follow-up, same day):
+the row is as tall as the accordions opposite, so left at `align-items: start`
+they had a ~121px empty tail beneath them. Fixed with `align-self: stretch` plus
+`align-content: center` — the first makes the BOX fill the row, which keeps its
+top rule level with the NOTES rule in column 2 (centring the whole box would have
+dropped that rule out of alignment); the second centres the badges inside it.
+
+⚠️ **`padding-top` had to go to 0 for this**, because `align-content` centres
+within the CONTENT box: with the compact 1.25rem still applied the result was
+81.6px above vs 60.6px below, and only zeroing it gave a true 71.6 / 70.6.
+Confirmed the centring adapts rather than being a fixed offset — on a
+shorter-aside product the box is 147.3px and the badges still centre (27.5 /
+26.5).
+
+A `product-trust-badge-icon` class was added purely as a styling hook for the
+disc; the `h-9 w-9` utilities remain the default everywhere else.
+
+**Three balance fixes followed (owner, same day, "make this a little more
+graceful"):**
+
+1. **Removed the double line at the top of the accordions.** The group's wrapper
+   draws a `border-t` and `.product-trust-accordion:first-of-type` drew another
+   16px below it — two parallel rules, **present at every width**, not just
+   ultrawide. Dropped the `:first-of-type` rule; the wrapper's is the section
+   separator and matches the Notes block above it. This is the one change here
+   that also improves desktop and mobile.
+2. **`padding-bottom: 2.5rem` on the band at ultrawide.** The old full-width
+   strip supplied that space via its own `mb-10`, which this arrangement zeroes,
+   so the last accordion's rule was sitting ~2px off the next section's divider.
+   Put on the LAYOUT rather than either column so both get it and the columns
+   still end level. Gap to the next section: 2px -> 40px.
+3. **A matching `border-bottom` on the trust strip at ultrawide**, so both
+   columns are bounded blocks terminating on the same rule instead of one bounded
+   block beside one floating cluster. Because the strip stretches to the row, the
+   two rules land level to the pixel (both at y=899.5). On a dark product page
+   both correctly resolve to the overridden token, `rgba(255,255,255,0.2)`.
+
+Verified at 390 / 768 / 1650 / 1999 / 2000 / 2100px, in both locales, and on a
+dark-variant product (`10k-gold-rope-chain-necklace`) where the strip correctly
+takes the dark palette — it sits on the dark page rather than painting its own
+light surface. Below 2000px confirmed to carry NONE of the ultrawide overrides
+(no stretch, no border-bottom, no layout padding, strip keeps its 40px margin).
+No document overflow at any width.
+
+⚠️ **Method note for the compiled-output check.** The accordion CSS ships inside
+a `<style>` template literal, so unlike `globals.css` it is NOT minified in the
+build. A pattern written against minified CSS (`.product-trust-accordion{border-`)
+matches nothing, and the first pass reported 0 for the removed rule AND 0 for its
+own positive control — a broken check that looked like a clean result. Confirmed
+properly by reading the block out of
+`.next/server/chunks/ssr/src_0coom2f._.js`, where the `border-bottom` rule is
+followed directly by the replacement comment and no `:first-of-type` rule.
+
+Verification, from `next-app/` with dev stopped and `.next` deleted:
+`npx tsc --noEmit` clean, `npm run lint` clean, `npm test` **963/963 across 95
+files**, `npm run build` exit 0 at **454/454** pages. Compiled CSS confirms
+`grid-area:3/1/auto/-1` for the md+ span and `grid-area:2/1` (strip) plus
+`grid-area:2/2` (aside) at 2000px+.
+
+## 2026-08-14 (later still) - Product gallery capped at ultrawide: wide tier -> medium tier
+
+Owner report, with a screenshot at ~2000px: the main product image is too big at
+ultrawide viewports.
+
+**The mechanism.** The gallery is a SQUARE sitting in a 50/50 grid, so the
+column's width is also the photo's height. Below 2000px the band is capped by
+`max-w-7xl` and the column is 576px. At 2000px the `ultrawide-page-wide` tier
+(2200px) took over and the column jumped to 888px, growing to **1036px wide and
+1120px tall** by 2560px. That step — 576 -> 888 -> 1036 — is what was reported.
+
+**The fix: both `ultrawide-page-wide` wrappers on `/shop/[id]` became
+`ultrawide-page-medium` (1600px).** Measured result, identical at 2000px and
+2560px because the medium tier resolves to a flat 1600px from 2000px up:
+
+| | Before | After |
+| --- | --- | --- |
+| Gallery | 1036 x 1120 | **736 x 820** |
+| Band width | 2136px | 1536px |
+| Band height | 1120px | **1087.5px** |
+
+So the photo lost 300px of width and the page did not get taller.
+
+**Capping the canvas was chosen over an asymmetric grid** — narrowing only
+column 1 would also cap the photo, but the equal columns are what the layout's
+balance calculation is fitted to, and the surplus would have gone either into a
+hole between the columns or into a ~1310px prose column.
+
+**The 2000px+ role inversion in `globals.css` had to go with it, and this is the
+part worth remembering.** That block existed because the *uncapped* gallery was
+the TALLER column at ultrawide, so the aside was mirrored into column 2 to keep
+it off the tall side. Capping the gallery reversed the premise: measured after
+the tier change, the gallery is 820px against an 873px info column, so it is the
+SHORT column again. Leaving the mirror in place would have inverted the original
+bug — stacking the aside onto the now-tallest column and making the band 53px
+taller (1140.5 vs 1087.5). Verified by measuring both arrangements. The tier and
+the mirror are one decision; DECISIONS now says so, with the ~900px column
+threshold at which the mirror would earn its place again.
+
+**Accepted cost, recorded so it is not re-litigated:** the info column runs out
+of content at ultrawide, leaving a 214.6px (EN) / 165.8px (ES) tail of whitespace
+above the trust strip, against ~14px at 1999px. Not fixable by moving blocks —
+the gallery grows with column width while the info column shrinks as its text
+stops wrapping, so balancing at ultrawide would require a column NARROWER than
+the desktop 576px. The whitespace moved rather than being added, since the band
+is shorter than before.
+
+⚠️ **A Turbopack per-rule CSS staleness hit during this work** — the `globals.css`
+edit applied while the removed `@media (min-width: 2000px)` block kept serving,
+so the aside stayed in column 2 through repeated reloads and the change looked
+like it had failed. Stopping dev, deleting `.next` and restarting fixed it, as
+`TASKS.md` documents. Worth knowing because the symptom is a change that appears
+not to work rather than an error.
+
+Verified across `/shop/[id]` in both locales and on a dark-variant product
+(`10k-gold-rope-chain-necklace`, `product-page-dark`), at 1999 / 2000 / 2560px,
+with no document overflow at any of them. The back-link bar's tier was changed
+in step so its left edge stays aligned with the gallery.
+
+Verification, from `next-app/` with dev stopped and `.next` deleted:
+`npx tsc --noEmit` clean, `npm run lint` clean, `npm test` **963/963 across 95
+files** (including the ultrawide source guard, which accepts the medium tier),
+`npm run build` exit 0, compiled successfully in 12.3s at **454/454** pages.
+Compiled-CSS check: both tier definitions still present, and exactly two
+`product-detail-column-aside` rules remain — the base `display:contents` and the
+md+ `grid-area:2/1` — proving the 2000px+ override is gone and the md+
+arrangement intact. (It minifies to `grid-area`, not `grid-column`/`grid-row`; a
+pattern matching the longhand reports a false absence.)
+
+## 2026-08-14 (later) - Homepage announcement bar reworded to "Summer special · Schedule a free evaluation"
+
+Owner request, in two steps within one session: first "Free evaluations" ->
+"Schedule a free evaluation" (a call to action rather than a statement of fact),
+then a wholesale replacement of both fragments with **"Summer special - schedule
+a free evaluation"**. Only the final wording was ever built or measured as a
+shipping state. The link to `/free-evaluation`, the trailing arrow, and the
+strip's styling are unchanged.
+
+Changed in `src/app/[locale]/(home)/page.tsx` only — the copy is inline there,
+not in `messages/*.json`, and no test pins it:
+
+- EN fragments: `['Free evaluations', 'This month only']` ->
+  `['Summer special', 'Schedule a free evaluation']`
+- ES fragments: `['Evaluaciones gratuitas', 'Solo este mes']` ->
+  `['Oferta de verano', 'Programe una evaluación gratuita']` (formal *usted*,
+  matching the existing register)
+- `aria-label` both locales, which exists so the separated fragments read as one
+  sentence: now `Summer special: schedule a free evaluation.` /
+  `Oferta de verano: programe una evaluación gratuita.`
+
+**The owner's "-" was rendered as the strip's existing "·" separator**, not as a
+literal hyphen: the two halves are exactly the two fragments the markup already
+maps over, and `.home-announcement-separator` draws the dot between them in its
+own muted gold. A typed dash would have rendered in the fragment's colour and
+sat inconsistently against the established design.
+
+⚠️ **This wording names a SEASON and therefore has a real expiry** — it reads
+wrong from roughly 22 September. Flagged to the owner and accepted. The homepage
+is statically generated, so nothing can expire it automatically; DECISIONS now
+carries this as an explicit weakening of the standing "do not name the month"
+rule rather than an exception someone might later "correct".
+
+**The one real risk here is the no-wrap rule, so it was measured, not assumed**
+(DECISIONS: *"The homepage announcement bar never wraps"* requires re-measuring
+both locales at 320px whenever the copy changes).
+
+| At 320px | Content | Available | Slack | Lines |
+| --- | --- | --- | --- | --- |
+| English | 228.3px | 304px | 75.7px | 1 |
+| Spanish | 273.6px | 304px | **30.4px** | 1 |
+
+Bar height 29.6px at 320px and 31.2px at 375px — both identical to the
+pre-change values, which is the real proof it stayed on one line. Spanish also
+checked at 375px (38.4px slack) and 502px (54.4px), with no document overflow at
+any width.
+
+⚠️ **Spanish is down to ~10% headroom, the tightest this strip has ever run**
+(the original copy left 100.1px). "Oferta de verano" was chosen over the more
+literal "Especial de verano" specifically for this: two extra characters cost
+~11px here and would have left under 20px. Any further Spanish lengthening needs
+the type clamp refitted, not just re-measured.
+
+**The measurement rig was validated with a positive control before it was
+trusted:** measuring the OLD copy at 320px returned 182.4px content / 121.6px
+slack against the 183.4px / 120.6px recorded in DECISIONS — a 1px agreement.
+Without that step a broken measurement would have looked exactly like a
+comfortable pass.
+
+Two durable facts added to DECISIONS: the new slack figures, and the proof that
+**320px is the tightest supported width** — the type clamp caps at its 0.62rem
+maximum at exactly 502px (computed 9.9167px, verified), so below that point type
+and container scale together while above it slack only grows. That means one
+measurement at 320px is sufficient and the previous ad-hoc width sweeps are not
+needed.
+
+Also corrected a stale comment beside the arrow, which justified its placement
+outside the mapped list by "the third item is hidden below 780px" — that third
+item was removed on 2026-08-11. The placement rule stands; only its reasoning
+was out of date.
+
+Verification, run from `next-app/` with the dev server stopped and `.next`
+deleted first: `npx tsc --noEmit` clean, `npm run lint` clean, `npm test`
+**963/963 across 95 files**, `npm run build` exit 0, compiled successfully in
+11.5s at **454/454 static pages** — tests and pages both matching the batch's
+existing baseline exactly.
+
+Compiled-output spot check across 2,301 files. Every new string present in 5
+files and every replaced string at **0**, against a positive control of
+`naplesestatejewelry` matching 406:
+
+| String | Files |
+| --- | --- |
+| `Summer special` / `Oferta de verano` | 5 / 5 |
+| `Schedule a free evaluation` / `Programe una evaluación gratuita` | 5 / 5 |
+| both new `aria-label` sentences | 5 / 5 |
+| `Free evaluations`, `This month only`, `Solo este mes` | **0** |
+| `Evaluaciones gratuitas, solo este mes` (old aria-label) | **0** |
+
+Note the bare string `Evaluaciones gratuitas` still matches 130 files and that is
+CORRECT — it is an unrelated sentence in the site footer
+(`SiteFooter.tsx:55`), not the banner. Matching the full old aria-label is what
+distinguishes them.
+
+⚠️ Note for the deploy: `C:\Users\rcman\NEJ-repo-staging` predates this edit and
+must be rebuilt before copying (command in `TASKS.md`).
+
 ## 2026-08-14 - First-paint investigation: 533KB was queue-jumping a 21KB stylesheet
 
 Owner report: a long white screen on first visit, then the spinner for a

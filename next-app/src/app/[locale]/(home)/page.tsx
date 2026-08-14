@@ -79,24 +79,33 @@ export default async function HomePage({ params }: Props) {
               data-customer-reveal-skip
               className="home-announcement"
               href={`${isEs ? '/es' : ''}/free-evaluation`}
-              // The visible text is three separated fragments, which reads as
-              // stop-start to a screen reader; this gives it one clean sentence.
+              // The visible text is separated fragments divided by a "·", which
+              // reads as stop-start to a screen reader; this gives it one clean
+              // sentence.
               aria-label={isEs
-                ? 'Evaluaciones gratuitas, solo este mes. Solicite la suya.'
-                : 'Free evaluations, this month only. Request yours.'}
+                ? 'Oferta de verano: programe una evaluación gratuita.'
+                : 'Summer special: schedule a free evaluation.'}
               style={{ background: '#1a1c1c' }}
             >
               {(isEs
-                ? ['Evaluaciones gratuitas', 'Solo este mes']
-                : ['Free evaluations', 'This month only']
+                ? ['Oferta de verano', 'Programe una evaluación gratuita']
+                : ['Summer special', 'Schedule a free evaluation']
               ).map((item, index) => (
                 <span
                   key={item}
                   // Both items show at EVERY width. The old strip hid its third
                   // item below 780px because three service claims could not fit;
-                  // this promo is two fragments and comfortably shorter than what
-                  // already fitted, so nothing needs hiding. Re-check at 320px in
-                  // BOTH locales if the copy changes — Spanish is the long one.
+                  // this promo is two fragments, so nothing needs hiding.
+                  //
+                  // The strip is `nowrap`, so copy length is a real constraint:
+                  // ALWAYS re-measure at 320px in BOTH locales when it changes.
+                  // Spanish is the binding one, and 320px is the tightest width
+                  // (the type clamp caps at 502px, so slack only grows above it).
+                  // Measured 2026-08-14: EN 75.7px slack, ES 30.4px of 304px.
+                  // ES is down to ~10% headroom — the tightest this strip has
+                  // ever run. Anything longer in Spanish needs the clamp
+                  // refitted, not just re-checked. ("Oferta de verano" was
+                  // chosen over "Especial de verano" for exactly this reason.)
                   className="home-announcement-item"
                   style={{ color: '#e9c349', fontFamily: 'var(--font-label)' }}
                 >
@@ -104,10 +113,10 @@ export default async function HomePage({ params }: Props) {
                   {item}
                 </span>
               ))}
-              {/* Outside the mapped list on purpose: the third item is hidden
-                  below 780px, so an arrow tacked onto it would take the only
-                  "this is tappable" cue away from phones — where the bar is
-                  most likely to be tapped. */}
+              {/* Outside the mapped list on purpose, so it shows at every width
+                  no matter how many fragments the copy has. It is the only cue
+                  the strip is tappable — and phones are where it is most likely
+                  to be tapped. */}
               <span aria-hidden="true" className="home-announcement-arrow">→</span>
             </Link>
           }

@@ -527,10 +527,22 @@ export default function HomeHeroStack({
     // frame but changes only as a colour seam sweeps, and this element is the
     // full pinned viewport.
     let lastFrameBackground = '';
+    // Last scroll progress actually applied. NaN so the first frame always runs,
+    // and reset to NaN by `remeasure` whenever the geometry or the active curve
+    // changes underneath it.
+    let lastP = NaN;
+    // Latch for the reduced-motion branch below, same purpose as `lastP`.
+    let reducedApplied = false;
 
     const apply = () => {
       queued = false;
       if (reduceMotion.matches) {
+        // Idempotent, and this runs on the same page-wide scroll listener as the
+        // main path — so without a latch a reduced-motion visitor pays for
+        // clearing already-cleared styles on every frame of the whole page.
+        // Reset by `remeasure`, which the reduced-motion listener calls.
+        if (reducedApplied) return;
+        reducedApplied = true;
         // CSS has collapsed the runway to the plain hero; clear any transforms
         // left over from before the preference flipped.
         paneA.style.transform = '';
@@ -556,7 +568,8 @@ export default function HomeHeroStack({
       // The sticky frame translates from 0 to (runway height - frame height)
       // within the runway while pinned, so this offset IS the scroll progress.
       // Cached: both heights derive purely from viewport units (the runway is
-      // calc(100svh...) + 110svh), so they change only on resize — but
+      // calc(100svh...) plus 240svh, or 210svh on a non-coarse pointer), so they
+      // change only on resize or a pointer-type change — but
       // offsetHeight is a forced layout, and this ran twice on every scroll
       // frame. Invalidated to null by the resize handler below.
       let travel = travelRef.current;
@@ -567,6 +580,22 @@ export default function HomeHeroStack({
       if (travel <= 0) return;
       const offset = frame.getBoundingClientRect().top - runway.getBoundingClientRect().top;
       const p = Math.min(Math.max(offset / travel, 0), 1);
+      // Everything below is a pure function of `p`, so an unchanged `p` can only
+      // rewrite the values already on the elements. Bail before doing it.
+      //
+      // This is not a micro-optimisation: the scroll listener is on `window`, so
+      // it fires for the WHOLE page, and `p` CLAMPS to 1 the moment the frame
+      // unpins. Without this guard, every scroll frame spent anywhere below the
+      // hero — the services strip, the reviews, the footer — still rewrote three
+      // transforms, two opacities, three mask gradients and three ring pulls,
+      // all to their existing values. The same applies at rest (p = 0) and to
+      // any horizontal or zero-delta scroll event.
+      //
+      // `remeasure` resets this to NaN alongside the cached travel, so a resize,
+      // a reduced-motion flip or a pointer-type change still forces one full
+      // re-apply rather than being swallowed by an equal `p`.
+      if (p === lastP) return;
+      lastP = p;
       // Two crossing clocks that deliberately OVERLAP: t2 starts before t1
       // finishes, so B is being pulled away by the second crossing while the
       // first is still seating it. B therefore sweeps THROUGH flush rather than
@@ -694,6 +723,11 @@ export default function HomeHeroStack({
     // travel so the next frame re-measures it exactly once.
     const remeasure = () => {
       travelRef.current = null;
+      // Drop the progress guard too. The geometry (or the easing curve, on a
+      // pointer-type change) is about to differ, so the same `p` no longer
+      // implies the same rendered result.
+      lastP = NaN;
+      reducedApplied = false;
       schedule();
     };
 
@@ -707,16 +741,20 @@ export default function HomeHeroStack({
     // it; only a width change or a large height change can.
     const stopResize = onLayoutAffectingResize(remeasure);
     reduceMotion.addEventListener('change', remeasure);
-    // Only the curve changes here, not the geometry, so a repaint is enough —
-    // but going through `schedule` keeps every write on the same rAF path
-    // instead of mutating styles straight from an event handler.
-    coarsePointer.addEventListener('change', schedule);
+    // `remeasure`, NOT `schedule`. This used to be a repaint-only listener on
+    // the reasoning that "only the curve changes here, not the geometry" — true
+    // until 2026-08-14, when the runway became SHORTER on non-coarse pointers to
+    // speed the hero up on desktop. Pointer type now changes the runway height,
+    // so the cached `travel` has to be dropped or a device that switches pointer
+    // (plugging in a mouse, a hybrid laptop) would drive the whole choreography
+    // off a stale measurement.
+    coarsePointer.addEventListener('change', remeasure);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('scroll', schedule);
       stopResize();
       reduceMotion.removeEventListener('change', remeasure);
-      coarsePointer.removeEventListener('change', schedule);
+      coarsePointer.removeEventListener('change', remeasure);
     };
   }, []);
 
@@ -725,11 +763,15 @@ export default function HomeHeroStack({
   // visitor smoothly to the NEXT slideshow. Both reduce to "one gesture advances
   // exactly one slideshow".
   //
-  // The runway is only ~1 screen (110svh), so a single flick covers most of it —
-  // which is precisely why a scroll could sail straight past a slideshow onto
-  // the one after. The fix is not a slower runway (that would recalibrate the
-  // whole choreography); it is stepping from where the GESTURE BEGAN, so however
-  // far a fling travels it still lands on the next slideshow and no further.
+  // A single flick covers a large share of the runway, which is precisely why a
+  // scroll could sail straight past a slideshow onto the one after. The fix is
+  // not a slower runway (that would recalibrate the whole choreography); it is
+  // stepping from where the GESTURE BEGAN, so however far a fling travels it
+  // still lands on the next slideshow and no further.
+  //
+  // (This paragraph used to cite "~1 screen (110svh)". The touch runway has been
+  // 240svh since 2026-08-09 and desktop 210svh since 2026-08-14; the argument is
+  // independent of the number, which is why it survived the retune unchanged.)
   //
   // Touch only, deliberately. A wheel already arrives in small discrete notches
   // and hijacking it would fight the visitor's own scrolling — the same reason
@@ -947,6 +989,39 @@ export default function HomeHeroStack({
              The PHASE_* fractions divide whatever budget is set here, so they do
              not need re-tuning alongside it. */
           height: calc((100svh - var(--site-header-height)) + 240svh);
+        }
+
+        /* DESKTOP ONLY: a slightly shorter runway, i.e. a slightly faster hero
+           (owner, 2026-08-14: "speed up the scroll a tiny bit on desktop").
+
+           240svh -> 210svh, so scroll-per-full-pane-travel goes 146svh -> 128svh
+           (0.61 x the runway). That is ~12.5% less scrolling through the hero —
+           on a 950px-tall window, 2280px of travel becomes 1995px. Still calmer
+           than 1:1, and nowhere near the 110svh that was rejected as "way too
+           fast" on 2026-08-09; that verdict came from a PHONE, which is exactly
+           why this is scoped away from touch.
+
+           TOUCH IS DELIBERATELY UNCHANGED. On a finger the handover is usually
+           driven by the snap, whose speed is SNAP_STEP_MS, and the runway governs
+           only the manual drag — so shortening it there would speed up half the
+           experience and leave the other half alone.
+
+           The query is written "not all and (pointer: coarse)" rather than
+           "(pointer: fine)" so it is the exact complement of the signal the JS
+           branches on. A device reporting "pointer: none" would otherwise get
+           the desktop CURVE from the JS but the touch RUNWAY from here, which is
+           the kind of mismatch that is invisible until it is not.
+
+           NOTE: no backticks anywhere in this style block. It is a template
+           literal, so one would terminate the string and 500 the route.
+
+           Must stay ABOVE the prefers-reduced-motion block, which collapses this
+           same property at equal specificity and therefore wins on source order
+           only. */
+        @media not all and (pointer: coarse) {
+          .home-hero-stack {
+            height: calc((100svh - var(--site-header-height)) + 210svh);
+          }
         }
 
         .home-hero-stack-frame {

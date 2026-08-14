@@ -562,8 +562,10 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
       <SiteHeader />
       <main className={`pt-24 md:pt-28 pb-20${isDarkPage ? ' product-page-dark' : ''}`} style={mainStyle}>
 
-        {/* Back to shop */}
-        <div className="ultrawide-page-wide max-w-7xl mx-auto px-4 md:px-8 mb-6">
+        {/* Back to shop. Shares the product band's ultrawide tier so their left
+            edges stay aligned — change both together or the back link detaches
+            from the gallery beneath it. */}
+        <div className="ultrawide-page-medium max-w-7xl mx-auto px-4 md:px-8 mb-6">
           <ProductBackLink
             href={backHref}
             productId={p.id}
@@ -575,7 +577,14 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
           </ProductBackLink>
         </div>
 
-        <div className="ultrawide-page-wide max-w-7xl mx-auto px-4 md:px-8">
+        {/* MEDIUM tier (1600px), not wide (2200px), deliberately: the gallery is
+            a SQUARE in a 50/50 grid, so column width is also its height. On the
+            wide tier a 2560px screen gave a 1036px column and therefore a 1120px
+            tall photo, which the owner reported as too big (2026-08-14). Capping
+            the canvas is the right lever because it preserves the equal columns
+            the layout's balance rules depend on; making the grid asymmetric
+            would cap the photo but invalidate that balance. */}
+        <div className="ultrawide-page-medium max-w-7xl mx-auto px-4 md:px-8">
           {/* Product layout. DOM order IS the reading order — gallery, then
               title/price, description, specifications, notes, policies — so the
               two wrappers below need no `order` juggling: flattening them on a
@@ -924,10 +933,15 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
               <ProductPolicyAccordions isEs={isEs} prefix={isEs ? '/es' : ''} />
 
             </div>
-          </div>
 
-          {/* Trust strip — full width beneath both columns (2026-08-04) */}
-          <ProductTrustBadges isEs={isEs} />
+            {/* Trust strip. It lives INSIDE the layout grid (moved 2026-08-14) so
+                that ultrawide can place it under the gallery. Below 2000px it
+                spans both columns in a third row and is visually unchanged from
+                when it was a sibling of this grid. Placement is entirely in
+                `.product-detail-layout` CSS — do not add position utilities
+                here. */}
+            <ProductTrustBadges isEs={isEs} />
+          </div>
         </div>
 
         {/* "You might also like" — same-category available pieces (2026-08-04) */}

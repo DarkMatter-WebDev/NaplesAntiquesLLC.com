@@ -716,10 +716,21 @@ button:focus-visible > .hover-underline-grow,
   .product-detail-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-rows: auto 1fr;
+    /* Third track is the trust strip, which moved inside this grid on
+       2026-08-14. The info column still spans only rows 1-2, so the `1fr`
+       above keeps doing its job (see the note above about surplus height). */
+    grid-template-rows: auto 1fr auto;
     align-items: start;
     column-gap: 2.5rem;
     row-gap: 2rem;
+  }
+  /* Full width beneath both columns — the pre-2026-08-14 appearance, now
+     expressed as a spanning grid item rather than a following sibling. Its own
+     `mt-12 pt-8` utilities still supply the deliberate blank space above it. */
+  .product-detail-layout > .product-trust-badges {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    min-width: 0;
   }
   .product-detail-layout > .product-detail-media {
     grid-column: 1;
@@ -751,25 +762,94 @@ button:focus-visible > .hover-underline-grow,
   }
 }
 
-/* At 2000px+ the `ultrawide-page-wide` tier widens the canvas to 2200px, the
-   columns roughly double, and the roles invert: the square gallery becomes the
-   TALLER column (~1120px) while the info column shrinks as its text stops
-   wrapping (~790px). Keeping the aside under the gallery there would stack it
-   onto the already-tallest column and make the band ~260px taller than doing
-   nothing. So the same rule is applied mirrored — the aside moves into the SHORT
-   column, under the info stack, and the gallery spans both rows. The flexible
-   row still absorbs the spanning item, so the band is exactly as tall as the
-   gallery. */
+/* ULTRAWIDE (2000px+): a different arrangement of the same four blocks, on the
+   `ultrawide-page-medium` tier (owner request 2026-08-14).
+
+       row 1 |  gallery        |  purchase panel / description / specs
+       row 2 |  trust strip    |  notes + policy accordions
+
+   Why this shape rather than the md+ one. Ultrawide is the width at which the
+   info column RUNS OUT of content: it gets wider, its text stops wrapping, and
+   it ends well above the gallery column. Stacking the accordions under the
+   gallery there (the md+ arrangement) puts them on the side that is already
+   long and leaves the short side emptier still. Moving them under the specs
+   they belong to, and giving the gallery the compact trust strip instead,
+   spends the surplus on the column that actually has it.
+
+   The trust strip is COMPACTED here because it is no longer a full-width band:
+   its generous `mt-12 pt-8` exists to separate it from two columns ending just
+   above it, which is not what it is doing in a 736px column under a photo.
+   Those utilities are overridden below — this rule is un-layered and Tailwind's
+   are in `@layer utilities`, so it wins without `!important`.
+
+   Do not reintroduce the old 2000px+ role inversion (gallery spanning both rows
+   with the aside mirrored). It existed for the `ultrawide-page-wide` tier, where
+   the uncapped square gallery was the TALLER column (~1120px); the medium tier
+   caps the column at 736px, so the gallery is the short column again and that
+   mirror would now stack the aside onto the tallest column. */
 @media (min-width: 2000px) {
+  .product-detail-layout {
+    grid-template-rows: auto auto;
+    /* The band used to end on the trust strip's own mb-10, which is zeroed here.
+       Without this the last accordion's bottom rule sits ~2px off the next
+       section's divider (owner, 2026-08-14). Padding on the LAYOUT rather than
+       margin on either column, so both get the same space and the two columns
+       still end level. */
+    padding-bottom: 2.5rem;
+  }
   .product-detail-layout > .product-detail-media {
-    grid-row: 1 / span 2;
+    grid-column: 1;
+    grid-row: 1;
   }
   .product-detail-layout > .product-detail-column-info {
+    grid-column: 2;
     grid-row: 1;
   }
   .product-detail-layout > .product-detail-column-aside {
     grid-column: 2;
     grid-row: 2;
+  }
+  .product-detail-layout > .product-trust-badges {
+    grid-column: 1;
+    grid-row: 2;
+    /* Compacted: the band's full-width breathing room is wrong under a photo. */
+    margin-top: 0;
+    margin-bottom: 0;
+    /* Zero, NOT the compact 1.25rem it started as. `align-content` centres
+       within the CONTENT box, so any padding-top offsets the badges by exactly
+       that much (measured: 81.6px above vs 60.6px below with 20px of padding).
+       Centring supplies the separation from the top rule on its own — there is
+       ~71px of it — so the padding has no job left here. */
+    padding-top: 0;
+    column-gap: 0.75rem;
+    /* The row is as tall as the accordions opposite, so the badges would
+       otherwise sit at the top with a long empty tail beneath them (owner,
+       2026-08-14). Two properties, and both are needed:
+
+       `align-self: stretch` overrides the grid's `align-items: start` so the
+       BOX fills the row — that is what keeps its top rule level with the NOTES
+       rule in column 2, which centring the whole box would have dropped out of
+       alignment. `align-content: center` then centres the badge row inside that
+       now-taller box, so the leftover space is split above and below instead of
+       all landing underneath. */
+    align-self: stretch;
+    align-content: center;
+    /* Closes the block at the bottom. Because the box stretches to the row, this
+       rule lands exactly level with the last accordion's bottom border in
+       column 2, so the two columns read as a matched pair bounded top and bottom
+       rather than one bounded block beside one floating cluster. Verified level
+       to the pixel; if the stretch is ever removed, remove this with it or it
+       will sit somewhere arbitrary. */
+    border-bottom: 1px solid var(--color-outline-variant);
+  }
+  /* Tighter badge internals so three still sit across a 736px column without
+     the descriptions running to three lines. */
+  .product-detail-layout > .product-trust-badges > * {
+    gap: 0.375rem;
+  }
+  .product-detail-layout > .product-trust-badges .product-trust-badge-icon {
+    height: 2rem;
+    width: 2rem;
   }
 }
 

@@ -2,13 +2,80 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-08-13**.
+> in `DECISIONS.md`. Last reconciled: **2026-08-14**.
 
-## Start Here (handoff, end of the 2026-08-13 session)
+## Start Here (handoff, end of the 2026-08-14 session)
 
-**Read this, then `TASKS.md`. Everything below is current as of 2026-08-13.**
+**Read this, then `TASKS.md`.**
 
-### ✅ DEPLOYED AND VERIFIED IN PRODUCTION (2026-08-13)
+### 🔴 ONE ACTION WAITING: DEPLOY
+
+A verified batch is staged at `C:\Users\rcman\NEJ-repo-staging` — **839 files /
+19.08 MB**, an exact mirror of this folder (robocopy dry run: 0 to copy, 0
+extras) and leak-checked clean. Copy it wholesale into the repo folder, keeping
+that folder's `.git`, then push.
+
+**No SQL is outstanding.** All three migrations this batch touched are already
+applied in Supabase and were verified live, not assumed.
+
+**What is in it, none of it yet in production:**
+
+| | |
+| --- | --- |
+| Refund ledger rework | `paypal_refunds.amount` = this refund's own amount; order total SET from PayPal's cumulative |
+| Checkout price-drift guard | `/api/checkout/quote` + `price_changed` 409 — a buyer can never be charged an unshown total |
+| Cart drawer quoting | drawer and checkout now show the same live figure |
+| First-paint fixes | 533KB was queue-jumping the 21KB stylesheet that gates the first pixel |
+| Black header wordmark | owner request |
+
+### After deploying, in this order
+
+1. **Watch the build reach `Published`** — a previous deploy showed `Canceled`.
+   Local builds run Node v24; Netlify pins 20.
+2. 🔴 **Re-measure first paint on production.** The console snippet is in
+   `TASKS.md`. Baseline to beat: **533KB across 30 requests before FCP.**
+   Localhost reports `transferSize: 0` and cannot measure this — production is
+   the only place it is real. Then check it **on a phone on cellular**, which is
+   the condition the reported white screen actually lives in.
+3. **Confirm the first real refund records itself** — order flips to
+   `refunded`/`partially_refunded` and a ledger row appears carrying that
+   refund's own amount and PayPal's real refund id.
+4. **Watch for the price-change banner** the first time metal moves mid-checkout.
+   Its payload contract and copy are test-pinned, but nobody has seen it render.
+
+### What this session produced
+
+- **Discount codes** — admin tab + checkout field, percent or fixed-dollar, with
+  optional minimum order, expiry and redemption cap. Live and verified in
+  production.
+- 🔴 **A PayPal refund bug** — every refund silently failed to record. Found by
+  accident while testing discounts; verified fixed against one full and two
+  partial live refunds.
+- 🔴 **A checkout price-drift bug** — the buyer's screen could show a different
+  total than the one charged. Reported from a sibling site; confirmed here by
+  measurement ($6,462.72 → $6,393.39 on one bracelet within a day).
+- **A first-paint investigation** — the reported "site appears to not exist" is
+  load ORDER, not server speed. TTFB is a healthy ~0.19s.
+- Two smaller items: the button-font fix and the black wordmark.
+
+### Five things a future session should NOT re-derive
+
+- **~205 buttons carry Tailwind font classes that do nothing.** Pre-existing and
+  understood; deliberately not fixed sitewide. See DECISIONS.
+- **Sandbox rows live permanently in the live `orders` table** (early July,
+  before the 2026-07-09 go-live). Tell them apart by the host in
+  `payment_response`, not by a 404 from PayPal.
+- **`paypal_refunds.amount` means this refund's OWN amount** since 2026-08-13,
+  and reconciling against a SUM of the ledger is valid again.
+- **The homepage boot splash cannot fix slow first paint** — it is
+  server-rendered, so the earliest it can appear is FCP, the very thing being
+  waited for. It arrives *after* the white screen. Do not reach for it as a
+  remedy.
+- **Every surface showing a cart price must quote**, not read the stored label.
+  A half-applied fix here manufactures a visible contradiction between two
+  surfaces one click apart.
+
+### ✅ Earlier in this batch: deployed and verified in production (2026-08-13)
 
 The batch is live and was exercised end to end through an authenticated admin
 session in the owner's own browser.
@@ -176,11 +243,13 @@ in this session (superseded, not lost, but do not assume).
 | --- | --- |
 | `npx tsc --noEmit` | clean |
 | `npm run lint` | clean |
-| `npm test` | **944 passed / 944**, 94 files |
-| `npm run build` | compiled successfully, **453/453** static pages, no warnings |
+| `npm test` | **963 passed / 963**, 95 files |
+| `npm run build` | compiled successfully, **454/454** static pages, no warnings |
 
-(Re-run 2026-08-11 after the discount-codes feature; previously 903/903 across
-92 files and 449 pages. The +41 tests and +4 pages are that feature.)
+Run 2026-08-14 from a deleted `.next` with the dev server stopped. Progression
+this batch: 903 → 944 (discount codes) → 946 (refund fix) → 949 (refund ledger)
+→ 962 (price drift) → 963 (image priority). Pages 449 → 453 (discount codes) →
+454 (checkout quote endpoint).
 
 Run from `next-app/`, with the dev server stopped and `.next` deleted first.
 
@@ -376,9 +445,18 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   column 2 is the purchase panel, description, and Specifications (which
   include a chain/band Width in mm for necklaces and bracelets), so both
   columns end together (~947px at 1280-1920 for a typical piece, down from
-  1337px). At 2000px+ the roles invert — the gallery is the taller column — so
-  the aside moves under the info stack instead. Below md everything collapses
-  to the original single-column order. The trade-in
+  1337px). **At 2000px+ the page uses the `ultrawide-page-medium` tier (1600px),
+  not wide (2200px), since 2026-08-14** — the gallery is square, so column width
+  is also photo height, and the wide tier produced a 1120px-tall photo the owner
+  reported as too big. The gallery is now capped at **736px** and is flat at
+  every width from 2000px up. **Ultrawide also rearranges the band** (owner,
+  2026-08-14): row 1 is gallery | purchase panel + description + specs, and row 2
+  is the compacted trust strip | notes + policy accordions — so the accordions
+  sit under the specs they describe and the trust strip sits under the photo
+  instead of forming a full-width band below everything. That strip is now a
+  CHILD of the layout grid; below 2000px it spans both columns from a third row
+  and is visually unchanged. Below md everything collapses to the original
+  single-column order. The trade-in
   service has a named page at `/trade-in` (Gold & Silver Trade-In Program),
   linked from the Sell menu, footer, each product page's trade-in line, and the
   homepage hero's **Trade** CTA (which pointed at `/contact` until 2026-08-09).
@@ -391,9 +469,13 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   `banner`), so it stays put until the hero text releases and then travels away
   with it. The frame's height is unchanged, so the hero choreography and touch
   snap are unaffected. 🟡 **It now advertises the free-evaluation promotion
-  ("Free evaluations · This month only") and links to
+  ("Summer special · Schedule a free evaluation", owner reword 2026-08-14;
+  "Oferta de verano · Programe una evaluación gratuita" in Spanish) and links to
   `/free-evaluation`** — time-limited copy that needs replacing when the promo
-  ends; nothing expires it automatically. The old 780px third-item reveal was
+  ends; nothing expires it automatically. ⚠️ **This wording names a SEASON, so it
+  reads wrong from roughly 22 September** — a real expiry date, not an open-ended
+  one. Spanish also sits at only ~10% width headroom now (30.4px of 304px at
+  320px), so lengthening it requires refitting the type clamp. The old 780px third-item reveal was
   removed with that change. It also carries
   a Meet the Owner story block, a Why Buy Estate Gold? education
   section, and four FAQ accordions linking to `/faq`, ordered hero →
@@ -430,8 +512,13 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   one slideshow however hard the fling (step measured from where the gesture
   began; B's snap point solved from the crossing constants), with a smooth
   ~1s scroll to the next slideshow (`SNAP_STEP_MS`) and free exit at both
-  ends; wheel/desktop scrolling is untouched. Runway is 240svh (drag speed
-  ~0.7x vs 1:1). All three lineups are admin-curated (Slideshow 1/2/3 tabs;
+  ends; wheel/desktop scrolling is untouched by the snap. **The runway is split
+  by pointer type since 2026-08-14: 240svh on touch, 210svh on everything else**
+  (owner asked for a slightly faster desktop scroll — ~12.5% less scrolling,
+  measured 2280px → 1995px of travel at 1500×950). Pointer type is therefore
+  geometry, not just the easing curve, so a pointer change re-measures.
+  The scroll handler also bails on unchanged progress, so it no longer rewrites
+  pane transforms while the visitor is anywhere below the hero. All three lineups are admin-curated (Slideshow 1/2/3 tabs;
   all migrations run; later lineups mirror A while empty), each with its own
   background color control; random draws FILL the editable lineup and saved
   lineups are always explicit manual lists. Lineups may include sold pieces
