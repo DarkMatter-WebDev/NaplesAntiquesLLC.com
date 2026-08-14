@@ -1,6 +1,97 @@
 
 # Changelog
 
+## 2026-08-14 - First-paint investigation: 533KB was queue-jumping a 21KB stylesheet
+
+Owner report: a long white screen on first visit, then the spinner for a
+fraction of a second — "to some users the site appears to not exist."
+
+**Ruled out by measurement first:** the server (TTFB a consistent ~0.19s, the
+homepage properly static at ISR 5m), the redirect chain (one clean 301), and
+fonts (`display: swap`, so no FOIT). The 2.54s figure in the first probe was a
+cold TLS handshake, not the origin.
+
+**The actual cause: 533KB across 30 requests before first contentful paint** —
+258KB of scripts, 157KB of carousel images and 87KB of fonts, all ahead of the
+**21KB stylesheet that is the only render-blocking resource on the page.** The
+stylesheet did not begin until 336ms; four preloaded fonts had started at 292ms
+and nine carousel images at 335ms. On desktop that is 488ms and invisible. The
+same payload on a first-time mobile visitor is ~2.7s (slow 4G) to ~10s (slow
+3G).
+
+**Four fixes, all about protecting the stylesheet's lane:**
+
+1. `carouselImageLoading` — every card except the LCP candidate is now
+   `fetchPriority: 'low'`. Still `eager`, so the documented hero pop-in problem
+   stays solved; they simply yield the network. Verified in the built output:
+   1 high, 27 low.
+2. `fonts.ts` — only the headline face is preloaded (the homepage LCP element is
+   the `<h1>`). Body face is `preload: false` with `display: swap`. Font
+   preloads 4 -> 3. Caslon's italic was checked and IS used on several pages, so
+   it was left intact rather than silently changing their appearance.
+3. `prefetch={false}` on low-intent links — the footer's four mapped groups
+   (including one per service-area city) and the cookie banner. The banner was
+   the single worst offender: it renders for first-time visitors specifically
+   and `/cookie-preferences` was the most-prefetched route on the site (6x).
+   Header nav still prefetches. **58 -> 44 prefetches, 111 -> 96 requests.**
+4. Inline `background-color` on `<html>`, plus the splash's critical CSS inlined
+   in `<head>`. Until the stylesheet lands the browser paints its own default —
+   pure white; an inline style attribute is applied by the parser from the first
+   bytes.
+
+⚠️ **The boot splash was found NOT to be doing its job, and cannot.** It is
+server-rendered, so the earliest it can appear is FCP — the very thing being
+waited on. It shows up *after* the white screen, then hydration removes it
+almost immediately: precisely the reported symptom. Its critical CSS is now
+inlined so it renders correctly if the stylesheet is slow or fails, but it must
+never be mistaken for a fix for slow first paint. See DECISIONS.
+
+**One test updated, deliberately.** `storefront-image-loading.test.ts` pinned
+`fetchPriority: 'auto'`. Its two real invariants — exactly one image may claim
+`high`, never a parked pane — are unchanged and now asserted explicitly; only
+the incidental literal moved. A runtime check that `auto` never returns was
+dropped as dead code: the return type is `'high' | 'low'`, so tsc rejects
+reintroducing it, which is stronger than a test.
+
+`tsc` clean, `lint` clean, `npm test` **963/963**, clean build 454/454 pages.
+
+⚠️ **Verify on production after deploy** — localhost reports
+`transferSize: 0` and cannot measure this. The recipe is in DECISIONS.
+
+## 2026-08-13 (later 4) - Cart drawer quotes too; production verified
+
+**Production verification of the price-drift batch.** All three rejection
+directions confirmed live against `naplesestatejewelry.com` — stale
+($6,904.34), overcharging ($6,723.59), and one-cent ($6,783.85) all returned
+**409 `price_changed`** with no `orderId` and no `paypalOrderId`. Database
+confirmed **0 rows** for the probe email and the order count unchanged at 20.
+The matching-quote path was deliberately NOT run in production, since it
+legitimately creates an order. The quote endpoint returned live figures
+($6,399.85 unit / $6,783.84 total) and wrote nothing.
+
+**Then a gap found by that verification: the cart drawer still read the stored
+label.** Searching the checkout DOM for the stale figure returned a hit; it
+traced to the always-mounted `CartDrawer`, parked off-screen at
+`translateX(448px)` — invisible on checkout, but one click away via *Edit cart*
+/ *Back to cart*.
+
+Worth stating plainly: **the first pass made this worse, not neutral.** Before
+it, checkout and the drawer both showed the same stale label — wrong but
+consistent. After it, checkout was correct and the drawer contradicted it.
+
+The drawer now quotes from the same endpoint, gated on `drawerOpen` (it is
+always mounted, so an unconditional fetch would quote on every page load for
+every visitor) and sending `local-pickup` — which, unlike Express above $5,000,
+can never be refused for a quote whose shipping figure is discarded anyway. Its
+quote is cart-tagged on the same principle as the checkout one.
+
+Verified against a cart holding a stale `$6,462.72`: drawer and checkout both
+render **$6,396.62**, and the stale figure is absent from the entire DOM
+(`staleAppearsAnywhere: false`).
+
+`tsc` clean, `lint` clean, `npm test` **962/962**, clean from-scratch
+`npm run build` **454/454** pages with no warnings.
+
 ## 2026-08-13 (later 3) - Checkout price drift: the buyer is never charged an unshown total
 
 Reported as a defect fixed on a sibling site adapted from this codebase.

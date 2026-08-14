@@ -459,6 +459,13 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   more. The server always charges its own price; the client's `quotedTotal`
   only decides whether to stop and ask. See DECISIONS, *"Never charge a total
   the buyer was not shown"*.
+  - **Both cart surfaces quote** — the checkout summary and the cart drawer.
+    The drawer was missed in the first pass, which briefly made the two
+    contradict each other one click apart; it now quotes on open. Any NEW
+    surface that shows a cart price must quote rather than read the stored
+    label, or it will reintroduce that contradiction.
+  - ✅ The guard's rejection paths are **verified live in production**; the
+    matching-quote path was deliberately not run there (it creates an order).
 - **Discount codes (2026-08-11, undeployed, needs its SQL run first).** Admin →
   **Discount Codes** creates a code that is either a percentage or a fixed
   dollar amount off, each optionally carrying a minimum order subtotal, an

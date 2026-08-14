@@ -373,16 +373,22 @@ export default function SiteHeader() {
             className="hidden md:block h-8 w-auto md:h-10 object-contain flex-shrink-0"
             priority
           />
-          {/* Full name on md+; abbreviated on mobile */}
+          {/* Full name on md+; abbreviated on mobile.
+              The wordmark is BLACK, not gold (owner, 2026-08-13). Uses the
+              on-surface token — the same near-black every heading on the site
+              uses — rather than a hardcoded #000, so it stays consistent with
+              the type around it. The token is only ever redefined inside
+              `.product-page-dark .product-light-surface`, which the fixed
+              header sits outside of, so it always resolves to #1a1c1c here. */}
           <span
             className="hidden sm:block text-[clamp(0.82rem,1.55vw,1.38rem)] tracking-normal uppercase whitespace-nowrap"
-            style={{ fontFamily: 'var(--font-headline)', color: GOLD }}
+            style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
           >
             Naples Estate Jewelry
           </span>
           <span
             className="site-header-brand-mobile block sm:hidden tracking-normal uppercase whitespace-nowrap"
-            style={{ fontFamily: 'var(--font-headline)', color: GOLD }}
+            style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
           >
             Naples Estate Jewelry
           </span>

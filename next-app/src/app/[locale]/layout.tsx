@@ -94,8 +94,34 @@ export default async function LocaleLayout({ children, params }: Props) {
   const messages = await getMessages();
 
   return (
-    <html lang={locale} className={`${caslon.variable} ${hanken.variable}`}>
+    <html
+      lang={locale}
+      className={`${caslon.variable} ${hanken.variable}`}
+      // The page background, INLINE on the root element, duplicating
+      // `body { background-color: var(--color-background) }` in globals.css.
+      //
+      // Not redundant: an external stylesheet is render-blocking, so until it
+      // arrives the browser paints the canvas with its own default — pure
+      // WHITE. That is the blank screen a first-time visitor on a slow
+      // connection stares at. An inline style attribute is applied by the
+      // parser from the first bytes of HTML, with no stylesheet needed, so the
+      // canvas starts as the brand off-white instead.
+      //
+      // Keep this value in sync with `--color-background` (#f9f9f7).
+      style={{ backgroundColor: '#f9f9f7' }}
+    >
       <head>
+        {/* Critical splash styles, inlined so the homepage boot splash is
+            painted the instant the browser has parsed this <head> — it does not
+            wait on the 21KB stylesheet, which on a slow first visit is the
+            single thing standing between the visitor and any pixel at all.
+            The full rules still live in globals.css; this is the minimum needed
+            to make the splash legible, and the stylesheet refines it. */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `.home-boot-splash{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:2rem 1rem;background:linear-gradient(145deg,#080806 0%,#17120a 48%,#030303 100%);color:#fff8e6;text-align:center;font-family:var(--font-caslon),Georgia,serif}.home-boot-splash .site-loading-eyebrow{font-size:.72rem;letter-spacing:.28em;text-transform:uppercase;color:rgba(255,248,230,.66)}.home-boot-splash .home-boot-splash-title{font-size:clamp(1.55rem,8vw,4.1rem);line-height:.98;margin:.4rem 0 0}.home-boot-splash .site-loading-copy{margin:.35rem 0 0;font-size:clamp(.9rem,3vw,1.05rem);color:rgba(255,248,230,.72)}`,
+          }}
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }}

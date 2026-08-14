@@ -46,10 +46,16 @@ export default function CookieNotice({ locale }: { locale: string }) {
         </p>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 md:mt-0 md:flex md:flex-shrink-0 md:flex-nowrap md:items-center">
-        <Link href={`${prefix}/privacy`} className="outline-button justify-center px-3 py-1.5 text-[0.62rem] md:px-4 md:py-2 md:text-[0.68rem]">
+        {/* ⚠️ These two do NOT prefetch, and this banner is the worst possible
+            place to do so: it renders for FIRST-TIME visitors specifically —
+            exactly the people already waiting on a cold, uncached page — and
+            points at two legal pages almost nobody opens. Measured 2026-08-14,
+            /cookie-preferences was the single most-prefetched route on the site
+            (6x) with /privacy close behind. */}
+        <Link href={`${prefix}/privacy`} prefetch={false} className="outline-button justify-center px-3 py-1.5 text-[0.62rem] md:px-4 md:py-2 md:text-[0.68rem]">
           {isEs ? 'Privacidad' : 'Privacy'}
         </Link>
-        <Link href={`${prefix}/cookie-preferences`} className="outline-button justify-center px-3 py-1.5 text-[0.62rem] md:px-4 md:py-2 md:text-[0.68rem]">
+        <Link href={`${prefix}/cookie-preferences`} prefetch={false} className="outline-button justify-center px-3 py-1.5 text-[0.62rem] md:px-4 md:py-2 md:text-[0.68rem]">
           {isEs ? 'Preferencias' : 'Preferences'}
         </Link>
         <button type="button" onClick={accept} className="gold-button col-span-2 justify-center px-3 py-1.5 text-[0.62rem] md:px-4 md:py-2 md:text-[0.68rem]">

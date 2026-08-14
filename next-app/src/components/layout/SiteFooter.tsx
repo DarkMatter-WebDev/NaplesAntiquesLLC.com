@@ -86,6 +86,16 @@ export default function SiteFooter({ locale = 'en' }: Props) {
               <Link
                 key={href}
                 href={href}
+                // ⚠️ Footer links do NOT prefetch. Measured on production
+                // 2026-08-14: the footer's four mapped groups (shop, company,
+                // legal, and one per SERVICE_AREA city) fired 58 route
+                // prefetches totalling 111KB — several routes repeatedly — while
+                // the visitor was still waiting for the first pixel. Footer
+                // links are the lowest-intent on the page; paying for them
+                // during the most bandwidth-constrained moment of the visit is
+                // backwards. Header nav still prefetches: that IS the likely
+                // next click.
+                prefetch={false}
                 className="hover-underline-grow w-fit py-0.5 text-xs leading-tight md:py-0 md:text-sm"
                 style={{ color: 'var(--color-on-surface-variant)' }}
               >
@@ -105,6 +115,7 @@ export default function SiteFooter({ locale = 'en' }: Props) {
               <Link
                 key={href}
                 href={href}
+                prefetch={false}
                 className="hover-underline-grow justify-self-center py-0.5 text-[0.68rem] leading-tight md:w-fit md:justify-self-auto md:py-0 md:text-sm"
                 style={{ color: 'var(--color-on-surface-variant)' }}
               >
@@ -124,6 +135,7 @@ export default function SiteFooter({ locale = 'en' }: Props) {
               <Link
                 key={href}
                 href={href}
+                prefetch={false}
                 className="hover-underline-grow justify-self-center py-0.5 text-center text-[0.68rem] leading-tight md:w-fit md:justify-self-auto md:py-0 md:text-left md:text-sm"
                 style={{ color: 'var(--color-on-surface-variant)' }}
               >
@@ -149,6 +161,9 @@ export default function SiteFooter({ locale = 'en' }: Props) {
               <Link
                 key={a.slug}
                 href={p(`/sell/${a.slug}`)}
+                // One city page per service area — the largest single group of
+                // prefetches on the page, and the least likely to be clicked.
+                prefetch={false}
                 className="hover-underline-grow text-[0.68rem] leading-tight md:text-xs"
                 style={{ color: 'var(--color-on-surface-variant)' }}
               >

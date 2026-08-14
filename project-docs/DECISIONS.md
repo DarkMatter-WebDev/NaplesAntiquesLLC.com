@@ -868,6 +868,68 @@ and must honor the same storage contracts as manual forms.
 
 ## Storefront
 
+### The first pixel is gated by ONE 21KB stylesheet — protect its lane
+
+Investigated 2026-08-14 after reports of a long white screen on first visit
+("to some users the site appears to not exist"). Measured on production, not
+inferred.
+
+**It was never the server.** TTFB is a consistent ~0.19s, the homepage is
+properly static (`● /[locale]`, ISR 5m), and the bare domain is a single clean
+301 hop. Fonts are `display: swap`, so no FOIT.
+
+**It was contention.** 533KB across 30 requests downloaded BEFORE first
+contentful paint:
+
+| Before FCP | Requests | Size |
+| --- | --- | --- |
+| scripts | 13 | 258KB |
+| carousel images | 9 | 157KB |
+| fonts | 4 | 87KB |
+| **stylesheet (the only render-blocking one)** | 3 | **21KB** |
+
+The stylesheet did not *begin* until 336ms because four preloaded fonts started
+at 292ms and nine carousel images at 335ms. On a fast desktop connection this is
+488ms and invisible; the same payload on a first-time mobile visitor is roughly
+**2.7s on slow 4G and 10s on slow 3G** — the reported blank screen.
+
+**The load order is the bug, not the byte count.** The thing gating the first
+pixel is 21KB. Everything else can wait, and the fixes are all about making it
+wait:
+
+1. **Carousel cards are `fetchPriority: 'low'`** except the single LCP
+   candidate. They stay `eager` — see the entry in
+   `storefront-image-loading.ts` for why lazy would reintroduce hero pop-in.
+2. **Only the headline face is preloaded.** The homepage LCP element is the
+   `<h1>`, so Caslon earns the priority lane. Hanken (body) is
+   `preload: false`; `display: swap` already paints every word immediately in
+   the fallback.
+3. **Low-intent links do not prefetch** — footer groups (including one per
+   service-area city) and the cookie banner. The banner was the worst offender:
+   it renders for FIRST-TIME visitors specifically, and `/cookie-preferences`
+   was the most-prefetched route on the site at 6x. Header nav still prefetches;
+   that IS the likely next click. Measured 58 -> 44 prefetches, 111 -> 96
+   requests.
+4. **The root element carries an inline `background-color`.** An external
+   stylesheet is render-blocking, so until it lands the browser paints its own
+   default — pure white. An inline style attribute on `<html>` is applied by the
+   parser from the first bytes, so the pre-CSS canvas is brand off-white.
+
+⚠️ **The boot splash cannot cover this gap, and it is important to understand
+why.** `HomeBootSplash` is server-rendered into the HTML, so the earliest it can
+appear is FCP — the very moment being waited for. It shows up *after* the white
+screen, then hydration (already downloaded by then) removes it almost at once.
+That is exactly the reported "white, then a spinner for a fraction of a second".
+**The splash is not a fix for slow first paint and must never be treated as
+one**; its critical CSS is now inlined in `<head>` so it at least renders
+correctly if the stylesheet is slow or fails, but the real work is keeping the
+stylesheet's lane clear.
+
+**Re-measure `KBbeforeFCP` on production before changing any of this.** The
+recipe: `performance.getEntriesByType('resource')` filtered to
+`startTime < first-contentful-paint`, summing `transferSize`. Localhost reports
+`transferSize: 0` and is useless for this.
+
 ### The fixed header's height is one token, and the header obeys it
 
 `--site-header-height` (`globals.css`) is the single source of truth for the
@@ -962,6 +1024,21 @@ once during verification ($6,850.64 quoted vs $6,776.99 charged). The guard
 catches it and the buyer re-confirms, which is the correct outcome. Closing it
 entirely would mean pinning a spot snapshot across both requests, i.e. signed
 quotes.
+
+**EVERY surface that shows a cart price must quote, not read the label.** The
+cart drawer was missed in the first pass, and the consequence was worse than
+leaving it alone: before the change both surfaces showed the same stale label —
+wrong, but consistent — and afterwards checkout was fresh while the drawer, one
+click away via *Edit cart* / *Back to cart*, still showed the old figure. **A
+half-applied fix here manufactures a visible contradiction.** The drawer now
+quotes too, gated on `drawerOpen` (it is always mounted, so an unconditional
+fetch would quote on every page load for every visitor) and using
+`local-pickup`, which — unlike Express above $5,000 — can never be refused for
+a quote whose shipping figure is discarded anyway.
+
+Both surfaces verified showing the identical figure ($6,396.62) against a cart
+holding a stale $6,462.72 label, with that stale figure absent from the whole
+DOM.
 
 ### The purchase panel sizes against itself, and its rows stay flush
 

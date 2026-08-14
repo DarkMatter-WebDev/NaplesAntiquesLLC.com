@@ -111,6 +111,34 @@ PayPal never performed ($2.12 total, both owner test addresses). Owner confirmed
 products involved were test data or have long since been re-listed — but do not
 generalize it to a real order.
 
+## ◻️ After the next deploy: re-measure first paint on production
+
+The 2026-08-14 first-paint work must be confirmed against production —
+**localhost reports `transferSize: 0` and cannot measure it.**
+
+Baseline before the fix: **533KB across 30 requests before FCP**, FCP 488ms on
+a fast desktop connection. Run this in the console on
+`https://naplesestatejewelry.com/` and compare:
+
+```js
+const fcp = performance.getEntriesByType('paint').find(p => p.name === 'first-contentful-paint').startTime;
+const before = performance.getEntriesByType('resource').filter(r => r.startTime < fcp);
+({ FCP: Math.round(fcp), requests: before.length,
+   KB: Math.round(before.reduce((s, r) => s + (r.transferSize || 0), 0) / 1024) });
+```
+
+Expect the carousel images (157KB) to fall out of the pre-FCP window and the
+stylesheet to start much earlier than 336ms.
+
+◻️ **Then test on a real phone on cellular, not office wifi.** This bug was
+invisible on a fast connection with a warm cache, which is why it went
+unreported for so long. Watch specifically for how long the screen is blank
+before the branded splash appears.
+
+◻️ **Remaining lever if it is still slow: 258KB of scripts before FCP.** Not
+touched in this pass — deferring or splitting them is a larger change than
+priority hints and needs its own measurement.
+
 ## Deploy-day checklist (reusable)
 
 Standing procedure for every deploy from this folder — the last run of it was

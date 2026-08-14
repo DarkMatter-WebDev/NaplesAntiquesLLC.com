@@ -15,6 +15,7 @@ import {
   FL_TAX_RATE_LABEL,
   formatCheckoutCurrency,
   round2,
+  type OrderQuote,
 } from '@/lib/checkout-pricing';
 import { parseManualPriceLabelValue } from '@/lib/pricing';
 import { createClient } from '@/lib/supabase/client';
@@ -44,6 +45,53 @@ export default function CartDrawer({ locale }: { locale: string }) {
   useEffect(() => {
     if (drawerOpen) void refreshAvailability();
   }, [drawerOpen, refreshAvailability]);
+
+  // Live prices, same source as the checkout summary. Without this the drawer
+  // renders the price LABEL frozen at add-to-cart time, which drifts as metal
+  // moves (64% of the catalog is spot-linked) — and after the checkout page
+  // started quoting, the two surfaces would have disagreed with each other, one
+  // click apart via "Edit cart".
+  //
+  // Tagged with the cart it was computed for, so a quote is ignored the moment
+  // the cart changes rather than briefly describing a cart the shopper has
+  // already edited.
+  const [quoteState, setQuoteState] = useState<{ key: string; quote: OrderQuote } | null>(null);
+  const quoteKey = items
+    .map((i) => `${i.id}:${Math.max(1, normalizeProductQuantity(i.purchaseQuantity))}`)
+    .sort()
+    .join(',');
+  const quote = quoteState?.key === quoteKey ? quoteState.quote : null;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Only while the drawer is actually open — it is always mounted, so an
+      // unconditional fetch would quote on every page load for every visitor.
+      if (!drawerOpen || items.length === 0) return;
+      try {
+        const res = await fetch('/api/checkout/quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: items.map((i) => ({ id: i.id, quantity: Math.max(1, normalizeProductQuantity(i.purchaseQuantity)) })),
+            // Local pickup deliberately: the drawer shows "calculated at
+            // checkout" for shipping and only consumes unit prices + subtotal.
+            // It also cannot be refused the way Express is above $5,000.
+            shippingMethod: 'local-pickup',
+          }),
+        });
+        if (cancelled) return;
+        const data = await res.json().catch(() => null);
+        // A failed quote leaves the stored labels in place rather than blanking
+        // the drawer. Checkout still recomputes authoritatively either way.
+        if (res.ok && data?.quote) setQuoteState({ key: quoteKey, quote: data.quote as OrderQuote });
+      } catch {
+        /* keep whatever is showing */
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawerOpen, quoteKey]);
 
   // Auth state, resolved when the drawer opens, so "Proceed to Checkout" knows
   // whether to go straight through (signed in) or offer the sign-in / guest gate.
@@ -166,7 +214,7 @@ export default function CartDrawer({ locale }: { locale: string }) {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <CartView items={items} isEs={isEs} prefix={prefix} hideSoldItemPrices={hideSoldItemPrices} onRemove={remove} onSetQuantity={setQuantity} onClear={clear} onClose={handleClose} onCheckout={handleProceedToCheckout} checkoutPending={checkoutPending} hasUnavailableItems={hasUnavailableItems} stockAlerts={stockAlerts} onDismissAlerts={dismissStockAlerts} />
+          <CartView items={items} isEs={isEs} prefix={prefix} hideSoldItemPrices={hideSoldItemPrices} onRemove={remove} onSetQuantity={setQuantity} onClear={clear} onClose={handleClose} onCheckout={handleProceedToCheckout} checkoutPending={checkoutPending} hasUnavailableItems={hasUnavailableItems} stockAlerts={stockAlerts} onDismissAlerts={dismissStockAlerts} quote={quote} />
         </div>
       </div>
 
@@ -283,6 +331,7 @@ function CartView({
   hasUnavailableItems,
   stockAlerts,
   onDismissAlerts,
+  quote,
 }: {
   items: CartItem[];
   isEs: boolean;
@@ -297,6 +346,8 @@ function CartView({
   hasUnavailableItems: boolean;
   stockAlerts: StockAlert[];
   onDismissAlerts: () => void;
+  /** Live server prices; falls back to the cart's stored labels when absent. */
+  quote: OrderQuote | null;
 }) {
   if (items.length === 0) {
     return (
@@ -312,9 +363,13 @@ function CartView({
     );
   }
 
+  // Live unit price for a line, or null to fall back to its stored label.
+  const quotedUnitPrice = (productId: string): number | null =>
+    quote?.items.find((q) => q.productId === productId)?.unitPrice ?? null;
+
   const lineTotals = items.map((i) => {
     if (hideSoldItemPrices && isProductSold(i.status)) return null;
-    const unit = parsePrice(i.priceLabel);
+    const unit = quotedUnitPrice(i.id) ?? parsePrice(i.priceLabel);
     return unit === null ? null : unit * Math.max(1, normalizeProductQuantity(i.purchaseQuantity));
   });
   const knownLineTotals = lineTotals.filter((p): p is number => p !== null);
@@ -328,7 +383,7 @@ function CartView({
       <div className="px-4 py-4 flex flex-col gap-3">
         <StockAlertBanner alerts={stockAlerts} isEs={isEs} onDismiss={onDismissAlerts} />
         {items.map((item) => (
-          <CartItemRow key={item.id} item={item} isEs={isEs} prefix={prefix} hideSoldItemPrices={hideSoldItemPrices} onRemove={() => onRemove(item.id)} onSetQuantity={(qty) => onSetQuantity(item.id, qty)} />
+          <CartItemRow key={item.id} item={item} isEs={isEs} prefix={prefix} hideSoldItemPrices={hideSoldItemPrices} onRemove={() => onRemove(item.id)} onSetQuantity={(qty) => onSetQuantity(item.id, qty)} quotedUnitPrice={quotedUnitPrice(item.id)} />
         ))}
       </div>
 
@@ -399,7 +454,7 @@ function CartView({
   );
 }
 
-function CartItemRow({ item, isEs, prefix, hideSoldItemPrices, onRemove, onSetQuantity }: { item: CartItem; isEs: boolean; prefix: string; hideSoldItemPrices: boolean; onRemove: () => void; onSetQuantity: (quantity: number) => void }) {
+function CartItemRow({ item, isEs, prefix, hideSoldItemPrices, onRemove, onSetQuantity, quotedUnitPrice = null }: { item: CartItem; isEs: boolean; prefix: string; hideSoldItemPrices: boolean; onRemove: () => void; onSetQuantity: (quantity: number) => void; quotedUnitPrice?: number | null }) {
   const title = isEs && item.title_es ? item.title_es : item.title;
   const description = (isEs && item.description_es ? item.description_es : item.description) ?? item.public_notes ?? null;
   const imageFrameBackground = productImagePaddingBackground(item.image_padding);
@@ -409,7 +464,9 @@ function CartItemRow({ item, isEs, prefix, hideSoldItemPrices, onRemove, onSetQu
   const hidePrice = hideSoldItemPrices && isProductSold(item.status);
   const stockCap = Math.max(1, normalizeProductQuantity(item.stockQuantity));
   const qty = Math.max(1, normalizeProductQuantity(item.purchaseQuantity));
-  const unitPrice = parsePrice(item.priceLabel);
+  // Live figure first; the stored label is the fallback when no quote is in hand.
+  const unitPrice = quotedUnitPrice ?? parsePrice(item.priceLabel);
+  const unitPriceLabel = quotedUnitPrice != null ? formatCheckoutCurrency(quotedUnitPrice) : item.priceLabel;
   const lineTotal = unitPrice === null ? null : unitPrice * qty;
   return (
       <div className="flex gap-3 items-start border p-3" style={{ borderColor: BORDER, background: 'rgba(255, 255, 255, 0.74)' }}>
@@ -424,7 +481,7 @@ function CartItemRow({ item, isEs, prefix, hideSoldItemPrices, onRemove, onSetQu
           {title}
         </Link>
         <p className="text-xs font-bold uppercase tracking-wide" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
-          {hidePrice ? (isEs ? 'Vendido' : 'Sold') : item.priceLabel}
+          {hidePrice ? (isEs ? 'Vendido' : 'Sold') : unitPriceLabel}
         </p>
         {itemDate && (
           <p className="text-[0.64rem] font-bold uppercase tracking-wide" style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}>
