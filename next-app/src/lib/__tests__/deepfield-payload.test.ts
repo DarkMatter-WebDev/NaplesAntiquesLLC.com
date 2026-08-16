@@ -132,11 +132,13 @@ describe('toAbsoluteImageUrl', () => {
 
 describe('resolveDeepFieldPrice', () => {
   it('computes spot price matching the storefront formula', () => {
-    // 53.91g x 14/24 x (4343.299805 / 31.1034768) = 4391.34 melt; x1.25 = 5489.17
+    // 53.91g x 14/24 x (4343.299805 / 31.1034768) = 4391.34 melt; x1.25 = 5489.17,
+    // rounded to the whole dollar the storefront shows and checkout charges.
+    // Melt is a market quote, not an offer, so it keeps its cents.
     const result = resolveDeepFieldPrice(makeProduct(), LIVE_SPOT);
     expect(result.nej_price_source).toBe('spot');
     expect(result.nej_melt_value_usd).toBeCloseTo(4391.34, 2);
-    expect(result.nej_price_usd).toBeCloseTo(5489.17, 2);
+    expect(result.nej_price_usd).toBe(5489);
   });
 
   it('locks a sold product to sold_price and ignores spot entirely', () => {

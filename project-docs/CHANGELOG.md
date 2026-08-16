@@ -1,6 +1,194 @@
 
 # Changelog
 
+## 2026-08-15 (2) - Immediate tap feedback on touch, and a route progress bar
+
+Owner request: on a tablet, tapping a buy/product control gave no sign it had
+registered until the next page painted. Two halves, deliberately separate —
+the tap, and the wait that follows it. Both **undeployed**.
+
+### The tap — CSS only, `@media (hover: none)`
+
+**CSS-only is a requirement, not a preference.** The shop cards and hero run
+their own touch handlers with measured slop and direction cones; JS press
+listeners here risked breaking gestures that were expensive to get right.
+
+The real defect was the **axis**: existing press states were gated behind
+`@media (min-width: 641px)`, whose own comment admits it skipped "mobile-only
+controls". That gives tablets hover styles they can never trigger and leaves
+**every phone with no feedback at all** — confirmed at 375px, where
+`min-width: 641px` does not match but the new `(hover: none)` rule does.
+
+- `.shop-card-wishlist-button` / `.shop-list-cart-button` get their press state
+  on phones, not just ≥641px.
+- Anchors styled as buttons get one. The generic `button:…:active` rule matches
+  only real `<button>` elements, so the 132 `.gold-button` usages that are
+  anchors previously had nothing.
+- `-webkit-tap-highlight-color` tinted to brand gold `rgba(181,137,12,0.16)`
+  (was the browser default grey) — verified computed on both a button and a link.
+- **Product cards deliberately excluded.** They are swipeable; a scale on
+  `:active` would fire mid-swipe. The route bar covers a card tap instead.
+
+### The wait — `components/layout/RouteProgressBar.tsx`
+
+A 2px gold bar at the **base of the fixed header** (owner, same day — it first
+shipped at the top of the viewport), built to two owner rules:
+
+1. **Only when needed.** Nothing renders for 120ms, so prefetched/cached routes
+   show no bar at all. Same-path (hash, query-only filter change), off-site,
+   `mailto:`/`tel:`, `target="_blank"`, `download` and modified clicks never
+   arm it.
+2. **Not a millisecond longer.** No minimum display, no run-to-100%, no fade
+   tail. The fill stops at 92%; completion is the element being removed.
+
+Measured on the running app rather than assumed:
+
+| Scenario | Result |
+| --- | --- |
+| Product card tap (`prefetch={false}`) | shown **+130ms** after click, removed **the moment the route committed** |
+| Back to an already-visited route | **no bar at all** |
+| Same-path / external / mailto / new tab / download / modified click | **never armed** |
+| Cancelled cross-path navigation | cleared by the 8s backstop |
+
+**Positioning it at the header's base needed two guards.** The offset comes from
+the `--site-header-height` TOKEN, not a literal, because the header changes
+height at md — measured flush at both breakpoints (bar top 56 vs header bottom
+56; 72 vs 72). And because the header is rendered PER PAGE while the bar renders
+from the root layout — admin renders no site header — the offset is conditional
+on `body:has([data-site-header])`, falling back to `top: 0`. Both branches
+verified: 72px with the header present, 0px without. Without that fallback the
+bar would hang in empty space partway down every admin page.
+
+**Why not `useLinkStatus`:** it reports one Link's pending state and must render
+inside that Link — a global bar would mean wrapping every link in the app.
+**Why `usePathname` not `useSearchParams`:** the latter would opt all 454 static
+pages into dynamic rendering from the root layout. Static count confirmed
+unchanged at **454/454** after the change.
+
+🔴 **One bug shipped and was caught by measuring, not reasoning.** `popstate`
+fires AFTER the URL has moved, so `location.pathname` in that handler is the
+DESTINATION. Recording it as the navigation's origin made the completion check
+compare a path against itself — it could never become true, and a real back
+navigation left the bar on screen for the full 8s timeout. Fixed by tracking the
+last COMMITTED path in a ref. The guards were then extracted into two pure
+functions (`shouldArmProgressBar`, `isNavigationComplete`) so they are testable —
+this project has no jsdom, so a pure predicate is the only testable form — and
+`route-progress-bar.test.ts` asserts the failing comparison directly as a
+regression.
+
+### Verification
+
+| Command | Result |
+| --- | --- |
+| `npx tsc --noEmit` | clean |
+| `npm run lint` | clean |
+| `npm test` | **984 passed / 984**, 97 files (971 → 984) |
+| `npm run build` | compiled in 10.4s, **454/454** static pages, no warnings |
+
+📱 **Still owner-side:** confirm on a real phone and tablet that the press states
+feel right and that the bar is not appearing on fast navigations in production,
+where most routes are prefetched and it should be rare.
+
+## 2026-08-15 - Whole-dollar item prices, and Tailwind font utilities fixed on form controls
+
+Two owner-requested changes. Both are **undeployed** and join the staged batch.
+
+### 1. Item prices round to the nearest whole dollar
+
+**The reported symptom was cosmetic; the underlying fault was not.** Two shop
+cards rendered cents ($2,360.88, $2,394.56) while the other 22 showed whole
+dollars — but measuring the charge path showed display and charge had *already*
+diverged for every spot-priced item: `formatUsdPrice` carried
+`maximumFractionDigits: 0`, so a card advertised **$5,533** while checkout
+collected **$5,533.47**.
+
+Rounding only the formatter would have widened that gap and undercut the
+2026-08-13 price-drift work, so **the rounding was put on the value**, in
+`getProductPriceValue()` — the single funnel feeding checkout, PayPal, eBay,
+Etsy, Instagram/Facebook cards, Deep Field, and sold-price capture.
+
+- `formatManualPriceAmount` (2-decimal) **deleted**; `formatUsdPrice` is now the
+  one formatter. Two formatters with different decimal policies was the defect.
+- `getDisplayPrice` now formats exactly what `getProductPriceValue` resolved, so
+  the card and the charge cannot drift apart by construction.
+- `getSnapshotPrice`'s `asking_price` fallback rounds too — it was the one
+  charged path bypassing the funnel.
+- **Not rounded:** a captured `sold_price` (historical fact), melt/scrap and the
+  spot ticker (market quotes), and tax/order totals (6% of a whole dollar is not
+  a whole dollar).
+
+**Verified on the running app, not assumed.** `/shop`: 24 rendered prices, **0
+with cents**, down from 2. Product pages: the only remaining cents figure is the
+gold spot ticker `$4,377.60/oz`, by design. End to end on a real cart, the piece
+shown at **$5,533** produced a checkout line item of **$5,533.00**, Local Pickup
+total $5,533 + $331.98 tax = **$5,864.98**, and the Standard alternative
+$5,533 + $99.00 = **$5,632.00** — every figure reconciling.
+
+⚠️ **A price under $0.50 now rounds to $0 and is refused** by CODE-D01 and by
+both marketplaces' `base <= 0` guard. Fail-closed and intended. Consequence:
+Etsy's $0.20 floor is unreachable from a product price now and only reachable
+via a negative markup; its test was re-fixtured to exercise it that way rather
+than deleted.
+
+Five existing expectations were stale arithmetic and were updated (Deep Field
+5489.17 → 5489; eBay/Etsy markup base 1166.67 → 1167; the two sub-dollar
+fixtures). New `whole-dollar-pricing.test.ts` pins the invariant that matters:
+`getDisplayPrice === formatUsdPrice(getSnapshotPrice(...))`.
+
+### 2. Tailwind font utilities work on buttons again
+
+The ~205-button hazard recorded in DECISIONS since 2026-08-12, closed — and the
+fix turned out to be **a deletion, not the re-layering that entry predicted**.
+
+Tailwind's preflight already sets `font: inherit` on
+`button, input, select, optgroup, textarea` inside `@layer base`. `globals.css`
+carried an identical declaration **outside any layer**, and an un-layered rule
+beats every layered rule regardless of specificity — so the duplicate, not the
+preflight, was the winning declaration, and it silently discarded every `text-*`
+and `font-*` utility on every form control. Deleting the one declaration leaves
+the preflight in charge. `max-width: 100%` stays un-layered; it is an overflow
+guard, not typography.
+
+**Blast radius measured before and after with `getComputedStyle`, which is what
+the "standalone project with its own before/after pass" note asked for.** It was
+far smaller than feared, because the app's own un-layered component CSS is still
+un-layered and still wins:
+
+| Control | Before | After |
+| --- | --- | --- |
+| Shop-card photo arrows `›` (×24) | 16px / 400 | **14px / 700** |
+| Drawer close `✕` | 16px / 400 | **14px / 700** |
+| Header Menu | 12px / 400 | 12px / **700** |
+| Shop-card Add to Cart (×24) | 9.28px / 700 | unchanged |
+| Filters, cookie Accept | 10.88px / 700 | unchanged |
+
+Only controls whose font came *solely* from the generic inherit moved, and each
+moved to what its className always declared. Container-query type scales were
+untouched.
+
+⚠️ **Diagnosis note worth keeping:** the first attempt wrapped the reset in
+`@layer base` and appeared to change nothing. The cause was the documented
+Turbopack **per-rule CSS staleness** bug — the new layered rule shipped while the
+old un-layered rule was still being served from the same stylesheet. Dumping
+`document.styleSheets` and grouping the matching rules by layer showed both
+present at once, which is also what revealed the preflight duplicate and turned
+the fix from a re-layering into a deletion. **A stale stylesheet looks exactly
+like a fix that did not work**; `rm -rf .next` with dev stopped resolved it.
+
+📱 **Wants a real-screen look after deploy:** the shop-card photo arrows are the
+one visible change on a customer-facing surface — bolder and slightly smaller.
+
+### Verification
+
+| Command | Result |
+| --- | --- |
+| `npx tsc --noEmit` | clean |
+| `npm run lint` | clean |
+| `npm test` | **971 passed / 971**, 96 files (963 → 971) |
+| `npm run build` | compiled in 11.0s, **454/454** static pages, no warnings |
+
+Build run from a deleted `.next` with the dev server stopped.
+
 ## 2026-08-14 (cleanup) - Stray nested git repo removed from next-app/
 
 `next-app/.git`, open as a 🔴 item since 2026-08-11, deleted on owner instruction.

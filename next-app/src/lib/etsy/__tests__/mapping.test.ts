@@ -626,10 +626,11 @@ describe('computeEtsyPrice', () => {
   it('applies the markup on top of the spot-computed price', () => {
     const product = makeProduct({ price_mode: 'spot-multiplier', purity: 14, gram_weight: 10, pricing_multiplier: 2 });
     const spotData = { goldPerTroyOz: 3110.34768, silverPerTroyOz: null, fetchedAt: Date.now(), source: 'api' as const };
-    // melt = weight(10) * (14/24) * (spotPerOz/31.1034768) = 10 * 0.5833.. * 100 = ~583.33; price = melt * 2 = ~1166.67
+    // melt = weight(10) * (14/24) * (spotPerOz/31.1034768) = 10 * 0.5833.. * 100 = ~583.33;
+    // price = melt * 2 = ~1166.67, rounded to the whole dollar the storefront shows.
     const result = computeEtsyPrice(product, spotData, 0);
-    expect(result.basePrice).toBeCloseTo(1166.67, 1);
-    expect(result.price).toBe(1166.67);
+    expect(result.basePrice).toBe(1167);
+    expect(result.price).toBe(1167);
   });
 
   it('fails closed instead of pushing a storefront fallback spot price', () => {
@@ -657,10 +658,20 @@ describe('computeEtsyPrice', () => {
   });
 
   it('rejects prices under $0.20', () => {
+    // Product prices are whole dollars now, so a negative markup is the only
+    // way left to land between $0 and Etsy's floor. The guard stays regardless.
+    const product = makeProduct({ price_mode: 'manual', manual_price_label: '$1' });
+    const result = computeEtsyPrice(product, null, -90);
+    expect(result.basePrice).toBe(1);
+    expect(result.price).toBeNull();
+    expect(result.rejectedReason).toMatch(/0\.20/);
+  });
+
+  it('rejects a sub-50-cent price, which rounds away to $0', () => {
     const product = makeProduct({ price_mode: 'manual', manual_price_label: '$0.10' });
     const result = computeEtsyPrice(product, null, 0);
     expect(result.price).toBeNull();
-    expect(result.rejectedReason).toMatch(/0\.20/);
+    expect(result.rejectedReason).toMatch(/no price could be computed/i);
   });
 
   it('returns null when no price can be computed', () => {

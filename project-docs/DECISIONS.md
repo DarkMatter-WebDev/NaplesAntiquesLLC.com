@@ -375,24 +375,49 @@ the controlled PayPal refund matrix as never run, and no live refund had ever
 been issued. **Provider-contract bugs do not surface from unit tests; they
 surface from one real transaction.**
 
-### Tailwind font-size and font-weight utilities DO NOTHING on a `<button>`
+### Tailwind font utilities work on a `<button>` again — the duplicate reset is deleted
+
+**FIXED 2026-08-15.** This entry described a live bug from 2026-08-12 until then;
+the history is kept because the cascade rule behind it is still worth knowing.
 
 Found 2026-08-12 when the discount field's REMOVE link shipped at 16px/400
-while its class said `text-[0.68rem] font-bold`.
-
-`globals.css:144` resets form controls:
+while its class said `text-[0.68rem] font-bold`. `globals.css` reset form
+controls **outside any cascade layer**:
 
 ```css
 button, input, select, textarea {
   max-width: 100%;
-  font: inherit;
+  font: inherit;   /* ← deleted 2026-08-15 */
 }
 ```
 
-That rule is **un-layered**, and Tailwind's utilities live in
-`@layer utilities`. In the CSS cascade, un-layered rules beat every layered
-rule **regardless of specificity** — so the reset wins and any `text-*`,
-`font-bold`, or font-family utility on a button is silently discarded.
+Tailwind's utilities live in `@layer utilities`, and in the CSS cascade an
+un-layered rule beats every layered rule **regardless of specificity** — so the
+reset won and any `text-*`, `font-bold`, or font-family utility on a button was
+silently discarded.
+
+**The fix was a deletion, not a re-layering.** Tailwind's own preflight already
+sets `font: inherit` on `button, input, select, optgroup, textarea` inside
+`@layer base`, so the app's copy was a duplicate that differed only by sitting
+in the stronger un-layered origin. Removing it leaves the preflight in charge:
+a control with no font utility still inherits exactly as before, and a control
+with one finally gets it.
+
+⚠️ **Do not re-add `font: inherit` to that rule.** `max-width: 100%` stays
+un-layered on purpose — it is an overflow guard, not typography.
+
+**What actually changed when it landed** (measured on the running app, before
+and after, via `getComputedStyle`): only controls whose font came *solely* from
+the generic inherit moved. The app's own un-layered component CSS is still
+un-layered and still wins, so container-query type scales were untouched —
+shop-card Add to Cart held at 9.28px/700, Filters and the cookie Accept at
+10.88px/700. The movers were the shop-card photo arrows and the drawer close
+(16px/400 → 14px/700, i.e. their declared `text-sm font-bold`) and the header
+Menu button (400 → 700 weight).
+
+The inline `BUTTON_LABEL_FONT` in `DiscountCodeField.tsx` is now redundant
+rather than wrong — inline styles still beat everything. Leave it; it is
+harmless and removing it is a separate visual decision.
 
 **The failure mode is what makes this expensive.** `letter-spacing` and
 `text-decoration` are NOT part of the `font` shorthand, so `tracking-*` and
@@ -402,30 +427,89 @@ choice rather than a bug. The REMOVE link had `tracking-[0.14em]` computing
 against the inherited 16px instead of the intended 0.68rem, making it *wider
 and larger* than the class implied.
 
-**Rules:**
+**Rules, as they now stand:**
 
-1. **Font properties on a button go in `style`, or in real CSS.** Inline styles
-   beat cascade layers. The existing `.checkout-recap-edit` (defined in
-   CheckoutClient's styled-jsx, also un-layered) is the established pattern for
-   a small uppercase link: `0.72rem / 700 / 0.08em / #735c00 / underline
-   3px / var(--font-label)`. Match it rather than inventing new values.
-2. **Padding, margin, color, letter-spacing, text-decoration, and layout
-   utilities all work fine on buttons.** Only the `font` shorthand's properties
-   are affected — font-size, font-weight, font-family, font-style, font-variant,
-   line-height. Keep those classes off buttons entirely so the code does not
-   claim styling it is not applying.
-3. **Inputs, selects and textareas are in the same reset** and have the same
-   problem. Both discount components set input font size inline for this reason.
-4. **`<label>`, `<span>`, `<p>`, `<th>`, `<h2>` are NOT in the reset** — Tailwind
-   font utilities work normally there.
+1. **Tailwind font utilities on a button, input, select or textarea apply
+   normally.** Write `text-sm font-bold` and expect it. The workaround of
+   pushing font properties into `style` is no longer required.
+2. **An un-layered rule still beats every utility.** Any font declaration in
+   `globals.css` outside a layer, or in a styled-jsx block, still wins over a
+   Tailwind class — that is why the container-query type scales on shop-card
+   buttons survived this change untouched. When a class looks ignored, look for
+   an un-layered rule before assuming the cascade is broken again.
+3. **Inline `style` beats everything**, layered or not.
+4. **`<label>`, `<span>`, `<p>`, `<th>`, `<h2>` were never in the reset** and
+   were always fine.
 
-⚠️ **Do not "fix" this globally without a deliberate visual review.** Wrapping
-the reset in `@layer base` would make utilities win and is the textbook fix, but
-roughly **205 button classNames across the codebase currently carry font
-utilities that do nothing**. Layering the reset would restyle all of them at
-once, sitewide, in a single change. That is a standalone project with its own
-before/after pass, not a drive-by. Until someone does it, the per-button rules
-above are the working convention.
+The durable lesson is the cascade one, and it outlives this particular bug: **a
+duplicated reset in a stronger origin is invisible until it contradicts
+something.** The declaration was identical to Tailwind's; only its origin
+differed, which is why nothing looked wrong for months and why the symptom, when
+it came, looked like a design choice rather than a defect.
+
+### Tap feedback is CSS-only, and the route bar shows only when it must
+
+Owner request, 2026-08-15: on touch there was no sign a control had been hit
+until the next page painted. Two halves, deliberately separate.
+
+**The tap itself — `@media (hover: none)` in `globals.css`, no JavaScript.**
+Pure CSS is a hard requirement, not a preference: the shop cards and the hero
+run their own touch handlers with measured slop and direction cones, and press
+listeners here risked interfering with gestures that were expensive to get
+right. ⚠️ **Scope press states by POINTER, never by width.** The rules this
+replaced were gated behind `min-width: 641px`, which handed tablets hover styles
+they can never trigger while leaving every phone with no feedback at all —
+verified at 375px, where `min-width: 641px` does not match. Anchors need
+explicit treatment too: the generic `button:…:active` rule matches only real
+`<button>` elements, so the 132 `.gold-button` usages that are anchors had
+nothing.
+
+Product **cards** deliberately get no press state. They are swipeable, and a
+scale on `:active` would fire mid-swipe. The route bar covers a card tap.
+
+**The wait after it — `components/layout/RouteProgressBar.tsx`.** Two rules:
+
+1. **Only when needed.** Nothing renders for the first **120ms**, so a
+   prefetched or cached route shows no bar at all rather than a flash. Clicks
+   that will not make anyone wait never arm it: same-path (hash, or a query-only
+   shop-filter change), off-site, `mailto:`/`tel:`, `target="_blank"`,
+   `download`, and modified clicks.
+2. **Not one millisecond longer.** No minimum display, no run-to-100%, no
+   fade-out tail. The fill stops at 92% and completion is expressed by the
+   element being REMOVED — so it can vanish at 40% width, and that is correct.
+
+**It sits at the BASE of the header, not the top of the viewport** (owner,
+2026-08-15), so it reads as attached to the header. Two constraints made that
+less trivial than it sounds:
+
+- ⚠️ **Offset from the `--site-header-height` token, never a literal.** The
+  header is sized BY that token and it changes at md (3.5rem → 4.5rem);
+  hardcoding 56/72px would drift the moment the header does. Verified flush at
+  both breakpoints — bar top 56 against header bottom 56, and 72 against 72.
+- ⚠️ **The header is rendered PER PAGE while the bar renders from the root
+  layout**, and admin renders no site header at all. So the offset is driven by
+  the header's presence — `body:has([data-site-header])` — with a `top: 0`
+  fallback. A page that stops rendering the header degrades to the top of the
+  viewport instead of leaving the bar floating in empty space, with no extra
+  bookkeeping. `SiteHeader` carries the `data-site-header` marker; keep it if
+  that element is ever moved or rewritten.
+
+**Why not `useLinkStatus`:** it reports one Link's pending state and must render
+inside that Link, so a global bar would mean wrapping every link in the app.
+**Why `usePathname` and not `useSearchParams` for completion:** this renders in
+the root layout, and `useSearchParams` would opt all 454 static pages into
+dynamic rendering. Confirmed unchanged at 454/454 after the change.
+
+⚠️ **The `popstate` trap, which shipped once and was caught by measurement.**
+`popstate` fires AFTER the URL has moved, so `location.pathname` inside that
+handler is the DESTINATION, not the origin. Recording it as the origin makes the
+completion check compare a path against itself; it never becomes true and the
+bar sits on screen for the full 8s safety timeout. **The origin must be the last
+path React COMMITTED**, tracked in a ref. Pinned by
+`route-progress-bar.test.ts`, which asserts the failing comparison directly.
+
+The 8s timeout is a backstop for a cross-path anchor whose handler cancels the
+navigation, not part of normal operation. Normal completion is the path commit.
 
 ### UI icons are inline SVG, never ligature fonts
 
@@ -953,6 +1037,48 @@ row inside a fixed height, the token must stay at least as tall as the tallest
 row content (32px phones, 40px logo from md up). A source guard test
 (`site-header-height.test.ts`) fails the build if a hardcoded `pt-16` main,
 `top: 4rem`, or `calc(100svh - 4rem)` reappears.
+
+### Item prices are whole dollars, and the rounding happens on the VALUE
+
+Owner decision, 2026-08-15. Every price the storefront offers — spot-computed or
+manual — resolves to a whole dollar, so the number on a shop card is exactly the
+number PayPal collects.
+
+**The rounding lives in `getProductPriceValue()` ([pricing.ts:99](next-app/src/lib/pricing.ts:99)),
+not in a formatter.** That placement is the entire point. Display and charge are
+computed on separate paths — a shop card formats `getDisplayPrice`, checkout
+charges `getSnapshotPrice` — and before this change those paths already
+disagreed: `formatUsdPrice` had `maximumFractionDigits: 0`, so a card advertised
+**$5,533** while checkout collected **$5,533.47**. Rounding only the formatter
+would have widened that gap, which is precisely what the entry below forbids.
+Because `getProductPriceValue` is the single funnel for checkout, PayPal, eBay,
+Etsy, the social card, Deep Field, and the sold-price capture, one change covers
+every surface.
+
+There is now **one price formatter**, `formatUsdPrice`. The second one,
+`formatManualPriceAmount`, emitted two decimals and is deleted — two formatters
+with different decimal policies is exactly what let manual-priced items render
+cents next to whole-dollar spot items on the same grid.
+
+**Deliberately NOT rounded, and each for its own reason:**
+
+| | Why |
+| --- | --- |
+| A captured `sold_price` | A record of what someone actually paid. Re-rounding it would misstate history. |
+| Melt/scrap value and the live spot ticker (`$4,377.60/oz`) | Market quotes, not offers. Cents are meaningful. |
+| Tax, shipping-inclusive totals, order totals | **6% of a whole dollar is not a whole dollar.** A Florida total will always carry cents; an out-of-state one comes out clean. Shipping tiers are already whole ($19–$165). |
+
+⚠️ **A price under $0.50 now rounds to $0 and becomes unsellable** — checkout
+rejects it under CODE-D01 ("call to purchase") and both marketplaces reject it
+on their existing `base <= 0` guard. That is fail-closed and intended: an estate
+piece is never legitimately worth $0.10, so a sub-dollar figure is bad data.
+A side effect worth knowing: Etsy's $0.20 platform floor is no longer reachable
+from a product price and is now only reachable via a negative markup. The guard
+stays; its test says so.
+
+Pinned by `whole-dollar-pricing.test.ts`, whose load-bearing assertion is that
+`getDisplayPrice` equals `formatUsdPrice(getSnapshotPrice(...))` — display and
+charge, proven equal rather than assumed.
 
 ### Never charge a total the buyer was not shown
 

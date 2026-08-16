@@ -145,8 +145,27 @@ button,
 input,
 select,
 textarea {
+  /* Overflow guard only. `font: inherit` used to live here too and was DELETED
+     on 2026-08-15 — deliberately, and it must not come back.
+
+     Tailwind's preflight already sets `font: inherit` on exactly these elements
+     inside `@layer base`, so this copy was a duplicate. But it sat OUTSIDE any
+     layer, and an un-layered rule beats every layered rule regardless of
+     specificity — so it, not the preflight, was the winning declaration, and it
+     silently discarded `text-*`, `font-bold`, and font-family utilities on every
+     button, input, select and textarea in the app.
+
+     The failure was quiet rather than loud: `letter-spacing` and
+     `text-decoration` are not part of the `font` shorthand, so a broken control
+     kept its tracking and underline and merely rendered at the wrong size and
+     weight — which reads as a design choice, not a bug.
+
+     Removing it changes nothing for a control with no font utility (preflight
+     still inherits) and nothing for the app's own un-layered component CSS,
+     which is still un-layered and still wins — e.g. the container-query type
+     scales on shop-card buttons. Only the ~110 classNames that always claimed a
+     font size or weight now actually get one. */
   max-width: 100%;
-  font: inherit;
 }
 
 table {
@@ -1414,6 +1433,100 @@ button:focus-visible > .hover-underline-grow,
 
 button:not(:disabled):not(.gold-button):not(.outline-button):active {
   filter: brightness(0.88);
+}
+
+/* ── Route progress bar ────────────────────────────────────────────────────
+   Paired with components/layout/RouteProgressBar.tsx, which decides WHEN this
+   mounts; the rules here only decide what it looks like. It sits above the
+   fixed header (z-50) and is 2px tall, so it never moves page content.
+
+   The fill stops at 92% and never completes, because the client cannot know how
+   much of a navigation is left. Completion is expressed by the element being
+   removed, not by the bar running to the end — see rule 2 in the component. */
+.route-progress {
+  position: fixed;
+  /* Fallback for surfaces that render no site header — admin, chiefly. Without
+     it the bar would hang in empty space partway down those pages. */
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 60;
+  pointer-events: none;
+}
+
+/* Owner request, 2026-08-15: sit at the BASE of the header rather than the top
+   of the viewport, so the bar reads as attached to the header.
+
+   Driven off the header's own presence rather than the route, because the bar
+   renders from the root layout while the header is rendered per page. `:has()`
+   keeps the two in agreement automatically — a page that stops rendering the
+   header gets the top-of-viewport fallback with no extra bookkeeping.
+
+   ⚠️ Offset from the `--site-header-height` TOKEN, never a hardcoded 56/72px.
+   The header is sized BY that token and it changes at md; a literal here would
+   drift the moment the header does. */
+body:has([data-site-header]) .route-progress {
+  top: var(--site-header-height);
+}
+.route-progress-bar {
+  height: 100%;
+  width: 0;
+  /* Same gradient as .gold-button, so the feedback reads as this brand. */
+  background: linear-gradient(90deg, #dcb336, #b5890c);
+  animation: route-progress-fill 8s cubic-bezier(0.12, 0.82, 0.28, 1) forwards;
+}
+@keyframes route-progress-fill {
+  0% { width: 0; }
+  25% { width: 48%; }
+  60% { width: 78%; }
+  100% { width: 92%; }
+}
+/* Reduced motion keeps the bar — it is information, not decoration — but drops
+   the easing to a plain linear crawl. */
+@media (prefers-reduced-motion: reduce) {
+  .route-progress-bar {
+    animation-timing-function: linear;
+  }
+}
+
+/* ── Touch press feedback ──────────────────────────────────────────────────
+   A touch device has no hover, so without this a control gives no sign it was
+   hit until the next paint. These rules cover the tap itself; the route
+   progress bar above covers the wait that follows.
+
+   Scoped by `(hover: none)` rather than a width breakpoint. Width was the wrong
+   axis: the existing shop-card rules gate their press state behind
+   `min-width: 641px`, which silently left every phone with no feedback at all
+   while still handing tablets hover styles they can never trigger.
+
+   Deliberately CSS-only. The shop cards and the hero run their own touch
+   gesture handlers with measured slop and direction cones (see DECISIONS), and
+   adding JS press listeners here risked interfering with them. */
+@media (hover: none) {
+  /* Restores the press state the width-gated rule above denies to phones. */
+  .shop-card-wishlist-button:active:not(:disabled),
+  .shop-list-cart-button:active:not(:disabled) {
+    transform: scale(0.94);
+    transition-duration: 0.05s;
+  }
+
+  /* Anchors styled as buttons. The generic `button:…:active` rule above only
+     matches real <button> elements, so links carrying a button treatment — and
+     there are 132 `.gold-button` usages, many of them anchors — had nothing. */
+  a:active:not(.gold-button):not(.outline-button),
+  [role='button']:active {
+    filter: brightness(0.9);
+  }
+
+  /* iOS draws a translucent grey block on tap. Tinting it to the brand gold
+     makes the same free feedback look intentional instead of like a default. */
+  a,
+  button,
+  [role='button'],
+  summary {
+    -webkit-tap-highlight-color: rgba(181, 137, 12, 0.16);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

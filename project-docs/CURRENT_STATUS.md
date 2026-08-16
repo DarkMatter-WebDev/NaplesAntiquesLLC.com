@@ -10,13 +10,15 @@
 
 ### 🔴 ONE ACTION WAITING: DEPLOY
 
-A verified batch is staged at `C:\Users\rcman\NEJ-repo-staging` — **839 files /
-19.08 MB**, an exact mirror of this folder (robocopy dry run: 0 to copy, 0
-extras) and leak-checked clean. Copy it wholesale into the repo folder, keeping
-that folder's `.git`, then push.
+✅ **Staging is CURRENT as of 2026-08-15 19:07** — `C:\Users\rcman\NEJ-repo-staging`,
+**842 files / 19.17 MB**, verified an exact mirror (a follow-up dry run reported
+0 to copy and 0 extras), leak-checked against a positive control, and all 15
+changed files hash-matched. Copy it wholesale into the repo folder, keeping that
+folder's `.git`, then push. Full evidence in `TASKS.md`.
 
 **No SQL is outstanding.** All three migrations this batch touched are already
-applied in Supabase and were verified live, not assumed.
+applied in Supabase and were verified live, not assumed. The 2026-08-15 work
+adds none.
 
 **What is in it, none of it yet in production:**
 
@@ -27,6 +29,10 @@ applied in Supabase and were verified live, not assumed.
 | Cart drawer quoting | drawer and checkout now show the same live figure |
 | First-paint fixes | 533KB was queue-jumping the 21KB stylesheet that gates the first pixel |
 | Black header wordmark | owner request |
+| **Whole-dollar item prices** (2026-08-15) | rounding moved onto the VALUE, so a card and its charge are one number; closes a live $5,533-vs-$5,533.47 gap |
+| **Button font cascade fix** (2026-08-15) | a duplicated un-layered `font: inherit` was discarding every Tailwind font utility on every form control |
+| **Touch tap feedback** (2026-08-15) | press states were gated by WIDTH, so phones had none; now `(hover: none)`, CSS-only so it cannot disturb the swipe gestures |
+| **Route progress bar** (2026-08-15) | 2px gold bar at the header's base; renders only after 120ms and is removed the instant the route commits |
 
 ### After deploying, in this order
 
@@ -60,8 +66,13 @@ applied in Supabase and were verified live, not assumed.
 
 ### Five things a future session should NOT re-derive
 
-- **~205 buttons carry Tailwind font classes that do nothing.** Pre-existing and
-  understood; deliberately not fixed sitewide. See DECISIONS.
+- ✅ **The "~205 buttons carry Tailwind font classes that do nothing" hazard is
+  CLOSED (2026-08-15)** — and the fix was a *deletion*, not the re-layering the
+  old note predicted. Tailwind's preflight already provided `font: inherit` in
+  `@layer base`; `globals.css` carried an un-layered duplicate that outranked
+  it. Measured blast radius was small: only the shop-card photo arrows, the
+  drawer close, and the header Menu button moved. Do not re-add that
+  declaration. See DECISIONS and CHANGELOG 2026-08-15.
 - **Sandbox rows live permanently in the live `orders` table** (early July,
   before the 2026-07-09 go-live). Tell them apart by the host in
   `payment_response`, not by a 404 from PayPal.
@@ -484,6 +495,21 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   method → contact → address) and a sticky Order summary on the right holding
   items, totals, and the PayPal buttons, with a **Back to cart** link that
   reopens the cart drawer.
+- **Touch controls confirm a tap immediately (2026-08-15, undeployed).** Press
+  states live in an `@media (hover: none)` block in `globals.css` and are
+  **CSS-only on purpose** — the shop cards and hero run their own touch gesture
+  handlers, and JS press listeners risked disturbing them. ⚠️ Scope any future
+  press state by POINTER, not width: the rules this replaced were behind
+  `min-width: 641px`, which left every phone with no feedback. Product cards are
+  deliberately excluded (they are swipeable; `:active` would fire mid-swipe).
+  A 2px gold **route progress bar** (`components/layout/RouteProgressBar.tsx`)
+  covers the wait after the tap — it renders only after 120ms, so prefetched
+  routes show nothing, and is removed the instant the path commits, with no
+  minimum display or fade tail. It sits at the **base of the header**, offset
+  from the `--site-header-height` token and made conditional on
+  `body:has([data-site-header])` so admin (which renders no site header) keeps a
+  `top: 0` fallback rather than a bar floating mid-page. See DECISIONS, *"Tap feedback is CSS-only, and
+  the route bar shows only when it must"*, including the `popstate` trap.
 - **In-app-browser stutter is fixed sitewide (2026-08-11, undeployed).**
   Instagram/Facebook embedded browsers hide their toolbar on scroll, changing the
   viewport height. All customer-facing viewport-height CSS now uses `svh` (stable
@@ -536,6 +562,16 @@ rather than assume. A rotated cron secret must change in three places: Netlify
 - PayPal Orders API v2 owns payment. Totals, product availability, U.S. address,
   shipping method/fee, and tax are recomputed server-side. There is no inventory
   hold; the first successful capture wins one-of-one inventory.
+- **Item prices are whole dollars (2026-08-15, undeployed).** Every offered
+  price — spot-computed or manual — is rounded in `getProductPriceValue()`, the
+  single funnel feeding checkout, PayPal, eBay, Etsy, the social card, Deep
+  Field, and sold-price capture. The rounding is on the VALUE, not in a
+  formatter: before this, a card advertised $5,533 while checkout collected
+  $5,533.47. `formatUsdPrice` is now the only price formatter. **Tax and order
+  totals still carry cents** — 6% of a whole dollar is not a whole dollar — as
+  do melt/scrap, the live spot ticker, and any already-captured `sold_price`.
+  ⚠️ A price under $0.50 rounds to $0 and is refused everywhere, deliberately.
+  See DECISIONS, *"Item prices are whole dollars"*.
 - **The buyer is never charged a total they were not shown (2026-08-13,
   undeployed).** 64% of the catalog is spot-linked, so a cart's stored price
   label drifts from the chargeable price as metal moves — measured at $69.33 on

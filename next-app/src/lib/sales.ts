@@ -1,7 +1,7 @@
 import type { Product } from '@/types/product';
 import { productMetalVariantLabel } from '@/types/product';
 import type { SpotData } from '@/types/product';
-import { getProductPriceValue } from '@/lib/pricing';
+import { getProductPriceValue, roundToWholeDollar } from '@/lib/pricing';
 
 export function generateOrderNumber(date = new Date()): string {
   const stamp = [
@@ -28,7 +28,11 @@ export function getProductWeight(product: Product): number | null {
 export function getSnapshotPrice(product: Product, spotData: SpotData | null): number {
   const resolved = getProductPriceValue(product, spotData);
   if (resolved != null) return resolved;
-  if (product.price_mode === 'manual' && product.asking_price != null) return Number(product.asking_price);
+  // Last-resort fallback for a manual item with no parseable label. Rounded like
+  // every other offer price so this path cannot reintroduce cents at checkout.
+  if (product.price_mode === 'manual' && product.asking_price != null) {
+    return roundToWholeDollar(Number(product.asking_price));
+  }
   return 0;
 }
 

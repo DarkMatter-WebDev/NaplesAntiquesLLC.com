@@ -417,9 +417,10 @@ describe('computeEbayPrice', () => {
     const product = makeProduct({ price_mode: 'spot-multiplier', purity: 14, gram_weight: 10, pricing_multiplier: 2 });
     const spotData: SpotData = { goldPerTroyOz: 3110.34768, silverPerTroyOz: null, fetchedAt: Date.now(), source: 'api' };
     // melt = 10 * (14/24) * (3110.34768/31.1034768) = 10 * 0.58333 * 100 = ~583.33;
-    // calcSpotPriceValue already multiplies by pricing_multiplier (2) = ~1166.67
+    // calcSpotPriceValue already multiplies by pricing_multiplier (2) = ~1166.67,
+    // which getProductPriceValue rounds to the whole dollar the storefront shows.
     const result = computeEbayPrice(product, spotData, 0);
-    expect(result.basePrice).toBeCloseTo(1166.67, 1);
+    expect(result.basePrice).toBe(1167);
     expect(result.price).toBe(result.basePrice);
   });
 
@@ -448,10 +449,21 @@ describe('computeEbayPrice', () => {
   });
 
   it('has no platform price floor (unlike Etsy) — a low price still computes', () => {
-    const product = makeProduct({ price_mode: 'manual', manual_price_label: '$0.10' });
-    const result = computeEbayPrice(product, null, 0);
+    // Product prices are whole dollars, so the markup is now the only way to
+    // reach a sub-dollar figure. $1 less 90% is $0.10 — under Etsy's $0.20
+    // floor, which eBay deliberately does not mirror.
+    const product = makeProduct({ price_mode: 'manual', manual_price_label: '$1' });
+    const result = computeEbayPrice(product, null, -90);
+    expect(result.basePrice).toBe(1);
     expect(result.price).toBe(0.1);
     expect(result.rejectedReason).toBeNull();
+  });
+
+  it('rejects a sub-50-cent price, which rounds away to $0', () => {
+    const product = makeProduct({ price_mode: 'manual', manual_price_label: '$0.10' });
+    const result = computeEbayPrice(product, null, 0);
+    expect(result.price).toBeNull();
+    expect(result.rejectedReason).toMatch(/no computable price/i);
   });
 
   it('returns null with a reason when no price can be computed', () => {

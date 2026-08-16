@@ -8,6 +8,7 @@ import { CartProvider } from '@/context/CartContext';
 import CookieNotice from '@/components/legal/CookieNotice';
 import CustomerReveal from '@/components/layout/CustomerReveal';
 import SocialBackgroundPublishProvider from '@/components/admin/SocialBackgroundPublishProvider';
+import RouteProgressBar from '@/components/layout/RouteProgressBar';
 import { jsonLdHtml } from '@/lib/json-ld';
 
 interface Props {
@@ -133,6 +134,9 @@ export default async function LocaleLayout({ children, params }: Props) {
               WishlistProvider) has an Add to Cart button that calls useCart(), so it
               needs a CartContext ancestor. CartDrawer has no reverse dependency on
               WishlistContext, so this order is safe. */}
+          {/* Outside the providers: it depends on nothing but the pathname, and
+              renders null except during a navigation slow enough to warrant it. */}
+          <RouteProgressBar />
           <CartProvider locale={locale}>
             <WishlistProvider locale={locale}>
               <SocialBackgroundPublishProvider>

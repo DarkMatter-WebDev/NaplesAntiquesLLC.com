@@ -11,27 +11,36 @@ export function purityToFraction(purity: number): number {
   return purity / 100;
 }
 
-export function calcSpotPrice(product: Product, spotData: SpotData | null): string | null {
-  const price = calcSpotPriceValue(product, spotData);
-  if (price == null) return null;
-
-  return formatUsdPrice(price);
+/**
+ * Item prices are whole dollars — owner policy, 2026-08-15. A piece is offered
+ * and charged at a round figure, so the number on a shop card is exactly the
+ * number PayPal collects.
+ *
+ * The rounding happens on the VALUE, never in a formatter alone. Display and
+ * charge are computed on separate paths (a shop card formats getDisplayPrice;
+ * checkout charges getSnapshotPrice via getProductPriceValue), so rounding only
+ * the formatter would show $5,533 and collect $5,533.47 — precisely what
+ * "Never charge a total the buyer was not shown" forbids.
+ *
+ * Deliberately NOT rounded:
+ * - a captured sold price, which is a historical amount rather than an offer;
+ * - melt/scrap value and the live spot ticker, which are market quotes;
+ * - tax and order totals, because 6% of a whole dollar is not a whole dollar.
+ */
+export function roundToWholeDollar(price: number): number {
+  return Math.round(price);
 }
 
+/**
+ * THE price formatter. There is deliberately only one. Two formatters with
+ * different decimal policies is what let manual-priced items render cents while
+ * spot-priced items rendered whole dollars on the same shop grid.
+ */
 export function formatUsdPrice(price: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     maximumFractionDigits: 0,
-  }).format(price);
-}
-
-export function formatManualPriceAmount(price: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: Number.isInteger(price) ? 0 : 2,
-    maximumFractionDigits: 2,
   }).format(price);
 }
 
@@ -51,7 +60,7 @@ export function normalizeManualPriceLabel(label: string | null | undefined): str
   if (!value) return null;
 
   const parsed = parseManualPriceLabelValue(value);
-  return parsed == null ? value : formatManualPriceAmount(parsed);
+  return parsed == null ? value : formatUsdPrice(roundToWholeDollar(parsed));
 }
 
 export function calcSpotPriceValue(product: Product, spotData: SpotData | null): number | null {
@@ -96,13 +105,21 @@ export function getMarketplaceSpotPriceError(product: Product, spotData: SpotDat
   return null;
 }
 
+/**
+ * THE chargeable price of one unit, and the same number every surface displays.
+ * Checkout, PayPal, eBay, Etsy, the social card, and Deep Field all read it, so
+ * rounding here is what keeps the shown price and the collected price identical.
+ */
 export function getProductPriceValue(product: Product, spotData: SpotData | null): number | null {
+  // A captured sale is a record of what someone actually paid, not an offer.
+  // It keeps its exact recorded amount; re-rounding it would misstate history.
   const lockedPrice = getProductSoldPriceLock(product);
   if (lockedPrice != null) return lockedPrice;
-  if (product.price_mode === 'manual') {
-    return parseManualPriceLabelValue(product.manual_price_label);
-  }
-  return calcSpotPriceValue(product, spotData);
+
+  const offered = product.price_mode === 'manual'
+    ? parseManualPriceLabelValue(product.manual_price_label)
+    : calcSpotPriceValue(product, spotData);
+  return offered == null ? null : roundToWholeDollar(offered);
 }
 
 export function getSpotMeltDisplayPrice(product: Product, spotData: SpotData | null): string {
@@ -110,13 +127,19 @@ export function getSpotMeltDisplayPrice(product: Product, spotData: SpotData | n
   return value == null ? '-' : formatUsdPrice(value);
 }
 
+/**
+ * Formats exactly the value getProductPriceValue resolved — one path, so the
+ * card and the charge can never disagree.
+ */
 export function getDisplayPrice(product: Product, spotData: SpotData | null): string {
-  const lockedPrice = getProductSoldPriceLock(product);
-  if (lockedPrice != null) return formatUsdPrice(lockedPrice);
-  if (product.price_mode === 'manual') {
-    return normalizeManualPriceLabel(product.manual_price_label) ?? 'Contact for price';
-  }
-  return calcSpotPrice(product, spotData) ?? 'Contact for price';
+  const value = getProductPriceValue(product, spotData);
+  if (value != null) return formatUsdPrice(value);
+
+  // A manual label that is not a parseable amount ("Contact for price",
+  // "Call for pricing") is prose, not a number. Show it verbatim.
+  const label = (product.manual_price_label ?? '').trim();
+  if (product.price_mode === 'manual' && label) return label;
+  return 'Contact for price';
 }
 
 export function getStorefrontDisplayPrice(

@@ -6,21 +6,64 @@
 ## 🔴 TOP OF THE LIST (2026-08-14)
 
 1. **Deploy the staged batch** — `C:\Users\rcman\NEJ-repo-staging`.
-   ✅ **REBUILT 2026-08-14 12:47** and re-verified: **839 files / 19.12 MB**, a
-   two-way inventory diff against the source returned **0 missing / 0 extra**,
-   and all 9 changed files hash-match. Leak check clean (0 `.git`, 0
-   `node_modules`, 0 `.next`, 0 `.env*`, 0 `.pem`, 0 `*.tsbuildinfo`, 0
-   `next-env.d.ts`, 0 `*.log`) against a positive control of 169 `.tsx`. Hidden
-   paths confirmed present: `.github/workflows/scheduled-jobs.yml`, `.gitignore`,
-   `.claude/launch.json`, `next-app/.npmrc`.
-   No SQL outstanding; all three migrations are applied.
-   ⚠️ It is still a point-in-time snapshot — rebuild again after any further
-   edit, using the command under *Copying to the repo folder*.
+   ✅ **REBUILT 2026-08-15 19:07** and verified: **842 files / 19.17 MB**.
+   A second robocopy dry run immediately after reported **Copied 0 / Extras 0 /
+   Mismatch 0 / FAILED 0**, i.e. an exact mirror. All **15** changed files
+   (3 new, 12 modified) **hash-match** SHA256 against the source.
+   Leak check clean — 0 `.git`, 0 `node_modules`, 0 `.next`, 0 `.env*`,
+   0 `.pem`, 0 `*.tsbuildinfo`, 0 `next-env.d.ts`, 0 `*.log` — against a
+   **positive control of 170 `.tsx`**, so the zeros are real rather than a
+   broken scan. Hidden paths confirmed present: `.github/workflows/
+   scheduled-jobs.yml`, `.gitignore`, `.claude/launch.json`, `next-app/.npmrc`,
+   `next-app/.gitignore`. Content spot-checks in the staged copy: the
+   `RouteProgressBar` mount, `data-site-header`, the
+   `body:has([data-site-header])` offset, `roundToWholeDollar`, and the ABSENCE
+   of the removed un-layered `font: inherit`.
+   No SQL outstanding; all three migrations are applied, and the 2026-08-15 work
+   adds none.
+
+   ℹ️ **Robocopy reports 845 total files against 842 on disk, and that is
+   correct** — it counts `/XF`-excluded files in its total. The three are
+   `.env.local`, `tsconfig.tsbuildinfo`, and `next-env.d.ts`, all verified
+   absent from staging. Do not chase this gap as a missing-file bug.
+
+   ⚠️ Still a point-in-time snapshot — rebuild again after any further edit.
 2. **Re-measure first paint on production** (snippet below, under *After the
    next deploy*). Baseline to beat: 533KB across 30 requests before FCP.
 3. **Confirm the first real refund records itself.** The fix is proven locally
    against real PayPal refunds but its automatic path has never run in
    production.
+
+4. **After deploying, check the two 2026-08-15 changes on a real screen:**
+   - 📱 **Shop-card photo arrows** are the one customer-facing visual change from
+     the button font fix — now **14px/700** where they were 16px/400 (bolder,
+     slightly smaller). Confirm they still read well on a phone and a desktop,
+     on both a light- and a dark-backdrop card. The drawer `✕` and the header
+     Menu button changed the same way.
+   - **Whole-dollar prices**: confirm no shop card, product page, cart drawer or
+     checkout line item shows cents, and that a checkout line item equals its
+     shop-card price exactly. Tax, and therefore a Florida total, **should**
+     still show cents — that is correct, not a miss. The gold/silver spot
+     tickers (`$4,377.60/oz`) keep their cents deliberately.
+   - Spot-check one eBay and one Etsy listing after their next price push: both
+     should now carry whole-dollar prices.
+   - 📱 **Tap feedback, on a real phone AND a real tablet** — this is the change
+     that cannot be judged from measurements. Tap a shop-card cart/wishlist
+     button, a gold CTA, and a nav link: each should visibly acknowledge the
+     touch. Confirm the gold tap highlight reads as deliberate rather than
+     grubby on both a light and a dark product page. Then **swipe a shop card
+     photo and confirm the swipe still works and does not flash a press state**
+     — cards are deliberately excluded from press feedback for this reason.
+   - 📱 **Route progress bar, in production specifically.** Most routes are
+     prefetched there, so it should appear **rarely** — mainly on product-card
+     taps (`prefetch={false}`) and on a slow connection. If it flashes on
+     ordinary fast navigations, raise `SHOW_DELAY_MS` in
+     `components/layout/RouteProgressBar.tsx`; the owner rule is that it appears
+     only when genuinely needed. Also confirm it never lingers after a page has
+     rendered, including on browser Back. Check it sits flush against the
+     header's bottom edge at both a phone width and a desktop width — the header
+     changes height at md — and that it does not appear to overlap or detach
+     from the header while scrolling.
 
 Nothing else in this file blocks a deploy.
 

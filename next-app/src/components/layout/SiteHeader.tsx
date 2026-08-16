@@ -341,6 +341,11 @@ export default function SiteHeader() {
 
   return (
     <header
+      // Marker for `body:has([data-site-header])` in globals.css, which drops the
+      // route progress bar to this header's bottom edge. Surfaces that do not
+      // render this header (admin) keep the bar at the top of the viewport, so
+      // it never floats in empty space. Keep this attribute if the header moves.
+      data-site-header
       className="fixed top-0 w-full z-50"
       style={{
         // Fully opaque, not a 0.95 wash + backdrop blur: page content scrolling
