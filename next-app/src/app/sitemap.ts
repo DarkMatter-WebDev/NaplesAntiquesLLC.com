@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import { SERVICE_AREAS } from '@/lib/service-areas';
+import { LEGAL_NOINDEX_PATHS } from '@/lib/legal-metadata';
 
 const BASE = 'https://naplesestatejewelry.com';
 
@@ -8,7 +9,7 @@ const BASE = 'https://naplesestatejewelry.com';
 // page content is meaningfully updated) avoids sending a churning "modified now"
 // signal on every crawl, which dilutes the freshness signal for pages that did
 // not actually change.
-const CONTENT_LAST_MODIFIED = new Date('2026-07-11');
+const CONTENT_LAST_MODIFIED = new Date('2026-08-17');
 
 const STATIC_PAGES = [
   { path: '', priority: 1.0, changeFrequency: 'weekly' },
@@ -41,6 +42,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: MetadataRoute.Sitemap = [];
 
   for (const { path, priority, changeFrequency } of STATIC_PAGES) {
+    // A `noindex` page must never be submitted here — the sitemap would be
+    // asking Google to index what the page header forbids. Filtered from the
+    // single source in legal-metadata.ts rather than by pruning STATIC_PAGES,
+    // so re-adding one of these paths above cannot silently reintroduce the
+    // contradiction.
+    if (LEGAL_NOINDEX_PATHS.includes(path)) continue;
+
     // The shop reprices daily, so it genuinely changes often; other static
     // pages use the stable content date rather than "now".
     const lastModified = path === '/shop' ? now : CONTENT_LAST_MODIFIED;

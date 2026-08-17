@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { alternatesFor } from '@/lib/seo';
+import { pageMetadata } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -16,13 +16,14 @@ import ClayMark from '@/components/ClayMark';
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   const isEs = locale === 'es';
-  return {
+  return pageMetadata({
     title: isEs ? 'Programa de Intercambio de Oro y Plata' : 'Gold & Silver Trade-In Program',
     description: isEs
       ? 'Aplique su oro o plata sin usar como crédito para cualquier pieza de nuestra tienda. Pesado y probado frente a usted, valorado contra el mercado spot en vivo, en Naples y el suroeste de Florida.'
       : 'Put unworn gold or silver toward any piece in our shop. Tested and weighed in front of you, valued against the live spot market, in Naples and across Southwest Florida.',
-    alternates: alternatesFor('/trade-in', locale),
-  };
+    path: '/trade-in',
+    locale,
+  });
 }
 
 interface Props {

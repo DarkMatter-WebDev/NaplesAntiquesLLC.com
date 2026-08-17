@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { alternatesFor } from '@/lib/seo';
+import { pageMetadata } from '@/lib/seo';
+import { jsonLdHtml } from '@/lib/json-ld';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -15,17 +16,21 @@ import type { CarouselItem } from '../../../../carousel/lib/carouselData';
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   const isEs = locale === 'es';
-  return {
-    title: {
-      absolute: isEs
-        ? 'Compramos Oro, Joyería y Plata Esterlina en Naples, FL | Naples Estate Jewelry'
-        : 'Sell Gold, Jewelry & Sterling Silver in Naples, FL | Naples Estate Jewelry',
-    },
-    description: isEs
-      ? 'Compramos oro, joyería de patrimonio, plata esterlina, diamantes, monedas y relojes en Naples y el suroeste de Florida. Evaluaciones gratuitas — vamos a usted. Llame al (239) 404-8505.'
-      : 'We buy gold, estate jewelry, sterling silver, diamonds, coins, and watches in Naples and across Southwest Florida. Top-dollar payouts, free appraisals, we come to you. Call (239) 404-8505.',
-    alternates: alternatesFor('/', locale),
-  };
+  // Brand first, then the descriptor — see the note on SITE_TITLE in
+  // app/layout.tsx for why the trailing-brand form was abandoned here and
+  // deliberately kept for interior pages.
+  const title = isEs
+    ? 'Naples Estate Jewelry - Compramos Joyería, Oro y Plata en Naples, FL'
+    : 'Naples Estate Jewelry - Sell Jewelry, Gold & Silver in Naples, FL';
+
+  const description = isEs
+    ? 'Compramos oro, joyería de patrimonio, plata esterlina, diamantes, monedas y relojes en Naples y el suroeste de Florida. Evaluaciones gratuitas — vamos a usted. Llame al (239) 404-8505.'
+    : 'We buy gold, estate jewelry, sterling silver, diamonds, coins, and watches in Naples and across Southwest Florida. Top-dollar payouts, free appraisals, we come to you. Call (239) 404-8505.';
+
+  // `brandedTitle` because this title LEADS with the brand rather than trailing
+  // it, so the suffix pageMetadata() adds to every other page's og:title would
+  // duplicate it here.
+  return pageMetadata({ title, description, path: '/', locale, brandedTitle: true });
 }
 
 interface Props {
@@ -50,8 +55,37 @@ export default async function HomePage({ params }: Props) {
 
   const carousel = await getHomeCarouselPayload(HOME_CAROUSEL_FALLBACK);
 
+  // Google prints a site name on its own line above the search result. Without a
+  // WebSite entity it falls back to the bare domain — which is why results read
+  // "naplesestatejewelry.com" rather than the brand. This is the documented
+  // mechanism for that line, and it is separate from the <title>.
+  //
+  // HOMEPAGE ONLY, per Google's spec: the WebSite entity belongs on the site
+  // root, not on every page. The sitewide JewelryStore entity in
+  // [locale]/layout.tsx is a different thing and stays where it is.
+  //
+  // ⚠️ Google re-crawls and re-evaluates this on its own schedule, so expect
+  // days-to-weeks before the displayed site name changes. It is not broken if
+  // the result looks identical the day after deploying.
+  // ⚠️ The brand is "Naples Estate Jewelry" — no "Co" (owner, 2026-08-15). An
+  // `alternateName: 'Naples Estate Jewelry Co'` was briefly set here and was
+  // removed: nobody uses that form, and Google cross-checks this against the
+  // JewelryStore schema, the header wordmark, and the Google Business Profile
+  // when choosing a site name. Disagreement among them is a reason it falls back
+  // to showing the bare domain, which is the problem this entity exists to fix.
+  // Do not reintroduce an alternateName unless the business genuinely trades
+  // under a second name. ("Naples Antiques LLC" is the legal entity, not a
+  // trading name, and must not go here.)
+  const webSiteLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Naples Estate Jewelry',
+    url: 'https://naplesestatejewelry.com',
+  };
+
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(webSiteLd) }} />
       <HomeBootSplash />
       <SiteHeader />
 
@@ -131,7 +165,13 @@ export default async function HomePage({ params }: Props) {
           <CardGrid className="md:grid-cols-3">
             {[
               {
-                title: isEs ? 'Compramos Oro' : 'We Buy Gold',
+                // These three card titles are real <h2> elements, so they carry
+                // heading weight. "in Naples" was added 2026-08-16: the homepage
+                // body mentions Naples 73 times but not ONE heading did, which
+                // under-declared the page's own topic. Cheap signal, no cost to
+                // the copy. (Card titles wrap freely — unlike the announcement
+                // strip above, which is nowrap and length-critical.)
+                title: isEs ? 'Compramos Oro en Naples' : 'We Buy Gold in Naples',
                 body: isEs
                   ? 'Evaluaciones gratuitas en el acto para todas las piezas de oro.'
                   : 'Free appraisals on all gold jewelry, coins, and bullion — we come to you.',
@@ -139,7 +179,7 @@ export default async function HomePage({ params }: Props) {
                 cta: isEs ? 'Evaluación gratuita →' : 'Free evaluation →',
               },
               {
-                title: isEs ? 'Vendemos Joyas' : 'We Sell Jewelry',
+                title: isEs ? 'Vendemos Joyería en Naples' : 'We Sell Estate Jewelry in Naples',
                 body: isEs
                   ? 'Cadenas, pulseras, anillos y piezas de diseñador con precios transparentes.'
                   : 'Chains, bracelets, rings, and designer pieces priced at live gold rates.',

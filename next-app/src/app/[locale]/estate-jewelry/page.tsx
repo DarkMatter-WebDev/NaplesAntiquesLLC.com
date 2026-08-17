@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { alternatesFor } from '@/lib/seo';
+import { pageMetadata } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -8,12 +8,17 @@ import { AppIcon } from '@/components/AppIcon';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
-  return {
-    title: 'Estate Jewelry Buyer in Naples, FL',
-    description:
-      'Private estate jewelry evaluations in Naples, FL. Onsite acid testing, XRF analysis, and GIA coordination. Immediate payment upon agreement.',
-    alternates: alternatesFor('/estate-jewelry', locale),
-  };
+  const isEs = locale === 'es';
+  return pageMetadata({
+    title: isEs
+      ? 'Comprador de Joyería de Patrimonio en Naples'
+      : 'Estate Jewelry Buyer in Naples, FL',
+    description: isEs
+      ? 'Evaluaciones privadas de joyería de patrimonio en Naples, FL. Pruebas ácidas en el sitio, análisis XRF y coordinación con GIA. Pago inmediato al llegar a un acuerdo.'
+      : 'Private estate jewelry evaluations in Naples, FL. Onsite acid testing, XRF analysis, and GIA coordination. Immediate payment upon agreement.',
+    path: '/estate-jewelry',
+    locale,
+  });
 }
 
 interface Props {

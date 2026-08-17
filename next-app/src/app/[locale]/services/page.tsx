@@ -1,17 +1,24 @@
 import type { Metadata } from 'next';
-import { alternatesFor } from '@/lib/seo';
+import { pageMetadata } from '@/lib/seo';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
-  return {
-    title: 'Our Services',
-    description:
-      'Choose a free jewelry evaluation or estate services with Naples Estate Jewelry. Private, appointment-only service throughout Southwest Florida.',
-    alternates: alternatesFor('/services', locale),
-  };
+  const isEs = locale === 'es';
+  return pageMetadata({
+    // Was the bare "Our Services" — the only title on the site carrying neither
+    // a keyword nor a location.
+    title: isEs
+      ? 'Servicios de Joyería en Naples, FL'
+      : 'Jewelry & Estate Services in Naples, FL',
+    description: isEs
+      ? 'Elija una evaluación gratuita de joyería o servicios de patrimonio con Naples Estate Jewelry. Servicio privado y con cita previa en todo el suroeste de Florida.'
+      : 'Choose a free jewelry evaluation or estate services with Naples Estate Jewelry. Private, appointment-only service throughout Southwest Florida.',
+    path: '/services',
+    locale,
+  });
 }
 
 interface Props {

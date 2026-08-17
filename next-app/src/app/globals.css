@@ -2111,7 +2111,7 @@ body:has([data-site-header]) .route-progress {
   text-transform: uppercase;
 }
 
-.site-loading-card h1,
+.site-loading-card .site-loading-title,
 .home-boot-splash-title {
   max-width: 100%;
   margin: 0;
@@ -2202,7 +2202,7 @@ body:has([data-site-header]) .route-progress {
     margin-bottom: 0.2rem;
   }
 
-  .site-loading-card h1 {
+  .site-loading-card .site-loading-title {
     font-size: clamp(1.55rem, 8vw, 2.1rem);
     line-height: 1.03;
   }

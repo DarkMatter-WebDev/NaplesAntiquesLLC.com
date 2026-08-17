@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { alternatesFor } from '@/lib/seo';
+import { pageMetadata } from '@/lib/seo';
 import { jsonLdHtml } from '@/lib/json-ld';
 import { SERVICE_AREAS } from '@/lib/service-areas';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -14,23 +14,20 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   const isEs = locale === 'es';
+  // Trimmed 2026-08-16: was "…& Sterling Silver in Southwest Florida", which
+  // rendered at 81 characters with the brand suffix — the longest title on the
+  // site, truncating mid-brand. "Sterling" is carried by /silver-services,
+  // which is the page that should rank for it.
   const title = isEs
     ? 'Vender Oro, Joyería y Plata en el Suroeste de Florida'
-    : 'Sell Gold, Jewelry & Sterling Silver in Southwest Florida';
+    : 'Sell Gold, Jewelry & Silver in Southwest Florida';
   const description = isEs
     ? 'Comprador de oro, joyería, plata esterlina, diamantes, monedas y relojes que paga al mejor precio en Naples, Marco Island, Bonita Springs, Estero, Fort Myers y Cape Coral. Evaluación gratuita — vamos a usted.'
     : 'Top-paying buyer of gold, jewelry, sterling silver, diamonds, coins & watches serving Naples, Marco Island, Bonita Springs, Estero, Fort Myers & Cape Coral. Free appraisals — we come to you.';
-  return {
-    title,
-    description,
-    alternates: alternatesFor('/sell', locale),
-    openGraph: {
-      type: 'website',
-      url: `https://naplesestatejewelry.com${isEs ? '/es' : ''}/sell`,
-      title: `${title} | Naples Estate Jewelry`,
-      description,
-    },
-  };
+  // Was a hand-rolled openGraph block with no `images`, which meant this page —
+  // one of the most shared on the site — posted a BLANK card. pageMetadata
+  // restores the image, siteName, locale and the matching twitter tags.
+  return pageMetadata({ title, description, path: '/sell', locale });
 }
 
 export default async function SellHubPage({ params }: Props) {

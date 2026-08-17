@@ -93,6 +93,9 @@ let additional loose app assets accumulate at root.
 | Translations | `next-app/messages/en.json` and `es.json` |
 | Local runtime assets | `next-app/public/assets/` |
 | SEO robots/sitemap | `next-app/src/app/robots.ts` and `sitemap.ts` |
+| Page titles, descriptions, canonicals and social cards | `next-app/src/lib/seo.ts` — `pageMetadata()`. Public pages call it rather than hand-rolling `openGraph`; a hand-rolled block that omits `images` silently ships a blank share card |
+| `noindex` legal pages (and their sitemap exclusion) | `next-app/src/lib/legal-metadata.ts` — `LEGAL_NOINDEX_PATHS`, which `sitemap.ts` subtracts |
+| Brand mark (header + browser tab, one artwork) | `public/assets/images/branding/nav-logo.webp`, `src/app/icon.png`, `src/app/favicon.ico` |
 | Project memory | `project-docs/` |
 
 ## Structural Invariants

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { cache, type CSSProperties } from 'react';
-import { alternatesFor } from '@/lib/seo';
+import { pageMetadata } from '@/lib/seo';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createPublicClient } from '@/lib/supabase/public';
@@ -226,20 +226,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     : undefined;
 
   return {
-    title,
-    description,
+    ...pageMetadata({
+      title,
+      description,
+      path: `/shop/${id}`,
+      locale,
+      // The product photo when there is one. Passing null (rather than the old
+      // `images: []`) falls back to the site card — an image-less product used
+      // to share as a completely blank card.
+      image: image ? { url: image } : null,
+    }),
     // A hidden product reachable only via an admin/account return link must stay
     // out of the index even though we render full metadata for the preview.
     ...(visible ? {} : { robots: { index: false, follow: false } }),
-    alternates: alternatesFor(`/shop/${id}`, locale),
-    openGraph: {
-      type: 'website',
-      url: `https://naplesestatejewelry.com${isEs ? '/es' : ''}/shop/${id}`,
-      title,
-      description,
-      images: image ? [{ url: image }] : [],
-    },
-    twitter: { card: 'summary_large_image', title, description, images: image ? [image] : [] },
   };
 }
 

@@ -1,15 +1,26 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-08-14**.
+> in `CHANGELOG.md`. Last reconciled: **2026-08-17**.
 
-## 🔴 TOP OF THE LIST (2026-08-14)
+## 🔴 TOP OF THE LIST (2026-08-17)
 
 1. **Deploy the staged batch** — `C:\Users\rcman\NEJ-repo-staging`.
-   ✅ **REBUILT 2026-08-15 19:07** and verified: **842 files / 19.17 MB**.
+   ✅ **REBUILT 2026-08-17** and verified: **843 files, ~19.3 MB**.
    A second robocopy dry run immediately after reported **Copied 0 / Extras 0 /
-   Mismatch 0 / FAILED 0**, i.e. an exact mirror. All **15** changed files
-   (3 new, 12 modified) **hash-match** SHA256 against the source.
+   Mismatch 0 / FAILED 0**, i.e. an exact mirror.
+
+   ✅ **The batch passed a pre-deploy audit first** (2026-08-17, no code
+   changed), from a deleted `.next`: `tsc` clean, `lint` clean, **998/998 tests**
+   across 98 files, **454/454 static pages**. A runtime sweep of **30 indexable
+   pages across both locales found zero problems**, and the money invariant was
+   proven through the live quote API — a `$5,558` card produced a `5558` charge.
+   Full evidence in `CHANGELOG.md` (2026-08-17).
+
+   ℹ️ Recording a rebuild in this file necessarily makes staging stale by this
+   file, so the sequence is always: edit docs LAST, then sync, then confirm a
+   0-copy dry run. The figures above are measured a moment before that final
+   sync; the file COUNT is the stable number to check, not the megabytes.
    Leak check clean — 0 `.git`, 0 `node_modules`, 0 `.next`, 0 `.env*`,
    0 `.pem`, 0 `*.tsbuildinfo`, 0 `next-env.d.ts`, 0 `*.log` — against a
    **positive control of 170 `.tsx`**, so the zeros are real rather than a
@@ -17,12 +28,14 @@
    scheduled-jobs.yml`, `.gitignore`, `.claude/launch.json`, `next-app/.npmrc`,
    `next-app/.gitignore`. Content spot-checks in the staged copy: the
    `RouteProgressBar` mount, `data-site-header`, the
-   `body:has([data-site-header])` offset, `roundToWholeDollar`, and the ABSENCE
-   of the removed un-layered `font: inherit`.
-   No SQL outstanding; all three migrations are applied, and the 2026-08-15 work
-   adds none.
+   `body:has([data-site-header])` offset, `roundToWholeDollar`, `pageMetadata`,
+   the settled hero copy, and the ABSENCE of the removed un-layered
+   `font: inherit`. The three regenerated binaries are present at their source
+   sizes — `nav-logo.webp` 16KB, `src/app/icon.png` 23KB, `favicon.ico` 11KB.
+   No SQL outstanding; all three migrations are applied, and the 2026-08-15/16
+   work adds none.
 
-   ℹ️ **Robocopy reports 845 total files against 842 on disk, and that is
+   ℹ️ **Robocopy reports 846 total files against 843 on disk, and that is
    correct** — it counts `/XF`-excluded files in its total. The three are
    `.env.local`, `tsconfig.tsbuildinfo`, and `next-env.d.ts`, all verified
    absent from staging. Do not chase this gap as a missing-file bug.
@@ -54,6 +67,72 @@
      grubby on both a light and a dark product page. Then **swipe a shop card
      photo and confirm the swipe still works and does not flash a press state**
      — cards are deliberately excluded from press feedback for this reason.
+   - 🔎 **Homepage title + site name in Google — check WEEKS later, not days.**
+     Both are re-crawl-gated. Search `naplesestatejewelry.com` and confirm the
+     result reads *"Naples Estate Jewelry - Sell Gold…"* and that the line above
+     it shows **Naples Estate Jewelry** rather than the bare domain. Fastest
+     nudge: request indexing for the homepage in Search Console. The title is
+     now **65 characters**, inside Google's display limit, so the whole line
+     including `in Naples, FL` should be visible. Note Google may still rewrite
+     a title regardless of what we set; that is its prerogative, not a bug.
+   - 🔎 **Spanish share card.** Paste `https://naplesestatejewelry.com/es` into
+     Facebook's Sharing Debugger and X's Card Validator and confirm a **Spanish**
+     title and description, the og-preview **image present**, and the URL
+     resolving to `/es` rather than the English homepage. Do the English
+     homepage too — the same edit rewrote its block. ⚠️ Facebook caches
+     scrapes; use "Scrape Again" rather than assuming it did not work.
+     ✅ Interior pages now emit their own cards via `pageMetadata()`. **Check
+     `/sell` and one `/sell/[city]` specifically** — those were posting BLANK
+     cards (hand-rolled `openGraph` with no `images`), so they are the pages
+     most worth confirming, and Facebook will be holding the old blank scrape
+     until you press "Scrape Again". Also check one product page shows the
+     PRODUCT photo, not the site card.
+   - 📱 **Homepage hero on a real PHONE, both locales.** Eyebrow **"One Piece or
+     an Entire Estate"** over h1 **"Naples Premier Gold, Sterling & Jewelry
+     Buyers"** (46 chars). **Desktop is confirmed good** — the headline block was
+     widened to `72rem` and it renders two clean lines, screenshotted. **Phone
+     still renders THREE lines** at 30.4px and was deliberately left alone; that
+     is the one view nobody has seen on real hardware. Measured clean (no
+     overflow, no horizontal scroll, 124px EN / 105px ES clearance to the sign-up
+     block), but three lines is the largest hero block this page has carried.
+     ⚠️ If it reads heavy, the fix is **fewer characters, not smaller type** —
+     shrinking the font keeps three lines until 20px, which is body-text size.
+     `Naples Premier Gold & Jewelry Buyers` (36) is the natural trim.
+     ℹ️ The old tagline *"Rare. Authentic. Timeless."* is gone from the page
+     entirely; say so if you want it kept somewhere (footer or `/about`).
+   - 🔎 **Confirm the homepage H2s read naturally.** *"We Buy Gold in Naples"*
+     and *"We Sell Estate Jewelry in Naples"* were lengthened for local signal
+     (headings mentioning Naples: 0 → 3). Card titles re-measured at 320px in
+     Spanish and wrap to at most 2 lines, but check the three-card strip still
+     looks balanced on a real screen in both locales.
+   - 🔎 **Spanish search results (2026-08-16 audit fixes).** After re-crawl,
+     search a Spanish query (e.g. *vender oro naples*) and confirm the `/es`
+     pages now show SPANISH titles. Eight of them served English titles over
+     Spanish bodies until this batch. In Search Console, the **"Submitted URL
+     marked noindex"** errors for the six legal pages should also clear — they
+     were being submitted and refused at the same time.
+   - 📱 **New octopus mark — check the HEADER on a real screen.** The framed
+     emblem was replaced by the floating octopus in both the header and the
+     favicon. At the header's 40px it is a small, detailed illustration on cream
+     `#f9f9f7`; it renders cleanly in a synthetic preview, but whether it reads
+     well beside the wordmark at real device pixel ratios is a judgement call.
+     Check a retina laptop and a phone. If it looks weak, the fix is a tighter
+     crop on the body, not a bigger file — the asset is deliberately capped at
+     120px tall / 16KB because it loads on every page.
+   - 🔎 **Favicon — check the browser tab immediately, Google much later.** The
+     tab icon should be the octopus the moment the deploy lands (hard-refresh;
+     browsers cache favicons hard). In Google results it is re-crawl-gated and
+     Google caches favicons **aggressively — expect weeks**. Do not re-cut the
+     artwork because the palm tree is still showing a few days after deploy.
+     If it never updates, confirm `https://naplesestatejewelry.com/favicon.ico`
+     and `/icon.png` both return 200 to Googlebot.
+   - 🔎 **Also check `/silver-services` after re-crawl.** Its title now reads
+     *"Sell Sterling Silver in Naples, FL"* (58 chars) — it is the page that
+     should rank for "sell sterling silver naples", and it previously had that
+     phrase everywhere except its title. Worth watching whether it starts
+     outranking the homepage for that query. ℹ️ Note its title and description
+     are **not localized** (same string in EN and ES) — pre-existing, unrelated
+     to this change, and worth a separate decision.
    - 📱 **Route progress bar, in production specifically.** Most routes are
      prefetched there, so it should appear **rarely** — mainly on product-card
      taps (`prefetch={false}`) and on a slow connection. If it flashes on
@@ -163,6 +242,37 @@ robocopy "C:\Users\rcman\OneDrive\Documents\NaplesEstateJewelry.co" "<repo folde
 Then re-run without `/L`. **After the copy, confirm `.github/workflows/` landed** —
 it is a hidden directory and some copy methods skip dotfiles. `.env.local` will
 be copied onto disk but stays gitignored and uncommitted, same as today.
+
+## 🔵 PHYSICAL LOCATION OPENING — not started, plan before it does
+
+Owner disclosed 2026-08-16 that a **storefront is opening soon**. The site is
+built on the opposite premise ("mobile, appointment-only, no physical
+storefront"), so this is a content + local-SEO project, not a one-line change.
+Nothing here is urgent until an address and date exist — but do not write new
+marketing copy that assumes the mobile-only model in the meantime.
+
+1. 🔴 **Get a verified Google Business Profile at the real address.** This is
+   the single biggest lever, bigger than anything on-site. A service-area
+   business is weak in the local pack; a verified storefront competes in it,
+   and that is where most "gold buyer naples" clicks land. Needs the address
+   first, so it gates everything else.
+2. **Schema** (`[locale]/layout.tsx`): add `streetAddress` + `postalCode`, move
+   `geo` off the Naples-centre approximation (26.142, -81.795) to the real
+   coordinates, and make `openingHoursSpecification` (currently claiming
+   Mon–Sat 10:00–17:00) genuinely true.
+   ✅ No emergency fix needed today — the address block declares only
+   locality/region/country, the correct honest shape, so there is no invented
+   address to unwind.
+3. **Copy pass across 10 files, BOTH locales** — "we come to you" / "vamos a
+   usted", "no storefront", "appointment-only": `(home)`, `about`,
+   `free-evaluation`, `sell`, `sell/[city]`, `services`, `trade-in`,
+   `app/layout.tsx`, `ContactForm`, `SiteFooter`. Note `/sell/[city]` covers
+   every city page, and its `travelEn`/`travelEs` strings are all about
+   travelling to the customer.
+4. **NAP consistency** — name / address / phone identical across the site, the
+   GBP, and any citations. Mismatches are a common local-ranking own goal.
+5. Consider whether `PROJECT_OVERVIEW.md`'s "Service model" line and the
+   city-page strategy change once there is a fixed location to rank.
 
 ## ◻️ OWNER: delete four pre-go-live test orders
 
@@ -1101,6 +1211,14 @@ Everything else below remains true: the carousel migrations are all applied.
 - **Spanish review translations want a native-speaker check**, including the
   newest (`Cristian Reatiga`). The English is the customer's own wording; the
   Spanish is ours.
+  - ⚠️ **Now also covers the 8 page titles + meta descriptions localized
+    2026-08-16** (`/es/about`, `/es/services`, `/es/estate-jewelry`,
+    `/es/gold-services`, `/es/silver-services`, `/es/bullion`, `/es/faq`,
+    `/es/estate-services`). These are OUR translations and they are the text
+    Google shows in Spanish results, so they matter more than body copy. Terms
+    used, for consistency if they are revised: `Joyería de Patrimonio` (estate
+    jewelry), `Vender` / `Compramos`, `Suroeste de Florida`,
+    `Plata Esterlina`, `Lingotes`, `Liquidación de Patrimonios`.
 - ✅ **Related items ("You might also like")** — DONE 2026-08-04.
   Same-category available pieces, same-type-first ranking, lean query, lazy
   images, spot-computed prices. Production smoke: open a product page in both
@@ -1196,6 +1314,18 @@ Everything else below remains true: the carousel migrations are all applied.
 
 Headlines only — full detail lives in `CHANGELOG.md` under each date.
 
+- **2026-08-16/17 (undeployed):** homepage hero rewritten (eyebrow *"One Piece
+  or an Entire Estate"* over an h1 naming Naples, plus location in the H2s);
+  `pageMetadata()` gave every public page its own social card and fixed blank
+  cards on `/sell` and all city pages; 8 Spanish pages stopped serving English
+  metadata; an SEO audit's four findings all fixed; nav dropdowns now close on
+  outside tap/Escape; the octopus mark replaced in the header and the tab.
+  Closed with a pre-deploy audit — 998/998 tests, 454/454 pages, 30 pages swept
+  live with zero problems.
+- **2026-08-15 (undeployed):** whole-dollar item prices (rounding moved onto the
+  value, so a card and its charge are one number), the sitewide button-font
+  cascade fix, touch tap feedback gated by pointer instead of width, and the
+  route progress bar at the header's base.
 - **2026-08-09 (undeployed):** shop-card touch overhaul, hero touch snap +
   slower handover, hero performance batch, and one solid background per
   slideshow replacing the per-photo sweep. This is the batch waiting to deploy.

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { alternatesFor } from '@/lib/seo';
+import { pageMetadata } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -11,12 +11,22 @@ import ClayMark, { type ClayMarkName } from '@/components/ClayMark';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
-  return {
-    title: 'Sell Silver in Naples, FL — Silver Buyer',
-    description:
-      'Private silver estate services in Naples FL. Expert evaluation of sterling silver flatware, hollowware, coins, and bullion with clear testing and immediate payment.',
-    alternates: alternatesFor('/silver-services', locale),
-  };
+  const isEs = locale === 'es';
+  return pageMetadata({
+    // "Silver Buyer" restated "Sell Silver"; those characters now carry the
+    // exact phrase instead. This is the page that should own "sell sterling
+    // silver naples", and it previously had the term everywhere EXCEPT its
+    // title. With the template applied this renders at 58 characters, inside
+    // Google's display limit.
+    title: isEs
+      ? 'Vender Plata Esterlina en Naples, FL'
+      : 'Sell Sterling Silver in Naples, FL',
+    description: isEs
+      ? 'Servicios privados de plata en Naples, FL. Evaluación experta de cubertería de plata esterlina, holloware, monedas y lingotes con pruebas claras y pago inmediato.'
+      : 'Private silver estate services in Naples FL. Expert evaluation of sterling silver flatware, hollowware, coins, and bullion with clear testing and immediate payment.',
+    path: '/silver-services',
+    locale,
+  });
 }
 
 interface Props {

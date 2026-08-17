@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { alternatesFor } from '@/lib/seo';
+import { pageMetadata } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -8,12 +8,17 @@ import { AppIcon } from '@/components/AppIcon';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
-  return {
-    title: 'Estate Liquidation Services in Naples, FL',
-    description:
-      'Estate services in Naples, Marco Island, and Fort Myers FL for entire estates, single heirlooms, and inherited collections. Confidential on-site evaluation, same-day payment, and discreet work with families, attorneys, and trustees throughout Southwest Florida.',
-    alternates: alternatesFor('/estate-services', locale),
-  };
+  const isEs = locale === 'es';
+  return pageMetadata({
+    title: isEs
+      ? 'Liquidación de Patrimonios en Naples, FL'
+      : 'Estate Liquidation Services in Naples, FL',
+    description: isEs
+      ? 'Servicios de patrimonio en Naples, Marco Island y Fort Myers, FL para patrimonios completos, herencias individuales y colecciones heredadas. Evaluación confidencial en el sitio, pago el mismo día y trabajo discreto con familias, abogados y fideicomisarios en todo el suroeste de Florida.'
+      : 'Estate services in Naples, Marco Island, and Fort Myers FL for entire estates, single heirlooms, and inherited collections. Confidential on-site evaluation, same-day payment, and discreet work with families, attorneys, and trustees throughout Southwest Florida.',
+    path: '/estate-services',
+    locale,
+  });
 }
 
 interface Props {

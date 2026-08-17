@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { alternatesFor } from '@/lib/seo';
+import { pageMetadata } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -11,12 +11,17 @@ import ClayMark from '@/components/ClayMark';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
-  return {
-    title: 'Sell Gold in Naples, FL — Gold Buyer',
-    description:
-      'Private gold estate services in Naples FL. Expert evaluation of gold jewelry, bullion, coins, and dental gold with clear testing and immediate payment throughout Southwest Florida.',
-    alternates: alternatesFor('/gold-services', locale),
-  };
+  const isEs = locale === 'es';
+  return pageMetadata({
+    title: isEs
+      ? 'Vender Oro en Naples, FL — Comprador de Oro'
+      : 'Sell Gold in Naples, FL — Gold Buyer',
+    description: isEs
+      ? 'Servicios privados de oro en Naples, FL. Evaluación experta de joyería de oro, lingotes, monedas y oro dental con pruebas claras y pago inmediato en todo el suroeste de Florida.'
+      : 'Private gold estate services in Naples FL. Expert evaluation of gold jewelry, bullion, coins, and dental gold with clear testing and immediate payment throughout Southwest Florida.',
+    path: '/gold-services',
+    locale,
+  });
 }
 
 interface Props {

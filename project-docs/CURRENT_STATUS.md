@@ -2,19 +2,26 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-08-14**.
+> in `DECISIONS.md`. Last reconciled: **2026-08-17**.
 
-## Start Here (handoff, end of the 2026-08-14 session)
+## Start Here (handoff, end of the 2026-08-16 session)
 
 **Read this, then `TASKS.md`.**
 
 ### 🔴 ONE ACTION WAITING: DEPLOY
 
-✅ **Staging is CURRENT as of 2026-08-15 19:07** — `C:\Users\rcman\NEJ-repo-staging`,
-**842 files / 19.17 MB**, verified an exact mirror (a follow-up dry run reported
-0 to copy and 0 extras), leak-checked against a positive control, and all 15
-changed files hash-matched. Copy it wholesale into the repo folder, keeping that
-folder's `.git`, then push. Full evidence in `TASKS.md`.
+✅ **Staging is CURRENT as of 2026-08-17** — `C:\Users\rcman\NEJ-repo-staging`,
+**843 files / ~19.3 MB**, verified an exact mirror (a follow-up dry run reported
+0 to copy and 0 extras) and leak-checked against a positive control. Copy it
+wholesale into the repo folder, keeping that folder's `.git`, then push. Full
+evidence in `TASKS.md`.
+
+✅ **The batch passed a pre-deploy audit** (2026-08-17, no code changed): `tsc`
+clean, `lint` clean, **998/998 tests** across 98 files, **454/454 static pages**
+built from a deleted `.next`, and a runtime sweep of **30 indexable pages across
+both locales with zero problems**. The display-equals-charge invariant was
+proven through the live quote API, not inferred. Details in `CHANGELOG.md`
+(2026-08-17).
 
 **No SQL is outstanding.** All three migrations this batch touched are already
 applied in Supabase and were verified live, not assumed. The 2026-08-15 work
@@ -33,6 +40,14 @@ adds none.
 | **Button font cascade fix** (2026-08-15) | a duplicated un-layered `font: inherit` was discarding every Tailwind font utility on every form control |
 | **Touch tap feedback** (2026-08-15) | press states were gated by WIDTH, so phones had none; now `(hover: none)`, CSS-only so it cannot disturb the swipe gestures |
 | **Route progress bar** (2026-08-15) | 2px gold bar at the header's base; renders only after 120ms and is removed the instant the route commits |
+| **Nav closes on outside tap** (2026-08-16) | mobile menu + accordions dismiss on `pointerdown` outside the `<header>` and on Escape; previously the toggle was the only way out. Anchored to the header so the toggle cannot close-then-reopen |
+| **Homepage hero + H2s** (2026-08-16) | eyebrow **"One Piece or an Entire Estate"** over h1 **"Naples Premier Gold, Sterling & Jewelry Buyers"**; homepage H2s gained the location (**"We Buy Gold in Naples"**, **"We Sell Estate Jewelry in Naples"**). Headings mentioning Naples went **0 → 3** per locale. ⚠️ The h1 is 46 chars, so the hero headline block was widened to `72rem` — **2 lines on desktop, 3 on phone/tablet** (`92vw` binds below ~1250px, so mobile is untouched; `.home-hero-bottom` stays `52rem` deliberately). ⚠️ Headline `line-height` is **1.15 and must not go below ~1.1** — at 0.95 the lines overlapped by 12.6px and the "p" of Naples collided with the "i" of Sterling. ⚠️ "Premier" not "Premiere". Says nothing about the service model, because a storefront is opening |
+| **SEO audit + 4 fixes** (2026-08-16) | 8 ES pages served ENGLISH titles/descriptions — now localized; 6 `noindex` legal pages removed from the sitemap (113→107); the streaming skeleton's `<h1>` (the domain name) removed so `/`, `/es`, `/shop` have ONE h1; `/sell` 81→72 chars and `/services` given a real title |
+| **`pageMetadata()` sitewide** (2026-08-16) | every public page now emits its OWN social card. Fixed **blank cards on `/sell` and every `/sell/[city]`** (hand-rolled `openGraph` with no `images`) and interior pages sharing as the homepage. `noindex` pages deliberately excluded |
+| **Spanish social card** (2026-08-16) | `/es` served English `og:`/`twitter:` title AND description, plus an `og:url` pointing at the English homepage. Now localized, with `og:locale`. ⚠️ page-level `openGraph` REPLACES the layout's — restate `images` or the card goes blank |
+| **New octopus mark** (2026-08-16) | owner's floating artwork replaces the old framed emblem in **both** places — header `nav-logo.webp` (157×120 transparent, 16KB, FULL artwork) and the favicon pair (square **crop**, so the creature fills 100% of a 16px tab rather than 77%). Icons keep transparency; header `width/height` corrected to 52/40 for the landscape ratio |
+| **Favicon = octopus brand mark** (2026-08-16) | `icon.png` 96×96 + a multi-size `favicon.ico`, both cropped from the existing `nav-logo.webp`. Replaces the gold palm tree Google was showing |
+| **Homepage title + WebSite entity** (2026-08-15) | title leads with the brand (Google strips a trailing one), trimmed to 65 chars; `WebSite` JSON-LD drives the site-name line; brand is "Naples Estate Jewelry", **no "Co"**. `/silver-services` title now carries "Sterling Silver". Other interior titles unchanged by design |
 
 ### After deploying, in this order
 
@@ -48,6 +63,13 @@ adds none.
    refund's own amount and PayPal's real refund id.
 4. **Watch for the price-change banner** the first time metal moves mid-checkout.
    Its payload contract and copy are test-pinned, but nobody has seen it render.
+5. **Nudge the recrawl in Search Console** — resubmit the sitemap and Request
+   Indexing on `/`, `/sell`, `/services`, `/silver-services` (the four whose
+   titles changed). Optional, not required: nothing about this deploy can hurt
+   search, since no URL, route, or robots directive changed. The sitemap needs
+   no manual edit — it is generated by `sitemap.ts` at build time — and its
+   `lastmod` was bumped to 2026-08-17 so the change is actually signalled.
+   Expect titles to swap in over days-to-weeks and the favicon to lag longer.
 
 ### What this session produced
 

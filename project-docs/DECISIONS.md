@@ -511,6 +511,440 @@ path React COMMITTED**, tracked in a ref. Pinned by
 The 8s timeout is a backstop for a cross-path anchor whose handler cancels the
 navigation, not part of normal operation. Normal completion is the path commit.
 
+### The homepage title leads with the brand; interior pages keep it as a suffix
+
+Owner, 2026-08-15, from a live Google result: the homepage listing read
+*"Sell Gold, Jewelry & Sterling Silver in Naples, FL"* with no brand anywhere,
+which is confusing for someone searching for the business by name.
+
+The cause is not a missing brand — the title already ended
+`| Naples Estate Jewelry`. **Google routinely strips a TRAILING brand**, because
+it prints a site name on its own line above the result. The only position it
+will not strip is the front. The homepage title (and the matching openGraph and
+twitter titles, all from `SITE_TITLE` in `app/layout.tsx`, plus the EN/ES
+`title.absolute` on the homepage) now read
+`Naples Estate Jewelry - <descriptor>`.
+
+⚠️ **This is deliberately homepage-only. Do not apply it to the `template`.**
+`'%s | Naples Estate Jewelry'` stays as-is for interior pages: the brand prefix
+costs 24 characters, and Google shows roughly 60, so prefixing it would push the
+part that actually identifies the page — a product name, a city — out of view. A
+product title is already 73 characters. The homepage is the one page whose job
+is to say who we are; every other page's job is to say what it is.
+
+**A second, separate lever: the site-name line.** That line is driven by a
+`WebSite` structured-data entity, NOT by `<title>`. Without one Google falls back
+to the bare domain, which is why results showed `naplesestatejewelry.com`. The
+homepage now emits a `WebSite` entity with `name` and `url`. Per Google's spec it
+belongs on the site root ONLY — do not move it into `[locale]/layout.tsx`, which
+would put it on all 454 pages. The sitewide `JewelryStore` entity there is a
+different thing and is unaffected.
+
+⚠️ **The brand is "Naples Estate Jewelry" — no "Co"** (owner, 2026-08-15). An
+`alternateName: 'Naples Estate Jewelry Co'` was briefly set and removed the same
+day. Google cross-checks the `WebSite` name against the `JewelryStore` schema,
+the header wordmark, and the Google Business Profile when picking a site name,
+and disagreement among them is itself a reason it falls back to the bare domain —
+so a second name that nobody actually uses works against the entity's purpose.
+**Do not add an `alternateName`** unless the business genuinely trades under a
+second name; `Naples Antiques LLC` is the legal entity, not a trading name, and
+must not go there. A sweep of shipped source found the "Co" form in exactly one
+place (that line), so the rest of the app was already consistent. ⚠️ When
+sweeping for this, match `Naples Estate Jewelry Co` with a word boundary — a
+loose search for "co" collides with the legacy `naplesestatejewelry.co` domain,
+which is unrelated and must never be edited.
+
+**Title length is managed per page, and the brand is not the thing to cut.**
+Google shows roughly 60 characters; the homepage sat at 74. Rather than move the
+brand back to the end, the descriptor was trimmed — dropping `Sterling` brought
+it to **65** and kept the trailing `in Naples, FL`, the local qualifier that was
+otherwise the part being truncated away. Nothing was lost: truncation is
+display-only (Google reads the full title for ranking), and `sterling` remains in
+the homepage's description, its visible copy, and its JSON-LD.
+
+The same pass fixed a genuine gap it exposed: **`/silver-services` — the page
+that should own "sell sterling silver naples" — did not contain the phrase in
+its title**, spending the space on `Silver Buyer`, which restated `Sell Silver`.
+It is now `Sell Sterling Silver in Naples, FL` (58 characters with the template).
+The net effect on that keyword is positive: it moved from a page that would never
+win the query to the page that should.
+
+⚠️ **Both changes are re-crawl-gated.** Google re-evaluates titles and site names
+on its own schedule; expect days to weeks. A search result that looks unchanged
+the day after deploying is not evidence of a fault, and Google may still rewrite
+a title it considers a poor match.
+
+ℹ️ Not a bug, so nobody re-investigates it: the snippet's run-together
+`(239) 404-8505info@naplesestatejewelry.com` is **Google concatenating contact
+fields from structured data**. The meta description ends at
+`Call (239) 404-8505.` and contains no email — verified in the served HTML.
+
+### The favicon is the octopus mark, cropped from the existing nav logo
+
+Owner, 2026-08-16: Google search results showed a **gold palm tree**, which is
+not the brand mark. The favicon is now the octopus emblem — the same mark the
+site header already uses — so the search result, the browser tab and the header
+finally agree.
+
+**Source is `public/assets/images/branding/nav-logo.webp`.** Both icon files are
+DERIVED from it, so if the logo is redrawn, regenerate rather than edit:
+
+- `src/app/icon.png` — 96×96
+- `src/app/favicon.ico` — a real multi-size ICO container (16/32/48, PNG
+  payloads). ⚠️ **Both must be replaced together.** Next emits a `<link>` for
+  each, and leaving one behind means Google can keep serving the old mark.
+
+🔄 **The mark was replaced 2026-08-16 (owner):** the navy circular emblem that
+carried its own "NAPLES ESTATE JEWELRY" text — duplicating the wordmark beside
+it in the header — gave way to the octopus **alone, on transparency**. The
+header logo and both icon files were regenerated from the new artwork together;
+they must never drift apart.
+
+Facts about the current source worth keeping:
+
+- It is a **landscape 1.31:1** cut-out (157×120 WebP, 16KB), not the old 160×160
+  square. `SiteHeader`'s `width`/`height` props were corrected from `40/40` to
+  `52/40` — they are aspect-ratio metadata for `next/image`, and leaving them
+  square mis-declares the artwork.
+- ⚠️ **Keep the header asset small.** The original export was 1536×1024 PNG at
+  2.9MB; a naive 240px-tall WebP came out at 46KB against the old emblem's
+  5.4KB. It ships on every page, on a site with first-paint history, so it is
+  capped at **120px tall / 16KB** — 3× the 40px render and no more.
+- The icons keep the artwork's **transparency** rather than the old navy field.
+  Checked on both a white and a `#202124` tab bar: the navy body carries enough
+  luminance and the gold suckers hold up.
+- ⚠️ **The favicon is a square CROP of the artwork, not the whole creature
+  letterboxed into a square.** Letterboxing shipped first and the owner reported
+  the tab icon looked tiny — correctly: the artwork is 1.3:1 landscape, so a
+  square canvas left it filling only **100% × 77%** of the frame, with empty
+  bands top and bottom eating the 16px tab slot. Cropping to
+  `1011×1011` centred takes it to **100% × 100%**, measured on the shipped file.
+  The cost is the outer tentacle tips and part of the pendant; at 16px that is
+  the right trade, and the silhouette still reads as an octopus.
+  **The header logo keeps the FULL artwork** — it has the width to show it.
+
+The older constraints below still apply to any future crop:
+
+1. **Crop above the wordmark.** The emblem has "NAPLES / ESTATE JEWELRY" text
+   below the octopus (its top edge is ~y103 in the 160px source). Any crop
+   reaching it renders illegible letter fragments at favicon size, which reads
+   as a mistake rather than a logo. The crop is `left 35, top 14, 88×88`.
+2. **Leave a margin — Google masks favicons into a CIRCLE.** The octopus is
+   scaled to ~83% and centred on a navy field (`rgb(4,26,50)`, sampled from the
+   source). A full-bleed version was rejected: its tentacles ran into the
+   corners, exactly what a circular mask clips.
+3. **Size in multiples of 48.** Google asks for it; the previous icons were
+   64×64 and 32×32 and satisfied neither. 96 is also the largest clean size the
+   160px source yields with **no upscaling**, so do not go higher without a
+   higher-resolution logo.
+
+⚠️ **Re-crawl-gated like the title work** — Google refreshes favicons on its own
+schedule, and it caches them aggressively. Weeks, not days.
+
+### A page-level `openGraph` REPLACES the layout's — it does not merge
+
+The most dangerous thing to know about metadata in this app. Next merges
+metadata objects **shallowly**, so a page that declares `openGraph` (or
+`twitter`) overwrites the root layout's block entirely. Omit `images` and the
+share card goes **blank** — silently, because the page still renders perfectly
+and nothing errors.
+
+Consequence: any page that localizes or customizes `og:title` **must also
+restate `type`, `siteName` and `images`**. To keep the image path out of two
+files, `SITE_NAME` and `OG_IMAGE` are exported from `lib/seo.ts` and imported by
+both the root layout and the homepage. Add a third consumer the same way rather
+than copying the path.
+
+**What this fixed (2026-08-16).** The homepage declared no `openGraph` at all, so
+`/es` inherited the English block wholesale: English `og:title` and
+`twitter:title`, English `og:description` and `twitter:description`, and — worse
+than cosmetic — an `og:url` of `https://naplesestatejewelry.com`, pointing every
+Spanish share at the **English** homepage. `og:locale` was absent entirely,
+leaving Facebook to assume `en_US`.
+
+The homepage now builds its own localized block. `og:url` comes from
+`alternatesFor('/', locale).canonical` — the same helper that produces the
+canonical link — so the two cannot drift. `og:locale` / `og:locale:alternate`
+come from `ogLocaleFor()`.
+
+✅ **Closed 2026-08-16 by `pageMetadata()` in `lib/seo.ts`. Use it for every
+public page** — pass `title` / `description` / `path` / `locale` and it returns
+the title, canonical + hreflang, and a complete social card. Do not hand-roll an
+`openGraph` block again; three separate defects came from doing so.
+
+Facts it encodes, each verified rather than assumed:
+
+- **`title.template` does NOT reach `og:title`.** Proved empirically: a page
+  declaring `openGraph.title: 'ZZPROBE'` emitted exactly `ZZPROBE`, unsuffixed.
+  So the helper appends `TITLE_SUFFIX` itself. Pass `brandedTitle: true` for the
+  homepage, whose title already leads with the brand.
+- **The same probe wiped `og:image` and `og:site_name`**, demonstrating the
+  replace-not-merge rule live.
+- **An empty `images: []` is as blank as no tag.** The helper's `image` falls
+  back to `OG_IMAGE`, so an image-less product still shares the site card.
+
+⚠️ **`noindex` pages are deliberately NOT converted** — the legal set (via
+`getLegalMetadata`), `/checkout`, `/shop-modern`, `/unsubscribe`, and everything
+under `/admin` and `/account`. A page excluded from search is not a page anyone
+shares, and giving it a social card is the wrong signal.
+
+### A `noindex` page is never listed in the sitemap
+
+Submitting a URL in `sitemap.xml` tells Google to index it while a `noindex`
+header tells it not to. Google logs that contradiction as a Search Console
+error. All six legal pages did exactly this until 2026-08-16.
+
+**`sitemap.ts` subtracts `LEGAL_NOINDEX_PATHS`** (exported from
+`legal-metadata.ts`, derived from the same object that sets `robots.index:
+false`). The filter is deliberately a subtraction rather than a hand-pruned
+list, so re-adding one of those paths to `STATIC_PAGES` cannot silently
+reintroduce the contradiction. `legal-metadata.test.ts` pins the constant to the
+pages actually marked noindex, in both directions.
+
+The direction of the fix was to REMOVE them from the sitemap, not to index them:
+legal boilerplate earns no search traffic, and `follow: true` already lets link
+equity pass through.
+
+### The homepage `<h1>` states the service, and its LENGTH is load-bearing
+
+Owner approved changing the brand voice, 2026-08-16. The hero `<h1>` was
+*"Rare. Authentic. Timeless."* — no service, product or location in the one slot
+Google reads as the page's topic — while the keywords sat in the eyebrow above
+it, which is a `<span>` and carries no heading weight whatsoever.
+
+The hero is now (owner copy, settled 2026-08-16):
+
+```
+ONE PIECE OR AN ENTIRE ESTATE                   ← eyebrow (span)
+Naples Premier Gold, Sterling & Jewelry Buyers  ← <h1>
+```
+
+ES: *"Una Pieza o Todo un Patrimonio"* / *"Compradores de Oro, Plata y Joyería
+en Naples"*.
+
+**Keywords in the `<h1>`, by owner priority:** the strongest signal on the site
+should be that we BUY in Naples, and the `<h1>` is the only element that can
+carry that with heading weight. It holds location + three categories + buyer
+intent.
+
+**The eyebrow does the human work.** It names the customer's situation rather
+than reciting inventory — the audience is executors and downsizing families, and
+it answers both unspoken worries at once: *is my single ring worth their time?*
+and *can they handle a whole estate?*
+
+⚠️ **"Premier", not "Premiere."** The latter means a debut performance.
+`/silver-services` already used the correct form, and "Premiere" appears nowhere
+in the codebase — do not let a well-meaning edit reintroduce it in the site's
+largest text.
+
+⚠️ At 46 characters the headline is far past the ~29-char two-line budget, so
+**the line count now differs by breakpoint** — two lines on desktop, three on
+phone and tablet. Re-measure on any rewording; assume nothing.
+
+**`.home-hero-top` is capped at `72rem` (1152px), NOT the `52rem` it shared with
+the sign-up block.** Measured: this headline needs exactly 1152px to fall from
+three lines to two at the 5.75rem type cap — 1024px and 1100px are both still
+three. Below roughly 1250px the `92vw` term binds first, so phones and tablets
+are untouched (verified at 390px: block width 359px = 92vw exactly, still 3
+lines at 30.4px).
+
+⚠️ **Do not apply the same cap to `.home-hero-bottom`.** That block holds the
+subscriber form and the Buy/Sell/Trade buttons; stretching an input row to
+1152px makes it worse. The two blocks having different widths is intentional.
+
+ℹ️ Shrinking the mobile type was considered and **rejected on measurement**: at
+320px this headline stays three lines all the way down from 30.4px to 22px, and
+only becomes two at 20px — which is body-text size, not a hero. Smaller type
+buys a ~20% shorter block and no fewer lines. If the phone rendering ever needs
+fixing, cut characters, not points.
+
+⚠️ **`line-height` on this headline is 1.15 and must not go below ~1.1.** It was
+`0.95`, which advances the baseline LESS than the font's own ink occupies, so on
+a two-line headline the descenders of line 1 collided with the ascenders of
+line 2 — visibly, the "p" of "Naples" sitting on the "i" of "Sterling".
+
+Measured at the 5.75rem cap (92px): line 2 needs **77px** of ascender and line 1
+drops a **23px** descender = **100px of ink** against an **87.4px** advance — a
+**12.6px overlap**. 1.0 and 1.05 still collide; 1.1 clears by only 1.2px, thin
+enough for a font-fallback swap to erase; **1.15 clears by 5.8px**. The ratio
+applies at every size, so the collision existed on phones too, just less
+visibly — at 390px the worst-case wrap now clears by 1px.
+
+Tight leading is fine as a look; tighter than the font's ink is a bug. Measure
+`actualBoundingBoxAscent` + `actualBoundingBoxDescent` against the advance
+before tightening it again.
+
+A brand-voice headline (*"Pieces Worth Discovering"*) held this slot briefly and
+was reverted, because it left the homepage with no on-page topic signal at all.
+That trade is the one to weigh if the question returns.
+
+Rejected drafts, worth not repeating:
+
+1. **"Sell Gold & Jewelry in Naples"** — ambiguous beside a carousel of pieces
+   **we** are selling. The eyebrow's "buy & sell" now solves this explicitly.
+2. **"Naples Gold & Jewelry Buyers"** / **"Naples' Trusted Jewelry & Gold
+   Buyers"** — keyword-correct but read as directory entries.
+3. ⚠️ **"Know What Yours Is Worth"** (owner caught this). It implies the visitor
+   should ALREADY know what they have — backwards, since most arrive holding
+   something inherited and unidentified. **Copy must put the knowing on US, not
+   the customer.** This test outlives any particular wording — apply it to every
+   future hero draft.
+
+If first-person is ever reintroduced, use **"we"** not "I" despite
+`/free-evaluation` using the singular: staff arrive with the storefront.
+
+⚠️ **Keep it to roughly 26–29 characters.** This is a measured constraint, not
+taste. At `clamp(2.4rem, 8vw, 5.75rem)` in a `min(92vw, 52rem)` box:
+
+| Length | Line count |
+| --- | --- |
+| 26–29 chars | **2 lines at every width** — the profile this page has always had |
+| 38 chars | 3 lines at 320px *and* at 1280px+ |
+| 48 chars | 4 lines |
+
+So the full page title will **not** fit here; re-measure before lengthening.
+Verified live after the change: 2 lines at 320px (262px in a 294px box) and at
+1440px (800px in an 832px box, 92px type), no overflow and no horizontal scroll
+at either.
+
+### Hero copy states CATEGORIES, never the service model — a storefront is coming
+
+Owner disclosed 2026-08-16 that a **physical location is opening soon**. The
+whole site is currently built on the opposite premise: `PROJECT_OVERVIEW`
+records "mobile, appointment-only, no physical storefront", and **10 files**
+carry copy asserting it — "we come to you" / "vamos a usted", "no storefront",
+"appointment-only" (`(home)`, `about`, `free-evaluation`, `sell`, `sell/[city]`,
+`services`, `trade-in`, `layout`, `ContactForm`, `SiteFooter`).
+
+**Rule for new hero/marketing copy until it opens: describe WHAT WE BUY, not HOW
+WE OPERATE.** A category list ("Estate Jewelry · Silver · Diamonds · Coins")
+never expires; "Private · Mobile · By Appointment" would need rewriting the day
+the doors open. The current eyebrow was chosen on exactly this basis — an
+earlier draft used the service-model wording and was rejected once the opening
+was known.
+
+✅ **The schema is already honest and needs no emergency fix.** The
+`JewelryStore` block in `[locale]/layout.tsx` declares `addressLocality` /
+`addressRegion` / `addressCountry` with **no `streetAddress` and no
+`postalCode`** — the correct shape for a service-area business. Nobody invented
+an address, so there is nothing to unwind.
+
+**What the opening will require** (not started — see TASKS):
+
+1. **A verified Google Business Profile at the real address is the single
+   biggest lever**, larger than anything on-site. A service-area business is
+   weak in the local pack; a verified storefront competes in it, and that is
+   where most "gold buyer naples" clicks go.
+2. `address` gains `streetAddress` + `postalCode`; `geo` moves from the current
+   Naples-centre approximation (26.142, -81.795) to the real coordinates.
+3. `openingHoursSpecification` already claims Mon–Sat 10:00–17:00 — harmless
+   for a service-area business, but it must become genuinely true.
+4. The 10-file copy pass above, in **both locales**.
+5. NAP (name / address / phone) must match exactly across the site, the GBP and
+   any citations — mismatches are a common local-ranking own goal.
+
+### The homepage renders TWICE in the client DOM — that is React, not our code
+
+Measured in a **production build** on 2026-08-16 while verifying the hero:
+`document.querySelectorAll('h1')` returns **2** on the homepage, and there are
+two complete `<main>` trees.
+
+**It is not a bug in this codebase and must not be "fixed".** The second copy
+lives in `<div hidden id="S:0">` — React's own streaming-Suspense holder, named
+by React — with a computed `display: none`. The page has `loading.tsx`, so it
+streams; the holder is the mechanism.
+
+What matters for SEO is unaffected, and was verified separately:
+
+- **Server HTML contains exactly ONE `<h1>`** — that is what Googlebot parses.
+- The live DOM has **one visible `<h1>`** plus one inert copy inside a
+  `display: none` holder.
+
+⚠️ **So measure heading counts against the SERVER HTML (`fetch` + parse), not
+`document.querySelectorAll` in a live page.** The audit that produced these
+entries did exactly that and was right; a live-DOM count on the homepage will
+report a phantom duplicate every time and send someone chasing nothing.
+
+ℹ️ Minor, unrelated to SEO: the holder retains a full ~21KB copy of the page
+rather than being emptied, so the homepage DOM carries the content twice. Not
+worth acting on, but worth knowing if the first-paint/DOM-size work is ever
+resumed.
+
+### The Suspense fallback must not contain an `<h1>`
+
+`loading.tsx` ships FIRST in the streamed HTML, so any heading inside it becomes
+the opening heading of that route — ahead of the real one — and leaves two
+`<h1>`s in the served markup. `SiteLoadingScreen` did this on `/` and `/shop`,
+making **the site's own domain name** the first `<h1>` of the two most important
+pages. `HomeBootSplash` had already avoided it for the same reason; its header
+comment was the clue.
+
+Fixed by rendering a `<div class="site-loading-title">`, with the CSS selectors
+re-pointed so the styling is byte-identical. ⚠️ Keep headings out of any future
+loading/skeleton component — Googlebot renders JS and probably settles on the
+final DOM, but "probably" is not a thing to rely on for a primary page.
+
+### The nav dismisses on outside interaction, anchored to the whole `<header>`
+
+Owner, 2026-08-16: the mobile menu could only be closed by pressing the toggle a
+second time. It now closes on any `pointerdown` outside the header, and on
+Escape (`SiteHeader.tsx`).
+
+⚠️ **The outside test is anchored to the `<header>`, not to the panel.** The
+toggle button lives in the header too, so a narrower test would let one tap both
+close the menu (via the outside handler) and re-open it (via the button's own
+`onClick`), leaving it stuck open. Pinned by a live check that tapping the
+toggle while open still closes it exactly once.
+
+`pointerdown` rather than `click`: it fires on the press instead of the release,
+so the menu is gone before the finger lifts, and one listener covers mouse,
+touch and pen. (`ComboboxInput.tsx` uses `mousedown` for the same job — fine
+there, since it is an admin-only, mouse-first control.)
+
+The handler also **blurs a focused element inside the header**, because the
+header holds two menus that close by different mechanisms: the mobile panel and
+its accordions are React state, while the desktop dropdown is pure CSS
+(`group-hover` / `group-focus-within`) with no state to reset. A mouse closes
+that one by moving away; a tap or a Tab leaves the trigger focused, and only a
+blur closes it.
+
+✅ **The desktop dropdown itself is healthy** — verified, after a false alarm
+worth recording. See *"A hidden Browser pane freezes CSS transitions"* below.
+
+### A hidden Browser pane freezes CSS transitions — do not trust computed values
+
+⚠️ **Refines the existing "hidden pane" warning, which says to trust
+`getComputedStyle` over screenshots. That is true for LAYOUT, and wrong for any
+property under a `transition`.**
+
+When the pane is not displayed the page stops compositing, so a transition's
+clock does not advance. `getComputedStyle` then returns the transition's START
+value **indefinitely** — it does not eventually settle on the target.
+
+This produced a convincing false bug on 2026-08-16. The desktop nav dropdown
+(`transition-all duration-150`) appeared to be broken: with the trigger hovered
+AND focused, `opacity` read `0` across repeated waits up to 600ms, while
+`pointer-events` — not an animated property, so applied instantly — correctly
+read `auto`. That combination looks exactly like an invisible click-catcher, and
+`elementFromPoint` "confirmed" it by returning `a.nav-dropdown-link`. All of it
+was an artifact; the dropdown works.
+
+**How to test an animated property reliably:**
+
+1. Set `element.style.transition = 'none'`, force a reflow (`void el.offsetHeight`),
+   then read — the property lands on its target with no clock involved.
+2. Beware a **physical cursor left parked** by an earlier `computer` hover: it
+   keeps `:hover` active and silently poisons every later reading. Check
+   `group.matches(':hover')` before concluding anything.
+3. For a state you cannot trigger in place, **build an isolated clone** with the
+   same classes somewhere the cursor is not, and drive it directly. That is what
+   finally settled this one: resting `0`, focused `1`, after blur `0`.
+
+Also useful, and got this wrong twice: a CSSOM walker must record
+`rule.selectorText` **and** recurse into `rule.cssRules`. Modern nested CSS means
+a style rule exposes both, so an `if (r.cssRules) … else …` walker silently skips
+every nested style rule and reports an empty result that reads like a clean one.
+
 ### UI icons are inline SVG, never ligature fonts
 
 All application icons render through

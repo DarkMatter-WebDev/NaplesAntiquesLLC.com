@@ -91,17 +91,65 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
 
       {/* Headline — centered in the top half, above the rotating pieces */}
       <div className="home-hero-top">
+        {/* Eyebrow: a <span>, so it carries NO heading weight — which is why the
+            PROMISE lives here and the keywords sit in the <h1> below. This is
+            the pairing the owner settled on; it was briefly
+            "We Buy & Sell Estate Jewelry and Watches" while the headline was
+            brand copy, and reverted with the headline.
+
+            ⚠️ It must put the knowing on US, not the customer.
+            "Know What Yours Is Worth" was rejected for implying the visitor
+            should already know what they have — most arrive holding something
+            inherited and unidentified.
+
+            ⚠️ Says nothing about the SERVICE MODEL, deliberately. A storefront
+            is opening, so "mobile", "we come to you" and "by appointment only"
+            would all need rewriting the day it does. Keep it that way. */}
         <span
           className="text-[0.75rem] font-bold uppercase tracking-[0.3em] block"
           style={{ color: 'var(--hero-eyebrow)', fontFamily: 'var(--font-label)' }}
         >
-          {isEs ? 'Joyería de Patrimonio y Relojes' : 'Curated Estate Jewelry & Watches'}
+          {isEs ? 'Una Pieza o Todo un Patrimonio' : 'One Piece or an Entire Estate'}
         </span>
+        {/* ⚠️ KEEP THIS SHORT — the length is load-bearing, not a style choice.
+            At clamp(2.4rem, 8vw, 5.75rem) in a min(92vw, 52rem) box, measured
+            line counts are: ~26-29 characters = 2 lines at every width (the
+            profile this page has always had), 38 characters = 3 lines at both
+            320px and 1280px+, 48 characters = 4 lines. Re-measure before
+            lengthening; the full page title will NOT fit here.
+
+            KEYWORDS, deliberately — location + both primary categories + buyer
+            intent, in the one slot Google reads as the page's topic. The owner's
+            stated priority (2026-08-16) is that the strongest signal on the site
+            is that we BUY in Naples, and this is the only element that can carry
+            it with heading weight.
+
+            A brand-voice draft ("Pieces Worth Discovering") held this slot
+            briefly and was reverted for exactly that reason. Its trade-off is
+            worth remembering if the question comes round again: warmer copy, but
+            the homepage then had no on-page topic signal at all.
+
+            ⚠️ At 46 characters this is well past the ~29-char two-line budget.
+            The headline block was widened to 72rem so it renders TWO lines on
+            desktop; it is still THREE at phone and tablet widths, where 92vw
+            binds before the cap. Accepted. Re-measure on any rewording and do
+            not assume a line count — it now differs by breakpoint.
+
+            ⚠️ "Premier", not "Premiere" — the latter means a debut performance.
+            `/silver-services` uses the same correct form; do not let a
+            well-meaning edit reintroduce the typo in the site's largest text.
+
+            ⚠️ One test survives every rewrite: hero copy must never imply the
+            visitor should ALREADY know what they have. "Know What Yours Is
+            Worth" was rejected for exactly that — most arrive holding something
+            inherited and unidentified. */}
         <h1
           className="font-normal tracking-normal"
           style={{ fontFamily: 'var(--font-headline)', color: 'var(--hero-text)' }}
         >
-          {isEs ? 'Rara. Auténtica. Atemporal.' : 'Rare. Authentic. Timeless.'}
+          {isEs
+            ? 'Compradores de Oro, Plata y Joyería en Naples'
+            : 'Naples Premier Gold, Sterling & Jewelry Buyers'}
         </h1>
       </div>
 
@@ -209,7 +257,18 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
           left: 50%;
           top: 0;
           height: 50%;
-          width: min(92vw, 52rem);
+          /* 72rem (1152px), not the 52rem the sign-up block below still uses.
+             Measured 2026-08-16: the 46-character headline needs 1152px to fall
+             from three lines to two at the 5.75rem type cap — 1024px and 1100px
+             are both still three. Widening buys a line back on desktop and
+             nothing else: below roughly 1250px the 92vw term binds first, so
+             phones and tablets are completely unaffected.
+
+             ⚠️ Deliberately NOT applied to .home-hero-bottom. That block holds
+             the subscriber form and the Buy/Sell/Trade buttons, and stretching
+             an input row to 1152px makes it worse, not better. The two blocks
+             being different widths is intended. */
+          width: min(92vw, 72rem);
           transform: translateX(-50%);
           z-index: 5;
           pointer-events: none;
@@ -253,7 +312,19 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
 
         .home-hero-top h1 {
           font-size: clamp(2.4rem, 8vw, 5.75rem);
-          line-height: 0.95;
+          /* 1.15, not the 0.95 this used to be. 0.95 advances the baseline LESS
+             than the font's own ink needs, so on a two-line headline the
+             descenders of line 1 collided with the ascenders of line 2 — the
+             "p" of "Naples" landed on the "i" of "Sterling" (owner spotted it).
+
+             Measured at the 5.75rem cap (92px): line 2 needs 77px of ascender
+             and line 1 drops a 23px descender = 100px of ink, against an 87.4px
+             advance — a 12.6px overlap. Anything below 1.09 still collides;
+             1.1 clears by only 1.2px, which a font-fallback swap could erase.
+             ⚠️ Do not tighten this back below ~1.1 without re-measuring the ink,
+             and note the ratio applies at EVERY size, so the collision existed
+             on phones too, just less visibly. */
+          line-height: 1.15;
           margin: 0;
           text-shadow: 0 2px 24px rgba(var(--hero-fade), 0.9);
         }

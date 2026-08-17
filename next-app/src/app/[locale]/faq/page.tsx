@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { alternatesFor } from '@/lib/seo';
+import { pageMetadata } from '@/lib/seo';
 import { jsonLdHtml } from '@/lib/json-ld';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -8,12 +8,17 @@ import { AppIcon } from '@/components/AppIcon';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
-  return {
-    title: 'FAQ — Selling Estate Jewelry, Gold & Antiques',
-    description:
-      'Answers to common questions about selling estate jewelry, gold, silver, and antiques in Naples FL. Free consultations, immediate cash payment, confidential mobile service throughout Southwest Florida.',
-    alternates: alternatesFor('/faq', locale),
-  };
+  const isEs = locale === 'es';
+  return pageMetadata({
+    title: isEs
+      ? 'Preguntas Frecuentes — Vender Oro y Joyería'
+      : 'FAQ — Selling Estate Jewelry, Gold & Antiques',
+    description: isEs
+      ? 'Respuestas a preguntas comunes sobre vender joyería de patrimonio, oro, plata y antigüedades en Naples, FL. Consultas gratuitas, pago inmediato en efectivo y servicio móvil confidencial en todo el suroeste de Florida.'
+      : 'Answers to common questions about selling estate jewelry, gold, silver, and antiques in Naples FL. Free consultations, immediate cash payment, confidential mobile service throughout Southwest Florida.',
+    path: '/faq',
+    locale,
+  });
 }
 
 interface Props {

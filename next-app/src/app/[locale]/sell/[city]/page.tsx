@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { alternatesFor } from '@/lib/seo';
+import { pageMetadata } from '@/lib/seo';
 import { jsonLdHtml } from '@/lib/json-ld';
 import { SERVICE_AREAS, getServiceArea } from '@/lib/service-areas';
 import { routing } from '@/i18n/routing';
@@ -30,17 +30,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const description = isEs
     ? `Comprador de oro, joyería y plata esterlina que paga al mejor precio en ${area.city}, FL. Compramos joyería de patrimonio, oro, plata, diamantes, monedas y relojes. Evaluación gratuita — vamos a usted. Llame al (239) 404-8505.`
     : `Top-paying gold, jewelry & sterling silver buyer serving ${area.city}, FL. We buy estate jewelry, gold, silver, diamonds, coins & watches. Free appraisals — we come to you. Call (239) 404-8505.`;
-  return {
-    title,
-    description,
-    alternates: alternatesFor(`/sell/${area.slug}`, locale),
-    openGraph: {
-      type: 'website',
-      url: `https://naplesestatejewelry.com${isEs ? '/es' : ''}/sell/${area.slug}`,
-      title: `${title} | Naples Estate Jewelry`,
-      description,
-    },
-  };
+  // Same blank-card defect as /sell, across every city page.
+  return pageMetadata({ title, description, path: `/sell/${area.slug}`, locale });
 }
 
 export default async function SellCityPage({ params }: Props) {

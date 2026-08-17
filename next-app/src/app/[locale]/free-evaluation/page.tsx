@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { alternatesFor } from '@/lib/seo';
+import { pageMetadata } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -11,13 +11,14 @@ import ClayMark, { type ClayMarkName } from '@/components/ClayMark';
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   const isEs = locale === 'es';
-  return {
+  return pageMetadata({
     title: isEs ? 'Evaluación Gratuita de Joyas y Oro' : 'Free Jewelry & Gold Evaluation',
     description: isEs
       ? 'Evaluación gratuita y sin compromiso de joyas, oro, plata, diamantes, relojes y monedas en Naples y el suroeste de Florida, con precios de mercado en vivo.'
       : 'Free, no-obligation evaluation of your jewelry, gold, silver, diamonds, watches, and coins in Naples, Marco Island, Bonita Springs, and Fort Myers FL. Live gold pricing and same-day cash offers.',
-    alternates: alternatesFor('/free-evaluation', locale),
-  };
+    path: '/free-evaluation',
+    locale,
+  });
 }
 
 interface Props {

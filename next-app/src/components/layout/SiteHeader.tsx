@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -331,6 +331,58 @@ export default function SiteHeader() {
     setAboutOpen(false);
   }
 
+  // Dismiss the nav when the visitor interacts anywhere outside the header, and
+  // on Escape. Before this, the mobile panel could only be closed by pressing
+  // the toggle a second time, which is not where anyone reaches.
+  //
+  // ⚠️ The header holds TWO menus that close by different mechanisms, and both
+  // need handling:
+  //   1. The mobile panel and its Sell/About accordions are React state, so
+  //      they are reset directly.
+  //   2. The desktop dropdown is pure CSS (`group-hover` / `group-focus-within`
+  //      on .nav-dropdown) with no state to reset. A mouse closes it by moving
+  //      away — but a TAP leaves the trigger focused, so `:focus-within` holds
+  //      it open on touch with no way out. Blurring the focused trigger is what
+  //      closes that one.
+  //
+  // Anchored to the whole <header>, not the panel: the toggle button lives in
+  // the header too, so a narrower test would let a tap on it both close (here)
+  // and re-open (its own onClick), leaving the menu stuck open.
+  const headerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    function dismiss(target: Node | null) {
+      const header = headerRef.current;
+      if (!header) return;
+      // Inside the header, every control already owns its own behaviour.
+      if (target && header.contains(target)) return;
+
+      setMenuOpen(false);
+      setSellOpen(false);
+      setAboutOpen(false);
+
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && header.contains(focused)) focused.blur();
+    }
+
+    // `pointerdown` rather than `click`: it fires on the press instead of the
+    // release, so the menu is gone before the finger lifts, and a single
+    // listener covers mouse, touch and pen without a synthetic-click delay.
+    function onPointerDown(event: PointerEvent) {
+      dismiss(event.target instanceof Node ? event.target : null);
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') dismiss(null);
+    }
+
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, []);
+
   function isActive(path: string) {
     return normalizedPathname === path || (path !== '/' && normalizedPathname.startsWith(`${path}/`));
   }
@@ -341,6 +393,7 @@ export default function SiteHeader() {
 
   return (
     <header
+      ref={headerRef}
       // Marker for `body:has([data-site-header])` in globals.css, which drops the
       // route progress bar to this header's bottom edge. Surfaces that do not
       // render this header (admin) keep the bar at the top of the viewport, so
@@ -369,12 +422,19 @@ export default function SiteHeader() {
         {/* Brand — same home-link behaviour as the Home nav item: on the
             homepage it returns to the top rather than doing nothing. */}
         <Link href={href('/')} onClick={handleHomeClick} className="flex items-center gap-2 min-w-0 shrink overflow-hidden">
+          {/* The mark is the octopus alone on transparency (owner, 2026-08-16),
+              replacing the old navy circular emblem that carried its own
+              "NAPLES ESTATE JEWELRY" text — which duplicated the wordmark
+              beside it. width/height describe the LANDSCAPE artwork (157x120
+              source, ~1.31:1); they are aspect-ratio metadata for next/image,
+              while the rendered size comes from h-8/md:h-10 with w-auto. Leaving
+              them square, as they were, would mis-declare the ratio. */}
           <Image
             src="/assets/images/branding/nav-logo.webp"
             alt="Naples Estate Jewelry Logo"
-            width={40}
+            width={52}
             height={40}
-            sizes="40px"
+            sizes="52px"
             className="hidden md:block h-8 w-auto md:h-10 object-contain flex-shrink-0"
             priority
           />

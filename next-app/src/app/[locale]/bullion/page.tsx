@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { alternatesFor } from '@/lib/seo';
+import { pageMetadata } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -11,12 +11,17 @@ import ClayMark from '@/components/ClayMark';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
-  return {
-    title: 'Sell Bullion, Gold & Silver Coins',
-    description:
-      'Sell gold and silver bullion, coins, sterling, platinum, palladium, and scrap precious metals in Naples FL. Fair live-market offers, clear testing, private appointments, and same-day payment throughout Southwest Florida.',
-    alternates: alternatesFor('/bullion', locale),
-  };
+  const isEs = locale === 'es';
+  return pageMetadata({
+    title: isEs
+      ? 'Vender Lingotes y Monedas de Oro y Plata'
+      : 'Sell Bullion, Gold & Silver Coins',
+    description: isEs
+      ? 'Venda lingotes y monedas de oro y plata, plata esterlina, platino, paladio y metales preciosos en Naples, FL. Ofertas justas según el mercado en vivo, pruebas claras, citas privadas y pago el mismo día en todo el suroeste de Florida.'
+      : 'Sell gold and silver bullion, coins, sterling, platinum, palladium, and scrap precious metals in Naples FL. Fair live-market offers, clear testing, private appointments, and same-day payment throughout Southwest Florida.',
+    path: '/bullion',
+    locale,
+  });
 }
 
 interface Props {

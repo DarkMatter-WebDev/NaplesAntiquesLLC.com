@@ -82,6 +82,19 @@ const LEGAL_METADATA: Record<LegalPageKey, {
   },
 };
 
+/**
+ * Every path this module renders `noindex` for.
+ *
+ * `sitemap.ts` subtracts this set from its own list. Submitting a URL in the
+ * sitemap says "index this" while the page header says "do not" — Google logs
+ * that contradiction as a Search Console error, and all six of these pages were
+ * doing it until 2026-08-16. Deriving the exclusion from this constant rather
+ * than hand-pruning the sitemap means the two cannot drift apart again.
+ */
+export const LEGAL_NOINDEX_PATHS: readonly string[] = Object.values(LEGAL_METADATA).map(
+  (config) => config.path,
+);
+
 export function getLegalMetadata(page: LegalPageKey, locale: string): Metadata {
   const config = LEGAL_METADATA[page];
   const copy = locale === 'es' ? config.es : config.en;

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { alternatesFor } from '@/lib/seo';
+import { pageMetadata } from '@/lib/seo';
 import { unstable_cache } from 'next/cache';
 import { createPublicClient } from '@/lib/supabase/public';
 import {
@@ -49,13 +49,14 @@ import { AppIcon } from '@/components/AppIcon';
 export async function generateShopMetadata({ params }: ShopPageProps): Promise<Metadata> {
   const { locale } = await params;
   const isEs = locale === 'es';
-  return {
+  return pageMetadata({
     title: isEs ? 'Comprar Joyería de Patrimonio en Naples, FL' : 'Shop Estate Jewelry in Naples, FL',
     description: isEs
       ? 'Explore joyería de oro, cadenas, pulseras y anillos de patrimonio con precios vinculados al valor spot del oro.'
       : 'Browse estate gold jewelry, chains, bracelets, and rings with live gold-spot pricing on every piece.',
-    alternates: alternatesFor('/shop', locale),
-  };
+    path: '/shop',
+    locale,
+  });
 }
 
 export interface ShopPageProps {

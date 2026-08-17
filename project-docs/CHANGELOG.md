@@ -1,6 +1,606 @@
 
 # Changelog
 
+## 2026-08-17 - Pre-deploy audit of the batch, sitemap `lastmod` bumped, staging rebuilt
+
+One line of code changed (below); the rest of this entry records the gate the
+batch passed through, so a future session does not have to re-run it to trust
+the deploy. (The session ran past midnight; every other code change it produced
+is filed under 2026-08-16.)
+
+### Sitemap `lastmod` bumped — `2026-07-11` → `2026-08-17`
+
+`CONTENT_LAST_MODIFIED` in `src/app/sitemap.ts:12` had not been bumped, so the
+sitemap would have told Google these pages were unchanged since July 11 —
+immediately after the homepage hero, four titles, and every page's social card
+were rewritten. Its own comment says to bump it when content meaningfully
+changes; this batch qualifies. Left deliberately stale would have meant waiting
+on Google's own recrawl cadence instead of signalling the change.
+
+Verified against the running server, not assumed: `/sitemap.xml` 200, **107
+URLs**, **19 now carry `2026-08-17`** (13 static + all 6 `/sell/[city]`), **zero
+still carry `2026-07-11`**. `/shop` correctly keeps `now`, and the 87 product
+URLs correctly keep their own `updated_at` — the constant must never reach
+those. `npx tsc --noEmit` and `npm run lint` clean afterward; no test pins the
+date.
+
+⚠️ **This deploy cannot hurt search.** No URL, route, or robots directive
+changed — the batch is metadata and copy. The 6 legal URLs that left the sitemap
+were already `noindex`, so removing them resolves a contradiction rather than
+deindexing anything. Expect titles to swap in over days-to-weeks and the favicon
+to lag longer; that is recrawl latency, not breakage.
+
+**Clean-gate verification, from a deleted `.next`:**
+
+| Command | Result |
+| --- | --- |
+| `npx tsc --noEmit` | clean |
+| `npm run lint` | clean, no warnings |
+| `npm test` | **998 passed / 998**, 98 files |
+| `npm run build` | **454/454 static pages**, no warnings; `BUILD_ID` and `prerender-manifest.json` present, 58 prerendered HTML files |
+
+**Runtime sweep — 30 indexable pages, both locales, zero problems.** Each was
+checked for: 200 status, exactly one `<h1>`, a canonical, `og:image` +
+`og:site_name`, `og:title` == `twitter:title` == `<title>`, `og:url` ==
+canonical, and the right `og:locale`. The 9 excluded pages were confirmed
+genuinely `noindex` rather than merely missing. Sitemap: **107 URLs, zero
+`noindex` leaks**. Assets all 200 — `icon.png` 23KB, `favicon.ico` 11KB,
+`nav-logo.webp` 16KB.
+
+**The money invariant was proven through the real API, not inferred**: a shop
+card reading `$5,558` produced a quote with `unitPrice` 5558 and a subtotal of
+5558, tax 333.48, total 5891.48 — reconciling exactly. 24 shop prices carried
+**0 cents**; the only cents anywhere on a product page is the `$4,398.20/oz`
+gold ticker, which is a spot quote and correctly keeps them.
+
+⚠️ **Two false positives came from the audit script itself, not the site**, and
+are worth not repeating: `'/estate-jewelry'.startsWith('/es')` is `true`, so
+English pages were briefly audited against Spanish expectations; and a guessed
+`/api/checkout/quote` payload (`lines`/`productId` instead of `items`/`id`)
+returned a 400 that looked like a broken endpoint. Both were script bugs.
+
+**Staging rebuilt** — see `TASKS.md` for the current figures and the leak-check
+evidence.
+
+## 2026-08-16 (6) - Octopus mark replaced with the floating artwork
+
+Owner supplied a new octopus illustration — the creature alone, no circular
+frame and no baked-in "NAPLES ESTATE JEWELRY" text (which had duplicated the
+wordmark sitting beside it in the header). **Undeployed.**
+
+Replaced in **both** places it appears, regenerated together from one source:
+
+| File | Before | After |
+| --- | --- | --- |
+| `branding/nav-logo.webp` | 160×160 navy emblem, 5.4KB | **157×120 transparent cut-out, 16KB** |
+| `src/app/icon.png` | 96×96 cropped from the emblem | **96×96 from the new artwork** |
+| `src/app/favicon.ico` | 16/32/48 multi-size | **16/32/48, regenerated** |
+
+`SiteHeader`'s `width`/`height` went `40/40` → **`52/40`**: the new artwork is
+landscape 1.31:1, and those props are aspect-ratio metadata for `next/image`.
+Rendered size still comes from `h-8`/`md:h-10` with `w-auto` — verified at
+52×40 with the aspect matching the natural 51×39.
+
+⚠️ **Size was a real constraint, not an afterthought.** The supplied PNG was
+1536×1024 at **2.9MB**, and a first pass at 240px tall produced a **46KB** WebP
+against the old 5.4KB — on an asset that ships on every page, on a site with
+first-paint history. Capped at 120px tall / **16KB**, which is 3× the 40px
+render.
+
+**The icons now keep transparency** rather than the old navy field. Checked
+against both a white and a `#202124` tab bar before committing to it.
+
+⚠️ **The favicon shipped letterboxed first and had to be re-cut.** The owner
+reported the tab icon looked tiny, and it was: the artwork is 1.3:1 landscape,
+so fitting the whole creature into a square left it filling **100% × 77%** with
+empty bands top and bottom — wasted space in a 16px slot. Re-cut as a centred
+`1011×1011` crop, measured at **100% × 100%** fill on the shipped file. The
+outer tentacle tips and part of the pendant are lost, which is the right trade
+at 16px. Judged from a render of all three (old emblem / letterboxed / filled)
+at 16, 24 and 32px rather than at full size — a mistake worth not repeating,
+since the letterboxed version looked perfectly good at 96px.
+
+**The header logo still carries the FULL artwork** — it has the width for it.
+Only the square icons are cropped.
+
+Verified: both `<link rel="icon">` tags serve 200 at `48x48` / `96x96`, all
+three ICO entries decode as valid transparent PNGs at their declared sizes, and
+the header logo renders correctly on the cream `#f9f9f7` background.
+
+Originals backed up outside the project at `…/scratchpad/logo-backup/`.
+
+⚠️ Browsers and Google both cache favicons hard — hard-refresh for the tab, and
+expect weeks before search results update.
+
+| Command | Result |
+| --- | --- |
+| `npx tsc --noEmit` | clean |
+| `npm run lint` | clean |
+| `npm test` | **998 passed / 998**, 98 files |
+| `npm run build` | compiled in 10.9s, **454/454** static pages, no warnings |
+
+## 2026-08-16 (5) - Nav closes on outside tap / Escape
+
+Owner: the mobile menu could only be dismissed by pressing the toggle a second
+time. **Undeployed.**
+
+`SiteHeader.tsx` now closes the menu on any `pointerdown` outside the
+`<header>`, and on Escape. It also blurs a focused element inside the header,
+which is what closes the *desktop* dropdown — that one is pure CSS
+(`group-hover` / `group-focus-within`) with no state to reset, and a tap or Tab
+leaves the trigger focused where a mouse would simply move away.
+
+⚠️ **Anchored to the whole `<header>`, not the panel.** The toggle button is in
+the header, so a narrower test would let one tap both close the menu and
+re-open it. Verified explicitly.
+
+Verified by driving the real menu at a 375px touch viewport:
+
+| Behaviour | Result |
+| --- | --- |
+| Opens on toggle | ✅ |
+| Pointer **inside** the panel keeps it open | ✅ |
+| Tap outside closes it | ✅ |
+| Escape closes it | ✅ |
+| Tapping the toggle while open still closes once (no re-open) | ✅ |
+| Sell/About accordions reset — no stale open state on reopen | ✅ |
+
+✅ **A "bug" reported mid-session was withdrawn — the desktop dropdown is
+healthy.** While testing, the dropdown appeared to become an invisible
+click-catcher: hovered and focused, `opacity` read `0` across repeated waits to
+600ms while `pointer-events` read `auto`, and `elementFromPoint` returned
+`a.nav-dropdown-link`.
+
+All of it was an artifact of the **hidden Browser pane freezing the 150ms CSS
+transition**, so `getComputedStyle` kept returning the transition's start value
+while `pointer-events` — not animated — applied instantly. Settled by testing an
+isolated clone away from the cursor with `transition: none`: resting `0`,
+focused `1`, after blur `0`. Cascade confirmed correct — both rules sit in
+`@layer utilities`, with `group-focus-within:opacity-100` later in source order
+*and* higher specificity than `.opacity-0`.
+
+Two durable lessons in DECISIONS, *"A hidden Browser pane freezes CSS
+transitions"*: the existing "trust `getComputedStyle`" guidance holds for layout
+but **not** for transitioned properties, and a physical cursor left parked by an
+earlier `computer` hover keeps `:hover` alive and poisons later readings.
+
+| Command | Result |
+| --- | --- |
+| `npx tsc --noEmit` | clean |
+| `npm run lint` | clean |
+| `npm test` | **998 passed / 998**, 98 files |
+| `npm run build` | compiled in 11.1s, **454/454** static pages, no warnings |
+
+## 2026-08-16 (4) - SEO audit, and all four findings fixed
+
+A full audit first — 22 EN pages, 16 ES pages, product pages (available + sold),
+pagination, filters, sitemap and robots, all measured against the running app —
+then the four findings fixed. **Undeployed.**
+
+### 1. 🔴 Half the Spanish site served English metadata (8 pages)
+
+`/es/about`, `/es/services`, `/es/estate-jewelry`, `/es/gold-services`,
+`/es/silver-services`, `/es/bullion`, `/es/faq`, `/es/estate-services` all had
+English `<title>` + description — and therefore English social cards — over
+fully Spanish bodies. Their metadata was a hardcoded English string with no
+`isEs` branch, while the other half of the site localized correctly.
+
+This was the biggest weakness found: it told Google those Spanish URLs were
+about English content, undercutting the hreflang setup on exactly the pages
+meant to win Spanish queries. All 8 now localized, vocabulary matched to the
+pages that were already correct (`Joyería de Patrimonio`, `Vender…`,
+`Suroeste de Florida`). ⚠️ These are our translations — the standing
+native-speaker review item in TASKS now covers them too.
+
+### 2. Six `noindex` pages were listed in the sitemap
+
+The legal set emitted `noindex, follow` while `sitemap.ts` submitted them with
+priorities — contradictory signals Google logs as Search Console errors.
+`sitemap.ts` now subtracts `LEGAL_NOINDEX_PATHS`, exported from the same object
+that sets the robots tag, so the two cannot drift. Sitemap **113 → 107 URLs**.
+Pinned by 7 new assertions in `legal-metadata.test.ts`.
+
+### 3. The homepage `<h1>` was the streaming skeleton's domain name
+
+`SiteLoadingScreen` (the `loading.tsx` fallback for `/` and `/shop`) carried
+`<h1>NaplesEstateJewelry.com</h1>`. Because a Suspense fallback ships FIRST in
+the streamed HTML, that was the opening heading of the site's two most important
+pages, and both served two `<h1>`s. Now a `<div class="site-loading-title">`
+with the CSS selectors re-pointed, so styling is unchanged. **h1 count on `/`,
+`/es` and `/shop`: 2 → 1.**
+
+### 3b. The homepage `<h1>` now states the service (owner approved a voice change)
+
+Follow-on to the audit: the hero heading was *"Rare. Authentic. Timeless."* —
+three adjectives, no service, product or location, in the one slot Google reads
+as the page's topic. The keywords were in the **eyebrow**, a `<span>` with no
+heading weight. (Every interior page already does the opposite; the homepage was
+the sole inversion, on the page where it cost most.)
+
+Final wording, after several owner review rounds:
+
+Settled after several review rounds:
+
+```
+ONE PIECE OR AN ENTIRE ESTATE                   ← eyebrow
+Naples Premier Gold, Sterling & Jewelry Buyers  ← h1
+```
+
+ES: *"Una Pieza o Todo un Patrimonio"* / *"Compradores de Oro, Plata y Joyería
+en Naples"*. The old tagline is retired.
+
+**Keywords sit in the `<h1>` by owner priority** — the strongest signal should be
+that we BUY in Naples, and only the heading carries weight. The eyebrow does the
+human work, naming the customer's situation (executors, downsizing families)
+rather than reciting inventory.
+
+✏️ **Two copy corrections applied, both evidenced.** "Premiere" → **"Premier"**
+(the former means a debut performance; `/silver-services` already used the
+correct form and "Premiere" appeared nowhere in the codebase — this was about to
+ship as the largest text on the site). And the comma before "&" was dropped to
+match house style (*"Sell Gold, Jewelry & Sterling Silver"*).
+
+**The hero headline block was widened to fit it.** `.home-hero-top` went from
+`min(92vw, 52rem)` to `min(92vw, 72rem)`, which drops the 46-character headline
+from three lines to **two on desktop**. Measured thresholds: 832px, 1024px and
+1100px all render three lines; **1152px is where it breaks to two**.
+
+⚠️ **Phones and tablets are deliberately unchanged** — below ~1250px the `92vw`
+term binds before the cap, so they keep three lines at 30.4px. Verified at 390px:
+block width 359px = 92vw exactly. `.home-hero-bottom` was left at `52rem` on
+purpose; widening the subscriber form and CTA row to 1152px would make them
+worse.
+
+ℹ️ **Shrinking the mobile type was proposed and rejected on measurement.** At
+320px this headline stays three lines from 30.4px all the way down to 22px, and
+only reaches two at **20px** — body-text size, not a hero. It buys a ~20%
+shorter block and zero fewer lines. Recorded so it is not re-proposed: to fix
+the phone rendering, cut characters, not points.
+
+🔴 **A real typographic bug surfaced by the two-line desktop rendering and
+fixed: `line-height` 0.95 → 1.15.** Owner spotted the "p" of "Naples" sitting on
+the "i" of "Sterling". The cause is that 0.95 advances the baseline **less than
+the font's own ink occupies**: at the 92px cap the two lines need **100px** of
+ink (77px ascender + 23px descender) against an **87.4px** advance — a **12.6px
+overlap**. 1.0 and 1.05 still collide; 1.1 clears by just 1.2px; **1.15 clears
+by 5.8px** and is what shipped. Confirmed by screenshot, not just numbers.
+
+⚠️ The ratio applies at every size, so this was wrong on phones too — just too
+small to notice. At 390px the worst-case wrap now clears by 1px. Blocks grew
+modestly (desktop 175 → 212px, mobile 87 → 105px) with clearance to the sign-up
+block still 244px / 194px.
+
+🔎 **A false alarm worth noting:** a bounding-box check reported the widened
+headline overlapping carousel pieces. A screenshot showed no collision — the
+test was intersecting full-height container images rather than the visible
+jewelry, and the old 832px block already "overlapped" five of them. The hero is
+designed for text to sit above the pieces (hence the text-shadow and top fade).
+Rect maths cannot answer that question; a screenshot can.
+
+A brand-voice headline (*"Pieces Worth Discovering"*, with a
+*"We Buy & Sell Estate Jewelry and Watches"* eyebrow) held the slot briefly and
+was reverted — it left the homepage with no on-page topic signal at all.
+
+**Also landed: the homepage H2s now carry the location.** *"We Buy Gold"* →
+**"We Buy Gold in Naples"**, *"We Sell Jewelry"* → **"We Sell Estate Jewelry in
+Naples"** (plus Spanish). The homepage body mentions Naples **73 times** but not
+one heading did. Headings with "Naples" went **0 → 3** per locale. Card titles
+re-measured at 320px in Spanish (the longest): max 2 lines, no overflow.
+
+Drafts rejected along the way, each for a reason worth keeping:
+
+- *"Sell Gold & Jewelry in Naples"* — ambiguous beside a carousel of pieces
+  **we** are selling.
+- *"Naples Gold & Jewelry Buyers"* — keyword-correct but reads as a
+  business-directory entry; wrong register for the brand.
+- ⚠️ *"Know What Yours Is Worth"* — **owner caught that it implies the visitor
+  should already know what they have**, which is backwards when most arrive
+  holding something inherited and unidentified. Copy has to put the knowing on
+  us. That is now a stated test in DECISIONS.
+
+An intermediate arrangement put the promise in the h1 and the keywords in the
+eyebrow; the owner swapped them so the keyword line takes the heading slot.
+
+🔎 **Length was chosen by measurement, not taste** — candidates were rendered
+through a probe using the hero's real font and clamp before picking one:
+
+| Length | Lines |
+| --- | --- |
+| 26–29 chars | **2 at every width** (unchanged from the old headline) |
+| 38 chars | 3 at 320px *and* 1280px+ |
+| 48 chars | 4 |
+
+So the full page title cannot go here. Confirmed live in **both locales at
+320px**: headline 2 lines, eyebrow 2 lines, no overflow, no horizontal scroll.
+
+🔎 **Investigated and NOT a defect:** a live-DOM `querySelectorAll('h1')` on the
+homepage returns **2**, and there are two complete `<main>` trees — reproduced in
+a **production build**, so not a dev artifact. The second lives in
+`<div hidden id="S:0">`, React's own streaming-Suspense holder, computed
+`display: none`. **Server HTML has exactly one `<h1>`**, which is what Googlebot
+parses. Lesson recorded in DECISIONS: **count headings against the server HTML,
+not the live DOM** — the homepage will always show a phantom duplicate otherwise.
+
+🔵 **New context: a physical location is opening soon** (owner, same day). It
+changed this edit — an eyebrow draft of *"Private · Mobile · By Appointment"*
+was discarded, because every word of it expires when the doors open. The rule
+recorded in DECISIONS is that hero copy states **what we buy**, never **how we
+operate**, until the model is settled.
+
+Checked while there, and **the schema needs no emergency fix**: the
+`JewelryStore` block declares locality/region/country with **no `streetAddress`
+and no `postalCode`** — the honest shape for a service-area business, so no
+invented address has to be unwound. What the opening *will* need is scoped in
+DECISIONS and TASKS: a verified Google Business Profile (the biggest lever by
+far), `streetAddress`/`postalCode`/`geo`, real opening hours, and a **10-file**
+copy pass in both locales to retire "we come to you" / "no storefront" /
+"appointment-only".
+
+### 4. Two weak titles
+
+- `/sell` was **81 characters** — longest on the site, truncating mid-brand.
+  Dropped "Sterling" (carried by `/silver-services`, the page that should rank
+  for it) → **72**.
+- `/services` was the bare **"Our Services"**, the only title with neither
+  keyword nor location → `Jewelry & Estate Services in Naples, FL` (**63**).
+
+### Verification
+
+Re-ran the audit sweep: **zero problems** across 15 Spanish pages (title AND
+description), h1 counts on 5 key pages, sitemap-vs-noindex, and title lengths.
+Spanish `og:title` confirmed matching each page's `<title>`.
+
+⚠️ **A scare worth recording:** mid-verification `/shop` and `/es/shop` returned
+**404** with no error in the log. It was the documented Turbopack cache
+corruption — the startup log carried the `Unexpected end of JSON input`
+signature — and `rm -rf .next` + restart restored 200s with 25 product cards.
+**Nothing in this batch touched the shop route.** Do not debug a sudden 404 on a
+route you did not change before wiping `.next` first.
+
+| Command | Result |
+| --- | --- |
+| `npx tsc --noEmit` | clean |
+| `npm run lint` | clean |
+| `npm test` | **998 passed / 998**, 98 files (991 → 998) |
+| `npm run build` | compiled in 12.3s, **454/454** static pages, no warnings |
+
+### Audited and healthy — do not re-audit
+
+Canonicals self-referencing on all 38 pages; hreflang `en`/`es`/`x-default`
+complete; `?page=` and filter URLs canonicalize to `/shop`; `Product` schema with
+correct `InStock`/`SoldOut`; `FAQPage` on `/faq` and every city page;
+`BreadcrumbList` on sell pages; **zero images missing an `alt` attribute**
+sitewide (the empty ones are correct decorative marking); descriptions all
+140–260 chars on indexed pages; robots.txt consistent with page-level noindex.
+
+Two items noted and deliberately NOT changed: the city pages carry two
+`JewelryStore` entities (distinct `@id`s, defensible — watch Search Console),
+and sold products stay indexable but out of the sitemap (link-discovery only).
+
+## 2026-08-16 (3) - Every public page gets its own social card (`pageMetadata`)
+
+Owner: fix the interior-page `og:title`s too. **Undeployed.**
+
+Interior pages set a `title` but no `openGraph`, and **Next does not propagate
+`title` into `og:title`** — so every one of them shared as the HOMEPAGE. Auditing
+that turned up two further defects, both live in production:
+
+| Page | Defect found |
+| --- | --- |
+| `/about`, `/faq`, `/bullion`, … | shared as the homepage title |
+| **`/sell`** | hand-rolled `openGraph` with **no `images`** → **BLANK share card** |
+| **`/sell/[city]`** (every city) | same → **BLANK share cards** |
+| `/shop/[id]` | lost `og:site_name`; `images: []` when a product had no photo |
+
+`/sell` and the city pages are lead-generation pages people actually share, and
+they were posting blank cards.
+
+**New `pageMetadata()` in `lib/seo.ts`** now returns title, canonical + hreflang
+and a complete social card from `title`/`description`/`path`/`locale`. Applied
+to **16 public pages** (12 by codemod, 4 by hand) plus the shared shop renderer.
+
+🔎 **Two facts established by an empirical probe, not assumption** — a temporary
+`openGraph.title: 'ZZPROBE'` on `/shop`:
+
+1. It emitted exactly `ZZPROBE` — **`title.template` never reaches `og:title`**,
+   so the helper appends `TITLE_SUFFIX` itself (`brandedTitle: true` for the
+   homepage, whose title already leads with the brand).
+2. The same probe **wiped `og:image` and `og:site_name`**, demonstrating the
+   replace-not-merge rule live rather than theoretically.
+
+⚠️ **`noindex` pages deliberately excluded** — legal pages (`getLegalMetadata`),
+`/checkout`, `/shop-modern`, `/unsubscribe`, `/admin/**`, `/account/**`. A page
+excluded from search is not shared, and a social card there is the wrong signal.
+
+**Verified by sweeping 19 public URLs across both locales: zero problems.**
+`og:title` == `twitter:title` == that page's own `<title>` on every one;
+`og:image` and `og:site_name` present everywhere (including the formerly blank
+`/sell` pages); `og:url` matching each locale's canonical; `og:locale`
+`en_US`/`es_ES` correct. Product pages confirmed still using the **product
+photo**, and `/sell` correctly using the site card.
+
+`page-metadata.test.ts` (7 tests) pins each defect: brand suffixing, no
+double-suffix when branded, images never empty, the null-image fallback,
+og:url == canonical per locale, and the locale pair.
+
+| Command | Result |
+| --- | --- |
+| `npx tsc --noEmit` | clean |
+| `npm run lint` | clean |
+| `npm test` | **991 passed / 991**, 98 files (984 → 991) |
+| `npm run build` | compiled in 13.3s, **454/454** static pages, no warnings |
+
+## 2026-08-16 (2) - Spanish homepage social card localized
+
+Owner: fix the Spanish `og:title` and `twitter:title`. **Undeployed.**
+
+Inspecting `/es` showed **every** social tag was the English one, not just the
+two named — the homepage declared no `openGraph` at all, so it inherited the root
+layout's English block wholesale. Two of those were worse than cosmetic:
+
+| Tag | Was on `/es` | Now |
+| --- | --- | --- |
+| `og:title` / `twitter:title` | English | Spanish |
+| `og:description` / `twitter:description` | English | Spanish |
+| `og:url` | `…com` (the **English** homepage) | `…com/es` |
+| `og:locale` | **absent** (Facebook assumes `en_US`) | `es_ES`, alternate `en_US` |
+
+`og:url` is the significant one: every Spanish share was attributed to the
+English URL. It now comes from `alternatesFor('/', locale).canonical` — the same
+helper that emits the canonical link — so the two cannot drift. Verified equal
+in both locales.
+
+🔴 **The trap this ran into:** a page-level `openGraph` **REPLACES** the
+layout's rather than merging (Next merges metadata shallowly). Declaring one on
+the homepage without restating `images` would have produced a **blank share
+card**, silently — the page renders fine and nothing errors. `type`, `siteName`
+and `images` are therefore restated, and `SITE_NAME` / `OG_IMAGE` were hoisted
+into `lib/seo.ts` so the image path is not duplicated across two files. Verified
+`og:image` still present in **both** locales, and that interior pages
+(`/shop`, `/es/shop`, `/free-evaluation`) still inherit `og:image`,
+`twitter:card` and `og:site_name` unchanged.
+
+⚠️ **Known and left open:** interior pages set `title` but no `openGraph`, and
+Next does not propagate `title` into `og:title` — so sharing `/shop` still shows
+the homepage title. A proper fix is a shared metadata helper across ~19 pages;
+recorded in DECISIONS rather than half-done here.
+
+📝 Also repaired a documentation defect introduced earlier the same day: the
+favicon entry had replaced the `### UI icons are inline SVG` heading instead of
+preserving it, orphaning that entry's body. Heading restored.
+
+| Command | Result |
+| --- | --- |
+| `npx tsc --noEmit` | clean |
+| `npm run lint` | clean |
+| `npm test` | **984 passed / 984**, 97 files |
+| `npm run build` | compiled in 9.9s, **454/454** static pages, no warnings |
+
+## 2026-08-16 - Favicon switched from the palm tree to the octopus brand mark
+
+Owner: the Google result showed a **gold palm tree**, not the brand. **Undeployed.**
+
+**No artwork was generated — the octopus already existed** as
+`public/assets/images/branding/nav-logo.webp` (160×160), the mark the site header
+already uses. Both icons are cropped from it, so the search result, the browser
+tab and the header now agree.
+
+- `src/app/icon.png` → **96×96** (was 64×64 palm tree)
+- `src/app/favicon.ico` → real multi-size **ICO container, 16/32/48**, PNG
+  payloads (was a 32×32 palm tree). Written by hand since `sharp` cannot emit
+  ICO; the container was parsed back out and each entry verified to decode as a
+  valid PNG at its declared size.
+
+⚠️ **Both files had to change.** Next emits a `<link rel="icon">` for each, so
+replacing only one leaves the old mark reachable. Advertised sizes went from
+`32x32` / `64x64` to **`48x48` / `96x96`** — Google asks for multiples of 48 and
+neither old file qualified.
+
+Three constraints drove the crop, each verified visually rather than assumed:
+
+1. **Crop stops above the wordmark** (`left 35, top 14, 88×88`). The emblem
+   carries "NAPLES / ESTATE JEWELRY" beneath the octopus; a first candidate
+   included its top edge and rendered as illegible letter fragments.
+2. **~83% scale on a navy field** (`rgb(4,26,50)`, sampled from the source).
+   Google masks result favicons into a circle; the full-bleed candidate put
+   tentacles in the corners, which is precisely what gets clipped.
+3. **96px is the ceiling without upscaling** from a 160px source.
+
+Verified on the running app: the emitted links advertise 48/96, `/icon.png` and
+`/favicon.ico` both return 200, and decoding `icon.png` in-page gives 96×96 with
+a navy corner `rgb(4,26,50)` and a gold body `rgb(219,189,136)` — proving the
+octopus, not the palm tree. Judged at 24px too, the size a search result uses.
+
+Originals backed up outside the project folder at
+`…/scratchpad/favicon-backup/` as `icon.png.palm-tree.bak` and
+`favicon.ico.palm-tree.bak`.
+
+⚠️ **Re-crawl-gated, and Google caches favicons aggressively — weeks, not days.**
+
+| Command | Result |
+| --- | --- |
+| `npx tsc --noEmit` | clean |
+| `npm run lint` | clean |
+| `npm test` | **984 passed / 984**, 97 files |
+| `npm run build` | compiled in 9.5s, **454/454** static pages, no warnings |
+
+## 2026-08-15 (3) - Homepage title leads with the brand, plus a WebSite entity
+
+Owner reported a live Google result reading *"Sell Gold, Jewelry & Sterling
+Silver in Naples, FL"* with the brand nowhere in sight. **Undeployed.**
+
+The brand was not missing — the title already ended `| Naples Estate Jewelry`.
+**Google strips a trailing brand routinely**, since it prints a site name on its
+own line above the result. Front is the one position it will not strip.
+
+- `SITE_TITLE` (`app/layout.tsx`) → `Naples Estate Jewelry - Sell Jewelry, Gold
+  & Silver in Naples, FL` (**65 chars**). That one constant also feeds the
+  openGraph and twitter titles, so all three stay consistent.
+- The homepage's EN and ES `title.absolute` follow the same shape (ES 68 chars —
+  Spanish runs longer and the brand still leads).
+- **Jewelry leads the descriptor, ahead of gold** (owner, 2026-08-16). Mirrored
+  in Spanish as `Compramos Joyería, Oro y Plata` so both locales lead with the
+  same category. Pure reorder — identical character count, so the fit is
+  unchanged.
+- ⚠️ **The `template` was deliberately NOT changed.** Interior pages keep
+  `'%s | Naples Estate Jewelry'`: the prefix costs 24 characters against
+  Google's ~60-character display, so it would push the distinguishing part of a
+  product or city title out of view. A product title already runs 73 characters.
+
+**Title length, and where the "Sterling" keyword really belongs.** The first cut
+of the brand-first title ran 74 characters against Google's ~60-character
+display, so the truncated tail was `in Naples, FL` — the local qualifier. Rather
+than move the brand back, the descriptor was trimmed by one word:
+
+- Homepage 74 → **65** chars by dropping `Sterling`. Nothing is lost for
+  ranking — truncation is display-only, Google reads the full title — and the
+  term stays in the homepage's description, its visible copy (11×) and its
+  JSON-LD (3×), and in `/sell`'s title.
+- 🔎 **That check exposed a real gap:** `/silver-services`, the page that should
+  own "sell sterling silver naples", **did not have the phrase in its title** —
+  it spent the space on `Silver Buyer`, restating `Sell Silver`. Now
+  `Sell Sterling Silver in Naples, FL` = **58 chars** with the template. Net
+  effect on the keyword is positive: it moved to the page that can actually win
+  the query.
+
+**Separately, the site-name line.** That line comes from a `WebSite` structured
+-data entity, not from `<title>`; with none present Google falls back to the bare
+domain, which is exactly what the screenshot showed. The homepage now emits a
+`WebSite` entity (`name`, `url`) following the existing `jsonLdHtml` pattern.
+Homepage-only per Google's spec — the sitewide `JewelryStore` entity in
+`[locale]/layout.tsx` is untouched.
+
+⚠️ **The brand is "Naples Estate Jewelry" — no "Co"** (owner decision). An
+`alternateName: 'Naples Estate Jewelry Co'` was set earlier the same day and
+removed: Google cross-checks the WebSite name against the JewelryStore schema,
+the wordmark and the Business Profile, and a name nobody uses works against the
+entity's purpose. A word-boundary sweep of shipped source found the "Co" form in
+exactly **one** place (that line) — the rest of the app was already consistent —
+and confirmed the 4 legacy `naplesestatejewelry.co` domain references were
+untouched, which a loose "co" search would have collided with.
+
+Verified in the served HTML: EN home **65 chars**, ES home 68, `/silver-services`
+**58** and now carrying the phrase, `/shop` and a product page still on the
+suffix form, the homepage emitting exactly two JSON-LD entities (`JewelryStore`
+and `WebSite`) with no `alternateName`, and zero occurrences of the "Co" brand
+form anywhere in the homepage HTML.
+
+ℹ️ **Investigated and NOT a bug:** the snippet's run-together
+`(239) 404-8505info@naplesestatejewelry.com` is Google concatenating contact
+fields from structured data. The meta description ends at `Call (239) 404-8505.`
+and contains no email address — confirmed in the served HTML.
+
+⚠️ **Both changes are re-crawl-gated** — days to weeks before Google reflects
+them, and Google may still rewrite a title. An unchanged result the next day is
+not a fault.
+
+| Command | Result |
+| --- | --- |
+| `npx tsc --noEmit` | clean |
+| `npm run lint` | clean |
+| `npm test` | **984 passed / 984**, 97 files |
+| `npm run build` | compiled in 10.6s, **454/454** static pages, no warnings |
+
 ## 2026-08-15 (2) - Immediate tap feedback on touch, and a route progress bar
 
 Owner request: on a tablet, tapping a buy/product control gave no sign it had
