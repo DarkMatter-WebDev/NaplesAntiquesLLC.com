@@ -14,8 +14,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ? 'Preguntas Frecuentes — Vender Oro y Joyería'
       : 'FAQ — Selling Estate Jewelry, Gold & Antiques',
     description: isEs
-      ? 'Respuestas a preguntas comunes sobre vender joyería de patrimonio, oro, plata y antigüedades en Naples, FL. Consultas gratuitas, pago inmediato en efectivo y servicio móvil confidencial en todo el suroeste de Florida.'
-      : 'Answers to common questions about selling estate jewelry, gold, silver, and antiques in Naples FL. Free consultations, immediate cash payment, confidential mobile service throughout Southwest Florida.',
+      ? 'Respuestas sobre vender joyería, oro, plata y antigüedades en Naples, FL. Consultas gratuitas en nuestro salón, martes a sábado, y pago inmediato en efectivo.'
+      : 'Answers on selling estate jewelry, gold, silver, and antiques in Naples FL. Free consultations at our showroom, Tue–Sat, and immediate cash payment.',
     path: '/faq',
     locale,
   });
@@ -53,8 +53,8 @@ const FAQ_ITEMS = [
   {
     questionEn: 'What areas do you serve?',
     questionEs: '¿Qué áreas sirven?',
-    answerEn: 'We provide mobile service throughout Southwest Florida, including Naples, Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral, and surrounding communities. For larger collections or estate liquidations, we will travel further on request.',
-    answerEs: 'Brindamos servicio móvil en todo el suroeste de Florida, incluyendo Naples, Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral y comunidades aledañas. Para colecciones más grandes o liquidaciones de patrimonio, viajamos más lejos a pedido.',
+    answerEn: 'Our showroom is at 6240 Shirley St, Ste 104 in Naples, inside Sharon Lynch Collections, open Tuesday to Saturday 11am–3pm or by appointment. We also buy throughout Southwest Florida — Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral, and surrounding communities — with home visits on request, and for larger collections or estate liquidations we will travel further.',
+    answerEs: 'Nuestro salón está en 6240 Shirley St, Ste 104 en Naples, dentro de Sharon Lynch Collections, abierto de martes a sábado de 11:00 a.m. a 3:00 p.m. o con cita. También compramos en todo el suroeste de Florida — Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral y comunidades aledañas — con visitas a domicilio a pedido, y para colecciones más grandes o liquidaciones de patrimonio viajamos más lejos.',
   },
   {
     questionEn: 'Do I need a formal evaluation before contacting you?',
@@ -71,8 +71,8 @@ const FAQ_ITEMS = [
   {
     questionEn: 'Is the process confidential?',
     questionEs: '¿El proceso es confidencial?',
-    answerEn: 'Yes. All consultations are private and discreet. We never share client information, transaction details, or item photos. Most clients prefer this approach over a public storefront, especially when handling inherited or sentimental collections.',
-    answerEs: 'Sí. Todas las consultas son privadas y discretas. Nunca compartimos información del cliente, detalles de transacciones ni fotos de artículos. La mayoría de los clientes prefieren este enfoque sobre una tienda pública, especialmente cuando manejan colecciones heredadas o sentimentales.',
+    answerEn: 'Yes. All consultations are private and discreet, whether at the showroom or in your home. We never share client information, transaction details, or item photos. Most clients value that discretion, especially when handling inherited or sentimental collections.',
+    answerEs: 'Sí. Todas las consultas son privadas y discretas, ya sea en el salón o en su casa. Nunca compartimos información del cliente, detalles de transacciones ni fotos de artículos. La mayoría de los clientes valoran esa discreción, especialmente cuando manejan colecciones heredadas o sentimentales.',
   },
 ];
 

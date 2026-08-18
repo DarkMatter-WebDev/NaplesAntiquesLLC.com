@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AudienceScope, MarketingSenderProfile } from '@/lib/marketing';
 import { withMarketingFooter } from '@/lib/marketing-email-html';
+import { addressOneLine } from '@/lib/business-location';
 
 type SettingsState = {
   mailingAddress: string | null;
@@ -190,7 +191,11 @@ export default function MarketingComposer() {
     return count === null ? 'Counting...' : `${count} ${count === 1 ? 'recipient' : 'recipients'}`;
   };
   const previewUnsubscribeUrl = `${settings?.siteUrl ?? 'https://naplesestatejewelry.com'}/unsubscribe?email=preview%40naplesestatejewelry.co`;
-  const previewMailingAddress = settings?.mailingAddress || 'Mailing address preview - add the live address in Admin Settings before sending.';
+  // Falls back to the showroom address for the same reason the server does:
+  // marketing email must carry a physical address. Before 2026-08-17 this
+  // rendered a "add the live address before sending" placeholder, which is now
+  // unreachable — getMarketingSettings() never returns a null mailingAddress.
+  const previewMailingAddress = settings?.mailingAddress || addressOneLine();
   const previewSubject = subject.trim() || 'Untitled Campaign';
   const selectedSender = settings?.senderProfiles?.[senderProfile];
   const selectedFromAddress = selectedSender?.fromAddress
@@ -298,12 +303,6 @@ export default function MarketingComposer() {
               Campaign ID: <span className="font-mono">{campaignSuccess.campaignId}</span>
             </p>
           )}
-        </div>
-      )}
-
-      {!settings?.mailingAddress && (
-        <div className="mb-4 rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'rgba(173, 93, 0, 0.32)', color: '#8a4f00', background: 'rgba(173, 93, 0, 0.08)' }}>
-          Add a physical mailing address in Admin Settings before sending.
         </div>
       )}
 

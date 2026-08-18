@@ -5,6 +5,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { startRouteProgress } from '@/components/layout/RouteProgressBar';
 import { createClient } from '@/lib/supabase/client';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import {
@@ -1866,6 +1867,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   // --- Sign out ---
   async function handleSignOut() {
     await supabase.auth.signOut();
+    startRouteProgress('/');
     router.push('/');
     router.refresh();
   }

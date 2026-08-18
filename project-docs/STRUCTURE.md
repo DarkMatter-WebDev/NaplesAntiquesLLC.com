@@ -96,6 +96,14 @@ let additional loose app assets accumulate at root.
 | Page titles, descriptions, canonicals and social cards | `next-app/src/lib/seo.ts` — `pageMetadata()`. Public pages call it rather than hand-rolling `openGraph`; a hand-rolled block that omits `images` silently ships a blank share card |
 | `noindex` legal pages (and their sitemap exclusion) | `next-app/src/lib/legal-metadata.ts` — `LEGAL_NOINDEX_PATHS`, which `sitemap.ts` subtracts |
 | Brand mark (header + browser tab, one artwork) | `public/assets/images/branding/nav-logo.webp`, `src/app/icon.png`, `src/app/favicon.ico` |
+| Touch photo-swipe gesture (product gallery AND shop cards) | `next-app/src/lib/photo-swipe.ts` — thresholds and axis arbitration included. It was duplicated per surface until 2026-08-17, and the gallery's copy silently missed the fix the cards got, so **both surfaces must keep importing this** |
+| Route-change progress bar | `next-app/src/components/layout/RouteProgressBar.tsx`, mounted once in `[locale]/layout.tsx` **inside `<Suspense>`**. Navigations begun in code arm it via its `startRouteProgress(href)` export rather than a second indicator |
+| Showroom address, hours, and shared-suite wayfinding copy | `next-app/src/lib/business-location.ts` — schema, footer, checkout, receipts and page copy all read from it. The phone number was never centralised and is now hardcoded in 105 places across 37 files; the address must not repeat that |
+| Embedded showroom map (homepage CTA + contact `VisitUsPanel`) | `next-app/src/components/ShowroomMap.tsx`, pinned by `mapsEmbedUrl()` in `business-location.ts`. ⚠️ It frames Google, so `frame-src` must list `https://www.google.com` AND `https://maps.google.com` in **both** `next-app/next.config.ts` and root `netlify.toml` — the frame is SQUARE (`aspect-ratio: 1/1`, capped by `maxWidth`, which binds height too); the embed 301s between those origins, and a CSP-blocked iframe blanks silently. `loading="lazy"` is required, not cosmetic |
+| Showroom address as a DISPLAY block (footer, homepage CTA, About) | `next-app/src/components/ShowroomAddress.tsx`. Puts the landmark on its own line so "Sharon Lynch Collections" cannot split. ⚠️ Only the NAME is `nowrap` — an unbreakable full clause overflows a 320px column. `addressWithLandmark()` is still the right call for prose and email; both compose from `landmarkParts()` |
+| Copy-address control (footer, homepage CTA, contact panel, About) | `next-app/src/components/CopyAddressButton.tsx`, copying `addressOneLine()` via `lib/clipboard.ts`. ⚠️ Street+city only — never the landmark or business name, because the paste target is a geocoder. Must remain a SIBLING of the maps link, never nested inside the `<a>` or the `<address>` |
+| Opening hours as a DISPLAY list (footer, contact, About, homepage CTA) | `next-app/src/components/ShowroomHours.tsx`, rows from `hoursRows()` / `hoursRowsGrouped()`. Closed days are derived from `HOURS.days`, never a second list. ⚠️ The grouped 2-row variant hardcodes "Sunday – Monday" and is only valid while the closed days stay a contiguous pair. `hoursLine()` remains the right call for prose and email |
+| Customer reviews (content + both presentations) | `next-app/src/lib/testimonials.ts` is the only review list; `components/home/TestimonialsSection.tsx` renders it as a grid (product pages) or a CSS-only marquee (homepage, `variant="marquee"`). ⚠️ Marquee card spacing must stay `margin-inline-end` not `gap`, and the wrapper must keep `data-customer-reveal-skip` — both fail silently. Quotes are verbatim; a review that cannot be published verbatim is not published |
 | Project memory | `project-docs/` |
 
 ## Structural Invariants
@@ -129,8 +137,15 @@ let additional loose app assets accumulate at root.
 `src/app/[locale]/shop/(list)/page.tsx` remains a thin Next route entry with
 only supported route exports. The reusable implementation lives beside it in
 `shop-page-renderer.tsx` and is shared with `/shop-modern`. The production build
-completed successfully on 2026-08-03: 443 pages, with TypeScript and lint also
-passing.
+completed successfully on **2026-08-17: 454 pages**, with TypeScript and lint
+also passing. (The 443-page figure previously recorded here was 2026-08-03.)
+
+⚠️ **The static page count is a structural invariant, not just a statistic.**
+`[locale]/layout.tsx` reads `useSearchParams` through `RouteProgressBar`, and
+that hook client-renders everything up to the nearest `<Suspense>` boundary. The
+boundary around that component is the only thing keeping the deopt contained; if
+it is removed, the build still succeeds and the page count silently collapses.
+Check the count after touching the root layout.
 
 ## Cleanup Notes
 

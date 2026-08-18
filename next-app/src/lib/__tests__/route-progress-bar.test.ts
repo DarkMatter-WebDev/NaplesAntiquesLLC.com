@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isNavigationComplete,
+  locationKey,
   shouldArmProgressBar,
   type NavigationIntent,
 } from '@/components/layout/RouteProgressBar';
@@ -26,17 +27,44 @@ describe('route progress bar — when it arms', () => {
     ).toBe(true);
   });
 
-  // Everything below is owner rule 1: the bar appears only when the visitor is
-  // actually made to wait on a route.
-
-  it('does not arm for a query-only change on the same path', () => {
-    // What a shop filter or a pagination click looks like. These update in
-    // place, so a bar would be noise.
-    expect(shouldArmProgressBar(intent({ href: `${ORIGIN}/shop?metal=gold&page=2` }))).toBe(false);
+  // Owner change, 2026-08-17: a query-only navigation is a real wait — the shop
+  // refetches from the server — so it now arms. It used to be refused on the
+  // grounds that it "updates in place", which was wrong about the cost.
+  it('arms for a query-only change on the same path', () => {
+    // What a shop filter, sort, or pagination click looks like.
+    expect(shouldArmProgressBar(intent({ href: `${ORIGIN}/shop?metal=gold&page=2` }))).toBe(true);
   });
 
-  it('does not arm for a hash link on the same path', () => {
+  it('arms when the query changes from one value to another', () => {
+    expect(
+      shouldArmProgressBar(
+        intent({ href: `${ORIGIN}/shop?page=3`, currentSearch: '?page=2' }),
+      ),
+    ).toBe(true);
+  });
+
+  it('arms when a query is cleared back to none', () => {
+    expect(
+      shouldArmProgressBar(intent({ href: `${ORIGIN}/shop`, currentSearch: '?metal=gold' })),
+    ).toBe(true);
+  });
+
+  // Everything below still holds: the bar appears only when the visitor is
+  // actually made to wait on the server.
+
+  it('does not arm for a link to the exact location already shown', () => {
+    expect(
+      shouldArmProgressBar(intent({ href: `${ORIGIN}/shop?page=2`, currentSearch: '?page=2' })),
+    ).toBe(false);
+  });
+
+  it('does not arm for a hash link on the same path and query', () => {
     expect(shouldArmProgressBar(intent({ href: `${ORIGIN}/shop#top` }))).toBe(false);
+    expect(
+      shouldArmProgressBar(
+        intent({ href: `${ORIGIN}/shop?page=2#top`, currentSearch: '?page=2' }),
+      ),
+    ).toBe(false);
   });
 
   it('does not arm for another site', () => {
@@ -67,13 +95,38 @@ describe('route progress bar — when it arms', () => {
   });
 });
 
+describe('route progress bar — location keys', () => {
+  it('spells an absent query the same way whatever the source', () => {
+    // `URL.search` gives '' or '?a=1'; `URLSearchParams.toString()` gives ''
+    // or 'a=1'. Both feed this, so both must land on one spelling or a
+    // navigation would look incomplete forever.
+    expect(locationKey('/shop', '')).toBe('/shop');
+    expect(locationKey('/shop', '?')).toBe('/shop');
+    expect(locationKey('/shop', '?page=2')).toBe('/shop?page=2');
+    expect(locationKey('/shop', 'page=2')).toBe('/shop?page=2');
+  });
+
+  it('distinguishes two queries on one path', () => {
+    expect(locationKey('/shop', 'page=2')).not.toBe(locationKey('/shop', 'page=3'));
+  });
+});
+
 describe('route progress bar — when it clears', () => {
   it('completes once a different path commits', () => {
     expect(isNavigationComplete('/shop', '/shop/some-bracelet-21')).toBe(true);
   });
 
-  it('does not complete while the committed path is unchanged', () => {
+  it('does not complete while the committed location is unchanged', () => {
     expect(isNavigationComplete('/shop', '/shop')).toBe(false);
+  });
+
+  // The reason completion is keyed on path AND query. A shop filter never
+  // changes the path, so a path-only comparison would report "not arrived"
+  // forever and strand the bar until the 8s safety timeout.
+  it('completes when only the query changed', () => {
+    expect(
+      isNavigationComplete(locationKey('/shop', ''), locationKey('/shop', 'metal=gold')),
+    ).toBe(true);
   });
 
   // Regression: this exact mistake shipped once and was caught by measuring a

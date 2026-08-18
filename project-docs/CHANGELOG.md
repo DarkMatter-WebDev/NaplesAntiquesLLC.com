@@ -1,6 +1,1077 @@
 
 # Changelog
 
+## 2026-08-18 (9) — The map is square, and the footer address copies too
+
+Both owner requests.
+
+### The map frame is 1:1
+
+`ShowroomMap` replaced its `height` prop with **`maxWidth`** and now sets
+`aspect-ratio: 1 / 1`. It was a wide short band that showed a corridor of
+Shirley St with almost no context north or south of the door; a square roughly
+doubles the north-south extent at the same zoom, which is what makes the plaza
+recognisable on arrival.
+
+| Surface | Before | Now |
+| --- | --- | --- |
+| Homepage CTA | 576 x ~260 letterbox | **448 x 448** (`maxWidth` default `28rem`) |
+| Contact `VisitUsPanel` | full-width x ~380 | **512 x 512** (`maxWidth="32rem"`) |
+
+⚠️ **The cap is on WIDTH but binds the height too**, because the frame is
+square. Widening a surface's `maxWidth` also makes it taller — check both before
+changing it. The frame is `mx-auto`, so it centres inside whatever column it is
+given.
+
+ℹ️ A width check will report the iframe 2px smaller than the frame. That is the
+1px border on each side: 448 border-box against a 446 content box. Not a bug.
+
+### Copy button in the footer
+
+The same `CopyAddressButton` now sits beside the footer address, so all four
+address surfaces have it.
+
+⚠️ It is a **sibling of the maps link** here as everywhere — a `<button>` in an
+`<a>` is invalid HTML. It IS inside the `<address>` element, unlike the contact
+page, and that is deliberate rather than sloppy: the footer's `<address>` wraps
+the whole band including the hours, so there is no "outside" without splitting
+the element, and `<address>` accepts flow content, so a button inside it is
+valid.
+
+**Verification:** `tsc` clean · `lint` clean · **1016/1016** · build
+**454/454 pages**.
+
+- Desktop 1206px: homepage map **448x448**, contact **512x512**, both exactly
+  square and centred, zoom buttons inside the frame, contact map still above
+  *Get directions*.
+- **320px**: the square shrinks to **288x288** and stays square, no horizontal
+  scroll, zoom buttons still inside.
+- Footer: copy button present, 24x24, on the address's first line, outside the
+  anchor, row centred.
+
+🔴 The clipboard still could not be exercised — same hidden-pane focus block
+recorded in (8). Unchanged by this entry.
+
+## 2026-08-18 (8) — A copy-address button on the three address surfaces
+
+Owner request. New `src/components/CopyAddressButton.tsx` — a 24px icon button
+next to the address on the **homepage** "Call or Visit Us Today" block, the
+**contact** page's Visit Us panel, and the **About** page's showroom section.
+Not added to the footer, which was not asked for.
+
+**It copies `addressOneLine()` — street and city ONLY.** No landmark, no
+business name. What gets pasted almost always goes into a maps app or a GPS, and
+"· inside Sharon Lynch Collections" is wayfinding for a human reading the page,
+not something to hand a geocoder. The landmark stays visible beside the button;
+it just does not travel.
+
+**Reuses the existing `lib/clipboard.ts` helper** rather than calling
+`navigator.clipboard` directly — it already falls back to a hidden textarea plus
+`execCommand` when the Clipboard API is unavailable, and admin surfaces have
+used it for a while.
+
+⚠️ **The button is a SIBLING of the maps link, never inside it.** A `<button>`
+nested in an `<a>` is invalid HTML and browsers resolve it by breaking one of
+the two — usually leaving a control that navigates instead of copying. On the
+contact page it also sits outside the `<address>` element, since that element is
+the address itself and a control is not part of one. Verified in the DOM:
+`insideAnchor: false` on all three, `insideAddressEl: false` on contact.
+
+Accessibility: the accessible name changes with state ("Copy address" ->
+"Address copied" / "Could not copy the address") so a re-read after activation
+hears the result, and the same string is announced through a polite live region
+because the icon swap is otherwise purely visual. The box is a fixed 24px square
+with same-size icons, so the confirmation cannot reflow the address beside it.
+
+**Verification:** `tsc` clean · `lint` clean · **1016/1016** · build
+**454/454 pages**. All three surfaces render a 24×24 button beside the address,
+outside any anchor; Spanish shows `Copiar dirección`; at **320px** the button
+stays on the address's first line, the row is 288px inside a 320px viewport with
+no overflow, and "Sharon Lynch Collections" is still unbroken.
+
+🔴 **The copy itself is UNVERIFIED in this environment, and the reason is
+measured, not assumed.** With the Browser pane hidden `document.hasFocus()` is
+**false**, and the browser blocks both paths on an unfocused document: the
+Clipboard API threw `NotAllowedError` and the `execCommand` fallback returned
+`false`. `isSecureContext` is true and `navigator.clipboard.writeText` exists,
+so both paths are available to a real, focused page. What this DID prove is that
+**the failure path is graceful** — the button reported "Could not copy the
+address" through both its label and the live region rather than silently
+pretending to succeed. Press it once on a real screen.
+
+## 2026-08-18 (7) — Hero "Visit Us" jump, and the footer address stacks
+
+### Footer: address ABOVE hours
+
+Reverted the side-by-side pairing from (6) — owner call. Side by side, the two
+halves read as two unrelated columns and the footer's centre line falls in the
+empty gap between them; stacked, they read as one address block with its opening
+times under it. Column heights stay **222/222/222/222**, so the balance the move
+bought is unaffected.
+
+### Hero: Trade -> Visit Us, jumping to the CTA block
+
+The third hero button was **Trade** (-> `/trade-in`). It is now **Visit Us** /
+**Visítenos**, jumping to the "Call or Visit Us Today" block at the foot of the
+homepage — the block that carries the phone number, the invitation, the address,
+the hours and the map together.
+
+⚠️ **`/trade-in` is no longer linked from the hero.** It remains in the footer
+under *Sell to Us*, but it has lost its only prominent entry point. If the
+trade-in program needs one again it needs a new home, not this slot back.
+
+**New `src/lib/home-anchors.ts` — `VISIT_ANCHOR_ID`.** The id and the
+`href="#..."` that targets it live in different files (the hero overlay links to
+a block the page renders), and a mismatch fails **silently**: the browser simply
+does nothing for an unknown hash, leaving a dead button and no error anywhere.
+One constant, imported by both.
+
+⚠️ **`scroll-margin-top: var(--site-header-height)` on the target is not
+optional.** The header is fixed, so without it the anchor lands with the eyebrow
+and part of the phone number underneath it. It reads the TOKEN, never a
+hardcoded 56/72px — the token changes at the md breakpoint (3.5rem -> 4.5rem),
+and both were verified.
+
+⚠️ **A plain `<a>`, never `<Link>`.** This is not a route change; routing it
+would arm the route progress bar for a navigation that never commits, leaving
+the bar to time out.
+
+⚠️ **Smooth scrolling is JS on the click, NOT `scroll-behavior: smooth` on
+`html`.** That property applies to the scrolling container, so setting it
+globally would also animate the scroll-to-top on every route change — a sitewide
+feel change to buy one button an animation. The handler honours
+`prefers-reduced-motion` and falls back to an instant jump; the underlying
+`<a href="#visit-us">` still works with JS off or on a middle-click.
+`history.replaceState`, not `pushState`, so the jump does not wedge an entry
+between the visitor and wherever they came from.
+
+**Verification:** `tsc` clean · `lint` clean · **1016/1016** · build
+**454/454 pages**.
+
+- Desktop: the jump lands with the block's top at **72px**, exactly the header's
+  bottom edge; hash becomes `#visit-us`. All three buttons 160px, unchanged.
+- **320px, Spanish** — the structural risk case, since "Visítenos" is longer
+  than "Intercambiar" was short: buttons all **141px with no overflow**, and the
+  **"two up, one down" layout holds** (Comprar + Vender / Visítenos). That
+  arrangement is documented as STRUCTURAL, so it was the thing most likely to
+  break and did not.
+- Footer at 1206px and 320px: address above hours, both centred, no horizontal
+  scroll.
+
+🔴 **The smooth animation itself is UNVERIFIED, and could not be verified here.**
+The Browser pane was hidden all session, which freezes `requestAnimationFrame` —
+measured directly: a rAF callback did not fire within 1500ms, and a `smooth`
+scroll stayed at scrollY 0 for six seconds. The same call with `behavior: 'auto'`
+scrolled correctly to **5871** and landed the block top at exactly the header's
+56px edge, which proves the anchor, the id and the offset are right and isolates
+the gap to the animation. Watch it once on a real screen.
+
+## 2026-08-18 (6) — The footer address and hours move out of the brand column
+
+Owner-reported, with a screenshot. Since 2026-08-17 the address sat in the
+footer's brand column, and once 2026-08-18 (3) turned the hours into a seven-row
+list that column ran to roughly twice the height of the other three. The footer
+read as one long column with three stubs beside it, and the whole right side of
+the block was dead space.
+
+**The `<address>` moved out of the column and became a centred band under the
+whole four-column row**, between the link columns and *Areas We Serve*. Inside
+it, **Visit Us** and **Hours** sit side by side from `sm` up and stack, still
+centred, below that. Both carry a small uppercase label in the footer's existing
+group-header style, so the band reads as part of the footer's system rather than
+as loose text.
+
+**Measured effect — this is the whole point of the change:** the four column
+heights went from wildly uneven to **222 / 222 / 222 / 222, a spread of zero**.
+
+The band's rule and spacing (`mt-4 border-t pt-4 md:mt-10 md:pt-6`) are copied
+exactly from the *Areas We Serve* band below it, so the footer keeps one rhythm
+instead of gaining a section that looks bolted on.
+
+⚠️ **Do not move it back into a column without shortening the hours first** —
+the column imbalance is a direct function of the seven-row list.
+
+ℹ️ **The phone number deliberately stayed in the brand column.** It is a bordered
+tap target on mobile and the highest-intent thing in the footer; moving it to
+sit beside the address would have made NAP contiguous but cost it that
+prominence. Say if the SEO argument should win instead — it is a small move.
+
+ℹ️ Still one `<address>` element wrapping the real address, so the sitewide NAP
+signal is unchanged in kind, only in position.
+
+**Verification:** `tsc` clean · `lint` clean · **1016/1016** · build
+**454/454 pages**. At **1206px**: centred, below the Legal column, above *Areas
+We Serve*, the two halves side by side. At **375px**: stacked, still centred, no
+overflow, no horizontal scroll, hours still sharing one right edge and
+"Sharon Lynch Collections" still unbroken. Spanish renders `VISÍTENOS` /
+`HORARIO` and the contact page's own hours panel is untouched.
+
+⚠️ Measurement, not eyes — the Browser pane stayed hidden.
+
+## 2026-08-18 (5) — Reviews: 4 -> 12, and the homepage band now scrolls
+
+Owner request: pull more reviews from the Google Business Profile and replace
+the 2x2 block with a continuous scrolling banner.
+
+### The reviews
+
+**`TESTIMONIALS` went 4 -> 12**, read from the live profile (**16 reviews, 5.0
+average**) with the "More" expander opened on every card, so these are full text
+rather than Google's collapsed preview. Eight added: Mine Cervantes, Max
+Kolegue, Scott Tallent, Gerald Nestico, Nathan Pablik, Judith Lam, Vasanth
+Gunasekaran, Douglas Mitchell.
+
+⚠️ **Quoted verbatim INCLUDING the spelling and grammar as posted** — Max's
+"Jewelery", Vasanth's "he have lots of collection", the double space in Scott's
+"pricing.  After". Those are not typos awaiting a fix; the rule at the top of
+`testimonials.ts` is verbatim, and a corrected quote is an invented one.
+
+ℹ️ **Two things were deliberately NOT added, and both need an owner decision:**
+
+- 🔴 **Linda Cusumano's review is excluded.** Its text on Google genuinely ends
+  `… Local. Honest. Professional.
+Hi baby` — the stray line is inside the review
+  body element itself, not an extraction artifact from a neighbouring node
+  (verified by reading each text node separately). Publishing it verbatim looks
+  broken; trimming it edits a customer's words, which this file forbids. It is a
+  strong review otherwise and worth having if the owner can ask her to edit it.
+- **A Spanish review** ("Tenía estas piezas de oro que prácticamente ya no las
+  usaba…") appears under *Updates by visitors* with no attributable reviewer
+  name in the DOM. Skipped rather than attributed wrongly.
+
+ℹ️ **10 of the 16 reviews loaded**; the feed stopped paginating after that.
+Three of the missing six are Nolan Olivier, Onur and Yisel Perez, which were
+already in the file — so 12 of 16 are now on the site.
+
+🔴 **NAP mismatch spotted while reading the profile: Google shows
+`Closed · Opens 10 AM`,** which matches neither the site nor the schema
+(Tue–Sat 11:00–15:00). `business-location.ts` warns that these must stay
+byte-identical to the profile. Owner action, in the profile — see `TASKS.md`.
+
+### The marquee
+
+**`TestimonialsSection` gained `variant="grid" | "marquee"`.** The homepage
+passes `marquee`; **product pages keep the grid** — a page about one item should
+not have a moving element competing with the photography.
+
+**It is CSS-only.** No measurement, no rAF, no client component: the homepage has
+an open first-paint budget and a marquee that costs JS to move would be paying
+for decoration. The track is a flex row of two identical halves translated
+`-50%` forever.
+
+⚠️ **Four things that are load-bearing rather than stylistic:**
+
+1. **Card spacing is `margin-inline-end`, NOT flex `gap`.** With `gap` the track
+   is `2n*card + (2n-1)*gap` — one gap short of two identical halves — so `-50%`
+   misses the seam and the loop jerks once per cycle. Verified in the browser:
+   track 8115px, one half's slots 4057px, **seam exact**.
+2. **`data-customer-reveal-skip` on the wrapper.** CustomerReveal matches
+   `main [class*="card"]` and stamps matches `data-customer-reveal="pending"`
+   (opacity 0) until an observer reveals them; inside a moving track the
+   off-screen cards may never be observed, so the band would scroll a procession
+   of invisible cards. `closest()` is what CustomerReveal tests, so one attribute
+   on the wrapper covers every card. Verified: zero `pending` cards in the track.
+3. **Repeats are `aria-hidden` and `tabIndex={-1}`.** A screen reader reading the
+   same twelve reviews twice is worse than no band. Verified: 12 real cards
+   tabbable, 12 repeats hidden and untabbable.
+4. **Reduced motion removes the repeats and makes it a scroller.** Not merely
+   "stop the animation" — a stopped marquee is a row with most of its content
+   unreachable. Verified in the served stylesheet: `animation-name: none`,
+   `.testimonial-marquee-repeat { display: none }`, `overflow-x: auto`.
+
+Duration is derived (`cardsPerHalf * 7s`), so adding reviews makes the band
+longer instead of faster: 12 cards -> **84s**, measured at **~49px/s**. Pauses on
+hover (pointer devices only, matching the existing card-hover rule) and on
+`:focus-within`. Edges are masked so cards fade in and out rather than being
+guillotined. Full-bleed, deliberately outside `PageContainer`.
+
+**Verification:** `tsc` clean · `lint` clean · **1016/1016** · build
+**454/454 pages**. Restored-file check: the four pre-existing reviews are
+**byte-identical** to the last staged copy (diff shows additions only).
+
+⚠️ Measurement, not eyes — the Browser pane stayed hidden, so nobody has watched
+the band actually scroll.
+
+## 2026-08-18 (4) — The homepage CTA gets a typographic ladder
+
+Owner request: "give this section more of a hierarchy. I vote for boldness."
+Everything below the phone number was one flat grey mass — deck, address,
+landmark, hours and footnote all at the same weight and the same muted colour,
+so the eye had nothing to step down.
+
+**The ladder now, measured on the rendered page:**
+
+| | Element | Size | Weight | Treatment |
+| --- | --- | --- | --- | --- |
+| 1 | Eyebrow | 10.4px | 700 | gold, wide tracking |
+| 2 | Phone | 29.75px | 700 | headline face |
+| 3 | **Deck** ("Visit us today …") | 15.2px | 400 | **promoted to full-strength text colour** |
+| 4 | Street line | 14px | **600** | |
+| 5 | Landmark | 14px | 400 | 0.80 opacity |
+| 6 | Day | 14px | **600** | |
+| 7 | Time | 14px | **700** | **tabular figures** |
+| 8–9 | Closed day / time | 14px | 600 / 500 | 0.55 opacity |
+| 10 | "or by appointment" | 12.6px | 400 | 0.70 opacity |
+
+**Three changes, two of them in shared components:**
+
+1. **`ShowroomAddress`** — street line to 600, landmark explicitly reset to
+   **400**. The reset is deliberate: it keeps the landmark a qualifier even when
+   a surface sets the whole block bold.
+2. **`ShowroomHours`** — day 600, time 700, closed rows dimmed to 0.55 with the
+   word "Closed" dropped to 500. Times gained
+   **`font-variant-numeric: tabular-nums`**; without it the digits and colons
+   drift and the right edge only looks aligned by luck. Verified: every time
+   cell in the 7-row footer list shares one right edge.
+   ⚠️ **Emphasis is weight and opacity, never colour.** These render on four
+   surfaces with four inherited colours; a hardcoded colour here would fight the
+   footer's muted palette.
+3. **Homepage CTA** — the deck takes `--color-on-surface`. Address and hours
+   moved into one block under **a single hairline rule on top** (`border-t`,
+   `inline-block` so it shrinks to content and centres). They are the same KIND
+   of fact — the practical detail you act on after the invitation — and grouping
+   them is what stops the section flattening back into a list.
+
+   ⚠️ **Both of those landed bolder first and were pulled back the same day,
+   on owner review — do not re-apply either:**
+
+   - **The deck was `fontWeight: 600` and read as shouting.** Two lines of bold
+     directly under a 30px phone number is two headlines arguing. The colour
+     lift alone does the separating; the weight is gone.
+   - **The block was bracketed top AND bottom and read as a stray box.** One
+     short rule reads as "detail follows"; closing the bottom makes a container
+     that competes with the map right beneath it. The map already supplies the
+     lower edge. `border-b` and `pb` are gone; `border-t` and `pt-5` stay.
+
+   Measured after the pullback: 32px deck-to-rule, 20px rule-to-address, 34px
+   footnote-to-map, and the 270px rule sits well inside the 532px map so it
+   reads as a short centred divider, not a container edge.
+
+ℹ️ **The shared-component half improves the footer, contact and About too** —
+those were carrying the same flat treatment. Only the bracketed panel is
+homepage-specific.
+
+**Verification** (re-run after the pullback): `tsc` clean · `lint` clean ·
+**1016/1016** · build **454/454 pages**. At **320px**: the CTA block is 270px
+inside a 320px column, **centred**, one top rule and no bottom rule, no row
+wraps, no overflow, no horizontal scroll. Spanish `/es/about` and the footer both
+render 7 rows with a shared right edge and no wrapping.
+
+⚠️ Measurement, not eyes — the Browser pane stayed hidden, so no screenshot of
+the finished ladder.
+
+## 2026-08-18 (3) — Hours as a day-by-day list, the way Google Maps shows them
+
+Owner request, with a screenshot of the footer. Hours read
+`Tue–Sat 11am–3pm, or by appointment` — one line packing three separate facts
+(which days, which hours, that appointments exist), so answering "can I come
+Thursday?" meant parsing a sentence. Now it is a two-column list you scan.
+
+**New `src/components/ShowroomHours.tsx`**, plus `hoursRows()`,
+`hoursRowsGrouped()`, `closedLabel()` and a `HoursRow` type in
+`business-location.ts`.
+
+```
+Monday       Closed
+Tuesday      11:00 AM – 3:00 PM
+Wednesday    11:00 AM – 3:00 PM
+Thursday     11:00 AM – 3:00 PM
+Friday       11:00 AM – 3:00 PM
+Saturday     11:00 AM – 3:00 PM
+Sunday       Closed
+or by appointment
+```
+
+**Decisions worth not re-litigating:**
+
+- **Monday-first**, so the two closed days bookend the open week. A Sunday-first
+  US calendar order opens the list with two "Closed" rows.
+- **Closed days are shown, dimmed, not hidden.** "Sunday — Closed" answers a
+  question someone is actually asking; a missing row does not.
+- **Closed days are DERIVED from `HOURS.days`**, never a second list, so
+  changing the open days changes the display and the schema together.
+- **"or by appointment" goes UNDER the list, not beside a row.** It qualifies
+  every row, so parking it in the time column next to one day would say
+  something false about that day. A third column would break the two-column
+  alignment the list exists for. (The owner offered either placement; this is
+  the reason for the choice.)
+- **It is a `<dl>`** — these really are term/definition pairs, and the markup
+  should say so rather than faking a table with divs.
+- **`inline-grid` inside a centering wrapper**, so the block centres as a unit
+  while the columns stay aligned. A plain centred grid centres each row and
+  loses the column edge that makes it scannable. Verified: every time cell
+  right-aligns to one edge.
+- ℹ️ **Today is deliberately NOT bolded** the way Google Maps does it. Today is
+  a client-side fact — these pages are statically prerendered, so a
+  server-rendered "today" is wrong for real visitors, and a client-rendered one
+  costs a hydration pass on the footer of every page.
+
+**Where each variant went:**
+
+| Surface | Variant | Why |
+| --- | --- | --- |
+| Footer | full, 7 rows | where the owner pointed; a footer is a reference block |
+| Contact `VisitUsPanel` | full, 7 rows | replaces the old 4-line stack |
+| About | full, 7 rows | replaces the old 4-line stack |
+| **Homepage CTA** | **grouped, 2 rows** | the one exception — a CTA holding a phone number, a sentence and a map in one narrow column; 7 rows would out-weigh the phone number and push the map off the fold |
+
+⚠️ `hoursRowsGrouped()` hardcodes "Sunday – Monday" as the closed pair, because
+that is what the current `HOURS.days` leaves over. **If the open days ever
+change so the closed days are no longer a contiguous Sunday/Monday pair, the
+grouped form silently lies** — the warning is on the function, and the fix is to
+use `hoursRows()`, which cannot.
+
+⚠️ `hoursLine()`, `hoursDaysLabel()`, `hoursTimesLabel()` and
+`byAppointmentLabel()` all survive and are still correct for prose and email —
+shipping, checkout, product trust, the invoice email and the Spanish legal copy
+were deliberately not converted. `ShowroomHours` composes from the same
+`hoursTimesLabel()`, so the list and the sentences cannot drift.
+
+**Verification:** `tsc` clean · `lint` clean · **1016/1016** · build
+**454/454 pages**. In-browser at **320px in Spanish** — the worst case: no row
+wraps, nothing overflows, no horizontal scroll. Footer list 187px inside a 225px
+column; homepage grouped list 259px inside 288px. Contact panel renders all
+seven Spanish rows plus `o con cita`.
+
+⚠️ Measurement, not eyes — the Browser pane stayed hidden, so no screenshot.
+
+## 2026-08-18 (2) — Map zoom buttons, and an address that stops splitting a name
+
+Two owner requests on top of 2026-08-18 (1).
+
+### Zoom buttons on the map, and a closer default
+
+**Default zoom 16 -> 17** (`mapsEmbedUrl()` default and `ShowroomMap`'s
+`DEFAULT_ZOOM`). Street level — the plaza and the roads you would turn off.
+
+**`ShowroomMap` now renders its own `+` / `–` controls**, top-right, clamped to
+**z12–z20** and disabled at each bound.
+
+⚠️ **They work by reloading the frame, and that is not a shortcut.** The map is
+a cross-origin iframe: nothing on our page can call into it, so no button can
+ask Google's map to zoom. Zoom is a query parameter, so each press re-requests
+the frame at a new `z`. The cost is a network round trip and a brief redraw per
+step; the alternative is the Maps JavaScript API, which zooms smoothly and needs
+a billable key — rejected for a decorative widget. Two guards make it behave:
+
+- **A 300ms debounce.** `zoom` follows the button instantly so the control feels
+  live; `appliedZoom` lags and is what the frame loads. A burst of clicks is one
+  load, not one per click. Measured: two rapid `+` presses took z17 -> z19 in a
+  single frame load.
+- **The frame is REMOUNTED via `key`, not re-`src`ed.** Changing a live iframe's
+  `src` pushes a session-history entry, so Back would walk backwards through
+  zoom levels instead of leaving the page. A freshly inserted iframe's first
+  load does not. Measured: `history.length` grew by **0** across a zoom.
+
+This also answers Google's "use ctrl + scroll to zoom" overlay — its own gesture
+guard, not removable on a keyless embed. With buttons, nobody has to find it.
+
+ℹ️ **`ShowroomMap` became a client component** for the buttons. It still
+server-renders its markup, so the map is in the initial HTML and the added cost
+is hydrating two buttons. **Build still 454/454 pages** — the prerender count
+did not collapse.
+
+Controls are **36px**, above WCAG 2.2 AA's 24px minimum, without the pair eating
+half the homepage map's 190px minimum height.
+
+### The footer stopped breaking "Sharon Lynch Collections" in half
+
+Owner-reported, with a screenshot. The footer rendered:
+
+```
+6240 Shirley St, Ste 104, Naples, FL 34109 · inside Sharon
+Lynch Collections
+```
+
+`addressWithLandmark()` joins address and landmark with a middot, and **a middot
+is not a break opportunity** — so the line broke wherever it ran out of column.
+A business name split across two lines reads as two things, and this name is
+pure wayfinding: it is the sign out front the visitor is scanning for, so it is
+the one phrase that must survive intact.
+
+**New `src/components/ShowroomAddress.tsx`** for display surfaces — footer,
+homepage CTA, About. It renders:
+
+```
+6240 Shirley St, Ste 104, Naples, FL 34109
+inside Sharon Lynch Collections
+```
+
+- The landmark is its own line and **drops the middot** — a line break already
+  separates the two facts, and a leading "·" on a wrapped line is worse than
+  none. It is a step down in weight (85% opacity), marking it a qualifier on the
+  address rather than a second address.
+- Street and city are separate `nowrap` runs, so a forced break lands after
+  "Ste 104," rather than inside "Naples, FL 34109".
+- ⚠️ **Only the NAME is `nowrap`, not the whole clause.** An unbreakable clause
+  would guarantee the line but hand it a cliff: at 320px the Spanish
+  "dentro de Sharon Lynch Collections" measures **190px inside a 269px column**,
+  and a font bump or a longer suite name would push an unbreakable run into
+  horizontal scroll. Letting the preposition wrap protects the name at any
+  width.
+
+**New `landmarkParts()` in `business-location.ts`** returns `{ lead, name }` —
+the seam the layout needs. `landmarkPhrase()` joins them back, and
+`addressWithLandmark()` composes from that, so the three cannot drift.
+
+⚠️ **`addressWithLandmark()` is still correct for prose and email** — sentences
+like "Local pickup is free at …" need the string, and an email cannot take a
+React element. Its 9 remaining call sites (checkout, shipping, product trust,
+invoice/order email, Spanish legal copy) were deliberately **not** converted.
+
+**Verification:** `tsc` clean · `lint` clean · **1016/1016** · build
+**454/454 pages**. In-browser at **320px** (narrowest realistic phone) in
+**Spanish** — the worst case for both changes: name on one line in the footer
+AND the homepage CTA, **no horizontal scroll**; zoom clamps at z20/z12 with the
+bound button disabled; controls sit inside the frame.
+
+⚠️ Still measurement, not eyes — the Browser pane stayed hidden, so no
+screenshot of a rendered tile or a pressed button.
+
+## 2026-08-18 (1) — "Visit us today", and a map on the pages that need one
+
+The showroom rollout (2026-08-17) put the address on the site but never invited
+anyone through the door. The homepage CTA read **"Call Us Today"** over a phone
+number and nothing else; the About page mentioned the store only inside a
+paragraph explaining low overhead ("one small shared showroom"), which reads as
+pricing rationale rather than an invitation; and the contact page's Visit Us
+panel offered a directions link but no picture of where it sends you.
+
+**New shared component: `src/components/ShowroomMap.tsx`.** A server component
+wrapping one `<iframe>`. The pin comes from `lib/business-location.ts`, so it
+cannot drift from the address printed beside it.
+
+**New: `mapsEmbedUrl()` in `lib/business-location.ts`**, beside the existing
+`mapsUrl()`. Keyless classic embed (`maps.google.com/maps?...&output=embed`) —
+the Maps Embed API needs a billable key, and this widget is decoration around an
+address already printed as text. It pins the **owner-supplied GEO pair** rather
+than geocoding the address: the coordinates are the verified door, and a
+geocoder is free to disagree with a suite number. Falls back to the address only
+if `GEO` is ever returned to `null`.
+
+**🔴 CSP had to change, in TWO files.** `frame-src` gained
+`https://www.google.com https://maps.google.com` in **both** `next.config.ts`
+and root `netlify.toml`. Both origins are required, not one: the request starts
+at `maps.google.com` and **301s to `www.google.com/maps/embed`**. The final
+document is frameable — the redirect hop carries `X-Frame-Options: SAMEORIGIN`,
+but that header on a *redirect* response is not enforced for framing; the 200
+that lands has no `X-Frame-Options` and a CSP with no `frame-ancestors`.
+Confirmed in-browser: the frame holds a **cross-origin** document
+(`contentDocument === null`), which is exactly what a CSP-blocked frame does not
+do.
+
+**Where the map went, and where it deliberately did not:**
+
+| Surface | Map | Why |
+| --- | --- | --- |
+| Homepage CTA | ✅ small — `clamp(190px, 42vw, 260px)`, `max-w-xl` | orientation, not navigation; it must not out-weigh the phone number the section exists to show |
+| Contact — `VisitUsPanel` | ✅ taller — `clamp(240px, 52vw, 380px)` | this is the page opened to answer "where are you"; it sits directly above **Get directions** so picture and action read as one unit |
+| About | ❌ text + directions link only | the page's job is to say the store exists; a third frame is weight for no new information |
+
+**`loading="lazy"` is load-bearing, not a nicety.** First paint is an open
+performance item (baseline: 533KB across 30 requests before FCP) and Google's
+embed is a substantial third-party payload. Lazy keeps all of it below the fold
+and off the critical path. Do not remove it to make the map appear sooner.
+
+**Homepage CTA copy.** Eyebrow `Call Us Today` -> **`Call or Visit Us Today`**,
+plus a new sentence above the address: *"Visit us today — walk into our Naples
+showroom during opening hours, or call ahead and we'll set a private
+appointment."* ⚠️ It says **"during opening hours"**, NOT "no appointment
+needed": both are true on a Tuesday and false on a Sunday, and "today" is read
+on whatever day the visitor lands. The hours line two elements below is what
+makes the sentence honest — do not separate them.
+
+**About page: a new Visit Us section** between *Meet Chris* and the CTA. H2
+**"We Now Have a Naples Showroom"**; the page's H2s went from `Meet Chris` /
+`Ready to Start a Conversation?` to those plus this one. It carries the
+wayfinding sentence, an hours block, the address as a maps link, and two buttons
+(**Get directions**, **See the map and contact us** -> `/contact`). It also
+restates the home-visit promise, so the store reads as an addition rather than a
+replacement. Every string comes from `business-location.ts`.
+
+**Privacy policy gained a Service Providers bullet for Google Maps** — the embed
+means Google receives the visitor's IP and may set its own cookies. The bullet
+also records that the frame loads only on scroll, and that address, hours and
+directions are shown as plain text without it. The existing "no Google
+Analytics / Tag Manager / pixel was found" statement is untouched and still
+true; a map is not analytics.
+
+Both locales throughout. ES: `Llámenos o Visítenos Hoy`, `Visítenos hoy: pase
+por nuestro salón…`, `Ahora Tenemos Salón en Naples`.
+
+**Verification:** `npx tsc --noEmit` clean · `npm run lint` clean ·
+**1016/1016** tests across 99 files · `npm run build` **454/454 static pages**
+(the invariant holds). In-browser on the dev server: the frame loads
+cross-origin on `/`, `/es` and `/contact` with **zero CSP violations in the
+console**; exactly one iframe per page (the second grep hit is the RSC flight
+payload, not a second frame); at **375px** the homepage map is 341x190 with **no
+horizontal scroll and no viewport overflow**; `/about` correctly has none.
+
+⚠️ **Not yet seen on real hardware.** The Browser pane was hidden for this
+session, so screenshots were unavailable and every check above is a DOM/network
+measurement, not a look at rendered map tiles.
+
+## 2026-08-17 (10) — Pre-deploy sign-off: email verified, palette approved
+
+**Email path verified end to end, against the real templates.** A test send went
+to `info@naplesestatejewelry.com` from the production Resend key and the real
+`EMAIL_FROM` (`noreply@naplesestatejewelry.com`), carrying all three surfaces the
+showroom rollout changed — the receipt's pickup note, the order-email footer in
+BOTH HTML and plain text, and the marketing footer's CAN-SPAM address.
+
+The bodies were rendered by running the actual `buildInvoiceEmailContent`,
+`buildOrderEmailFooterHtml` and `withMarketingFooter` through vitest (which
+resolves the `@/` aliases and stubs `server-only`) against a pickup-order
+fixture — not retyped. So what was reviewed is byte-for-byte what a customer
+receives.
+
+**It arrived in the inbox, not Spam** — the outcome that matters, because DMARC
+is `p=quarantine` and a DKIM or alignment fault would have failed silently with
+Resend still reporting success. Owner confirmed the address, hours and landmark
+all read correctly.
+
+⚠️ The test was sent from LOCAL. It proves Resend + DNS + DKIM/DMARC + inbox
+placement. It does **not** prove Netlify's environment, which has silently
+differed from local before (`EBAY_CRON_SECRET`, `EMAIL_FROM`). Watch the first
+real production receipt.
+
+ℹ️ The owner noted odd wrapping in the test email. That was the one-off harness's
+own box layout, not a production template — no app code renders it.
+
+**Product attribute palette approved**, amethyst included (CHANGELOG (7)). The
+colour scheme is settled; it should not be re-opened.
+
+## 2026-08-17 (9) — Meta descriptions trimmed so the showroom survives truncation
+
+Pre-deploy audit of the descriptions rewritten in (8). Google truncates around
+160 characters, and **7 of 14 pages had the new showroom message sitting in the
+cut-off tail** — including `/sell` and every `/sell/[city]` page, which are
+precisely the pages meant to carry it.
+
+Measured honestly before acting: **10 of the 13 descriptions were already over
+160 before this rollout**, so the length problem was inherited, not created.
+(`/silver-services`, `/trade-in` and `/free-evaluation` were over and were never
+touched by this work.) The rollout did push 2 newly over and added +3 to +36
+characters across the rest.
+
+Rewritten to front-load the showroom and fit the budget. All **24** URLs — both
+locales, all six cities — now measure ≤160 with the showroom message inside the
+visible window.
+
+⚠️ The `/sell/[city]` description is a TEMPLATE: its length must hold for the
+longest city name, **"Bonita Springs" (14 chars)**. It measured 163 at that
+city while Naples measured 155 — check the longest, not the first.
+
+ℹ️ `/shipping` has an `og:description` that does not match its `description`.
+Left alone deliberately: it is a `LEGAL_NOINDEX_PATHS` page with
+`robots: { index: false }`, so search never sees either.
+
+## 2026-08-17 (8) — Showroom address, hours, and the end of the mobile-only site
+
+The showroom at **6240 Shirley St, Ste 104, Naples, FL 34109** (inside **Sharon
+Lynch Collections**, Tue–Sat 11:00–15:00 or by appointment) is open, and the
+site had been built on the opposite premise in 61 strings across 15 files.
+Decision recorded in DECISIONS: **store-first, home visits by request** — the
+six `/sell/[city]` pages are reframed rather than gutted, because they rank on
+travel intent.
+
+**New single source of truth** — `src/lib/business-location.ts`. Address,
+hours, the wayfinding sentence, and the schema.org `PostalAddress` /
+`OpeningHoursSpecification` builders. Created because the phone number was
+never centralised and is now hardcoded in 105 places across 37 files; the
+address must not repeat that.
+
+**Two strings were false, not merely stale:**
+
+- `[locale]/layout.tsx` — `openingHoursSpecification` claimed Mon–Sat
+  10:00–17:00. Now Tue–Sat 11:00–15:00 from the shared constant.
+- `(home)/page.tsx` — the visible strip read "Naples, Florida · Mon–Sat · By
+  appointment". Now the real address (linked to Maps) plus the real hours.
+
+**`geo` was REMOVED rather than corrected.** It carried 26.142/-81.795, the
+Naples-downtown approximation, 5.6 miles from Shirley St — a pin that
+contradicted the street address in the same schema block. `GEO` is `null` in
+`business-location.ts` and the key is omitted until real coordinates exist. An
+estimated pin is worse than none.
+
+**Address added to 8 surfaces**, transactional first:
+
+- `order-invoice-email.ts` — 🔴 the pickup receipt previously told a buyer who
+  had just paid several thousand dollars to *call and ask where to go*. It now
+  names the place and the hours.
+- `CheckoutClient.tsx` — Local Pickup said only "in the Naples area"; a buyer
+  chose it without being shown where they would drive.
+- `SiteFooter.tsx` — an `<address>` block with the landmark and hours, sitewide.
+- `contact/page.tsx` — new `VisitUsPanel` server component: address, hours,
+  directions button, and the note that home visits continue on request.
+- `shipping/page.tsx` + `spanish-legal-copy.ts`, `order-email-branding.ts`
+  (HTML and text footers), `[locale]/layout.tsx` schema + `hasMap`.
+
+⚠️ **"Inside Sharon Lynch Collections" is wayfinding, not courtesy.** The sign
+out front is theirs, so a customer hunting for our name drives past. "Inside"
+beat "we share a space with" because it reads as a destination and doubles as
+the instruction that finds the door. Do not trim the landmark out.
+
+**Verified** against the running app, not assumed: address + landmark + hours
+present on `/`, `/es`, `/contact`, `/es/contact`, `/shipping`, `/es/shipping`,
+`/checkout`, `/faq`, `/sell/naples`, `/shop`; JSON-LD carries the new
+`PostalAddress`, the Tue–Sat hours, `hasMap`, and no `geo`; zero stale
+mobile-only claims across 8 pages sampled in both locales. `tsc` clean, lint
+clean, **1016/1016 tests**, **454/454 pages** from a deleted `.next`.
+
+Still owner-side: real `geo` coordinates, the CAN-SPAM marketing mailing
+address in Admin → Marketing Settings, the Google Business Profile, and
+marketplace NAP (eBay `merchant_location_key`, Etsy shop location).
+
+## 2026-08-17 (7) — Product attribute row: one color per fact
+
+Owner request. The product page's summary row printed the status badge, metal,
+karat and length in a single gold, so four separate facts read as one blob.
+Each fact now owns a hue, named for the stone it borrows from — emerald, gold,
+sapphire, amethyst — at 149° / 48° / 214° / 285°, deliberately ~70° apart so
+no two converge.
+
+- Tokens `--color-spec-*` in `globals.css` `@theme`, dark-page counterparts in
+  `.product-page-dark`. Light values clear **4.5:1** — not 3:1, because 11px
+  bold is NORMAL text under WCAG — against all four light backgrounds a product
+  page can generate; dark values clear 4.5:1 against black and a mid-dark custom.
+- `productMetalAccentVar()` in `types/product.ts` makes the metal word its own
+  swatch: yellow/tricolor/bicolor/vermeil → gold, rose → rose, white
+  gold/silver/platinum → a TRUE NEUTRAL.
+- ⚠️ The neutral is deliberate. A blue-grey (hue 210) would land 4° from
+  sapphire karat (214), so a white-gold item would print "WHITE GOLD" and "14K"
+  in two near-identical blues. A neutral has no hue to collide with.
+- ⚠️ Metal and karat were ONE span with the separator baked into the string as
+  ` · `. Split, because one text node cannot carry two colors. Dots are now
+  their own `aria-hidden` spans.
+- Teal was tried for karat first and rejected: too close to the emerald badge
+  under deuteranopia simulation.
+- Measured old vs new markup side by side with a positive control: the new row
+  is **5px narrower** in every case. The Tricolor item's badge wrap at 375px is
+  pre-existing, not caused by this.
+
+Verified on the running app: all six tokens resolve correctly on a light page
+and on a black one, all four metal variants map right in both locales, fits at
+320px with 35px spare, no page horizontal scroll.
+
+## 2026-08-17 (6) - Photo swipe: one shared gesture, and it triggers on a slight sideways move
+
+Owner: the swipe on product pages and shop cards is "very hard to get to
+register, and it tries to scroll down instead of swiping over".
+
+**This was two problems, and the more serious one is that the fix already
+existed.** The shop cards were repaired on 2026-08-09 after the owner reported
+the same thing in almost the same words. **The product gallery was never
+updated** and still ran the original, structurally broken implementation for
+another eight days:
+
+| | Shop card (fixed 08-09) | Product gallery (until now) |
+| --- | --- | --- |
+| Mechanism | native non-passive `touchmove` | React `pointermove` |
+| Can cancel a scroll | yes | **no — by spec** |
+| Axis decision | 5px, bias 1.25 (~51°) | **10px, strict `\|dx\|>\|dy\|` (45°)** |
+| Advance threshold | 24px / 10% | **40px / 12%** |
+
+`preventDefault` on a pointer event does nothing to scrolling, so on the gallery
+the browser's own direction detection always won, fired `pointercancel`, and the
+swipe died before its 10px threshold was ever reached. No amount of tuning
+would have fixed that surface; it needed the mechanism.
+
+**Both now share `src/lib/photo-swipe.ts`**, so a future tune lands on both. The
+duplication is exactly how the gallery fell eight days behind.
+
+### The tuning: asymmetric arbitration
+
+The old rule picked an axis at one shared slop with a mild horizontal lean. That
+still lost the common case — **a thumb swiping across a phone arcs**, so the
+first pixels are often more DOWN than across, which locked 'v' and killed the
+swipe before the finger had gone anywhere sideways. The two axes now need
+different amounts of evidence:
+
+| | Value | Was |
+| --- | --- | --- |
+| Horizontal trigger | **4px** sideways | 5px total (cards) / 10px (gallery) |
+| Horizontal cone | **1.6 (~58°)** | 1.25 (~51°) / 1.0 (45°) |
+| Vertical trigger | **12px** — 3x harder | same slop as horizontal |
+| Advance threshold | **20px / 8%** | 24px / 10% / 40px / 12% |
+
+**The key change is that there is now an UNDECIDED state.** Below the vertical
+trigger the gesture commits to neither axis and we never `preventDefault`, so
+the page scrolls exactly as before — but the swipe is not yet thrown away
+either, and can still resolve horizontal once the finger commits sideways.
+2px across and 5px down used to be a dead swipe; it is now merely "not yet
+known".
+
+⚠️ A gesture the browser has already claimed (`event.cancelable === false` while
+undecided) concedes to vertical immediately, so a late horizontal lock can never
+advance a photo mid-scroll.
+
+### Verified with synthetic touch sequences, both surfaces
+
+| Gesture | Product gallery | Shop card |
+| --- | --- | --- |
+| Arcing thumb (`-2,+5` → `-8,+7` → `-40,+12` → `-70,+14`) | photo **changed**, 3 of 4 moves `preventDefault`ed (the first correctly left undecided) | dot **0 → 1**, 3 `preventDefault`s |
+| Straight vertical scroll (`0,+6` → `+1,+18` → `+2,+45` → `+3,+90`) | photo unchanged, **0** `preventDefault`s | dot unchanged, **0** `preventDefault`s |
+
+Page scrolling that starts on a photo is untouched — the thing most at risk from
+widening the cone, and the reason the cone stops at 1.6 rather than going
+further.
+
+12 new tests pin the arbitration, including the arcing-thumb case, the
+undecided-then-resolves case, and an assertion that the vertical trigger stays
+greater than the horizontal one (equalising them reinstates the original bug).
+Tests 1004 → **1016**.
+
+Gate: `tsc` clean, `lint` clean, **1016/1016 across 99 files**, `npm run build`
+compiled successfully at **454/454 pages** from a deleted `.next`.
+
+Files: new `src/lib/photo-swipe.ts` + `src/lib/__tests__/photo-swipe.test.ts`;
+`components/shop/ProductCard.tsx`, `components/shop/ProductImageGallery.tsx`.
+
+## 2026-08-17 (5) - Route progress bar fires on every navigation, everywhere
+
+Owner request: the bar seemed to appear "only on some pages and some viewport
+sizes"; make it immediate everywhere.
+
+**It was never gated by page or viewport.** It mounts globally in
+`[locale]/layout.tsx` and its CSS has no media queries at all. Three pieces of
+logic produced the appearance of a lottery:
+
+1. `SHOW_DELAY_MS = 120` — nothing rendered for 120ms, so any navigation that
+   committed faster showed **nothing at all**. Most internal links are prefetched
+   by Next and commit well inside that window.
+2. Query-only navigations never armed — every shop filter, sort, view toggle and
+   pagination click.
+3. Only `<a>` clicks armed — a `<button>` calling `router.push` was invisible.
+
+The **viewport** pattern was a second-order effect of (1): Next prefetches links
+as they scroll into view, so a desktop has most links warm (no bar) while a phone
+has fewer prefetched and product cards set `prefetch={false}`. Identical taps
+therefore produced a bar or no bar depending on screen size. Consistency was the
+missing feature, not coverage.
+
+**Owner decisions taken before implementing** (rule 1 reversed, rule 2 upheld):
+
+- **Rule 1 REVERSED.** Was "appears only when genuinely needed"; now appears
+  immediately on every navigation. `SHOW_DELAY_MS` is deleted and `setVisible` is
+  called synchronously in the click handler.
+- **Rule 2 UPHELD, explicitly.** Still no minimum display, no animate-to-100%,
+  no fade tail — it vanishes the instant the route commits. A minimum duration
+  was offered and **declined**, so a fast navigation shows a brief flash by
+  design. ⚠️ Do not "fix" that flash without asking.
+
+**What changed**
+
+| | |
+| --- | --- |
+| Immediate | `SHOW_DELAY_MS` removed; visible set synchronously on the click |
+| Query-only navigations | now arm — shop filter/sort/view/pagination are real server round-trips, not in-place updates as the old test claimed |
+| Completion keyed on path **+ query** | a filter never changes the path, so the old path-only check would have reported "not arrived" forever and stranded the bar until the 8s safety timeout |
+| Programmatic navigations | new `startRouteProgress(href)` export, wired into the shop controls, cart drawer checkout, both sign-outs, sign-in, and the admin order rows/back |
+
+**`useSearchParams` arrived with a hard requirement.** Completion needs the
+query, and that hook client-renders the tree up to the nearest Suspense
+boundary. ⚠️ `RouteProgressBar` is therefore wrapped in `<Suspense fallback={null}>`
+in `[locale]/layout.tsx` and **must stay wrapped** — without it the boundary is
+the whole app and every prerendered page deopts. Verified after the change:
+**454/454 static pages**, and the page routes still carry their prerender marker
+(`/[locale]`, `/about`, `/accessibility`, `/sign-in` all `●`; the `ƒ` routes are
+the auth-gated `/account` and `/admin/*`, which were always dynamic).
+
+**The shop's centred spinner was removed as a duplicate.** `/shop` had its own
+`ShopLoadingOverlay`, and once the bar armed on query changes both fired for one
+click — measured, both true in the same mutation batch. Two indicators for one
+action is worse than either, and the bar sits at the base of the FIXED header so
+it stays on screen however far down the catalog the visitor has scrolled. What
+survives is the part the bar cannot do: the `role="status"` live region, now
+screen-reader-only. The bar is deliberately `aria-hidden` and Next's route
+announcer does not announce a query-only change, so deleting that region
+outright would have left screen-reader users with no signal. Restoring the
+spinner is a markup revert in one component.
+
+**Measured live** (dev, MutationObserver on the bar element):
+
+| Action | Result |
+| --- | --- |
+| Prefetched nav link, desktop | ADDED immediately at `top: 72px`, z-60, REMOVED on commit |
+| Shop sort (query-only) | ADDED, REMOVED when `/shop?sort=price-asc` committed — the new path+query completion working |
+| Same click, before the spinner removal | bar **and** spinner both true in one batch — the duplicate, confirmed not assumed |
+| Nav link from the open mobile menu, 390px | ADDED at `top: 56px` (the 3.5rem token), z-60, REMOVED on commit |
+| Back/forward | `popstate` fires and the guard evaluates `wouldArm: true`; no bar appears because a cached traversal commits in the same React batch, and **no case stranded the bar** |
+
+ℹ️ On back/forward with a warm router cache there is genuinely no wait, so
+showing nothing is rule 2 behaving correctly rather than a gap.
+
+Tests 998 → **1004**: query-only now asserted to arm (the old test asserting the
+opposite is replaced), plus `locationKey` normalisation (`URL.search` gives
+`'?a=1'`, `URLSearchParams.toString()` gives `'a=1'` — they must agree or a
+navigation never looks complete) and a query-only completion case.
+
+Gate: `tsc` clean, `lint` clean, **1004/1004 across 98 files**, `npm run build`
+compiled successfully at **454/454 pages** from a deleted `.next`.
+
+Files: `components/layout/RouteProgressBar.tsx`, `app/[locale]/layout.tsx`,
+`components/shop/ShopNavigationProgress.tsx`, `components/cart/CartDrawer.tsx`,
+`components/account/SignOutButton.tsx`, `app/[locale]/account/sign-in/page.tsx`,
+`components/admin/{AdminShell,OrdersPanel,OrderDetailPanel}.tsx`,
+`lib/__tests__/route-progress-bar.test.ts`.
+
+## 2026-08-17 (4) - ES/EN chip leaves the header below md; wordmark restored
+
+Owner request: collapse the language toggle into the dropdown nav on mobile to
+buy back header space.
+
+**No new markup was needed — the mobile menu has carried its own language item
+all along** (the `Español`/`English` link at the foot of the panel). The header
+chip was a duplicate control on exactly the widths that could least afford one.
+It is now `hidden md:inline-block`, so below 768px the menu item is the single
+language control and above it nothing changed.
+
+**Checked before removing it, because Google indexes mobile-first:** the mobile
+menu only exists in the DOM while open, so hiding the chip means a closed mobile
+page has no body link to the other locale at all. That is safe here — hreflang
+is declared in the HEAD by `pageMetadata()`/`alternatesFor()` on every page
+(verified in the served markup: `en`, `es` and `x-default` all present) and every
+locale URL is in the sitemap. Alternate-language discovery never depended on the
+body link.
+
+**Freed 17.2px, and it was spent putting the wordmark back.** The mark's
+fits-pass earlier the same day had to shrink the mobile wordmark to
+`clamp(8.75px, 2.35vw, 11px)` to make room. With the chip gone that compromise
+is unnecessary, so the clamp is now **`2.9vw`**, which is **>= the pre-mark size
+at every width** — 9.28px vs 8.8px at 320px, 10.15px vs 9.63px at 350px, and the
+11px cap reached at ~379px where the old rules only reached it at 400px. Net
+effect across both changes: the mark was added and **nothing else got smaller**.
+
+Row slack, Spanish with the menu open (the widest state), before this change →
+after, all with 0px clipped and 0 page overflow:
+
+| Width | Slack before | Slack after | Wordmark |
+| --- | --- | --- | --- |
+| 320px | 8.1px | **18.0px** | 9.28px |
+| 350px | 8.0px | **11.7px** | 10.15px |
+| 400px | 13.3px | **25.9px** | 11px (the original size) |
+
+Boundary confirmed: 767px chip hidden / header 56px; 768px chip **shown**, `EN`
+→ `/`, 12px, 29.6px wide, header 72px. The in-menu link was clicked at 390px and
+navigated `/es` → `/`, closing the menu.
+
+Dead CSS removed with it: the `.site-header-language` sizing rules in the
+`max-width: 399px` and `max-width: 349px` blocks now had no visible target. The
+`.menu-toggle` comment that described the chip as "adjacent" was corrected — it
+is only adjacent at md and up.
+
+⚠️ **A backtick in a comment inside `HEADER_STYLES` breaks the build.** Those
+styles are a template literal; a stray backtick ends the string mid-CSS and
+Turbopack reports it as `Expected a semicolon` on the comment line. Hit and
+fixed during this change; a warning note now sits in the block.
+
+Gate: `tsc` clean, `lint` clean, **998/998 across 98 files**, `npm run build`
+compiled successfully at **454/454 pages** from a deleted `.next`.
+
+Files: `src/components/layout/SiteHeader.tsx`.
+
+## 2026-08-17 (3) - Octopus mark now shows at EVERY viewport width
+
+Owner request: the header mark was `hidden md:block`, so every phone and every
+sub-768px tablet carried the wordmark with no mark beside it. It now renders at
+all widths.
+
+**The mark alone was a one-word change; making room for it was the work.** The
+brand link is `shrink` + `overflow-hidden`, so a mark that does not fit does not
+overflow the page — it silently clips the tail off "Naples Estate Jewelry". That
+is exactly what a naive `hidden md:block` → `block` produced. Measured in the
+worst state (Spanish, menu OPEN, since `Cerrar` is the longest toggle label and
+the action cluster is `flex-shrink-0`):
+
+| Width | Wordmark clipped, mark shown, before the fits-pass |
+| --- | --- |
+| 350px | 11.6px cut |
+| 390px | 0.3px cut |
+| **400px** | **16.6px cut** — the worst width in the band |
+| 430px | 0.0px — but zero headroom, a knife's edge |
+
+400px was worst because the old CSS *stepped* the wordmark 10px → 11px at
+exactly 400px while the row padding and gaps also grew. Three coordinated
+changes fixed it, all confined to below `md`:
+
+1. **Wordmark is one fluid rule, not a step** — `clamp(8.75px, 2.35vw, 11px)`
+   replaces the `11px` + `@media (max-width: 399px) clamp(8.75px, 2.75vw, 10px)`
+   pair. Reaches the 11px cap at ~468px; floors at 8.75px, the floor this header
+   already used at 320px.
+2. **Mark shrinks with the same band** — `clamp(1.75rem, 7vw, 2rem)` inside
+   `@media (max-width: 767px)`, bottoming out at the 1.75rem the action buttons
+   already use below 350px and reaching the 2rem mobile content budget by
+   ~457px. Bounded at 767px so it never fights the `md:h-10` utility.
+3. **Brand gap 8px → 5px below md** (`gap-[0.3125rem] md:gap-2`).
+
+The heights are the header's own content budget, not arbitrary: 32px is exactly
+the mobile budget (56px token = 32 content + 12 above/below) and 40px the
+desktop one (72px = 40 + 16), so **`--site-header-height` is unmoved** — measured
+56px below md and 72px at and above it, same as before.
+
+**Verified after the fix**, same worst-case state, wordmark clipping **0px at
+every width measured** with real slack in the row:
+
+| Width | Mark rendered | Wordmark | Row slack | Clipped |
+| --- | --- | --- | --- | --- |
+| 320px | 36.6×28.0 | 8.75px | 8.1px | 0 |
+| 350px | 36.6×28.0 | 8.75px | 8.0px | 0 |
+| 400px | 36.6×28.0 | 9.40px | 13.3px | 0 |
+| 430px | 39.3×30.1 | 10.11px | 30.8px | 0 |
+| 639px | 41.8×32.0 | 11px | 223.5px | 0 |
+| 640px | 41.8×32.0 | 13.12px | 195.4px | 0 |
+| 767px | 41.8×32.0 | 13.12px | 317.3px | 0 |
+| 768px | 52.2×40.0 | 13.12px | 262.1px | 0 |
+
+Zero horizontal page overflow at every width, including 320px. English is the
+comfortable case throughout (22.5–26.6px slack at 400px vs Spanish's 13.3px) —
+**measure Spanish, not English, if these numbers are ever revisited.**
+`1280px` re-checked as untouched: mark 52.2×40.0, gap 8px, wordmark 19.84px,
+header 72px — all identical to before.
+
+⚠️ **The three numbers are coupled.** The row is genuinely full on a narrow
+phone; changing one of the mark height, the wordmark clamp, or the brand gap
+without re-measuring the 350–430px band in Spanish with the menu open will
+reintroduce silent clipping rather than a visible break.
+
+`sizes="52px"` and the `width`/`height` aspect metadata are unchanged — 52px is
+still the largest rendered width, so the attribute stays accurate.
+
+Gate: `tsc` clean, `lint` clean, **998/998 tests across 98 files**, `npm run
+build` compiled successfully at **454/454 static pages** (from a deleted `.next`
+with the dev server stopped). All four match the batch baseline exactly.
+
+Files: `src/components/layout/SiteHeader.tsx`.
+
+## 2026-08-17 (2) - DEPLOYED - the 2026-08-09 → 2026-08-17 batch is live
+
+Owner deployed successfully. **Nothing is now waiting to ship.** This closes a
+queue that had been building since 2026-08-09: the hero slideshow work, the
+refund-ledger rework, the checkout price-drift guard, whole-dollar pricing, the
+button-font fix, touch tap feedback, the route progress bar, the full SEO/social
+metadata pass, the nav dismissal fix, and the new octopus mark.
+
+**Verified by fetching production, not inferred from a green build.** A deploy
+that reports success can still leave the previous release serving, which is how
+an earlier one failed — so the check is what the live origin returns:
+
+| Check | Result |
+| --- | --- |
+| Homepage | 200; title `Naples Estate Jewelry - Sell Jewelry, Gold & Silver in Naples, FL`; h1 `Naples Premier Gold, Sterling & Jewelry Buyers`; eyebrow present; **exactly one `<h1>`**; `og:title` == `<title>` |
+| `/es`, `/sell`, `/sell/naples`, `/services`, `/silver-services`, `/es/estate-jewelry` | all 200, all exactly one `<h1>`, **all carrying `og:image`**, `og:locale` correct per locale (`es_ES` / `en_US`), `og:title` == `<title>` on every one |
+| `/sitemap.xml` | **107 URLs**; **20 on `2026-08-17`**; **0** left on `2026-07-11`; **0** `noindex` legal URLs leaked |
+| Brand assets | `favicon.ico` 11,486 B and `nav-logo.webp` 16,174 B — byte-identical to source; `icon.png` 200 |
+
+Two things this confirms that only production could: the streaming-skeleton
+`<h1>` duplicate really is gone (it was a client-DOM artifact, so a local check
+was not proof), and the Spanish pages serve Spanish metadata to a real crawler.
+
+**Still unexercised in production** — carried forward in `TASKS.md`, none of it
+blocking: first-paint re-measurement (baseline 533KB across 30 requests before
+FCP, and localhost cannot measure it), the first real refund recording itself,
+and the price-change banner rendering the first time metal moves mid-checkout.
+
 ## 2026-08-17 - Pre-deploy audit of the batch, sitemap `lastmod` bumped, staging rebuilt
 
 One line of code changed (below); the rest of this entry records the gate the

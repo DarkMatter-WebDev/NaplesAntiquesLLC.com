@@ -642,3 +642,32 @@ export function productMetalVariantLabel(
   if (!option) return category;
   return locale === 'es' ? option.labelEs : option.label;
 }
+
+/**
+ * The color the metal name is printed in on the product page's summary row, so
+ * the word doubles as its own swatch: yellow gold reads gold, rose gold reads
+ * rose, and the white metals read as a neutral.
+ *
+ * Returns a `var()` reference rather than a hex — the light values live in
+ * `@theme` in globals.css and the dark-page counterparts in
+ * `.product-page-dark`, so a dark-backed product gets the right one with no
+ * branch here.
+ *
+ * Tricolor, bicolor and vermeil deliberately fall through to gold: the first
+ * two have no single true color, and vermeil IS gold over silver.
+ */
+export function productMetalAccentVar(
+  value: string | null | undefined,
+  category: Product['category'],
+): string {
+  switch (normalizeProductMetalVariant(value, category)) {
+    case 'rose_gold':
+      return 'var(--color-spec-metal-rose)';
+    case 'white_gold':
+    case 'silver':
+    case 'platinum':
+      return 'var(--color-spec-metal-neutral)';
+    default:
+      return 'var(--color-spec-metal-gold)';
+  }
+}

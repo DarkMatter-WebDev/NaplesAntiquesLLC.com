@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import LegalPolicyPage from '@/components/legal/LegalPolicyPage';
 import { getLegalMetadata } from '@/lib/legal-metadata';
 import { getSpanishLegalCopy } from '@/lib/spanish-legal-copy';
+import { addressWithLandmark, hoursLine } from '@/lib/business-location';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -27,7 +28,7 @@ export default async function ShippingPage({ params }: Props) {
         {
           title: isEs ? 'Opciones de Entrega' : 'Fulfillment Options',
           bullets: [
-            'Local pickup by appointment in the Naples / Southwest Florida area.',
+            `Free local pickup at our showroom, ${addressWithLandmark(false)} — ${hoursLine(false)}.`,
             'Priority insured and express overnight insured shipping for eligible items.',
             'Every shipped order is fully insured for its purchase price.',
             'Items ship in discreet, unbranded packaging for your privacy and security.',

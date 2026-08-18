@@ -14,6 +14,7 @@ import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 import { getMountedProductImageIndexes } from '@/lib/shop-card-images';
 import { getShopCardDots } from '@/lib/shop-card-dots';
 import { claimShopCardPhotoFocus, subscribeShopCardPhotoFocus } from '@/lib/shop-card-photo-focus';
+import { attachPhotoSwipe } from '@/lib/photo-swipe';
 import { rememberShopReturn } from '@/lib/shop-return';
 import { AppIcon } from '@/components/AppIcon';
 
@@ -24,28 +25,9 @@ import { AppIcon } from '@/components/AppIcon';
  */
 const POINTER_COVER_RESET_MS = 1000;
 
-/**
- * Travel, in px, before a card swipe commits to horizontal or vertical.
- *
- * Deliberately small. The decision has to beat the BROWSER's own direction
- * detection — once it starts scrolling, touchmove stops being cancelable and the
- * swipe is lost for good. The previous logic waited for 10px of horizontal
- * travel, by which point the page was usually already moving.
- */
-const DIRECTION_LOCK_SLOP_PX = 5;
-
-/**
- * How much the lock leans toward horizontal. 1 is a square 45-degree split;
- * 1.25 widens the horizontal cone to ~51 degrees, because a thumb swiping
- * across a small card always carries some vertical drift and a strict
- * |dx| > |dy| test rejected swipes that clearly read as sideways. Raising it
- * further starts stealing genuine page scrolls that begin on a photo.
- */
-const HORIZONTAL_LOCK_BIAS = 1.25;
-
-/** Minimum swipe distance to advance a photo: a floor, then a share of width. */
-const SWIPE_ADVANCE_MIN_PX = 24;
-const SWIPE_ADVANCE_WIDTH_SHARE = 0.1;
+/* The swipe's thresholds and axis arbitration now live in `lib/photo-swipe.ts`,
+   shared with the product gallery. They were duplicated here and tuned only
+   here, which is how the gallery ended up eight days behind on the same bug. */
 
 interface Props {
   product: Product;
@@ -237,122 +219,49 @@ export default function ProductCard({
   });
 
   /**
-   * Swipe the card photo, via NATIVE touch listeners rather than React's pointer
-   * events — and the difference is the whole fix.
+   * Swipe the card photo. The gesture itself lives in `lib/photo-swipe.ts`,
+   * shared with the product gallery — see that file for why this uses native
+   * non-passive touch listeners rather than React pointer events, and for the
+   * asymmetric axis arbitration that keeps an arcing thumb from being read as a
+   * scroll (owner, 2026-08-09 and again 2026-08-17).
    *
-   * Pointer events cannot stop the page scrolling: by spec, preventDefault on
-   * pointermove does nothing to scrolling, and the only other lever is the
-   * `touch-action` CSS below. `pan-y` explicitly permits vertical panning, so
-   * the browser's own direction detection ran first, claimed the gesture as a
-   * scroll, and fired pointercancel — killing the swipe before our threshold was
-   * ever reached (owner, 2026-08-09: "it tries to scroll me up or down and
-   * doesn't easily trigger the swipe").
-   *
-   * A non-passive touchmove listener can preventDefault, which cancels the
-   * browser's scroll for the rest of the gesture — but ONLY if it happens before
-   * the browser commits, which is why the decision is made at a 5px slop rather
-   * than 10px of horizontal travel.
-   *
-   * Vertical is still the browser's: when the gesture locks vertical we never
-   * preventDefault, so a scroll that starts on a photo scrolls the page exactly
-   * as before. That matters here more than on most carousels — the photos are
-   * most of the scrollable surface of the shop grid.
+   * Only the card-specific consequences stay here.
    */
   useEffect(() => {
     const frame = imageFrameRef.current;
     if (!frame) return;
 
-    let startX = 0;
-    let startY = 0;
-    let lock: 'h' | 'v' | null = null;
-    let moved = false;
-    let tracking = false;
-
-    const onTouchStart = (event: TouchEvent) => {
-      // A second finger is a pinch — hand it straight back to the browser.
-      if (event.touches.length !== 1 || !swipeDeps.current.hasMultipleImages) {
-        tracking = false;
-        return;
-      }
-      const touch = event.touches[0];
-      startX = touch.clientX;
-      startY = touch.clientY;
-      lock = null;
-      moved = false;
-      tracking = true;
-      // Clear any suppression left over from the PREVIOUS gesture. It is armed
-      // at touchend and normally consumed by the click that follows — but a
-      // horizontal swipe now calls preventDefault, and the browser then fires no
-      // click at all, so nothing consumes it. Left standing it would swallow the
-      // visitor's next genuine tap, i.e. one swipe would cost one tap on the
-      // product. A new touch means any pending suppression is stale.
-      suppressNextClick.current = false;
-      setIsTouchCarousel(true);
-      setHasCarouselInteraction(true);
-    };
-
-    const onTouchMove = (event: TouchEvent) => {
-      if (!tracking || event.touches.length !== 1) return;
-      const touch = event.touches[0];
-      const dx = touch.clientX - startX;
-      const dy = touch.clientY - startY;
-      const distance = Math.hypot(dx, dy);
-      if (distance > DIRECTION_LOCK_SLOP_PX) moved = true;
-      if (lock === null) {
-        if (distance < DIRECTION_LOCK_SLOP_PX) return;
-        // Slightly biased toward horizontal (a ~51 degree cone rather than 45),
-        // because a real thumb swipe across a 166px card always carries some
-        // vertical drift and the old strict comparison rejected it.
-        lock = Math.abs(dx) * HORIZONTAL_LOCK_BIAS >= Math.abs(dy) ? 'h' : 'v';
-      }
-      // Claiming the gesture. Non-cancelable means the browser already committed
-      // to scrolling, so there is nothing to take back.
-      if (lock === 'h' && event.cancelable) event.preventDefault();
-    };
-
-    const onTouchEnd = (event: TouchEvent) => {
-      if (!tracking) return;
-      tracking = false;
-      // ANY drag swallows the click that follows — horizontal or not, and even a
-      // horizontal one too short to advance. The visitor dragged, they did not
-      // tap, so the card must not navigate.
-      if (moved) suppressNextClick.current = true;
-      if (lock !== 'h') return;
-      const touch = event.changedTouches[0];
-      if (!touch) return;
-      const dx = touch.clientX - startX;
-      const frameWidth = frame.getBoundingClientRect().width;
-      // Proportional with a floor, so the gesture feels the same on a 166px card
-      // as on a 279px one.
-      if (Math.abs(dx) < Math.max(SWIPE_ADVANCE_MIN_PX, frameWidth * SWIPE_ADVANCE_WIDTH_SHARE)) return;
+    return attachPhotoSwipe(frame, () => {
       const deps = swipeDeps.current;
-      // Claim only when the swipe will actually move this card. Claiming on a
-      // swipe that cannot advance — already at the last photo — would send every
-      // OTHER card back to its cover while this one visibly did nothing.
-      const willAdvance = dx < 0 ? deps.canShowNextImage : deps.canShowPreviousImage;
-      if (!willAdvance) return;
-      claimShopCardPhotoFocus(deps.productId);
-      if (dx < 0) deps.showNextImage();
-      else deps.showPreviousImage();
-    };
-
-    const onTouchCancel = () => {
-      tracking = false;
-      lock = null;
-    };
-
-    frame.addEventListener('touchstart', onTouchStart, { passive: true });
-    // The one listener that MUST be non-passive — a passive listener may not
-    // preventDefault, which is the entire mechanism here.
-    frame.addEventListener('touchmove', onTouchMove, { passive: false });
-    frame.addEventListener('touchend', onTouchEnd, { passive: true });
-    frame.addEventListener('touchcancel', onTouchCancel, { passive: true });
-    return () => {
-      frame.removeEventListener('touchstart', onTouchStart);
-      frame.removeEventListener('touchmove', onTouchMove);
-      frame.removeEventListener('touchend', onTouchEnd);
-      frame.removeEventListener('touchcancel', onTouchCancel);
-    };
+      return {
+        onGestureStart: () => {
+          // Clear any suppression left over from the PREVIOUS gesture. It is
+          // armed at touchend and normally consumed by the click that follows —
+          // but a horizontal swipe calls preventDefault, and the browser then
+          // fires no click at all, so nothing consumes it. Left standing it
+          // would swallow the visitor's next genuine tap, i.e. one swipe would
+          // cost one tap on the product.
+          suppressNextClick.current = false;
+          setIsTouchCarousel(true);
+          setHasCarouselInteraction(true);
+        },
+        onDragged: () => {
+          suppressNextClick.current = true;
+        },
+        // Claim only when the swipe will actually move this card. Claiming on a
+        // swipe that cannot advance — already at the last photo — would send
+        // every OTHER card back to its cover while this one visibly did nothing.
+        canSwipe: (direction) => (
+          deps.hasMultipleImages
+          && (direction === 'next' ? deps.canShowNextImage : deps.canShowPreviousImage)
+        ),
+        onSwipe: (direction) => {
+          claimShopCardPhotoFocus(deps.productId);
+          if (direction === 'next') deps.showNextImage();
+          else deps.showPreviousImage();
+        },
+      };
+    });
   }, []);
 
   const handleImageLinkClick = (event: React.MouseEvent<HTMLAnchorElement>) => {

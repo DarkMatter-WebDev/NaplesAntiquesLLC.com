@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServiceClient } from '@/lib/supabase/service';
 import { withMarketingFooter } from '@/lib/marketing-email-html';
+import { addressOneLine } from '@/lib/business-location';
 
 export type AudienceScope = 'subscribers' | 'accounts' | 'buyers' | 'all';
 export type MarketingSenderProfile = 'no_reply' | 'chris';
@@ -192,7 +193,18 @@ export async function getMarketingSettings(): Promise<MarketingSettings> {
   const chrisReplyTo = process.env.MARKETING_CHRIS_REPLY_TO || 'info@naplesestatejewelry.com';
 
   return {
-    mailingAddress: (data?.mailing_address || process.env.MARKETING_MAILING_ADDRESS || '').trim() || null,
+    // CAN-SPAM requires a valid physical postal address on marketing email, and
+    // this used to resolve to null unless someone typed one into Admin, which
+    // blocked sending entirely (see the throw in sendMarketingEmail). Now the
+    // showroom address is the final fallback, so compliance does not depend on
+    // data entry. An admin value or a Netlify override still wins.
+    //
+    // ⚠️ Deliberately `addressOneLine()`, NOT `addressWithLandmark()`. CAN-SPAM
+    // wants the sender's valid physical address; "inside Sharon Lynch
+    // Collections" is wayfinding for a visitor and does not belong in a legal
+    // footer.
+    mailingAddress: (data?.mailing_address || process.env.MARKETING_MAILING_ADDRESS || '').trim()
+      || addressOneLine(),
     siteUrl: marketingSiteUrl(),
     fromAddress: chrisFromAddress,
     senderProfiles: {

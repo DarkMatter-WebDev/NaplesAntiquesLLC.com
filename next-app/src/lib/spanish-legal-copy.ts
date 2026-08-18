@@ -1,5 +1,6 @@
 import type { LegalSection } from '@/components/legal/LegalPolicyPage';
 import type { LegalPageKey } from '@/lib/legal-metadata';
+import { addressWithLandmark, hoursLine } from '@/lib/business-location';
 
 export interface SpanishLegalPageCopy {
   title: string;
@@ -188,7 +189,7 @@ export const SPANISH_LEGAL_COPY: Record<LegalPageKey, SpanishLegalPageCopy> = {
     title: 'Política de Envío',
     updated: UPDATED,
     sections: [
-      { title: 'Opciones de Entrega', bullets: ['Recogida local con cita previa en el área de Naples y el suroeste de Florida.', 'Envío prioritario asegurado y envío exprés asegurado al día siguiente para artículos elegibles.', 'Cada pedido enviado está asegurado por el precio total de compra.', 'Los artículos se envían en embalaje discreto y sin marca para proteger su privacidad y seguridad.'] },
+      { title: 'Opciones de Entrega', bullets: [`Recogida local gratuita en nuestro salón, ${addressWithLandmark(true)} — ${hoursLine(true)}.`, 'Envío prioritario asegurado y envío exprés asegurado al día siguiente para artículos elegibles.', 'Cada pedido enviado está asegurado por el precio total de compra.', 'Los artículos se envían en embalaje discreto y sin marca para proteger su privacidad y seguridad.'] },
       { title: 'Garantía de Autenticidad', body: ['Garantizamos que cada pieza es auténtica y corresponde a su descripción. Si un artículo fue materialmente mal descrito, se aplica nuestra garantía de devolución de 5 días; consulte la política de Devoluciones y Reembolsos.'] },
       { title: 'Revisión de Dirección e Identidad', body: ['Para pedidos de alto valor, podemos confirmar su identidad y dirección de envío antes de despachar. Esto le protege a usted y a nosotros contra el fraude y la entrega incorrecta de artículos valiosos.'] },
       { title: 'Costos y Plazos de Envío', body: ['Las opciones y costos de envío aparecen durante el pago. Un pedido de alto valor puede requerir un acuerdo específico con un transportista asegurado; de ser así, le contactaremos antes del envío. Procuramos despachar pronto los pedidos confirmados y compartir el seguimiento cuando el artículo esté en camino.'] },

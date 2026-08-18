@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo';
 import { jsonLdHtml } from '@/lib/json-ld';
+import { mapsUrl } from '@/lib/business-location';
+import { VISIT_ANCHOR_ID } from '@/lib/home-anchors';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
@@ -9,6 +11,10 @@ import { CardGrid, PageContainer, Section } from '@/components/layout/Responsive
 import HomeHeroStack from '@/components/home/HomeHeroStack';
 import HomeBootSplash from '@/components/home/HomeBootSplash';
 import ClayMark from '@/components/ClayMark';
+import ShowroomMap from '@/components/ShowroomMap';
+import ShowroomAddress from '@/components/ShowroomAddress';
+import ShowroomHours from '@/components/ShowroomHours';
+import CopyAddressButton from '@/components/CopyAddressButton';
 import TestimonialsSection from '@/components/home/TestimonialsSection';
 import { getHomeCarouselPayload } from '@/lib/home-carousel-server';
 import type { CarouselItem } from '../../../../carousel/lib/carouselData';
@@ -24,8 +30,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     : 'Naples Estate Jewelry - Sell Jewelry, Gold & Silver in Naples, FL';
 
   const description = isEs
-    ? 'Compramos oro, joyería de patrimonio, plata esterlina, diamantes, monedas y relojes en Naples y el suroeste de Florida. Evaluaciones gratuitas — vamos a usted. Llame al (239) 404-8505.'
-    : 'We buy gold, estate jewelry, sterling silver, diamonds, coins, and watches in Naples and across Southwest Florida. Top-dollar payouts, free appraisals, we come to you. Call (239) 404-8505.';
+    ? 'Compramos oro, joyería, plata, diamantes, monedas y relojes en Naples, FL. Visite nuestro salón, martes a sábado, o vamos a usted. Llame al (239) 404-8505.'
+    : 'We buy gold, estate jewelry, silver, diamonds, coins, and watches in Naples, FL. Visit our showroom Tue–Sat, or we come to you. Call (239) 404-8505.';
 
   // `brandedTitle` because this title LEADS with the brand rather than trailing
   // it, so the suffix pageMetadata() adds to every other page's og:title would
@@ -174,7 +180,7 @@ export default async function HomePage({ params }: Props) {
                 title: isEs ? 'Compramos Oro en Naples' : 'We Buy Gold in Naples',
                 body: isEs
                   ? 'Evaluaciones gratuitas en el acto para todas las piezas de oro.'
-                  : 'Free appraisals on all gold jewelry, coins, and bullion — we come to you.',
+                  : 'Free appraisals on all gold jewelry, coins, and bullion — visit us or we come to you.',
                 href: evalHref,
                 cta: isEs ? 'Evaluación gratuita →' : 'Free evaluation →',
               },
@@ -259,8 +265,8 @@ export default async function HomePage({ params }: Props) {
                 </h2>
                 <p className="text-sm leading-relaxed mb-4" style={{ color: 'var(--color-on-surface-variant)' }}>
                   {isEs
-                    ? 'Nacido y criado en Naples, Chris lleva más de 15 años comprando y vendiendo joyería fina de patrimonio en el suroeste de Florida. Sin vitrina y sin intermediarios: cada evaluación es una cita privada, en su casa o en un lugar que le convenga, y cada pieza de la tienda fue seleccionada y verificada personalmente.'
-                    : 'Born and raised in Naples, Chris has spent 15+ years buying and selling fine estate jewelry across Southwest Florida. No storefront, no middlemen — every appraisal is a private appointment at your home or a place convenient to you, and every piece in the shop was personally selected and verified.'}
+                    ? 'Nacido y criado en Naples, Chris lleva más de 15 años comprando y vendiendo joyería fina de patrimonio en el suroeste de Florida. Sin intermediarios: véalo en nuestro salón de Naples o pida una cita privada en su casa, y cada pieza de la tienda fue seleccionada y verificada personalmente.'
+                    : 'Born and raised in Naples, Chris has spent 15+ years buying and selling fine estate jewelry across Southwest Florida. No middlemen — see him at our Naples showroom, or book a private appointment at your home, and every piece in the shop was personally selected and verified.'}
                 </p>
                 <p className="text-sm leading-relaxed mb-6" style={{ color: 'var(--color-on-surface-variant)' }}>
                   {isEs
@@ -345,15 +351,15 @@ export default async function HomePage({ params }: Props) {
             <div className="flex flex-col">
               {(isEs
                 ? [
-                    { q: '¿Compran joyería además de venderla?', a: 'Sí — comprar es la mitad del negocio. Evaluaciones gratuitas y privadas para oro, plata, diamantes, relojes y patrimonios completos; vamos a usted en todo el suroeste de Florida.' },
+                    { q: '¿Compran joyería además de venderla?', a: 'Sí — comprar es la mitad del negocio. Evaluaciones gratuitas y privadas para oro, plata, diamantes, relojes y patrimonios completos, en nuestro salón de Naples o en su casa en todo el suroeste de Florida.' },
                     { q: '¿Cómo funciona el envío?', a: 'Cada pedido enviado viaja totalmente asegurado con confirmación de firma, y los pedidos de $5,000+ se envían por USPS Registered Mail. Las tarifas según el valor se muestran al pagar.' },
-                    { q: '¿Puedo ver una pieza en persona?', a: 'Por supuesto. La recogida local con cita es gratuita en el área de Naples — elija Recogida local al pagar o llame para coordinar.' },
+                    { q: '¿Puedo ver una pieza en persona?', a: 'Sí — visite nuestro salón en 6240 Shirley St, Ste 104, dentro de Sharon Lynch Collections, de martes a sábado de 11:00 a.m. a 3:00 p.m. o con cita. La recogida local es gratuita: elija Recogida local al pagar o llame para coordinar.' },
                     { q: '¿Cómo fijan sus precios?', a: 'La mayoría de las piezas se calculan directamente contra el mercado de metales en vivo, con el valor de rescate junto al precio; algunas tienen un precio fijo. En ambos casos, lo que ve es transparente — no un margen arbitrario.' },
                   ]
                 : [
-                    { q: 'Do you buy jewelry as well as sell it?', a: 'Yes — buying is half the business. Free, private appraisals for gold, silver, diamonds, watches, and full estates; we come to you across Southwest Florida.' },
+                    { q: 'Do you buy jewelry as well as sell it?', a: 'Yes — buying is half the business. Free, private appraisals for gold, silver, diamonds, watches, and full estates, at our Naples showroom or at your home across Southwest Florida.' },
                     { q: 'How does shipping work?', a: 'Every shipped order travels fully insured with signature confirmation, and orders of $5,000+ ship USPS Registered Mail. Value-based rates are shown at checkout.' },
-                    { q: 'Can I see a piece in person?', a: 'Absolutely. Local pickup by appointment is free in the Naples area — choose Local Pickup at checkout, or call to arrange a viewing.' },
+                    { q: 'Can I see a piece in person?', a: 'Yes — visit our Naples showroom at 6240 Shirley St, Ste 104, inside Sharon Lynch Collections, Tue–Sat 11am–3pm or by appointment. Local pickup is free: choose Local Pickup at checkout, or call to arrange a viewing.' },
                     { q: 'How are your prices set?', a: 'Most pieces are priced directly against the live metals market, with the scrap value shown right beside the price; some carry a set price instead. Either way, what you see is transparent — not an arbitrary markup.' },
                   ]
               ).map((faq) => (
@@ -416,19 +422,27 @@ export default async function HomePage({ params }: Props) {
 
         {/* Testimonials — real Google reviews (verbatim), shared with product
             pages via src/lib/testimonials.ts */}
-        <TestimonialsSection locale={locale} />
+        <TestimonialsSection locale={locale} variant="marquee" />
 
-        {/* CTA */}
+        {/* CTA — also the hero's "Visit Us" destination.
+            ⚠️ `scroll-margin-top` is not optional: the header is fixed, so
+            without it the anchor lands with the eyebrow and part of the phone
+            number underneath the header. It reads the header-height TOKEN, never
+            a hardcoded 56/72px, because that token changes at the md breakpoint. */}
         <Section
+          id={VISIT_ANCHOR_ID}
           className="text-center border-t"
-          style={{ borderColor: 'var(--color-outline-variant)' }}
+          style={{
+            borderColor: 'var(--color-outline-variant)',
+            scrollMarginTop: 'var(--site-header-height)',
+          }}
         >
           <PageContainer max="narrow">
           <p
             className="text-[0.65rem] font-bold uppercase tracking-[0.35em] mb-4"
             style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
           >
-            {isEs ? 'Llámenos Hoy' : 'Call Us Today'}
+            {isEs ? 'Llámenos o Visítenos Hoy' : 'Call or Visit Us Today'}
           </p>
           <a
             href="tel:2394048505"
@@ -437,9 +451,87 @@ export default async function HomePage({ params }: Props) {
           >
             (239) 404-8505
           </a>
-          <p className="mt-4 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-            {isEs ? 'Naples, Florida · Lunes–Sábado · Con cita' : 'Naples, Florida · Mon–Sat · By appointment'}
+          {/* The invitation to walk in. This block said "Call Us Today" and gave
+              a phone number and nothing else until 2026-08-18 — a storefront the
+              homepage never actually invited anyone into.
+
+              ⚠️ It says "during showroom hours", NOT "no appointment needed".
+              Both are true on a Tuesday and false on a Sunday, and "today" is
+              read on whatever day the visitor lands. The hours line two
+              elements below is what makes the sentence honest, so do not
+              separate them. */}
+          {/* A deck, not body copy. Everything under the phone number was one
+              flat grey mass until 2026-08-18; this line is the section's second
+              voice, so it takes the full-strength text colour while the details
+              below stay quiet.
+
+              ⚠️ Colour ONLY — it was 600 weight for part of 2026-08-18 and read
+              as shouting (owner, same day). Two lines of bold directly under a
+              30px phone number is two headlines arguing. The colour lift alone
+              is what separates it from the details; do not re-add the weight. */}
+          <p
+            className="responsive-copy mt-6 max-w-xl mx-auto"
+            style={{ color: 'var(--color-on-surface)' }}
+          >
+            {isEs
+              ? 'Visítenos hoy: pase por nuestro salón en Naples durante el horario de atención, o llámenos antes y concertamos una cita privada.'
+              : 'Visit us today — walk into our Naples showroom during opening hours, or call ahead and we\'ll set a private appointment.'}
           </p>
+          {/* Real address + real hours. Read "Naples, Florida · Mon–Sat · By
+              appointment" until 2026-08-17 — the day part was simply false, and
+              it named no address at all. Strings come from
+              lib/business-location.ts; the landmark is deliberate wayfinding. */}
+          {/* Address and hours share one block: they are the same KIND of fact
+              — the practical detail you act on after the invitation — and
+              grouping them is what stops the section flattening into a grey
+              list.
+
+              ⚠️ ONE rule, on top. It was bracketed top AND bottom for part of
+              2026-08-18 and read as a stray box (owner, same day). A single
+              short rule reads as "detail follows"; closing the bottom turns it
+              into a container competing with the map right beneath it. The map
+              already supplies the lower edge. Do not re-add `border-b`. */}
+          <div
+            className="mt-8 inline-block border-t pt-5 text-sm"
+            style={{ borderColor: 'var(--color-outline-variant)' }}
+          >
+            {/* ⚠️ The copy button is a SIBLING of the maps link, never inside
+                it. A <button> nested in an <a> is invalid HTML, and browsers
+                resolve it by breaking one of the two — usually leaving a
+                control that navigates instead of copying. */}
+            <div
+              className="flex items-start justify-center gap-2"
+              style={{ color: 'var(--color-on-surface)' }}
+            >
+              <a
+                href={mapsUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover-underline-grow"
+                style={{ color: 'inherit' }}
+              >
+                <ShowroomAddress locale={locale} />
+              </a>
+              <CopyAddressButton locale={locale} />
+            </div>
+            {/* `grouped`, not `full`, and this is the ONLY surface that uses it.
+                The footer, contact and About all list seven days, because those
+                are places someone consults before driving over. This is a
+                call-to-action with a phone number, a sentence and a map stacked
+                in one narrow column — a seven-row table here would out-weigh
+                the phone number and push the map off the fold. If the two-row
+                form ever reads as evasive, switch it to `full`; the component
+                takes the same props. */}
+            <div className="mt-4" style={{ color: 'var(--color-on-surface)' }}>
+              <ShowroomHours locale={locale} variant="grouped" />
+            </div>
+          </div>
+          {/* Deliberately small, and deliberately last. The address above is
+              already a link to directions, so this is orientation ("which part
+              of Naples"), not navigation — it must not out-weigh the phone
+              number this section exists to show. It lazy-loads, which is what
+              keeps a third-party frame off the homepage's critical path. */}
+          <ShowroomMap locale={locale} className="mt-8" />
           </PageContainer>
         </Section>
 

@@ -163,8 +163,8 @@ export default async function TradeInPage({ params }: Props) {
             </h2>
             <p className="text-[#4d4635] text-lg mb-10 max-w-2xl mx-auto leading-relaxed">
               {isEs
-                ? 'Envíe fotos de lo que tiene o llame para una evaluación privada gratuita — vamos a usted en Naples y todo el suroeste de Florida.'
-                : 'Text photos of what you have, or call for a free private evaluation — we come to you in Naples and across Southwest Florida.'}
+                ? 'Envíe fotos de lo que tiene o llame para una evaluación privada gratuita — en nuestro salón de Naples o a domicilio en todo el suroeste de Florida.'
+                : 'Text photos of what you have, or call for a free private evaluation — at our Naples showroom, or at your home across Southwest Florida.'}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center flex-wrap">
               <Link href={p('/free-evaluation')} className="gold-button">

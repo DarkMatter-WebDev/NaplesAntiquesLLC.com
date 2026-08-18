@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { getMessages, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -10,6 +11,7 @@ import CustomerReveal from '@/components/layout/CustomerReveal';
 import SocialBackgroundPublishProvider from '@/components/admin/SocialBackgroundPublishProvider';
 import RouteProgressBar from '@/components/layout/RouteProgressBar';
 import { jsonLdHtml } from '@/lib/json-ld';
+import { GEO, mapsUrl, openingHoursSchema, postalAddressSchema } from '@/lib/business-location';
 
 interface Props {
   children: React.ReactNode;
@@ -34,26 +36,22 @@ const jsonLd = {
   image: 'https://naplesestatejewelry.com/assets/images/pages/trust.webp',
   logo: 'https://naplesestatejewelry.com/assets/images/branding/logo.webp',
   description:
-    'Naples, FL gold, jewelry, and sterling silver buyer paying top dollar for estate jewelry, gold, silver, diamonds, coins, watches, and full estates. Free on-site evaluations by appointment across Southwest Florida.',
-  address: {
-    '@type': 'PostalAddress',
-    addressLocality: 'Naples',
-    addressRegion: 'FL',
-    addressCountry: 'US',
-  },
-  geo: {
-    '@type': 'GeoCoordinates',
-    latitude: 26.142,
-    longitude: -81.795,
-  },
-  openingHoursSpecification: [
-    {
-      '@type': 'OpeningHoursSpecification',
-      dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
-      opens: '10:00',
-      closes: '17:00',
-    },
-  ],
+    'Naples, FL gold, jewelry, and sterling silver buyer paying top dollar for estate jewelry, gold, silver, diamonds, coins, watches, and full estates. Showroom at 6240 Shirley St, Ste 104, open Tuesday to Saturday, with home evaluations on request across Southwest Florida.',
+  // Real street address as of 2026-08-17 (showroom open). Sourced from
+  // lib/business-location.ts so the schema, the footer, checkout and the
+  // pickup receipt cannot drift apart — NAP consistency is a ranking factor.
+  address: postalAddressSchema(),
+  // `geo` is emitted ONLY when real coordinates exist. It previously carried
+  // 26.142/-81.795, the Naples-downtown approximation, which is 5.6 miles from
+  // Shirley St — a pin that contradicted the street address in this same
+  // block. Omitting it is strictly better than shipping a wrong one; see the
+  // note on GEO in lib/business-location.ts for how to fill it in.
+  ...(GEO ? { geo: { '@type': 'GeoCoordinates', ...GEO } } : {}),
+  hasMap: mapsUrl(),
+  // ⚠️ Tue-Sat 11:00-15:00. Claimed Mon-Sat 10:00-17:00 until 2026-08-17, which
+  // was never true of the showroom. Must stay identical to the Google Business
+  // Profile: Google compares them once the profile is verified.
+  openingHoursSpecification: openingHoursSchema(),
   priceRange: '$$',
   currenciesAccepted: 'USD',
   paymentAccepted: 'Cash, Check, Wire Transfer, PayPal, Credit Card, Debit Card',
@@ -134,9 +132,20 @@ export default async function LocaleLayout({ children, params }: Props) {
               WishlistProvider) has an Add to Cart button that calls useCart(), so it
               needs a CartContext ancestor. CartDrawer has no reverse dependency on
               WishlistContext, so this order is safe. */}
-          {/* Outside the providers: it depends on nothing but the pathname, and
-              renders null except during a navigation slow enough to warrant it. */}
-          <RouteProgressBar />
+          {/* Outside the providers: it depends on nothing but the current URL,
+              and renders null except while a navigation is in flight.
+
+              ⚠️ The Suspense boundary is REQUIRED, not decorative. The bar reads
+              `useSearchParams` (a shop filter changes only the query, so that is
+              the only way it can tell when such a navigation has landed), and
+              calling that hook client-renders the tree up to the nearest
+              boundary. Without this wrapper that tree is the whole app and every
+              static page would deopt; with it, containment is exactly the bar,
+              which renders null anyway. Removing it silently costs 454 prerendered
+              pages. */}
+          <Suspense fallback={null}>
+            <RouteProgressBar />
+          </Suspense>
           <CartProvider locale={locale}>
             <WishlistProvider locale={locale}>
               <SocialBackgroundPublishProvider>

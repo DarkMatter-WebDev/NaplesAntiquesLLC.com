@@ -5,6 +5,7 @@ import SiteFooter from '@/components/layout/SiteFooter';
 import { HeroSection, PageContainer } from '@/components/layout/ResponsiveLayout';
 import InquiryForm from '@/components/contact/InquiryForm';
 import MessageUsForm from '@/components/contact/MessageUsForm';
+import VisitUsPanel from '@/components/contact/VisitUsPanel';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -12,8 +13,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return pageMetadata({
     title: isEs ? 'Contáctenos — Envíe Su Artículo' : 'Contact Us — Submit Your Item',
     description: isEs
-      ? 'Contacte a Naples Estate Jewelry para enviar fotos y detalles de joyería, oro, plata, relojes, monedas o antigüedades. Evaluaciones móviles y privadas en el suroeste de Florida.'
-      : 'Contact Naples Estate Jewelry to submit photos and details about estate jewelry, gold, silver, watches, coins, or antiques. Mobile, private evaluations throughout Southwest Florida. Call or text (239) 404-8505.',
+      ? 'Envíe fotos de joyería, oro, plata, relojes, monedas o antigüedades. Visítenos en 6240 Shirley St, Ste 104, Naples, martes a sábado. (239) 404-8505.'
+      : 'Submit photos of jewelry, gold, silver, watches, coins, or antiques. Visit us at 6240 Shirley St, Ste 104, Naples, Tue–Sat. Call or text (239) 404-8505.',
     path: '/contact',
     locale,
   });
@@ -83,6 +84,12 @@ export default async function ContactPage({ params, searchParams }: Props) {
         ) : (
           <MessageUsForm locale={locale} />
         )}
+
+        {/* Visit Us — the contact page had no address, no hours and no map
+            until 2026-08-17, only a call button and a form. It is the first
+            place someone looks for "where are you", so it carries the full
+            two-sentence wayfinding line rather than the compact one. */}
+        <VisitUsPanel locale={locale} />
 
       </main>
       <SiteFooter locale={locale} />

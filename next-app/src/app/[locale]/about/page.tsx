@@ -5,6 +5,10 @@ import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import { PageContainer, Section } from '@/components/layout/ResponsiveLayout';
+import ShowroomAddress from '@/components/ShowroomAddress';
+import ShowroomHours from '@/components/ShowroomHours';
+import CopyAddressButton from '@/components/CopyAddressButton';
+import { mapsUrl, wayfindingSentence } from '@/lib/business-location';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -14,8 +18,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ? 'Sobre Chris — Comprador de Joyería en Naples'
       : 'About Chris — Naples Estate Jewelry Buyer',
     description: isEs
-      ? 'Conozca a Chris, especialista en joyería de patrimonio y antigüedades en Naples con más de 15 años de experiencia en el suroeste de Florida. Servicio privado, móvil y con cita previa.'
-      : 'Meet Chris, Naples estate jewelry and antiques specialist with 15+ years experience serving Southwest Florida. Private, mobile, appointment-only service.',
+      ? 'Conozca a Chris, especialista en joyería de patrimonio y antigüedades con más de 15 años en Naples. Visítenos en nuestro salón, martes a sábado, o con cita.'
+      : 'Meet Chris, Naples estate jewelry and antiques specialist with 15+ years in Southwest Florida. Visit our showroom, Tue–Sat, or book a private appointment.',
     path: '/about',
     locale,
   });
@@ -113,8 +117,8 @@ export default async function AboutPage({ params }: Props) {
                   </p>
                   <p>
                     {isEs
-                      ? 'Al operar como un servicio móvil privado, solo por cita, mantenemos los gastos generales bajos y trasladamos esos ahorros como algunos de los pagos más competitivos de la región. Cada consulta se maneja de forma personal y confidencial - sin presión de tienda física, sin intermediarios y sin obligación.'
-                      : 'By operating as a private, appointment-only mobile service, we keep overhead low and pass those savings on as some of the most competitive payouts in the region. Every consultation is handled personally and confidentially - no storefront pressure, no middlemen, and no obligation.'}
+                      ? 'Al mantener un solo salón compartido y trabajar en gran medida con cita, mantenemos los gastos generales bajos y trasladamos esos ahorros como algunos de los pagos más competitivos de la región. Cada consulta se maneja de forma personal y confidencial - sin presión, sin intermediarios y sin obligación.'
+                      : 'By keeping to one small shared showroom and working largely by appointment, we keep overhead low and pass those savings on as some of the most competitive payouts in the region. Every consultation is handled personally and confidentially - no pressure, no middlemen, and no obligation.'}
                   </p>
                   <p>
                     {isEs
@@ -128,7 +132,7 @@ export default async function AboutPage({ params }: Props) {
                     { stat: '15+', label: isEs ? 'Años de Experiencia' : 'Years Experience' },
                     { stat: '100%', label: isEs ? 'Privado y Confidencial' : 'Private & Confidential' },
                     { stat: isEs ? 'Mismo Día' : 'Same-Day', label: isEs ? 'Pago Disponible' : 'Payment Available' },
-                    { stat: isEs ? 'Móvil' : 'Mobile', label: isEs ? 'Vamos a Usted' : 'We Come to You' },
+                    { stat: isEs ? 'Mar–Sáb' : 'Tue–Sat', label: isEs ? 'Salón en Naples' : 'Naples Showroom' },
                   ].map((item) => (
                     <div
                       key={item.label}
@@ -155,6 +159,89 @@ export default async function AboutPage({ params }: Props) {
           </PageContainer>
         </Section>
 
+
+        {/* Showroom.
+            The About page carried no address at all, and mentioned the store
+            only in passing inside a paragraph about overhead ("one small shared
+            showroom"), which reads as an explanation of pricing rather than an
+            invitation. This section states the plain fact — there is a room,
+            here is where it is, you may come in.
+
+            ⚠️ Every string comes from lib/business-location.ts. Do not retype
+            the address here; NAP consistency is a ranking factor and this is
+            exactly the kind of page where a stale suite number survives. */}
+        <Section>
+          <PageContainer max="narrow" className="text-center">
+            <span
+              className="text-xs font-bold uppercase tracking-[0.4em]"
+              style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+            >
+              {isEs ? 'Visítenos' : 'Visit Us'}
+            </span>
+            <h2
+              className="responsive-title-md font-bold mt-4 mb-6 tracking-tight"
+              style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
+            >
+              {isEs ? 'Ahora Tenemos Salón en Naples' : 'We Now Have a Naples Showroom'}
+            </h2>
+            <div
+              className="space-y-5 leading-relaxed text-lg"
+              style={{ color: 'var(--color-on-surface-variant)' }}
+            >
+              <p>
+                {isEs
+                  ? 'Durante años trabajamos únicamente con cita y visitas a domicilio. Ahora también puede vernos en persona: tenemos un salón en Naples donde puede traer sus piezas, recibir una evaluación gratuita y cobrar el mismo día.'
+                  : 'For years we worked by appointment and home visit only. Now you can also see us in person — we keep a showroom in Naples where you can bring your pieces in, get a free evaluation, and be paid the same day.'}
+              </p>
+              <p>{wayfindingSentence(isEs)}</p>
+              <p>
+                {isEs
+                  ? 'Y si tiene un patrimonio grande o prefiere no transportar objetos de valor, Chris sigue acudiendo a su domicilio a pedido, en todo el suroeste de Florida.'
+                  : 'And if you have a larger estate, or would rather not transport valuables, Chris still comes to you on request, anywhere in Southwest Florida.'}
+              </p>
+            </div>
+
+            <div
+              className="mt-10 inline-flex flex-col gap-3 border-t border-b py-4"
+              style={{ borderColor: 'var(--color-outline-variant)' }}
+            >
+              <span
+                className="text-[0.6875rem] font-bold uppercase tracking-[0.3em]"
+                style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+              >
+                {isEs ? 'Horario' : 'Hours'}
+              </span>
+              <ShowroomHours locale={locale} className="responsive-copy" />
+            </div>
+
+            {/* Copy button is a SIBLING of the maps link — a <button> inside an
+                <a> is invalid HTML and browsers break one of the two. */}
+            <div
+              className="mt-8 flex items-start justify-center gap-2 text-sm"
+              style={{ color: 'var(--color-on-surface-variant)' }}
+            >
+              <a
+                href={mapsUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover-underline-grow"
+                style={{ color: 'inherit' }}
+              >
+                <ShowroomAddress locale={locale} />
+              </a>
+              <CopyAddressButton locale={locale} />
+            </div>
+
+            <div className="responsive-actions justify-center mt-8">
+              <a href={mapsUrl()} target="_blank" rel="noopener noreferrer" className="gold-button">
+                {isEs ? 'Cómo llegar' : 'Get directions'}
+              </a>
+              <Link href={isEs ? '/es/contact' : '/contact'} className="outline-button">
+                {isEs ? 'Ver mapa y contacto' : 'See the map and contact us'}
+              </Link>
+            </div>
+          </PageContainer>
+        </Section>
 
         {/* CTA */}
         <Section

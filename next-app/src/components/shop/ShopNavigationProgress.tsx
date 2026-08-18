@@ -26,6 +26,7 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLinkStatus } from 'next/link';
+import { startRouteProgress } from '@/components/layout/RouteProgressBar';
 import { clearRequestedShopReturn, readRequestedShopReturn } from '@/lib/shop-return';
 
 interface ShopNavigationContextValue {
@@ -58,6 +59,11 @@ export function ShopNavigationProvider({ children }: { children: ReactNode }) {
         ? null
         : `${window.location.pathname}${window.location.search}`;
       pendingHrefRef.current = href === currentHref ? null : href;
+      // Every shop control reaches the router through here, and none of them is
+      // an anchor the global click listener could see — so this is the one place
+      // the top progress bar can learn that a filter/sort/view/pagination
+      // navigation just started. It no-ops when href is where we already are.
+      startRouteProgress(href);
       startTransition(() => {
         router.push(href, options);
       });
@@ -133,47 +139,32 @@ export function ShopScrollRestoration() {
   return null;
 }
 
-// Show immediately so every filter, sort, view, and pagination click receives
-// visible acknowledgement while its navigation is in flight.
+// Announce filter/sort/view/pagination waits to assistive technology.
+//
+// ⚠️ This used to ALSO paint a centred spinner overlay. It was removed on
+// 2026-08-17, when the global route progress bar started arming on query-only
+// navigations (owner: one consistent top loader everywhere). Both fired for a
+// single filter click — measured, both true in the same mutation batch — and two
+// indicators for one action is worse than either alone. The top bar sits at the
+// base of the FIXED header, so it is on screen however far the visitor has
+// scrolled down the catalog; that is what made the centred spinner redundant
+// rather than merely duplicated.
+//
+// What stays is the part the bar cannot do: the bar is deliberately
+// `aria-hidden` (Next's route announcer covers path changes), and a query-only
+// change is not a route change it announces — so without this live region a
+// screen-reader user would get no word of the wait at all.
+//
+// To bring the spinner back, restore the visual markup here; the pending state
+// it needs is unchanged.
 export function ShopLoadingOverlay() {
   const { isPending } = useShopNavigation();
 
   return (
-    <div
-      className={`shop-loading-overlay${isPending ? ' is-visible' : ''}`}
-      role="status"
-      aria-live="polite"
-      aria-hidden={!isPending}
-    >
-      <span className="shop-loading-spinner" aria-hidden="true" />
-      <span className="shop-loading-overlay-sr-only">
-        {isPending ? 'Loading...' : ''}
-      </span>
+    <div className="shop-loading-status" role="status" aria-live="polite">
+      {isPending ? 'Loading...' : ''}
       <style>{`
-        .shop-loading-overlay {
-          position: fixed;
-          top: 50%;
-          left: 50%;
-          z-index: 70;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 3.25rem;
-          height: 3.25rem;
-          border: 1px solid rgba(115, 92, 0, 0.18);
-          border-radius: 8px;
-          background: rgba(255, 255, 255, 0.96);
-          box-shadow: 0 16px 38px rgba(42, 34, 12, 0.18);
-          opacity: 0;
-          transform: translate(-50%, -50%) scale(0.92);
-          transition: opacity 140ms ease, transform 140ms ease;
-          pointer-events: none;
-        }
-        .shop-loading-overlay.is-visible {
-          opacity: 1;
-          transform: translate(-50%, -50%) scale(1);
-        }
-        .shop-loading-overlay-sr-only {
+        .shop-loading-status {
           position: absolute;
           width: 1px;
           height: 1px;
@@ -183,27 +174,6 @@ export function ShopLoadingOverlay() {
           clip: rect(0, 0, 0, 0);
           white-space: nowrap;
           border: 0;
-        }
-        .shop-loading-spinner {
-          width: 2.1rem;
-          height: 2.1rem;
-          border-radius: 50%;
-          border: 3px solid rgba(115, 92, 0, 0.16);
-          border-top-color: #b5890c;
-          animation: shop-loading-spin 0.65s linear infinite;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .shop-loading-overlay {
-            transition: opacity 140ms ease;
-          }
-          .shop-loading-spinner {
-            animation-duration: 1.6s;
-          }
-        }
-        @keyframes shop-loading-spin {
-          to {
-            transform: rotate(360deg);
-          }
         }
       `}</style>
     </div>

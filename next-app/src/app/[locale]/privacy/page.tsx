@@ -65,6 +65,7 @@ export default async function PrivacyPage({ params }: Props) {
             'Supabase for account authentication, database records, profiles, favorites, carts, inquiries, products, and admin data.',
             'Netlify for website hosting, deployment, serverless/runtime infrastructure, forms, and related logs.',
             'Resend for transactional and administrative email, including inquiry and order notices.',
+            'Google Maps for the embedded showroom map on our home and contact pages. The map loads from Google when you scroll to it, and Google may receive your IP address and set its own cookies under its own terms. Nothing you enter on our site is sent to it, and every address, hour, and directions link is also shown as plain text without it.',
             'Payment processors if online payment processing is enabled; payment information is handled by the processor under its own terms.',
             'Shipping providers when shipment or insured delivery is arranged.',
             'Professional advisers, fraud-prevention services, or authorities when reasonably necessary for legal, security, accounting, tax, or compliance purposes.',

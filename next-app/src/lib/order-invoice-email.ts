@@ -3,6 +3,7 @@ import { formatCurrency, formatPublicPurity, orderStatusLabel } from '@/types/sa
 import { formatProductItemYear } from '@/types/product';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
 import { buildOrderEmailFooterHtml, buildOrderEmailFooterTextLines } from '@/lib/order-email-branding';
+import { addressWithLandmark, hoursLine } from '@/lib/business-location';
 
 export type InvoiceEmailOrder = Order & { order_items: OrderItem[] };
 
@@ -112,9 +113,17 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
     ? `Thank you for your order with Naples Estate Jewelry. Your payment has been received — here is your receipt for order ${order.order_number}.`
     : `Thank you for your order with Naples Estate Jewelry. Invoice ${invoiceNumber} for ${order.order_number} is ready for review.`;
   // Sent from a no-reply address, so don't invite replies — direct to phone/text.
+  //
+  // A pickup buyer is TOLD WHERE TO GO. Until 2026-08-17 this email said only
+  // "call or text with any questions about pickup" — someone who had just paid
+  // several thousand dollars had to phone up to learn the address. The showroom
+  // shares a suite, so the landmark is part of the address, not a nicety.
+  const pickupNote = isPickup
+    ? ` Pick up at ${addressWithLandmark(false)}. ${hoursLine(false)}.`
+    : '';
   const note = paid
-    ? 'Your payment has been received in full — thank you. Call or text us at (239) 404-8505 with any questions about pickup, delivery, or shipping.'
-    : 'Call or text us at (239) 404-8505 with any questions about payment, pickup, delivery, or shipping.';
+    ? `Your payment has been received in full — thank you.${pickupNote} Call or text us at (239) 404-8505 with any questions about pickup, delivery, or shipping.`
+    : `Call or text us at (239) 404-8505 with any questions about payment, pickup, delivery, or shipping.${pickupNote}`;
   const closing = 'Thank you, NaplesEstateJewelry.com';
   const shipToLines = formatAddressLines(order.shipping_address);
   const shipToLabel = isPickup ? 'Address' : 'Ship to';

@@ -65,4 +65,85 @@ export const TESTIMONIALS: Testimonial[] = [
     meta: 'Google review',
     metaEs: 'Reseña de Google',
   },
+
+  // --- Added 2026-08-18, read from the live Google Business Profile ----------
+  // Taken from the profile's own review list (16 reviews, 5.0 average) with the
+  // "More" expander opened on every card, so these are full text and not
+  // Google's collapsed preview.
+  //
+  // ⚠️ Quoted verbatim INCLUDING the spelling and grammar as posted: Max's
+  // "Jewelery", Vasanth's "he have lots of collection", and the double space in
+  // Scott's "pricing.  After". Those are not typos to fix — the rule at the top
+  // of this file is verbatim, and a corrected quote is an invented one.
+  {
+    name: 'Mine Cervantes',
+    quote:
+      'Thank you Naples Estate Jewelry for making this such an easy experience for me. I’m 80 and honestly I was scared of getting scammed. Chris was so patient, explained everything to me, and made me feel comfortable from the start. I’m very grateful for his honesty and kindness. It’s nice to know there are still good people you can trust. Thank you, Chris!',
+    quoteEs:
+      'Gracias a Naples Estate Jewelry por hacer de esto una experiencia tan sencilla para mí. Tengo 80 años y, sinceramente, tenía miedo de que me estafaran. Chris fue muy paciente, me explicó todo y me hizo sentir cómoda desde el principio. Estoy muy agradecida por su honestidad y su amabilidad. Es bueno saber que todavía hay buenas personas en quienes se puede confiar. ¡Gracias, Chris!',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Max Kolegue',
+    quote:
+      'Naples Estate Jewelery is a high touch establishment! I was interested in a new piece they had just brought in I saw on their Instagram. The entire buying process from initial outreach to purchase was seamless. I left wondering why more businesses don’t treat you like NEJ does. Would highly recommend!',
+    quoteEs:
+      '¡Naples Estate Jewelry es un establecimiento de primer nivel! Me interesó una pieza nueva que acababan de recibir y que vi en su Instagram. Todo el proceso de compra, desde el primer contacto hasta la adquisición, fue impecable. Me fui preguntándome por qué más negocios no tratan a uno como lo hace NEJ. ¡Muy recomendable!',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Scott Tallent',
+    quote:
+      'Chris was very professional and upfront with his pricing.  After trying 3 other buyers, Chris gave us the best deal by far!',
+    quoteEs:
+      'Chris fue muy profesional y transparente con sus precios. Después de probar con otros tres compradores, ¡Chris nos dio la mejor oferta con diferencia!',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Gerald Nestico',
+    quote:
+      'Highly recommend! I appreciate the time Chris took with me when selling my jewelry and felt very comfortable when dealing with him. Thank you so much! Will look to you again in the future if I am looking to purchase!',
+    quoteEs:
+      '¡Muy recomendable! Agradezco el tiempo que Chris me dedicó cuando vendí mi joyería y me sentí muy cómodo tratando con él. ¡Muchas gracias! Volveré a buscarlos en el futuro si quiero comprar algo.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Nathan Pablik',
+    quote:
+      'Chris is exceptionally knowledgeable in all areas of jewelry! He helped me get situated with pricing, delivery, and knowledge in gold. Highly recommend!',
+    quoteEs:
+      '¡Chris tiene un conocimiento excepcional en todas las áreas de la joyería! Me ayudó con los precios, la entrega y a entender mejor el oro. ¡Muy recomendable!',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Judith Lam',
+    quote:
+      'Chris is amazing! He is very knowledgeable and understanding. I feel he is honest and trustworthy.',
+    quoteEs:
+      '¡Chris es increíble! Sabe muchísimo y es muy comprensivo. Siento que es honesto y de confianza.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Vasanth Gunasekaran',
+    quote: 'The owner Chris was very nice and friendly, he have lots of collection',
+    quoteEs: 'El dueño, Chris, fue muy amable y agradable, y tiene una gran colección',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Douglas Mitchell',
+    // Google's UI shows a trailing "…" after the emoji on this card. That is
+    // its own collapse marker, not Douglas's text — confirmed by the card
+    // having no "More" expander to open. Do not paste the ellipsis in.
+    quote: 'Dude knows his stuff knowledgeable and professional 👍',
+    quoteEs: 'Este hombre sabe lo que hace, con mucho conocimiento y profesionalismo 👍',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
 ];

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { startRouteProgress } from '@/components/layout/RouteProgressBar';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import { createClient } from '@/lib/supabase/client';
@@ -65,7 +66,9 @@ export default function SignInPage() {
       return;
     }
 
-    router.push(nextUrlRef.current ?? `${prefix}/account`);
+    const destination = nextUrlRef.current ?? `${prefix}/account`;
+    startRouteProgress(destination);
+    router.push(destination);
     router.refresh();
   }
 

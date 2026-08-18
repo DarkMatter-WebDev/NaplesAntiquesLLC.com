@@ -14,6 +14,7 @@ import {
   type ThumbnailLoopDirection,
 } from '@/lib/product-gallery-thumbnails';
 import { productThumbnailLoading } from '@/lib/storefront-image-loading';
+import { attachPhotoSwipe } from '@/lib/photo-swipe';
 import { AppIcon } from '@/components/AppIcon';
 
 // The hover/touch magnifier was removed on 2026-08-04 (owner request) at every
@@ -467,29 +468,50 @@ export default function ProductImageGallery({ images, title, imagePadding = null
    * the ONLY on-image control below 768px, where the edge bars are hidden; from
    * 768px up it runs alongside them.
    *
-   * Touch pointers only — a mouse drag stays a plain click so the lightbox and
-   * text selection behave as before.
+   * ⚠️ **This used to be React `pointermove` handlers, and that could not work.**
+   * `preventDefault` on a pointer event does nothing to scrolling, so the
+   * browser's own direction detection always won: it claimed the gesture as a
+   * scroll and fired `pointercancel` before the old 10px horizontal threshold
+   * was reached. The shop cards hit exactly this and were moved to native
+   * non-passive touch listeners on 2026-08-09; this surface was missed and kept
+   * the broken version until the owner reported it again on 2026-08-17 —
+   * "very hard to get to register, and it tries to scroll down instead".
+   *
+   * The gesture now lives in `lib/photo-swipe.ts`, shared with the cards, so
+   * the two cannot drift apart again. Touch only — a mouse drag stays a plain
+   * click so the lightbox and text selection behave as before, which is free
+   * here because touch listeners never fire for a mouse.
    */
-  const swipe = useRef<{ x: number; y: number; id: number; horizontal: boolean; moved: boolean } | null>(null);
+  const swipeDeps = useRef({ hasMultipleMedia, videoSelected, showNextMedia, showPreviousMedia });
+  useEffect(() => {
+    swipeDeps.current = { hasMultipleMedia, videoSelected, showNextMedia, showPreviousMedia };
+  });
 
-  const handleFramePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType === 'mouse' || videoSelected || !hasMultipleMedia) return;
-    swipe.current = { x: e.clientX, y: e.clientY, id: e.pointerId, horizontal: false, moved: false };
-  }, [hasMultipleMedia, videoSelected]);
+  useEffect(() => {
+    const frame = revealFrameRef.current;
+    if (!frame) return;
+    return attachPhotoSwipe(frame, () => {
+      const deps = swipeDeps.current;
+      return {
+        onDragged: () => {
+          // ANY drag swallows the click that follows — even a horizontal one too
+          // short to advance. The visitor dragged, they did not tap, so the
+          // lightbox must not open. Browsers usually suppress the click
+          // themselves once a touch becomes a scroll, but that is not something
+          // to depend on.
+          suppressNextClick.current = true;
+        },
+        // A selected video owns its own gestures, and one photo cannot swipe.
+        canSwipe: () => deps.hasMultipleMedia && !deps.videoSelected,
+        onSwipe: (direction) => {
+          if (direction === 'next') deps.showNextMedia();
+          else deps.showPreviousMedia();
+        },
+      };
+    });
+  }, []);
 
   const handleFramePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const gesture = swipe.current;
-    if (gesture && e.pointerId === gesture.id) {
-      // Commit to "this is a swipe" only once the movement is clearly sideways,
-      // so a vertical scroll that starts on the photo still scrolls the page.
-      const dx = e.clientX - gesture.x;
-      const dy = e.clientY - gesture.y;
-      if (Math.hypot(dx, dy) > 10) gesture.moved = true;
-      if (!gesture.horizontal && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
-        gesture.horizontal = true;
-      }
-      return;
-    }
     // Mouse only. A touch device keeps the CSS `(hover: none)` treatment, and
     // writing an inline value here would override it permanently after one tap.
     if (e.pointerType !== 'mouse') return;
@@ -504,30 +526,6 @@ export default function ProductImageGallery({ images, title, imagePadding = null
       paintEdgeReveal(pendingRevealX.current);
     });
   }, [paintEdgeReveal]);
-
-  const handleFramePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const gesture = swipe.current;
-    swipe.current = null;
-    if (!gesture || e.pointerId !== gesture.id) return;
-    // ANY drag swallows the click that follows — horizontal or not, and even a
-    // horizontal one too short to advance. The visitor dragged, they did not
-    // tap, so the lightbox must not open. Browsers usually suppress the click
-    // themselves once a touch becomes a scroll, but that is not something to
-    // depend on.
-    if (gesture.moved) suppressNextClick.current = true;
-    if (!gesture.horizontal) return;
-    const dx = e.clientX - gesture.x;
-    const frameWidth = revealFrameRef.current?.getBoundingClientRect().width ?? 0;
-    // Proportional, with a floor, so the gesture feels the same on a 344px
-    // phone frame and a 576px tablet one.
-    if (Math.abs(dx) < Math.max(40, frameWidth * 0.12)) return;
-    if (dx < 0) showNextMedia();
-    else showPreviousMedia();
-  }, [showNextMedia, showPreviousMedia]);
-
-  const handleFramePointerCancel = useCallback(() => {
-    swipe.current = null;
-  }, []);
 
   const handleFramePointerLeave = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== 'mouse') return;
@@ -581,12 +579,12 @@ export default function ProductImageGallery({ images, title, imagePadding = null
           leaving vertical scrolling AND pinch-zoom to the browser — a plain
           `none` would take all three, and `auto` would let the browser consume
           the horizontal drag before we see it. */}
+      {/* The remaining pointer handlers are the MOUSE edge-bar reveal only; the
+          swipe is bound natively in an effect above, because React's pointer
+          events cannot preventDefault a scroll. */}
       <div
         ref={revealFrameRef}
-        onPointerDown={handleFramePointerDown}
         onPointerMove={handleFramePointerMove}
-        onPointerUp={handleFramePointerUp}
-        onPointerCancel={handleFramePointerCancel}
         onPointerLeave={handleFramePointerLeave}
         className="product-gallery-frame relative aspect-square overflow-hidden"
         style={{

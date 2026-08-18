@@ -28,8 +28,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ? `Vender Oro, Joyería y Plata en ${area.city}, FL`
     : `Sell Gold, Jewelry & Silver in ${area.city}, FL`;
   const description = isEs
-    ? `Comprador de oro, joyería y plata esterlina que paga al mejor precio en ${area.city}, FL. Compramos joyería de patrimonio, oro, plata, diamantes, monedas y relojes. Evaluación gratuita — vamos a usted. Llame al (239) 404-8505.`
-    : `Top-paying gold, jewelry & sterling silver buyer serving ${area.city}, FL. We buy estate jewelry, gold, silver, diamonds, coins & watches. Free appraisals — we come to you. Call (239) 404-8505.`;
+    ? `Compramos oro, joyería, plata, diamantes y relojes en ${area.city}, FL. Evaluación gratuita en nuestro salón de Naples, martes a sábado, o a domicilio.`
+    : `Sell gold, jewelry, silver, diamonds & watches in ${area.city}, FL. Free appraisals at our Naples showroom, Tue–Sat, or at your home. Call (239) 404-8505.`;
   // Same blank-card defect as /sell, across every city page.
   return pageMetadata({ title, description, path: `/sell/${area.slug}`, locale });
 }
@@ -104,8 +104,8 @@ export default async function SellCityPage({ params }: Props) {
     },
     {
       mark: 'house',
-      titleEn: 'We come to you',
-      titleEs: 'Vamos a usted',
+      titleEn: 'Meet at the showroom, or at home',
+      titleEs: 'En el salón o en su casa',
       descEn: `${travel} We test and weigh everything in front of you — no mailing off your valuables.`,
       descEs: `${travel} Probamos y pesamos todo frente a usted — sin enviar sus objetos de valor por correo.`,
     },
@@ -122,8 +122,8 @@ export default async function SellCityPage({ params }: Props) {
     {
       qEn: `Where can I sell gold in ${area.city}?`,
       qEs: `¿Dónde puedo vender oro en ${area.city}?`,
-      aEn: `Naples Estate Jewelry buys gold throughout ${area.city} by private appointment. We come to your home, test and weigh your gold in front of you, price it against the live gold-spot market, and pay you on the spot — typically more than a pawn shop or mail-in buyer.`,
-      aEs: `Naples Estate Jewelry compra oro en todo ${area.city} con cita privada. Vamos a su casa, probamos y pesamos su oro frente a usted, lo valoramos según el mercado spot en vivo y le pagamos en el acto — normalmente más que una casa de empeño o un comprador por correo.`,
+      aEn: `Naples Estate Jewelry buys gold from sellers throughout ${area.city}. Bring it to our Naples showroom, or book a private appointment at your home. Either way we test and weigh your gold in front of you, price it against the live gold-spot market, and pay you on the spot — typically more than a pawn shop or mail-in buyer.`,
+      aEs: `Naples Estate Jewelry compra oro a vendedores de todo ${area.city}. Tráigalo a nuestro salón en Naples o reserve una cita privada en su casa. En ambos casos probamos y pesamos su oro frente a usted, lo valoramos según el mercado spot en vivo y le pagamos en el acto — normalmente más que una casa de empeño o un comprador por correo.`,
     },
     {
       qEn: `Who buys sterling silver near ${area.city}?`,
@@ -138,10 +138,10 @@ export default async function SellCityPage({ params }: Props) {
       aEs: `Sí. Además de oro y plata, compramos joyería de patrimonio y de diseñador, diamantes sueltos y montados, relojes de lujo y monedas en todo ${area.city}.`,
     },
     {
-      qEn: `Do I have to come to you?`,
-      qEs: `¿Tengo que ir a usted?`,
-      aEn: `No. ${travel} Our service is mobile and appointment-only, so you never have to carry valuables into a store.`,
-      aEs: `No. ${travel} Nuestro servicio es móvil y solo con cita, así que nunca tiene que llevar objetos de valor a una tienda.`,
+      qEn: `Do I have to come to the showroom?`,
+      qEs: `¿Tengo que ir al salón?`,
+      aEn: `No. ${travel} Home visits stay available by request, so you never have to carry valuables anywhere you would rather not.`,
+      aEs: `No. ${travel} Las visitas a domicilio siguen disponibles a pedido, así que nunca tiene que llevar objetos de valor a donde prefiera no hacerlo.`,
     },
     {
       qEn: `How do I get paid?`,
@@ -215,8 +215,8 @@ export default async function SellCityPage({ params }: Props) {
               </h1>
               <p className="mb-8 max-w-xl text-lg leading-relaxed text-[#d7d0c3]">
                 {isEs
-                  ? `El comprador de confianza y al mejor precio de ${area.city} para oro, joyería de patrimonio, plata, diamantes, monedas y relojes. Vamos a usted.`
-                  : `${area.city}'s trusted, top-paying buyer for gold, estate jewelry, silver, diamonds, coins, and watches. We come to you.`}
+                  ? `El comprador de confianza y al mejor precio de ${area.city} para oro, joyería de patrimonio, plata, diamantes, monedas y relojes. Visítenos en Naples o pida una cita a domicilio.`
+                  : `${area.city}'s trusted, top-paying buyer for gold, estate jewelry, silver, diamonds, coins, and watches. Visit our Naples showroom, or ask us to come to you.`}
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link href={evalHref} className="gold-button">

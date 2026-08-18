@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { startRouteProgress } from '@/components/layout/RouteProgressBar';
 import { createClient } from '@/lib/supabase/client';
 import type { Order, OrderItem, FulfillmentStatus, OrderStatus } from '@/types/sales';
 import { formatCurrency, formatOrderDate, orderStatusLabel } from '@/types/sales';
@@ -413,6 +414,7 @@ export default function OrderDetailPanel({
       setSaving(null);
       return;
     }
+    startRouteProgress(`${adminBasePath}/orders`);
     router.push(`${adminBasePath}/orders`);
   }
 

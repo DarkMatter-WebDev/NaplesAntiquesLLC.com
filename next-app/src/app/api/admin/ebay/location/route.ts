@@ -7,11 +7,21 @@ import { updateConnection } from '@/lib/ebay/store';
 
 // One-time inventory-location setup (ebay-sync-plan/06-account-prerequisites.md
 // step 6, ebay-sync-plan/OWNER-SETUP.md step 8 item 4). Not run automatically
-// at connect time — createInventoryLocation needs the business's real postal
-// code, which isn't stored anywhere else in this codebase, so an admin
-// supplies it explicitly here rather than the code guessing at one. Uses the
-// already-connected session's access token (ensureFreshAccessToken) — no
-// separate credentials needed.
+// at connect time. Uses the already-connected session's access token
+// (ensureFreshAccessToken) — no separate credentials needed.
+//
+// ⚠️ The postal code sent here becomes eBay's "Item location" on every listing,
+// so it is a NAP signal and must match the site and the Google Business
+// Profile. Since 2026-08-17 the real ZIP lives in `lib/business-location.ts`
+// and the admin field is prefilled from it — the older note here said the
+// postal code "isn't stored anywhere else in this codebase", which was true
+// then and is not now. It is still passed in the body rather than read
+// server-side, because a location created before that date may carry a
+// different ZIP and the admin needs to be able to see and confirm the value.
+//
+// ⚠️ The KEY is immutable once created, but the ADDRESS is not: correcting a
+// wrong ZIP later means POST /location/{key}/update_location_details, which
+// this route does not implement.
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;

@@ -1,33 +1,195 @@
-# Current Status
+﻿# Current Status
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-08-17**.
+> in `DECISIONS.md`. Last reconciled: **2026-08-18**.
 
-## Start Here (handoff, end of the 2026-08-16 session)
+## Start Here (handoff, end of the 2026-08-18 session)
 
 **Read this, then `TASKS.md`.**
 
-### 🔴 ONE ACTION WAITING: DEPLOY
+### 🟢 A BATCH IS STAGED AND READY TO DEPLOY (2026-08-18)
 
-✅ **Staging is CURRENT as of 2026-08-17** — `C:\Users\rcman\NEJ-repo-staging`,
-**843 files / ~19.3 MB**, verified an exact mirror (a follow-up dry run reported
-0 to copy and 0 extras) and leak-checked against a positive control. Copy it
-wholesale into the repo folder, keeping that folder's `.git`, then push. Full
-evidence in `TASKS.md`.
+Everything below the 2026-08-17 deploy is **built, gated and staged**. Nothing
+is half-finished and no SQL is outstanding.
 
-✅ **The batch passed a pre-deploy audit** (2026-08-17, no code changed): `tsc`
-clean, `lint` clean, **998/998 tests** across 98 files, **454/454 static pages**
-built from a deleted `.next`, and a runtime sweep of **30 indexable pages across
-both locales with zero problems**. The display-equals-charge invariant was
-proven through the live quote API, not inferred. Details in `CHANGELOG.md`
-(2026-08-17).
+**The gate, run from a deleted `.next`:** `npx tsc --noEmit` clean ·
+`npm run lint` clean · **1016/1016 tests across 99 files** · `npm run build`
+**454/454 static pages** (the prerender-count invariant holds).
 
-**No SQL is outstanding.** All three migrations this batch touched are already
-applied in Supabase and were verified live, not assumed. The 2026-08-15 work
-adds none.
+**What is in it, newest first — full detail in `CHANGELOG.md` 2026-08-18 (1)–(9):**
 
-**What is in it, none of it yet in production:**
+| | Change |
+| --- | --- |
+| (9) | Map frame is **square**; footer address gains the copy button |
+| (8) | **Copy-address button** on the homepage CTA, contact panel and About |
+| (7) | Hero **Trade → Visit Us**, jumping to the CTA block; footer address stacks above hours |
+| (6) | Footer address+hours move out of the brand column into a **centred band** |
+| (5) | **Reviews 4 → 12** from the live Google profile; homepage band is a **scrolling marquee** |
+| (4) | Homepage CTA **typographic ladder** (pulled back from bold after owner review) |
+| (3) | Hours become a **day-by-day list** like Google Maps |
+| (2) | Map **zoom buttons** + closer default; address stops splitting the landmark name |
+| (1) | **"Visit us today"** copy, the **Google map**, and the About showroom section |
+
+🔴 **One deploy hazard that will not announce itself.** The CSP `frame-src`
+gained `https://www.google.com https://maps.google.com` in **two** files:
+`next-app/next.config.ts` and **root `netlify.toml`**. The root file is what
+serves production. If it does not travel, every map renders as an empty rounded
+box with only a console error — the page still looks finished. Check after
+deploying:
+
+```bash
+curl -s -D - -o /dev/null https://naplesestatejewelry.com/ | grep -i "content-security-policy"
+```
+
+👀 **Nothing in this batch has been seen by a human.** The Browser pane was
+hidden for the entire session, so every check was a DOM/network measurement.
+Three things specifically could not be exercised, each for a *measured* reason,
+not an assumed one:
+
+- **The smooth scroll** on the new Visit Us button — a hidden pane freezes
+  `requestAnimationFrame` (no callback in 1500ms; a smooth scroll sat at scrollY
+  0 for six seconds). The instant path was proven correct instead.
+- **The clipboard** on the copy buttons — a hidden pane leaves
+  `document.hasFocus()` false, which the browser blocks both copy paths on
+  (`NotAllowedError`, and `execCommand` returned false). The graceful *failure*
+  path was proven.
+- **The scrolling review band** — measured moving at ~49px/s with an exact seam,
+  but nobody has watched it loop.
+
+🔴 **Two owner actions are open, both outside the code** — the Google Business
+Profile still shows `Closed · Opens 10 AM` (matching neither the site nor the
+schema), and Linda Cusumano's review is held out of the site because its text
+genuinely ends "Hi baby". Both in `TASKS.md`.
+
+### ✅ DEPLOYED 2026-08-17 — the batch is LIVE
+
+The long-pending batch (2026-08-09 through 2026-08-17) shipped.
+
+🔴 **The showroom opened and the site has been rewritten for it (2026-08-17,
+NOT deployed).** Address **6240 Shirley St, Ste 104, Naples, FL 34109**, inside
+**Sharon Lynch Collections**, **Tue–Sat 11:00–15:00 or by appointment**. The
+site had asserted "mobile, appointment-only, no physical storefront" in 61
+strings across 15 files; all are rewritten in both locales to **store-first
+with home visits by request**, and the address now appears on 8 surfaces.
+Two strings were outright FALSE and are fixed: the schema claimed Mon–Sat
+10:00–17:00, and the homepage strip said Mon–Sat. New single source of truth
+`src/lib/business-location.ts` — never retype the address. `geo` is **26.222053,
+-81.781429** (owner-supplied 2026-08-17, verified live); the previous downtown
+pin measured 5.59 miles from the real door. The CAN-SPAM marketing address is
+now handled in code (falls back to the showroom address, so it cannot send
+empty). ❌ Owner has explicitly declined three NAP items — the eBay
+item-location ZIP (anywhere in SWFL is fine), the Etsy shop location, and
+`naplesjewelrybuyers.com`. **Do not re-raise them.** 🔴 The only external
+item still open is the **Google Business Profile**. Detail in `CHANGELOG.md` 2026-08-17 (8), `DECISIONS.md`
+*Business Model*, and `TASKS.md` *PHYSICAL LOCATION*.
+
+🟡 **Product attribute colors (2026-08-17, NOT deployed):** the product page's
+status/metal/karat/length row prints one color per fact (emerald / metal-true /
+sapphire / amethyst) instead of one gold blob. ✅ **Owner-approved 2026-08-17,
+including the amethyst — the palette is settled, do not re-open it.**
+`CHANGELOG.md` 2026-08-17 (7).
+
+🟡 **The site now invites people IN (2026-08-18, NOT deployed).** The showroom
+rollout put the address on the site but never asked anyone to come. Fixed on
+three surfaces: the homepage CTA is **"Call or Visit Us Today"** with a
+walk-in sentence and a **small Google map**; the contact page's Visit Us panel
+gained a **taller map** directly above *Get directions*; and the About page
+gained a **"We Now Have a Naples Showroom"** section (text + directions, no map
+by design). New shared `components/ShowroomMap.tsx` + `mapsEmbedUrl()` in
+`business-location.ts` — keyless embed, pinned to the verified `GEO` pair, and
+**always `loading="lazy"`** so a heavy third party stays off the critical path.
+🔴 **CSP `frame-src` gained `www.google.com` + `maps.google.com` in BOTH
+`next.config.ts` and root `netlify.toml`** — the embed 301s between those two
+origins, and a CSP-blocked iframe blanks silently. `/privacy` gained a Google
+Maps bullet. Full gate passed (`tsc`/`lint` clean, **1016/1016**, **454/454
+pages**). ⚠️ Verified by DOM/network measurement only — the Browser pane was
+hidden, so **nobody has looked at the rendered tiles**. Detail in
+`CHANGELOG.md` 2026-08-18 (1) and `DECISIONS.md` *Business Model*.
+
+**Then refined the same day (2026-08-18 (2)):** the map got its own **`+`/`–`
+buttons** (top-right, z12–z20, default zoom **16 -> 17**) because a cross-origin
+iframe cannot be scripted — each press *reloads* the frame at a new `z`, kept
+sane by a 300ms debounce and by **remounting** the iframe rather than changing
+its `src` (a live `src` change pushes history and would make Back rewind the
+zoom). `ShowroomMap` is now a client component; **build still 454/454**. And the
+footer's address stopped splitting the landmark — it read
+"… inside Sharon / **Lynch Collections**" because the middot join offers no
+break point. New `<ShowroomAddress>` puts the landmark on its own line with only
+the **name** marked `nowrap`; `addressWithLandmark()` stays for prose and email.
+Verified at **320px in Spanish**, the worst case for both. **And 2026-08-18 (3):** opening hours are now a
+Google-Maps-style day-by-day list (`<ShowroomHours>`) instead of
+"Tue–Sat 11am–3pm, or by appointment" — seven rows in the footer, contact and
+About, a 2-row grouped form on the homepage CTA only. Closed days are shown,
+dimmed, and **derived from `HOURS.days`** so display and schema move together;
+"or by appointment" sits under the list because it qualifies every row. **And 2026-08-18 (4):** the homepage CTA gained a real
+typographic ladder — the deck went full-strength colour (weight
+deliberately NOT raised), street 600 with the landmark reset to 400, day 600 /
+time 700 with **tabular figures**, closed rows at 0.55, and address+hours
+grouped under a single top hairline. Emphasis is weight
+and opacity only, never colour, because the two shared components render on four
+surfaces with four inherited palettes. **And 2026-08-18 (5):** the homepage review band
+is now a **continuous CSS-only marquee** (product pages keep the grid), and
+`TESTIMONIALS` went **4 -> 12**, read from the live Google profile (16 reviews,
+5.0) with every "More" expander opened. Quotes ship verbatim including posted
+spelling/grammar. 🔴 **Two owner decisions are open** — Linda Cusumano's review
+is held out because its text genuinely ends "Hi baby", and Google's profile
+shows `Closed · Opens 10 AM`, which matches neither the site nor the schema
+(Tue–Sat 11:00–15:00). See `TASKS.md`. **And 2026-08-18 (6):** the footer's address+hours moved out
+of the brand column into a **centred band under all four columns** — the
+seven-row list had made that column twice the height of the others. Column
+heights are now 222/222/222/222, spread zero. **And 2026-08-18 (7):** that band now stacks
+**address above hours** (side by side read as two unrelated columns), and the
+hero's third button changed **Trade -> Visit Us**, jumping to the
+"Call or Visit Us Today" block via `VISIT_ANCHOR_ID` + `scroll-margin-top`.
+⚠️ `/trade-in` has lost its only prominent entry point. 🔴 The smooth-scroll
+animation is unverified — the hidden Browser pane freezes rAF; the instant path
+was proven correct instead. **And 2026-08-18 (8):** a 24px **copy-address
+button** now sits beside the address on the homepage CTA, the contact panel and
+the About showroom section (not the footer). It copies street+city only — no
+landmark, no business name — because the paste target is a maps app. 🔴 The copy
+itself is unverified: the hidden pane leaves `document.hasFocus()` false, which
+the browser blocks both clipboard paths on; the graceful failure path WAS
+proven. **And 2026-08-18 (9):** the map frame is now **square**
+(`aspect-ratio: 1/1`, sized by `maxWidth`) — 448px on the homepage, 512px on
+contact, 288px at a 320px viewport — because the old letterbox showed a corridor
+of Shirley St with no context north or south of the door. The **footer address
+gained the copy button** too, so all four address surfaces have it.
+
+🟡 **Four owner-requested changes have landed since, and are NOT deployed:**
+the octopus mark now shows at every viewport width (it was hidden below 768px);
+the ES/EN chip moved out of the header into the mobile menu below `md` to pay
+for the space; the route progress bar is now immediate on every navigation,
+including shop filters and button-initiated navigations; and the photo swipe is
+one shared gesture that triggers on a slight sideways move. Full gate passed
+(`tsc`/`lint` clean, **1016/1016**, 454/454 pages). Staging is therefore stale;
+rebuild it before the next deploy. Detail in `CHANGELOG.md` 2026-08-17 (3)
+through (6), and under *Storefront And Accounts* below.
+
+**Confirmed on production, not assumed** — fetched from
+`https://naplesestatejewelry.com` right after the deploy:
+
+- Homepage: 200, title `Naples Estate Jewelry - Sell Jewelry, Gold & Silver in
+  Naples, FL`, h1 `Naples Premier Gold, Sterling & Jewelry Buyers`, the eyebrow
+  present, **exactly one `<h1>`** (the streaming-skeleton duplicate is gone in
+  production, not just locally), `og:title` == `<title>`.
+- Six pages spot-checked across both locales — `/es`, `/sell`, `/sell/naples`,
+  `/services`, `/silver-services`, `/es/estate-jewelry`: all 200, all one `<h1>`,
+  **all carrying `og:image`** (the blank-card fix is live), `og:locale` correct
+  per locale, `og:title` == `<title>` on every one. Spanish serves Spanish.
+- `/sitemap.xml`: **107 URLs**, **20 carrying `2026-08-17`**, zero left on
+  `2026-07-11`, **zero `noindex` legal URLs leaked**.
+- Brand assets all 200 — `favicon.ico` 11,486 B and `nav-logo.webp` 16,174 B,
+  byte-identical to source.
+
+**Staging** (`C:\Users\rcman\NEJ-repo-staging`, **843 files / ~19.3 MB**) was
+re-synced after this doc update and re-verified as an exact mirror. It now
+represents what is live, so the next batch starts from a clean baseline.
+
+**No SQL is outstanding.** All three migrations this batch touched were applied
+in Supabase and verified live. The 2026-08-15/16/17 work adds none.
+
+**What went live in it:**
 
 | | |
 | --- | --- |
@@ -49,10 +211,11 @@ adds none.
 | **Favicon = octopus brand mark** (2026-08-16) | `icon.png` 96×96 + a multi-size `favicon.ico`, both cropped from the existing `nav-logo.webp`. Replaces the gold palm tree Google was showing |
 | **Homepage title + WebSite entity** (2026-08-15) | title leads with the brand (Google strips a trailing one), trimmed to 65 chars; `WebSite` JSON-LD drives the site-name line; brand is "Naples Estate Jewelry", **no "Co"**. `/silver-services` title now carries "Sterling Silver". Other interior titles unchanged by design |
 
-### After deploying, in this order
+### Now open, in this order (post-deploy)
 
-1. **Watch the build reach `Published`** — a previous deploy showed `Canceled`.
-   Local builds run Node v24; Netlify pins 20.
+1. ✅ **The build published.** Owner-confirmed, and the live fetches above prove
+   the new code is actually being served — not a `Canceled` build leaving the
+   previous release up, which is how a past deploy failed.
 2. 🔴 **Re-measure first paint on production.** The console snippet is in
    `TASKS.md`. Baseline to beat: **533KB across 30 requests before FCP.**
    Localhost reports `transferSize: 0` and cannot measure this — production is
@@ -153,8 +316,8 @@ against real PayPal refunds but has not yet run automatically end to end.
   before the 2026-07-09 go-live). Filter by the host in `payment_response`.
 - **`paypal_refunds.amount` was reworked 2026-08-13** and now means *this
   refund's own amount*; `orders.refund_amount` is SET from PayPal's cumulative.
-  Reconciling against a SUM of the ledger is valid again. ⚠️ **The SQL is
-  applied but the code change is UNDEPLOYED** — see `TASKS.md`.
+  Reconciling against a SUM of the ledger is valid again. ✅ **Both halves are
+  now live** — the SQL was already applied, and the code shipped 2026-08-17.
 
 ### ✅ Discount-codes SQL applied and proven by a real purchase (2026-08-12)
 
@@ -169,7 +332,7 @@ PayPal (full $42.39, zero fee). Verified clean: 0 test products, 0
 `discount_codes`, 0 redemptions, 0 orders with a discount code, no orphaned
 `paypal_refunds` row, and `DEEPFIELD_SYNC_DRY_RUN` restored to `false`.
 
-🔴 **That refund exposed a real production bug, now FIXED (undeployed):
+🔴 **That refund exposed a real production bug, now FIXED (deployed 2026-08-17):
 every PayPal refund silently failed to record.** The money moved correctly but
 the order stayed `paid` with a null `refund_amount`, because a
 `PAYMENT.CAPTURE.REFUNDED` resource is a REFUND, not a capture — so the refund
@@ -196,12 +359,12 @@ disputes and invoices remain untested.
 `paypal_refunds.amount`** — the ledger amount can drift on a repeat call for an
 already-applied refund id. Unreachable from the real webhook path; see DECISIONS.
 
-### One thing is waiting: DEPLOY
+### ✅ That deploy happened — 2026-08-17
 
-A batch is finished, fully verified, and sitting undeployed in
-`C:\Users\rcman\NEJ-repo-staging` — **rebuilt 2026-08-13, 835 files / 19.0 MB,
-verified as an exact mirror of this folder** (two-way inventory diff: 0 missing,
-0 extra) and leak-checked clean. Production is `main@3e30d0e`.
+This section described the batch as finished and waiting. It shipped on
+2026-08-17, together with everything added to it through 2026-08-16. See the top
+of this file for the production verification. The staging figures once quoted
+here (835 files, rebuilt 2026-08-13) are superseded by the current **843 files**.
 
 **Nothing further is needed before deploying.** Copy the staging folder into the
 repo folder, keeping that folder's `.git`, then push.
@@ -276,13 +439,19 @@ in this session (superseded, not lost, but do not assume).
 | --- | --- |
 | `npx tsc --noEmit` | clean |
 | `npm run lint` | clean |
-| `npm test` | **963 passed / 963**, 95 files |
+| `npm test` | **1016 passed / 1016**, 99 files |
 | `npm run build` | compiled successfully, **454/454** static pages, no warnings |
 
-Run 2026-08-14 from a deleted `.next` with the dev server stopped. Progression
-this batch: 903 → 944 (discount codes) → 946 (refund fix) → 949 (refund ledger)
-→ 962 (price drift) → 963 (image priority). Pages 449 → 453 (discount codes) →
-454 (checkout quote endpoint).
+Run **2026-08-17** from a deleted `.next` with the dev server stopped. Test
+progression this session: 998 (as deployed) → 1004 (route bar: query-only
+arming, `locationKey` normalisation) → **1016** (the shared photo-swipe
+arbitration). Pages unchanged at 454 throughout — worth noting, because this
+session introduced `useSearchParams` into the root layout, which deopts every
+prerendered page if its `<Suspense>` boundary is ever removed. The page count is
+the check that catches that.
+
+⚠️ `npx tsc` resolves a stub in this repo — run the local binary:
+`next-app\node_modules\.bin\tsc.cmd --noEmit -p next-app/tsconfig.json`.
 
 Run from `next-app/`, with the dev server stopped and `.next` deleted first.
 
@@ -336,7 +505,7 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   that matters, only an opened inbox is. Checkout is unaffected either way (send
   failures are caught and never throw) and missed receipts re-send from
   Admin → Orders.
-- 🟡 **The undeployed batch grew substantially on 2026-08-09 and is now a real
+- 🟡 **The batch grew substantially on 2026-08-09 and is now a real
   UX release** (still no security or delivery impact): the shop-card touch pass
   (mobile Add to Cart restored, cart icon sitewide, dot indicators + swipe,
   single-card-off-cover model), the hero touch snap + slowdown, the hero
@@ -425,6 +594,19 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   its own light background (related products, reviews) carries
   `product-light-surface` and restores the light text tokens. Both variants
   audit clean for WCAG AA text contrast in both locales.
+- **The photo swipe is ONE gesture, shared by the product gallery and the shop
+  cards (`src/lib/photo-swipe.ts`, 2026-08-17, undeployed).** It was duplicated,
+  and the gallery's copy was never given the 2026-08-09 fix — it still used
+  React `pointermove`, which by spec cannot cancel a scroll, so that surface was
+  structurally unable to swipe. Arbitration is now asymmetric: horizontal locks
+  at **4px** sideways within a **~58°** cone, vertical only at **12px**, and in
+  between the gesture is **undecided** — never claimed, so the page still
+  scrolls, but not yet discarded either. That undecided window is what rescues
+  the arcing thumb whose first pixels read as downward. ⚠️ Keep the vertical
+  trigger well above the horizontal one and the cone at ~1.6 or below; a
+  greedier cone steals genuine page scrolls, and photos are most of the
+  scrollable surface on both surfaces. See DECISIONS, *"An undecided swipe is
+  not a scroll"*.
 - The product gallery has no hover/touch magnifier (removed 2026-08-04);
   clicking the main photo opens the full-size lightbox, and the prev/next
   controls only navigate. Swiping the main photo changes it on touch devices at
@@ -442,7 +624,7 @@ rather than assume. A rotated cron secret must change in three places: Netlify
 - `/shop` is the canonical catalog. Public visibility is Available and Sold;
   Draft, Pending Payment, and Archived remain private. Sold prices are masked
   unless a captured sale snapshot supplies the historical amount.
-- Shop gallery cards (undeployed 2026-08-09 batch): the photo carries windowed
+- Shop gallery cards (2026-08-09 batch, deployed 2026-08-17): the photo carries windowed
   DOT indicators (max 7, tapered edges when truncated; on the scrim pill +
   hover-revealed on pointer devices, permanent and floating with per-dot
   ring/halo contrast on touch), seated on the photo's bottom edge with the
@@ -517,7 +699,7 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   method → contact → address) and a sticky Order summary on the right holding
   items, totals, and the PayPal buttons, with a **Back to cart** link that
   reopens the cart drawer.
-- **Touch controls confirm a tap immediately (2026-08-15, undeployed).** Press
+- **Touch controls confirm a tap immediately (2026-08-15, deployed 2026-08-17).** Press
   states live in an `@media (hover: none)` block in `globals.css` and are
   **CSS-only on purpose** — the shop cards and hero run their own touch gesture
   handlers, and JS press listeners risked disturbing them. ⚠️ Scope any future
@@ -525,14 +707,26 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   `min-width: 641px`, which left every phone with no feedback. Product cards are
   deliberately excluded (they are swipeable; `:active` would fire mid-swipe).
   A 2px gold **route progress bar** (`components/layout/RouteProgressBar.tsx`)
-  covers the wait after the tap — it renders only after 120ms, so prefetched
-  routes show nothing, and is removed the instant the path commits, with no
-  minimum display or fade tail. It sits at the **base of the header**, offset
-  from the `--site-header-height` token and made conditional on
-  `body:has([data-site-header])` so admin (which renders no site header) keeps a
-  `top: 0` fallback rather than a bar floating mid-page. See DECISIONS, *"Tap feedback is CSS-only, and
-  the route bar shows only when it must"*, including the `popstate` trap.
-- **In-app-browser stutter is fixed sitewide (2026-08-11, undeployed).**
+  covers the wait after the tap. **Since 2026-08-17 (undeployed) it is
+  IMMEDIATE and fires on every navigation** — the 120ms delay is gone. That
+  delay is what made it look page- and viewport-dependent: a navigation faster
+  than 120ms showed nothing, and prefetch coverage varies with how many links
+  are on screen, so the same tap behaved differently on a phone and a desktop.
+  It now also arms on **query-only** navigations (shop filter/sort/view/
+  pagination) and on navigations started from a `<button>`, via the exported
+  `startRouteProgress(href)`. It is still removed the instant the route commits,
+  with no minimum display or fade tail — that half was re-offered to the owner
+  and deliberately declined, so **a fast navigation flashes by design**. It sits
+  at the **base of the header**, offset from the `--site-header-height` token and
+  made conditional on `body:has([data-site-header])` so admin (which renders no
+  site header) keeps a `top: 0` fallback rather than a bar floating mid-page.
+  ⚠️ **Completion is keyed on path + query and therefore reads
+  `useSearchParams`, so the `<Suspense>` wrapper in `[locale]/layout.tsx` is
+  load-bearing** — without it all 454 prerendered pages deopt. ⚠️ The shop's
+  centred spinner was removed as a duplicate (its screen-reader live region
+  stays). See DECISIONS, *"The route bar is immediate, and that is the whole
+  point"* and *"Tap feedback is CSS-only…"*, including the `popstate` trap.
+- **In-app-browser stutter is fixed sitewide (2026-08-11, deployed 2026-08-17).**
   Instagram/Facebook embedded browsers hide their toolbar on scroll, changing the
   viewport height. All customer-facing viewport-height CSS now uses `svh` (stable
   against that) instead of `vh`/`dvh` — the worst was `/shop`'s sticky filter
@@ -548,12 +742,40 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   sized BY the token, so page offsets (`.site-header-offset`), sticky tops, and
   full-height panes derive from it and cannot drift. A source guard test rejects
   a reintroduced `pt-16` main, `top: 4rem`, or `calc(100svh - 4rem)`.
+- **The octopus mark shows at EVERY width, and the ES/EN chip is md-and-up only
+  (2026-08-17, undeployed).** The mark was `hidden md:block`, so phones and
+  sub-768px tablets carried the wordmark alone; the language chip was a
+  duplicate of a control the mobile menu already had, so it moved out of the
+  header row below `md` to pay for the mark.
+  ⚠️ **The brand row is genuinely full on a narrow phone**, and the brand link is
+  `shrink` + `overflow-hidden` — so a mark that does not fit does not break
+  visibly, it silently clips the tail off "Naples Estate Jewelry". Three numbers
+  share one budget below `md` and must move together: the mark height
+  (`clamp(1.75rem, 7vw, 2rem)`, bounded at 767px so it never fights `md:h-10`),
+  the wordmark size (one fluid `clamp(8.75px, 2.9vw, 11px)`, replacing a pair
+  of rules that STEPPED 10px → 11px at exactly 400px — the worst width in the
+  band), and the brand gap (8px → 5px). Both mark heights are the header's own
+  content budget (32px of the 56px mobile token, 40px of the 72px desktop one),
+  so the token is unmoved. **Net effect: the mark was added and nothing else got
+  smaller** — the `2.9vw` clamp is at or above the pre-mark wordmark size at
+  every width.
+  **Re-measure the 320–430px band in Spanish with the menu OPEN before changing
+  any of the three** — that is the widest state (`Cerrar` is the longest toggle
+  label) and English carries roughly twice the slack, so an English-only check
+  will pass a layout that clips. Verified 0px clipping and 0 page overflow at
+  320/350/400/430/639/640/767/768/1280, with 11.7–25.9px of slack across the
+  phone band.
+  ℹ️ Hiding the chip is safe for mobile-first indexing: hreflang lives in the
+  HEAD via `pageMetadata()`, not in that link.
+  ⚠️ `HEADER_STYLES` is a template literal — **never put a backtick in a comment
+  inside it**; it ends the string and the error surfaces as a bogus
+  "Expected a semicolon".
 - The homepage hero is a scroll-pinned parallax stack (`HomeHeroStack`) of
   THREE slideshows handing over in overlapping crossings, everything traveling
   upward (the next slideshow rises from below); the headline/sign-up/CTA
   overlay stays pinned until the frame releases. Full choreography rules live
   in DECISIONS. Each slideshow shows **one solid admin-chosen background
-  color** for its whole time on screen (2026-08-09, undeployed — the per-photo
+  color** for its whole time on screen (2026-08-09, deployed 2026-08-17 — the per-photo
   sweep is removed; `add-slideshow-bg-colors.sql` already run and verified),
   and the overlay's light/dark text theme derives from the dominant pane's
   color by luminance. On TOUCH the hero SNAPS: one gesture advances exactly
@@ -584,7 +806,7 @@ rather than assume. A rotated cron secret must change in three places: Netlify
 - PayPal Orders API v2 owns payment. Totals, product availability, U.S. address,
   shipping method/fee, and tax are recomputed server-side. There is no inventory
   hold; the first successful capture wins one-of-one inventory.
-- **Item prices are whole dollars (2026-08-15, undeployed).** Every offered
+- **Item prices are whole dollars (2026-08-15, deployed 2026-08-17).** Every offered
   price — spot-computed or manual — is rounded in `getProductPriceValue()`, the
   single funnel feeding checkout, PayPal, eBay, Etsy, the social card, Deep
   Field, and sold-price capture. The rounding is on the VALUE, not in a
@@ -595,7 +817,7 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   ⚠️ A price under $0.50 rounds to $0 and is refused everywhere, deliberately.
   See DECISIONS, *"Item prices are whole dollars"*.
 - **The buyer is never charged a total they were not shown (2026-08-13,
-  undeployed).** 64% of the catalog is spot-linked, so a cart's stored price
+  deployed 2026-08-17).** 64% of the catalog is spot-linked, so a cart's stored price
   label drifts from the chargeable price as metal moves — measured at $69.33 on
   one bracelet within a single day. Two halves: `POST /api/checkout/quote`
   (read-only, keeps the summary showing live figures) and a `price_changed`
@@ -611,7 +833,7 @@ rather than assume. A rotated cron secret must change in three places: Netlify
     label, or it will reintroduce that contradiction.
   - ✅ The guard's rejection paths are **verified live in production**; the
     matching-quote path was deliberately not run there (it creates an order).
-- **Discount codes (2026-08-11, undeployed, needs its SQL run first).** Admin →
+- **Discount codes (2026-08-11, deployed; its SQL is applied).** Admin →
   **Discount Codes** creates a code that is either a percentage or a fixed
   dollar amount off, each optionally carrying a minimum order subtotal, an
   expiry, and a total-redemption cap. Shoppers enter it at checkout.
@@ -650,7 +872,7 @@ rather than assume. A rotated cron secret must change in three places: Netlify
 
 ## Marketplace Integrations
 
-- **The product table carries TWO chips per marketplace (2026-08-11, undeployed):**
+- **The product table carries TWO chips per marketplace (2026-08-11, deployed 2026-08-17):**
   the state chip, relabelled **"Content stale"** (was "Out of date"), and a
   separate **price chip** ("Price failed" / "Price stalled") that appears only
   when `error_count > 0`. They measure different things and must not be
@@ -675,16 +897,16 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   (33 failures became 139 error rows in one run), and `err.detail` was
   discarded so every failure logged an unusable generic message. Etsy carried
   the same defects but is clean in practice because its auto-delist moves sold
-  listings outside the selection; fixed there too. **Undeployed — production
-  still runs the old code, so eBay's next 7:45 a.m. EDT cron will repeat the
-  failures until this ships.**
-- 🔴 **A live disclosure bug is fixed in the working folder but NOT DEPLOYED:**
-  any hidden product (archived / draft / pending_payment) is readable on
+  listings outside the selection; fixed there too. ✅ **Deployed 2026-08-17** —
+  production runs the fixed code, so the 7:45 a.m. EDT eBay cron should stop
+  repeating those failures. Worth confirming on its next run.
+- ✅ **A disclosure bug, fixed and now live (was: fixed but undeployed):**
+  any hidden product (archived / draft / pending_payment) was readable on
   production by appending `?returnTo=/admin` to its URL, with no session. The
   gate used a back-link validator as an authorization check. Found by the Deep
-  Field team in a port of this code. Highest-priority item in the batch — see
-  TASKS and the DECISIONS rule *"A query parameter is never an authorization
-  signal"*.
+  Field team in a port of this code. It was the highest-priority item in the
+  queue and is no longer outstanding — see TASKS and the DECISIONS rule *"A
+  query parameter is never an authorization signal"*.
 - **Deep Field Gallery is LIVE.** One-way outbound product push to a separate
   site, server-side only, sharing nothing but a bearer token — no Supabase
   credential crosses either way and NEJ never touches their database. The
@@ -692,8 +914,9 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   exactly, the Netlify vars are set, and the hook is proven end to end (a save
   logs `[deepfield] synced 1 product(s)`). All environments write for real,
   including local dev, deliberately — so there is no sandbox unless
-  `DEEPFIELD_SYNC_DRY_RUN=true` is set locally. Undeployed: the archived-product
-  push and `image_count`. Their hourly reconciliation cron is built but not yet
+  `DEEPFIELD_SYNC_DRY_RUN=true` is set locally. The archived-product push and
+  `image_count` went live 2026-08-17. Their hourly reconciliation cron — on
+  *their* side, not ours — is built but not yet
   running, so hard deletes and dropped pushes currently depend on a manual poll.
   The hooks fire from admin save/status-change and both checkout sold-flip
   paths. See `features/deepfield-sync.md`.

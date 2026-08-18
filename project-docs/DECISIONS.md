@@ -30,6 +30,322 @@ into the current feature documents. Historical names and chronology may remain
 in `CHANGELOG.md`, but stale planning folders must never compete with current
 code, applied SQL, `TASKS.md`, or feature runbooks as a source of truth.
 
+## Business Model
+
+### The showroom is store-first; home visits continue by request
+
+Owner opened a showroom at **6240 Shirley St, Ste 104, Naples, FL 34109**,
+**Tue–Sat 11:00–15:00 or by appointment**, in space shared with **Sharon Lynch
+Collections** (confirmed 2026-08-17). The site was built on the opposite
+premise — "private, mobile, appointment-only, no physical storefront" — in 61
+strings across 15 files, both locales.
+
+The chosen model is **store-first with home visits by request**, not
+store-only. That distinction is the whole reason the six `/sell/[city]` pages
+survive: they exist almost entirely to rank on travel-to-you searches, and
+deleting the travel framing would gut them for no gain. So `travelEn`/`travelEs`
+in `lib/service-areas.ts` and the city pages get **reframed** ("serving <city>
+from our Naples showroom, home visits on request"), never removed.
+
+⚠️ **Name the shared space as a landmark, not as an arrangement.** The sign
+out front reads Sharon Lynch Collections, so a customer looking for our name
+drives past. Copy says "**inside** Sharon Lynch Collections" — a destination
+that doubles as a wayfinding instruction. "We share a space with" was rejected:
+it explains the business relationship and fails the customer trying to find the
+door.
+
+⚠️ Hours are a published fact in two places that must agree —
+`openingHoursSpecification` in `[locale]/layout.tsx` and the Google Business
+Profile. Both claimed Mon–Sat 10:00–17:00 in schema before this; a GBP/schema
+mismatch is a self-inflicted local-SEO wound, so they change together.
+
+⚠️ The `geo` block is the Naples-downtown approximation (26.142, -81.795),
+miles from Shirley St. Take the real coordinates from Google Maps — do not
+estimate them. A wrong pin is worse than no pin.
+
+❌ **NAP consistency stops at the website and the Google Business Profile**
+(owner, 2026-08-17). Three marketplace/citation surfaces were raised and
+explicitly declined:
+
+- **eBay item location** — driven by a hand-typed ZIP in the inventory
+  location; may not read 34109. Owner: anywhere in Southwest Florida is fine.
+- **Etsy shop location** — an Etsy account setting; no address exists in
+  `src/lib/etsy/`.
+- **`naplesjewelrybuyers.com`** — the related site in `sameAs`.
+
+These are a deliberate accepted cost, not an oversight. A future session must
+not re-open them as defects or "fix" them unprompted.
+
+The CAN-SPAM marketing mailing address was solved in CODE rather than by data
+entry: `getMarketingSettings()` falls back to `addressOneLine()`, so the Admin
+field is an override and marketing email can never send without a physical
+address. It uses the plain postal address, not the landmark form — "inside
+Sharon Lynch Collections" helps a visitor find a door and has no place in a
+legal footer.
+
+Inventory and rollout order live in `TASKS.md` under *PHYSICAL LOCATION*.
+
+### The showroom map is a keyless embed, pinned to GEO, and always lazy
+
+`ShowroomMap` frames Google's classic keyless embed
+(`maps.google.com/maps?...&output=embed`) via `mapsEmbedUrl()` in
+`lib/business-location.ts`. The Maps Embed API was rejected because it needs a
+billable API key, and this widget adds no information — every page carrying it
+also prints the address, the hours and a directions link as text. A blocked or
+failed frame therefore costs a visitor nothing.
+
+**It pins the GEO coordinates, not the address string.** `GEO` is the
+owner-supplied, verified door; a geocoder handed "6240 Shirley St, Ste 104" is
+free to disagree with the suite, and the project has already been burned once by
+a location that contradicted its own address (see the `GEO` comment — the
+previous downtown pin sat 5.59 miles off). The address is used only as a
+fallback if `GEO` is ever returned to `null`.
+
+**Two CSP files must list two Google origins.** `frame-src` needs
+`https://www.google.com` AND `https://maps.google.com`, in **both**
+`next-app/next.config.ts` (serves dev) and root `netlify.toml` (serves
+production). The request begins at `maps.google.com` and 301s to
+`www.google.com/maps/embed`, so allowing one origin blanks the frame. A
+CSP-blocked iframe fails quietly — it renders empty with only a console error —
+so the symptom does not look like a security setting. If a map ever goes blank,
+check these two lines before touching the component.
+
+**Zoom buttons reload the frame, because nothing else can.** The iframe is
+cross-origin, so no script of ours can zoom Google's map — zoom is a query
+parameter, and each press re-requests the frame at a new `z`. Two guards are
+mandatory and must not be removed as "extra complexity": a **300ms debounce**,
+so a burst of clicks is one load; and **remounting the iframe via `key` rather
+than changing `src`**, because changing a live iframe's `src` pushes a
+session-history entry and would turn the browser Back button into a zoom-level
+rewind. Range is z12–z20, default **z17**.
+
+**`loading="lazy"` must stay.** First paint is an open performance item on this
+site and the embed is a heavy third party; lazy is what keeps it off the
+critical path. Removing it to "make the map appear sooner" trades a measured
+site-wide problem for a decoration.
+
+**The frame is SQUARE** (`aspect-ratio: 1 / 1`, sized by `maxWidth`). It was a
+wide short band and showed a corridor of Shirley St with no context north or
+south of the door; 1:1 roughly doubles the north-south extent at the same zoom.
+⚠️ The cap is on width but binds height too — widening `maxWidth` also makes the
+map taller.
+
+**It is a third party, and `/privacy` says so.** Google receives the visitor's
+IP and may set cookies once the frame loads. If the component is ever removed
+sitewide, remove the Service Providers bullet with it.
+
+### The homepage invites a visit, and the invitation is hours-conditional
+
+The homepage CTA says **"Visit us today — walk into our Naples showroom during
+opening hours, or call ahead and we'll set a private appointment."**
+
+⚠️ It deliberately does **not** say "no appointment needed" or "we're open
+today". "Today" is read on whatever day the visitor lands, and the showroom is
+closed Sunday and Monday; an unconditional invitation is false two days in
+seven. "During opening hours" is true every day, and the hours line rendered two
+elements below is what completes it. **Do not separate the invitation from the
+hours line, and do not strengthen the copy without adding a day check** — which
+would mean making a server-rendered, cached page time-aware, a far larger change
+than the sentence is worth.
+
+The About page states the store exists but carries **no map**: its job is the
+fact, not the wayfinding, and the contact page one click away does the picture
+properly.
+
+### A display address is laid out; a prose address is a string
+
+`addressWithLandmark()` joins the address and "inside Sharon Lynch Collections"
+with a middot. **A middot is not a break opportunity**, so in a narrow column
+the line broke wherever it ran out of room — the footer shipped
+"… inside Sharon / Lynch Collections" until 2026-08-18. A business name split
+across two lines reads as two things, and this name is the entire point of the
+clause: it is the sign out front that the visitor is scanning for.
+
+**Display surfaces use `<ShowroomAddress>`** (footer, homepage CTA, About). It
+puts the landmark on its own line, drops the middot (a line break already
+separates the facts, and a leading "·" on a wrapped line is worse than none),
+and marks it a qualifier with a step down in weight.
+
+⚠️ **Only the business NAME is `nowrap`, never the whole clause.** An
+unbreakable clause guarantees the line but creates an overflow cliff — at 320px
+the Spanish version measures 190px in a 269px column, and a font bump or a
+longer suite name would push it into horizontal scroll. The preposition wraps;
+the name cannot.
+
+⚠️ **`addressWithLandmark()` remains correct for prose and email** and was
+deliberately left at its other call sites. A sentence ("Local pickup is free at
+…") needs the string, and an email cannot take a React element. `landmarkParts()`
+is the shared seam — `landmarkPhrase()` and `addressWithLandmark()` both compose
+from it, so the layout and the string cannot drift.
+
+### Hours are a day-by-day list, and closed days are part of the answer
+
+`hoursLine()` ("Tue–Sat 11am–3pm, or by appointment") packs three facts into one
+sentence, so "can I come Thursday?" costs a parse. Display surfaces use
+`<ShowroomHours>`, a two-column day/time list.
+
+- **Monday-first**, so the closed days bookend the week rather than opening the
+  list with two "Closed" rows.
+- **Closed days are shown, dimmed** — "Sunday — Closed" is the answer to a real
+  question; an absent row is not.
+- **Closed days are DERIVED from `HOURS.days`.** Never maintain a second list;
+  the display and the schema must move together.
+- **"or by appointment" sits under the list, never beside a row.** It qualifies
+  every row, so putting it in the time column next to one day asserts something
+  false about that day.
+- **Today is not bolded**, unlike Google Maps. These pages are statically
+  prerendered, so a server-rendered "today" is wrong for real visitors and a
+  client-rendered one costs hydration on the footer of every page.
+
+⚠️ **`hoursRowsGrouped()` (the 2-row form, homepage CTA only) hardcodes
+"Sunday – Monday"** because that is what today's `HOURS.days` leaves over. If
+the open days ever stop leaving a contiguous Sunday/Monday pair, it silently
+lies — switch that surface to `hoursRows()`, which derives and cannot.
+
+⚠️ **The string helpers survive on purpose.** `hoursLine()` and friends remain
+correct in prose and email (checkout, shipping, product trust, invoice email,
+Spanish legal copy) and were deliberately not converted. Both paths compose from
+`hoursTimesLabel()`, so the list and the sentences cannot drift.
+
+⚠️ **A seven-row list cannot live in a footer COLUMN.** It ran the brand column
+to ~2x the height of the other three and left the right side of the footer
+empty. The address and hours are therefore a centred band under the whole
+column row, with the same rule and spacing as *Areas We Serve*. Measured after
+the move: all four columns 222px, spread zero. Moving them back into a column
+requires shortening the list first.
+
+⚠️ **Address ABOVE hours, never beside them** (owner, 2026-08-18). Side by side
+they read as two unrelated columns and the footer's centre line lands in the
+empty gap between them; stacked, they read as one address block with its opening
+times under it.
+
+### Showroom detail emphasis is weight and opacity, never colour
+
+`ShowroomAddress` and `ShowroomHours` render on four surfaces — footer, homepage
+CTA, contact and About — each with a different inherited text colour. Their
+internal hierarchy is therefore expressed only in **font-weight and opacity**,
+which compose with any palette. A hardcoded colour inside either component
+fights the footer's muted grey and must not be added.
+
+The fixed relationships:
+
+- Street line **600**; landmark explicitly **400** at 0.8 opacity. The 400 is a
+  deliberate *reset*, not a default — it keeps the landmark a qualifier even
+  when a surface sets the surrounding block bold.
+- Day **600**; time **700**. The time is the answer, the day is the lookup key.
+- Closed rows at **0.55 opacity**, with "Closed" dropped to 500, so open days
+  carry the contrast.
+- **Times use `font-variant-numeric: tabular-nums`.** Proportional digits drift
+  and the shared right edge that makes the column scannable only holds by luck.
+
+On the homepage CTA specifically, address and hours sit together under **one
+hairline rule on top**. They are the same kind of fact — practical detail acted
+on after the invitation — and grouping them is what stops the section flattening
+into a grey list.
+
+⚠️ **Two bolder versions were tried and rejected on owner review, both on
+2026-08-18. Do not reintroduce them:**
+
+- **The deck is colour-only, never bold.** At `fontWeight: 600` it read as
+  shouting — two lines of bold immediately under a 30px phone number is two
+  headlines arguing for the same job. The lift from muted to full-strength text
+  colour is what separates it from the details below; that is sufficient.
+- **The rule is on TOP only, never bracketed.** Closed top and bottom it read as
+  a stray box, because it becomes a container competing with the map directly
+  beneath it. A single short rule announces "detail follows" and lets the map
+  supply the lower edge. It is also deliberately narrower than the map, so it
+  reads as a divider rather than a container edge.
+
+### The reviews marquee is CSS-only, and four details in it are load-bearing
+
+The homepage review band scrolls continuously (`variant="marquee"`); product
+pages keep the 2/4 grid, because a page about one item should not have a moving
+element competing with its photography.
+
+No JS moves it — no measurement, no rAF, no client component. The homepage has
+an open first-paint budget and a marquee that cost JS to run would be paying for
+decoration. The track is a flex row of two identical halves translated -50%.
+
+⚠️ **These four are correctness, not style. Each fails silently.**
+
+1. **Card spacing is `margin-inline-end`, never flex `gap`.** With `gap` the
+   track measures `2n*card + (2n-1)*gap`, one gap short of two identical halves,
+   so -50% misses the seam and the loop jerks once per cycle.
+2. **`data-customer-reveal-skip` on the wrapper.** CustomerReveal stamps
+   `main [class*="card"]` with `data-customer-reveal="pending"` (opacity 0)
+   until observed; inside a moving track the off-screen cards may never be
+   observed, and the band scrolls invisible cards. CustomerReveal tests with
+   `closest()`, so the one attribute covers every card beneath it.
+3. **Duplicate cards are `aria-hidden` + `tabIndex={-1}`.** They exist only to
+   fill the loop; a screen reader reading the same reviews twice is worse than
+   no band at all.
+4. **`prefers-reduced-motion` removes the duplicates and makes it a scroller**,
+   rather than merely stopping the animation — a stopped marquee is a row with
+   most of its content permanently unreachable.
+
+Duration is derived from the card count (`cardsPerHalf * 7s`), so adding reviews
+lengthens the band instead of speeding it up.
+
+### A review is published verbatim or not at all
+
+`testimonials.ts` already forbade inventing or paraphrasing a quote. Two
+corollaries were settled on 2026-08-18 while importing eight reviews from the
+live profile:
+
+- **Posted spelling and grammar are part of the quote.** "Jewelery", "he have
+  lots of collection" and a double space after a full stop all ship as posted. A
+  tidied quote is an invented one.
+- **A review that cannot be published verbatim is not published.** Linda
+  Cusumano's review ends with a stray "Hi baby" that is genuinely inside the
+  review body on Google, not an extraction artifact. Publishing it looks broken
+  and trimming it edits a customer's words, so it is held out until the customer
+  edits it. Do not "fix" it into the file.
+
+Google's own UI chrome is not part of the quote either: a trailing "…" on a card
+with no "More" expander is its emoji-collapse marker, and is dropped.
+
+### An in-page jump is an `<a>`, an id constant, and a scroll-margin
+
+The hero's third button jumps to the homepage's "Call or Visit Us Today" block.
+Four rules, each of which fails quietly if broken:
+
+- **The id is a constant** (`lib/home-anchors.ts`, `VISIT_ANCHOR_ID`), imported
+  by both the link and the target. They live in different files, and a mismatch
+  produces no error at all — the browser does nothing for an unknown hash, so
+  the symptom is a dead button.
+- **`scroll-margin-top: var(--site-header-height)` on the target.** The header
+  is fixed; without it the block arrives underneath it. Use the TOKEN — it
+  changes at the md breakpoint.
+- **A plain `<a>`, never `<Link>`.** A hash is not a route change, and routing
+  it arms the route progress bar for a navigation that never commits.
+- **Smooth scrolling is JS on the click, never `scroll-behavior: smooth` on
+  `html`.** That property applies to the scrolling container, so globally it
+  would also animate the scroll-to-top of every route change. The handler
+  honours `prefers-reduced-motion`; the `<a href="#...">` underneath still works
+  without JS.
+
+⚠️ **The hero no longer links to `/trade-in`.** That slot was Trade until
+2026-08-18; the trade-in program now has no prominent entry point, only the
+footer. Giving it one means finding a new home, not reclaiming this slot.
+
+### The copy-address button copies the address, not the wayfinding
+
+`CopyAddressButton` copies `addressOneLine()` — street and city only. The
+landmark ("inside Sharon Lynch Collections") and the business name are
+deliberately excluded: a copied address is nearly always pasted into a maps app
+or a GPS, and the landmark is guidance for a human reading the page, not input
+for a geocoder. It stays visible next to the button.
+
+⚠️ **The button must stay a SIBLING of the maps link, never a child.** A
+`<button>` inside an `<a>` is invalid HTML, and browsers resolve the conflict by
+breaking one of them — typically leaving a control that navigates instead of
+copying. Same reason it sits outside the `<address>` element on the contact
+page: that element IS the address, and a control is not part of one.
+
+It reuses `lib/clipboard.ts` rather than calling `navigator.clipboard` directly,
+because that helper already carries the hidden-textarea/`execCommand` fallback
+for non-secure contexts.
+
 ## Application Architecture
 
 ### Next.js under `next-app/` remains the only runtime
@@ -447,6 +763,81 @@ something.** The declaration was identical to Tailwind's; only its origin
 differed, which is why nothing looked wrong for months and why the symptom, when
 it came, looked like a design choice rather than a defect.
 
+### The header brand row is full on a phone — its three sizes move together
+
+Owner request, 2026-08-17: show the octopus mark at every viewport width. It had
+been `hidden md:block` since it was introduced, so phones and every sub-768px
+tablet showed the wordmark with nothing beside it.
+
+**Why this was not a one-word change.** The brand `<Link>` is `shrink` +
+`overflow-hidden` and the action cluster is `flex-shrink-0`. That combination
+means the header can never overflow the page — it absorbs the pressure by
+clipping the brand instead. So adding a 42px mark to a row that was already full
+did not produce a visible break that anyone would notice and report; it produced
+"Naples Estate Jewelr" with the tail quietly sliced off. Measured before the
+fits-pass, in Spanish with the menu open: **16.6px cut at 400px**, 11.6px at
+350px, and exactly 0.0px of headroom at 430px.
+
+**The decision: three sizes are one coupled budget, not three independent
+knobs.** Below `md` the row holds mark + gap + wordmark and nothing is spare, so
+all three now shrink together on the same band —
+
+| | Value | Why that value |
+| --- | --- | --- |
+| Mark height | `clamp(1.75rem, 7vw, 2rem)` | floor is the 1.75rem the action buttons already drop to below 350px; ceiling is the 32px mobile content budget |
+| Wordmark | `clamp(8.75px, 2.35vw, 11px)` | floor is the 8.75px this header already used at 320px; caps at ~468px |
+| Brand gap | 5px below md, 8px at md+ | 3px the wordmark does not have to surrender |
+
+Both mark heights are the header's OWN content budget — 32px of the 56px mobile
+token, 40px of the 72px desktop one — so making the mark visible did not move
+`--site-header-height`, and every offset derived from that token is untouched.
+The mark rule is bounded at `max-width: 767px` specifically so it never competes
+with the `md:h-10` utility; a single-class CSS rule and a Tailwind responsive
+utility have equal specificity, and which one wins would come down to source
+order.
+
+**Two traps worth naming:**
+
+1. ⚠️ **Measure Spanish with the menu OPEN.** `Cerrar` is the longest toggle
+   label, and the toggle grows when tapped, so the widest state of this row is
+   one that only appears after an interaction. English carries roughly twice the
+   slack (22.5px vs 13.3px at 400px), so an English-only check passes a layout
+   that clips in Spanish.
+2. ⚠️ **A step in a fluid band lands its worst case at the step.** The old rules
+   held the wordmark at `11px` and dropped to `clamp(8.75px, 2.75vw, 10px)` only
+   below 400px — so at exactly 400px the wordmark jumped UP while the row
+   padding and gaps also grew, making 400px worse than the narrower widths on
+   either side of it. One clamp across the whole band removes the cliff.
+
+The general rule: **when a flex row clips rather than overflows, "it fits" is
+not something you can see — it is something you measure.** Verified 0px clipped
+and 0 page overflow at 320/350/400/430/639/640/767/768/1280.
+
+**Postscript, same day — the ES/EN chip left the row and paid the debt back.**
+Owner asked for the language toggle to collapse into the dropdown nav on mobile.
+It needed no new markup: the mobile menu had carried its own `Español`/`English`
+item all along, so the header chip was a *duplicate control on exactly the
+widths that could least afford one*. Hidden below `md`, it freed 17.2px — and
+that went straight into raising the wordmark clamp from `2.35vw` to `2.9vw`,
+which is at or above its pre-mark size at every width. **Net across both
+changes: the mark was added and nothing else got smaller.** The lesson worth
+keeping is the ordering one — the fits-pass forced a compromise, and the
+compromise became unnecessary one change later; when a squeeze forces you to
+shrink something, note it, because the constraint may not be permanent.
+
+Removing the chip was checked against **mobile-first indexing** before it went:
+the mobile menu is only in the DOM while open, so a closed mobile page now has
+no body link to the other locale. Safe here because hreflang is declared in the
+HEAD by `pageMetadata()`/`alternatesFor()` on every page and every locale URL is
+in the sitemap — but that is the check to repeat before removing any other
+locale link, not an assumption to inherit.
+
+⚠️ **Never put a backtick in a comment inside `HEADER_STYLES`.** That block is a
+template literal; a stray backtick terminates the string mid-CSS and Turbopack
+reports it as `Expected a semicolon` pointing at the comment, which reads like a
+CSS syntax error rather than a JS string error. Cost a 500-ing dev server during
+this change.
+
 ### Tap feedback is CSS-only, and the route bar shows only when it must
 
 Owner request, 2026-08-15: on touch there was no sign a control had been hit
@@ -469,14 +860,15 @@ scale on `:active` would fire mid-swipe. The route bar covers a card tap.
 
 **The wait after it — `components/layout/RouteProgressBar.tsx`.** Two rules:
 
-1. **Only when needed.** Nothing renders for the first **120ms**, so a
-   prefetched or cached route shows no bar at all rather than a flash. Clicks
-   that will not make anyone wait never arm it: same-path (hash, or a query-only
-   shop-filter change), off-site, `mailto:`/`tel:`, `target="_blank"`,
-   `download`, and modified clicks.
+1. ⛔ **SUPERSEDED 2026-08-17 — see *"The route bar is immediate, and that is the
+   whole point"* below.** Rule 1 was "only when needed": nothing rendered for the
+   first **120ms**, and same-path clicks (including query-only shop filters)
+   never armed. The owner reversed it; the bar is now immediate on every
+   navigation, and query-only changes arm.
 2. **Not one millisecond longer.** No minimum display, no run-to-100%, no
    fade-out tail. The fill stops at 92% and completion is expressed by the
    element being REMOVED — so it can vanish at 40% width, and that is correct.
+   ✅ **Still current** — re-offered and explicitly declined on 2026-08-17.
 
 **It sits at the BASE of the header, not the top of the viewport** (owner,
 2026-08-15), so it reads as attached to the header. Two constraints made that
@@ -499,6 +891,9 @@ inside that Link, so a global bar would mean wrapping every link in the app.
 **Why `usePathname` and not `useSearchParams` for completion:** this renders in
 the root layout, and `useSearchParams` would opt all 454 static pages into
 dynamic rendering. Confirmed unchanged at 454/454 after the change.
+⛔ **The `useSearchParams` half of that is superseded (2026-08-17):** the hook is
+now used, contained by a `<Suspense>` boundary, still at 454/454. See the entry
+below for why it became unavoidable.
 
 ⚠️ **The `popstate` trap, which shipped once and was caught by measurement.**
 `popstate` fires AFTER the URL has moved, so `location.pathname` inside that
@@ -510,6 +905,68 @@ path React COMMITTED**, tracked in a ref. Pinned by
 
 The 8s timeout is a backstop for a cross-path anchor whose handler cancels the
 navigation, not part of normal operation. Normal completion is the path commit.
+
+### The route bar is immediate, and that is the whole point
+
+Owner, 2026-08-17. The report was that the bar showed "only on some pages and
+some viewport sizes". **It was never gated by either** — it mounts globally and
+its CSS has no media query. What produced that impression is worth keeping,
+because it is a general trap:
+
+> **A delay-gated indicator inherits the timing distribution of whatever it is
+> measuring, and that distribution is not uniform across devices.**
+
+The 120ms delay meant a navigation faster than 120ms showed nothing. Next
+prefetches links as they enter the viewport, so on a desktop most links are warm
+and commit instantly (no bar), while on a phone fewer are prefetched and product
+cards set `prefetch={false}` (bar). The same tap on the same link behaved
+differently depending on screen size — so a rule written as "only when needed"
+was experienced as "at random". **Consistency was the missing feature, not
+coverage.**
+
+**Rule 1 is therefore reversed: immediate, on every navigation.** No delay;
+`setVisible` is synchronous in the click handler.
+
+**Rule 2 was re-offered and explicitly declined, so it stands.** The obvious
+companion change — a ~200ms minimum plus a run-out to 100%, which is what most
+route loaders do — was put to the owner and refused. The bar still vanishes the
+instant the route commits. ⚠️ **A fast navigation therefore flashes, by
+decision.** Do not add a minimum duration to "fix" it without asking again.
+
+**Query-only navigations now arm**, and that forced two consequences:
+
+- **Completion must be keyed on path AND query.** A shop filter never changes
+  the path, so the old path-only comparison would return "not arrived" forever
+  and strand the bar for the full 8s safety timeout — the same shape as the
+  popstate trap above. `locationKey()` normalises the two spellings that reach
+  it (`URL.search` gives `'?a=1'`, `URLSearchParams.toString()` gives `'a=1'`);
+  if those ever disagree, every navigation looks incomplete.
+- ⚠️ **`useSearchParams` is now used, and its `<Suspense>` wrapper in
+  `[locale]/layout.tsx` is load-bearing.** The hook client-renders the tree up
+  to the nearest boundary; without the wrapper that tree is the entire app and
+  all 454 prerendered pages deopt. With it, containment is exactly the bar —
+  which renders null anyway. Verified 454/454 after the change, with page routes
+  still carrying `●`.
+
+**A click listener can only see anchors**, so navigations that start from a
+`<button>` are wired explicitly through the exported `startRouteProgress(href)`
+— shop controls, cart-drawer checkout, both sign-outs, sign-in, admin order
+rows. Pass the destination: it is the only way the bar can refuse a push to
+where the visitor already is, which would commit nothing and strand it.
+
+**The shop's centred spinner was deleted as a duplicate.** Once the bar armed on
+query changes, a single filter click lit both — measured true in the same
+mutation batch. The bar sits at the base of the FIXED header, so it is on screen
+however far down the catalog the visitor has scrolled, which is what made the
+spinner redundant rather than complementary. ⚠️ **Its `role="status"` live
+region was KEPT** (now screen-reader-only): the bar is deliberately
+`aria-hidden`, and Next's route announcer does not announce a query-only change,
+so deleting the region outright would have left screen-reader users with no
+signal at all for filtering.
+
+ℹ️ **Back/forward shows no bar on a warm cache, and that is rule 2, not a gap.**
+`popstate` fires and the guard arms, but a cached traversal commits inside the
+same React batch, so the visible state never renders. There is no wait to report.
 
 ### The homepage title leads with the brand; interior pages keep it as a suffix
 
@@ -2581,6 +3038,57 @@ positioning in a JSX inline `style` attribute, so any override needs
 stylesheet is a template literal, so a single backtick anywhere inside it —
 including in a comment — terminates the string and 500s the route.
 
+### An undecided swipe is not a scroll — and a duplicated gesture rots
+
+Owner, 2026-08-17: the photo swipe is "very hard to get to register, and it
+tries to scroll down instead of swiping over" — **the same complaint, in almost
+the same words, as 2026-08-09.** That repetition is the important part.
+
+**The 08-09 fix was correct and was applied to only one of the two surfaces.**
+The shop cards moved to native non-passive touch listeners; the product gallery
+kept React `pointermove` and stayed structurally broken for eight more days.
+`preventDefault` on a pointer event does nothing to scrolling, so on that
+surface the browser's direction detection always won, fired `pointercancel`, and
+killed the swipe before its 10px threshold was reached. **No tuning could have
+fixed it** — the mechanism was wrong, and the working mechanism was sitting in a
+sibling file.
+
+The durable rule: **a gesture implemented twice will be fixed once.** Both
+surfaces now share `src/lib/photo-swipe.ts`, thresholds included.
+
+**The tuning insight — add an UNDECIDED state.** The old arbitration picked an
+axis at one shared slop with a mild horizontal lean, which still lost the most
+common real gesture: *a thumb swiping across a phone arcs*, so its first pixels
+are frequently more down than across. A symmetric test read those pixels as a
+scroll and the swipe was dead before the finger had gone anywhere sideways.
+Conceding is unrecoverable — once the browser scrolls it never hands the gesture
+back — so the two axes must need different amounts of evidence:
+
+- **Horizontal locks eagerly**: 4px sideways, vertical drift allowed to 1.6x
+  that (~58° cone). Cheap, because triggering was the thing failing.
+- **Vertical locks reluctantly**: 12px, three times as far.
+- **Between the two, the gesture is UNDECIDED, and undecided means hands off** —
+  never `preventDefault`, so the page scrolls exactly as before, while the swipe
+  is not yet thrown away and can still resolve horizontal.
+
+⚠️ **Keep the vertical trigger well above the horizontal one.** Equalising them
+is precisely the original bug, and a test asserts the inequality rather than the
+numbers, so a retune is free but a collapse is not.
+
+⚠️ **Do not push the cone much past 1.6.** Photos are most of the scrollable
+surface on both the shop grid and a product page; a greedier cone starts
+stealing genuine page scrolls, which is a worse failure than a missed swipe
+because it makes the page feel stuck.
+
+⚠️ A gesture the browser has already claimed (`cancelable === false` while
+undecided) concedes to vertical at once — otherwise a late horizontal lock could
+advance a photo in the middle of a scroll.
+
+Verified with synthetic touch sequences on both surfaces: the arcing thumb
+advances the photo and `preventDefault`s every move after the lock (the
+undecided first move correctly left alone), while a straight vertical drag
+starting on a photo produces zero `preventDefault` calls and no photo change.
+
 ### Shop-card photos: swipe + windowed dots on touch; hover affordances are mouse-only
 
 Owner requests 2026-08-09 (dots replacing the progress bar, swipe, floating
@@ -2592,11 +3100,12 @@ that must survive refactors:
    scrolling; the only levers are `touch-action` (and `pan-y` deliberately
    permits vertical panning) and a cancelable touchmove. With pointer events
    the browser claimed the gesture and fired pointercancel before any
-   threshold was reached. Direction locks at a 5px slop — it must beat the
-   browser's own commit — with the horizontal cone widened to ~51°
-   (`atan(1.25)`) because a thumb crossing a ~166px card always drifts.
-   Vertical gestures are never claimed; the photos are most of the grid's
-   scrollable surface.
+   threshold was reached. Vertical gestures are never claimed; the photos are
+   most of the grid's scrollable surface.
+   ⚠️ **The gesture moved to `src/lib/photo-swipe.ts` on 2026-08-17 and is now
+   SHARED with the product gallery** — thresholds included, so the numbers once
+   quoted here (5px slop, ~51° cone) live there and are superseded. See
+   *"An undecided swipe is not a scroll"* below for the current arbitration.
 2. **A swipe suppresses the trailing click one-shot, and the flag is cleared
    on the next touchstart.** A preventDefault'd swipe produces NO trailing
    click, so nothing consumes the flag — left standing, one swipe silently

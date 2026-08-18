@@ -19,6 +19,7 @@ import {
   productImagePaddingBackground,
   productImagePaddingForImage,
   productLengthSizeDisplay,
+  productMetalAccentVar,
   productMetalVariantLabel,
   productStatusLabel,
   productSupportsLinkType,
@@ -342,6 +343,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   const description = isEs && p.description_es ? p.description_es : p.description;
   const publicNotes = (isEs && p.public_notes_es?.trim() ? p.public_notes_es : p.public_notes)?.trim();
   const metalLabel = productMetalVariantLabel(p.metal_variant, p.category, locale);
+  const metalAccent = productMetalAccentVar(p.metal_variant, p.category);
   const isSold = isProductSold(p.status);
   const price = getStorefrontDisplayPrice(p, spotData, visibility.hideSoldItemPrices, locale);
   const isPurchasable = isProductPurchasable(p.status, p.quantity);
@@ -631,31 +633,73 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                   <span
                     className="text-[0.6875rem] font-bold uppercase tracking-widest px-2 py-0.5"
                     style={{
+                      /* Available is emerald, not gold. It was gold, which is
+                         also the metal's color — the badge and the metal name
+                         were the same swatch a few pixels apart. Sold keeps its
+                         near-black chip unchanged. */
                       background: isPurchasable
-                        ? (isDarkPage ? '#e9c349' : 'var(--color-primary)')
+                        ? 'var(--color-spec-status)'
                         : (isDarkPage ? '#dcd9d2' : 'var(--color-on-surface)'),
-                      color: isDarkPage ? '#1a1c1c' : (isPurchasable ? 'var(--color-on-primary)' : 'var(--color-surface)'),
+                      color: isPurchasable
+                        ? 'var(--color-spec-on-status)'
+                        : (isDarkPage ? '#1a1c1c' : 'var(--color-surface)'),
                     }}
                   >
                     {isPurchasable
                       ? (isEs ? 'Disponible' : 'Available')
                       : isSold ? (isEs ? 'Vendido' : 'Sold') : productStatusLabel(p.status)}
                   </span>
-                  <span className="product-detail-summary-specs inline-flex items-center gap-3 whitespace-nowrap">
+                  {/* Metal / karat / length each print in their own color, so four
+                      separate facts stop reading as one gold blob. The colors are
+                      `--color-spec-*` (globals.css `@theme`, with dark-page
+                      counterparts in `.product-page-dark`); the metal's is chosen
+                      by `productMetalAccentVar` so the word matches the metal.
+
+                      ⚠️ Metal and karat were ONE span until 2026-08-17, with the
+                      separator baked into the string as ` · `. They are split
+                      because a single text node cannot carry two colors. The dots
+                      are now their own `aria-hidden` spans — decorative, and a
+                      screen reader already gets the boundary from the elements. */}
+                  <span className="product-detail-summary-specs inline-flex items-center gap-2 whitespace-nowrap">
                     <span
                       className="text-[0.6875rem] font-bold uppercase tracking-[0.3em]"
-                      style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
+                      style={{ color: metalAccent, fontFamily: 'var(--font-label)' }}
                     >
                       {metalLabel}
-                      {p.purity ? ` · ${formatKarat(p.purity)}` : ''}
                     </span>
+                    {p.purity ? (
+                      <>
+                        <span
+                          aria-hidden="true"
+                          className="text-[0.6875rem] font-bold"
+                          style={{ color: 'var(--color-spec-separator)', fontFamily: 'var(--font-label)' }}
+                        >
+                          &middot;
+                        </span>
+                        <span
+                          className="text-[0.6875rem] font-bold uppercase tracking-[0.3em]"
+                          style={{ color: 'var(--color-spec-karat)', fontFamily: 'var(--font-label)' }}
+                        >
+                          {formatKarat(p.purity)}
+                        </span>
+                      </>
+                    ) : null}
                     {localizedBuyerLength && (
-                      <span
-                        className="text-[0.6875rem] font-bold uppercase tracking-[0.3em]"
-                        style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
-                      >
-                        &middot; {localizedBuyerLength}
-                      </span>
+                      <>
+                        <span
+                          aria-hidden="true"
+                          className="text-[0.6875rem] font-bold"
+                          style={{ color: 'var(--color-spec-separator)', fontFamily: 'var(--font-label)' }}
+                        >
+                          &middot;
+                        </span>
+                        <span
+                          className="text-[0.6875rem] font-bold uppercase tracking-[0.3em]"
+                          style={{ color: 'var(--color-spec-length)', fontFamily: 'var(--font-label)' }}
+                        >
+                          {localizedBuyerLength}
+                        </span>
+                      </>
                     )}
                   </span>
                 </div>

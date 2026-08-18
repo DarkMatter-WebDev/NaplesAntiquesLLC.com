@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { addressOneLine } from '@/lib/business-location';
 
 type MarketingSettingsResponse = {
   mailingAddress: string | null;
@@ -102,6 +103,16 @@ export default function MarketingSettingsPanel() {
             placeholder="Business name, street address, city, state, ZIP"
           />
         </label>
+        {/* Without this, a blank box looks like non-compliance while the emails
+            actually carry the showroom address — the field is an OVERRIDE now,
+            not the only source. */}
+        {!loading && !mailingAddress.trim() && (
+          <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+            Leave blank to use the showroom address, <strong>{addressOneLine()}</strong>.
+            Marketing email legally needs a physical address, so this never sends empty.
+            Anything you type here overrides it.
+          </p>
+        )}
         <div className="grid gap-2 text-xs md:grid-cols-3" style={{ color: 'var(--color-on-surface-variant)' }}>
           <span><strong>Site URL:</strong> {settings?.siteUrl ?? 'https://naplesestatejewelry.com'}</span>
           <span><strong>Chris sender:</strong> {settings?.senderProfiles?.chris?.fromAddress ?? 'Chris at Naples Estate Jewelry <info@naplesestatejewelry.com>'}</span>

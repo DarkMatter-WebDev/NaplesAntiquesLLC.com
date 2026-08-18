@@ -1,5 +1,9 @@
 import Link from 'next/link';
 import { SERVICE_AREAS } from '@/lib/service-areas';
+import { mapsUrl } from '@/lib/business-location';
+import ShowroomAddress from '@/components/ShowroomAddress';
+import ShowroomHours from '@/components/ShowroomHours';
+import CopyAddressButton from '@/components/CopyAddressButton';
 
 interface Props {
   locale?: string;
@@ -52,8 +56,8 @@ export default function SiteFooter({ locale = 'en' }: Props) {
             </p>
             <p className="max-w-[20rem] text-xs leading-snug md:text-sm md:leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
               {isEs
-                ? 'Compramos y vendemos joyería de patrimonio fina en Naples, Florida. Evaluaciones gratuitas.'
-                : 'Buying and selling fine estate jewelry in Naples, Florida. Free, on-the-spot appraisals — we come to you.'}
+                ? 'Compramos y vendemos joyería de patrimonio fina en nuestro salón de Naples, Florida. Evaluaciones gratuitas.'
+                : 'Buying and selling fine estate jewelry at our Naples, Florida showroom. Free, on-the-spot appraisals.'}
             </p>
             <a
               href="tel:2394048505"
@@ -144,6 +148,71 @@ export default function SiteFooter({ locale = 'en' }: Props) {
             ))}
           </nav>
         </div>
+
+        {/* Sitewide NAP. The footer is on every page, so this is the strongest
+            name/address/phone signal the site emits — it must stay
+            byte-identical to the Google Business Profile. Rendered as
+            <address> so the markup says what it is.
+
+            ⚠️ It lives HERE, centred under the four link columns, rather than
+            inside the brand column where it shipped on 2026-08-17. Once the
+            hours became a seven-row list, the brand column ran roughly twice
+            the height of the other three and the footer read as one long column
+            with three stubs beside it. Centring it under the whole row turns
+            that dead space into the block's base. Do not move it back into a
+            column without shortening the hours first.
+
+            The rule and spacing deliberately match the "Areas We Serve" band
+            below, so the footer keeps one rhythm rather than gaining a band
+            that looks bolted on.
+
+            Address ABOVE hours, never beside them (owner, 2026-08-18). Side by
+            side, the two halves read as two unrelated columns and the centre
+            line of the footer falls in the empty gap between them; stacked,
+            they read as one address block with its opening times under it. */}
+        <address
+          className="not-italic mt-4 flex flex-col items-center gap-5 border-t pt-4 text-center text-xs leading-snug md:mt-10 md:pt-6 md:text-sm md:leading-relaxed"
+          style={{ borderColor: 'var(--color-outline-variant)', color: 'var(--color-on-surface-variant)' }}
+        >
+          <div>
+            <p
+              className="mb-1.5 text-[0.6rem] font-bold uppercase tracking-[0.3em]"
+              style={{ fontFamily: 'var(--font-label)' }}
+            >
+              {isEs ? 'Visítenos' : 'Visit Us'}
+            </p>
+            {/* ⚠️ Sibling of the maps link, never inside it — a <button> in an
+                <a> is invalid HTML and browsers break one of the two.
+
+                It IS inside the <address> element here, unlike the contact
+                page. That is deliberate rather than sloppy: this <address>
+                wraps the whole band including the hours, so there is no
+                "outside" without splitting the element, and `<address>` accepts
+                flow content, so a button in it is valid. */}
+            <div className="flex items-start justify-center gap-2">
+              <a
+                href={mapsUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover-underline-grow"
+                style={{ color: 'inherit' }}
+              >
+                <ShowroomAddress locale={locale} />
+              </a>
+              <CopyAddressButton locale={locale} />
+            </div>
+          </div>
+
+          <div>
+            <p
+              className="mb-1.5 text-[0.6rem] font-bold uppercase tracking-[0.3em]"
+              style={{ fontFamily: 'var(--font-label)' }}
+            >
+              {isEs ? 'Horario' : 'Hours'}
+            </p>
+            <ShowroomHours locale={locale} />
+          </div>
+        </address>
 
         <nav
           className="mt-4 border-t pt-4 md:mt-10 md:pt-6"

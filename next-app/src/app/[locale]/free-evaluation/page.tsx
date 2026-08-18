@@ -63,7 +63,7 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
         {
           num: '02',
           title: 'Lo Evaluamos',
-          body: 'Reunámonos con cita o déjenos ir a usted. Probamos, pesamos y explicamos cómo llegamos a cada número — usando precios de oro en vivo, nada oculto.',
+          body: 'Visítenos en el salón o déjenos ir a usted. Probamos, pesamos y explicamos cómo llegamos a cada número — usando precios de oro en vivo, nada oculto.',
         },
         {
           num: '03',
@@ -80,7 +80,7 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
         {
           num: '02',
           title: 'We Evaluate It',
-          body: "Meet by appointment or let us come to you. We test, weigh, and explain how we arrive at each number — using live gold pricing, nothing hidden.",
+          body: "Visit the showroom, or let us come to you. We test, weigh, and explain how we arrive at each number — using live gold pricing, nothing hidden.",
         },
         {
           num: '03',
@@ -482,12 +482,12 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
                 ? [
                     { mark: 'nocost' as ClayMarkName, title: 'Sin Costo, Sin Trampa', body: 'La evaluación es genuinamente gratuita y no tiene ninguna obligación de vender.' },
                     { mark: 'pricing' as ClayMarkName, title: 'Precios de Mercado en Vivo', body: 'El oro y la plata se valoran según los precios spot en tiempo real, mostrados abiertamente.' },
-                    { mark: 'private' as ClayMarkName, title: 'Privado y Discreto', body: 'Móvil y solo con cita. Sus artículos e información permanecen confidenciales.' },
+                    { mark: 'private' as ClayMarkName, title: 'Privado y Discreto', body: 'En el salón o en su casa. Sus artículos e información permanecen confidenciales.' },
                   ]
                 : [
                     { mark: 'nocost' as ClayMarkName, title: 'No Cost, No Catch', body: 'The evaluation is genuinely free and carries zero obligation to sell.' },
                     { mark: 'pricing' as ClayMarkName, title: 'Live Market Pricing', body: 'Gold and silver are valued against real-time spot prices, shown openly.' },
-                    { mark: 'private' as ClayMarkName, title: 'Private & Discreet', body: 'Mobile and appointment-only. Your items and information stay confidential.' },
+                    { mark: 'private' as ClayMarkName, title: 'Private & Discreet', body: 'At the showroom or in your home. Your items and information stay confidential.' },
                   ]
               ).map((pillar) => (
                 <div key={pillar.title} className="p-6">

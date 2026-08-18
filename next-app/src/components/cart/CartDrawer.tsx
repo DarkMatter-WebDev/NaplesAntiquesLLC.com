@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { startRouteProgress } from '@/components/layout/RouteProgressBar';
 import { useCart, type CartItem } from '@/context/CartContext';
 import { formatProductItemYear, isProductPurchasable, isProductSold, normalizeProductQuantity, productImagePaddingBackground, productStatusLabel } from '@/types/product';
 import { QuantityStepper } from '@/components/checkout/OrderSummary';
@@ -127,6 +128,7 @@ export default function CartDrawer({ locale }: { locale: string }) {
     if (isLoggedIn) {
       setCheckoutPending(false);
       closeDrawer();
+      startRouteProgress(checkoutHref);
       router.push(checkoutHref);
     } else {
       // Signed-out shoppers get the choice to log in, create an account, or
@@ -228,9 +230,15 @@ export default function CartDrawer({ locale }: { locale: string }) {
             setShowCheckoutGate(false);
             if (hasUnavailableItems) return;
             closeDrawer();
+            startRouteProgress(checkoutHref);
             router.push(checkoutHref);
           }}
-          onNavigate={(href) => { setShowCheckoutGate(false); closeDrawer(); router.push(href); }}
+          onNavigate={(href) => {
+            setShowCheckoutGate(false);
+            closeDrawer();
+            startRouteProgress(href);
+            router.push(href);
+          }}
         />
       )}
     </>

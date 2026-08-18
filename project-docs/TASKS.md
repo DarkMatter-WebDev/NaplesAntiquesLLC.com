@@ -1,21 +1,49 @@
-# Tasks
+﻿# Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-08-17**.
+> in `CHANGELOG.md`. Last reconciled: **2026-08-18**.
 
-## 🔴 TOP OF THE LIST (2026-08-17)
+## 🔴 TOP OF THE LIST (2026-08-18)
 
-1. **Deploy the staged batch** — `C:\Users\rcman\NEJ-repo-staging`.
-   ✅ **REBUILT 2026-08-17** and verified: **843 files, ~19.3 MB**.
-   A second robocopy dry run immediately after reported **Copied 0 / Extras 0 /
-   Mismatch 0 / FAILED 0**, i.e. an exact mirror.
+0. 🟢 **DEPLOY THIS BATCH (2026-08-18).** Staged and ready; figures under
+   *Copying to the repo folder*. Gate from a deleted `.next`: `tsc` clean,
+   `lint` clean, **1016/1016**, **454/454 pages**. **No SQL outstanding.**
+   Contents are listed in `CURRENT_STATUS.md` and detailed in `CHANGELOG.md`
+   2026-08-18 (1)–(9).
 
-   ✅ **The batch passed a pre-deploy audit first** (2026-08-17, no code
-   changed), from a deleted `.next`: `tsc` clean, `lint` clean, **998/998 tests**
-   across 98 files, **454/454 static pages**. A runtime sweep of **30 indexable
-   pages across both locales found zero problems**, and the money invariant was
-   proven through the live quote API — a `$5,558` card produced a `5558` charge.
-   Full evidence in `CHANGELOG.md` (2026-08-17).
+   🔴 **The one hazard that fails silently: the CSP.** `frame-src` gained
+   `https://www.google.com https://maps.google.com` in **`next-app/next.config.ts`
+   AND root `netlify.toml`**. The root file serves production. If it does not
+   travel, every map is an empty rounded box and the page still looks finished.
+   Verify after the deploy:
+
+   ```bash
+   curl -s -D - -o /dev/null https://naplesestatejewelry.com/ | grep -i "content-security-policy"
+   ```
+
+   👀 **Nothing in this batch has been looked at by a human** — the Browser pane
+   was hidden all session. The three unexercised items (smooth scroll, clipboard,
+   marquee loop) are listed with their measured reasons in the phone-check items
+   below. None of them blocks a deploy; all three are worth ten seconds each
+   once it is live.
+
+1. ✅ **DEPLOYED 2026-08-17 — that batch is live.** The batch that had
+   been queued since 2026-08-09 is live, owner-confirmed, and verified by
+   fetching production: homepage title/h1/eyebrow correct with exactly one
+   `<h1>`; six pages across both locales all 200 with `og:image` present and
+   `og:title` == `<title>`; sitemap 107 URLs with 20 on `2026-08-17`, none left
+   on `2026-07-11`, and no `noindex` leaks; brand assets byte-identical to
+   source. Evidence in `CHANGELOG.md` (2026-08-17) and `CURRENT_STATUS.md`.
+
+   ✅ It passed a pre-deploy audit first, from a deleted `.next`: `tsc` clean,
+   `lint` clean, **998/998 tests** across 98 files, **454/454 static pages**. A
+   runtime sweep of **30 indexable pages across both locales found zero
+   problems**, and the money invariant was proven through the live quote API —
+   a `$5,558` card produced a `5558` charge.
+
+   ✅ **Staging re-synced after the deploy** — `C:\Users\rcman\NEJ-repo-staging`,
+   **843 files, ~19.3 MB**, dry run **Copied 0 / Extras 0 / Mismatch 0 /
+   FAILED 0**. It now mirrors what is live, so the next batch starts clean.
 
    ℹ️ Recording a rebuild in this file necessarily makes staging stale by this
    file, so the sequence is always: edit docs LAST, then sync, then confirm a
@@ -41,13 +69,296 @@
    absent from staging. Do not chase this gap as a missing-file bug.
 
    ⚠️ Still a point-in-time snapshot — rebuild again after any further edit.
-2. **Re-measure first paint on production** (snippet below, under *After the
+
+   🟡 **Four changes have landed since and are NOT deployed** — see item 2.
+   Staging is stale as of 2026-08-17; rebuild it (command under *Copying to the
+   repo folder*) before the next deploy.
+2. 🟡 **UNDEPLOYED — the showroom map and the "visit us" copy (2026-08-18).**
+   Gate passed: `tsc` clean, `lint` clean, **1016/1016**, **454/454 pages**.
+   Detail: CHANGELOG 2026-08-18 (1); DECISIONS, *"The showroom map is a keyless
+   embed, pinned to GEO, and always lazy"* and *"The homepage invites a visit,
+   and the invitation is hours-conditional"*.
+
+   🔴 **Deploy hazard — the CSP change must travel with the code.** `frame-src`
+   gained `https://www.google.com https://maps.google.com` in **two** files:
+   `next-app/next.config.ts` and **root `netlify.toml`**. The root file is the
+   one that serves production. If the copy to the repo folder misses it, every
+   map on the live site renders as an empty rounded box with only a console
+   error — the page still looks finished, so this failure will not announce
+   itself. **Check the live CSP header after deploying:**
+
+   ```bash
+   curl -s -D - -o /dev/null https://naplesestatejewelry.com/ | grep -i "content-security-policy"
+   ```
+
+   👀 **Nobody has actually looked at these maps.** The Browser pane was hidden
+   for the whole session, so every check was a DOM/network measurement — the
+   frame is confirmed to hold a cross-origin document, but no human or
+   screenshot has seen a tile render. This is the first thing to eyeball.
+
+   📱 **Phone checks after deploy:**
+   - **Homepage** — the map is deliberately small (`clamp(190px, 42vw, 260px)`,
+     341×190 measured at 375px). Confirm it reads as orientation and does not
+     out-weigh the phone number above it. If it feels like an afterthought,
+     grow the clamp; if it steals the section, shrink it.
+   - **Contact** — the taller map (`clamp(240px, 52vw, 380px)`) sits directly
+     above *Get directions*. Confirm the two read as one unit and that the pin
+     lands on the right building, not the plaza next door.
+   - **Scroll past both on a slow connection** and confirm the lazy frame does
+     not cause a visible layout jump when it swaps in.
+   - **Both locales.** ES strings: `Llámenos o Visítenos Hoy`, `Visítenos hoy:
+     pase por nuestro salón…`, `Ahora Tenemos Salón en Naples`.
+
+   ⚠️ **The homepage copy is hours-conditional on purpose** — "walk in during
+   opening hours", never "no appointment needed". The showroom is closed Sunday
+   and Monday and the page is cached, so an unconditional invitation is false
+   two days in seven. Strengthening it means making the page time-aware.
+
+   📱 **Also check, from 2026-08-18 (2):**
+   - **The zoom buttons.** Each press *reloads* the Google frame (a cross-origin
+     iframe cannot be scripted), so expect a brief redraw per step rather than a
+     smooth native zoom. Confirm that reads as acceptable on a phone on
+     cellular, where the reload is slowest. If it feels broken rather than
+     merely slow, the honest options are to widen the debounce, drop to a single
+     "View larger map" link, or pay for a Maps API key — not to pretend it is
+     instant.
+   - **Press Back after zooming.** It must leave the page, not rewind through
+     zoom levels. Measured `history.length` growth of 0, but this is the exact
+     thing a future `src`-instead-of-`key` "simplification" would silently
+     break.
+   - **Zoom 17 is the new default.** Confirm it opens close enough to read the
+     plaza without losing the surrounding roads someone navigates by.
+   - **Control size is 36px.** Above the WCAG 2.2 AA minimum, but it is a
+     judgement call against the homepage map's 190px minimum height — say if
+     they read as cramped or as too dominant.
+   - **The address block, in BOTH locales**, in the footer, the homepage CTA and
+     About: "Sharon Lynch Collections" must never split across lines. Verified
+     at 320px in Spanish (the worst case), but this is a font-rendering question
+     and real devices have their own fonts.
+
+   📱 **And from 2026-08-18 (3) — the hours list:**
+   - **Seven rows in the footer** is the biggest layout change: the footer's
+     brand column grew by roughly five lines on every page. Check it does not
+     unbalance the footer on desktop or add awkward scroll on a phone. If it is
+     too heavy there, switch the footer to `variant="grouped"` — same
+     component, one prop.
+   - **The homepage CTA is the ONE surface using the 2-row grouped form.**
+     Confirm it does not read as evasive next to the seven-row lists elsewhere.
+     Switching it to `full` is also one prop.
+   - **Column alignment on a real screen**, both locales — times should form a
+     single right edge. Measured clean at 320px in Spanish (no row wraps,
+     nothing overflows), but this is a font-metrics question.
+   - ⚠️ **If the open days ever change**, re-read the warning on
+     `hoursRowsGrouped()`: it hardcodes "Sunday – Monday" as the closed pair and
+     will silently lie if the closed days stop being contiguous.
+
+   📱 **And from 2026-08-18 (4) — the hierarchy pass:**
+   - **The homepage CTA ladder on a real screen.** Ten steps from a 10.4px gold
+     eyebrow to a 12.6px footnote. ✅ The two judgement calls here were already
+     put to the owner and answered on 2026-08-18: the deck is **colour-only, not
+     bold** (600 read as shouting) and the block carries **one rule on top, not
+     a bracket** (closed both ends read as a stray box). Confirm the pulled-back
+     version on a real screen, and see DECISIONS before touching either.
+   - **The footer, contact and About got the shared half of this** (bolder
+     street line, bolder days/times, dimmer closed rows). Confirm the footer
+     hours do not now out-shout the address above them at 12px.
+   - ⚠️ **Do not "simplify" the emphasis into a colour.** Both components
+     render on four surfaces with four inherited palettes; weight and opacity
+     are what survive that. See DECISIONS.
+
+   🔴 **OWNER ACTIONS from 2026-08-18 (5) — the reviews import:**
+
+   - 🔴 **Fix the hours on the Google Business Profile.** It currently
+     shows `Closed · Opens 10 AM`, which matches neither the site nor the
+     schema (**Tue–Sat 11:00–15:00**). `business-location.ts` warns that the
+     profile, the site, eBay and Etsy must stay byte-identical; this is the one
+     that is wrong. Spotted while reading the profile, not yet corrected.
+   - ◻️ **Linda Cusumano's review is held out of the site.** Her text on
+     Google genuinely ends `… Local. Honest. Professional.` followed by a stray
+     `Hi baby` — verified to be inside the review body itself, not an extraction
+     artifact. It is a strong review and worth having: ask her to edit that line
+     off, then paste it into `testimonials.ts`. **Do not trim it ourselves** —
+     see DECISIONS, *"A review is published verbatim or not at all"*.
+   - ◻️ **Four reviews are still not on the site** (12 of 16). The Maps feed
+     stopped paginating after ten. One of the missing is a **Spanish** review
+     ("Tenía estas piezas de oro…") shown under *Updates by visitors* with no
+     attributable name in the DOM. Paste any of them in and every surface picks
+     them up.
+
+   📱 **And check the marquee itself:**
+   - **Speed.** Measured ~49px/s (84s per cycle at 12 reviews). Duration is
+     derived from the card count, so it stays at that speed as reviews are
+     added — confirm it is readable rather than hypnotic on a real screen.
+   - **The seam.** It should loop with no visible jump. Measured exact (track
+     8115px, half 4057px), but a jerk once per 84s is the symptom if the
+     `margin-inline-end` rule is ever "tidied" into `gap`.
+   - **On a phone**, confirm the band does not fight vertical page scrolling.
+   - **Product pages still show the GRID**, deliberately — confirm that still
+     looks right next to the new homepage treatment.
+
+   📱 **And from 2026-08-18 (6) — the footer:**
+   - The address and hours are now a **centred band under all four link
+     columns**, not inside the brand column. Column heights measured
+     222/222/222/222 (spread zero) after the move, against a roughly 2:1
+     imbalance before. Confirm the centred band reads as deliberate on a wide
+     desktop, where it sits alone under four left-aligned columns.
+   - On a phone the two halves **stack, still centred**. Confirm the footer has
+     not become tediously long — it is the seven-row hours list that drives the
+     height, and `variant="grouped"` on that one instance is the lever.
+   - ◻️ **The phone number stayed in the brand column** (it is a bordered tap
+     target on mobile). That splits N-A-P across the footer. Say if it should
+     move down beside the address for a contiguous NAP signal instead.
+
+   📱 **And from 2026-08-18 (7):**
+   - 🔴 **Watch the "Visit Us" button scroll, once.** The smooth animation
+     is the one thing this session could NOT verify: the hidden Browser pane
+     freezes `requestAnimationFrame`, measured directly (no rAF callback in
+     1500ms; a smooth scroll sat at scrollY 0 for six seconds). The instant
+     path was proven correct — scrolled to 5871 and landed the block exactly at
+     the header's bottom edge — so the anchor, id and offset are right and only
+     the animation is unseen.
+   - Check it lands cleanly on a **phone**, where the header token is 3.5rem
+     rather than 4.5rem. Both were verified by measurement.
+   - ◻️ **`/trade-in` has lost its only prominent entry point.** It is now
+     only in the footer under *Sell to Us*. Decide whether the trade-in program
+     needs a new home — taking the hero slot back would cost the showroom its
+     link.
+
+   📱 **And from 2026-08-18 (8) — the copy-address button:**
+   - 🔴 **Press it once on each of the three surfaces.** The copy could not
+     be exercised here: the hidden Browser pane leaves `document.hasFocus()`
+     **false**, and the browser blocks both paths on an unfocused document
+     (Clipboard API threw `NotAllowedError`, `execCommand` returned `false`).
+     `isSecureContext` is true and the API exists, so a real focused page has
+     both. Paste the result somewhere and confirm it is
+     `6240 Shirley St, Ste 104, Naples, FL 34109` — street and city only, with
+     **no** landmark and **no** business name.
+   - **On a phone**, confirm 24px is a comfortable tap target beside the
+     address. It is small by request; if it is fiddly in practice the box can
+     grow without touching the icon.
+   - ✅ **The footer address got one too** (2026-08-18 (9)), so all four
+     address surfaces now carry it.
+
+   📱 **And from 2026-08-18 (9) — the square map:**
+   - The frame is now **1:1**: 448px on the homepage, 512px on contact, 288px at
+     a 320px viewport. Confirm the extra height earns its space on the homepage,
+     where it sits under the CTA — it is roughly 190px taller than the strip it
+     replaced.
+   - ⚠️ `maxWidth` caps the WIDTH but binds the height too. If a surface wants
+     a wider map it also gets a taller one; re-check both.
+
+   ◻️ **Owner call:** the About page has **no map** by design (text + directions
+   link only), on the reasoning that its job is to say the store exists and the
+   contact page one click away does wayfinding properly. Say so if you want one
+   there — it is a one-line change.
+
+3. 🟡 **UNDEPLOYED — four owner-requested changes.** Gate passed: `tsc` clean,
+   `lint` clean, **1016/1016**, **454/454 pages** from a deleted `.next`.
+   Detail: CHANGELOG 2026-08-17 (3) through (6), and DECISIONS,
+   *"The header brand row is full on a phone"*, *"The route bar is immediate,
+   and that is the whole point"*, and *"An undecided swipe is not a scroll"*.
+
+   All four are 📱 **phone-first checks** — every one of them turns on a
+   judgement the measurements could not make. Taken in order:
+
+   (a) **The octopus mark now shows at every viewport width** — it was
+   `hidden md:block`, so phones and sub-768px tablets showed the wordmark alone.
+   (b) **The ES/EN chip is md-and-up only**, collapsed into the mobile menu's
+   existing language item, which is what paid for (a).
+   (c) **The route progress bar is now immediate on every navigation.**
+   (d) **The photo swipe triggers on a slight sideways move**, and is now one
+   shared gesture.
+
+   Detail follows **most recent first**, so (d), then (c), then (a)+(b).
+
+   (d) 📱 **Photo swipe — the change that most needs a real thumb.** The product
+   gallery had never received the 2026-08-09 fix and was structurally unable to
+   swipe (React `pointermove` cannot cancel a scroll). Synthetic touch proves the
+   thresholds fire, not how it feels:
+   - On a phone, swipe the main photo on a product page and a shop card. It
+     should catch on a **slight** sideways move now, including when your thumb
+     arcs downward as it travels.
+   - Then deliberately **scroll the page with a drag that starts on a photo**,
+     both surfaces. This is the risk side of the change: if scrolling now feels
+     sticky or steals into a photo change, the cone (1.6) is too greedy — lower
+     it in `lib/photo-swipe.ts`, do not raise the vertical trigger.
+   - Confirm a swipe still does not open the product/lightbox, and that a plain
+     tap still does.
+
+   (c) **The route progress bar is now immediate on every navigation** — the
+   120ms delay is gone, query-only navigations (shop filter/sort/view/
+   pagination) arm it, and navigations started from a `<button>` arm it via
+   `startRouteProgress()`. It was never gated by page or viewport; the delay
+   plus uneven prefetch coverage is what made it look that way.
+
+   📱 **Check after deploy:**
+   - **The flash is deliberate.** On a fast connection most navigations commit
+     in tens of milliseconds, so the bar will blink rather than travel. A
+     minimum display time was offered and declined — if it now reads as
+     glitchy, that decision is the thing to revisit, not the delay.
+   - **`/shop` lost its centred spinner** (duplicate of the bar once filters
+     started arming it). Run a filter, a sort, a view toggle and a pagination
+     click and confirm the top bar is enough acknowledgement on a long catalog
+     page, including scrolled to the bottom — the bar is at the fixed header, so
+     it should always be in view. Restoring the spinner is a markup revert in
+     `ShopNavigationProgress.tsx`.
+   - Confirm the **cart drawer's Checkout button** and **Sign out** show the bar
+     — those navigate from a button and are newly covered.
+   - ⚠️ **Do not remove the `<Suspense>` wrapper** around `RouteProgressBar` in
+     `[locale]/layout.tsx`. It is what keeps `useSearchParams` from deopting all
+     454 prerendered pages.
+
+   (a) + (b) 📱 **Header mark and language chip — check on a real phone and a
+   real tablet, in BOTH locales:**
+   - The mark renders at **28px tall on a phone**, below the 40px it gets on
+     desktop. It is a small, detailed illustration; whether it still reads as
+     the octopus at that size on a real screen is exactly the open question
+     TASKS already raised for the 40px header case. **If it reads as mud, the
+     fix is a tighter crop on the body, not a bigger box** — the box is the
+     header's content budget and growing it moves `--site-header-height`.
+     ℹ️ There IS spare room now (11.7–25.9px across the phone band), so a
+     modestly larger mark is affordable if the owner wants one — but it must be
+     re-measured, not assumed.
+   - **Open the mobile menu on a narrow phone in Spanish** (`Cerrar` is the
+     longest toggle label — the widest this row ever gets) and confirm the
+     wordmark still ends in a clean "y", not a clipped "Jewelr".
+   - **Confirm switching language still feels findable on a phone**: it is now
+     the last item in the hamburger menu (`Español` / `English`) and no longer a
+     chip in the header. This is the one behaviour change a returning visitor
+     could notice. The link itself was exercised at 390px — `/es` → `/`, menu
+     closes.
+   - Confirm the chip is back to normal at tablet/desktop widths (it returns at
+     768px), and that the wordmark reads well: it is fluid now and is at or
+     above its old size at every width.
+4. ◻️ **Resubmit the sitemap in Search Console, and Request Indexing on the
+   four pages whose titles changed** — `/`, `/sell`, `/services`,
+   `/silver-services`. Owner action; nobody has done it yet.
+
+   Search Console → **Sitemaps** → resubmit `https://naplesestatejewelry.com/sitemap.xml`,
+   then **URL Inspection** → *Request Indexing* on each of the four.
+
+   ℹ️ **There is no sitemap file to edit** — `src/app/sitemap.ts` generates it at
+   build time, and the deploy already published the new one (verified live
+   2026-08-17: 107 URLs, 20 carrying `2026-08-17`, zero `noindex` leaks).
+   Resubmitting only asks Google to re-fetch sooner; it changes nothing about
+   what is served. `CONTENT_LAST_MODIFIED` was bumped `2026-07-11` → `2026-08-17`
+   for the same reason.
+
+   This is a **nudge, not a repair.** Nothing in the deploy can hurt search — no
+   URL, route, or robots directive changed. Left undone, Google finds everything
+   anyway on its own cadence; done, the new titles land sooner. Expect titles to
+   swap in over days-to-weeks and the favicon to lag longer still.
+
+   While there, check that the **"Submitted URL marked noindex"** errors for the
+   six legal pages clear — they were being submitted and refused simultaneously
+   until this batch removed them from the sitemap (113 → 107 URLs).
+5. **Re-measure first paint on production** (snippet below, under *After the
    next deploy*). Baseline to beat: 533KB across 30 requests before FCP.
-3. **Confirm the first real refund records itself.** The fix is proven locally
+6. **Confirm the first real refund records itself.** The fix is proven locally
    against real PayPal refunds but its automatic path has never run in
    production.
 
-4. **After deploying, check the two 2026-08-15 changes on a real screen:**
+7. **Now live — check the two 2026-08-15 changes on a real screen:**
    - 📱 **Shop-card photo arrows** are the one customer-facing visual change from
      the button font fix — now **14px/700** where they were 16px/400 (bolder,
      slightly smaller). Confirm they still read well on a phone and a desktop,
@@ -144,6 +455,23 @@
      changes height at md — and that it does not appear to overlap or detach
      from the header while scrolling.
 
+8. ✅ **Showroom copy rollout DONE 2026-08-17, undeployed.**
+   Owner gave the address, hours and shared-space arrangement on 2026-08-17:
+   **6240 Shirley St, Ste 104, Naples, FL 34109**, **Tue–Sat 11:00–15:00 or by
+   appointment**, inside **Sharon Lynch Collections**. Decision recorded:
+   **store-first, home visits by request** — so the 6 city pages are reframed,
+   not deleted. Scoped by grep: **15 files, 61 strings, both locales**, plus 8
+   surfaces that need the address added. Two strings are outright FALSE today
+   (schema hours claim Mon–Sat 10:00–17:00; the homepage strip says Mon–Sat).
+   All 15 files rewritten in both locales and both false strings fixed. Gate
+   passed from a deleted `.next`: `tsc` clean, lint clean, **1016/1016**,
+   **454/454 pages**. Verified by fetching the running app: address + landmark
+   + hours present on `/`, `/es`, `/contact`, `/es/contact`, `/shipping`,
+   `/es/shipping`, `/checkout`, `/faq`, `/sell/naples` and `/shop`, and no
+   stale mobile-only claim served on any of 8 pages checked.
+   🔴 **Two owner actions still outstanding — see *PHYSICAL LOCATION* below:
+   the real `geo` coordinates, and the CAN-SPAM marketing mailing address.**
+
 Nothing else in this file blocks a deploy.
 
 ## ✅ Stray nested git repo inside `next-app/` — DELETED 2026-08-14
@@ -180,25 +508,43 @@ removing rather than ignoring.
 ## Copying to the repo folder — use the staging folder
 
 **A ready-made, verified staging copy lives at `C:\Users\rcman\NEJ-repo-staging`**
-(rebuilt **2026-08-13**, deliberately OUTSIDE this folder and outside OneDrive so
+(rebuilt **2026-08-18**, deliberately OUTSIDE this folder and outside OneDrive so
 it neither pollutes the source of truth nor triggers a sync storm). Its contents
 are exactly what belongs in the repo — copy *everything* in it into the repo
 folder with no exclusions to think about.
 
-Verified at build time (2026-08-13): **835 files / 19.0 MB**, an **exact
-mirror** of the source — a two-way inventory diff returned 0 files missing and 0
-extra. Per-area: 504 `next-app/src`, 175 `next-app/public`, 27 `project-docs`,
-73 `supabase`, 1 `.github`. Hidden paths confirmed present
-(`.github/workflows/scheduled-jobs.yml`, `.gitignore`, `.claude/launch.json`).
-Leak check clean — 0 `.git`, 0 `node_modules`, 0 `.next`, 0 `.env*`, 0 `.pem`,
-0 `next-env.d.ts`, 0 `*.tsbuildinfo`, 0 `*.log`, 0 `*.bak`.
+Rebuilt **2026-08-18** for the showroom-map / reviews / footer batch:
+**852 files / 19.55 MB**, 22 files copied, **0 FAILED / 0 Extras / 0 Mismatch**,
+and a follow-up dry run reported **0 to copy**. Hidden paths confirmed present
+(`.github/workflows/scheduled-jobs.yml`, `.gitignore`, `.claude/launch.json`,
+`next-app/.npmrc`, `next-app/.gitignore`). Leak check clean — 0 `.git`,
+0 `node_modules`, 0 `.next`, 0 `.env*`, 0 `.pem`, 0 `*.tsbuildinfo`,
+0 `next-env.d.ts`, 0 `*.log`, 0 `*.bak` — against a **positive control of 175
+`.tsx`**, so the zeros are a real result rather than a broken scan.
 
-Content spot-check on this batch's changes: `discount-codes-2026-08.sql`,
-`discount-codes.ts`, `discount-codes-server.ts`, both new API routes, the admin
-page and manager, `DiscountCodeField.tsx`, `features/discount-codes.md`, plus
-`REFUND_SHAPED_CAPTURE_EVENTS` (the refund fix), the PayPal `discount` breakdown
-key, `calculateDiscountAmount`, `BUTTON_LABEL_FONT` (the button font fix), and
-the Discount Codes admin tab — all present.
+Content spot-checks run against the STAGED copy, not the source:
+
+- 🔴 **`frame-src ... maps.google.com` present in BOTH `netlify.toml` and
+  `next-app/next.config.ts`** — the one item in this batch that fails silently
+  if it does not travel.
+- All five new files present: `ShowroomMap.tsx`, `ShowroomAddress.tsx`,
+  `ShowroomHours.tsx`, `CopyAddressButton.tsx`, `lib/home-anchors.ts`.
+- `testimonials.ts` carries **12** reviews; `globals.css` carries
+  `testimonial-marquee-track` and the `margin-inline-end` seam rule;
+  `ShowroomMap.tsx` carries `aspectRatio: '1 / 1'`; `HomeHeroOverlay.tsx`
+  carries `VISIT_ANCHOR_ID`; `business-location.ts` defaults to `zoom = 17`.
+- Docs carry the batch: `CHANGELOG.md` has `2026-08-18 (9)`,
+  `CURRENT_STATUS.md` has the staged-and-ready banner, this file has the deploy
+  item.
+
+Negative checks against the staged copy: the old `Intercambiar`/Trade hero label
+is **gone**, the old fixed map height `clamp(190px…)` is **gone**, and there are
+**0** `@naplesestatejewelry.co` addresses anywhere under `next-app/src`.
+
+ℹ️ **Robocopy reports 855 total against 852 on disk, and that is correct** — it
+counts `/XF`-excluded files in its total. The three are `.env.local`,
+`tsconfig.tsbuildinfo` and `next-env.d.ts`, all verified absent from staging.
+Do not chase this gap as a missing-file bug.
 
 ⚠️ **Verifying a path containing `[locale]` needs `Test-Path -LiteralPath`.**
 PowerShell reads `[...]` as a wildcard character class, so a plain `Test-Path`
@@ -243,36 +589,121 @@ Then re-run without `/L`. **After the copy, confirm `.github/workflows/` landed*
 it is a hidden directory and some copy methods skip dotfiles. `.env.local` will
 be copied onto disk but stays gitignored and uncommitted, same as today.
 
-## 🔵 PHYSICAL LOCATION OPENING — not started, plan before it does
+## ✅ PHYSICAL LOCATION — copy rollout DONE 2026-08-17 (undeployed)
 
-Owner disclosed 2026-08-16 that a **storefront is opening soon**. The site is
-built on the opposite premise ("mobile, appointment-only, no physical
-storefront"), so this is a content + local-SEO project, not a one-line change.
-Nothing here is urgent until an address and date exist — but do not write new
-marketing copy that assumes the mobile-only model in the meantime.
+Owner confirmed **2026-08-17**: the showroom is **open**, in a shared space,
+and the site still tells every visitor the opposite on every page. The earlier
+"copy pass across 10 files" estimate here was low. Re-scoped by grep against
+the tree on 2026-08-17: **15 files, 61 strings, both locales.**
 
-1. 🔴 **Get a verified Google Business Profile at the real address.** This is
-   the single biggest lever, bigger than anything on-site. A service-area
-   business is weak in the local pack; a verified storefront competes in it,
-   and that is where most "gold buyer naples" clicks land. Needs the address
-   first, so it gates everything else.
-2. **Schema** (`[locale]/layout.tsx`): add `streetAddress` + `postalCode`, move
-   `geo` off the Naples-centre approximation (26.142, -81.795) to the real
-   coordinates, and make `openingHoursSpecification` (currently claiming
-   Mon–Sat 10:00–17:00) genuinely true.
-   ✅ No emergency fix needed today — the address block declares only
-   locality/region/country, the correct honest shape, so there is no invented
-   address to unwind.
-3. **Copy pass across 10 files, BOTH locales** — "we come to you" / "vamos a
-   usted", "no storefront", "appointment-only": `(home)`, `about`,
-   `free-evaluation`, `sell`, `sell/[city]`, `services`, `trade-in`,
-   `app/layout.tsx`, `ContactForm`, `SiteFooter`. Note `/sell/[city]` covers
-   every city page, and its `travelEn`/`travelEs` strings are all about
-   travelling to the customer.
-4. **NAP consistency** — name / address / phone identical across the site, the
-   GBP, and any citations. Mismatches are a common local-ranking own goal.
-5. Consider whether `PROJECT_OVERVIEW.md`'s "Service model" line and the
-   city-page strategy change once there is a fixed location to rank.
+### ✅ What shipped into the working tree 2026-08-17
+
+All 15 files rewritten, both locales. New single source of truth:
+**`next-app/src/lib/business-location.ts`** — address, hours, wayfinding copy,
+`PostalAddress` and `OpeningHoursSpecification` builders. Every surface imports
+from it; nothing retypes the address. New component
+`components/contact/VisitUsPanel.tsx` (server component) gives `/contact` the
+address, hours and a directions link it never had.
+
+`service-areas.ts` and the six city pages were **reframed, not stripped** —
+"visit the Naples showroom, or ask us to come to you" — so the travel-intent
+ranking survives the change.
+
+⚠️ **Still open, both owner-side:**
+
+1. ✅ **`geo` DONE 2026-08-17** — owner supplied **26.222053, -81.781429**;
+   verified live in the JSON-LD. The old pin (26.142, -81.795) measured
+   **5.59 miles** from the real door.
+2. ✅ **CAN-SPAM mailing address DONE 2026-08-17 — in code, no data entry.**
+   `getMarketingSettings()` now falls back to `addressOneLine()`, so marketing
+   email can never send without a physical address and the Admin field became
+   an OVERRIDE rather than the only source. The dead "add an address before
+   sending" warning was removed from the composer, and the Settings panel now
+   states which address is used when the box is blank. Deliberately the plain
+   postal address, NOT the "inside Sharon Lynch Collections" form — the
+   landmark is wayfinding and does not belong in a legal footer.
+3. ❌ **eBay item-location ZIP — WON'T FIX (owner decision, 2026-08-17).**
+   The inventory location is created from a hand-typed postal code and nothing
+   in this codebase records what was entered, so eBay's "Item location" may not
+   read 34109. **Owner has accepted this: anywhere in Southwest Florida is
+   fine.** Do not re-raise it as a NAP defect, do not implement
+   `POST /location/{key}/update_location_details`, and do not spend a future
+   session auditing it. The admin field is now prefilled from
+   `business-location.ts`, which is enough for any future setup.
+4. ❌ **Etsy shop location — WON'T FIX (owner decision, 2026-08-17).** There is
+   no address anywhere in `src/lib/etsy/` and none is needed; the shop location
+   is an Etsy account setting. Owner is not changing it. Do not re-raise.
+5. ❌ **`naplesjewelrybuyers.com` — WON'T FIX (owner decision, 2026-08-17).**
+   Listed in `sameAs`. Owner is not updating it for the showroom. Do not
+   re-raise.
+6. 🔴 **Google Business Profile — the ONLY external item still open.** Name,
+   address and hours byte-identical to the site; hours must match
+   `openingHoursSpecification` (Tue–Sat 11:00–15:00) or Google compares them
+   and the mismatch costs ranking.
+
+### Copy rewrite — 15 files, 61 strings, both locales
+
+Under the store-first decision, `travelEn`/`travelEs` and the city pages are
+REFRAMED (serving <city> from the Naples showroom, visits on request), not
+deleted — the 6 city pages keep their local-SEO value.
+
+| File | Hits | What is there |
+| --- | --- | --- |
+| `src/lib/service-areas.ts` | **18** | ⚠️ **Missed by the old 10-file list, and it is the biggest one.** `travelEn`/`travelEs` for all 6 cities + blurbs ("crosses the bridge to you") |
+| `[locale]/sell/[city]/page.tsx` | 10 | `:107` "We come to you" heading, `:141` "Do I have to come to you?", `:143` "so you never have to carry valuables into a store" |
+| `[locale]/(home)/page.tsx` | 7 | `:263` "No storefront, no middlemen", `:441` hours strip, `:350`/`:356` the "see a piece in person" FAQ |
+| `[locale]/about/page.tsx` | 5 | `:117` "no storefront pressure", `:131` a stat tile reading literally **"Mobile / We Come to You"** |
+| `[locale]/sell/page.tsx` | 4 | `:75` "Private, mobile buyer … we come to you" |
+| `[locale]/faq/page.tsx` | 4 | ⚠️ Missed by the old list. `:74` "Most clients prefer this approach **over a public storefront**" |
+| `[locale]/free-evaluation/page.tsx` | 3 | `:490` "Mobile and appointment-only" |
+| `components/contact/ContactForm.tsx` | 2 | `:428` "Mobile, appointment-only evaluations in…" |
+| `[locale]/trade-in/page.tsx` | 2 | `:167` "we come to you" |
+| `components/layout/SiteFooter.tsx` | 1 | `:56` "we come to you" — sitewide, every page |
+| `app/layout.tsx` | 1 | `:26` root meta description |
+| `[locale]/services/page.tsx` | 1 | ⚠️ Missed by the old list. Meta description "appointment-only" |
+| `[locale]/silver-services/page.tsx` | 1 | ⚠️ Missed by the old list. `:320` "evaluación móvil privada" |
+| `[locale]/contact/page.tsx` | 1 | ⚠️ Missed by the old list. Meta "Mobile, private evaluations" |
+
+Also stale: the code comment at `components/home/HomeHeroOverlay.tsx:105`
+explaining why the hero deliberately omits the service model.
+
+### Add address / hours — where, and why it matters
+
+| Where | Why |
+| --- | --- |
+| `[locale]/layout.tsx:39-48` | Add `streetAddress` + `postalCode`; add `hasMap`. ⚠️ **`geo` is 26.142, -81.795 — downtown Naples, miles from Shirley St.** Pull the real lat/long from Google Maps; do NOT estimate it, a wrong pin is worse than none |
+| `components/checkout/CheckoutClient.tsx:651` | Local Pickup says "in the Naples area" and never says where. A buyer committing $5k should see the address first |
+| `lib/order-invoice-email.ts:116` | 🔴 **Sharpest gap found.** The pickup receipt tells the buyer to *call to find out where to go* |
+| `[locale]/shipping/page.tsx:30` | "Local pickup by appointment in the Naples / Southwest Florida area" |
+| `components/layout/SiteFooter.tsx:51-75` | Contact column has phone + email, no address. Sitewide NAP signal |
+| `[locale]/contact/page.tsx` | Call button + form only — no address block, no hours, no map. Best home for the full wayfinding sentence |
+| `[locale]/(home)/page.tsx:356` | FAQ "Can I see a piece in person?" — the answer changes completely |
+| `lib/order-email-branding.ts:30` | Every order email footer says just "Naples, FL" |
+
+### Owner-side, not code
+
+1. 🔴 **Verified Google Business Profile at 6240 Shirley St.** Still the single
+   biggest lever — a storefront competes in the local pack where a service-area
+   business cannot. Hours there MUST match `openingHoursSpecification`.
+2. 🔴 **Marketing email mailing address** — `lib/marketing-email-html.ts:10`
+   injects `mailingAddress` from the `marketing_settings` DB row (Admin →
+   Marketing Settings). CAN-SPAM requires a real physical address on marketing
+   mail; update it to Shirley St. Sending is already blocked when it is empty.
+3. **NAP consistency** across GBP, eBay `merchant_location_key`, Etsy shop
+   location, and `naplesjewelrybuyers.com`. Mismatches are a common
+   local-ranking own goal.
+
+### Order of work
+
+1. Fix the two FALSE strings (schema hours + homepage strip) — smallest edit,
+   removes the active liability.
+2. Add address/hours to the 8 surfaces above, starting with the pickup receipt
+   and checkout, which are transactional rather than marketing.
+3. Reframe the 61 marketing strings, both locales, `service-areas.ts` first
+   since it feeds all 6 city pages.
+4. Owner: GBP, marketing mailing address, marketplace NAP.
+5. Then re-check `PROJECT_OVERVIEW.md`'s "Service model" line, which still
+   reads "mobile, appointment-only, no physical storefront".
 
 ## ◻️ OWNER: delete four pre-go-live test orders
 
@@ -322,6 +753,61 @@ before the branded splash appears.
 ◻️ **Remaining lever if it is still slow: 258KB of scripts before FCP.** Not
 touched in this pass — deferring or splitting them is a larger change than
 priority hints and needs its own measurement.
+
+## 🔴 BEFORE THE NEXT DEPLOY — this batch specifically (2026-08-17)
+
+Everything in code is gated green: `tsc`, lint, **1016/1016**, **454/454 pages**
+from a deleted `.next`. No SQL outstanding. No new env vars. What is left is
+judgement and procedure, not code.
+
+1. ✅ **Amethyst CONFIRMED by the owner, 2026-08-17.** The product attribute
+   colors (CHANGELOG 2026-08-17 (7)) are signed off as shipped: emerald status /
+   metal-true / sapphire karat / amethyst length. No further review needed —
+   do not re-open the palette.
+2. ✅ **Test email DELIVERED and owner-verified, 2026-08-17.** Sent to
+   `info@naplesestatejewelry.com` (Resend id `e1a0a905-d546-4f39-9d98-c93fda214ce8`),
+   **arrived in the inbox — not Spam — and the owner confirmed the address,
+   hours and landmark all read correctly** on the receipt note, the order footer
+   (HTML and text) and the marketing footer. The only complaint was the wrapping
+   of the test harness's own layout, which is scaffold from the one-off send and
+   is not part of any production template.
+   ⚠️ Sent from LOCAL using the production Resend key and `EMAIL_FROM`, so it
+   proves Resend + DNS + DKIM/DMARC + inbox placement. It does **not** prove
+   Netlify's env vars, which have silently differed before (`EBAY_CRON_SECRET`,
+   `EMAIL_FROM`). Original note: **this deploy TOUCHES EMAIL, so deploy-day
+   item 3 applies: test send and OPEN THE INBOX.** Three email paths changed — the pickup line in
+   `order-invoice-email.ts`, the address in BOTH `order-email-branding.ts`
+   footers (HTML *and* plain text), and the marketing footer's mailing address,
+   which now falls back to the showroom address in code. DMARC is
+   `p=quarantine`: a DKIM or alignment fault lands in spam **without erroring**,
+   so a green "sent" in Resend's log proves nothing.
+3. ✅ **Hours CONFIRMED TRUE by the owner, 2026-08-17.** The showroom really is
+   open Tue–Sat 11:00–15:00, so publishing them in the present tense is honest
+   and this no longer blocks the deploy. (Signage is not up yet, which is why
+   the Google Business Profile is still pending — but the copy already names
+   Sharon Lynch Collections as the landmark, so wayfinding does not depend on
+   our own sign existing.)
+4. ✅ **Staging rebuilt 2026-08-17** — see *Copying to the repo folder* for the
+   verified figures. Docs were written BEFORE the sync, then a dry run confirmed
+   0 copies outstanding.
+5. 🟡 **The four earlier undeployed changes still want a real thumb** — octopus
+   mark at 28px, the route bar's deliberate flash, the photo-swipe cone, the
+   ES/EN chip. See item 2 at the top of this file. They have now been sitting
+   unverified across several sessions.
+6. ℹ️ **Local builds run Node v24.16.0; Netlify pins NODE_VERSION 20** and
+   `package.json` declares no `engines`. Production has always built on 20, so
+   the risk is low — but watch the Netlify log rather than trusting the local
+   pass.
+
+**After it publishes:** resubmit the sitemap and Request Indexing on the pages
+whose descriptions changed (`/`, `/sell`, `/about`, `/faq`, `/services`,
+`/contact`, and all six city pages). Then re-measure first paint on production —
+still open from the last batch, and localhost cannot measure it.
+
+**Deliberately NOT blocking this deploy:** the Google Business Profile. It needs
+the store signage up and a verification video, and the owner is doing it soon.
+Publishing the address first is the right order anyway — the site becomes a
+citation that already matches when the profile is verified.
 
 ## Deploy-day checklist (reusable)
 
@@ -476,7 +962,7 @@ Still true and worth keeping visible:
   archived and hard-deleted.
 - ◻️ **Raise the image budget 30 → ~50 only after Deep Field supplies the
   timeout line** from their dashboard. Not urgent. (The 18 → 30 retune is in
-  the undeployed batch.)
+  the batch that shipped 2026-08-17.)
 - ◻️ **Pin the production batching defaults.** `IMAGE_BUDGET_PER_REQUEST` and
   `MAX_PRODUCTS_PER_REQUEST` have **no test asserting their values**. The
   batching tests pass budgets in as explicit arguments — correct, because it
@@ -825,12 +1311,14 @@ Everything else below remains true: the carousel migrations are all applied.
   the fuzzy amount-matching that caused mis-attachment.
   20 checks passed against the real function, including out-of-order delivery.
   Reconciling against a SUM of `paypal_refunds.amount` is now valid.
-  - ⚠️ **The code change is UNDEPLOYED** — the migration is live but
-    `webhook/route.ts` is not. Until it deploys, the CAPTURE.REFUNDED handler
-    still sends the derived increment and the `event:<id>` key. That is not
-    harmful (the SQL's monotonic cumulative path is simply unused, and the old
-    accumulate branch still produces a correct `orders.refund_amount`), but the
-    ledger keeps the old shape until the deploy lands.
+  - ✅ **Both halves are live as of 2026-08-17** — the migration was already
+    applied and `webhook/route.ts` has now shipped, so the CAPTURE.REFUNDED
+    handler sends PayPal's cumulative and its real refund id rather than the
+    derived increment and the synthetic `event:<id>` key. The interim state was
+    never harmful (the old accumulate branch still produced a correct
+    `orders.refund_amount`), but the ledger shape is only correct from here on.
+    ⚠️ **This path has still never run automatically in production** — confirm
+    it on the first real refund.
   - ◻️ **Cosmetic, unreachable in practice:** an over-refund writes a
     `paypal_refunds` row for the full increment while `orders.refund_amount`
     clamps at the total, so the ledger would sum higher than the order. PayPal
@@ -1041,7 +1529,7 @@ Everything else below remains true: the carousel migrations are all applied.
     `TODO(ebay-verify)`. That TODO now has an answer: **not needed, we are not
     listing watches.** Its aside that "no Watch-type item exists in the catalog
     yet" is stale (two do), but the conclusion stands for a different reason.
-    - ✅ **Handled in code 2026-08-11 (undeployed).** `EBAY_EXCLUDED_PRODUCT_IDS`
+    - ✅ **Handled in code 2026-08-11 (deployed 2026-08-17).** `EBAY_EXCLUDED_PRODUCT_IDS`
       (`ebay/guards.ts`) holds the two ids; pre-flight now fails `eligibility`
       with "This item is not listed on eBay per owner decision", and
       `enqueueProducts` drops them alongside write-blocked ids so no bulk run
@@ -1314,21 +1802,22 @@ Everything else below remains true: the carousel migrations are all applied.
 
 Headlines only — full detail lives in `CHANGELOG.md` under each date.
 
-- **2026-08-16/17 (undeployed):** homepage hero rewritten (eyebrow *"One Piece
-  or an Entire Estate"* over an h1 naming Naples, plus location in the H2s);
+- **2026-08-16/17 (deployed 2026-08-17):** homepage hero rewritten (eyebrow
+  *"One Piece or an Entire Estate"* over an h1 naming Naples, location in the H2s);
   `pageMetadata()` gave every public page its own social card and fixed blank
   cards on `/sell` and all city pages; 8 Spanish pages stopped serving English
   metadata; an SEO audit's four findings all fixed; nav dropdowns now close on
   outside tap/Escape; the octopus mark replaced in the header and the tab.
   Closed with a pre-deploy audit — 998/998 tests, 454/454 pages, 30 pages swept
   live with zero problems.
-- **2026-08-15 (undeployed):** whole-dollar item prices (rounding moved onto the
-  value, so a card and its charge are one number), the sitewide button-font
-  cascade fix, touch tap feedback gated by pointer instead of width, and the
-  route progress bar at the header's base.
-- **2026-08-09 (undeployed):** shop-card touch overhaul, hero touch snap +
-  slower handover, hero performance batch, and one solid background per
-  slideshow replacing the per-photo sweep. This is the batch waiting to deploy.
+- **2026-08-15 (deployed 2026-08-17):** whole-dollar item prices (rounding moved
+  onto the value, so a card and its charge are one number), the sitewide
+  button-font cascade fix, touch tap feedback gated by pointer instead of width,
+  and the route progress bar at the header's base.
+- **2026-08-09 (deployed 2026-08-17):** shop-card touch overhaul, hero touch snap
+  + slower handover, hero performance batch, and one solid background per
+  slideshow replacing the per-photo sweep. This was the head of the queue that
+  had been waiting since 2026-08-09; it shipped with everything added since.
 - **2026-08-08 (shipped):** email fully `.com`, `?returnTo=` disclosure fix,
   Deep Field production import + live hooks, daily price-push defects fixed,
   admin email removed from the client bundle.

@@ -8,7 +8,8 @@
 Marketing + commerce website for **Naples Estate Jewelry** (legal
 entity: *Naples Antiques LLC*). The site does two jobs:
 
-1. **Lead generation** for a private, mobile, appointment-only buying service —
+1. **Lead generation** for a private buying service run from a Naples
+   showroom, with home visits on request —
    the owner travels to clients throughout Southwest Florida to evaluate and buy
    estate jewelry, gold, sterling silver, diamonds, watches, antiques, coins, and
    full estates.
@@ -40,7 +41,15 @@ discretion and a personal relationship over a storefront transaction.
 
 - **Owner**: Chris (15+ years experience, born and raised in Naples).
 - **Phone / text**: (239) 404-8505
-- **Service model**: mobile, appointment-only, no physical storefront.
+- **Showroom**: 6240 Shirley St, Ste 104, Naples, FL 34109 — **inside Sharon
+  Lynch Collections** (shared suite; name the landmark, the sign out front is
+  theirs). Open **Tue–Sat 11:00–15:00, or by appointment**.
+- **Service model**: **store-first** since 2026-08-17. Private home visits
+  continue **on request** (large estates, downsizing, sellers who would rather
+  not transport valuables) but are no longer the default. The site described
+  itself as "mobile, appointment-only, no physical storefront" until that date.
+- Address, hours and the wayfinding copy have ONE source:
+  `next-app/src/lib/business-location.ts`. Do not retype them.
 - **Service area**: Naples, Marco Island, Bonita Springs, Estero, Fort Myers,
   Cape Coral, and nearby Southwest Florida communities.
 

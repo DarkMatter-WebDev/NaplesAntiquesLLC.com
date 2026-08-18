@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useCart, type CartItem } from '@/context/CartContext';
 import OrderSummary, { OrderTotals, computeOrderTotals } from '@/components/checkout/OrderSummary';
 import type { OrderQuote } from '@/lib/checkout-pricing';
+import { addressWithLandmark, hoursLine } from '@/lib/business-location';
 import PayPalCheckoutButton from '@/components/checkout/PayPalCheckoutButton';
 import DiscountCodeField from '@/components/checkout/DiscountCodeField';
 import type { AppliedDiscount } from '@/lib/discount-codes';
@@ -647,8 +648,13 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
               .map((option) => {
                 const fee = getCheckoutShippingFee(option.value, cartSubtotal) ?? 0;
                 const selected = effectiveShippingMethod === option.value;
+                // Local Pickup names the actual place. It said only "in the
+                // Naples area" until 2026-08-17, so a buyer chose it without
+                // ever being shown where they would be driving.
                 const description = option.value === 'local-pickup'
-                  ? (isEs ? 'Recogida en persona con cita en el área de Naples. No se necesita dirección de envío.' : 'In-person pickup by appointment in the Naples area. No shipping address needed.')
+                  ? (isEs
+                      ? `Recogida en persona en ${addressWithLandmark(true)}. ${hoursLine(true)}. No se necesita dirección de envío.`
+                      : `In-person pickup at ${addressWithLandmark(false)}. ${hoursLine(false)}. No shipping address needed.`)
                   : option.value === 'express-overnight-insured'
                     ? (isEs ? 'Entrega al día siguiente, totalmente asegurada.' : 'Next-day delivery, fully insured.')
                     : (isEs ? 'Envío totalmente asegurado con firma de entrega.' : 'Fully insured shipping with delivery signature.');

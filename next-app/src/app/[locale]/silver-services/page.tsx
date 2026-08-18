@@ -317,8 +317,8 @@ export default async function SilverServicesPage({ params }: Props) {
             </h2>
             <p className="text-base text-[#4d4635] mb-10 leading-relaxed max-w-xl mx-auto">
               {isEs
-                ? 'Programe una evaluación móvil privada para plata esterlina, cubertería, vajilla, monedas y lingotes. Revisamos las piezas claramente y le presentamos una oferta directa con pago inmediato.'
-                : 'Schedule a private mobile evaluation for sterling silver, flatware, holloware, coins, and bullion. We review the pieces clearly and provide a straightforward offer with prompt payment.'}
+                ? 'Programe una evaluación privada para plata esterlina, cubertería, vajilla, monedas y lingotes, en nuestro salón de Naples o en su casa. Revisamos las piezas claramente y le presentamos una oferta directa con pago inmediato.'
+                : 'Schedule a private evaluation for sterling silver, flatware, holloware, coins, and bullion — at our Naples showroom or in your home. We review the pieces clearly and provide a straightforward offer with prompt payment.'}
             </p>
             <div className="flex flex-col md:flex-row gap-4 justify-center">
               <Link

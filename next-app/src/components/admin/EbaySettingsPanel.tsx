@@ -7,6 +7,7 @@ import {
   type PricePushCardCopy,
   type PricePushHealth,
 } from '@/lib/marketplace-price-push-health';
+import { ADDRESS } from '@/lib/business-location';
 
 const PRICE_PUSH_TONE_COLOR: Record<PricePushCardCopy['tone'], string> = {
   ok: 'var(--color-primary)',
@@ -104,7 +105,11 @@ export default function EbaySettingsPanel() {
   // panel: set true when a *changed* markup is saved, cleared once prices
   // are pushed to eBay.
   const [pricesStale, setPricesStale] = useState(false);
-  const [locationPostalCode, setLocationPostalCode] = useState('');
+  // Prefilled from the showroom's real ZIP rather than left blank. This value
+  // becomes eBay's "Item location" on every listing, so a hand-typed ZIP here
+  // silently creates a NAP mismatch against the site and the Google Business
+  // Profile — and the location key is immutable once created.
+  const [locationPostalCode, setLocationPostalCode] = useState<string>(ADDRESS.postalCode);
   const [settingUpLocation, setSettingUpLocation] = useState(false);
   const [provisioningTiers, setProvisioningTiers] = useState(false);
   // Account-change reset: `resetSummary` holds the dry-run report while the
@@ -561,8 +566,11 @@ export default function EbaySettingsPanel() {
                 ) : (
                   <div>
                     <p className="text-xs mb-2" style={{ color: 'var(--color-on-surface-variant)' }}>
-                      One-time setup — enter your business postal code to create it
-                      (needs a real ZIP so eBay has accurate shipping-origin data).
+                      One-time setup, and <strong>immutable once created</strong>.
+                      Prefilled with the showroom ZIP ({ADDRESS.postalCode}) — this
+                      becomes the &ldquo;Item location&rdquo; shown on every eBay
+                      listing, so keep it identical to the site and the Google
+                      Business Profile.
                     </p>
                     <div className="flex gap-2">
                       <input

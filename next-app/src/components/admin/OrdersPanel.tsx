@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { startRouteProgress } from '@/components/layout/RouteProgressBar';
 import { createClient } from '@/lib/supabase/client';
 import type { Product } from '@/types/product';
 import { isProductPurchasable, normalizeProductQuantity, productStatusLabel } from '@/types/product';
@@ -322,6 +323,7 @@ export default function OrdersPanel({
     setProductSearch('');
     setShowAllProductMatches(false);
     setForm(emptyForm);
+    startRouteProgress(`${adminBasePath}/orders/${order.id}`);
     router.push(`${adminBasePath}/orders/${order.id}`);
     router.refresh();
   }
@@ -628,6 +630,7 @@ export default function OrdersPanel({
                     // native behavior.
                     if ((event.target as HTMLElement).closest('a, button')) return;
                     if (window.getSelection()?.toString()) return;
+                    startRouteProgress(`${adminBasePath}/orders/${order.id}`);
                     router.push(`${adminBasePath}/orders/${order.id}`);
                   }}
                 >

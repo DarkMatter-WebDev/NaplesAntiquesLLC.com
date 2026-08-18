@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { AppIcon } from '@/components/AppIcon';
+import { addressWithLandmark, hoursLine, streetLine } from '@/lib/business-location';
 
 // Product-page trust layer (owner request 2026-08-04, modeled on the
 // mels-treasures.com review): three compact policy accordions plus a
@@ -29,8 +30,8 @@ export function ProductPolicyAccordions({ isEs, prefix }: Props) {
         <>
           <p>
             {isEs
-              ? 'Cada pedido enviado viaja totalmente asegurado con confirmación de firma — las tarifas según el valor se muestran al pagar, y los pedidos de $5,000+ se envían por USPS Registered Mail, el servicio más seguro del Servicio Postal. ¿Prefiere evitar el envío? La recogida local en el área de Naples es gratuita con cita.'
-              : 'Every shipped order travels fully insured with signature confirmation — value-based rates are shown at checkout, and orders of $5,000+ ship USPS Registered Mail, the most secure service the Postal Service offers. Prefer to skip shipping entirely? Local pickup in the Naples area is free by appointment.'}
+              ? 'Cada pedido enviado viaja totalmente asegurado con confirmación de firma — las tarifas según el valor se muestran al pagar, y los pedidos de $5,000+ se envían por USPS Registered Mail, el servicio más seguro del Servicio Postal. ¿Prefiere evitar el envío? La recogida local es gratuita en ' + addressWithLandmark(true) + ', ' + hoursLine(true) + '.'
+              : 'Every shipped order travels fully insured with signature confirmation — value-based rates are shown at checkout, and orders of $5,000+ ship USPS Registered Mail, the most secure service the Postal Service offers. Prefer to skip shipping entirely? Local pickup is free at ' + addressWithLandmark(false) + ', ' + hoursLine(false) + '.'}
           </p>
           <p className="mt-2">
             {isEs ? 'Detalles completos: ' : 'Full details: '}
@@ -66,15 +67,15 @@ export function ProductPolicyAccordions({ isEs, prefix }: Props) {
               El pago funciona con PayPal — pague de forma segura con cualquier tarjeta de crédito o débito
               o con su saldo de PayPal; no se requiere cuenta. En compras que califiquen, PayPal Pay Later
               puede dividir su pago en cuotas, directamente al pagar. ¿Compra en persona? La recogida local
-              es gratuita con cita — llame o envíe un mensaje al{' '}
+              es gratuita en {streetLine()} — llame o envíe un mensaje al{' '}
               <a href="tel:2394048505" className="product-trust-link">(239) 404-8505</a>.
             </>
           ) : (
             <>
               Checkout is powered by PayPal — pay securely with any major credit or debit card or your
               PayPal balance; no account required. On qualifying purchases, PayPal Pay Later can split your
-              payment into installments, right in checkout. Buying in person? Local pickup is free by
-              appointment — call or text{' '}
+              payment into installments, right in checkout. Buying in person? Local pickup is free at
+              {' '}{streetLine()} — call or text{' '}
               <a href="tel:2394048505" className="product-trust-link">(239) 404-8505</a>.
             </>
           )}
@@ -189,9 +190,10 @@ export function ProductTrustBadges({ isEs }: Pick<Props, 'isEs'>) {
     {
       icon: 'location_on',
       title: isEs ? 'Recogida local en Naples' : 'Local Pickup in Naples',
+      // Names the place. Said only "the Naples area" until 2026-08-17.
       text: isEs
-        ? 'Gratis con cita en el área de Naples.'
-        : 'Free by appointment across the Naples area.',
+        ? `Gratis en ${streetLine()}, ${hoursLine(true)}.`
+        : `Free at ${streetLine()}, ${hoursLine(false)}.`,
     },
   ] as const;
 

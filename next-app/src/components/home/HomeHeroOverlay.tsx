@@ -10,8 +10,32 @@
 // transition between the two token sets.
 
 import Link from 'next/link';
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties, type MouseEvent } from 'react';
 import HomeSubscriberForm from './HomeSubscriberForm';
+import { VISIT_ANCHOR_ID } from '@/lib/home-anchors';
+
+/**
+ * Smooth-scroll to the in-page target, honouring reduced motion.
+ *
+ * ⚠️ Deliberately JS here rather than `scroll-behavior: smooth` on `html`.
+ * That property applies to the scrolling container, so setting it globally
+ * would also animate the scroll-to-top that happens on every route change —
+ * a sitewide feel change to buy one button an animation.
+ *
+ * The `<a href="#...">` underneath is real: without JS, on a middle-click, or
+ * from the keyboard's context menu, the browser's own jump still works. This
+ * only upgrades the plain jump when it can.
+ */
+function scrollToAnchor(event: MouseEvent<HTMLAnchorElement>, id: string) {
+  const target = document.getElementById(id);
+  if (!target) return; // Let the browser try the default jump.
+  event.preventDefault();
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  // `replaceState`, not `pushState`: the jump should not put an entry between
+  // the visitor and whatever they were on before the homepage.
+  window.history.replaceState(null, '', `#${id}`);
+}
 
 type Props = {
   locale: string;
@@ -72,10 +96,15 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
   const buttons = [
     { href: storeHref, label: isEs ? 'Comprar' : 'Buy' },
     { href: isEs ? '/es/estate-jewelry' : '/estate-jewelry', label: isEs ? 'Vender' : 'Sell' },
-    // Trade goes to the named program page, not /contact — the page explains
-    // how a trade-in works and carries its own contact paths, so sending
-    // people straight to a contact form skipped the explanation.
-    { href: isEs ? '/es/trade-in' : '/trade-in', label: isEs ? 'Intercambiar' : 'Trade' },
+    // Third slot was Trade (-> /trade-in) until 2026-08-18. Now it jumps to the
+    // "Call or Visit Us Today" block at the foot of this page — the showroom is
+    // the thing the hero should be selling now, and that block carries the
+    // phone number, the address, the hours and the map together.
+    //
+    // ⚠️ /trade-in is no longer linked from the hero. It is still in the footer
+    // under "Sell to Us"; if the trade-in program needs a prominent entry
+    // again, it needs a new home rather than this slot back.
+    { href: `#${VISIT_ANCHOR_ID}`, label: isEs ? 'Visítenos' : 'Visit Us', anchor: true },
   ];
 
   return (
@@ -102,9 +131,10 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
             should already know what they have — most arrive holding something
             inherited and unidentified.
 
-            ⚠️ Says nothing about the SERVICE MODEL, deliberately. A storefront
-            is opening, so "mobile", "we come to you" and "by appointment only"
-            would all need rewriting the day it does. Keep it that way. */}
+            ⚠️ Says nothing about the SERVICE MODEL, deliberately — and that
+            foresight paid off: the showroom opened 2026-08-17 and 61 strings
+            elsewhere had to be rewritten, while this one did not. Do not add
+            "visit us", "mobile" or "by appointment" here now either. */}
         <span
           className="text-[0.75rem] font-bold uppercase tracking-[0.3em] block"
           style={{ color: 'var(--hero-eyebrow)', fontFamily: 'var(--font-label)' }}
@@ -162,23 +192,37 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
           className="home-hero-actions flex flex-wrap justify-center gap-4 md:gap-5"
           style={{ pointerEvents: 'auto' }}
         >
-          {buttons.map(({ href, label }) => (
-            <Link
-              key={label}
-              href={href}
-              className="hero-cta inline-flex justify-center min-w-[9rem] md:min-w-[10rem] border px-8 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest"
-              style={{
-                background: 'var(--hero-btn-bg)',
-                borderColor: 'var(--hero-btn-border)',
-                color: 'var(--hero-btn-color)',
-                fontFamily: 'var(--font-label)',
-                boxShadow: '0 0 18px rgba(212,175,55,0.12)',
-                backdropFilter: 'blur(3px)',
-              }}
-            >
-              {label}
-            </Link>
-          ))}
+          {buttons.map(({ href, label, anchor }) => {
+            const className =
+              'hero-cta inline-flex justify-center min-w-[9rem] md:min-w-[10rem] border px-8 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest';
+            const style = {
+              background: 'var(--hero-btn-bg)',
+              borderColor: 'var(--hero-btn-border)',
+              color: 'var(--hero-btn-color)',
+              fontFamily: 'var(--font-label)',
+              boxShadow: '0 0 18px rgba(212,175,55,0.12)',
+              backdropFilter: 'blur(3px)',
+            };
+
+            // A plain <a> for the in-page jump, never <Link>. This is not a
+            // route change: routing it would arm the route progress bar for a
+            // navigation that never commits, leaving the bar to time out.
+            return anchor ? (
+              <a
+                key={label}
+                href={href}
+                className={className}
+                style={style}
+                onClick={(event) => scrollToAnchor(event, VISIT_ANCHOR_ID)}
+              >
+                {label}
+              </a>
+            ) : (
+              <Link key={label} href={href} className={className} style={style}>
+                {label}
+              </Link>
+            );
+          })}
         </div>
       </div>
 
@@ -345,9 +389,10 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
             font-size: clamp(1.9rem, 7vw, 2.5rem);
           }
 
-          /* Sign-up + actions anchored to the bottom of the hero so the Trade
-             button always stays inside it (with a small gap before the next
-             section) regardless of viewport height / browser-chrome changes. */
+          /* Sign-up + actions anchored to the bottom of the hero so the last
+             CTA button (Visit Us) always stays inside it (with a small gap
+             before the next section) regardless of viewport height /
+             browser-chrome changes. */
           .home-hero-bottom {
             top: auto;
             bottom: clamp(1rem, 3svh, 2rem);

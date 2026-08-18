@@ -22,8 +22,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ? 'Vender Oro, Joyería y Plata en el Suroeste de Florida'
     : 'Sell Gold, Jewelry & Silver in Southwest Florida';
   const description = isEs
-    ? 'Comprador de oro, joyería, plata esterlina, diamantes, monedas y relojes que paga al mejor precio en Naples, Marco Island, Bonita Springs, Estero, Fort Myers y Cape Coral. Evaluación gratuita — vamos a usted.'
-    : 'Top-paying buyer of gold, jewelry, sterling silver, diamonds, coins & watches serving Naples, Marco Island, Bonita Springs, Estero, Fort Myers & Cape Coral. Free appraisals — we come to you.';
+    ? 'Compramos oro, joyería, plata, diamantes, monedas y relojes al mejor precio. Evaluación gratuita en nuestro salón de Naples, martes a sábado, o a domicilio.'
+    : 'Top-paying buyer of gold, jewelry, silver, diamonds, coins & watches. Free appraisals at our Naples showroom, Tue–Sat, or at your home across Southwest Florida.';
   // Was a hand-rolled openGraph block with no `images`, which meant this page —
   // one of the most shared on the site — posted a BLANK card. pageMetadata
   // restores the image, siteName, locale and the matching twitter tags.
@@ -71,8 +71,8 @@ export default async function SellHubPage({ params }: Props) {
               </h1>
               <p className="mb-8 max-w-xl text-lg leading-relaxed text-[#d7d0c3]">
                 {isEs
-                  ? 'Comprador privado y móvil de oro, joyería de patrimonio, plata, diamantes, monedas y relojes. Evaluación gratuita, números honestos y pago inmediato — vamos a usted.'
-                  : 'Private, mobile buyer of gold, estate jewelry, silver, diamonds, coins, and watches. Free evaluation, honest numbers, and immediate payment — we come to you.'}
+                  ? 'Comprador privado de oro, joyería de patrimonio, plata, diamantes, monedas y relojes. Evaluación gratuita, números honestos y pago inmediato — en nuestro salón de Naples o en su casa.'
+                  : 'Private buyer of gold, estate jewelry, silver, diamonds, coins, and watches. Free evaluation, honest numbers, and immediate payment — at our Naples showroom or at your home.'}
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link href={p('/free-evaluation')} className="gold-button">

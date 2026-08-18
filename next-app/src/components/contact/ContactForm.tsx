@@ -424,8 +424,8 @@ export default function ContactForm({ locale, submitted }: Props) {
                 content: (
                   <p className="text-sm leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
                     {isEs
-                      ? 'Evaluaciones móviles, solo con cita, en Naples, Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral y comunidades cercanas.'
-                      : 'Mobile, appointment-only evaluations in Naples, Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral, and nearby communities.'}
+                      ? 'Salón en Naples, de martes a sábado. También evaluaciones a domicilio, a pedido, en Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral y comunidades cercanas.'
+                      : 'Naples showroom, Tue–Sat. Home evaluations also available on request in Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral, and nearby communities.'}
                   </p>
                 ),
               },

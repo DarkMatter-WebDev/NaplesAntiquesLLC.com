@@ -14,7 +14,7 @@ const CONTENT_SECURITY_POLICY = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "connect-src 'self' https://evzluixourmsefwdsieu.supabase.co https://api.gold-api.com https://s3.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com https://*.paypal.com https://*.cloudflarestream.com https://*.videodelivery.net",
-  "frame-src https://*.tradingview.com https://*.tradingview-widget.com https://*.paypal.com https://*.cloudflarestream.com https://*.videodelivery.net",
+  "frame-src https://*.tradingview.com https://*.tradingview-widget.com https://*.paypal.com https://*.cloudflarestream.com https://*.videodelivery.net https://www.google.com https://maps.google.com",
   "media-src 'self' blob: https://*.cloudflarestream.com https://*.videodelivery.net",
   "worker-src 'self' blob:",
 ].join('; ');

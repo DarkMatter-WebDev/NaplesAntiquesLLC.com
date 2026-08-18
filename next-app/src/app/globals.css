@@ -54,6 +54,33 @@
   --radius:    0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
+
+  /* ── Product attribute colors ─────────────────────────────
+     The product page's summary row (status badge / metal / karat / length)
+     used to print every token in one gold, so four separate facts read as a
+     single blob. Each fact now owns a hue, named after the stone it borrows
+     from: emerald, gold, sapphire, amethyst. The hues sit at 149°, 48°, 214°
+     and 285° — deliberately spread ~70° apart so no two tokens converge,
+     including under protanopia/deuteranopia simulation.
+
+     ⚠️ These are used at 11px/700, which WCAG counts as NORMAL text, not
+     large. Every value below clears 4.5:1 — not 3:1 — against all four light
+     backgrounds a product page can generate (#fbf8f2 cream, #ffffff,
+     #eeeeee surface-container, #f9f9f7 surface). The dark-page counterparts
+     live in `.product-page-dark` far below; change one, re-check the other.
+
+     ⚠️ Silver-family metals are a TRUE NEUTRAL on purpose. The obvious choice
+     — a blue-grey — lands on hue 210, which is 4° from sapphire, so a white
+     gold item would print "WHITE GOLD" and "14K" in two near-identical blues
+     side by side. A neutral has no hue to collide with. */
+  --color-spec-status:        #16653c; /* emerald  · 6.11:1 · available badge fill */
+  --color-spec-on-status:     #ffffff; /* 7.09:1 on the fill above */
+  --color-spec-metal-gold:    #735c00; /* brand gold · 5.55:1 · yellow/tricolor/bicolor/vermeil */
+  --color-spec-metal-rose:    #9c4a49; /* rose · 5.19:1 · rose gold */
+  --color-spec-metal-neutral: #4d4d4d; /* neutral · 7.7:1 · white gold, silver, platinum */
+  --color-spec-karat:         #1a4d8f; /* sapphire · 7.23:1 */
+  --color-spec-length:        #6b3f7a; /* amethyst · 6.92:1 */
+  --color-spec-separator:     #6f6a5e; /* 4.64:1 — the dots recede but stay legible */
 }
 
 /* Light-palette originals, captured once on :root.
@@ -387,6 +414,108 @@ table {
 .testimonial-card .testimonial-stars {
   font-size: clamp(0.75rem, 0.45rem + 1.5vw, 0.875rem);
   letter-spacing: 0.15em;
+}
+
+/* Reviews marquee — the homepage presentation (2026-08-18). The grid above is
+   still what product pages render; only the homepage band scrolls.
+
+   It is CSS-only on purpose: no measurement, no rAF, no client component. The
+   homepage has an open first-paint budget, and a marquee that costs JS to move
+   would be paying for decoration. The track is a plain flex row translated by
+   exactly one half of itself, forever. */
+.testimonial-marquee {
+  overflow: hidden;
+  /* Cards fade in and out at the edges instead of being guillotined by the
+     viewport, which is what makes it read as a continuous band rather than a
+     clipped row. Masking does NOT create a containing block, so the cards'
+     stretched-link ::after overlays still resolve against their own card. */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 clamp(1.5rem, 6vw, 5rem),
+    #000 calc(100% - clamp(1.5rem, 6vw, 5rem)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 clamp(1.5rem, 6vw, 5rem),
+    #000 calc(100% - clamp(1.5rem, 6vw, 5rem)),
+    transparent
+  );
+}
+.testimonial-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: testimonial-marquee-scroll var(--testimonial-marquee-duration, 56s) linear infinite;
+}
+@keyframes testimonial-marquee-scroll {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+/* ⚠️ THE SPACING IS `margin-inline-end`, NOT flex `gap`, and that is load-bearing.
+   With `gap`, the track's width is `2n*card + (2n-1)*gap` — one gap short of two
+   identical halves — so `translate(-50%)` lands slightly off the seam and the
+   loop visibly jerks once per cycle. Giving every card its own trailing margin
+   makes each slot `card + gap`, the total exactly `2n*(card+gap)`, and -50%
+   exactly one half. Do not "tidy" this into `gap`. */
+.testimonial-marquee .testimonial-card {
+  flex: 0 0 auto;
+  width: min(78vw, 20rem);
+  margin-inline-end: clamp(0.75rem, 2vw, 1.25rem);
+  /* The grid's padding/type ramps are all `vw`-based because there the card
+     width tracks the viewport. Here it does not — a card is a fixed 20rem on
+     any desktop — so those ramps would hand a phone desktop-sized type in a
+     narrow card. Fixed values instead. */
+  padding: 1.25rem;
+  gap: 0.75rem;
+}
+.testimonial-marquee .testimonial-card blockquote {
+  font-size: 0.875rem;
+  /* Six, not eight: every card in a row must be the same height, and the row
+     height is now set by the tallest card rather than by a grid row. */
+  -webkit-line-clamp: 6;
+  line-clamp: 6;
+}
+.testimonial-marquee .testimonial-card figcaption,
+.testimonial-marquee .testimonial-google-link {
+  font-size: 0.75rem;
+}
+.testimonial-marquee .testimonial-card .testimonial-stars {
+  font-size: 0.875rem;
+}
+/* Pointer-only, matching the card hover rule above: on touch this would latch
+   after a tap and leave the band frozen with no way to restart it. */
+@media (hover: hover) {
+  .testimonial-marquee:hover .testimonial-marquee-track {
+    animation-play-state: paused;
+  }
+}
+/* Keyboard users must be able to read a card they have tabbed to. */
+.testimonial-marquee-track:focus-within {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Not just "stop the animation" — a stopped marquee is a row with most of its
+     content unreachable. The repeats are removed so exactly one copy of each
+     review remains, and the band becomes an ordinary horizontal scroller the
+     reader drives themselves. */
+  .testimonial-marquee {
+    overflow-x: auto;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .testimonial-marquee-track {
+    animation: none;
+    width: auto;
+  }
+  .testimonial-marquee-repeat {
+    display: none;
+  }
 }
 
 .responsive-form-grid {
@@ -1571,6 +1700,31 @@ body:has([data-site-header]) .route-progress {
    these same components are already correct, completely untouched. Add
    `product-light-surface` to any future card that brings its own light
    background. */
+/* Product attribute colors, dark-page counterparts.
+   ------------------------------------------------
+   Same four stones as the light values in `@theme`, lifted for a dark page.
+   Hues are held constant (149° / 48° / 214° / 285°) so the row means the same
+   thing on a black-padded item as on a cream one; only lightness moves.
+
+   ⚠️ Each clears 4.5:1 against #000000, #1a1c1c AND a mid-dark custom padding
+   (#2b2f3a was the worst case tested) — the page background is admin-chosen,
+   so black alone is not a sufficient check.
+
+   These live on the class rather than the inline `mainStyle` that carries the
+   four core token overrides, so all eight attribute values sit in one place
+   next to their light originals. `mainStyle` is on the same element and would
+   win if it ever set these — it must not. */
+.product-page-dark {
+  --color-spec-status:        #6ee7a4; /* emerald  · 8.68:1 */
+  --color-spec-on-status:     #10231a; /* 10.67:1 on the fill above */
+  --color-spec-metal-gold:    #e9c349; /* 7.87:1 — matches the dark --color-primary */
+  --color-spec-metal-rose:    #eda29c; /* 6.53:1 */
+  --color-spec-metal-neutral: #cfcfcf; /* 9.9:1 */
+  --color-spec-karat:         #93bdf5; /* sapphire · 6.90:1 */
+  --color-spec-length:        #d5a8e6; /* amethyst · 6.73:1 */
+  --color-spec-separator:     #a8a298; /* 5.0:1 — #9a948a measured 4.44 and was rejected */
+}
+
 .product-page-dark .product-light-surface {
   --color-on-surface: var(--color-on-surface-light);
   --color-on-surface-variant: var(--color-on-surface-variant-light);

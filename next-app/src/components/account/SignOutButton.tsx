@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { startRouteProgress } from '@/components/layout/RouteProgressBar';
 import { createClient } from '@/lib/supabase/client';
 
 interface Props {
@@ -20,7 +21,9 @@ export default function SignOutButton({ label, locale, className }: Props) {
     try {
       const supabase = createClient();
       await supabase.auth.signOut();
-      router.push(locale === 'es' ? '/es' : '/');
+      const home = locale === 'es' ? '/es' : '/';
+      startRouteProgress(home);
+      router.push(home);
       router.refresh();
     } catch {
       setIsSigningOut(false);

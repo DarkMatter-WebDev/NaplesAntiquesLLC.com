@@ -129,10 +129,39 @@ const HEADER_STYLES = `
     }
   }
 
-  /* Keep the full brand and every action visible on scrollbar-narrowed phones. */
+  /* Keep the full brand and every action visible on scrollbar-narrowed phones.
+
+     ONE fluid rule, not a step at 400px. The brand link carries mark + gap +
+     wordmark and clips (overflow:hidden) rather than overflowing, so the
+     wordmark has to surrender width smoothly as the viewport narrows instead of
+     holding a fixed size and losing its tail invisibly. The rules this replaced
+     stepped 10px -> 11px at exactly 400px, which made 400px the WORST width in
+     the band rather than a middling one.
+
+     2.9vw is sized so this is >= the old value at every width (320px: 9.28 vs
+     8.8; 350px: 10.15 vs 9.63; 11px cap from ~379px, where the old rules only
+     reached 11px at 400px), i.e. nothing got smaller to make room for the mark.
+     That is affordable only because the ES/EN chip left this row for the mobile
+     menu on the same day; before that it had to be 2.35vw to fit.
+
+     Floor stays 8.75px, the floor this header already used at 320px.
+     ⚠️ Re-measure the 320-430px band in Spanish WITH THE MENU OPEN before
+     changing this, the mark height, or the brand gap — they share one budget. */
   .site-header-brand-mobile {
-    font-size: 11px;
+    font-size: clamp(8.75px, 2.9vw, 11px);
   }
+  /* The mark shrinks with the same band, bottoming out at the 1.75rem the
+     action buttons use below 350px and reaching the 2rem mobile content budget
+     by ~457px. Bounded at 767px so it never fights the md:h-10 utility. */
+  @media (max-width: 767px) {
+    .site-header-brand-mark {
+      height: clamp(1.75rem, 7vw, 2rem);
+    }
+  }
+  /* No .site-header-language rules in the narrow blocks below: that chip is
+     display:none under md now, so anything sizing it here would be dead code.
+     (Never use a backtick in this block — these styles are a template literal
+     and a stray one ends the string mid-CSS.) */
   @media (max-width: 399px) {
     .site-header-row {
       gap: 0.25rem;
@@ -140,12 +169,6 @@ const HEADER_STYLES = `
     }
     .site-header-actions {
       gap: 0.25rem;
-    }
-    .site-header-language {
-      padding-inline: 0.125rem;
-    }
-    .site-header-brand-mobile {
-      font-size: clamp(8.75px, 2.75vw, 10px);
     }
     .menu-toggle {
       padding-inline: 0.5rem;
@@ -160,7 +183,9 @@ const HEADER_STYLES = `
     font-family: var(--font-label);
     /* Set the size explicitly: a button ignores the text-[10px] utility because
        the global 'button { font: inherit }' reset (unlayered) overrides Tailwind's
-       layered utilities. Match the adjacent language toggle (10px / 12px at md). */
+       layered utilities. 12px at md matches the language chip it sits beside
+       there; below md that chip is hidden and this is the only labelled control
+       in the row, so 10px is on its own. */
     font-size: 0.625rem;
     transition: background 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
   }
@@ -177,10 +202,6 @@ const HEADER_STYLES = `
     }
     .site-header-actions {
       gap: 0.125rem;
-    }
-    .site-header-language {
-      font-size: 0.5625rem;
-      padding-inline: 0.0625rem;
     }
     .site-header-call-button,
     .site-header-icon-button {
@@ -421,21 +442,36 @@ export default function SiteHeader() {
 
         {/* Brand — same home-link behaviour as the Home nav item: on the
             homepage it returns to the top rather than doing nothing. */}
-        <Link href={href('/')} onClick={handleHomeClick} className="flex items-center gap-2 min-w-0 shrink overflow-hidden">
+        {/* gap-[0.3125rem] below md: 5px, not 8px. On a phone the mark and the
+            wordmark are competing for a row that is already full, and 3px of
+            gap is 3px the wordmark does not have to give up. */}
+        <Link href={href('/')} onClick={handleHomeClick} className="flex items-center gap-[0.3125rem] md:gap-2 min-w-0 shrink overflow-hidden">
           {/* The mark is the octopus alone on transparency (owner, 2026-08-16),
               replacing the old navy circular emblem that carried its own
               "NAPLES ESTATE JEWELRY" text — which duplicated the wordmark
               beside it. width/height describe the LANDSCAPE artwork (157x120
               source, ~1.31:1); they are aspect-ratio metadata for next/image,
-              while the rendered size comes from h-8/md:h-10 with w-auto. Leaving
-              them square, as they were, would mis-declare the ratio. */}
+              while the rendered size comes from the height ladder below with
+              w-auto. Leaving them square, as they were, would mis-declare the
+              ratio.
+
+              It shows at EVERY width (owner, 2026-08-17) — it used to be
+              `hidden md:block`, so every phone and every sub-768px tablet
+              carried a wordmark with no mark beside it. The heights are the
+              header's own content budget, not arbitrary: 32px is exactly the
+              mobile budget (56px token = 32px content + 12px above/below) and
+              40px the desktop one (72px = 40 + 16), so the mark fills the row
+              without inflating --site-header-height. `.site-header-brand-mark`
+              exists only so the ≤349px block can shrink it in step with the
+              action buttons there; the sizes attr states the largest rendered
+              width (52px at md+). */}
           <Image
             src="/assets/images/branding/nav-logo.webp"
             alt="Naples Estate Jewelry Logo"
             width={52}
             height={40}
             sizes="52px"
-            className="hidden md:block h-8 w-auto md:h-10 object-contain flex-shrink-0"
+            className="site-header-brand-mark block h-8 w-auto md:h-10 object-contain flex-shrink-0"
             priority
           />
           {/* Full name on md+; abbreviated on mobile.
@@ -487,9 +523,20 @@ export default function SiteHeader() {
 
         {/* Actions */}
         <div className="site-header-actions flex items-center gap-2 md:gap-3 flex-shrink-0">
+          {/* Language — md and up only (owner, 2026-08-17), to buy back header
+              space on phones. Below md it is NOT lost: the mobile menu has
+              carried its own language item all along (the `Español`/`English`
+              MobileLink at the foot of the panel), so this chip was a duplicate
+              control on exactly the widths that could least afford one.
+
+              Safe for SEO despite Google indexing mobile-first: hreflang is
+              declared in the HEAD by `pageMetadata()`/`alternatesFor()` on every
+              page (verified: en, es and x-default all present), and every locale
+              URL is in the sitemap. Alternate-language discovery never depended
+              on this body link. */}
           <Link
             href={altHref}
-            className="site-header-language text-[10px] md:text-xs font-bold tracking-widest uppercase px-1.5 py-1 transition-colors"
+            className="site-header-language hidden md:inline-block text-xs font-bold tracking-widest uppercase px-1.5 py-1 transition-colors"
             style={{ color: GOLD, fontFamily: 'var(--font-label)' }}
           >
             {locale === 'en' ? 'ES' : 'EN'}
