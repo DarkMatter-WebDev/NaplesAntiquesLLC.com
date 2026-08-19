@@ -67,7 +67,7 @@ Both touch-only, both invisible on a desktop, both landed after the `svh` fix:
 
 ### An instrument, because inference already failed once here
 
-`ViewportDebugOverlay`, behind `?vpdebug=1`, reports the live `vh`/`svh`/`dvh`
+`ViewportDebugOverlay` reports the live `vh`/`svh`/`dvh`
 probe heights, the `innerHeight` / `visualViewport` / `scrollHeight` ranges, and
 scrolling that happened with no finger on the glass — that last one being the
 discriminator for the hero snap. Two details it needed:
@@ -75,6 +75,11 @@ discriminator for the hero snap. Two details it needed:
 - It discounts the first 600ms after `load`. Without that it reported the page's
   own load growth as `doc height moves: YES 6238px` — answering its own headline
   question wrongly on every page load.
+- It is switched on by a **visible DEBUG button**, bottom-left. `?vpdebug=1`
+  alone could not reach the environment under test: the Instagram in-app browser
+  has **no address bar**, so the param can be neither typed nor pasted. A hidden
+  tap gesture was built first and rejected by the owner in favour of a visible
+  control, explicitly and knowing it sits on a live storefront. It is temporary.
 - It polls at 250ms as well as listening. Measured while building it: a
   non-compositing webview suppresses `scroll` events AND `requestAnimationFrame`
   entirely while still moving `scrollY` (a 1200px programmatic scroll produced 0

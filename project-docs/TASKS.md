@@ -158,13 +158,25 @@ looks exactly like a clean result" trap.
 
 ### How to read the overlay, on the phone that fails
 
-Open any page from an Instagram link with `?vpdebug=1` appended, scroll up and
-down until the toolbar has moved several times, then screenshot it.
+🔴 **Turn it on with the visible DEBUG button, bottom-left on every page.**
+`?vpdebug=1` still works where there is an address bar, but **the Instagram
+in-app browser has none** — you arrive on whatever URL the link carried and
+cannot edit it, which is why a query-string-only switch could not reach the one
+environment that fails. Owner asked for a visible button, explicitly and knowing
+it is on a live storefront; it is temporary and is the first thing to delete
+when this closes.
+
+Tapping DEBUG stores the choice and **reloads**, so the measurement starts from
+a clean baseline. It then persists across navigation until TURN OFF, which
+clears the key and drops the query string.
+
+Open the site from an Instagram link, tap DEBUG, scroll up and down until the
+toolbar has moved several times, then screenshot it.
 
 | Line | What it settles |
 | --- | --- |
 | `vh-svh gap` | the retractable chrome as CSS sees it — **this is the phantom scroll** `100vh` was adding. `0px` means the shell theory does not apply on this device |
-| `doc height moves` | `YES` = something is still sized to the dynamic viewport. `no` + a visible jump = the cause is not CSS units at all |
+| `doc height moves` | a magnitude, deliberately not a YES/no verdict — late content settles the document by a few px after load, so compare it against `toolbar travel` on the next line. Comparable to the toolbar = something is still sized to the dynamic viewport. `no`, or a few px, plus a visible jump = the cause is not CSS units at all |
 | `auto-scroll Nx max Mpx` | scrolling with no finger on the glass. A large `max` is the **hero snap** mis-targeting — candidate 2 |
 | `toolbar travel` | how far `innerHeight` actually moved |
 | `offsetTop` | the browser sliding the visual viewport under a fixed page |
