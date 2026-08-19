@@ -3,9 +3,22 @@
 > Actionable open work plus a short recent-completions summary. Full history is
 > in `CHANGELOG.md`. Last reconciled: **2026-08-18**.
 
-## 🔴 READY TO DEPLOY — the checkout sign-in/guest gate (2026-08-19)
+## ✅ DEPLOYED 2026-08-19 — the checkout sign-in/guest gate
 
-Complete and gate-passed locally. **Not deployed.** No SQL.
+Shipped and **owner-confirmed good on production**. No SQL.
+
+**Verified by fetching production, not assumed** — all 15 JS chunks behind
+`/checkout` scanned: **0** `checkout-auth-overlay`, **0** `checkout-auth-card`,
+**0** of the old two-option heading, against controls of **1** `checkout-page`,
+**1** `How would you like to continue`, and **3** chunks carrying `--app-vh`.
+`/`, `/es`, `/checkout`, `/es/checkout` all 200.
+
+⚠️ **A zero is not evidence without a positive control in the same scan.** Two
+false passes were hit producing that table: the downloaded chunks saved with a
+**double** leading underscore (URL path starts with `/`), so the glob matched
+nothing and every grep returned 0; and the static `.css` files returned 0 for
+the deleted classes **and** for the control, because styled-jsx rules compile
+into the JS bundle and never appear in a stylesheet.
 
 The double sign-in/guest prompt is gone (the drawer now records the buyer's
 answer before routing), the two-option screen is deleted in favour of the
@@ -17,8 +30,8 @@ Full detail and measurements in `CHANGELOG.md` 2026-08-19 (4); the rule is in
 **Gate passed from a deleted `.next`:** `tsc` clean · `lint` clean ·
 **1024/1024** · build **454/454 pages**.
 
-📱 **Check on a real phone after deploying** — the whole bug was reported from
-one, and the two things worth ten seconds each:
+📱 **Still worth ten seconds on a real phone** — the whole bug was reported from
+one, and none of this has been looked at on real hardware:
 
 - Proceed to checkout signed out. You should see the four-option screen
   **once**, centred, and land on checkout with **no** second prompt.
@@ -28,10 +41,11 @@ one, and the two things worth ten seconds each:
 - Both locales — ES reads `¿Cómo desea continuar?` /
   `Iniciar sesión · Crear cuenta · Continuar como invitado`.
 
-⚠️ **Rebuild staging** before the next batch — this change makes it stale.
-Command under *Copying to the repo folder*.
+✅ **Staging was rebuilt for this batch and re-synced after the deploy** — see
+*Copying to the repo folder*. It mirrors the source, so the next batch starts
+from a clean baseline.
 
-## ✅ Hydration warning on `<html>` — FIXED 2026-08-19 (ships with the gate batch)
+## ✅ Hydration warning on `<html>` — FIXED 2026-08-19, deployed with the gate batch
 
 Found while investigating the gate bug and fixed the same day, at owner request.
 It had fired on **every page** in dev since the 2026-08-18 `--app-vh` work.
@@ -304,11 +318,51 @@ everywhere `svh` behaves per spec.
      line. She had not edited it; the owner chose to trim rather than wait. That
      is a deliberate, recorded override of the verbatim rule — see DECISIONS and
      the inline note in `testimonials.ts`. ⛔ One exception, not a new policy.
-   - ◻ **Four reviews are still not on the site** (13 of 16 now). The Maps feed
-     stopped paginating after ten. One of the missing is a **Spanish** review
-     ("Tenía estas piezas de oro…") shown under *Updates by visitors* with no
-     attributable name in the DOM. Paste any of them in and every surface picks
-     them up.
+   - ✅ **DONE 2026-08-19 — all five missing reviews are in.** With the
+     reconciliation below, `TESTIMONIALS` is **13 → 16**. Five were missing, not
+     four: the earlier count came from a Maps feed that stopped paginating after
+     ten, so the tail was never seen.
+     Added: **Ruthe Lloyd, Ariel Babastro, Ryan Smith, Edna Cavazos, Mayelin
+     Pérez**.
+
+     ⚠️ **Mayelin Pérez is the Spanish one, and her entry inverts the pair** —
+     `quoteEs` is her verbatim original, `quote` is our translation. Google's
+     card shows a machine translation by default; the original is only behind
+     its *"See original (Spanish)"* control. Publishing the visible text would
+     have shipped a machine translation as a customer's words.
+
+     **How to read the full list** (the pagination trap that caused the
+     undercount): the Reviews pane must be scrolled by its own scroll container
+     — `div.m6QErb.DxyBCb.kA9KIf.dS8AEf` — until the card count stops growing,
+     then every *"More"* expander clicked. Scrolling the window does nothing.
+     ⚠️ Google appends a trailing `" …"` to `textContent` on emoji-ending cards
+     (Cristian's, Douglas's) even when the text is complete — strip it; it is a
+     UI marker, not the reviewer's words.
+
+   - ✅ **RESOLVED — the list is reconciled against the profile, 16 matching
+     1:1.** Three entries did not reconcile, and the owner supplied the reason:
+     **he accidentally deleted his original Google Business Profile and rebuilt
+     it from scratch.** Those reviews were real and his; they did not survive.
+
+     | Entry | Action |
+     | --- | --- |
+     | **Nolan Olivier** | removed — gone with the old profile |
+     | **Onur** | removed — gone with the old profile |
+     | **Yisel Perez** | **quote replaced** — she re-reviewed on the new profile |
+
+     Yisel was refreshed rather than dropped: she is still a live reviewer, only
+     her text is new. Leaving the old words under her name was the worst option —
+     a reader clicking "Read on Google" would find her saying something else.
+
+     ⛔ **Standing rule, now in `testimonials.ts`: every entry must still exist
+     on the live profile.** Each card links to it, so an absent quote sends the
+     reader to look for something they will not find. Reconcile the list against
+     the profile — drop what vanished, refresh what changed — don't only append.
+
+     ⚠️ ***Naples Jewelry Buyers* (5.0/33) is NOT the owner's business** — the
+     name is coincidence. A guess made during this session said it was the
+     likely source of those entries; that was wrong. Do not repeat the
+     inference.
 
    🔴 **NEXT, owner: Google address verification** — owner is going 2026-08-20.
    Until the address is verified, the showroom's NAP is not fully trusted by
@@ -643,8 +697,10 @@ it neither pollutes the source of truth nor triggers a sync storm). Its contents
 are exactly what belongs in the repo — copy *everything* in it into the repo
 folder with no exclusions to think about.
 
-🟢 **Rebuilt 2026-08-19 for the checkout-gate batch — READY TO DEPLOY.**
-**855 files / 19.63 MB**, 8 files copied, **0 FAILED / 0 Extras / 0 Mismatch**,
+✅ **Rebuilt 2026-08-19, twice.** First for the checkout-gate batch (now
+DEPLOYED and confirmed on production), then again for the **Google-reviews
+batch, which is still UNDEPLOYED and is what staging currently carries.**
+**855 files / ~19.65 MB**, **0 FAILED / 0 Extras / 0 Mismatch**,
 and a follow-up dry run reported **0 to copy**. `/MIR` deleted nothing — the
 dry run showed 0 Extras *before* it ran, which is the check that makes `/MIR`
 safe. Leak check clean — 0 `.git`, 0 `node_modules`, 0 `.next`, 0 `.env*`,

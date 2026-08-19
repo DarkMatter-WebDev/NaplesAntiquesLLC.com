@@ -5,6 +5,25 @@
 // reviews. Never invent, embellish, or paraphrase a quote: add new entries
 // only by pasting a real review's text.
 //
+// ⚠️ ONE ENTRY INVERTS THAT PAIRING. Mayelin Pérez wrote in Spanish, so her
+// `quoteEs` is the verbatim original and her `quote` is the translation. The
+// rule is "the reviewer's own language is the verbatim side", not "English is".
+// Google's card shows a machine translation by default with a "See original"
+// control beneath it; always publish what that control reveals.
+//
+// ⛔ EVERY ENTRY MUST STILL EXIST ON THE LIVE PROFILE. Each card renders a
+// "Read on Google" link to GOOGLE_REVIEWS_URL, so a quote that is no longer
+// there sends the reader to look for something they will not find. Two entries
+// (Nolan Olivier, Onur) were removed on 2026-08-19 for exactly this: they were
+// real reviews on the owner's ORIGINAL Business Profile, which he accidentally
+// deleted and rebuilt, and they did not survive it. Genuine, and unverifiable —
+// which on a page that invites verification is the same problem as invented.
+//
+// This list is therefore reconciled AGAINST the profile, not just appended to.
+// When re-reading it, drop entries that have vanished and refresh ones whose
+// text has changed (Yisel Perez re-reviewed on the new profile; her entry
+// carries the new words).
+//
 // To add a review: append an object below — every surface updates together.
 
 /**
@@ -30,27 +49,22 @@ export interface Testimonial {
 
 export const TESTIMONIALS: Testimonial[] = [
   {
-    name: 'Nolan Olivier',
-    quote:
-      'Chris is amazing! Worked with him selling some items. Got a fair and accurate price, and he had great communication while being fast and flexible to meet! Highly recommend and will be selling to him again.',
-    quoteEs:
-      '¡Chris es increíble! Trabajé con él vendiendo algunos artículos. Obtuve un precio justo y preciso, y tuvo una excelente comunicación, además de ser rápido y flexible para reunirse. ¡Muy recomendable y volveré a venderle!',
-    meta: 'Google review',
-    metaEs: 'Reseña de Google',
-  },
-  {
-    name: 'Onur',
-    quote: 'Chris is the best, he is always so professional when dealing with him!',
-    quoteEs: 'Chris es el mejor, ¡siempre es muy profesional al tratar con él!',
-    meta: 'Google Local Guide',
-    metaEs: 'Guía Local de Google',
-  },
-  {
+    // ⚠️ Her review was RE-READ from the live profile on 2026-08-19 and replaced.
+    // The previous quote here ("Working with this company was an excellent
+    // experience…") came from the owner's ORIGINAL Google Business Profile,
+    // which he accidentally deleted and rebuilt from scratch. That text no
+    // longer exists anywhere; Yisel reviewed the business again on the new
+    // profile, and this is what she wrote. Keeping the old words under her name
+    // would have sent anyone who clicked "Read on Google" to a review that says
+    // something else — indistinguishable, from the outside, from a fabricated
+    // quote.
+    //
+    // "facebook" is lower-cased as she posted it.
     name: 'Yisel Perez',
     quote:
-      'Working with this company was an excellent experience. They offered me a significantly better price for my gold jewelry compared to other places where I had it appraised. Chris was incredibly helpful and took the time to explain everything in detail, which made me feel comfortable and confident throughout the process. I never felt rushed, and I truly appreciated the care and attention he provided. I highly recommend this company and will definitely be returning in the future. Thank you!',
+      'I had a couple of jewelry pieces I wanted to sell, I reached out to many different people and companies but their offer was too low. I found Chris with Naples Estate Jewelry one day casually on facebook and his offer was the highest one! Thank you so much for walking me through the whole process, great experience for sure. Highly recommend this business.',
     quoteEs:
-      'Trabajar con esta empresa fue una experiencia excelente. Me ofrecieron un precio significativamente mejor por mi joyería de oro en comparación con otros lugares donde la había tasado. Chris fue increíblemente servicial y se tomó el tiempo de explicarme todo en detalle, lo que me hizo sentir cómoda y segura durante todo el proceso. Nunca me sentí presionada, y realmente aprecié el cuidado y la atención que brindó. Recomiendo mucho esta empresa y sin duda volveré en el futuro. ¡Gracias!',
+      'Tenía un par de piezas de joyería que quería vender, contacté a muchas personas y empresas diferentes pero su oferta era demasiado baja. ¡Encontré a Chris de Naples Estate Jewelry un día casualmente en facebook y su oferta fue la más alta! Muchas gracias por guiarme durante todo el proceso, sin duda una gran experiencia. Recomiendo mucho este negocio.',
     meta: 'Google review',
     metaEs: 'Reseña de Google',
   },
@@ -170,6 +184,67 @@ export const TESTIMONIALS: Testimonial[] = [
       'My husband and I cannot say enough Chris Surette with Naples Estate Jewelry. Chris went through two boxes of silver flatware. We were offered a check, or told to take it if we wanted to shop around more. The cash paid for our good sterling was more than fair. We would highly recommend Chris and Naples Estate Jewelry. Local. Honest. Professional.',
     quoteEs:
       'Mi esposo y yo no podemos decir suficiente sobre Chris Surette de Naples Estate Jewelry. Chris revisó dos cajas de cubertería de plata. Nos ofrecieron un cheque, o nos dijeron que podíamos llevárnosla si queríamos seguir buscando. El efectivo que pagó por nuestra buena plata esterlina fue más que justo. Recomendamos mucho a Chris y a Naples Estate Jewelry. Local. Honesto. Profesional.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+
+  // --- Added 2026-08-19, read from the live Google Business Profile ----------
+  // The profile's full list was loaded (16 reviews, 5.0) by scrolling the
+  // Reviews pane until the count stopped growing, and every "More" expander was
+  // opened, so these are full text rather than Google's collapsed preview.
+  //
+  // ⚠️ Verbatim INCLUDING what looks like a mistake: Ryan's "weary" (for
+  // "wary") and Edna's missing space in "pressured.I really". Those are not
+  // typos to fix — a corrected quote is an invented one. The Spanish
+  // translations render the intended meaning, which is what a translation is.
+  {
+    name: 'Ruthe Lloyd',
+    quote: 'Chris is honest and completely trustworthy, he is a pleasure to do business with!',
+    quoteEs: '¡Chris es honesto y completamente confiable, es un placer hacer negocios con él!',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Ariel Babastro',
+    quote:
+      'What a pleasure it was working with Chris! I was looking for a trustworthy company to sell some of my jewelry because I needed the money for a down payment. I had received a few offers from other places, but they were much lower than I expected.\n\nI found Naples Estate Jewelry, and I’m so glad I did! Chris was incredibly patient, kind, and easy to work with, especially since English is not my first language. He took the time to explain everything and made me feel very comfortable throughout the whole process.\n\nHis offer was the best one I received, and he actually paid me more than I was expecting! I couldn’t be happier with my experience. Thank you so much, Chris! I will definitely be coming back to do more business with you guys. Highly recommend Naples Estate Jewelry!',
+    quoteEs:
+      '¡Qué placer fue trabajar con Chris! Buscaba una empresa de confianza para vender algunas de mis joyas porque necesitaba el dinero para un pago inicial. Había recibido algunas ofertas de otros lugares, pero eran mucho más bajas de lo que esperaba.\n\n¡Encontré Naples Estate Jewelry y me alegro muchísimo de haberlo hecho! Chris fue increíblemente paciente, amable y fácil de tratar, sobre todo porque el inglés no es mi primer idioma. Se tomó el tiempo de explicarme todo y me hizo sentir muy cómoda durante todo el proceso.\n\n¡Su oferta fue la mejor que recibí, y de hecho me pagó más de lo que esperaba! No podría estar más feliz con mi experiencia. ¡Muchísimas gracias, Chris! Sin duda volveré para hacer más negocios con ustedes. ¡Recomiendo mucho Naples Estate Jewelry!',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Ryan Smith',
+    quote:
+      'I worked with Chris and had an amazing experience. I was kinda weary buying gold but I wanted something special for my son. He’s now the proud owner of a beautiful gold chain with the perfect Italian horn charm. I’m psyched for him but also happy that I know it’s real gold and will carry its value in the future.',
+    quoteEs:
+      'Trabajé con Chris y tuve una experiencia increíble. Estaba un poco receloso de comprar oro, pero quería algo especial para mi hijo. Ahora él es el orgulloso dueño de una hermosa cadena de oro con el dije de cuerno italiano perfecto. Estoy entusiasmado por él y también contento de saber que es oro de verdad y que mantendrá su valor en el futuro.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Edna Cavazos',
+    quote:
+      'Chris met up with me and I had a great experience. He took the time to carefully examine my silver-plated items and explained what they were, their condition, and what they might be worth. Even though we didn’t end up making a deal, he was honest, professional, and never made me feel pressured.I really appreciated how knowledgeable, patient, and accommodating he was. I left feeling much more informed than when I arrived, and I truly appreciated his generosity with his time and expertise.',
+    quoteEs:
+      'Chris se reunió conmigo y tuve una gran experiencia. Se tomó el tiempo de examinar cuidadosamente mis artículos plateados y me explicó qué eran, en qué estado estaban y cuánto podrían valer. Aunque al final no cerramos un trato, fue honesto, profesional y nunca me hizo sentir presionada. Realmente aprecié lo bien informado, paciente y atento que fue. Me fui sintiéndome mucho más informada que cuando llegué, y de verdad aprecié su generosidad con su tiempo y su experiencia.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    // ⚠️ THE ONE REVIEW WRITTEN IN SPANISH. The direction of the pair is
+    // therefore INVERTED here: `quoteEs` is her ORIGINAL text, verbatim, and
+    // `quote` is our English translation. Google's own card shows a machine
+    // translation with "See original (Spanish)" beneath it; the original was
+    // read from that control, not from the translation.
+    //
+    // ⚠️ "Naples estate jewelry" is lower-cased in her original. Left exactly
+    // as posted — the Spanish side is the verbatim one on this entry.
+    name: 'Mayelin Pérez',
+    quote:
+      'I had these gold pieces that I practically didn’t wear anymore, and I had also lost one of the rings, so I started looking for people who might want to buy them. Chris offered me a good price that I couldn’t turn down, because I had contacted two other people before and they were offering me much less than half of what Chris with Naples Estate Jewelry offered me. Thank you so much for everything, and I’ll be in touch soon because my mom also wants to sell some of her things.',
+    quoteEs:
+      'Tenía estas piezas de oro que prácticamente ya no las usaba, también había perdido una de las argollas y empecé a buscar personas que las quisieran comprar. Chris me ofreció un buen precio que no pude rechazar porque había contactado dos personas antes y me ofrecían mucho menos de la mitad que me ofreció Chris con Naples estate jewelry. Muchas gracias por todo y pronto les contactaré porque mi mamá también quiere vender algunas de sus cosas.',
     meta: 'Google review',
     metaEs: 'Reseña de Google',
   },

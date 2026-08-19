@@ -8,11 +8,41 @@
 
 **Read this, then `TASKS.md`.**
 
-### 🔴 ONE UNDEPLOYED CHANGE IS WAITING — the checkout sign-in/guest gate
+### 🔴 ONE UNDEPLOYED CHANGE — the five missing Google reviews
 
-Everything below this section is deployed and verified. **This one is not.** It
-is local-only, complete, and gate-passed; it needs a deploy and a staging
-rebuild. No SQL.
+The 2026-08-19 checkout-gate batch shipped and the owner confirmed production
+good. **Since then, `TESTIMONIALS` went 13 → 16** and that is local-only,
+gate-passed, and needs a deploy plus a staging rebuild. No SQL.
+
+Five reviews were missing (not the four the old note claimed — its arithmetic
+never worked: 16 − 13 = 3). The earlier count came from a Maps feed that stopped
+paginating after ten cards, so the tail was never seen. Five were added and
+three stale entries reconciled away, landing on 16.
+
+⚠️ **Mayelin Pérez wrote in Spanish, and her entry inverts the verbatim pair** —
+`quoteEs` is her original, `quote` is our translation. Google's card shows a
+machine translation by default; the original sits behind *"See original
+(Spanish)"*. Publishing the visible text would have attributed Google
+Translate's words to a named customer.
+
+✅ **The list is now RECONCILED against the profile — 16, matching 1:1.** Three
+entries did not reconcile, and the owner explained why: **he accidentally
+deleted his original Business Profile and rebuilt it.** Those reviews were real
+and his, and did not survive. **Nolan Olivier** and **Onur** are removed;
+**Yisel Perez** re-reviewed on the new profile, so her quote was replaced with
+her current words rather than dropping her.
+
+⛔ **Standing rule, now in the file header: every entry must still exist on the
+live profile**, because each card renders a "Read on Google" link. Genuine but
+unverifiable is, on a page that invites verification, the same problem as
+invented. Reconcile the list against the profile — drop what has vanished,
+refresh what has changed — rather than only appending.
+
+⚠️ *Naples Jewelry Buyers* (the 5.0/33 Google profile) is **not the owner's** —
+the name is coincidence. An earlier guess in this session said otherwise; it was
+wrong.
+
+### ✅ The checkout sign-in/guest gate — DEPLOYED 2026-08-19, owner-confirmed
 
 **Owner report, from a phone:** proceeding to checkout signed out asked
 "log in or continue as guest" **twice**, and the second prompt sat out of the
@@ -47,18 +77,23 @@ a silencer: React already left the DOM alone, so the token always survived.
 the root-layout change, since the prerender count is a structural invariant.
 Browser-verified in both locales — measurements in `CHANGELOG.md` 2026-08-19 (4).
 
+**Confirmed on production after the deploy**, by scanning all 15 JS chunks behind
+`/checkout`: **0** `checkout-auth-overlay`, **0** `checkout-auth-card`, **0** of
+the old two-option heading — against controls of **1** `checkout-page`, **1**
+`How would you like to continue`, and **3** chunks carrying `--app-vh`. All four
+of `/`, `/es`, `/checkout`, `/es/checkout` are 200.
+
 ⚠️ **Reusable trap worth carrying forward:** any `position: fixed` element placed
 inside a `[data-customer-reveal]` subtree is anchored to that subtree, not the
 viewport. It fails silently — the element renders, just in the wrong place.
 
-### ✅ EVERYTHING ELSE IS DEPLOYED AND VERIFIED. NOTHING IS HALF-DONE.
+⚠️ **A second trap, hit twice while verifying the above:** a grep that returns 0
+proves nothing without a positive control in the same scan. The chunk files
+saved with a **double** leading underscore so the glob matched nothing, and the
+static `.css` files can never contain styled-jsx rules (those compile into the
+JS). Both looked like clean passes.
 
-Apart from the gate change above, there is **no staged batch waiting**, no
-outstanding SQL, and no other undeployed code. The site, the Google profile and
-the docs all agree with each other for the first time since the showroom opened.
-⚠️ Staging no longer mirrors the source — rebuild it with the gate change.
-
-**What closed on 2026-08-19:**
+**What else closed on 2026-08-19:**
 
 | | |
 | --- | --- |
@@ -120,8 +155,10 @@ Nothing is blocking. In rough priority:
 3. **Confirm the first real refund records itself** — the fix is proven locally
    against real PayPal refunds but its automatic path has never run in
    production.
-4. **Four Google reviews are still not on the site** (13 of 16), one of them
-   Spanish. Paste any in and every surface picks them up.
+4. ✅ **DONE 2026-08-19 — every Google review is on the site and the list is
+   reconciled.** `TESTIMONIALS` is **13 → 16**, a 1:1 match with the live
+   profile: five added, two removed (lost with the owner's deleted original
+   profile), one refreshed.
 5. **Search Console**: resubmit the sitemap and Request Indexing on the four
    pages whose titles changed. A nudge, not a repair.
 6. 📱 **Phone-only checks** that have never been done on real hardware — listed

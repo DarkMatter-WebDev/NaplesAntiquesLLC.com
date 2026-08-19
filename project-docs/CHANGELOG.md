@@ -1,9 +1,139 @@
 
 # Changelog
 
-## 2026-08-19 (4) — The double sign-in/guest prompt is gone, and the survivor is no longer off-screen on a phone
+## 2026-08-19 (5) — Reviews reconciled against the live profile: `TESTIMONIALS` 13 → 16
 
 ◻️ **NOT DEPLOYED.** Local only; gate passed (below).
+
+Owner asked to bring in all the Google reviews. The standing note said "four
+missing (13 of 16)". **It was five**, and the note's arithmetic never worked —
+16 − 13 = 3, and neither number was right.
+
+Added, all verbatim from the live profile: **Ruthe Lloyd, Ariel Babastro,
+Ryan Smith, Edna Cavazos, Mayelin Pérez**.
+
+### The two traps that had caused the undercount
+
+1. **The Maps review pane paginates on its OWN scroll container.** Scrolling the
+   window loads nothing; the earlier read stopped at ten cards and never saw the
+   tail. The container is `div.m6QErb.DxyBCb.kA9KIf.dS8AEf` — scroll it until
+   the card count stops growing (16), then click every *"More"*.
+2. **Google appends a trailing `" …"` to `textContent`** on cards whose text
+   ends in an emoji, even when nothing is truncated — Cristian's and Douglas's.
+   Already documented inline for Douglas; confirmed again by length arithmetic
+   (118 chars of real text + `" …"` = the 120 Google reports).
+
+### Mayelin Pérez inverts the verbatim pairing
+
+She wrote in **Spanish**, and Google's card shows a **machine translation** by
+default with the original hidden behind *"See original (Spanish)"*. Publishing
+what is visible would have shipped Google Translate's words as a named
+customer's. Her entry therefore stores `quoteEs` as the **verbatim original**
+and `quote` as our translation — the inverse of every other row. The file header
+now states the rule as *"the reviewer's own language is the verbatim side"*,
+rather than assuming English is.
+
+⚠️ Her original lower-cases the brand — "Chris con Naples estate jewelry" —
+and that is left exactly as posted.
+
+### Verbatim quirks preserved, deliberately
+
+Ryan's **"kinda weary"** (for "wary") and Edna's missing space in
+**"pressured.I really appreciated"** ship as written. The Spanish translations
+render the intended meaning, which is what a translation is for.
+
+### The list is now RECONCILED against the profile — 16, matching exactly
+
+Three entries did not reconcile, and the owner supplied the reason: **he
+accidentally deleted his original Google Business Profile and rebuilt it from
+scratch.** Those reviews were real and were his; they did not survive the
+rebuild. (An earlier guess in this session — that they came from the separate
+*Naples Jewelry Buyers* profile — was **wrong**; the owner confirms that
+business is not his, the name is coincidence. Do not repeat that inference.)
+
+| Entry | Was | Action |
+| --- | --- | --- |
+| **Nolan Olivier** | gone with the old profile | **removed** |
+| **Onur** | gone with the old profile | **removed** |
+| **Yisel Perez** | re-reviewed on the NEW profile, different text | **quote replaced** with her current words |
+
+Yisel was updated rather than dropped: she is still a live reviewer, only her
+text is new. Leaving the old words under her name was the worst of the three
+options — a reader who clicked "Read on Google" would find her saying something
+else, which from the outside is indistinguishable from a fabricated quote.
+
+⛔ **New standing rule, now in the file header: every entry must still exist on
+the live profile.** Each card renders a "Read on Google" link, so a quote that
+is no longer there sends the reader to look for something they will not find.
+Genuine-but-unverifiable is, on a page that invites verification, the same
+problem as invented. The list is therefore **reconciled** against the profile —
+drop what has vanished, refresh what has changed — not merely appended to.
+
+**Net: `TESTIMONIALS` 13 → 16**, a 1:1 match with the live profile.
+
+⚠️ **Correction to an earlier line in this entry:** the marquee math was
+misreported as "36 cards per half (`repeatsPerHalf` 2 × 18)". Wrong.
+`MIN_CARDS_PER_HALF` is **8**, so `repeatsPerHalf` is **1** at any list length
+above 8, and a **single** track holds both halves (`repeatsPerHalf * 2` passes).
+At 18 that was 18 per half / 36 in the track / 126s; at 16 it is **16 per half,
+32 in the track, 112s**.
+
+### Verified
+
+Rendered in both locales on the dev server: all five new names present on `/`;
+`kinda weary buying gold` and `pressured.I really appreciated` intact; on `/es`
+Mayelin's original Spanish renders (`también había perdido una de las argollas`,
+`Chris con Naples estate jewelry`) with **no** English leaking into the Spanish
+surface. After the reconciliation: `Nolan Olivier` and `Onur` absent from both
+locales, Yisel's new text present and her old text gone in EN **and** ES.
+
+Marquee re-measured at the final count of 16 — **32 figures in the track, 16 per
+half, halves byte-identical at 5408px each, duration 112s**, `margin-inline-end`
+intact, wrapper still carrying `data-customer-reveal-skip`. Measured scroll speed
+**48px/s**, matching the ~49px/s recorded when the marquee shipped, so changing
+the list length did not change how fast the band moves. That holds by
+construction — duration is `cardsPerHalf × SECONDS_PER_CARD`, so speed reduces to
+`cardWidth / 7` regardless of how many reviews exist.
+
+ℹ️ A second, zero-width `.testimonial-marquee` exists in the DOM inside a
+`display: none` container directly under `<body>` — a dev-mode artifact, present
+before this change and inert. Do not chase it as a duplicate-render bug.
+
+**Gate, from a deleted `.next`:** `tsc` clean · `lint` clean · **1024/1024
+across 100 files** · build **454/454 static pages**.
+
+## 2026-08-19 (4) — The double sign-in/guest prompt is gone, and the survivor is no longer off-screen on a phone
+
+✅ **DEPLOYED 2026-08-19 and owner-confirmed good on production.**
+
+**Confirmed by fetching production, not assumed.** All 15 JS chunks behind
+`https://naplesestatejewelry.com/checkout` were downloaded and scanned:
+
+| Check | Result |
+| --- | --- |
+| `checkout-auth-overlay` (deleted screen 2) | **0** |
+| `checkout-auth-card` (deleted) | **0** |
+| `How would you like to check out` (old 2-option heading) | **0** |
+| `checkout-page` — *control for the styled-jsx scan* | **1** |
+| `How would you like to continue` (the surviving gate) | **1** |
+| `Continue as Guest` / `Create Account` / `Cancelar` / `Crear cuenta` | **1 each** |
+| `--app-vh` still shipping — *control* | **3 chunks** |
+| `/` · `/es` · `/checkout` · `/es/checkout` | all **200** |
+
+⚠️ **Two false readings were hit and corrected while running this** — both are
+the "broken scan" failure mode this project has been bitten by before, and both
+initially looked like clean passes:
+
+1. The downloaded chunks were saved with a **double** leading underscore
+   (`__next_...`, because the URL path starts with `/`), so a
+   `_next_static_chunks_*` glob matched **nothing** and every grep returned 0 —
+   including the positive control.
+2. Grepping the static `.css` files for `.checkout-auth-overlay` returned 0, but
+   so did the `checkout-page` control: **styled-jsx rules compile into the JS
+   bundle, not into a static stylesheet.** The CSS files can never prove this
+   either way.
+
+A zero is only evidence when a positive control in the same scan is non-zero.
 
 **Reported by the owner from a phone:** proceeding to checkout while signed out
 asked "log in or continue as guest" **twice** — first a four-option screen, then
