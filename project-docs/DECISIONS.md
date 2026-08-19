@@ -3206,6 +3206,39 @@ churning, and the guard alone does not stop CSS from resizing.
    the baseline would creep along with them and the 300px total would never
    register.
 
+3. **Never use Tailwind's `*-screen` height utilities** (`min-h-screen`,
+   `h-screen`, `max-h-screen`). Added 2026-08-18, after the owner reported the
+   jump again. They compile to `100vh`, and the reason they are banned outright
+   rather than merely discouraged is that **they are invisible to the check that
+   enforces this rule.** The 2026-08-11 sweep searched for unit literals;
+   `min-h-screen` contains none, so eight usages survived it — including the one
+   on `<body>` in `[locale]/layout.tsx`, which applies to every page on the site.
+
+   The proof it was an oversight and not a judgement: that same sweep converted
+   `[locale]/not-found.tsx` from `60vh` to `60svh` while leaving
+   `app/not-found.tsx` on `min-h-screen`. Two 404 pages, one fixed, one not,
+   differing only in whether the unit happened to be spelled out.
+
+   `min-h-svh` / `h-svh` / `max-h-svh` are the replacements — Tailwind v4 ships
+   them, they say what they mean, and a future unit sweep can find them.
+   `lib/__tests__/viewport-units.test.ts` enforces this, because **a convention
+   that can only be enforced by grepping for a string the offender does not
+   contain is not a convention, it is a hope.**
+
+   ⚠️ On the page shell this trades a cosmetic cost, accepted by the owner
+   2026-08-18: on a page SHORTER than the screen with the toolbar hidden,
+   `min-h-svh` leaves a thin strip of page background below the footer's
+   `#f3f3f3`. ~50px of a near-identical tone, on sign-in/sign-up/404 only. The
+   loop it removes is worth more than the strip it leaves.
+
+   ⚠️ `.min-h-screen{min-height:100vh}` REMAINS in the compiled CSS, and that is
+   not a regression. Tailwind's scanner is a plain string scan over the source
+   tree and does not parse, so the class name inside the comments explaining
+   this very rule is enough to emit the utility. Nothing applies it. Audit the
+   served `<body class>`, never the stylesheet — this is the same shape as the
+   project's existing "a broken absence check looks exactly like a clean result"
+   trap.
+
 Applied to all three resize listeners in the app: the homepage hero's remeasure
 (whose geometry is entirely `svh`/`rem`-derived, so toolbar movement genuinely
 cannot change it — it was forcing a synchronous `offsetHeight` reflow per scroll

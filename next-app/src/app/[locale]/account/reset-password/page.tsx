@@ -331,7 +331,7 @@ export default function ResetPasswordPage() {
   return (
     <>
       <SiteHeader />
-      <main className="modern-auth-page min-h-screen flex items-start justify-center px-4 pt-20 pb-10 md:items-center md:pt-24 md:pb-20">
+      <main className="modern-auth-page min-h-svh flex items-start justify-center px-4 pt-20 pb-10 md:items-center md:pt-24 md:pb-20">
         {renderCard()}
         <style>{RESET_AUTH_STYLES}</style>
       </main>

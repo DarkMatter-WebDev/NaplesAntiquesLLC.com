@@ -8,12 +8,12 @@
 
 **Read this, then `TASKS.md`.**
 
-### 🟢 A BATCH IS STAGED AND READY TO DEPLOY (2026-08-18)
+### ✅ DEPLOYED 2026-08-18 — the batch is LIVE
 
-Everything below the 2026-08-17 deploy is **built, gated and staged**. Nothing
-is half-finished and no SQL is outstanding.
+Everything below the 2026-08-17 deploy **shipped on 2026-08-18** and is
+confirmed serving from production. No SQL was outstanding and none is now.
 
-**The gate, run from a deleted `.next`:** `npx tsc --noEmit` clean ·
+**The gate it passed, run from a deleted `.next`:** `npx tsc --noEmit` clean ·
 `npm run lint` clean · **1016/1016 tests across 99 files** · `npm run build`
 **454/454 static pages** (the prerender-count invariant holds).
 
@@ -31,23 +31,37 @@ is half-finished and no SQL is outstanding.
 | (2) | Map **zoom buttons** + closer default; address stops splitting the landmark name |
 | (1) | **"Visit us today"** copy, the **Google map**, and the About showroom section |
 
-🔴 **One deploy hazard that will not announce itself.** The CSP `frame-src`
-gained `https://www.google.com https://maps.google.com` in **two** files:
-`next-app/next.config.ts` and **root `netlify.toml`**. The root file is what
-serves production. If it does not travel, every map renders as an empty rounded
-box with only a console error — the page still looks finished. Check after
-deploying:
+✅ **The CSP hazard cleared — checked on production, not assumed.** The risk was
+that `frame-src`'s new `https://www.google.com https://maps.google.com` lived in
+**two** files (`next-app/next.config.ts` and **root `netlify.toml`**, the latter
+being what actually serves production) and that a copy missing the root file
+would blank every map with only a console error. It travelled. The live header
+reads:
+
+```text
+frame-src https://*.tradingview.com https://*.tradingview-widget.com
+          https://*.paypal.com https://*.cloudflarestream.com
+          https://*.videodelivery.net https://www.google.com https://maps.google.com
+```
+
+Re-run any time with:
 
 ```bash
 curl -s -D - -o /dev/null https://naplesestatejewelry.com/ | grep -i "content-security-policy"
 ```
 
-👀 **Nothing in this batch has been seen by a human.** The Browser pane was
-hidden for the entire session, so every check was a DOM/network measurement.
-Three things specifically could not be exercised, each for a *measured* reason,
-not an assumed one:
+**Confirmed live on production the same day** — the homepage is 200 with the
+correct title, and the batch's own markers are all serving: `Call or Visit Us
+Today`, the `#visit-us` hero anchor, the `6240 Shirley` / `Sharon Lynch` address
+block, the copy-address control, and the review marquee. **Both maps render** —
+homepage and `/contact` each carry the lazy `maps.google.com/maps?q=26.222053,
+-81.781429&z=17&output=embed` frame, pinned to the verified GEO pair.
 
-- **The smooth scroll** on the new Visit Us button — a hidden pane freezes
+👀 **Three things still have not been LOOKED at by a human**, each for a
+*measured* reason recorded when they shipped, not an assumed one. All three are
+now exercisable on the live site and are worth ten seconds each:
+
+- **The smooth scroll** on the Visit Us button — a hidden Browser pane freezes
   `requestAnimationFrame` (no callback in 1500ms; a smooth scroll sat at scrollY
   0 for six seconds). The instant path was proven correct instead.
 - **The clipboard** on the copy buttons — a hidden pane leaves
@@ -66,8 +80,8 @@ genuinely ends "Hi baby". Both in `TASKS.md`.
 
 The long-pending batch (2026-08-09 through 2026-08-17) shipped.
 
-🔴 **The showroom opened and the site has been rewritten for it (2026-08-17,
-NOT deployed).** Address **6240 Shirley St, Ste 104, Naples, FL 34109**, inside
+🟢 **The showroom opened and the site has been rewritten for it (2026-08-17,
+DEPLOYED 2026-08-18).** Address **6240 Shirley St, Ste 104, Naples, FL 34109**, inside
 **Sharon Lynch Collections**, **Tue–Sat 11:00–15:00 or by appointment**. The
 site had asserted "mobile, appointment-only, no physical storefront" in 61
 strings across 15 files; all are rewritten in both locales to **store-first
@@ -84,13 +98,13 @@ item-location ZIP (anywhere in SWFL is fine), the Etsy shop location, and
 item still open is the **Google Business Profile**. Detail in `CHANGELOG.md` 2026-08-17 (8), `DECISIONS.md`
 *Business Model*, and `TASKS.md` *PHYSICAL LOCATION*.
 
-🟡 **Product attribute colors (2026-08-17, NOT deployed):** the product page's
+🟢 **Product attribute colors (2026-08-17, deployed 2026-08-18):** the product page's
 status/metal/karat/length row prints one color per fact (emerald / metal-true /
 sapphire / amethyst) instead of one gold blob. ✅ **Owner-approved 2026-08-17,
 including the amethyst — the palette is settled, do not re-open it.**
 `CHANGELOG.md` 2026-08-17 (7).
 
-🟡 **The site now invites people IN (2026-08-18, NOT deployed).** The showroom
+🟢 **The site now invites people IN (2026-08-18, deployed 2026-08-18).** The showroom
 rollout put the address on the site but never asked anyone to come. Fixed on
 three surfaces: the homepage CTA is **"Call or Visit Us Today"** with a
 walk-in sentence and a **small Google map**; the contact page's Visit Us panel
@@ -105,8 +119,8 @@ origins, and a CSP-blocked iframe blanks silently. `/privacy` gained a Google
 Maps bullet. Full gate passed (`tsc`/`lint` clean, **1016/1016**, **454/454
 pages**). ⚠️ Verified by DOM/network measurement only — the Browser pane was
 hidden, so **nobody has looked at the rendered tiles**. Detail in
-`CHANGELOG.md` 2026-08-18 (1) and `DECISIONS.md` *Business Model*.
-
+`CHANGELOG.md` 2026-08-18 (1) and `DECISIONS.md` *Business Model*.
+
 **Then refined the same day (2026-08-18 (2)):** the map got its own **`+`/`–`
 buttons** (top-right, z12–z20, default zoom **16 -> 17**) because a cross-origin
 iframe cannot be scripted — each press *reloads* the frame at a new `z`, kept
@@ -156,14 +170,14 @@ contact, 288px at a 320px viewport — because the old letterbox showed a corrid
 of Shirley St with no context north or south of the door. The **footer address
 gained the copy button** too, so all four address surfaces have it.
 
-🟡 **Four owner-requested changes have landed since, and are NOT deployed:**
+🟢 **Four owner-requested changes shipped in the same 2026-08-18 deploy:**
 the octopus mark now shows at every viewport width (it was hidden below 768px);
 the ES/EN chip moved out of the header into the mobile menu below `md` to pay
 for the space; the route progress bar is now immediate on every navigation,
 including shop filters and button-initiated navigations; and the photo swipe is
 one shared gesture that triggers on a slight sideways move. Full gate passed
-(`tsc`/`lint` clean, **1016/1016**, 454/454 pages). Staging is therefore stale;
-rebuild it before the next deploy. Detail in `CHANGELOG.md` 2026-08-17 (3)
+(`tsc`/`lint` clean, **1016/1016**, 454/454 pages). ✅ Staging was rebuilt after
+this batch and is an exact mirror — **854 files / 19.59 MB**, 0-copy dry run. Detail in `CHANGELOG.md` 2026-08-17 (3)
 through (6), and under *Storefront And Accounts* below.
 
 **Confirmed on production, not assumed** — fetched from
@@ -595,7 +609,7 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   `product-light-surface` and restores the light text tokens. Both variants
   audit clean for WCAG AA text contrast in both locales.
 - **The photo swipe is ONE gesture, shared by the product gallery and the shop
-  cards (`src/lib/photo-swipe.ts`, 2026-08-17, undeployed).** It was duplicated,
+  cards (`src/lib/photo-swipe.ts`, 2026-08-17, deployed 2026-08-18).** It was duplicated,
   and the gallery's copy was never given the 2026-08-09 fix — it still used
   React `pointermove`, which by spec cannot cancel a scroll, so that surface was
   structurally unable to swipe. Arbitration is now asymmetric: horizontal locks
@@ -707,7 +721,7 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   `min-width: 641px`, which left every phone with no feedback. Product cards are
   deliberately excluded (they are swipeable; `:active` would fire mid-swipe).
   A 2px gold **route progress bar** (`components/layout/RouteProgressBar.tsx`)
-  covers the wait after the tap. **Since 2026-08-17 (undeployed) it is
+  covers the wait after the tap. **Since 2026-08-17 (deployed 2026-08-18) it is
   IMMEDIATE and fires on every navigation** — the 120ms delay is gone. That
   delay is what made it look page- and viewport-dependent: a navigation faster
   than 120ms showed nothing, and prefetch coverage varies with how many links
@@ -726,16 +740,68 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   centred spinner was removed as a duplicate (its screen-reader live region
   stays). See DECISIONS, *"The route bar is immediate, and that is the whole
   point"* and *"Tap feedback is CSS-only…"*, including the `popstate` trap.
-- **In-app-browser stutter is fixed sitewide (2026-08-11, deployed 2026-08-17).**
-  Instagram/Facebook embedded browsers hide their toolbar on scroll, changing the
-  viewport height. All customer-facing viewport-height CSS now uses `svh` (stable
-  against that) instead of `vh`/`dvh` — the worst was `/shop`'s sticky filter
-  sidebar on `dvh` — and every `resize` listener goes through
-  `onLayoutAffectingResize` (`lib/viewport-resize.ts`), which ignores height-only
-  changes under 160px. See DECISIONS, *"Viewport height is `svh`, and `resize` is
-  never listened to bare"*. 📱 Worth confirming on a real phone inside the
-  Instagram browser — that is the one environment this cannot be reproduced in
-  locally.
+- 🔴 **In-app-browser viewport jump — PARTIALLY fixed, and the owner reports it
+  again (2026-08-18).** Instagram/Facebook embedded browsers hide their toolbar
+  on scroll, changing the viewport height; the page jumps. The 2026-08-11 batch
+  (deployed 2026-08-17) moved all customer-facing viewport-height CSS to `svh`
+  instead of `vh`/`dvh` — the worst was `/shop`'s sticky filter sidebar on
+  `dvh` — and routed every `resize` listener through `onLayoutAffectingResize`
+  (`lib/viewport-resize.ts`), which ignores height-only changes under 160px. See
+  DECISIONS, *"Viewport height is `svh`, and `resize` is never listened to
+  bare"*.
+
+  ⚠️ **That batch never was confirmed on a real phone inside the Instagram
+  browser** — this doc said so from the day it shipped, and it is still true.
+
+  **Nothing on the 2026-08-11 LIST reverted** — re-verified line by line
+  2026-08-18, and the production stylesheet contains no `dvh` rule at all.
+  ⚠️ **That is a narrower statement than it first looks**, and an early read of
+  this investigation overstated it: checking that batch's own table can only
+  clear that batch's own table. It says nothing about code added AFTER
+  2026-08-11, which is where the owner's "it worked, then it drifted" would
+  actually live. See the two drift candidates below.
+
+  ✅ **One real defect found and FIXED (2026-08-18, undeployed).** The sweep
+  matched CSS unit *literals*, so Tailwind's `min-h-screen` — which compiles to
+  `min-height: 100vh` and contains no literal — was invisible to it. Eight
+  usages, all customer-facing, including **`<body>` in `[locale]/layout.tsx`,
+  i.e. every page**. All eight are now `min-h-svh`. The tell that it was an
+  oversight: that batch converted `[locale]/not-found.tsx` `60vh` → `60svh`
+  while leaving `app/not-found.tsx` on `min-h-screen`.
+  A source-guard test (`lib/__tests__/viewport-units.test.ts`) now rejects the
+  aliases, because a convention enforced by grepping for a string the offender
+  does not contain is not enforceable. ⚠️ `.min-h-screen{min-height:100vh}`
+  still appears in the COMPILED CSS — Tailwind's scanner reads comments too, and
+  the comments explaining this rule name the class. Its presence there is not
+  evidence of use; check the served `<body class>`.
+
+  ⚠️ **This is not a measurement of the failure.** On a desktop
+  `100vh == innerHeight`, so the phantom scroll is zero and the loop cannot
+  occur locally — which is exactly why the 2026-08-11 fix shipped unverified.
+  A flag-gated diagnostic (`?vpdebug=1`,
+  `components/layout/ViewportDebugOverlay.tsx`) ships alongside so one phone
+  session settles it instead of a third round of inference.
+
+  🔴 **Two post-fix drift candidates, both touch-only, both invisible on a
+  desktop, both landed AFTER the svh fix:**
+  1. **The shared photo swipe** (2026-08-17) attaches a **non-passive
+     `touchmove` that calls `preventDefault()`** to product galleries and shop
+     cards — most of the scrollable surface on a phone. A non-passive touch
+     listener takes the compositor off the fast scroll path, because it must
+     wait on JS to learn whether the scroll is cancelled.
+  2. **The hero touch snap** (2026-08-09) reasserts `window.scrollTo` **every
+     frame for up to 1.6s** to beat momentum, and re-reads `pinStart`/`travel`
+     from live layout at touch-start and again at touch-end. A toolbar
+     transition mid-gesture is exactly the case where those two reads disagree,
+     and the result would be the page animating to a wrong absolute position —
+     a jump the visitor cannot fight. The overlay's `auto-scroll` counter is the
+     discriminator for this one.
+
+  🔴 **Ask the owner WHEN it last worked** — that single fact splits these
+  candidates. Note the svh fix only reached PRODUCTION on 2026-08-17, the same
+  day as the photo swipe, so an "it worked on the live site" memory has a
+  one-day window. Full analysis and plan in `TASKS.md` → *IN-APP-BROWSER
+  VIEWPORT JUMP*.
 - The fixed site header is fully opaque (`#f9f9f7`, no backdrop blur; the mobile
   menu panel likewise), and its height comes from one token,
   `--site-header-height` — 3.5rem on phones, 4.5rem from md up. The header is
@@ -743,7 +809,7 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   full-height panes derive from it and cannot drift. A source guard test rejects
   a reintroduced `pt-16` main, `top: 4rem`, or `calc(100svh - 4rem)`.
 - **The octopus mark shows at EVERY width, and the ES/EN chip is md-and-up only
-  (2026-08-17, undeployed).** The mark was `hidden md:block`, so phones and
+  (2026-08-17, deployed 2026-08-18).** The mark was `hidden md:block`, so phones and
   sub-768px tablets carried the wordmark alone; the language chip was a
   duplicate of a control the mobile menu already had, so it moved out of the
   header row below `md` to pay for the mark.
@@ -1017,12 +1083,20 @@ rather than assume. A rotated cron secret must change in three places: Netlify
 
 ## Immediate Priorities
 
-1. **Deploy the staged batch** (`C:\Users\rcman\NEJ-repo-staging`) and run the
-   focused production smoke list in `TASKS.md`. ⚠️ Do this **before** any bulk
-   eBay sync — see *Start Here*.
-2. Run the phone-only 📱 checks, above all the in-app-browser scroll test
-   (open a texted link inside Instagram and scroll `/` and `/shop`). It is the
-   one fix this environment could not exercise.
+1. 🔴 **The in-app-browser viewport jump is BACK — owner-reported 2026-08-18,
+   after the deploy.** Opening the site from an Instagram link and scrolling up
+   and down makes Instagram's bottom toolbar show/hide and the page jump. This
+   is the same symptom the 2026-08-11 `svh` batch was meant to close, and that
+   batch was **never verified in the real environment** — the note under
+   *Storefront And Accounts* has said so since it shipped. Investigated
+   2026-08-18: **nothing reverted**; the gap is that the sweep matched CSS unit
+   *literals* and could not see Tailwind's `*-screen` aliases, which compile to
+   `100vh`. See `TASKS.md` → *IN-APP-BROWSER VIEWPORT JUMP*.
+2. **Deploy the viewport-jump batch.** ✅ Staging is CURRENT — rebuilt after this
+   session, **854 files / 19.59 MB**, 0 Extras / 0 FAILED, follow-up dry run
+   0-copy. Then run the rest of the focused production smoke list in `TASKS.md`,
+   plus the three never-looked-at items (Visit Us smooth scroll, copy-address
+   clipboard, review-marquee loop).
 3. Complete accountant review before changing Florida surtax or other-state tax.
 4. Run the controlled PayPal recovery/refund/concurrency matrix.
 5. ✅ Marketplace price-push and shipping-tier work is **DONE** (2026-08-11).

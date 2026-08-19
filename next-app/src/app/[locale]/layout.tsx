@@ -10,6 +10,10 @@ import CookieNotice from '@/components/legal/CookieNotice';
 import CustomerReveal from '@/components/layout/CustomerReveal';
 import SocialBackgroundPublishProvider from '@/components/admin/SocialBackgroundPublishProvider';
 import RouteProgressBar from '@/components/layout/RouteProgressBar';
+// TEMPORARY (2026-08-18): diagnostic for the in-app-browser viewport jump.
+// Renders null unless the URL carries `?vpdebug=1`. Remove this import, its
+// mount below, and the component itself once the jump is understood and fixed.
+import ViewportDebugOverlay from '@/components/layout/ViewportDebugOverlay';
 import { jsonLdHtml } from '@/lib/json-ld';
 import { GEO, mapsUrl, openingHoursSchema, postalAddressSchema } from '@/lib/business-location';
 
@@ -126,7 +130,28 @@ export default async function LocaleLayout({ children, params }: Props) {
           dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }}
         />
       </head>
-      <body className="min-h-screen flex flex-col">
+      {/* `min-h-svh`, NOT `min-h-screen` (2026-08-18).
+          Tailwind's `min-h-screen` compiles to `min-height: 100vh`, and on
+          mobile `100vh` is the LARGE viewport — the height with the in-app
+          browser's toolbar retracted. That made every page whose content is
+          shorter than the screen about one toolbar-height taller than the
+          visible area, i.e. scrollable by exactly that much. That is enough
+          travel to trigger Instagram's hide-on-scroll, which grows the viewport,
+          which removes the need to scroll, which brings the toolbar back — the
+          loop the owner reported as the page "jumping".
+          `svh` is measured against fully-expanded chrome and does not move.
+
+          ⚠️ The 2026-08-11 svh sweep MISSED this because it searched for CSS
+          unit literals, and `min-h-screen` contains none. A source-guard test
+          (`lib/__tests__/viewport-units.test.ts`) now rejects the alias so it
+          cannot return unsearchably. See DECISIONS, *"Viewport height is `svh`,
+          and `resize` is never listened to bare"*.
+
+          ℹ️ Accepted trade (owner, 2026-08-18): on a page SHORTER than the
+          screen with the toolbar hidden, this leaves a thin strip of the page
+          background below the footer's `#f3f3f3`. ~50px of a near-identical
+          tone, on sign-in/sign-up/404 only. */}
+      <body className="min-h-svh flex flex-col">
         <NextIntlClientProvider locale={locale} messages={messages}>
           {/* CartProvider must wrap WishlistProvider: WishlistDrawer (rendered by
               WishlistProvider) has an Add to Cart button that calls useCart(), so it
@@ -146,6 +171,12 @@ export default async function LocaleLayout({ children, params }: Props) {
           <Suspense fallback={null}>
             <RouteProgressBar />
           </Suspense>
+          {/* TEMPORARY diagnostic — see the import note. Deliberately NOT inside
+              a Suspense boundary and deliberately NOT using `useSearchParams`:
+              it reads `window.location.search` in an effect instead, so it
+              cannot deopt the 454 prerendered pages the way the bar above
+              could. */}
+          <ViewportDebugOverlay />
           <CartProvider locale={locale}>
             <WishlistProvider locale={locale}>
               <SocialBackgroundPublishProvider>

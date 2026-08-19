@@ -1,6 +1,125 @@
 
 # Changelog
 
+## 2026-08-18 (11) — In-app-browser viewport jump: the `*-screen` blind spot
+
+Owner reports, after the deploy, that opening the site from an Instagram link
+and scrolling makes the bottom toolbar show/hide and the whole page jump — the
+symptom the 2026-08-11 `svh` batch was written to close — and that the fix had
+worked before and drifted.
+
+**Nothing on the 2026-08-11 list reverted.** Every item in that batch's own
+table is still in place: `.shop-filter-sidebar`, `.checkout-page`, the account
+panels, `error.tsx`, `[locale]/not-found.tsx`, `ContactForm`, the nine admin
+modals, the two deliberate `h-dvh` shells, `lib/viewport-resize.ts`, and all
+three listeners routed through `onLayoutAffectingResize`. Zero bare `resize`
+listeners in `src/`; the production stylesheet has no `dvh` rule at all.
+
+⚠️ **That is narrower than it first reads, and the first pass overstated it.**
+Checking a batch's own table clears that batch's own table and nothing else. It
+says nothing about code added after it — which is where a drift would live.
+
+### The blind spot: Tailwind's `*-screen` aliases
+
+That sweep matched CSS unit literals. `min-h-screen` compiles to
+`min-height: 100vh` and contains no literal, so no grep in that session could
+have found it. Eight usages survived, all customer-facing, including **`<body>`
+in `[locale]/layout.tsx`, which is every page on the site**.
+
+The tell that it was an oversight rather than a choice: the same batch converted
+`[locale]/not-found.tsx` from `60vh` to `60svh` while leaving `app/not-found.tsx`
+on `min-h-screen`. Two 404 pages, one fixed, one not, differing only in whether
+the unit happened to be spelled out.
+
+**Mechanism.** On mobile `100vh` is the LARGE viewport, so a page shorter than
+the screen gains about one toolbar-height of phantom scroll — enough travel to
+trigger hide-on-scroll, which grows the viewport, which removes the need to
+scroll, which brings the toolbar back.
+
+All eight are now `min-h-svh`, and a source-guard test
+(`lib/__tests__/viewport-units.test.ts`) rejects the aliases and confines `dvh`
+to the two `AdminShell` shells that were argued for, pinned by count. A
+convention enforceable only by grepping for a string the offender does not
+contain is not enforceable.
+
+⚠️ `.min-h-screen{min-height:100vh}` is still emitted into the compiled CSS
+and that is NOT a failure of the guard: Tailwind's scanner is a plain string
+scan that does not parse, so the class named in the comments explaining this
+rule is enough to generate it. Nothing applies it. Check the served
+`<body class>`, not the stylesheet — same shape as the documented "a broken
+absence check looks exactly like a clean result" trap.
+
+### Two post-fix drift candidates, neither proven
+
+Both touch-only, both invisible on a desktop, both landed after the `svh` fix:
+
+1. **The shared photo swipe** (2026-08-17) attaches a **non-passive `touchmove`
+   calling `preventDefault()`** to the product gallery and shop cards — most of
+   the scrollable surface on a phone. That takes the compositor off the fast
+   scroll path, since it must wait on JS to learn whether the scroll is
+   cancelled.
+2. **The hero touch snap** (2026-08-09) reasserts `window.scrollTo` every frame
+   for up to 1.6s to beat momentum, and re-reads `pinStart`/`travel` from live
+   layout at touch-start and again at touch-end. A toolbar transition mid-gesture
+   is exactly when those disagree. The scroll handler meanwhile uses a *cached*
+   `travel` that `onLayoutAffectingResize`'s 160px tolerance deliberately does
+   not refresh on toolbar movement — so the two can disagree by construction.
+
+### An instrument, because inference already failed once here
+
+`ViewportDebugOverlay`, behind `?vpdebug=1`, reports the live `vh`/`svh`/`dvh`
+probe heights, the `innerHeight` / `visualViewport` / `scrollHeight` ranges, and
+scrolling that happened with no finger on the glass — that last one being the
+discriminator for the hero snap. Two details it needed:
+
+- It discounts the first 600ms after `load`. Without that it reported the page's
+  own load growth as `doc height moves: YES 6238px` — answering its own headline
+  question wrongly on every page load.
+- It polls at 250ms as well as listening. Measured while building it: a
+  non-compositing webview suppresses `scroll` events AND `requestAnimationFrame`
+  entirely while still moving `scrollY` (a 1200px programmatic scroll produced 0
+  scroll events and 0 frames; only `setTimeout` ran). Without the poll it could
+  not have been verified before shipping.
+
+⚠️ **Still not a measurement of the failure.** On a desktop
+`100vh == innerHeight`, so the loop is structurally absent locally — exactly why
+the 2026-08-11 fix shipped unverified. The `*-screen` defect is real; that it is
+the whole cause is not established.
+
+Gate from a deleted `.next`: `tsc` clean, `lint` clean, **1020/1020 across 100
+files** (was 1016/99), build exit 0, **454/454 static pages** — the prerender
+invariant holding despite the root layout being touched. The guard was
+negative-controlled with a probe file, not merely observed passing.
+
+## 2026-08-18 (10) — The 2026-08-18 batch deployed
+
+Items (1)–(9) shipped. Gate before the deploy, from a deleted `.next`: `tsc`
+clean, `lint` clean, **1016/1016 tests across 99 files**, **454/454 static
+pages**. No SQL outstanding.
+
+**The CSP hazard cleared.** `frame-src`'s new
+`https://www.google.com https://maps.google.com` lived in **two** files —
+`next-app/next.config.ts` and root `netlify.toml`, the latter being what serves
+production — and a copy missing the root file would have blanked every map with
+nothing but a console error. It travelled. The live header carries both origins.
+
+**Confirmed serving**, fetched from production rather than assumed:
+
+| Check | Result |
+| --- | --- |
+| Homepage | 200, title `Naples Estate Jewelry - Sell Jewelry, Gold & Silver in Naples, FL` |
+| CSP `frame-src` | carries `https://www.google.com https://maps.google.com` |
+| Homepage map | lazy iframe, `maps.google.com/maps?q=26.222053,-81.781429&z=17&output=embed` |
+| `/contact` map | same frame, same pin |
+| Batch copy | `Call or Visit Us Today`, `#visit-us` anchor, `6240 Shirley` / `Sharon Lynch`, copy-address control, review marquee |
+
+👀 Still **not looked at by a human**: the Visit Us smooth scroll, the
+clipboard copy, and the marquee loop — each unexercised for a measured reason
+recorded when it shipped (a hidden Browser pane freezes `requestAnimationFrame`
+and leaves `document.hasFocus()` false). All three are now exercisable live.
+
+⚠️ Staging lags again as of this entry. Rebuild before the next batch.
+
 ## 2026-08-18 (9) — The map is square, and the footer address copies too
 
 Both owner requests.

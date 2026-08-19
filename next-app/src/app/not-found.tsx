@@ -24,7 +24,7 @@ export default function NotFound() {
     <html lang="en" className={`${caslon.variable} ${hanken.variable}`}>
       <body>
         <main
-          className="flex flex-col items-center justify-center text-center px-6 min-h-screen"
+          className="flex flex-col items-center justify-center text-center px-6 min-h-svh"
           style={{ background: 'var(--color-background)' }}
         >
       <Link

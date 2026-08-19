@@ -3,29 +3,224 @@
 > Actionable open work plus a short recent-completions summary. Full history is
 > in `CHANGELOG.md`. Last reconciled: **2026-08-18**.
 
+## 🔴 IN-APP-BROWSER VIEWPORT JUMP — reopened by the owner 2026-08-18
+
+**Symptom, owner-reported after the 2026-08-18 deploy.** Open the site from an
+Instagram link. Scrolling up and down makes Instagram's bottom toolbar show and
+hide, and the whole page jumps with it.
+
+This is the symptom the 2026-08-11 `svh` batch was written to close. Investigated
+2026-08-18, **read-only — no code changed**; the plan below is proposed and
+awaiting owner sign-off.
+
+### Nothing on the 2026-08-11 LIST reverted — but that list is not the whole story
+
+⚠️ An early read of this investigation concluded "nothing reverted" flatly. That overstated it. Checking a batch's own table can only clear that batch's own table; it says nothing about code added AFTER it, which is where the owner's "it worked, then it drifted" would actually live. The owner is right that something changed. See *Two post-fix drift candidates*.
+
+Every item the 2026-08-11 fix touched is still exactly as it shipped:
+
+| Item from `CHANGELOG.md` 2026-08-11 (later 5) | State 2026-08-18 |
+| --- | --- |
+| `.shop-filter-sidebar` → `calc(100svh - 7.5rem)` | intact (`shop-page-renderer.tsx`, with the explanatory comment) |
+| `.checkout-page` → `vh` then `svh` | intact (`CheckoutClient.tsx`) |
+| account panel/modal, account security → `82svh`, `min(96svh, calc(100svh - 1rem))` | intact |
+| `error.tsx` `70svh`, `[locale]/not-found.tsx` `60svh`, `ContactForm` `min(88svh, 48rem)` | intact |
+| Nine admin modals → `max-h-[calc(100svh-2rem)]` | intact |
+| Two deliberate `h-dvh` shells in `AdminShell` | intact, and still the only `dvh` in the app |
+| `lib/viewport-resize.ts` + its 10 tests | intact |
+| All three `resize` listeners routed through `onLayoutAffectingResize` | intact — **zero** bare `resize` listeners in `src/` |
+
+Measured against the running dev server: the shipped stylesheet contains **no
+`dvh` rule at all**, so the CSS half of the fix genuinely holds.
+
+⚠️ **Git history was not consulted** — this folder has no git workflow
+(`AGENTS.md`). The conclusion above comes from reading the current source
+against the changelog's own table, not from a diff.
+
+### The real gap: Tailwind's `*-screen` aliases were invisible to the sweep
+
+The 2026-08-11 sweep looked for CSS unit **literals** (`vh`, `dvh`). Tailwind's
+`min-h-screen` compiles to `min-height: 100vh` and contains no such literal, so
+no grep in that session could have found it. Confirmed from the served
+stylesheet, not inferred:
+
+```text
+.min-h-screen { min-height: 100vh; }
+```
+
+Eight usages remain, **all customer-facing**:
+
+| File | Line | Why it matters |
+| --- | --- | --- |
+| `src/app/[locale]/layout.tsx` | 129 | `<body className="min-h-screen flex flex-col">` — **every page on the site** |
+| `src/app/not-found.tsx` | 27 | root 404 |
+| `src/app/[locale]/account/page.tsx` | 161 | account |
+| `src/app/[locale]/account/security/page.tsx` | 53 | account |
+| `src/app/[locale]/account/sign-in/page.tsx` | 78 | short page |
+| `src/app/[locale]/account/sign-up/page.tsx` | 230, 257 | short page |
+| `src/app/[locale]/account/reset-password/page.tsx` | 334 | short page |
+
+**The tell that this is an oversight, not a decision:** that same batch converted
+`[locale]/not-found.tsx` from `60vh` to `60svh` while leaving `app/not-found.tsx`
+on `min-h-screen`. Two 404 pages, one fixed and one not, differing only in
+whether the unit was spelled out.
+
+### Why `min-height: 100vh` on `<body>` produces this exact symptom
+
+On mobile, `100vh` resolves to the **large** viewport — the height with the
+toolbar retracted. So on every page whose content is shorter than the screen,
+the body is roughly one toolbar-height **taller than the visible area**, which
+makes an otherwise unscrollable page scrollable by exactly that much. That is
+enough travel to trigger the toolbar's hide-on-scroll, which grows the viewport,
+which removes the need to scroll, which brings the toolbar back — a feedback
+loop whose visible form is a page that jumps while the toolbar flickers.
+
+It also adds phantom scroll at the bottom of every long page, which is where the
+browser's scroll clamp is most visible when the viewport height changes.
+
+### The honest limit of this investigation
+
+**This cannot be reproduced locally**, and that is precisely why the 2026-08-11
+fix shipped unverified and is being reopened now. On a desktop browser
+`100vh == innerHeight`, so the phantom scroll is exactly zero and the loop cannot
+occur. Everything above is code-and-spec reasoning plus measurements from the
+served stylesheet; **none of it is a measurement of the failure itself.**
+
+Two things follow, and Phase 1 exists because of them:
+- Do not treat the `*-screen` finding as *proven* to be the whole cause. It is a
+  real, unambiguous defect, and it is the best-supported candidate — not a
+  confirmed diagnosis.
+- Fixing it and shipping blind would repeat the mistake this task exists to
+  correct.
+
+### Two post-fix drift candidates
+
+Both are touch-only, both are invisible on a desktop, and both landed AFTER the
+`svh` fix. Neither is proven; both are cheap to discriminate with the overlay.
+
+1. **The shared photo swipe (2026-08-17, `lib/photo-swipe.ts`).** It attaches a
+   **non-passive `touchmove` that calls `preventDefault()`** to the product
+   gallery and the shop cards — most of the scrollable surface on a phone. A
+   non-passive touch listener takes the compositor off the fast scroll path,
+   because it has to wait on JavaScript to learn whether the scroll is being
+   cancelled. `DECISIONS.md` already warns that "photos are most of the
+   scrollable surface on both surfaces".
+2. **The hero touch snap (2026-08-09, `HomeHeroStack.tsx`).** `animateTo()`
+   reasserts `window.scrollTo` **every frame for up to 1.6s**, deliberately, to
+   beat platform momentum — a one-shot `scrollTo` would lose to it. And
+   `readMetrics()` re-reads `pinStart` and `travel` from live layout at
+   touch-start and again at touch-end. A toolbar transition mid-gesture is
+   precisely the case where those two reads disagree; the snap would then
+   animate the page to a wrong absolute position and hold it there against the
+   visitor's finger. It fires on every gesture inside the hero runway with
+   `|dy| >= 8px`, which on a phone is most of the homepage.
+
+   ℹ️ Note the scroll handler uses a **cached** `travel` (refreshed only through
+   `onLayoutAffectingResize`, whose 160px tolerance deliberately ignores toolbar
+   movement) while the snap recomputes it **live**. Those two can disagree by
+   construction.
+
+🔴 **Ask the owner when it last worked.** That single fact splits these:
+the `svh` fix only reached PRODUCTION on 2026-08-17 — the same day as the photo
+swipe — so an "it worked on the live site" memory has a one-day window, whereas
+"it worked when I tested it on my phone over the LAN" points much earlier.
+
+### ✅ Done 2026-08-18 (undeployed) — the fix, the guard, the instrument
+
+Owner approved *fix + instrument together* and *accept the strip*.
+
+| | |
+| --- | --- |
+| **All eight `*-screen` sites** → `min-h-svh`, including `<body>` | the shell one applies to every page |
+| **Source-guard test** `lib/__tests__/viewport-units.test.ts` | rejects `min-h-screen`/`h-screen`/`max-h-screen`, confines `dvh` to the two argued-for `AdminShell` shells, and pins that file to exactly 2 |
+| **`ViewportDebugOverlay`** behind `?vpdebug=1` | flag-gated diagnostic, removed once this is closed |
+
+**Gate, from a deleted `.next` with the dev server stopped:** `tsc` clean ·
+`lint` clean · **1020/1020 across 100 files** (was 1016/99) · build exit 0,
+**454/454 static pages** — the prerender invariant holds despite the root layout
+being touched. Served `<body class="min-h-svh flex flex-col">` confirmed in the
+prerendered HTML, and `.min-h-svh{min-height:100svh}` in the built CSS.
+
+**The guard was negative-controlled**, not just observed passing: a probe file
+carrying `min-h-screen` and `h-dvh` was added, both assertions failed on it, and
+the probe was removed. A guard that has never been seen to fail is not evidence.
+
+⚠️ Accepted cosmetic trade (owner): on a page SHORTER than the screen with the
+toolbar hidden, `min-h-svh` leaves a thin strip of page background below the
+footer's `#f3f3f3`. ~50px of a near-identical tone, on sign-in/sign-up/404 only.
+
+⚠️ `.min-h-screen{min-height:100vh}` is STILL in the compiled CSS and that is
+not a failure. Tailwind's scanner is a plain string scan and does not parse, so
+the class named in the comments explaining this rule is enough to emit it. The
+rule is applied by nothing. **Check the served `<body class>`, not the
+stylesheet** — this is the same shape as the documented "a broken absence check
+looks exactly like a clean result" trap.
+
+### How to read the overlay, on the phone that fails
+
+Open any page from an Instagram link with `?vpdebug=1` appended, scroll up and
+down until the toolbar has moved several times, then screenshot it.
+
+| Line | What it settles |
+| --- | --- |
+| `vh-svh gap` | the retractable chrome as CSS sees it — **this is the phantom scroll** `100vh` was adding. `0px` means the shell theory does not apply on this device |
+| `doc height moves` | `YES` = something is still sized to the dynamic viewport. `no` + a visible jump = the cause is not CSS units at all |
+| `auto-scroll Nx max Mpx` | scrolling with no finger on the glass. A large `max` is the **hero snap** mis-targeting — candidate 2 |
+| `toolbar travel` | how far `innerHeight` actually moved |
+| `offsetTop` | the browser sliding the visual viewport under a fixed page |
+
+ℹ️ It ignores the first 600ms after `load` on purpose. Without that it reported
+the page's own load growth as `doc height moves: YES 6238px` — an instrument
+answering its own headline question wrongly on every page load.
+
+ℹ️ It polls at 250ms as well as listening. Measured here: a non-compositing
+webview suppresses `scroll` events AND `requestAnimationFrame` entirely while
+still moving `scrollY` — a 1200px programmatic scroll produced **0 scroll events
+and 0 frames**, and only `setTimeout` ran. Without the poll the overlay could
+not have been verified before shipping, which is the whole failure mode this
+task exists to stop repeating.
+
+### Still open
+
+1. **Deploy, then read the overlay on the phone that fails.** Nothing here is
+   "done" on a desktop measurement.
+2. **Answer the drift question** with the owner's "when did it last work".
+3. **Then remove the overlay** — the component, its mount in
+   `[locale]/layout.tsx`, and its entry in the guard's `dvh` allowlist.
+
 ## 🔴 TOP OF THE LIST (2026-08-18)
 
-0. 🟢 **DEPLOY THIS BATCH (2026-08-18).** Staged and ready; figures under
-   *Copying to the repo folder*. Gate from a deleted `.next`: `tsc` clean,
-   `lint` clean, **1016/1016**, **454/454 pages**. **No SQL outstanding.**
-   Contents are listed in `CURRENT_STATUS.md` and detailed in `CHANGELOG.md`
-   2026-08-18 (1)–(9).
+0. ✅ **DEPLOYED 2026-08-18 — this batch is LIVE.** It passed the gate from a
+   deleted `.next` (`tsc` clean, `lint` clean, **1016/1016**, **454/454 pages**)
+   and shipped the same day. No SQL was outstanding. Contents are listed in
+   `CURRENT_STATUS.md` and detailed in `CHANGELOG.md` 2026-08-18 (1)–(9).
 
-   🔴 **The one hazard that fails silently: the CSP.** `frame-src` gained
-   `https://www.google.com https://maps.google.com` in **`next-app/next.config.ts`
-   AND root `netlify.toml`**. The root file serves production. If it does not
-   travel, every map is an empty rounded box and the page still looks finished.
-   Verify after the deploy:
+   ✅ **The CSP hazard cleared.** The risk was that `frame-src`'s new
+   `https://www.google.com https://maps.google.com` lived in
+   **`next-app/next.config.ts` AND root `netlify.toml`** — the root file is what
+   serves production — and that a copy missing the root file would blank every
+   map with nothing but a console error. It travelled; the live header carries
+   both origins. Re-check any time with:
 
    ```bash
    curl -s -D - -o /dev/null https://naplesestatejewelry.com/ | grep -i "content-security-policy"
    ```
 
-   👀 **Nothing in this batch has been looked at by a human** — the Browser pane
-   was hidden all session. The three unexercised items (smooth scroll, clipboard,
-   marquee loop) are listed with their measured reasons in the phone-check items
-   below. None of them blocks a deploy; all three are worth ten seconds each
-   once it is live.
+   ✅ **Confirmed serving**, fetched from production: homepage 200 with the
+   correct title; `Call or Visit Us Today`, the `#visit-us` hero anchor, the
+   `6240 Shirley` / `Sharon Lynch` address block, the copy-address control and
+   the review marquee all present; and **both maps render** — homepage and
+   `/contact` each carry the lazy
+   `maps.google.com/maps?q=26.222053,-81.781429&z=17&output=embed` frame.
+
+   👀 **Three things still have not been LOOKED at by a human** — the Browser
+   pane was hidden for the session that built them. The smooth scroll, the
+   clipboard copy and the marquee loop are listed with their measured reasons in
+   the phone-check items below. All three are now exercisable on the live site
+   and are worth ten seconds each.
+
+   ⚠️ **Rebuild staging before the next batch** — recording this deploy makes
+   it stale by definition. Command under *Copying to the repo folder*.
 
 1. ✅ **DEPLOYED 2026-08-17 — that batch is live.** The batch that had
    been queued since 2026-08-09 is live, owner-confirmed, and verified by
@@ -70,10 +265,10 @@
 
    ⚠️ Still a point-in-time snapshot — rebuild again after any further edit.
 
-   🟡 **Four changes have landed since and are NOT deployed** — see item 2.
-   Staging is stale as of 2026-08-17; rebuild it (command under *Copying to the
-   repo folder*) before the next deploy.
-2. 🟡 **UNDEPLOYED — the showroom map and the "visit us" copy (2026-08-18).**
+   ✅ **Those four changes shipped too**, in the 2026-08-18 deploy — see item 2.
+   ⚠️ Staging is stale again as of this doc update; rebuild it (command under
+   *Copying to the repo folder*) before the next batch.
+2. ✅ **DEPLOYED 2026-08-18 — the showroom map and the "visit us" copy.**
    Gate passed: `tsc` clean, `lint` clean, **1016/1016**, **454/454 pages**.
    Detail: CHANGELOG 2026-08-18 (1); DECISIONS, *"The showroom map is a keyless
    embed, pinned to GEO, and always lazy"* and *"The homepage invites a visit,
@@ -252,7 +447,7 @@
    contact page one click away does wayfinding properly. Say so if you want one
    there — it is a one-line change.
 
-3. 🟡 **UNDEPLOYED — four owner-requested changes.** Gate passed: `tsc` clean,
+3. ✅ **DEPLOYED 2026-08-18 — four owner-requested changes.** Gate passed: `tsc` clean,
    `lint` clean, **1016/1016**, **454/454 pages** from a deleted `.next`.
    Detail: CHANGELOG 2026-08-17 (3) through (6), and DECISIONS,
    *"The header brand row is full on a phone"*, *"The route bar is immediate,
@@ -455,7 +650,7 @@
      changes height at md — and that it does not appear to overlap or detach
      from the header while scrolling.
 
-8. ✅ **Showroom copy rollout DONE 2026-08-17, undeployed.**
+8. ✅ **Showroom copy rollout DONE 2026-08-17, deployed 2026-08-18.**
    Owner gave the address, hours and shared-space arrangement on 2026-08-17:
    **6240 Shirley St, Ste 104, Naples, FL 34109**, **Tue–Sat 11:00–15:00 or by
    appointment**, inside **Sharon Lynch Collections**. Decision recorded:
@@ -513,35 +708,39 @@ it neither pollutes the source of truth nor triggers a sync storm). Its contents
 are exactly what belongs in the repo — copy *everything* in it into the repo
 folder with no exclusions to think about.
 
-Rebuilt **2026-08-18** for the showroom-map / reviews / footer batch:
-**852 files / 19.55 MB**, 22 files copied, **0 FAILED / 0 Extras / 0 Mismatch**,
-and a follow-up dry run reported **0 to copy**. Hidden paths confirmed present
-(`.github/workflows/scheduled-jobs.yml`, `.gitignore`, `.claude/launch.json`,
-`next-app/.npmrc`, `next-app/.gitignore`). Leak check clean — 0 `.git`,
+Rebuilt **2026-08-18** again, for the viewport-jump batch (the showroom-map /
+reviews / footer batch it previously described is now DEPLOYED):
+**854 files / 19.59 MB**, 13 files copied, **0 FAILED / 0 Extras / 0 Mismatch**,
+and a follow-up dry run reported **0 to copy**. `/MIR` deleted nothing — the
+dry run showed 0 Extras before it ran. Leak check clean — 0 `.git`,
 0 `node_modules`, 0 `.next`, 0 `.env*`, 0 `.pem`, 0 `*.tsbuildinfo`,
-0 `next-env.d.ts`, 0 `*.log`, 0 `*.bak` — against a **positive control of 175
+0 `next-env.d.ts`, 0 `*.log`, 0 `*.bak` — against a **positive control of 176
 `.tsx`**, so the zeros are a real result rather than a broken scan.
+
+The 13 files are the 7 sources carrying the eight `*-screen` → `min-h-svh`
+conversions, the 2 new files (`ViewportDebugOverlay.tsx`,
+`viewport-units.test.ts`), and the 4 memory files.
 
 Content spot-checks run against the STAGED copy, not the source:
 
-- 🔴 **`frame-src ... maps.google.com` present in BOTH `netlify.toml` and
-  `next-app/next.config.ts`** — the one item in this batch that fails silently
-  if it does not travel.
-- All five new files present: `ShowroomMap.tsx`, `ShowroomAddress.tsx`,
-  `ShowroomHours.tsx`, `CopyAddressButton.tsx`, `lib/home-anchors.ts`.
-- `testimonials.ts` carries **12** reviews; `globals.css` carries
-  `testimonial-marquee-track` and the `margin-inline-end` seam rule;
-  `ShowroomMap.tsx` carries `aspectRatio: '1 / 1'`; `HomeHeroOverlay.tsx`
-  carries `VISIT_ANCHOR_ID`; `business-location.ts` defaults to `zoom = 17`.
-- Docs carry the batch: `CHANGELOG.md` has `2026-08-18 (9)`,
-  `CURRENT_STATUS.md` has the staged-and-ready banner, this file has the deploy
-  item.
+- 🔴 **`maps.google.com` present in BOTH `netlify.toml` and
+  `next-app/next.config.ts`** — the standing item that fails silently if it does
+  not travel. Still true after this sync.
+- Staged `[locale]/layout.tsx` carries **`<body className="min-h-svh flex
+  flex-col">`** and the `<ViewportDebugOverlay />` mount; both new files present.
+- **Zero CODE occurrences of `min-h-screen` / `h-screen` / `max-h-screen`** under
+  staged `next-app/src`. Six lines still mention it and all six are COMMENTS
+  explaining the ban — which is also why the compiled CSS still emits the dead
+  rule. Do not read either as a missed conversion.
+- Docs carry this session: `CHANGELOG.md` has `2026-08-18 (10)` and `(11)`,
+  `CURRENT_STATUS.md` says DEPLOYED, this file has the viewport-jump section,
+  `DECISIONS.md` carries the `*-screen` ban.
 
-Negative checks against the staged copy: the old `Intercambiar`/Trade hero label
-is **gone**, the old fixed map height `clamp(190px…)` is **gone**, and there are
-**0** `@naplesestatejewelry.co` addresses anywhere under `next-app/src`.
+⚠️ **Verifying a staged path containing `[locale]` needs `-LiteralPath`.**
+PowerShell reads `[...]` as a wildcard character class, so a plain `Test-Path`
+reports `next-app/src/app/[locale]/...` as MISSING when the file is there.
 
-ℹ️ **Robocopy reports 855 total against 852 on disk, and that is correct** — it
+ℹ️ **Robocopy reports 857 total against 854 on disk, and that is correct** — it
 counts `/XF`-excluded files in its total. The three are `.env.local`,
 `tsconfig.tsbuildinfo` and `next-env.d.ts`, all verified absent from staging.
 Do not chase this gap as a missing-file bug.
@@ -589,7 +788,7 @@ Then re-run without `/L`. **After the copy, confirm `.github/workflows/` landed*
 it is a hidden directory and some copy methods skip dotfiles. `.env.local` will
 be copied onto disk but stays gitignored and uncommitted, same as today.
 
-## ✅ PHYSICAL LOCATION — copy rollout DONE 2026-08-17 (undeployed)
+## ✅ PHYSICAL LOCATION — copy rollout DONE 2026-08-17 (deployed 2026-08-18)
 
 Owner confirmed **2026-08-17**: the showroom is **open**, in a shared space,
 and the site still tells every visitor the opposite on every page. The earlier
@@ -790,7 +989,7 @@ judgement and procedure, not code.
 4. ✅ **Staging rebuilt 2026-08-17** — see *Copying to the repo folder* for the
    verified figures. Docs were written BEFORE the sync, then a dry run confirmed
    0 copies outstanding.
-5. 🟡 **The four earlier undeployed changes still want a real thumb** — octopus
+5. 📱 **The four changes from 2026-08-17 still want a real thumb** — octopus
    mark at 28px, the route bar's deliberate flash, the photo-swipe cone, the
    ES/EN chip. See item 2 at the top of this file. They have now been sitting
    unverified across several sessions.

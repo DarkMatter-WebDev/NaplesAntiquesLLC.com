@@ -158,7 +158,7 @@ export default async function AccountPage({ params }: Props) {
   return (
     <>
       <SiteHeader />
-      <main className="account-page pt-24 md:pt-28 pb-0 min-h-screen">
+      <main className="account-page pt-24 md:pt-28 pb-0 min-h-svh">
         <section className="account-hero px-4 md:px-8">
           <div className="account-hero-inner ultrawide-page max-w-6xl mx-auto">
             <div className="account-hero-copy">
