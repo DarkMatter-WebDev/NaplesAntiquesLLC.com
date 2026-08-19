@@ -205,7 +205,12 @@ export default async function AccountPage({ params }: Props) {
           top: 0;
           right: 0;
           left: 0;
-          height: min(42rem, 82svh);
+          /* var(--app-vh), not svh. Fixed and decorative, so it adds no
+             document height - but it still RESIZED by 74.2px as the in-app
+             browser chrome moved, dragging the gradient edge across the page.
+             Being invisible to a document-height test is not the same as being
+             invisible to the reader. */
+          height: min(42rem, calc(var(--app-vh) * 0.82));
           pointer-events: none;
           z-index: 0;
           background:

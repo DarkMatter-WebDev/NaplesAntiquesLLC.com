@@ -20,8 +20,11 @@ export default async function NotFound() {
   return (
     <>
       <SiteHeader />
+      {/* The min-h reads --app-vh, not 60svh, which moved this 74.4px in an
+          in-app browser. See DECISIONS, "svh is NOT stable in an in-app
+          browser". */}
       <main
-        className="pt-28 md:pt-32 pb-20 flex flex-col items-center justify-center text-center px-6 min-h-[60svh]"
+        className="pt-28 md:pt-32 pb-20 flex flex-col items-center justify-center text-center px-6 min-h-[calc(var(--app-vh)*0.6)]"
         style={{ background: 'var(--color-background)' }}
       >
         <p

@@ -3,6 +3,22 @@
 > Actionable open work plus a short recent-completions summary. Full history is
 > in `CHANGELOG.md`. Last reconciled: **2026-08-18**.
 
+## ✅ ALL `svh` SURFACES CONVERTED — DONE 2026-08-19
+
+The five listed after the hero fix are converted, plus `.site-loading-screen` as
+a sixth. Detail and per-surface measurements in `CHANGELOG.md` 2026-08-19 (3).
+
+**Nothing is left to convert.** The rule is now enforced by
+`lib/__tests__/viewport-units.test.ts`, which rejects `svh` sizing or
+positioning anywhere under `src/app` + `src/components`, with two encoded
+exemptions: `max-height` on a transient overlay, and the `--app-vh` declaration
+itself. ⛔ Do not add a third exemption without reading DECISIONS first.
+
+⚠️ **`tsc` and `lint` pass on a broken styled-jsx template literal.** The
+compile check for a `<style jsx>` change is a **real build**. A stray backtick
+in a comment inside one of those literals ends the string and 500s every route;
+this bit twice on 2026-08-19.
+
 ## ✅ IN-APP-BROWSER VIEWPORT JUMP — FIXED AND OWNER-CONFIRMED 2026-08-18
 
 Deployed and confirmed by the owner from inside Instagram: **the jump is gone.**
@@ -214,12 +230,12 @@ everywhere `svh` behaves per spec.
    - ✅ **Google Business Profile hours FIXED.** Were `Mon–Sat 10:00 AM–5:00 PM`,
      matching neither the site nor the schema. Now **Sun + Mon closed, Tue–Sat
      11:00 AM–3:00 PM**, byte-identical to `HOURS` in `business-location.ts`.
-     ⚠️ **PENDING Google review** (up to 10 minutes) — confirm it went live.
+     ✅ **Applied and live** — re-checked in the profile editor after review.
    - ✅ **The profile Description no longer claims to be mobile-only.** It still
      read "We're private, mobile, and appointment-only…", the last place
      contradicting the store-first rewrite. Now leads on the showroom, the
      Sharon Lynch Collections landmark and Tue–Sat 11am–3pm, with home visits
-     framed as on request. ⚠️ **Also PENDING Google review.**
+     framed as on request. ✅ **Also applied and live.**
    - ✅ **Linda Cusumano's review is published**, without the stray "Hi baby"
      line. She had not edited it; the owner chose to trim rather than wait. That
      is a deliberate, recorded override of the verbatim rule — see DECISIONS and

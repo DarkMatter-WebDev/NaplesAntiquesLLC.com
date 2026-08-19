@@ -1,11 +1,121 @@
 
 # Changelog
 
+## 2026-08-19 (3) — The last six `svh` surfaces converted; the guard now enforces it
+
+Owner asked for the five surfaces listed after the hero fix. All five converted,
+plus a sixth found while making the guard airtight.
+
+Movement is against the 124px of in-app-browser chrome travel measured on the
+owner's phone:
+
+| Surface | Was | Moved |
+| --- | --- | --- |
+| `.checkout-page` `min-height` | `100svh` | **124.0px** — a page min-height on a live buying path |
+| `[locale]/error.tsx` | `minHeight: 70svh` | 86.8px |
+| `[locale]/not-found.tsx` | `min-h-[60svh]` | 74.4px |
+| `account/page.tsx` fixed wash | `min(42rem, 82svh)` | 74.2px |
+| `account/security/page.tsx` fixed wash | `min(42rem, 82svh)` | 74.2px |
+| **`.site-loading-screen`** (the sixth) | `100svh` | 124.0px |
+
+The two account rules are `position: fixed` decorative gradients, so they add no
+document height — and still resized by 74.2px, dragging the gradient edge across
+the page as the chrome moved. **Being invisible to a document-height test is not
+the same as being invisible to the reader**, which is the whole point of the
+widened rule.
+
+`.site-loading-screen` was not on the owner's list. It is block-level, so while
+it is showing it IS the document height. Converting it was one line and it let
+the new guard be written with no special-case exemption for it.
+
+### The guard now enforces the rule, not one corner of it
+
+New assertion: **no `svh` sizing or positioning on any customer surface**, across
+all of `src/app` + `src/components`. Two deliberate exemptions, both encoded:
+`max-height` on a transient overlay (modal, drawer, sticky summary, sticky
+filter sidebar — those SHOULD fit what is visible now), and the `--app-vh`
+declaration itself, whose value must stay `100svh` as the no-JS fallback. Admin
+is out of scope. Negative-controlled with a probe. `npm test` **1023 → 1024**.
+
+### ⚠️ Verification note worth keeping
+
+`tsc` and `lint` both pass on a broken styled-jsx template literal — proven
+earlier the same day. So the compile check for anything touching a `<style jsx>`
+block is **a real build**, not the type-checker. Every touched route was
+exercised (`/`, `/checkout`, `/account`, `/account/security`, a 404) and then
+confirmed by a clean production build of all 454 pages.
+
+ℹ️ While doing that, the dev server threw the documented Turbopack
+`Unexpected end of JSON input` cache error — caused by running `npm run build`
+and then `npm run dev`, which share `.next`. Known, harmless, fixed by wiping
+`.next`. Do not chase it as a code fault.
+
+Gate from a deleted `.next`: `tsc` clean, `lint` clean, **1024/1024 across 100
+files**, build exit 0, **454/454 static pages**.
+
+## 2026-08-19 (2) — The hero TEXT was still on `svh`; the first fix was incomplete
+
+Owner: after the viewport jump was fixed, the homepage hero text alone still
+moved a little when scrolling in the Instagram browser — "independent of the
+rest of the page".
+
+Correct, and it was the same root cause with the previous fix stopping short.
+2026-08-19 (1) converted the hero's RUNWAY and FRAME to `var(--app-vh)` but left
+everything positioned INSIDE that frame on `svh`. With the frame now rock
+stable, an `svh` offset moves the text against a background that does not —
+which reads as more obviously broken than the whole page shifting did.
+
+Measured against the 124px of chrome travel recorded on the owner's phone
+(`innerHeight` 729 ↔ 853):
+
+| Rule | Was | Moves |
+| --- | --- | --- |
+| `.home-hero-top` `top` (phone) | `clamp(3rem, 11svh, 6rem)` | **13.6px** — the reported symptom |
+| `.home-hero-bottom` `bottom` (phone) | `clamp(1rem, 3svh, 2rem)` | 3.7px |
+| `.home-hero-bottom` `bottom` (≥641px) | `clamp(5rem, 15svh, 10rem)` | 18.6px |
+| carousel ring `translateY` | `-12svh` | 14.9px |
+| **`.responsive-hero` `min-height`** | `clamp(24rem, 58svh, 42rem)` | **71.9px** |
+
+`.responsive-hero` was not part of the report and is the worst instance in the
+codebase: it is a **min-height**, so on every interior page using
+`ResponsiveLayout` it moved the document itself, not just its own contents.
+Converted with the rest.
+
+**Verified by measurement** at 390px wide across the exact 729 ↔ 853 swing: the
+`<h1>` moved **0px**, both hero offsets held at `93.83px` / `25.59px`, and
+document height held at 7868. Under `svh` the headline would have moved 13.6px.
+
+### The guard was too narrow, and that is why this shipped
+
+The 2026-08-19 (1) assertion covered **only `HomeHeroStack.tsx`** — one file of a
+five-file feature — so it reported success while `HomeHeroOverlay` and
+`HomeHero` were still broken. It now scans **all of `src/components/home/`**,
+plus a dedicated assertion pinning `.responsive-hero`. Negative-controlled with
+a probe file. `npm test` **1021 → 1023**.
+
+### ⚠️ Walked into a documented trap while writing the fix
+
+The first attempt put backticks in an explanatory comment **inside a styled-jsx
+template literal**, which ended the string and produced a bogus
+`Expected '</', got 'var'` JSX parse error and a 500 on every route.
+`CURRENT_STATUS` already warned about exactly this for `HEADER_STYLES`. The
+comment now says so inline. **`tsc` and `lint` both passed with the file
+broken** — only running the dev server caught it, which is worth remembering:
+a template-literal break is a *runtime* compile error here, not a type error.
+
+Gate from a deleted `.next`: `tsc` clean, `lint` clean, **1023/1023 across 100
+files**, build exit 0, **454/454 static pages**.
+
 ## 2026-08-19 — Google Business Profile corrected; Linda's review published
 
 Two long-open owner-side items closed, both done in Chrome against the live
-profile. **Both Google edits are PENDING review** (Google states up to 10
-minutes); neither is live until it clears.
+profile. **Both Google edits went through review and are APPLIED** — re-opened
+in the owner's own profile editor afterwards and confirmed live, not pending.
+
+ℹ️ Google's surfaces disagreed with each other briefly while it propagated: the
+search summary line already read "Opens 11 AM" while the expanded hours panel
+still listed the old `10AM–5PM`. The profile editor is the authoritative view;
+do not chase that gap.
 
 ### Hours — the NAP mismatch is fixed
 

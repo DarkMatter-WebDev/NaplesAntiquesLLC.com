@@ -275,7 +275,9 @@ export default function HomeHero({
             /* Lifted higher (translateY -6svh -> -12svh) and trimmed a touch
                (scale 1.14 -> 1.06) so the ring clears the "Get first look"
                sign-up block on short viewports instead of sitting behind it. */
-            transform: translateY(-12svh) scale(1.06);
+            /* var(--app-vh), not svh: an svh lift drifts the ring 14.9px
+               while the frame holds still. */
+            transform: translateY(calc(var(--app-vh) * -0.12)) scale(1.06);
             transform-origin: center 50%;
           }
         }

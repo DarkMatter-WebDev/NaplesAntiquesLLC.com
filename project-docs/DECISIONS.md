@@ -3195,8 +3195,23 @@ is the amplifier: its runway is `(100svh - header) + 240svh`, i.e. **3.4 × the
 unit**, so 124px of chrome became 3.4 × 124 = **421.6px** against 423px measured.
 The arithmetic closes to under 2px.
 
-**The rule.** Anything sized to the viewport that contributes to document height
-reads **`var(--app-vh)`**, never a viewport unit:
+**The rule.** Anything customer-facing that is **positioned or sized to the
+viewport** reads **`var(--app-vh)`**, never a viewport unit.
+
+⚠️ **This originally said "contributes to document height", and that was too
+narrow — it let a second bug ship on 2026-08-19.** The hero's runway and frame
+were converted; the overlay's `top`/`bottom` offsets INSIDE that frame were not,
+because they change nothing about document height. But with the frame stable an
+`svh` offset moves the **text alone against a background that does not**, which
+the owner reported as more obviously wrong than the whole page shifting. In an
+in-app browser every `svh` is dynamic; the only question is whether the movement
+is visible, and inside a pinned frame it is *more* visible, not less.
+
+**The one deliberate exception is a max-height on a transient overlay** — a
+modal, a drawer, the boot splash. Those SHOULD track the currently-visible area,
+so a dynamic unit is correct there and they stay on `svh`.
+
+The mechanics:
 
 - `globals.css` defines `--app-vh: 100svh` as the no-JS fallback — correct
   everywhere `svh` behaves per spec.
@@ -3215,8 +3230,10 @@ a rotation updates the token and the runway follows.
 
 ⚠️ Do not "simplify" a `var(--app-vh)` back to `100svh`. It looks like a
 pointless indirection and is the whole fix.
-⚠️ Max-heights on modals and panels were deliberately left on `svh`. They do
-not contribute to document height, so they cannot cause this.
+⚠️ Max-heights on modals, drawers and the boot splash stay on `svh` by design —
+they are transient overlays that should fit whatever is visible right now.
+⚠️ **Do not extend that exemption to page content.** "It does not change
+document height" is NOT sufficient grounds; see the widened rule above.
 ⚠️ Tailwind's `*-screen` aliases are separately banned — see rule 3 below.
 That was a real defect and it was NOT the cause of this; fixing it changed
 nothing on the failing device, because `vh` and `svh` are the same moving number

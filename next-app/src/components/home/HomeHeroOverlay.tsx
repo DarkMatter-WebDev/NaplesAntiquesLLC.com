@@ -324,11 +324,22 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
           padding: 0 1rem;
         }
 
-        /* Sign-up + actions — centered in the open space BELOW the pieces. */
+        /* Sign-up + actions — centered in the open space BELOW the pieces.
+
+           WARNING: var(--app-vh), never svh. These offsets position content
+           INSIDE the pinned frame, and that frame is now stable — so an svh
+           offset here moves the TEXT ALONE against a background that does not,
+           which reads as more obviously broken than the whole page shifting.
+           Owner reported exactly that on 2026-08-19. See DECISIONS,
+           "svh is NOT stable in an in-app browser".
+
+           NOTE: no backticks anywhere in this comment. It lives inside a
+           styled-jsx template literal, so a backtick would END the string and
+           surface as a bogus JSX parse error. */
         .home-hero-bottom {
           position: absolute;
           left: 50%;
-          bottom: clamp(5rem, 15svh, 10rem);
+          bottom: clamp(5rem, calc(var(--app-vh) * 0.15), 10rem);
           width: min(92vw, 52rem);
           transform: translateX(-50%);
           z-index: 5;
@@ -376,7 +387,8 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
         @media (max-width: 640px) {
           /* Headline near the top (nudged down a touch). */
           .home-hero-top {
-            top: clamp(3rem, 11svh, 6rem);
+            /* var(--app-vh), not svh — moved the headline 13.6px on its own. */
+            top: clamp(3rem, calc(var(--app-vh) * 0.11), 6rem);
             height: auto;
             justify-content: flex-start;
           }
@@ -395,7 +407,7 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
              browser-chrome changes. */
           .home-hero-bottom {
             top: auto;
-            bottom: clamp(1rem, 3svh, 2rem);
+            bottom: clamp(1rem, calc(var(--app-vh) * 0.03), 2rem);
             gap: 0.85rem;
           }
 

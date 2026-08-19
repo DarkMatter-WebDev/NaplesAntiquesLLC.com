@@ -21,7 +21,8 @@ export default function Error({
   return (
     <main
       style={{
-        minHeight: '70svh',
+        // var(--app-vh), not svh: 70svh moved this 86.8px in an in-app browser.
+        minHeight: 'calc(var(--app-vh) * 0.7)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',

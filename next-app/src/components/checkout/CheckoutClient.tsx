@@ -1038,10 +1038,15 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
 
       <style jsx>{`
         .checkout-page {
-          /* svh so an in-app browser's toolbar hiding on scroll does not resize
-             the page box mid-scroll; vh stays as the fallback. */
+          /* var(--app-vh), NOT svh. svh does not do what it promises in an
+             in-app browser: all three viewport units collapse to one number
+             there and that number tracks the chrome. This is a page
+             min-height, so on the measured 124px of travel it moved the
+             document by 124px under a buyer mid-checkout. vh stays as the
+             legacy fallback. (No backticks in this comment - it is inside a
+             styled-jsx template literal.) */
           min-height: 100vh;
-          min-height: 100svh;
+          min-height: var(--app-vh);
           padding: 3rem 0 4rem;
           background:
             linear-gradient(180deg, rgba(255, 253, 248, 0.94) 0%, rgba(249, 247, 239, 0.98) 46%, #f9f7ef 100%),

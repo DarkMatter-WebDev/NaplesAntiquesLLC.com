@@ -543,7 +543,11 @@ table {
 
 .responsive-hero {
   width: 100%;
-  min-height: clamp(24rem, 58svh, 42rem);
+  /* var(--app-vh), not svh. This was the WORST instance in the codebase: at the
+     measured 124px of in-app-browser chrome travel it resized by 71.9px, and
+     unlike the homepage overlay it is a min-height, so it moved the document
+     under the reader on every interior page that uses ResponsiveLayout. */
+  min-height: clamp(24rem, calc(var(--app-vh) * 0.58), 42rem);
   padding-block: clamp(4.5rem, 9vw, 8rem);
 }
 
@@ -2201,8 +2205,12 @@ body:has([data-site-header]) .route-progress {
 }
 
 .site-loading-screen {
+  /* var(--app-vh), not svh. Block-level, so while it is showing it IS the
+     document height — an in-app browser would resize it by the full 124px of
+     chrome travel and slide the centred spinner with it. vh stays as the
+     legacy fallback. */
   min-height: 100vh;
-  min-height: 100svh;
+  min-height: var(--app-vh);
   display: grid;
   place-items: center;
   padding: 2rem clamp(1rem, 4vw, 1.25rem);

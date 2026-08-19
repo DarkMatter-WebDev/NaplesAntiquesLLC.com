@@ -36,6 +36,7 @@ import { describe, expect, it } from 'vitest';
 // `<body class>` instead, which is what the second assertion below pins.
 
 const SOURCE_ROOTS = [join(process.cwd(), 'src', 'app'), join(process.cwd(), 'src', 'components')];
+const GLOBALS = join(process.cwd(), 'src', 'app', 'globals.css');
 
 /**
  * `dvh` is legitimate in exactly one shape: a NON-SCROLLING full-viewport shell.
@@ -120,7 +121,37 @@ describe('viewport height units', () => {
     expect(layout).toContain('<body className="min-h-[var(--app-vh)] flex flex-col">');
   });
 
-  it('leaves no viewport-unit sizing in the hero, which amplifies it 3.4x', () => {
+  it('leaves no viewport-unit sizing anywhere in the homepage hero', () => {
+    // ⚠️ This assertion originally covered ONLY `HomeHeroStack.tsx`, and that
+    // narrowness is precisely why a second bug shipped: the runway and frame
+    // were converted while `HomeHeroOverlay`'s `top`/`bottom` offsets and
+    // `HomeHero`'s carousel lift stayed on `svh`. With the frame now stable,
+    // those moved the TEXT alone against a background that did not — 13.6px on
+    // the headline at the measured 124px of chrome travel, reported by the
+    // owner on 2026-08-19. A guard scoped to one file of a five-file feature is
+    // a guard that reports success while the feature is broken.
+    const heroDir = join(process.cwd(), 'src', 'components', 'home');
+    const offenders = sourceFiles(heroDir).flatMap((file) =>
+      codeLines(file)
+        .map((line, index) => ({
+          file: relative(process.cwd(), file).replace(/\\/g, '/'),
+          line: line.trim(),
+          lineNumber: index + 1,
+        }))
+        .filter(({ line }) => /\d+svh/.test(line)),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it('keeps .responsive-hero on the token — it was the worst instance found', () => {
+    // At 124px of chrome travel this min-height moved 71.9px, and being a
+    // min-height it shifted the DOCUMENT on every interior page using
+    // ResponsiveLayout, not just its own contents.
+    const css = readFileSync(GLOBALS, 'utf8');
+    expect(css).toContain('min-height: clamp(24rem, calc(var(--app-vh) * 0.58), 42rem)');
+  });
+
+  it('leaves no viewport-unit sizing in the hero runway, which amplifies it 3.4x', () => {
     // The homepage runway is `(100svh - header) + 240svh` = 3.4 x the unit, so
     // a 124px chrome swing became 423px of DOCUMENT HEIGHT — measured on the
     // live site, and the arithmetic closes at 3.4 x 124 = 421.6. A page whose
@@ -133,6 +164,44 @@ describe('viewport height units', () => {
       .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
       .filter(({ line }) => /\d+svh/.test(line));
     expect(hero).toEqual([]);
+  });
+
+  it('leaves no svh sizing or positioning on any customer surface', () => {
+    // The widened rule (DECISIONS, 2026-08-19): anything customer-facing that
+    // is POSITIONED OR SIZED to the viewport reads `var(--app-vh)`.
+    //
+    // The rule said "contributes to document height" for one day, and that
+    // wording is what let the hero-text bug ship — the overlay offsets change
+    // no document height at all and still moved the text against a stable
+    // background. In an in-app browser every `svh` is dynamic; the only
+    // question is whether the movement is visible.
+    //
+    // TWO exemptions, both deliberate:
+    //  - **max-height on a transient overlay** (modal, drawer, sticky summary,
+    //    sticky filter sidebar). Those SHOULD fit whatever is visible right
+    //    now, so a dynamic unit is correct there.
+    //  - **the `--app-vh` declaration itself**, whose value is the no-JS
+    //    fallback and must stay `100svh`.
+    // Admin is out of scope — it is not a customer surface and its shells are
+    // covered by the `dvh` assertions below.
+    const TRANSIENT_MAX_HEIGHT = /max-h|max-height|maxHeight/;
+    const TOKEN_DECLARATION = /--app-vh\s*:/;
+
+    const offenders = SOURCE_ROOTS.flatMap(sourceFiles)
+      .filter((file) => !/[\\/]admin[\\/]/.test(file))
+      .flatMap((file) =>
+        codeLines(file)
+          .map((line, index) => ({
+            file: relative(process.cwd(), file).replace(/\\/g, '/'),
+            line: line.trim(),
+            lineNumber: index + 1,
+          }))
+          .filter(
+            ({ line }) =>
+              /\d+svh/.test(line) && !TRANSIENT_MAX_HEIGHT.test(line) && !TOKEN_DECLARATION.test(line),
+          ),
+      );
+    expect(offenders).toEqual([]);
   });
 
   it('confines dvh to the non-scrolling shells that legitimately need it', () => {

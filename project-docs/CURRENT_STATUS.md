@@ -2,11 +2,96 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-08-18**.
+> in `DECISIONS.md`. Last reconciled: **2026-08-19**.
 
-## Start Here (handoff, end of the 2026-08-18 session)
+## Start Here (handoff, end of the 2026-08-19 session)
 
 **Read this, then `TASKS.md`.**
+
+### ✅ EVERYTHING IS DEPLOYED AND VERIFIED. NOTHING IS HALF-DONE.
+
+There is **no staged batch waiting**, no outstanding SQL, and no undeployed code.
+Staging mirrors the source exactly. The site, the Google profile and the docs all
+agree with each other for the first time since the showroom opened.
+
+**What closed on 2026-08-19:**
+
+| | |
+| --- | --- |
+| 🔴 **The in-app-browser viewport jump** | root cause found, fixed, owner-confirmed gone, diagnostic removed |
+| **Google Business Profile hours** | `Mon–Sat 10–5` → **Sun+Mon closed, Tue–Sat 11:00 AM–3:00 PM**. Applied and live |
+| **Google profile Description** | stopped claiming "private, mobile, and appointment-only"; now leads on the showroom. Applied and live |
+| **Linda Cusumano's review** | published, minus its stray "Hi baby" line, by explicit owner decision. `TESTIMONIALS` 12 → 13 |
+| **Hero text still drifting** | the first viewport fix stopped at the hero's frame; the offsets INSIDE it were still `svh`. Fixed, plus `.responsive-hero` (71.9px). Guard widened to the whole hero |
+| **Every remaining `svh` surface** | checkout shell (124px), `error`, `not-found`, both account washes, `.site-loading-screen`. **Nothing is left on `svh`** except transient-overlay max-heights and the token's own fallback, both guard-encoded |
+
+**Verified on production, not assumed:** homepage 200, `<body class="min-h-[var(--app-vh)] flex flex-col">`,
+`Linda Cusumano` present, **zero** `Hi baby`, and zero `vpdebug` across all 15 JS
+bundles against a positive control of 8 `--app-vh` hits. The Google hours and
+description were re-opened in the owner's own profile editor and are **applied,
+not pending**.
+
+**Gate at session end, from a deleted `.next`:** `tsc` clean · `lint` clean ·
+**1024/1024 across 100 files** · build **454/454 static pages**.
+
+### 🔴 The one thing that matters most for the next session
+
+**`svh` is not stable in an in-app browser, and that is now a governing rule.**
+Measured on the live site inside Instagram: `vh`, `svh` and `dvh` all resolve to
+the SAME value there and all three track the chrome (`innerHeight` 729 ↔ 853).
+Instagram resizes the WKWebView natively, so WebKit sees a plain window resize
+with no small-vs-large viewport to distinguish.
+
+Anything customer-facing that is **positioned or sized to the viewport** must
+read **`var(--app-vh)`**, never a viewport unit. ⚠️ It looks like a pointless
+indirection around `100svh`, and "simplifying" it back is exactly how this
+regresses. `lib/__tests__/viewport-units.test.ts` guards it. Full rationale:
+DECISIONS, *"`svh` is NOT stable in an in-app browser"*.
+
+⚠️ **`tsc` and `lint` both PASS on a broken styled-jsx template literal.** A
+stray backtick in a comment inside a `<style jsx>` literal ends the string and
+500s every route; the type-checker does not see it. The compile check for those
+files is a **real build**. This bit twice on 2026-08-19.
+
+⚠️ **That rule said "contributes to document height" for one day and it was too
+narrow** — a second bug shipped because the hero's frame was converted but the
+text positioned inside it was not, so the text moved alone against a stable
+background (owner-reported 2026-08-19, fixed same day). Transient overlay
+max-heights — modals, drawers, the boot splash — are the one deliberate
+exception and stay on `svh`, because they *should* fit what is visible now.
+
+### ◻ What is actually open
+
+Nothing is blocking. In rough priority:
+
+1. 🔴 **Google address verification** — owner going **2026-08-20**. The hours
+   and description are already correct, so the profile is in good shape for it.
+2. **Re-measure first paint on production** (snippet in `TASKS.md`). Baseline to
+   beat: 533KB across 30 requests before FCP. Never done.
+3. **Confirm the first real refund records itself** — the fix is proven locally
+   against real PayPal refunds but its automatic path has never run in
+   production.
+4. **Four Google reviews are still not on the site** (13 of 16), one of them
+   Spanish. Paste any in and every surface picks them up.
+5. **Search Console**: resubmit the sitemap and Request Indexing on the four
+   pages whose titles changed. A nudge, not a repair.
+6. 📱 **Phone-only checks** that have never been done on real hardware — listed
+   in `TASKS.md`. The in-app-browser one is now moot; the rest are not.
+
+### ⚠️ Three traps this session hit, worth not re-learning
+
+- **A guard test that scans source must strip comments AND normalise newlines.**
+  This repo mixes CRLF and LF; in JavaScript `` is a line terminator, so
+  `/(^|[^:])\/\/.*$/` silently fails to match on CRLF files and every `//`
+  comment survives. A guard then reports its own rationale as a violation.
+- **Tailwind's scanner reads comments.** `.min-h-screen{min-height:100vh}` is
+  still emitted into the built CSS because the comments explaining the ban name
+  the class. Its presence there is NOT evidence of use — check the served
+  `<body class>`.
+- **A hidden Browser pane freezes `requestAnimationFrame` AND suppresses
+  `scroll` events** while still moving `scrollY` — measured: a 1200px
+  programmatic scroll produced 0 scroll events and 0 frames, only `setTimeout`
+  ran. Anything verified through that pane must not depend on either.
 
 ### ✅ DEPLOYED 2026-08-18 — THREE times, and the last one is what is live
 
@@ -88,8 +173,8 @@ now exercisable on the live site and are worth ten seconds each:
 Business Profile hours were corrected to **Tue–Sat 11:00 AM–3:00 PM, Sun + Mon
 closed**, byte-identical to `HOURS`; its Description was also rewritten, since it
 still claimed "private, mobile, and appointment-only" — the last place
-contradicting the store-first rewrite. ⚠️ **Both Google edits are PENDING
-review** and are not live until they clear. Linda Cusumano's review is published
+contradicting the store-first rewrite. ✅ **Both Google edits cleared review and
+are APPLIED**, re-checked in the owner's profile editor. Linda Cusumano's review is published
 **without** its stray "Hi baby" line — an explicit, recorded owner override of
 the verbatim rule (⛔ one exception, not a policy; see DECISIONS).
 🔴 **Google address verification is next** — owner going 2026-08-20.
