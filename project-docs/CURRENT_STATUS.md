@@ -8,10 +8,23 @@
 
 **Read this, then `TASKS.md`.**
 
-### ✅ DEPLOYED 2026-08-18 — the batch is LIVE
+### ✅ DEPLOYED 2026-08-18 — THREE times, and the last one is what is live
 
-Everything below the 2026-08-17 deploy **shipped on 2026-08-18** and is
-confirmed serving from production. No SQL was outstanding and none is now.
+The 2026-08-18 session shipped in three deploys, all confirmed on production and
+all owner-confirmed. Read them in order or the middle one reads as a failure:
+
+1. **The showroom-map / reviews / footer batch** — items (1)–(9) below.
+2. **The `*-screen` → `svh` fix plus a temporary diagnostic overlay.** A real
+   defect, and it did **not** fix the reported jump. That is not a wasted deploy:
+   the overlay it carried is what produced the measurement that found the actual
+   cause.
+3. **The real fix, then its cleanup.** `svh` turned out not to be stable in an
+   in-app browser at all; `--app-vh` replaced it, the owner confirmed **the jump
+   is gone**, and the diagnostic was removed. Verified on production: 0
+   occurrences of `vpdebug` / `nej-vpdebug` / `TURN OFF` across all 15 JS
+   bundles, against a positive control of 8 `--app-vh` hits.
+
+No SQL was outstanding at any point and none is now.
 
 **The gate it passed, run from a deleted `.next`:** `npx tsc --noEmit` clean ·
 `npm run lint` clean · **1016/1016 tests across 99 files** · `npm run build`
@@ -71,10 +84,15 @@ now exercisable on the live site and are worth ten seconds each:
 - **The scrolling review band** — measured moving at ~49px/s with an exact seam,
   but nobody has watched it loop.
 
-🔴 **Two owner actions are open, both outside the code** — the Google Business
-Profile still shows `Closed · Opens 10 AM` (matching neither the site nor the
-schema), and Linda Cusumano's review is held out of the site because its text
-genuinely ends "Hi baby". Both in `TASKS.md`.
+✅ **Both of those owner actions are now CLOSED (2026-08-19).** The Google
+Business Profile hours were corrected to **Tue–Sat 11:00 AM–3:00 PM, Sun + Mon
+closed**, byte-identical to `HOURS`; its Description was also rewritten, since it
+still claimed "private, mobile, and appointment-only" — the last place
+contradicting the store-first rewrite. ⚠️ **Both Google edits are PENDING
+review** and are not live until they clear. Linda Cusumano's review is published
+**without** its stray "Hi baby" line — an explicit, recorded owner override of
+the verbatim rule (⛔ one exception, not a policy; see DECISIONS).
+🔴 **Google address verification is next** — owner going 2026-08-20.
 
 ### ✅ DEPLOYED 2026-08-17 — the batch is LIVE
 
@@ -740,8 +758,8 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   centred spinner was removed as a duplicate (its screen-reader live region
   stays). See DECISIONS, *"The route bar is immediate, and that is the whole
   point"* and *"Tap feedback is CSS-only…"*, including the `popstate` trap.
-- ✅ **In-app-browser viewport jump — ROOT CAUSE FOUND AND FIXED (2026-08-18,
-  undeployed).** Measured on the live site from inside Instagram's iOS browser,
+- ✅ **In-app-browser viewport jump — ROOT CAUSE FOUND, FIXED AND DEPLOYED
+  (2026-08-18, owner-confirmed).** Measured on the live site from inside Instagram's iOS browser,
   not inferred:
 
   | reading | value |

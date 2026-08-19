@@ -1,9 +1,62 @@
 
 # Changelog
 
-## 2026-08-18 (13) — Jump confirmed gone; diagnostic removed
+## 2026-08-19 — Google Business Profile corrected; Linda's review published
 
-Owner deployed and confirmed from inside Instagram: **the jump is gone.**
+Two long-open owner-side items closed, both done in Chrome against the live
+profile. **Both Google edits are PENDING review** (Google states up to 10
+minutes); neither is live until it clears.
+
+### Hours — the NAP mismatch is fixed
+
+The profile read **Mon–Sat 10:00 AM–5:00 PM**, matching neither the site nor the
+schema. Now **Sun + Mon closed, Tue–Sat 11:00 AM–3:00 PM**, byte-identical to
+`HOURS` in `business-location.ts`. Google's own pending diff confirms it per day.
+
+### Description — no longer claims to be mobile-only
+
+Owner asked for it while preparing for address verification. It still read
+*"We're private, mobile, and appointment-only, coming to you in Naples…"* — the
+pre-showroom copy the site itself was rewritten away from on 2026-08-17, and the
+last place that contradicted the store-first story. Replaced with copy that
+leads on the showroom (address, the Sharon Lynch Collections landmark, and
+Tue–Sat 11am–3pm) and frames home visits as on request. 661/750 characters.
+
+### Linda Cusumano's review is now on the site — trimmed, by owner decision
+
+Her review was held out because it ends with a stray "Hi baby" inside the review
+body. Re-verified 2026-08-19 in the owner's Reviews panel: **she had not edited
+it.** The owner was shown the exact text and the three options, and chose to
+publish without that line.
+
+🔴 That is a deliberate override of *"A review is published verbatim or not at
+all"*, made explicitly and with the trade-off stated — it attributes edited words
+to a named real person. Recorded in DECISIONS and inline in `testimonials.ts`,
+including a ⛔ marker that it is one exception and not a new policy. Nothing
+else in the quote is altered, including the clipped "cannot say enough Chris
+Surette". `TESTIMONIALS` **12 → 13**.
+
+Gate from a deleted `.next`: `tsc` clean, `lint` clean, **1021/1021 across 100
+files**, build exit 0, **454/454 static pages**. Prerendered homepage carries
+"Linda Cusumano" and **zero** occurrences of "Hi baby".
+
+ℹ️ Checked while there and NOT a problem: Google's search snippet for
+`/estate-jewelry` still shows `info@naplesestatejewelry.co`. The live page serves
+`.com` only — that snippet is a stale pre-migration cache and will clear on
+recrawl.
+
+## 2026-08-18 (13) — Jump confirmed gone; diagnostic removed and redeployed
+
+Owner deployed and confirmed from inside Instagram: **the jump is gone.** The
+removal then shipped in its own deploy and the owner confirmed the DEBUG button
+is gone from the live site.
+
+✅ Verified on production after that deploy: the fix is intact
+(`<body class="min-h-[var(--app-vh)]">` plus the pre-paint script) and the
+diagnostic is fully absent — **0** occurrences of `vpdebug`, `nej-vpdebug`,
+`TURN OFF`, `toolbar travel` and `vh-svh gap` across all **15** shipped JS
+bundles, against a **positive control of 8 `--app-vh` hits** so the zeros are a
+real absence rather than a broken scan.
 
 Verified on production before removing anything:
 `<body class="min-h-[var(--app-vh)] flex flex-col">`, the pre-paint

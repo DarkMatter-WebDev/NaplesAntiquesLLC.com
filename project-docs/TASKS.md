@@ -209,24 +209,31 @@ everywhere `svh` behaves per spec.
      render on four surfaces with four inherited palettes; weight and opacity
      are what survive that. See DECISIONS.
 
-   🔴 **OWNER ACTIONS from 2026-08-18 (5) — the reviews import:**
+   ✅ **OWNER ACTIONS from 2026-08-18 (5) — both CLOSED 2026-08-19:**
 
-   - 🔴 **Fix the hours on the Google Business Profile.** It currently
-     shows `Closed · Opens 10 AM`, which matches neither the site nor the
-     schema (**Tue–Sat 11:00–15:00**). `business-location.ts` warns that the
-     profile, the site, eBay and Etsy must stay byte-identical; this is the one
-     that is wrong. Spotted while reading the profile, not yet corrected.
-   - ◻️ **Linda Cusumano's review is held out of the site.** Her text on
-     Google genuinely ends `… Local. Honest. Professional.` followed by a stray
-     `Hi baby` — verified to be inside the review body itself, not an extraction
-     artifact. It is a strong review and worth having: ask her to edit that line
-     off, then paste it into `testimonials.ts`. **Do not trim it ourselves** —
-     see DECISIONS, *"A review is published verbatim or not at all"*.
-   - ◻️ **Four reviews are still not on the site** (12 of 16). The Maps feed
+   - ✅ **Google Business Profile hours FIXED.** Were `Mon–Sat 10:00 AM–5:00 PM`,
+     matching neither the site nor the schema. Now **Sun + Mon closed, Tue–Sat
+     11:00 AM–3:00 PM**, byte-identical to `HOURS` in `business-location.ts`.
+     ⚠️ **PENDING Google review** (up to 10 minutes) — confirm it went live.
+   - ✅ **The profile Description no longer claims to be mobile-only.** It still
+     read "We're private, mobile, and appointment-only…", the last place
+     contradicting the store-first rewrite. Now leads on the showroom, the
+     Sharon Lynch Collections landmark and Tue–Sat 11am–3pm, with home visits
+     framed as on request. ⚠️ **Also PENDING Google review.**
+   - ✅ **Linda Cusumano's review is published**, without the stray "Hi baby"
+     line. She had not edited it; the owner chose to trim rather than wait. That
+     is a deliberate, recorded override of the verbatim rule — see DECISIONS and
+     the inline note in `testimonials.ts`. ⛔ One exception, not a new policy.
+   - ◻ **Four reviews are still not on the site** (13 of 16 now). The Maps feed
      stopped paginating after ten. One of the missing is a **Spanish** review
      ("Tenía estas piezas de oro…") shown under *Updates by visitors* with no
      attributable name in the DOM. Paste any of them in and every surface picks
      them up.
+
+   🔴 **NEXT, owner: Google address verification** — owner is going 2026-08-20.
+   Until the address is verified, the showroom's NAP is not fully trusted by
+   Google. The hours and description edits above should have cleared review by
+   then; check both before going.
 
    📱 **And check the marquee itself:**
    - **Speed.** Measured ~49px/s (84s per cycle at 12 reviews). Duration is

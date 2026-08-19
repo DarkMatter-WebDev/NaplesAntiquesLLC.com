@@ -146,4 +146,31 @@ export const TESTIMONIALS: Testimonial[] = [
     meta: 'Google review',
     metaEs: 'Reseña de Google',
   },
+  {
+    name: 'Linda Cusumano',
+    // ⚠️ THE ONE ENTRY ON THIS PAGE THAT IS NOT VERBATIM, and the exception is
+    // deliberate. Her review on Google ends with a stray line — "Hi baby" — on
+    // its own, after "Local. Honest. Professional." It is genuinely inside the
+    // review body, not a UI artifact: verified 2026-08-18 in the owner's own
+    // Reviews panel with the full text expanded.
+    //
+    // The standing rule is verbatim-or-not-at-all (DECISIONS, "A review is
+    // published verbatim or not at all"), and the plan of record was to ask her
+    // to remove the line herself. The OWNER decided on 2026-08-19 to publish it
+    // without that line instead, after being shown the exact text and told
+    // plainly that this attributes edited words to a named real person.
+    //
+    // Nothing else is altered — wording, punctuation and the clipped
+    // "cannot say enough Chris Surette" are all exactly as posted.
+    //
+    // ⛔ Do NOT treat this comment as licence to trim other reviews. It is one
+    // owner-authorised exception, not a new policy. If Linda edits her review
+    // on Google, replace this quote with the real text and delete this note.
+    quote:
+      'My husband and I cannot say enough Chris Surette with Naples Estate Jewelry. Chris went through two boxes of silver flatware. We were offered a check, or told to take it if we wanted to shop around more. The cash paid for our good sterling was more than fair. We would highly recommend Chris and Naples Estate Jewelry. Local. Honest. Professional.',
+    quoteEs:
+      'Mi esposo y yo no podemos decir suficiente sobre Chris Surette de Naples Estate Jewelry. Chris revisó dos cajas de cubertería de plata. Nos ofrecieron un cheque, o nos dijeron que podíamos llevárnosla si queríamos seguir buscando. El efectivo que pagó por nuestra buena plata esterlina fue más que justo. Recomendamos mucho a Chris y a Naples Estate Jewelry. Local. Honesto. Profesional.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
 ];

@@ -295,11 +295,22 @@ live profile:
 - **Posted spelling and grammar are part of the quote.** "Jewelery", "he have
   lots of collection" and a double space after a full stop all ship as posted. A
   tidied quote is an invented one.
-- **A review that cannot be published verbatim is not published.** Linda
-  Cusumano's review ends with a stray "Hi baby" that is genuinely inside the
-  review body on Google, not an extraction artifact. Publishing it looks broken
-  and trimming it edits a customer's words, so it is held out until the customer
-  edits it. Do not "fix" it into the file.
+- **A review that cannot be published verbatim is not published** — with one
+  owner-authorised exception, recorded below. Linda Cusumano's review ends with
+  a stray "Hi baby" that is genuinely inside the review body on Google, not an
+  extraction artifact (re-verified 2026-08-19 in the owner's own Reviews panel
+  with the full text expanded — she had not edited it).
+
+  🔴 **The owner overrode this on 2026-08-19** and chose to publish the review
+  WITHOUT that line, having been shown the exact text and told plainly that it
+  attributes edited words to a named real person. The entry in `testimonials.ts`
+  carries the same explanation inline. Nothing else about the quote is altered,
+  including the clipped "cannot say enough Chris Surette".
+
+  ⛔ **This is one authorised exception, not a new policy.** Do not trim any
+  other review on the strength of it, and do not "restore" the line — its
+  absence is deliberate. If Linda edits her review on Google, replace the quote
+  with the real text and delete the note.
 
 Google's own UI chrome is not part of the quote either: a trailing "…" on a card
 with no "More" expander is its emoji-collapse marker, and is dropped.
