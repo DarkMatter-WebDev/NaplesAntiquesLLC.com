@@ -1,7 +1,160 @@
 
 # Changelog
 
+## 2026-08-19 (4) — The double sign-in/guest prompt is gone, and the survivor is no longer off-screen on a phone
+
+◻️ **NOT DEPLOYED.** Local only; gate passed (below).
+
+**Reported by the owner from a phone:** proceeding to checkout while signed out
+asked "log in or continue as guest" **twice** — first a four-option screen, then
+a thinner two-option one. He also reported the second one sat **too far down,
+out of the viewport**, so he had to scroll to reach it.
+
+Both reports are correct, and they are two separate defects.
+
+### (a) Why it asked twice
+
+Two components, both firing:
+
+| | Where | Options |
+| --- | --- | --- |
+| Screen 1 | `CartDrawer.tsx`, local `CheckoutGate` | Log In / Create Account / Continue as Guest / Cancel |
+| Screen 2 | `CheckoutClient.tsx`, `.checkout-auth-overlay` | Sign in / Continue as guest |
+
+Screen 2 suppressed itself with a sessionStorage key,
+`nej-checkout-auth-choice` — written in exactly one place, `dismissAuthPrompt()`
+inside `CheckoutClient`. The drawer's `onGuest` routed to `/checkout` **without
+ever writing it**, so checkout had no idea the buyer had already answered.
+
+⚠️ **It was never mobile-only.** Reproduced at **899px** — a desktop width.
+There is no media query on either prompt, and `CartDrawer` is the only in-app
+link to `/checkout` (no `/cart` route exists), so there is one code path and it
+double-prompted on every device. Desktop *looked* clean because sessionStorage
+survives for the life of a tab: after one dismissal the flow measured
+`sawFirstPrompt: true, sawSecondPrompt: false` forever after. A long-lived
+desktop tab hides the bug; a phone opening fresh tabs does not.
+
+### (b) Why the second one was off-screen
+
+`.checkout-auth-overlay` was `position: fixed; inset: 0`, but rendered **inside**
+`<div className="checkout-page">` — which carries `data-customer-reveal="visible"`,
+whose `transform` / `filter` / `will-change` (globals.css:226) make it a
+containing block for fixed descendants. `inset: 0` therefore resolved to the
+page box, not the viewport, and `align-items: center` centred the card at the
+page's midpoint.
+
+Measured at 375×812 with a one-item cart:
+
+| | |
+| --- | --- |
+| Viewport | 375 × **812** |
+| Overlay box (= `.checkout-page`) | **2409px** tall |
+| Card top | **1114px** — 302px below the fold |
+| Visible in viewport | **false** |
+| Scroll to reach it | **854px** |
+
+The drawer's screen 1, measured identically, had **zero** containing-block
+ancestors: box 812px, card 236–576, fully visible. Same CSS technique, opposite
+outcome, purely because of where it was mounted.
+
+### What shipped
+
+**Owner picked screen 1. Screen 2 is deleted.**
+
+- **New `src/components/checkout/CheckoutGate.tsx`** — the four-option screen,
+  moved verbatim out of `CartDrawer`, plus the choice helpers
+  `rememberGuestCheckout()` / `hasChosenGuestCheckout()` and the key
+  `CHECKOUT_AUTH_CHOICE_KEY`. One component, one design, both callers.
+- **`CartDrawer`** now calls `rememberGuestCheckout()` before routing to
+  checkout. ⚠️ That call is the whole fix for the double prompt.
+- **`CheckoutClient`** lost `.checkout-auth-overlay`, `.checkout-auth-card`,
+  its local `AUTH_CHOICE_KEY` and the two-option markup. It renders the shared
+  gate instead, **outside `.checkout-page`** (return wrapped in a fragment), with
+  `showCancel={false}` — the buyer is already on checkout, so "Continue as
+  Guest" is the way out and a Cancel beside it would duplicate it.
+- Direct arrivals — bookmark, restored tab, Back out of PayPal — still get a
+  gate. It is now the good one.
+- Incidental fix: the old screen 2 built its sign-in link with an **unencoded**
+  `next=${prefix}/checkout`. The shared gate uses `encodeURIComponent`.
+
+### Verified in the browser, not assumed
+
+| Check | Result |
+| --- | --- |
+| Drawer gate options | `Log In / Create Account / Continue as Guest / Cancel` — unchanged |
+| After "Continue as Guest" → `/checkout` | **no second prompt**, `sessionChoice: 'guest'` |
+| Direct arrival, no prior choice | gate shown, `Log In / Create Account / Continue as Guest` (no Cancel) |
+| Direct-arrival gate box | **812px** (was 2409px), card **254–558**, `cardFullyVisible: true` |
+| Containing-block ancestors | **[]** — parent is `site-header-offset`, not `checkout-page` |
+| Guest dismissal survives reload | gate not re-shown, choice `guest` |
+| Spanish `/es/checkout` | `¿Cómo desea continuar?` · `Iniciar sesión / Crear cuenta / Continuar como invitado`, fully visible |
+| "Log In" from the gate | `/es/account/sign-in?next=%2Fes%2Fcheckout` — correctly encoded |
+
+**Gate, run from a deleted `.next`:** `npx tsc --noEmit` clean · `npm run lint`
+clean · `npm test` **1024/1024 across 100 files** · `npm run build`
+**454/454 static pages** (prerender-count invariant holds).
+
+⚠️ The build was mandatory here, not optional: this edit removed rules from a
+`<style jsx>` template literal, and `tsc`/`lint` both pass on a broken one.
+
+Decision and the reusable trap: `DECISIONS.md`, *"There is exactly ONE
+sign-in/guest gate, and it lives outside `.checkout-page`"*.
+
+### (c) The `<html>` hydration warning, fixed in the same batch
+
+Owner asked for it after the investigation above surfaced it. It had fired on
+**every page** in dev since the 2026-08-18 `--app-vh` work.
+
+`<html style={{ backgroundColor: '#f9f9f7' }}>` in `[locale]/layout.tsx` carried
+no `suppressHydrationWarning`, while the inline script a few lines below writes
+`--app-vh` onto `document.documentElement.style` before React hydrates — by
+design, since the token has to land before first paint. React compared its own
+prop against the real attribute and found the extra property:
+
+```text
++ backgroundColor: "#f9f9f7"
+- background-color: "rgb(249, 249, 247)"
+- --app-vh: "812px"
+```
+
+⚠️ The `--app-vh: 0px` seen in the dev overlay initially was a **hidden Browser
+pane** reporting `innerHeight` 0, not the real value. The mismatch fires with
+real values too — confirming it needed the pane displayed to read honestly.
+
+**Fix:** `suppressHydrationWarning` on that element. Correct rather than a
+silencer — React already said it "won't be patched up", so it left the DOM alone
+and the token always survived; the log was a false alarm about a deliberate
+pre-hydration write. It applies to that element only, so genuine mismatches
+inside the app are still reported.
+
+**Verified in a CLEAN tab** — the console buffer is cumulative across
+navigations and will happily replay pre-fix errors at you:
+
+| Check | Result |
+| --- | --- |
+| `/` fresh load | console: React DevTools notice + `[HMR] connected`, **no errors** |
+| `/es/shop` | **zero** errors |
+| Token still lands | `background-color: rgb(249, 249, 247); --app-vh: 1278px` |
+| Body still bound to it | `class="min-h-[var(--app-vh)] flex flex-col"` |
+
+**Re-gated after the change**, because this is the root layout and the
+prerender count is a structural invariant (`STRUCTURE.md`): `tsc` clean ·
+`lint` clean · **1024/1024** · build **454/454 pages**.
+
 ## 2026-08-19 (3) — The last six `svh` surfaces converted; the guard now enforces it
+
+✅ **DEPLOYED and owner-verified.** Together with 2026-08-19 (2), the hero-text
+drift is confirmed gone by the owner in the Instagram browser.
+
+Verified on production afterwards, not assumed:
+
+| Check | Result |
+| --- | --- |
+| `.responsive-hero` | `min-height:clamp(24rem, calc(var(--app-vh) * .58), 42rem)` |
+| `.site-loading-screen` | `min-height:100vh;min-height:var(--app-vh)` |
+| `.checkout-page` | `min-height:100vh;min-height:var(--app-vh)` |
+| homepage hero (styled-jsx) | 16 `--app-vh` occurrences, **zero** bare `Nsvh` in its clamps |
+| deployed checkout JS | **0** occurrences of `min-height:100svh` |
 
 Owner asked for the five surfaces listed after the hero fix. All five converted,
 plus a sixth found while making the guard airtight.
@@ -54,6 +207,8 @@ Gate from a deleted `.next`: `tsc` clean, `lint` clean, **1024/1024 across 100
 files**, build exit 0, **454/454 static pages**.
 
 ## 2026-08-19 (2) — The hero TEXT was still on `svh`; the first fix was incomplete
+
+✅ **DEPLOYED and owner-verified 2026-08-19** — the hero text no longer drifts.
 
 Owner: after the viewport jump was fixed, the homepage hero text alone still
 moved a little when scrolling in the Instagram browser — "independent of the

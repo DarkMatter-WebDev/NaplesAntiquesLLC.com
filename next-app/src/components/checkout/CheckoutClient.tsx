@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { startRouteProgress } from '@/components/layout/RouteProgressBar';
+import CheckoutGate, { hasChosenGuestCheckout, rememberGuestCheckout } from '@/components/checkout/CheckoutGate';
 import { useCart, type CartItem } from '@/context/CartContext';
 import OrderSummary, { OrderTotals, computeOrderTotals } from '@/components/checkout/OrderSummary';
 import type { OrderQuote } from '@/lib/checkout-pricing';
@@ -42,7 +45,6 @@ const GOLD = '#735c00';
 // four-step wizard. With PayPal's capture-on-approve design, "place order" IS
 // the Pay Now inside PayPal's window, so the PayPal buttons sit directly under
 // the total — the buyer always sees the final amount before paying.
-const AUTH_CHOICE_KEY = 'nej-checkout-auth-choice';
 
 type CartProductInfo = Pick<
   CartItem,
@@ -82,6 +84,7 @@ interface CustomerInfo {
 
 export default function CheckoutClient({ locale, paypalClientId }: { locale: string; paypalClientId?: string | null }) {
   const { items, remove, clear, setQuantity, refreshAvailability, stockAlerts, dismissStockAlerts, openDrawer } = useCart();
+  const router = useRouter();
   const isEs = locale === 'es';
   const hideSoldItemPrices = useHideSoldItemPrices(true);
   const prefix = isEs ? '/es' : '';
@@ -133,29 +136,25 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     createClient().auth.getUser().then(({ data }) => setIsGuest(!data.user)).catch(() => {});
   }, []);
 
-  // Entry sign-in/guest prompt. Starts dismissed and is re-enabled on mount
-  // for signed-out visitors who haven't chosen "guest" this tab (sessionStorage
-  // is unavailable during SSR, so this must not participate in hydration).
+  // Entry sign-in/guest gate, for buyers who reach this page WITHOUT passing
+  // the cart drawer's gate — a bookmark, a restored tab, a Back out of PayPal.
+  // Anyone arriving through the drawer has already answered and
+  // `rememberGuestCheckout()` recorded it, so they are never asked twice.
+  //
+  // Starts dismissed and is re-enabled on mount (sessionStorage is unavailable
+  // during SSR, so this must not participate in hydration).
   const [authPromptOpen, setAuthPromptOpen] = useState(false);
   useEffect(() => {
     // Deferred callback (PriceUpdateTicker's pattern) — satisfies
     // react-hooks/set-state-in-effect while still only opening post-hydration.
     const timer = window.setTimeout(() => {
-      try {
-        if (sessionStorage.getItem(AUTH_CHOICE_KEY) !== 'guest') setAuthPromptOpen(true);
-      } catch {
-        /* storage unavailable — keep the prompt closed rather than nag every render */
-      }
+      if (!hasChosenGuestCheckout()) setAuthPromptOpen(true);
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
   const dismissAuthPrompt = () => {
     setAuthPromptOpen(false);
-    try {
-      sessionStorage.setItem(AUTH_CHOICE_KEY, 'guest');
-    } catch {
-      /* ignore */
-    }
+    rememberGuestCheckout();
   };
 
   // Re-check live stock when the checkout page loads (and whenever the cart
@@ -559,6 +558,32 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
   }
 
   return (
+    <>
+      {/* ⚠️ OUTSIDE `.checkout-page`, deliberately. The gate is
+          `position: fixed`, and `.checkout-page` carries
+          `data-customer-reveal="visible"` whose transform/filter/will-change
+          make it a containing block for fixed descendants — nested inside it,
+          `inset: 0` resolved to the 2409px page instead of the viewport and
+          the card sat 1114px down an 812px phone screen. Do not move it in. */}
+      {isGuest && authPromptOpen && (
+        <CheckoutGate
+          isEs={isEs}
+          prefix={prefix}
+          checkoutHref={`${prefix}/checkout`}
+          // The buyer is already ON checkout — "Continue as Guest" IS the way
+          // out, so a Cancel beside it would just be a second button doing the
+          // same thing. Tapping the backdrop does the same as guest.
+          showCancel={false}
+          onClose={dismissAuthPrompt}
+          onGuest={dismissAuthPrompt}
+          onNavigate={(href) => {
+            setAuthPromptOpen(false);
+            startRouteProgress(href);
+            router.push(href);
+          }}
+        />
+      )}
+
     <div className="checkout-page">
       <div className="checkout-shell">
       <section className="checkout-hero">
@@ -579,35 +604,6 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
           {isEs ? 'Complete sus datos para finalizar la compra de los artículos de su carrito.' : 'Complete your details to check out the items in your cart.'}
         </p>
       </section>
-
-      {/* Entry prompt: signed-out visitors pick sign-in or guest before the
-          steps. Signed-in buyers never see it; the guest choice is remembered
-          per tab so a PayPal cancel/return doesn't re-ask. */}
-      {isGuest && authPromptOpen && (
-        <div
-          className="checkout-auth-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-label={isEs ? 'Iniciar sesión o continuar como invitado' : 'Sign in or continue as guest'}
-        >
-          <div className="checkout-auth-card">
-            <h2 className="text-xl font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-              {isEs ? '¿Cómo desea continuar?' : 'How would you like to check out?'}
-            </h2>
-            <p className="text-sm leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
-              {isEs
-                ? 'Inicie sesión para un pago más rápido con sus datos guardados, o continúe como invitado — no se requiere cuenta.'
-                : 'Sign in for faster checkout with your saved details, or continue as a guest — no account required.'}
-            </p>
-            <Link href={`${prefix}/account/sign-in?next=${prefix}/checkout`} className="gold-button justify-center" style={{ width: '100%' }}>
-              {isEs ? 'Iniciar sesión' : 'Sign in'}
-            </Link>
-            <button type="button" className="outline-button justify-center" style={{ width: '100%' }} onClick={dismissAuthPrompt}>
-              {isEs ? 'Continuar como invitado' : 'Continue as guest'}
-            </button>
-          </div>
-        </div>
-      )}
 
       <StockAlertBanner alerts={stockAlerts} isEs={isEs} onDismiss={dismissStockAlerts} />
 
@@ -1193,27 +1189,6 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
           border-color: #b5890c;
           box-shadow: 0 0 0 1px #b5890c inset;
         }
-        .checkout-auth-overlay {
-          position: fixed;
-          inset: 0;
-          z-index: 80;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 1.5rem;
-          background: rgba(42, 34, 12, 0.45);
-        }
-        .checkout-auth-card {
-          display: flex;
-          flex-direction: column;
-          gap: 0.9rem;
-          width: min(26rem, 100%);
-          padding: 1.5rem;
-          border: 1px solid rgba(216, 208, 194, 0.94);
-          background: #fffdf8;
-          box-shadow: 0 24px 64px rgba(42, 34, 12, 0.25);
-          border-radius: var(--radius-lg);
-        }
         .checkout-confirm-box {
           display: flex;
           align-items: flex-start;
@@ -1276,5 +1251,6 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
         }
       `}</style>
     </div>
+    </>
   );
 }

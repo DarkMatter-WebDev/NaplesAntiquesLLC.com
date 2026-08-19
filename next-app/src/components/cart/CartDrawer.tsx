@@ -8,6 +8,7 @@ import { startRouteProgress } from '@/components/layout/RouteProgressBar';
 import { useCart, type CartItem } from '@/context/CartContext';
 import { formatProductItemYear, isProductPurchasable, isProductSold, normalizeProductQuantity, productImagePaddingBackground, productStatusLabel } from '@/types/product';
 import { QuantityStepper } from '@/components/checkout/OrderSummary';
+import CheckoutGate, { rememberGuestCheckout } from '@/components/checkout/CheckoutGate';
 import StockAlertBanner from '@/components/cart/StockAlertBanner';
 import type { StockAlert } from '@/context/CartContext';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
@@ -229,6 +230,10 @@ export default function CartDrawer({ locale }: { locale: string }) {
           onGuest={() => {
             setShowCheckoutGate(false);
             if (hasUnavailableItems) return;
+            // Record the answer BEFORE navigating. Without this the checkout
+            // page has no idea the buyer was already asked and raises the very
+            // same gate again the moment it mounts.
+            rememberGuestCheckout();
             closeDrawer();
             startRouteProgress(checkoutHref);
             router.push(checkoutHref);
@@ -244,87 +249,6 @@ export default function CartDrawer({ locale }: { locale: string }) {
     </>
   );
 }
-
-function CheckoutGate({
-  isEs,
-  prefix,
-  checkoutHref,
-  onClose,
-  onGuest,
-  onNavigate,
-}: {
-  isEs: boolean;
-  prefix: string;
-  checkoutHref: string;
-  onClose: () => void;
-  onGuest: () => void;
-  onNavigate: (href: string) => void;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center px-4"
-      style={{ background: 'rgba(0,0,0,0.5)' }}
-      role="dialog"
-      aria-modal="true"
-      aria-label={isEs ? 'Opciones de pago' : 'Checkout options'}
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm rounded-2xl p-6 shadow-2xl"
-        style={{ background: 'var(--color-background)', border: `1px solid ${BORDER}` }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-5 text-center">
-          <h2 className="text-lg font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
-            {isEs ? '¿Cómo desea continuar?' : 'How would you like to continue?'}
-          </h2>
-          <p className="mt-1.5 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
-            {isEs
-              ? 'Inicie sesión para un pago más rápido, o continúe como invitado — no se requiere cuenta.'
-              : 'Sign in for a faster checkout, or continue as a guest — no account required.'}
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-2.5">
-          <button
-            type="button"
-            onClick={() => onNavigate(`${prefix}/account/sign-in?next=${encodeURIComponent(checkoutHref)}`)}
-            className="gold-button justify-center"
-            style={{ width: '100%' }}
-          >
-            {isEs ? 'Iniciar sesión' : 'Log In'}
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate(`${prefix}/account/sign-up`)}
-            className="outline-button justify-center"
-            style={{ width: '100%' }}
-          >
-            {isEs ? 'Crear cuenta' : 'Create Account'}
-          </button>
-          <button
-            type="button"
-            onClick={onGuest}
-            className="outline-button justify-center"
-            style={{ width: '100%' }}
-          >
-            {isEs ? 'Continuar como invitado' : 'Continue as Guest'}
-          </button>
-        </div>
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-4 w-full text-center text-xs font-bold uppercase tracking-widest transition-colors hover:text-[#735c00]"
-          style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
-        >
-          {isEs ? 'Cancelar' : 'Cancel'}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function CartView({
   items,
   isEs,

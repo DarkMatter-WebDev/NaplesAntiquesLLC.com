@@ -3,10 +3,74 @@
 > Actionable open work plus a short recent-completions summary. Full history is
 > in `CHANGELOG.md`. Last reconciled: **2026-08-18**.
 
-## ✅ ALL `svh` SURFACES CONVERTED — DONE 2026-08-19
+## 🔴 READY TO DEPLOY — the checkout sign-in/guest gate (2026-08-19)
+
+Complete and gate-passed locally. **Not deployed.** No SQL.
+
+The double sign-in/guest prompt is gone (the drawer now records the buyer's
+answer before routing), the two-option screen is deleted in favour of the
+owner's four-option one, and the survivor no longer renders inside
+`.checkout-page` — which had been anchoring it 1114px down a 812px phone screen.
+Full detail and measurements in `CHANGELOG.md` 2026-08-19 (4); the rule is in
+`DECISIONS.md`, *"There is exactly ONE sign-in/guest gate…"*.
+
+**Gate passed from a deleted `.next`:** `tsc` clean · `lint` clean ·
+**1024/1024** · build **454/454 pages**.
+
+📱 **Check on a real phone after deploying** — the whole bug was reported from
+one, and the two things worth ten seconds each:
+
+- Proceed to checkout signed out. You should see the four-option screen
+  **once**, centred, and land on checkout with **no** second prompt.
+- Open `/checkout` directly in a fresh tab with something in the cart (this is
+  the bookmark / Back-out-of-PayPal path). The gate should appear **centred in
+  the viewport**, with no Cancel button, and must not require scrolling.
+- Both locales — ES reads `¿Cómo desea continuar?` /
+  `Iniciar sesión · Crear cuenta · Continuar como invitado`.
+
+⚠️ **Rebuild staging** before the next batch — this change makes it stale.
+Command under *Copying to the repo folder*.
+
+## ✅ Hydration warning on `<html>` — FIXED 2026-08-19 (ships with the gate batch)
+
+Found while investigating the gate bug and fixed the same day, at owner request.
+It had fired on **every page** in dev since the 2026-08-18 `--app-vh` work.
+
+`<html style={{ backgroundColor: '#f9f9f7' }}>` in `[locale]/layout.tsx` had no
+`suppressHydrationWarning`, while the inline script below it writes `--app-vh`
+onto `document.documentElement.style` before React hydrates — deliberately,
+since the token must land before first paint. React compared its prop against
+the real attribute (`background-color: rgb(249, 249, 247); --app-vh: 812px`),
+found the extra property, and logged "A tree hydrated but some attributes …
+didn't match".
+
+**Fix:** `suppressHydrationWarning` on that `<html>`, the pattern already used
+at `shop/(list)/shop-page-renderer.tsx:754`.
+
+⚠️ It is the correct resolution, not a silencer — React already said it "won't
+be patched up", so the DOM was never touched and the token always survived. And
+it applies to **that element only**, not descendants, so a genuine mismatch
+anywhere inside the app is still reported.
+
+**Verified in a clean tab** (the console buffer is cumulative across
+navigations, so a stale buffer will lie to you here): `/` and `/es/shop` both
+load with **zero** console errors, and `--app-vh` still lands —
+`htmlStyleAttr: "background-color: rgb(249, 249, 247); --app-vh: 1278px"`,
+`body class="min-h-[var(--app-vh)] flex flex-col"`.
+
+**Re-gated after the change**, because this file is the root layout and the
+prerender count is a structural invariant: `tsc` clean · `lint` clean ·
+**1024/1024** · build **454/454 pages**.
+
+## ✅ ALL `svh` SURFACES CONVERTED — DONE, DEPLOYED, OWNER-VERIFIED 2026-08-19
 
 The five listed after the hero fix are converted, plus `.site-loading-screen` as
-a sixth. Detail and per-surface measurements in `CHANGELOG.md` 2026-08-19 (3).
+a sixth. Shipped, and the owner confirmed the hero-text drift is gone in the
+Instagram browser. Verified on production: `.responsive-hero`,
+`.site-loading-screen` and `.checkout-page` all carry `var(--app-vh)`, the
+homepage hero carries 16 `--app-vh` occurrences with zero bare `Nsvh` in its
+clamps, and the deployed checkout JS has **0** `min-height:100svh`. Detail and
+per-surface measurements in `CHANGELOG.md` 2026-08-19 (3).
 
 **Nothing is left to convert.** The rule is now enforced by
 `lib/__tests__/viewport-units.test.ts`, which rejects `svh` sizing or
@@ -574,52 +638,62 @@ removing rather than ignoring.
 ## Copying to the repo folder — use the staging folder
 
 **A ready-made, verified staging copy lives at `C:\Users\rcman\NEJ-repo-staging`**
-(rebuilt **2026-08-18**, deliberately OUTSIDE this folder and outside OneDrive so
+(rebuilt **2026-08-19**, deliberately OUTSIDE this folder and outside OneDrive so
 it neither pollutes the source of truth nor triggers a sync storm). Its contents
 are exactly what belongs in the repo — copy *everything* in it into the repo
 folder with no exclusions to think about.
 
-Rebuilt **2026-08-18** again, for the viewport-jump batch (the showroom-map /
-reviews / footer batch it previously described is now DEPLOYED):
-**854 files / 19.59 MB**, 13 files copied, **0 FAILED / 0 Extras / 0 Mismatch**,
+🟢 **Rebuilt 2026-08-19 for the checkout-gate batch — READY TO DEPLOY.**
+**855 files / 19.63 MB**, 8 files copied, **0 FAILED / 0 Extras / 0 Mismatch**,
 and a follow-up dry run reported **0 to copy**. `/MIR` deleted nothing — the
-dry run showed 0 Extras before it ran. Leak check clean — 0 `.git`,
-0 `node_modules`, 0 `.next`, 0 `.env*`, 0 `.pem`, 0 `*.tsbuildinfo`,
-0 `next-env.d.ts`, 0 `*.log`, 0 `*.bak` — against a **positive control of 176
-`.tsx`**, so the zeros are a real result rather than a broken scan.
+dry run showed 0 Extras *before* it ran, which is the check that makes `/MIR`
+safe. Leak check clean — 0 `.git`, 0 `node_modules`, 0 `.next`, 0 `.env*`,
+0 `.pem`, 0 `*.tsbuildinfo`, 0 `next-env.d.ts`, 0 `*.log` — against a
+**positive control of 177 `.tsx`**, so the zeros are a real result rather than a
+broken scan. Hidden paths confirmed present: `.github/workflows/
+scheduled-jobs.yml`, `.gitignore`, `.claude/launch.json`, `next-app/.npmrc`.
 
-The 13 files are the 7 sources carrying the eight `*-screen` → `min-h-svh`
-conversions, the 2 new files (`ViewportDebugOverlay.tsx`,
-`viewport-units.test.ts`), and the 4 memory files.
+The 8 files are 4 sources and the 4 memory files:
+`CheckoutGate.tsx` (new), `CartDrawer.tsx`, `CheckoutClient.tsx`, and
+`[locale]/layout.tsx`.
 
 Content spot-checks run against the STAGED copy, not the source:
 
-- 🔴 **`maps.google.com` present in BOTH `netlify.toml` and
+- 🔴 **`maps.google.com` present in BOTH root `netlify.toml` and
   `next-app/next.config.ts`** — the standing item that fails silently if it does
-  not travel. Still true after this sync.
-- Staged `[locale]/layout.tsx` carries **`<body className="min-h-svh flex
-  flex-col">`** and the `<ViewportDebugOverlay />` mount; both new files present.
-- **Zero CODE occurrences of `min-h-screen` / `h-screen` / `max-h-screen`** under
-  staged `next-app/src`. Six lines still mention it and all six are COMMENTS
-  explaining the ban — which is also why the compiled CSS still emits the dead
-  rule. Do not read either as a missed conversion.
-- Docs carry this session: `CHANGELOG.md` has `2026-08-18 (10)` and `(11)`,
-  `CURRENT_STATUS.md` says DEPLOYED, this file has the viewport-jump section,
-  `DECISIONS.md` carries the `*-screen` ban.
+  not travel. Confirmed 1 hit each after this sync.
+- Staged `CheckoutGate.tsx` present; staged `CartDrawer.tsx` carries
+  `rememberGuestCheckout`; staged `CheckoutClient.tsx` has **0** occurrences of
+  `checkout-auth-overlay` (the deleted second prompt) and 2 of `CheckoutGate`.
+- Staged `[locale]/layout.tsx` carries `suppressHydrationWarning` and still has
+  its 8 `--app-vh` references.
+- Docs carry this session: `CHANGELOG.md` has `2026-08-19 (4)`,
+  `CURRENT_STATUS.md` leads with the undeployed-gate handoff, `DECISIONS.md`
+  carries the one-gate rule, and this file has both the deploy item and the
+  hydration fix.
+
+<details><summary>Previous rebuild, 2026-08-18 (viewport-jump batch) — now superseded</summary>
+
+**854 files / 19.59 MB**, 13 files copied, 0 FAILED / 0 Extras / 0 Mismatch,
+follow-up dry run 0 to copy, positive control 176 `.tsx`. The 13 files were the
+7 sources carrying the eight `*-screen` → `min-h-svh` conversions, the 2 new
+files (`ViewportDebugOverlay.tsx`, `viewport-units.test.ts`), and the 4 memory
+files. Its spot-checks were the `min-h-svh` body class, the
+`<ViewportDebugOverlay />` mount, and zero CODE occurrences of `*-screen` under
+staged `next-app/src` (the six remaining lines are COMMENTS explaining the ban,
+which is also why the compiled CSS still emits the dead rule).
+
+</details>
 
 ⚠️ **Verifying a staged path containing `[locale]` needs `-LiteralPath`.**
 PowerShell reads `[...]` as a wildcard character class, so a plain `Test-Path`
-reports `next-app/src/app/[locale]/...` as MISSING when the file is there.
+reports `next-app/src/app/[locale]/...` as MISSING when the file is there. That
+false alarm is easy to act on by mistake.
 
-ℹ️ **Robocopy reports 857 total against 854 on disk, and that is correct** — it
+ℹ️ **Robocopy reports 858 total against 855 on disk, and that is correct** — it
 counts `/XF`-excluded files in its total. The three are `.env.local`,
 `tsconfig.tsbuildinfo` and `next-env.d.ts`, all verified absent from staging.
 Do not chase this gap as a missing-file bug.
-
-⚠️ **Verifying a path containing `[locale]` needs `Test-Path -LiteralPath`.**
-PowerShell reads `[...]` as a wildcard character class, so a plain `Test-Path`
-reports `next-app/src/app/[locale]/...` as MISSING when the file is there. That
-false alarm is easy to act on by mistake.
 
 ⚠️ **It is a point-in-time snapshot.** Rebuild it after any further edits:
 

@@ -109,6 +109,20 @@ export default async function LocaleLayout({ children, params }: Props) {
       //
       // Keep this value in sync with `--color-background` (#f9f9f7).
       style={{ backgroundColor: '#f9f9f7' }}
+      // Required, not cosmetic. The `--app-vh` script below writes a SECOND
+      // property onto this element's style attribute before React hydrates —
+      // by design, since the token has to land before first paint. React then
+      // compares its own `{ backgroundColor }` prop against the real attribute
+      // (`background-color: rgb(249, 249, 247); --app-vh: 812px`), finds the
+      // extra property, and logs a hydration mismatch on every page.
+      //
+      // Suppressing is the correct resolution rather than a silencer: React
+      // already says it "won't be patched up", so it leaves the DOM alone and
+      // the token survives either way. This only stops the false alarm.
+      //
+      // ⚠️ It applies to THIS element only, not descendants, so a genuine
+      // mismatch anywhere inside the app is still reported.
+      suppressHydrationWarning
     >
       <head>
         {/* Critical splash styles, inlined so the homepage boot splash is

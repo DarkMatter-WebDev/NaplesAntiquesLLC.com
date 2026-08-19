@@ -3428,6 +3428,45 @@ Server checkout rejections carry machine-readable codes
 and falls back to message-pattern matching only for uncoded/legacy
 responses. New rejection reasons must add a code, not rely on wording.
 
+### There is exactly ONE sign-in/guest gate, and it lives outside `.checkout-page`
+
+Owner decision 2026-08-19, after hitting the gate twice on a phone. There used
+to be two: a four-option gate (Log In / Create Account / Continue as Guest /
+Cancel) raised by the cart drawer, and a second two-option one (Sign in /
+Continue as guest) baked into `CheckoutClient`. The drawer never recorded the
+buyer's answer, so a shopper who picked "Continue as Guest" was asked again the
+moment checkout mounted. **The owner picked the four-option screen; the
+two-option one is deleted.**
+
+`components/checkout/CheckoutGate.tsx` is now the single source for that screen
+and for the choice itself (`rememberGuestCheckout()` /
+`hasChosenGuestCheckout()`, sessionStorage key `nej-checkout-auth-choice`).
+
+- ⚠️ **The drawer MUST call `rememberGuestCheckout()` before routing to
+  `/checkout`.** That call is the only thing preventing the double prompt from
+  returning.
+- **sessionStorage, not localStorage**, deliberately: the answer belongs to this
+  shopping run. A PayPal cancel/return must not re-ask; a visit next week should.
+- The checkout page still renders the gate, for buyers who arrive **without**
+  passing the drawer — a bookmark, a restored tab, a Back out of PayPal. It
+  passes `showCancel={false}` there, because the buyer is already on checkout
+  and "Continue as Guest" IS the way out; a Cancel beside it would be a second
+  button doing the same thing.
+
+🔴 **The gate is rendered as a SIBLING of `.checkout-page`, never inside it.**
+`.checkout-page` carries `data-customer-reveal="visible"`, whose
+`transform` / `filter` / `will-change` (globals.css) make it a **containing block
+for `position: fixed` descendants** — and `will-change` stays applied forever,
+long after the reveal animation ends. Nested inside it, the gate's `inset: 0`
+resolved to the 2409px page instead of the viewport: measured on a 375×812
+phone, the card sat at **top 1114px**, entirely below the fold, so the buyer saw
+a dimmed unusable checkout and had to scroll ~854px to find the dialog. It
+reads as "fine on desktop" only because a tall window happens to catch it.
+
+⚠️ **This is a general trap, not a checkout one.** Any `position: fixed` element
+placed inside a `[data-customer-reveal]` subtree breaks the same way and does so
+silently — the element renders, it is simply anchored to the wrong box.
+
 ### PayPal captures on approval with no reservation
 
 PayPal Orders API v2 is the storefront processor. PayPal credentials and

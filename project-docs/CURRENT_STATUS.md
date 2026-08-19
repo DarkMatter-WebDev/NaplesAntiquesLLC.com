@@ -8,11 +8,55 @@
 
 **Read this, then `TASKS.md`.**
 
-### ✅ EVERYTHING IS DEPLOYED AND VERIFIED. NOTHING IS HALF-DONE.
+### 🔴 ONE UNDEPLOYED CHANGE IS WAITING — the checkout sign-in/guest gate
 
-There is **no staged batch waiting**, no outstanding SQL, and no undeployed code.
-Staging mirrors the source exactly. The site, the Google profile and the docs all
-agree with each other for the first time since the showroom opened.
+Everything below this section is deployed and verified. **This one is not.** It
+is local-only, complete, and gate-passed; it needs a deploy and a staging
+rebuild. No SQL.
+
+**Owner report, from a phone:** proceeding to checkout signed out asked
+"log in or continue as guest" **twice**, and the second prompt sat out of the
+viewport so he had to scroll to it. Two separate defects, both confirmed:
+
+1. **The double prompt was never mobile-only** — reproduced at **899px**. The
+   cart drawer routed to `/checkout` without recording the buyer's answer, so
+   checkout raised its own gate again. Desktop only *looked* clean because the
+   suppressing sessionStorage key survives for the life of a tab.
+2. **The second prompt was anchored to the wrong box.** It was
+   `position: fixed; inset: 0` but rendered **inside** `.checkout-page`, which
+   carries `data-customer-reveal="visible"` — whose transform/filter/will-change
+   make it a containing block for fixed descendants. On a 375×812 phone the card
+   landed at **top 1114px** inside a **2409px** overlay: below the fold,
+   854px of scrolling away.
+
+**Owner picked the four-option screen** (Log In / Create Account / Continue as
+Guest / Cancel). The two-option one is **deleted**. New
+`components/checkout/CheckoutGate.tsx` is now the single source for that screen
+and for the choice; the drawer calls `rememberGuestCheckout()` before routing,
+and checkout renders the same gate **outside `.checkout-page`** for buyers who
+arrive without passing the drawer.
+
+**Also in this batch:** the `<html>` **hydration warning is fixed** — it had
+fired on every page in dev since the 2026-08-18 `--app-vh` work, because the
+pre-first-paint script writes the token onto `document.documentElement.style`
+while the element carried no `suppressHydrationWarning`. Correct resolution, not
+a silencer: React already left the DOM alone, so the token always survived.
+
+**Gate passed from a deleted `.next`:** `tsc` clean · `lint` clean ·
+**1024/1024 across 100 files** · build **454/454 static pages** — re-run after
+the root-layout change, since the prerender count is a structural invariant.
+Browser-verified in both locales — measurements in `CHANGELOG.md` 2026-08-19 (4).
+
+⚠️ **Reusable trap worth carrying forward:** any `position: fixed` element placed
+inside a `[data-customer-reveal]` subtree is anchored to that subtree, not the
+viewport. It fails silently — the element renders, just in the wrong place.
+
+### ✅ EVERYTHING ELSE IS DEPLOYED AND VERIFIED. NOTHING IS HALF-DONE.
+
+Apart from the gate change above, there is **no staged batch waiting**, no
+outstanding SQL, and no other undeployed code. The site, the Google profile and
+the docs all agree with each other for the first time since the showroom opened.
+⚠️ Staging no longer mirrors the source — rebuild it with the gate change.
 
 **What closed on 2026-08-19:**
 
@@ -22,8 +66,8 @@ agree with each other for the first time since the showroom opened.
 | **Google Business Profile hours** | `Mon–Sat 10–5` → **Sun+Mon closed, Tue–Sat 11:00 AM–3:00 PM**. Applied and live |
 | **Google profile Description** | stopped claiming "private, mobile, and appointment-only"; now leads on the showroom. Applied and live |
 | **Linda Cusumano's review** | published, minus its stray "Hi baby" line, by explicit owner decision. `TESTIMONIALS` 12 → 13 |
-| **Hero text still drifting** | the first viewport fix stopped at the hero's frame; the offsets INSIDE it were still `svh`. Fixed, plus `.responsive-hero` (71.9px). Guard widened to the whole hero |
-| **Every remaining `svh` surface** | checkout shell (124px), `error`, `not-found`, both account washes, `.site-loading-screen`. **Nothing is left on `svh`** except transient-overlay max-heights and the token's own fallback, both guard-encoded |
+| **Hero text still drifting** | ✅ the first viewport fix stopped at the hero's frame; the offsets INSIDE it were still `svh`. Fixed, plus `.responsive-hero` (71.9px). Deployed and **owner-verified gone** |
+| **Every remaining `svh` surface** | ✅ checkout shell (124px), `error`, `not-found`, both account washes, `.site-loading-screen`. Deployed and verified on production. **Nothing is left on `svh`** except transient-overlay max-heights and the token's own fallback, both guard-encoded |
 
 **Verified on production, not assumed:** homepage 200, `<body class="min-h-[var(--app-vh)] flex flex-col">`,
 `Linda Cusumano` present, **zero** `Hi baby`, and zero `vpdebug` across all 15 JS
@@ -33,6 +77,11 @@ not pending**.
 
 **Gate at session end, from a deleted `.next`:** `tsc` clean · `lint` clean ·
 **1024/1024 across 100 files** · build **454/454 static pages**.
+
+✅ **The viewport work is finished and owner-verified.** Three rounds: the page
+shell, then the hero's frame, then everything positioned inside it plus the last
+six surfaces. Production carries the token on every one of them, and the guard
+rejects a regression.
 
 ### 🔴 The one thing that matters most for the next session
 
