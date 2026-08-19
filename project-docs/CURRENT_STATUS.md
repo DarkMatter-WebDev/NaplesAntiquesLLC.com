@@ -740,68 +740,62 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   centred spinner was removed as a duplicate (its screen-reader live region
   stays). See DECISIONS, *"The route bar is immediate, and that is the whole
   point"* and *"Tap feedback is CSS-only…"*, including the `popstate` trap.
-- 🔴 **In-app-browser viewport jump — PARTIALLY fixed, and the owner reports it
-  again (2026-08-18).** Instagram/Facebook embedded browsers hide their toolbar
-  on scroll, changing the viewport height; the page jumps. The 2026-08-11 batch
-  (deployed 2026-08-17) moved all customer-facing viewport-height CSS to `svh`
-  instead of `vh`/`dvh` — the worst was `/shop`'s sticky filter sidebar on
-  `dvh` — and routed every `resize` listener through `onLayoutAffectingResize`
-  (`lib/viewport-resize.ts`), which ignores height-only changes under 160px. See
-  DECISIONS, *"Viewport height is `svh`, and `resize` is never listened to
-  bare"*.
+- ✅ **In-app-browser viewport jump — ROOT CAUSE FOUND AND FIXED (2026-08-18,
+  undeployed).** Measured on the live site from inside Instagram's iOS browser,
+  not inferred:
 
-  ⚠️ **That batch never was confirmed on a real phone inside the Instagram
-  browser** — this doc said so from the day it shipped, and it is still true.
+  | reading | value |
+  | --- | --- |
+  | `vh` / `svh` / `dvh` probes | **all three identical**, and all three moved |
+  | `innerHeight` | **729 ↔ 853** — 124px of chrome |
+  | homepage document height | **423px** swing |
 
-  **Nothing on the 2026-08-11 LIST reverted** — re-verified line by line
-  2026-08-18, and the production stylesheet contains no `dvh` rule at all.
-  ⚠️ **That is a narrower statement than it first looks**, and an early read of
-  this investigation overstated it: checking that batch's own table can only
-  clear that batch's own table. It says nothing about code added AFTER
-  2026-08-11, which is where the owner's "it worked, then it drifted" would
-  actually live. See the two drift candidates below.
+  🔴 **`svh` is not stable in an in-app browser.** Instagram resizes the
+  WKWebView natively rather than retracting browser chrome, so WebKit sees a
+  plain window resize: there is no small-vs-large viewport to distinguish, the
+  three unit families collapse into one number, and that number tracks the
+  toolbar. The 2026-08-11 batch adopted `svh` *because* it is "stable across
+  exactly this event" — true per spec, false here. That is why two rounds of
+  fixes changed nothing.
 
-  ✅ **One real defect found and FIXED (2026-08-18, undeployed).** The sweep
-  matched CSS unit *literals*, so Tailwind's `min-h-screen` — which compiles to
-  `min-height: 100vh` and contains no literal — was invisible to it. Eight
-  usages, all customer-facing, including **`<body>` in `[locale]/layout.tsx`,
-  i.e. every page**. All eight are now `min-h-svh`. The tell that it was an
-  oversight: that batch converted `[locale]/not-found.tsx` `60vh` → `60svh`
-  while leaving `app/not-found.tsx` on `min-h-screen`.
-  A source-guard test (`lib/__tests__/viewport-units.test.ts`) now rejects the
-  aliases, because a convention enforced by grepping for a string the offender
-  does not contain is not enforceable. ⚠️ `.min-h-screen{min-height:100vh}`
-  still appears in the COMPILED CSS — Tailwind's scanner reads comments too, and
-  the comments explaining this rule name the class. Its presence there is not
-  evidence of use; check the served `<body class>`.
+  **The homepage hero is the amplifier and the arithmetic closes:** its runway is
+  `(100svh - header) + 240svh` = **3.4 × the unit**, so 124px of chrome becomes
+  3.4 × 124 = **421.6px** against **423px** measured. A page whose height moves
+  under a scroll is the jump.
 
-  ⚠️ **This is not a measurement of the failure.** On a desktop
-  `100vh == innerHeight`, so the phantom scroll is zero and the loop cannot
-  occur locally — which is exactly why the 2026-08-11 fix shipped unverified.
-  A flag-gated diagnostic (`?vpdebug=1`,
-  `components/layout/ViewportDebugOverlay.tsx`) ships alongside so one phone
-  session settles it instead of a third round of inference.
+  **Fix:** `--app-vh`, written before first paint by an inline script in
+  `[locale]/layout.tsx` and refreshed **only** through `onLayoutAffectingResize`
+  (160px tolerance, above the 124px measured). `globals.css` keeps
+  `--app-vh: 100svh` as the no-JS fallback. The hero runway/frame, `HomeHero`
+  and the `<body>` shell read the token. Verified both ways: a 124px height
+  change leaves the token, the document height (7820px) and the runway (2844px)
+  unmoved — the `svh` rule would have taken the runway to 2423px — while a
+  rotation updates them. See DECISIONS, *"`svh` is NOT stable in an in-app
+  browser"*, which supersedes the premise of the older `svh` entry.
 
-  🔴 **Two post-fix drift candidates, both touch-only, both invisible on a
-  desktop, both landed AFTER the svh fix:**
-  1. **The shared photo swipe** (2026-08-17) attaches a **non-passive
-     `touchmove` that calls `preventDefault()`** to product galleries and shop
-     cards — most of the scrollable surface on a phone. A non-passive touch
-     listener takes the compositor off the fast scroll path, because it must
-     wait on JS to learn whether the scroll is cancelled.
-  2. **The hero touch snap** (2026-08-09) reasserts `window.scrollTo` **every
-     frame for up to 1.6s** to beat momentum, and re-reads `pinStart`/`travel`
-     from live layout at touch-start and again at touch-end. A toolbar
-     transition mid-gesture is exactly the case where those two reads disagree,
-     and the result would be the page animating to a wrong absolute position —
-     a jump the visitor cannot fight. The overlay's `auto-scroll` counter is the
-     discriminator for this one.
+  ℹ️ Modal/panel max-heights stay on `svh` deliberately — they do not contribute
+  to document height, so they cannot cause this.
 
-  🔴 **Ask the owner WHEN it last worked** — that single fact splits these
-  candidates. Note the svh fix only reached PRODUCTION on 2026-08-17, the same
-  day as the photo swipe, so an "it worked on the live site" memory has a
-  one-day window. Full analysis and plan in `TASKS.md` → *IN-APP-BROWSER
-  VIEWPORT JUMP*.
+  ℹ️ **The `*-screen` → `min-h-svh` change was a real defect and NOT the cause.**
+  On the failing device `vh` and `svh` are the same moving number, so it could
+  not have helped. Kept, because it is correct everywhere `svh` behaves per spec,
+  and guarded by `lib/__tests__/viewport-units.test.ts`.
+
+  ℹ️ **The hero touch snap is cleared** by this data: homepage `auto-scroll`
+  maxed at 134px ≈ the 124px toolbar travel, i.e. the browser clamping scroll as
+  the document resized — not the 1-second animated snap.
+
+  🔴 **Still to do: deploy, then re-read the overlay on the same phone** and
+  confirm `doc height moves` has collapsed. Then remove the overlay (component,
+  its mount, the DEBUG button, and its `dvh` allowlist entry) and the temporary
+  `?vpdebug=1` handling.
+
+  ⚠️ Two known flaws in the overlay, worth knowing when reading a screenshot:
+  its ranges **persist across client-side navigation** (`settle()` arms on
+  `load`, which an App Router navigation does not fire), so a second page's
+  numbers carry the first page's extremes — read the MINIMUM; and
+  `vh-svh gap: 0px (no retractable chrome)` is a **wrong label** — the gap is 0
+  because `vh` and `svh` are the same dynamic value, not because nothing moves.
 - The fixed site header is fully opaque (`#f9f9f7`, no backdrop blur; the mobile
   menu panel likewise), and its height comes from one token,
   `--site-header-height` — 3.5rem on phones, 4.5rem from md up. The header is

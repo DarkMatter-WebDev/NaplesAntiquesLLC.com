@@ -192,7 +192,7 @@ export default function HomeHero({
 
       <style>{`
         .home-carousel-hero {
-          min-height: calc(100svh - var(--site-header-height));
+          min-height: calc(var(--app-vh) - var(--site-header-height));
         }
 
         .home-carousel-theme {
@@ -248,8 +248,8 @@ export default function HomeHero({
         /* Carousel scene: full height, transparent so the section color shows
            through, base scale. */
         .home-carousel-hero .home-carousel-theme > div:first-child {
-          min-height: calc(100svh - var(--site-header-height));
-          block-size: calc(100svh - var(--site-header-height));
+          min-height: calc(var(--app-vh) - var(--site-header-height));
+          block-size: calc(var(--app-vh) - var(--site-header-height));
           background: transparent !important;
           transform: scale(1.22);
           transform-origin: center center;

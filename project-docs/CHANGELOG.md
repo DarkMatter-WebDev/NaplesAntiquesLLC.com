@@ -1,6 +1,84 @@
 
 # Changelog
 
+## 2026-08-18 (12) — ROOT CAUSE: `svh` is not stable in an in-app browser
+
+The `*-screen` fix shipped and the owner reported the jump unchanged. The
+overlay he screenshotted from inside Instagram settles it.
+
+| reading | value |
+| --- | --- |
+| `vh` / `svh` / `dvh` probes | **all three identical**, and all three moved |
+| `innerHeight` | **729 ↔ 853** — 124px of chrome |
+| homepage `docH` | **7415–7838**, a **423px** swing |
+| `offsetTop` | 0 on the homepage |
+| homepage `auto-scroll` | 816×, **max 134px** |
+
+**Instagram resizes the WKWebView natively** rather than retracting browser
+chrome, so WebKit sees a plain window resize: no small-vs-large viewport to
+distinguish, the three unit families collapse to one number, and that number
+tracks the toolbar. The 2026-08-11 batch adopted `svh` precisely because it is
+"stable across exactly this event" — true per spec, false here.
+
+**The homepage hero is the amplifier, and the arithmetic closes.** Its runway is
+`(100svh - header) + 240svh` = **3.4 × the unit**, so 124px of chrome becomes
+3.4 × 124 = **421.6px** against **423px** measured. A page whose height changes
+under a scroll is the jump.
+
+### Fix: freeze the height in JS
+
+`--app-vh`, written before first paint by an inline script and refreshed **only**
+through `onLayoutAffectingResize` (160px tolerance, comfortably above the 124px
+measured). `globals.css` keeps `--app-vh: 100svh` as the no-JS fallback. The hero
+runway/frame, `HomeHero`, and the `<body>` shell all read the token.
+
+Verified both directions, by measurement: a **124px** height change leaves
+`--app-vh` (853px), the document height (7820px) and the hero runway (2844px)
+**completely unmoved** — where the `svh` rule would have taken the runway to
+2423px; a **rotation** updates the token and the runway follows (1091px =
+3.1 × 375 − 72, the desktop runway).
+
+Modal and panel max-heights stay on `svh` deliberately: they do not contribute
+to document height, so they cannot cause this.
+
+### What this says about the previous two fixes
+
+- The `*-screen` → `min-h-svh` change (entry 11) was a **real defect** and was
+  **not the cause**. On the failing device `vh` and `svh` are the same moving
+  number, so it could not have helped. Kept: it is correct everywhere `svh`
+  behaves per spec.
+- **The hero touch snap is not implicated.** Homepage `auto-scroll` maxed at
+  134px ≈ the 124px toolbar travel, i.e. the browser clamping scroll as the
+  document resized — not the 1-second animated snap, which would show large
+  sustained movement.
+
+### Two flaws found in the instrument itself
+
+- ⚠️ **Its ranges persist across client-side navigation.** `settle()` is armed
+  on `load`, which an App Router navigation does not fire, so the `/account/sign-in`
+  screenshots carry the homepage's `docH` (7852) and `offsetTop`/`auto-scroll`
+  extremes. Read the MINIMUM (729 — exactly one viewport, the short-page case)
+  on those, not the range.
+- ⚠️ **`vh-svh gap: 0px  (no retractable chrome)` was the wrong label.** The gap
+  is 0 because `vh` and `svh` are the same DYNAMIC value, not because nothing
+  moves — `toolbar travel: 124px` on the same readout proves chrome is moving.
+  The number was right and the words were wrong.
+
+### And one in the guard test
+
+`codeLines()` did not normalise newlines. This repo mixes CRLF and LF; splitting
+CRLF on `
+` leaves a trailing ``, and in JavaScript `` is a line
+terminator, so `.` will not cross it and `$` (no `m` flag) never matches — every
+`//` comment in a CRLF file survived the strip. Earlier assertions passed by
+luck. Caught when the new hero assertion flagged three comment lines quoting old
+runway figures. Negative-controlled again after the fix.
+
+Gate from a deleted `.next`: `tsc` clean, `lint` clean, **1021/1021 across 100
+files**, build exit 0, **454/454 static pages**. The inline token script and
+`<body class="min-h-[var(--app-vh)] flex flex-col">` both confirmed in the
+prerendered HTML.
+
 ## 2026-08-18 (11) — In-app-browser viewport jump: the `*-screen` blind spot
 
 Owner reports, after the deploy, that opening the site from an Instagram link

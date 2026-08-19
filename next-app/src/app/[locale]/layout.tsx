@@ -14,6 +14,7 @@ import RouteProgressBar from '@/components/layout/RouteProgressBar';
 // Renders null unless the URL carries `?vpdebug=1`. Remove this import, its
 // mount below, and the component itself once the jump is understood and fixed.
 import ViewportDebugOverlay from '@/components/layout/ViewportDebugOverlay';
+import ViewportHeightToken from '@/components/layout/ViewportHeightToken';
 import { jsonLdHtml } from '@/lib/json-ld';
 import { GEO, mapsUrl, openingHoursSchema, postalAddressSchema } from '@/lib/business-location';
 
@@ -125,33 +126,53 @@ export default async function LocaleLayout({ children, params }: Props) {
             __html: `.home-boot-splash{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:2rem 1rem;background:linear-gradient(145deg,#080806 0%,#17120a 48%,#030303 100%);color:#fff8e6;text-align:center;font-family:var(--font-caslon),Georgia,serif}.home-boot-splash .site-loading-eyebrow{font-size:.72rem;letter-spacing:.28em;text-transform:uppercase;color:rgba(255,248,230,.66)}.home-boot-splash .home-boot-splash-title{font-size:clamp(1.55rem,8vw,4.1rem);line-height:.98;margin:.4rem 0 0}.home-boot-splash .site-loading-copy{margin:.35rem 0 0;font-size:clamp(.9rem,3vw,1.05rem);color:rgba(255,248,230,.72)}`,
           }}
         />
+        {/* `--app-vh`, written before first paint.
+            Everything sized to the viewport reads this token instead of `svh`,
+            because `svh` is NOT stable in an in-app browser: measured
+            2026-08-18 in Instagram's iOS webview, `vh`/`svh`/`dvh` all resolve
+            to the SAME value and all three track the chrome (innerHeight
+            729<->853). See `ViewportHeightToken` for the full measurement.
+
+            Inline and synchronous on purpose. Setting this after hydration
+            would let the page lay out at the CSS fallback first and jump when
+            the token landed — reintroducing, at load, the exact class of shift
+            this removes during scroll. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{document.documentElement.style.setProperty('--app-vh',window.innerHeight+'px')}catch(e){}`,
+          }}
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }}
         />
       </head>
-      {/* `min-h-svh`, NOT `min-h-screen` (2026-08-18).
-          Tailwind's `min-h-screen` compiles to `min-height: 100vh`, and on
-          mobile `100vh` is the LARGE viewport — the height with the in-app
-          browser's toolbar retracted. That made every page whose content is
-          shorter than the screen about one toolbar-height taller than the
-          visible area, i.e. scrollable by exactly that much. That is enough
-          travel to trigger Instagram's hide-on-scroll, which grows the viewport,
-          which removes the need to scroll, which brings the toolbar back — the
-          loop the owner reported as the page "jumping".
-          `svh` is measured against fully-expanded chrome and does not move.
+      {/* `min-h-[var(--app-vh)]`, NOT `min-h-screen` and no longer `min-h-svh`.
+          Two corrections, a few hours apart on 2026-08-18, and the second
+          supersedes the first:
 
-          ⚠️ The 2026-08-11 svh sweep MISSED this because it searched for CSS
-          unit literals, and `min-h-screen` contains none. A source-guard test
-          (`lib/__tests__/viewport-units.test.ts`) now rejects the alias so it
-          cannot return unsearchably. See DECISIONS, *"Viewport height is `svh`,
-          and `resize` is never listened to bare"*.
+          1. Tailwind's `min-h-screen` compiles to `min-height: 100vh`. On
+             mobile `100vh` is the LARGE viewport, so every page shorter than
+             the screen carried about one toolbar-height of phantom scroll —
+             enough travel to trigger hide-on-scroll, which grows the viewport,
+             which removes the need to scroll, which brings the toolbar back.
+             That was real, and the 2026-08-11 svh sweep could not see it
+             because the alias contains no unit literal.
+          2. `min-h-svh` did not fix it, because **`svh` is not stable in an
+             in-app browser.** Measured in Instagram's iOS webview on the live
+             site: `vh`, `svh` and `dvh` all resolve to the SAME value and all
+             three track the chrome (innerHeight 729<->853). Instagram resizes
+             the webview natively, so WebKit sees a plain window resize and has
+             no small-vs-large viewport to distinguish.
 
-          ℹ️ Accepted trade (owner, 2026-08-18): on a page SHORTER than the
-          screen with the toolbar hidden, this leaves a thin strip of the page
-          background below the footer's `#f3f3f3`. ~50px of a near-identical
-          tone, on sign-in/sign-up/404 only. */}
-      <body className="min-h-svh flex flex-col">
+          `--app-vh` is written before first paint by the inline script above
+          and refreshed only through `onLayoutAffectingResize`, so toolbar
+          movement cannot touch it. See `ViewportHeightToken`.
+
+          ℹ️ The cosmetic trade the owner accepted for `svh` still applies and is
+          unchanged: on a page SHORTER than the screen with the toolbar hidden,
+          a thin strip of page background shows below the footer's `#f3f3f3`. */}
+      <body className="min-h-[var(--app-vh)] flex flex-col">
         <NextIntlClientProvider locale={locale} messages={messages}>
           {/* CartProvider must wrap WishlistProvider: WishlistDrawer (rendered by
               WishlistProvider) has an Add to Cart button that calls useCart(), so it
@@ -176,6 +197,7 @@ export default async function LocaleLayout({ children, params }: Props) {
               it reads `window.location.search` in an effect instead, so it
               cannot deopt the 454 prerendered pages the way the bar above
               could. */}
+          <ViewportHeightToken />
           <ViewportDebugOverlay />
           <CartProvider locale={locale}>
             <WishlistProvider locale={locale}>

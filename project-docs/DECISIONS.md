@@ -3158,6 +3158,59 @@ accurate `sizes`, and targeted priority are preferred before full row/card
 virtualization, because virtualization would complicate accessibility, focus,
 history, and responsive layout.
 
+### `svh` is NOT stable in an in-app browser — freeze the height in JS
+
+Added 2026-08-18. **This supersedes the core premise of the entry below it.**
+That entry says `svh` "is measured against FULLY-EXPANDED chrome and is stable
+across exactly this event". Measured on the live site in Instagram's iOS in-app
+browser, that is false there:
+
+| reading | value |
+| --- | --- |
+| `vh` / `svh` / `dvh` probes | **all three identical**, and all three moved |
+| `innerHeight` | swung **729 ↔ 853** — 124px of chrome |
+| homepage document height | moved **423px** |
+
+**Why.** Instagram resizes the WKWebView natively instead of retracting browser
+chrome. WebKit therefore sees a plain window resize: there is no "small" versus
+"large" viewport to distinguish, the three unit families collapse into one
+number, and that number tracks the toolbar. `svh` is no more stable than `dvh`
+in the one environment it was adopted for. It remains correct everywhere else,
+which is why this was invisible for a week.
+
+**Why it jumps.** Only elements in normal flow that CHANGE DOCUMENT HEIGHT
+matter — a page whose height moves under a scroll is the jump. The homepage hero
+is the amplifier: its runway is `(100svh - header) + 240svh`, i.e. **3.4 × the
+unit**, so 124px of chrome became 3.4 × 124 = **421.6px** against 423px measured.
+The arithmetic closes to under 2px.
+
+**The rule.** Anything sized to the viewport that contributes to document height
+reads **`var(--app-vh)`**, never a viewport unit:
+
+- `globals.css` defines `--app-vh: 100svh` as the no-JS fallback — correct
+  everywhere `svh` behaves per spec.
+- An inline script in `[locale]/layout.tsx` overwrites it with a pixel value
+  **before first paint**. Setting it after hydration would lay the page out at
+  the fallback and jump when the token landed, reintroducing at load exactly the
+  shift this removes during scroll.
+- `ViewportHeightToken` refreshes it **only** through `onLayoutAffectingResize`,
+  whose 160px tolerance sits comfortably above the 124px measured here — so
+  toolbar movement can never move it, while a rotation still does.
+
+Verified by measurement, both directions: a 124px height change leaves
+`--app-vh`, the document height (7820px) and the hero runway (2844px) all
+completely unmoved, where the `svh` rule would have taken the runway to 2423px;
+a rotation updates the token and the runway follows.
+
+⚠️ Do not "simplify" a `var(--app-vh)` back to `100svh`. It looks like a
+pointless indirection and is the whole fix.
+⚠️ Max-heights on modals and panels were deliberately left on `svh`. They do
+not contribute to document height, so they cannot cause this.
+⚠️ Tailwind's `*-screen` aliases are separately banned — see rule 3 below.
+That was a real defect and it was NOT the cause of this; fixing it changed
+nothing on the failing device, because `vh` and `svh` are the same moving number
+there.
+
 ### Viewport height is `svh`, and `resize` is never listened to bare
 
 Added 2026-08-11 after the owner reported the classic in-app-browser stutter:

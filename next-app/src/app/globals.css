@@ -116,6 +116,23 @@
    padding instead of inflating this. */
 :root {
   --site-header-height: 3.5rem; /* 56px = 32px content + 12px above/below */
+
+  /* Stable viewport height. Measured 2026-08-18 in Instagram's iOS in-app
+     browser: `vh`, `svh` and `dvh` ALL resolve to the same value there, and
+     that value TRACKS the chrome (innerHeight swings 729<->853, a 124px
+     toolbar). Instagram resizes the WKWebView natively, so WebKit sees a plain
+     window resize and the three unit families collapse into one moving number
+     — `svh` is not stable in the one environment the 2026-08-11 batch adopted
+     it for.
+
+     An inline script in `[locale]/layout.tsx` overwrites this with a pixel
+     value before first paint, and `ViewportHeightToken` refreshes it only
+     through `onLayoutAffectingResize` (width change, or >160px) so toolbar
+     movement never touches it.
+
+     The `100svh` here is the no-JS fallback and is correct everywhere `svh`
+     behaves per spec. Do NOT "simplify" a `var(--app-vh)` back to `100svh`. */
+  --app-vh: 100svh;
 }
 @media (min-width: 768px) {
   :root {

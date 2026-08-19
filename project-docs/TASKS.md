@@ -93,37 +93,33 @@ Two things follow, and Phase 1 exists because of them:
 - Fixing it and shipping blind would repeat the mistake this task exists to
   correct.
 
-### Two post-fix drift candidates
+### ✅ ROOT CAUSE, measured from the failing device 2026-08-18
 
-Both are touch-only, both are invisible on a desktop, and both landed AFTER the
-`svh` fix. Neither is proven; both are cheap to discriminate with the overlay.
+The `*-screen` fix shipped and the jump was unchanged. The overlay screenshotted
+from inside Instagram settles it: **`vh`, `svh` and `dvh` all resolve to the SAME
+value there, and all three track the chrome** (`innerHeight` 729 ↔ 853, 124px).
+Instagram resizes the WKWebView natively, so WebKit sees a plain window resize
+and has no small-vs-large viewport to distinguish. `svh` — adopted in 2026-08-11
+precisely because it is "stable across exactly this event" — is no more stable
+than `dvh` here.
 
-1. **The shared photo swipe (2026-08-17, `lib/photo-swipe.ts`).** It attaches a
-   **non-passive `touchmove` that calls `preventDefault()`** to the product
-   gallery and the shop cards — most of the scrollable surface on a phone. A
-   non-passive touch listener takes the compositor off the fast scroll path,
-   because it has to wait on JavaScript to learn whether the scroll is being
-   cancelled. `DECISIONS.md` already warns that "photos are most of the
-   scrollable surface on both surfaces".
-2. **The hero touch snap (2026-08-09, `HomeHeroStack.tsx`).** `animateTo()`
-   reasserts `window.scrollTo` **every frame for up to 1.6s**, deliberately, to
-   beat platform momentum — a one-shot `scrollTo` would lose to it. And
-   `readMetrics()` re-reads `pinStart` and `travel` from live layout at
-   touch-start and again at touch-end. A toolbar transition mid-gesture is
-   precisely the case where those two reads disagree; the snap would then
-   animate the page to a wrong absolute position and hold it there against the
-   visitor's finger. It fires on every gesture inside the hero runway with
-   `|dy| >= 8px`, which on a phone is most of the homepage.
+The homepage hero is the amplifier: runway `(100svh - header) + 240svh` = **3.4 ×
+the unit**, so 3.4 × 124 = **421.6px** against the **423px** of document-height
+movement measured. A page whose height changes under a scroll IS the jump.
 
-   ℹ️ Note the scroll handler uses a **cached** `travel` (refreshed only through
-   `onLayoutAffectingResize`, whose 160px tolerance deliberately ignores toolbar
-   movement) while the snap recomputes it **live**. Those two can disagree by
-   construction.
+**Fixed** with `--app-vh` (inline pre-paint script + `ViewportHeightToken`,
+refreshed only via `onLayoutAffectingResize`). Verified both ways: a 124px height
+change leaves token, document height and runway unmoved; a rotation updates them.
+See `DECISIONS.md`, *"`svh` is NOT stable in an in-app browser"*.
 
-🔴 **Ask the owner when it last worked.** That single fact splits these:
-the `svh` fix only reached PRODUCTION on 2026-08-17 — the same day as the photo
-swipe — so an "it worked on the live site" memory has a one-day window, whereas
-"it worked when I tested it on my phone over the LAN" points much earlier.
+**Both earlier candidates are resolved rather than left hanging:**
+
+- **The hero touch snap is CLEARED.** Homepage `auto-scroll` maxed at 134px ≈ the
+  124px toolbar travel — the browser clamping scroll as the document resized, not
+  the 1-second animated snap, which would show large sustained movement.
+- **The photo swipe's non-passive `touchmove` is not implicated** by this data
+  either. It remains a plausible cause of scroll *jank* distinct from this jump;
+  nothing here argues for changing it.
 
 ### ✅ Done 2026-08-18 (undeployed) — the fix, the guard, the instrument
 

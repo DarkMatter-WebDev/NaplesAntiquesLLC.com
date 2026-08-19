@@ -74,10 +74,21 @@ function sourceFiles(directory: string): string[] {
  * `//` is ignored when preceded by `:` so a `https://` URL survives intact.
  */
 function codeLines(file: string): string[] {
-  return readFileSync(file, 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, ' '))
-    .split('\n')
-    .map((line) => line.replace(/(^|[^:])\/\/.*$/, '$1'));
+  return (
+    readFileSync(file, 'utf8')
+      // ⚠️ Load-bearing, not tidying. This repo mixes CRLF and LF sources.
+      // Splitting CRLF text on `\n` leaves a trailing `\r` on every line, and
+      // in JavaScript `\r` is a LINE TERMINATOR: `.` will not cross it and `$`
+      // (no `m` flag) wants end-of-string, so the `//` pattern below silently
+      // fails to match and every line comment in a CRLF file survives the
+      // strip. The guard then reports its own rationale as a violation.
+      // Caught 2026-08-18, when the hero assertion flagged three comment lines
+      // quoting old runway figures.
+      .replace(/\r\n?/g, '\n')
+      .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, ' '))
+      .split('\n')
+      .map((line) => line.replace(/(^|[^:])\/\/.*$/, '$1'))
+  );
 }
 
 function scan(pattern: RegExp) {
@@ -99,9 +110,28 @@ describe('viewport height units', () => {
     expect(scan(SCREEN_ALIAS)).toEqual([]);
   });
 
-  it('keeps the page shell on svh, since it applies to every page', () => {
+  it('keeps the page shell on the stable token, since it applies to every page', () => {
+    // Not `min-h-screen` (100vh) and not `min-h-svh` either: `svh` is not
+    // stable in an in-app browser. Measured 2026-08-18 in Instagram's iOS
+    // webview, `vh`/`svh`/`dvh` all resolve to the same value and all three
+    // track the chrome. `--app-vh` is frozen at load instead.
     const layout = readFileSync(join(process.cwd(), 'src', 'app', '[locale]', 'layout.tsx'), 'utf8');
-    expect(layout).toContain('<body className="min-h-svh flex flex-col">');
+    expect(layout).toContain('<body className="min-h-[var(--app-vh)] flex flex-col">');
+  });
+
+  it('leaves no viewport-unit sizing in the hero, which amplifies it 3.4x', () => {
+    // The homepage runway is `(100svh - header) + 240svh` = 3.4 x the unit, so
+    // a 124px chrome swing became 423px of DOCUMENT HEIGHT — measured on the
+    // live site, and the arithmetic closes at 3.4 x 124 = 421.6. A page whose
+    // height changes under a scroll is the jump. These must read `--app-vh`.
+    //
+    // Comments stripped first: this file's own history notes quote the runway
+    // figures ("110svh", "240svh") a dozen times, and a scan that trips on its
+    // own rationale is a scan the next person deletes.
+    const hero = codeLines(join(process.cwd(), 'src', 'components', 'home', 'HomeHeroStack.tsx'))
+      .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
+      .filter(({ line }) => /\d+svh/.test(line));
+    expect(hero).toEqual([]);
   });
 
   it('confines dvh to the non-scrolling shells that legitimately need it', () => {

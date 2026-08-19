@@ -988,7 +988,7 @@ export default function HomeHeroStack({
 
              The PHASE_* fractions divide whatever budget is set here, so they do
              not need re-tuning alongside it. */
-          height: calc((100svh - var(--site-header-height)) + 240svh);
+          height: calc((var(--app-vh) - var(--site-header-height)) + (var(--app-vh) * 2.4));
         }
 
         /* DESKTOP ONLY: a slightly shorter runway, i.e. a slightly faster hero
@@ -1020,14 +1020,14 @@ export default function HomeHeroStack({
            only. */
         @media not all and (pointer: coarse) {
           .home-hero-stack {
-            height: calc((100svh - var(--site-header-height)) + 210svh);
+            height: calc((var(--app-vh) - var(--site-header-height)) + (var(--app-vh) * 2.1));
           }
         }
 
         .home-hero-stack-frame {
           position: sticky;
           top: var(--site-header-height); /* pinned just below the fixed site header */
-          height: calc(100svh - var(--site-header-height));
+          height: calc(var(--app-vh) - var(--site-header-height));
           overflow: hidden;
           /* Seeded with slideshow A's solid color (A is the resting pane); the
              scroll handler repaints this with the dominant pane's color. */
@@ -1105,7 +1105,7 @@ export default function HomeHeroStack({
           /* No travel: the runway is exactly the frame, so nothing pins and
              the single slideshow + overlay render as the original hero. */
           .home-hero-stack {
-            height: calc(100svh - var(--site-header-height));
+            height: calc(var(--app-vh) - var(--site-header-height));
           }
           .home-hero-stack-pane--b,
           .home-hero-stack-pane--c {
