@@ -10,10 +10,6 @@ import CookieNotice from '@/components/legal/CookieNotice';
 import CustomerReveal from '@/components/layout/CustomerReveal';
 import SocialBackgroundPublishProvider from '@/components/admin/SocialBackgroundPublishProvider';
 import RouteProgressBar from '@/components/layout/RouteProgressBar';
-// TEMPORARY (2026-08-18): diagnostic for the in-app-browser viewport jump.
-// Renders null unless the URL carries `?vpdebug=1`. Remove this import, its
-// mount below, and the component itself once the jump is understood and fixed.
-import ViewportDebugOverlay from '@/components/layout/ViewportDebugOverlay';
 import ViewportHeightToken from '@/components/layout/ViewportHeightToken';
 import { jsonLdHtml } from '@/lib/json-ld';
 import { GEO, mapsUrl, openingHoursSchema, postalAddressSchema } from '@/lib/business-location';
@@ -192,13 +188,10 @@ export default async function LocaleLayout({ children, params }: Props) {
           <Suspense fallback={null}>
             <RouteProgressBar />
           </Suspense>
-          {/* TEMPORARY diagnostic — see the import note. Deliberately NOT inside
-              a Suspense boundary and deliberately NOT using `useSearchParams`:
-              it reads `window.location.search` in an effect instead, so it
-              cannot deopt the 454 prerendered pages the way the bar above
-              could. */}
+          {/* Writes `--app-vh`. Not inside a Suspense boundary and not using
+              `useSearchParams`, so it cannot deopt the 454 prerendered pages the
+              way the bar above could. */}
           <ViewportHeightToken />
-          <ViewportDebugOverlay />
           <CartProvider locale={locale}>
             <WishlistProvider locale={locale}>
               <SocialBackgroundPublishProvider>

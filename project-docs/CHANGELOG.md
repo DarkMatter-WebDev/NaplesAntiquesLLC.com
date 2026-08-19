@@ -1,6 +1,29 @@
 
 # Changelog
 
+## 2026-08-18 (13) — Jump confirmed gone; diagnostic removed
+
+Owner deployed and confirmed from inside Instagram: **the jump is gone.**
+
+Verified on production before removing anything:
+`<body class="min-h-[var(--app-vh)] flex flex-col">`, the pre-paint
+`setProperty('--app-vh', window.innerHeight+'px')` script, and the
+`--app-vh:100svh` no-JS fallback are all serving.
+
+**Removed:** `ViewportDebugOverlay`, its import and mount in
+`[locale]/layout.tsx`, the visible DEBUG button, the `?vpdebug=1` handling, the
+`nej-vpdebug` storage key, and the component's entry in the `dvh` allowlist —
+leaving `AdminShell` as the only exemption. Confirmed **0** occurrences of
+`vpdebug` in the built JS.
+
+**Kept:** `--app-vh` and `ViewportHeightToken` (the fix), and
+`lib/__tests__/viewport-units.test.ts` (the guard — `*-screen` aliases banned,
+`dvh` confined, the hero held free of viewport units, and the `<body>` shell
+pinned to the token).
+
+Gate from a deleted `.next`: `tsc` clean, `lint` clean, **1021/1021 across 100
+files**, build exit 0, **454/454 static pages**.
+
 ## 2026-08-18 (12) — ROOT CAUSE: `svh` is not stable in an in-app browser
 
 The `*-screen` fix shipped and the owner reported the jump unchanged. The

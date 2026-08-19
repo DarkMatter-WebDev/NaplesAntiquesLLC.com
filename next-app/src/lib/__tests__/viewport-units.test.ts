@@ -43,10 +43,11 @@ const SOURCE_ROOTS = [join(process.cwd(), 'src', 'app'), join(process.cwd(), 'sr
  * internal scrolling, so the page never scrolls, the toolbar never auto-hides,
  * and `dvh` fills the visible area exactly where `svh` would leave dead space.
  *
- * `ViewportDebugOverlay` measures all three units on purpose and is TEMPORARY —
- * when that component goes, this entry goes with it.
+ * It is the ONLY exemption. The temporary `ViewportDebugOverlay`, which probed
+ * all three units deliberately, was removed 2026-08-18 once the jump was fixed,
+ * and its entry went with it.
  */
-const DVH_ALLOWED = new Set(['components/admin/AdminShell.tsx', 'components/layout/ViewportDebugOverlay.tsx']);
+const DVH_ALLOWED = new Set(['components/admin/AdminShell.tsx']);
 
 /** Sizing uses of `dvh`, not the word appearing in prose or a comment. */
 const DVH_SIZING = /(?:\d+(?:\.\d+)?dvh|\bh-dvh\b)/;

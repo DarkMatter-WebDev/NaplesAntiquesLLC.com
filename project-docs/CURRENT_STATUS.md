@@ -785,17 +785,9 @@ rather than assume. A rotated cron secret must change in three places: Netlify
   maxed at 134px ≈ the 124px toolbar travel, i.e. the browser clamping scroll as
   the document resized — not the 1-second animated snap.
 
-  🔴 **Still to do: deploy, then re-read the overlay on the same phone** and
-  confirm `doc height moves` has collapsed. Then remove the overlay (component,
-  its mount, the DEBUG button, and its `dvh` allowlist entry) and the temporary
-  `?vpdebug=1` handling.
-
-  ⚠️ Two known flaws in the overlay, worth knowing when reading a screenshot:
-  its ranges **persist across client-side navigation** (`settle()` arms on
-  `load`, which an App Router navigation does not fire), so a second page's
-  numbers carry the first page's extremes — read the MINIMUM; and
-  `vh-svh gap: 0px (no retractable chrome)` is a **wrong label** — the gap is 0
-  because `vh` and `svh` are the same dynamic value, not because nothing moves.
+  ✅ **Deployed and owner-confirmed 2026-08-18: the jump is gone.** The
+  temporary `?vpdebug=1` overlay and its DEBUG button have been removed; 0
+  occurrences of `vpdebug` remain in the built JS.
 - The fixed site header is fully opaque (`#f9f9f7`, no backdrop blur; the mobile
   menu panel likewise), and its height comes from one token,
   `--site-header-height` — 3.5rem on phones, 4.5rem from md up. The header is
@@ -1077,15 +1069,11 @@ rather than assume. A rotated cron secret must change in three places: Netlify
 
 ## Immediate Priorities
 
-1. 🔴 **The in-app-browser viewport jump is BACK — owner-reported 2026-08-18,
-   after the deploy.** Opening the site from an Instagram link and scrolling up
-   and down makes Instagram's bottom toolbar show/hide and the page jump. This
-   is the same symptom the 2026-08-11 `svh` batch was meant to close, and that
-   batch was **never verified in the real environment** — the note under
-   *Storefront And Accounts* has said so since it shipped. Investigated
-   2026-08-18: **nothing reverted**; the gap is that the sweep matched CSS unit
-   *literals* and could not see Tailwind's `*-screen` aliases, which compile to
-   `100vh`. See `TASKS.md` → *IN-APP-BROWSER VIEWPORT JUMP*.
+1. ✅ **The in-app-browser viewport jump is FIXED and owner-confirmed
+   (2026-08-18).** Root cause was that **`svh` is not stable in an in-app
+   browser** — `vh`/`svh`/`dvh` all resolve to one moving number in Instagram's
+   iOS webview. Replaced by the `--app-vh` token. The temporary diagnostic has
+   been removed. See `TASKS.md` and DECISIONS.
 2. **Deploy the viewport-jump batch.** ✅ Staging is CURRENT — rebuilt after this
    session, **854 files / 19.59 MB**, 0 Extras / 0 FAILED, follow-up dry run
    0-copy. Then run the rest of the focused production smoke list in `TASKS.md`,

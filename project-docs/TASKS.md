@@ -3,198 +3,38 @@
 > Actionable open work plus a short recent-completions summary. Full history is
 > in `CHANGELOG.md`. Last reconciled: **2026-08-18**.
 
-## 🔴 IN-APP-BROWSER VIEWPORT JUMP — reopened by the owner 2026-08-18
+## ✅ IN-APP-BROWSER VIEWPORT JUMP — FIXED AND OWNER-CONFIRMED 2026-08-18
 
-**Symptom, owner-reported after the 2026-08-18 deploy.** Open the site from an
-Instagram link. Scrolling up and down makes Instagram's bottom toolbar show and
-hide, and the whole page jumps with it.
+Deployed and confirmed by the owner from inside Instagram: **the jump is gone.**
+Closed. Full detail in `CHANGELOG.md` 2026-08-18 (11)–(13) and `DECISIONS.md`,
+*"`svh` is NOT stable in an in-app browser"*.
 
-This is the symptom the 2026-08-11 `svh` batch was written to close. Investigated
-2026-08-18, **read-only — no code changed**; the plan below is proposed and
-awaiting owner sign-off.
+**Root cause, measured rather than inferred.** `vh`, `svh` and `dvh` all resolve
+to the SAME value in Instagram's iOS webview, and all three track the chrome
+(`innerHeight` 729 ↔ 853, 124px). Instagram resizes the WKWebView natively, so
+WebKit sees a plain window resize with no small-vs-large viewport to
+distinguish. The 2026-08-11 batch adopted `svh` *because* it is "stable across
+exactly this event" — true per spec, false there, which is why two rounds of
+fixes changed nothing.
 
-### Nothing on the 2026-08-11 LIST reverted — but that list is not the whole story
+The homepage hero amplified it: runway `(100svh - header) + 240svh` = **3.4 × the
+unit**, so 124px of chrome became 3.4 × 124 = **421.6px** against **423px**
+measured. A page whose height moves under a scroll is the jump.
 
-⚠️ An early read of this investigation concluded "nothing reverted" flatly. That overstated it. Checking a batch's own table can only clear that batch's own table; it says nothing about code added AFTER it, which is where the owner's "it worked, then it drifted" would actually live. The owner is right that something changed. See *Two post-fix drift candidates*.
+**Fix:** `--app-vh`, written before first paint and refreshed only through
+`onLayoutAffectingResize`. ⚠️ Do not "simplify" a `var(--app-vh)` back to
+`100svh` — it looks like a pointless indirection and is the whole fix. Guarded
+by `lib/__tests__/viewport-units.test.ts`.
 
-Every item the 2026-08-11 fix touched is still exactly as it shipped:
+**The temporary diagnostic is REMOVED** (2026-08-18): `ViewportDebugOverlay`,
+its mount, the DEBUG button, the `?vpdebug=1` handling, and its `dvh` allowlist
+entry. Verified: **0** occurrences of `vpdebug` in the built JS.
 
-| Item from `CHANGELOG.md` 2026-08-11 (later 5) | State 2026-08-18 |
-| --- | --- |
-| `.shop-filter-sidebar` → `calc(100svh - 7.5rem)` | intact (`shop-page-renderer.tsx`, with the explanatory comment) |
-| `.checkout-page` → `vh` then `svh` | intact (`CheckoutClient.tsx`) |
-| account panel/modal, account security → `82svh`, `min(96svh, calc(100svh - 1rem))` | intact |
-| `error.tsx` `70svh`, `[locale]/not-found.tsx` `60svh`, `ContactForm` `min(88svh, 48rem)` | intact |
-| Nine admin modals → `max-h-[calc(100svh-2rem)]` | intact |
-| Two deliberate `h-dvh` shells in `AdminShell` | intact, and still the only `dvh` in the app |
-| `lib/viewport-resize.ts` + its 10 tests | intact |
-| All three `resize` listeners routed through `onLayoutAffectingResize` | intact — **zero** bare `resize` listeners in `src/` |
-
-Measured against the running dev server: the shipped stylesheet contains **no
-`dvh` rule at all**, so the CSS half of the fix genuinely holds.
-
-⚠️ **Git history was not consulted** — this folder has no git workflow
-(`AGENTS.md`). The conclusion above comes from reading the current source
-against the changelog's own table, not from a diff.
-
-### The real gap: Tailwind's `*-screen` aliases were invisible to the sweep
-
-The 2026-08-11 sweep looked for CSS unit **literals** (`vh`, `dvh`). Tailwind's
-`min-h-screen` compiles to `min-height: 100vh` and contains no such literal, so
-no grep in that session could have found it. Confirmed from the served
-stylesheet, not inferred:
-
-```text
-.min-h-screen { min-height: 100vh; }
-```
-
-Eight usages remain, **all customer-facing**:
-
-| File | Line | Why it matters |
-| --- | --- | --- |
-| `src/app/[locale]/layout.tsx` | 129 | `<body className="min-h-screen flex flex-col">` — **every page on the site** |
-| `src/app/not-found.tsx` | 27 | root 404 |
-| `src/app/[locale]/account/page.tsx` | 161 | account |
-| `src/app/[locale]/account/security/page.tsx` | 53 | account |
-| `src/app/[locale]/account/sign-in/page.tsx` | 78 | short page |
-| `src/app/[locale]/account/sign-up/page.tsx` | 230, 257 | short page |
-| `src/app/[locale]/account/reset-password/page.tsx` | 334 | short page |
-
-**The tell that this is an oversight, not a decision:** that same batch converted
-`[locale]/not-found.tsx` from `60vh` to `60svh` while leaving `app/not-found.tsx`
-on `min-h-screen`. Two 404 pages, one fixed and one not, differing only in
-whether the unit was spelled out.
-
-### Why `min-height: 100vh` on `<body>` produces this exact symptom
-
-On mobile, `100vh` resolves to the **large** viewport — the height with the
-toolbar retracted. So on every page whose content is shorter than the screen,
-the body is roughly one toolbar-height **taller than the visible area**, which
-makes an otherwise unscrollable page scrollable by exactly that much. That is
-enough travel to trigger the toolbar's hide-on-scroll, which grows the viewport,
-which removes the need to scroll, which brings the toolbar back — a feedback
-loop whose visible form is a page that jumps while the toolbar flickers.
-
-It also adds phantom scroll at the bottom of every long page, which is where the
-browser's scroll clamp is most visible when the viewport height changes.
-
-### The honest limit of this investigation
-
-**This cannot be reproduced locally**, and that is precisely why the 2026-08-11
-fix shipped unverified and is being reopened now. On a desktop browser
-`100vh == innerHeight`, so the phantom scroll is exactly zero and the loop cannot
-occur. Everything above is code-and-spec reasoning plus measurements from the
-served stylesheet; **none of it is a measurement of the failure itself.**
-
-Two things follow, and Phase 1 exists because of them:
-- Do not treat the `*-screen` finding as *proven* to be the whole cause. It is a
-  real, unambiguous defect, and it is the best-supported candidate — not a
-  confirmed diagnosis.
-- Fixing it and shipping blind would repeat the mistake this task exists to
-  correct.
-
-### ✅ ROOT CAUSE, measured from the failing device 2026-08-18
-
-The `*-screen` fix shipped and the jump was unchanged. The overlay screenshotted
-from inside Instagram settles it: **`vh`, `svh` and `dvh` all resolve to the SAME
-value there, and all three track the chrome** (`innerHeight` 729 ↔ 853, 124px).
-Instagram resizes the WKWebView natively, so WebKit sees a plain window resize
-and has no small-vs-large viewport to distinguish. `svh` — adopted in 2026-08-11
-precisely because it is "stable across exactly this event" — is no more stable
-than `dvh` here.
-
-The homepage hero is the amplifier: runway `(100svh - header) + 240svh` = **3.4 ×
-the unit**, so 3.4 × 124 = **421.6px** against the **423px** of document-height
-movement measured. A page whose height changes under a scroll IS the jump.
-
-**Fixed** with `--app-vh` (inline pre-paint script + `ViewportHeightToken`,
-refreshed only via `onLayoutAffectingResize`). Verified both ways: a 124px height
-change leaves token, document height and runway unmoved; a rotation updates them.
-See `DECISIONS.md`, *"`svh` is NOT stable in an in-app browser"*.
-
-**Both earlier candidates are resolved rather than left hanging:**
-
-- **The hero touch snap is CLEARED.** Homepage `auto-scroll` maxed at 134px ≈ the
-  124px toolbar travel — the browser clamping scroll as the document resized, not
-  the 1-second animated snap, which would show large sustained movement.
-- **The photo swipe's non-passive `touchmove` is not implicated** by this data
-  either. It remains a plausible cause of scroll *jank* distinct from this jump;
-  nothing here argues for changing it.
-
-### ✅ Done 2026-08-18 (undeployed) — the fix, the guard, the instrument
-
-Owner approved *fix + instrument together* and *accept the strip*.
-
-| | |
-| --- | --- |
-| **All eight `*-screen` sites** → `min-h-svh`, including `<body>` | the shell one applies to every page |
-| **Source-guard test** `lib/__tests__/viewport-units.test.ts` | rejects `min-h-screen`/`h-screen`/`max-h-screen`, confines `dvh` to the two argued-for `AdminShell` shells, and pins that file to exactly 2 |
-| **`ViewportDebugOverlay`** behind `?vpdebug=1` | flag-gated diagnostic, removed once this is closed |
-
-**Gate, from a deleted `.next` with the dev server stopped:** `tsc` clean ·
-`lint` clean · **1020/1020 across 100 files** (was 1016/99) · build exit 0,
-**454/454 static pages** — the prerender invariant holds despite the root layout
-being touched. Served `<body class="min-h-svh flex flex-col">` confirmed in the
-prerendered HTML, and `.min-h-svh{min-height:100svh}` in the built CSS.
-
-**The guard was negative-controlled**, not just observed passing: a probe file
-carrying `min-h-screen` and `h-dvh` was added, both assertions failed on it, and
-the probe was removed. A guard that has never been seen to fail is not evidence.
-
-⚠️ Accepted cosmetic trade (owner): on a page SHORTER than the screen with the
-toolbar hidden, `min-h-svh` leaves a thin strip of page background below the
-footer's `#f3f3f3`. ~50px of a near-identical tone, on sign-in/sign-up/404 only.
-
-⚠️ `.min-h-screen{min-height:100vh}` is STILL in the compiled CSS and that is
-not a failure. Tailwind's scanner is a plain string scan and does not parse, so
-the class named in the comments explaining this rule is enough to emit it. The
-rule is applied by nothing. **Check the served `<body class>`, not the
-stylesheet** — this is the same shape as the documented "a broken absence check
-looks exactly like a clean result" trap.
-
-### How to read the overlay, on the phone that fails
-
-🔴 **Turn it on with the visible DEBUG button, bottom-left on every page.**
-`?vpdebug=1` still works where there is an address bar, but **the Instagram
-in-app browser has none** — you arrive on whatever URL the link carried and
-cannot edit it, which is why a query-string-only switch could not reach the one
-environment that fails. Owner asked for a visible button, explicitly and knowing
-it is on a live storefront; it is temporary and is the first thing to delete
-when this closes.
-
-Tapping DEBUG stores the choice and **reloads**, so the measurement starts from
-a clean baseline. It then persists across navigation until TURN OFF, which
-clears the key and drops the query string.
-
-Open the site from an Instagram link, tap DEBUG, scroll up and down until the
-toolbar has moved several times, then screenshot it.
-
-| Line | What it settles |
-| --- | --- |
-| `vh-svh gap` | the retractable chrome as CSS sees it — **this is the phantom scroll** `100vh` was adding. `0px` means the shell theory does not apply on this device |
-| `doc height moves` | a magnitude, deliberately not a YES/no verdict — late content settles the document by a few px after load, so compare it against `toolbar travel` on the next line. Comparable to the toolbar = something is still sized to the dynamic viewport. `no`, or a few px, plus a visible jump = the cause is not CSS units at all |
-| `auto-scroll Nx max Mpx` | scrolling with no finger on the glass. A large `max` is the **hero snap** mis-targeting — candidate 2 |
-| `toolbar travel` | how far `innerHeight` actually moved |
-| `offsetTop` | the browser sliding the visual viewport under a fixed page |
-
-ℹ️ It ignores the first 600ms after `load` on purpose. Without that it reported
-the page's own load growth as `doc height moves: YES 6238px` — an instrument
-answering its own headline question wrongly on every page load.
-
-ℹ️ It polls at 250ms as well as listening. Measured here: a non-compositing
-webview suppresses `scroll` events AND `requestAnimationFrame` entirely while
-still moving `scrollY` — a 1200px programmatic scroll produced **0 scroll events
-and 0 frames**, and only `setTimeout` ran. Without the poll the overlay could
-not have been verified before shipping, which is the whole failure mode this
-task exists to stop repeating.
-
-### Still open
-
-1. **Deploy, then read the overlay on the phone that fails.** Nothing here is
-   "done" on a desktop measurement.
-2. **Answer the drift question** with the owner's "when did it last work".
-3. **Then remove the overlay** — the component, its mount in
-   `[locale]/layout.tsx`, and its entry in the guard's `dvh` allowlist.
+✅ Two things this closed that had been left open as suspects: the **hero touch
+snap is cleared** (homepage `auto-scroll` maxed at 134px ≈ the 124px toolbar
+travel — scroll clamping, not the 1s animated snap), and the `*-screen` → `svh`
+conversion was a **real defect but not the cause**, kept because it is correct
+everywhere `svh` behaves per spec.
 
 ## 🔴 TOP OF THE LIST (2026-08-18)
 
