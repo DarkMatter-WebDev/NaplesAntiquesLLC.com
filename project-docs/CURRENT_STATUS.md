@@ -155,19 +155,26 @@ background (owner-reported 2026-08-19, fixed same day). Transient overlay
 max-heights — modals, drawers, the boot splash — are the one deliberate
 exception and stay on `svh`, because they *should* fit what is visible now.
 
-### 🔴 One undeployed fix (2026-08-19, after the handoff below)
+### 🟡 Two undeployed defensive changes; one unexplained failure
 
-Both social drips now carry a 20s wall-clock budget. They were bounded by row
-count (25) but never by TIME, and Netlify cuts a synchronous function at
-**26 seconds** — `facebook-drip` ran 25s and GitHub reported `curl (56)`.
-`maxDuration = 60` on those routes was a Vercel contract Netlify ignores, and is
-now `26` with a comment. No duplicate-post risk: the publish step is idempotent.
-Gate: `tsc`/`lint` clean, **1029/1029**, **454/454**. **Not deployed.**
+`facebook-drip` failed once (run #124, 2026-08-19) with `curl (56)` after 25s —
+Netlify's 26s ceiling. **123 of the 124 runs before it passed.**
 
-✅ **A `pull_request` trigger was suspected and DISPROVED.** The GitHub mobile
-app mislabelled the run; github.com shows **"Triggered via schedule"**, the
-repo's workflow file is byte-identical to this folder's, and the run fired at
-03:00 UTC, squarely inside its cron. Do not re-raise it; see `TASKS.md`.
+✅ The 25s was startup or platform, not handler work: the queue was empty
+(owner-confirmed), so the handler does three Supabase calls, and warm the
+endpoint answers in **0.2s** — from the route itself, since `/api/*` is outside
+the middleware matcher.
+
+🔴 **What consumed the 25s is NOT established.** Two theories were formed and
+both overstated: "published more than fit" (impossible — empty queue) and "the
+`sharp` + `next/og` import graph makes cold starts expensive" (chain real,
+causation unproven). A transient platform stall is not excluded. Detail and the
+three failed measurement attempts: `CHANGELOG.md` 2026-08-20.
+
+**Staged, not deployed:** a 20s wall-clock budget on both drip loops, and a lazy
+`./images` import. Both correct on their own terms; **neither is a fix for that
+failure** and the code comments say so. Gate: `tsc`/`lint` clean, **1029/1029**,
+**454/454**. Watch the next few runs before doing anything more.
 
 ### ◻ What is actually open
 

@@ -76,38 +76,39 @@ load with **zero** console errors, and `--app-vh` still lands —
 prerender count is a structural invariant: `tsc` clean · `lint` clean ·
 **1024/1024** · build **454/454 pages**.
 
-## 🔴 SCHEDULED-JOBS TIMEOUT — fixed, NOT yet deployed (2026-08-19)
+## 🟡 SCHEDULED-JOBS: `facebook-drip` failed once; cause NOT established
 
-Owner forwarded a GitHub Actions failure email for `facebook-drip`:
-`curl (56)`, exit 56, POST 25s, job dead at 26s — Netlify closing the connection
-on a synchronous function that ran past its ceiling.
+Run #124 (2026-08-19, 03:00 UTC) failed with `curl (56)` after 25s — Netlify
+cutting a synchronous function at its 26s ceiling. **123 of the 124 runs before
+it passed.**
 
-Both drips now carry a 20s wall-clock budget and defer the remainder to the next
-run. Detail in `CHANGELOG.md` 2026-08-19 (4) and DECISIONS, *"A bounded bulk run
-must also be bounded in TIME"*. No duplicate-post risk existed or exists — the
-publish step is idempotent and checkpoint-safe.
+✅ **Established:** the 25s was startup or platform, NOT handler work. With the
+queue empty (owner-confirmed) `runScheduledDrip` does three Supabase calls;
+warm, the endpoint answers in **0.2s**, and that 0.2s is the route itself
+(`proxy.ts:21` — `/api/*` is outside the middleware matcher).
 
-⚠️ **Deploy this**, or the drip keeps failing on any run with more than a couple
-of due posts.
+🔴 **NOT established:** what consumed the 25s. Two theories were formed and
+neither survived as proven — first "it published more than fit in 26s"
+(impossible: empty queue), then "the `sharp` + `next/og` import graph makes cold
+starts expensive" (chain is real, causation unproven; three measurement attempts
+failed, see `CHANGELOG.md` 2026-08-20). **A transient Netlify/Supabase stall is
+not excluded.**
 
-✅ **A `pull_request` trigger was suspected and DISPROVED — do not re-raise it.**
-The GitHub mobile app labelled run #124 "Triggered via pull request by
-chrissurette". It was wrong. Checked on github.com 2026-08-19:
+### ◻ What to do
 
-- The run page reads **"Triggered via schedule"**, `on: schedule`, and every one
-  of the 124 runs is listed as `Scheduled`.
-- The repo's `.github/workflows/scheduled-jobs.yml` is **byte-identical** to
-  this folder's copy — 198 lines, `on:` declaring only `schedule` and
-  `workflow_dispatch`. There is no drift.
-- The run fired **2026-08-19 23:00:28 −4:00 = 03:00 UTC**, and UTC hour 3 is in
-  `0 0-5,16-23 * * *`. It was 28 seconds late, which is normal.
+1. **Deploy the two staged defensive changes** — a 20s wall-clock budget on both
+   drip loops, and a lazy `./images` import so a no-op drip cannot load the
+   image stack. Both are correct on their own terms and neither is claimed as a
+   fix. Gate: `tsc`/`lint` clean, **1029/1029**, **454/454**.
+2. **Watch the next few runs.** One failure in 124 does not justify more surgery.
+3. **If it recurs, run the one measurement that settles it:** leave the site
+   idle ~15 minutes, then time a single unauthenticated POST to
+   `/api/admin/facebook/drip`. Seconds ⇒ cold-start cost is real. Fast ⇒ the 25s
+   was transient and the import theory is dead.
 
-ℹ️ The misreading that made this look real: the phone screenshot's `11:03` was
-**PM**, read as AM, which put the run outside the cron window and seemed to
-corroborate the app's label. The reliable signal was there all along — only
-`github.event.schedule` matching the drip cron can produce "two jobs ran, three
-skipped" under these `if:` conditions. **Trust the `if:` deduction over the
-mobile app's event label.**
+⚠️ **Do not re-run the three failed measurements** (grepping the built route
+chunk, timing a local `next start`, or a `Module._load` probe) — all three are
+recorded in `CHANGELOG.md` 2026-08-20 with why they proved nothing.
 
 ## ✅ ALL `svh` SURFACES CONVERTED — DONE, DEPLOYED, OWNER-VERIFIED 2026-08-19
 

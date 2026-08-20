@@ -9,12 +9,19 @@ export const SOCIAL_SCHEDULED_DRIP_BATCH_SIZE = 25;
 /**
  * Wall-clock budget for one drip run.
  *
- * ⚠️ THE BATCH SIZE ABOVE IS NOT A LIMIT ON RUNTIME, and runtime is what
- * actually kills these workers. Netlify's ceiling for a SYNCHRONOUS function is
- * **26 seconds**. On 2026-08-19 the Facebook drip ran 25s and Netlify cut the
- * connection mid-response; GitHub Actions reported it as `curl (56) Failure when
- * receiving data from the peer` and the job went red. Nothing in the code was
- * wrong — it simply published more posts than fit in 26 seconds.
+ * ⚠️ THE BATCH SIZE ABOVE IS NOT A LIMIT ON RUNTIME. Netlify's ceiling for a
+ * SYNCHRONOUS function is **26 seconds**, and 25 sequential Meta publishes
+ * cannot fit inside it, so a full queue would be cut off mid-response.
+ *
+ * ℹ️ HONEST PROVENANCE: this was written after the Facebook drip failed on
+ * 2026-08-19 with `curl (56)` at 25s, on the theory that it had published more
+ * than fit. **That theory was WRONG** — the owner confirmed the queue was empty
+ * that run, and with zero rows this loop does three Supabase calls and returns.
+ * The real cause of that 25s was never established; see DECISIONS.
+ *
+ * The budget is kept anyway because the reasoning stands on its own: an
+ * unbounded loop over a third party inside a 26s ceiling WILL fail once a queue
+ * exists. It is correct insurance, not a diagnosis.
  *
  * ⚠️ `export const maxDuration = 60` on the drip routes does NOT raise that.
  * `maxDuration` is a Vercel contract; Netlify ignores it. Do not "fix" a

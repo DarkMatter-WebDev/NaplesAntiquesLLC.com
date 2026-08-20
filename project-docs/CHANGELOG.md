@@ -1,6 +1,69 @@
 
 # Changelog
 
+## 2026-08-20 — The drip diagnosis was WRONG; cause still unestablished
+
+The owner supplied one fact that broke the 2026-08-19 (4) diagnosis: **there
+were no scheduled posts**. With an empty queue `runScheduledDrip` does three
+Supabase calls and returns — it cannot take 25 seconds. The theory that
+`facebook-drip` had published more than fit in 26s was therefore impossible.
+
+### What is actually established
+
+| Fact | Evidence |
+| --- | --- |
+| Handler work with 0 due rows is trivial | 3 Supabase calls; read from source |
+| Warm, the endpoint answers in **0.2s** | measured against production |
+| That 0.2s is the ROUTE, not middleware | `proxy.ts:21` — `/api/*` is outside the matcher |
+| Run #124 took 25s; Netlify cut it at 26s | GitHub Actions |
+| 123 of 124 prior runs passed; durations 6s–30s | Actions run list |
+
+⇒ The 25s was **startup or platform, not handler work**. That much is certain.
+
+### What is NOT established — and was claimed too confidently
+
+The follow-up theory was that the route's static import graph
+(`facebook/sync.ts` → `./images` → `instagram/images.ts` → `sharp` (19MB of
+native binaries) and `instagram/card.ts` → `next/og` (3.2MB WASM)) made cold
+starts expensive. The import chain is real and was confirmed by reading source.
+**That it caused the 25s was never proven.**
+
+Three attempts failed to establish it, each recorded so nobody repeats them:
+
+- **Grepping the built route chunk** — useless. `route.js` is a 1.0K stub and
+  the real code lives in shared chunks; the positive control read 0 too, which
+  is the only reason the method was caught as meaningless.
+- **Timing a cold `next start` locally** — 10ms. A local machine with warm page
+  cache does not model a cold serverless container.
+- **Instrumenting `Module._load` to log heavy loads** — the probe works
+  (verified against a plain `require('sharp')`) but fired **zero** times even for
+  `card-preview`, which statically imports the card renderer and returned a
+  route-level 401. Under the webpack-bundled server the probe does not observe
+  what it does in plain Node, so the result neither confirms nor refutes.
+
+With 1 failure in 124 runs, **a transient Netlify or Supabase stall remains a
+live alternative** and is not excluded.
+
+### What was kept, and why
+
+Both changes stay as defence in depth, with their comments corrected to stop
+claiming they fixed anything:
+
+- **The 20s wall-clock budget.** Correct on its own terms — an unbounded loop
+  over a third party inside a 26s ceiling will fail once a queue exists. It is
+  insurance, not a diagnosis.
+- **The lazy `./images` import.** Costs nothing and guarantees the scheduled
+  drip, which usually has nothing to publish, cannot pay for an image stack it
+  never uses.
+
+**Next step if it recurs:** leave the site idle ~15 minutes, then time a single
+unauthenticated POST to the drip route. `/api/*` bypasses middleware, so that
+request exercises the real route. Seconds ⇒ startup; fast ⇒ the 25s was
+transient.
+
+Gate: `tsc` clean, `lint` clean, **1029/1029 across 100 files**, build exit 0,
+**454/454 static pages**.
+
 ## 2026-08-19 (4) — Social drips were unbounded in TIME; Netlify cut them at 26s
 
 Owner forwarded a GitHub Actions failure email: `facebook-drip` red,

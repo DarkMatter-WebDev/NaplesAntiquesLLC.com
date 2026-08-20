@@ -30,7 +30,6 @@ import {
   validateEditedSocialCaptionOpening,
 } from '@/lib/social-caption-opening';
 import { adaptSocialCaptionForTarget } from '@/lib/social-publish-both';
-import { buildFacebookRenditions, deleteRenditions } from './images';
 import {
   getConnection,
   getPost,
@@ -39,6 +38,55 @@ import {
   upsertPost,
   type FacebookPostRow,
 } from './store';
+
+/**
+ * `./images` is imported LAZILY, and these two wrappers exist only to make that
+ * happen without touching the call sites.
+ *
+ * WHY
+ * ---
+ * `./images` reaches `sharp` (19MB of native binaries under `@img`) and
+ * `next/og` (3.2MB of Satori + resvg WASM). A STATIC import pulls all of that
+ * into this module's graph, so `/api/admin/{channel}/drip` paid the full
+ * initialisation cost on every cold invocation — before the handler ran, and
+ * even to return a 401.
+ *
+ * ℹ️ WHAT IS AND IS NOT ESTABLISHED. On 2026-08-19 `facebook-drip` spent 25s
+ * and Netlify cut it at the 26s ceiling, with an EMPTY queue — so the handler's
+ * own work (three Supabase calls) cannot explain it, and warm the same endpoint
+ * answers in 0.2s. Startup is therefore where the time went. That this import
+ * graph is what made startup expensive is **plausible but UNPROVEN**: a local
+ * probe could not confirm the heavy modules load under the webpack-bundled
+ * server, so it neither confirmed nor refuted. 123 of 124 runs had passed, so a
+ * transient platform stall remains a live alternative.
+ *
+ * This change is kept as defence in depth: it costs nothing, and it guarantees
+ * the scheduled drip — which usually has nothing to publish — cannot pay for an
+ * image stack it never uses. Do not describe it as the fix for that failure.
+ *
+ * ⚠️ Do NOT "tidy" these back into a static import. The scheduled drip usually
+ * has nothing to publish, and this keeps the image stack off that path
+ * entirely. The prepare/publish paths that genuinely need it pay the cost then,
+ * where it belongs.
+ *
+ * ℹ️ Scoped to this edge deliberately: `sharp` and `next/og` are reachable only
+ * through `lib/instagram/images.ts` and `lib/instagram/card.ts`, so this one
+ * import is the whole connection.
+ */
+type ImagesModule = typeof import('./images');
+
+async function buildFacebookRenditions(
+  ...args: Parameters<ImagesModule['buildFacebookRenditions']>
+): Promise<Awaited<ReturnType<ImagesModule['buildFacebookRenditions']>>> {
+  return (await import('./images')).buildFacebookRenditions(...args);
+}
+
+async function deleteRenditions(
+  ...args: Parameters<ImagesModule['deleteRenditions']>
+): Promise<Awaited<ReturnType<ImagesModule['deleteRenditions']>>> {
+  return (await import('./images')).deleteRenditions(...args);
+}
+
 
 /**
  * Facebook publishing state machine — same states and operator flow as

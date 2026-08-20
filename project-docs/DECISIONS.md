@@ -3771,6 +3771,12 @@ Added 2026-08-19, after the Facebook drip went red with
 `curl (56) Failure when receiving data from the peer` — the server closing the
 connection mid-response.
 
+⚠️ **The incident that prompted this rule was NOT caused by it.** The owner
+confirmed the queue was empty that run, so nothing was published and the loop
+never iterated. What consumed the 25s was never established (see `CHANGELOG.md`
+2026-08-20). The rule below stands on its own reasoning, not on that evidence —
+keep it, but do not cite that failure as proof of it.
+
 **Netlify cuts a SYNCHRONOUS function at 26 seconds.** The drip selected up to 25
 due rows and published them sequentially with no clock. A cap of 25 says nothing
 about how long 25 Meta publishes take, and the platform only enforces time.
@@ -3796,6 +3802,13 @@ a loop whose steps are not resumable.**
 ⚠️ **`export const maxDuration` is a VERCEL contract and Netlify ignores it.**
 It read 60 on both drip routes and bought nothing. Raising it is never the fix
 for a timeout here.
+
+⚠️ **A cap on COUNT is not a cap on TIME** is the durable half of this. The
+diagnosis that produced it was wrong twice over, which is itself the lesson: an
+error signature that *fits* a theory is not evidence for it. `curl (56)` at 25s
+against a 26s ceiling fit "too much work" perfectly, and the work was zero.
+**Ask what the code actually does with the data it actually had** before
+believing a timing signature.
 
 ⚠️ A budget cannot rescue a run where ONE step exceeds the whole ceiling. That
 needs a background function, which returns 202 immediately and gives up the loud
