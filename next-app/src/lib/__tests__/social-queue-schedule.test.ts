@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  createDripBudget,
   formatSocialScheduleChoice,
   formatSocialScheduleInput,
   getDefaultSocialScheduledFor,
   parseSocialScheduleChoice,
   parseSocialScheduleInput,
   SOCIAL_QUEUE_POSTING_SLOTS,
+  SOCIAL_DRIP_TIME_BUDGET_MS,
   SOCIAL_SCHEDULED_DRIP_BATCH_SIZE,
   validateSocialScheduledFor,
 } from '@/lib/social-queue-schedule';
@@ -69,5 +71,67 @@ describe('social queue schedule', () => {
     expect(validateSocialScheduledFor('not-a-date', now).error).toMatch(/invalid/i);
     expect(validateSocialScheduledFor('2026-08-02T13:59:00.000Z', now).error).toMatch(/future/i);
     expect(validateSocialScheduledFor('2028-08-02T22:00:00.000Z', now).error).toMatch(/12 months/i);
+  });
+});
+
+// The drip budget exists because the BATCH SIZE never bounded runtime, and
+// runtime is what kills these workers: Netlify cuts a synchronous function at
+// 26 seconds. On 2026-08-19 the Facebook drip ran 25s and the job went red with
+// `curl (56)`. These assertions pin the part that stops that recurring.
+describe('drip time budget', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const at = (ms: number) => vi.setSystemTime(new Date(ms));
+
+  it('stays under the Netlify 26s synchronous ceiling, with headroom', () => {
+    // Not a style preference: 26_000 is the platform limit, and the run still
+    // has to insert a closing sync log and serialise a response after the loop.
+    expect(SOCIAL_DRIP_TIME_BUDGET_MS).toBeLessThan(26_000);
+    expect(26_000 - SOCIAL_DRIP_TIME_BUDGET_MS).toBeGreaterThanOrEqual(5_000);
+  });
+
+  it('always attempts the first row, however tight the budget', () => {
+    vi.useFakeTimers();
+    at(0);
+    const budget = createDripBudget(1);
+    at(10_000);
+    // A stalled queue is worse than a slow one: if one slow publish could stop
+    // the loop before it started, nothing would ever post again.
+    expect(budget.exhausted(0)).toBe(false);
+  });
+
+  it('refuses to START a row that cannot finish, rather than waiting to overrun', () => {
+    vi.useFakeTimers();
+    at(0);
+    const budget = createDripBudget(20_000);
+
+    at(8_000);
+    budget.record(8_000); // one slow publish, measured
+    expect(budget.exhausted(1)).toBe(false); // 8s + 8s = 16s, fits
+
+    at(13_000);
+    // 13s elapsed + an 8s row = 21s, past the 20s budget. A naive
+    // `elapsed > budget` test would say "keep going" here and land at 21s.
+    expect(budget.exhausted(1)).toBe(true);
+  });
+
+  it('measures the SLOWEST row, not the most recent one', () => {
+    vi.useFakeTimers();
+    at(0);
+    const budget = createDripBudget(20_000);
+    budget.record(9_000);
+    budget.record(500); // a fast row must not make the loop optimistic again
+    at(12_000);
+    expect(budget.exhausted(2)).toBe(true);
+  });
+
+  it('reports elapsed time for the deferral message', () => {
+    vi.useFakeTimers();
+    at(0);
+    const budget = createDripBudget();
+    at(4_200);
+    expect(budget.elapsedMs()).toBe(4_200);
   });
 });

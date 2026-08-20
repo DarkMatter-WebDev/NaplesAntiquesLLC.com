@@ -3765,6 +3765,42 @@ them listed, and separately they cannot publish without the Department aspect. I
 watches are ever wanted on eBay, map Department and remove the id — both halves
 are needed.
 
+### A bounded bulk run must also be bounded in TIME, not just in count
+
+Added 2026-08-19, after the Facebook drip went red with
+`curl (56) Failure when receiving data from the peer` — the server closing the
+connection mid-response.
+
+**Netlify cuts a SYNCHRONOUS function at 26 seconds.** The drip selected up to 25
+due rows and published them sequentially with no clock. A cap of 25 says nothing
+about how long 25 Meta publishes take, and the platform only enforces time.
+
+Two rules:
+
+1. **Any loop that calls a third party in a serverless route needs a wall-clock
+   budget**, not just a row cap. `createDripBudget()` in
+   `social-queue-schedule.ts` is the shared one; both social channels use it so
+   they cannot drift apart.
+2. **Test "would another row fit", never "have we run out".** Measure rows as
+   they run and refuse to START one that cannot finish. `elapsed > budget`
+   begins an 8-second publish at 19.9s and lands past the ceiling — the same
+   failure with extra steps. Always attempt the FIRST row regardless, or one
+   slow item stalls the queue forever.
+
+Work not attempted is returned as `deferred` and named in the sync log; the next
+scheduled run continues. This is only safe because the publish step is
+idempotent — it early-returns on an already-published row and recovers a feed
+request Meta completed before the server stopped. **Do not add a time budget to
+a loop whose steps are not resumable.**
+
+⚠️ **`export const maxDuration` is a VERCEL contract and Netlify ignores it.**
+It read 60 on both drip routes and bought nothing. Raising it is never the fix
+for a timeout here.
+
+⚠️ A budget cannot rescue a run where ONE step exceeds the whole ceiling. That
+needs a background function, which returns 202 immediately and gives up the loud
+pass/fail this project deliberately wanted from its cron.
+
 ### A bounded bulk run must ORDER its queue, not just cap it
 
 Added 2026-08-11. `EBAY_BULK_ENQUEUE_LIMIT = 25` makes "never blanket re-sync"

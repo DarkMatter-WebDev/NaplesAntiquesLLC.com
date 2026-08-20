@@ -3,7 +3,15 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { runScheduledDrip } from '@/lib/facebook/sync';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+// ⚠️ NOT 60. `maxDuration` is a VERCEL contract and Netlify ignores it; the real
+// ceiling for a synchronous function here is 26 seconds. This said 60 until
+// 2026-08-19, when the Facebook drip ran 25s, Netlify cut the connection
+// mid-response, and GitHub Actions reported `curl (56) Failure when receiving
+// data from the peer`. The number was never doing anything.
+//
+// Raising it does not buy time. What keeps a run inside the ceiling is the
+// wall-clock budget in `runScheduledDrip` — see SOCIAL_DRIP_TIME_BUDGET_MS.
+export const maxDuration = 26;
 
 /**
  * Scheduled worker: publish the next bounded batch of due posts. Only products

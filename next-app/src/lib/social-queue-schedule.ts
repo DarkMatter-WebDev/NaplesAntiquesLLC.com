@@ -6,6 +6,60 @@ export const SOCIAL_QUEUE_MAX_MONTHS_AHEAD = 12;
 /** Per-worker safety bound only; there is intentionally no local daily cap. */
 export const SOCIAL_SCHEDULED_DRIP_BATCH_SIZE = 25;
 
+/**
+ * Wall-clock budget for one drip run.
+ *
+ * ⚠️ THE BATCH SIZE ABOVE IS NOT A LIMIT ON RUNTIME, and runtime is what
+ * actually kills these workers. Netlify's ceiling for a SYNCHRONOUS function is
+ * **26 seconds**. On 2026-08-19 the Facebook drip ran 25s and Netlify cut the
+ * connection mid-response; GitHub Actions reported it as `curl (56) Failure when
+ * receiving data from the peer` and the job went red. Nothing in the code was
+ * wrong — it simply published more posts than fit in 26 seconds.
+ *
+ * ⚠️ `export const maxDuration = 60` on the drip routes does NOT raise that.
+ * `maxDuration` is a Vercel contract; Netlify ignores it. Do not "fix" a
+ * timeout by raising that number.
+ *
+ * 20s leaves ~6s of headroom for the connection lookup, the closing sync-log
+ * insert, and response serialisation.
+ */
+export const SOCIAL_DRIP_TIME_BUDGET_MS = 20_000;
+
+/**
+ * Stops a drip loop before it runs out of platform time.
+ *
+ * The check is "would ANOTHER row fit", not "have we run out" — measuring the
+ * rows as they go and refusing to START one that cannot finish. A plain
+ * `elapsed > budget` test is not enough: it happily begins an 8-second publish
+ * at 19.9s and lands at ~28s, past the ceiling, which is the same red job with
+ * extra steps.
+ *
+ * The first row always runs. Otherwise a single slow publish would mean nothing
+ * ever gets posted, and a stalled queue is worse than a slow one.
+ *
+ * ⚠️ This cannot save a run where ONE publish exceeds the whole ceiling on its
+ * own. If that starts happening the fix is a background function, not a bigger
+ * number here.
+ */
+export function createDripBudget(budgetMs: number = SOCIAL_DRIP_TIME_BUDGET_MS) {
+  const startedAt = Date.now();
+  let slowestRowMs = 0;
+
+  return {
+    /** True when the slowest row seen so far would not fit in what is left. */
+    exhausted(rowsAttempted: number): boolean {
+      if (rowsAttempted === 0) return false;
+      return Date.now() - startedAt + slowestRowMs > budgetMs;
+    },
+    record(rowMs: number): void {
+      slowestRowMs = Math.max(slowestRowMs, rowMs);
+    },
+    elapsedMs(): number {
+      return Date.now() - startedAt;
+    },
+  };
+}
+
 /** Midnight means the end of the date selected in the scheduling dialog. */
 export const SOCIAL_QUEUE_POSTING_SLOTS = [
   { value: '12:00', label: '12:00 PM - noon' },

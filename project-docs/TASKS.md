@@ -76,6 +76,39 @@ load with **zero** console errors, and `--app-vh` still lands —
 prerender count is a structural invariant: `tsc` clean · `lint` clean ·
 **1024/1024** · build **454/454 pages**.
 
+## 🔴 SCHEDULED-JOBS TIMEOUT — fixed, NOT yet deployed (2026-08-19)
+
+Owner forwarded a GitHub Actions failure email for `facebook-drip`:
+`curl (56)`, exit 56, POST 25s, job dead at 26s — Netlify closing the connection
+on a synchronous function that ran past its ceiling.
+
+Both drips now carry a 20s wall-clock budget and defer the remainder to the next
+run. Detail in `CHANGELOG.md` 2026-08-19 (4) and DECISIONS, *"A bounded bulk run
+must also be bounded in TIME"*. No duplicate-post risk existed or exists — the
+publish step is idempotent and checkpoint-safe.
+
+⚠️ **Deploy this**, or the drip keeps failing on any run with more than a couple
+of due posts.
+
+✅ **A `pull_request` trigger was suspected and DISPROVED — do not re-raise it.**
+The GitHub mobile app labelled run #124 "Triggered via pull request by
+chrissurette". It was wrong. Checked on github.com 2026-08-19:
+
+- The run page reads **"Triggered via schedule"**, `on: schedule`, and every one
+  of the 124 runs is listed as `Scheduled`.
+- The repo's `.github/workflows/scheduled-jobs.yml` is **byte-identical** to
+  this folder's copy — 198 lines, `on:` declaring only `schedule` and
+  `workflow_dispatch`. There is no drift.
+- The run fired **2026-08-19 23:00:28 −4:00 = 03:00 UTC**, and UTC hour 3 is in
+  `0 0-5,16-23 * * *`. It was 28 seconds late, which is normal.
+
+ℹ️ The misreading that made this look real: the phone screenshot's `11:03` was
+**PM**, read as AM, which put the run outside the cron window and seemed to
+corroborate the app's label. The reliable signal was there all along — only
+`github.event.schedule` matching the drip cron can produce "two jobs ran, three
+skipped" under these `if:` conditions. **Trust the `if:` deduction over the
+mobile app's event label.**
+
 ## ✅ ALL `svh` SURFACES CONVERTED — DONE, DEPLOYED, OWNER-VERIFIED 2026-08-19
 
 The five listed after the hero fix are converted, plus `.site-loading-screen` as
@@ -318,10 +351,12 @@ everywhere `svh` behaves per spec.
      line. She had not edited it; the owner chose to trim rather than wait. That
      is a deliberate, recorded override of the verbatim rule — see DECISIONS and
      the inline note in `testimonials.ts`. ⛔ One exception, not a new policy.
-   - ✅ **DONE 2026-08-19 — all five missing reviews are in.** With the
-     reconciliation below, `TESTIMONIALS` is **13 → 16**. Five were missing, not
-     four: the earlier count came from a Maps feed that stopped paginating after
-     ten, so the tail was never seen.
+   - ✅ **DONE AND DEPLOYED 2026-08-19 — all five missing reviews are in**, and
+     confirmed on production (`/`, `/es`, a product page and the legacy `.co`
+     all serve the new list; `Nolan Olivier` and `Onur` return 0 on every one).
+     With the reconciliation below, `TESTIMONIALS` is **13 → 16**. Five were
+     missing, not four: the earlier count came from a Maps feed that stopped
+     paginating after ten, so the tail was never seen.
      Added: **Ruthe Lloyd, Ariel Babastro, Ryan Smith, Edna Cavazos, Mayelin
      Pérez**.
 
@@ -697,9 +732,9 @@ it neither pollutes the source of truth nor triggers a sync storm). Its contents
 are exactly what belongs in the repo — copy *everything* in it into the repo
 folder with no exclusions to think about.
 
-✅ **Rebuilt 2026-08-19, twice.** First for the checkout-gate batch (now
-DEPLOYED and confirmed on production), then again for the **Google-reviews
-batch, which is still UNDEPLOYED and is what staging currently carries.**
+✅ **Rebuilt 2026-08-19 for both batches — the checkout gate and the review
+reconciliation — and BOTH are now DEPLOYED and confirmed on production.**
+Staging mirrors the source, so the next batch starts from a clean baseline.
 **855 files / ~19.65 MB**, **0 FAILED / 0 Extras / 0 Mismatch**,
 and a follow-up dry run reported **0 to copy**. `/MIR` deleted nothing — the
 dry run showed 0 Extras *before* it ran, which is the check that makes `/MIR`
@@ -1024,6 +1059,21 @@ Standing procedure for every deploy from this folder — the last run of it was
    erroring** — a green "sent" in Resend's log is not the check that matters.
 4. **Check for outstanding manual SQL** before deploying. (None is outstanding
    as of 2026-08-09.)
+5. ⚠️ **"The change didn't land" is usually BROWSER CACHE, not the deploy.**
+   Prove it from outside the browser before re-deploying or re-syncing staging —
+   neither of those fixes a client-side cache, and both are wasted work. Hit the
+   live URL with `curl` and grep for a marker the change removed or added:
+
+   ```bash
+   curl -s "https://naplesestatejewelry.com/" | grep -c "SOME_REMOVED_STRING"
+   ```
+
+   If that returns what you expect, the deploy is fine and the fix is a hard
+   refresh (Ctrl+F5 / Cmd+Shift+R, or a private window; on iOS Safari close the
+   tab entirely — it has no hard-refresh). This cost a round trip on 2026-08-19.
+   Context that makes it near-certain: the origin sends
+   `Cache-Control: public, max-age=0, must-revalidate`, and the site has **no
+   service worker**, so nothing is deliberately serving an offline copy.
 
 Closed and moved to CHANGELOG — do not re-litigate:
 

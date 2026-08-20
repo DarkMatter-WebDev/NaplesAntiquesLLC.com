@@ -8,16 +8,27 @@
 
 **Read this, then `TASKS.md`.**
 
-### 🔴 ONE UNDEPLOYED CHANGE — the five missing Google reviews
+### ✅ EVERYTHING IS DEPLOYED AND VERIFIED. NOTHING IS HALF-DONE.
 
-The 2026-08-19 checkout-gate batch shipped and the owner confirmed production
-good. **Since then, `TESTIMONIALS` went 13 → 16** and that is local-only,
-gate-passed, and needs a deploy plus a staging rebuild. No SQL.
+No staged batch waiting, no outstanding SQL, no undeployed code. Both 2026-08-19
+batches — the checkout sign-in/guest gate and the review reconciliation — shipped
+and were confirmed on production by fetching it. Staging mirrors the source.
+
+### ✅ Google reviews reconciled — DEPLOYED 2026-08-19, `TESTIMONIALS` 13 → 16
 
 Five reviews were missing (not the four the old note claimed — its arithmetic
 never worked: 16 − 13 = 3). The earlier count came from a Maps feed that stopped
 paginating after ten cards, so the tail was never seen. Five were added and
-three stale entries reconciled away, landing on 16.
+three stale entries reconciled away, landing on 16 — a 1:1 match with the live
+profile.
+
+⚠️ **The deploy looked like it "didn't land"; it had. Browser cache.** Before
+re-deploying or re-syncing staging on that symptom, spend ten seconds proving it
+from outside the browser — neither of those fixes a client-side cache:
+
+```bash
+curl -s "https://naplesestatejewelry.com/" | grep -c "Nolan Olivier"
+```
 
 ⚠️ **Mayelin Pérez wrote in Spanish, and her entry inverts the verbatim pair** —
 `quoteEs` is her original, `quote` is our translation. Google's card shows a
@@ -143,6 +154,20 @@ text positioned inside it was not, so the text moved alone against a stable
 background (owner-reported 2026-08-19, fixed same day). Transient overlay
 max-heights — modals, drawers, the boot splash — are the one deliberate
 exception and stay on `svh`, because they *should* fit what is visible now.
+
+### 🔴 One undeployed fix (2026-08-19, after the handoff below)
+
+Both social drips now carry a 20s wall-clock budget. They were bounded by row
+count (25) but never by TIME, and Netlify cuts a synchronous function at
+**26 seconds** — `facebook-drip` ran 25s and GitHub reported `curl (56)`.
+`maxDuration = 60` on those routes was a Vercel contract Netlify ignores, and is
+now `26` with a comment. No duplicate-post risk: the publish step is idempotent.
+Gate: `tsc`/`lint` clean, **1029/1029**, **454/454**. **Not deployed.**
+
+✅ **A `pull_request` trigger was suspected and DISPROVED.** The GitHub mobile
+app mislabelled the run; github.com shows **"Triggered via schedule"**, the
+repo's workflow file is byte-identical to this folder's, and the run fired at
+03:00 UTC, squarely inside its cron. Do not re-raise it; see `TASKS.md`.
 
 ### ◻ What is actually open
 

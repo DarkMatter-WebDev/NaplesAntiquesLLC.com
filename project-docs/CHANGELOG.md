@@ -1,9 +1,117 @@
 
 # Changelog
 
+## 2026-08-19 (4) — Social drips were unbounded in TIME; Netlify cut them at 26s
+
+Owner forwarded a GitHub Actions failure email: `facebook-drip` red,
+`curl (56) Failure when receiving data from the peer`, exit 56, POST step 25s,
+job dead at 26s.
+
+**Not a network fault and not an application error.** `curl (56)` is the server
+closing the connection mid-response. Netlify's ceiling for a SYNCHRONOUS
+function is **26 seconds**, and the run walked straight into it.
+
+**What guaranteed it.** `runScheduledDrip` selected up to
+`SOCIAL_SCHEDULED_DRIP_BATCH_SIZE` (**25**) due rows and published them
+sequentially with **no time budget** — each one uploading photos to Meta,
+creating the feed post, then reading it back to verify. The batch was bounded by
+COUNT and never by TIME, and time is the only thing the platform enforces. The
+Instagram drip carried the byte-identical loop; it passed at 11s that day
+because it had little to do, not because it was safe.
+
+⚠️ **`export const maxDuration = 60` on both routes was doing nothing.**
+`maxDuration` is a Vercel contract; Netlify ignores it. It now reads `26` with a
+comment saying so, because the next person to hit a timeout will otherwise try
+raising it.
+
+### The fix: refuse to START a row that cannot finish
+
+`createDripBudget()` in `social-queue-schedule.ts`, shared by both channels so
+they cannot drift apart. `SOCIAL_DRIP_TIME_BUDGET_MS` is **20s**, leaving ~6s for
+the connection lookup, the closing sync log and serialisation.
+
+The check is *"would another row fit"*, not *"have we run out"*. It measures
+rows as they run and refuses to begin one that cannot complete — a plain
+`elapsed > budget` test happily starts an 8-second publish at 19.9s and lands at
+~28s, which is the same red job with extra steps. **The first row always runs**,
+or a single slow publish would stall the queue permanently.
+
+Anything not attempted is returned as `deferred` and named in the sync-log
+message; the next hourly run picks it up. A red job becomes an honest 200.
+
+✅ **No duplicate-post risk, then or now.** `runPublishStep` early-returns
+`Already published.` on `sync_state === 'published' && fb_post_id` and carries
+explicit recovery for "Meta completed an earlier feed request but the server
+stopped before" recording it. The rows published before the 2026-08-19 timeout
+were safe; the rest simply waited.
+
+Five tests pin the budget, **negative-controlled**: swapping in the naive
+`elapsed > budget` fails exactly the two assertions that matter. `npm test`
+**1024 → 1029**.
+
+⚠️ This cannot rescue a run where ONE publish exceeds the whole 26s ceiling. If
+that starts happening the answer is a background function, not a bigger number.
+
+### A `pull_request` trigger was suspected and disproved — recorded so it stays disproved
+
+The GitHub **mobile app** labelled run #124 "Triggered via pull request by
+chrissurette". That produced a plausible and alarming theory: that the repo's
+workflow carried a `pull_request` trigger this folder does not, and therefore
+that opening a PR could publish to the live Facebook Page and Instagram account.
+
+**All of it was wrong.** Checked on github.com:
+
+- The run page reads **"Triggered via schedule"**, `on: schedule`, and all 124
+  runs are listed as `Scheduled`.
+- The repo's `.github/workflows/scheduled-jobs.yml` is **byte-identical** to
+  this folder's — 198 lines, `on:` declaring only `schedule` and
+  `workflow_dispatch`.
+- The run fired **2026-08-19 23:00:28 −4:00 = 03:00 UTC**; UTC hour 3 is in
+  `0 0-5,16-23 * * *`. 28 seconds late, which is normal.
+
+Two compounding errors, both worth naming. The phone screenshot's `11:03` was
+**PM**, read as AM — which put the run outside the cron window and appeared to
+corroborate the app's label. And the correct deduction was already in hand and
+was overridden: under these `if:` conditions, **only** `github.event.schedule`
+matching the drip cron can produce "two jobs ran, three skipped". A
+`pull_request` event leaves both `github.event.schedule` and `inputs.job` empty,
+which skips all five.
+
+**Trust the `if:` deduction over the mobile app's event label.** The app is not
+a reliable source for what triggered a run.
+
+Gate from a deleted `.next`: `tsc` clean, `lint` clean, **1029/1029 across 100
+files**, build exit 0, **454/454 static pages**.
+
 ## 2026-08-19 (5) — Reviews reconciled against the live profile: `TESTIMONIALS` 13 → 16
 
-◻️ **NOT DEPLOYED.** Local only; gate passed (below).
+✅ **DEPLOYED 2026-08-19 and confirmed on production.**
+
+**Verified by fetching production, not assumed:**
+
+| Surface | `Nolan Olivier` | `Onur` | New reviews | Yisel's OLD text |
+| --- | --- | --- | --- | --- |
+| `/` | **0** | **0** | all five present | **0** |
+| `/es` | **0** | — | Mayelin's Spanish original present | **0** |
+| product page | **0** | **0** | present | — |
+| legacy `.co` | **0** | — | present | — |
+
+Yisel's new text (`casually on facebook`) serves on all of them; the ES surface
+carries `casualmente en facebook` and `una de las argollas`.
+
+⚠️ **The owner reported the deploy "didn't land" — it had. It was browser
+cache.** A hard refresh cleared it. Worth the ten seconds before ever
+re-deploying or re-syncing staging on that symptom, because both are wasted
+work and neither fixes a client-side cache:
+
+```bash
+curl -s "https://naplesestatejewelry.com/" | grep -c "Nolan Olivier"
+```
+
+Two facts made the diagnosis quick rather than speculative: the origin sends
+`Cache-Control: public, max-age=0, must-revalidate` and Netlify's edge returned a
+**hit whose cached copy already held the new content**, and the codebase has
+**no service worker**, so nothing on the site deliberately keeps an offline copy.
 
 Owner asked to bring in all the Google reviews. The standing note said "four
 missing (13 of 16)". **It was five**, and the note's arithmetic never worked —

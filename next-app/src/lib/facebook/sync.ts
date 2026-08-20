@@ -1,7 +1,7 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { SOCIAL_SCHEDULED_DRIP_BATCH_SIZE } from '@/lib/social-queue-schedule';
+import { createDripBudget, SOCIAL_SCHEDULED_DRIP_BATCH_SIZE } from '@/lib/social-queue-schedule';
 import type { Product } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
 import { getSiteUrl } from '@/lib/order-email-branding';
@@ -832,6 +832,8 @@ export async function discardPrepared(
 export async function runScheduledDrip(service: SupabaseClient): Promise<{
   published: number;
   skipped: number;
+  /** Due rows this run declined to start, to stay inside the platform ceiling. */
+  deferred: number;
   message: string;
 }> {
   const connection = await getConnection(service);
@@ -842,7 +844,7 @@ export async function runScheduledDrip(service: SupabaseClient): Promise<{
     // weeks (see DECISIONS, "An absent record is a fault, not a clean slate").
     const message = 'Scheduled queue check skipped because Facebook is not connected.';
     await insertSyncLog(service, { action: 'scheduled_drip', outcome: 'warning', message });
-    return { published: 0, skipped: 0, message };
+    return { published: 0, skipped: 0, deferred: 0, message };
   }
 
   const { data: queued } = await service
@@ -856,22 +858,43 @@ export async function runScheduledDrip(service: SupabaseClient): Promise<{
     .order('queued_at', { ascending: true })
     .limit(SOCIAL_SCHEDULED_DRIP_BATCH_SIZE);
 
+  const budget = createDripBudget();
+  const rows = (queued as FacebookPostRow[]) ?? [];
   let published = 0;
   let skipped = 0;
-  for (const row of (queued as FacebookPostRow[]) ?? []) {
-    // Publishing to Facebook changes no storefront data, so there is
-    // deliberately no shop-cache revalidation here.
-    const result = await runPublishStep(service, row.product_id);
+  let deferred = 0;
+
+  for (let index = 0; index < rows.length; index += 1) {
+    // Refuse to START a row that cannot finish inside the platform ceiling.
+    // Whatever is left is simply picked up by the next hourly run — the queue
+    // drains a little slower instead of the whole job going red and publishing
+    // nothing further. See createDripBudget for why this is not `elapsed >
+    // budget`.
+    if (budget.exhausted(published + skipped)) {
+      deferred = rows.length - index;
+      break;
+    }
+
+    // Publishing changes no storefront data, so there is deliberately no
+    // shop-cache revalidation here.
+    const rowStartedAt = Date.now();
+    const result = await runPublishStep(service, rows[index].product_id);
+    budget.record(Date.now() - rowStartedAt);
+
     if (result.state === 'published') published += 1;
     else skipped += 1;
   }
 
-  const message = `Scheduled queue check complete: ${published} published, ${skipped} skipped.`;
+  const message =
+    `Scheduled queue check complete: ${published} published, ${skipped} skipped` +
+    (deferred > 0
+      ? `, ${deferred} deferred to the next run after ${budget.elapsedMs()}ms.`
+      : '.');
   await insertSyncLog(service, {
     action: 'scheduled_drip',
     outcome: skipped > 0 && published === 0 ? 'warning' : 'ok',
     message,
   });
 
-  return { published, skipped, message };
+  return { published, skipped, deferred, message };
 }
