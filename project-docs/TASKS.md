@@ -1,7 +1,7 @@
 ﻿# Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-08-18**.
+> in `CHANGELOG.md`. Last reconciled: **2026-08-20**.
 
 ## ✅ DEPLOYED 2026-08-19 — the checkout sign-in/guest gate
 
@@ -96,12 +96,26 @@ not excluded.**
 
 ### ◻ What to do
 
-1. **Deploy the two staged defensive changes** — a 20s wall-clock budget on both
-   drip loops, and a lazy `./images` import so a no-op drip cannot load the
-   image stack. Both are correct on their own terms and neither is claimed as a
-   fix. Gate: `tsc`/`lint` clean, **1029/1029**, **454/454**.
-2. **Watch the next few runs.** One failure in 124 does not justify more surgery.
-3. **If it recurs, run the one measurement that settles it:** leave the site
+1. ✅ **DEPLOYED 2026-08-20** — a 20s wall-clock budget on both drip loops, and a
+   lazy `./images` import so a no-op drip cannot load the image stack. Both are
+   correct on their own terms and **neither is claimed as a fix**. Gate:
+   `tsc`/`lint` clean, **1029/1029**, **454/454**. Endpoints verified live and
+   still secret-guarded after the deploy (401, 0.29–0.40s) — which confirms they
+   serve, not that either change did anything.
+2. ✅ **Run #125 passed and proves the new code is live.** Its `facebook-drip`
+   log returned `HTTP 200` with
+   `{"published":0,"skipped":0,"deferred":0,...}` — `deferred` exists only in
+   the new code — and the step took **1s** against #124's 25s.
+
+   ⚠️ **That is not proof the budget fixed anything.** With zero rows the loop
+   never iterates, so 1s is just the trivial handler on a healthy platform —
+   which supports the transient-stall reading. The lazy `./images` import
+   shipped later and has **not** yet had a scheduled run.
+
+3. 🟡 **OWNER: keep half an eye on the next few runs.** One failure in 125 does
+   not justify more surgery. Run list:
+   `github.com/DarkMatter-WebDev/NaplesAntiquesLLC.com/actions/workflows/scheduled-jobs.yml`
+4. **If it recurs, run the one measurement that settles it:** leave the site
    idle ~15 minutes, then time a single unauthenticated POST to
    `/api/admin/facebook/drip`. Seconds ⇒ cold-start cost is real. Fast ⇒ the 25s
    was transient and the import theory is dead.

@@ -2,16 +2,26 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-08-19**.
+> in `DECISIONS.md`. Last reconciled: **2026-08-20**.
 
-## Start Here (handoff, end of the 2026-08-19 session)
+## Start Here (handoff, end of the 2026-08-20 session)
 
 **Read this, then `TASKS.md`.**
 
-### ✅ EVERYTHING IS DEPLOYED AND VERIFIED. NOTHING IS HALF-DONE.
+### ✅ EVERYTHING IS DEPLOYED. ONE THING IS UNEXPLAINED, AND IS NOT A CODE TASK.
 
-No staged batch waiting, no outstanding SQL, no undeployed code. Both 2026-08-19
-batches — the checkout sign-in/guest gate and the review reconciliation — shipped
+No staged batch waiting, no outstanding SQL, no undeployed code. Staging mirrors
+the source exactly.
+
+🟡 **The single open item is a WATCH, not a fix:** `facebook-drip` failed once
+(run #124) and **what consumed its 25 seconds was never established**. Two
+defensive changes shipped; neither is claimed to fix it. See *Two undeployed
+defensive changes* — now deployed — further down, and `TASKS.md`.
+**Do not do more surgery on one failure in 124 runs.**
+
+### ✅ THE REST IS DEPLOYED AND VERIFIED.
+
+Both 2026-08-19 — the checkout sign-in/guest gate and the review reconciliation — shipped
 and were confirmed on production by fetching it. Staging mirrors the source.
 
 ### ✅ Google reviews reconciled — DEPLOYED 2026-08-19, `TESTIMONIALS` 13 → 16
@@ -171,10 +181,21 @@ both overstated: "published more than fit" (impossible — empty queue) and "the
 causation unproven). A transient platform stall is not excluded. Detail and the
 three failed measurement attempts: `CHANGELOG.md` 2026-08-20.
 
-**Staged, not deployed:** a 20s wall-clock budget on both drip loops, and a lazy
-`./images` import. Both correct on their own terms; **neither is a fix for that
-failure** and the code comments say so. Gate: `tsc`/`lint` clean, **1029/1029**,
-**454/454**. Watch the next few runs before doing anything more.
+✅ **Deployed 2026-08-20:** a 20s wall-clock budget on both drip loops, and a
+lazy `./images` import. Both correct on their own terms; **neither is a fix for
+that failure** and the code comments say so. Gate: `tsc`/`lint` clean,
+**1029/1029**, **454/454**.
+
+✅ **Run #125 passed and proves the new code is live** — its `facebook-drip` log
+returned `HTTP 200 {"published":0,"skipped":0,"deferred":0,...}`, and `deferred`
+exists only in the new code. Step time **1s** against #124's 25s. It also
+confirms the empty queue independently.
+
+⚠️ Not proof the budget fixed anything: with zero rows the loop never iterates,
+so 1s is the trivial handler on a healthy platform — which supports the
+transient reading. The lazy `./images` import shipped later and has not yet had
+a scheduled run. **Watch the next few; do not do more surgery on one failure in
+125.**
 
 ### ◻ What is actually open
 

@@ -3,6 +3,24 @@
 
 ## 2026-08-20 — The drip diagnosis was WRONG; cause still unestablished
 
+✅ **DEPLOYED, and run #125 proves the new code is live.** Its `facebook-drip`
+log:
+
+```text
+HTTP 200
+{"published":0,"skipped":0,"deferred":0,"message":"Scheduled queue check complete: 0 published, 0 skipped."}
+```
+
+`deferred` exists **only** in the new code, so this run exercised it. **HTTP 200,
+step time 1s** — against #124's 25s. It also independently confirms the empty
+queue that broke the original diagnosis: `published 0, skipped 0`.
+
+⚠️ **Read what that does and does not show.** With zero rows the budget loop
+never iterates, so 25s → 1s is **not** the budget working — it is the same
+trivial handler on a healthy platform. That is evidence FOR the transient-stall
+reading, not against it. The lazy `./images` import shipped in a later deploy
+and has not yet had a scheduled run.
+
 The owner supplied one fact that broke the 2026-08-19 (4) diagnosis: **there
 were no scheduled posts**. With an empty queue `runScheduledDrip` does three
 Supabase calls and returns — it cannot take 25 seconds. The theory that
