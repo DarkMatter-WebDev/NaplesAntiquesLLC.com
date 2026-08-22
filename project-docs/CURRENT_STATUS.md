@@ -2,22 +2,160 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-08-20**.
+> in `DECISIONS.md`. Last reconciled: **2026-08-21**.
 
-## Start Here (handoff, end of the 2026-08-20 session)
+## Start Here (handoff, end of the 2026-08-21 session)
 
 **Read this, then `TASKS.md`.**
 
-### ✅ EVERYTHING IS DEPLOYED. ONE THING IS UNEXPLAINED, AND IS NOT A CODE TASK.
+### ✅ DEPLOYED AND CONFIRMED — the auto-delist hook was dropping ~1 sale in 20
 
-No staged batch waiting, no outstanding SQL, no undeployed code. Staging mirrors
-the source exactly.
+Root-caused 2026-08-21. The marketplace auto-delist hook was launched as a bare
+floating promise at six call sites, and Netlify freezes the container once the
+response flushes — killing the eBay/Etsy call mid-flight. **39 of 41** sold
+products delisted correctly; 2 did not, and stayed live and buyable.
 
-🟡 **The single open item is a WATCH, not a fix:** `facebook-drip` failed once
-(run #124) and **what consumed its 25 seconds was never established**. Two
-defensive changes shipped; neither is claimed to fix it. See *Two undeployed
-defensive changes* — now deployed — further down, and `TASKS.md`.
-**Do not do more surgery on one failure in 124 runs.**
+⛔ **The hook did not fail, it was killed.** It logs an error row for any throw
+(proven — it did so on 2026-07-29). The misses left **no row of any kind** and no
+partial write. Silence meant termination.
+
+Fixed with `after()` via new `lib/product-status-hooks.ts` (+ `allSettled`, +
+real logging), plus a second hole where `adminRevalidateProduct` sat after the
+video-commit early return in `AdminShell.tsx`. `queueDeepFieldSync` deleted.
+
+⚠️ **The dangerous path was PayPal checkout, not admin.** Both misses were items
+that had sold on eBay, so the marketplace zeroed its own quantity and covered for
+us. A website sale has no such safety net.
+
+✅ **Confirmed on production** (`main@e81f9f9`). Both previously-stale products
+were run through the hook and are now `hidden_oos` qty 0 on eBay and
+`delisted`/`inactive` on Etsy, with the log rows to match. `after()` proven live:
+the Netlify function log shows `[deepfield] synced 1 product(s)` emitted from
+inside the callback, where that work used to be killed.
+
+⛔ **Never re-fire hooks via the "mark sold" quick action on an already-sold
+item** — it recomputes and overwrites `sold_price` from current spot. Use a
+no-change save in the edit modal.
+
+🔴 **`after()` is an improvement, NOT a guarantee here — read this before
+trusting the fix.** The `hide_oos` row first reported missing was not missing: it
+landed **127.6s late**, when the frozen Lambda thawed on the next request. Two
+sequential awaits cannot be 128s apart unless the process stops between them, and
+clock skew is ruled out (the Monaco's identical pair is 0.469s).
+
+Next's docs list `after()` as requiring **graceful shutdown support**; Netlify
+freezes on response instead of draining. Work that finishes inside the response
+window now lands reliably (Etsy, Deep Field); slower work (eBay, which adds a
+token round-trip) still freezes and completes only if the container is reused.
+
+⛔ This also sharpens the original diagnosis: the work was never *killed*, it was
+*frozen* — lost only when the container was reclaimed before reuse. That is why
+it was 39/41, not 0/41.
+
+✅ **The durable fix is BUILT and needs deploying: a status-drift reconcile
+sweep.** **Every 30 minutes** it asks "is anything sold still live right now?"
+and repairs what it finds — catching a missed delist regardless of cause (freeze, API error,
+or an unhooked status path). `reconcile{Ebay,Etsy}StatusDrift()` +
+`/api/admin/{ebay,etsy}/reconcile-status`, on the existing GitHub Actions
+workflow, using each channel's existing cron secret.
+
+Verified against production: read-only dry run found **0 drift on 124 eBay + 128
+Etsy listings** (the negative result that proves it will not delist healthy
+stock), then a real run completed in **1131ms / 781ms** and wrote its audit rows.
+
+⛔ **Deliberately NOT awaiting the hook in the PayPal capture path.** The
+payment is already captured before that line runs, so a hang there would turn a
+successful payment into an error page. Neither marketplace client has a request
+timeout and both retry with 1s/2s/4s backoff, against a ~26–30s gateway ceiling.
+The sweep bounds the exposure from outside instead, with no buyer-facing risk.
+Full reasoning: `CHANGELOG.md` 2026-08-21 (5); the standing decision is in
+`TASKS.md`.
+
+⚠️ **Static page count is now 456, not 454** — the two new API routes. That
+number is a structural invariant in STRUCTURE.md; this is the new baseline.
+
+Do not read a missing log row as a failed delist, or a present one as proof it
+was timely; `sync_state` and `last_pushed_qty` are the operative state.
+
+📱 **A real website sale still has not exercised this path** — the confirmation
+ran through the admin route, not PayPal checkout.
+
+### ✅ Inventory #82 is repaired ON PRODUCTION — the write-block list is now EMPTY
+
+Done and verified 2026-08-21, owner-approved. The mug's live listing was an
+external relist attached to **no** Inventory-API offer, so the daily push could
+not reach it — it sat 17 days at **$928.69** when it should have been
+**$1,068.35** (15% under), with a buyer holding it in their cart.
+
+Repaired by end-and-republish: relist `800354878200` ended, offer
+`204558136011` published as **`800547117368`** at $1,068.35 through the app's own
+`runSyncStep`. `isEbayWriteBlocked` → false, planner reports **0 blocked**
+(was 1), and the eBay-side price matches `last_pushed_price` exactly.
+
+⛔ **The rule that came out of it:** never lift a write-block to fix an
+unreachable listing — the push then writes to the orphaned offer, *succeeds*,
+and the dashboard reads clean while the live price keeps drifting. DECISIONS,
+*"A listing the Inventory API cannot reach must be republished, not unblocked"*.
+
+⚠️ Shipping moved $15 → $59 on republish. Correct: that is the current tier for
+its price band, and the old fee was a pre-tier leftover.
+
+### ✅ Full eBay reconciliation: 84 of 87 healthy, 0 price drift
+
+Every live listing was compared against eBay (one `getOffer` each). **84 exact
+matches** — published offer, ACTIVE listing, eBay price equal to
+`last_pushed_price`. Zero price drift, zero listing-id drift, zero API errors.
+The other three were the mug (now fixed) and two sold items.
+
+🟡 **Two sold products carry stale local state on BOTH channels** — verified not
+purchasable on either, so no double-sale exposure, but **the auto-delist hook
+logged nothing after either sale**. It has worked before. Worth understanding
+before a future sale leaves something genuinely buyable. See `TASKS.md`.
+
+### 🟡 DEPLOYED — the price-push timeout fix (awaiting its first scheduled run)
+
+**Shipped in `main@e81f9f9`** alongside the auto-delist fix and the write-block
+removal — one deploy carried all three. **No outstanding SQL.** Staging is stale
+as of this session and must be rebuilt before the next batch.
+
+⚠️ **Not yet verified in production:** the scheduled pushes have not run since
+the deploy. Success looks like `0 deferred` in tomorrow's `scheduled_price_push`
+summary rows on both channels.
+
+`ebay-price-push` failed on 2026-08-21 (run #142, 504 `Inactivity Timeout` after
+32s) **having already pushed all 50 prices successfully** — the gateway hung up
+a fraction of a second before the handler returned. Etsy carried the identical
+defect and had been silently deferring **15–18 listings a day** since 2026-08-20
+without ever going red.
+
+Two causes, both fixed in `lib/{ebay,etsy}/{sync,store}.ts`:
+
+1. **Bookkeeping was per-listing** — two awaited Supabase round-trips each.
+   Measured: 100 round-trips at ~157ms = **15.7s of a 22.2s run**. The
+   marketplace APIs were never the cost. Now batched.
+2. **The budget could not bound the request** — it was measured from inside the
+   push loop, so ~10s of setup fell outside it. Now an absolute `deadlineAt`
+   stamped on entry, at 20s.
+
+**Gate, from a deleted `.next`:** `tsc` clean · `lint` clean · **1033/1033
+across 101 files** · build **454/454 pages**. The four new tests were
+**mutation-tested** — reintroducing either bug fails them.
+
+⛔ **A red scheduled job does not mean the work failed.** Read the
+`scheduled_price_push` summary row in the sync log first. That row is what
+proved the prices had landed.
+
+🔴 **Still unexplained: ~5–7s of the ≥9.7s of setup.** Cold start, spot fetch
+and the three Supabase reads only account for ~3s. Recorded rather than guessed
+at; the fix does not depend on it.
+
+✅ **Cold start is NOT the explanation, for these routes or the drip.** The
+unauthenticated 401 path on production returns in **0.23–0.67s** across 5
+attempts. This kills the unproven `sharp`/`next/og` cold-start theory carried
+over from the 2026-08-20 `facebook-drip` investigation — **do not re-raise it.**
+
+🟡 **`facebook-drip` (run #124) remains a WATCH, not a fix.** Still unexplained,
+still one failure in 125 runs. **Do not do more surgery on it.**
 
 ### ✅ THE REST IS DEPLOYED AND VERIFIED.
 

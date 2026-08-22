@@ -346,15 +346,13 @@ export async function syncProductsToDeepField(productIds: string[]): Promise<voi
   }
 }
 
-/**
- * Fire-and-forget entry point for the product-write chokepoints.
- *
- * Returns immediately. Never rejects, so a bare call needs no `.catch()` at the
- * call site to be safe — though call sites still use `void … .catch(() => {})`
- * to match the surrounding Etsy/eBay convention.
- */
-export function queueDeepFieldSync(productIds: string[]): void {
-  void syncProductsToDeepField(productIds).catch((error) => {
-    console.error('[deepfield] queued sync failed:', error);
-  });
-}
+// `queueDeepFieldSync` lived here until 2026-08-21 and is deliberately GONE.
+// It was a `void syncProductsToDeepField(ids).catch(...)` wrapper — the exact
+// floating-promise shape that let two sold products stay live on eBay and Etsy,
+// because Netlify freezes the container once the response flushes and nothing
+// waits for an un-awaited promise. Callers now go through
+// `lib/product-status-hooks.ts`, which hands the work to `after()`.
+//
+// ⛔ Do not reintroduce a fire-and-forget wrapper here. `syncProductsToDeepField`
+// already never rejects; scheduling is the caller's job, and there is exactly
+// one correct way to schedule it.

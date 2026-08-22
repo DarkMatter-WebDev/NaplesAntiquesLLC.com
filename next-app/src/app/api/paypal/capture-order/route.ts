@@ -3,9 +3,7 @@ import { revalidateTag } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/service';
 import { capturePayPalOrder, getPayPalOrderCapture, paypalConfigured, type PayPalCaptureResult } from '@/lib/paypal';
 import { finalizePaidOrder, notifyItemConflict } from '@/lib/order-finalize';
-import { handleProductStatusChange as handleEtsyProductStatusChange } from '@/lib/etsy/sync';
-import { handleProductStatusChange as handleEbayProductStatusChange } from '@/lib/ebay/sync';
-import { queueDeepFieldSync } from '@/lib/deepfield/sync';
+import { scheduleProductStatusHooks } from '@/lib/product-status-hooks';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -225,18 +223,23 @@ export async function POST(req: Request) {
   revalidateTag('shop-catalog', { expire: 0 }); // purchased items are now 'sold' in the gallery
 
   // Phase 2 auto-delist (etsy-sync-plan/03-sync-lifecycle.md Flow 3 and
-  // ebay-sync-plan/03-sync-lifecycle.md Flow 3): fire-and-forget, best-effort
-  // — never block the buyer's confirmation on Etsy or eBay.
-  const { data: capturedItems } = await service.from('order_items').select('product_id').eq('order_id', order.id);
-  const capturedProductIds = (capturedItems ?? []).map((item) => item.product_id).filter((id): id is string => Boolean(id));
-  void handleEtsyProductStatusChange(capturedProductIds).catch(() => {});
-  void handleEbayProductStatusChange(capturedProductIds).catch(() => {});
+  // ebay-sync-plan/03-sync-lifecycle.md Flow 3). Runs after the response, so it
+  // still never blocks the buyer's confirmation — but as work the runtime
+  // drains rather than a floating promise the freeze kills.
+  //
+  // 🔴 This path is the one that matters most. A WEBSITE sale has no safety
+  // net: when the August misses happened the items had sold on eBay, so eBay
+  // zeroed its own quantity and covered for us. Nothing covers a sale made
+  // here — a missed delist leaves the item live and buyable on both channels.
+  //
   // Deep Field mirrors the sold flip too. The status change happens inside the
   // capture_paypal_order database function, so this HTTP path is the only place
   // application code learns about it — adminRevalidateProduct(s) is never called
   // here, and hooking only there would leave Deep Field showing sold items as
-  // available. Fire-and-forget: never block the buyer's confirmation.
-  queueDeepFieldSync(capturedProductIds);
+  // available.
+  const { data: capturedItems } = await service.from('order_items').select('product_id').eq('order_id', order.id);
+  const capturedProductIds = (capturedItems ?? []).map((item) => item.product_id).filter((id): id is string => Boolean(id));
+  scheduleProductStatusHooks(capturedProductIds);
 
   // Invoice upsert (idempotent) + auto receipt email. Shared with the webhook
   // backstop so a browser-death capture still produces both. Best-effort — the

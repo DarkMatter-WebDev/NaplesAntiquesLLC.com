@@ -319,6 +319,12 @@ place).
   unchanged, 1 blocked, 0 failed, 6 deferred"* (the 1 blocked is #82). Note the
   GitHub secret must match Netlify's `EBAY_CRON_SECRET`; a mismatch returns
   `401 {"code":"unauthorized","message":"Invalid cron secret."}`.
+  ⚠️ **Bookkeeping is BATCHED and the budget is an ABSOLUTE deadline** since
+  2026-08-21 — recording each push individually cost 100 Supabase round-trips
+  (15.7s of a 22.2s run) and the loop-relative budget could not bound the
+  request, which together drew a gateway 504 *after* all 50 prices had landed.
+  See DECISIONS, *"Marketplace bookkeeping is batched"*. Do not unpick either;
+  `lib/__tests__/marketplace-price-push-batching.test.ts` guards them.
 - **Not built:** a dedicated "eBay: out of date / error / not listed"
   product-table filter chip — there's no existing single-marketplace filter
   control on the Etsy side to extend, so this was skipped rather than

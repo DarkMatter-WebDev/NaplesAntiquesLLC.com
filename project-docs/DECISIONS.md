@@ -3597,6 +3597,193 @@ Price-only drift does not mark content out of date; dedicated price-push actions
 handle price changes. Marketplace failures never block storefront cache
 revalidation or successful buyer checkout.
 
+### Never put a marketplace call in the buyer's payment path
+
+⛔ **Do not `await` the auto-delist hook in the PayPal capture route.** By the
+time that line runs the payment is **already captured**, so anything that hangs
+converts a successful payment into an error page — the buyer is charged and
+believes they were not. That is strictly worse than a delist arriving late.
+
+The tail is not bounded: `lib/ebay/client.ts` and `lib/etsy/client.ts` both call
+`fetch()` with **no `AbortSignal`**, and both retry 3× with 1s/2s/4s backoff —
+7s of sleep plus four round-trips — against a gateway that cuts at ~26–30s.
+Multi-item orders multiply it, because each channel loops products sequentially.
+
+⚠️ More generally: an outage at eBay or Etsy must never become an outage at
+checkout. Marketplace sync is not on the critical path of taking money.
+
+**Bound the exposure from OUTSIDE instead.** The reconcile sweep runs every 30
+minutes and needs nothing from the request. If near-zero exposure is ever
+genuinely required, the safe shape is start-the-work → await with a short cap →
+hand the SAME promise to `after()` regardless, so a slow marketplace can never
+strand a paid buyer. Never a plain `await`.
+
+ℹ️ The PayPal **webhook** is the exception: no buyer waits on that response, so
+awaiting there costs nothing.
+
+### On a freeze-on-response platform, post-response work is best-effort BY DESIGN
+
+⛔ **Do not treat `after()` as a guarantee on Netlify.** Next's own feature
+matrix lists `after()` as **"Requires graceful shutdown support"**
+(`deploying-to-platforms.md`), and `self-hosting.md#after` defines that as a
+SIGTERM drain with a 10–30s window. Netlify's Lambda model **freezes** the
+container the moment the response flushes — there is no drain.
+
+Measured 2026-08-21, in the act: a `hide_oos` log insert landed **127.6 seconds**
+after the `upsertListing` two lines above it. Two sequential awaits cannot be
+128s apart unless the process stops in between. Clock skew is excluded — the
+same pair of statements for another product, same code path, is 0.469s apart, and
+the two timestamps come from different clocks (Node vs Postgres). The late
+completions coincided with the next request to the site: freeze → thaw on reuse.
+
+⚠️ **What `after()` did and did not buy.** It reliably covers work that finishes
+inside the response window — the Etsy delist and Deep Field push now land where
+they used to be dropped. It does NOT cover slower work: eBay's branch adds an
+`ensureFreshAccessToken` round-trip and was still in flight when the function
+returned at 995ms.
+
+⛔ **The correct mental model for the original bug is FROZEN, not KILLED.** Work
+suspended on a container that is later reused finishes late; work on a container
+reclaimed while cold is lost forever. That is why the failure rate was 39/41
+rather than 0/41, and why it was impossible to reproduce on demand.
+
+**Therefore: anything that MUST happen gets a reconcile sweep, not a better
+scheduling primitive.** A scheduled job that finds sold products whose listings
+are still live and delists them is the only approach that does not depend on the
+platform honouring post-response work — and it also catches API errors and
+status paths nobody hooked. Make it synchronous instead only where the latency
+is acceptable to the user doing the action.
+
+### Post-response work uses `after()`. A floating promise is not scheduling.
+
+⛔ **Never launch background work as `void promise.catch(() => {})` in a route
+handler or Server Action.** On Netlify the Lambda freezes the moment the response
+flushes and kills anything still in flight. Next registers `after()` callbacks as
+pending work and drains them before exit; an un-awaited promise is invisible to
+it. `docs/01-app/02-guides/self-hosting.md` is explicit about this.
+
+This was not theoretical. Six call sites used that shape for the marketplace
+auto-delist hook, and it dropped roughly **one sale in twenty**: 39 of 41 sold
+products delisted correctly, 2 did not, and the two that failed left a sold item
+live and buyable. It is a RACE — the same hook worked again two days later — so
+it will never reproduce on demand and never fail in local dev, where the process
+does not freeze.
+
+⛔ **The tell is silence, not an error.** `handleProductStatusChange` logs a
+`status_change_hook` error row for any throw. The failures left no row of any
+kind and no partial write. If a side effect has simply *not happened* with
+nothing in the log, suspect termination before suspecting a bug.
+
+**All product-write side effects now go through
+`lib/product-status-hooks.ts` → `scheduleProductStatusHooks()`**, which wraps
+them in `after()`, uses `Promise.allSettled` so one marketplace cannot cancel the
+other, and **logs** failures. `queueDeepFieldSync` was deleted rather than left
+unused, because it was the same broken shape waiting to be picked up again.
+
+⚠️ **A website sale is the dangerous case, not the admin one.** Both August
+misses were items that had sold on eBay, so eBay zeroed its own quantity and
+covered for us. Nothing covers a PayPal checkout sale.
+
+### Persist first, announce second — an early return must not strand a write
+
+⛔ **Do not put cache revalidation or side-effect hooks after unrelated work that
+can `return` early.** In the admin edit modal the product row (status included)
+was written, then the video was committed, and only then was
+`adminRevalidateProduct` called — so a video-commit failure left a sold item
+cached as available and never delisted from either marketplace.
+
+The row write and the announcement that it happened are one unit. Anything
+optional and unrelated goes after both.
+
+### A listing the Inventory API cannot reach must be republished, not unblocked
+
+⛔ **Never lift a write-block to "fix" a listing the API cannot reach.** eBay
+listings created outside the Inventory API — a Seller Hub relist, a "Sell
+similar" — carry the same custom label (SKU) but are attached to **no** Inventory
+offer. `bulk_update_price_quantity` cannot touch them by any route.
+
+Removing the guard makes it worse, not better: the push writes to the orphaned
+UNPUBLISHED offer, **succeeds**, and advances `last_pushed_price` while the live
+listing stays frozen. The dashboard then reads "0 blocked" and the drift grows
+unseen. Inventory #82 sat 17 days at a 15% discount exactly this way
+(2026-08-21).
+
+**The only repair that restores normal management is end-and-republish:** end
+the external listing, reset local state to `sync_state: 'ended'` with
+`ebay_listing_id: null`, then publish through `runSyncStep(id, 'publish')` — not
+raw API calls, so content hash, price, quantity and state land identically to
+every other listing. Cost: a new item number and the loss of the old listing's
+views, watchers and carts. That cost is real and the owner must approve it.
+
+⚠️ **A republished listing re-enters the CURRENT shipping tiers.** #82 went
+$15.00 → $59.00 because its price band demands it; the old fee was a pre-tier
+leftover that survived precisely because the listing was unmanaged. Expect this
+on any similar repair and do not mistake it for a bug.
+
+⚠️ **`EBAY_WRITE_BLOCKED_PRODUCT_IDS` is empty and should stay that way.** Keep
+the mechanism — pinning is right for a live-but-unreachable listing — but treat
+a non-empty set as an open incident, not a steady state. A pinned id is a
+listing the price push has silently stopped updating.
+
+### A scheduled marketplace job's time budget is an ABSOLUTE deadline, stamped on entry
+
+⛔ **Never measure a scheduled price push's budget from inside the push loop.**
+It reads as equivalent and is not: setup (spot fetch, connection read, listing
+and product queries) runs BEFORE the loop, so a loop-relative budget bounds the
+loop and nothing else. The real ceiling becomes `budget + however long setup
+took`.
+
+That shipped, and on 2026-08-21 it cost a run: 22s of loop budget plus ~10s of
+setup = 32s, and Netlify's gateway returned a 504 `Inactivity Timeout`. Both
+`runScheduledPricePush` implementations now stamp `deadlineAt` as their FIRST
+statement and pass it down; the constant is **20s**, leaving headroom under
+Netlify's 26s synchronous ceiling.
+
+⚠️ **Raising that number toward 26 is the wrong repair.** If runs start
+reporting `deferred` again, the catalog has outgrown a single synchronous
+request — move the push to a background function (15-minute ceiling) instead.
+
+### Marketplace bookkeeping is batched; the API call is not the cost
+
+⛔ **Do not record a bulk marketplace operation one row at a time.** Both price
+pushes did, and it was the entire performance problem — not the marketplace
+API, which was never slow.
+
+Measured 2026-08-21 on eBay: 50 prices went up in **two** bulk
+`bulk_update_price_quantity` calls, but recording them cost **100 serialized
+Supabase round-trips** (an `upsertListing` + an `insertSyncLog` each) at ~157ms
+apiece — **15.7s of a 22.2s run**. Etsy was the same shape and had been quietly
+deferring 15–18 listings a day since 2026-08-20.
+
+`bulkPatchListings` and `insertSyncLogs` in each store collapse a batch into two
+round-trips. `lib/__tests__/marketplace-price-push-batching.test.ts` guards
+both this and the deadline rule, and was mutation-tested — reintroducing either
+bug fails it.
+
+⚠️ **eBay's `bulkPatchListings` requires `ebay_sku` in every patch** and Etsy's
+does not. `ebay_listings.ebay_sku` is `not null unique`, so the INSERT half of
+the upsert needs it; `etsy_listings` has no such column. Callers pass it from
+the row they just read.
+
+⚠️ **A deadline checked between BATCHES can overshoot by a whole batch.** eBay
+works in 25-offer chunks and one bulk call was measured at 6.5s, so its loop
+requires headroom equal to the worst chunk seen so far in that run. Etsy checks
+per item, so its overshoot is one listing and it deliberately has no headroom
+term. Do not "unify" these — the granularities differ for a reason.
+
+### A red scheduled job does not mean the work failed
+
+⛔ **Check the `scheduled_price_push` summary row in the sync log before
+concluding anything was lost.** On 2026-08-21 `ebay-price-push` went red with a
+504 and every one of the 50 prices had already landed on eBay; the handler
+finished a fraction of a second after the gateway hung up. The 504 was a
+reporting failure.
+
+⚠️ The GitHub **mobile app** mislabels these runs — it rendered a scheduled run
+as "Triggered via pull request" with an `on:pull_request` breadcrumb. The web UI
+is authoritative. Do not go looking for a workflow-file divergence on that
+basis; there was none.
+
 ### Marketplace writes require a live relevant-metal quote
 
 The storefront may display its explicitly labeled fallback estimate during a

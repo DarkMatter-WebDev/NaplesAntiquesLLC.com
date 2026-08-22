@@ -40,7 +40,10 @@ import {
   getListing,
   getListingImages,
   insertListingImage,
+  bulkPatchListings,
   insertSyncLog,
+  insertSyncLogs,
+  type EtsySyncLogInput,
   pruneOldSyncLogs,
   upsertListing,
   ETSY_REPAIRABLE_SYNC_STATES,
@@ -1331,6 +1334,131 @@ const LIVE_LISTING_STATES = ['draft_created', 'images_synced', 'inventory_synced
  * operation (an order capture, an admin status change). No-ops entirely when
  * `auto_delist_on_sold` is off (Phase 1 default) or Etsy isn't connected.
  */
+// ---------------------------------------------------------------------------
+// Status-drift reconciliation (2026-08-21) — twin of the eBay sweep.
+//
+// The auto-delist hook runs after the response via `after()`, which on Netlify
+// is best-effort BY DESIGN (Next lists `after()` as requiring graceful-shutdown
+// support; the Lambda freeze-on-response model does not provide it). Work still
+// in flight when the response flushes is frozen, and lost outright if the
+// container is reclaimed while cold — that is how two sold products stayed live
+// on Etsy and eBay for twelve days.
+//
+// This sweep asks "does any listing disagree with its product's status right
+// now?" and repairs what it finds, which catches a missed delist regardless of
+// cause. Detection only — the repair DELEGATES to handleProductStatusChange so
+// the delist/reactivate logic has exactly one implementation.
+//
+// See the eBay twin in lib/ebay/sync.ts; the two must not drift apart.
+// ---------------------------------------------------------------------------
+
+/** What a drifted listing needs. `null` when local state already agrees. */
+export type EtsyStatusDrift = 'delist' | 'restore' | null;
+
+/**
+ * Pure mirror of `handleProductStatusChange`'s branches, exported so the drift
+ * rules are testable without a database or an Etsy account.
+ *
+ * ⚠️ Etsy keys on STATUS ONLY — unlike eBay it does not consider quantity.
+ * That asymmetry is in the hook it mirrors; do not "fix" it here in isolation.
+ */
+export function detectEtsyStatusDrift(
+  row: EtsyListingRow,
+  product: { status?: string | null } | null,
+): EtsyStatusDrift {
+  if (!row.etsy_listing_id) return null;
+  if (!product) return null;
+  const status = normalizeProductStatus(product.status);
+  if (status !== 'available' && LIVE_LISTING_STATES.includes(row.sync_state)) return 'delist';
+  if (status === 'available' && row.sync_state === 'delisted') return 'restore';
+  return null;
+}
+
+export interface EtsyReconcileResult {
+  scanned: number;
+  drifted: number;
+  repaired: number;
+  remaining: number;
+  skipped: boolean;
+}
+
+/** Wall-clock ceiling, stamped on entry. Same reasoning as the price push. */
+const RECONCILE_BUDGET_MS = 20_000;
+
+/**
+ * Find every Etsy listing whose state disagrees with its product's status and
+ * repair it. With nothing drifted this is three queries and no Etsy calls.
+ */
+export async function reconcileEtsyStatusDrift(): Promise<EtsyReconcileResult> {
+  const deadlineAt = Date.now() + RECONCILE_BUDGET_MS;
+  const service = createServiceClient();
+  const empty: EtsyReconcileResult = { scanned: 0, drifted: 0, repaired: 0, remaining: 0, skipped: true };
+
+  try {
+    const connection = await getConnection(service);
+    // Mirrors the hook's own gate: with auto-delist off, an "out of sync"
+    // listing is the owner's deliberate choice, not drift to repair.
+    if (!connection || connection.status !== 'connected' || !connection.auto_delist_on_sold) {
+      await insertSyncLog(service, {
+        action: 'reconcile_status',
+        outcome: 'warning',
+        message: !connection || connection.status !== 'connected'
+          ? 'Status reconcile skipped because Etsy is not connected.'
+          : 'Status reconcile skipped because auto-delist on sold is disabled.',
+      });
+      return empty;
+    }
+
+    const { data: listingRows, error } = await service
+      .from('etsy_listings')
+      .select('*')
+      .in('sync_state', [...LIVE_LISTING_STATES, 'delisted']);
+    if (error) throw new Error(error.message);
+    const rows = (listingRows ?? []) as EtsyListingRow[];
+    if (!rows.length) return { scanned: 0, drifted: 0, repaired: 0, remaining: 0, skipped: false };
+
+    const { data: productRows } = await service
+      .from('products')
+      .select('id, status')
+      .in('id', rows.map((row) => row.product_id));
+    const products = new Map(
+      ((productRows ?? []) as Array<{ id: string; status: string | null }>).map((p) => [p.id, p]),
+    );
+
+    const drifted = rows.filter(
+      (row) => detectEtsyStatusDrift(row, products.get(row.product_id) ?? null) !== null,
+    );
+
+    let repaired = 0;
+    for (const row of drifted) {
+      if (repaired > 0 && Date.now() > deadlineAt) break;
+      await handleProductStatusChange([row.product_id]);
+      repaired += 1;
+    }
+
+    const result: EtsyReconcileResult = {
+      scanned: rows.length,
+      drifted: drifted.length,
+      repaired,
+      remaining: drifted.length - repaired,
+      skipped: false,
+    };
+    // Logged even on a clean run — a silent no-op is indistinguishable from a
+    // cron that stopped firing.
+    await insertSyncLog(service, {
+      action: 'reconcile_status',
+      outcome: result.remaining ? 'warning' : 'ok',
+      message: `Etsy status reconcile: ${result.scanned} scanned, ${result.drifted} drifted, ${result.repaired} repaired, ${result.remaining} deferred.`,
+      detail: { ...result },
+    });
+    return result;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Etsy status reconcile failed.';
+    await insertSyncLog(service, { action: 'reconcile_status', outcome: 'error', message });
+    throw err;
+  }
+}
+
 export async function handleProductStatusChange(productIds: string[]): Promise<void> {
   if (productIds.length === 0) return;
   try {
@@ -1477,9 +1605,16 @@ async function pushEtsyPriceCandidates(params: {
   connection: EtsyConnectionRow;
   candidates: EtsyPricePushCandidate[];
   maxItems?: number;
-  budgetMs?: number;
+  /**
+   * ABSOLUTE epoch-ms deadline for the whole REQUEST, not a duration for this
+   * loop. It used to be `budgetMs`, measured from the top of this function, so
+   * everything before it (spot fetch, connection read, listing + product
+   * queries) fell outside the ceiling it claimed to enforce. The eBay twin hit
+   * exactly that on 2026-08-21 and 504'd; this side had been quietly deferring
+   * 15-18 listings a day since 2026-08-20 for the same reason.
+   */
+  deadlineAt?: number;
 }): Promise<{ pushed: number; failed: number; remaining: number }> {
-  const startedAt = Date.now();
   const limit = Math.min(params.maxItems ?? params.candidates.length, params.candidates.length);
   let attempted = 0;
   let pushed = 0;
@@ -1489,8 +1624,28 @@ async function pushEtsyPriceCandidates(params: {
     : { accessToken: '', shopId: 0 };
   const tierProfileMap = limit > 0 ? await loadTierProfileMap(params.service) : {};
 
+  // Bookkeeping is accumulated and flushed in batches instead of written twice
+  // per listing. Etsy has no bulk price endpoint, so the per-item API call
+  // stays — but the two Supabase round-trips per listing were ~60% of the
+  // measured 522ms/item, and they are the part that can be batched away.
+  let pendingPatches: Array<{ product_id: string } & Record<string, unknown>> = [];
+  let pendingLogs: EtsySyncLogInput[] = [];
+  const flushBookkeeping = async () => {
+    if (!pendingPatches.length && !pendingLogs.length) return;
+    const patches = pendingPatches;
+    const logs = pendingLogs;
+    pendingPatches = [];
+    pendingLogs = [];
+    // Best-effort, matching the per-item behaviour it replaces: bookkeeping
+    // must never throw and abandon listings that were pushed successfully.
+    await bulkPatchListings(params.service, patches).catch(() => {});
+    await insertSyncLogs(params.service, logs);
+  };
+
   for (const candidate of params.candidates.slice(0, limit)) {
-    if (params.budgetMs != null && attempted > 0 && Date.now() - startedAt >= params.budgetMs) break;
+    // Per-item granularity, so the overshoot is a single listing rather than a
+    // batch — no headroom term needed, unlike the eBay twin's 25-offer chunks.
+    if (params.deadlineAt != null && attempted > 0 && Date.now() > params.deadlineAt) break;
     attempted += 1;
     try {
       await updateListingInventory({
@@ -1516,7 +1671,7 @@ async function pushEtsyPriceCandidates(params: {
           accessToken,
           json: { shipping_profile_id: targetProfileId },
         });
-        await insertSyncLog(params.service, {
+        pendingLogs.push({
           product_id: candidate.row.product_id,
           listing_id: candidate.row.etsy_listing_id,
           action: 'shipping_tier',
@@ -1526,13 +1681,14 @@ async function pushEtsyPriceCandidates(params: {
       }
 
       // Clearing the counter is what makes the attempt ceiling self-healing.
-      await upsertListing(params.service, candidate.row.product_id, {
+      pendingPatches.push({
+        product_id: candidate.row.product_id,
         last_pushed_price: candidate.price,
         last_synced_at: new Date().toISOString(),
         error_count: 0,
         last_error: null,
       });
-      await insertSyncLog(params.service, {
+      pendingLogs.push({
         product_id: candidate.row.product_id,
         listing_id: candidate.row.etsy_listing_id,
         action: 'price_push',
@@ -1564,11 +1720,12 @@ async function pushEtsyPriceCandidates(params: {
       // Also COUNT the failure. This was a no-op `{}` patch, so `error_count`
       // never moved off 0 and the attempt ceiling could never engage — a
       // permanently broken listing was retried on every single run.
-      await upsertListing(params.service, candidate.row.product_id, {
+      pendingPatches.push({
+        product_id: candidate.row.product_id,
         error_count: (candidate.row.error_count ?? 0) + 1,
         last_error: message.slice(0, 500),
-      }).catch(() => {});
-      await insertSyncLog(params.service, {
+      });
+      pendingLogs.push({
         product_id: candidate.row.product_id,
         listing_id: candidate.row.etsy_listing_id,
         action: 'price_push',
@@ -1577,15 +1734,28 @@ async function pushEtsyPriceCandidates(params: {
         detail,
       });
     }
+
+    // Flush periodically rather than only at the end, so a run cut short by
+    // the deadline still records everything it actually pushed.
+    if (pendingPatches.length >= 25 || pendingLogs.length >= 25) await flushBookkeeping();
   }
 
+  await flushBookkeeping();
   return { pushed, failed, remaining: params.candidates.length - attempted };
 }
 
-const SCHEDULED_PRICE_PUSH_BUDGET_MS = 22_000;
+/**
+ * Wall-clock ceiling for the WHOLE scheduled request, stamped on entry.
+ * See the eBay twin's constant for the full rationale — same change, same
+ * reason, and the two must not drift apart.
+ */
+const SCHEDULED_PRICE_PUSH_BUDGET_MS = 20_000;
 
 /** Phase 2 scheduled daily price push — see /api/admin/etsy/price-push (Netlify Scheduled Function target). */
 export async function runScheduledPricePush(): Promise<EtsyPricePushResult> {
+  // Stamped FIRST, before the prune / connection read / spot fetch / queries,
+  // so the deadline covers setup rather than just the push loop.
+  const deadlineAt = Date.now() + SCHEDULED_PRICE_PUSH_BUDGET_MS;
   const service = createServiceClient();
   await pruneOldSyncLogs(service).catch(() => {});
 
@@ -1622,7 +1792,7 @@ export async function runScheduledPricePush(): Promise<EtsyPricePushResult> {
       service,
       connection,
       candidates: plan.candidates,
-      budgetMs: SCHEDULED_PRICE_PUSH_BUDGET_MS,
+      deadlineAt,
     });
     const result: EtsyPricePushResult = {
       done: processed.remaining === 0,

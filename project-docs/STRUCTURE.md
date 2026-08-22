@@ -137,7 +137,7 @@ let additional loose app assets accumulate at root.
 `src/app/[locale]/shop/(list)/page.tsx` remains a thin Next route entry with
 only supported route exports. The reusable implementation lives beside it in
 `shop-page-renderer.tsx` and is shared with `/shop-modern`. The production build
-completed successfully on **2026-08-17: 454 pages**, with TypeScript and lint
+completed successfully on **2026-08-21: 456 pages** (454 until the two `reconcile-status` API routes were added that day), with TypeScript and lint
 also passing. (The 443-page figure previously recorded here was 2026-08-03.)
 
 ⚠️ **The static page count is a structural invariant, not just a statistic.**

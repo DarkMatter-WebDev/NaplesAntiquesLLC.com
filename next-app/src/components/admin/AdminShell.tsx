@@ -3598,6 +3598,17 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       }
     }
 
+    // Revalidate + fire the marketplace hooks HERE, not after the video commit.
+    //
+    // The product row (status included) is already written by this point, so
+    // every `return` below this line used to strand it: the shop cache kept
+    // serving a sold item as available, and the Etsy/eBay auto-delist never
+    // ran. The video-commit failure path immediately below is exactly that
+    // hole — a video error would silently leave a sold piece live on both
+    // marketplaces. Saving the product and announcing the save are separate
+    // concerns; the announcement must not hinge on unrelated work succeeding.
+    if (savedId) void adminRevalidateProduct(savedId);
+
     const videoResult = await productVideoEditorRef.current?.commit(payload.id, payload.images?.[0] ?? null);
     if (videoResult && !videoResult.ok) {
       if (isNew) {
@@ -3627,7 +3638,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
 
     flash(isNew ? 'Product added' : productChanged ? 'Product saved' : videoChanged ? 'Product video saved' : 'No changes to save');
     setSaving(false);
-    if (savedId) void adminRevalidateProduct(savedId);
 
     if (afterSave === 'close') {
       closeModal();

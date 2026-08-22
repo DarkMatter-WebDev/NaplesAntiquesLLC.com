@@ -223,6 +223,53 @@ export async function deleteListingImagesByListingId(service: SupabaseClient, et
   if (error && !isMissingSchemaError(error)) throw new Error(error.message);
 }
 
+/**
+ * Bulk twin of `insertSyncLog` — ONE round-trip for a whole batch.
+ *
+ * The scheduled price push awaited this once per listing, alongside an
+ * `upsertListing`. Measured 2026-08-21: ~522ms per listing, of which the Etsy
+ * API call was only part — the two bookkeeping round-trips were ~314ms of it.
+ * That capped the run at 41 of 56 candidates inside its budget, silently
+ * deferring 15 listings a day. See `bulkPatchListings`.
+ */
+export async function insertSyncLogs(service: SupabaseClient, inputs: EtsySyncLogInput[]): Promise<void> {
+  if (!inputs.length) return;
+  const { error } = await service.from('etsy_sync_log').insert(
+    inputs.map((input) => ({
+      product_id: input.product_id ?? null,
+      listing_id: input.listing_id ?? null,
+      action: input.action,
+      outcome: input.outcome,
+      message: input.message ?? null,
+      detail: input.detail ?? null,
+    })),
+  );
+  if (error && !isMissingSchemaError(error)) {
+    console.error('etsy_sync_log bulk insert error:', error.message);
+  }
+}
+
+/**
+ * Bulk twin of `upsertListing` — ONE round-trip for a whole batch of patches.
+ * Same `onConflict: 'product_id'` semantics as the singular version; unlike
+ * the eBay twin no extra column is required, because `product_id` is the only
+ * `not null` column here without a default.
+ */
+export async function bulkPatchListings(
+  service: SupabaseClient,
+  patches: Array<{ product_id: string } & Partial<Omit<EtsyListingRow, 'product_id' | 'created_at'>>>,
+): Promise<void> {
+  if (!patches.length) return;
+  const updatedAt = new Date().toISOString();
+  const { error } = await service
+    .from('etsy_listings')
+    .upsert(patches.map((patch) => ({ ...patch, updated_at: updatedAt })), { onConflict: 'product_id' });
+  if (error) {
+    if (isMissingSchemaError(error)) throw new EtsyNotMigratedError();
+    throw new Error(error.message);
+  }
+}
+
 export async function insertSyncLog(service: SupabaseClient, input: EtsySyncLogInput): Promise<void> {
   const { error } = await service.from('etsy_sync_log').insert({
     product_id: input.product_id ?? null,

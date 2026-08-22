@@ -3,9 +3,7 @@
 import { revalidateTag, revalidatePath } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/service';
 import { requireAdmin } from '@/lib/admin-auth';
-import { handleProductStatusChange as handleEtsyProductStatusChange, scanAndMarkOutOfDate as scanEtsyOutOfDate } from '@/lib/etsy/sync';
-import { handleProductStatusChange as handleEbayProductStatusChange, scanAndMarkOutOfDate as scanEbayOutOfDate } from '@/lib/ebay/sync';
-import { queueDeepFieldSync } from '@/lib/deepfield/sync';
+import { scheduleProductStatusHooks } from '@/lib/product-status-hooks';
 import { normalizeProductStatus, type Product, type ProductStatus } from '@/types/product';
 import { fetchSpotData } from '@/lib/spot-price';
 import { getProductPriceValue } from '@/lib/pricing';
@@ -168,22 +166,17 @@ export async function adminRevalidateProducts(ids: string[]): Promise<void> {
   // Phase 2: auto-delist/relist piggybacks on this existing chokepoint (every
   // products-write path already calls this) rather than a new "where do
   // status changes happen" audit — see etsy-sync-plan/03-sync-lifecycle.md
-  // Flow 3 and ebay-sync-plan/03-sync-lifecycle.md Flow 3. Fire-and-forget:
-  // never let an Etsy or eBay hiccup block this revalidation.
-  void handleEtsyProductStatusChange(ids).catch(() => {});
-  void handleEbayProductStatusChange(ids).catch(() => {});
-  // Same chokepoint reuse for content-change detection (price edits, etc.):
-  // scanAndMarkOutOfDate was built+tested but never actually called from
-  // anywhere until 2026-07-10, so an already-synced listing never flipped to
-  // 'out_of_date' after a price edit — "Sync all" kept reporting it as
-  // already up to date. Scoped to just these ids, so this stays cheap on a
-  // single-product save instead of re-hashing the whole catalog.
-  void scanEtsyOutOfDate(ids).catch(() => {});
-  void scanEbayOutOfDate(ids).catch(() => {});
-  // One-way push to Deep Field Gallery, on the same chokepoint and with the
-  // same fire-and-forget contract as the marketplace hooks above. Covers every
-  // admin write: create, edit, archive, delete, and bulk status changes.
-  queueDeepFieldSync(ids);
+  // Flow 3 and ebay-sync-plan/03-sync-lifecycle.md Flow 3.
+  //
+  // `scanOutOfDate` is on here and off in the PayPal paths: an admin write can
+  // change a listing's CONTENT (price, copy, photos), a sale only changes its
+  // status. Scoped to these ids, so a single-product save stays cheap instead
+  // of re-hashing the whole catalog.
+  //
+  // ⛔ These were six bare `void promise.catch(() => {})` calls until
+  // 2026-08-21, and that dropped ~1 sale in 20 on Netlify. See
+  // lib/product-status-hooks.ts.
+  scheduleProductStatusHooks(ids, { scanOutOfDate: true });
 }
 
 export async function adminRevalidateProduct(id: string): Promise<void> {
@@ -196,9 +189,5 @@ export async function adminRevalidateProduct(id: string): Promise<void> {
   // localePrefix is 'as-needed': default locale (en) has no prefix.
   revalidatePath(`/shop/${id}`);
   revalidatePath(`/es/shop/${id}`);
-  void handleEtsyProductStatusChange([id]).catch(() => {});
-  void handleEbayProductStatusChange([id]).catch(() => {});
-  void scanEtsyOutOfDate([id]).catch(() => {});
-  void scanEbayOutOfDate([id]).catch(() => {});
-  queueDeepFieldSync([id]);
+  scheduleProductStatusHooks([id], { scanOutOfDate: true });
 }

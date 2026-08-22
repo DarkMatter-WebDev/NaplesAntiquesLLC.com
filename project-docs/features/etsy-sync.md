@@ -441,6 +441,12 @@ Phase 2 adds: incremental updates via content-hash diff,
 bulk enqueue/drain, auto-delist/relist wired into
 `adminRevalidateProduct(s)`/PayPal capture/webhook, and a daily scheduled
 price push gated by a ≥1%-of-last-pushed-price threshold (Q4).
+⚠️ **Bookkeeping is BATCHED and the budget is an ABSOLUTE deadline** since
+2026-08-21. Etsy has no bulk price endpoint, so the per-item API call stays, but
+the two Supabase writes per listing were ~314ms of the measured 522ms/item —
+enough that the run finished only 41 of 56 candidates and silently deferred
+15–18 listings a day from 2026-08-20. See DECISIONS, *"Marketplace bookkeeping
+is batched"*; `lib/__tests__/marketplace-price-push-batching.test.ts` guards it.
 
 ## Field mapping highlights
 

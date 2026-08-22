@@ -24,8 +24,10 @@ import {
   countPendingListings,
   countReviewListings,
   getConnection,
+  bulkPatchListings,
   getListing,
   insertSyncLog,
+  insertSyncLogs,
   pruneOldSyncLogs,
   upsertListing,
   type EbayConnectionRow,
@@ -50,20 +52,25 @@ export const RELISTED_LISTING_WARNING =
 
 /**
  * Hard, data-independent write block. The detached-relist guard below infers
- * its block from `last_error` still holding RELISTED_LISTING_WARNING — which is
- * true today but evaporates the moment anything overwrites that column (a
- * different error, a manual clear, a partial sync). For a listing the owner has
- * deliberately quarantined, that is too fragile, so the product id is pinned
- * here as well. Both checks must pass before any eBay write.
+ * its block from `last_error` still holding RELISTED_LISTING_WARNING — which
+ * evaporates the moment anything overwrites that column (a different error, a
+ * manual clear, a partial sync). For a listing the owner has deliberately
+ * quarantined, that is too fragile, so the product id is pinned here as well.
+ * Both checks must pass before any eBay write.
  *
- * Inventory #82 / eBay listing 800354878200: live through an external relist
- * that is not attached to stored offer 204558136011. Writing to it could end or
- * duplicate the live listing. Remove this entry ONLY after the owner-approved
- * reattachment (or end-and-republish) is tested — see project-docs/TASKS.md.
+ * EMPTY since 2026-08-21, deliberately. Inventory #82 was pinned here because
+ * eBay listing 800354878200 was live through an external relist not attached to
+ * stored offer 204558136011, so the Inventory-API price push could not reach
+ * it — it sat 17 days at a stale price while silver moved. The owner-approved
+ * end-and-republish ran that day: the detached relist was ended and offer
+ * 204558136011 was published in its place, putting the item back under normal
+ * management. See CHANGELOG 2026-08-21.
+ *
+ * ⚠️ Keep this mechanism. Pinning is the right response to a listing that is
+ * live but unreachable, and an empty set is a statement that none exist today —
+ * not that the hazard is gone.
  */
-export const EBAY_WRITE_BLOCKED_PRODUCT_IDS: ReadonlySet<string> = new Set([
-  'antique-georgian-sterling-silver-handled-mug-london-1824-edward-farrell-82',
-]);
+export const EBAY_WRITE_BLOCKED_PRODUCT_IDS: ReadonlySet<string> = new Set([]);
 
 export const EBAY_WRITE_BLOCKED_WARNING =
   'This listing is write-blocked pending an owner-approved reattachment on eBay. Manage it on eBay until the block is lifted.';
@@ -1552,32 +1559,98 @@ export function planEbayPricePush(
   return { candidates, skipped, blocked };
 }
 
-async function recordEbayPricePushSuccess(
+/**
+ * Record a whole batch of successful pushes in TWO round-trips, not two per
+ * listing.
+ *
+ * This was per-candidate until 2026-08-21, and that is what made the scheduled
+ * push time out. eBay itself was never slow: 50 prices go up in two
+ * `bulk_update_price_quantity` calls, but recording them cost 100 serialized
+ * Supabase round-trips at ~157ms each — 15.7s of a 22.2s run. The push then
+ * blew the gateway's ceiling at 32s and GitHub marked the job failed even
+ * though every price had actually landed.
+ */
+async function recordEbayPricePushSuccesses(
   service: SupabaseClient,
-  candidate: EbayPricePushCandidate,
+  candidates: EbayPricePushCandidate[],
 ): Promise<void> {
+  if (!candidates.length) return;
   // Clearing the counter is what makes the backoff self-healing: once whatever
   // was wrong on eBay is fixed and one push lands, the listing is eligible again.
-  await upsertListing(service, candidate.listing.product_id, {
+  await bulkPatchListings(service, candidates.map((candidate) => ({
+    product_id: candidate.listing.product_id,
+    // Required by bulkPatchListings — `ebay_sku` is `not null`, so the INSERT
+    // half of the upsert needs it. Taken off the row we just read.
+    ebay_sku: candidate.listing.ebay_sku,
     last_pushed_price: candidate.price,
     error_count: 0,
     last_error: null,
-  });
-  await insertSyncLog(service, {
+  })));
+  await insertSyncLogs(service, candidates.map((candidate) => ({
     product_id: candidate.listing.product_id,
     listing_id: candidate.listing.ebay_listing_id,
     action: 'price_push',
-    outcome: 'ok',
+    outcome: 'ok' as const,
     detail: { price: candidate.price },
-  });
+  })));
 }
 
-async function recordEbayPricePushFailure(
+/** One failed candidate, paired with the error eBay returned for it. */
+interface EbayPricePushFailure {
+  candidate: EbayPricePushCandidate;
+  err: unknown;
+}
+
+/**
+ * Bulk twin of the old per-candidate failure recorder. Same two writes and the
+ * same detail payload, batched for the same reason as
+ * `recordEbayPricePushSuccesses`.
+ */
+async function recordEbayPricePushFailures(
   service: SupabaseClient,
+  failures: EbayPricePushFailure[],
+): Promise<void> {
+  if (!failures.length) return;
+  const described = failures.map(({ candidate, err }) => ({
+    candidate,
+    message: describeEbayPricePushError(err),
+    detail: describeEbayPricePushDetail(candidate, err),
+  }));
+
+  // Rotate the failed rows behind untouched rows without changing their pushed
+  // price, so a single bad offer cannot block the rest of a manual run.
+  //
+  // Also COUNT the failure. This was a no-op patch `{}` before, so
+  // `error_count` never moved off 0 and nothing could ever back off — every
+  // broken listing was retried on every poll forever. `last_error` gives the
+  // admin panel something to show besides a bare count.
+  //
+  // Best-effort, exactly as the per-item version was: bookkeeping for a failed
+  // push must not itself throw and abandon the rest of the run.
+  await bulkPatchListings(service, described.map(({ candidate, message }) => ({
+    product_id: candidate.listing.product_id,
+    ebay_sku: candidate.listing.ebay_sku,
+    error_count: (candidate.listing.error_count ?? 0) + 1,
+    last_error: message.slice(0, 500),
+  }))).catch(() => {});
+  await insertSyncLogs(service, described.map(({ candidate, message, detail }) => ({
+    product_id: candidate.listing.product_id,
+    listing_id: candidate.listing.ebay_listing_id,
+    action: 'price_push',
+    outcome: 'error' as const,
+    message,
+    detail,
+  })));
+}
+
+function describeEbayPricePushError(err: unknown): string {
+  return err instanceof EbayApiError ? err.operatorMessage : err instanceof Error ? err.message : 'Price push failed.';
+}
+
+function describeEbayPricePushDetail(
   candidate: EbayPricePushCandidate,
   err: unknown,
-): Promise<void> {
-  const message = err instanceof EbayApiError ? err.operatorMessage : err instanceof Error ? err.message : 'Price push failed.';
+): Record<string, unknown> {
   // Persist the API detail, not just the operator sentence.
   //
   // `EbayApiError.detail` is redacted at construction specifically so it is
@@ -1587,7 +1660,7 @@ async function recordEbayPricePushFailure(
   // 140 rows all reading `eBay API error (HTTP 400).` and no cause: eBay
   // returned a 400 whose envelope carried no top-level message, so the operator
   // string fell back to the generic form and the useful part was discarded.
-  const detail = err instanceof EbayApiError
+  return err instanceof EbayApiError
     ? {
       status: err.status,
       code: err.code,
@@ -1600,35 +1673,23 @@ async function recordEbayPricePushFailure(
       attemptedPrice: candidate.price,
     }
     : { message: String(err).slice(0, 500), offerId: candidate.listing.ebay_offer_id };
-
-  // Rotate the failed row behind untouched rows without changing its pushed
-  // price, so a single bad offer cannot block the rest of a manual run.
-  //
-  // Also COUNT the failure. This was a no-op patch `{}` before, so
-  // `error_count` never moved off 0 and nothing could ever back off — every
-  // broken listing was retried on every poll forever. `last_error` gives the
-  // admin panel something to show besides a bare count.
-  await upsertListing(service, candidate.listing.product_id, {
-    error_count: (candidate.listing.error_count ?? 0) + 1,
-    last_error: message.slice(0, 500),
-  }).catch(() => {});
-  await insertSyncLog(service, {
-    product_id: candidate.listing.product_id,
-    listing_id: candidate.listing.ebay_listing_id,
-    action: 'price_push',
-    outcome: 'error',
-    message,
-    detail,
-  });
 }
 
 async function pushEbayPriceCandidates(params: {
   service: SupabaseClient;
   candidates: EbayPricePushCandidate[];
   maxItems?: number;
-  budgetMs?: number;
+  /**
+   * ABSOLUTE epoch-ms deadline for the whole REQUEST, not a duration for this
+   * loop. It used to be `budgetMs`, measured from the top of this function —
+   * which could not bound the request, because everything before it (spot
+   * fetch, connection read, listing + product queries) fell outside the
+   * measurement. On 2026-08-21 that setup ran ~10s, the loop then used its
+   * full 22s, and the 32s total blew the gateway's ceiling. The caller now
+   * stamps the deadline on entry so this is a real ceiling.
+   */
+  deadlineAt?: number;
 }): Promise<{ pushed: number; failed: number; remaining: number }> {
-  const startedAt = Date.now();
   const limit = Math.min(params.maxItems ?? params.candidates.length, params.candidates.length);
   const { accessToken } = limit > 0
     ? await ensureFreshAccessToken(params.service)
@@ -1636,9 +1697,19 @@ async function pushEbayPriceCandidates(params: {
   let attempted = 0;
   let pushed = 0;
   let failed = 0;
+  // The deadline is only testable BETWEEN chunks, so a naive check can still
+  // overshoot by a whole chunk — and one bulk eBay call was measured at 6.5s
+  // (2026-08-21). Require headroom equal to the worst chunk seen SO FAR in
+  // this run: costs nothing on a fast day, self-tightens on a slow one, and
+  // never blocks the first chunk (which must run for the push to progress).
+  let worstChunkMs = 0;
+  const outOfTime = () => params.deadlineAt != null
+    && attempted > 0
+    && Date.now() + worstChunkMs > params.deadlineAt;
 
   while (attempted < limit) {
-    if (params.budgetMs != null && attempted > 0 && Date.now() - startedAt >= params.budgetMs) break;
+    if (outOfTime()) break;
+    const chunkStartedAt = Date.now();
     const chunk = params.candidates.slice(attempted, Math.min(attempted + 25, limit));
     const entries = chunk.map((candidate) => ({
       sku: candidate.listing.ebay_sku,
@@ -1648,39 +1719,66 @@ async function pushEbayPriceCandidates(params: {
 
     try {
       await bulkUpdatePriceQuantity(accessToken, entries);
-      for (const candidate of chunk) {
-        await recordEbayPricePushSuccess(params.service, candidate);
-        pushed += 1;
-      }
+      await recordEbayPricePushSuccesses(params.service, chunk);
+      pushed += chunk.length;
       attempted += chunk.length;
     } catch {
       // A mixed eBay bulk response can contain one bad offer. Retry this chunk
-      // one item at a time so the valid offers still advance.
+      // one item at a time so the valid offers still advance. Results are
+      // accumulated and written once at the end of the chunk rather than per
+      // item — same reason the success path is batched.
+      const succeeded: EbayPricePushCandidate[] = [];
+      const failures: EbayPricePushFailure[] = [];
       for (const candidate of chunk) {
-        if (params.budgetMs != null && attempted > 0 && Date.now() - startedAt >= params.budgetMs) break;
+        // Per-item granularity here, so no headroom term is needed: the
+        // overshoot is one single-offer call, not a 25-offer bulk one.
+        if (params.deadlineAt != null && attempted > 0 && Date.now() > params.deadlineAt) break;
         try {
           await bulkUpdatePriceQuantity(accessToken, [{
             sku: candidate.listing.ebay_sku,
             offerId: candidate.listing.ebay_offer_id!,
             price: candidate.price,
           }]);
-          await recordEbayPricePushSuccess(params.service, candidate);
-          pushed += 1;
+          succeeded.push(candidate);
         } catch (err) {
-          await recordEbayPricePushFailure(params.service, candidate, err);
-          failed += 1;
+          failures.push({ candidate, err });
         }
         attempted += 1;
       }
+      await recordEbayPricePushSuccesses(params.service, succeeded);
+      await recordEbayPricePushFailures(params.service, failures);
+      pushed += succeeded.length;
+      failed += failures.length;
     }
+
+    worstChunkMs = Math.max(worstChunkMs, Date.now() - chunkStartedAt);
   }
 
   return { pushed, failed, remaining: params.candidates.length - attempted };
 }
 
-const SCHEDULED_PRICE_PUSH_BUDGET_MS = 22_000;
+/**
+ * Wall-clock ceiling for the WHOLE scheduled request, stamped on entry.
+ *
+ * 20s, not the old 22s, and measured from a different place. The old value was
+ * a budget for the push loop alone; setup ran outside it, so the real ceiling
+ * was 22s + however long setup took. On 2026-08-21 that was 32s and the
+ * gateway returned a 504 `Inactivity Timeout` after every price had already
+ * been pushed — the work succeeded and the job still went red.
+ *
+ * 20s leaves headroom under Netlify's 26s synchronous-function ceiling. With
+ * the bookkeeping batched this should now be slack rather than the thing that
+ * shapes a run: the same 55-candidate day that needed 22s+ of loop time fits
+ * in a few seconds of it. If runs start reporting `deferred` again, that is
+ * the signal the catalog has outgrown a single synchronous request — move the
+ * push to a background function rather than raising this number toward 26.
+ */
+const SCHEDULED_PRICE_PUSH_BUDGET_MS = 20_000;
 
 export async function runScheduledPricePush(): Promise<EbayPricePushResult> {
+  // Stamped FIRST — before the prune, the connection read, the spot fetch and
+  // the listing/product queries — so the deadline covers setup too.
+  const deadlineAt = Date.now() + SCHEDULED_PRICE_PUSH_BUDGET_MS;
   const service = createServiceClient();
   await pruneOldSyncLogs(service).catch(() => {});
 
@@ -1717,7 +1815,7 @@ export async function runScheduledPricePush(): Promise<EbayPricePushResult> {
     const processed = await pushEbayPriceCandidates({
       service,
       candidates: plan.candidates,
-      budgetMs: SCHEDULED_PRICE_PUSH_BUDGET_MS,
+      deadlineAt,
     });
     const result: EbayPricePushResult = {
       done: processed.remaining === 0,
@@ -1770,6 +1868,156 @@ export async function pushPricesBatch(): Promise<EbayPricePushResult> {
     blocked: plan.blocked,
     remaining: processed.remaining,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Status-drift reconciliation (2026-08-21)
+//
+// WHY THIS EXISTS — the auto-delist hook cannot be made reliable in-request
+// ------------------------------------------------------------------------
+// `handleProductStatusChange` runs after the response via `after()`, and on
+// Netlify that is best-effort BY DESIGN: Next's own feature matrix lists
+// `after()` as "Requires graceful shutdown support", which the Lambda
+// freeze-on-response model does not provide. Measured 2026-08-21: a `hide_oos`
+// log insert landed 127.6s after the `upsertListing` two lines above it, when
+// the frozen container thawed on a later request. Work on a container that is
+// reclaimed while cold is lost outright — that is how two sold products stayed
+// live on both marketplaces for twelve days.
+//
+// So this sweep does NOT try to schedule better. It asks a different question:
+// "does any listing's state disagree with its product's status right now?" and
+// repairs what it finds. That catches a missed delist regardless of cause — a
+// frozen container, a marketplace API error, or a status-write path nobody
+// hooked — which no scheduling primitive can.
+//
+// It deliberately DELEGATES the repair to `handleProductStatusChange` rather
+// than reimplementing withdraw/hide/restore. The sweep owns detection only;
+// duplicating the write logic is how the two drift apart.
+// ---------------------------------------------------------------------------
+
+/** What a drifted listing needs. `null` when local state already agrees. */
+export type EbayStatusDrift = 'delist' | 'restore' | null;
+
+/**
+ * Pure mirror of `handleProductStatusChange`'s branches. Kept pure and exported
+ * so the drift rules are testable without a database or an eBay account — and
+ * so a future change to the hook that forgets this function fails a test rather
+ * than silently making the sweep blind.
+ */
+export function detectEbayStatusDrift(
+  listing: EbayListingRow,
+  product: { status?: string | null; quantity?: number | null } | null,
+): EbayStatusDrift {
+  // A write-blocked listing is quarantined on purpose; the sweep must not
+  // "repair" it into a write the owner deliberately suspended.
+  if (isEbayWriteBlocked(listing.product_id, listing)) return null;
+  if (!listing.ebay_listing_id) return null;
+  if (!product) return null;
+
+  const status = normalizeProductStatus(product.status);
+  const quantity = normalizeProductQuantity(product.quantity);
+  const isSoldOut = status === 'sold' || quantity <= 0;
+
+  if (status === 'archived' || status === 'draft') {
+    return listing.sync_state === 'ended' ? null : 'delist';
+  }
+  if (isSoldOut) {
+    return listing.sync_state === 'published' || listing.sync_state === 'out_of_date' ? 'delist' : null;
+  }
+  if (status === 'available' && quantity > 0 && listing.sync_state === 'hidden_oos') {
+    return 'restore';
+  }
+  return null;
+}
+
+export interface EbayReconcileResult {
+  scanned: number;
+  drifted: number;
+  repaired: number;
+  remaining: number;
+  skipped: boolean;
+}
+
+/** Wall-clock ceiling, stamped on entry. Same reasoning as the price push. */
+const RECONCILE_BUDGET_MS = 20_000;
+
+/**
+ * Find every eBay listing whose state disagrees with its product's status and
+ * repair it. Safe to run on any schedule: with nothing drifted it is three
+ * queries and no marketplace calls.
+ */
+export async function reconcileEbayStatusDrift(): Promise<EbayReconcileResult> {
+  const deadlineAt = Date.now() + RECONCILE_BUDGET_MS;
+  const service = createServiceClient();
+  const empty: EbayReconcileResult = { scanned: 0, drifted: 0, repaired: 0, remaining: 0, skipped: true };
+
+  try {
+    const connectionRow = await getConnection(service);
+    if (!connectionRow || connectionRow.status !== 'connected') {
+      await insertSyncLog(service, {
+        action: 'reconcile_status',
+        outcome: 'warning',
+        message: 'Status reconcile skipped because eBay is not connected.',
+      });
+      return empty;
+    }
+
+    // Only states a drift can exist in. 'pending'/'review'/'error' are mid-flow
+    // and are not this sweep's business.
+    const { data: listingRows, error } = await service
+      .from('ebay_listings')
+      .select('*')
+      .in('sync_state', ['published', 'out_of_date', 'hidden_oos', 'ended']);
+    if (error) throw new Error(error.message);
+    const listings = (listingRows ?? []) as EbayListingRow[];
+    if (!listings.length) return { scanned: 0, drifted: 0, repaired: 0, remaining: 0, skipped: false };
+
+    const { data: productRows } = await service
+      .from('products')
+      .select('id, status, quantity')
+      .in('id', listings.map((listing) => listing.product_id));
+    const products = new Map(
+      ((productRows ?? []) as Array<{ id: string; status: string | null; quantity: number | null }>)
+        .map((product) => [product.id, product]),
+    );
+
+    const drifted = listings.filter(
+      (listing) => detectEbayStatusDrift(listing, products.get(listing.product_id) ?? null) !== null,
+    );
+
+    let repaired = 0;
+    for (const listing of drifted) {
+      // Checked per product, not per batch: one repair is one marketplace call,
+      // so the overshoot is a single item.
+      if (repaired > 0 && Date.now() > deadlineAt) break;
+      // Delegate. handleProductStatusChange re-reads state and owns the
+      // withdraw-vs-quantity-zero choice, the backoff and the logging.
+      await handleProductStatusChange([listing.product_id]);
+      repaired += 1;
+    }
+
+    const result: EbayReconcileResult = {
+      scanned: listings.length,
+      drifted: drifted.length,
+      repaired,
+      remaining: drifted.length - repaired,
+      skipped: false,
+    };
+    // Logged even on a clean run: "the sweep ran and found nothing" is the
+    // evidence that the safety net is alive. A silent no-op is indistinguishable
+    // from a cron that stopped firing.
+    await insertSyncLog(service, {
+      action: 'reconcile_status',
+      outcome: result.remaining ? 'warning' : 'ok',
+      message: `eBay status reconcile: ${result.scanned} scanned, ${result.drifted} drifted, ${result.repaired} repaired, ${result.remaining} deferred.`,
+      detail: { ...result },
+    });
+    return result;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'eBay status reconcile failed.';
+    await insertSyncLog(service, { action: 'reconcile_status', outcome: 'error', message });
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------

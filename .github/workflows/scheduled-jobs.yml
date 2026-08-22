@@ -49,6 +49,7 @@ on:
     - cron: '45 11 * * *' # eBay price push      — staggered 30 min after Etsy
     - cron: '0 0-5,16-23 * * *' # Instagram + Facebook drip
     - cron: '15 12 * * 1' # Instagram token refresh — Mondays
+    - cron: '*/30 * * * *' # Marketplace status reconcile — every 30 min (see the job comment)
   workflow_dispatch:
     inputs:
       job:
@@ -63,6 +64,7 @@ on:
           - instagram-drip
           - facebook-drip
           - instagram-token-refresh
+          - reconcile-status
 
 # No repository access is needed — these jobs only make an outbound HTTPS call.
 permissions: {}
@@ -173,6 +175,86 @@ jobs:
 
   # Uses INSTAGRAM_CRON_SECRET, same as the drip — the refresh-token route is
   # guarded by that same variable.
+  # Status-drift reconcile — the SAFETY NET under the auto-delist hook.
+  #
+  # The hook itself runs post-response via Next's after(), which on Netlify is
+  # best-effort by design: the Lambda freezes when the response flushes, so work
+  # still in flight is suspended and is lost outright if that container is
+  # reclaimed while cold. Measured 2026-08-21 — a log insert landed 127.6s late
+  # on a thaw, and in August two sold products stayed live on both marketplaces
+  # for twelve days because their containers never came back.
+  #
+  # These two jobs ask the question no scheduling primitive can: "is anything
+  # sold still live right now?" — and fix it.
+  #
+  # EVERY 30 MINUTES, chosen deliberately over awaiting the hook in the PayPal
+  # capture path. Awaiting would close the window to ~0 but puts eBay/Etsy in
+  # the buyer's payment path — and since the payment is ALREADY captured by the
+  # time the hook runs, any hang there turns a successful payment into an error
+  # page for the buyer. Neither marketplace client has a request timeout and
+  # both retry with 1s/2s/4s backoff, so that tail is unbounded. Bounding the
+  # exposure from the outside is the trade with no downside.
+  #
+  # Cheap when clean: measured 2026-08-21 at 1131ms (eBay) / 781ms (Etsy) for
+  # 124 + 128 listings, three queries each and NO marketplace calls unless
+  # something actually drifted. Actions minutes are free on this public repo.
+  #
+  # ⚠️ It does write one `reconcile_status` row per channel per run (~96/day).
+  # That is deliberate — a clean run that logs nothing is indistinguishable from
+  # a cron that stopped firing — but it does add to the sync-log volume already
+  # tracked in project-docs/TASKS.md. Lengthen the interval if that becomes the
+  # problem; the sweep is a backstop, and a dropped run costs nothing.
+  #
+  # Each channel uses its OWN existing secret, so no new repository secret is
+  # needed — a new secret is a new way for a cron to 401 silently.
+  ebay-reconcile-status:
+    if: github.event.schedule == '*/30 * * * *' || contains(fromJSON('["all","reconcile-status"]'), inputs.job)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST /api/admin/ebay/reconcile-status
+        env:
+          ROUTE: /api/admin/ebay/reconcile-status
+          SECRET_NAME: EBAY_CRON_SECRET
+          CRON_SECRET: ${{ secrets.EBAY_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::${SECRET_NAME} is not set in this repository's Actions secrets."
+            exit 1
+          fi
+          code=$(curl -sS --max-time 120 -o response.json -w '%{http_code}' \
+            -X POST "${SITE_URL}${ROUTE}" \
+            -H 'content-type: application/json' \
+            -H "x-cron-secret: ${CRON_SECRET}")
+          echo "HTTP ${code}"
+          cat response.json; echo
+          [ "${code}" -ge 200 ] && [ "${code}" -lt 300 ]
+
+  etsy-reconcile-status:
+    if: github.event.schedule == '*/30 * * * *' || contains(fromJSON('["all","reconcile-status"]'), inputs.job)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST /api/admin/etsy/reconcile-status
+        env:
+          ROUTE: /api/admin/etsy/reconcile-status
+          SECRET_NAME: ETSY_CRON_SECRET
+          CRON_SECRET: ${{ secrets.ETSY_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::${SECRET_NAME} is not set in this repository's Actions secrets."
+            exit 1
+          fi
+          code=$(curl -sS --max-time 120 -o response.json -w '%{http_code}' \
+            -X POST "${SITE_URL}${ROUTE}" \
+            -H 'content-type: application/json' \
+            -H "x-cron-secret: ${CRON_SECRET}")
+          echo "HTTP ${code}"
+          cat response.json; echo
+          [ "${code}" -ge 200 ] && [ "${code}" -lt 300 ]
+
   instagram-token-refresh:
     if: github.event.schedule == '15 12 * * 1' || contains(fromJSON('["all","instagram-token-refresh"]'), inputs.job)
     runs-on: ubuntu-latest

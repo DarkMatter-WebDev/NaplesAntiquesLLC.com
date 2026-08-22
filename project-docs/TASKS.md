@@ -1,7 +1,216 @@
 ﻿# Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-08-20**.
+> in `CHANGELOG.md`. Last reconciled: **2026-08-21**.
+
+## ✅ Inventory #82 reattached — DONE ON PRODUCTION 2026-08-21
+
+The mug is back under normal management: detached relist `800354878200` ended,
+offer `204558136011` published as **[`800547117368`](https://www.ebay.com/itm/800547117368)**
+at **$1,068.35**, and `EBAY_WRITE_BLOCKED_PRODUCT_IDS` is now **empty**. The
+daily push owns it like every other listing — the planner reports **0 blocked**.
+
+⚠️ **Shipping moved $15.00 → $59.00 and that is correct** — $1,068.35 sits in
+the `$1,000–2,500 → $59` band. The old $15 was a pre-tier leftover on an
+unmanaged listing, so it had been under-charging shipping by $44. Say so if the
+owner asks why the listing looks different.
+
+ℹ️ The new listing starts at zero views/watchers. The old one had 16 views and
+one buyer with it in the cart; that was the accepted cost of the repair
+(owner-approved) and is the only way an unmanaged listing can be brought back
+under the Inventory API.
+
+Full detail and the reasoning: `CHANGELOG.md` 2026-08-21 (2).
+
+## ✅ Auto-delist hook FIXED, DEPLOYED and CONFIRMED on production 2026-08-21
+
+The hook was a **floating promise** at six call sites; Netlify froze the
+container before it finished. It dropped **~1 sale in 20** (39/41 delisted
+correctly). Now scheduled with `after()` via new
+`lib/product-status-hooks.ts`, with `allSettled` and real error logging. A
+second hole — `adminRevalidateProduct` sitting after the video-commit early
+return in `AdminShell.tsx` — is closed too. `queueDeepFieldSync` deleted as dead
+broken-shape code.
+
+Gate: `tsc`/`lint` clean · **1037/1037** · **454/454**. Tests mutation-tested per
+property. Detail: `CHANGELOG.md` 2026-08-21 (3).
+
+### ✅ Confirmed end-to-end on production
+
+Deployed `main@e81f9f9`. Both previously-stale products were run through a
+no-change edit-modal save and are now **`hidden_oos` qty 0 on eBay** and
+**`delisted`/`inactive` on Etsy**, with `etsy delist ok` and `ebay hide_oos ok`
+rows. `after()` proven live: the Netlify log shows `[deepfield] synced 1
+product(s)` emitted from inside the callback. Sale prices preserved (1146.63,
+1116.66). Detail: `CHANGELOG.md` 2026-08-21 (4).
+
+⛔ **Never use the "mark sold" quick action to re-fire hooks on an
+already-sold item.** `adminUpdateProductsStatus` recomputes `sold_price` from
+current spot and overwrites the recorded sale price. Use a no-change save in the
+edit modal, which fires the same hooks and writes nothing.
+
+### ◻ Still worth doing
+
+1. ✅ **BUILT 2026-08-21 — the reconcile sweep (needs deploying).** Diagnosed:
+   the "missing" `hide_oos` row was not missing, it landed **127.6s late**, when
+   the frozen Lambda thawed on the next request.
+   Two sequential awaits cannot be 128s apart unless the process stops between
+   them. The Next docs list `after()` as requiring **graceful shutdown support**
+   (`deploying-to-platforms.md`), which Netlify's freeze-on-response model does
+   not provide.
+
+   Work finishing inside the response window now lands reliably (Etsy, Deep
+   Field). Slower work (eBay, which adds a token round-trip) still freezes and
+   completes only if the container is reused before being reclaimed. **That is
+   the residual ~5% risk, unchanged in kind, reduced in size.**
+
+   **Built:** `reconcile{Ebay,Etsy}StatusDrift()` + `/api/admin/{ebay,etsy}/
+   reconcile-status`, on the existing GitHub Actions workflow **every 30 minutes**
+   (`*/30 * * * *`), each guarded by that channel's existing cron secret so no
+   new repository secret is needed. Verified against production read-only
+   (0 drift on 124 + 128 listings) and then for real (1131ms / 781ms, audit rows
+   written). Detail: `CHANGELOG.md` 2026-08-21 (5).
+
+   ⚠️ **The static page count is now 456, not 454** — the two new API routes.
+   STRUCTURE.md treats the count as an invariant; this is the new baseline.
+
+   ### ◻ After deploying
+
+   - **Trigger it once by hand** to confirm the cron path works end-to-end, via
+     the workflow's `reconcile-status` dispatch option:
+     `github.com/DarkMatter-WebDev/NaplesAntiquesLLC.com/actions/workflows/scheduled-jobs.yml`
+     → Run workflow → job: `reconcile-status`. Expect two green jobs and
+     `0 drifted` in both responses.
+   - **Then leave it alone.** A `reconcile_status` row every 6h with `0 drifted`
+     is the net working. A row with `drifted > 0` means something upstream missed
+     a delist — worth reading, not worth panicking about, since the sweep just
+     fixed it.
+
+   ⛔ **DECIDED 2026-08-21 — do NOT await the hook in the PayPal capture path.**
+   The payment is already captured before that line runs, so a hang there turns a
+   successful payment into an error page for the buyer. Neither marketplace
+   client has a request timeout (verified) and both retry with 1s/2s/4s backoff,
+   so the tail is unbounded against a ~26–30s gateway ceiling. The 30-minute
+   sweep bounds the exposure from outside with no buyer-facing risk. If near-zero
+   exposure is ever wanted, the safe shape is: start the work, await it with a
+   ~3s cap, and hand the SAME promise to `after()` regardless — never a plain
+   `await`.
+
+   ℹ️ **If you do want it awaited somewhere**, the PayPal **webhook** is the free
+   one — no buyer is waiting on that response.
+
+## 🟡 Marketplace clients have no request timeout (latent, not urgent)
+
+`lib/ebay/client.ts` and `lib/etsy/client.ts` both call `fetch()` with **no
+`AbortSignal`**, so a hung connection blocks indefinitely, and both retry 3×
+with 1s/2s/4s backoff on top. Today that only strands background work, which is
+why it is not urgent — but it is the specific reason awaiting a marketplace call
+in a buyer-facing route is unsafe.
+
+⚠️ **Not a drive-by fix.** It changes every eBay/Etsy call site, including
+legitimately slow ones (Etsy image upload, publish). Pick per-operation timeouts
+deliberately rather than one global number, and gate it properly.
+2. **A real website sale still has not exercised this path.** The confirmation
+   above went through the admin route. The PayPal capture route shares the same
+   helper, but has not run in production since the fix.
+3. **Watch for `[product-status-hooks]` lines** in the Netlify function log.
+   Before this change such failures were silent; if any appear, that is the new
+   logging working, not a new problem.
+
+## ✅ RESOLVED 2026-08-21 — the two sold listings are reconciled
+
+Both `10k-gold-monaco-cuban-link-necklace` and `10k-gold-rope-chain-necklace` are
+now **`hidden_oos` qty 0 on eBay** and **`delisted`/`inactive` on Etsy**, fixed as
+a side effect of confirming the auto-delist fix. Kept below for the reasoning
+about why they were never a live risk.
+
+## 🟡 (historical) Two sold listings carried stale local state
+
+`10k-gold-monaco-cuban-link-necklace` and `10k-gold-rope-chain-necklace` are
+`status: sold` in the app, and:
+
+- **eBay** — offers PUBLISHED but listings `OUT_OF_STOCK`. Both sold on eBay
+  itself (Monaco: "You sold this item on Aug 9"; rope chain: "out of stock").
+  Not purchasable. Local `last_pushed_qty` is still `1` because eBay decremented
+  the quantity itself — we never pushed a zero.
+- **Etsy** — local rows still say `sync_state: active` / `listing_state: active`,
+  while Etsy itself serves *"Sorry, this item is unavailable."* Not purchasable.
+
+✅ **Verified on both marketplaces — there is NO double-sale exposure.** This is
+stale local state only.
+
+⚠️ **But the auto-delist hook did not log anything after either sale.** The
+product went `sold` on 2026-08-09 / 2026-08-10 and there is no
+`status_change_hook`, `delist`, `withdraw` or `hide_oos` row on either channel
+after those dates. Earlier hook runs DID log (`delist ok` 2026-07-20), so the
+mechanism works — it just did not fire this time. Worth finding out why before a
+future sale leaves something genuinely purchasable.
+
+Side effect while it stands: both rows are re-selected and skipped by every
+price-push run, forever. Same class as the 33-item residue from 2026-08-08.
+
+## 🟡 DEPLOYED 2026-08-21 — marketplace price-push timeout fix (awaiting its first cron)
+
+**Shipped in `main@e81f9f9`**, the same deploy as the auto-delist fix — the whole
+working tree went over at once. **No SQL.**
+
+⚠️ **Deployed is not verified.** The scheduled price pushes have not run since.
+The first real evidence arrives at the 7:15 / 7:45 a.m. EDT crons; see *After
+deploying* below.
+
+`ebay-price-push` failed (run #142, 504 after 32s) **after successfully pushing
+all 50 prices** — the gateway hung up just before the handler returned. Etsy had
+the same defect and was silently deferring **15–18 listings a day** since
+2026-08-20 without ever going red.
+
+**What changed** — `lib/{ebay,etsy}/sync.ts` + `lib/{ebay,etsy}/store.ts`:
+
+1. Bookkeeping batched — `bulkPatchListings` + `insertSyncLogs` replace two
+   awaited round-trips per listing. That was 15.7s of a 22.2s run.
+2. Budget is now an absolute `deadlineAt` stamped on entry (20s, was a 22s
+   loop-relative budget that could not bound the request).
+
+**Gate, from a deleted `.next`:** `tsc` clean · `lint` clean · **1033/1033
+across 101 files** · build **454/454 pages**. New tests were **mutation-tested**
+— reintroducing either bug fails them.
+
+### ◻ After deploying
+
+1. **Watch the 7:15 and 7:45 a.m. EDT runs tomorrow.** Both should be green and
+   noticeably faster. Success looks like `0 deferred` in the summary row:
+
+   ```bash
+   curl -s -o /dev/null -w "%{http_code} %{time_total}s
+" -X POST https://naplesestatejewelry.com/api/admin/ebay/price-push
+   ```
+
+   (401 unauthenticated — that is the point; it times the route, not the work.)
+
+2. **Confirm the Etsy backlog clears.** It should push all ~56 candidates in one
+   run instead of 41. Check the newest `scheduled_price_push` row in
+   `etsy_sync_log` for `0 deferred`.
+
+3. ⚠️ **If `deferred` is still non-zero**, the catalog has outgrown a single
+   synchronous request. Move the push to a Netlify **background** function
+   (15-minute ceiling) — do NOT raise the 20s constant toward 26.
+
+## 🟡 eBay `account_deletion` webhook rows are 97% of the sync log
+
+Found while investigating the above; **not** its cause, and not urgent.
+
+`ebay_sync_log` holds **77,617 rows, 75,459 of them `account_deletion`**
+receipts from eBay's marketplace-account-deletion webhook, arriving at
+**~126/hour** (~3,000/day). `pruneOldSyncLogs` keeps 90 days, and the oldest row
+is only 42 days old, so nothing has ever been deleted.
+
+These are compliance pings about eBay users unrelated to this shop. Options, in
+order of preference: stop logging them at all, log only a daily count, or prune
+that one action on a much shorter retention. Anything that keeps the real
+sync history readable — right now `price_push` rows are 563 of 77,617 and the
+table is unusable for eyeballing.
+
+⚠️ Do not "fix" this by shortening the global 90-day prune; the genuine sync
+history is the part worth keeping.
 
 ## ✅ DEPLOYED 2026-08-19 — the checkout sign-in/guest gate
 
@@ -742,28 +951,62 @@ removing rather than ignoring.
 ## Copying to the repo folder — use the staging folder
 
 **A ready-made, verified staging copy lives at `C:\Users\rcman\NEJ-repo-staging`**
-(rebuilt **2026-08-19**, deliberately OUTSIDE this folder and outside OneDrive so
+(rebuilt **2026-08-21**, deliberately OUTSIDE this folder and outside OneDrive so
 it neither pollutes the source of truth nor triggers a sync storm). Its contents
 are exactly what belongs in the repo — copy *everything* in it into the repo
 folder with no exclusions to think about.
 
-✅ **Rebuilt 2026-08-19 for both batches — the checkout gate and the review
-reconciliation — and BOTH are now DEPLOYED and confirmed on production.**
-Staging mirrors the source, so the next batch starts from a clean baseline.
-**855 files / ~19.65 MB**, **0 FAILED / 0 Extras / 0 Mismatch**,
-and a follow-up dry run reported **0 to copy**. `/MIR` deleted nothing — the
+✅ **Rebuilt 2026-08-21 and READY TO DEPLOY.** It carries the marketplace
+price-push timeout fix, the auto-delist `after()` fix, the empty write-block
+list, and the new status-drift reconcile sweep.
+
+**861 files / 19.79 MB**, **25 copied, 0 FAILED / 0 Extras / 0 Mismatch**, and a
+follow-up dry run reported **0 to copy**. The +6 files over the previous 855 are
+exactly the new ones: `product-status-hooks.ts`, the two `reconcile-status`
+routes, and three test files.
+
+⚠️ **The staging folder was NOT the source of the 2026-08-21 19:55 deploy**
+(`main@e81f9f9`). It was still on the 2026-08-19 snapshot at that point, so that
+deploy came from somewhere else. Worth knowing if the repo folder and staging
+ever look out of step. `/MIR` deleted nothing — the
 dry run showed 0 Extras *before* it ran, which is the check that makes `/MIR`
 safe. Leak check clean — 0 `.git`, 0 `node_modules`, 0 `.next`, 0 `.env*`,
 0 `.pem`, 0 `*.tsbuildinfo`, 0 `next-env.d.ts`, 0 `*.log` — against a
-**positive control of 177 `.tsx`**, so the zeros are a real result rather than a
+**positive control of 177 `.tsx`** (re-confirmed 2026-08-21), so the zeros are a real result rather than a
 broken scan. Hidden paths confirmed present: `.github/workflows/
 scheduled-jobs.yml`, `.gitignore`, `.claude/launch.json`, `next-app/.npmrc`.
 
-The 8 files are 4 sources and the 4 memory files:
-`CheckoutGate.tsx` (new), `CartDrawer.tsx`, `CheckoutClient.tsx`, and
-`[locale]/layout.tsx`.
-
 Content spot-checks run against the STAGED copy, not the source:
+
+- 🔴 **`maps.google.com` present in BOTH root `netlify.toml` and
+  `next-app/next.config.ts`** — the standing item that fails silently if it does
+  not travel. Confirmed **1 hit each** after this sync.
+- Workflow: **3** `*/30 * * * *` hits and **2** `reconcile-status:` jobs.
+- `lib/product-status-hooks.ts` present and importing `after` from
+  `next/server`; both `reconcile-status/route.ts` files present.
+- Staged `lib/ebay/sync.ts` has the write-block list as `new Set([])` (**1** hit)
+  and **8** `deadlineAt` references; `lib/etsy/sync.ts` has **6**.
+- `bulkPatchListings` present in both stores (**3** / **2**), and
+  `export function queueDeepFieldSync` is **0** — it was deliberately deleted.
+- Docs carry this session: `CHANGELOG.md` has `2026-08-21 (3)`, `(4)` and `(5)`;
+  `STRUCTURE.md` says **456 pages**; `DECISIONS.md` carries the never-await rule.
+
+⚠️ **A wrapped phrase produces a false negative.** Searching staged
+`CURRENT_STATUS.md` for "reconcile sweep" returns 0 because the phrase breaks
+across a line; single-line tokens return 13. Same trap as any zero-without-a-
+positive-control.
+
+<details><summary>Previous rebuild, 2026-08-19 (checkout gate + reviews) — now superseded</summary>
+
+**855 files / ~19.65 MB**, 8 files copied — 4 sources and the 4 memory files:
+`CheckoutGate.tsx` (new), `CartDrawer.tsx`, `CheckoutClient.tsx`, and
+`[locale]/layout.tsx`. Its spot-checks were the staged `CheckoutGate.tsx`,
+`rememberGuestCheckout` in `CartDrawer.tsx`, **0** `checkout-auth-overlay` in
+`CheckoutClient.tsx`, and `suppressHydrationWarning` in `[locale]/layout.tsx`.
+
+</details>
+
+Older spot-checks, retained because the CSP one is a standing hazard:
 
 - 🔴 **`maps.google.com` present in BOTH root `netlify.toml` and
   `next-app/next.config.ts`** — the standing item that fails silently if it does

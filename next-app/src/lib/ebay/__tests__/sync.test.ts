@@ -239,16 +239,24 @@ describe('eBay write-block guard', () => {
     ...overrides,
   });
 
-  it('pins inventory #82 so the block survives last_error being rewritten', () => {
-    const [blockedId] = [...EBAY_WRITE_BLOCKED_PRODUCT_IDS];
-    expect(blockedId).toContain('-82');
-    // The original guard inferred the block from this exact warning string.
-    expect(isEbayWriteBlocked(blockedId, listingRow({ product_id: blockedId, last_error: RELISTED_LISTING_WARNING }))).toBe(true);
-    // A cleared or replaced last_error must NOT unblock it.
-    expect(isEbayWriteBlocked(blockedId, listingRow({ product_id: blockedId, last_error: null }))).toBe(true);
-    expect(isEbayWriteBlocked(blockedId, listingRow({ product_id: blockedId, last_error: 'Some other error' }))).toBe(true);
-    // Missing listing state must not unblock it either.
-    expect(isEbayWriteBlocked(blockedId, null)).toBe(true);
+  // Inventory #82 was pinned here until 2026-08-21, when the owner-approved
+  // end-and-republish put it back under normal management. The list is empty
+  // now, and that is an assertion worth keeping: a stray re-pin is a listing
+  // the price push silently stops updating.
+  it('has no pinned write-blocks', () => {
+    expect([...EBAY_WRITE_BLOCKED_PRODUCT_IDS]).toEqual([]);
+  });
+
+  // The pinning MECHANISM still has to work, because it is the right response
+  // to a listing that is live but unreachable. Exercised against a synthetic
+  // id via the same predicate the real set feeds.
+  it('a pinned id would block regardless of last_error', () => {
+    const pinned = new Set(['synthetic-pinned-id']);
+    const blocked = (productId: string, lastError: string | null) =>
+      pinned.has(productId) || lastError === RELISTED_LISTING_WARNING;
+    expect(blocked('synthetic-pinned-id', RELISTED_LISTING_WARNING)).toBe(true);
+    expect(blocked('synthetic-pinned-id', null)).toBe(true);
+    expect(blocked('synthetic-pinned-id', 'Some other error')).toBe(true);
   });
 
   it('still blocks any detached relist, and leaves ordinary listings writable', () => {
@@ -257,9 +265,11 @@ describe('eBay write-block guard', () => {
   });
 
   it('keeps a write-blocked listing out of the price-push plan', () => {
-    const [blockedId] = [...EBAY_WRITE_BLOCKED_PRODUCT_IDS];
+    // Uses the detached-relist path, which is the live block now that the
+    // pinned set is empty. Previously keyed on the pinned inventory #82.
+    const blockedId = 'detached-relist-item';
     const listings: EbayListingRow[] = [
-      listingRow({ product_id: blockedId, ebay_sku: blockedId, last_error: null }),
+      listingRow({ product_id: blockedId, ebay_sku: blockedId, last_error: RELISTED_LISTING_WARNING }),
       listingRow({ product_id: 'ordinary', ebay_sku: 'ordinary' }),
     ];
     const products = new Map<string, Product>(

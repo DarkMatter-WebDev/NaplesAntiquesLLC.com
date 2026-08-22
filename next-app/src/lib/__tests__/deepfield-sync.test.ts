@@ -20,7 +20,7 @@ vi.mock('@/lib/spot-price', () => ({
 }));
 
 const {
-  syncProductsToDeepField, queueDeepFieldSync, isDeepFieldSyncConfigured,
+  syncProductsToDeepField, isDeepFieldSyncConfigured,
   IMAGE_BUDGET_PER_REQUEST, MAX_PRODUCTS_PER_REQUEST,
 } = await import('@/lib/deepfield/sync');
 
@@ -272,9 +272,4 @@ describe('deep field sync never throws into its caller', () => {
     await expect(syncProductsToDeepField(['a'])).resolves.toBeUndefined();
   });
 
-  it('queueDeepFieldSync returns synchronously and never rejects', async () => {
-    fetchMock.mockRejectedValue(new Error('down'));
-    expect(queueDeepFieldSync(['a'])).toBeUndefined();
-    await new Promise((r) => setTimeout(r, 0));
-  });
 });

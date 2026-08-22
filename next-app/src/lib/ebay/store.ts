@@ -253,6 +253,65 @@ export async function insertSyncLog(service: SupabaseClient, input: EbaySyncLogI
   }
 }
 
+/**
+ * Bulk twin of `insertSyncLog` — ONE round-trip for a whole batch.
+ *
+ * The scheduled price push used to await `insertSyncLog` once per listing. At
+ * 50 listings that was 50 serialized round-trips, and paired with
+ * `bulkPatchListings` below it accounted for ~15.7s of a 22.2s run (measured
+ * 2026-08-21: 100 round-trips at ~157ms each). See `bulkPatchListings`.
+ *
+ * Same swallow-but-surface contract as the singular version: logging must
+ * never break the caller.
+ */
+export async function insertSyncLogs(service: SupabaseClient, inputs: EbaySyncLogInput[]): Promise<void> {
+  if (!inputs.length) return;
+  const { error } = await service.from('ebay_sync_log').insert(
+    inputs.map((input) => ({
+      product_id: input.product_id ?? null,
+      listing_id: input.listing_id ?? null,
+      action: input.action,
+      outcome: input.outcome,
+      message: input.message ?? null,
+      detail: input.detail ?? null,
+    })),
+  );
+  if (error && !isMissingSchemaError(error)) {
+    console.error('ebay_sync_log bulk insert error:', error.message);
+  }
+}
+
+/**
+ * Bulk twin of `upsertListing` — ONE round-trip for a whole batch of patches.
+ *
+ * WHY THIS EXISTS: `runScheduledPricePush` pushed prices to eBay in bulk (one
+ * `bulk_update_price_quantity` call per 25 offers) but then recorded the
+ * results one listing at a time — two awaited round-trips each. The eBay side
+ * was never the bottleneck; the bookkeeping was.
+ *
+ * ⚠️ Unlike the singular `upsertListing` (update-then-insert), this is a real
+ * `upsert` keyed on `product_id`, matching the Etsy twin. `ebay_sku` is
+ * REQUIRED in every patch and is not optional bookkeeping: the column is
+ * `not null unique`, so the INSERT half of the upsert would fail without it.
+ * Callers pass the value off the row they already selected, so the insert half
+ * is correct if it ever fires — in practice it never does, because every
+ * caller patches rows it just read.
+ */
+export async function bulkPatchListings(
+  service: SupabaseClient,
+  patches: Array<{ product_id: string; ebay_sku: string } & Partial<Omit<EbayListingRow, 'product_id' | 'ebay_sku'>>>,
+): Promise<void> {
+  if (!patches.length) return;
+  const updatedAt = new Date().toISOString();
+  const { error } = await service
+    .from('ebay_listings')
+    .upsert(patches.map((patch) => ({ ...patch, updated_at: updatedAt })), { onConflict: 'product_id' });
+  if (error) {
+    if (isMissingSchemaError(error)) throw new EbayNotMigratedError();
+    throw new Error(error.message);
+  }
+}
+
 export async function getRecentSyncLog(
   service: SupabaseClient,
   limit = 50,
