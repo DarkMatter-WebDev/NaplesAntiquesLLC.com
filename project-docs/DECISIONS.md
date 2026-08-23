@@ -1284,6 +1284,11 @@ carry copy asserting it — "we come to you" / "vamos a usted", "no storefront",
 "appointment-only" (`(home)`, `about`, `free-evaluation`, `sell`, `sell/[city]`,
 `services`, `trade-in`, `layout`, `ContactForm`, `SiteFooter`).
 
+ℹ️ **File-list note (2026-08-22):** `ContactForm.tsx` no longer exists — it was
+deleted as dead code (`CHANGELOG.md` 2026-08-22 (7)), so that list is 10 files as
+of 2026-08-16 and 9 today. **The rule below is unaffected**; only the inventory
+shrank.
+
 **Rule for new hero/marketing copy until it opens: describe WHAT WE BUY, not HOW
 WE OPERATE.** A category list ("Estate Jewelry · Silver · Diamonds · Coins")
 never expires; "Private · Mobile · By Appointment" would need rewriting the day
@@ -3336,6 +3341,44 @@ mobile through wide desktop, including short landscape viewports.
 
 ## Checkout, Tax, And Payments
 
+### Contact fields are validated for substance, and their ORDER is load-bearing
+
+A paid order arrived on 2026-08-22 with `customer_name` = "Sara" and
+`customer_phone` = "Catlett". Checkout had only ever asserted that those fields
+were non-empty, so a first name plus a surname-in-the-phone-box was a valid
+order. `type="tel"` contributes nothing here — it hints at a mobile keypad and
+validates no input.
+
+Two rules came out of it.
+
+**1. Substance, not presence.** `lib/person-name.ts` and `lib/phone.ts` are the
+single source for what counts as a usable name and phone, applied on the client
+for UX and in `create-order/route.ts` as the actual gate — before any order row,
+PayPal order, or money. The canonical values are what get stored and what the
+PayPal shipping label prints.
+
+**2. Phone never sits adjacent to the name.** Contact fields run
+**First Name → Last Name → Email → Phone**. `responsive-form-grid` is
+`auto-fit / minmax(16rem, 1fr)`, so an adjacent pair is side by side on desktop
+and stacked on mobile — either way, the field after a first name is the one a
+buyer fills with a surname. Last Name occupies that position now. Reordering
+these fields is a behavioural change, not a cosmetic one.
+
+⛔ **Both validators must stay the most lenient rule that does the job.** Two
+whitespace-separated tokens for a name; structural NANP/E.164 facts for a phone,
+with extensions and explicit `+` international numbers accepted. **A false
+positive is a lost sale** — a very different cost from a false positive in spam
+filtering, where the same instinct to tighten already nearly cost a real customer
+named `VanDerBeek`. Never replace either with a heuristic about what a real name
+or number "looks like".
+
+ℹ️ Considered and rejected: a single Full Name field requiring a space. It gets
+the same data with one fewer field (Amazon's pattern) but rejects mononyms and
+only reveals the requirement after the buyer has tripped on it. Two labelled
+fields state it up front, and match `profiles`, which already stored
+`first_name`/`last_name`. The pair is joined into the existing `customer_name`
+column, so no migration was needed.
+
 ### Server pricing is authoritative
 
 The browser sends product IDs/quantities and selections, never trusted amounts.
@@ -4447,6 +4490,57 @@ off-eBay website URLs. Product-photo galleries must contain product imagery,
 not a marketing banner.
 
 ## Security And Privacy
+
+### A public form filter is tuned by MEASUREMENT, and fails open toward the human
+
+⛔ **Never pick a spam threshold by eye.** `lib/spam-heuristics.ts` counts case
+flips in a single-token name — generated identifiers flip constantly, real names
+barely do. The first attempt used 4 because "McDonald scores 3, so 4 is safe".
+It was wrong: **`VanDerBeek` scores 5 at ten characters**, so the length gate
+does not save it, and a real customer typing only their surname would have been
+silently discarded.
+
+The value that shipped came from measuring both populations against the real
+2026-08-22 sample:
+
+```text
+humans  1, 3, 3, 3, 3, 3, 3, 3, 3, 5, 5      <- max 5
+spam    7, 8, 8, 10, 10, 11, 12, 12, 13, 13  <- min 7
+```
+
+**6** is the only value with clearance on both sides. Re-derive it the same way
+if the sample changes; do not nudge it.
+
+⛔ **The asymmetry is the whole design: a missed bot is spam, a false positive is
+a lost customer.** Spend every point of margin on the human side. Two tokens in
+the name field is the strongest human signal available and wins outright.
+
+⚠️ **The 10 spam rows in `inquiries` are the labelled sample** and are named
+verbatim in `spam-heuristics.test.ts`. The owner's decision (2026-08-22) is to
+keep them. Do not "tidy" them away — the threshold is calibrated against them.
+
+### A silently-dropped submission must still be logged
+
+⛔ **Silent to the caller, never silent in the log.** The `bot-field` honeypot
+dropped bots invisibly on two forms for months, so when a third form shipped
+*without* the honeypot rendered there was no signal at all — the filter looked
+identical whether it was working or absent. Drops now log `[inquiry-spam]` with
+the reason.
+
+Same lesson as `.catch(() => {})` on the marketplace hooks: a swallowed outcome
+is indistinguishable from a mechanism that has stopped running.
+
+ℹ️ The response stays a normal success on purpose. A bot that receives an error
+learns the filter's shape and adapts; one that receives "thanks" keeps posting
+into a void.
+
+⚠️ **Accepted residual risk (owner decision, 2026-08-22):** `/api/inquire` still
+emails a confirmation to whatever address is submitted, so the form remains a
+potential relay for any bot that uses plausible two-word names. The decision is
+to react if abuse recurs rather than change customer-facing behaviour now; the
+playbook is in `TASKS.md`.
+
+
 
 ### A query parameter is never an authorization signal
 

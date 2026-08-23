@@ -2,11 +2,213 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-08-21**.
+> in `DECISIONS.md`. Last reconciled: **2026-08-22**.
 
-## Start Here (handoff, end of the 2026-08-21 session)
+## Start Here (handoff, end of the 2026-08-22 session)
 
 **Read this, then `TASKS.md`.**
+
+### The shape, in one glance
+
+🔴 **THREE THINGS ARE UNDEPLOYED: the inquiry-form bot filter, the
+name/phone validation, and the transactional bounce handler.** Plus the
+`ContactForm.tsx` dead-code deletion.
+
+✅ **STAGING IS CURRENT AND READY** — `C:\Users\rcman\NEJ-repo-staging` rebuilt
+**2026-08-22**: 868 files / 19.84 MB, 21 copied, 1 Extra deleted (the removed
+`ContactForm.tsx`), follow-up dry run **0 to copy / 0 extras**, leak check clean
+against a positive control of 176 `.tsx`. Copy it into the repo folder keeping
+that folder's `.git`, then push. **No SQL for any of it.**
+
+🔴 **The documented robocopy command CHANGED — do not use an older copy.** It now
+excludes `"$src\.claude\worktrees"`. Background agent sessions create git
+worktrees there, and a worktree's `.git` is a **FILE**, so `/XD .git` does not
+exclude it. The 2026-08-22 dry run wanted **1,122 files** under `.claude` against
+**20** real ones. `.gitignore` now covers it too, but robocopy does not read
+`.gitignore` — the `/XD` entry is what protects the copy.
+
+⛔ **"0 Extras" is NOT sufficient as a safety check.** Extras only catches junk in
+the DESTINATION; it was 0 while 1,122 stray files were queued to flow IN. Read
+the file COUNT and sanity-check it against what the session actually changed.
+
+✅ **Everything else from 2026-08-21/22 is live AND verified in production**, not
+merely shipped: the marketplace price-push timeout fix, the Inventory #82
+reattachment, the auto-delist `after()` fix, and the reconcile sweep. Each was
+confirmed by an unattended run or a fetched result, never by assumption.
+
+⚠️ The one thing with no production observation is the **auto-delist hook on a
+real website sale** — the PayPal capture path has not run since the fix. The
+reconcile sweep bounds that exposure to ~30 minutes regardless.
+
+### ◻ What is actually open
+
+Nothing is blocking. In rough priority:
+
+1. 🔴 **Deploy: the bot filter, the name/phone validation, the bounce handler,
+   and the `ContactForm.tsx` deletion.** ✅ Staging is already rebuilt and
+   verified (2026-08-22) — just copy `C:\Users\rcman\NEJ-repo-staging` into the
+   repo folder, keeping that folder's `.git`, and push. **No SQL.**
+   ⚠️ The bounce handler is inert unless a webhook secret is set in Netlify AND
+   Resend is configured to send `email.bounced` there.
+2. **Then watch the Netlify function log for `[inquiry-spam]`.** Lines = the
+   filter working. No lines and no new junk rows = the bot moved on. No lines but
+   NEW junk rows = it is being evaded, and `TASKS.md` has the playbook.
+3. 🟡 **Marketplace clients have no request timeout** (`lib/{ebay,etsy}/client.ts`
+   call `fetch()` with no `AbortSignal`, and both retry with 1s/2s/4s backoff).
+   Latent, not urgent — it only strands background work today. It is also the
+   specific reason awaiting a marketplace call in a buyer-facing route is unsafe.
+   ⚠️ Not a drive-by fix: it touches every call site, including legitimately slow
+   ones like Etsy image upload.
+4. 🟡 **`ebay_sync_log` is ~97% eBay `account_deletion` webhook noise**
+   (75k+ rows, ~3,000/day, pruned only at 90 days). Makes the real sync history
+   hard to read. Not causing failures.
+5. **A real website sale still has not exercised the auto-delist hook** since the
+   fix. Nothing to do but wait; the reconcile sweep bounds it to ~30 min.
+6. Older, unchanged from the 2026-08-20 handoff: Google address verification,
+   re-measure first paint on production (baseline 533KB / 30 requests), confirm
+   the first real refund records itself, Search Console re-submit, and the
+   phone-only checks never done on real hardware.
+
+### 🔴 UNDEPLOYED — checkout accepted a surname as a phone number, and only a first name
+
+A real paid order arrived with **name "Sara", phone "Catlett"**: the buyer typed
+her first name, tabbed, and typed her surname into the next box. Checkout checked
+only that name and phone were **non-empty** — client and server both — so it went
+through, leaving a paid order with a first name and no reachable phone.
+
+**Fixed (undeployed), in two parts.** Validation: new `lib/phone.ts` and
+`lib/person-name.ts`, enforced in `create-order/route.ts` with a 400 **before**
+any order row, PayPal order, or money, stored canonically on **both** write
+paths, and used for the PayPal shipping label. Cause: checkout now collects
+**First Name + Last Name** as two fields, joined into the existing
+`customer_name` column (**no migration**), and Phone moved out of the slot right
+after the name.
+
+⚠️ **Field ORDER is load-bearing, not cosmetic** — contact fields run
+**First → Last → Email → Phone**. Phone used to sit next to the name (side by
+side on desktop, stacked directly under it on mobile), which is exactly what made
+a surname feel right there. Do not move it back.
+
+⚠️ **`type="tel"` validates nothing** — it only hints at a mobile keypad. That is
+why the presence-only checks looked adequate for as long as they did.
+
+⛔ **Both validators are deliberately the most lenient rule that works** — two
+tokens for a name, structural NANP/E.164 facts for a phone (extensions and
+explicit `+` international pass on purpose). **A false positive in either is a
+lost sale.** Do not "strengthen" them into judgements about what a real name or
+number looks like; this project already has that scar (`VanDerBeek`).
+
+✅ **Extended to all contact/lead forms in the same session.**
+`InquiryForm`, `MessageUsForm` and `EvalForm` (and `ContactForm`, deleted later
+the same day as dead code), plus
+`/api/contact-message` and **both** `/api/inquire` paths, now share one rule and
+one message from `lib/phone.ts` and store the normalized number.
+`MessageUsForm` and `/api/contact-message` each had their own looser "10–15
+digits" copy that accepted `0000000000`; both now defer to the shared rule.
+
+⛔ **In `/api/inquire` the phone rejection is a VISIBLE 400, deliberately NOT
+folded into the silent spam drop above it.** A bot should vanish; a real person
+who mistyped must be told. Keep those paths distinct.
+
+✅ `ContactForm.tsx` turned out to be **dead code** and was **deleted
+2026-08-22** — nothing imported it, no barrel file and no dynamic import reached
+it; `/contact` renders `MessageUsForm`, or `InquiryForm` when `?item=` is
+present. `/api/inquire`, the route it posted to, stays live for `InquiryForm` and
+`EvalForm`. Build after deletion: **456/456**, unchanged.
+
+Gate: `tsc`/`lint` clean · **1077/1077** · build **456/456**. The original failing
+payload was replayed against a live server and now 400s, as do all three server
+paths; all three mounted forms were driven in the browser.
+
+🔴 **A test submission reached production data** — a probe with a *valid* phone
+ran the whole success path, creating one inquiry row, one admin notification, an
+owner email, and a bounced confirmation to a non-existent address. Ids and the
+cleanup SQL are in `TASKS.md`, awaiting the owner's call. ⚠️ Probe only the
+rejection paths on these endpoints; they return before any insert or email.
+
+### 🔴 UNDEPLOYED — transactional email bounces were being thrown away
+
+`/api/webhooks/resend` returned early on any event without a `campaign_id`, so
+every **transactional** failure was discarded. A buyer mistypes their email at
+checkout, the receipt hard-bounces, Resend reports it — and the report was thrown
+away. Nobody ever found out.
+
+**Fixed (undeployed):** the campaign-id gate now applies only to campaign
+analytics. New `lib/email-bounce.ts` classifies the bounce, matches the address
+to the most recent order and inquiry, and writes an `email_bounce` admin
+notification naming who to call and their phone number (red "Bounced" chip).
+
+🔴 **It is INERT unless two things are true in production — verify, do not
+assume:** a webhook secret is set in Netlify (the route **fails CLOSED**, 401
+without one), and Resend is actually configured to send `email.bounced` /
+`email.complained` to that URL. First success signal: an `[email-bounce]` log
+line plus a red chip in the message center.
+
+⛔ **Only a CONFIRMED transient bounce is spared from suppression** — `unknown`
+still suppresses, because the route used to suppress on any bounce and weakening
+that leaves dead addresses on the one verified sending domain. **Behaviour
+change:** a `MailboxFull` bounce no longer unsubscribes someone permanently.
+
+⛔ **Notifications are transactional-only** — campaign bounces are handled by
+suppression, and per-bounce notifications would bury the message center.
+
+◻ The hard-bounce path has unit tests but was **deliberately not fired against
+production** (it writes a notification — see the accidental-write note above).
+The side-effect-free paths were verified live. Gate: `tsc`/`lint` clean ·
+**1086/1086** · build **456/456**.
+
+ℹ️ **`ymail.com` is NOT a typo** — MX confirms `mta5.am0.yahoodns.net`, Yahoo's
+own servers. ⛔ Any future "did you mean?" check MUST list it as known-good: it
+is one character from `gmail.com`, so the naive version flags a real customer.
+
+### ⚠️ Traps this session hit, worth not re-learning
+
+- **`after()` is best-effort on Netlify, not a guarantee.** Next lists it as
+  requiring graceful-shutdown support, which the Lambda freeze-on-response model
+  does not provide. Work still in flight when the response flushes is frozen and
+  finishes only if the container is reused. Measured: a log insert landed
+  **127.6s late** on a thaw.
+- **A "missing" row may just be late.** That 127.6s insert was first reported as
+  lost. Check again before diagnosing.
+- **Deleting `.next` under a running dev server 500s every route** with
+  `ENOENT … build-manifest.json`. That is the deleted build dir, not the code —
+  restart rather than debug.
+- **A wrapped phrase makes `Select-String` return 0.** Searching staged
+  `CURRENT_STATUS.md` for "reconcile sweep" found nothing because the phrase
+  breaks across a line. Always pair a zero with a positive control.
+- **The GitHub mobile app mislabels run triggers** — it showed a scheduled run as
+  "Triggered via pull request". The web UI is authoritative.
+
+### 🔴 UNDEPLOYED — inquiry-form bot filter (the form was an EMAIL RELAY)
+
+A bot used the product-inquiry form to make Resend send confirmation mail **to
+strangers** from `noreply@naplesestatejewelry.com` — 10 submissions in 18 hours
+on 2026-08-22, one victim address hit twice. `.com` is the only verified Resend
+sender, so this put order receipts and marketing at risk too.
+
+**Root cause:** the `bot-field` honeypot was checked server-side but
+`InquiryForm.tsx` never rendered it. It is the only one of the three inquiry
+forms that was spammed — a perfect correlation.
+
+**Fixed (undeployed):** honeypot added to that form; new `lib/spam-heuristics.ts`
+catches generated names even when a bot POSTs JSON directly; drops are logged as
+`[inquiry-spam]` rather than vanishing silently.
+
+⚠️ **The threshold is measured, not guessed** — human max 5, spam min 7, so 6.
+A first attempt at 4 would have silently discarded a real customer named
+`VanDerBeek`. A false positive here is a lost customer; the constant is pinned
+by tests from both directions.
+
+✅ **Both owner decisions are settled (2026-08-22): leave the 10 spam rows, and
+leave the confirmation email as-is — react if abuse recurs.** The rows are also
+the labelled sample the heuristic was derived from and are referenced by name in
+`spam-heuristics.test.ts`, so do not tidy them away.
+
+⚠️ **Accepted residual risk, recorded so nobody re-discovers it in a panic:**
+`sendEmails` still sends to whatever address is submitted. A next bot using
+plausible two-word names walks past the name heuristic. `TASKS.md` carries the
+if-it-recurs playbook — and its first rule is **re-measure before changing any
+constant**.
 
 ### ✅ DEPLOYED AND CONFIRMED — the auto-delist hook was dropping ~1 sale in 20
 
@@ -52,8 +254,11 @@ token round-trip) still freezes and completes only if the container is reused.
 *frozen* — lost only when the container was reclaimed before reuse. That is why
 it was 39/41, not 0/41.
 
-✅ **The durable fix is BUILT and needs deploying: a status-drift reconcile
-sweep.** **Every 30 minutes** it asks "is anything sold still live right now?"
+✅ **DEPLOYED AND CONFIRMED 2026-08-22 — the status-drift reconcile sweep is
+live.** Run #153 ran both jobs green in 6s with all five other jobs skipped, and
+wrote `124 scanned, 0 drifted` (eBay) / `128 scanned, 0 drifted` (Etsy).
+✅ **Firing unattended** — 18 runs per channel overnight, all `ok` / `0 drifted`,
+gaps 18–56 min (GitHub's best-effort spread, not a fault). **Every 30 minutes** it asks "is anything sold still live right now?"
 and repairs what it finds — catching a missed delist regardless of cause (freeze, API error,
 or an unhooked status path). `reconcile{Ebay,Etsy}StatusDrift()` +
 `/api/admin/{ebay,etsy}/reconcile-status`, on the existing GitHub Actions
@@ -112,15 +317,18 @@ purchasable on either, so no double-sale exposure, but **the auto-delist hook
 logged nothing after either sale**. It has worked before. Worth understanding
 before a future sale leaves something genuinely buyable. See `TASKS.md`.
 
-### 🟡 DEPLOYED — the price-push timeout fix (awaiting its first scheduled run)
+### ✅ VERIFIED IN PRODUCTION — the price-push timeout fix
 
 **Shipped in `main@e81f9f9`** alongside the auto-delist fix and the write-block
 removal — one deploy carried all three. **No outstanding SQL.** Staging is stale
 as of this session and must be rebuilt before the next batch.
 
-⚠️ **Not yet verified in production:** the scheduled pushes have not run since
-the deploy. Success looks like `0 deferred` in tomorrow's `scheduled_price_push`
-summary rows on both channels.
+✅ **Verified 2026-08-22 on the first unattended run.** eBay **success in 2s**
+(`0 pushed, 85 unchanged, 0 blocked, 0 failed, 0 deferred`) where run #142 was
+**38s and a 504**. Etsy **success in 14s** (`32 pushed, 0 deferred`) with its 32
+item writes in **2.14s** against 20.9s for 41 items before — **per item 522ms →
+67ms**. `0 deferred` on both channels, `0 blocked` on eBay, and **0 failed
+workflow runs since #143**.
 
 `ebay-price-push` failed on 2026-08-21 (run #142, 504 `Inactivity Timeout` after
 32s) **having already pushed all 50 prices successfully** — the gateway hung up
@@ -358,7 +566,8 @@ Nothing is blocking. In rough priority:
 ### ⚠️ Three traps this session hit, worth not re-learning
 
 - **A guard test that scans source must strip comments AND normalise newlines.**
-  This repo mixes CRLF and LF; in JavaScript `` is a line terminator, so
+  This repo mixes CRLF and LF; in JavaScript `
+` is a line terminator, so
   `/(^|[^:])\/\/.*$/` silently fails to match on CRLF files and every `//`
   comment survives. A guard then reports its own rationale as a violation.
 - **Tailwind's scanner reads comments.** `.min-h-screen{min-height:100vh}` is

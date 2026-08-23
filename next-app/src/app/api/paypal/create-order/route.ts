@@ -26,6 +26,8 @@ import {
   type NormalizedUsShippingAddress,
   validateUsShippingAddress,
 } from '@/lib/us-address';
+import { normalizePhoneNumber } from '@/lib/phone';
+import { normalizePersonName } from '@/lib/person-name';
 
 export const runtime = 'nodejs';
 
@@ -42,11 +44,13 @@ function lineItems(items: { title_snapshot: string; price_snapshot: number; quan
 }
 
 function buildPayPalShippingAddress(
-  customer: Record<string, unknown>,
+  // The already-validated name, not the raw body field: this is what gets
+  // printed on the shipping label.
+  fullName: string,
   address: NormalizedUsShippingAddress,
 ): PayPalShippingAddress {
   return {
-    fullName: String(customer.name ?? '').trim(),
+    fullName,
     addressLine1: address.line1,
     addressLine2: address.line2,
     city: address.city,
@@ -128,6 +132,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Name, email, and phone are required' }, { status: 400 });
   }
 
+  // Presence was never enough: a real order landed with `customer_name` = "Sara"
+  // and `customer_phone` = "Catlett", leaving no way to reach the buyer. Checkout
+  // now collects the name as two fields and validates the phone, but THESE are
+  // the checks that hold — the route is reachable directly, so the form is
+  // convenience, not enforcement. See `lib/person-name.ts` and `lib/phone.ts`.
+  const normalizedName = normalizePersonName(customer.name);
+  if (!normalizedName) {
+    return NextResponse.json(
+      { error: 'Enter both a first and last name for this order.' },
+      { status: 400 },
+    );
+  }
+
+  const normalizedPhone = normalizePhoneNumber(customer.phone);
+  if (!normalizedPhone) {
+    return NextResponse.json(
+      { error: 'Enter a valid phone number so we can reach you about your order.' },
+      { status: 400 },
+    );
+  }
+
   const addressValidation = needsShipping
     ? validateUsShippingAddress({
         line1: customer.address_line1,
@@ -152,7 +177,7 @@ export async function POST(req: Request) {
     country: normalizedShippingAddress?.country ?? customer.country,
   });
   const paypalShippingAddress = normalizedShippingAddress
-    ? buildPayPalShippingAddress(customer, normalizedShippingAddress)
+    ? buildPayPalShippingAddress(normalizedName, normalizedShippingAddress)
     : null;
 
   const supabase = await createClient();
@@ -260,9 +285,9 @@ export async function POST(req: Request) {
             paypal_order_id: paypalOrder.id,
             order_status: 'open',
             fulfillment_status: 'pending',
-            customer_name: String(customer.name).trim(),
+            customer_name: normalizedName,
             customer_email: String(customer.email).trim(),
-            customer_phone: String(customer.phone).trim(),
+            customer_phone: normalizedPhone,
             shipping_address: orderShippingAddress,
           })
           .eq('id', order.id)
@@ -309,9 +334,9 @@ export async function POST(req: Request) {
   const orderPayload = {
     order_number: orderNumber,
     user_id: user?.id ?? null,
-    customer_name: String(customer.name).trim(),
+    customer_name: normalizedName,
     customer_email: String(customer.email).trim(),
-    customer_phone: String(customer.phone).trim(),
+    customer_phone: normalizedPhone,
     subtotal: draft.subtotal,
     tax: draft.tax,
     shipping_fee: draft.shippingFee,

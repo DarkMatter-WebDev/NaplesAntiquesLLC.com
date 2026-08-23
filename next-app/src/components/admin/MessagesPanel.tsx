@@ -35,6 +35,8 @@ const TYPE_META: Record<string, { label: string; color: string }> = {
   inquiry: { label: 'Inquiry', color: GOLD },
   message: { label: 'Message', color: '#2563eb' },
   order: { label: 'Order', color: '#166534' },
+  // Red on purpose: this one means a customer never received something we sent.
+  email_bounce: { label: 'Bounced', color: '#b91c1c' },
 };
 
 function typeMeta(type: string): { label: string; color: string } {

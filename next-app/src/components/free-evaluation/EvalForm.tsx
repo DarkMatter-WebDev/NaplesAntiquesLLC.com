@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
+import { isValidPhoneNumber, phoneErrorMessage } from '@/lib/phone';
 
 interface Props {
   locale: string;
@@ -14,6 +15,7 @@ export default function EvalForm({ locale, submitted }: Props) {
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(submitted);
   const [err, setErr] = useState('');
+  const [phoneError, setPhoneError] = useState('');
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -28,6 +30,13 @@ export default function EvalForm({ locale, submitted }: Props) {
         : 'Please add at least one photo or a short description of what you have.');
       return;
     }
+    // Before sending: the server rejects this too, but an inline message points
+    // at the field instead of showing a generic "failed to send".
+    if (!isValidPhoneNumber(String(fd.get('phone') ?? ''))) {
+      setPhoneError(phoneErrorMessage(isEs));
+      return;
+    }
+    setPhoneError('');
     setSending(true);
     setErr('');
     try {
@@ -204,11 +213,18 @@ export default function EvalForm({ locale, submitted }: Props) {
                 id="fe-phone"
                 name="phone"
                 type="tel"
+                inputMode="tel"
+                placeholder="(239) 555-0123"
                 autoComplete="tel"
                 required
+                aria-invalid={phoneError !== ''}
                 className="w-full rounded-xl px-3 py-2 text-sm"
                 style={{ border: '1px solid #d8d0c2', background: 'white', color: '#1a1c1c' }}
+                onChange={() => phoneError && setPhoneError('')}
               />
+              {phoneError && (
+                <p className="text-sm" style={{ color: 'var(--color-error, #b91c1c)' }}>{phoneError}</p>
+              )}
             </div>
           </div>
 

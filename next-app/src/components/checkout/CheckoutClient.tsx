@@ -34,6 +34,8 @@ import {
   normalizeUsZip,
   US_STATES,
 } from '@/lib/us-address';
+import { normalizePhoneNumber } from '@/lib/phone';
+import { composeFullName, formatFullName, parseFullName } from '@/lib/person-name';
 import { AppIcon } from '@/components/AppIcon';
 
 const GOLD = '#735c00';
@@ -70,7 +72,12 @@ type CartProductInfo = Pick<
 >;
 
 interface CustomerInfo {
-  name: string;
+  // Collected as two fields since 2026-08-22 and composed into the single
+  // `customer_name` the order stores. A buyer previously typed her first name
+  // here and her surname into Phone, because Phone was the next box and there
+  // was nowhere else a surname belonged. See `lib/person-name.ts`.
+  first_name: string;
+  last_name: string;
   email: string;
   phone: string;
   notes: string;
@@ -89,7 +96,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
   const hideSoldItemPrices = useHideSoldItemPrices(true);
   const prefix = isEs ? '/es' : '';
   const [customer, setCustomer] = useState<CustomerInfo>({
-    name: '', email: '', phone: '', notes: '',
+    first_name: '', last_name: '', email: '', phone: '', notes: '',
     address_line1: '', address_line2: '', city: '', state: '', postal_code: '', country: 'United States',
   });
   const [shippingMethod, setShippingMethod] = useState<string>(DEFAULT_SHIPPING_METHOD);
@@ -204,8 +211,13 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
   const needsShipping = effectiveShippingMethod !== 'local-pickup';
   const normalizedShippingState = normalizeUsState(customer.state);
   const normalizedShippingZip = normalizeUsZip(customer.postal_code);
+  // Checked for shape, not just presence: a buyer once tabbed out of Full Name
+  // and typed her surname here, and the order went through with an unreachable
+  // `customer_phone`. See `lib/phone.ts`.
+  const normalizedPhone = normalizePhoneNumber(customer.phone);
+  const composedName = composeFullName(customer.first_name, customer.last_name);
   const contactReady =
-    customer.name.trim() !== '' && customer.email.trim() !== '' && customer.phone.trim() !== '';
+    composedName !== null && customer.email.trim() !== '' && normalizedPhone !== null;
   const shippingAddressReady =
     !needsShipping ||
     (customer.address_line1.trim() !== '' &&
@@ -225,8 +237,9 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     needsShipping && normalizedShippingState === null ? (isEs ? 'Estado válido de EE. UU.' : 'Valid U.S. State') : null,
     needsShipping && normalizedShippingZip === null ? (isEs ? 'Código postal válido de EE. UU.' : 'Valid U.S. ZIP Code') : null,
     needsShipping && !isUnitedStatesCountry(customer.country) ? (isEs ? 'Dirección en Estados Unidos' : 'United States Address') : null,
-    customer.name.trim() === '' ? (isEs ? 'Nombre completo' : 'Full Name') : null,
-    customer.phone.trim() === '' ? (isEs ? 'Teléfono' : 'Phone') : null,
+    customer.first_name.trim() === '' ? (isEs ? 'Nombre' : 'First Name') : null,
+    customer.last_name.trim() === '' ? (isEs ? 'Apellido' : 'Last Name') : null,
+    normalizedPhone === null ? (isEs ? 'Teléfono válido' : 'Valid Phone Number') : null,
     customer.email.trim() === '' ? (isEs ? 'Correo electrónico' : 'Email') : null,
     // The confirmation checkbox is surfaced separately (needsInfoConfirmation) so
     // the pay reminder can spell out "check the box" clearly.
@@ -236,9 +249,13 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
     return {
       items: items.map((item) => ({ id: item.id, quantity: Math.max(1, Math.floor(item.purchaseQuantity ?? 1)) })),
       customer: {
-        name: customer.name,
+        // The two fields are joined here into the single value `orders` has
+        // always stored. The server re-checks it and is the authority.
+        name: composedName ?? formatFullName(customer.first_name, customer.last_name),
         email: customer.email,
-        phone: customer.phone,
+        // Canonical form, so the order row reads the same regardless of how the
+        // buyer punctuated it. The server re-normalizes and is the authority.
+        phone: normalizedPhone ?? customer.phone,
         notes: customer.notes,
         // Always send the address the buyer entered (captured as a contact record
         // on the order). The server only *requires* a complete address when the
@@ -277,15 +294,20 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
         .maybeSingle();
 
       const metadata = user.user_metadata ?? {};
-      const profileName = profile?.full_name ?? [profile?.first_name, profile?.last_name].filter(Boolean).join(' ');
-      const knownName = profileName || metadata.full_name || metadata.name || '';
+      // `profiles` already stores the two parts separately, so prefer them and
+      // fall back to splitting a stored full name only when they're absent.
+      const composedName = profile?.full_name || metadata.full_name || metadata.name || '';
+      const parsedName = parseFullName(composedName);
+      const knownFirstName = profile?.first_name || parsedName.first;
+      const knownLastName = profile?.last_name || parsedName.last;
       const knownEmail = profile?.email ?? user.email ?? metadata.email ?? '';
       const knownPhone = profile?.phone ?? user.phone ?? metadata.phone ?? metadata.phone_number ?? '';
 
       if (cancelled) return;
       setCustomer((current) => ({
         ...current,
-        name: current.name || String(knownName || ''),
+        first_name: current.first_name || String(knownFirstName || ''),
+        last_name: current.last_name || String(knownLastName || ''),
         email: current.email || String(knownEmail || ''),
         phone: current.phone || String(knownPhone || ''),
       }));
@@ -504,7 +526,7 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
                   <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: GOLD, fontFamily: 'var(--font-label)' }}>
                     {isEs ? 'Contacto' : 'Contact'}
                   </p>
-                  <p style={{ color: 'var(--color-on-surface)' }}>{c.name}</p>
+                  <p style={{ color: 'var(--color-on-surface)' }}>{formatFullName(c.first_name, c.last_name)}</p>
                   <p>{c.email}</p>
                   <p>{c.phone}</p>
                 </div>
@@ -693,19 +715,58 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
           <div className="checkout-subhead">
             {isEs ? 'Datos de contacto' : 'Contact details'}
           </div>
+          {/* Field ORDER is load-bearing, not cosmetic. Phone used to sit
+              directly after the name — side by side on desktop, immediately
+              below it on mobile — so a buyer who had just typed her first name
+              met a box where her surname was the natural next thing to type,
+              and one did exactly that. Last Name now occupies that position.
+              Keep Phone away from the name fields. */}
           <div className="responsive-form-grid">
             <div>
-              <label className="form-label" htmlFor="checkout-name">{isEs ? 'Nombre completo' : 'Full Name'} *</label>
-              <input id="checkout-name" required className="form-field" autoComplete="name" value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} />
+              <label className="form-label" htmlFor="checkout-first-name">{isEs ? 'Nombre' : 'First Name'} *</label>
+              <input
+                id="checkout-first-name"
+                required
+                className="form-field"
+                autoComplete="given-name"
+                value={customer.first_name}
+                onChange={(e) => setCustomer({ ...customer, first_name: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="form-label" htmlFor="checkout-last-name">{isEs ? 'Apellido' : 'Last Name'} *</label>
+              <input
+                id="checkout-last-name"
+                required
+                className="form-field"
+                autoComplete="family-name"
+                value={customer.last_name}
+                onChange={(e) => setCustomer({ ...customer, last_name: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="responsive-form-grid">
+            <div>
+              <label className="form-label" htmlFor="checkout-email">{isEs ? 'Correo electrónico' : 'Email'} *</label>
+              <input id="checkout-email" required type="email" className="form-field" autoComplete="email" value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} />
             </div>
             <div>
               <label className="form-label" htmlFor="checkout-phone">{isEs ? 'Teléfono' : 'Phone'} *</label>
-              <input id="checkout-phone" required type="tel" className="form-field" autoComplete="tel" value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} />
+              <input
+                id="checkout-phone"
+                required
+                type="tel"
+                inputMode="tel"
+                placeholder="(239) 555-0123"
+                className="form-field"
+                autoComplete="tel"
+                // Only once they've typed something — an untouched empty field
+                // is incomplete, not wrong.
+                aria-invalid={customer.phone.trim() !== '' && normalizedPhone === null}
+                value={customer.phone}
+                onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
+              />
             </div>
-          </div>
-          <div>
-            <label className="form-label" htmlFor="checkout-email">{isEs ? 'Correo electrónico' : 'Email'} *</label>
-            <input id="checkout-email" required type="email" className="form-field" autoComplete="email" value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} />
           </div>
 
           <div className="checkout-address-fields">

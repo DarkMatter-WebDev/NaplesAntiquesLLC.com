@@ -44,6 +44,13 @@ next-app/.cache/
 .codex-dev*.log
 next-app/.codex-dev*.log
 
+# Agent worktrees. Throwaway checkouts created by background agent sessions, and
+# they hold a `.git` FILE (a worktree pointer) rather than a directory — so a
+# `robocopy /XD .git` exclusion does NOT catch them. Left unignored, a single
+# worktree adds ~860 files to a wholesale copy of this folder.
+# NOT all of `.claude`: `.claude/launch.json` belongs in the repo.
+.claude/worktrees/
+
 # One-off generated cleanup artifacts
 storage-gc-archive-*/
 .shop-png-delete-list.json

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
+import { isValidPhoneNumber, phoneErrorMessage } from '@/lib/phone';
 
 interface Props {
   locale: string;
@@ -17,19 +18,31 @@ export default function InquiryForm({ locale, itemName, submitted: initialSubmit
   const [message, setMessage] = useState(
     isEs ? `Estoy interesado/a en: ${itemName}. ` : `I'm interested in: ${itemName}. `
   );
+  // Honeypot. Invisible to humans, so any value means a bot — the server drops
+  // the submission silently. This form shipped WITHOUT one while the other two
+  // inquiry forms had it, and it is the only one that got spammed (2026-08-22).
+  const [botField, setBotField] = useState('');
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(initialSubmitted);
   const [err, setErr] = useState('');
+  const [phoneError, setPhoneError] = useState('');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // Before sending: the server rejects this too, but an inline message points
+    // at the field instead of showing a generic "failed to send".
+    if (!isValidPhoneNumber(phone)) {
+      setPhoneError(phoneErrorMessage(isEs));
+      return;
+    }
+    setPhoneError('');
     setSending(true);
     setErr('');
     try {
       const res = await fetch('/api/inquire', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ item: itemName, name, phone, email, message }),
+        body: JSON.stringify({ item: itemName, name, phone, email, message, 'bot-field': botField }),
       });
       if (!res.ok) throw new Error(await res.text());
       setDone(true);
@@ -91,6 +104,19 @@ export default function InquiryForm({ locale, itemName, submitted: initialSubmit
           className="grid gap-5 rounded-2xl border p-6 shadow-[0_18px_54px_rgba(38,28,6,0.07)] md:p-8"
           style={{ background: 'rgba(255,255,255,0.86)', borderColor: 'rgba(115, 92, 0, 0.14)' }}
         >
+          <p className="sr-only" aria-hidden="true">
+            <label>
+              Do not fill this out if you are human:{' '}
+              <input
+                name="bot-field"
+                tabIndex={-1}
+                autoComplete="off"
+                value={botField}
+                onChange={(e) => setBotField(e.target.value)}
+              />
+            </label>
+          </p>
+
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="grid gap-1">
               <label htmlFor="inq-name" className="form-label">
@@ -115,10 +141,19 @@ export default function InquiryForm({ locale, itemName, submitted: initialSubmit
                 type="tel"
                 autoComplete="tel"
                 required
+                inputMode="tel"
+                placeholder="(239) 555-0123"
+                aria-invalid={phoneError !== ''}
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  if (phoneError) setPhoneError('');
+                }}
                 className="form-field"
               />
+              {phoneError && (
+                <p className="text-sm" style={{ color: 'var(--color-error, #b91c1c)' }}>{phoneError}</p>
+              )}
             </div>
           </div>
 

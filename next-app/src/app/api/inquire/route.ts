@@ -4,6 +4,8 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { createAdminNotification } from '@/lib/admin-notify';
 import { PRODUCT_IMAGES_BUCKET } from '@/lib/product-image-storage';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { checkSubmissionForSpam } from '@/lib/spam-heuristics';
+import { normalizePhoneNumber, phoneErrorMessage } from '@/lib/phone';
 
 export const runtime = 'nodejs';
 
@@ -135,16 +137,41 @@ async function sendEmails({ itemTitle, name, phone, email, message, imageUrls }:
  * JSON path — product inquiry from the shop (no file uploads).
  * Preserves the original contract used by InquiryForm.
  */
+/**
+ * Log a dropped submission, then let the caller return a normal success.
+ *
+ * ⛔ The logging is not decoration. The honeypot has been silently dropping
+ * bots on two of the three forms since it was written, and because nothing was
+ * ever recorded there was no way to tell a working filter from a filter that
+ * had stopped matching. A dropped submission must leave a trace somewhere, and
+ * the Netlify function log is the cheapest somewhere.
+ *
+ * Greppable prefix on purpose: `[inquiry-spam]`.
+ */
+function logDroppedSubmission(kind: string, reasons: string[], name: string, email: string) {
+  console.warn(
+    `[inquiry-spam] dropped ${kind} submission (${reasons.join(', ')}) name=${JSON.stringify(name.slice(0, 40))} email=${JSON.stringify(email.slice(0, 60))}`,
+  );
+}
+
 async function handleJsonInquiry(req: Request) {
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
 
-  // Honeypot — silently accept and drop obvious bots (parity with the lead-form path).
-  if (String((body as Record<string, unknown>)['bot-field'] ?? '').trim()) {
+  const raw = body as Record<string, string>;
+
+  // Honeypot + heuristics — silently accept and drop.
+  //
+  // ⚠️ The honeypot alone was not enough here: `InquiryForm.tsx` shipped without
+  // a `bot-field` input, so on the product-inquiry form there was nothing for a
+  // bot to fall into. That is fixed, but a bot POSTing JSON straight at this
+  // route never sees the form either — hence the content check alongside it.
+  const verdict = checkSubmissionForSpam({ name: raw.name, honeypot: raw['bot-field'] });
+  if (verdict.isSpam) {
+    logDroppedSubmission('product-inquiry', verdict.reasons, String(raw.name ?? ''), String(raw.email ?? ''));
     return NextResponse.json({ success: true });
   }
 
-  const raw = body as Record<string, string>;
   const item = String(raw.item ?? '').trim().slice(0, MAX_ITEM);
   const name = String(raw.name ?? '').trim().slice(0, MAX_NAME);
   const phone = String(raw.phone ?? '').trim().slice(0, MAX_PHONE);
@@ -153,6 +180,13 @@ async function handleJsonInquiry(req: Request) {
   if (!item || !name || !phone || !message) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
+  // ⚠️ A VISIBLE 400, deliberately not folded into the silent spam drop above:
+  // a bot should vanish, but a real person who mistyped their number must be
+  // told so they can fix it. See lib/phone.ts.
+  const normalizedPhone = normalizePhoneNumber(phone);
+  if (!normalizedPhone) {
+    return NextResponse.json({ error: phoneErrorMessage(false) }, { status: 400 });
+  }
 
   // Insert as the anon role, which holds the public-insert grant on inquiries.
   // (The service role is intentionally not used here — it lacks INSERT on the table.)
@@ -160,7 +194,7 @@ async function handleJsonInquiry(req: Request) {
   const { error } = await supabase.from('inquiries').insert({
     item_title: item,
     name,
-    phone,
+    phone: normalizedPhone,
     email: email || null,
     message,
   });
@@ -170,8 +204,8 @@ async function handleJsonInquiry(req: Request) {
     return NextResponse.json({ error: 'Failed to save inquiry' }, { status: 500 });
   }
 
-  await notifyAdminOfInquiry({ kind: 'product-inquiry', itemTitle: item, name, phone, email: email || null, message, imageUrls: [] });
-  await sendEmails({ itemTitle: item, name, phone, email: email || null, message, imageUrls: [] });
+  await notifyAdminOfInquiry({ kind: 'product-inquiry', itemTitle: item, name, phone: normalizedPhone, email: email || null, message, imageUrls: [] });
+  await sendEmails({ itemTitle: item, name, phone: normalizedPhone, email: email || null, message, imageUrls: [] });
 
   return NextResponse.json({ success: true });
 }
@@ -186,9 +220,16 @@ async function handleJsonInquiry(req: Request) {
 async function handleLeadForm(req: Request) {
   const form = await req.formData();
 
-  // Honeypot — silently accept and drop obvious bots.
-  const honeypot = String(form.get('bot-field') ?? '').trim();
-  if (honeypot) return NextResponse.json({ success: true });
+  // Honeypot + heuristics — silently accept and drop. Same contract as the JSON
+  // path; this one matters more per request, because it also uploads photos.
+  const leadVerdict = checkSubmissionForSpam({
+    name: String(form.get('name') ?? ''),
+    honeypot: String(form.get('bot-field') ?? ''),
+  });
+  if (leadVerdict.isSpam) {
+    logDroppedSubmission('lead-form', leadVerdict.reasons, String(form.get('name') ?? ''), String(form.get('email') ?? ''));
+    return NextResponse.json({ success: true });
+  }
 
   const source = String(form.get('source') ?? '').toLowerCase();
   const name = String(form.get('name') ?? '').trim();
@@ -201,6 +242,11 @@ async function handleLeadForm(req: Request) {
 
   if (!name || !phone) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+  }
+  // Visible 400 — same contract as the JSON path above.
+  const normalizedPhone = normalizePhoneNumber(phone);
+  if (!normalizedPhone) {
+    return NextResponse.json({ error: phoneErrorMessage(false) }, { status: 400 });
   }
 
   const itemTitle = source === 'free-evaluation' ? 'Free Evaluation Request' : 'Submit Your Item';
@@ -258,7 +304,7 @@ async function handleLeadForm(req: Request) {
   const baseRow = {
     item_title: itemTitle,
     name,
-    phone,
+    phone: normalizedPhone,
     email: email || null,
     message,
   };
@@ -288,9 +334,9 @@ async function handleLeadForm(req: Request) {
 
   await notifyAdminOfInquiry({
     kind: source === 'free-evaluation' ? 'free-evaluation' : 'submit-item',
-    itemTitle, name, phone, email: email || null, message, imageUrls,
+    itemTitle, name, phone: normalizedPhone, email: email || null, message, imageUrls,
   });
-  await sendEmails({ itemTitle, name, phone, email: email || null, message, imageUrls });
+  await sendEmails({ itemTitle, name, phone: normalizedPhone, email: email || null, message, imageUrls });
 
   return NextResponse.json({ success: true });
 }

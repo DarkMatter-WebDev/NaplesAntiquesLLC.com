@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { normalizeEmail, stableEventId, suppressMarketingEmail } from '@/lib/marketing';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { classifyBounceEvent, recordTransactionalBounce } from '@/lib/email-bounce';
 
 export const runtime = 'nodejs';
 
@@ -77,22 +78,61 @@ export async function POST(req: Request) {
   const email = emailFromPayload(data);
   const campaignId = campaignIdFromPayload(data);
 
-  if (!eventType || !email || !campaignId || campaignId === 'test') {
+  if (!eventType || !email) {
     return NextResponse.json({ success: true, ignored: true });
   }
 
-  const url = typeof data.url === 'string' ? data.url : null;
-  const supabase = createServiceClient();
-  await supabase.from('email_campaign_events').upsert({
-    id: stableEventId(campaignId, email, eventType, url),
-    campaign_id: campaignId,
-    email,
-    type: eventType,
-    url,
-  }, { onConflict: 'campaign_id,email,type' });
+  const isCampaignEvent = Boolean(campaignId) && campaignId !== 'test';
+  const isFailure = eventType === 'bounced' || eventType === 'complained';
 
-  if (eventType === 'bounced' || eventType === 'complained') {
-    await suppressMarketingEmail(email);
+  // ⚠️ A missing campaign id used to end the request here, which silently threw
+  // away every TRANSACTIONAL failure — a bounced order receipt or inquiry
+  // confirmation was reported by Resend and then discarded. Only campaign
+  // ANALYTICS need a campaign id; a bounce matters either way.
+  if (!isCampaignEvent && !isFailure) {
+    return NextResponse.json({ success: true, ignored: true });
+  }
+
+  const supabase = createServiceClient();
+
+  if (isCampaignEvent) {
+    const url = typeof data.url === 'string' ? data.url : null;
+    await supabase.from('email_campaign_events').upsert({
+      id: stableEventId(campaignId, email, eventType, url),
+      campaign_id: campaignId,
+      email,
+      type: eventType,
+      url,
+    }, { onConflict: 'campaign_id,email,type' });
+  }
+
+  if (isFailure) {
+    const classification = classifyBounceEvent(data, eventType === 'complained');
+
+    // ⛔ Only a CONFIRMED transient failure is spared — mailbox full or
+    // greylisting says nothing about whether the address is valid, and
+    // suppressing on one drops a good customer from email for good.
+    //
+    // `unknown` deliberately still suppresses. This route previously suppressed
+    // on ANY bounce, and weakening that would let unrecognised payloads leave
+    // dead addresses on the list — which costs sending reputation on the ONE
+    // verified domain that also carries order receipts. Losing one subscriber to
+    // an unparsed bounce is the cheaper mistake.
+    if (classification.severity !== 'soft') {
+      await suppressMarketingEmail(email);
+    }
+
+    // Notify for TRANSACTIONAL failures only. A campaign bounce is already
+    // handled by suppression, and one notification per bounce would bury the
+    // message center on any sizeable send. A bounced receipt is the rare,
+    // actionable case: a specific buyer never got their order confirmation.
+    if (!isCampaignEvent && classification.severity !== 'soft') {
+      const recorded = await recordTransactionalBounce(supabase, email, classification);
+      console.warn(
+        `[email-bounce] ${eventType} ${email} severity=${classification.severity}` +
+          ` detail=${classification.detail ?? 'none'} notified=${recorded}`,
+      );
+    }
   }
 
   return NextResponse.json({ success: true });

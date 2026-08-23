@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
+import { isValidPhoneNumber, phoneErrorMessage } from '@/lib/phone';
 import { FormGrid, PageContainer, Section } from '@/components/layout/ResponsiveLayout';
 
 interface Props {
@@ -16,24 +17,14 @@ export default function MessageUsForm({ locale }: Props) {
   const [phoneError, setPhoneError] = useState('');
   const [photoCount, setPhotoCount] = useState(0);
 
-  function validatePhone(raw: string): string | null {
-    const digits = raw.replace(/\D/g, '');
-    if (digits.length < 10) return isEs
-      ? 'Ingrese un número de teléfono válido (mínimo 10 dígitos).'
-      : 'Please enter a valid phone number (at least 10 digits).';
-    if (digits.length > 15) return isEs
-      ? 'El número de teléfono es demasiado largo.'
-      : 'Phone number is too long.';
-    return null;
-  }
-
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formEl = e.currentTarget;
+    // Shared rule — this form used to carry its own looser "10 to 15 digits"
+    // copy, which accepted unreachable strings like 0000000000.
     const phoneVal = String(new FormData(formEl).get('phone') ?? '').trim();
-    const phoneMsg = validatePhone(phoneVal);
-    if (phoneMsg) {
-      setPhoneError(phoneMsg);
+    if (!isValidPhoneNumber(phoneVal)) {
+      setPhoneError(phoneErrorMessage(isEs));
       return;
     }
     setPhoneError('');
@@ -158,8 +149,11 @@ export default function MessageUsForm({ locale }: Props) {
                 id="message-phone"
                 name="phone"
                 type="tel"
+                inputMode="tel"
+                placeholder="(239) 555-0123"
                 autoComplete="tel"
                 required
+                aria-invalid={phoneError !== ''}
                 className="form-field"
                 onChange={() => phoneError && setPhoneError('')}
               />

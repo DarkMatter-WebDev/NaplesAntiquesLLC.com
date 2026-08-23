@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { createAdminNotification } from '@/lib/admin-notify';
 import { PRODUCT_IMAGES_BUCKET } from '@/lib/product-image-storage';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { normalizePhoneNumber, phoneErrorMessage } from '@/lib/phone';
 
 export const runtime = 'nodejs';
 
@@ -77,9 +78,13 @@ export async function POST(req: Request) {
   if (!phone || !message) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
-  const phoneDigits = phone.replace(/\D/g, '');
-  if (phoneDigits.length < 10 || phoneDigits.length > 15) {
-    return NextResponse.json({ error: 'Please enter a valid phone number (at least 10 digits).' }, { status: 400 });
+  // Was a local "10 to 15 digits" count, duplicated in MessageUsForm. Both now
+  // defer to lib/phone.ts, so one rule covers every surface and the stored value
+  // is canonical. Note this is a VISIBLE 400 — never fold a bad phone into the
+  // silent honeypot drop above, which would make a real person's message vanish.
+  const normalizedPhone = normalizePhoneNumber(phone);
+  if (!normalizedPhone) {
+    return NextResponse.json({ error: phoneErrorMessage(false) }, { status: 400 });
   }
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 });
@@ -127,10 +132,13 @@ export async function POST(req: Request) {
     }
   }
 
-  const notificationBody = phone ? `${message}\n\nPhone: ${phone}` : message;
+  // Canonical form, so the owner reads the same shape on every message. Phone
+  // is required and validated above, so the empty branch this used to have was
+  // unreachable.
+  const notificationBody = `${message}\n\nPhone: ${normalizedPhone}`;
 
   // Insert into the admin message center.
-  const sender = name || phone;
+  const sender = name || normalizedPhone;
   const savedToMessages = service
     ? await createAdminNotification(service, {
         type: 'message',
@@ -144,7 +152,7 @@ export async function POST(req: Request) {
 
   // Best-effort email backup so the message reaches the owner even if the message
   // center write is unavailable (e.g. service role not configured).
-  const emailed = await sendOwnerEmail(name, email, phone, message, imageUrls);
+  const emailed = await sendOwnerEmail(name, email, normalizedPhone, message, imageUrls);
 
   if (!savedToMessages && !emailed) {
     return NextResponse.json({ error: 'Failed to send message' }, { status: 500 });

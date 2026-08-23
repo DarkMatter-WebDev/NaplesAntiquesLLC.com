@@ -1,6 +1,547 @@
 
 # Changelog
 
+## 2026-08-22 (7) — Deleted `ContactForm.tsx`, which was dead code
+
+Flagged as a deletion candidate by 2026-08-22 (5) and left in place pending the
+owner's call. Confirmed and removed.
+
+### Why it was safe
+
+- `grep` for the symbol `ContactForm` across the whole project — `next-app/src/`,
+  `netlify/`, `messages/` and the repo root — returned **only its own definition**
+  plus mentions in `project-docs/`.
+- No barrel files: `find next-app/src/components -maxdepth 2 -name 'index.ts*'`
+  returns nothing, so nothing could re-export it.
+- No dynamic import could reach it. The only variable-path `import()` in the tree
+  is `src/i18n/request.ts:13` (`messages/${locale}.json`); the other is a plain
+  `await import('resend')`. Neither touches `components/`.
+- `/contact` renders `InquiryForm` when `?item=` is present and `MessageUsForm`
+  otherwise (`src/app/[locale]/contact/page.tsx:6-8`) — `ContactForm` was never
+  one of them.
+
+ℹ️ **`/api/inquire` stays live.** It was the route `ContactForm` posted to, but
+`InquiryForm.tsx:42` and `EvalForm.tsx:44` post to it as well. Nothing on the
+server side became orphaned by this deletion.
+
+ℹ️ The file had been updated hours earlier, in (5), to use the shared
+`lib/phone.ts` validation. Being newly consistent was not a reason to keep it —
+it was consistent *and* unreachable.
+
+### Verification
+
+`npm run build` from `next-app/`: compiled successfully, TypeScript clean,
+**456/456 static pages** — the invariant is unchanged, as expected for a file no
+route ever pulled in. `npm run lint` clean.
+
+### Docs touched
+
+`TASKS.md` (the open ◻ item closed; the copy-rewrite table row struck through),
+`CURRENT_STATUS.md`, `features/lead-capture.md` (the stale "current form
+components" list also gained `MessageUsForm`, which it had been missing).
+`STRUCTURE.md` never named the file, so it needed no change.
+
+⚠️ Historical entries below still mention `ContactForm` — (5) above, plus the
+2026-08-22 honeypot table, the viewport-height table and the 2026-07 "Submit Your
+Item" removal. Those are records of what was true then; they are not stale
+pointers to a file you should expect to find.
+
+## 2026-08-22 (6) — Transactional email bounces were being thrown away
+
+Prompted by an order showing `scatlett@ymail.com`, which looked like a typo and
+is not: **`ymail.com` is a genuine Yahoo domain**, resolving to Yahoo's own mail
+servers (`mta5.am0.yahoodns.net`, the same `am0.yahoodns.net` infrastructure as
+`yahoo.com`). Yahoo introduced it in 2008 when `yahoo.com` addresses ran short.
+
+⚠️ **That is also why the obvious fix is a trap.** `ymail.com` is ONE character
+from `gmail.com`, so the standard edit-distance "did you mean?" check would have
+flagged a real customer's correct address. Same false-positive shape as the
+`VanDerBeek` spam threshold and the phone rules.
+
+### The real hole: `/api/webhooks/resend` discarded every transactional event
+
+The route already handled `bounced` and `complained` — but it returned early on
+any event without a `campaign_id`:
+
+```ts
+if (!eventType || !email || !campaignId || campaignId === 'test') {
+  return NextResponse.json({ success: true, ignored: true });
+}
+```
+
+Order receipts and inquiry confirmations carry no campaign tag. So a buyer could
+mistype their email at checkout, the receipt would hard-bounce, Resend would
+report it — and we would throw the report away. **Nobody ever found out.** (That
+is also what happened to the accidental `a@b.com` confirmation in entry (5).)
+
+### Fix
+
+New `lib/email-bounce.ts`. The campaign-id gate now applies only to campaign
+ANALYTICS; a failure is processed either way.
+
+- `classifyBounceEvent()` reads Resend's SES-style `data.bounce`
+  (`Permanent` / `Transient` / `Undetermined`, plus `subType`) and returns
+  `hard` / `soft` / `unknown`.
+- `findBounceContext()` matches the address against the most recent order and
+  inquiry, so the notification names **who** to chase and gives their phone
+  number instead of just quoting an address.
+- `recordTransactionalBounce()` writes an `email_bounce` admin notification,
+  rendered with a red "Bounced" chip in the message center.
+
+⛔ **Only a CONFIRMED transient bounce is spared from suppression.** `unknown`
+still suppresses. The route previously suppressed on *any* bounce, and weakening
+that would leave dead addresses on the list — costing sending reputation on the
+ONE verified domain that also carries order receipts. Losing a subscriber to an
+unparsed bounce is the cheaper mistake. Only `Transient` / `MailboxFull` — a
+temporary condition that says nothing about validity — is now ignored, which is
+a **behaviour change**: a mailbox-full bounce used to unsubscribe someone
+permanently.
+
+⛔ **Notifications are for TRANSACTIONAL failures only.** A campaign bounce is
+handled by suppression; one notification per bounce would bury the message
+center on any sizeable send.
+
+### Verification
+
+`tsc` clean · `eslint` clean · **1086/1086** (9 new) · build **456/456**.
+
+Against the running dev server, with a correctly signed Svix payload:
+
+```
+unsigned request                        -> 401 Invalid signature
+email.bounced Transient/MailboxFull     -> 200, and provably wrote NOTHING
+email.delivered, no campaign id         -> 200 ignored (unchanged)
+```
+
+The soft-bounce negative result was confirmed by querying afterwards: 0
+`email_bounce` rows, 0 rows for the probe addresses, `homepage_subscribers`
+untouched.
+
+⚠️ **The hard-bounce path is covered by unit tests but was deliberately NOT
+fired against production**, because it writes an admin notification — the same
+side effect that entry (5) hit by accident. Its first real exercise will be a
+genuine bounce.
+
+🔴 **Not deployed** as of this entry. Deploying it needs no SQL, but it is only
+useful if `PROVIDER_WEBHOOK_SECRET`/`RESEND_WEBHOOK_SECRET` is set in Netlify AND
+Resend is configured to send `email.bounced` / `email.complained` to
+`/api/webhooks/resend` — verify both, since the route fails CLOSED without a
+secret.
+
+## 2026-08-22 (5) — Phone validation extended to all four contact/lead forms
+
+Follows 2026-08-22 (4), which fixed checkout. The same hole existed on every
+other form that collects a phone, where a bad number costs a **lead** rather than
+stranding a paid order.
+
+### What was there before
+
+| surface | client rule | server rule |
+| --- | --- | --- |
+| `MessageUsForm` | own copy: 10–15 digits | `/api/contact-message`: own copy, 10–15 digits |
+| `InquiryForm` | none | `/api/inquire` (JSON): none |
+| `EvalForm` | none | `/api/inquire` (multipart): none |
+| `ContactForm` | none | as above |
+
+⚠️ **The two "10–15 digits" rules were separate copies of the same idea** — the
+per-surface duplication that let the photo-swipe fix miss the product gallery.
+They also accepted numbers that cannot ring: `0000000000`, `1111111111`,
+`1234567890` all passed.
+
+### Now
+
+One rule and **one message** for all five surfaces, from `lib/phone.ts`:
+`normalizePhoneNumber` / `isValidPhoneNumber` plus new `phoneErrorMessage(isEs)`.
+
+- All four forms validate before sending and show the message **inline under the
+  field**, with `aria-invalid`, `inputMode="tel"` and a placeholder. This was
+  `MessageUsForm`'s existing pattern, generalized rather than reinvented.
+- `/api/contact-message` and **both** `/api/inquire` paths (JSON and multipart)
+  reject with a 400 and store the **normalized** number, so the owner reads one
+  shape everywhere — including the admin notification and the owner email.
+
+⛔ **The phone rejection is a VISIBLE 400, deliberately not folded into the silent
+spam drop** that sits directly above it in `/api/inquire`. A bot should vanish; a
+real person who mistyped their number must be told so they can fix it.
+
+⚠️ **Behaviour change worth knowing:** an international number typed WITHOUT a
+`+` used to pass `/api/contact-message`'s digit count and now fails. `+` is
+required for international, for the reason given in (4).
+
+### Discovered: `ContactForm.tsx` is dead code
+
+`grep` for the symbol across `src/`, `netlify/` and `messages/` returns only its
+own definition — nothing imports it and no route renders it. `/contact` renders
+`MessageUsForm`, or `InquiryForm` when `?item=` is present. It was updated along
+with the rest rather than left inconsistent, but it should probably be deleted.
+Left in place pending the owner's call. → **Deleted later the same day; see
+2026-08-22 (7).**
+
+### Verification
+
+`tsc` clean · `eslint` clean · **1077/1077** (2 new) · build **456/456**.
+
+All three server paths, against the running dev server — including the two values
+the old rule let through:
+
+```
+/api/inquire (JSON)       "Catlett" -> 400   "0000000000" -> 400   valid -> 200
+/api/inquire (multipart)  "Catlett" -> 400   "1111111111" -> 400
+/api/contact-message      "Catlett" -> 400   "0000000000" -> 400
+```
+
+All three live forms driven in the browser (`MessageUsForm` on `/contact`,
+`EvalForm` on `/free-evaluation`, `InquiryForm` on `/contact?item=`): submitting
+`Catlett` sets `aria-invalid="true"`, renders the shared message inline, makes no
+network request, and leaves the form intact; typing a valid number clears both.
+
+🔴 **Not deployed** as of this entry.
+
+⚠️ **One test submission reached production data.** Probing the JSON path with a
+VALID number ran the whole success path: inquiry row
+`a317891f-4509-4c95-ac09-e5074c1fd1c0` ("Test Chain" / "Sara Catlett" /
+`a@b.com`), admin notification `5e46cc7d-7bc3-400f-856e-7763bd485a9f`, an owner
+email, and a confirmation email to the non-existent `a@b.com`. See `TASKS.md`;
+the rejection cases are side-effect-free, the success case is not.
+
+## 2026-08-22 (4) — Checkout accepted a surname as a phone number, and only a first name
+
+A real paid order came in with **`customer_name` = "Sara", `customer_phone` =
+"Catlett"** — the buyer typed her first name, tabbed, and typed her surname into
+the next box. The order was otherwise complete and paid; it just left the owner
+with **no way to reach the buyer by phone**.
+
+### Root cause: presence was the only check
+
+Both layers checked that `phone` was non-empty and nothing more:
+
+- `CheckoutClient.tsx` — `customer.phone.trim() !== ''` in `contactReady`
+- `api/paypal/create-order/route.ts` — `if (!customer.name || !customer.email ||
+  !customer.phone)`
+
+`type="tel"` does **not** validate; it only hints at a keypad. Any non-empty
+string passed.
+
+⚠️ The field layout is complicit: `Full Name` and `Phone` sit side by side in
+`responsive-form-grid`, so tabbing out of a name field lands in a box where a
+surname is a natural thing to type. See the open name-field question in
+`TASKS.md` — the validation below stops the bad data, not the confusion.
+
+### Fix — new `lib/phone.ts`, applied at both layers
+
+`normalizePhoneNumber()` returns a canonical dialable string or `null`:
+
+- U.S./Canada → `(239) 404-8505`; a leading country-code `1` is accepted and
+  dropped. Any punctuation is accepted.
+- Explicit `+` international → kept as E.164 (`+442071234567`). The `+` is
+  **required** for international, because without it a foreign number and a typo
+  are indistinguishable — and the shop ships only to U.S. addresses anyway.
+- A trailing extension is **preserved**, not rejected (`x12`, `ext. 12`, `#12`).
+
+⚠️ **The reject rules are structural NANP/E.164 facts, not guesses about what
+"looks real"** — a false positive here costs a sale. Area code and central
+office code must be `[2-9]XX` and may not be N11 (reserved service codes), which
+is what rejects `000-000-0000` and `111-111-1111` without touching any assignable
+number.
+
+Wired in:
+
+- `CheckoutClient.tsx` — feeds `contactReady`, so the PayPal button stays
+  blocked; the missing-field reminder now reads **"Valid Phone Number"** /
+  **"Teléfono válido"** (matching the existing "Valid U.S. ZIP Code" pattern);
+  `inputMode="tel"`, a placeholder, and `aria-invalid` once the buyer has typed
+  something. The canonical value is what gets sent.
+- `create-order/route.ts` — rejects with 400 **before any order row, PayPal
+  order, or money**, and writes the normalized value to `customer_phone` on
+  **both** write paths (new order and the reuse/retry branch).
+
+⛔ The server check is the one that holds — the route is reachable directly, and
+the client check is convenience only.
+
+ℹ️ `OrdersPanel.tsx` (admin manually creating/editing an order) is deliberately
+left alone: that is the owner typing, not a public form.
+
+### Verification
+
+`tsc` clean · `eslint` clean · **1068/1068** (1061 + 7 new in
+`__tests__/phone.test.ts`, covering the accept direction, the reject direction,
+extensions, and international).
+
+Against the running dev server, the exact failing payload:
+
+```
+POST /api/paypal/create-order  {"name":"Sara","email":"scatlett@ymail.com","phone":"Catlett"}
+  -> 400 {"error":"Enter a valid phone number so we can reach you about your order."}
+POST same, phone "239-404-8505"
+  -> falls through to the next check ("Cart is empty") — i.e. accepted
+```
+
+In the live checkout form, `aria-invalid` on `#checkout-phone` measured across
+inputs: `Catlett` → true, `239` → true, `2394048505` → false,
+`(239) 404-8505` → false, `+44 20 7123 4567` → false.
+
+### Follow-up in the same session: the name field was SPLIT, and Phone moved
+
+The validation stops the bad data but not its cause. `Full Name` and `Phone` sat
+**adjacent** — side by side on desktop, and (because `responsive-form-grid` is
+`auto-fit / minmax(16rem, 1fr)`) stacked directly on top of each other on mobile.
+Either way, the box after a first name was Phone, and a surname is a natural
+thing to type there.
+
+⚠️ **Field ORDER is load-bearing here, not cosmetic.** Contact fields now run
+**First Name → Last Name → Email → Phone**, in two grid rows
+(`first|last`, `email|phone`). Tabbing out of First Name lands in Last Name.
+Keep Phone away from the name fields.
+
+- `CustomerInfo.name` → `first_name` + `last_name`, with `autocomplete`
+  `given-name` / `family-name`.
+- New `lib/person-name.ts`: `composeFullName` (validated join, used for
+  readiness), `formatFullName` (display join that never fails, for the on-screen
+  receipt), `normalizePersonName` (server-side re-check), `parseFullName`
+  (prefill fallback only).
+- The two fields are joined into the single `customer_name` the `orders` table
+  has always stored, so **no migration**.
+- Profile prefill now prefers `profiles.first_name` / `last_name`, which already
+  existed, and only falls back to splitting a stored `full_name`.
+- `create-order` rejects a one-part name with 400 before any side effect, and the
+  PayPal **shipping label** now uses the validated name rather than the raw body
+  field.
+
+⛔ **`normalizePersonName` is deliberately the most lenient rule that works: two
+tokens.** No length floor, no character classes, no shape heuristics. Do not
+"strengthen" it — that is how you silently discard customers with unusual names,
+and this project already has that scar (`VanDerBeek`).
+
+ℹ️ An alternative considered and rejected: keep one Full Name field and require a
+space in it. It reaches the same outcome with one fewer field (Amazon's pattern),
+but it rejects mononyms and only states the requirement once the buyer has
+already tripped on it.
+
+### Verification (final)
+
+`tsc` clean · `eslint` clean · **1075/1075** (1061 + 7 phone + 7 name) · build
+**456/456**, unchanged (both additions are libs, not routes).
+
+Server matrix against the running dev server:
+
+```
+name "Sara"            phone "Catlett"      -> 400 first and last name
+name "Sara"            phone "239-404-8505" -> 400 first and last name
+name "Sara Catlett"    phone "Catlett"      -> 400 valid phone number
+name "Sara Catlett"    phone "239-404-8505" -> passes (next check: cart empty)
+name "Juan de la Cruz" phone "(239) 404-8505" -> passes
+```
+
+In the live form, EN and ES: fields render in order
+`first-name, last-name, email, phone` with labels
+`First Name/Last Name/Email/Phone` and `Nombre/Apellido/Correo electrónico/Teléfono`,
+and the focusable element after First Name is **Last Name** — the original
+mistake is no longer reachable.
+
+🔴 **Not deployed** as of this entry.
+
+## 2026-08-22 (3) — Inquiry-form bot: the form was being used as an EMAIL RELAY
+
+🔴 **Not junk mail — a sending-reputation problem.** From `2026-08-22T00:25Z` a
+bot submitted the product-inquiry form roughly hourly: **10 submissions in 18
+hours**, against 3 pre-existing rows (2 June test rows and 1 real inquiry).
+
+`/api/inquire` sends a confirmation to whatever address is typed in
+(`sendEmails`, `to: email`), so each submission made Resend deliver mail **to a
+stranger** from `noreply@naplesestatejewelry.com`. One victim address
+(`catherinemthomas@icloud.com`) was hit **twice**. Others were harvested-looking
+real addresses; some were Gmail dot-abuse (`apr.ild.w.o.l.f.2.0.1.3@gmail.com`)
+or SMS gateways (`8126045102@txt.att.net`).
+
+⛔ `.com` is the ONLY verified Resend sending domain, so complaints against it
+also threaten order receipts and marketing. That is what made this urgent.
+
+### Root cause: the honeypot existed but one form never rendered it
+
+`route.ts` has checked a `bot-field` honeypot on both the JSON and multipart
+paths since it was written. But:
+
+| form | rendered `bot-field`? | spammed? |
+| --- | --- | --- |
+| `ContactForm.tsx` | yes | no |
+| `EvalForm.tsx` | yes | no |
+| **`InquiryForm.tsx`** | **NO** | **yes — all 10** |
+
+A perfect correlation. The server was checking for a field the product-inquiry
+form never put on the page, so there was nothing for a bot to fall into.
+
+### Fix — three layers, because a honeypot alone is not enough
+
+1. **`InquiryForm.tsx` now renders the honeypot**, matching `ContactForm`'s
+   `sr-only` pattern, and sends `bot-field` in its JSON payload.
+2. **New `lib/spam-heuristics.ts`** — a content check that still works when a bot
+   POSTs JSON straight at the route and never sees the form at all. That case is
+   real and a honeypot cannot touch it.
+3. **Dropped submissions are LOGGED** (`[inquiry-spam]`, greppable). The honeypot
+   had been dropping silently on two forms for months; with no record there was
+   no way to tell a working filter from one that had stopped matching. Same
+   lesson as the `.catch(() => {})` that hid the auto-delist failures.
+
+Both paths keep the silent-success contract: a bot that gets an error learns the
+filter's shape and adapts; one that gets "thanks" keeps posting into a void.
+
+### The threshold was MEASURED, and the first attempt was wrong
+
+The heuristic counts case flips between adjacent letters — real names have very
+few, generated identifiers have many. Measured against the 10 real spam names
+and the most transition-heavy real surnames:
+
+```text
+humans  1, 3, 3, 3, 3, 3, 3, 3, 3, 5, 5      <- max 5  (DeLaCruz, VanDerBeek)
+spam    7, 8, 8, 10, 10, 11, 12, 12, 13, 13  <- min 7  (xujmxSZGvFfhHrqUCPXJ)
+```
+
+⚠️ **4 was chosen first and it was WRONG.** `VanDerBeek` scores 5 at ten
+characters, so the length gate does not save it — a real customer typing only
+their surname would have been silently discarded. The band with clearance on
+both sides is 6–7; **6** is used, spending the margin on the human side.
+
+⛔ A false positive here is a lost customer, not a lost bot. That asymmetry is
+why the constant is pinned by tests from BOTH directions.
+
+### Verification
+
+`tsc` clean · `lint` clean · **1061/1061** (+11) · build **456/456**.
+
+**Mutation-tested in both directions** — the earlier version of this test did
+NOT catch a bad threshold, because `McDonald` (8 chars) and `MacArthur` (9) sit
+under the length gate and never reach the transition check. Real surnames of 10+
+characters were added specifically to close that:
+
+| Mutation | Failure |
+| --- | --- |
+| threshold 6 → 5 | *VanDerBeek: expected true to be false* (real name flagged) |
+| threshold 6 → 8 | *xujmxSZGvFfhHrqUCPXJ: expected false to be true* (spam missed) |
+
+**Replayed the real spam payloads against a running server**: all four dropped
+with `{"success":true}`, `inquiries` **13 rows before and 13 after** — nothing
+inserted and no email sent — and the log shows the reason for each:
+
+```text
+[inquiry-spam] dropped product-inquiry submission (random-name) name="eaGqGQKfZrTtwwmRJTEobY" ...
+[inquiry-spam] dropped product-inquiry submission (honeypot) name="Jane Smith" ...
+```
+
+### ◻ Two decisions left for the owner
+
+1. **The 10 spam rows are still in `inquiries`.** Deleting them is destructive
+   and was not done unprompted.
+2. **The confirmation email to the submitter is the thing being abused.** The
+   filters stop the current bot; they do not change the fact that a public form
+   will send mail to any address supplied. Worth deciding whether that email is
+   worth keeping as-is.
+
+## 2026-08-22 (2) — Everything from the 2026-08-21 session is now PROVEN in production
+
+The first unattended morning after the deploy. All three outstanding
+verifications came back positive, and there are **0 failed workflow runs since
+#143**.
+
+### ✅ The price-push timeout fix worked — this was the bug that started it all
+
+| | before (2026-08-21) | after (2026-08-22) |
+| --- | --- | --- |
+| eBay run | **#142 FAILED, 38s, 504** | **success, 2s** |
+| eBay result | `50 pushed, 1 blocked, 5 deferred` (warning) | **`0 pushed, 85 unchanged, 0 blocked, 0 failed, 0 deferred`** (ok) |
+| Etsy run | 20.9s of loop, silently deferring | **success, 14s** |
+| Etsy result | `41 pushed, 15 deferred` (warning) | **`32 pushed, 55 unchanged, 0 blocked, 0 failed, 0 deferred`** (ok) |
+| Etsy item writes | 41 items in **20.9s** | **32 items in 2.14s** |
+
+**Per item: 522ms → 67ms, a 7.8× speedup.** That is the batched bookkeeping
+doing exactly what it was built for — the marketplace APIs were never the cost.
+
+✅ **`0 deferred` on both channels** is the number that matters. Etsy had been
+quietly leaving 15–18 listings at stale prices every day since 2026-08-20; that
+backlog is gone.
+
+✅ **`0 blocked` on eBay, down from 1** — independent confirmation through the
+scheduled cron that the Inventory #82 reattachment holds. The write-block list
+being empty is now load-bearing and proven, not just asserted.
+
+ℹ️ eBay pushed 0 because nothing crossed the 1% threshold (85 unchanged), not
+because anything was skipped. Its selected set is 85 rather than the old 87
+because the two reconciled sold listings moved to `hidden_oos`.
+
+### ✅ The reconcile sweep is firing unattended
+
+**18 runs per channel** overnight, every one `ok` with `0 drifted`
+(124 eBay / 128 Etsy scanned each time). Gaps between runs: **18–56 minutes,
+mean ~33**.
+
+⚠️ **That spread is GitHub, not a bug.** `*/30` is best-effort; the workflow's
+own header already records that scheduled runs are "commonly 5–15 minutes late
+and can be dropped entirely under load". A backstop does not care — a dropped
+run costs nothing and the next one catches the same drift.
+
+### What this closes
+
+- The 2026-08-21 (1) price-push timeout fix — **verified in production**.
+- The 2026-08-21 (2) Inventory #82 reattachment — **verified through the cron**.
+- The 2026-08-21 (5) reconcile sweep — **verified firing unattended**.
+
+The only item from that session still without a production observation is the
+auto-delist hook on a **real website sale**; the PayPal capture path has not run
+since the fix. The reconcile sweep bounds that exposure to ~30 minutes
+regardless.
+
+## 2026-08-22 — Reconcile sweep CONFIRMED live on production
+
+✅ **Deployed and exercised end-to-end.** Run **#153** (`workflow_dispatch`,
+job `reconcile-status`) completed **success**, both jobs in **6s**:
+
+```text
+ebay-reconcile-status   success  6s
+etsy-reconcile-status   success  6s
+etsy-price-push         skipped
+ebay-price-push         skipped
+instagram-drip          skipped
+facebook-drip           skipped
+instagram-token-refresh skipped
+```
+
+⛔ **The five skips are the important half.** The dispatch form defaults to
+`all`, which would have fired both price pushes and both drips off-schedule.
+Selecting `reconcile-status` and confirming the others skipped is the check that
+the `if:` conditions actually scope the new cron.
+
+**Audit rows landed 8s after dispatch:**
+
+```text
+03:34:56.315  ok  eBay status reconcile: 124 scanned, 0 drifted, 0 repaired, 0 deferred.
+03:34:56.497  ok  Etsy status reconcile: 128 scanned, 0 drifted, 0 repaired, 0 deferred.
+```
+
+**Nothing was touched that should not have been:** `ebay_listings` sits at
+`published 85 / hidden_oos 39`, `etsy_listings` at `active 86 / delisted 41 /
+out_of_date 1`, and **0** non-reconcile log rows were written — with zero drift
+the sweep makes no marketplace calls at all, exactly as designed.
+
+Routes verified deployed and guarded first: both return **401** unauthenticated
+on production (a 404 would have meant the deploy had not carried them).
+
+### 🟡 One observation still outstanding
+
+**The `*/30 * * * *` schedule has not fired on its own yet.** The workflow file
+is confirmed on GitHub with the new cron (`sha b89f4bde`), both jobs, and the
+dispatch option — but the newest *scheduled* run is #152 at `02:57Z`, which is
+the hourly drip. GitHub is explicit that `schedule` is best-effort and a newly
+added cron commonly lags before it starts firing.
+
+The manual dispatch proves the whole path — Actions → secret-guarded route →
+sweep → audit row. What is still unobserved is only the trigger itself. Confirm
+with one query rather than watching the UI:
+
+```bash
+# expect rows roughly every 30 minutes once GitHub picks the schedule up
+select created_at, message from ebay_sync_log
+where action = 'reconcile_status' order by created_at desc limit 5;
+```
+
 ## 2026-08-21 (5) — Status-drift reconcile sweep: the safety net under the delist hook
 
 Built because `after()` cannot be made reliable on Netlify. Rather than chase a
@@ -1237,7 +1778,9 @@ to document height, so they cannot cause this.
 
 `codeLines()` did not normalise newlines. This repo mixes CRLF and LF; splitting
 CRLF on `
-` leaves a trailing ``, and in JavaScript `` is a line
+` leaves a trailing `
+`, and in JavaScript `
+` is a line
 terminator, so `.` will not cross it and `$` (no `m` flag) never matches — every
 `//` comment in a CRLF file survived the strip. Earlier assertions passed by
 luck. Caught when the new hero assertion flagged three comment lines quoting old

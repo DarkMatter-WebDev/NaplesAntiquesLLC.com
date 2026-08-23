@@ -34,13 +34,20 @@ HTML site. The major paths are:
 
 Current form components:
 
-- `next-app/src/components/contact/ContactForm.tsx`
-- `next-app/src/components/contact/InquiryForm.tsx`
+- `next-app/src/components/contact/InquiryForm.tsx` — product inquiry, rendered
+  by `/contact` when `?item=` is present
+- `next-app/src/components/contact/MessageUsForm.tsx` — general message,
+  rendered by `/contact` otherwise
 - `next-app/src/components/free-evaluation/EvalForm.tsx`
+
+⚠️ `ContactForm.tsx` was **deleted 2026-08-22** — it was dead code, imported by
+nothing. Do not re-add it from an old copy of this list.
 
 Current inquiry APIs:
 
-- `next-app/src/app/api/inquire/route.ts`
+- `next-app/src/app/api/inquire/route.ts` — `InquiryForm` (JSON) and `EvalForm`
+  (multipart)
+- `next-app/src/app/api/contact-message/route.ts` — `MessageUsForm`
 - `next-app/src/app/api/inquiries/[id]/route.ts`
 
 Submitted inquiry records live in Supabase `inquiries`. Admin review lives under
@@ -51,6 +58,25 @@ The older Jotform and root static Netlify Form instructions are historical.
 `next-app/public/netlify-forms.html` remains only as a static form-detection
 helper if Netlify Forms compatibility is needed; it is not the primary product
 inventory or inquiry source of truth.
+
+## Bot protection (2026-08-22)
+
+All three inquiry forms render a `bot-field` honeypot and `/api/inquire` checks
+it on both the JSON and multipart paths. ⚠️ **`InquiryForm.tsx` shipped without
+one** and was the only form that got spammed — a bot used it as an email relay,
+10 submissions in 18 hours. Keep the honeypot on every form that posts here.
+
+`lib/spam-heuristics.ts` adds a content check that works even when a bot POSTs
+JSON directly and never sees the form. Its case-transition threshold is
+**measured** (human max 5 / spam min 7 → 6) and pinned by tests from both
+directions; a false positive is a lost customer.
+
+Drops are silent to the caller but logged as `[inquiry-spam]`. Do not make them
+silent in the log too — that is how the original gap went unnoticed.
+
+⛔ `sendEmails` still sends a confirmation to whatever address is submitted.
+That is the underlying abuse surface and is an open owner decision — see
+`TASKS.md`.
 
 ## Newsletter / Marketing Audience
 
