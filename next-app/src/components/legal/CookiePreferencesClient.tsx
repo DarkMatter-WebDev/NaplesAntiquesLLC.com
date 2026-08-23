@@ -15,13 +15,18 @@ export default function CookiePreferencesClient({ locale }: { locale: string }) 
     return () => window.clearTimeout(timer);
   }, []);
 
+  // Both handlers also sync `data-nej-cookies-ok` on <html>: the banner is
+  // server-rendered and hidden purely by that attribute (see CookieNotice.tsx),
+  // so without the sync a reset here would not bring it back until a reload.
   function acceptNotice() {
     localStorage.setItem(COOKIE_NOTICE_KEY, 'accepted');
+    document.documentElement.setAttribute('data-nej-cookies-ok', '');
     setAccepted(true);
   }
 
   function resetNotice() {
     localStorage.removeItem(COOKIE_NOTICE_KEY);
+    document.documentElement.removeAttribute('data-nej-cookies-ok');
     setAccepted(false);
   }
 

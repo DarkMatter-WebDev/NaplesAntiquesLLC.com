@@ -1,6 +1,228 @@
 
 # Changelog
 
+## 2026-08-23 — PageSpeed sweep: cookie banner was the mobile LCP; a11y/BP to 100
+
+PSI on production (`naplesestatejewelry.com`, mobile): **Perf 80 / A11y 93 /
+BP 96 / SEO 100** — desktop 97/96/100/100, so every problem was mobile-lab.
+Mobile LCP 4.4s (red) with TBT 40ms and CLS 0: a loading-sequence problem, not
+a JS problem. CrUX has no field data for the site yet, so lab IS the record.
+
+### Root cause: the cookie notice was the LCP element
+
+Both PSI and a local Lighthouse run named the same node:
+`body > div.fixed > div.min-w-0 > p` — the cookie banner paragraph. TTFB 50ms,
+load delay 0, load time 0, **render delay 2,360ms** (6.2s on the slower local
+run). `CookieNotice.tsx` rendered `null` until hydration + a `useEffect`
+localStorage read, so on throttled mobile it popped in seconds late, and its
+paragraph out-measured every earlier paint candidate.
+
+**Fix — SSR the banner, gate visibility before paint:**
+
+- `CookieNotice.tsx`: always renders (server HTML included); no `useState`/
+  `useEffect`; Accept stamps `data-nej-cookies-ok` on `<html>` + localStorage.
+- `[locale]/layout.tsx`: inline `<head>` script (same pattern as `--app-vh`)
+  reads `nej_cookie_notice_v1` and stamps the attribute BEFORE first paint.
+- `globals.css`: `html[data-nej-cookies-ok] [data-cookie-notice]{display:none}`.
+- `CookiePreferencesClient.tsx`: accept/reset now sync the attribute too, so
+  reset brings the banner back without a reload.
+
+Verified in dev (all four states): fresh visitor sees banner (SSR HTML confirmed
+to contain it, gate script confirmed before `<body>`); Accept hides instantly
+and persists; reload as accepted → attribute set pre-paint, banner
+display:none; Reset on /cookie-preferences → banner returns live.
+
+### Carousel: preloader was 215 KiB of "wasted" bytes + the BP failure
+
+Lighthouse audits offscreen `<img>`s by their own boxes. The warm-up preloader
+rendered 48×48 spans fetching the exact card variants (w=640) — flagged ~98%
+wasted per image ("Improve image delivery", ~215 KiB) AND as distorted aspect
+ratio (the BP 96). Preloader spans now size to `var(--cardW)`/`var(--ar)` with
+`objectFit: contain`, matching the card they warm. `image-aspect-ratio` now
+passes; preloader waste roughly halved (the remainder is Lighthouse's DPR
+rounding against the w=640 ladder step, same as the unflagged live cards).
+
+### Carousel a11y: back/edge cards out of the tab order
+
+Back-facing cards were pointer-events:none but still real tab stops; edge-on
+cards projected as ~14px slivers that axe flagged under target-size. The facing
+sampler now also writes `tabindex="-1"` + `aria-hidden="true"` when a card
+faces away, and `isFrontFacing` is `depth > 0.1` (≈84°) rather than `> 0`, so
+the degenerate sliver band gets the same exclusion. Verified live in dev: 15
+back cards all carried both attributes, 13 front cards none.
+
+### Contrast (7 axe nodes): ShowroomHours muted opacities
+
+Closed-day rows used opacity 0.55 → measured 2.72:1 on the footer's #f3f3f3
+and 3.8:1 on the CTA's #f9f9f7 (needs 4.5:1). The by-appointment footnote at
+0.7 → 3.85:1. All three raised to **0.8** (worst-surface ≈4.9:1); the
+fontWeight step still carries the muting.
+
+### Target size (13 axe nodes): footer link padding
+
+Company/Legal/Areas-We-Serve links measured 13.6–17.6px tall on mobile.
+`py-1.5` on mobile (md:py-0 keeps desktop rhythm) → ≥24px. The 8 nav.col-span-2
++ 4 service-area nodes clear; the 2 carousel nodes are the sliver fix above.
+
+### Label-content-name-mismatch (3 axe nodes)
+
+- Home announcement strip: aria-label dropped (its colon broke the required
+  visible-text containment); the screen-reader sentence pause now comes from an
+  `sr-only` ". " emitted beside the visual "·". Verified: sr-only is
+  position:absolute/1px (nowrap strip width unaffected), aria-label gone.
+- Testimonial links: label now BEGINS with the visible text —
+  `Read on Google: {name}'s full review (opens in a new tab)` (+ES form).
+
+### Image cache: `minimumCacheTTL: 2678400` (31 days)
+
+`/_next/image` responses served 1h cache (~66 KiB re-downloaded per repeat
+view). Safe: upload filenames are timestamped, so replaced photos are new URLs.
+`uses-long-cache-ttl` now passes.
+
+### Verification
+
+```
+npx vitest run     1086/1086 passed (107 files)
+npm run lint       clean
+npx tsc --noEmit   clean
+npm run build      Compiled successfully; 456/456 static pages  <- invariant
+                   re-checked because [locale]/layout.tsx was touched
+Lighthouse (local prod build, localhost:3003, mobile sim):
+  accessibility 1.0  best-practices 1.0   (were 0.93 / 0.96)
+  color-contrast, target-size, label-content-name-mismatch,
+  image-aspect-ratio, uses-long-cache-ttl, aria-hidden-focus: all pass, 0 nodes
+  LCP element: no longer the banner; observed (unthrottled) FCP 393ms /
+  LCP 476ms, front card image priority High done at 53ms
+```
+
+Like-for-like local sim: perf 0.70 → 0.78 (LCP 6.9s → 4.7s). The remaining
+sim LCP is hydration-bound (the hero paints at reveal), which is architecture,
+not a banner bug. Production PSI numbers require the deploy — see TASKS.md.
+
+### Deliberately NOT done
+
+- `experimental.inlineCss` for the ~350–600ms render-blocking CSS chunk:
+  experimental flag, held unless the owner wants to chase 95+.
+- Unused/legacy JS (~72 KiB + 13 KiB): modest, TBT already green.
+- Marketplace client timeouts, `ebay_sync_log` noise: unrelated, still open.
+
+
+## 2026-08-23 — Session close: verification record
+
+Every gate run this session, with its result. All from `next-app/`.
+
+```
+npx tsc --noEmit      clean
+npm run lint          clean (eslint, no output)
+npx vitest run        1086/1086 passed, 106 files
+npm run build         Compiled successfully; 456/456 static pages
+```
+
+Test count moved **1061 → 1086**: +7 `phone.test.ts`, +7 `person-name.test.ts`,
++9 `email-bounce.test.ts`, +2 added to `phone.test.ts` for the shared message and
+the values the old per-form rule let through.
+
+Static page count stayed **456** — every addition was a lib, not a route.
+
+⚠️ The final gate was re-run AFTER the `ContactForm.tsx` deletion landed from a
+separate agent session, so the numbers above reflect the deployed tree, not the
+tree before it.
+
+### Production verification (not local)
+
+```
+POST /api/paypal/create-order  name "Sara"          -> 400 first and last name
+POST /api/paypal/create-order  phone "Catlett"      -> 400 valid phone number
+POST /api/inquire (JSON)       phone "0000000000"   -> 400
+POST /api/inquire (multipart)  phone "1111111111"   -> 400
+POST /api/contact-message      phone "Catlett"      -> 400
+POST /api/webhooks/resend      unsigned             -> 401 (both hosts)
+Resend replay of a real Transient bounce            -> 200 {"success":true}
+```
+
+⚠️ The replay's response body is the load-bearing detail: it was
+`{"success":true,"ignored":true}` before the deploy. That difference is what
+proves the new code is live.
+
+### Staging
+
+`C:\Users\rcman\NEJ-repo-staging` — 868 files / 19.84 MB, follow-up dry run
+**0 to copy / 0 extras**, leak check clean against a positive control of
+**176 `.tsx`** (down from 177 exactly because `ContactForm.tsx` was deleted).
+
+🟡 **Left 3 files behind deliberately** (owner's call): `CHANGELOG.md`,
+`CURRENT_STATUS.md`, `TASKS.md`. **Docs only, zero runtime files** — production
+is correct as-is. Re-sync when there is real code to ship.
+
+## 2026-08-23 — Bounce handler CONFIRMED LIVE; Resend endpoint moved `.co` → `.com`
+
+Deployed and verified against the real Resend dashboard.
+
+### ✅ Proven live by a replay, with zero side effects
+
+The 2026-08-22 `email.bounced` event (`msg_3IFveICf7FtStpHOVAKSxswgpG3`) was
+replayed at the production endpoint. **ATTEMPTS went 1 → 2 and the response body
+changed from `{"success":true,"ignored":true}` to `{"success":true}`** — exactly
+the old-code/new-code difference, since the old path bailed on any event without
+a `campaign_id`. That is proof the deploy is live, not an inference.
+
+⚠️ **The replay was chosen BECAUSE it is a no-op.** That event is
+`Transient` / `MailboxFull` → classified `soft` → no suppression, no
+notification. Confirmed afterwards in production: **0** `email_bounce`
+notifications, and `susan1@hvc.rr.com` still `marketing_opt_out: false`.
+
+ℹ️ That is the soft-bounce rule earning its keep on a real customer: her mailbox
+was full, and a naive "suppress on any bounce" would have unsubscribed her
+permanently.
+
+### ✅ The real payload matches the classifier
+
+The live bounce carries exactly the shape `classifyBounceEvent()` was written
+against — no guesswork left in it:
+
+```json
+"bounce": {
+  "diagnosticCode": [null],
+  "message": "...the recipient's inbox was full...",
+  "subType": "MailboxFull",
+  "type": "Transient"
+}
+```
+
+### ✅ Subscriptions and status
+
+Enabled, signing secret set, and listening for **5** events: `email.delivered`,
+`email.opened`, `email.clicked`, **`email.bounced`**, **`email.complained`** —
+both events the handler needs.
+
+### ✅ Endpoint RE-POINTED from `.co` to `.com` (owner-requested)
+
+Was `https://naplesestatejewelry.co/api/webhooks/resend`, now
+`https://naplesestatejewelry.com/api/webhooks/resend`.
+
+The `.co` form worked — the `netlify.toml` `/api/*` carve-out is a **200
+rewrite**, so the body and `svix-*` headers survived — but it made that rewrite
+silently load-bearing: converting the legacy host rules to a plain 301 would have
+killed bounce handling, because a redirect does not replay a POST body. The
+webhook no longer depends on it.
+
+⛔ **Changed with "Edit endpoint", NEVER "Duplicate" or "Delete + recreate".**
+Those mint a NEW signing secret, which would break every event until Netlify's
+`PROVIDER_WEBHOOK_SECRET` was updated to match. Do it the same way next time.
+
+Verified the edit was in-place, not a re-creation: **same webhook id**
+(`16c348b8-4075-4d71-a61b-540ec88d456b`), **CREATED still "2mo ago"**, status
+still Enabled, still **5 events**, signing secret still present.
+
+Pre-flight before changing anything: both hosts already returned **401** to an
+unsigned POST, proving the `.com` route existed and its signature check ran.
+
+✅ **Then proven end-to-end**: replaying the same bounce at the new URL returned
+**200 `{"success":true}`** with ATTEMPTS climbing to 4. **A rotated secret would
+have returned 401** — so that 200 is positive proof the secret still matches
+production. Side effects re-checked after: still 0 `email_bounce` notifications,
+`susan1@hvc.rr.com` still `marketing_opt_out: false`.
+
 ## 2026-08-22 (7) — Deleted `ContactForm.tsx`, which was dead code
 
 Flagged as a deletion candidate by 2026-08-22 (5) and left in place pending the

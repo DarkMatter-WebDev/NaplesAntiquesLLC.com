@@ -119,12 +119,14 @@ export default async function HomePage({ params }: Props) {
               data-customer-reveal-skip
               className="home-announcement"
               href={`${isEs ? '/es' : ''}/free-evaluation`}
-              // The visible text is separated fragments divided by a "·", which
-              // reads as stop-start to a screen reader; this gives it one clean
-              // sentence.
-              aria-label={isEs
-                ? 'Oferta de verano: programe una evaluación gratuita.'
-                : 'Summer special: schedule a free evaluation.'}
+              // No aria-label. The old one ("Summer special: schedule a free
+              // evaluation.") read as one clean sentence but did not CONTAIN
+              // the visible text, so axe flagged it under
+              // label-content-name-mismatch — the colon breaks the substring
+              // match, and any punctuation between the fragments would. The
+              // sentence pause now comes from an sr-only ". " emitted with the
+              // visual "·" separator below, which keeps the accessible name
+              // equal to the content and the rule satisfied by construction.
               style={{ background: '#1a1c1c' }}
             >
               {(isEs
@@ -150,6 +152,7 @@ export default async function HomePage({ params }: Props) {
                   style={{ color: '#e9c349', fontFamily: 'var(--font-label)' }}
                 >
                   {index > 0 && <span aria-hidden="true" className="home-announcement-separator">·</span>}
+                  {index > 0 && <span className="sr-only">. </span>}
                   {item}
                 </span>
               ))}

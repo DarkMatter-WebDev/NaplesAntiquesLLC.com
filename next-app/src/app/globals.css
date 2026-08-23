@@ -2929,3 +2929,12 @@ body:has([data-site-header]) .route-progress {
 @media (prefers-reduced-motion: reduce) {
   .nej-skeleton::after { animation: none; }
 }
+
+/* Cookie notice pre-paint gate. The banner is SERVER-rendered visible so it
+   paints with first paint (it was the mobile LCP element while it waited for
+   hydration — see CookieNotice.tsx). The inline <head> script in
+   [locale]/layout.tsx stamps this attribute from localStorage before first
+   paint, so returning visitors never see a flash; Accept stamps it live. */
+html[data-nej-cookies-ok] [data-cookie-notice] {
+  display: none;
+}

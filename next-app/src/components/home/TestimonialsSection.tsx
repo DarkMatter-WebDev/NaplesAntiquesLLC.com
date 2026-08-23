@@ -122,10 +122,14 @@ export default function TestimonialsSection({ locale, compact = false, variant =
           target="_blank"
           rel="noopener noreferrer"
           tabIndex={isRepeat ? -1 : undefined}
+          // Must BEGIN with the visible text ("Read on Google") or axe flags
+          // label-content-name-mismatch: the accessible name has to contain
+          // the visible label as a contiguous run, so the reviewer's name goes
+          // after the phrase, never inside it.
           aria-label={
             isEs
-              ? `Leer la reseña completa de ${review.name} en Google (se abre en una pestaña nueva)`
-              : `Read ${review.name}'s full review on Google (opens in a new tab)`
+              ? `Leer en Google: reseña completa de ${review.name} (se abre en una pestaña nueva)`
+              : `Read on Google: ${review.name}'s full review (opens in a new tab)`
           }
         >
           {isEs ? 'Leer en Google' : 'Read on Google'}

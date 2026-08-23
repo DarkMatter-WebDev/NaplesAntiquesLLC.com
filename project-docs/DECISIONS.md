@@ -30,6 +30,23 @@ into the current feature documents. Historical names and chronology may remain
 in `CHANGELOG.md`, but stale planning folders must never compete with current
 code, applied SQL, `TASKS.md`, or feature runbooks as a source of truth.
 
+### The wholesale copy must exclude agent worktrees
+
+Background agent sessions create git worktrees under `.claude/worktrees/`. A
+single one adds **~860 files**, and its `.git` is a **FILE** (a pointer to the
+parent repo), so a `robocopy /XD .git` exclusion does **not** catch it — a `.git`
+entry would be copied into the repo folder.
+
+The staging command therefore excludes `"$src\.claude\worktrees"` by full path,
+and `.gitignore` lists `.claude/worktrees/`. ⚠️ Robocopy does not read
+`.gitignore`, so the `/XD` entry is what actually protects the copy. Never
+exclude `.claude` wholesale — `.claude/launch.json` belongs in the repo.
+
+⛔ **"0 Extras" is NOT a sufficient safety check for `/MIR`.** Extras only detects
+files in the DESTINATION that are absent from the source; it was 0 while 1,122
+stray files were queued to flow IN. Always read the file COUNT and sanity-check
+it against what the session actually changed.
+
 ## Business Model
 
 ### The showroom is store-first; home visits continue by request
@@ -1858,6 +1875,31 @@ The AI assistant may extract width/length only from explicit, reliable evidence
 and must honor the same storage contracts as manual forms.
 
 ## Storefront
+
+### The cookie banner is SERVER-rendered; its visibility gate runs before paint
+
+Decided 2026-08-23, measured on production via PSI + a corroborating local
+Lighthouse run. `CookieNotice` used to render `null` until hydration plus a
+`useEffect` localStorage read. On throttled mobile that made it appear seconds
+after the page — and because its paragraph out-measured every earlier paint
+candidate, **the cookie notice itself was the site's LCP element**
+(`body > div.fixed > div.min-w-0 > p`, render delay 2,360ms, mobile
+performance 80 with everything else green).
+
+The standing rule:
+
+1. The banner renders in the SSR HTML, unconditionally — no `visible` state
+   that starts false, no effect gate. It must paint with first paint.
+2. Returning visitors are handled BEFORE paint: an inline `<head>` script in
+   `[locale]/layout.tsx` reads `nej_cookie_notice_v1` and stamps
+   `data-nej-cookies-ok` on `<html>`; `globals.css` hides the banner via that
+   attribute. Accept (and /cookie-preferences accept/reset) syncs the same
+   attribute live.
+3. Anything else that pops in late over the page (toasts, promos, chat
+   bubbles) carries the same risk: if it is big enough and late enough, IT
+   becomes the LCP. Late-appearing fixed overlays need either first-paint
+   rendering with a pre-paint gate, or to stay smaller than the hero content.
+
 
 ### The first pixel is gated by ONE 21KB stylesheet — protect its lane
 
@@ -4670,6 +4712,47 @@ code). It presents identically to a drifted constant — the number shown is not
 the number that binds — but the fix is a product decision about whether the cap
 should exist, not a code change. File it; do not invent a limit to make a label
 true.
+
+## Email Deliverability
+
+### A bounce is ground truth; a "did you mean?" guess is not
+
+`/api/webhooks/resend` handles TRANSACTIONAL bounces, not just campaign ones. It
+previously returned early on any event without a `campaign_id`, which silently
+discarded every bounced order receipt and inquiry confirmation — a buyer could
+mistype their address at checkout and nobody would ever learn the receipt failed.
+The campaign-id gate now applies only to campaign analytics.
+
+⛔ **Only a CONFIRMED transient bounce is spared from suppression.** `unknown`
+still suppresses. The route used to suppress on any bounce, and weakening that
+would leave dead addresses on the list — which costs sending reputation on the
+ONE verified domain that also carries order receipts. Losing a subscriber to an
+unparsed payload is the cheaper mistake. `Transient`/`MailboxFull` is the case
+that must NOT suppress: it says nothing about whether the address is valid.
+
+⛔ **Notifications are transactional-only.** Campaign bounces are handled by
+suppression; one notification per bounce would bury the message center.
+
+⛔ **Do NOT add an edit-distance "did you mean?" check on email domains.**
+`ymail.com` is a real Yahoo domain one character from `gmail.com` — the naive
+version flags a paying customer's correct address. A bounce tells you the address
+actually failed; a spell-check only tells you it looks unusual.
+
+### The Resend webhook endpoint
+
+Registered at `https://naplesestatejewelry.com/api/webhooks/resend`. It ran on
+`.co` until 2026-08-23 and worked, because the `netlify.toml` `/api/*` carve-out
+is a **200 rewrite** — but that made the rewrite silently load-bearing, since a
+plain 301 does not replay a POST body. Keep the webhook on `.com`.
+
+⛔ **Change it with "Edit endpoint" ONLY.** "Duplicate webhook", "Delete", and
+"Rotate signing secret" all mint a NEW signing secret, and every event 401s until
+Netlify's `PROVIDER_WEBHOOK_SECRET` is updated to match. Verify an edit was
+in-place by confirming the webhook id and CREATED date did not change.
+
+⚠️ **Verify by replaying a `Transient` bounce, never a `Permanent` one** — the
+transient path writes nothing, so it proves reachability and signature validity
+with no side effects.
 
 ## Compliance And Marketing
 

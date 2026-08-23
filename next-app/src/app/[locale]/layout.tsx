@@ -152,6 +152,16 @@ export default async function LocaleLayout({ children, params }: Props) {
             __html: `try{document.documentElement.style.setProperty('--app-vh',window.innerHeight+'px')}catch(e){}`,
           }}
         />
+        {/* Cookie-notice gate, same inline-and-synchronous rationale as above:
+            the banner is server-rendered visible (it is otherwise the mobile
+            LCP element — see CookieNotice.tsx), so returning visitors need it
+            hidden BEFORE first paint or they get a one-frame flash. The CSS
+            half of this lives in globals.css under [data-nej-cookies-ok]. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem('nej_cookie_notice_v1')==='accepted')document.documentElement.setAttribute('data-nej-cookies-ok','')}catch(e){}`,
+          }}
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }}

@@ -74,7 +74,12 @@ export default function ShowroomHours({
                 colour here would fight the footer's muted palette. Days sit a
                 step under their times: the time is the answer, the day is the
                 lookup key. */}
-            <dt style={{ fontWeight: 600, opacity: row.closed ? 0.55 : 1 }}>
+            {/* 0.8, not lower: closed days are muted by OPACITY over four
+                different surfaces, and axe measured 0.55 at 2.72:1 on the
+                footer's #f3f3f3 and 3.8:1 on the CTA's #f9f9f7 — both under
+                the 4.5:1 WCAG AA floor. 0.8 clears 4.5:1 on the worst surface
+                while the weight step below still reads as muted. */}
+            <dt style={{ fontWeight: 600, opacity: row.closed ? 0.8 : 1 }}>
               {row.day}
             </dt>
             <dd
@@ -85,7 +90,7 @@ export default function ShowroomHours({
                 // edge only looks aligned by luck.
                 fontVariantNumeric: 'tabular-nums',
                 fontWeight: row.closed ? 500 : 700,
-                opacity: row.closed ? 0.55 : 1,
+                opacity: row.closed ? 0.8 : 1, // same 4.5:1 floor as the dt above
                 whiteSpace: 'nowrap',
               }}
             >
@@ -97,7 +102,9 @@ export default function ShowroomHours({
 
       {/* Smallest thing here on purpose: it is a footnote to the whole list,
           and it must not compete with the days it qualifies. */}
-      <p className="mt-2.5 text-[0.9em]" style={{ opacity: 0.7 }}>
+      {/* Opacity 0.8 is the contrast floor here too (0.7 measured 3.85:1 on
+          the footer); the smaller size alone keeps it subordinate. */}
+      <p className="mt-2.5 text-[0.9em]" style={{ opacity: 0.8 }}>
         {byAppointmentLabel(isEs)}
       </p>
     </div>

@@ -267,7 +267,13 @@ export function Carousel({
       // testing so they cannot cover a card that is actually visible.
       const card = ring.children[p] as HTMLElement | undefined;
       const depth = Math.cos(rad);
-      const isFrontFacing = depth > 0;
+      // Not `> 0`: a card within a few degrees of edge-on projects as a sliver
+      // (axe measured 13.8px wide) that is visually unreadable but was still a
+      // full-sized click/tab target — flagged under WCAG target-size. Treating
+      // the near-edge band as "back" hands those degenerate targets the same
+      // pointer-events/tab-order exclusion; 0.1 ≈ 84°, so every card a user
+      // could actually recognize stays clickable.
+      const isFrontFacing = depth > 0.1;
       if (card) {
         // Write only on change. The values are identical across most frames, and
         // an unconditional write invalidates style for every card every frame.
@@ -277,6 +283,19 @@ export function Carousel({
         if (prevFacingRef.current[p] !== facing) {
           prevFacingRef.current[p] = facing;
           card.dataset.carouselFacing = facing;
+          // Back-facing link cards are pointer-events:none but were still real
+          // tab stops with real accessible names — a keyboard user could focus
+          // a card that is visually reversed behind the ring, and axe flagged
+          // the hidden planes under target-size. Keep them out of the tab order
+          // and the accessibility tree while they face away; both attributes
+          // are cleared the moment the card swings back to the front.
+          if (facing === "back") {
+            card.setAttribute("tabindex", "-1");
+            card.setAttribute("aria-hidden", "true");
+          } else {
+            card.removeAttribute("tabindex");
+            card.removeAttribute("aria-hidden");
+          }
         }
         // When front cards overlap in projection, the card closest to the
         // viewer must win hit testing just as it wins visual stacking.
@@ -497,13 +516,24 @@ export function Carousel({
           style={{ position: "fixed", left: "-9999px", top: 0, width: 1, height: 1, overflow: "hidden", opacity: 0, pointerEvents: "none" }}
         >
           {preloadItems.map((item) => (
-            <span key={`preload-${item.id}`} style={{ position: "relative", display: "block", width: 48, height: 48 }}>
+            // Card-sized (via the scene's --cardW/--ar vars) with the same
+            // object-fit as .img, NOT a fixed 48px square. Lighthouse audits
+            // offscreen <img>s by their own boxes: at 48x48 each preload was
+            // flagged as ~98% wasted bytes ("Improve image delivery", ~215 KiB)
+            // and as a distorted aspect ratio (Best Practices) — measured on
+            // production 2026-08-23. Matching the real card's box makes both
+            // audits read it exactly like the card it is warming.
+            <span
+              key={`preload-${item.id}`}
+              style={{ position: "relative", display: "block", width: "var(--cardW)", aspectRatio: "var(--ar)" }}
+            >
               <Image
                 src={item.imageUrl}
                 alt=""
                 fill
                 sizes="(max-width: 640px) 80vw, (max-width: 1024px) 50vw, 35vw"
                 quality={CARD_IMAGE_QUALITY}
+                style={{ objectFit: "contain" }}
               />
             </span>
           ))}

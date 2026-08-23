@@ -1,11 +1,56 @@
 ﻿# Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-08-22**.
+> in `CHANGELOG.md`. Last reconciled: **2026-08-23**.
 
-## 🔴 READY TO DEPLOY — transactional email bounce handler (2026-08-22)
+## ◻ OPEN — needs a human
 
-**Not yet on production.** No SQL.
+1. 🔴 **Deploy the PageSpeed/a11y batch, then re-test PSI** (2026-08-23, later
+   session; no SQL). Files: `CookieNotice.tsx`, `[locale]/layout.tsx`,
+   `globals.css`, `CookiePreferencesClient.tsx`, `carousel/components/
+   Carousel.tsx`, `SiteFooter.tsx`, `ShowroomHours.tsx`,
+   `TestimonialsSection.tsx`, `[locale]/(home)/page.tsx`, `next.config.ts`.
+   Locally verified: 1086/1086 · lint/tsc clean · build **456/456** ·
+   Lighthouse a11y **1.0** + best-practices **1.0** on the local prod build.
+   After deploy: PSI mobile on `https://naplesestatejewelry.com/` — the LCP
+   element must NOT be the cookie banner anymore (was
+   `body > div.fixed > div.min-w-0 > p`, render delay 2,360ms, the whole
+   reason mobile perf was 80). Expected: a11y 100, BP 100, SEO 100, perf
+   up from 80. Detail: `CHANGELOG.md` 2026-08-23 (PageSpeed sweep).
+
+   ⚠️ Regression tripwires for this batch, worth one manual glance after
+   deploy: (a) fresh visitor still gets the cookie banner and Accept sticks
+   across a reload; (b) a visitor who accepted long ago does NOT see a flash
+   of banner on load; (c) the homepage announcement strip still fits at 320px
+   in Spanish (an sr-only span was added inside it — position:absolute, so it
+   should be layout-inert, verified locally at desktop width only).
+
+
+2. **Delete two junk rows?** Created 2026-08-23 by a verification probe that used
+   a *passing* payload and so ran the whole success path (inquiry row, admin
+   notification, owner email, and a confirmation to a non-existent address that
+   bounced). They are junk — unlike the 10 spam rows deliberately kept as the
+   heuristic's labelled sample — so deleting loses nothing, but nothing was
+   removed without the owner's say-so.
+
+   ```sql
+   delete from inquiries where id = 'a317891f-4509-4c95-ac09-e5074c1fd1c0';
+   delete from admin_notifications where id = '5e46cc7d-7bc3-400f-856e-7763bd485a9f';
+   ```
+
+   ⛔ **Never probe `/api/inquire` or `/api/contact-message` with a payload that
+   passes validation.** Test the rejection paths; they return before any insert
+   or email.
+
+3. **The hard-bounce path has never run for real.** Every live exercise used the
+   *soft* path deliberately, because it writes nothing. The first genuine
+   permanent bounce is the first real test — expect an `[email-bounce]` line in
+   the Netlify function log and a red **Bounced** chip in the admin message
+   center. Nothing to do but watch.
+
+## ✅ DEPLOYED AND CONFIRMED — transactional email bounce handler (2026-08-23)
+
+**Live on production.** No SQL.
 
 `/api/webhooks/resend` returned early on any event without a `campaign_id`, so
 every **transactional** bounce was discarded — a mistyped checkout email meant the
@@ -18,17 +63,32 @@ notification naming who to call and their phone number.
 Gate: `tsc`/`lint` clean · **1086/1086** · build **456/456**. Detail:
 `CHANGELOG.md` 2026-08-22 (6).
 
-### 🔴 Check BEFORE trusting this in production
+### ✅ CHECKED IN THE RESEND DASHBOARD 2026-08-23 — both preconditions hold
 
-The code is inert unless both of these are true — verify, do not assume:
+1. ✅ The webhook is **Enabled** with a signing secret set (the route fails
+   CLOSED, so a missing secret would 401 everything — it does not).
+2. ✅ It listens for all 5 events, including **`email.bounced`** and
+   **`email.complained`**.
 
-1. **`PROVIDER_WEBHOOK_SECRET` or `RESEND_WEBHOOK_SECRET` is set in Netlify.**
-   The route **fails CLOSED**: with no secret every event is rejected 401.
-2. **Resend is configured to send `email.bounced` and `email.complained`** to
-   `https://naplesestatejewelry.com/api/webhooks/resend`.
+✅ **Confirmed live by replaying a real bounce**: ATTEMPTS 1 → 2, response body
+`{"success":true,"ignored":true}` → `{"success":true}`. That difference IS the
+deploy.
 
-⚠️ **First success signal:** a `[email-bounce]` line in the Netlify function log
-and a red **Bounced** chip in the admin message center.
+✅ **Endpoint re-pointed to `.com` 2026-08-23** (owner-requested):
+`https://naplesestatejewelry.com/api/webhooks/resend`. The old `.co` form worked
+via the `netlify.toml` `/api/*` 200-rewrite, but that quietly made the rewrite
+load-bearing — a plain 301 there would have killed bounce handling, because a
+redirect does not replay a POST body. No longer a dependency.
+
+⛔ **Always use "Edit endpoint" for this — never "Duplicate webhook" or delete +
+recreate.** Those mint a NEW signing secret and every event 401s until Netlify's
+`PROVIDER_WEBHOOK_SECRET` is updated to match. The 2026-08-23 change was verified
+in-place: same webhook id `16c348b8-4075-4d71-a61b-540ec88d456b`, CREATED still
+"2mo ago", still Enabled, still 5 events.
+
+✅ Re-verified after the move: replay → **200 `{"success":true}`** (a rotated
+secret would 401, so this proves the secret still matches), and still 0
+`email_bounce` rows written by the soft bounce.
 
 ### ⛔ Two rules not to "simplify" later
 
@@ -57,9 +117,9 @@ servers, same infrastructure as `yahoo.com`. It is a real Yahoo domain from 2008
 known-good list** — it is ONE character from `gmail.com`, so the naive version
 flags a real customer's correct address.
 
-## 🔴 READY TO DEPLOY — name + phone validation, checkout AND all four forms (2026-08-22)
+## ✅ DEPLOYED — name + phone validation, checkout AND the lead forms (2026-08-23)
 
-**Not yet on production.** No SQL. Ships alongside the bot filter below.
+**Live on production.** No SQL.
 
 A real paid order arrived with **name "Sara", phone "Catlett"** — the buyer typed
 her first name, tabbed, and typed her surname into the next box. Checkout only
@@ -154,9 +214,9 @@ with the phone change rather than left inconsistent, then removed. `/api/inquire
 after deletion: **456/456 pages**, unchanged. Detail: `CHANGELOG.md` 2026-08-22
 (7).
 
-## 🔴 READY TO DEPLOY — inquiry-form bot filter (2026-08-22)
+## ✅ DEPLOYED — inquiry-form bot filter (2026-08-23)
 
-**Not yet on production.** No SQL.
+**Live on production.** No SQL.
 
 A bot used the product-inquiry form as an **email relay** — 10 submissions in 18
 hours from `2026-08-22T00:25Z`, each making Resend send a confirmation to a

@@ -1,31 +1,43 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 const COOKIE_NOTICE_KEY = 'nej_cookie_notice_v1';
 
+/**
+ * ⚠️ LCP-load-bearing: this banner must render in the SERVER HTML, visible by
+ * default, with NO hydration gate.
+ *
+ * It used to render `null` until a post-hydration effect read localStorage.
+ * On throttled mobile that made it pop in seconds after the page, and because
+ * its paragraph out-measured every earlier paint candidate, Lighthouse crowned
+ * the cookie notice itself the LCP element — render delay 2.4–6.2s, mobile
+ * performance 80 (measured on production 2026-08-23, PSI + local Lighthouse
+ * agreeing on `body > div.fixed > div.min-w-0 > p`). Painting it with first
+ * paint is the fix; do not reintroduce a `visible` state that starts false.
+ *
+ * Returning visitors never see a flash: an inline <head> script in
+ * `[locale]/layout.tsx` reads the same localStorage key BEFORE first paint and
+ * stamps `data-nej-cookies-ok` on <html>; the CSS rule in globals.css hides
+ * the banner via that attribute. Accept below stamps the same attribute, so
+ * dismissal is instant without any React state.
+ */
 export default function CookieNotice({ locale }: { locale: string }) {
   const isEs = locale === 'es';
   const prefix = isEs ? '/es' : '';
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setVisible(localStorage.getItem(COOKIE_NOTICE_KEY) !== 'accepted');
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   function accept() {
-    localStorage.setItem(COOKIE_NOTICE_KEY, 'accepted');
-    setVisible(false);
+    try {
+      localStorage.setItem(COOKIE_NOTICE_KEY, 'accepted');
+    } catch {
+      // Storage blocked: the attribute below still hides it for this pageview.
+    }
+    document.documentElement.setAttribute('data-nej-cookies-ok', '');
   }
-
-  if (!visible) return null;
 
   return (
     <div
+      data-cookie-notice
       className="fixed bottom-3 left-3 right-3 z-[70] mx-auto max-w-4xl rounded-2xl border p-3.5 shadow-[0_18px_64px_rgba(38,28,6,0.18)] backdrop-blur md:bottom-5 md:flex md:items-center md:justify-between md:gap-5 md:p-5"
       style={{
         background: 'rgba(255,255,255,0.94)',

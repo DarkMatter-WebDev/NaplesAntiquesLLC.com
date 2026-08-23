@@ -1,6 +1,6 @@
 # Feature: Lead Capture
 
-> Current lead and subscriber capture surfaces. Last updated: **2026-08-10**.
+> Current lead and subscriber capture surfaces. Last updated: **2026-08-23**.
 
 ## `/free-evaluation` is the sendable lead surface (2026-08-09/10 rework)
 
@@ -77,6 +77,39 @@ silent in the log too — that is how the original gap went unnoticed.
 ⛔ `sendEmails` still sends a confirmation to whatever address is submitted.
 That is the underlying abuse surface and is an open owner decision — see
 `TASKS.md`.
+
+## Phone validation (2026-08-22)
+
+Every surface that collects a phone — checkout plus `InquiryForm`,
+`MessageUsForm` and `EvalForm` — validates through **`lib/phone.ts`**
+(`normalizePhoneNumber` / `isValidPhoneNumber` / `phoneErrorMessage`), and the
+routes store the **normalized** value. `/api/inquire` (both paths) and
+`/api/contact-message` enforce it server-side.
+
+⚠️ **`type="tel"` validates nothing.** Before this, a real paid order came in
+with `customer_name` "Sara" and `customer_phone` "Catlett" — the buyer typed her
+first name, tabbed, and typed her surname into the next box.
+
+⛔ **One rule, one message, one file.** `MessageUsForm` and
+`/api/contact-message` each carried their own looser "10–15 digits" copy that
+accepted `0000000000`. That per-surface duplication is the same shape as the
+photo-swipe bug. Do not reintroduce a local phone check.
+
+⛔ **The rule must stay the most lenient thing that works** — structural
+NANP/E.164 facts only, with extensions and explicit `+` international accepted.
+**A false positive is a lost lead.**
+
+⚠️ **In `/api/inquire` the phone rejection is a VISIBLE 400**, deliberately NOT
+folded into the silent spam drop directly above it. A bot should vanish; a real
+person who mistyped must be told.
+
+## Bounced confirmations (2026-08-22)
+
+A bounced inquiry confirmation is no longer discarded. `/api/webhooks/resend`
+handles transactional bounces via `lib/email-bounce.ts`, matches the address to
+the most recent order and inquiry, and raises an `email_bounce` admin
+notification naming who to call and their phone number. See
+`DECISIONS.md` → *Email Deliverability* for the suppression rules.
 
 ## Newsletter / Marketing Audience
 

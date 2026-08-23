@@ -115,12 +115,17 @@ export default function SiteFooter({ locale = 'en' }: Props) {
             >
               {isEs ? 'Empresa' : 'Company'}
             </p>
+            {/* `py-1.5` on mobile (here, Legal, and Areas We Serve) is a WCAG
+                2.5.8 tap-target floor, not spacing taste: at text-[0.68rem]
+                these links measured ~18px tall and axe flagged them under
+                target-size (24px minimum). 12px of padding clears it; md:py-0
+                restores the tighter desktop rhythm where pointers are precise. */}
             {companyLinks.map(({ label, href }) => (
               <Link
                 key={href}
                 href={href}
                 prefetch={false}
-                className="hover-underline-grow justify-self-center py-0.5 text-[0.68rem] leading-tight md:w-fit md:justify-self-auto md:py-0 md:text-sm"
+                className="hover-underline-grow justify-self-center py-1.5 text-[0.68rem] leading-tight md:w-fit md:justify-self-auto md:py-0 md:text-sm"
                 style={{ color: 'var(--color-on-surface-variant)' }}
               >
                 {label}
@@ -140,7 +145,7 @@ export default function SiteFooter({ locale = 'en' }: Props) {
                 key={href}
                 href={href}
                 prefetch={false}
-                className="hover-underline-grow justify-self-center py-0.5 text-center text-[0.68rem] leading-tight md:w-fit md:justify-self-auto md:py-0 md:text-left md:text-sm"
+                className="hover-underline-grow justify-self-center py-1.5 text-center text-[0.68rem] leading-tight md:w-fit md:justify-self-auto md:py-0 md:text-left md:text-sm"
                 style={{ color: 'var(--color-on-surface-variant)' }}
               >
                 {label}
@@ -233,7 +238,7 @@ export default function SiteFooter({ locale = 'en' }: Props) {
                 // One city page per service area — the largest single group of
                 // prefetches on the page, and the least likely to be clicked.
                 prefetch={false}
-                className="hover-underline-grow text-[0.68rem] leading-tight md:text-xs"
+                className="hover-underline-grow py-1.5 text-[0.68rem] leading-tight md:py-0 md:text-xs"
                 style={{ color: 'var(--color-on-surface-variant)' }}
               >
                 {isEs ? `Vender en ${a.city}` : `Sell in ${a.city}`}

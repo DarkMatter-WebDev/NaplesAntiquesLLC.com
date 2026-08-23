@@ -93,6 +93,14 @@ const nextConfig: NextConfig = {
     // is worth roughly half the payload here, which is the single largest
     // mobile cost in the hero.
     qualities: [75, 82, 90],
+    // 31 days, up from the 1-hour default Lighthouse flagged ("use efficient
+    // cache lifetimes", ~66 KiB re-downloaded per repeat view). Safe at this
+    // length because optimized-image URLs are fully content-addressed: every
+    // upload gets a timestamped filename (see the Storage upload path), so a
+    // replaced photo is a NEW URL — the old cache entry is orphaned, never
+    // stale. Do not raise this to "immutable forever" though: the underlying
+    // remote fetch from Supabase still revalidates on this cadence.
+    minimumCacheTTL: 2678400,
     remotePatterns: [
       {
         protocol: 'https',
