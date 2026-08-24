@@ -5,10 +5,33 @@
 
 ## ◻ OPEN — needs a human
 
-0. 🔴 **Hero-reveal batch RESTORED — deploy pending.** Owner chose restore
-   after the 3x PSI data below; the three files are re-applied verbatim,
-   gates re-run (1086/1086 · lint/tsc · 456/456), staging re-synced. Deploy,
-   then optionally re-run PSI expecting a stable ~79–81 with no 71 mode.
+0. 🔴 **Front-card LCP pin BUILT — deploy pending, then PSI 2–3x.** Owner
+   chose the deterministic fix: pane A's slot-0 card is `priority`-preloaded
+   and exempt from the reveal fade, so the page's largest element gets an
+   early paint record (verified locally: LCP element = front card, observed
+   LCP 497ms, load delay 0). Expectation: the 71–73 image-mode tail
+   disappears; the score should sit stably ~79–81, upside uncertain (lantern
+   still charges the JS graph). Files: `Carousel.tsx`, `HomeHero.tsx`.
+   Staging synced. Detail: `CHANGELOG.md` front-card entry. Prior analysis:
+
+   ◻ ~~**Hero-reveal batch restored + deployed; PSI bimodality is INTRINSIC —
+   next-step decision pending.**~~ Post-restore PSI mobile: **73** (LCP 9.2s,
+   hero-image mode) and **80** (4.3s, banner mode). ⚠️ CORRECTION to the
+   earlier analysis: the image mode fires in BOTH states — full dataset across
+   the day: sweep-only 81/79, +batch 79, reverted 71/80/80, restored 73/80.
+   Every configuration is ~79–81 when the banner text wins LCP and 71–73 when
+   the hero card image's paint registers instead (lantern balloons any
+   post-FCP image LCP to ~9s sim). The batch did NOT eliminate the tail; it
+   remains live because it measurably improves real paint (observed FCP==LCP)
+   and does not hurt the distribution.
+
+   **The only deterministic fix for the 71–73 tail**: let the FRONT card
+   paint at first paint — `priority` on the front-slot `<Image>` (preload)
+   and exclude it from the opacity fade, so the LCP image has an early paint
+   record (~2.7s sim, likely green) instead of a late one. Visible design
+   change (front card appears instantly, rest still fade in) — owner call.
+   Alternative: accept ~80-with-tail; field data (CrUX) will reflect the
+   good real-world paint once traffic accrues.
 
    The measurement that decided it:
 

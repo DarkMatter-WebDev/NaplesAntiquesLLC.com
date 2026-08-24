@@ -1,6 +1,38 @@
 
 # Changelog
 
+## 2026-08-23 — Front-card LCP pin: pane A's slot-0 card paints at first paint
+
+Owner-requested follow-up to kill PSI mobile's bimodal 71–73 tail (the hero
+card image registering a late LCP whenever its reveal-fade paint landed in the
+trace; lantern balloons any post-FCP image LCP to ~9s sim).
+
+**Change (2 files):**
+
+- `carousel/components/Carousel.tsx` — the live pane's slot-0 card `<Image>`
+  gets `priority` (SSR `<link rel="preload">` on top of the eager/high hints
+  it already had), and every card now carries `data-carousel-card` +
+  `data-carousel-slot` as CSS hooks. Both card variants (`<a>`/`<div>`).
+- `src/components/home/HomeHero.tsx` — the reveal gate moved from the
+  `.home-carousel-theme` CONTAINER to the individual cards, exempting pane A's
+  slot-0 card (`opacity: 1 !important; animation: none !important` — the
+  !importants must beat both reveal triggers). Pane A's spinner is
+  `display: none` (it would sit on top of the now-visible front card); panes
+  B/C keep spinner + full fade. Reduced-motion block updated to the card
+  selector. Occlusion by the boot splash is irrelevant to LCP (the banner
+  proved overlapped paints count); only the element's own opacity gates it.
+
+**Design change, deliberate:** the front card appears instantly; the other
+ring cards still blur-fade in on the same nej-hero-go / .is-ready triggers.
+
+**Verified (local prod build):** LCP element is now deterministically the
+front card image — observed LCP 497ms ≈ first paint, load delay 0 (preload
+working). SSR HTML carries the preload link, 8 pane-A cards have the attrs,
+front card computes opacity 1/animation none, spinner gone, no console
+errors. Gate: 1086/1086 · lint/tsc clean · build 456/456 · local sim score
+0.79 (locals never discriminated the modes; the PSI tail is the real test).
+
+
 ## 2026-08-23 — Hero-reveal batch RESTORED (owner call, after 3x PSI data)
 
 Post-revert PSI mobile measured **71 / 80 / 80**: the reverted site is bimodal

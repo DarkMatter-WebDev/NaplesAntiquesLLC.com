@@ -10,8 +10,11 @@
 
 ### The shape, in one glance
 
-🔴 **Hero-reveal batch RESTORED locally (owner call, 2026-08-23); production
-still runs the reverted state until the owner deploys.** Post-revert PSI mobile 3x: **71 / 80 / 80** — the reverted
+🔴 **Front-card LCP pin BUILT and staged, deploy pending** (owner-approved
+design change: pane A's front card appears instantly, rest of the ring still
+fades). Locally verified: LCP element pinned to the front card at observed
+497ms. This targets the 71–73 PSI tail; see `TASKS.md` item 0. The restored
+hero-reveal batch and the a11y/BP=100 sweep remain live underneath.** Post-revert PSI mobile 3x: **71 / 80 / 80** — the reverted
 site is bimodal (usually 80, intermittent ~71 when the hydration-gated hero
 paint lands as LCP at ~9s). The batch had eliminated the 71 mode (79–81
 stable) and made real paint first-paint; it is preserved verbatim in
