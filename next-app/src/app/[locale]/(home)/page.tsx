@@ -165,6 +165,31 @@ export default async function HomePage({ params }: Props) {
           }
         />
 
+        {/* Pre-hydration hero reveal. Pane A's carousel used to stay at
+            opacity 0 until React hydrated and its heroReady gate flipped
+            .is-ready — on throttled mobile that hydration wait was ~2.5s of
+            pure LCP render delay (the LCP element IS the front card image;
+            measured on production 2026-08-23). This script replicates the
+            gate's exact semantics — wait for pane A's rendered card images
+            (preloader excluded via its aria-hidden wrapper), capped at the
+            same 1800ms — but runs at parse time, then stamps `nej-hero-go`
+            on <html>, which HomeHero's CSS maps to the SAME fade animation
+            as .is-ready. React never manages <html> classes, so hydration
+            cannot strip it. Placed AFTER the stack so pane A's <img>s exist
+            when it runs (panes B/C mount only post-hydration, so they are
+            structurally excluded here and keep their own gates).
+            Fonts are deliberately NOT awaited (the React gate still waits on
+            them for its own purposes): they only affect the card price
+            captions, and font-display handles the swap — waiting on ~87KB of
+            fonts would hand back most of the LCP win on slow connections.
+            ⚠️ Reverted then RESTORED 2026-08-23 — without it PSI mobile has an
+            intermittent ~71 mode (9s hero-image LCP); see HomeHero.tsx. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var d=false;var go=function(){if(d)return;d=true;document.documentElement.classList.add('nej-hero-go')};var t=setTimeout(go,1800);var s=document.querySelector('.home-hero-stack-pane--a .home-carousel-hero');var im=s?[].filter.call(s.querySelectorAll('img'),function(i){return !i.closest('[aria-hidden="true"]')}):[];Promise.all(im.map(function(i){return i.complete?0:new Promise(function(r){i.addEventListener('load',r,{once:true});i.addEventListener('error',r,{once:true})})})).then(function(){clearTimeout(t);go()})})();`,
+          }}
+        />
+
         {/* Services strip */}
         <Section
           className="border-t"

@@ -1,6 +1,19 @@
 
 # Changelog
 
+## 2026-08-23 — Hero-reveal batch RESTORED (owner call, after 3x PSI data)
+
+Post-revert PSI mobile measured **71 / 80 / 80**: the reverted site is bimodal
+— usually 80, but ~71 whenever the hydration-gated hero paint lands inside the
+trace as a 9.2s LCP. The batch had eliminated that mode (79–81 stable) and
+moves real paint to first-paint, so the owner chose to restore it. All three
+files re-applied verbatim from the hero-reveal entry below, each now carrying
+a "reverted then RESTORED" note with the 71/80/80 measurement so a future
+session does not un-do it casually.
+
+Gate: 1086/1086 · lint/tsc clean · build 456/456. Staging re-synced.
+
+
 ## 2026-08-23 — Hero-reveal batch REVERTED (owner call)
 
 The hero-reveal batch (pre-hydration `nej-hero-go` stamp + splash dismissal —

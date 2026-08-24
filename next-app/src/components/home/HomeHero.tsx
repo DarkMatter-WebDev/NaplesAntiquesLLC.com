@@ -199,6 +199,25 @@ export default function HomeHero({
           opacity: 0;
         }
 
+        /* Two triggers, ONE identical animation value — that identity is
+           load-bearing. html.nej-hero-go is stamped by the inline script in
+           (home)/page.tsx the moment pane A's card images settle (same
+           image-wait + 1800ms cap as the React gate below), WITHOUT waiting
+           for hydration. On throttled mobile, hydration is ~2.5s of the LCP
+           render delay this pane used to pay: the LCP element is the front
+           card image, and it painted only when React flipped .is-ready
+           (measured on production 2026-08-23: render delay 7.4s of a 9.0s sim
+           LCP). When .is-ready lands later, its animation shorthand computes
+           to the SAME value, so the running animation is not restarted — do
+           not let these two declarations drift apart.
+           Scoped to pane A: panes B/C mount post-hydration behind the pinned
+           frame and must keep waiting for their own .is-ready, or they would
+           fade in at mount before their images exist.
+           ⚠️ Reverted then RESTORED 2026-08-23: without this, PSI mobile is
+           bimodal — usually ~80 but ~71 whenever the hydration-gated hero
+           paint lands as a 9s LCP inside the trace (measured 71/80/80 across
+           three post-revert runs). This stamp eliminates that failure mode. */
+        html.nej-hero-go .home-hero-stack-pane--a .home-carousel-theme,
         .home-carousel-hero.is-ready .home-carousel-theme {
           animation: home-carousel-fade-in 760ms ease 260ms both;
         }
@@ -228,6 +247,7 @@ export default function HomeHero({
           opacity: 1;
           transition: opacity 180ms ease;
         }
+        html.nej-hero-go .home-hero-stack-pane--a .home-hero-loading,
         .home-carousel-hero.is-ready .home-hero-loading {
           opacity: 0;
         }

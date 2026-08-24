@@ -10,12 +10,13 @@
 
 ### The shape, in one glance
 
-🔴 **Hero-reveal batch REVERTED locally; production still runs it until the
-owner deploys.** It shipped, PSI read 79/100/100/100 mobile (vs 81 pre-batch,
-within variance), and the owner chose to revert. Source and staging are back
-to the pre-batch state (`grep nej-hero-go` = 0). The a11y/BP = 100 sweep is
-untouched and stays. Analysis of why the lab perf number is stuck (~80):
-font-swap LCP re-emission + lantern JS-graph pessimism — `TASKS.md` item 0.
+🔴 **Hero-reveal batch RESTORED locally (owner call, 2026-08-23); production
+still runs the reverted state until the owner deploys.** Post-revert PSI mobile 3x: **71 / 80 / 80** — the reverted
+site is bimodal (usually 80, intermittent ~71 when the hydration-gated hero
+paint lands as LCP at ~9s). The batch had eliminated the 71 mode (79–81
+stable) and made real paint first-paint; it is preserved verbatim in
+`CHANGELOG.md` for re-application. A11y/BP = 100 sweep untouched throughout.
+See `TASKS.md` item 0.
 
 ✅ **The PageSpeed/a11y sweep is DEPLOYED and re-tested on production
 (2026-08-23, same session).** PSI mobile **81/100/100/100** (was 80/93/96/100),

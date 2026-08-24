@@ -5,7 +5,27 @@
 
 ## ◻ OPEN — needs a human
 
-0. 🔴 **REVERTED, REDEPLOY PENDING (2026-08-23)** — after the PSI re-run below
+0. 🔴 **Hero-reveal batch RESTORED — deploy pending.** Owner chose restore
+   after the 3x PSI data below; the three files are re-applied verbatim,
+   gates re-run (1086/1086 · lint/tsc · 456/456), staging re-synced. Deploy,
+   then optionally re-run PSI expecting a stable ~79–81 with no 71 mode.
+
+   The measurement that decided it:
+
+   ◻ ~~**Hero-reveal batch: reverted, redeployed, and PSI measured 3x — owner
+   decision pending on whether to restore it.**~~ Post-revert PSI mobile runs:
+   **71** (LCP 9.2s — the hero image at its hydration-gated paint), **80**
+   (4.4s, banner), **80** (4.4s, banner). The reverted site is BIMODAL: usually
+   80, but when the late hero paint lands inside the Lighthouse trace the
+   score drops to ~71. The hero batch eliminated that failure mode entirely
+   (its runs anchored at 79–81 with the banner font-swap as LCP) AND made real
+   paint first-paint. Net: the revert did not raise the score — it restored an
+   intermittent ~71 mode. The batch is preserved in `CHANGELOG.md` (hero-reveal
+   entry) and can be re-applied verbatim if the owner wants the stable floor.
+
+   Prior record:
+
+   🔴 ~~**REVERTED, REDEPLOY PENDING (2026-08-23)**~~ — after the PSI re-run below
    came back 79 (vs 81 pre-batch, within variance), the owner chose to revert
    the hero-reveal batch entirely. All three files are back to their pre-batch
    state (`grep nej-hero-go` = 0 hits); staging re-synced. **The production
