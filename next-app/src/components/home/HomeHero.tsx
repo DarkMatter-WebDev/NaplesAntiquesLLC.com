@@ -195,14 +195,7 @@ export default function HomeHero({
           min-height: calc(var(--app-vh) - var(--site-header-height));
         }
 
-        /* The reveal gate lives on the CARDS, not the theme container, so the
-           front card can be exempted (below) and paint at first paint. It was
-           container-level opacity until 2026-08-23; that made the LCP image's
-           first VISIBLE paint wait for the reveal, and PSI mobile was bimodal
-           in every configuration — 79–81 when the cookie banner won LCP,
-           71–73 when the hero card's late paint registered instead (lantern
-           balloons any post-FCP image LCP to ~9s sim). */
-        .home-carousel-theme [data-carousel-card] {
+        .home-carousel-theme {
           opacity: 0;
         }
 
@@ -224,30 +217,9 @@ export default function HomeHero({
            bimodal — usually ~80 but ~71 whenever the hydration-gated hero
            paint lands as a 9s LCP inside the trace (measured 71/80/80 across
            three post-revert runs). This stamp eliminates that failure mode. */
-        html.nej-hero-go .home-hero-stack-pane--a .home-carousel-theme [data-carousel-card],
-        .home-carousel-hero.is-ready .home-carousel-theme [data-carousel-card] {
+        html.nej-hero-go .home-hero-stack-pane--a .home-carousel-theme,
+        .home-carousel-hero.is-ready .home-carousel-theme {
           animation: home-carousel-fade-in 760ms ease 260ms both;
-        }
-
-        /* ⭐ THE LCP EXEMPTION — pane A's front card (slot 0) is visible from
-           the SSR HTML onward: no opacity gate, no fade. Its image is also
-           preloaded (priority, see Carousel.tsx), so the largest element on
-           the page gets an EARLY paint record and pins LCP deterministically
-           instead of racing the cookie banner. The !importants are deliberate:
-           this must beat both reveal triggers above regardless of specificity,
-           and it must never be "simplified" back into the fade. Occlusion by
-           the boot splash does not matter — LCP counts paints under overlays
-           (the banner proved this) — only the element's own opacity does. */
-        .home-hero-stack-pane--a .home-carousel-theme [data-carousel-card][data-carousel-slot="0"] {
-          opacity: 1 !important;
-          animation: none !important;
-        }
-
-        /* With its front card visible from first paint, pane A's spinner has
-           nothing to stand in for — and it would sit ON TOP of that card.
-           Panes B/C keep theirs. */
-        .home-hero-stack-pane--a .home-hero-loading {
-          display: none;
         }
 
         @keyframes home-carousel-fade-in {
@@ -335,7 +307,7 @@ export default function HomeHero({
             display: none;
           }
 
-          .home-carousel-theme [data-carousel-card] {
+          .home-carousel-theme {
             opacity: 1;
             filter: none;
             animation: none !important;

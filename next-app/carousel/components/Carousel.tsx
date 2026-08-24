@@ -458,12 +458,6 @@ export function Carousel({
           // `paused` is the owner's on/offscreen signal, so it doubles as the
           // "this pane is parked" hint for fetch priority.
           const imageLoading = carouselImageLoading(slot, paused);
-          // The live pane's FRONT card is the page's LCP element. `priority`
-          // adds a <link rel="preload"> for it in the SSR head (on top of the
-          // eager/high hints every slot-0 already gets), so its fetch starts
-          // during head parse — the LCP-paint half of this lives in
-          // HomeHero.tsx, which exempts this card from the reveal fade.
-          const isLcpFront = slot === 0 && !paused;
           const inner = (
             <>
               <Image
@@ -476,7 +470,6 @@ export function Carousel({
                 // instead of the full-resolution original.
                 sizes="(max-width: 640px) 80vw, (max-width: 1024px) 50vw, 35vw"
                 quality={CARD_IMAGE_QUALITY}
-                priority={isLcpFront}
                 loading={imageLoading.loading}
                 fetchPriority={imageLoading.fetchPriority}
                 draggable={false}
@@ -494,18 +487,12 @@ export function Carousel({
             ...(item.bgColor ? { "--card-bg": item.bgColor } : {}),
           } as CSSProperties;
 
-          // data-carousel-card / data-carousel-slot: hooks for HomeHero's
-          // reveal CSS — the fade gate lives on the CARDS (not the theme
-          // container) precisely so the front card can be exempted and paint
-          // at first paint. Both attributes must ride on BOTH variants.
           return item.href ? (
             <a
               key={slot}
               href={item.href}
               className={`${styles.card} ${styles.link}`}
               style={cardStyle}
-              data-carousel-card=""
-              data-carousel-slot={slot}
               onPointerDown={() => {
                 const ring = ringRef.current;
                 if (ring) ring.style.animationPlayState = "paused";
@@ -514,13 +501,7 @@ export function Carousel({
               {inner}
             </a>
           ) : (
-            <div
-              key={slot}
-              className={styles.card}
-              style={cardStyle}
-              data-carousel-card=""
-              data-carousel-slot={slot}
-            >
+            <div key={slot} className={styles.card} style={cardStyle}>
               {inner}
             </div>
           );

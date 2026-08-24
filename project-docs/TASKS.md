@@ -5,7 +5,15 @@
 
 ## ◻ OPEN — needs a human
 
-0. 🔴 **Front-card LCP pin BUILT — deploy pending, then PSI 2–3x.** Owner
+0. 🔴 **Front-card pin REVERTED (its first PSI run: 72, LCP 9.2s — tail
+   survived); back to the hero-reveal state, DEPLOY PENDING.** The owner chose
+   the state that loads fastest in practice over further lab-score chasing.
+   After deploy the site is: a11y/BP sweep + hero-reveal batch, nothing else.
+   Lab expectation: ~79–81 typical with a known ~71–73 tail that NO tested
+   configuration removes (see `CHANGELOG.md` front-card-revert entry for the
+   full analysis and the untested levers). Prior item:
+
+   ~~**Front-card LCP pin BUILT — deploy pending, then PSI 2–3x.**~~ Owner
    chose the deterministic fix: pane A's slot-0 card is `priority`-preloaded
    and exempt from the reveal fade, so the page's largest element gets an
    early paint record (verified locally: LCP element = front card, observed

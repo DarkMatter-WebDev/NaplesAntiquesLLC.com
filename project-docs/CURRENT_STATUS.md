@@ -10,11 +10,12 @@
 
 ### The shape, in one glance
 
-🔴 **Front-card LCP pin BUILT and staged, deploy pending** (owner-approved
-design change: pane A's front card appears instantly, rest of the ring still
-fades). Locally verified: LCP element pinned to the front card at observed
-497ms. This targets the 71–73 PSI tail; see `TASKS.md` item 0. The restored
-hero-reveal batch and the a11y/BP=100 sweep remain live underneath.** Post-revert PSI mobile 3x: **71 / 80 / 80** — the reverted
+🔴 **Front-card pin reverted (it deployed once, PSI read 72 — the tail
+survived it); source and staging are back to the hero-reveal state, DEPLOY
+PENDING.** Final intended state: a11y/BP=100 sweep + hero-reveal batch. The
+PSI lab number is bimodal (~79–81 / ~71–73) in every tested configuration —
+treat single lab runs as noise; CrUX field data is the metric that matters.
+See `TASKS.md` item 0.** Post-revert PSI mobile 3x: **71 / 80 / 80** — the reverted
 site is bimodal (usually 80, intermittent ~71 when the hydration-gated hero
 paint lands as LCP at ~9s). The batch had eliminated the 71 mode (79–81
 stable) and made real paint first-paint; it is preserved verbatim in

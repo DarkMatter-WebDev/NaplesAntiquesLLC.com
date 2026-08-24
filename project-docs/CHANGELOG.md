@@ -1,6 +1,33 @@
 
 # Changelog
 
+## 2026-08-23 — Front-card LCP pin REVERTED (owner call): back to the hero-reveal state
+
+The front-card pin deployed and its first PSI run came back **72 with LCP
+9.2s** — the image-mode tail survived even with the front card visible from
+first paint and preloaded. (Mechanism unresolved; candidate explanation: a
+photo swap or another card's later paint re-emitting a large LCP entry. Not
+investigated further — the owner called the revert first.) The owner chose to
+return to the hero-reveal state ("the second optimization update"), which is
+where the site subjectively loads fastest: content at first paint, splash
+dismissed as soon as pane A's images settle.
+
+Reverted `Carousel.tsx` (priority prop, data-carousel-card/-slot attrs) and
+`HomeHero.tsx` (card-level gate back to container-level, exemption and
+pane-A spinner-hide removed). `grep isLcpFront|data-carousel-` = 0; the
+nej-hero-go batch is untouched and verified present. Gate: 1086/1086 ·
+lint/tsc clean · build 456/456. Staging synced.
+
+⚠️ For whoever next chases the PSI number: THREE configurations have now been
+measured extensively and ALL show the same bimodal lab distribution (~79–81
+banner mode, ~71–73 image mode): no-batch, hero-reveal batch, and front-card
+pin. The tail is not gated by hydration, reveal timing, or image priority.
+Remaining untested levers: font-display optional (banner font-swap
+re-emission), experimental.inlineCss, JS-graph reduction — or accepting that
+the lab number is noisy and letting CrUX field data (currently No Data) tell
+the real story.
+
+
 ## 2026-08-23 — Front-card LCP pin: pane A's slot-0 card paints at first paint
 
 Owner-requested follow-up to kill PSI mobile's bimodal 71–73 tail (the hero
