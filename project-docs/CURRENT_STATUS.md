@@ -10,10 +10,12 @@
 
 ### The shape, in one glance
 
-🔴 **A newer hero-reveal batch is UNDEPLOYED** — pane A's carousel reveal and
-the boot-splash dismissal no longer wait for hydration (`TASKS.md` item 0,
-`CHANGELOG.md` hero-reveal entry). Staging re-synced with it; deploy + PSI
-re-run pending.
+🔴 **Hero-reveal batch REVERTED locally; production still runs it until the
+owner deploys.** It shipped, PSI read 79/100/100/100 mobile (vs 81 pre-batch,
+within variance), and the owner chose to revert. Source and staging are back
+to the pre-batch state (`grep nej-hero-go` = 0). The a11y/BP = 100 sweep is
+untouched and stays. Analysis of why the lab perf number is stuck (~80):
+font-swap LCP re-emission + lantern JS-graph pessimism — `TASKS.md` item 0.
 
 ✅ **The PageSpeed/a11y sweep is DEPLOYED and re-tested on production
 (2026-08-23, same session).** PSI mobile **81/100/100/100** (was 80/93/96/100),

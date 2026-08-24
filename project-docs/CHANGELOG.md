@@ -1,6 +1,28 @@
 
 # Changelog
 
+## 2026-08-23 — Hero-reveal batch REVERTED (owner call)
+
+The hero-reveal batch (pre-hydration `nej-hero-go` stamp + splash dismissal —
+see the entry below) shipped and PSI came back **79**/100/100/100 mobile vs 81
+before it. The 2-point drop is within PSI's run-to-run variance and the batch
+measurably moved real paint to first-paint (observed FCP == LCP), but the
+owner chose the certain baseline over the flat lab number: all three files
+reverted to their pre-batch state — `HomeHero.tsx` (both `html.nej-hero-go`
+selectors removed), `[locale]/(home)/page.tsx` (inline script removed),
+`globals.css` (splash dismissal rule removed). `grep nej-hero-go` across
+`src/` + `carousel/`: 0 hits.
+
+ℹ️ For the record, the sim-score analysis stands for any future attempt: the
+lab LCP is bounded by the cookie-banner text's font-swap re-emission (~2.5s
+observed on slow-4G) and lantern's JS-graph pessimism — not by hydration
+gating, which the reverted batch had already eliminated. The levers list
+(font-display optional, experimental.inlineCss, unused/legacy JS) is in
+`TASKS.md`.
+
+Gate: tests, lint, `tsc` clean · build 456/456 static pages.
+
+
 ## 2026-08-23 — Hero reveal decoupled from hydration (LCP paint at first paint)
 
 Follow-on to the PageSpeed sweep, owner-requested. The mobile LCP element had

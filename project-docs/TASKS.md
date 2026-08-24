@@ -5,7 +5,34 @@
 
 ## ◻ OPEN — needs a human
 
-0. 🔴 **Deploy the hero-reveal batch, then re-run PSI mobile.** (2026-08-23,
+0. 🔴 **REVERTED, REDEPLOY PENDING (2026-08-23)** — after the PSI re-run below
+   came back 79 (vs 81 pre-batch, within variance), the owner chose to revert
+   the hero-reveal batch entirely. All three files are back to their pre-batch
+   state (`grep nej-hero-go` = 0 hits); staging re-synced. **The production
+   site still runs the batch until the owner deploys the revert.** History and
+   the still-valid lab-score analysis: `CHANGELOG.md` 2026-08-23 (revert
+   entry). The record of the deployed run follows:
+
+   ✅ ~~**DONE 2026-08-23 — hero-reveal batch deployed, PSI re-run.**~~ Mobile
+   **79 / 100 / 100 / 100**, desktop **96 / 100 / 100 / 100** (79 and 96 are
+   within PSI's ±2–3 run variance of the prior 81/98 — the sim perf number is
+   flat, as predicted). The reveal itself is live and working: deploy verified
+   by curl (nej-hero-go in production HTML). **The LCP element is the cookie
+   banner paragraph again, for a NEW reason**: it paints at first paint now,
+   but Chrome re-emits the LCP entry when the web font swaps in (~2.5s on
+   slow-4G), and lantern maps that to 4.5s sim. The lab number is therefore
+   bounded by (a) the font-swap re-emission and (b) the JS dependency graph.
+   Next levers, in rising invasiveness: font-display `optional` on the body/
+   label font (kills the swap re-emission; trade: slow connections may keep
+   the fallback font for a pageview), `experimental.inlineCss`, and the
+   ~85KB unused/legacy JS. All are owner-decision design trades — none
+   attempted without a call. Real-user loading DID improve: content paints at
+   first paint (observed FCP == LCP locally), hero appears ~2s in on a
+   throttled phone instead of after a hydration-length splash hold.
+
+   Original item follows for the record:
+
+   🔴 ~~**Deploy the hero-reveal batch, then re-run PSI mobile.**~~ (2026-08-23,
    third batch of the day; no SQL.) Three files: `HomeHero.tsx`,
    `[locale]/(home)/page.tsx`, `globals.css` — pane A's carousel and the boot
    splash no longer wait for React hydration (inline `nej-hero-go` stamp; see
