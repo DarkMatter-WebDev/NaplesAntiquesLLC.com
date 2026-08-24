@@ -1,6 +1,81 @@
 
 # Changelog
 
+## 2026-08-23 — Hero reveal decoupled from hydration (LCP paint at first paint)
+
+Follow-on to the PageSpeed sweep, owner-requested. The mobile LCP element had
+moved to the hero front-card image, but its paint still waited on React: pane
+A's carousel sat at opacity 0 until hydration flipped `.is-ready` — ~2.5s of
+pure render delay on throttled mobile — and the boot splash then turned out to
+be a SECOND gate (see below).
+
+### Part 1 — pre-hydration hero reveal
+
+New inline `<script>` in `(home)/page.tsx`, placed AFTER the hero stack so pane
+A's `<img>`s exist at parse time. It replicates the React gate's exact
+semantics — wait for pane A's rendered card images (preloader excluded via its
+aria-hidden wrapper), capped at the same 1800ms — then stamps `nej-hero-go` on
+`<html>`. HomeHero's CSS maps that class to the SAME `home-carousel-fade-in`
+animation value as `.is-ready`, so when React's gate lands later the running
+animation is NOT restarted (CSS animation identity). React never manages
+`<html>` classes, so hydration cannot strip the stamp.
+
+- Scoped to pane A (`.home-hero-stack-pane--a`): panes B/C mount post-hydration
+  and keep their own `.is-ready` gates — a global trigger would fade them in at
+  mount before their images exist.
+- Fonts deliberately NOT awaited (unlike the React gate): they only affect card
+  price captions, and waiting ~87KB of fonts would hand back the LCP win.
+- Soft navigations: React-inserted scripts execute; the stamp is idempotent,
+  and if the script ever doesn't run, `.is-ready` still reveals exactly as
+  before. No new failure mode.
+- ⚠️ Backticks inside the `<style>` template literal broke the build on the
+  first attempt (a CSS comment quoted `html.nej-hero-go`) — template literals
+  end at any backtick, comments included.
+
+### Part 2 — splash dismissal on the same signal
+
+With Part 1 alone the sim LCP did not move: `HomeBootSplash` covers the page
+until hydration, the finished hero painted OCCLUDED beneath it, and the
+splash's own title became the LCP element at its font-swap repaint (~4.3s sim).
+New rule in `globals.css`: `html.nej-hero-go .home-boot-splash` gets the exact
+`.is-hidden` treatment (opacity 0 + pointer-events none, existing 380ms
+transition). Once the hero can paint there is nothing left for the splash to
+cover. React's hydration path still unmounts the node; the 6s CSS failsafe
+stays as the last resort.
+
+### Measured (local prod build, mobile sim, like-for-like)
+
+```
+                      before        after
+perf score            0.78          0.80
+speed index           2.8s          2.5s
+observed FCP / LCP    462 / 529ms   414 / 414ms   <- LCP IS first paint now
+LCP element           splash title  cookie banner p (paints at first paint)
+```
+
+The remaining sim LCP (~4.6s) is Lighthouse's lantern model pessimism about
+the page's JS dependency graph, not a real paint delay — observed FCP == LCP.
+Moving the sim number further means shrinking the script graph (unused JS
+~72KB, legacy JS 13KB, render-blocking CSS via `experimental.inlineCss`) —
+recorded as the next lever, not attempted here.
+
+### Verification
+
+```
+npx vitest run     1086/1086
+npm run lint       clean
+npx tsc --noEmit   clean
+npm run build      456/456 static pages (twice — script add, then splash rule)
+prod build runtime: nej-hero-go stamped pre-hydration (checked with .is-ready
+  still false), fade animation running off the stamp alone, splash dismissed,
+  no console errors, no hydration mismatch. SSR HTML: script present after
+  pane A markup.
+```
+
+Files: `src/components/home/HomeHero.tsx`, `src/app/[locale]/(home)/page.tsx`,
+`src/app/globals.css`.
+
+
 ## 2026-08-23 — PageSpeed sweep: cookie banner was the mobile LCP; a11y/BP to 100
 
 PSI on production (`naplesestatejewelry.com`, mobile): **Perf 80 / A11y 93 /

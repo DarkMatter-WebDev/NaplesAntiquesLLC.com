@@ -5,7 +5,48 @@
 
 ## ◻ OPEN — needs a human
 
-1. 🔴 **Deploy the PageSpeed/a11y batch, then re-test PSI** (2026-08-23, later
+0. 🔴 **Deploy the hero-reveal batch, then re-run PSI mobile.** (2026-08-23,
+   third batch of the day; no SQL.) Three files: `HomeHero.tsx`,
+   `[locale]/(home)/page.tsx`, `globals.css` — pane A's carousel and the boot
+   splash no longer wait for React hydration (inline `nej-hero-go` stamp; see
+   `CHANGELOG.md` 2026-08-23 hero-reveal entry). Locally verified: 1086/1086 ·
+   lint/tsc clean · build 456/456 · observed FCP == LCP on the prod build.
+   ⚠️ Expectation-setting: real paint moved to first paint, but the SIM number
+   is lantern-bound by the JS graph — PSI perf may move only a few points.
+   Post-deploy glance: splash still shows briefly then fades into the hero
+   (fast machines), and on a throttled phone the hero appears ~2s in with no
+   long branded-splash hold.
+
+1. ✅ **DONE 2026-08-23 — deployed and PSI re-tested on production.**
+   PSI mobile: **81 / 100 / 100 / 100** (was 80 / 93 / 96 / 100); desktop
+   **98 / 100 / 100 / 100** (was 97 / 96 / 100 / 100). The LCP element is no
+   longer the cookie banner — it is now a hero carousel product image (real
+   content), confirmed by a local Lighthouse run against production naming
+   `a.Carousel… > img` ("Kurt Goldschmidt 14K…") with a11y 1.0 / BP 1.0.
+   Deploy presence proven by curl: the SSR banner and the pre-paint gate
+   script are in the production HTML. `/_next/image` now serves
+   `Cache-Control: public,max-age=31536000` on cache miss (the six 1h entries
+   Lighthouse still saw were pre-deploy edge caches; they age out within the
+   hour — do not chase).
+
+   ⚠️ **Mobile perf is now bounded by the hero reveal, not the banner.** The
+   LCP image's sim breakdown is render-delay-dominated: it paints when the
+   hero fade-in runs (fonts + card images + hydration — `HomeHero`'s
+   `heroReady` gate and the boot splash), which on throttled mobile lands
+   near where the banner used to. Moving 81 → 90+ means loosening that
+   reveal for the front card, `experimental.inlineCss`, or a JS diet — a
+   deliberate design trade, listed under "Deliberately NOT done" in
+   `CHANGELOG.md` 2026-08-23. Owner's call whether to pursue.
+
+   Remaining manual glances (phone-in-hand, no tooling): banner Accept sticks
+   across reload; no banner flash for a long-ago-accepted visitor; ES
+   announcement strip still fits at 320px.
+
+   <details><summary>Pre-deploy record (what shipped and how it was verified)</summary>
+
+   (original task text follows)
+
+   🔴 **Deploy the PageSpeed/a11y batch, then re-test PSI** (2026-08-23, later
    session; no SQL). Files: `CookieNotice.tsx`, `[locale]/layout.tsx`,
    `globals.css`, `CookiePreferencesClient.tsx`, `carousel/components/
    Carousel.tsx`, `SiteFooter.tsx`, `ShowroomHours.tsx`,
@@ -24,6 +65,8 @@
    of banner on load; (c) the homepage announcement strip still fits at 320px
    in Spanish (an sr-only span was added inside it — position:absolute, so it
    should be layout-inert, verified locally at desktop width only).
+
+   </details>
 
 
 2. **Delete two junk rows?** Created 2026-08-23 by a verification probe that used

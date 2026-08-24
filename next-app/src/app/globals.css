@@ -2350,6 +2350,18 @@ body:has([data-site-header]) .route-progress {
   pointer-events: none;
 }
 
+/* Pre-hydration dismissal, same trigger as the hero reveal: the inline script
+   in (home)/page.tsx stamps nej-hero-go on <html> the moment pane A's card
+   images settle (1800ms cap). Once the hero can paint, the splash has nothing
+   left to cover — and leaving it up until hydration made IT the LCP: measured
+   2026-08-23, the splash title's font swap emitted the final LCP entry at
+   ~4.3s (sim) while the finished hero sat occluded beneath it. Mirrors
+   .is-hidden exactly; React's own hydration path still unmounts the node. */
+html.nej-hero-go .home-boot-splash {
+  opacity: 0;
+  pointer-events: none;
+}
+
 @keyframes home-boot-splash-failsafe {
   to {
     opacity: 0;

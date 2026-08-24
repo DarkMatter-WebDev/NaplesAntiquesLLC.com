@@ -10,9 +10,18 @@
 
 ### The shape, in one glance
 
-🔴 **ONE UNDEPLOYED BATCH: the PageSpeed/a11y sweep (2026-08-23, later
-session). No SQL.** Locally verified end-to-end (1086/1086, lint, tsc, build
-456/456, Lighthouse a11y+BP = 100 on the prod build) but NOT yet on production.
+🔴 **A newer hero-reveal batch is UNDEPLOYED** — pane A's carousel reveal and
+the boot-splash dismissal no longer wait for hydration (`TASKS.md` item 0,
+`CHANGELOG.md` hero-reveal entry). Staging re-synced with it; deploy + PSI
+re-run pending.
+
+✅ **The PageSpeed/a11y sweep is DEPLOYED and re-tested on production
+(2026-08-23, same session).** PSI mobile **81/100/100/100** (was 80/93/96/100),
+desktop **98/100/100/100**. The LCP element is no longer the cookie banner —
+it is a hero carousel product image; the remaining mobile-perf ceiling is the
+hero reveal gate, an owner-level design trade (see `TASKS.md` item 1). No SQL.
+Locally it had been verified end-to-end first (1086/1086, lint, tsc, build
+456/456, Lighthouse a11y+BP = 100 on the prod build).
 What it is, in one line each — full detail in `CHANGELOG.md` 2026-08-23:
 
 - **Cookie banner is now SSR + pre-paint gate** — it was literally the mobile
@@ -27,9 +36,10 @@ What it is, in one line each — full detail in `CHANGELOG.md` 2026-08-23:
   aria-labels reworked (label-content-name-mismatch).
 - **`next.config.ts`**: `images.minimumCacheTTL` 1h → 31 days.
 
-**After the owner deploys: re-run PSI on production** (mobile) and confirm the
-LCP element is no longer the cookie banner. Expected: a11y 100, BP 100, perf
-well up from 80 (exact number depends on their lab calibration).
+Post-deploy PSI confirmed the LCP element moved off the banner (a11y and BP
+hit 100 exactly as predicted); mobile perf moved only 80→81 because the hero
+reveal now sets the LCP time — that ceiling and the levers for it are recorded
+in `TASKS.md` item 1.
 
 Everything below this line is the state from the EARLIER 2026-08-23 session
 and still holds — the email-validation batch is live, no outstanding SQL from
@@ -49,11 +59,13 @@ old-code/new-code difference.
 ✅ **Resend endpoint moved `.co` → `.com`** (2026-08-23, owner-requested) and
 re-verified after the move.
 
-🟡 **Staging is 3 files behind, deliberately.** `C:\Users\rcman\NEJ-repo-staging`
-is otherwise current (868 files / 19.84 MB). The drift is
-`CHANGELOG.md`, `CURRENT_STATUS.md` and `TASKS.md` — **docs only, zero runtime
-files**, so production is correct as-is. Owner's call to leave it until there is
-real code to ship; re-sync then and these ride along.
+✅ **Staging re-synced 2026-08-23 (PageSpeed session) and verified current.**
+`C:\Users\rcman\NEJ-repo-staging` now matches this folder exactly: dry run
+showed **15 files** (the 10 source files + 4 memory docs from this session,
+plus `features/lead-capture.md` riding along from the earlier drift), 0 Extras,
+no `.claude` leak; after the copy a second dry run showed **0 to copy** of 871,
+staged `CookieNotice.tsx`/`next.config.ts` grep-verified for the new content,
+`.claude\worktrees` absent, `.claude\launch.json` present. Ready to deploy.
 
 ### ◻ What is actually open
 
