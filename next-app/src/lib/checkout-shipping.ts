@@ -135,6 +135,59 @@ export function shippingMethodForDb(value: CheckoutShippingMethod): 'pickup' | '
   return value === 'local-pickup' ? 'pickup' : 'shipping';
 }
 
+/**
+ * The buyer-facing service name for a STORED order, e.g. "Insured Shipping".
+ *
+ * `orders.shipping_method` is the narrowed database value — `shippingMethodForDb`
+ * collapses both paid tiers to the single word `shipping` — so an invoice
+ * printing that column directly read "Shipping method: Shipping", which says
+ * nothing and reads as a mistake (owner report, 2026-08-23).
+ *
+ * The chosen tier is not stored, but it IS recoverable: `orders.subtotal` is the
+ * pre-discount merchandise subtotal the fee was keyed to, and `shipping_fee` is
+ * what that lookup returned, so re-running the catalog identifies the option.
+ * No two methods share a fee at the same subtotal (Standard 19/25/29/35/59/99/165
+ * against Express 55/79/119), so a match is unambiguous.
+ *
+ * ⚠️ Deliberately NOT a migration. Storing the tier means altering `orders` AND
+ * rewriting the `create_paypal_order` RPC, which enumerates its columns — a
+ * change to the live payment path for a cosmetic label. It would also leave
+ * every existing order blank, where this reads them all correctly.
+ *
+ * ⚠️ The safety property that makes inference acceptable here: it only names a
+ * tier on an EXACT, UNIQUE fee match. If the fee table is ever re-priced, old
+ * orders stop matching and fall back to the generic wording — they never get
+ * relabelled as the wrong service. Keep that shape if you touch this.
+ */
+export function describeOrderShippingService(
+  dbMethod: string,
+  merchandiseSubtotal: number,
+  shippingFee: number,
+  isEs = false,
+): string {
+  if (dbMethod === 'pickup') {
+    const pickup = getCheckoutShippingOption('local-pickup');
+    return pickup ? (isEs ? pickup.labelEs : pickup.labelEn) : (isEs ? 'Recogida local' : 'Local Pickup');
+  }
+  if (dbMethod === 'local_delivery') return isEs ? 'Entrega local' : 'Local Delivery';
+
+  const paidFee = round2(shippingFee);
+  const matches = CHECKOUT_SHIPPING_OPTIONS.filter((option) => {
+    if (option.value === 'local-pickup') return false;
+    const fee = getCheckoutShippingFee(option.value, merchandiseSubtotal);
+    return fee !== null && round2(fee) === paidFee;
+  });
+  if (matches.length === 1) return isEs ? matches[0].labelEs : matches[0].labelEn;
+
+  // No match, or an ambiguous one: say what is true of every paid tier rather
+  // than guessing which of them it was.
+  return isEs ? 'Envío asegurado' : 'Insured Shipping';
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 // ---------------------------------------------------------------------------
 // Marketplace scaffolding — NOT wired yet. The next planned update extends
 // these tiers to Etsy/eBay listings: marketplace listings quote shipping per

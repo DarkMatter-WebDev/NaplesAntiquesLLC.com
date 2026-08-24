@@ -2,10 +2,47 @@ import type { Order, OrderItem } from '@/types/sales';
 import { formatCurrency, formatPublicPurity, orderStatusLabel } from '@/types/sales';
 import { formatProductItemYear } from '@/types/product';
 import { normalizeLegacyLocalImageUrl } from '@/lib/image-url';
-import { buildOrderEmailFooterHtml, buildOrderEmailFooterTextLines } from '@/lib/order-email-branding';
-import { addressWithLandmark, hoursLine } from '@/lib/business-location';
+import { BUSINESS_PHONE, buildOrderEmailFooterHtml, buildOrderEmailFooterTextLines, pinPhoneToOneLine } from '@/lib/order-email-branding';
+import {
+  byAppointmentLabel,
+  cityLine,
+  hoursDaysLabel,
+  hoursTimesLabel,
+  landmarkPhrase,
+  streetLine,
+} from '@/lib/business-location';
+import { describeOrderShippingService } from '@/lib/checkout-shipping';
 
 export type InvoiceEmailOrder = Order & { order_items: OrderItem[] };
+
+/**
+ * Where and when to collect a pickup order, as a laid-out block rather than a
+ * sentence.
+ *
+ * Until 2026-08-23 this was spliced into `note` as prose, so a receipt read
+ * "…thank you. Pick up at 6240 Shirley St, Ste 104, Naples, FL 34109 · inside
+ * Sharon Lynch Collections. Tue–Sat 11am–3pm, or by appointment. Call or text
+ * us at…" — one run-on block in which the address a buyer actually needs was
+ * the least findable thing (owner report).
+ *
+ * Kept as DATA, not a formatted string, because the HTML and plain-text bodies
+ * lay it out differently — a bordered panel against indented lines — and a
+ * pre-joined string forces one of them to unpick the other's formatting.
+ *
+ * ⚠️ Every string here comes from `business-location.ts`. Do not retype the
+ * address, and do not reintroduce `addressWithLandmark()` here: this block
+ * needs the landmark on its OWN line, which that helper deliberately joins.
+ */
+export interface InvoicePickupBlock {
+  label: string;
+  /** Street+suite, then city/state/ZIP — one line each, as on an envelope. */
+  addressLines: string[];
+  /** Set quieter than the address: a finding aid, not a postal line. */
+  landmark: string;
+  hoursLabel: string;
+  hours: string;
+  byAppointment: string;
+}
 
 export interface InvoiceEmailContent {
   subject: string;
@@ -28,7 +65,12 @@ export interface InvoiceEmailContent {
     shipping: string;
     total: string;
   };
+  /** Opening prose above the pickup block. Empty on an unpaid invoice. */
   note: string;
+  /** Pickup directions, or null on a shipped order. */
+  pickup: InvoicePickupBlock | null;
+  /** Closing contact sentence, below the pickup block. */
+  contactNote: string;
   closing: string;
   html: string;
   text: string;
@@ -112,18 +154,30 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
   const intro = paid
     ? `Thank you for your order with Naples Estate Jewelry. Your payment has been received — here is your receipt for order ${order.order_number}.`
     : `Thank you for your order with Naples Estate Jewelry. Invoice ${invoiceNumber} for ${order.order_number} is ready for review.`;
-  // Sent from a no-reply address, so don't invite replies — direct to phone/text.
-  //
   // A pickup buyer is TOLD WHERE TO GO. Until 2026-08-17 this email said only
   // "call or text with any questions about pickup" — someone who had just paid
   // several thousand dollars had to phone up to learn the address. The showroom
-  // shares a suite, so the landmark is part of the address, not a nicety.
-  const pickupNote = isPickup
-    ? ` Pick up at ${addressWithLandmark(false)}. ${hoursLine(false)}.`
-    : '';
-  const note = paid
-    ? `Your payment has been received in full — thank you.${pickupNote} Call or text us at (239) 404-8505 with any questions about pickup, delivery, or shipping.`
-    : `Call or text us at (239) 404-8505 with any questions about payment, pickup, delivery, or shipping.${pickupNote}`;
+  // shares a suite, so the landmark belongs here, not just on the website.
+  //
+  // Laid out as a block since 2026-08-23 (owner request). The business name is
+  // deliberately NOT a line: on an envelope it would be, but this is an email
+  // from that same business, so it only pushed the street address down.
+  const pickup: InvoicePickupBlock | null = isPickup
+    ? {
+      label: 'Pickup Location',
+      addressLines: [streetLine(), cityLine()],
+      landmark: landmarkPhrase(false),
+      hoursLabel: 'Hours',
+      hours: `${hoursDaysLabel(false)}, ${hoursTimesLabel(false)}`,
+      byAppointment: byAppointmentLabel(false),
+    }
+    : null;
+
+  // Sent from a no-reply address, so don't invite replies — direct to phone/text.
+  const note = paid ? 'Your payment has been received in full — thank you.' : '';
+  const contactNote = paid
+    ? `Call or text us at ${BUSINESS_PHONE} with any questions about pickup, delivery, or shipping.`
+    : `Call or text us at ${BUSINESS_PHONE} with any questions about payment, pickup, delivery, or shipping.`;
   const closing = 'Thank you, NaplesEstateJewelry.com';
   const shipToLines = formatAddressLines(order.shipping_address);
   const shipToLabel = isPickup ? 'Address' : 'Ship to';
@@ -136,6 +190,8 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
     items,
     totals,
     note,
+    pickup,
+    contactNote,
     closing,
     html: buildInvoiceEmailHtml({
       orderNumber: order.order_number,
@@ -145,11 +201,19 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
       items,
       totals,
       note,
+      pickup,
+      contactNote,
       closing,
       paid,
       paymentStatus: orderStatusLabel(order.payment_status),
       fulfillmentStatus: orderStatusLabel(order.fulfillment_status),
-      shippingMethod: orderStatusLabel(order.shipping_method),
+      // NOT `orderStatusLabel(order.shipping_method)` — that column is the
+      // narrowed DB value, so it printed "Shipping method: Shipping".
+      shippingMethod: describeOrderShippingService(
+        order.shipping_method,
+        order.subtotal,
+        order.shipping_fee,
+      ),
       shipTo: shipToLines,
       shipToLabel,
     }),
@@ -168,7 +232,22 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
       `Total: ${totals.total}`,
       ...(shipToLines.length > 0 ? ['', `${shipToLabel}:`, ...shipToLines] : []),
       '',
-      note,
+      ...(note ? [note, ''] : []),
+      // The same three beats as the HTML: prose, then the block set off by
+      // blank lines and uppercase labels, then the contact line.
+      ...(pickup
+        ? [
+          pickup.label.toUpperCase(),
+          ...pickup.addressLines,
+          pickup.landmark,
+          '',
+          pickup.hoursLabel.toUpperCase(),
+          pickup.hours,
+          pickup.byAppointment,
+          '',
+        ]
+        : []),
+      contactNote,
       closing,
       '',
       ...buildOrderEmailFooterTextLines(),
@@ -184,6 +263,8 @@ function buildInvoiceEmailHtml({
   items,
   totals,
   note,
+  pickup,
+  contactNote,
   closing,
   paid,
   paymentStatus,
@@ -260,7 +341,9 @@ function buildInvoiceEmailHtml({
                     ${shipTo.length > 0 ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #eadfbd;"><strong style="display:block;color:#1d1a14;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">${escapeHtml(shipToLabel)}</strong>${shipTo.map(escapeHtml).join('<br/>')}</div>` : ''}
                   </div>
 
-                  <p style="margin:0 0 18px;font-size:15px;line-height:1.55;">${escapeHtml(note)}</p>
+                  ${note ? `<p style="margin:0 0 18px;font-size:15px;line-height:1.55;">${pinPhoneToOneLine(escapeHtml(note))}</p>` : ''}
+                  ${pickup ? pickupBlockHtml(pickup) : ''}
+                  <p style="margin:0 0 18px;font-size:15px;line-height:1.55;">${pinPhoneToOneLine(escapeHtml(contactNote))}</p>
                   <p style="margin:0;font-size:15px;line-height:1.55;">${escapeHtml(closing)}</p>
                   ${buildOrderEmailFooterHtml()}
                 </td>
@@ -270,6 +353,43 @@ function buildInvoiceEmailHtml({
         </tr>
       </table>
     </div>
+  `;
+}
+
+/**
+ * The pickup panel: where to collect, then when, in the email's existing
+ * panel style (`#fbfaf5` on a `#eadfbd` hairline, 11px letterspaced caps) so
+ * it reads as a sibling of the Ship-to block rather than a new component.
+ *
+ * ⚠️ A TABLE, not a div, unlike the Ship-to block it mirrors. Outlook's Word
+ * rendering engine drops padding and background on a block-level div, which
+ * would collapse this to unstyled text in exactly the client most likely to be
+ * open on a desk. The inner hairline stays a div because a border-top on a div
+ * is already proven in this template.
+ *
+ * ⚠️ Stacked `display:block` spans, not `<br/>`: each line carries its own
+ * size and colour, and the landmark deliberately renders quieter than the
+ * street lines — it is a finding aid, not part of the postal address.
+ */
+function pickupBlockHtml(pickup: InvoicePickupBlock) {
+  const caps = 'display:block;color:#1d1a14;font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:700;';
+  const line = 'display:block;color:#1d1a14;font-size:14px;line-height:1.5;';
+  const muted = 'display:block;color:#746b5b;font-size:13px;line-height:1.5;';
+  return `
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 20px;background:#fbfaf5;border:1px solid #eadfbd;">
+                    <tr>
+                      <td style="padding:16px 18px;">
+                        <strong style="${caps}margin:0 0 10px;">${escapeHtml(pickup.label)}</strong>
+                        ${pickup.addressLines.map((addressLine) => `<span style="${line}">${escapeHtml(addressLine)}</span>`).join('')}
+                        <span style="${muted}margin-top:2px;">${escapeHtml(pickup.landmark)}</span>
+                        <div style="margin-top:12px;padding-top:12px;border-top:1px solid #eadfbd;">
+                          <strong style="${caps}margin:0 0 5px;">${escapeHtml(pickup.hoursLabel)}</strong>
+                          <span style="${line}">${escapeHtml(pickup.hours)}</span>
+                          <span style="${muted}">${escapeHtml(pickup.byAppointment)}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
   `;
 }
 

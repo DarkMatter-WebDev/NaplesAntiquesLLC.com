@@ -1,6 +1,6 @@
 import type { FulfillmentStatus, Order } from '@/types/sales';
 import { orderStatusLabel } from '@/types/sales';
-import { buildOrderEmailFooterHtml, buildOrderEmailFooterTextLines } from '@/lib/order-email-branding';
+import { BUSINESS_PHONE, buildOrderEmailFooterHtml, buildOrderEmailFooterTextLines, pinPhoneToOneLine } from '@/lib/order-email-branding';
 
 export interface FulfillmentUpdateEmailContent {
   subject: string;
@@ -31,7 +31,7 @@ export function buildFulfillmentUpdateEmailContent(
   const greeting = `Hi ${customerName},`;
   const message = STATUS_MESSAGES[status] ?? `Your order status has been updated to ${statusLabel}.`;
   // Sent from a no-reply address, so don't invite replies — direct to phone/text.
-  const note = 'Call or text us at (239) 404-8505 with any questions.';
+  const note = `Call or text us at ${BUSINESS_PHONE} with any questions.`;
   const closing = 'Thank you, NaplesEstateJewelry.com';
   const shippingCarrier = order.shipping_carrier?.trim() || null;
   const trackingNumber = order.tracking_number?.trim() || null;
@@ -81,7 +81,7 @@ export function buildFulfillmentUpdateEmailContent(
                   <p style="margin:0 0 14px;font-size:15px;line-height:1.55;">${escapeHtml(greeting)}</p>
                   <p style="margin:0 0 20px;font-size:15px;line-height:1.55;">${escapeHtml(message)}</p>
                   ${shipmentHtml}
-                  <p style="margin:0 0 18px;font-size:15px;line-height:1.55;">${escapeHtml(note)}</p>
+                  <p style="margin:0 0 18px;font-size:15px;line-height:1.55;">${pinPhoneToOneLine(escapeHtml(note))}</p>
                   <p style="margin:0;font-size:15px;line-height:1.55;">${escapeHtml(closing)}</p>
                   ${buildOrderEmailFooterHtml()}
                 </td>

@@ -1,6 +1,456 @@
 
 # Changelog
 
+## 2026-08-24 — "Encountered a script tag while rendering React component" silenced sitewide
+
+Owner report: this console error keeps appearing in dev. Fixed by mounting the
+guard that **already existed for it** at the layout level. One line of real
+change; the value is in what the investigation ruled out. No SQL.
+
+**What it is.** React 19 logs a dev-only error for any `<script>` it renders on
+the client, and it re-creates those fibers on client renders, so the message
+fires during ordinary navigation. The scripts are correct — the HTML parser
+executes them on a real page load, which is exactly what the pre-paint
+`--app-vh` token and the cookie gate need.
+
+✅ **It never reaches visitors.** Verified against a real production build
+(`next start`): **zero console output of any kind**, including across a locale
+switch. Production React does not emit this warning.
+
+**The fix.** `components/shop/ScriptTagWarningGuard.tsx` was added in an earlier
+session for the shop list page's anti-flash script, with the research already
+done (facebook/react#34008, shadcn-ui/ui#10104 — the same filter their docs
+recommend for next-themes). It is now mounted in `[locale]/layout.tsx`, so it
+covers the layout's own `<head>` scripts and the JSON-LD on eight routes. The
+shop-page mount is left in place and is a harmless no-op — the patch is
+idempotent behind `__nejScriptTagWarningPatched`.
+
+⚠️ **Verified the filter is narrow**, since a console patch that swallows real
+errors would be far worse than the warning: after the change a plain
+`console.error` and an `Error` object both still appear, and only the one exact
+message is dropped. It is `NODE_ENV === 'development'` only.
+
+### Two fixes tried, measured, and rejected — do not repeat them
+
+1. ⛔ **`next/script` with `strategy="beforeInteractive"`.** The obvious
+   "official" answer, and it is **wrong here**. Reading the built HTML shows it
+   does not emit an inline script at all — it emits a `self.__next_s` queue push
+   that Next's runtime runs AFTER first paint. That reintroduces both the
+   `--app-vh` layout jump and the cookie-banner flash. Caught only because the
+   built output was inspected rather than the docs trusted.
+2. ⛔ **Emitting the scripts as raw HTML** so React never creates a script
+   fiber. It genuinely works, but no element valid inside `<head>` can carry raw
+   innerHTML (`<template>` is inert, `<noscript>` is not parsed when scripting
+   is on), so it forces the pre-paint scripts AND the JSON-LD out of `<head>`,
+   and it only silences the warning if all eight routes' JSON-LD is converted
+   too. Built and tested end-to-end, then reverted in favour of the existing
+   guard.
+
+A third change — making the language switch a full document navigation — was
+also built and reverted: it is a real document load (proven with a
+non-surviving `window` marker), but it did **not** stop the warning, so it was
+not worth changing navigation behaviour for.
+
+### Traps worth keeping
+
+⚠️ **The MCP console reader's buffer is cumulative across navigations**, and
+stale tabs from a previous dev server keep reporting into it. Several readings
+during this investigation were contaminated that way — one "fix" looked like it
+had worked and had not. Every conclusion here was re-taken in a **freshly
+created tab** against a **freshly started server**.
+
+⚠️ **Browser errors forwarded to the dev server log can arrive AFTER the next
+request line**, so log ordering is not proof of which document logged them.
+
+**Gate, from a deleted `.next`:** `tsc` clean · `lint` clean · **1125/1125
+across 109 files** · build **456/456 static pages**. Built HTML re-checked: both
+pre-paint scripts are raw inline `<script>` in `<head>`, no `__next_s` queue,
+JSON-LD still in `<head>`.
+
+## 2026-08-24 — Landmark dropped from the Visit Us blocks; contact page matched to the homepage
+
+Two owner requests, one change. No SQL.
+
+**(1) "inside Sharon Lynch Collections" removed from the homepage Visit Us
+block** — from both places it appeared there: the supporting line under the
+address (now just `Naples, FL 34109`) and the orienting sentence in the right
+column, which now reads "…with parking right at the door" instead.
+
+**(2) The contact page's `VisitUsPanel` rebuilt in the same two-column format**
+as the homepage: eyebrow → `<h2>` → address → seven days of hours with the Today
+badge → the four feature labels → Get Directions + phone buttons, with the
+orienting sentence, map and home-visits note in the right column. It was a
+centred single column with a two-line grouped hours list.
+
+The two blocks are now the same shape on purpose — a visitor moving between them
+should not have to re-learn where to look. Both components say so; keep them in
+step.
+
+⚠️ **The landmark is now retired from three surfaces** (order-email footer,
+homepage, contact). `VisitUsPanel` had carried an explicit comment calling it
+load-bearing — *"Do not trim it to just the street address"* — because the sign
+out front is the other business's. That is an override, not an oversight, and
+both the comment and `DECISIONS.md` now record it as such. **`DECISIONS.md`
+carries the full list of the eight places it still appears**, so a future sweep
+does not have to rediscover them.
+
+⚠️ `wayfindingSentence()` is no longer used by the contact page but is **still
+live on About** — it was not deleted.
+
+**Gate, from a deleted `.next`:** `tsc` clean · `lint` clean · **1125/1125
+across 109 files** · build **456/456 static pages**.
+
+### Two things the guards caught, worth recording
+
+🔴 **`ultrawide-layout.test.ts` failed the first attempt.** The rebuilt panel
+used a hand-rolled wide `div`, and every large canvas must opt into an
+ultra-wide tier. The fix was the right one anyway: use `PageContainer
+max="content"`, the shared component that carries the opt-in — and the same one
+the homepage block uses.
+
+⚠️ **Then it failed a SECOND time on the comment explaining the first fix.**
+That guard scans raw source and does **not** strip comments, so naming the raw
+Tailwind width class in prose trips it. Same family as the recorded trap that
+"Tailwind's scanner reads comments". The comment is now worded around it and
+says why.
+
+### The Today badge proved itself in the wild
+
+The date rolled from Sunday to Monday mid-session. The pages were **prerendered
+the previous day**, and the badge moved to Monday on reload — which is precisely
+the failure a server-rendered "today" would have shipped. Combined with the
+UTC-said-Monday-while-Naples-said-Sunday observation from when it was built,
+both halves of the design are now confirmed against reality rather than only
+against tests.
+
+**Verified:** contact page desktop two columns at 512px each, seven rows, badge
+on the correct day, four chips, both buttons, map still `loading="lazy"`, and a
+real `<address>` element retained. **Spanish at 320px: 0px horizontal overflow**,
+single column, times pinned to the container edge, every chip on one line, map
+286px inside a 288px column. Landmark confirmed absent from both panels; the
+only visible occurrence left on `/contact` is the sitewide footer.
+
+## 2026-08-23 — Homepage "Visit Us" rebuilt as a two-column block
+
+Owner supplied a reference layout (a Naples restaurant's location section) and
+asked for the homepage CTA reformatted to match. **Mocked up and approved
+before implementation**, with four decisions answered explicitly. No SQL.
+
+**Was:** one narrow centred stack — eyebrow, phone number as the headline, a
+sentence, address, two grouped hours rows, square map.
+**Now:** two columns. Left carries eyebrow → `<h2>` → address → all seven days
+of hours → four feature labels → Get Directions + phone buttons → email. Right
+carries an orienting sentence and the map.
+
+**The four calls, all owner-approved:**
+
+1. ⛔ **The address leads; the phone is a button.** This REVERSES the recorded
+   rule that the details "must not out-weigh the phone number this section
+   exists to show". Right when there was no storefront; wrong now that there is.
+   Recorded in `DECISIONS.md` so it is not "fixed" back later.
+2. ✅ **A "Today" badge**, built properly — see below.
+3. ✅ **Four feature labels**, each traceable to existing site copy. ❌ "Free
+   parking" left out: true, but the owner's call is that it is assumed in that
+   area.
+4. ✅ **All seven days** instead of the grouped pair. The grouped form only
+   existed because one narrow column could not spend seven rows without pushing
+   the map off the fold; the second column pays for it. The code comment there
+   had already anticipated this exact switch.
+
+**The "Today" badge is the part with real depth.** `ShowroomHours` had
+deliberately shipped without one, and both of its reasons still hold, so the
+badge is opt-in (`highlightToday`, homepage only — the footer's copy stays a
+pure server component) and:
+
+- Renders a `false` **server snapshot** through hydration via
+  `useSyncExternalStore`, then swaps to the client value. Prerendered pages mean
+  a server-rendered "today" would be the BUILD date.
+- Reads **`America/New_York`**, never the visitor's clock.
+
+⚠️ **Not theoretical — caught live while building it: UTC said Monday while
+Naples said Sunday**, and the badge correctly marked Sunday. A naive
+implementation is wrong for several hours of every day. Test-pinned with that
+exact fixture, plus both sides of DST.
+
+⚠️ **`useSyncExternalStore`, not `useState` in an effect.** The first draft used
+the effect form; `npm run lint` rejected it (`react-hooks/set-state-in-effect`).
+The rule was right — the store API is the correct one for a value the server
+cannot know, and it cannot mismatch during hydration.
+
+⚠️ **`dayKey` is separate from `day` on `HoursRow` for a reason:** `Intl`
+returns English weekday names, so a Spanish row labelled "Domingo" could never
+match one. Without the split the badge would silently never appear on `/es`.
+
+**Other structural notes:**
+
+- The section is now `max="content"` where it was `narrow` — the width IS the
+  feature.
+- It finally contributes a real `<h2>`; it previously opened on a styled `<p>`
+  and a phone-number `<a>`, contributing nothing to the page outline.
+- New `.dark-button` in `globals.css` (ink counterpart to `.gold-button`, same
+  geometry so a row of the two aligns). Two equal-weight outline pills would
+  have made the section ask which to press.
+- ShowroomMap is **unchanged**: still square, still lazy, both recorded
+  decisions. It only grew to fill the column (`maxWidth="34rem"`).
+- The layout borrows the reference's STRUCTURE, not its typography — Caslon and
+  Hanken throughout, or the section would stop looking like the site.
+
+**Gate, from a deleted `.next`:** `tsc` clean · `lint` clean · **1125/1125
+across 109 files** · build **456/456 static pages**.
+
+**Browser-verified:** desktop two columns at 504px each, real `<h2>`, seven
+rows, badge on Sunday reporting `America/New_York`, four chips, both buttons
+with correct `href`s, map still `loading="lazy"`. Mobile 375px collapses to one
+column with **0px horizontal overflow**. **Spanish at 320px** — the worst case
+this repo always checks — also 0px overflow, badge localized to "Hoy" on
+Domingo, landmark holding one line inside its container.
+
+⚠️ **One console red herring, confirmed not ours:** `useState is not defined` in
+`ShowroomTodayBadge` appeared in the buffer — it was the intermediate state
+during the rewrite, still in a cumulative buffer alongside `webpack-hmr`
+failures from while the server was stopped for the build. A clean tab shows
+**zero console messages** and the badge working.
+
+◻ **Undeployed**, with the batches below.
+
+## 2026-08-23 — Pickup details become a laid-out block, not a run-on sentence
+
+Owner request, following the order-email batch below. The pickup receipt read as
+one paragraph: *"Your payment has been received in full — thank you. Pick up at
+6240 Shirley St, Ste 104, Naples, FL 34109 · inside Sharon Lynch Collections.
+Tue–Sat 11am–3pm, or by appointment. Call or text us at…"* — the address a buyer
+actually needs was the least findable thing in it. **Design was mocked up and
+owner-approved before implementation.** No SQL.
+
+**Now three beats:** the payment sentence, a bordered *Pickup Location* panel,
+then the contact line.
+
+```
+PICKUP LOCATION            11px letterspaced caps
+6240 Shirley St, Ste 104   14px
+Naples, FL 34109
+inside Sharon Lynch Collections   13px muted
+──────────────────────────
+HOURS
+Tuesday – Saturday, 11:00 AM – 3:00 PM
+or by appointment          muted
+```
+
+❌ **The business name is deliberately NOT a line in the block** (owner call). On
+an envelope it would lead; in an email *from* that business it only pushed the
+street address down. Test-pinned so it does not creep back.
+
+**Design choices worth keeping:**
+
+- The panel reuses this email's existing tokens — `#fbfaf5` fill, `#eadfbd`
+  hairline, the same 11px letterspaced caps as the Ship-to block — so it reads
+  as that block's sibling rather than a new component.
+- The landmark renders **quieter** than the street lines: it is a finding aid,
+  not a postal line. It stays, because the sign on the door is another
+  business's name.
+- "or by appointment" sits under the hours in muted text — it qualifies them
+  rather than being a second set.
+- ⚠️ The panel is a **`<table>`**, unlike the `<div>` Ship-to block it mirrors:
+  Outlook's Word engine drops padding and background on a block-level div, which
+  would collapse it to unstyled text in the client most likely to be open on a
+  desk. The inner hairline stays a div, a construct already proven here.
+
+**Shape change:** the pickup details moved out of the flat `note` string into a
+new `InvoicePickupBlock` on `InvoiceEmailContent`, plus a `contactNote`. Kept as
+DATA, not a pre-formatted string, because the HTML and plain-text bodies lay it
+out differently and a joined string forces one to unpick the other's formatting.
+`note` is now the opening prose only, and is **empty on an unpaid invoice** —
+the block must not ride on it, which is test-pinned.
+
+⚠️ **The admin email preview was updated too** (`OrderDetailPanel.tsx` rendered
+`content.note` directly). Without that it would have silently stopped showing
+the address the buyer is given — a preview that lies is worse than no preview.
+
+Every string still comes from `business-location.ts` (`streetLine`, `cityLine`,
+`landmarkPhrase`, `hoursDaysLabel`, `hoursTimesLabel`, `byAppointmentLabel`).
+⛔ Do not reintroduce `addressWithLandmark()` here — it joins the landmark onto
+the address, which is exactly what this block splits apart.
+
+**Gate, from a deleted `.next`:** `tsc` clean · `lint` clean · **1117/1117
+across 108 files** · build **456/456 static pages**.
+
+Verified by rendering the real email and measuring it in a browser at a 340px
+phone column: all seven lines stack on their own rows (tops 17/44/65/88 →
+132/154/175), fill `#fbfaf5` and hairline `#eadfbd` resolve, the landmark
+renders at 13px `#746b5b` against the address's 14px `#1d1a14`, and nothing
+wraps. Plain-text output read directly and matches the approved mockup.
+
+◻ **Undeployed**, with the two batches below.
+
+## 2026-08-23 — Order-email fixes: footer landmark, wrapping phone, "Shipping method: Shipping"
+
+Three owner reports from a real receipt, all in the customer-facing order emails
+(invoice/receipt **and** fulfillment updates, which share the footer). No SQL.
+
+**(1) The footer named the shared suite.** `buildOrderEmailFooterHtml` used
+`addressWithLandmark()`, printing `… Naples, FL 34109 · inside Sharon Lynch
+Collections · (239) 404-8505`. Now `addressOneLine()`.
+
+⚠️ **Deliberate asymmetry, do not "finish the job" later:** the PICKUP sentence
+in `order-invoice-email.ts` STILL carries the landmark, because that one is
+directions — the sign on the door reads Sharon Lynch Collections, and a buyer
+being sent to collect an order needs it (the reason it was added 2026-08-17).
+The footer is a contact block, where it was only length. Test-pinned in both
+directions.
+
+**(2) The phone broke across lines** — "(239)" on one line, "404-8505" on the
+next, which is unreadable and un-dialable. New `pinPhoneToOneLine()` wraps every
+occurrence in `white-space:nowrap`, applied to the footer and to the body
+sentence in both emails. New `BUSINESS_PHONE` constant replaces the literals in
+those files.
+
+**Measured, with a positive control** — the phone text run's client-rect count
+across widths 200–620px, Arial 12px: **31 widths where it broke into 2 lines
+without the fix, 0 with it.** ⚠️ The same sweep proves removing the landmark
+alone would NOT have fixed it — the unpinned-but-landmark-free line still broke
+at those widths. Two separate defects that looked like one.
+
+**(3) "Shipping method: Shipping".** The invoice printed
+`orderStatusLabel(order.shipping_method)`, and that column is the NARROWED
+database value — `shippingMethodForDb` collapses both paid tiers to the single
+word `shipping`. New `describeOrderShippingService()` in `checkout-shipping.ts`
+names the real service: **Insured Shipping**, **Express Overnight Insured**, or
+**Local Pickup**, using the same catalog labels the buyer saw at checkout.
+
+The tier is not stored, but it is **recoverable**: `orders.subtotal` is the
+pre-discount merchandise subtotal the fee was keyed to (`checkout-pricing.ts`
+resolves the discount *after* the shipping fee, deliberately), and
+`shipping_fee` is what the lookup returned. No two methods share a fee at the
+same subtotal — Standard 19/25/29/35/59/99/165 against Express 55/79/119 — so a
+match is unambiguous.
+
+⛔ **Deliberately NOT a migration.** Storing the tier means altering `orders`
+AND rewriting the `create_paypal_order` RPC, which enumerates its columns by
+name — a change to the live payment path for a cosmetic label, which would also
+leave every existing order blank where this reads them all correctly.
+
+⚠️ **The safety property that makes inference acceptable: it only names a tier
+on an EXACT, UNIQUE fee match.** Re-price the table and old orders stop matching
+and fall back to the generic "Insured Shipping" — they are never relabelled as a
+service the buyer did not choose. Keep that shape. Test-pinned with an
+unmatched-fee case.
+
+**Gate, from a deleted `.next`:** `tsc` clean · `lint` clean · **1108/1108
+across 108 files** · build **456/456 static pages**.
+
+Verified by rendering the actual email (both a shipped and a pickup order) and
+reading the output, not only by unit test: footer carries the address with no
+landmark, `Shipping method: Insured Shipping` / `Local Pickup`, pickup note
+keeps its wayfinding.
+
+◻ **Undeployed**, alongside the cookie-banner fix below.
+
+## 2026-08-23 — Cookie banner reappeared on every language switch (FIXED, undeployed)
+
+**Owner report:** switching EN↔ES asks you to accept cookies again.
+
+**It is real, and it is a regression from the same-day PageSpeed batch.** Not a
+consent bug: `localStorage.nej_cookie_notice_v1` read `accepted` at every step.
+The banner is hidden purely by `data-nej-cookies-ok` on `<html>`, and the
+language switch was wiping that attribute.
+
+**Root cause.** The language chip (`SiteHeader.tsx:537`, and the mobile menu's
+link at `:759`) is a `next/link`, so switching is a CLIENT-side navigation.
+`/` and `/es` are different `[locale]` segments, so it remounts the root layout;
+React re-acquires `<html>` and re-applies only the attributes it renders
+(`lang`, `class`, `style`), dropping the imperatively-stamped one. The inline
+`<head>` script that normally stamps it does not re-run on a soft navigation.
+
+Measured in the browser, four states — the middle two are the bug and the last
+is what isolated it:
+
+| Action | localStorage | attribute | banner |
+| --- | --- | --- | --- |
+| Fresh load of `/`, accepted | `accepted` | present | hidden |
+| Click **ES** → `/es` | `accepted` | **gone** | **visible** |
+| Click **EN** → `/shop` | `accepted` | **gone** | **visible** |
+| Same-locale nav `/es` → `/es/shop` | `accepted` | present | hidden |
+
+⚠️ **`--app-vh` is written by the same inline script and did NOT break**, which
+is what pointed at the mechanism: `ViewportHeightToken` re-applies it on mount.
+The cookie gate was the only pre-paint stamp with no React re-applier.
+
+**Fix.** New `lib/cookie-consent.ts` owns the key, the attribute and the reads;
+`CookieNotice` re-applies the gate through a layout effect keyed on `locale`
+(`useEffect` on the server / `useLayoutEffect` on the client, aliased once at
+module scope so SSR does not warn and hook order stays constant). A layout
+effect, not `useEffect`: after paint would still fix the consent but flash a
+frame of banner on every switch. `CookiePreferencesClient` now imports the same
+constants instead of its own copies.
+
+⛔ **Additive only** — the re-stamp never REMOVES the attribute, so it cannot
+hide the banner from someone who has not consented. localStorage stays the
+source of truth; the attribute is its cache.
+
+**The LCP design is untouched**: the banner still server-renders visible with no
+hydration gate, which is the whole point of the 2026-08-23 sweep.
+
+**Guard:** new `lib/__tests__/cookie-consent-gate.test.ts` (15 tests) — unit
+tests for the helpers plus a source scan pinning the two literals in the inline
+script and the `globals.css` selector, neither of which can import the
+constants. **Mutation-tested both ways**: downgrading to `useEffect` fails it,
+and `[locale]` → `[]` fails it.
+
+⚠️ **The first version of the layout-effect assertion was a false pass** — it
+matched a bare `useLayoutEffect`, which also appears on the import line, so it
+stayed green after the gate was downgraded. It now asserts the alias assignment.
+Caught by mutation testing; a guard that cannot fail is not a guard.
+
+**Gate, from a deleted `.next`:** `tsc` clean · `lint` clean · **1101/1101
+across 108 files** (was 1086/107) · build **456/456 static pages** — unchanged,
+no new routes.
+
+**Browser-verified on the final code** (not the intermediate draft), both
+directions, plus the negative control that a never-consented visitor STILL gets
+the banner after switching, plus `/cookie-preferences` accept/reset still
+driving the banner live.
+
+⚠️ **Two console red herrings, both confirmed not ours.** A hooks-order error
+and a "dependency array changed size" error appeared during verification — they
+were the mutation-test edits hot-reloading, and a clean tab shows zero. The
+repo's own warning that the console buffer is cumulative applies exactly here.
+Separately, `SyntaxError: Unexpected end of JSON input` on `/es` fired once on
+the first compile after `.next` was deleted; every `/es` request since is 200.
+
+◻ **Undeployed.** No SQL.
+
+## 2026-08-23 — Session close (PageSpeed session): verification record
+
+Final deployed state: **a11y/BP sweep + hero-reveal batch** (front-card pin
+built, deployed once, measured 72, reverted — owner call). Gates on the final
+tree, all from `next-app/`:
+
+```
+npx vitest run        1086/1086 passed (107 files)
+npm run lint          clean
+npx tsc --noEmit      clean
+npm run build         456/456 static pages (checked after EVERY batch —
+                      [locale]/layout.tsx was touched this session)
+```
+
+Production verification: curl greps confirmed each deploy landed (banner SSR +
+gate script; nej-hero-go present, absent, present, absent across the four
+deploys, matching intent each time). ~12 PSI runs across the day; final state
+measured mobile 98 (LCP 1.7s) and 80, desktop 86 (TBT-noise draw; 96–98
+earlier). A11y/BP/SEO = 100/100/100 in every run.
+
+Staging: re-synced after every batch via the documented robocopy procedure
+(dry run → count sanity-check → copy → 0-remaining re-verify → content grep).
+Ends the day matching source except memory docs, per the owner's standing
+docs-only-drift preference.
+
+Memory: `DECISIONS.md` gained two durable rules (cookie banner stays SSR with
+a pre-paint gate; the PSI mobile number is a distribution — do not chase it
+with reveal/priority changes). `TASKS.md` item 0 records the final state;
+items 1+ (junk-row delete decision, hard-bounce watch, marketplace timeouts,
+ebay_sync_log noise) are unchanged from the earlier session and still open.
+
+
 ## 2026-08-23 — Front-card LCP pin REVERTED (owner call): back to the hero-reveal state
 
 The front-card pin deployed and its first PSI run came back **72 with LCP

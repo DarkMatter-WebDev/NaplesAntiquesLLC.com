@@ -169,6 +169,53 @@ The About page states the store exists but carries **no map**: its job is the
 fact, not the wayfinding, and the contact page one click away does the picture
 properly.
 
+**Since 2026-08-23 that invitation is a two-column block, and the ADDRESS leads
+it.** Owner's call, from a reference layout he supplied. Left column: eyebrow,
+`<h2>`, address, all seven days of hours, four feature labels, Get Directions +
+phone buttons, email. Right column: an orienting sentence and the map.
+
+⛔ **This REVERSES the rule that governed the block until then** — the phone
+number was the headline and everything else was deliberately kept quiet so it
+"must not out-weigh the phone number this section exists to show". That was
+right when there was no storefront to send anyone to. There is one now, the
+phone keeps a full-size button, and the section finally contributes a real
+`<h2>` to the page outline instead of opening on a styled `<p>`. **Do not
+restore the old hierarchy as a "fix" — it is a decision, not drift.**
+
+⚠️ Two constraints the width bought, and one it did not change:
+
+- **All seven days now render here.** The grouped two-row form existed only
+  because a single narrow column could not spend seven rows without pushing the
+  map off the fold. It is still correct on the surfaces that use it.
+- **The feature labels must be TRUE and traceable to existing site copy.**
+  "Free parking" is deliberately absent: it is true, but the owner's call is
+  that it is assumed in that area and not worth a slot. Do not pad the row.
+- **The map is still SQUARE and still lazy.** Both are older recorded decisions
+  (a letterbox showed a corridor of Shirley St with no context; lazy keeps a
+  heavy third party off the critical path). It only grew to fill the column.
+
+### "Today" on the hours list is a client-only fact, in the SHOWROOM's timezone
+
+`ShowroomHours` shipped with no today-marker at all, for two reasons that still
+hold and now shape how the opt-in one works. It is `highlightToday`, on only for
+the homepage CTA, so the footer's copy stays a pure server component.
+
+1. **These pages are statically prerendered.** A server-rendered "today" is
+   whatever day the BUILD machine ran on — stale the moment it ships.
+2. **It must answer for Naples, not the reader.** `ShowroomTodayBadge` reads
+   `America/New_York`, never `new Date().getDay()`.
+
+⚠️ Reason 2 is not theoretical: while this was being built, **UTC said Monday
+while Naples said Sunday**, and the badge correctly marked Sunday. A naive
+implementation is wrong for several hours of every day.
+
+⚠️ It uses **`useSyncExternalStore`** with a `false` server snapshot, not state
+set in an effect — that is the API for "a value the server cannot know", it
+cannot mismatch during hydration, and the repo's lint rule rejects the effect
+form. `lib/__tests__/showroom-today.test.ts` pins the timezone behaviour and the
+English `dayKey`, which exists separately from the localized `day` precisely so
+the comparison still works on the Spanish page.
+
 ### A display address is laid out; a prose address is a string
 
 `addressWithLandmark()` joins the address and "inside Sharon Lynch Collections"
@@ -178,10 +225,26 @@ the line broke wherever it ran out of room — the footer shipped
 across two lines reads as two things, and this name is the entire point of the
 clause: it is the sign out front that the visitor is scanning for.
 
-**Display surfaces use `<ShowroomAddress>`** (footer, homepage CTA, About). It
-puts the landmark on its own line, drops the middot (a line break already
-separates the facts, and a leading "·" on a wrapped line is worse than none),
-and marks it a qualifier with a step down in weight.
+**Display surfaces use `<ShowroomAddress>`.** It puts the landmark on its own
+line, drops the middot (a line break already separates the facts, and a leading
+"·" on a wrapped line is worse than none), and marks it a qualifier with a step
+down in weight.
+
+🔴 **The landmark is being retired from the primary surfaces, by owner decision
+(2026-08-23/24).** It has now been removed from the **order-email footer**, the
+**homepage Visit Us block**, and the **contact page panel** — the last two no
+longer use `<ShowroomAddress>` at all; they print `streetLine()` as a heading
+with `cityLine()` under it. The wayfinding argument above was real and is
+recorded as overridden, not forgotten.
+
+Where it still appears, so a future sweep does not have to rediscover the list:
+the **sitewide footer** (`<ShowroomAddress>`), the **About** page
+(`wayfindingSentence()`), the **FAQ answers** on `/faq` and the homepage
+(hardcoded in both locales), **`/shipping`**, the **checkout** pickup option,
+**`ProductTrustSections`**, **`spanish-legal-copy`**, and the **order-email
+pickup block** (`landmarkPhrase()`, deliberately kept — it is directions for
+someone driving over). Ask before clearing the rest; several are prose where the
+landmark still earns its place.
 
 ⚠️ **Only the business NAME is `nowrap`, never the whole clause.** An
 unbreakable clause guarantees the line but creates an overflow cliff — at 320px
@@ -1876,6 +1939,32 @@ and must honor the same storage contracts as manual forms.
 
 ## Storefront
 
+### The hero reveal is pre-hydration; the PSI mobile perf number is not chased
+
+Decided 2026-08-23 after an extensively measured build/revert/restore cycle.
+The shipped state: pane A's carousel fade and the boot splash trigger on a
+pre-hydration `nej-hero-go` stamp (inline script waits for pane A's card
+images, 1800ms cap) rather than on React hydration. Content paints at first
+paint; on a throttled phone the hero appears ~2s in instead of after a
+hydration-length splash hold.
+
+**Do not chase the PSI mobile performance number with reveal-timing or image
+priority changes — it was tried, measured, and does not work.** Three
+configurations (hydration-gated reveal, pre-hydration reveal, front-card
+priority+fade-exemption pin) all produce the same bimodal lab distribution:
+~79–81 when the cookie banner's text wins LCP, ~71–73 when a hero card
+image's paint registers instead, with a rare ~98 draw when everything lands
+at first paint. The tail is a property of a large fade-in hero image under
+Lighthouse's lantern model, not of any gating bug. A single PSI run is one
+draw from that distribution and must not by itself justify a code change —
+that mistake caused one full revert/redeploy round trip on 2026-08-23.
+
+Untried levers, all owner-decision design trades: font-display `optional`
+(kills the banner text's font-swap LCP re-emission), `experimental.inlineCss`,
+and shrinking the ~85KB unused/legacy JS. The metric that actually matters is
+CrUX field data (no data yet as of 2026-08-23), which will reflect the
+first-paint behavior real visitors get.
+
 ### The cookie banner is SERVER-rendered; its visibility gate runs before paint
 
 Decided 2026-08-23, measured on production via PSI + a corroborating local
@@ -1899,6 +1988,74 @@ The standing rule:
    bubbles) carries the same risk: if it is big enough and late enough, IT
    becomes the LCP. Late-appearing fixed overlays need either first-paint
    rendering with a pre-paint gate, or to stay smaller than the hero content.
+4. **The gate needs a CLIENT-side re-stamp as well as the head script**
+   (added 2026-08-23 after the language-switch bug below). `CookieNotice`
+   re-applies it through a layout effect keyed on `locale`. The two are not
+   duplicates: the script covers page loads, the effect covers soft
+   navigation. Guarded by `lib/__tests__/cookie-consent-gate.test.ts`.
+
+### An imperative attribute on `<html>` does NOT survive a locale switch
+
+Measured 2026-08-23, from an owner report that accepting cookies did not stick
+when switching language. It is not a consent bug — `nej_cookie_notice_v1` read
+`accepted` throughout — it is a DOM bug: `/` and `/es` are different `[locale]`
+segments, so switching remounts the root layout, React re-acquires `<html>` and
+re-applies only the attributes it renders (`lang`, `class`, `style`), and
+anything stamped imperatively is dropped. The inline `<head>` script that
+normally stamps it does not re-run on a client-side navigation. Same-locale
+navigation is unaffected, which is what isolates it to the remount.
+
+⛔ **The rule: any `<html>`/`<body>` attribute or style property written
+imperatively must have a React component that re-applies it on mount.**
+`--app-vh` already survived precisely because `ViewportHeightToken` does that;
+the cookie gate had no equivalent and was the only such writer without one.
+Before adding a third pre-paint stamp of any kind, give it its re-applier at
+the same time.
+
+⚠️ Use a LAYOUT effect, not `useEffect`. After paint still corrects the state,
+but shows a frame of the thing you are hiding on every switch. Aliased once at
+module scope (`useEffect` on the server, `useLayoutEffect` on the client) so
+SSR does not warn and hook order stays constant.
+
+ℹ️ React reports this itself, if you read the console during a switch:
+"Encountered a script tag while rendering React component. Scripts inside React
+components are never executed when rendering on the client." That message is the
+same mechanism — a symptom to read, not a separate defect. It is now filtered in
+development sitewide; see below.
+
+### The inline `<head>` scripts stay, and React's dev warning about them is filtered
+
+⛔ **Settled 2026-08-24 after re-investigating from scratch. Do not re-open it by
+"fixing" the scripts.** React 19 logs a dev console error for ANY `<script>` it
+renders on the client, and it re-creates those fibers on client renders, so the
+message fires on ordinary navigation. The scripts are correct and necessary: the
+HTML parser executes them on a real page load, which is the entire point.
+
+`components/shop/ScriptTagWarningGuard.tsx` already existed for this (added for
+the shop list page's anti-flash script). It is now mounted in
+`[locale]/layout.tsx` instead, so it covers every page — the same warning comes
+from the layout's own `<head>` scripts and from the JSON-LD blocks on eight
+routes. It is dev-only, and scoped to that one exact message: verified
+2026-08-24 that a plain `console.error` and an `Error` object both still appear.
+
+**Two fixes were tried, measured, and rejected — do not repeat them:**
+
+1. ⛔ **`next/script` with `strategy="beforeInteractive"`.** It does NOT emit an
+   inline script. The built HTML contains a `self.__next_s` queue push that
+   Next's runtime executes AFTER first paint, which reintroduces both the
+   `--app-vh` layout jump and the cookie-banner flash. Verified by reading
+   `.next/server/app/en.html`.
+2. ⛔ **Emitting the scripts as raw HTML inside a wrapper** (so React never
+   creates a script fiber). It works, but no element valid inside `<head>` can
+   carry raw innerHTML — `<template>` is inert and `<noscript>` is not parsed
+   when scripting is on — so it forces the pre-paint scripts and the JSON-LD out
+   of `<head>`, and it only silences the warning if all eight routes' JSON-LD is
+   converted too. Large, SEO-adjacent, and it competes with the guard that
+   already exists.
+
+✅ **It never reaches visitors.** Verified against a real production build
+(`next start`, 2026-08-24): zero console output of any kind, including across a
+locale switch. Production React does not emit this warning at all.
 
 
 ### The first pixel is gated by ONE 21KB stylesheet — protect its lane

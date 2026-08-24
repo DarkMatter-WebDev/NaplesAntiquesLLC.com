@@ -1,8 +1,25 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useLayoutEffect } from 'react';
+import {
+  COOKIE_NOTICE_ACCEPTED,
+  COOKIE_NOTICE_ATTR,
+  COOKIE_NOTICE_KEY,
+  applyStoredConsentGate,
+} from '@/lib/cookie-consent';
 
-const COOKIE_NOTICE_KEY = 'nej_cookie_notice_v1';
+/**
+ * `useLayoutEffect` on the client, `useEffect` on the server.
+ *
+ * The re-stamp below MUST land before the browser paints, or the banner
+ * flashes for an already-consented visitor on every language switch — the
+ * exact defect it exists to fix. `useEffect` runs after paint and would show
+ * that frame. But `useLayoutEffect` alone warns "does nothing on the server"
+ * during SSR of this client component, so the choice is made once per
+ * environment at module scope, which keeps hook order constant.
+ */
+const useGateEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 /**
  * ⚠️ LCP-load-bearing: this banner must render in the SERVER HTML, visible by
@@ -21,18 +38,41 @@ const COOKIE_NOTICE_KEY = 'nej_cookie_notice_v1';
  * stamps `data-nej-cookies-ok` on <html>; the CSS rule in globals.css hides
  * the banner via that attribute. Accept below stamps the same attribute, so
  * dismissal is instant without any React state.
+ *
+ * ⚠️ THREE writers stamp that attribute, and the third is not redundant.
+ * The inline script only runs on a real page load, so a CLIENT-SIDE language
+ * switch used to lose the gate entirely: `/` and `/es` are different `[locale]`
+ * segments, so the switch remounts the root layout, React re-acquires <html>
+ * and re-applies only the attributes it renders (`lang`, `class`, `style`),
+ * and the imperative one is dropped with nothing to put it back. Measured
+ * 2026-08-23: localStorage still read `accepted` throughout — consent was
+ * never lost — but the banner reappeared in the new language and asked an
+ * already-consented visitor to accept again, in both directions. Same-locale
+ * navigation was unaffected, which is what isolated it to the remount.
+ *
+ * `--app-vh` is written by the same inline script and does NOT break, because
+ * `ViewportHeightToken` re-applies it on mount. `useGateEffect` below is this
+ * attribute's equivalent. ⚠️ Do not "simplify" it away as a duplicate of the
+ * head script — they cover different events, and only this one survives a soft
+ * navigation. `lib/__tests__/cookie-consent-gate.test.ts` guards it.
  */
 export default function CookieNotice({ locale }: { locale: string }) {
   const isEs = locale === 'es';
   const prefix = isEs ? '/es' : '';
 
+  // Keyed on `locale`, not `[]`: this re-applies whether React remounts the
+  // component on the locale switch or merely re-renders it with a new prop.
+  useGateEffect(() => {
+    applyStoredConsentGate(document.documentElement);
+  }, [locale]);
+
   function accept() {
     try {
-      localStorage.setItem(COOKIE_NOTICE_KEY, 'accepted');
+      localStorage.setItem(COOKIE_NOTICE_KEY, COOKIE_NOTICE_ACCEPTED);
     } catch {
       // Storage blocked: the attribute below still hides it for this pageview.
     }
-    document.documentElement.setAttribute('data-nej-cookies-ok', '');
+    document.documentElement.setAttribute(COOKIE_NOTICE_ATTR, '');
   }
 
   return (

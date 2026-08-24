@@ -11,6 +11,7 @@ import CustomerReveal from '@/components/layout/CustomerReveal';
 import SocialBackgroundPublishProvider from '@/components/admin/SocialBackgroundPublishProvider';
 import RouteProgressBar from '@/components/layout/RouteProgressBar';
 import ViewportHeightToken from '@/components/layout/ViewportHeightToken';
+import ScriptTagWarningGuard from '@/components/shop/ScriptTagWarningGuard';
 import { jsonLdHtml } from '@/lib/json-ld';
 import { GEO, mapsUrl, openingHoursSchema, postalAddressSchema } from '@/lib/business-location';
 
@@ -156,7 +157,13 @@ export default async function LocaleLayout({ children, params }: Props) {
             the banner is server-rendered visible (it is otherwise the mobile
             LCP element — see CookieNotice.tsx), so returning visitors need it
             hidden BEFORE first paint or they get a one-frame flash. The CSS
-            half of this lives in globals.css under [data-nej-cookies-ok]. */}
+            half of this lives in globals.css under [data-nej-cookies-ok].
+
+            ⚠️ This covers full page loads ONLY. A client-side language switch
+            remounts this layout without re-running the script, and React drops
+            the attribute when it re-acquires <html> — so CookieNotice carries a
+            pre-paint re-stamp for that path. Both are required; neither
+            replaces the other. */}
         <script
           dangerouslySetInnerHTML={{
             __html: `try{if(localStorage.getItem('nej_cookie_notice_v1')==='accepted')document.documentElement.setAttribute('data-nej-cookies-ok','')}catch(e){}`,
@@ -193,6 +200,16 @@ export default async function LocaleLayout({ children, params }: Props) {
           unchanged: on a page SHORTER than the screen with the toolbar hidden,
           a thin strip of page background shows below the footer's `#f3f3f3`. */}
       <body className="min-h-[var(--app-vh)] flex flex-col">
+        {/* Silences ONE known React 19 dev-only false positive sitewide — see
+            the component for the full rationale and references. It was mounted
+            on the shop list page only until 2026-08-24; the same warning fires
+            for the inline <head> scripts above on every client render, so it
+            belongs at the layout level where all of them live.
+
+            ⚠️ Dev-only and scoped to that one exact message. Production React
+            never emits it (verified against a production build, 2026-08-24:
+            zero console output across a locale switch). */}
+        <ScriptTagWarningGuard />
         <NextIntlClientProvider locale={locale} messages={messages}>
           {/* CartProvider must wrap WishlistProvider: WishlistDrawer (rendered by
               WishlistProvider) has an Add to Cart button that calls useCart(), so it

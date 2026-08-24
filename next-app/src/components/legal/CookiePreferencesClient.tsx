@@ -1,8 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-
-const COOKIE_NOTICE_KEY = 'nej_cookie_notice_v1';
+import {
+  COOKIE_NOTICE_ACCEPTED,
+  COOKIE_NOTICE_ATTR,
+  COOKIE_NOTICE_KEY,
+  hasStoredConsent,
+} from '@/lib/cookie-consent';
 
 export default function CookiePreferencesClient({ locale }: { locale: string }) {
   const isEs = locale === 'es';
@@ -10,7 +14,7 @@ export default function CookiePreferencesClient({ locale }: { locale: string }) 
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setAccepted(localStorage.getItem(COOKIE_NOTICE_KEY) === 'accepted');
+      setAccepted(hasStoredConsent());
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
@@ -19,14 +23,14 @@ export default function CookiePreferencesClient({ locale }: { locale: string }) 
   // server-rendered and hidden purely by that attribute (see CookieNotice.tsx),
   // so without the sync a reset here would not bring it back until a reload.
   function acceptNotice() {
-    localStorage.setItem(COOKIE_NOTICE_KEY, 'accepted');
-    document.documentElement.setAttribute('data-nej-cookies-ok', '');
+    localStorage.setItem(COOKIE_NOTICE_KEY, COOKIE_NOTICE_ACCEPTED);
+    document.documentElement.setAttribute(COOKIE_NOTICE_ATTR, '');
     setAccepted(true);
   }
 
   function resetNotice() {
     localStorage.removeItem(COOKIE_NOTICE_KEY);
-    document.documentElement.removeAttribute('data-nej-cookies-ok');
+    document.documentElement.removeAttribute(COOKIE_NOTICE_ATTR);
     setAccepted(false);
   }
 

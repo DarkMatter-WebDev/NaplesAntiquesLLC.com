@@ -174,6 +174,36 @@ export interface HoursRow {
   day: string;
   time: string;
   closed: boolean;
+  /**
+   * Canonical ENGLISH weekday for a single-day row, or undefined on a grouped
+   * row that covers several days. Separate from `day`, which is localized: the
+   * "today" comparison runs against `Intl`'s en-US weekday name, so a Spanish
+   * label could never match it.
+   */
+  dayKey?: string;
+}
+
+/**
+ * ⚠️ The SHOWROOM's timezone, not the visitor's and not the server's.
+ *
+ * "Is it open today" is a question about Naples. A visitor in London at 02:00
+ * GMT is still asking about the Naples day, and the build machine's timezone is
+ * an implementation detail of whenever the page was prerendered.
+ */
+export const SHOWROOM_TIME_ZONE = 'America/New_York';
+
+/**
+ * Today's weekday in the showroom's timezone, as a canonical English name
+ * matching `HOURS.days` / `WEEK_ORDER`.
+ *
+ * ⚠️ Client-side only in practice — see `ShowroomTodayBadge` for why calling
+ * this during a prerender would bake in the build date.
+ */
+export function showroomWeekdayName(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: SHOWROOM_TIME_ZONE,
+    weekday: 'long',
+  }).format(now);
 }
 
 export function closedLabel(isEs: boolean): string {
@@ -193,6 +223,7 @@ export function hoursRows(isEs: boolean): HoursRow[] {
       day: isEs ? DAY_LABELS_ES[day] : day,
       time: isOpen ? hoursTimesLabel(isEs) : closedLabel(isEs),
       closed: !isOpen,
+      dayKey: day,
     };
   });
 }

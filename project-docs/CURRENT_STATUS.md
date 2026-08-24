@@ -10,69 +10,156 @@
 
 ### The shape, in one glance
 
-🔴 **Front-card pin reverted (it deployed once, PSI read 72 — the tail
-survived it); source and staging are back to the hero-reveal state, DEPLOY
-PENDING.** Final intended state: a11y/BP=100 sweep + hero-reveal batch. The
-PSI lab number is bimodal (~79–81 / ~71–73) in every tested configuration —
-treat single lab runs as noise; CrUX field data is the metric that matters.
-See `TASKS.md` item 0.** Post-revert PSI mobile 3x: **71 / 80 / 80** — the reverted
-site is bimodal (usually 80, intermittent ~71 when the hydration-gated hero
-paint lands as LCP at ~9s). The batch had eliminated the 71 mode (79–81
-stable) and made real paint first-paint; it is preserved verbatim in
-`CHANGELOG.md` for re-application. A11y/BP = 100 sweep untouched throughout.
-See `TASKS.md` item 0.
+🔴 **FIVE BATCHES ARE UNDEPLOYED (2026-08-23/24), and STAGING IS SYNCED AND
+READY TO DEPLOY.** No outstanding SQL in any of them.
 
-✅ **The PageSpeed/a11y sweep is DEPLOYED and re-tested on production
-(2026-08-23, same session).** PSI mobile **81/100/100/100** (was 80/93/96/100),
-desktop **98/100/100/100**. The LCP element is no longer the cookie banner —
-it is a hero carousel product image; the remaining mobile-perf ceiling is the
-hero reveal gate, an owner-level design trade (see `TASKS.md` item 1). No SQL.
-Locally it had been verified end-to-end first (1086/1086, lint, tsc, build
-456/456, Lighthouse a11y+BP = 100 on the prod build).
-What it is, in one line each — full detail in `CHANGELOG.md` 2026-08-23:
+**The five, oldest first:** the cookie-banner language-switch fix; the
+order-email fixes (footer landmark, wrapping phone, shipping-method label); the
+pickup block; the homepage "Visit Us" rebuild; and the contact-page match +
+landmark removal + the dev console-warning filter.
 
-- **Cookie banner is now SSR + pre-paint gate** — it was literally the mobile
-  LCP element on PSI (render delay 2.4s, mobile perf 80). `CookieNotice.tsx`,
-  `[locale]/layout.tsx` (new inline head script), `globals.css`,
-  `CookiePreferencesClient.tsx`.
-- **Carousel**: preloader spans card-sized (kills the fake 215 KiB
-  image-delivery flag + the Best-Practices aspect failure); back/edge-on cards
-  get `tabindex=-1`/`aria-hidden` (target-size).
-- **Footer links** `py-1.5` on mobile (24px tap targets); **ShowroomHours**
-  muted opacity 0.55/0.7 → 0.8 (4.5:1 contrast); announcement/testimonial
-  aria-labels reworked (label-content-name-mismatch).
-- **`next.config.ts`**: `images.minimumCacheTTL` 1h → 31 days.
+**Gate on the final tree, from a deleted `.next`:** `tsc` clean · `lint` clean ·
+**1125/1125 across 109 files** · build **456/456 static pages**.
 
-Post-deploy PSI confirmed the LCP element moved off the banner (a11y and BP
-hit 100 exactly as predicted); mobile perf moved only 80→81 because the hero
-reveal now sets the LCP time — that ceiling and the levers for it are recorded
-in `TASKS.md` item 1.
+**Staging rebuilt 2026-08-24** — `C:\Users\rcman\NEJ-repo-staging`, **872 files
+/ ~20.2 MB**. Dry run first: **23 files** queued, exactly the 19 app files and 4
+memory docs this session touched, with **0 Extras / 0 Mismatch / 0 FAILED**. The
+copy ran clean and a re-run dry run confirmed **0 remaining**. Leak check
+clean — 0 `.git` (directory *or* file), 0 `node_modules`, 0 `.next`, 0
+`worktrees`, 0 `.env*`, 0 `*.log`, 0 `*.tsbuildinfo` — against a **positive
+control of 177 `.tsx`**, so the zeros are real rather than a broken scan.
+`.claude/launch.json` and `.github/workflows/scheduled-jobs.yml` confirmed
+present, and the staged copies were content-checked (guard mounted, pre-paint
+scripts still inline in `<head>`, landmark absent from both Visit Us blocks).
 
-Everything below this line is the state from the EARLIER 2026-08-23 session
-and still holds — the email-validation batch is live, no outstanding SQL from
-it:
+ℹ️ Robocopy reports 875 total against 872 on disk. That gap is the three
+`/XF`-excluded files and is expected, not a missing-file bug.
 
-✅ **The earlier batch: nothing undeployed, no outstanding SQL.** The 2026-08-22 batch shipped and
-was verified on production: the inquiry-form bot filter, checkout name+phone
-validation with the field reorder, phone validation on the three remaining
-contact/lead forms, the transactional email bounce handler, and the
-`ContactForm.tsx` dead-code deletion.
+⚠️ **A `$home` variable collision made one staging spot-check report a false
+NEGATIVE** — `$HOME` is read-only in PowerShell, so the assignment silently
+failed and the check ran against the wrong value. Re-run under another name it
+passed. Never name a PowerShell variable `$home`.
 
-✅ **The bounce handler is CONFIRMED LIVE**, not merely deployed — proven by
-replaying a real bounce and watching the response body change from
-`{"success":true,"ignored":true}` to `{"success":true}`, which is exactly the
-old-code/new-code difference.
+**React's "script tag while rendering" console error is filtered in dev**
+(2026-08-24). `ScriptTagWarningGuard` — which already existed for the shop
+page — is now mounted in the locale layout, so it covers every page. ✅ Nothing
+user-facing changes: verified against a real production build that the warning
+is dev-only (zero console output there, even across a locale switch). ⛔ Two
+"proper" fixes were built, measured and rejected — `next/script`
+`beforeInteractive` defers the pre-paint scripts past first paint, and raw-HTML
+emission forces them out of `<head>`. See `DECISIONS.md`.
 
-✅ **Resend endpoint moved `.co` → `.com`** (2026-08-23, owner-requested) and
-re-verified after the move.
+**The contact page now matches the homepage block, and the shared-suite
+landmark is off both** (2026-08-24). `VisitUsPanel` was a centred single column
+with grouped hours; it is now the same two-column layout, and "inside Sharon
+Lynch Collections" is gone from the homepage block's address line and its
+orienting sentence. 🔴 **It still appears in eight other places** — footer,
+About, both FAQ surfaces, `/shipping`, checkout pickup, product trust copy,
+Spanish legal copy, and the order-email pickup block — all listed by name in
+`DECISIONS.md`. Not swept; owner decision pending.
 
-✅ **Staging re-synced 2026-08-23 (PageSpeed session) and verified current.**
-`C:\Users\rcman\NEJ-repo-staging` now matches this folder exactly: dry run
-showed **15 files** (the 10 source files + 4 memory docs from this session,
-plus `features/lead-capture.md` riding along from the earlier drift), 0 Extras,
-no `.claude` leak; after the copy a second dry run showed **0 to copy** of 871,
-staged `CookieNotice.tsx`/`next.config.ts` grep-verified for the new content,
-`.claude\worktrees` absent, `.claude\launch.json` present. Ready to deploy.
+**Homepage "Visit Us" is now a two-column block** (owner-supplied reference,
+mocked up and approved before building): eyebrow → `<h2>` → address → all seven
+days of hours → four feature labels → Get Directions + phone buttons → email,
+with an orienting sentence and the map in the right column.
+⛔ **The address leads and the phone is a button — this REVERSES the older rule
+that the phone must stay the biggest thing here.** Owner's decision; do not
+"fix" it back. A new **Today** badge marks the current day after mount, pinned
+to Naples time (UTC and Naples genuinely disagreed while it was built). The map
+is untouched — still square, still lazy. Detail: `CHANGELOG.md` 2026-08-23
+(Visit Us); rules in `DECISIONS.md`.
+
+**Order emails** (owner-reported from a real receipt, all three fixed): the
+footer no longer names Sharon Lynch Collections, the phone number can no
+longer break across two lines (`white-space:nowrap`, measured — 31 widths
+between 200–620px used to break it, now zero), and the summary line reads
+**"Shipping method: Insured Shipping / Express Overnight Insured / Local
+Pickup"** instead of the redundant "Shipping method: Shipping".
+**The pickup details are now a laid-out block**, not a run-on sentence
+(owner request, mocked up and approved before building): payment sentence →
+a *Pickup Location* panel with the address on its own lines and hours below a
+hairline → contact line. ⚠️ The landmark is deliberately KEPT here, as its own
+muted line — it is wayfinding to a door signed with another business's name —
+and the business name is deliberately NOT a line, since the email is already
+from that business.
+⛔ The tier is INFERRED from `subtotal` + `shipping_fee` on an exact unique
+match, never stored — storing it would mean altering `orders` and rewriting
+the `create_paypal_order` RPC. Detail: `CHANGELOG.md` 2026-08-23 (order-email
+entry). Everything else in production,
+source and staging matches (staging drifts only by memory docs, per the
+owner's standing docs-only-drift preference), and staging has NOT been
+re-synced for this change.
+
+**Owner-reported, reproduced, fixed, verified locally, not yet deployed:**
+accepting cookies did not stick when switching EN↔ES. Consent was never
+actually lost — `localStorage` read `accepted` throughout — but the switch is
+a client-side navigation between two `[locale]` segments, which remounts the
+root layout, and React drops the imperatively-stamped `data-nej-cookies-ok`
+attribute that hides the banner. The inline `<head>` script that stamps it
+does not re-run on a soft navigation.
+
+Fixed with a pre-paint re-stamp in `CookieNotice` (layout effect keyed on
+`locale`) plus a new `lib/cookie-consent.ts` owning the key and attribute.
+⚠️ **The LCP design is untouched** — the banner still server-renders visible
+with no hydration gate, which is the entire point of the earlier sweep.
+Gate: `tsc`/`lint` clean · **1101/1101** · build **456/456**. Detail:
+`CHANGELOG.md` 2026-08-23 (cookie banner entry); the durable rule is in
+`DECISIONS.md`, *"An imperative attribute on `<html>` does NOT survive a
+locale switch"*.
+
+⛔ **The rule that came out of it, worth more than the fix:** any `<html>` or
+`<body>` attribute written imperatively must have a React component that
+re-applies it on mount. `--app-vh` survived the same event only because
+`ViewportHeightToken` does exactly that.
+
+✅ **FINAL performance state, DEPLOYED and verified on production:** the
+PageSpeed/a11y sweep + the hero-reveal batch. The front-card LCP pin was
+built, deployed, measured (72), and reverted the same day — owner's call,
+preferring the state that loads fastest in practice.
+
+**Scores, before → after this session:**
+
+- Mobile: 80 / 93 / 96 / 100 → **80–98 band / 100 / 100 / 100** (best run 98
+  with LCP 1.7s green; typical ~80)
+- Desktop: 97 / 96 / 100 / 100 → **~96–98 / 100 / 100 / 100**
+- **A11y, Best Practices, and SEO held a perfect 100 in every one of ~12 PSI
+  runs.** The perf number is the only mover, and it is a DISTRIBUTION.
+
+🔴 **Do not chase the mobile perf lab number further with reveal/priority
+tricks.** Three configurations were measured extensively (no hero batch, hero
+batch, front-card pin) and ALL show the same bimodal lab distribution:
+~79–81 when the cookie banner's text wins LCP, ~71–73 when a hero card
+image's paint registers instead (lantern balloons any post-FCP image LCP to
+~9s sim), plus a rare high draw (98) when everything lands at first paint.
+Untested levers if the owner ever asks again: font-display `optional`,
+`experimental.inlineCss`, JS-graph reduction — listed in `CHANGELOG.md`
+(front-card revert entry). CrUX field data (currently "No Data") is the
+number that will actually matter, and the deployed state paints content at
+first paint for real visitors.
+
+**What is live from this session** (detail in `CHANGELOG.md` 2026-08-23):
+
+- **Cookie banner SSR + pre-paint gate** — it was literally the mobile LCP
+  element (render delay 2.4s). `CookieNotice.tsx`, `[locale]/layout.tsx`
+  (inline head script), `globals.css`, `CookiePreferencesClient.tsx`.
+- **Hero-reveal batch** — pane A's carousel fade and the boot splash no
+  longer wait for React hydration (`nej-hero-go` stamp; `HomeHero.tsx`,
+  `[locale]/(home)/page.tsx`, `globals.css`). Content paints at first paint.
+- **A11y to 100**: carousel back/edge cards `tabindex=-1`/`aria-hidden`;
+  footer tap targets `py-1.5`; ShowroomHours muted opacity 0.55/0.7 → 0.8;
+  announcement/testimonial accessible-name fixes.
+- **BP to 100**: carousel preloader spans card-sized (also killed a fake
+  215 KiB image-delivery flag).
+- **`images.minimumCacheTTL`** 1h → 31 days.
+
+### State from the earlier 2026-08-23 session — still holds
+
+✅ The 2026-08-22 email-validation batch is live and verified: inquiry-form
+bot filter, checkout name+phone validation with field reorder, phone
+validation on the three lead forms, the transactional email bounce handler
+(confirmed by replaying a real bounce), and the `ContactForm.tsx` deletion.
+
+✅ **Resend endpoint moved `.co` → `.com`** and re-verified after the move.
 
 ### ◻ What is actually open
 

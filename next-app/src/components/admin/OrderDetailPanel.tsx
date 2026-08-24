@@ -1265,7 +1265,24 @@ export default function OrderDetailPanel({
                       <EmailTotalRow label="Total" value={emailContent.totals.total} strong />
                     </div>
                   </div>
-                  <p className="mt-5">{emailContent.note}</p>
+                  {emailContent.note && <p className="mt-5">{emailContent.note}</p>}
+                  {/* Mirrors the pickup panel in the sent email. Without it this
+                      preview silently omits the address the buyer is given. */}
+                  {emailContent.pickup && (
+                    <div className="mt-5 border px-4 py-3" style={{ borderColor: BORDER, background: 'var(--color-surface-container-low)' }}>
+                      <strong className="block text-[11px] font-bold uppercase tracking-wider">{emailContent.pickup.label}</strong>
+                      {emailContent.pickup.addressLines.map((addressLine) => (
+                        <span key={addressLine} className="block">{addressLine}</span>
+                      ))}
+                      <span className="block opacity-70">{emailContent.pickup.landmark}</span>
+                      <div className="mt-3 border-t pt-3" style={{ borderColor: BORDER }}>
+                        <strong className="block text-[11px] font-bold uppercase tracking-wider">{emailContent.pickup.hoursLabel}</strong>
+                        <span className="block">{emailContent.pickup.hours}</span>
+                        <span className="block opacity-70">{emailContent.pickup.byAppointment}</span>
+                      </div>
+                    </div>
+                  )}
+                  <p className="mt-5">{emailContent.contactNote}</p>
                   <p className="mt-3">{emailContent.closing}</p>
                 </div>
               </section>

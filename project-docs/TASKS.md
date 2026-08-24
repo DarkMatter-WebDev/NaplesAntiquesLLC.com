@@ -5,8 +5,145 @@
 
 ## ◻ OPEN — needs a human
 
-0. 🔴 **Front-card pin REVERTED (its first PSI run: 72, LCP 9.2s — tail
-   survived); back to the hero-reveal state, DEPLOY PENDING.** The owner chose
+✅ **STAGING IS SYNCED AND READY TO DEPLOY (2026-08-24)** — 872 files, 23 copied,
+0 Extras/Mismatch/FAILED, 0-remaining on the re-run, leak check clean against a
+177-`.tsx` positive control. Five batches, no SQL in any of them. Full figures in
+`CURRENT_STATUS.md`.
+
+◻ **Not covered before deploy — none blocking, all "first real use" items:**
+
+1. **No order email has actually been SENT** through the new templates. They
+   were rendered and unit-tested, not delivered. The first real receipt is the
+   first live exercise.
+2. 📧 **The pickup block has never been seen in a real mail client.** Outlook
+   desktop is the one worth checking — the panel is a `<table>` specifically
+   because Word-rendered Outlook drops padding and background on a `<div>`.
+3. 📱 **The Visit Us / contact layouts have not been seen on real phone
+   hardware.** Measured at 375px and at 320px in Spanish with 0px overflow, but
+   measurement is not the same as looking.
+4. 📊 **PSI has not been re-run since the homepage section changed.** The block
+   is below the fold and the map was already there, so no LCP change is
+   expected. ⛔ Per the standing rule, do not react to a single run — the mobile
+   number is a distribution.
+5. ◻ **The landmark still appears in 8 other places** (footer, About, both FAQ
+   surfaces, `/shipping`, checkout pickup, product trust copy, Spanish legal
+   copy, order-email pickup block). Deliberately not swept — owner decision.
+
+🔴 **DEPLOY the script-tag console-warning fix** (2026-08-24; no SQL). One line:
+`ScriptTagWarningGuard` is now mounted in `[locale]/layout.tsx` instead of only
+on the shop list page, so React 19's dev-only "Encountered a script tag while
+rendering React component" no longer clutters the overlay on every page.
+
+✅ **Nothing user-facing changes** — the warning is dev-only and was verified
+absent from a real production build. The inline `<head>` scripts are untouched.
+
+⛔ **Do not "properly fix" the scripts later.** Both alternatives were built and
+measured this session and are worse: `next/script` `beforeInteractive` defers
+execution past first paint (reintroducing the layout jump and banner flash), and
+raw-HTML emission forces the scripts and JSON-LD out of `<head>`. Full reasoning
+in `DECISIONS.md`, *"The inline `<head>` scripts stay…"*.
+
+🔴 **DEPLOY the contact-page match + landmark removal** (2026-08-24; no SQL).
+"inside Sharon Lynch Collections" is gone from the homepage Visit Us block, and
+`components/contact/VisitUsPanel.tsx` is rebuilt in the same two-column format.
+Detail: `CHANGELOG.md` 2026-08-24.
+
+◻ **Owner decision — how far does the landmark removal go?** It is now off three
+surfaces (order-email footer, homepage, contact) but still appears in **eight**
+places, listed by name in `DECISIONS.md` under *"A display address is laid
+out…"*. The notable ones: the **sitewide footer**, **About**, and the **FAQ
+answers on `/faq` and the homepage**. Several are prose where it still earns its
+place, so this was NOT swept — say the word if you want the rest gone.
+
+🔴 **DEPLOY the homepage "Visit Us" rebuild** (2026-08-23; no SQL). Two-column
+layout from an owner-supplied reference — mocked up and approved first, four
+design calls answered explicitly. Detail: `CHANGELOG.md` 2026-08-23 (Visit Us).
+
+Files: `app/[locale]/(home)/page.tsx`, `components/ShowroomHours.tsx`,
+`components/ShowroomTodayBadge.tsx` (new), `lib/business-location.ts`,
+`app/globals.css`, `lib/__tests__/showroom-today.test.ts` (new).
+
+⛔ **The address now leads and the phone is a button — that REVERSES an older
+recorded rule** ("must not out-weigh the phone number this section exists to
+show"). It is an owner decision, not drift. Do not restore the old hierarchy.
+
+👀 **Worth a look on a real phone after deploying**, since it is a layout
+change: the section stacks to one column with no sideways scroll (measured 0px
+at 375px and at 320px in Spanish), and the **Today** badge should sit on the
+current day — it appears a frame after load, by design, and is pinned to Naples
+time, so it is correct even for a visitor in another timezone.
+
+🔴 **DEPLOY the order-email fixes** (2026-08-23; no SQL). Three owner reports
+from a real receipt — footer named the shared suite, the phone number broke
+across two lines, and the summary read "Shipping method: Shipping". Detail:
+`CHANGELOG.md` 2026-08-23 (order-email entry).
+
+Files: `lib/order-email-branding.ts`, `lib/order-invoice-email.ts`,
+`lib/order-fulfillment-email.ts`, `lib/checkout-shipping.ts`, and
+`lib/__tests__/order-invoice-email.test.ts`.
+
+✅ **Settled:** the landmark is gone from the FOOTER and kept in the PICKUP
+block, where it is directions to a door whose sign reads someone else's name.
+It now renders as its own muted line rather than joined onto the address.
+
+**Also in this batch — the pickup details are a laid-out block, not a run-on
+sentence** (owner request, design mocked up and approved first). Payment
+sentence → *Pickup Location* panel (address on its own lines, hours below a
+hairline) → contact line. ❌ The business name is deliberately NOT a line in it.
+Adds `InvoicePickupBlock`/`contactNote` to `InvoiceEmailContent` and updates the
+admin email preview, which rendered `note` directly and would otherwise have
+stopped showing the address. Detail: `CHANGELOG.md` 2026-08-23 (pickup block).
+
+📱 **Worth one glance after deploying:** send yourself a pickup receipt and open
+it on a phone. The panel was measured at a 340px column and stacks correctly,
+but no human has looked at it in a real mail client. Outlook desktop is the one
+worth checking if you have it — the panel is a `<table>` specifically for it.
+
+⛔ The shipping tier is INFERRED from `subtotal` + `shipping_fee`, not stored.
+That is deliberate (storing it means altering `orders` and rewriting the
+`create_paypal_order` RPC — the live payment path). It only names a tier on an
+exact, unique fee match and falls back to generic wording otherwise, so
+re-pricing the tiers can never mislabel an old order. **If the tier table is
+ever re-priced, historical invoices quietly become generic — that is the
+intended trade, not a bug.**
+
+🔴 **DEPLOY the cookie-banner language-switch fix** (2026-08-23, later session;
+no SQL). Owner-reported: accepting cookies did not stick when switching EN↔ES.
+Reproduced, root-caused, fixed and verified locally — see `CHANGELOG.md`
+2026-08-23 (cookie banner entry).
+
+Files: `lib/cookie-consent.ts` (new), `components/legal/CookieNotice.tsx`,
+`components/legal/CookiePreferencesClient.tsx`, `app/[locale]/layout.tsx`
+(comment only), `app/globals.css` (comment only), and
+`lib/__tests__/cookie-consent-gate.test.ts` (new, 15 tests, mutation-tested).
+
+Gate from a deleted `.next`: `tsc` clean · `lint` clean · **1101/1101 across
+108 files** · build **456/456 static pages** (unchanged — no new routes).
+
+⚠️ **Staging has NOT been re-synced for this change.** Do that before the copy.
+
+**After deploying, one 20-second check on the live site** (this is the whole
+bug, and it is trivial to confirm): accept the banner, click **ES**, confirm it
+does not come back; click **EN**, same. Then in a private window, DON'T accept,
+switch language, and confirm the banner IS still there — that negative control
+is the one that matters, because a fix that over-hides would look identical on
+the first check.
+
+⛔ Do not "simplify" the new re-stamp as a duplicate of the inline `<head>`
+script. They cover different events: the script covers page loads, the effect
+covers soft navigation. The guard test fails if the layout effect is downgraded
+to `useEffect` or its `[locale]` key is dropped.
+
+0. ✅ **FINAL STATE DEPLOYED 2026-08-23 (owner's choice): a11y/BP sweep +
+   hero-reveal batch, nothing else.** Front-card pin reverted after its one
+   PSI run read 72. Post-deploy PSI mobile: **98** (LCP 1.7s green — best run
+   of the day) and **80** (4.3s, banner mode); desktop that session: 86 (a
+   TBT-noise draw; 96–98 earlier). A11y/BP/SEO held 100/100/100 in every run
+   all day. The lab perf number remains a distribution, not a constant —
+   treat single runs accordingly; CrUX field data (currently No Data) is the
+   number that will matter. No further lab-score work planned unless the
+   owner asks; untested levers remain listed in the CHANGELOG front-card
+   revert entry. The owner chose
    the state that loads fastest in practice over further lab-score chasing.
    After deploy the site is: a11y/BP sweep + hero-reveal batch, nothing else.
    Lab expectation: ~79–81 typical with a known ~71–73 tail that NO tested

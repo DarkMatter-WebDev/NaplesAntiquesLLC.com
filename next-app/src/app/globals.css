@@ -663,6 +663,51 @@ button:focus-visible > .hover-underline-grow,
   box-shadow: 0 0 0 4px rgba(233, 195, 73, 0.45);
 }
 
+/* Ink counterpart to .gold-button, for a secondary action that still needs to
+   read as a button rather than a link — the homepage Visit Us phone pill beside
+   Get Directions. Deliberately NOT .outline-button there: two pills of equal
+   visual weight would make the section ask which one to press, and the phone
+   number is the one that has always converted.
+
+   Same geometry as .gold-button on purpose, so a row of the two aligns without
+   per-button overrides. */
+.dark-button {
+  background: var(--color-on-surface);
+  color: #ffffff;
+  font-family: var(--font-label);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.65rem 1.5rem;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  text-decoration: none;
+  box-shadow: 0 12px 26px rgba(26, 28, 28, 0.16);
+  transition: filter 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.dark-button:hover {
+  filter: brightness(1.35);
+  box-shadow: 0 14px 30px rgba(26, 28, 28, 0.22);
+  transform: translateY(-1px);
+}
+.dark-button:active {
+  transform: scale(0.95);
+  transition-duration: 0.05s;
+}
+/* Gold ring, not the default: the button is already near-black, so a dark
+   browser focus ring on it is invisible. */
+.dark-button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(115, 92, 0, 0.35);
+}
+
 .detail-cart-button {
   background: #0f5f46;
   color: #ffffff;
@@ -2948,7 +2993,9 @@ html.nej-hero-go .home-boot-splash {
    paints with first paint (it was the mobile LCP element while it waited for
    hydration — see CookieNotice.tsx). The inline <head> script in
    [locale]/layout.tsx stamps this attribute from localStorage before first
-   paint, so returning visitors never see a flash; Accept stamps it live. */
+   paint, so returning visitors never see a flash; Accept stamps it live; and
+   CookieNotice re-stamps it before paint on a client-side language switch,
+   which remounts the layout and drops the attribute. */
 html[data-nej-cookies-ok] [data-cookie-notice] {
   display: none;
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo';
 import { jsonLdHtml } from '@/lib/json-ld';
-import { mapsUrl } from '@/lib/business-location';
+import { cityLine, mapsUrl, streetLine } from '@/lib/business-location';
 import { VISIT_ANCHOR_ID } from '@/lib/home-anchors';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -11,8 +11,8 @@ import { CardGrid, PageContainer, Section } from '@/components/layout/Responsive
 import HomeHeroStack from '@/components/home/HomeHeroStack';
 import HomeBootSplash from '@/components/home/HomeBootSplash';
 import ClayMark from '@/components/ClayMark';
+import { AppIcon } from '@/components/AppIcon';
 import ShowroomMap from '@/components/ShowroomMap';
-import ShowroomAddress from '@/components/ShowroomAddress';
 import ShowroomHours from '@/components/ShowroomHours';
 import CopyAddressButton from '@/components/CopyAddressButton';
 import TestimonialsSection from '@/components/home/TestimonialsSection';
@@ -459,107 +459,153 @@ export default async function HomePage({ params }: Props) {
             a hardcoded 56/72px, because that token changes at the md breakpoint. */}
         <Section
           id={VISIT_ANCHOR_ID}
-          className="text-center border-t"
+          className="border-t"
           style={{
             borderColor: 'var(--color-outline-variant)',
             scrollMarginTop: 'var(--site-header-height)',
           }}
         >
-          <PageContainer max="narrow">
-          <p
-            className="text-[0.65rem] font-bold uppercase tracking-[0.35em] mb-4"
-            style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
-          >
-            {isEs ? 'Llámenos o Visítenos Hoy' : 'Call or Visit Us Today'}
-          </p>
-          <a
-            href="tel:2394048505"
-            className="responsive-title-lg font-bold transition-opacity hover:opacity-70"
-            style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
-          >
-            (239) 404-8505
-          </a>
-          {/* The invitation to walk in. This block said "Call Us Today" and gave
-              a phone number and nothing else until 2026-08-18 — a storefront the
-              homepage never actually invited anyone into.
+          <PageContainer max="content">
+          {/* Two columns: the details you act on, beside the map that
+              orients you. It was a single narrow centred stack until
+              2026-08-23 — phone number, sentence, address, two hours rows and
+              a square map, all down one axis, which is why the hours were
+              grouped into two lossy rows: seven would have pushed the map off
+              the fold. The second column is what pays for the full week.
 
-              ⚠️ It says "during showroom hours", NOT "no appointment needed".
-              Both are true on a Tuesday and false on a Sunday, and "today" is
-              read on whatever day the visitor lands. The hours line two
-              elements below is what makes the sentence honest, so do not
-              separate them. */}
-          {/* A deck, not body copy. Everything under the phone number was one
-              flat grey mass until 2026-08-18; this line is the section's second
-              voice, so it takes the full-strength text colour while the details
-              below stay quiet.
+              ⚠️ This section is `max="content"` where the block before it runs
+              narrower. That is deliberate — the width IS the feature here. */}
+          <div className="grid gap-12 lg:grid-cols-2 lg:items-start lg:gap-16">
 
-              ⚠️ Colour ONLY — it was 600 weight for part of 2026-08-18 and read
-              as shouting (owner, same day). Two lines of bold directly under a
-              30px phone number is two headlines arguing. The colour lift alone
-              is what separates it from the details; do not re-add the weight. */}
-          <p
-            className="responsive-copy mt-6 max-w-xl mx-auto"
-            style={{ color: 'var(--color-on-surface)' }}
-          >
-            {isEs
-              ? 'Visítenos hoy: pase por nuestro salón en Naples durante el horario de atención, o llámenos antes y concertamos una cita privada.'
-              : 'Visit us today — walk into our Naples showroom during opening hours, or call ahead and we\'ll set a private appointment.'}
-          </p>
-          {/* Real address + real hours. Read "Naples, Florida · Mon–Sat · By
-              appointment" until 2026-08-17 — the day part was simply false, and
-              it named no address at all. Strings come from
-              lib/business-location.ts; the landmark is deliberate wayfinding. */}
-          {/* Address and hours share one block: they are the same KIND of fact
-              — the practical detail you act on after the invitation — and
-              grouping them is what stops the section flattening into a grey
-              list.
-
-              ⚠️ ONE rule, on top. It was bracketed top AND bottom for part of
-              2026-08-18 and read as a stray box (owner, same day). A single
-              short rule reads as "detail follows"; closing the bottom turns it
-              into a container competing with the map right beneath it. The map
-              already supplies the lower edge. Do not re-add `border-b`. */}
-          <div
-            className="mt-8 inline-block border-t pt-5 text-sm"
-            style={{ borderColor: 'var(--color-outline-variant)' }}
-          >
-            {/* ⚠️ The copy button is a SIBLING of the maps link, never inside
-                it. A <button> nested in an <a> is invalid HTML, and browsers
-                resolve it by breaking one of the two — usually leaving a
-                control that navigates instead of copying. */}
-            <div
-              className="flex items-start justify-center gap-2"
-              style={{ color: 'var(--color-on-surface)' }}
-            >
-              <a
-                href={mapsUrl()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover-underline-grow"
-                style={{ color: 'inherit' }}
+            {/* LEFT — what a visitor acts on, in the order they need it:
+                where, when, what to expect, then how to start. */}
+            <div>
+              <p
+                className="flex items-center gap-3 text-[0.65rem] font-bold uppercase tracking-[0.32em]"
+                style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
               >
-                <ShowroomAddress locale={locale} />
-              </a>
-              <CopyAddressButton locale={locale} />
+                {/* Rule then label. Decorative, so it is hidden from the
+                    accessibility tree rather than read as stray punctuation. */}
+                <span aria-hidden="true" className="inline-block h-px w-8 flex-shrink-0" style={{ background: 'var(--color-primary)' }} />
+                {isEs ? 'Visítenos' : 'Visit Us'}
+              </p>
+
+              {/* ⚠️ A real <h2>. The old block opened on a styled <p> and a
+                  phone-number <a>, so this section contributed no heading to the
+                  page outline at all. */}
+              <h2
+                className="responsive-title-lg mt-4 font-bold tracking-tight"
+                style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)', lineHeight: 1.06 }}
+              >
+                {isEs ? 'Venga a Vernos' : 'Come See Us'}
+                <span className="block" style={{ color: 'var(--color-primary)' }}>
+                  {isEs ? 'Hoy.' : 'Today.'}
+                </span>
+              </h2>
+
+              {/* The address leads now, where the phone number used to.
+                  ⚠️ This REVERSES the rule that stood here until 2026-08-23
+                  (the details "must not out-weigh the phone number this section
+                  exists to show"), on the owner's call: there is a storefront to
+                  walk into, and the phone keeps a full-size button below. Do not
+                  restore the old hierarchy without asking — it is a decision,
+                  not drift.
+
+                  ⚠️ The copy button is a SIBLING of the maps link, never
+                  inside it: a <button> nested in an <a> is invalid HTML, and
+                  browsers resolve it by breaking one of the two. */}
+              <div className="mt-8 flex items-start gap-2">
+                <a
+                  href={mapsUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover-underline-grow text-[1.35rem] font-bold leading-tight sm:text-2xl"
+                  style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
+                >
+                  {streetLine()}
+                </a>
+                <CopyAddressButton locale={locale} />
+              </div>
+              {/* City only. The shared-suite landmark was removed here on
+                  2026-08-23 at the owner's request — it is not part of the
+                  postal address, and he does not want it on this block. */}
+              <p className="mt-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                {cityLine()}
+              </p>
+
+              {/* All seven days now — see the note above on why the grouped
+                  pair existed. `highlightToday` marks the current day AFTER
+                  mount, in the showroom's timezone; it stays off everywhere
+                  else so the footer's copy remains a server component. */}
+              <ShowroomHours
+                locale={locale}
+                variant="full"
+                layout="rows"
+                highlightToday
+                className="mt-8"
+              />
+
+              {/* ⚠️ Every one of these must be TRUE and traceable to something
+                  the site already says. "Free parking" is deliberately absent:
+                  it is true, but the owner's call is that it is assumed in this
+                  area and not worth a slot. Do not pad this row to fill it. */}
+              <ul
+                className="mt-8 flex flex-wrap gap-x-6 gap-y-2.5 border-t pt-6"
+                style={{ borderColor: 'var(--color-outline-variant)' }}
+              >
+                {(isEs
+                  ? ['Sin cita previa', 'Citas privadas', 'Recogida local gratis', 'Visitas a domicilio a pedido']
+                  : ['Walk-Ins Welcome', 'Private Appointments', 'Free Local Pickup', 'Home Visits on Request']
+                ).map((feature) => (
+                  <li
+                    key={feature}
+                    className="text-[0.62rem] font-bold uppercase tracking-[0.16em]"
+                    style={{ color: 'var(--color-on-surface-variant)', fontFamily: 'var(--font-label)' }}
+                  >
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-8 flex flex-wrap gap-3">
+                <a href={mapsUrl()} target="_blank" rel="noopener noreferrer" className="gold-button">
+                  {isEs ? 'Cómo Llegar' : 'Get Directions'}
+                </a>
+                {/* The phone keeps its own tap target rather than becoming body
+                    text — it is still the action most visitors take. */}
+                <a href="tel:2394048505" className="dark-button">
+                  <AppIcon name="call" />
+                  (239) 404-8505
+                </a>
+              </div>
+
+              <p className="mt-5 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                {isEs ? 'O escríbanos a ' : 'Or email us at '}
+                <a
+                  href="mailto:info@naplesestatejewelry.com"
+                  className="hover-underline-grow"
+                  style={{ color: 'var(--color-primary)' }}
+                >
+                  info@naplesestatejewelry.com
+                </a>
+              </p>
             </div>
-            {/* `grouped`, not `full`, and this is the ONLY surface that uses it.
-                The footer, contact and About all list seven days, because those
-                are places someone consults before driving over. This is a
-                call-to-action with a phone number, a sentence and a map stacked
-                in one narrow column — a seven-row table here would out-weigh
-                the phone number and push the map off the fold. If the two-row
-                form ever reads as evasive, switch it to `full`; the component
-                takes the same props. */}
-            <div className="mt-4" style={{ color: 'var(--color-on-surface)' }}>
-              <ShowroomHours locale={locale} variant="grouped" />
+
+            {/* RIGHT — orientation, then the map. */}
+            <div>
+              <p className="responsive-copy" style={{ color: 'var(--color-on-surface-variant)' }}>
+                {isEs
+                  ? 'Estamos en Shirley St, justo al norte de Pine Ridge Rd, con estacionamiento en la puerta. Pase durante el horario de atención, o llámenos antes y concertamos una cita privada.'
+                  : 'We’re on Shirley St just north of Pine Ridge Rd, with parking right at the door. Walk in during showroom hours, or call ahead and we’ll set a private appointment.'}
+              </p>
+              {/* Still SQUARE and still lazy — both are recorded decisions. The
+                  square replaced a letterbox that showed a corridor of Shirley
+                  St with no context north or south of the door, and lazy keeps a
+                  heavy third-party frame off the critical path. It only grows to
+                  fill the wider column. */}
+              <ShowroomMap locale={locale} maxWidth="34rem" className="mt-7" />
             </div>
           </div>
-          {/* Deliberately small, and deliberately last. The address above is
-              already a link to directions, so this is orientation ("which part
-              of Naples"), not navigation — it must not out-weigh the phone
-              number this section exists to show. It lazy-loads, which is what
-              keeps a third-party frame off the homepage's critical path. */}
-          <ShowroomMap locale={locale} className="mt-8" />
           </PageContainer>
         </Section>
 
