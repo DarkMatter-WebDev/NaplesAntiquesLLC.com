@@ -1,6 +1,57 @@
 
 # Changelog
 
+## 2026-08-24 — Bot-signup audit: five bot accounts deleted, Turnstile gate built (NOT YET ACTIVE)
+
+Five bot accounts (random-consonant names, dot-permutation Gmail addresses,
+one every ~3 hours: `poo.re.don@`, `d.oc.to.r.r.it.a.st.arri.tt@`, `cj_slip@`,
+`damont.u.r.l.ey.676@`, `enclaved@swva.net`) were deleted from the admin Users
+page, each verified by name in its confirmation dialog before deleting. Post
+state: 3 accounts / 3 reachable / 1 admin.
+
+**Root cause of the exposure:** sign-up calls `supabase.auth.signUp()` from
+the browser with the public anon key, so bots POST JSON straight to Supabase's
+`/auth/v1/signup` — no route of ours, no edge function, and none of the
+2026-08-22 `spam-heuristics.ts` layer is in that path. The profile trigger
+then creates a `profiles` row (confirmed or not) with `marketing_opt_out =
+false`, so every bot lands in the marketing audience as "Reachable"
+(`buildMarketingAudience()` never checks email confirmation — still true, the
+Phase 2 filter is open in `TASKS.md`).
+
+**The fix built this session — Cloudflare Turnstile on Supabase Auth,
+deployed inert:**
+
+- New `components/account/TurnstileWidget.tsx` — singleton script loader,
+  explicit render, single-use-token reset handling, ES/EN. Renders NOTHING
+  and sends no token while `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is unset, so this
+  deploy changes zero user-facing behavior.
+- Wired into all four client auth calls: sign-up (`signUp` + its
+  existing-account reset offer), sign-in (`signInWithPassword`, plus a
+  friendly captcha error string), reset-password request form
+  (`resetPasswordForEmail`). Submit buttons gate on a token only when the
+  site key is configured. Every auth failure path calls `reset()` because
+  Turnstile tokens are single-use.
+- The reset-password UPDATE form (authenticated recovery session) is
+  deliberately not gated.
+- CSP: `https://challenges.cloudflare.com` added to `script-src` and
+  `frame-src` in BOTH `next-app/next.config.ts` and root `netlify.toml`.
+- `ACCOUNT_SETUP.md` documents the new env var and the activation order.
+
+**Enabled-state verified locally, not just the inert state:** with
+Cloudflare's universal always-pass test key in `.env.local` (removed after),
+the script loaded through the new CSP, the widget rendered on sign-up and
+sign-in (EN and ES), minted a token, and the submit gating released. The
+signed-out reset request form was verified by pattern only (an admin session
+forces update mode locally).
+
+**Gates:** `tsc` clean · `lint` clean · **1125/1125 across 109 files** ·
+build **456/456 static pages**.
+
+⛔ **Activation order is load-bearing** (see `TASKS.md`): deploy + Netlify
+site key FIRST, Supabase CAPTCHA toggle LAST. The toggle makes GoTrue demand
+a token on every auth call, so flipping it before the code ships breaks
+sign-in for everyone.
+
 ## 2026-08-24 — Session close: everything deployed, verification record
 
 Two deploys today. The five-batch release (cookie/language fix, order-email

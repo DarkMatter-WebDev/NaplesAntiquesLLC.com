@@ -8,6 +8,19 @@
 
 **Read this, then `TASKS.md`.**
 
+### 🆕 2026-08-24 (later session) — bot signups: cleaned up, gate built, NOT yet active
+
+Five bot accounts (created via direct anon-key calls to Supabase
+`/auth/v1/signup`, one every ~3h) were **deleted from admin** — the Users
+page now shows 3 accounts / 1 admin, all real. A Cloudflare Turnstile gate on
+all four client auth calls is **built, gated, tested (1125/1125, 456/456) and
+deployed-inert**: it does nothing until `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
+exists AND the Supabase CAPTCHA toggle is on. ⛔ The activation ORDER matters
+(code+key first, Supabase toggle last) — the exact runbook is the top item in
+`TASKS.md`. Until activated, nothing stops the next bot; expect new junk rows
+at ~3h cadence until then. Also still true: `buildMarketingAudience()` counts
+unconfirmed accounts as Reachable — the Phase 2 filter is listed in `TASKS.md`.
+
 ### The shape, in one glance
 
 ✅ **EVERYTHING IS DEPLOYED (2026-08-24). Nothing is undeployed, no outstanding

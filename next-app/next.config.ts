@@ -10,11 +10,13 @@ const CONTENT_SECURITY_POLICY = [
   "form-action 'self'",
   "frame-ancestors 'none'",
   "img-src 'self' data: blob: https://evzluixourmsefwdsieu.supabase.co https://s3.tradingview.com https://*.tradingview.com https://*.paypal.com https://*.paypalobjects.com https://*.cloudflarestream.com https://*.videodelivery.net",
-  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''} https://s3.tradingview.com https://www.paypal.com https://*.paypalobjects.com`,
+  // challenges.cloudflare.com is Turnstile (Supabase Auth CAPTCHA) — it needs
+  // script-src AND frame-src, and must match root netlify.toml (two-CSP rule).
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''} https://s3.tradingview.com https://www.paypal.com https://*.paypalobjects.com https://challenges.cloudflare.com`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "connect-src 'self' https://evzluixourmsefwdsieu.supabase.co https://api.gold-api.com https://s3.tradingview.com https://*.tradingview.com https://*.tradingview-widget.com https://*.paypal.com https://*.cloudflarestream.com https://*.videodelivery.net",
-  "frame-src https://*.tradingview.com https://*.tradingview-widget.com https://*.paypal.com https://*.cloudflarestream.com https://*.videodelivery.net https://www.google.com https://maps.google.com",
+  "frame-src https://*.tradingview.com https://*.tradingview-widget.com https://*.paypal.com https://*.cloudflarestream.com https://*.videodelivery.net https://www.google.com https://maps.google.com https://challenges.cloudflare.com",
   "media-src 'self' blob: https://*.cloudflarestream.com https://*.videodelivery.net",
   "worker-src 'self' blob:",
 ].join('; ');

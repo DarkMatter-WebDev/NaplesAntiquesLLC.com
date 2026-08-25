@@ -58,6 +58,12 @@ Required public values:
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_SITE_URL=
+# Cloudflare Turnstile SITE key (public by design) — bot gate on the auth
+# forms. Unset = widget renders nothing, auth calls send no token. The SECRET
+# key lives only in the Supabase dashboard (Auth -> Attack Protection), never
+# in this repo or Netlify. Deploy the site key BEFORE enabling the Supabase
+# CAPTCHA toggle, or sign-in breaks for everyone.
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=
 ```
 
 Server-only values, if enabled:

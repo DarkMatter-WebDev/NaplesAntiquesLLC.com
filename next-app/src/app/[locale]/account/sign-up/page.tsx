@@ -1,12 +1,13 @@
 ﻿'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import SiteHeader from '@/components/layout/SiteHeader';
 import { createClient } from '@/lib/supabase/client';
 import { AppIcon } from '@/components/AppIcon';
 import PasswordInput from '@/components/account/PasswordInput';
+import TurnstileWidget, { turnstileEnabled, type TurnstileHandle } from '@/components/account/TurnstileWidget';
 
 const MODERN_AUTH_STYLES = `
   .modern-auth-page {
@@ -138,6 +139,10 @@ export default function SignUpPage() {
   const [existingEmail, setExistingEmail] = useState<string | null>(null);
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  // Bot gate (see TurnstileWidget). Null until the widget mints a token; every
+  // Supabase auth call below consumes the token, so failures must reset().
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<TurnstileHandle>(null);
 
   function clearExistingAccountNotice() {
     if (existingEmail) setExistingEmail(null);
@@ -172,6 +177,7 @@ export default function SignUpPage() {
       email,
       password,
       options: {
+        captchaToken: captchaToken ?? undefined,
         data: {
           full_name: fullName,
           terms_accepted_at: acceptedAt,
@@ -182,6 +188,9 @@ export default function SignUpPage() {
     });
 
     if (authError) {
+      // The token was consumed by the failed attempt; mint a fresh one so the
+      // user's retry isn't rejected for a stale captcha.
+      captchaRef.current?.reset();
       // Some Supabase configurations return an explicit "already registered" error.
       if (/already\s*(registered|exists)|already\s*in\s*use/i.test(authError.message)) {
         setExistingEmail(email);
@@ -198,6 +207,9 @@ export default function SignUpPage() {
     // email. That empty array is the signal the email is already taken.
     const identities = data?.user?.identities;
     if (data?.user && Array.isArray(identities) && identities.length === 0) {
+      // This "successful" response still consumed the token; the reset offer
+      // below makes another auth call, so it needs a fresh one.
+      captchaRef.current?.reset();
       setExistingEmail(email);
       setLoading(false);
       return;
@@ -213,8 +225,13 @@ export default function SignUpPage() {
 
     const supabase = createClient();
     const redirectTo = `${window.location.origin}${prefix}/account/reset-password`;
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(existingEmail, { redirectTo });
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(existingEmail, {
+      redirectTo,
+      captchaToken: captchaToken ?? undefined,
+    });
 
+    // Consumed either way — keep a fresh token available for any further attempt.
+    captchaRef.current?.reset();
     setResetLoading(false);
     if (resetError) {
       setError(resetError.message);
@@ -375,7 +392,7 @@ export default function SignUpPage() {
                   <button
                     type="button"
                     onClick={handleSendReset}
-                    disabled={resetLoading}
+                    disabled={resetLoading || (turnstileEnabled && !captchaToken)}
                     className="modern-auth-submit disabled:opacity-60"
                   >
                     {resetLoading ? (isEs ? 'Enviando enlace…' : 'Sending reset link...') : (isEs ? 'Restablecer Contraseña' : 'Reset Password')}
@@ -391,9 +408,11 @@ export default function SignUpPage() {
               <p className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</p>
             )}
 
+            <TurnstileWidget ref={captchaRef} onToken={setCaptchaToken} isEs={isEs} />
+
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (turnstileEnabled && !captchaToken)}
               className="modern-auth-submit mt-2 disabled:opacity-60"
             >
               {loading ? (isEs ? 'Creando cuenta…' : 'Creating account...') : (isEs ? 'Crear Cuenta' : 'Create Account')}

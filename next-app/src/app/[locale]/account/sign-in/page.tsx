@@ -8,6 +8,7 @@ import SiteHeader from '@/components/layout/SiteHeader';
 import { createClient } from '@/lib/supabase/client';
 import { AppIcon } from '@/components/AppIcon';
 import PasswordInput from '@/components/account/PasswordInput';
+import TurnstileWidget, { turnstileEnabled, type TurnstileHandle } from '@/components/account/TurnstileWidget';
 
 // Map raw Supabase auth errors to friendly, human copy so shoppers never see
 // developer-facing strings like "Invalid login credentials".
@@ -28,6 +29,11 @@ function friendlyAuthError(message: string, isEs: boolean): string {
       ? 'Demasiados intentos. Espere un momento e intente de nuevo.'
       : 'Too many attempts. Please wait a moment and try again.';
   }
+  if (m.includes('captcha')) {
+    return isEs
+      ? 'No se pudo completar la verificación de seguridad. Intente de nuevo.'
+      : "The security check didn't complete. Please try again.";
+  }
   return isEs
     ? 'No pudimos iniciar sesión. Verifique sus datos e intente de nuevo.'
     : "We couldn't sign you in. Please check your details and try again.";
@@ -46,6 +52,10 @@ export default function SignInPage() {
   // shouldn't trigger a re-render — and reading it in an effect keeps it off the
   // server (no window there) without a hydration mismatch.
   const nextUrlRef = useRef<string | null>(null);
+  // Bot gate (see TurnstileWidget). Tokens are single-use — a failed sign-in
+  // consumes one, so the error path resets the widget for the retry.
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<TurnstileHandle>(null);
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search).get('next');
@@ -58,9 +68,14 @@ export default function SignInPage() {
     setError(null);
 
     const supabase = createClient();
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: { captchaToken: captchaToken ?? undefined },
+    });
 
     if (authError) {
+      captchaRef.current?.reset();
       setError(friendlyAuthError(authError.message, isEs));
       setLoading(false);
       return;
@@ -132,9 +147,11 @@ export default function SignInPage() {
               <p className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</p>
             )}
 
+            <TurnstileWidget ref={captchaRef} onToken={setCaptchaToken} isEs={isEs} />
+
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (turnstileEnabled && !captchaToken)}
               className="modern-auth-submit mt-2 disabled:opacity-60"
             >
               {loading ? (isEs ? 'Iniciando sesión…' : 'Signing in…') : (isEs ? 'Iniciar Sesión' : 'Sign In')}

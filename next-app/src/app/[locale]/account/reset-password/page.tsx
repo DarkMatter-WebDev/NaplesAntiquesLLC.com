@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import SiteHeader from '@/components/layout/SiteHeader';
 import { createClient } from '@/lib/supabase/client';
 import { AppIcon } from '@/components/AppIcon';
 import PasswordInput from '@/components/account/PasswordInput';
+import TurnstileWidget, { turnstileEnabled, type TurnstileHandle } from '@/components/account/TurnstileWidget';
 
 const RESET_AUTH_STYLES = `
   .modern-auth-page {
@@ -102,6 +103,12 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [requestSent, setRequestSent] = useState(false);
   const [updated, setUpdated] = useState(false);
+  // Bot gate for the REQUEST form only (see TurnstileWidget) — this endpoint
+  // emails whatever address is typed in, so it needs the same gate as sign-up.
+  // The UPDATE form runs inside an authenticated recovery session and is not
+  // captcha-gated by Supabase.
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<TurnstileHandle>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -144,8 +151,13 @@ export default function ResetPasswordPage() {
 
     const supabase = createClient();
     const redirectTo = `${window.location.origin}${prefix}/account/reset-password`;
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo,
+      captchaToken: captchaToken ?? undefined,
+    });
 
+    // Consumed either way — mint a fresh token for any further attempt.
+    captchaRef.current?.reset();
     setLoading(false);
     if (resetError) {
       setError(resetError.message);
@@ -313,7 +325,9 @@ export default function ResetPasswordPage() {
             <p className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</p>
           )}
 
-          <button type="submit" disabled={loading} className="modern-auth-submit mt-2 disabled:opacity-60">
+          <TurnstileWidget ref={captchaRef} onToken={setCaptchaToken} isEs={isEs} />
+
+          <button type="submit" disabled={loading || (turnstileEnabled && !captchaToken)} className="modern-auth-submit mt-2 disabled:opacity-60">
             {loading ? (isEs ? 'Enviando enlace…' : 'Sending reset link...') : (isEs ? 'Enviar Enlace' : 'Send Reset Link')}
           </button>
         </form>

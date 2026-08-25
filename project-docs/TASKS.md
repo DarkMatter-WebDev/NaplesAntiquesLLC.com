@@ -5,6 +5,44 @@
 
 ## ◻ OPEN — needs a human
 
+🔴 **DEPLOY the Turnstile bot gate, then ACTIVATE it — order is load-bearing**
+(2026-08-24; no SQL). Five bot accounts were created via direct calls to
+Supabase's `/auth/v1/signup` (the anon key is public; no route of ours is in
+that path). The five were deleted from admin the same day. The code is built,
+tested (1125/1125, build 456/456) and **inert** until activated.
+
+Activation, in this exact order:
+
+1. Deploy this batch (widget + CSP for `challenges.cloudflare.com` in both
+   `next.config.ts` and root `netlify.toml`).
+2. Cloudflare dashboard → Turnstile → create a widget for
+   `naplesestatejewelry.com` (+ `localhost` for dev), **Managed** mode. Free.
+3. Netlify → set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (the SITE key — public by
+   design) → redeploy so it inlines.
+4. Supabase dashboard → Authentication → Attack Protection → enable CAPTCHA,
+   provider Turnstile, paste the SECRET key (lives ONLY there — never in the
+   repo or Netlify).
+5. Verify: sign-in works with your real account on `.com` (EN + ES); a raw
+   `curl` POST to `/auth/v1/signup` without a token is rejected; bot cadence
+   was ~every 3h, so 24 quiet hours on `/admin/users` confirms.
+
+⛔ **Never flip step 4 before steps 1–3 are live** — GoTrue then demands a
+token no deployed form is sending, and sign-in breaks for everyone. Roll back
+by turning the Supabase toggle OFF (tokens sent to a toggle-off project are
+ignored, so the code side never needs reverting).
+
+◻ **Phase 2 hardening (after activation):**
+
+- Exclude never-confirmed accounts from `buildMarketingAudience()`
+  (`lib/marketing.ts` selects all `profiles` with `marketing_opt_out = false`;
+  bot leftovers read as "Reachable" until confirmed-email is checked).
+- Tighten Supabase Auth rate limits (dashboard).
+- Optional: "unconfirmed" badge on the admin Users table.
+- 30-second check while in the Supabase dashboard: Auth → Emails — confirm
+  whether auth emails use Supabase's built-in mailer or custom SMTP. If
+  custom SMTP ever points at Resend, bot signups burn `.com` sender
+  reputation directly.
+
 ✅ **DEPLOYED 2026-08-24 — the invoice heading fix** (`SUBJECT_HEADING_PX` 28 →
 20). Email-only, so the real check is the next invoice/receipt that goes out.
 Post-deploy smoke check passed: 7 routes 200, CSP intact, one `<h1>`.
