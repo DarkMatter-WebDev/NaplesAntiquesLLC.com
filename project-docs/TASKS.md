@@ -5,12 +5,9 @@
 
 ## ◻ OPEN — needs a human
 
-🔴 **DEPLOY the invoice heading size change** (2026-08-24, after the main
-deploy; no SQL). One constant: `SUBJECT_HEADING_PX` 28 → 20 in
-`lib/order-invoice-email.ts`, because that `<h1>` prints the generated subject
-and wrapped to four lines on a phone. **Email-only — nothing on the site
-changes**, so there is nothing to smoke-test on the web after deploying; the
-check is the next invoice/receipt that goes out. Staging is synced.
+✅ **DEPLOYED 2026-08-24 — the invoice heading fix** (`SUBJECT_HEADING_PX` 28 →
+20). Email-only, so the real check is the next invoice/receipt that goes out.
+Post-deploy smoke check passed: 7 routes 200, CSP intact, one `<h1>`.
 
 ✅ **DEPLOYED AND VERIFIED ON PRODUCTION 2026-08-24.** All five batches are live.
 The reported cookie/language bug was re-exercised as a user on the live site in

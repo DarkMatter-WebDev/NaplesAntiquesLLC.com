@@ -1,7 +1,40 @@
 
 # Changelog
 
-## 2026-08-24 — Invoice email heading 28px → 20px (UNDEPLOYED)
+## 2026-08-24 — Session close: everything deployed, verification record
+
+Two deploys today. The five-batch release (cookie/language fix, order-email
+fixes, pickup block, homepage Visit Us rebuild, contact-page match + landmark
+removal + dev warning filter), then the invoice heading fix.
+
+**Gates run on the final tree, from a deleted `.next`:**
+
+```
+npx tsc --noEmit      clean
+npm run lint          clean
+npx vitest run        1125/1125 passed (109 files)
+npm run build         456/456 static pages
+```
+
+**Production verified after both deploys** — full evidence table in
+`CURRENT_STATUS.md`. Headline items: the reported cookie/language bug exercised
+as a user in both directions with the negative control passing; 7–9 routes 200;
+one `<h1>` per page; every JSON-LD block parsing; CSP `frame-src` intact so the
+maps render; zero console errors on production.
+
+**Staging:** synced after every batch via the documented robocopy procedure
+(dry run → count sanity-check → copy → 0-remaining re-verify → leak check
+against a 177-`.tsx` positive control). Ends the session at **0 to copy**.
+
+**A real pickup invoice was sent** to `info@naplesestatejewelry.com` from
+production admin, which is what surfaced the manual-order trap recorded below.
+
+◻ **Still unexercised, all first-real-use:** no order email has been sent by a
+real customer transaction; the pickup block has not been seen in Outlook
+desktop; the new layouts have not been seen on real phone hardware; PSI has not
+been re-run (⛔ and single runs must not be reacted to).
+
+## 2026-08-24 — Invoice email heading 28px → 20px (DEPLOYED)
 
 Owner, after seeing the real invoice land: the main title was much too big. It
 prints the SUBJECT — "Invoice INV-20260824-ZCW89 from Naples Estate Jewelry" —
@@ -24,7 +57,7 @@ literal, which is why the constant exists.
 
 Gate: `tsc` clean · `lint` clean · **1125/1125** · build **456/456**.
 
-◻ **Undeployed** — this landed after the day's deploy, so it needs its own.
+✅ **Deployed 2026-08-24** in a second release after the day's main deploy.
 
 ## 2026-08-24 — Pickup block sent for real, and a manual-order trap found
 

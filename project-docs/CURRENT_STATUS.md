@@ -10,15 +10,19 @@
 
 ### The shape, in one glance
 
-✅ **ALL FIVE BATCHES ARE DEPLOYED AND VERIFIED ON PRODUCTION (2026-08-24).**
-No outstanding SQL.
+✅ **EVERYTHING IS DEPLOYED (2026-08-24). Nothing is undeployed, no outstanding
+SQL, and staging mirrors source exactly.** Six deploys' worth of work went out
+today across two rounds — the five batches below, then the invoice heading fix.
 
-🔴 **ONE SMALL THING IS UNDEPLOYED since then:** the invoice email's main
-heading, **28px → 20px** (`SUBJECT_HEADING_PX` in `order-invoice-email.ts`).
-Owner's call after seeing a real invoice — that `<h1>` prints the generated
-SUBJECT, so at 28px it wrapped to four lines and filled a phone screen before
-any content. Email-only; nothing on the site changes. Gate: `tsc`/`lint` clean ·
-**1125/1125** · **456/456**. Staging synced.
+**Second deploy (heading only):** the invoice email `<h1>` went **28px → 20px**
+(`SUBJECT_HEADING_PX` in `order-invoice-email.ts`). That heading prints the
+generated SUBJECT, so at 28px it wrapped to four lines and filled a phone screen
+before any content. **Email-only — nothing on the site changed**, so the real
+check is the next invoice or receipt that goes out, not a page load. Post-deploy
+smoke check passed anyway: `/`, `/es`, `/contact`, `/es/contact`, `/shop`,
+`/checkout`, `/sitemap.xml` all **200**, CSP `frame-src` still carries
+`maps.google.com`, homepage still exactly one `<h1>` with the Visit Us block
+serving.
 
 **The five, oldest first:** the cookie-banner language-switch fix; the
 order-email fixes (footer landmark, wrapping phone, shipping-method label); the
