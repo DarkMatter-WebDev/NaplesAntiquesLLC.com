@@ -1,6 +1,155 @@
 
 # Changelog
 
+## 2026-08-24 — Weak-GPU hero freeze: FPS watchdog + compositor housekeeping
+
+Owner report: the homepage carousel was very choppy on an older desktop, and it
+stayed choppy after load settled — confirmed weak GPU. Audited first (no code),
+then built with the owner's explicit choices: **freeze the ring on machines
+that can't keep up** + the housekeeping batch.
+
+**Why freezing is the only honest fix:** the spinning ring re-composites 8–10
+large clipped 3D layers every frame (desktop cards are
+`--cardW: clamp(26em, 29vw, 36em)` scaled ×1.42, each with
+`border-radius` + `overflow: hidden` forcing a clip mask per layer; live admin
+settings run `visibleCountDesktop: 12` with 8/10/10-item lineups, so every
+lineup item is on its ring). Spin SPEED is irrelevant — the transform changes
+every frame at any speed, so "slow it down" keeps the identical per-frame GPU
+cost. Measured groundwork from 2026-08-06 already ruled out the JS (per-frame
+writes are write-on-change; 1 rAF loop at rest).
+
+**1. FPS watchdog → freeze** (`src/lib/hero-frame-guard.ts`, wired into
+`carousel/components/Carousel.tsx`):
+
+- Runs inside the existing rAF `sample()` loop — no new loop. Warm-up ignores
+  the first 4s of deltas (AVIF decode + reveal blur jank on EVERY machine);
+  deltas > 250ms are discarded as gaps (hidden tab, paused pane), not slow
+  frames.
+- Trips on a **median > 40ms (~25fps) across a 60-frame tumbling window** —
+  median so GC hiccups can't trip it; 40ms so an honest 30Hz display (33ms)
+  and healthy mid-scroll crossings (~16.7ms median) never do.
+- On trip: `freezeHero()` latches (module flag + `sessionStorage
+  nej-hero-frozen`) and the carousel takes the existing `paused` path — CSS
+  animation paused, loop stopped, cards still spread (mount-time `sample()`
+  stamps facings/z-index, verified 13 front-facing cards on a frozen ring).
+  Scroll handover between panes still works: pane translates are cheap
+  single-layer moves; only the rings inside stop spinning.
+- Siblings converge by reading `isHeroFrozen()` per frame — but only a genuine
+  trip WRITES the latch, so `?heroFreeze=1` (force-preview) can never latch
+  itself permanent. `?heroFreeze=0` disables the guard AND ignores the latch,
+  for A/B on the affected machine itself.
+- One-way latch per session: later page views freeze immediately instead of
+  re-janking through a measurement window.
+
+**2. prefers-reduced-motion now fully stops the ring** (was slowed to 128s —
+which still re-composited every frame). CSS `animation-play-state: paused`
+covers pre-hydration; `Carousel.tsx` folds the same media query into the
+freeze path because the visibility observer's inline
+`animationPlayState = 'running'` would otherwise stomp the CSS rule after
+hydration. Trade accepted: if a lineup ever exceeds `visibleCount` again, a
+frozen ring never cycles the extra items for reduced-motion users (the marquee
+made the same trade when it removed repeats).
+
+**3. CustomerReveal releases `will-change` after the reveal**: new `done`
+state stamped ~800ms after `visible` (timeout, not `transitionend` — the
+transition can be skipped entirely under hidden-document or reduced-motion).
+`done` has NO CSS rules on purpose; natural styles equal the transition's end
+state. ⚠️ `done` had to join `revealElement`'s early-return guard or the
+MutationObserver re-sweep would restamp settled elements `pending` (opacity 0)
+and blank the page. Verified: 8 elements settle to `done`, computed
+`will-change: auto`, and the testimonial stretched-link overlay still covers
+its card (hit-test at card center returns `a.testimonial-google-link` — the
+containing-block risk was pre-cleared: `.testimonial-card` has its own
+`position: relative`).
+
+**4. Testimonial marquee pauses offscreen**: new `TestimonialMarqueeBand`
+client island (IO toggling `data-marquee-paused`, no state, no re-render; CSS
+rule does the pausing). Attribute + rule rather than inline style because an
+inline `'running'` would override the hover/focus pause rules. The "marquee
+movement is pure CSS" decision stands — the island adds only an off switch
+with zero per-frame cost. Verified: paused at load (band below fold), resumes
+scrolled into view, re-pauses back out.
+
+Files: `src/lib/hero-frame-guard.ts` (new),
+`src/lib/__tests__/hero-frame-guard.test.ts` (new, 11 tests),
+`carousel/components/Carousel.tsx`, `carousel/components/Carousel.module.css`,
+`src/components/layout/CustomerReveal.tsx`,
+`src/components/home/TestimonialMarqueeBand.tsx` (new),
+`src/components/home/TestimonialsSection.tsx`, `src/app/globals.css`.
+
+Gate on the final tree from a deleted `.next`: `tsc` clean · `lint` clean ·
+**1136/1136 across 110 files** · build **456/456 static pages**. Browser
+verification (dev): default = pane A running / B+C paused / no latch;
+`?heroFreeze=1` = all 3 rings paused, latch NOT written; reveal settles to
+`done`; marquee pause/resume both directions. ⚠️ NOT verified on the actual
+weak-GPU desktop — that is the deploy-time check.
+
+## 2026-08-24 — Supabase auth email moved off the built-in mailer onto Resend SMTP
+
+Found while closing out the bot-gate session: **Supabase auth emails
+(confirmation, password reset) had always used Supabase's built-in email
+service** — generic sender, a-few-per-hour rate cap, and the dashboard's own
+"not meant for production apps" warning. Real customers' confirmation emails
+were the exposure, not bots (the bots' emails never touched Resend — a silver
+lining of the old setup).
+
+⚠️ **The ordering mattered:** this was deliberately done AFTER the Turnstile
+gate went live. Custom SMTP before the gate would have let every bot signup
+fire a Resend send to a stranger from the `.com` domain.
+
+Configured (Supabase → Authentication → Emails → SMTP Settings): host
+`smtp.resend.com`, port 465, username `resend`, sender
+`"Naples Estate Jewelry" <noreply@naplesestatejewelry.com>`, min interval
+60s. Password is a NEW Resend API key `supabase-auth-smtp` — **sending-only,
+scoped to naplesestatejewelry.com** — created for this and pasted by the
+owner (write-only once saved; rotate, don't copy). Enabling custom SMTP also
+raised Supabase's email cap to 30/hour (adjustable).
+
+**Verified end-to-end:** a recovery email was triggered through the
+service-role admin path (`POST /auth/v1/recover` with the service key —
+bypasses the captcha gate, which correctly blocks the anon path) and Resend's
+log shows it **Delivered** to the owner's mailbox with the branded From
+address. Resend email id `2015dee4-ce30-42fb-b03e-45dd9c285207`.
+
+## 2026-08-24 — Turnstile gate ACTIVATED and verified (and the Browser-pane crash)
+
+Continuation of the entry below. The full activation ran end-to-end:
+
+- **Cloudflare**: widget "Naples Estate Jewelry auth" created via the owner's
+  Chrome (hostnames `naplesestatejewelry.com` + `localhost`, Managed mode,
+  no pre-clearance). Site key `0x4AAAAAAEa0eMDYdUm0JTws`.
+- **Netlify**: `NEXT_PUBLIC_TURNSTILE_SITE_KEY` added (all scopes/contexts).
+- ⚠️ **The first "deployed" push was stale** — the owner pushed the staging
+  folder from before this batch, so `main@83ea9f3` had zero Turnstile code
+  (proved by grepping every live `_next` chunk and the CSP header). The
+  staging robocopy dry-run showed exactly the session's 10 files; they were
+  copied (file-by-file after the `/MIR` write was permission-blocked), the
+  re-run dry run read 0 remaining, and the owner pushed `main@94fe20c`
+  ("turnstile update").
+- **Live-bundle verification, fully static**: chunk `1tjkow_9u70wi.js`
+  contains the Turnstile code AND the exact site key; the production CSP
+  header carries `challenges.cloudflare.com`. curl only — no JS executed.
+- **Owner** pasted the secret in Supabase (Attack Protection → CAPTCHA →
+  Turnstile) and saved.
+- **Negative controls (all pass)**: tokenless POSTs to `/auth/v1/signup`,
+  `/auth/v1/token?grant_type=password`, and `/auth/v1/recover` each return
+  **400 `captcha_failed`** — the bots' exact call path, plus the
+  reset-email-cannon path, both dead.
+
+🔴 **The Browser-pane crash, twice, forcing an app reinstall:** loading the
+live sign-up page in the in-app Browser pane crashed the Claude desktop app
+both times it was tried — the first real-key page loads ever attempted there.
+Cloudflare's own analytics confirm it: 2 challenges issued to source browser
+"**Electron**", 0 solved. The always-pass TEST key used in local dev never
+crashed anything, so dev testing does not predict this. ⛔ Durable rule (also
+in auto-memory): never load real-Turnstile pages in the Browser pane or any
+automated browser; verify with curl (bundle grep + CSP header) and the
+owner's own eyes.
+
+Remaining: one human sign-in on the live site; then the Phase 2 hardening
+items in `TASKS.md` (confirmed-email filter for the marketing audience, auth
+rate limits, unconfirmed badge, SMTP check).
+
 ## 2026-08-24 — Bot-signup audit: five bot accounts deleted, Turnstile gate built (NOT YET ACTIVE)
 
 Five bot accounts (random-consonant names, dot-permutation Gmail addresses,

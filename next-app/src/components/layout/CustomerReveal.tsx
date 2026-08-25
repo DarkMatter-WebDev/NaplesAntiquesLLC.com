@@ -78,10 +78,20 @@ function waitForBackground(url: string) {
 }
 
 function revealElement(element: HTMLElement, index: number) {
-  if (element.dataset.customerReveal === 'pending' || element.dataset.customerReveal === 'visible') return;
+  // 'done' must be in this guard: the MutationObserver re-runs the sweep, and
+  // without it every settled element would be re-stamped 'pending' (opacity 0)
+  // and vanish.
+  if (
+    element.dataset.customerReveal === 'pending' ||
+    element.dataset.customerReveal === 'visible' ||
+    element.dataset.customerReveal === 'done'
+  ) {
+    return;
+  }
 
+  const delayMs = Math.min(index, 7) * 70;
   element.dataset.customerReveal = 'pending';
-  element.style.setProperty('--customer-reveal-delay', `${Math.min(index, 7) * 70}ms`);
+  element.style.setProperty('--customer-reveal-delay', `${delayMs}ms`);
 
   // Lazy images are intentionally allowed to remain offscreen and unloaded.
   // Waiting for them here can hide an otherwise ready page indefinitely (for
@@ -92,9 +102,29 @@ function revealElement(element: HTMLElement, index: number) {
   const backgroundPromises = backgroundUrlsFor(element).map(waitForBackground);
   const fontsReady = 'fonts' in document ? document.fonts.ready.catch(() => undefined) : Promise.resolve();
   let hasRevealed = false;
+  let settleTimer: number | undefined;
 
   const commitReveal = () => {
     element.dataset.customerReveal = 'visible';
+
+    // Release the reveal's compositor hint once the transition has finished.
+    // 'visible' carries `will-change: opacity, transform, filter` (globals.css)
+    // — needed DURING the 620ms transition, but left on forever it pinned every
+    // revealed element as a compositor layer for the life of the page, which is
+    // real GPU memory pressure on weak machines (found in the 2026-08-24 weak-GPU
+    // hero audit). 'done' has NO CSS rules on purpose: natural styles are
+    // visually identical to the transition's end state (opacity 1, no transform,
+    // no blur), so the swap is invisible. A timeout rather than `transitionend`
+    // because the transition can be skipped entirely (hidden document commits
+    // immediately; reduced-motion forces transition: none) and the settle must
+    // still happen. 620ms matches the CSS duration — keep them in step.
+    if (settleTimer === undefined) {
+      settleTimer = window.setTimeout(() => {
+        if (element.dataset.customerReveal === 'visible') {
+          element.dataset.customerReveal = 'done';
+        }
+      }, delayMs + 620 + 180);
+    }
   };
 
   const reveal = () => {

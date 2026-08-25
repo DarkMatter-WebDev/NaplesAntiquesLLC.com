@@ -101,5 +101,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ring { animation-duration: 128s; }
+  /* Fully stopped, not merely slowed (was `animation-duration: 128s` until
+     2026-08-24): a slowed ring still re-composites every frame — the same
+     per-frame GPU cost as full speed — and reduced-motion users asked for no
+     motion, not gentler motion. This rule covers pre-hydration; after
+     hydration Carousel.tsx folds the same media query into its freeze path so
+     the inline `animationPlayState = 'running'` writes can never override it.
+     The ring rests at angle 0 with cards evenly spread, and the component's
+     mount-time sample() sets every card's facing/z-index without the loop. */
+  .ring { animation-play-state: paused; }
 }

@@ -1,11 +1,65 @@
 ﻿# Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-08-23**.
+> in `CHANGELOG.md`. Last reconciled: **2026-08-24**.
 
 ## ◻ OPEN — needs a human
 
-🔴 **DEPLOY the Turnstile bot gate, then ACTIVATE it — order is load-bearing**
+🔴 **DEPLOY the weak-GPU hero-freeze batch** (2026-08-24, latest session; no
+SQL). Owner-reported: the homepage carousel is very choppy on an older desktop
+with a weak GPU, and stays choppy after load settles. Built with the owner's
+explicit choices (freeze-the-ring + housekeeping): an FPS watchdog freezes the
+hero rings on machines that sustain a median frame time > 40ms (~25fps),
+prefers-reduced-motion now fully stops the ring instead of slowing it, the
+customer reveal releases its `will-change` ~800ms after revealing, and the
+testimonial marquee pauses while offscreen. Zero change on machines that keep
+up — verified: default local state is identical (pane A running, B/C paused,
+no latch). Detail: `CHANGELOG.md` 2026-08-24 (weak-GPU entry); durable rules:
+`DECISIONS.md` *"A machine that cannot hold the spin gets a FROZEN ring"*.
+
+Files: `src/lib/hero-frame-guard.ts` (new) + its test (new, 11 tests),
+`carousel/components/Carousel.tsx`, `carousel/components/Carousel.module.css`,
+`src/components/layout/CustomerReveal.tsx`,
+`src/components/home/TestimonialMarqueeBand.tsx` (new),
+`src/components/home/TestimonialsSection.tsx`, `src/app/globals.css`.
+
+Gate (final tree, deleted `.next`): `tsc` clean · lint clean · **1136/1136
+across 110 files** · build **456/456**.
+
+👀 **The check that matters after deploying — the owner's weak desktop itself:**
+
+1. Load the homepage cold. Expect a few seconds of choppy spin (the watchdog's
+   warm-up + measurement window), then the ring freezes and the page goes
+   quiet. Reload: it should now freeze immediately (session latch).
+2. `?heroFreeze=0` on the same machine = the old always-spinning behavior, for
+   an A/B. `?heroFreeze=1` on ANY machine previews the frozen look without
+   latching.
+3. On a normal machine: the hero must look exactly as before — spinning ring,
+   handover on scroll, marquee moving when visible.
+
+⚠️ Staging has NOT been re-synced for this batch.
+
+✅ **ACTIVE IN PRODUCTION 2026-08-24 (later session) — the Turnstile bot gate
+is LIVE and verified.** All five activation steps completed: code deployed
+(`main@94fe20c` "turnstile update" — the first push shipped a stale staging
+folder without this batch; re-synced and re-pushed), Netlify
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY` set (site key `0x4AAAAAAEa0eMDYdUm0JTws`),
+widget code + site key + CSP verified in the LIVE bundle by static curl
+inspection, then the owner saved the secret in Supabase. Negative controls all
+pass: tokenless POSTs to `/auth/v1/signup`, `/auth/v1/token?grant_type=password`
+and `/auth/v1/recover` each return 400 `captcha_failed`. Rollback if ever
+needed: turn the Supabase CAPTCHA toggle off — the code side needs no revert.
+
+◻ Remaining human check: one real sign-in on the live site (owner, any
+browser). ⛔ NEVER verify those pages via the in-app Browser pane or any
+automated browser — loading the live Turnstile challenge in the embedded
+pane hard-crashed the Claude app twice on 2026-08-24 (Cloudflare analytics:
+2 "Electron" challenges, both unsolved) and forced a reinstall. Verify with
+curl (bundle grep + CSP header) or the owner's own eyes only.
+
+📜 Historical runbook (completed; kept for the reasoning):
+
+🔴 ~~DEPLOY the Turnstile bot gate, then ACTIVATE it — order is load-bearing~~
 (2026-08-24; no SQL). Five bot accounts were created via direct calls to
 Supabase's `/auth/v1/signup` (the anon key is public; no route of ours is in
 that path). The five were deleted from admin the same day. The code is built,
@@ -38,10 +92,13 @@ ignored, so the code side never needs reverting).
   bot leftovers read as "Reachable" until confirmed-email is checked).
 - Tighten Supabase Auth rate limits (dashboard).
 - Optional: "unconfirmed" badge on the admin Users table.
-- 30-second check while in the Supabase dashboard: Auth → Emails — confirm
-  whether auth emails use Supabase's built-in mailer or custom SMTP. If
-  custom SMTP ever points at Resend, bot signups burn `.com` sender
-  reputation directly.
+- ✅ SMTP check DONE and FIXED 2026-08-24: auth emails HAD been on Supabase's
+  built-in mailer the whole time; now on Resend SMTP (sender
+  `noreply@naplesestatejewelry.com`, new sending-only key
+  `supabase-auth-smtp`, 30/hr cap). Verified delivered with the branded From.
+  Safe only BECAUSE the Turnstile gate now fronts every email-triggering
+  endpoint — never disable the gate while custom SMTP is on. Detail:
+  `CHANGELOG.md` 2026-08-24 (SMTP entry).
 
 ✅ **DEPLOYED 2026-08-24 — the invoice heading fix** (`SUBJECT_HEADING_PX` 28 →
 20). Email-only, so the real check is the next invoice/receipt that goes out.

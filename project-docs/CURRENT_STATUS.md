@@ -2,13 +2,47 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-08-23**.
+> in `DECISIONS.md`. Last reconciled: **2026-08-24**.
 
 ## Start Here (handoff, end of the 2026-08-23 PageSpeed session)
 
 **Read this, then `TASKS.md`.**
 
-### 🆕 2026-08-24 (later session) — bot signups: cleaned up, gate built, NOT yet active
+### 🆕 2026-08-24 (latest session) — weak-GPU hero freeze BUILT, NOT deployed
+
+Owner-reported: the hero carousel is very choppy on an older desktop (weak
+GPU, confirmed), and stays choppy after load — the bound is per-frame
+compositing of 8–10 large clipped 3D layers, so slowing the spin fixes
+nothing. Built (owner chose freeze + housekeeping): **an FPS watchdog freezes
+the rings on machines sustaining >40ms median frames** (warm-up 4s, gap
+discard, one-way session latch, `?heroFreeze=1/0` debug overrides);
+reduced-motion now fully stops the ring; CustomerReveal releases `will-change`
+via a new `done` state; the testimonial marquee pauses offscreen. Gate on the
+final tree from a deleted `.next`: `tsc` · lint · **1136/1136 (110 files)** ·
+build **456/456**. Verified in the local browser: default behavior unchanged
+(pane A running, B/C paused, no latch), force-freeze pauses all 3 rings
+WITHOUT latching, reveal settles to `done` with the stretched-link overlay
+intact, marquee pauses/resumes both directions. 🔴 **Not deployed; staging not
+re-synced; never seen on the actual weak desktop** — the deploy checklist is
+the top item in `TASKS.md`. Durable rules: `DECISIONS.md` *"A machine that
+cannot hold the spin gets a FROZEN ring"*.
+
+### 🆕 2026-08-24 (later session) — bot signups: cleaned up, gate LIVE
+
+**UPDATE, end of session: the gate is ACTIVE and verified.** Deployed as
+`main@94fe20c`, Netlify site key set, owner saved the Turnstile secret in
+Supabase. Tokenless POSTs to signup / password sign-in / recover all return
+400 `captcha_failed`. The owner signed in on the live site — the full human check passed.
+**Also this session: Supabase auth email moved off the built-in mailer onto
+Resend SMTP** (branded sender, 30/hr cap, sending-only scoped key) and
+verified delivered — see `CHANGELOG.md`. ⚠️ Never disable the Turnstile gate
+while custom SMTP is on: the gate is what makes Resend-backed auth email safe.
+⛔ **Never load the live auth pages in the in-app Browser pane** — the real
+Turnstile challenge crashed the Claude app twice (forced reinstall); verify
+via curl or the owner's own browser only. Original block below kept for the
+build/activation detail.
+
+### (superseded) bot signups: cleaned up, gate built, NOT yet active
 
 Five bot accounts (created via direct anon-key calls to Supabase
 `/auth/v1/signup`, one every ~3h) were **deleted from admin** — the Users
@@ -23,9 +57,11 @@ unconfirmed accounts as Reachable — the Phase 2 filter is listed in `TASKS.md`
 
 ### The shape, in one glance
 
-✅ **EVERYTHING IS DEPLOYED (2026-08-24). Nothing is undeployed, no outstanding
-SQL, and staging mirrors source exactly.** Six deploys' worth of work went out
-today across two rounds — the five batches below, then the invoice heading fix.
+✅ **Everything below this line IS deployed (2026-08-24), no outstanding SQL.**
+(The one undeployed thing is the newer weak-GPU hero-freeze batch above, which
+also means staging no longer mirrors source.) Six deploys' worth of work went
+out today across two rounds — the five batches below, then the invoice heading
+fix.
 
 **Second deploy (heading only):** the invoice email `<h1>` went **28px → 20px**
 (`SUBJECT_HEADING_PX` in `order-invoice-email.ts`). That heading prints the

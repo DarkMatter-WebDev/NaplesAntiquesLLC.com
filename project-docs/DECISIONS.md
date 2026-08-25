@@ -4,7 +4,36 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-08-14**.
+> compaction. Last reconciled: **2026-08-24**.
+
+## Auth Abuse Protection
+
+### Auth abuse is gated by Supabase-enforced CAPTCHA, and it is coupled to SMTP
+
+**Live since 2026-08-24.** Bot signups (and reset-email abuse) POST straight to
+Supabase `/auth/v1/*` with the public anon key, so no route, edge function, or
+form heuristic of ours can be in the path — the only gate that works is one
+GoTrue enforces itself: Attack Protection → CAPTCHA (Turnstile). The client
+half is `TurnstileWidget.tsx` + `captchaToken` on all four auth calls, INERT
+without `NEXT_PUBLIC_TURNSTILE_SITE_KEY`; the secret lives only in the
+Supabase dashboard. Tokens are single-use — every auth failure path must
+`reset()` the widget. CSP needs `challenges.cloudflare.com` in `script-src` +
+`frame-src` in BOTH `next.config.ts` and root `netlify.toml`.
+
+⚠️ **The gate and custom SMTP travel together.** Auth email moved to Resend
+SMTP the same day (branded sender `noreply@naplesestatejewelry.com`,
+sending-only key `supabase-auth-smtp`, 30/hr cap) — explicitly BECAUSE the
+gate now fronts every email-triggering endpoint. Turning the CAPTCHA toggle
+off while custom SMTP stays on re-opens a Resend email cannon against the
+`.com` sending domain. Rollback of either setting must consider the other.
+
+⛔ **Never load a page running the real Turnstile challenge in the in-app
+Browser pane or any automated browser.** It hard-crashed the Claude app twice
+(2 "Electron" challenges in Cloudflare analytics, 0 solved) and forced a
+reinstall. The always-pass TEST key is safe locally and predicts nothing.
+Verify those pages statically — curl the bundle chunks and CSP header — and
+leave visual checks to a human in a real browser.
+
 
 ## Repository And Memory
 
@@ -2510,6 +2539,51 @@ Rules to keep:
    ⚠️ **`remeasure` must reset the guard** (`lastP = NaN`) alongside the cached
    travel, or a resize, a reduced-motion flip or a pointer-type change would be
    swallowed by an equal `p`.
+
+### A machine that cannot hold the spin gets a FROZEN ring, never a slower one
+
+Established 2026-08-24 after the owner confirmed the hero carousel is choppy on
+a weak-GPU desktop even after load settles. The bound is compositing, not JS:
+the ring re-composites 8–10 large clipped 3D layers every frame, so **spin
+speed changes nothing** — the transform changes every frame at any speed, and
+"slow it down" keeps the identical per-frame GPU cost. The only degraded mode
+that helps is one where the ring stops moving.
+
+`src/lib/hero-frame-guard.ts` measures real frame cadence inside the carousel's
+existing rAF loop and freezes the ring (via the existing `paused` machinery)
+when a machine proves it cannot keep up. Rules to keep:
+
+1. **Warm-up (4s) and gap-discard (>250ms) are load-bearing.** Every machine is
+   janky during AVIF decode + the reveal blur, and a suspended tab's giant
+   delta says nothing about render cost. Removing either makes fast machines
+   trip.
+2. **Median over a 60-frame window, threshold 40ms.** Median so GC hiccups
+   cannot trip it; 40ms so an honest 30Hz display (33ms cadence) and healthy
+   mid-scroll crossings (~16.7ms median, CHANGELOG 2026-08-06) never do.
+3. **Only a genuine trip writes the session latch.** Sibling carousels converge
+   by READING `isHeroFrozen()`; `?heroFreeze=1` is a force-preview and must
+   never latch. `?heroFreeze=0` disables the guard and ignores the latch — the
+   A/B tool for the affected machine itself.
+4. **A frozen ring still needs its facings.** The mount-time `sample()` stamps
+   facing/z-index without the loop; do not "simplify" that effect away or a
+   frozen ring's back cards become full-size invisible click targets again.
+5. **prefers-reduced-motion takes the same freeze path**, in BOTH layers: CSS
+   `animation-play-state: paused` (pre-hydration) AND the JS media-query state
+   — because the visibility observer writes inline
+   `animationPlayState = 'running'`, which overrides the CSS rule. Restoring
+   the old "slow to 128s" behavior would restore full per-frame GPU cost for
+   exactly the users who asked for no motion.
+6. **`will-change` from the customer reveal is released** ~800ms after
+   `visible` via the `done` state, which deliberately has NO CSS rules. `done`
+   must stay in `revealElement`'s early-return guard — the MutationObserver
+   re-sweep would otherwise restamp settled elements `pending` (opacity 0).
+   Any element relying on reveal-era `will-change` for its containing block is
+   a bug to fix at the element (give it `position: relative`), not a reason to
+   re-pin layers.
+7. **The testimonial marquee pauses offscreen by attribute + CSS rule**
+   (`data-marquee-paused`), never by inline `animationPlayState` — an inline
+   `'running'` would override the hover/focus pause rules that share that
+   property.
 
 ### Product-page label type has an 11px floor
 

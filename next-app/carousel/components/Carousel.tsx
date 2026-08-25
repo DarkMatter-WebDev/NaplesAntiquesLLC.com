@@ -24,6 +24,12 @@ import {
 } from "../lib/carouselData";
 import { DEFAULT_BG } from "../lib/carouselConfig";
 import { carouselImageLoading } from "@/lib/storefront-image-loading";
+import {
+  createFrameGuard,
+  freezeHero,
+  isFrameGuardDisabled,
+  isHeroFrozen,
+} from "@/lib/hero-frame-guard";
 
 type Props = {
   /** Provide items directly to bypass the Supabase fetch. */
@@ -119,6 +125,36 @@ export function Carousel({
   const [priceOn, setPriceOn] = useState<boolean>(showPrice ?? false);
   const [bgColor, setBgColor] = useState<string>(bg ?? DEFAULT_BG);
   const [error, setError] = useState<string | null>(null);
+
+  // ---- Weak-machine freeze (2026-08-24) --------------------------------------
+  // The spinning ring re-composites every card layer every frame; on a weak or
+  // software-rendered GPU that is a sustained 10–20fps no matter what the JS
+  // does. `hero-frame-guard` watches real frame cadence inside the rAF loop
+  // below and, once a machine proves it cannot keep up, freezes the ring — a
+  // still 3D arrangement, cards clickable, hero handover intact. The verdict is
+  // a per-session latch shared by every Carousel instance, so later panes and
+  // later page views freeze immediately instead of re-measuring.
+  //
+  // Both initializers read browser state lazily: on the server they fall to
+  // `false`, and a client whose first render disagrees is harmless because
+  // neither value appears in the markup — they only steer effects. (This is
+  // why there is no hydration hazard despite the asymmetric init.)
+  // `reducedMotion` folds prefers-reduced-motion into the same freeze path:
+  // the CSS pause in Carousel.module.css covers pre-hydration, but the inline
+  // `animationPlayState = 'running'` the observer writes below would stomp it
+  // after hydration — so JS has to know about it too, and stopping the rAF
+  // loop for a ring that cannot move is free battery anyway.
+  const [fpsFrozen, setFpsFrozen] = useState(() => isHeroFrozen());
+  const [reducedMotion, setReducedMotion] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReducedMotion(mq.matches);
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  const hardPaused = paused || fpsFrozen || reducedMotion;
 
   useEffect(() => {
     if (items) return; // controlled mode: caller supplies the items
@@ -333,8 +369,31 @@ export function Carousel({
 
     let raf = 0;
     let running = false;
-    const loop = () => {
+    // One guard per effect run. Its warm-up clock starts at its FIRST frame —
+    // for panes B/C that is when they first become visible, not at mount — and
+    // an IO stop/start gap shows up as one huge delta, which the guard discards.
+    const guardDisabled = isFrameGuardDisabled();
+    const guard = createFrameGuard();
+    const loop = (now: number) => {
       sample();
+      // A sibling carousel may have tripped the shared latch (or the owner
+      // soft-navigated in with ?heroFreeze=1); converge on it rather than keep
+      // spinning choppily next to a frozen pane. Deliberately does NOT call
+      // freezeHero() — only a genuine trip below writes the session latch, so
+      // a forced preview can never latch itself permanent.
+      if (isHeroFrozen()) {
+        setFpsFrozen(true);
+        running = false;
+        return;
+      }
+      if (!guardDisabled && guard.frame(now)) {
+        freezeHero();
+        setFpsFrozen(true);
+        // No next frame: the state flip re-runs this effect into the paused
+        // branch, which also pauses the CSS animation.
+        running = false;
+        return;
+      }
       raf = requestAnimationFrame(loop);
     };
     const start = () => {
@@ -365,7 +424,9 @@ export function Carousel({
     // slideshow is holding, 2 only mid-crossing (when both really are visible).
     // An explicit `paused` from the owner wins outright: stop and do not even
     // observe, so no late geometry callback can restart an offscreen ring.
-    if (paused) {
+    // `hardPaused` folds in the weak-machine freeze latch and reduced-motion,
+    // which take the identical path: CSS animation paused, no rAF loop.
+    if (hardPaused) {
       const ring = ringRef.current;
       if (ring) ring.style.animationPlayState = 'paused';
       stop();
@@ -390,7 +451,7 @@ export function Carousel({
       stop();
     };
     // data.length so the observer (re)attaches when the ring first mounts (0 -> N).
-  }, [sample, data.length, paused]);
+  }, [sample, data.length, hardPaused]);
 
   // Fire immediately whenever the items change (initial paint, or reduced-motion
   // where rAF may not advance) so every card's facing/z-index is correct even

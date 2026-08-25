@@ -234,6 +234,13 @@ table {
   will-change: opacity, transform, filter;
 }
 
+/* 'done' (stamped by CustomerReveal ~800ms after 'visible') has NO rules, and
+   that absence is the feature: it drops the will-change above, releasing the
+   element's compositor layer once the transition has finished. Left on
+   forever, dozens of pinned layers were real GPU memory pressure on weak
+   machines (2026-08-24 weak-GPU hero audit). Natural styles equal the
+   transition's end state, so the swap is invisible — do not add rules here. */
+
 .customer-reveal-enabled .mobile-menu-panel,
 .customer-reveal-enabled .mobile-sub-list {
   animation: customer-menu-reveal 180ms ease both;
@@ -504,6 +511,15 @@ table {
 }
 .testimonial-marquee .testimonial-card .testimonial-stars {
   font-size: 0.875rem;
+}
+/* Offscreen pause (2026-08-24): TestimonialMarqueeBand's IntersectionObserver
+   stamps this attribute while the band is scrolled out of view. The infinite
+   track animation otherwise re-composites this masked, viewport-wide band
+   every frame for the life of the page — waste that weak GPUs actually feel.
+   Attribute + rule rather than an inline style, because an inline 'running'
+   would override the hover/focus pause rules below. */
+.testimonial-marquee[data-marquee-paused] .testimonial-marquee-track {
+  animation-play-state: paused;
 }
 /* Pointer-only, matching the card hover rule above: on touch this would latch
    after a tap and leave the band frozen with no way to restart it. */

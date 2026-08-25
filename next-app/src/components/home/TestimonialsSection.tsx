@@ -1,11 +1,15 @@
 import { CardGrid, PageContainer, Section } from '@/components/layout/ResponsiveLayout';
 import { GOOGLE_REVIEWS_URL, TESTIMONIALS, type Testimonial } from '@/lib/testimonials';
+import TestimonialMarqueeBand from './TestimonialMarqueeBand';
 
 // Curated customer testimonials, shared by the homepage and product pages so
-// there is exactly one review list (src/lib/testimonials.ts). Server-rendered,
-// no client JS — including the marquee, which is pure CSS. Renders nothing at
-// all if the curated list is ever emptied — an empty "reviews" section is worse
-// than none.
+// there is exactly one review list (src/lib/testimonials.ts). Server-rendered;
+// the marquee's MOVEMENT is pure CSS, and its one piece of client JS is the
+// tiny TestimonialMarqueeBand island, which only pauses the animation while
+// the band is offscreen (an IntersectionObserver, no per-frame work — the
+// cards themselves stay server-rendered children). Renders nothing at all if
+// the curated list is ever emptied — an empty "reviews" section is worse than
+// none.
 
 type Props = {
   locale: string;
@@ -159,18 +163,15 @@ export default function TestimonialsSection({ locale, compact = false, variant =
             may never be observed, so the band would scroll a procession of
             invisible cards. `closest()` is what CustomerReveal tests, so this
             one attribute on the wrapper excludes every card beneath it. */}
-        <div className="testimonial-marquee" data-customer-reveal-skip>
-          <div
-            className="testimonial-marquee-track"
-            style={{ '--testimonial-marquee-duration': `${durationSeconds}s` } as React.CSSProperties}
-          >
-            {Array.from({ length: repeatsPerHalf * 2 }).flatMap((_, pass) =>
-              TESTIMONIALS.map((review) =>
-                card(review, `${review.name}-${pass}`, pass > 0),
-              ),
-            )}
-          </div>
-        </div>
+        <TestimonialMarqueeBand
+          trackStyle={{ '--testimonial-marquee-duration': `${durationSeconds}s` } as React.CSSProperties}
+        >
+          {Array.from({ length: repeatsPerHalf * 2 }).flatMap((_, pass) =>
+            TESTIMONIALS.map((review) =>
+              card(review, `${review.name}-${pass}`, pass > 0),
+            ),
+          )}
+        </TestimonialMarqueeBand>
 
         <PageContainer>{footnote}</PageContainer>
       </Section>
