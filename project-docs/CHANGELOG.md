@@ -1,6 +1,125 @@
 
 # Changelog
 
+## 2026-08-24 — Invoice email heading 28px → 20px (UNDEPLOYED)
+
+Owner, after seeing the real invoice land: the main title was much too big. It
+prints the SUBJECT — "Invoice INV-20260824-ZCW89 from Naples Estate Jewelry" —
+which is a generated sentence, not a short label, so at 28px it wrapped to
+**four lines** and filled a phone screen before any content. Now **20px** with
+line-height 1.3, which renders it in two.
+
+Extracted as `SUBJECT_HEADING_PX` in `order-invoice-email.ts` so the value has
+one place and carries its own reasoning.
+
+ℹ️ **The fulfillment email deliberately stays at 24px** — its heading is the two
+words "Order Update" and cannot wrap, so it has none of this problem.
+
+⚠️ **A mistake worth recording:** the first attempt added a `{/* … */}` JSX
+comment beside the `<h1>`. That block is a **template literal building an HTML
+string**, not JSX, so the comment would have been printed verbatim into every
+invoice email. Caught before running anything. When editing these builders,
+remember they are strings — explanation goes in a JS comment outside the
+literal, which is why the constant exists.
+
+Gate: `tsc` clean · `lint` clean · **1125/1125** · build **456/456**.
+
+◻ **Undeployed** — this landed after the day's deploy, so it needs its own.
+
+## 2026-08-24 — Pickup block sent for real, and a manual-order trap found
+
+Owner asked for a test receipt to check the pickup block in a real mail client,
+and signed in so it could be driven through his own Chrome.
+
+**Sent.** A temporary manual order was created with **Delivery Method = Pickup**
+(customer "Pickup Block Test", `info@naplesestatejewelry.com`, one $1,040 item,
+$0 shipping, total $1,102.40), its email previewed, sent, and the order then
+deleted. The admin preview and the delivered email both show the block as
+designed:
+
+```
+PICKUP LOCATION
+6240 Shirley St, Ste 104
+Naples, FL 34109
+inside Sharon Lynch Collections
+──────────────────
+HOURS
+Tuesday - Saturday, 11:00 AM - 3:00 PM
+or by appointment
+```
+
+ℹ️ It sent as an **Invoice**, not a Receipt, because the order was left UNPAID
+deliberately — see the trap below. The pickup block, footer, phone and
+shipping-method label render identically either way; only the heading and the
+"paid in full" line differ.
+
+### 🔴 TRAP — creating a manual order takes the product OFF the public shop
+
+**`CREATE MANUAL ORDER` immediately flips the chosen product to `PENDING
+PAYMENT`**, which removes it from the public gallery and its product page. This
+is not obvious from the form, and the order does not have to be paid for it to
+happen. During this test, live product **#3 (10K Gold 5mm Hollow Cuban Link
+Chain Necklace, $1,040)** was pulled from the shop the moment the order was
+created.
+
+⚠️ **The first check for this gave a FALSE ALARM in the other direction too:**
+`/shop` did not contain the title, but `/shop` is paginated, so its absence
+proved nothing. And the admin product list defaults to a **`Status = Available`
+filter**, so the product simply vanished from search rather than showing a
+changed status. Clear the filter to see the truth.
+
+✅ **The recovery path is built in, and it is the order detail page's
+`RESTORE ITEM TO INVENTORY` button** — "restored to available inventory. The
+order status and payment record were left unchanged." Use it BEFORE deleting the
+order; deleting alone was not relied on to release the item.
+
+**Verified restored:** product back to `AVAILABLE`, marketplace columns still
+`ACTIVE` / `LIVE` (eBay and Etsy were never delisted), and the public product
+page `/shop/10k-hollow-cuban-link-chain-necklace-01` serves with **Add to Cart**
+and no SOLD badge.
+
+⛔ **The order was deliberately NOT marked paid.** Marking a manual order paid is
+what fires the sold/delist hooks, which would have withdrawn a real listing from
+eBay and Etsy for a throwaway test. If a genuine "Receipt" heading is ever
+needed, understand that cost first.
+
+ℹ️ Residue, all intended: the temp order sits in the recycle bin (now 19), and
+its email history row records the send.
+
+## 2026-08-24 — All five batches DEPLOYED, and verified on production
+
+Owner deployed the synced staging copy. Post-deploy verification below; nothing
+broke. No SQL was outstanding in any batch.
+
+**The bug that started the session was re-exercised as a user on the live site:**
+accept the cookie banner, switch EN→ES — it stays gone; switch ES→EN — still
+gone. ⚠️ **Negative control also run on production**: with consent cleared, a
+language switch still shows the banner in Spanish and does not stamp the gate
+attribute, so the fix does not over-hide.
+
+**Everything else checked:** 8 routes all 200; exactly one `<h1>` on each of 9
+pages; every JSON-LD block parses on those 9 plus 3 product pages (`JewelryStore`
++ `Product` + `BreadcrumbList` intact); CSP `frame-src` still carries
+`www.google.com` and `maps.google.com` so the maps render; **zero console errors
+on production**, including across two locale switches; homepage Visit Us at
+504/504 two columns with 7 hour rows, 4 chips, both buttons and a still-lazy map;
+contact panel likewise with its `<address>` retained and 0px overflow; the
+**Today** badge on Monday reporting `America/New_York` on both pages and in
+Spanish (`Lunes`/`Hoy`); `/api/metal-prices` returning live spot; `/shop`
+rendering 48 cards and 91 prices.
+
+⚠️ **The sitemap reads 105 where the 2026-08-17 note says 107 — not a
+regression, and worth recording so nobody "fixes" it.** Composition is **85
+product + 20 static**; the static count is unchanged, so the delta is two fewer
+PRODUCT urls — two items sold in the intervening week. No route or sitemap code
+changed this session and the build prerendered the same 456 pages.
+
+◻ **Still unexercised, all first-real-use:** no order email has actually been
+SENT through the new templates; the pickup block has not been seen in a real mail
+client (Outlook especially — the panel is a `<table>` for its sake); the new
+layouts have not been seen on real phone hardware; PSI has not been re-run
+(⛔ and single runs must not be reacted to).
+
 ## 2026-08-24 — "Encountered a script tag while rendering React component" silenced sitewide
 
 Owner report: this console error keeps appearing in dev. Fixed by mounting the

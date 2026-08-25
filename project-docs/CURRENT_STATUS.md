@@ -10,13 +10,77 @@
 
 ### The shape, in one glance
 
-🔴 **FIVE BATCHES ARE UNDEPLOYED (2026-08-23/24), and STAGING IS SYNCED AND
-READY TO DEPLOY.** No outstanding SQL in any of them.
+✅ **ALL FIVE BATCHES ARE DEPLOYED AND VERIFIED ON PRODUCTION (2026-08-24).**
+No outstanding SQL.
+
+🔴 **ONE SMALL THING IS UNDEPLOYED since then:** the invoice email's main
+heading, **28px → 20px** (`SUBJECT_HEADING_PX` in `order-invoice-email.ts`).
+Owner's call after seeing a real invoice — that `<h1>` prints the generated
+SUBJECT, so at 28px it wrapped to four lines and filled a phone screen before
+any content. Email-only; nothing on the site changes. Gate: `tsc`/`lint` clean ·
+**1125/1125** · **456/456**. Staging synced.
 
 **The five, oldest first:** the cookie-banner language-switch fix; the
 order-email fixes (footer landmark, wrapping phone, shipping-method label); the
 pickup block; the homepage "Visit Us" rebuild; and the contact-page match +
 landmark removal + the dev console-warning filter.
+
+### 🔴 TRAP — `CREATE MANUAL ORDER` pulls the product off the public shop
+
+Found 2026-08-24 while sending a real pickup invoice. Creating a manual order
+flips the chosen product to **`PENDING PAYMENT`** the moment it is created — no
+payment required — which removes it from the public gallery and its product
+page. A live $1,040 chain was off the shop until it was restored.
+
+✅ **Recovery is built in:** the order detail page's **`RESTORE ITEM TO
+INVENTORY`** button. Use it BEFORE deleting the order.
+
+⚠️ **Two things made this hard to see, and both can mislead again:** `/shop` is
+paginated, so a title missing from page one proves nothing; and the admin
+product list defaults to a **`Status = Available` filter**, so a product whose
+status changed disappears from search entirely rather than showing its new
+status. Clear the filter.
+
+⛔ **Never mark a throwaway manual order PAID** — that is what fires the
+sold/delist hooks, which would withdraw a real eBay and Etsy listing.
+
+### ✅ The pickup block was sent and confirmed, 2026-08-24
+
+A real email was sent to `info@naplesestatejewelry.com` from the production
+admin, and the block renders as designed (address on its own lines, landmark
+muted beneath, hours under a hairline). It went as an **Invoice**, not a
+Receipt, because the order was deliberately left unpaid; the pickup block,
+footer, phone and shipping-method label are identical either way.
+📧 Still unconfirmed: how it looks in **Outlook desktop** specifically.
+
+### ✅ Production verification, 2026-08-24 — measured, not assumed
+
+**The reported bug is fixed on the live site**, exercised as a user: accept the
+cookie banner, switch EN→ES — it does **not** come back; switch back ES→EN — it
+does not come back. ⚠️ And the negative control passes: with consent cleared, a
+switch still shows the banner (in Spanish) and does **not** wrongly stamp the
+gate attribute. So it does not over-hide.
+
+| Check | Result |
+| --- | --- |
+| `/`, `/es`, `/contact`, `/es/contact`, `/shop`, `/checkout`, `/cookie-preferences`, `/sitemap.xml` | all **200** |
+| `<h1>` per page (9 pages) | exactly **1** everywhere |
+| JSON-LD blocks | **every block parses** on all 9 pages + 3 product pages |
+| Product pages | 200, `JewelryStore` + `Product` + `BreadcrumbList` intact |
+| CSP `frame-src` | still carries `www.google.com` + `maps.google.com` — maps render |
+| Console errors on production | **zero**, including across two locale switches |
+| Homepage Visit Us | 2 columns (504/504), 7 hour rows, 4 chips, gold + dark buttons, map still `loading="lazy"` |
+| Contact panel | 2 columns, 7 rows, `<address>` retained, 0px overflow |
+| **Today** badge | on **Monday**, reporting `America/New_York`, on both pages and in ES (`Lunes`/`Hoy`) |
+| Landmark in either Visit Us block | **absent** (still present in footer/FAQ by design) |
+| `/api/metal-prices` | 200, live spot returned |
+| `/shop` | 48 cards, 91 prices rendered |
+
+⚠️ **The sitemap reads 105 URLs where the old note says 107 — that is NOT a
+regression.** It breaks down as **85 product + 20 static**, and the static count
+is unchanged; the delta is two fewer PRODUCT urls, i.e. two items sold in the
+week since. No route or sitemap code changed, and the build prerendered the same
+456 pages. Do not chase it.
 
 **Gate on the final tree, from a deleted `.next`:** `tsc` clean · `lint` clean ·
 **1125/1125 across 109 files** · build **456/456 static pages**.

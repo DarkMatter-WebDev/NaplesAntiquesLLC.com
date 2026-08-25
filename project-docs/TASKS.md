@@ -5,12 +5,22 @@
 
 ## ◻ OPEN — needs a human
 
-✅ **STAGING IS SYNCED AND READY TO DEPLOY (2026-08-24)** — 872 files, 23 copied,
-0 Extras/Mismatch/FAILED, 0-remaining on the re-run, leak check clean against a
-177-`.tsx` positive control. Five batches, no SQL in any of them. Full figures in
-`CURRENT_STATUS.md`.
+🔴 **DEPLOY the invoice heading size change** (2026-08-24, after the main
+deploy; no SQL). One constant: `SUBJECT_HEADING_PX` 28 → 20 in
+`lib/order-invoice-email.ts`, because that `<h1>` prints the generated subject
+and wrapped to four lines on a phone. **Email-only — nothing on the site
+changes**, so there is nothing to smoke-test on the web after deploying; the
+check is the next invoice/receipt that goes out. Staging is synced.
 
-◻ **Not covered before deploy — none blocking, all "first real use" items:**
+✅ **DEPLOYED AND VERIFIED ON PRODUCTION 2026-08-24.** All five batches are live.
+The reported cookie/language bug was re-exercised as a user on the live site in
+both directions, with the negative control passing. Full evidence table in
+`CURRENT_STATUS.md`. No SQL was outstanding.
+
+⚠️ **Sitemap 105 vs the old 107 is normal** — 85 product + 20 static, static
+unchanged, two products sold. Not a regression; do not chase it.
+
+◻ **Still not exercised — none blocking, all "first real use" items:**
 
 1. **No order email has actually been SENT** through the new templates. They
    were rendered and unit-tested, not delivered. The first real receipt is the

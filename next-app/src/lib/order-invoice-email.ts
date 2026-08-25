@@ -255,6 +255,19 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
   };
 }
 
+/**
+ * Size of the email's `<h1>`, which prints the SUBJECT.
+ *
+ * ⚠️ 20px, not the 24–28px a display heading would normally take (owner,
+ * 2026-08-24). This heading is a generated SENTENCE — "Invoice
+ * INV-20260824-ZCW89 from Naples Estate Jewelry" — not a short label. At 28px
+ * it wrapped to four lines and filled a phone screen before any content.
+ *
+ * The fulfillment email deliberately keeps 24px: its heading is the two words
+ * "Order Update" and cannot wrap.
+ */
+const SUBJECT_HEADING_PX = 20;
+
 function buildInvoiceEmailHtml({
   orderNumber,
   subject,
@@ -314,7 +327,7 @@ function buildInvoiceEmailHtml({
               <tr>
                 <td style="padding:28px 30px 18px;border-bottom:1px solid #d5c697;">
                   <div style="color:#735c00;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;">NaplesEstateJewelry.com</div>
-                  <h1 style="margin:10px 0 0;color:#1d1a14;font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:1.2;">${escapeHtml(subject)}</h1>
+                  <h1 style="margin:10px 0 0;color:#1d1a14;font-family:Georgia,'Times New Roman',serif;font-size:${SUBJECT_HEADING_PX}px;line-height:1.3;">${escapeHtml(subject)}</h1>
                   ${paid ? '<div style="display:inline-block;margin:12px 0 0;padding:5px 12px;background:#0f7a4f;color:#ffffff;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border-radius:3px;">Paid in full</div>' : ''}
                   <p style="margin:8px 0 0;color:#746b5b;font-size:13px;">Order ${escapeHtml(orderNumber)} - ${escapeHtml(paymentStatus)} - ${escapeHtml(fulfillmentStatus)}</p>
                 </td>
