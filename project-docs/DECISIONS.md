@@ -6,6 +6,90 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-08-24**.
 
+## Homepage Announcement Banner
+
+### The strip's copy is admin data, and its LENGTH is enforced, not remembered
+
+Admin-editable since 2026-08-25 (Admin → Settings → Homepage Banner): both
+fragments, per-locale with ES falling back to EN **per field**, a link on/off
+toggle, an editable destination, and a master show/hide. Stored on
+`shop_settings.home_banner` (jsonb, null = built-in copy). Same split as store
+hours: pure/client-safe `home-banner.ts` (shape, default, resolve, parse,
+budget) + server-only `home-banner-server.ts` (cached fetch, degrades to the
+default on any error).
+
+⚠️ **The strip is `nowrap` at a fitted type clamp — long copy overflows, it
+does not wrap.** The 2026-08-14 measurement (320px viewport, ~304px usable;
+shipped ES 48 chars / 273.6px; EN 40 chars / 228.3px; ≈5.66px per character)
+is now encoded as `BANNER_SAFE_CHARS` (48, warns) and `BANNER_MAX_CHARS` (53,
+blocks). The ceiling is enforced in `parseHomeBanner()` as well as the admin
+panel, so a hand-edited DB row cannot break the mobile header either. ⛔ If
+the type clamp or copy conventions ever change, RE-MEASURE at 320px in
+Spanish and update both constants — do not nudge them to fit a new string.
+
+### A banner that goes nowhere is a `<div>`, and loses its arrow
+
+When the link is switched off the strip renders as a plain `<div>`, not an
+anchor: no `href`, not focusable, and **no trailing `→`** — the arrow is the
+only affordance telling a phone user the strip is tappable, so keeping it on
+a static strip would lie. The hover/focus rules in `globals.css` are scoped
+to `a.home-announcement` for the same reason; do not widen them back to the
+bare class.
+
+### The banner's destination is an ALLOW-LIST, never free text
+
+`linkPath` is validated against `HOME_BANNER_LINK_OPTIONS` (9 curated
+marketing routes) in both the API and the parser, and stored locale-less with
+`/es` prefixed at render. This is deliberate: a free-text URL field on a
+public banner is an open-redirect surface, and the admin does not need one.
+Add routes to that constant rather than relaxing the check.
+
+## Store Hours
+
+### Showroom hours are DATA, and every formatter is pure
+
+Since 2026-08-25 the weekly schedule lives in `shop_settings.store_hours`
+(jsonb, single row; null = default) and is edited in Admin → Settings → Store
+Hours. `business-location.ts` keeps every hours formatter PURE and sync —
+each takes a `StoreHoursSchedule` first parameter — and the server-only
+`store-hours.ts` owns fetching (`getStoreHours()`: `unstable_cache`, tag
+`store-hours`, 300s, degrades to `DEFAULT_STORE_HOURS` on ANY error, so the
+site can never render blank hours). Client components never fetch the
+schedule; their server parent passes a formatted string prop
+(`pickupHoursLine` on checkout/product, `pickupHours` on the order panel).
+
+⛔ **Never format times with `Intl`** here: the site's byte conventions are EN
+`11am` / `11:00 AM` and ES `11:00 a.m.` — Intl's es output is `a. m.` (extra
+space) and would silently change shipped bytes. The hand-rolled formatter in
+`business-location.ts` is deliberate; `store-hours-format.test.ts` asserts
+byte-identity on the default schedule.
+
+⛔ **`HOURS` stays** as the NAP-canonical fallback constant — its only
+consumer is `DEFAULT_STORE_HOURS`. An hours edit in the admin panel must be
+mirrored to the Google Business Profile, eBay merchant location, and Etsy
+shop location the same day (the panel carries the warning permanently).
+
+### An hours save busts the WHOLE page tree, deliberately
+
+The admin PUT runs `revalidateTag('store-hours', { expire: 0 })` then
+`revalidatePath('/', 'layout')`. Hours print in the footer of every page in
+both locales and most pages are statically prerendered, so enumerating paths
+would be strictly more fragile; edits are rare enough that a sitewide
+regeneration is cheap. If a fully static page ever proves sticky on Netlify's
+durable cache after a save, the fallback is `export const revalidate = 3600`
+on hours-consuming pages — measured need first, do not add preemptively.
+
+### Prose never names the open days
+
+The ~14 marketing/meta strings that used to say "Tue–Sat" were reworded ONCE
+to day-agnostic copy ("during showroom hours or by appointment") rather than
+derived from the schedule — meta descriptions should not churn with an hours
+edit, and the two FAQ answers serialize into FAQPage JSON-LD. Do not
+reintroduce day names into prose, metadata, or JSON-LD descriptions; the
+exact schedule belongs only to the hours surfaces and
+`openingHoursSpecification` (which is omitted entirely, not `[]`, when every
+day is closed).
+
 ## Auth Abuse Protection
 
 ### Auth abuse is gated by Supabase-enforced CAPTCHA, and it is coupled to SMTP

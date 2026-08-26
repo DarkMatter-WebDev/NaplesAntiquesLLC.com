@@ -67,6 +67,13 @@ interface Props {
   locale: string;
   recycleBinSupported?: boolean;
   trackingSupported?: boolean;
+  /**
+   * Admin-editable pickup hours (`formatPickupHours(await getStoreHours())`),
+   * resolved by the server page — this client component cannot fetch the
+   * schedule itself. Keeps the on-screen preview honest against what the
+   * mailer will actually send.
+   */
+  pickupHours: string;
 }
 
 export default function OrderDetailPanel({
@@ -78,6 +85,7 @@ export default function OrderDetailPanel({
   locale,
   recycleBinSupported = true,
   trackingSupported = true,
+  pickupHours,
 }: Props) {
   const router = useRouter();
   const supabase = createClient();
@@ -122,7 +130,7 @@ export default function OrderDetailPanel({
   const invoiceNumber = invoiceNumberForOrder(order, latestInvoice?.invoice_number);
   const numericItemDiscounts = Object.fromEntries(Object.entries(itemDiscounts).map(([id, value]) => [id, Number(value) || 0]));
   const emailOrder = withInvoiceLineDiscounts(order, numericItemDiscounts);
-  const emailContent = buildInvoiceEmailContent(emailOrder, invoiceNumber);
+  const emailContent = buildInvoiceEmailContent(emailOrder, invoiceNumber, { pickupHours });
   const emailUpdateContent = emailUpdateStatus ? buildFulfillmentUpdateEmailContent(order, emailUpdateStatus) : null;
   const persistedLineDiscount = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(item.discount ?? 0), orderItemLineSubtotal(item)), 0);
   const editedLineDiscount = order.order_items.reduce((sum, item) => sum + clampMoneyDiscount(Number(itemDiscounts[item.id]) || 0, orderItemLineSubtotal(item)), 0);

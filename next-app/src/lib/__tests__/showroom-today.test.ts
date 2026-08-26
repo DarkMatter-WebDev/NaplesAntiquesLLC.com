@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_STORE_HOURS,
   SHOWROOM_TIME_ZONE,
   hoursRows,
-  hoursRowsGrouped,
   showroomWeekdayName,
 } from '@/lib/business-location';
 
@@ -44,7 +44,7 @@ describe('showroomWeekdayName — answers for Naples, not the reader', () => {
   it('returns a name that can actually match a row key', () => {
     // The comparison is `showroomWeekdayName() === row.dayKey`, so this must
     // stay in the same vocabulary as HOURS.days / WEEK_ORDER.
-    expect(hoursRows(false).map((row) => row.dayKey)).toContain(
+    expect(hoursRows(DEFAULT_STORE_HOURS, false).map((row) => row.dayKey)).toContain(
       showroomWeekdayName(new Date('2026-08-24T02:00:00Z')),
     );
   });
@@ -56,7 +56,7 @@ describe('showroomWeekdayName — answers for Naples, not the reader', () => {
 
 describe('hours rows — day keys for the today comparison', () => {
   it('keys every day in canonical English', () => {
-    expect(hoursRows(false).map((row) => row.dayKey)).toEqual([
+    expect(hoursRows(DEFAULT_STORE_HOURS, false).map((row) => row.dayKey)).toEqual([
       'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
     ]);
   });
@@ -65,14 +65,8 @@ describe('hours rows — day keys for the today comparison', () => {
     // ⚠️ The whole reason `dayKey` exists separately from `day`. `Intl` returns
     // "Sunday"; a Spanish row labelled "Domingo" could never match it, so the
     // badge would silently never appear on the ES homepage.
-    const spanish = hoursRows(true);
+    const spanish = hoursRows(DEFAULT_STORE_HOURS, true);
     expect(spanish.map((row) => row.day)).toContain('Domingo');
-    expect(spanish.map((row) => row.dayKey)).toEqual(hoursRows(false).map((row) => row.dayKey));
-  });
-
-  it('gives grouped rows NO day key, so they cannot be marked today', () => {
-    // A grouped row spans several days ("Sunday – Monday"), so "today" is not a
-    // property it has. Undefined keys are what suppress the badge there.
-    expect(hoursRowsGrouped(false).every((row) => row.dayKey === undefined)).toBe(true);
+    expect(spanish.map((row) => row.dayKey)).toEqual(hoursRows(DEFAULT_STORE_HOURS, false).map((row) => row.dayKey));
   });
 });

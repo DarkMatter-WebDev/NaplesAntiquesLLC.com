@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { AppIcon } from '@/components/AppIcon';
-import { addressWithLandmark, hoursLine, streetLine } from '@/lib/business-location';
+import { addressWithLandmark, streetLine } from '@/lib/business-location';
 
 // Product-page trust layer (owner request 2026-08-04, modeled on the
 // mels-treasures.com review): three compact policy accordions plus a
@@ -19,9 +19,14 @@ type Props = {
   isEs: boolean;
   /** Locale path prefix ('' or '/es'). */
   prefix: string;
+  /**
+   * Admin-editable hours sentence (`hoursLine(schedule, isEs)`), formatted by
+   * the product page so both exports read the schedule exactly once.
+   */
+  pickupHoursLine: string;
 };
 
-export function ProductPolicyAccordions({ isEs, prefix }: Props) {
+export function ProductPolicyAccordions({ isEs, prefix, pickupHoursLine }: Props) {
   const accordions: Array<{ id: string; title: string; body: React.ReactNode }> = [
     {
       id: 'shipping-returns',
@@ -30,8 +35,8 @@ export function ProductPolicyAccordions({ isEs, prefix }: Props) {
         <>
           <p>
             {isEs
-              ? 'Cada pedido enviado viaja totalmente asegurado con confirmación de firma — las tarifas según el valor se muestran al pagar, y los pedidos de $5,000+ se envían por USPS Registered Mail, el servicio más seguro del Servicio Postal. ¿Prefiere evitar el envío? La recogida local es gratuita en ' + addressWithLandmark(true) + ', ' + hoursLine(true) + '.'
-              : 'Every shipped order travels fully insured with signature confirmation — value-based rates are shown at checkout, and orders of $5,000+ ship USPS Registered Mail, the most secure service the Postal Service offers. Prefer to skip shipping entirely? Local pickup is free at ' + addressWithLandmark(false) + ', ' + hoursLine(false) + '.'}
+              ? 'Cada pedido enviado viaja totalmente asegurado con confirmación de firma — las tarifas según el valor se muestran al pagar, y los pedidos de $5,000+ se envían por USPS Registered Mail, el servicio más seguro del Servicio Postal. ¿Prefiere evitar el envío? La recogida local es gratuita en ' + addressWithLandmark(true) + ', ' + pickupHoursLine + '.'
+              : 'Every shipped order travels fully insured with signature confirmation — value-based rates are shown at checkout, and orders of $5,000+ ship USPS Registered Mail, the most secure service the Postal Service offers. Prefer to skip shipping entirely? Local pickup is free at ' + addressWithLandmark(false) + ', ' + pickupHoursLine + '.'}
           </p>
           <p className="mt-2">
             {isEs ? 'Detalles completos: ' : 'Full details: '}
@@ -171,7 +176,7 @@ export function ProductPolicyAccordions({ isEs, prefix }: Props) {
 // The "why buy from us" band. Rendered full-width beneath the two product
 // columns, so its three badges stay on one row instead of stacking inside a
 // half-width column.
-export function ProductTrustBadges({ isEs }: Pick<Props, 'isEs'>) {
+export function ProductTrustBadges({ isEs, pickupHoursLine }: Pick<Props, 'isEs' | 'pickupHoursLine'>) {
   const badges = [
     {
       icon: 'recycling',
@@ -192,8 +197,8 @@ export function ProductTrustBadges({ isEs }: Pick<Props, 'isEs'>) {
       title: isEs ? 'Recogida local en Naples' : 'Local Pickup in Naples',
       // Names the place. Said only "the Naples area" until 2026-08-17.
       text: isEs
-        ? `Gratis en ${streetLine()}, ${hoursLine(true)}.`
-        : `Free at ${streetLine()}, ${hoursLine(false)}.`,
+        ? `Gratis en ${streetLine()}, ${pickupHoursLine}.`
+        : `Free at ${streetLine()}, ${pickupHoursLine}.`,
     },
   ] as const;
 

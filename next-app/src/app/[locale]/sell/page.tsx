@@ -22,8 +22,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ? 'Vender Oro, Joyería y Plata en el Suroeste de Florida'
     : 'Sell Gold, Jewelry & Silver in Southwest Florida';
   const description = isEs
-    ? 'Compramos oro, joyería, plata, diamantes, monedas y relojes al mejor precio. Evaluación gratuita en nuestro salón de Naples, martes a sábado, o a domicilio.'
-    : 'Top-paying buyer of gold, jewelry, silver, diamonds, coins & watches. Free appraisals at our Naples showroom, Tue–Sat, or at your home across Southwest Florida.';
+    ? 'Compramos oro, joyería, plata, diamantes, monedas y relojes al mejor precio. Evaluación gratuita en nuestro salón de Naples o a domicilio.'
+    : 'Top-paying buyer of gold, jewelry, silver, diamonds, coins & watches. Free appraisals at our Naples showroom or at your home across Southwest Florida.';
   // Was a hand-rolled openGraph block with no `images`, which meant this page —
   // one of the most shared on the site — posted a BLANK card. pageMetadata
   // restores the image, siteName, locale and the matching twitter tags.

@@ -14,8 +14,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ? 'Preguntas Frecuentes — Vender Oro y Joyería'
       : 'FAQ — Selling Estate Jewelry, Gold & Antiques',
     description: isEs
-      ? 'Respuestas sobre vender joyería, oro, plata y antigüedades en Naples, FL. Consultas gratuitas en nuestro salón, martes a sábado, y pago inmediato en efectivo.'
-      : 'Answers on selling estate jewelry, gold, silver, and antiques in Naples FL. Free consultations at our showroom, Tue–Sat, and immediate cash payment.',
+      ? 'Respuestas sobre vender joyería, oro, plata y antigüedades en Naples, FL. Consultas gratuitas en nuestro salón de Naples o con cita, y pago inmediato en efectivo.'
+      : 'Answers on selling estate jewelry, gold, silver, and antiques in Naples FL. Free consultations at our Naples showroom or by appointment, and immediate cash payment.',
     path: '/faq',
     locale,
   });
@@ -53,8 +53,8 @@ const FAQ_ITEMS = [
   {
     questionEn: 'What areas do you serve?',
     questionEs: '¿Qué áreas sirven?',
-    answerEn: 'Our showroom is at 6240 Shirley St, Ste 104 in Naples, inside Sharon Lynch Collections, open Tuesday to Saturday 11am–3pm or by appointment. We also buy throughout Southwest Florida — Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral, and surrounding communities — with home visits on request, and for larger collections or estate liquidations we will travel further.',
-    answerEs: 'Nuestro salón está en 6240 Shirley St, Ste 104 en Naples, dentro de Sharon Lynch Collections, abierto de martes a sábado de 11:00 a.m. a 3:00 p.m. o con cita. También compramos en todo el suroeste de Florida — Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral y comunidades aledañas — con visitas a domicilio a pedido, y para colecciones más grandes o liquidaciones de patrimonio viajamos más lejos.',
+    answerEn: 'Our showroom is at 6240 Shirley St, Ste 104 in Naples, inside Sharon Lynch Collections — open during showroom hours or by appointment. We also buy throughout Southwest Florida — Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral, and surrounding communities — with home visits on request, and for larger collections or estate liquidations we will travel further.',
+    answerEs: 'Nuestro salón está en 6240 Shirley St, Ste 104 en Naples, dentro de Sharon Lynch Collections — abierto durante el horario del salón o con cita. También compramos en todo el suroeste de Florida — Marco Island, Bonita Springs, Estero, Fort Myers, Cape Coral y comunidades aledañas — con visitas a domicilio a pedido, y para colecciones más grandes o liquidaciones de patrimonio viajamos más lejos.',
   },
   {
     questionEn: 'Do I need a formal evaluation before contacting you?',

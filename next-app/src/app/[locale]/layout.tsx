@@ -13,7 +13,14 @@ import RouteProgressBar from '@/components/layout/RouteProgressBar';
 import ViewportHeightToken from '@/components/layout/ViewportHeightToken';
 import ScriptTagWarningGuard from '@/components/shop/ScriptTagWarningGuard';
 import { jsonLdHtml } from '@/lib/json-ld';
-import { GEO, mapsUrl, openingHoursSchema, postalAddressSchema } from '@/lib/business-location';
+import {
+  GEO,
+  mapsUrl,
+  openingHoursSchema,
+  postalAddressSchema,
+  type StoreHoursSchedule,
+} from '@/lib/business-location';
+import { getStoreHours } from '@/lib/store-hours';
 
 interface Props {
   children: React.ReactNode;
@@ -21,7 +28,11 @@ interface Props {
 }
 
 // This layout owns <html>/<head>/<body> so `lang` reflects the active locale.
-const jsonLd = {
+//
+// A FUNCTION, not a module constant, since hours became admin-editable
+// (2026-08): a module-scope object would freeze `openingHoursSchema()` at
+// import time and the schema would never reflect a saved edit.
+const buildJsonLd = (schedule: StoreHoursSchedule) => ({
   '@context': 'https://schema.org',
   '@type': 'JewelryStore',
   '@id': 'https://naplesestatejewelry.com/#business',
@@ -37,8 +48,10 @@ const jsonLd = {
   email: 'info@naplesestatejewelry.com',
   image: 'https://naplesestatejewelry.com/assets/images/pages/trust.webp',
   logo: 'https://naplesestatejewelry.com/assets/images/branding/logo.webp',
+  // Day-agnostic on purpose: hours are admin-editable, so naming days here
+  // would go stale. The exact schedule lives in openingHoursSpecification.
   description:
-    'Naples, FL gold, jewelry, and sterling silver buyer paying top dollar for estate jewelry, gold, silver, diamonds, coins, watches, and full estates. Showroom at 6240 Shirley St, Ste 104, open Tuesday to Saturday, with home evaluations on request across Southwest Florida.',
+    'Naples, FL gold, jewelry, and sterling silver buyer paying top dollar for estate jewelry, gold, silver, diamonds, coins, watches, and full estates. Showroom at 6240 Shirley St, Ste 104 — visit during showroom hours or by appointment, with home evaluations on request across Southwest Florida.',
   // Real street address as of 2026-08-17 (showroom open). Sourced from
   // lib/business-location.ts so the schema, the footer, checkout and the
   // pickup receipt cannot drift apart — NAP consistency is a ranking factor.
@@ -50,10 +63,15 @@ const jsonLd = {
   // note on GEO in lib/business-location.ts for how to fill it in.
   ...(GEO ? { geo: { '@type': 'GeoCoordinates', ...GEO } } : {}),
   hasMap: mapsUrl(),
-  // ⚠️ Tue-Sat 11:00-15:00. Claimed Mon-Sat 10:00-17:00 until 2026-08-17, which
-  // was never true of the showroom. Must stay identical to the Google Business
-  // Profile: Google compares them once the profile is verified.
-  openingHoursSpecification: openingHoursSchema(),
+  // ⚠️ Admin-editable since 2026-08 (Admin → Settings → Store Hours); defaults
+  // to Tue-Sat 11:00-15:00 until configured. Must stay identical to the Google
+  // Business Profile: Google compares them once the profile is verified — the
+  // admin panel repeats that warning. Omitted entirely when every day is
+  // closed (an empty array would be worse schema than none).
+  ...(() => {
+    const spec = openingHoursSchema(schedule);
+    return spec.length > 0 ? { openingHoursSpecification: spec } : {};
+  })(),
   priceRange: '$$',
   currenciesAccepted: 'USD',
   paymentAccepted: 'Cash, Check, Wire Transfer, PayPal, Credit Card, Debit Card',
@@ -78,7 +96,7 @@ const jsonLd = {
     { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Sterling silver buying — we buy silver flatware, holloware, and jewelry' } },
     { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Diamond, coin, and watch buying' } },
   ],
-};
+});
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -93,6 +111,7 @@ export default async function LocaleLayout({ children, params }: Props) {
 
   setRequestLocale(locale);
   const messages = await getMessages();
+  const jsonLd = buildJsonLd(await getStoreHours());
 
   return (
     <html

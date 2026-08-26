@@ -18,8 +18,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ? 'Sobre Chris — Comprador de Joyería en Naples'
       : 'About Chris — Naples Estate Jewelry Buyer',
     description: isEs
-      ? 'Conozca a Chris, especialista en joyería de patrimonio y antigüedades con más de 15 años en Naples. Visítenos en nuestro salón, martes a sábado, o con cita.'
-      : 'Meet Chris, Naples estate jewelry and antiques specialist with 15+ years in Southwest Florida. Visit our showroom, Tue–Sat, or book a private appointment.',
+      ? 'Conozca a Chris, especialista en joyería de patrimonio y antigüedades con más de 15 años en Naples. Visítenos en nuestro salón de Naples o con cita privada.'
+      : 'Meet Chris, Naples estate jewelry and antiques specialist with 15+ years in Southwest Florida. Visit our Naples showroom or book a private appointment.',
     path: '/about',
     locale,
   });
@@ -132,7 +132,7 @@ export default async function AboutPage({ params }: Props) {
                     { stat: '15+', label: isEs ? 'Años de Experiencia' : 'Years Experience' },
                     { stat: '100%', label: isEs ? 'Privado y Confidencial' : 'Private & Confidential' },
                     { stat: isEs ? 'Mismo Día' : 'Same-Day', label: isEs ? 'Pago Disponible' : 'Payment Available' },
-                    { stat: isEs ? 'Mar–Sáb' : 'Tue–Sat', label: isEs ? 'Salón en Naples' : 'Naples Showroom' },
+                    { stat: isEs ? 'Salón' : 'Showroom', label: isEs ? 'Abierto en Naples' : 'Open in Naples' },
                   ].map((item) => (
                     <div
                       key={item.label}

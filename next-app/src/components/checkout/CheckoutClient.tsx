@@ -8,7 +8,7 @@ import CheckoutGate, { hasChosenGuestCheckout, rememberGuestCheckout } from '@/c
 import { useCart, type CartItem } from '@/context/CartContext';
 import OrderSummary, { OrderTotals, computeOrderTotals } from '@/components/checkout/OrderSummary';
 import type { OrderQuote } from '@/lib/checkout-pricing';
-import { addressWithLandmark, hoursLine } from '@/lib/business-location';
+import { addressWithLandmark } from '@/lib/business-location';
 import PayPalCheckoutButton from '@/components/checkout/PayPalCheckoutButton';
 import DiscountCodeField from '@/components/checkout/DiscountCodeField';
 import type { AppliedDiscount } from '@/lib/discount-codes';
@@ -89,7 +89,11 @@ interface CustomerInfo {
   country: string;
 }
 
-export default function CheckoutClient({ locale, paypalClientId }: { locale: string; paypalClientId?: string | null }) {
+// `pickupHoursLine` is the admin-editable hours sentence, formatted server-side
+// on the checkout page (this is a client component, so it cannot read the
+// schedule itself without a second Supabase round-trip and a default-hours
+// flash before hydration).
+export default function CheckoutClient({ locale, paypalClientId, pickupHoursLine }: { locale: string; paypalClientId?: string | null; pickupHoursLine: string }) {
   const { items, remove, clear, setQuantity, refreshAvailability, stockAlerts, dismissStockAlerts, openDrawer } = useCart();
   const router = useRouter();
   const isEs = locale === 'es';
@@ -671,8 +675,8 @@ export default function CheckoutClient({ locale, paypalClientId }: { locale: str
                 // ever being shown where they would be driving.
                 const description = option.value === 'local-pickup'
                   ? (isEs
-                      ? `Recogida en persona en ${addressWithLandmark(true)}. ${hoursLine(true)}. No se necesita dirección de envío.`
-                      : `In-person pickup at ${addressWithLandmark(false)}. ${hoursLine(false)}. No shipping address needed.`)
+                      ? `Recogida en persona en ${addressWithLandmark(true)}. ${pickupHoursLine}. No se necesita dirección de envío.`
+                      : `In-person pickup at ${addressWithLandmark(false)}. ${pickupHoursLine}. No shipping address needed.`)
                   : option.value === 'express-overnight-insured'
                     ? (isEs ? 'Entrega al día siguiente, totalmente asegurada.' : 'Next-day delivery, fully insured.')
                     : (isEs ? 'Envío totalmente asegurado con firma de entrega.' : 'Fully insured shipping with delivery signature.');

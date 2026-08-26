@@ -13,8 +13,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return pageMetadata({
     title: isEs ? 'Contáctenos — Envíe Su Artículo' : 'Contact Us — Submit Your Item',
     description: isEs
-      ? 'Envíe fotos de joyería, oro, plata, relojes, monedas o antigüedades. Visítenos en 6240 Shirley St, Ste 104, Naples, martes a sábado. (239) 404-8505.'
-      : 'Submit photos of jewelry, gold, silver, watches, coins, or antiques. Visit us at 6240 Shirley St, Ste 104, Naples, Tue–Sat. Call or text (239) 404-8505.',
+      ? 'Envíe fotos de joyería, oro, plata, relojes, monedas o antigüedades. Visítenos en 6240 Shirley St, Ste 104, Naples — en horario del salón o con cita. (239) 404-8505.'
+      : 'Submit photos of jewelry, gold, silver, watches, coins, or antiques. Visit us at 6240 Shirley St, Ste 104, Naples — showroom hours or by appointment. Call or text (239) 404-8505.',
     path: '/contact',
     locale,
   });

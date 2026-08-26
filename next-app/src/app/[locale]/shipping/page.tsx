@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import LegalPolicyPage from '@/components/legal/LegalPolicyPage';
 import { getLegalMetadata } from '@/lib/legal-metadata';
-import { getSpanishLegalCopy } from '@/lib/spanish-legal-copy';
+import { getSpanishLegalCopy, spanishShippingSections } from '@/lib/spanish-legal-copy';
 import { addressWithLandmark, hoursLine } from '@/lib/business-location';
+import { getStoreHours } from '@/lib/store-hours';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -17,6 +18,11 @@ export default async function ShippingPage({ params }: Props) {
   const { locale } = await params;
   const isEs = locale === 'es';
   const spanishCopy = getSpanishLegalCopy('shipping', locale);
+  // Admin-editable hours: the ES module constant froze the DEFAULT hours line
+  // at import, so rebuild the ES sections with the live schedule here. Never
+  // mutate the shared SPANISH_LEGAL_COPY object — the other legal pages read it.
+  const schedule = await getStoreHours();
+  const spanishSections = spanishCopy ? spanishShippingSections(hoursLine(schedule, true)) : null;
 
   return (
     <LegalPolicyPage
@@ -24,11 +30,11 @@ export default async function ShippingPage({ params }: Props) {
       title={spanishCopy?.title ?? 'Shipping Policy'}
       updated={spanishCopy?.updated}
       intro={spanishCopy?.intro}
-      sections={spanishCopy?.sections ?? [
+      sections={spanishSections ?? [
         {
           title: isEs ? 'Opciones de Entrega' : 'Fulfillment Options',
           bullets: [
-            `Free local pickup at our showroom, ${addressWithLandmark(false)} — ${hoursLine(false)}.`,
+            `Free local pickup at our showroom, ${addressWithLandmark(false)} — ${hoursLine(schedule, false)}.`,
             'Priority insured and express overnight insured shipping for eligible items.',
             'Every shipped order is fully insured for its purchase price.',
             'Items ship in discreet, unbranded packaging for your privacy and security.',

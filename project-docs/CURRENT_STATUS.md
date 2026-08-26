@@ -8,7 +8,69 @@
 
 **Read this, then `TASKS.md`.**
 
-### 🆕 2026-08-24 (latest session) — weak-GPU hero freeze BUILT, NOT deployed
+### 🆕 2026-08-25 (latest) — admin-editable HOMEPAGE BANNER built; ✅ hours SQL is DONE
+
+The homepage promo strip is now editable from **Admin → Settings → Homepage
+Banner**: both fragments (eyebrow + message), EN + ES with per-field fallback,
+a link on/off toggle, an editable destination from a curated allow-list, and a
+master show/hide. Stored as `shop_settings.home_banner` jsonb; degrades to the
+current promo copy when unconfigured (verified byte-identical in EN and ES).
+⚠️ The strip is `nowrap`, so the 2026-08-14 320px measurement is now
+ENFORCED as a character budget (warn at 48, block at 53) in both the panel and
+the parser. Link off = plain `<div>`, no arrow, no hover/focus (CSS rescoped
+to `a.home-announcement`). Gate: `tsc` · lint · **1176/1176 (112 files)** ·
+build **458/458**.
+
+✅ **BOTH migrations are RUN** (`store-hours-2026-08.sql` and
+`home-banner-2026-08.sql`) and both columns verified `null` via the anon REST
+key — built-in defaults serve until an admin saves. ✅ **All three banner
+render paths were then exercised against the real DB** (link off → `<div>` with
+no arrow; banner off → no element, page still 200/one `<h1>`; custom
+destination → `/shop` + `/es/shop` with ES falling back to English), and the
+column restored to `null`. 🟡 **Nothing blocks the deploy**; the only remaining
+checks need production (first save of each panel + the Netlify durable-cache
+behavior of `revalidatePath('/', 'layout')`) — see `TASKS.md`. Durable rules:
+`DECISIONS.md` → *"Homepage Announcement Banner"*. Detail: `CHANGELOG.md`
+2026-08-25.
+
+✅ **Staging synced and ready to push** (`C:\Users\rcman\NEJ-repo-staging`,
+**887 files / 20.14 MB**): 44 files queued and copied, 0 Extras / 0 Mismatch /
+0 FAILED, follow-up dry run 0, leak check clean against a **181 `.tsx`**
+positive control. Gate from a deleted `.next`: `tsc` · lint · **1176/1176
+(112 files)** · build **458/458**. Full evidence in `TASKS.md`.
+
+### 🆕 2026-08-25 (later session) — admin-editable STORE HOURS built; 🔴 SQL + deploy pending
+
+The weekly showroom hours are now editable from **Admin → Settings → Store
+Hours** (per-day open/closed + times; mockup approved before building).
+Stored as `shop_settings.store_hours` jsonb; every surface — footer,
+homepage/contact Visit Us, About, checkout pickup, product trust copy,
+shipping policy EN/ES, order-invoice pickup block, JewelryStore JSON-LD —
+now reads the schedule through `getStoreHours()` and **degrades byte-identically
+to the historical Tue–Sat 11:00–15:00** when unconfigured (verified on the dev
+server). ~14 hardcoded "Tue–Sat" prose/meta strings were reworded once to
+day-agnostic copy. Gate: `tsc` · lint · **1159/1159 (111 files)** · build
+**457/457**.
+
+🔴 **Two manual steps before it's live** (top item in `TASKS.md`): run
+`supabase/store-hours-2026-08.sql` in the Supabase SQL Editor, and deploy.
+Until both, production is unchanged — the feature is inert-by-default.
+Durable rules in `DECISIONS.md` under *"Store Hours"* (pure formatters, no
+Intl, sitewide revalidate, prose never names days). Detail: `CHANGELOG.md`
+2026-08-25.
+
+### 🆕 UPDATE 2026-08-25 — the hero-freeze batch is DEPLOYED and LIVE
+
+Owner pushed and deployed (~9:42 AM); live site confirmed normal on a normal
+machine. The post-deploy "~24% errors" scare in Netlify Observability was
+checked the same morning and is **pre-existing eBay-webhook 499s, not this
+deploy** — zero server errors in the deploy window; details filed under the
+eBay `account_deletion` item in `TASKS.md`. ◻ Still open: the one check that
+motivated the whole batch — the owner's weak-GPU desktop (owner will check
+later; expect brief choppiness, then a frozen ring, instant freeze on reload).
+Original build record below.
+
+### 2026-08-24 (earlier) — weak-GPU hero freeze BUILT, NOT deployed
 
 Owner-reported: the hero carousel is very choppy on an older desktop (weak
 GPU, confirmed), and stays choppy after load — the bound is per-frame
@@ -22,10 +84,12 @@ final tree from a deleted `.next`: `tsc` · lint · **1136/1136 (110 files)** ·
 build **456/456**. Verified in the local browser: default behavior unchanged
 (pane A running, B/C paused, no latch), force-freeze pauses all 3 rings
 WITHOUT latching, reveal settles to `done` with the stretched-link overlay
-intact, marquee pauses/resumes both directions. 🔴 **Not deployed; staging not
-re-synced; never seen on the actual weak desktop** — the deploy checklist is
-the top item in `TASKS.md`. Durable rules: `DECISIONS.md` *"A machine that
-cannot hold the spin gets a FROZEN ring"*.
+intact, marquee pauses/resumes both directions. ✅ **Staging re-synced
+2026-08-25** (12 files exactly as expected, 0 Extras/Mismatch/FAILED, leak
+check clean against a 179-`.tsx` positive control — evidence in `TASKS.md`).
+(Deployed 2026-08-25 — see the update block above; the weak-desktop check is
+the open item.) Durable rules: `DECISIONS.md` *"A machine that cannot hold the
+spin gets a FROZEN ring"*.
 
 ### 🆕 2026-08-24 (later session) — bot signups: cleaned up, gate LIVE
 
@@ -57,11 +121,11 @@ unconfirmed accounts as Reachable — the Phase 2 filter is listed in `TASKS.md`
 
 ### The shape, in one glance
 
-✅ **Everything below this line IS deployed (2026-08-24), no outstanding SQL.**
-(The one undeployed thing is the newer weak-GPU hero-freeze batch above, which
-also means staging no longer mirrors source.) Six deploys' worth of work went
-out today across two rounds — the five batches below, then the invoice heading
-fix.
+✅ **Everything below this line IS deployed (2026-08-24), no outstanding SQL —
+and as of 2026-08-25 the hero-freeze batch above is deployed too, so nothing
+is undeployed.** (Staging drifts from source only by memory docs — the owner's
+accepted standing preference.) Six deploys' worth of work went out 2026-08-24
+across two rounds — the five batches below, then the invoice heading fix.
 
 **Second deploy (heading only):** the invoice email `<h1>` went **28px → 20px**
 (`SUBJECT_HEADING_PX` in `order-invoice-email.ts`). That heading prints the

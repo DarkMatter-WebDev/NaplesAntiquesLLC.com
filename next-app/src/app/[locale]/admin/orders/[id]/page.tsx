@@ -3,6 +3,8 @@ import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { getVerifiedUser } from '@/lib/auth-claims';
 import OrderDetailPanel from '@/components/admin/OrderDetailPanel';
+import { formatPickupHours } from '@/lib/order-invoice-email';
+import { getStoreHours } from '@/lib/store-hours';
 import AdminHeader from '@/components/admin/AdminHeader';
 import type { Order, OrderItem } from '@/types/sales';
 import type { Product } from '@/types/product';
@@ -227,6 +229,7 @@ export default async function AdminOrderDetailPage({ params }: Props) {
       />
 
       <OrderDetailPanel
+        pickupHours={formatPickupHours(await getStoreHours())}
         initialOrder={order as unknown as Order & { order_items: OrderItem[] }}
         itemMeltValues={itemMeltValues}
         initialInvoices={(invoices ?? []) as Invoice[]}

@@ -17,6 +17,8 @@ import ShowroomHours from '@/components/ShowroomHours';
 import CopyAddressButton from '@/components/CopyAddressButton';
 import TestimonialsSection from '@/components/home/TestimonialsSection';
 import { getHomeCarouselPayload } from '@/lib/home-carousel-server';
+import { getHomeBanner } from '@/lib/home-banner-server';
+import { resolveHomeBanner } from '@/lib/home-banner';
 import type { CarouselItem } from '../../../../carousel/lib/carouselData';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -30,8 +32,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     : 'Naples Estate Jewelry - Sell Jewelry, Gold & Silver in Naples, FL';
 
   const description = isEs
-    ? 'Compramos oro, joyería, plata, diamantes, monedas y relojes en Naples, FL. Visite nuestro salón, martes a sábado, o vamos a usted. Llame al (239) 404-8505.'
-    : 'We buy gold, estate jewelry, silver, diamonds, coins, and watches in Naples, FL. Visit our showroom Tue–Sat, or we come to you. Call (239) 404-8505.';
+    ? 'Compramos oro, joyería, plata, diamantes, monedas y relojes en Naples, FL. Visite nuestro salón o agende una cita — o vamos a usted. Llame al (239) 404-8505.'
+    : 'We buy gold, estate jewelry, silver, diamonds, coins, and watches in Naples, FL. Visit our showroom or book an appointment — or we come to you. Call (239) 404-8505.';
 
   // `brandedTitle` because this title LEADS with the brand rather than trailing
   // it, so the suffix pageMetadata() adds to every other page's og:title would
@@ -60,6 +62,8 @@ export default async function HomePage({ params }: Props) {
   const contactHref = isEs ? '/es/contact' : '/contact';
 
   const carousel = await getHomeCarouselPayload(HOME_CAROUSEL_FALLBACK);
+  // Admin-editable announcement strip; null when switched off or empty.
+  const banner = resolveHomeBanner(await getHomeBanner(), isEs);
 
   // Google prints a site name on its own line above the search result. Without a
   // WebSite entity it falls back to the bare domain — which is why results read
@@ -114,55 +118,81 @@ export default async function HomePage({ params }: Props) {
           initialAltItems={carousel.altItems}
           initialThirdItems={carousel.thirdItems}
           initialSettings={carousel.settings}
-          banner={
-            <Link
-              data-customer-reveal-skip
-              className="home-announcement"
-              href={`${isEs ? '/es' : ''}/free-evaluation`}
-              // No aria-label. The old one ("Summer special: schedule a free
-              // evaluation.") read as one clean sentence but did not CONTAIN
-              // the visible text, so axe flagged it under
-              // label-content-name-mismatch — the colon breaks the substring
-              // match, and any punctuation between the fragments would. The
-              // sentence pause now comes from an sr-only ". " emitted with the
-              // visual "·" separator below, which keeps the accessible name
-              // equal to the content and the rule satisfied by construction.
-              style={{ background: '#1a1c1c' }}
-            >
-              {(isEs
-                ? ['Oferta de verano', 'Programe una evaluación gratuita']
-                : ['Summer special', 'Schedule a free evaluation']
-              ).map((item, index) => (
-                <span
-                  key={item}
-                  // Both items show at EVERY width. The old strip hid its third
-                  // item below 780px because three service claims could not fit;
-                  // this promo is two fragments, so nothing needs hiding.
-                  //
-                  // The strip is `nowrap`, so copy length is a real constraint:
-                  // ALWAYS re-measure at 320px in BOTH locales when it changes.
-                  // Spanish is the binding one, and 320px is the tightest width
-                  // (the type clamp caps at 502px, so slack only grows above it).
-                  // Measured 2026-08-14: EN 75.7px slack, ES 30.4px of 304px.
-                  // ES is down to ~10% headroom — the tightest this strip has
-                  // ever run. Anything longer in Spanish needs the clamp
-                  // refitted, not just re-checked. ("Oferta de verano" was
-                  // chosen over "Especial de verano" for exactly this reason.)
-                  className="home-announcement-item"
-                  style={{ color: '#e9c349', fontFamily: 'var(--font-label)' }}
+          banner={banner && (
+            (() => {
+              // Admin-editable since 2026-08-25 (copy, link on/off, destination,
+              // and a master switch). `banner` is null when it is switched off
+              // or has no copy — HomeHeroStack simply renders no strip.
+              //
+              // Element depends on the LINK toggle: an <a> when it points
+              // somewhere, a plain <div> when it does not. A non-link must not
+              // be focusable, must not carry an href, and must not show the
+              // trailing arrow — the arrow is the affordance that says
+              // "tappable", so leaving it on a static strip would lie. The
+              // hover/focus styling is scoped to `a.home-announcement` in
+              // globals.css for the same reason.
+              const inner = (
+                <>
+                  {banner.fragments.map((item, index) => (
+                    <span
+                      key={item}
+                      // Both items show at EVERY width. The old strip hid its third
+                      // item below 780px because three service claims could not fit;
+                      // this promo is two fragments, so nothing needs hiding.
+                      //
+                      // The strip is `nowrap`, so copy length is a real constraint:
+                      // ALWAYS re-measure at 320px in BOTH locales when it changes.
+                      // Spanish is the binding one, and 320px is the tightest width
+                      // (the type clamp caps at 502px, so slack only grows above it).
+                      // Measured 2026-08-14: EN 75.7px slack, ES 30.4px of 304px.
+                      // ES is down to ~10% headroom — the tightest this strip has
+                      // ever run. That measurement is now ENFORCED rather than
+                      // remembered: BANNER_SAFE_CHARS / BANNER_MAX_CHARS in
+                      // lib/home-banner.ts derive from it, and the admin panel
+                      // blocks copy that would overflow.
+                      className="home-announcement-item"
+                      style={{ color: '#e9c349', fontFamily: 'var(--font-label)' }}
+                    >
+                      {index > 0 && <span aria-hidden="true" className="home-announcement-separator">·</span>}
+                      {index > 0 && <span className="sr-only">. </span>}
+                      {item}
+                    </span>
+                  ))}
+                  {/* Outside the mapped list on purpose, so it shows at every width
+                      no matter how many fragments the copy has. It is the only cue
+                      the strip is tappable — so it renders ONLY when it is. */}
+                  {banner.href && <span aria-hidden="true" className="home-announcement-arrow">→</span>}
+                </>
+              );
+
+              return banner.href ? (
+                <Link
+                  data-customer-reveal-skip
+                  className="home-announcement"
+                  href={banner.href}
+                  // No aria-label. The old one ("Summer special: schedule a free
+                  // evaluation.") read as one clean sentence but did not CONTAIN
+                  // the visible text, so axe flagged it under
+                  // label-content-name-mismatch — the colon breaks the substring
+                  // match, and any punctuation between the fragments would. The
+                  // sentence pause now comes from an sr-only ". " emitted with the
+                  // visual "·" separator below, which keeps the accessible name
+                  // equal to the content and the rule satisfied by construction.
+                  style={{ background: '#1a1c1c' }}
                 >
-                  {index > 0 && <span aria-hidden="true" className="home-announcement-separator">·</span>}
-                  {index > 0 && <span className="sr-only">. </span>}
-                  {item}
-                </span>
-              ))}
-              {/* Outside the mapped list on purpose, so it shows at every width
-                  no matter how many fragments the copy has. It is the only cue
-                  the strip is tappable — and phones are where it is most likely
-                  to be tapped. */}
-              <span aria-hidden="true" className="home-announcement-arrow">→</span>
-            </Link>
-          }
+                  {inner}
+                </Link>
+              ) : (
+                <div
+                  data-customer-reveal-skip
+                  className="home-announcement"
+                  style={{ background: '#1a1c1c' }}
+                >
+                  {inner}
+                </div>
+              );
+            })()
+          )}
         />
 
         {/* Pre-hydration hero reveal. Pane A's carousel used to stay at
@@ -381,13 +411,13 @@ export default async function HomePage({ params }: Props) {
                 ? [
                     { q: '¿Compran joyería además de venderla?', a: 'Sí — comprar es la mitad del negocio. Evaluaciones gratuitas y privadas para oro, plata, diamantes, relojes y patrimonios completos, en nuestro salón de Naples o en su casa en todo el suroeste de Florida.' },
                     { q: '¿Cómo funciona el envío?', a: 'Cada pedido enviado viaja totalmente asegurado con confirmación de firma, y los pedidos de $5,000+ se envían por USPS Registered Mail. Las tarifas según el valor se muestran al pagar.' },
-                    { q: '¿Puedo ver una pieza en persona?', a: 'Sí — visite nuestro salón en 6240 Shirley St, Ste 104, dentro de Sharon Lynch Collections, de martes a sábado de 11:00 a.m. a 3:00 p.m. o con cita. La recogida local es gratuita: elija Recogida local al pagar o llame para coordinar.' },
+                    { q: '¿Puedo ver una pieza en persona?', a: 'Sí — visite nuestro salón en 6240 Shirley St, Ste 104, dentro de Sharon Lynch Collections, durante el horario del salón o con cita (el horario actual aparece arriba y en nuestra página de contacto). La recogida local es gratuita: elija Recogida local al pagar o llame para coordinar.' },
                     { q: '¿Cómo fijan sus precios?', a: 'La mayoría de las piezas se calculan directamente contra el mercado de metales en vivo, con el valor de rescate junto al precio; algunas tienen un precio fijo. En ambos casos, lo que ve es transparente — no un margen arbitrario.' },
                   ]
                 : [
                     { q: 'Do you buy jewelry as well as sell it?', a: 'Yes — buying is half the business. Free, private appraisals for gold, silver, diamonds, watches, and full estates, at our Naples showroom or at your home across Southwest Florida.' },
                     { q: 'How does shipping work?', a: 'Every shipped order travels fully insured with signature confirmation, and orders of $5,000+ ship USPS Registered Mail. Value-based rates are shown at checkout.' },
-                    { q: 'Can I see a piece in person?', a: 'Yes — visit our Naples showroom at 6240 Shirley St, Ste 104, inside Sharon Lynch Collections, Tue–Sat 11am–3pm or by appointment. Local pickup is free: choose Local Pickup at checkout, or call to arrange a viewing.' },
+                    { q: 'Can I see a piece in person?', a: 'Yes — visit our Naples showroom at 6240 Shirley St, Ste 104, inside Sharon Lynch Collections, during showroom hours or by appointment (current hours are listed just above and on our contact page). Local pickup is free: choose Local Pickup at checkout, or call to arrange a viewing.' },
                     { q: 'How are your prices set?', a: 'Most pieces are priced directly against the live metals market, with the scrap value shown right beside the price; some carry a set price instead. Either way, what you see is transparent — not an arbitrary markup.' },
                   ]
               ).map((faq) => (
@@ -539,7 +569,6 @@ export default async function HomePage({ params }: Props) {
                   else so the footer's copy remains a server component. */}
               <ShowroomHours
                 locale={locale}
-                variant="full"
                 layout="rows"
                 highlightToday
                 className="mt-8"

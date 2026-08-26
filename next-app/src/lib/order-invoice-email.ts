@@ -6,10 +6,12 @@ import { BUSINESS_PHONE, buildOrderEmailFooterHtml, buildOrderEmailFooterTextLin
 import {
   byAppointmentLabel,
   cityLine,
-  hoursDaysLabel,
-  hoursTimesLabel,
+  DEFAULT_STORE_HOURS,
+  hoursSegmentsFull,
+  hoursSummary,
   landmarkPhrase,
   streetLine,
+  type StoreHoursSchedule,
 } from '@/lib/business-location';
 import { describeOrderShippingService } from '@/lib/checkout-shipping';
 
@@ -107,7 +109,25 @@ export function isOrderPaid(order: Pick<Order, 'payment_status'>): boolean {
   return String(order.payment_status ?? '').trim().toLowerCase() === 'paid';
 }
 
-export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoiceNumber?: string | null): InvoiceEmailContent {
+/**
+ * Format the admin-editable schedule for the pickup block's single hours line:
+ * `Tuesday – Saturday, 11:00 AM – 3:00 PM`, or a `'; '`-joined per-segment
+ * list when the week doesn't compress to one range, or `'By appointment'`
+ * when every day is closed (the block's own byAppointment footnote would
+ * otherwise be the only content).
+ */
+export function formatPickupHours(schedule: StoreHoursSchedule): string {
+  const summary = hoursSummary(schedule, false);
+  if (summary) return `${summary.days}, ${summary.times}`;
+  const segments = hoursSegmentsFull(schedule, false);
+  return segments.length > 0 ? segments.join('; ') : 'By appointment';
+}
+
+// This module is sync and imported by a client component (OrderDetailPanel's
+// preview), so it cannot fetch the schedule itself. Server callers pass
+// `opts.pickupHours` from `getStoreHours()`; without it the block shows the
+// built-in default hours.
+export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoiceNumber?: string | null, opts?: { pickupHours?: string }): InvoiceEmailContent {
   const invoiceNumber = invoiceNumberForOrder(order, fallbackInvoiceNumber);
   const paid = isOrderPaid(order);
   // Local pickup orders can still have an address on file (the checkout address
@@ -168,7 +188,7 @@ export function buildInvoiceEmailContent(order: InvoiceEmailOrder, fallbackInvoi
       addressLines: [streetLine(), cityLine()],
       landmark: landmarkPhrase(false),
       hoursLabel: 'Hours',
-      hours: `${hoursDaysLabel(false)}, ${hoursTimesLabel(false)}`,
+      hours: opts?.pickupHours ?? formatPickupHours(DEFAULT_STORE_HOURS),
       byAppointment: byAppointmentLabel(false),
     }
     : null;

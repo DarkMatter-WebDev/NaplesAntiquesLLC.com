@@ -5,11 +5,97 @@
 
 ## ◻ OPEN — needs a human
 
-🔴 **DEPLOY the weak-GPU hero-freeze batch** (2026-08-24, latest session; no
-SQL). Owner-reported: the homepage carousel is very choppy on an older desktop
-with a weak GPU, and stays choppy after load settles. Built with the owner's
-explicit choices (freeze-the-ring + housekeeping): an FPS watchdog freezes the
-hero rings on machines that sustain a median frame time > 40ms (~25fps),
+🟡 **READY TO DEPLOY 2026-08-25 — store hours + homepage banner.** Both SQL
+migrations are RUN and both features are verified locally against the live
+columns. Nothing is blocking the deploy.
+
+✅ **Both migrations done by the owner**: `store-hours-2026-08.sql` and
+`home-banner-2026-08.sql`. Verified via the anon REST key that both columns
+exist, read cleanly, and are `null` — i.e. the built-in defaults serve until an
+admin saves.
+
+✅ **All three banner render paths exercised against the real database**
+(2026-08-25, by writing test values to `home_banner`, verifying, then restoring
+the column to `null`):
+
+| State | Result |
+| --- | --- |
+| Link off | `<div>`, 0 anchors, **0 arrows**, copy intact, EN + ES |
+| Banner off | no element at all; page 200, one `<h1>`, hero intact, no copy in either locale |
+| Custom destination + blank ES | EN `href="/shop"`, ES `href="/es/shop"`, arrow back, ES falls back to English copy |
+
+(The only `home-announcement` string left in the banner-off page is a CSS rule
+in the hero's styled-jsx, not an element.) Restored state re-verified from a
+cold start: EN → `/free-evaluation`, ES → `/es/free-evaluation`, arrow present,
+hours and JSON-LD unaffected. Other `shop_settings` values untouched — only
+`home_banner` was ever PATCHed.
+
+✅ **Staging synced 2026-08-25 — ready to copy to the repo folder and push.**
+Gate first, from a deleted `.next` with the dev server stopped: `tsc` clean ·
+lint clean · **1176/1176 across 112 files** · build **458/458**.
+
+Dry run queued exactly **44 files** — 22 store-hours files, 3 SQL, 8
+prose-sweep pages, 6 banner files, 5 memory docs — with **0 Extras / 0
+Mismatch / 0 FAILED**; the file list was read and every entry accounted for.
+Real run **44 copied / 0 FAILED**; follow-up dry run **0 to copy**.
+
+**887 files / 20.14 MB** on disk (robocopy total 890 = the documented 3
+`/XF`-excluded files: `.env.local`, `tsconfig.tsbuildinfo`, `next-env.d.ts`).
+Leak check clean — 0 `.git` (dir *or* file), 0 `worktrees`, 0 `node_modules`,
+0 `.next`, 0 `.env*`, 0 `*.log`, 0 `*.tsbuildinfo`, 0 `next-env.d.ts`,
+0 `*.pem` — against a **positive control of 181 `.tsx`** (= 179 at the
+2026-08-25 hero-freeze sync + `AdminStoreHoursPanel` + `AdminHomeBannerPanel`),
+so the zeros are real rather than a broken scan.
+
+Hidden paths confirmed present: `.claude/launch.json`,
+`.github/workflows/scheduled-jobs.yml`, `.gitignore`, `next-app/.npmrc`.
+Staged-content spot checks: all 11 new feature files present; `globals.css`
+carries 6 `a.home-announcement` hits (the link-scoped rules); `(home)/page.tsx`
+imports and calls `resolveHomeBanner`; `ShowroomHours.tsx` calls
+`getStoreHours`; `shop-settings.sql` carries both new columns; and the standing
+CSP hazard still reads **`maps.google.com` 1 hit each** in root `netlify.toml`
+and `next-app/next.config.ts`. The only remaining `hoursDaysLabel`/
+`hoursRowsGrouped` string in the tree is a test DESCRIPTION naming the retired
+helpers — no code references survive.
+
+(Post-sync doc edits recording this result drift staging by memory docs only —
+the owner's accepted standing preference.)
+
+◻ **Post-deploy checks (the only things left, both need production):**
+
+1. **First hours save**: Admin → Settings → Store Hours → save a schedule;
+   confirm footer/homepage/contact/checkout/shipping update within a few
+   minutes and view-source JSON-LD `openingHoursSpecification` reflects it.
+   ⚠️ This is also the live test of `revalidatePath('/', 'layout')` against
+   Netlify's durable cache — if a static page proves sticky, the documented
+   fallback is adding `export const revalidate = 3600` to hours-consuming
+   pages (see `DECISIONS.md`; do NOT add preemptively).
+2. **First banner save**: same panel flow; the render paths are proven, so this
+   is confirming the admin POST + revalidation round-trip, not the rendering.
+   ⚠️ Check any new copy at **320px in Spanish** — the panel blocks past 53
+   characters, but 49–53 only warns, and that band is the one to eyeball.
+3. ⚠️ **NAP**: after any hours change, update the Google Business Profile, eBay
+   merchant location, and Etsy shop location the same day (the panel warns).
+
+
+✅ **DEPLOYED 2026-08-25 — the weak-GPU hero-freeze batch is LIVE.** Owner
+pushed and deployed (published ~9:42 AM); owner confirmed the live site looks
+normal on a normal machine. Post-deploy scare resolved the same morning: the
+~24% "Errors" in Netlify Observability are the PRE-EXISTING eBay-webhook 499s,
+not this deploy — see the ℹ️ note under the eBay `account_deletion` item below
+before ever re-diagnosing that panel.
+
+◻ **The one remaining check — the owner's weak desktop** (owner said they will
+check later): load the homepage there; expect a few choppy seconds (watchdog
+warm-up + measurement window), then the ring freezes and stays quiet; reload
+should freeze immediately (session latch). `?heroFreeze=0` there = old
+always-spinning behavior for A/B; `?heroFreeze=1` anywhere previews the frozen
+look without latching.
+
+📜 What the batch is (2026-08-24; no SQL): owner-reported choppy carousel on a
+weak-GPU desktop, persisting after load. Built with the owner's explicit
+choices (freeze-the-ring + housekeeping): an FPS watchdog freezes the hero
+rings on machines that sustain a median frame time > 40ms (~25fps),
 prefers-reduced-motion now fully stops the ring instead of slowing it, the
 customer reveal releases its `will-change` ~800ms after revealing, and the
 testimonial marquee pauses while offscreen. Zero change on machines that keep
@@ -37,7 +123,26 @@ across 110 files** · build **456/456**.
 3. On a normal machine: the hero must look exactly as before — spinning ring,
    handover on scroll, marquee moving when visible.
 
-⚠️ Staging has NOT been re-synced for this batch.
+✅ **Staging re-synced for this batch, 2026-08-25** — ready to copy to the repo
+folder and push. Dry run queued exactly **12 files** (the 8 app files + 4
+memory docs above), real run **12 copied / 0 Extras / 0 Mismatch / 0 FAILED**,
+follow-up dry run **0 to copy**. **876 files / ~20.05 MB** on disk (robocopy
+total 879 = the documented 3 `/XF`-excluded files). Leak check clean — 0
+`.git` (dir or file), 0 `worktrees`, 0 `node_modules`, 0 `.next`, 0 `.env*`,
+0 `*.log`, 0 `*.tsbuildinfo`, 0 `next-env.d.ts`, 0 `*.pem` — against a
+**positive control of 179 `.tsx`** (= 177 at the 08-24 morning rebuild
++ `TurnstileWidget.tsx` + `TestimonialMarqueeBand.tsx`; source and staging
+both count 179). Hidden paths present: `.github/workflows/scheduled-jobs.yml`,
+`.gitignore`, `.claude/launch.json`, `next-app/.npmrc`. Staged-content spot
+checks: `maps.google.com` **1 hit each** in root `netlify.toml` and
+`next-app/next.config.ts` (the standing CSP hazard); `hero-frame-guard.ts` +
+its test + `TestimonialMarqueeBand.tsx` present; staged `Carousel.tsx` imports
+the guard (8 guard-symbol hits); staged `Carousel.module.css` has
+`animation-play-state: paused` and its only `128s` hit is the comment
+explaining the removal; staged `CustomerReveal.tsx` has 4 `'done'` refs;
+staged `globals.css` has `data-marquee-paused`; all four staged memory docs
+carry this session's entries. (Post-sync doc edits recording this very result
+drift staging by memory docs only — the owner's accepted standing preference.)
 
 ✅ **ACTIVE IN PRODUCTION 2026-08-24 (later session) — the Turnstile bot gate
 is LIVE and verified.** All five activation steps completed: code deployed
@@ -860,6 +965,20 @@ across 101 files** · build **454/454 pages**. New tests were **mutation-tested*
 ## 🟡 eBay `account_deletion` webhook rows are 97% of the sync log
 
 Found while investigating the above; **not** its cause, and not urgent.
+
+ℹ️ **This same webhook is also what makes Netlify Observability's error rate
+look scary** (checked 2026-08-25 after the owner asked about ~24% errors
+post-deploy). The "errors" are `499 Client Disconnected` on
+`POST /api/webhooks/ebay-account-deletion` — eBay's sender hangs up when our
+response takes >~1s (slow ones run 0.9–2.9s; fast ones 200). ~794/day, a
+perfectly even drumbeat across the last 24h, predating that day's deploy —
+**status-code breakdown showed zero server errors in the same window** (the
+only 5xx were 6/day-scale bot POSTs to `/contact`, a sitemap-variant probe,
+and one `/_next/image` 502 blip, all pre-deploy). Netlify counts 499 in its
+error rollup and the cadence is constant, so quiet hours show a HIGHER
+percentage. Do not re-diagnose this from the Observability panel; filter by
+status code first. An ack-immediately-process-later webhook handler would
+clear the 499s cosmetically — same latent-priority bucket as the log noise.
 
 `ebay_sync_log` holds **77,617 rows, 75,459 of them `account_deletion`**
 receipts from eBay's marketplace-account-deletion webhook, arriving at

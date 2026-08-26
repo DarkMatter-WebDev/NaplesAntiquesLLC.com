@@ -14,8 +14,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ? 'Servicios de Joyería en Naples, FL'
       : 'Jewelry & Estate Services in Naples, FL',
     description: isEs
-      ? 'Elija una evaluación gratuita de joyería o servicios de patrimonio. Salón en Naples, de martes a sábado, o con cita en el suroeste de Florida.'
-      : 'Choose a free jewelry evaluation or estate services. Naples showroom open Tue–Sat, or by appointment throughout Southwest Florida.',
+      ? 'Elija una evaluación gratuita de joyería o servicios de patrimonio. En nuestro salón de Naples o con cita en el suroeste de Florida.'
+      : 'Choose a free jewelry evaluation or estate services. At our Naples showroom, or by appointment throughout Southwest Florida.',
     path: '/services',
     locale,
   });

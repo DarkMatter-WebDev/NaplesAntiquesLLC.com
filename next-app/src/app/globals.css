@@ -1463,16 +1463,19 @@ button:focus-visible > .hover-underline-grow,
 /* The strip became a link to /free-evaluation (owner, 2026-08-11: promote the
    free-evaluation offer, this month only). It is an <a>, so kill the underline
    and give it a hover/focus state — the gold text on near-black already reads as
-   a banner, so the affordance is the trailing arrow plus a lift on hover. */
+   a banner, so the affordance is the trailing arrow plus a lift on hover.
+   ⚠️ The interactive rules are scoped to `a.home-announcement` because the link
+   is admin-switchable (2026-08-25): with it off the strip renders as a <div>,
+   which must not lift on hover or take a focus ring — it goes nowhere. */
 .home-announcement {
   text-decoration: none;
   transition: background-color 160ms ease;
 }
-.home-announcement:hover,
-.home-announcement:focus-visible {
+a.home-announcement:hover,
+a.home-announcement:focus-visible {
   background: #24211a !important; /* overrides the inline near-black */
 }
-.home-announcement:focus-visible {
+a.home-announcement:focus-visible {
   outline: 2px solid #e9c349;
   outline-offset: -2px;
 }
@@ -1486,7 +1489,7 @@ button:focus-visible > .hover-underline-grow,
   color: #e9c349;
   transition: transform 160ms ease;
 }
-.home-announcement:hover .home-announcement-arrow {
+a.home-announcement:hover .home-announcement-arrow {
   transform: translateX(2px);
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1494,7 +1497,7 @@ button:focus-visible > .hover-underline-grow,
   .home-announcement-arrow {
     transition: none;
   }
-  .home-announcement:hover .home-announcement-arrow {
+  a.home-announcement:hover .home-announcement-arrow {
     transform: none;
   }
 }

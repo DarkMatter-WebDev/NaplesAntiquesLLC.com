@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import AdminCarouselSettingsPanel from './AdminCarouselSettingsPanel';
 import AdminShopVisibilityPanel from './AdminShopVisibilityPanel';
+import AdminStoreHoursPanel from './AdminStoreHoursPanel';
+import AdminHomeBannerPanel from './AdminHomeBannerPanel';
 import AdminSpecialPricePanel from './AdminSpecialPricePanel';
 import MarketingSettingsPanel from './MarketingSettingsPanel';
 import EtsySettingsPanel from './EtsySettingsPanel';
@@ -338,6 +340,8 @@ export default function AdminSettingsPanel() {
           </div>
         </section>
         <AdminShopVisibilityPanel />
+        <AdminStoreHoursPanel />
+        <AdminHomeBannerPanel />
         <AdminSpecialPricePanel />
         <MarketingSettingsPanel />
         <EtsySettingsPanel />

@@ -43,11 +43,15 @@ export const GEO: { latitude: number; longitude: number } | null = {
 };
 
 /**
- * Tue–Sat 11:00–15:00. `opens`/`closes` are 24h for schema.org
- * OpeningHoursSpecification; the human strings are built below.
+ * Tue–Sat 11:00–15:00 — the BUILT-IN DEFAULT schedule. Since 2026-08 the live
+ * hours are admin-editable (Admin → Settings → Store Hours, stored on
+ * `shop_settings.store_hours`); this constant survives only as the source of
+ * `DEFAULT_STORE_HOURS` in `store-hours.ts`, served whenever the DB value is
+ * null, malformed, or unreachable. `opens`/`closes` are 24h `HH:MM`.
  *
  * ⚠️ These must match the Google Business Profile exactly. Google compares the
  * two once the profile is verified, and a mismatch is a self-inflicted wound.
+ * The same applies to ADMIN-EDITED hours — the admin panel carries the warning.
  */
 export const HOURS = {
   days: ['Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
@@ -119,22 +123,6 @@ export function wayfindingSentence(isEs: boolean): string {
     : `Our Naples showroom is inside ${SHARED_SPACE_NAME} at ${ADDRESS.street}, Suite 104 — look for their sign, then Suite 104.`;
 }
 
-/** `Tue–Sat 11am–3pm, or by appointment` */
-export function hoursLine(isEs: boolean): string {
-  return isEs
-    ? 'Martes a sábado, 11:00 a.m. – 3:00 p.m., o con cita'
-    : 'Tue–Sat 11am–3pm, or by appointment';
-}
-
-/** `Tuesday – Saturday` / `11:00 AM – 3:00 PM`, for a two-line hours block. */
-export function hoursDaysLabel(isEs: boolean): string {
-  return isEs ? 'Martes a sábado' : 'Tuesday – Saturday';
-}
-
-export function hoursTimesLabel(isEs: boolean): string {
-  return isEs ? '11:00 a.m. – 3:00 p.m.' : '11:00 AM – 3:00 PM';
-}
-
 export function byAppointmentLabel(isEs: boolean): string {
   return isEs ? 'o con cita' : 'or by appointment';
 }
@@ -144,7 +132,7 @@ export function byAppointmentLabel(isEs: boolean): string {
  * stacking two "Closed" rows at the top of the list, which is what a
  * Sunday-first US calendar order would do.
  */
-const WEEK_ORDER = [
+export const WEEK_ORDER = [
   'Monday',
   'Tuesday',
   'Wednesday',
@@ -154,7 +142,46 @@ const WEEK_ORDER = [
   'Sunday',
 ] as const;
 
-type WeekDay = (typeof WEEK_ORDER)[number];
+export type WeekDay = (typeof WEEK_ORDER)[number];
+
+/**
+ * One day of the admin-editable weekly schedule. `opens`/`closes` are 24h
+ * `HH:MM` strings (the schema.org format AND the `<input type="time">` format).
+ * A closed day keeps its last times so reopening it restores them.
+ */
+export interface StoreDayHours {
+  open: boolean;
+  opens: string;
+  closes: string;
+}
+
+/**
+ * The full weekly schedule, keyed by canonical ENGLISH day name. Stored as
+ * jsonb on `shop_settings.store_hours`; fetched via `getStoreHours()` in
+ * `store-hours.ts`, which falls back to `DEFAULT_STORE_HOURS` (built from
+ * `HOURS` above) whenever the column is null, missing, or unreachable.
+ *
+ * Every hours formatter below is PURE and takes the schedule as a parameter —
+ * this file never fetches, so it stays sync, testable, and client-safe.
+ */
+export type StoreHoursSchedule = Record<WeekDay, StoreDayHours>;
+
+/**
+ * `HOURS` as a schedule — Tue–Sat open 11:00–15:00, Sun/Mon closed (carrying
+ * the same times so the admin panel starts from sensible values). Lives HERE,
+ * not in `store-hours.ts`, so client code (admin preview, module-scope legal
+ * copy) can format the fallback without touching the server-only data layer.
+ */
+export const DEFAULT_STORE_HOURS: StoreHoursSchedule = Object.fromEntries(
+  WEEK_ORDER.map((day) => [
+    day,
+    {
+      open: (HOURS.days as readonly string[]).includes(day),
+      opens: HOURS.opens,
+      closes: HOURS.closes,
+    },
+  ]),
+) as StoreHoursSchedule;
 
 /**
  * ⚠️ Display only. `HOURS.days` stays English because schema.org
@@ -175,10 +202,10 @@ export interface HoursRow {
   time: string;
   closed: boolean;
   /**
-   * Canonical ENGLISH weekday for a single-day row, or undefined on a grouped
-   * row that covers several days. Separate from `day`, which is localized: the
+   * Canonical ENGLISH weekday. Separate from `day`, which is localized: the
    * "today" comparison runs against `Intl`'s en-US weekday name, so a Spanish
-   * label could never match it.
+   * label could never match it. Always set since the grouped-rows variant was
+   * removed (2026-08), but kept optional for interface stability.
    */
   dayKey?: string;
 }
@@ -211,41 +238,163 @@ export function closedLabel(isEs: boolean): string {
 }
 
 /**
+ * `'HH:MM'` (24h) → human time, hand-rolled so the output stays byte-identical
+ * to the strings this site has always shipped. ⛔ Do NOT swap these for
+ * `Intl.DateTimeFormat` — its es-US output is `a. m.` (space between the
+ * letters) where the site's convention is `a.m.`, and its en-US output never
+ * produces the compact `11am` form.
+ *
+ * - `'en-compact'`: `11am`, `3pm`, `11:30am` — minutes only when non-zero.
+ * - `'en-full'`:    `11:00 AM` — always minutes, space, uppercase.
+ * - `'es'`:         `11:00 a.m.` — always minutes, space, lowercase + periods.
+ */
+function formatTime(hhmm: string, style: 'en-compact' | 'en-full' | 'es'): string {
+  const [h24, m] = hhmm.split(':').map(Number);
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  const isPm = h24 >= 12;
+  const mm = String(m).padStart(2, '0');
+  if (style === 'en-compact') {
+    return `${h12}${m === 0 ? '' : `:${mm}`}${isPm ? 'pm' : 'am'}`;
+  }
+  if (style === 'en-full') {
+    return `${h12}:${mm} ${isPm ? 'PM' : 'AM'}`;
+  }
+  return `${h12}:${mm} ${isPm ? 'p.m.' : 'a.m.'}`;
+}
+
+/** `11am–3pm` (compact, no spaces) or `11:00 AM – 3:00 PM` / `11:00 a.m. – 3:00 p.m.`. */
+function formatTimeRange(opens: string, closes: string, style: 'en-compact' | 'en-full' | 'es'): string {
+  const joiner = style === 'en-compact' ? '–' : ' – ';
+  return `${formatTime(opens, style)}${joiner}${formatTime(closes, style)}`;
+}
+
+interface OpenSegment {
+  days: WeekDay[];
+  opens: string;
+  closes: string;
+}
+
+/**
+ * Maximal runs of CONSECUTIVE open days (Monday-first `WEEK_ORDER`) sharing
+ * identical times. The default schedule compresses to one `Tue–Sat` segment.
+ *
+ * No Sunday↔Monday wrap-around merge: a schedule open Sun + Mon yields two
+ * segments. `WEEK_ORDER` starts Monday precisely so the default closed days
+ * bookend the week, and a wrap merge would buy nothing for real schedules
+ * while making the labels ("Sun–Mon"?) ambiguous.
+ */
+function openSegments(schedule: StoreHoursSchedule): OpenSegment[] {
+  const segments: OpenSegment[] = [];
+  for (const day of WEEK_ORDER) {
+    const d = schedule[day];
+    if (!d?.open) continue;
+    const last = segments[segments.length - 1];
+    const prevDay = WEEK_ORDER[WEEK_ORDER.indexOf(day) - 1];
+    if (
+      last &&
+      prevDay &&
+      last.days[last.days.length - 1] === prevDay &&
+      last.opens === d.opens &&
+      last.closes === d.closes
+    ) {
+      last.days.push(day);
+    } else {
+      segments.push({ days: [day], opens: d.opens, closes: d.closes });
+    }
+  }
+  return segments;
+}
+
+/**
+ * A segment's day label.
+ * - EN compact: `Tue` / `Tue–Sat` (3-letter, bare en dash).
+ * - EN full: `Tuesday` / `Tuesday – Saturday` (spaced en dash).
+ * - ES: `Martes` / `Martes a sábado` (first capitalized, second lowercase).
+ */
+function segmentDaysLabel(days: WeekDay[], style: 'en-compact' | 'en-full' | 'es'): string {
+  const first = days[0];
+  const last = days[days.length - 1];
+  if (style === 'es') {
+    const firstEs = DAY_LABELS_ES[first];
+    return days.length === 1 ? firstEs : `${firstEs} a ${DAY_LABELS_ES[last].toLowerCase()}`;
+  }
+  if (style === 'en-compact') {
+    return days.length === 1 ? first.slice(0, 3) : `${first.slice(0, 3)}–${last.slice(0, 3)}`;
+  }
+  return days.length === 1 ? first : `${first} – ${last}`;
+}
+
+/**
+ * The one-line hours sentence: `Tue–Sat 11am–3pm, or by appointment` /
+ * `Martes a sábado, 11:00 a.m. – 3:00 p.m., o con cita`.
+ *
+ * Note the deliberate asymmetry: ES separates days from times with a comma,
+ * EN with a space — those are the bytes the site has always shipped. Multiple
+ * segments join with `'; '`; an all-closed week reads `By appointment only` /
+ * `Solo con cita` (no suffix).
+ */
+export function hoursLine(schedule: StoreHoursSchedule, isEs: boolean): string {
+  const segments = openSegments(schedule);
+  if (segments.length === 0) {
+    return isEs ? 'Solo con cita' : 'By appointment only';
+  }
+  const parts = segments.map((s) =>
+    isEs
+      ? `${segmentDaysLabel(s.days, 'es')}, ${formatTimeRange(s.opens, s.closes, 'es')}`
+      : `${segmentDaysLabel(s.days, 'en-compact')} ${formatTimeRange(s.opens, s.closes, 'en-compact')}`,
+  );
+  return `${parts.join('; ')}, ${byAppointmentLabel(isEs)}`;
+}
+
+/**
+ * `{ days: 'Tuesday – Saturday', times: '11:00 AM – 3:00 PM' }` — the two-line
+ * hours block (invoice/receipt pickup panel). Non-null only when the whole
+ * week compresses to ONE segment; a split schedule or an all-closed week
+ * returns null and the caller falls back to `hoursSegmentsFull()` / a
+ * by-appointment line.
+ */
+export function hoursSummary(
+  schedule: StoreHoursSchedule,
+  isEs: boolean,
+): { days: string; times: string } | null {
+  const segments = openSegments(schedule);
+  if (segments.length !== 1) return null;
+  const s = segments[0];
+  return {
+    days: segmentDaysLabel(s.days, isEs ? 'es' : 'en-full'),
+    times: formatTimeRange(s.opens, s.closes, isEs ? 'es' : 'en-full'),
+  };
+}
+
+/**
+ * Full-form segment lines for surfaces that need per-segment rows when
+ * `hoursSummary()` is null: `['Tuesday – Wednesday 10:00 AM – 2:00 PM',
+ * 'Friday 11:00 AM – 3:00 PM']`. Empty when every day is closed.
+ */
+export function hoursSegmentsFull(schedule: StoreHoursSchedule, isEs: boolean): string[] {
+  return openSegments(schedule).map((s) =>
+    isEs
+      ? `${segmentDaysLabel(s.days, 'es')}, ${formatTimeRange(s.opens, s.closes, 'es')}`
+      : `${segmentDaysLabel(s.days, 'en-full')} ${formatTimeRange(s.opens, s.closes, 'en-full')}`,
+  );
+}
+
+/**
  * All seven days, each with its own time or "Closed" — the Google-Maps-style
- * list. Closed days are DERIVED from `HOURS.days`, never listed separately, so
+ * list. Closed days are DERIVED from the schedule, never listed separately, so
  * changing the open days changes the list and the schema together.
  */
-export function hoursRows(isEs: boolean): HoursRow[] {
-  const open = new Set<string>(HOURS.days);
+export function hoursRows(schedule: StoreHoursSchedule, isEs: boolean): HoursRow[] {
   return WEEK_ORDER.map((day) => {
-    const isOpen = open.has(day);
+    const d = schedule[day];
+    const isOpen = Boolean(d?.open);
     return {
       day: isEs ? DAY_LABELS_ES[day] : day,
-      time: isOpen ? hoursTimesLabel(isEs) : closedLabel(isEs),
+      time: isOpen ? formatTimeRange(d.opens, d.closes, isEs ? 'es' : 'en-full') : closedLabel(isEs),
       closed: !isOpen,
       dayKey: day,
     };
   });
-}
-
-/**
- * The same information in two rows, for surfaces too tight for seven — a
- * marketing CTA, not a reference block.
- *
- * ⚠️ The closed-day label is hardcoded to "Sunday – Monday" because that is
- * what the current `HOURS.days` leaves over. If the open days ever change so
- * the closed days are no longer a contiguous Sunday/Monday pair, this grouping
- * silently lies — use `hoursRows()` instead, which cannot.
- */
-export function hoursRowsGrouped(isEs: boolean): HoursRow[] {
-  return [
-    { day: hoursDaysLabel(isEs), time: hoursTimesLabel(isEs), closed: false },
-    {
-      day: isEs ? 'Domingo y lunes' : 'Sunday – Monday',
-      time: closedLabel(isEs),
-      closed: true,
-    },
-  ];
 }
 
 /**
@@ -286,14 +435,31 @@ export function postalAddressSchema() {
   };
 }
 
-/** schema.org OpeningHoursSpecification. */
-export function openingHoursSchema() {
-  return [
-    {
-      '@type': 'OpeningHoursSpecification',
-      dayOfWeek: [...HOURS.days],
-      opens: HOURS.opens,
-      closes: HOURS.closes,
-    },
-  ];
+/**
+ * schema.org OpeningHoursSpecification — one spec per distinct (opens, closes)
+ * pair, with every open day sharing that pair listed in its `dayOfWeek` array
+ * (grouping need not be contiguous; schema.org allows any day set). Day names
+ * stay ENGLISH — never localize them. An all-closed week returns `[]`; the
+ * caller should then omit `openingHoursSpecification` entirely rather than
+ * publish an empty array.
+ */
+export function openingHoursSchema(schedule: StoreHoursSchedule) {
+  const byTimes = new Map<string, { days: WeekDay[]; opens: string; closes: string }>();
+  for (const day of WEEK_ORDER) {
+    const d = schedule[day];
+    if (!d?.open) continue;
+    const key = `${d.opens}|${d.closes}`;
+    const group = byTimes.get(key);
+    if (group) {
+      group.days.push(day);
+    } else {
+      byTimes.set(key, { days: [day], opens: d.opens, closes: d.closes });
+    }
+  }
+  return [...byTimes.values()].map((g) => ({
+    '@type': 'OpeningHoursSpecification',
+    dayOfWeek: g.days,
+    opens: g.opens,
+    closes: g.closes,
+  }));
 }

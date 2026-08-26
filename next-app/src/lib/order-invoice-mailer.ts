@@ -1,10 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   buildInvoiceEmailContent,
+  formatPickupHours,
   isOrderPaid,
   withInvoiceLineDiscounts,
   type InvoiceEmailOrder,
 } from '@/lib/order-invoice-email';
+import { getStoreHours } from '@/lib/store-hours';
 
 const ORDER_INVOICE_COLUMNS = [
   'id',
@@ -101,7 +103,11 @@ export async function sendOrderInvoiceEmail(opts: {
     order as unknown as InvoiceEmailOrder,
     opts.itemDiscounts ?? {},
   );
-  const content = buildInvoiceEmailContent(emailOrder, invoiceNumber);
+  // Admin-editable hours, resolved at SEND time so the pickup block always
+  // prints the current schedule (defaults to Tue–Sat if unconfigured).
+  const content = buildInvoiceEmailContent(emailOrder, invoiceNumber, {
+    pickupHours: formatPickupHours(await getStoreHours()),
+  });
   const emailType: 'invoice' | 'receipt' = isOrderPaid(emailOrder) ? 'receipt' : 'invoice';
 
   try {

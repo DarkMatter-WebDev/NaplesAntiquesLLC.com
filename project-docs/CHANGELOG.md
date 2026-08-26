@@ -1,6 +1,164 @@
 
 # Changelog
 
+## 2026-08-25 — Admin-editable homepage banner (BUILT; ⚠️ needs SQL + deploy)
+
+**The homepage announcement strip is now admin-editable** from Admin →
+Settings → Homepage Banner (new panel, mockup approved before building).
+Owner-confirmed scope: edit BOTH fragments (eyebrow + message), separate ES
+fields that fall back to EN per field, a link on/off toggle **plus** an
+editable destination, and a master show/hide switch.
+
+**Storage**: new `home_banner jsonb` column on `shop_settings` (null = the
+built-in promo copy). 🔴 **MANUAL SQL PENDING:
+`supabase/home-banner-2026-08.sql`** (also folded into `shop-settings.sql`).
+
+**The load-bearing constraint is length.** The strip is `white-space: nowrap`
+at a fitted type clamp, so long copy OVERFLOWS instead of wrapping. The
+2026-08-14 measurement recorded in `globals.css` (at 320px: ~304px usable, the
+shipped ES copy 48 chars / 273.6px, EN 40 chars / 228.3px → ~5.66px per
+character) is now **enforced rather than remembered**: `BANNER_SAFE_CHARS`
+(48, measured-good) warns and `BANNER_MAX_CHARS` (53, the computed overflow
+point) blocks — in the admin panel AND in `parseHomeBanner()`, so a
+hand-edited row cannot break the header either. The budget applies per
+locale.
+
+**Architecture** mirrors the store-hours split: pure/client-safe
+`src/lib/home-banner.ts` (shape, `DEFAULT_HOME_BANNER`, curated
+`HOME_BANNER_LINK_OPTIONS`, `resolveHomeBanner()`, `parseHomeBanner()`, the
+budget) + server-only `src/lib/home-banner-server.ts` (`getHomeBanner()`,
+`unstable_cache`, tag `home-banner`, degrades to the default on any error).
+New API `/api/admin/home-banner` (GET/PUT, requireAdmin, service client);
+PUT validates per-field then `revalidateTag('home-banner', {expire: 0})` +
+`revalidatePath('/', 'layout')`.
+
+**Homepage render**: the strip is an `<a>` when it links and a plain `<div>`
+when it does not — and the trailing `→` renders ONLY when it links, since the
+arrow is the affordance that says "tappable". The hover/focus CSS in
+`globals.css` was rescoped from `.home-announcement` to
+`a.home-announcement` for the same reason: a static strip must not lift on
+hover or take a focus ring. `banner={null}` when switched off —
+`HomeHeroStack`'s `banner` prop is already optional, so the hero simply
+starts at the carousel.
+
+**Destination allow-list**: `linkPath` is validated against a curated list of
+9 marketing routes (no admin/checkout/account/legal), stored locale-less with
+`/es` prefixed at render. Tested against an off-site URL and `/admin` — both
+rejected, so the column cannot smuggle in an open redirect.
+
+**Gate**: `tsc` clean · lint clean · **1176/1176 across 112 files** (new
+`home-banner.test.ts`: default byte-identity, visibility/link/ES-fallback
+resolution, destination allow-list, the combined-length budget) · build
+**458/458**. Dev-server check: the strip renders byte-identically to before
+in EN and ES (link, both fragments, `·` separator, sr-only period, arrow);
+`/api/admin/home-banner` unauthenticated → 401.
+
+◻ NOT yet exercised in a browser: the link-off and banner-off render paths
+(unit-tested, and TypeScript checks the JSX branch, but no visual pass) — the
+home_banner column does not exist yet, so no admin save was possible. Check
+those first after running the SQL.
+
+**Also this session:** ✅ the owner ran `store-hours-2026-08.sql`
+successfully. Verified against the now-migrated column: a null value degrades
+to the Tue–Sat default byte-identically, and the JSON-LD still emits the
+historical single spec.
+
+
+## 2026-08-25 — Admin-editable store hours (BUILT + verified locally; ⚠️ needs SQL + deploy)
+
+**The weekly showroom hours are now admin-editable** from Admin → Settings →
+Store Hours (new panel, mockup approved before building). Per-day rows: each
+of the 7 days has its own open/closed toggle and open/close times. Scope
+decisions (owner-confirmed): per-day granularity; structural surfaces dynamic
++ prose reworded day-agnostic once; weekly schedule only (no holiday
+overrides v1).
+
+**Storage**: new `store_hours jsonb` column on the single-row
+`public.shop_settings` (null = built-in default). 🔴 **MANUAL SQL PENDING:
+`supabase/store-hours-2026-08.sql`** (also folded into the canonical
+`shop-settings.sql`). Until it runs, every surface serves the historical
+Tue–Sat 11:00–15:00 — verified byte-identical locally.
+
+**Architecture**: `business-location.ts` hours formatters became pure
+functions taking a `StoreHoursSchedule` param (`hoursLine`, `hoursSummary` —
+replacing `hoursDaysLabel`/`hoursTimesLabel` — `hoursSegmentsFull`,
+`hoursRows`, `openingHoursSchema`); hand-rolled time formatting keeps the
+site's exact byte conventions (EN `11am`/`11:00 AM`, ES `11:00 a.m.` — NOT
+Intl, which emits `a. m.`). `hoursRowsGrouped` deleted (zero call sites).
+New server-only `src/lib/store-hours.ts`: `getStoreHours()` via
+`unstable_cache` (tag `store-hours`, 300s, falls back to
+`DEFAULT_STORE_HOURS` on any error). New API
+`/api/admin/store-hours` (GET/PUT, requireAdmin, service client); PUT
+validates per-field, then `revalidateTag('store-hours', {expire: 0})` +
+`revalidatePath('/', 'layout')` — hours print in the footer on EVERY page, so
+the sitewide bust is the honest one.
+
+**Consumers made dynamic**: `ShowroomHours` (now async; footer, homepage +
+contact Visit Us, About), the `[locale]/layout.tsx` JewelryStore JSON-LD
+(module constant → `buildJsonLd(schedule)` per render; omits
+`openingHoursSpecification` when all-closed), checkout pickup description
+(server page passes `pickupHoursLine` prop to the client `CheckoutClient`),
+product trust surfaces (same prop pattern), shipping policy EN + ES
+(`spanishShippingSections()` factory extracted so the ES module constant no
+longer freezes the hours line), and the order-invoice email (new
+`formatPickupHours()`; the mailer + both admin previews pass live hours at
+send/render time; the no-opts fallback stays byte-identical — asserted in
+tests).
+
+**Prose sweep**: ~14 hardcoded "Tue–Sat"/"martes a sábado" strings (meta
+descriptions on 8 pages, homepage + FAQ answers feeding FAQPage JSON-LD,
+About stat tile, root JSON-LD description) reworded once to day-agnostic
+copy ("during showroom hours or by appointment") so they can never go stale.
+
+**Gate (final tree)**: `tsc` clean · lint clean · **1159/1159 across 111
+files** (new `store-hours-format.test.ts`: byte-identity on the default
+schedule, segment compression, schema grouping, `parseStoreHours` matrix) ·
+build **457/457**. Dev-server checks: default hours byte-identical on
+`/`, `/es`, `/checkout`, `/shipping`, `/es/shipping`; JSON-LD emits the
+historical single spec; `/api/admin/store-hours` unauthenticated → 401;
+zero references to the deleted helpers remain.
+
+◻ NOT yet exercised: an actual admin save (needs the SQL), and the
+post-deploy `revalidatePath('/', 'layout')` behavior on Netlify's durable
+cache (fallback documented in DECISIONS: add `revalidate = 3600` to
+hours-consuming pages only if a static page proves sticky).
+
+
+## 2026-08-25 — Hero-freeze batch deployed; Netlify "errors" identified as webhook 499s
+
+**The weak-GPU hero-freeze batch went live.** Staging was re-synced first (dry
+run queued exactly the expected 12 files; 12 copied / 0 Extras / 0 Mismatch /
+0 FAILED; follow-up dry run 0; leak check clean against a 179-`.tsx` positive
+control — full evidence in `TASKS.md`). The owner copied to the repo folder,
+pushed, and Netlify published ~9:42 AM. Owner confirmed the live site looks
+normal on a normal machine. ◻ The weak-GPU desktop check — the point of the
+batch — is still pending (owner will check later).
+
+**Post-deploy scare investigated and closed the same morning.** The owner saw
+~24% "Errors" in Netlify Observability and asked whether it was normal.
+Checked in the Netlify dashboard (real Chrome session), filtered by status
+code rather than trusting the rollup:
+
+- **Every "error" in the last hour was `499 Client Disconnected` on
+  `POST /api/webhooks/ebay-account-deletion`** (38 of 38) — eBay's
+  compliance-notice sender hangs up when our response takes >~1s (slow
+  responses 0.9–2.9s; fast ones 200). Zero server errors in the window.
+- Over 24h: **794 client errors in a perfectly even drumbeat**, identical
+  before and after the deploy — pre-existing, and the deploy (client-side
+  carousel code) could not touch the webhook path anyway.
+- The only 5xx in 24h were 6 requests, all pre-deploy: 4 bot `POST /contact`
+  500s (~1/day background spam at the page route — the real form posts to
+  `/api/contact-message`), one scanner probe of `/sitemap.ols.xml`, one
+  `/_next/image` 502 blip.
+- Why the % swings: the 499 cadence is constant while real traffic varies, so
+  QUIET hours show a HIGHER error percentage (23.87% of 155 vs 10.67% of
+  375). "Non-browser 89.7%" is the same story — webhooks, scanners and RSC
+  prefetches dominate raw request counts.
+
+No code change needed or made. The finding is filed as an ℹ️ note under the
+existing 🟡 eBay `account_deletion` item in `TASKS.md` (same webhook, same
+latent-priority bucket; an ack-first handler would clear the 499s cosmetically).
+
 ## 2026-08-24 — Weak-GPU hero freeze: FPS watchdog + compositor housekeeping
 
 Owner report: the homepage carousel was very choppy on an older desktop, and it

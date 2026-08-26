@@ -42,6 +42,8 @@ import CartButton from '@/components/shop/CartButton';
 import type { CartItem } from '@/context/CartContext';
 import PriceUpdateTicker from '@/components/shop/PriceUpdateTicker';
 import { ProductPolicyAccordions, ProductTrustBadges } from '@/components/shop/ProductTrustSections';
+import { hoursLine } from '@/lib/business-location';
+import { getStoreHours } from '@/lib/store-hours';
 import RelatedProductsStrip from '@/components/shop/RelatedProductsStrip';
 import SpotRefreshPill from '@/components/shop/SpotRefreshPill';
 import TestimonialsSection from '@/components/home/TestimonialsSection';
@@ -325,6 +327,9 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
   const { data: product, error } = await fetchPublicProduct(id);
 
   if (error || !product) notFound();
+
+  // Admin-editable hours, read once here and passed to both trust surfaces.
+  const pickupHoursLine = hoursLine(await getStoreHours(), isEs);
 
   const p = product as Product;
   // The load-bearing half of the gate — see generateMetadata above. A streaming
@@ -973,7 +978,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
               )}
 
               {/* Policy accordions (2026-08-04) */}
-              <ProductPolicyAccordions isEs={isEs} prefix={isEs ? '/es' : ''} />
+              <ProductPolicyAccordions isEs={isEs} prefix={isEs ? '/es' : ''} pickupHoursLine={pickupHoursLine} />
 
             </div>
 
@@ -983,7 +988,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                 when it was a sibling of this grid. Placement is entirely in
                 `.product-detail-layout` CSS — do not add position utilities
                 here. */}
-            <ProductTrustBadges isEs={isEs} />
+            <ProductTrustBadges isEs={isEs} pickupHoursLine={pickupHoursLine} />
           </div>
         </div>
 

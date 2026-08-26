@@ -23,7 +23,7 @@ import './globals.css';
 // actually rank for it.
 const SITE_TITLE = 'Naples Estate Jewelry - Sell Jewelry, Gold & Silver in Naples, FL';
 const SITE_DESCRIPTION =
-  'Naples gold, jewelry, and sterling silver buyer paying top dollar. We buy estate jewelry, gold, silver, diamonds, coins, and watches across Naples, Marco Island, Bonita Springs, Estero, Fort Myers & Cape Coral. Free appraisals at our Naples showroom, Tue–Sat.';
+  'Naples gold, jewelry, and sterling silver buyer paying top dollar. We buy estate jewelry, gold, silver, diamonds, coins, and watches across Naples, Marco Island, Bonita Springs, Estero, Fort Myers & Cape Coral. Free appraisals at our Naples showroom or by appointment.';
 
 export const metadata: Metadata = {
   title: {

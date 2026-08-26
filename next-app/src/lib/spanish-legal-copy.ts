@@ -1,6 +1,6 @@
 import type { LegalSection } from '@/components/legal/LegalPolicyPage';
 import type { LegalPageKey } from '@/lib/legal-metadata';
-import { addressWithLandmark, hoursLine } from '@/lib/business-location';
+import { addressWithLandmark, DEFAULT_STORE_HOURS, hoursLine } from '@/lib/business-location';
 
 export interface SpanishLegalPageCopy {
   title: string;
@@ -10,6 +10,25 @@ export interface SpanishLegalPageCopy {
 }
 
 const UPDATED = '19 de junio de 2026';
+
+/**
+ * The shipping-policy sections as a FACTORY, because bullet one prints the
+ * showroom hours and those are admin-editable (2026-08): a module-scope
+ * constant would freeze whatever hours existed at import. The shipping page
+ * fetches the live schedule and rebuilds its sections through this; the
+ * `SPANISH_LEGAL_COPY.shipping` entry below keeps a default-hours copy so
+ * `getSpanishLegalCopy()` and the other legal pages stay untouched.
+ */
+export function spanishShippingSections(hoursLineEs: string): LegalSection[] {
+  return [
+    { title: 'Opciones de Entrega', bullets: [`Recogida local gratuita en nuestro salón, ${addressWithLandmark(true)} — ${hoursLineEs}.`, 'Envío prioritario asegurado y envío exprés asegurado al día siguiente para artículos elegibles.', 'Cada pedido enviado está asegurado por el precio total de compra.', 'Los artículos se envían en embalaje discreto y sin marca para proteger su privacidad y seguridad.'] },
+    { title: 'Garantía de Autenticidad', body: ['Garantizamos que cada pieza es auténtica y corresponde a su descripción. Si un artículo fue materialmente mal descrito, se aplica nuestra garantía de devolución de 5 días; consulte la política de Devoluciones y Reembolsos.'] },
+    { title: 'Revisión de Dirección e Identidad', body: ['Para pedidos de alto valor, podemos confirmar su identidad y dirección de envío antes de despachar. Esto le protege a usted y a nosotros contra el fraude y la entrega incorrecta de artículos valiosos.'] },
+    { title: 'Costos y Plazos de Envío', body: ['Las opciones y costos de envío aparecen durante el pago. Un pedido de alto valor puede requerir un acuerdo específico con un transportista asegurado; de ser así, le contactaremos antes del envío. Procuramos despachar pronto los pedidos confirmados y compartir el seguimiento cuando el artículo esté en camino.'] },
+    { title: 'Riesgo de Pérdida', body: ['Como los pedidos enviados están totalmente asegurados, los paquetes perdidos o dañados están cubiertos. Inspeccione el embalaje al recibirlo y contáctenos inmediatamente al (239) 404-8505 si existe algún daño o problema de entrega para que podamos presentar la reclamación.'] },
+    { title: 'Destinos Restringidos', body: ['Podemos rechazar o cancelar envíos a destinos donde la entrega, el seguro, las restricciones legales o las limitaciones del transportista impidan una entrega segura y práctica.'] },
+  ];
+}
 
 export const SPANISH_LEGAL_COPY: Record<LegalPageKey, SpanishLegalPageCopy> = {
   privacy: {
@@ -188,14 +207,9 @@ export const SPANISH_LEGAL_COPY: Record<LegalPageKey, SpanishLegalPageCopy> = {
   shipping: {
     title: 'Política de Envío',
     updated: UPDATED,
-    sections: [
-      { title: 'Opciones de Entrega', bullets: [`Recogida local gratuita en nuestro salón, ${addressWithLandmark(true)} — ${hoursLine(true)}.`, 'Envío prioritario asegurado y envío exprés asegurado al día siguiente para artículos elegibles.', 'Cada pedido enviado está asegurado por el precio total de compra.', 'Los artículos se envían en embalaje discreto y sin marca para proteger su privacidad y seguridad.'] },
-      { title: 'Garantía de Autenticidad', body: ['Garantizamos que cada pieza es auténtica y corresponde a su descripción. Si un artículo fue materialmente mal descrito, se aplica nuestra garantía de devolución de 5 días; consulte la política de Devoluciones y Reembolsos.'] },
-      { title: 'Revisión de Dirección e Identidad', body: ['Para pedidos de alto valor, podemos confirmar su identidad y dirección de envío antes de despachar. Esto le protege a usted y a nosotros contra el fraude y la entrega incorrecta de artículos valiosos.'] },
-      { title: 'Costos y Plazos de Envío', body: ['Las opciones y costos de envío aparecen durante el pago. Un pedido de alto valor puede requerir un acuerdo específico con un transportista asegurado; de ser así, le contactaremos antes del envío. Procuramos despachar pronto los pedidos confirmados y compartir el seguimiento cuando el artículo esté en camino.'] },
-      { title: 'Riesgo de Pérdida', body: ['Como los pedidos enviados están totalmente asegurados, los paquetes perdidos o dañados están cubiertos. Inspeccione el embalaje al recibirlo y contáctenos inmediatamente al (239) 404-8505 si existe algún daño o problema de entrega para que podamos presentar la reclamación.'] },
-      { title: 'Destinos Restringidos', body: ['Podemos rechazar o cancelar envíos a destinos donde la entrega, el seguro, las restricciones legales o las limitaciones del transportista impidan una entrega segura y práctica.'] },
-    ],
+    // Default-hours copy; the shipping page overrides `sections` with a live
+    // rebuild via spanishShippingSections(). See the factory's docblock.
+    sections: spanishShippingSections(hoursLine(DEFAULT_STORE_HOURS, true)),
   },
   accessibility: {
     title: 'Declaración de Accesibilidad',

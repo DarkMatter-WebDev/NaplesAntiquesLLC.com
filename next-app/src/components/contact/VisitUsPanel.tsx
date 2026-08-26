@@ -104,7 +104,6 @@ export default function VisitUsPanel({ locale = 'en' }: Props) {
                 today", so it is the surface that most earns the badge. */}
             <ShowroomHours
               locale={locale}
-              variant="full"
               layout="rows"
               highlightToday
               className="mt-8"

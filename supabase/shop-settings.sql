@@ -30,6 +30,14 @@ alter table public.shop_settings
   add column if not exists special_price_default_enabled boolean not null default false;
 alter table public.shop_settings
   add column if not exists special_price_default_percent numeric;
+-- Admin-editable weekly showroom hours — see store-hours-2026-08.sql.
+-- null = app serves its built-in Tue–Sat 11:00–15:00 default.
+alter table public.shop_settings
+  add column if not exists store_hours jsonb;
+-- Admin-editable homepage announcement banner — see home-banner-2026-08.sql.
+-- null = app serves its built-in promo copy and /free-evaluation link.
+alter table public.shop_settings
+  add column if not exists home_banner jsonb;
 
 -- Seed the single row so reads always find it.
 insert into public.shop_settings (id, show_sold_items)

@@ -154,9 +154,20 @@ describe('buildInvoiceEmailContent - pickup block layout', () => {
   });
 
   it('separates hours from the address, with the appointment note apart', () => {
+    // ⚠️ No opts on purpose: this asserts the NO-DB fallback stays byte-
+    // identical to the hours this email has always printed.
     const content = buildInvoiceEmailContent(pickupOrder);
     expect(content.pickup?.hours).toBe('Tuesday – Saturday, 11:00 AM – 3:00 PM');
     expect(content.pickup?.byAppointment).toBe('or by appointment');
+  });
+
+  it('prints admin-edited hours when the caller passes them', () => {
+    const content = buildInvoiceEmailContent(pickupOrder, null, {
+      pickupHours: 'Tuesday – Friday, 10:00 AM – 2:00 PM; Saturday 11:00 AM – 3:00 PM',
+    });
+    expect(content.pickup?.hours).toBe('Tuesday – Friday, 10:00 AM – 2:00 PM; Saturday 11:00 AM – 3:00 PM');
+    expect(content.html).toContain('Tuesday – Friday, 10:00 AM – 2:00 PM; Saturday 11:00 AM – 3:00 PM');
+    expect(content.text).toContain('HOURS\nTuesday – Friday, 10:00 AM – 2:00 PM; Saturday 11:00 AM – 3:00 PM');
   });
 
   it('no longer runs the address into the payment sentence', () => {

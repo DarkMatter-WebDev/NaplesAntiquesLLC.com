@@ -28,8 +28,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ? `Vender Oro, Joyería y Plata en ${area.city}, FL`
     : `Sell Gold, Jewelry & Silver in ${area.city}, FL`;
   const description = isEs
-    ? `Compramos oro, joyería, plata, diamantes y relojes en ${area.city}, FL. Evaluación gratuita en nuestro salón de Naples, martes a sábado, o a domicilio.`
-    : `Sell gold, jewelry, silver, diamonds & watches in ${area.city}, FL. Free appraisals at our Naples showroom, Tue–Sat, or at your home. Call (239) 404-8505.`;
+    ? `Compramos oro, joyería, plata, diamantes y relojes en ${area.city}, FL. Evaluación gratuita en nuestro salón de Naples o a domicilio.`
+    : `Sell gold, jewelry, silver, diamonds & watches in ${area.city}, FL. Free appraisals at our Naples showroom or at your home. Call (239) 404-8505.`;
   // Same blank-card defect as /sell, across every city page.
   return pageMetadata({ title, description, path: `/sell/${area.slug}`, locale });
 }

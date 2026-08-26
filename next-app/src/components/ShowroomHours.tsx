@@ -1,22 +1,10 @@
 import { Fragment } from 'react';
 import ShowroomTodayBadge from '@/components/ShowroomTodayBadge';
-import {
-  byAppointmentLabel,
-  hoursRows,
-  hoursRowsGrouped,
-} from '@/lib/business-location';
+import { byAppointmentLabel, hoursRows } from '@/lib/business-location';
+import { getStoreHours } from '@/lib/store-hours';
 
 interface Props {
   locale?: string;
-  /**
-   * `full` lists all seven days, the way Google Maps does — the reference
-   * layout, for surfaces someone consults before driving over.
-   *
-   * `grouped` says the same thing in two rows, for a marketing block that
-   * cannot spend seven. See the warning on `hoursRowsGrouped()`: it is the
-   * lossy one.
-   */
-  variant?: 'full' | 'grouped';
   /**
    * WHICH rows is `variant`; this is HOW they are laid out.
    *
@@ -69,16 +57,20 @@ interface Props {
  * date. `ShowroomTodayBadge` therefore renders nothing until after mount, and
  * reads the SHOWROOM's timezone rather than the visitor's. Leaving it off keeps
  * the footer's copy of this list a pure server component on every page.
+ *
+ * Async since 2026-08: the schedule is admin-editable, fetched through
+ * `getStoreHours()` (cached, tag-busted on save, defaults to Tue–Sat when
+ * unconfigured). All four render sites are server components, so the await
+ * costs nothing extra client-side.
  */
-export default function ShowroomHours({
+export default async function ShowroomHours({
   locale = 'en',
-  variant = 'full',
   layout = 'inline',
   highlightToday = false,
   className = '',
 }: Props) {
   const isEs = locale === 'es';
-  const rows = variant === 'grouped' ? hoursRowsGrouped(isEs) : hoursRows(isEs);
+  const rows = hoursRows(await getStoreHours(), isEs);
   const asRows = layout === 'rows';
   const todayLabel = isEs ? 'Hoy' : 'Today';
 
@@ -101,7 +93,7 @@ export default function ShowroomHours({
             ? '1px solid var(--color-outline-variant)'
             : undefined;
           return (
-          <Fragment key={row.day}>
+          <Fragment key={row.dayKey ?? row.day}>
             {/* Weight, not colour, carries the emphasis — these render on four
                 surfaces with four different inherited colours, and a hardcoded
                 colour here would fight the footer's muted palette. Days sit a

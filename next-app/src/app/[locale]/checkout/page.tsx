@@ -3,6 +3,8 @@ import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import CheckoutClient from '@/components/checkout/CheckoutClient';
 import { alternatesFor } from '@/lib/seo';
+import { hoursLine } from '@/lib/business-location';
+import { getStoreHours } from '@/lib/store-hours';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -28,12 +30,15 @@ export default async function CheckoutPage({ params }: Props) {
   // records the contact details entered here, and a user_id is attached only when
   // the buyer happens to be signed in. CheckoutClient offers an optional sign-in.
   const paypalClientId = process.env.PAYPAL_CLIENT_ID ?? null;
+  // Admin-editable hours, formatted here so the client component receives a
+  // ready string instead of reading Supabase a second time.
+  const pickupHoursLine = hoursLine(await getStoreHours(), locale === 'es');
 
   return (
     <>
       <SiteHeader />
       <main className="site-header-offset">
-        <CheckoutClient locale={locale} paypalClientId={paypalClientId} />
+        <CheckoutClient locale={locale} paypalClientId={paypalClientId} pickupHoursLine={pickupHoursLine} />
       </main>
       <SiteFooter locale={locale} />
     </>
