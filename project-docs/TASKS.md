@@ -34,6 +34,19 @@ longer lists `/account` or `/checkout` and still lists `/admin`, `/api`,
 from "Blocked by robots.txt" to "Excluded by `noindex`" over some weeks — both
 are non-indexed states, so nothing that currently ranks changes.
 
+### ◻ 2026-08-28 — owner follow-ups on the `/review` work
+
+- **Print/QR:** the string to encode is `https://naplesestatejewelry.com/review`.
+  No QR asset is in the repo — it needs either a QR dependency or an externally
+  generated image. Ask before adding a dependency.
+- **Post-purchase thank-you page** was deliberately NOT built; it touches the
+  checkout flow and needs a decision on where in the order flow it belongs.
+- **Site shows 18 testimonials** (`TESTIMONIALS.length`) against 21 on the live
+  Google profile — three real reviews are not yet on the site.
+- ⚠️ **Never add `aggregateRating`** for the business's own reviews. Google
+  disallows self-serving review markup on LocalBusiness and it risks a
+  structured-data manual action.
+
 ### ◻ 2026-08-27 — 18 Request Indexing calls still owed (retry tomorrow)
 
 Only **1 of 19** live product URLs was accepted before **Quota Exceeded**

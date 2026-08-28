@@ -66,6 +66,52 @@ export const HOURS = {
   closes: '15:00',
 } as const;
 
+/**
+ * The business's verified Google Business Profile (CID 17050430560749692864).
+ * This is the ENTITY url — it belongs in `sameAs`, and nowhere else.
+ */
+export const GOOGLE_BUSINESS_PROFILE_URL =
+  'https://maps.google.com/?cid=17050430560749692864';
+
+/**
+ * One-click "leave a review" form, from Business Profile → "Ask for reviews".
+ * Served by the /review route handler.
+ *
+ * ✅ Verified to be THIS business: the link resolves to a Maps place URL whose
+ * embedded hex id `0xec9f4c4208f327c0` decodes to 17050430560749692864 — the
+ * same CID as the profile above. Re-run that check if the link is ever
+ * replaced; a review link for the wrong profile would send customers to a
+ * competitor's page.
+ *
+ * ⛔ Never put this in `sameAs`. That field is an identity claim about the
+ * business, not a call to action — a review FORM is not "another official
+ * presence of this entity".
+ */
+export const GOOGLE_REVIEW_URL = 'https://g.page/r/CcAn8whCTJ_sEBM/review';
+
+/**
+ * `sameAs` for the JewelryStore entity — an IDENTITY claim, not a link list.
+ * Every URL here tells Google "this is another official presence of this exact
+ * business", which is what it uses to merge or split entities.
+ *
+ * ⛔ NEVER list `naplesjewelrybuyers.com` here (removed 2026-08-28). A different,
+ * real business trades as "Naples Jewelry Buyers" in Naples with its own
+ * VERIFIED Google Business Profile and more reviews. Claiming that name as our
+ * own presence invites Google to merge the two entities — and a visitor who
+ * reads the name may search it and land on the competitor's panel. The owner
+ * owns that domain, so the claim was not false, merely dangerous; the risk is
+ * one-sided and `sameAs` carries no PageRank, so there is nothing to lose by
+ * omitting it.
+ *
+ * ⛔ Do not list naplesestatejewelry.com or the legacy .co here either — a page
+ * does not need to declare itself, and the .co 301-redirects to this domain.
+ */
+export const SAME_AS: readonly string[] = [
+  GOOGLE_BUSINESS_PROFILE_URL,
+  'https://www.instagram.com/naples_estate_jewelry/',
+  'https://www.facebook.com/naplesestatejewelry',
+];
+
 /** `6240 Shirley St, Ste 104` */
 export function streetLine(): string {
   return `${ADDRESS.street}, ${ADDRESS.suite}`;

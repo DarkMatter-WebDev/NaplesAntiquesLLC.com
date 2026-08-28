@@ -8,6 +8,23 @@
 
 **Read this, then `TASKS.md`.**
 
+### 🟡 2026-08-28 — `sameAs` entity fix + `/review` (BUILT, not deployed)
+
+`sameAs` claimed `naplesjewelrybuyers.com` — a competitor's trading name with
+its own verified GBP — in **two** places (sitewide `layout.tsx` + every
+`/sell/[city]` page). Now single-sourced as `SAME_AS` in
+`business-location.ts`: verified GBP CID + Instagram + Facebook. Built output
+contains **0** references to the old domain.
+
+New `/review` route → the one-click Google review form (verified to be this
+business: the link's embedded hex CID decodes to 17050430560749692864).
+⛔ It is a route handler, not a `next.config` redirect (those never fire on
+Netlify), and it needed `review` added to the proxy matcher exclusions.
+
+ℹ️ An external SEO review suggested six items; **four were already done** —
+single-sourced hours, the Spanish locale, and the testimonial `aria-hidden`.
+Detail in `CHANGELOG.md` 2026-08-28.
+
 ### 🔴 2026-08-27 (latest) — Search Console audit; 2 SEO fixes BUILT, NOT deployed
 
 A full Google Search Console audit, plus two code changes that came out of it.

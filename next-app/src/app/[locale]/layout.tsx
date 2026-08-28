@@ -19,6 +19,7 @@ import {
   openingHoursSchema,
   postalAddressSchema,
   type StoreHoursSchedule,
+  SAME_AS,
 } from '@/lib/business-location';
 import { getStoreHours } from '@/lib/store-hours';
 
@@ -75,13 +76,10 @@ const buildJsonLd = (schedule: StoreHoursSchedule) => ({
   priceRange: '$$',
   currenciesAccepted: 'USD',
   paymentAccepted: 'Cash, Check, Wire Transfer, PayPal, Credit Card, Debit Card',
-  // Related domains + profiles help Google consolidate this business entity.
-  // naplesestatejewelry.com is now the primary domain (owner bought it,
-  // confirmed 2026-08-01 — superseding the 2026-07-11 parked-page note). The
-  // legacy .co apex 301-redirects here, so it is not listed in sameAs.
-  sameAs: [
-    'https://naplesjewelrybuyers.com',
-  ],
+  // Verified profiles that identify THIS business. Single-sourced so the
+  // sitewide entity and the per-city ones can never drift. See SAME_AS in
+  // business-location.ts for why naplesjewelrybuyers.com must never return.
+  sameAs: [...SAME_AS],
   areaServed: [
     'Naples, FL', 'Marco Island, FL', 'Bonita Springs, FL',
     'Estero, FL', 'Fort Myers, FL', 'Cape Coral, FL',

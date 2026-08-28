@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { pageMetadata } from '@/lib/seo';
 import { jsonLdHtml } from '@/lib/json-ld';
 import { SERVICE_AREAS, getServiceArea } from '@/lib/service-areas';
+import { SAME_AS } from '@/lib/business-location';
 import { routing } from '@/i18n/routing';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
@@ -168,9 +169,8 @@ export default async function SellCityPage({ params }: Props) {
     currenciesAccepted: 'USD',
     paymentAccepted: 'Cash, Check, Wire Transfer, PayPal',
     areaServed: [...new Set([area.city, ...area.nearby])].map((name) => ({ '@type': 'City', name: `${name}, FL` })),
-    // naplesestatejewelry.com is now this site's own primary domain, so it no
-    // longer belongs in sameAs (the legacy .co apex 301-redirects here).
-    sameAs: ['https://naplesjewelrybuyers.com'],
+    // Same identity claim as the sitewide entity, from one source.
+    sameAs: [...SAME_AS],
   };
 
   const breadcrumbLd = {

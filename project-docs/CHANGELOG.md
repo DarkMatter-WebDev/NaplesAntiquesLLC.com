@@ -1,6 +1,73 @@
 
 # Changelog
 
+## 2026-08-28 — `sameAs` entity fix, and a one-click `/review` path
+
+Two items from an external SEO review, both verified against the code first.
+Four of that review's six suggestions were **already implemented** (single-
+sourced hours, the Spanish locale, and the `aria-hidden` on the duplicated
+testimonial marquee) — it described the site as it was two weeks earlier.
+
+### 🔴 `sameAs` no longer claims a competitor's trading name
+
+The `JewelryStore` JSON-LD asserted `sameAs: ['https://naplesjewelrybuyers.com']`
+— in **TWO** places, not the one the review reported: `[locale]/layout.tsx`
+(sitewide) and `[locale]/sell/[city]/page.tsx` (every city page, a second
+independent literal).
+
+`sameAs` is an IDENTITY claim. A different, real business trades as "Naples
+Jewelry Buyers" in Naples with its own **verified** Google Business Profile and
+roughly double the reviews, so the claim invited Google to merge the two
+entities. The owner owns that domain, so it was not false — merely one-sided
+risk, and `sameAs` carries no PageRank, so omitting it costs nothing.
+
+Replaced with the business's own verified presences, and **single-sourced** as
+`SAME_AS` in `business-location.ts` so the sitewide and per-city entities can
+never drift again:
+
+- `https://maps.google.com/?cid=17050430560749692864` (verified GBP)
+- Instagram + Facebook (both confirmed **200** before wiring in — a `sameAs`
+  pointing at a dead profile is worse than none)
+
+Verified in the built HTML on both the sitewide and per-city entities.
+**0 files** in the built output still contain `naplesjewelrybuyers`; the only
+two source mentions are the ⛔ comments telling future readers not to re-add it.
+
+### `/review` — a short, speakable review link
+
+New route handler at `src/app/review/route.ts`, **302** to
+`https://g.page/r/CcAn8whCTJ_sEBM/review`. Review count is the business's
+weakest competitive signal at the same 5.0 rating, so the cost of leaving one
+should be near zero.
+
+✅ **The review link was verified to be THIS business, not a stray profile:** it
+resolves to a Maps place URL whose embedded hex id `0xec9f4c4208f327c0` decodes
+to **17050430560749692864** — the same CID as the profile. Re-run that check if
+the link is ever replaced.
+
+⛔ **Two repo-specific traps this had to avoid:**
+1. **Not** a `next.config.ts` redirect. On Netlify the plugin rewrites
+   locale-less paths to `/en/...` before config redirects run, so they never
+   fire — 22 dead ones sat in production until 2026-08-02. A route handler is
+   the only shape that works, same as `/p/<code>`.
+2. It needed a **proxy matcher exclusion** (`review` added to the negative
+   lookahead in `proxy.ts`), or next-intl rewrites it to a `/[locale]/review`
+   page that does not exist.
+
+⛔ `GOOGLE_REVIEW_URL` must **never** go in `sameAs` — a review FORM is not
+"another official presence of the entity". It is a separate constant from
+`GOOGLE_BUSINESS_PROFILE_URL` for exactly this reason; verified the `g.page`
+URL does not appear in any page HTML.
+
+⚠️ Not built, and deliberately: the post-purchase thank-you page (touches the
+checkout flow) and the QR asset (needs a QR dependency or an externally
+generated image — the string to encode is `https://naplesestatejewelry.com/review`).
+
+ℹ️ Gate: `tsc` clean · lint clean · **1176/1176 across 112 files** · build
+**457/457** (up one — the new route; `ƒ /review` present in the route table).
+⚠️ `layout.tsx` and `proxy.ts` are **CRLF** while their neighbours are LF —
+each file was edited according to its own line endings, not normalised.
+
 ## 2026-08-27 — Search Console audit; robots.txt/`noindex` conflict fixed; `/contact?item=` nofollowed
 
 Audit session against Google Search Console (URL-prefix property
