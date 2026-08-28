@@ -48,14 +48,14 @@ describe('DEFAULT_STORE_HOURS — derived from the NAP-canonical constant', () =
   });
 });
 
-describe('hoursLine — byte-identical to the retired literals on the default', () => {
+describe('hoursLine — matches the current built-in default (Mon–Sat)', () => {
   it('EN', () => {
-    expect(hoursLine(DEFAULT_STORE_HOURS, false)).toBe('Tue–Sat 11am–3pm, or by appointment');
+    expect(hoursLine(DEFAULT_STORE_HOURS, false)).toBe('Mon–Sat 11am–3pm, or by appointment');
   });
 
   it('ES (comma between days and times, lowercase a.m. with periods)', () => {
     expect(hoursLine(DEFAULT_STORE_HOURS, true)).toBe(
-      'Martes a sábado, 11:00 a.m. – 3:00 p.m., o con cita',
+      'Lunes a sábado, 11:00 a.m. – 3:00 p.m., o con cita',
     );
   });
 
@@ -96,13 +96,13 @@ describe('hoursLine — byte-identical to the retired literals on the default', 
 });
 
 describe('hoursSummary — the invoice two-line block', () => {
-  it('matches the retired hoursDaysLabel/hoursTimesLabel bytes on the default', () => {
+  it('matches the hoursDaysLabel/hoursTimesLabel bytes on the default', () => {
     expect(hoursSummary(DEFAULT_STORE_HOURS, false)).toEqual({
-      days: 'Tuesday – Saturday',
+      days: 'Monday – Saturday',
       times: '11:00 AM – 3:00 PM',
     });
     expect(hoursSummary(DEFAULT_STORE_HOURS, true)).toEqual({
-      days: 'Martes a sábado',
+      days: 'Lunes a sábado',
       times: '11:00 a.m. – 3:00 p.m.',
     });
   });
@@ -122,10 +122,10 @@ describe('hoursSummary — the invoice two-line block', () => {
 });
 
 describe('hoursRows — per-day times', () => {
-  it('matches the historical default rows byte-for-byte', () => {
+  it('matches the built-in default rows byte-for-byte', () => {
     const rows = hoursRows(DEFAULT_STORE_HOURS, false);
     expect(rows.map((r) => [r.day, r.time, r.closed])).toEqual([
-      ['Monday', 'Closed', true],
+      ['Monday', '11:00 AM – 3:00 PM', false],
       ['Tuesday', '11:00 AM – 3:00 PM', false],
       ['Wednesday', '11:00 AM – 3:00 PM', false],
       ['Thursday', '11:00 AM – 3:00 PM', false],
@@ -144,11 +144,11 @@ describe('hoursRows — per-day times', () => {
 });
 
 describe('openingHoursSchema — grouped by identical times, English days', () => {
-  it('emits the historical single spec on the default', () => {
+  it('emits a single grouped spec on the default', () => {
     expect(openingHoursSchema(DEFAULT_STORE_HOURS)).toEqual([
       {
         '@type': 'OpeningHoursSpecification',
-        dayOfWeek: ['Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+        dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
         opens: '11:00',
         closes: '15:00',
       },
@@ -212,8 +212,8 @@ describe('parseStoreHours — untrusted jsonb/PUT validation', () => {
     // A CLOSED day's times are dormant state, not an assertion — reopening the
     // day in the admin panel is when they get validated again.
     const closedInverted = structuredClone(DEFAULT_STORE_HOURS);
-    closedInverted.Monday.opens = '15:00';
-    closedInverted.Monday.closes = '11:00';
+    closedInverted.Sunday.opens = '15:00';
+    closedInverted.Sunday.closes = '11:00';
     expect(parseStoreHours(closedInverted)).toEqual(closedInverted);
   });
 });

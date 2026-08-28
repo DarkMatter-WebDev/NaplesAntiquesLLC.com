@@ -1,6 +1,253 @@
 
 # Changelog
 
+## 2026-08-27 — Search Console audit; robots.txt/`noindex` conflict fixed; `/contact?item=` nofollowed
+
+Audit session against Google Search Console (URL-prefix property
+`https://naplesestatejewelry.com/`, owner `info@surettesystems.com`). Two code
+changes came out of it. **Neither is deployed yet.** No SQL, no env vars.
+
+### Search Console state, as measured
+
+Page indexing (report stamped 8/20/26): **192 indexed / 213 not indexed**;
+filtered to sitemap-submitted URLs, **89 indexed / 26 not**. Performance
+8/1–8/25: **44 clicks · 1.09K impressions · 4% CTR · average position 36.7**.
+No manual actions, no security issues. HTTPS 28/0, Product snippets 9/0,
+Merchant listings 9/0, Breadcrumbs 15/0. Core Web Vitals still **No data** on
+both mobile and desktop (not enough field traffic).
+
+Not-indexed reasons: Alternate page w/ proper canonical **127** (all
+`/contact?item=` variants), Page with redirect **44** (mostly `/en/*`),
+Excluded by `noindex` **13** (6 legal pages x 2 locales + `/en/shipping`), Not
+found 404 **3** (`/oz`, `/$`, `/&` — junk), Blocked by robots.txt **2**
+(`/account`, `/es/account`), Discovered - currently not indexed **20**,
+Crawled - not indexed **4** (favicon query variants + two `.woff2`).
+
+✅ **The long-open sitemap resubmission is DONE** (`TASKS.md` item 4, open
+since 2026-08-17): `/sitemap.xml` submitted and read **Aug 27, 2026**, status
+Success, **99 discovered pages** — matching the 99 `<loc>` the live file serves.
+
+### 🔎 The 20 "Discovered" URLs are NOT sold products — 19 are live inventory
+
+Judged by the `schema.org` availability in each page's own JSON-LD: **19 of 20
+are `InStock`** with live prices ($49–$2,993, **$9,633 combined**), all 19 in
+the sitemap, all 200, all `Last crawled: N/A` — never fetched by Googlebot.
+The one `SoldOut`
+(`vintage-egyptian-silver-hand-engraved-round-tray-with-arabic-script-75`) is
+correctly **absent from the sitemap**, i.e. working as designed.
+
+⚠️ **Control that kills the "they're sold" theory:**
+`14k-infinity-rope-chain-necklace-01` is `SoldOut` **and indexed** (crawled Aug
+21). Sold products stay indexed; being sold does not cause "Discovered -
+currently not indexed."
+
+⚠️ **Method trap:** a first pass grepping page text for `sold` matched all 20
+and would have confirmed the theory falsely — the word appears elsewhere in the
+markup. Judge product state by JSON-LD `availability`, never a text grep.
+
+### 🔴 FIXED — robots.txt was blocking the crawl that `noindex` depends on
+
+`/account` and `/checkout` were listed in `robots.txt` **and** emitting
+`robots: { index: false, follow: false }`. Those fight each other: the crawl
+block stops Googlebot fetching the page, so it can never read the `noindex`.
+The tag was unreachable and the URLs remained indexable-by-link.
+
+Removed six entries from `src/app/robots.ts` — `/account`, `/checkout`, and
+their `/en/` and `/es/` variants. Kept `/admin`, `/api`, `/shop-modern`,
+`/en/admin`, `/es/admin`. A comment now explains why they must not return.
+
+Verified live BEFORE removing: **all 12 account/checkout paths in both locales
+emit `noindex`** (`/account`, `/account/sign-in`, `/account/sign-up`,
+`/account/reset-password`, `/account/security`, the `/es/` mirror of each, plus
+`/checkout` and `/es/checkout`) — sourced from `getAccountMetadata()` in
+`src/lib/account-metadata.ts` and reaching the pages that lack their own
+`generateMetadata` via each route's `layout.tsx`.
+
+⛔ **`/admin` must stay blocked.** It only *appears* to carry `noindex` because
+a logged-out request redirects to `/account/sign-in`; its own metadata is
+`{ title: 'Admin - Products' }` with no robots directive.
+
+### `/contact?item=` inquire links are now `rel="nofollow"`
+
+Two links on the product page (`shop/[id]/page.tsx` lines 758 and 767) generate
+one `/contact?item=<title>` URL per product per locale; Google had crawled
+**127**. They canonicalise correctly to `/contact`, so this was crawl
+tidiness — not a duplicate-content problem.
+
+⛔ **Rejected: `Disallow: /contact?item=` in robots.txt** — the same mistake as
+the `/account` bug above. Blocking the crawl would stop Google reading the
+canonical that currently consolidates these into `/contact`, potentially
+leaving them indexed URL-only and competing with the real page.
+
+⛔ **Rejected: moving `item` to a URL fragment.** `/contact` reads the param
+**server-side** (`contact/page.tsx:30`) and passes it to `InquiryForm` for
+prefill; a fragment never reaches the server, so prefill would have to move
+client-side — risking a working conversion path for a cosmetic gain.
+
+`/contact` keeps **12 plain follow links**, including SiteHeader and SiteFooter
+on every page, so nofollowing two product-page links costs it no internal link
+equity. The form behaviour is unchanged — `rel` is a crawl hint, not navigation.
+
+ℹ️ **Correction made during this session:** the 127 parameter URLs were first
+called the likely cause of the 19 unindexed products. That was too strong —
+they are ~1.2% of 10.4K crawl requests over 90 days on a ~400-URL site, and
+crawl budget does not realistically bind below ~10k URLs. Treat the nofollow as
+housekeeping, not a fix for the indexing gap.
+
+### Request Indexing: 1 of 19, then daily quota exhausted
+
+`bill-tompkins-...-coffee-pot-early-19th-century-55` ($2,993) was accepted —
+"URL was added to a priority crawl queue." Every request after it returned
+**Quota Exceeded**. ⚠️ The quota is **per site, shared across properties** —
+the new Domain property returned the same error, so there is no workaround.
+This corroborates that an earlier agent spent most of the day's quota.
+**18 URLs still need requesting.**
+
+### Search Console property added: `sc-domain:naplesestatejewelry.com`
+
+A **Domain** property was created at the owner's request and **auto-verified**
+via "Domain name provider" off the `google-site-verification` TXT already in
+the `.com` zone — no DNS change was made or needed. It is a wider net (http +
+https + www + all subdomains) than the URL-prefix property, which keeps all the
+history. ⚠️ **Do not delete that TXT record** — it now verifies both properties,
+in a zone that also carries live Workspace MX, root SPF and `p=quarantine`
+DMARC.
+
+⚠️ **GSC shows the identical "Oops, you don't have access to this property"
+screen whether you lack permission OR the property was never created.** That
+screen cost a wrong "access problem" diagnosis this session; the account was a
+verified owner the whole time.
+
+No conflicts among the three project properties. The `.co` change of address is
+intact (`.co` → `.com`, started **August 2, 2026**, ~180-day window), `.co`
+still shows 43 indexed pages all last crawled Aug 2–3 (pre-301, normal decay),
+and the sitemap already surfaces in the new Domain property. Live 301s
+re-verified path-preserving and one-hop.
+
+### Built-in default hours corrected: Tue–Sat → **Mon–Sat** (owner opened Mondays)
+
+Owner-confirmed 2026-08-27: **the showroom is open Mondays now.** The live site
+was already correct (the admin-saved DB schedule renders Mon–Sat everywhere,
+visible copy and `JewelryStore` JSON-LD alike). The repo was the stale part.
+
+⚠️ **This was initially mis-reported as "your hours are wrong on the live site."**
+The comparison was only ever against this repo's own records —
+`PROJECT_OVERVIEW.md` and the `HOURS` constant — never against the Google
+Business Profile, which is the only authority for that claim. The docs were
+stale; the site was right.
+
+`HOURS.days` in `business-location.ts` gains `'Monday'`. It is **only** the
+fallback served when `shop_settings.store_hours` is null, malformed, or
+unreachable — but a stale fallback would silently drop Monday from the site and
+the JSON-LD on any DB defect, which is why it must track reality.
+
+⛔ **Hours are admin-editable and the owner changes them on the fly.** The DB is
+the source of truth. Do not read `HOURS` to answer "when is the store open", and
+do not reintroduce day names into prose or metadata — the 2026-08-25 day-agnostic
+prose sweep still holds (every remaining `Tue–Sat` in `src/` is a comment, zero
+user-facing copy).
+
+Eight test expectations updated to the new default. Seven were literal swaps
+(`Tue–Sat`→`Mon–Sat`, `Martes a sábado`→`Lunes a sábado`, `Tuesday – Saturday`→
+`Monday – Saturday`, the `openingHoursSchema` `dayOfWeek` array, the `hoursRows`
+Monday row). ⚠️ **The eighth was structural:** `parseStoreHours`'s "tolerates
+inverted times on a CLOSED day" case used **Monday as its closed-day example**.
+With Monday open the premise was invalid, so it now uses **Sunday** — intent
+preserved, not a literal patched over. Three `describe`/`it` names that said
+"retired literals" / "historical default" were reworded, since they now pin the
+CURRENT default rather than guarding a legacy guarantee.
+
+ℹ️ Spanish day formatting was taken from the formatters' own output, not
+guessed — `hoursLine` emits `Lunes a sábado, 11:00 a.m. – 3:00 p.m., o con cita`.
+
+### Sitemap now submits BOTH locales (99 → 200 URLs)
+
+Every public page exists in EN and ES, but until now **no `/es` URL was ever
+submitted** — Spanish existed only as an `<xhtml:link rel="alternate">` inside
+the English entry. Google supports that, but its documented pattern is one
+`<url>` block per language version. The pages that were never submitted are the
+ones ranking best (`/es/shop` **9.7** vs `/shop` 42.6; `/es/sell/cape-coral`
+**5.3** vs 18.0; `/es/free-evaluation` **3.0**).
+
+`sitemap.ts` now emits both locales via a `pushLocalized()` helper driven by
+`LOCALE_PREFIXES = ['', '/es']`, and every entry carries the full bidirectional
+alternate set including **`x-default`** — which the sitemap previously omitted
+entirely (0 declarations) even though the HTML has always had it.
+
+Generated output verified from the build, not assumed: **200 `<loc>` = 100 EN +
+100 ES, perfectly paired** (0 EN without an ES twin, 0 ES without an EN twin),
+**200 `x-default`**, **0 `noindex` legal leaks**, **0 `/en/` URLs**. EN
+composition: 14 static + 6 city + 80 product. (Live was 99 when measured earlier
+the same day; the extra product is ordinary inventory churn, not a defect.)
+
+⚠️ **The `LEGAL_NOINDEX_PATHS` `continue` now skips BOTH locales**, which is
+required — the six Spanish legal pages carry the same `noindex` as the English
+ones (verified live). Missing that would have re-created the "Submitted URL
+marked noindex" contradiction the 2026-08-16 batch cleaned up, doubled.
+
+⛔ **No `/en` prefix is emitted.** `/en/*` is not a route — it 307-redirects to
+the bare path, and those redirects are already 44 URLs of crawl noise.
+
+ℹ️ Expect GSC's "not indexed" count to RISE after this deploys: ~100 newly
+submitted URLs Google has not crawled yet. That is a reporting artifact of
+submitting more, not a regression.
+
+### Gate
+
+Run after each of the two changes, independently: `tsc` clean · lint clean ·
+**1176/1176 across 112 files** · build **456/456**. Built `robots.txt` body
+verified byte-for-byte. `rel:"nofollow"` confirmed **exactly twice** in the
+built SSR chunk `src_0coom2f._.js`. LF line endings preserved in both files.
+
+## 2026-08-25 — Store hours + homepage banner DEPLOYED, and both exercised in production
+
+Both features are **LIVE and validated by real owner use the same evening** —
+this closes out the whole batch, including the one question the plan could not
+answer locally.
+
+**Deployed:** the 44-file batch (store hours, homepage banner, the day-agnostic
+prose sweep, 5 memory docs). Gate before push, from a deleted `.next`: `tsc`
+clean · lint clean · **1176/1176 across 112 files** · build **458/458**.
+Staging synced with a read-and-verified 44-file dry run, 0 Extras/Mismatch/
+FAILED, and a leak check clean against a 181-`.tsx` positive control.
+
+**Post-deploy smoke check, production:** `/`, `/es`, `/shop`, `/contact`,
+`/checkout`, `/shipping`, `/es/shipping`, `/about`, `/faq`, `/sitemap.xml` all
+**200**; homepage exactly one `<h1>`; zero `Tue–Sat` left in any meta
+description (the prose sweep landed).
+
+### 🟢 The owner used BOTH panels, and production regenerated correctly
+
+Read back from the live DB (`updated_at` 2026-08-26T03:43Z) and confirmed
+against the rendered production HTML:
+
+- **Store hours** — Wednesday closed, Tue/Thu/Fri/Sat 11:00–15:00. The Visit Us
+  and footer lists both show `Wednesday — Closed`, and the JSON-LD emits
+  `dayOfWeek: ["Tuesday","Thursday","Friday","Saturday"]` — i.e. the
+  **non-contiguous grouping works in the wild**, exactly as unit-tested.
+- **Homepage banner** — `enabled: true`, **`linkEnabled: false`**, blank
+  eyebrow, message `"Closed on Wednesday, Aug. 26, Call w/ any questions!"` /
+  `"Cerrado en 26 de Ag. ¡Llame si tiene alguna pregunta!"`. Production renders
+  a `<div class="home-announcement">` with **0 anchors and 0 arrows** in both
+  locales, and a single fragment (blank eyebrow ⇒ no `·` separator). The
+  link-off path is now proven in production, not just locally.
+
+### ✅ RESOLVED — `revalidatePath('/', 'layout')` works on Netlify's durable cache
+
+This was the plan's one untestable-locally risk, with `export const revalidate
+= 3600` documented as the fallback. **The fallback is not needed.** The owner's
+saves propagated to the statically prerendered homepage in both locales without
+any code change — hours, banner, and JSON-LD all regenerated. Do not add
+per-page `revalidate` windows for this.
+
+⚠️ **Note on the shipped copy:** at 51 (EN) and 52 (ES) characters both sit in
+the 49–53 amber band — allowed, under the 53 hard block, but the band the panel
+flags for a narrow-phone eyeball. They are more forgiving than the budget
+assumes, because a single fragment carries no `·` separator and the link-off
+state carries no `→`; the arithmetic leaves roughly 23–28px of slack at 320px.
+Worth a real look on a phone if that copy stays up.
+
+
 ## 2026-08-25 — Admin-editable homepage banner (BUILT; ⚠️ needs SQL + deploy)
 
 **The homepage announcement strip is now admin-editable** from Admin →

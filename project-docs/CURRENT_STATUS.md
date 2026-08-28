@@ -2,13 +2,71 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-08-24**.
+> in `DECISIONS.md`. Last reconciled: **2026-08-27**.
 
-## Start Here (handoff, end of the 2026-08-23 PageSpeed session)
+## Start Here (handoff, end of the 2026-08-27 Search Console session)
 
 **Read this, then `TASKS.md`.**
 
-### 🆕 2026-08-25 (latest) — admin-editable HOMEPAGE BANNER built; ✅ hours SQL is DONE
+### 🔴 2026-08-27 (latest) — Search Console audit; 2 SEO fixes BUILT, NOT deployed
+
+A full Google Search Console audit, plus two code changes that came out of it.
+**Both are locally verified and undeployed** — production still serves the old
+`robots.txt` and the old product pages. No SQL, no env vars, nothing to run in
+Supabase.
+
+**Where search stands.** 192 indexed / 213 not indexed (report stamped 8/20/26);
+89 / 26 when filtered to sitemap-submitted URLs. Performance 8/1–8/25:
+**44 clicks · 1.09K impressions · 4% CTR · average position 36.7.** No manual
+actions, no security issues. ✅ The **sitemap resubmission that had been open
+since 2026-08-17 is DONE** — read Aug 27, Success, 99 pages.
+
+**Fix 1 — `robots.txt` was defeating its own `noindex`.** `/account` and
+`/checkout` were blocked in `robots.txt` *and* emitting
+`robots: { index: false, follow: false }`. The crawl block stops Googlebot
+fetching the page, so it can never read the `noindex` — the tag was
+unreachable. Six entries removed from `src/app/robots.ts`. ⛔ **`/admin` stays
+blocked**: it only *looks* noindexed because a logged-out request redirects to
+`/account/sign-in`; its own metadata carries no robots directive.
+
+**Fix 3 — the sitemap now submits BOTH locales**, 99 → **200 URLs** (100 EN +
+100 ES, verified paired, 0 `noindex` leaks, 0 `/en/`), each carrying
+`en`/`es`/`x-default`. No `/es` URL had ever been submitted — despite the
+Spanish pages outranking their English twins (`/es/shop` **9.7** vs 42.6).
+
+**Fix 2 — the two `/contact?item=` inquire links are `rel="nofollow"`**
+(`shop/[id]/page.tsx` 758, 767). ⛔ Do **not** "improve" this by adding
+`Disallow: /contact?item=` to `robots.txt` — that repeats Fix 1's bug and would
+break the canonical consolidation that is currently working correctly.
+
+**🔎 The 20 unindexed product pages are NOT sold — 19 are live inventory**
+totalling **$9,633** ($49–$2,993), all in the sitemap, all `Last crawled: N/A`.
+Only 1 is `SoldOut`, and it is correctly absent from the sitemap. Control that
+settles it: a `SoldOut` chain (`14k-infinity-rope-chain-necklace-01`) **is**
+indexed, so being sold does not cause "Discovered - currently not indexed."
+
+**◻ 18 Request Indexing calls still owed.** Only 1 of 19 went through before
+**Quota Exceeded**; the quota is **per site, shared across properties**, so the
+new Domain property is not a workaround. Retry tomorrow.
+
+**New GSC property:** `sc-domain:naplesestatejewelry.com` (Domain type),
+auto-verified off the existing DNS TXT — no DNS change. ⚠️ Do not delete that
+`google-site-verification` TXT; it now verifies two properties. The three
+project properties do not conflict, and the `.co` → `.com` change of address is
+intact (started Aug 2, 2026).
+
+**🕐 Store hours: Monday is OPEN as of 2026-08-27 (owner-confirmed).** The live
+site was already right; the repo was stale. `HOURS` in `business-location.ts`
+now reads Mon–Sat, and `PROJECT_OVERVIEW.md` matches. ⛔ That constant is only
+the fallback for a null/unreachable DB row — **the admin panel is the source of
+truth and the owner changes hours on the fly.** Never hardcode days into prose
+or metadata.
+
+⚠️ **The real ranking problem is not indexing — it is CTR at position 36.7.**
+"estate jewelry buyers" drew 60 impressions and **0 clicks**; `/sell/naples`
+drew 220 impressions for 1 click. Detail in `CHANGELOG.md` 2026-08-27.
+
+### 🟢 2026-08-25 — store hours + homepage banner are LIVE and in real use
 
 The homepage promo strip is now editable from **Admin → Settings → Homepage
 Banner**: both fragments (eyebrow + message), EN + ES with per-field fallback,
@@ -38,6 +96,22 @@ behavior of `revalidatePath('/', 'layout')`) — see `TASKS.md`. Durable rules:
 0 FAILED, follow-up dry run 0, leak check clean against a **181 `.tsx`**
 positive control. Gate from a deleted `.next`: `tsc` · lint · **1176/1176
 (112 files)** · build **458/458**. Full evidence in `TASKS.md`.
+
+🟢 **DEPLOYED and validated the same evening.** Post-deploy smoke: 10 routes
+200, one `<h1>`, prose sweep landed. **The owner then used both panels for
+real** (DB `updated_at` 2026-08-26T03:43Z): Wednesday marked closed — the
+JSON-LD correctly emits the non-contiguous `["Tuesday","Thursday","Friday",
+"Saturday"]` — plus a **link-OFF** banner announcing the closure, which
+production renders as a `<div>` with 0 anchors and 0 arrows in both locales.
+
+✅ **The open caching question is CLOSED: `revalidatePath('/', 'layout')` works
+on Netlify's durable cache.** Both saves propagated to the statically
+prerendered homepage in EN and ES with no code change. ⛔ The documented
+`export const revalidate = 3600` fallback is **not needed** — do not add it.
+
+◻ Soft follow-up only: the live copy is 51/52 chars, inside the 49–53 amber
+band; it should fit but deserves a phone eyeball. ⚠️ And the site now advertises
+Wednesday closed — mirror that to Google Business Profile, eBay and Etsy.
 
 ### 🆕 2026-08-25 (later session) — admin-editable STORE HOURS built; 🔴 SQL + deploy pending
 

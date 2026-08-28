@@ -4,7 +4,113 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-08-24**.
+> compaction. Last reconciled: **2026-08-27**.
+
+## Crawling & Indexing
+
+### A page that can say `noindex` must NEVER also be blocked in `robots.txt`
+
+Decided 2026-08-27 after finding `/account` and `/checkout` carrying both.
+They are not belt-and-suspenders — they **cancel each other**. `robots.txt`
+blocks the *fetch*; `noindex` is read *from the fetched page*. Block the fetch
+and Googlebot can never see the tag, so the tag does nothing and the URL stays
+eligible to be indexed from an inbound link, with no way for us to remove it.
+
+The rule, in order of preference:
+
+1. The route can render metadata → give it `robots: { index: false }` and
+   **leave it out of `robots.txt`**. Let Google crawl it and obey the tag.
+2. The route cannot render metadata (`/api`, a non-HTML asset) or genuinely
+   must not be fetched at all → `robots.txt` is the only tool, and the page
+   must not pretend to carry a `noindex`.
+
+`robots.txt` therefore keeps only `/admin`, `/api`, `/shop-modern`,
+`/en/admin`, `/es/admin`.
+
+⛔ **`/admin` is the trap.** Inspecting it logged-out shows a `noindex`, but
+that comes from the `/account/sign-in` page it redirects to — `admin/page.tsx`
+declares `{ title: 'Admin - Products' }` and no robots directive. It has no
+`noindex` of its own, so it stays blocked. Verify by reading the route's
+metadata, never by curling the redirect target.
+
+### Query-parameter URLs are controlled by canonical + `nofollow`, never by `robots.txt`
+
+The product page generates one `/contact?item=<title>` URL per product per
+locale; Google had crawled 127 of them. They resolve to `/contact` via its
+canonical, which is *correct and working* — Google reports them as "Alternate
+page with proper canonical tag", not as duplicates.
+
+⛔ **Never add `Disallow: /contact?item=`.** Blocking the crawl removes
+Google's ability to read the canonical that is doing the consolidation, which
+can leave the variants indexed URL-only and competing with the real
+`/contact`. This is the same failure as the `/account` rule above.
+
+The chosen control is `rel="nofollow"` on the two inquire links
+(`shop/[id]/page.tsx`). It is a hint, not a directive, and it does not
+retroactively remove URLs already discovered — that is accepted. `/contact`
+keeps 12 plain follow links including SiteHeader and SiteFooter, so it loses
+no internal link equity.
+
+⛔ **Do not move `item` to a URL fragment** to make the URLs disappear.
+`/contact` reads the param **server-side** and passes it to `InquiryForm` for
+prefill; a fragment never reaches the server, so the prefill would have to move
+client-side — trading a working conversion path for a cosmetic crawl gain.
+
+ℹ️ **Crawl budget is not a real constraint on this site.** ~400 URLs against
+10.4K crawl requests per 90 days; the 127 parameter URLs are ~1.2% of that.
+Google does not meaningfully ration crawl below ~10k URLs. Do not justify
+future changes as "saving crawl budget" here.
+
+### Every language version gets its OWN `<url>` entry in the sitemap
+
+Decided 2026-08-27. Listing only the English URL and hanging Spanish off it as
+an alternate is supported by Google but is the weaker pattern, and it meant the
+best-ranking pages on the site were never submitted at all. `sitemap.ts` emits
+one `<url>` per locale per path, each carrying the identical `en` / `es` /
+`x-default` alternate set.
+
+⛔ **The `noindex` filter must skip BOTH locales.** The six Spanish legal pages
+carry the same `noindex` as the English ones, so a filter that only pruned the
+English path would submit `/es/privacy` and friends — the same
+sitemap-contradicts-the-page-header bug, doubled.
+
+⛔ **Never emit an `/en` prefix.** It is not a route; it 307-redirects to the
+bare path and only adds crawl noise.
+
+ℹ️ Submitting more URLs raises GSC's "not indexed" count until Google crawls
+them. That is arithmetic, not a regression — do not "fix" it by reverting.
+
+### Judge product state by JSON-LD `availability`, never by grepping for "sold"
+
+A text grep for `sold` matches all product pages regardless of state — the word
+appears elsewhere in the markup — and on 2026-08-27 it nearly confirmed a false
+theory that 20 unindexed products had been sold. The authoritative signal is
+`"availability":"https://schema.org/InStock"` vs `.../SoldOut` in the page's own
+JSON-LD, which is also exactly what Google reads.
+
+Related, and worth not re-learning: **a sold product stays indexed.** Being
+`SoldOut` does not cause "Discovered - currently not indexed"; sold pages
+remain 200 and keep their index entry, and only drop out of `sitemap.xml`.
+
+### Search Console: the "no access" screen does not mean a permissions problem
+
+GSC renders the identical *"Oops, you don't have access to this property"* page
+whether the account lacks permission **or** the property simply does not exist.
+On 2026-08-27 that cost a wrong diagnosis: the account was a verified owner of
+`https://naplesestatejewelry.com/` the whole time, and the failing URL was a
+`sc-domain:` property that had never been created. Check the property picker
+before concluding anything about access.
+
+The site now has both a URL-prefix property (`https://naplesestatejewelry.com/`,
+added Aug 2, holds all history) and a Domain property
+(`sc-domain:naplesestatejewelry.com`, added Aug 27). Overlap is by design and
+is not a conflict. ⚠️ Both verify off the same `google-site-verification` TXT
+in the `.com` zone — **deleting that record breaks both**, in a zone that also
+carries live Workspace MX, root SPF and `p=quarantine` DMARC.
+
+ℹ️ **Request Indexing quota is per SITE, not per property** — roughly 10/day.
+Adding a second property does not buy more; both return "Quota Exceeded"
+together.
 
 ## Homepage Announcement Banner
 
@@ -69,15 +175,19 @@ consumer is `DEFAULT_STORE_HOURS`. An hours edit in the admin panel must be
 mirrored to the Google Business Profile, eBay merchant location, and Etsy
 shop location the same day (the panel carries the warning permanently).
 
-### An hours save busts the WHOLE page tree, deliberately
+### An hours save busts the WHOLE page tree, deliberately — and it WORKS
 
 The admin PUT runs `revalidateTag('store-hours', { expire: 0 })` then
 `revalidatePath('/', 'layout')`. Hours print in the footer of every page in
 both locales and most pages are statically prerendered, so enumerating paths
 would be strictly more fragile; edits are rare enough that a sitewide
-regeneration is cheap. If a fully static page ever proves sticky on Netlify's
-durable cache after a save, the fallback is `export const revalidate = 3600`
-on hours-consuming pages — measured need first, do not add preemptively.
+regeneration is cheap.
+
+✅ **CONFIRMED in production 2026-08-25**, on the first real owner save (hours
+AND banner): both propagated to the statically prerendered homepage in EN and
+ES with no code change. ⛔ The `export const revalidate = 3600` fallback this
+entry used to hold in reserve is **not needed — do not add per-page revalidate
+windows for this.** The same mechanism backs the homepage banner.
 
 ### Prose never names the open days
 

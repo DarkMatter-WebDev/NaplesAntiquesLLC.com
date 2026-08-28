@@ -43,7 +43,11 @@ discretion and a personal relationship over a storefront transaction.
 - **Phone / text**: (239) 404-8505
 - **Showroom**: 6240 Shirley St, Ste 104, Naples, FL 34109 — **inside Sharon
   Lynch Collections** (shared suite; name the landmark, the sign out front is
-  theirs). Open **Tue–Sat 11:00–15:00, or by appointment**.
+  theirs). Open **Mon–Sat 11:00–15:00, or by appointment** as of 2026-08-27.
+  ⛔ Hours are ADMIN-EDITABLE and the owner changes them on the fly — the DB
+  (`shop_settings.store_hours`, Admin → Settings → Store Hours) is the source
+  of truth, not this line and not `HOURS` in `business-location.ts`. Treat both
+  as a stale-able fallback; never hardcode days into prose or metadata.
 - **Service model**: **store-first** since 2026-08-17. Private home visits
   continue **on request** (large estates, downsizing, sellers who would rather
   not transport valuables) but are no longer the default. The site described

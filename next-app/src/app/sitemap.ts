@@ -11,6 +11,27 @@ const BASE = 'https://naplesestatejewelry.com';
 // not actually change.
 const CONTENT_LAST_MODIFIED = new Date('2026-08-17');
 
+// Both locale prefixes the app serves. EVERY public page exists in both, so each
+// language version gets its OWN <url> entry — Google's documented pattern —
+// rather than the Spanish page appearing only as an alternate inside the English
+// entry. Before 2026-08-27 no /es URL was ever submitted, despite the Spanish
+// pages consistently outranking their English twins.
+// ⛔ Do not add an '/en' prefix here: /en/* is not a route, it 307-redirects to
+// the bare path, and those redirects are already crawl noise.
+const LOCALE_PREFIXES = ['', '/es'] as const;
+
+// The same alternate set is attached to every language version of a page, which
+// is what makes the annotations bidirectional. `x-default` points at English.
+function languageAlternates(path: string) {
+  return {
+    languages: {
+      en: `${BASE}${path}`,
+      es: `${BASE}/es${path}`,
+      'x-default': `${BASE}${path}`,
+    },
+  };
+}
+
 const STATIC_PAGES = [
   { path: '', priority: 1.0, changeFrequency: 'weekly' },
   { path: '/sell', priority: 0.9, changeFrequency: 'monthly' },
@@ -34,43 +55,51 @@ const STATIC_PAGES = [
   { path: '/shipping', priority: 0.3, changeFrequency: 'yearly' },
 ] as const;
 
-// One entry per page carrying en/es hreflang alternates (Google reads the
-// alternates rather than needing a separate /es row), plus a lastModified so the
-// shop and products get recrawled when they change.
+// One entry per language version per page, each carrying en/es/x-default
+// alternates, plus a lastModified so the shop and products get recrawled when
+// they change.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
   const entries: MetadataRoute.Sitemap = [];
+
+  // Emits the English and Spanish URL for one path. Callers must already have
+  // excluded anything that is `noindex` — this helper does not re-check, and it
+  // would otherwise duplicate the contradiction across both locales.
+  const pushLocalized = (
+    path: string,
+    lastModified: Date,
+    priority: number,
+    changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency'],
+  ) => {
+    for (const prefix of LOCALE_PREFIXES) {
+      entries.push({
+        url: `${BASE}${prefix}${path}`,
+        lastModified,
+        priority,
+        changeFrequency,
+        alternates: languageAlternates(path),
+      });
+    }
+  };
 
   for (const { path, priority, changeFrequency } of STATIC_PAGES) {
     // A `noindex` page must never be submitted here — the sitemap would be
     // asking Google to index what the page header forbids. Filtered from the
     // single source in legal-metadata.ts rather than by pruning STATIC_PAGES,
     // so re-adding one of these paths above cannot silently reintroduce the
-    // contradiction.
+    // contradiction. ⚠️ The `continue` skips BOTH locales, which is required:
+    // the Spanish legal pages carry the same `noindex` as the English ones.
     if (LEGAL_NOINDEX_PATHS.includes(path)) continue;
 
     // The shop reprices daily, so it genuinely changes often; other static
     // pages use the stable content date rather than "now".
     const lastModified = path === '/shop' ? now : CONTENT_LAST_MODIFIED;
-    entries.push({
-      url: `${BASE}${path}`,
-      lastModified,
-      priority,
-      changeFrequency,
-      alternates: { languages: { en: `${BASE}${path}`, es: `${BASE}/es${path}` } },
-    });
+    pushLocalized(path, lastModified, priority, changeFrequency);
   }
 
   // Buy-side local landing pages (/sell/[city]).
   for (const area of SERVICE_AREAS) {
-    const path = `/sell/${area.slug}`;
-    entries.push({
-      url: `${BASE}${path}`,
-      lastModified: CONTENT_LAST_MODIFIED,
-      priority: 0.8,
-      changeFrequency: 'monthly',
-      alternates: { languages: { en: `${BASE}${path}`, es: `${BASE}/es${path}` } },
-    });
+    pushLocalized(`/sell/${area.slug}`, CONTENT_LAST_MODIFIED, 0.8, 'monthly');
   }
 
   // Dynamic product pages from Supabase (anon read — no cookies needed)
@@ -86,13 +115,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     if (products) {
       for (const { id, updated_at } of products) {
-        entries.push({
-          url: `${BASE}/shop/${id}`,
-          lastModified: updated_at ? new Date(updated_at as string) : now,
-          priority: 0.6,
-          changeFrequency: 'weekly',
-          alternates: { languages: { en: `${BASE}/shop/${id}`, es: `${BASE}/es/shop/${id}` } },
-        });
+        // Same availability filter governs both locales, so a sold item leaves
+        // the English and Spanish sitemaps together.
+        pushLocalized(
+          `/shop/${id}`,
+          updated_at ? new Date(updated_at as string) : now,
+          0.6,
+          'weekly',
+        );
       }
     }
   } catch {

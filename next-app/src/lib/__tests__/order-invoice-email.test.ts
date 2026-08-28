@@ -135,7 +135,7 @@ describe('buildInvoiceEmailContent - footer address and phone', () => {
 
 // Owner request, 2026-08-23: the pickup details were one run-on sentence
 // ("…thank you. Pick up at 6240 Shirley St, Ste 104, Naples, FL 34109 · inside
-// Sharon Lynch Collections. Tue–Sat 11am–3pm, or by appointment. Call or text
+// Sharon Lynch Collections. Mon–Sat 11am–3pm, or by appointment. Call or text
 // us at…"). They are now a laid-out block.
 
 describe('buildInvoiceEmailContent - pickup block layout', () => {
@@ -157,7 +157,7 @@ describe('buildInvoiceEmailContent - pickup block layout', () => {
     // ⚠️ No opts on purpose: this asserts the NO-DB fallback stays byte-
     // identical to the hours this email has always printed.
     const content = buildInvoiceEmailContent(pickupOrder);
-    expect(content.pickup?.hours).toBe('Tuesday – Saturday, 11:00 AM – 3:00 PM');
+    expect(content.pickup?.hours).toBe('Monday – Saturday, 11:00 AM – 3:00 PM');
     expect(content.pickup?.byAppointment).toBe('or by appointment');
   });
 
@@ -194,7 +194,7 @@ describe('buildInvoiceEmailContent - pickup block layout', () => {
   it('breaks the plain-text version onto separate lines too', () => {
     const content = buildInvoiceEmailContent(pickupOrder);
     expect(content.text).toContain('PICKUP LOCATION\n6240 Shirley St, Ste 104\nNaples, FL 34109\ninside Sharon Lynch Collections');
-    expect(content.text).toContain('HOURS\nTuesday – Saturday, 11:00 AM – 3:00 PM\nor by appointment');
+    expect(content.text).toContain('HOURS\nMonday – Saturday, 11:00 AM – 3:00 PM\nor by appointment');
   });
 
   it('shows no pickup block at all on a shipped order', () => {

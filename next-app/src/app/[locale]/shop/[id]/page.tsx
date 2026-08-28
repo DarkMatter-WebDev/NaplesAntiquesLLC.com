@@ -755,7 +755,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                   <div className="product-cta-grid mt-3">
                     <CartButton item={cartItem} variant="detail" locale={locale} />
                     <WishlistButton item={wishlistItem} variant="button" locale={locale} />
-                    <Link href={`${contactHref}?item=${encodeURIComponent(p.title)}`} className="outline-button">
+                    <Link href={`${contactHref}?item=${encodeURIComponent(p.title)}`} rel="nofollow" className="outline-button">
                       {isEs ? 'Consultar' : 'Inquire'}
                     </Link>
                     <a href="tel:2394048505" className="outline-button">
@@ -764,7 +764,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
                   </div>
                 ) : (
                   <div className="product-cta-grid product-cta-grid-pair mt-3">
-                    <Link href={`${contactHref}?item=${encodeURIComponent(p.title)}`} className="outline-button">
+                    <Link href={`${contactHref}?item=${encodeURIComponent(p.title)}`} rel="nofollow" className="outline-button">
                       {isEs ? 'Consultar pieza similar' : 'Inquire about a similar piece'}
                     </Link>
                     <a href="tel:2394048505" className="outline-button">

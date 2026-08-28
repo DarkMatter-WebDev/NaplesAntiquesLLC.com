@@ -1,81 +1,123 @@
 ﻿# Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-08-24**.
+> in `CHANGELOG.md`. Last reconciled: **2026-08-27**.
 
 ## ◻ OPEN — needs a human
 
-🟡 **READY TO DEPLOY 2026-08-25 — store hours + homepage banner.** Both SQL
-migrations are RUN and both features are verified locally against the live
-columns. Nothing is blocking the deploy.
+### 🔴 2026-08-27 — DEPLOY the two SEO fixes (built, verified, undeployed)
 
-✅ **Both migrations done by the owner**: `store-hours-2026-08.sql` and
-`home-banner-2026-08.sql`. Verified via the anon REST key that both columns
-exist, read cleanly, and are `null` — i.e. the built-in defaults serve until an
-admin saves.
+Both changes sit in the working folder only; production is unchanged. No SQL,
+no env vars, nothing to run in Supabase.
 
-✅ **All three banner render paths exercised against the real database**
-(2026-08-25, by writing test values to `home_banner`, verifying, then restoring
-the column to `null`):
+1. `next-app/src/app/robots.ts` — removed `/account`, `/checkout` and their
+   `/en/` + `/es/` variants (they emit their own `noindex`, which the crawl
+   block was making unreachable). `/admin`, `/api`, `/shop-modern`,
+   `/en/admin`, `/es/admin` stay.
+2. `next-app/src/app/[locale]/shop/[id]/page.tsx` lines 758 + 767 — the two
+   `/contact?item=` inquire links gained `rel="nofollow"`.
+3. `next-app/src/lib/business-location.ts` — `HOURS.days` gains `'Monday'`
+   (owner opened Mondays; the live site was already correct, the constant was
+   the stale part). 8 test expectations updated with it.
+4. `next-app/src/app/sitemap.ts` — emits BOTH locales, 99 → **200 URLs**
+   (100 EN + 100 ES, paired), each with `en`/`es`/`x-default` alternates.
+   ⚠️ After deploying, resubmit `/sitemap.xml` in Search Console and expect the
+   "not indexed" count to rise as ~100 new URLs await crawl — that is expected.
 
-| State | Result |
-| --- | --- |
-| Link off | `<div>`, 0 anchors, **0 arrows**, copy intact, EN + ES |
-| Banner off | no element at all; page 200, one `<h1>`, hero intact, no copy in either locale |
-| Custom destination + blank ES | EN `href="/shop"`, ES `href="/es/shop"`, arrow back, ES falls back to English copy |
+Gate, run after each change independently: `tsc` clean · lint clean ·
+**1176/1176 across 112 files** · build **456/456**. Built `robots.txt` body
+verified; `rel:"nofollow"` confirmed exactly twice in the built SSR chunk.
 
-(The only `home-announcement` string left in the banner-off page is a CSS rule
-in the hero's styled-jsx, not an element.) Restored state re-verified from a
-cold start: EN → `/free-evaluation`, ES → `/es/free-evaluation`, arrow present,
-hours and JSON-LD unaffected. Other `shop_settings` values untouched — only
-`home_banner` was ever PATCHed.
+**After deploying,** confirm `https://naplesestatejewelry.com/robots.txt` no
+longer lists `/account` or `/checkout` and still lists `/admin`, `/api`,
+`/shop-modern`. Then expect the two `/account` rows in Page indexing to migrate
+from "Blocked by robots.txt" to "Excluded by `noindex`" over some weeks — both
+are non-indexed states, so nothing that currently ranks changes.
 
-✅ **Staging synced 2026-08-25 — ready to copy to the repo folder and push.**
-Gate first, from a deleted `.next` with the dev server stopped: `tsc` clean ·
-lint clean · **1176/1176 across 112 files** · build **458/458**.
+### ◻ 2026-08-27 — 18 Request Indexing calls still owed (retry tomorrow)
 
-Dry run queued exactly **44 files** — 22 store-hours files, 3 SQL, 8
-prose-sweep pages, 6 banner files, 5 memory docs — with **0 Extras / 0
-Mismatch / 0 FAILED**; the file list was read and every entry accounted for.
-Real run **44 copied / 0 FAILED**; follow-up dry run **0 to copy**.
+Only **1 of 19** live product URLs was accepted before **Quota Exceeded**
+(`bill-tompkins-...-coffee-pot-early-19th-century-55`, $2,993 — "added to a
+priority crawl queue"). ⚠️ The quota is **per site, shared across properties** —
+the new Domain property returns the same error, so it is not a workaround.
 
-**887 files / 20.14 MB** on disk (robocopy total 890 = the documented 3
-`/XF`-excluded files: `.env.local`, `tsconfig.tsbuildinfo`, `next-env.d.ts`).
-Leak check clean — 0 `.git` (dir *or* file), 0 `worktrees`, 0 `node_modules`,
-0 `.next`, 0 `.env*`, 0 `*.log`, 0 `*.tsbuildinfo`, 0 `next-env.d.ts`,
-0 `*.pem` — against a **positive control of 181 `.tsx`** (= 179 at the
-2026-08-25 hero-freeze sync + `AdminStoreHoursPanel` + `AdminHomeBannerPanel`),
-so the zeros are real rather than a broken scan.
+The 18 remaining are all `InStock`, all in the sitemap, all `Last crawled: N/A`.
+Search Console → **URL Inspection** → paste URL → **REQUEST INDEXING**, ~10/day:
 
-Hidden paths confirmed present: `.claude/launch.json`,
-`.github/workflows/scheduled-jobs.yml`, `.gitignore`, `next-app/.npmrc`.
-Staged-content spot checks: all 11 new feature files present; `globals.css`
-carries 6 `a.home-announcement` hits (the link-scoped rules); `(home)/page.tsx`
-imports and calls `resolveHomeBanner`; `ShowroomHours.tsx` calls
-`getStoreHours`; `shop-settings.sql` carries both new columns; and the standing
-CSP hazard still reads **`maps.google.com` 1 hit each** in root `netlify.toml`
-and `next-app/next.config.ts`. The only remaining `hoursDaysLabel`/
-`hoursRowsGrouped` string in the tree is a test DESCRIPTION naming the retired
-helpers — no code references survive.
+```
+https://naplesestatejewelry.com/shop/antique-bhutanese-koma-garment-hook-silver-with-gold-wash-66
+https://naplesestatejewelry.com/shop/art-nouveau-whiting-mfg-co-sterling-silver-large-serving-fork-lily-pattern-antique-94
+https://naplesestatejewelry.com/shop/gorham-chantilly-sterling-silver-salt-spoon-monogrammed-81
+https://naplesestatejewelry.com/shop/joseph-mayer-brothers-sterling-silver-george-washington-souvenir-spoon-124
+https://naplesestatejewelry.com/shop/pair-of-antique-english-sterling-silver-salt-cellars-with-cobalt-blue-glass-liners-74
+https://naplesestatejewelry.com/shop/reed-barton-francis-i-sterling-silver-iced-tea-spoon-116
+https://naplesestatejewelry.com/shop/reed-barton-francis-i-sterling-silver-teaspoon-73
+https://naplesestatejewelry.com/shop/set-of-three-graduated-japanese-silver-tazza-by-mitsubishi-mihara-54
+https://naplesestatejewelry.com/shop/sterling-silver-monogram-brooch-pendant-openwork-jc-initials-dual-use-pin-bail-79
+https://naplesestatejewelry.com/shop/tiffany-co-sterling-silver-punch-ladle-acanthus-pattern-pat-1895-53
+https://naplesestatejewelry.com/shop/victorian-silver-napkin-ring-w-applied-running-rabbit-hare-figure-and-engraved-decoration-monogrammed-mad-104
+https://naplesestatejewelry.com/shop/vintage-sterling-silver-amethyst-cabochon-earrings-convertible-pendants-93
+https://naplesestatejewelry.com/shop/vintage-sterling-silver-men-s-cufflinks-with-carved-figural-scene-80
+https://naplesestatejewelry.com/shop/whiting-lily-pattern-sterling-silver-teaspoon-monogrammed-art-nouveau-101
+https://naplesestatejewelry.com/shop/whiting-sterling-silver-handled-grape-shears-with-german-steel-blades-127
+https://naplesestatejewelry.com/shop/william-henry-juno-sterling-silver-cable-link-necklace-men-s-90
+https://naplesestatejewelry.com/shop/william-suckling-sterling-silver-footed-salt-cellar-with-cobalt-glass-liner-birmingham-1955-108
+https://naplesestatejewelry.com/shop/zina-sterling-silver-dragonfly-brooch-78
+```
 
-(Post-sync doc edits recording this result drift staging by memory docs only —
-the owner's accepted standing preference.)
+ℹ️ This is an accelerator, not a repair — the sitemap was resubmitted and read
+successfully on Aug 27, so Google reaches these on its own cadence regardless.
 
-◻ **Post-deploy checks (the only things left, both need production):**
+### 🟡 2026-08-27 — the real ranking problem is CTR, not indexing
 
-1. **First hours save**: Admin → Settings → Store Hours → save a schedule;
-   confirm footer/homepage/contact/checkout/shipping update within a few
-   minutes and view-source JSON-LD `openingHoursSpecification` reflects it.
-   ⚠️ This is also the live test of `revalidatePath('/', 'layout')` against
-   Netlify's durable cache — if a static page proves sticky, the documented
-   fallback is adding `export const revalidate = 3600` to hours-consuming
-   pages (see `DECISIONS.md`; do NOT add preemptively).
-2. **First banner save**: same panel flow; the render paths are proven, so this
-   is confirming the admin POST + revalidation round-trip, not the rendering.
-   ⚠️ Check any new copy at **320px in Spanish** — the panel blocks past 53
-   characters, but 49–53 only warns, and that band is the one to eyeball.
-3. ⚠️ **NAP**: after any hours change, update the Google Business Profile, eBay
-   merchant location, and Etsy shop location the same day (the panel warns).
+Average position **36.7** (page four). The site is being *seen and skipped*:
+
+| Query | Clicks | Impressions |
+| --- | --- | --- |
+| estate jewelry buyers | **0** | 60 |
+| custom jewelry design marco island, fl | **0** | 36 |
+| antique jewelry naples fl | **0** | 35 |
+| estate jewelry buyers near me | **0** | 28 |
+
+By page: `/sell/naples` **220 impressions → 1 click**, `/sell/marco-island`
+103 → 1, `/sell/fort-myers` 62 → 1. The homepage carries 38 of the 44 clicks,
+and "naples estate jewelry" (brand) is 16 of them. Nothing in the two fixes
+above touches this — it is title/meta/content work and deserves its own session.
+
+### ◻ 2026-08-27 — recheck in a day or two
+
+- The new Domain property's Settings showed **"No robots.txt file"** and "No
+  data available yet" — expected for a property hours old (the URL-prefix
+  property reports it **Valid**, fetched 8/9/26). Confirm it flips to Valid.
+- The Domain property renders the **old gold palm-tree favicon** in the picker
+  while the URL-prefix property shows the octopus. Google's favicon cache lags;
+  ⛔ do not re-cut the artwork over it.
+
+
+✅ **DONE 2026-08-25 — store hours + homepage banner are DEPLOYED and both were
+exercised in production the same evening.** Nothing outstanding. Full evidence
+in `CHANGELOG.md` 2026-08-25.
+
+- Post-deploy smoke: 10 routes **200**, one `<h1>`, zero `Tue–Sat` left in any
+  meta description.
+- **Owner used both panels** (DB `updated_at` 2026-08-26T03:43Z): Wednesday
+  closed (JSON-LD correctly groups the non-contiguous `["Tuesday","Thursday",
+  "Friday","Saturday"]`), and a link-OFF banner announcing the closure —
+  production renders a `<div>` with 0 anchors and 0 arrows in both locales.
+- ✅ **`revalidatePath('/', 'layout')` is CONFIRMED working on Netlify's durable
+  cache.** The saves propagated to the statically prerendered homepage in both
+  locales. ⛔ The documented `export const revalidate = 3600` fallback is **not
+  needed** — do not add per-page revalidate windows for this.
+
+◻ **Only soft follow-up:** the live banner copy is 51 (EN) / 52 (ES) chars —
+inside the 49–53 amber band the panel flags. It should fit (a single fragment
+has no `·` separator and link-off has no `→`, leaving ~23–28px slack at 320px),
+but it is worth an eyeball on a real phone while that copy is up.
+
+⚠️ **NAP, now live and real:** the showroom hours on the site now say Wednesday
+closed. Update the Google Business Profile, eBay merchant location, and Etsy
+shop location to match — the panel warns about this, and Google compares.
+
 
 
 ✅ **DEPLOYED 2026-08-25 — the weak-GPU hero-freeze batch is LIVE.** Owner
@@ -1555,7 +1597,11 @@ everywhere `svh` behaves per spec.
    - Confirm the chip is back to normal at tablet/desktop widths (it returns at
      768px), and that the wordmark reads well: it is fluid now and is at or
      above its old size at every width.
-4. ◻️ **Resubmit the sitemap in Search Console, and Request Indexing on the
+4. ✅ **DONE 2026-08-27 (sitemap half) — resubmitted, read Success, 99 pages.**
+   The Request-Indexing half is superseded by the 2026-08-27 item at the top of
+   this file. Original text kept for context:
+
+   ◻️ **Resubmit the sitemap in Search Console, and Request Indexing on the
    four pages whose titles changed** — `/`, `/sell`, `/services`,
    `/silver-services`. Owner action; nobody has done it yet.
 

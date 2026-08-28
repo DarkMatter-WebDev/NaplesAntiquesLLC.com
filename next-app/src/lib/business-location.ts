@@ -43,18 +43,25 @@ export const GEO: { latitude: number; longitude: number } | null = {
 };
 
 /**
- * Tue–Sat 11:00–15:00 — the BUILT-IN DEFAULT schedule. Since 2026-08 the live
+ * Mon–Sat 11:00–15:00 — the BUILT-IN DEFAULT schedule. Since 2026-08 the live
  * hours are admin-editable (Admin → Settings → Store Hours, stored on
  * `shop_settings.store_hours`); this constant survives only as the source of
  * `DEFAULT_STORE_HOURS` in `store-hours.ts`, served whenever the DB value is
  * null, malformed, or unreachable. `opens`/`closes` are 24h `HH:MM`.
+ *
+ * ⛔ This is a FALLBACK, not the schedule. The admin panel is the source of
+ * truth and the owner changes these on the fly — do not read this constant to
+ * answer "when is the store open", and do not reintroduce day names into
+ * prose or metadata. Keep it matching the CURRENT real hours anyway, because
+ * it is what renders if the DB row is ever null or unreachable.
+ * Updated 2026-08-27: Monday added (owner opened Mondays).
  *
  * ⚠️ These must match the Google Business Profile exactly. Google compares the
  * two once the profile is verified, and a mismatch is a self-inflicted wound.
  * The same applies to ADMIN-EDITED hours — the admin panel carries the warning.
  */
 export const HOURS = {
-  days: ['Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+  days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
   opens: '11:00',
   closes: '15:00',
 } as const;
@@ -167,7 +174,7 @@ export interface StoreDayHours {
 export type StoreHoursSchedule = Record<WeekDay, StoreDayHours>;
 
 /**
- * `HOURS` as a schedule — Tue–Sat open 11:00–15:00, Sun/Mon closed (carrying
+ * `HOURS` as a schedule — Mon–Sat open 11:00–15:00, Sunday closed (carrying
  * the same times so the admin panel starts from sensible values). Lives HERE,
  * not in `store-hours.ts`, so client code (admin preview, module-scope legal
  * copy) can format the fallback without touching the server-only data layer.
@@ -276,7 +283,7 @@ interface OpenSegment {
 
 /**
  * Maximal runs of CONSECUTIVE open days (Monday-first `WEEK_ORDER`) sharing
- * identical times. The default schedule compresses to one `Tue–Sat` segment.
+ * identical times. The default schedule compresses to one `Mon–Sat` segment.
  *
  * No Sunday↔Monday wrap-around merge: a schedule open Sun + Mon yields two
  * segments. `WEEK_ORDER` starts Monday precisely so the default closed days
