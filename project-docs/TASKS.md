@@ -34,6 +34,22 @@ longer lists `/account` or `/checkout` and still lists `/admin`, `/api`,
 from "Blocked by robots.txt" to "Excluded by `noindex`" over some weeks — both
 are non-indexed states, so nothing that currently ranks changes.
 
+### 🔴 2026-08-28 — SET SATURDAY TO 11:00–16:00 IN THE ADMIN PANEL
+
+Google Business Profile says **Saturday 11 AM–4 PM**; the site says 11–3. Owner
+confirmed 11–4 is correct, so the site is stale. Mon–Fri and Sunday already agree.
+
+**Admin → Settings → Store Hours → Saturday → closes 16:00.** No deploy, no SQL —
+it is a DB value and propagates via `revalidatePath('/', 'layout')`.
+
+⚠️ Until it is set, the visible hours table AND the `openingHoursSpecification`
+JSON-LD both understate Saturday, and Google compares the two against the
+verified profile.
+
+ℹ️ The `HOURS` fallback in `business-location.ts` cannot express this (one
+`opens`/`closes` for every open day) and is knowingly one hour short on Saturday.
+It only renders if the DB row is null or unreachable.
+
 ### ◻ 2026-08-28 — owner follow-ups on the `/review` work
 
 - **Print/QR:** the string to encode is `https://naplesestatejewelry.com/review`.

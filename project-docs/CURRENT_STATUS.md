@@ -8,6 +8,16 @@
 
 **Read this, then `TASKS.md`.**
 
+### 🔴 2026-08-28 (later) — reviews 16→22, `/review` links BUILT; Saturday hours need an ADMIN fix
+
+Testimonials caught up to the live profile (**22**, verbatim). "Leave a Review"
+now appears in two places — the testimonials CTA (homepage + every product page)
+and the footer Company column — both plain `<a>` to `/review`, both bilingual.
+
+🔴 **Owner action, no deploy:** Google says **Saturday 11 AM–4 PM**, the site says
+11–3. Fix in **Admin → Settings → Store Hours**. The `HOURS` fallback cannot
+express per-day times and is knowingly one hour short on Saturday.
+
 ### 🟡 2026-08-28 — `sameAs` entity fix + `/review` (BUILT, not deployed)
 
 `sameAs` claimed `naplesjewelrybuyers.com` — a competitor's trading name with

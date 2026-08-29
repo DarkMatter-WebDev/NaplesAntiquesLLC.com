@@ -1,6 +1,61 @@
 
 # Changelog
 
+## 2026-08-28 (later) — 6 new reviews, `/review` links, and a Saturday hours mismatch
+
+### Testimonials 16 → 22, read verbatim from the live profile
+
+The site was 6 reviews behind (profile shows **5.0 ★ / 22**). Added Joseph Roth,
+Bill Boleyn, Otis Leknug, Danna Simmons, Stephen Nguyen, Krish Pr — each read
+off the live listing, not paraphrased.
+
+⚠️ **Bill Boleyn's review is clamped in Google's DOM** and the accessibility-tree
+click would not expand it; it took a coordinate click on "More" to get the full
+text. A truncated quote would have been indistinguishable from a fabricated one.
+⚠️ **Joseph Roth's typos are preserved** (`knowledge.and`, `I have know`, `cme`)
+— the verbatim rule at the top of `testimonials.ts` forbids tidying them.
+
+### "Leave a Review" in two places, both pointing at `/review`
+
+Mocked up in the owner's real tokens and approved before any code was written.
+
+1. **Testimonials CTA** — added to `footnote` in `TestimonialsSection.tsx`,
+   which BOTH variants render, so it appears on the homepage marquee and the
+   product-page grid from one edit.
+2. **Footer, Company column** — a sibling of the `companyLinks` map, not an
+   entry in it.
+
+⛔ **Neither can use `next/link`, and the footer one cannot use the shared map.**
+`/review` is a route handler that 302s to Google — there is no page for a
+client-side navigation to render — and `p('/review')` would locale-prefix it to
+`/es/review`, which 404s. Both are plain `<a target="_blank">`.
+
+⚠️ Each `aria-label` BEGINS with the visible label ("Leave a Review on Google
+(opens in a new tab)") — axe flags `label-content-name-mismatch` otherwise, the
+same rule the per-card "Read on Google" links already follow.
+
+Labels: EN "Leave a Review"; ES **"Dejar una Reseña"** (button) /
+**"Deje una Reseña"** (footer). Verified in the built HTML: **2 `/review`
+anchors** on the homepage in each locale, correct label per slot, 44 testimonial
+figures (22 × 2 marquee halves).
+
+### 🔴 Google Business Profile says Saturday 11 AM–4 PM; the site says 11–3
+
+Found while reading the profile. Mon–Fri and Sunday agree; **Saturday is an hour
+apart**. Owner confirmed **11–4 is correct**, so the SITE is the stale side.
+
+⛔ **This is not a code fix.** Live hours come from `shop_settings.store_hours`
+via the admin panel — Admin → Settings → Store Hours. Owner action, no deploy.
+
+⚠️ **`HOURS` cannot express it.** The fallback has ONE `opens`/`closes` for all
+open days, so it is deliberately one hour short on Saturday. Accepted: it only
+renders if the DB row is null or unreachable. Its docblock now says so rather
+than claiming it matches GBP exactly. A per-day fallback would need an overrides
+map AND would break the single-segment compression several formatter tests
+assert — not done, and not obviously worth it given hours change on the fly.
+
+ℹ️ Gate: `tsc` clean · lint clean · **1176/1176** · build **457/457**.
+
 ## 2026-08-28 — `sameAs` entity fix, and a one-click `/review` path
 
 Two items from an external SEO review, both verified against the code first.

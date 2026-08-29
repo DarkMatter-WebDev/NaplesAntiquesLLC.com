@@ -56,9 +56,18 @@ export const GEO: { latitude: number; longitude: number } | null = {
  * it is what renders if the DB row is ever null or unreachable.
  * Updated 2026-08-27: Monday added (owner opened Mondays).
  *
- * ⚠️ These must match the Google Business Profile exactly. Google compares the
- * two once the profile is verified, and a mismatch is a self-inflicted wound.
- * The same applies to ADMIN-EDITED hours — the admin panel carries the warning.
+ * ⚠️ The LIVE hours must match the Google Business Profile exactly. Google
+ * compares the two once the profile is verified, and a mismatch is a
+ * self-inflicted wound. The admin panel carries the same warning.
+ *
+ * ⚠️ This constant is a COARSE fallback and cannot express per-day times — it
+ * has one `opens`/`closes` for every open day. As of 2026-08-28 the real
+ * Saturday runs 11:00–16:00 while the rest of the week is 11:00–15:00, so the
+ * fallback is deliberately one hour short on Saturday. That is accepted: it
+ * only ever renders if `shop_settings.store_hours` is null or unreachable, and
+ * the DB is the source of truth. If a per-day fallback is ever wanted, give
+ * `HOURS` an overrides map and rebuild `DEFAULT_STORE_HOURS` from it — but note
+ * that breaks the single-segment compression several formatter tests assert.
  */
 export const HOURS = {
   days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],

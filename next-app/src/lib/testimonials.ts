@@ -248,4 +248,62 @@ export const TESTIMONIALS: Testimonial[] = [
     meta: 'Google review',
     metaEs: 'Reseña de Google',
   },
+  // ── Added 2026-08-28. Read verbatim from the live profile (22 reviews at the
+  // time); the site was 6 behind. Typos and spacing are the reviewers' own —
+  // the verbatim rule at the top of this file forbids tidying them.
+  {
+    name: 'Joseph Roth',
+    // ⚠️ 'knowledge.and', 'I have know', and 'cme' are exactly as posted.
+    quote:
+      'Chris has the utmost integrity, superior knowledge.and a pleasure to work with. I have know for years as an auction house manager and felt completely at ease with the experience, working with him as a client for 8 years. I still cme to Naples to visit.',
+    quoteEs:
+      'Chris tiene la máxima integridad, un conocimiento superior y es un placer trabajar con él. Lo conozco desde hace años como gerente de una casa de subastas y me sentí completamente cómodo con la experiencia, trabajando con él como cliente durante 8 años. Todavía vengo a Naples de visita.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Bill Boleyn',
+    quote:
+      'Chris helped us every step of the way with the acquisition of a portion of our estate silver. He is most knowledgeable of every aspect of this subject matter. He offered us a much better deal than others in his profession in Naples were willing to consider. We will certainly use him again for other assets we wish to sell. We highly recommend his services.',
+    quoteEs:
+      'Chris nos ayudó en cada paso con la adquisición de una parte de nuestra plata patrimonial. Conoce a fondo todos los aspectos de este tema. Nos ofreció un trato mucho mejor del que otros de su profesión en Naples estaban dispuestos a considerar. Sin duda volveremos a recurrir a él para otros bienes que deseemos vender. Recomendamos mucho sus servicios.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Otis Leknug',
+    quote:
+      'Chris is very helpful in explaining different aspects of silver to you. Very fair in his pricing and accommodative in meeting to look at your items.',
+    quoteEs:
+      'Chris es muy servicial al explicarle los diferentes aspectos de la plata. Muy justo en sus precios y flexible para reunirse a ver sus artículos.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Danna Simmons',
+    quote:
+      'Awesome guy. Explained everything he was doing as we went along. Very satisfied. Will come back.',
+    quoteEs:
+      'Un tipo excelente. Explicó todo lo que hacía a medida que avanzábamos. Muy satisfecha. Volveré.',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Stephen Nguyen',
+    quote:
+      'Very honest seller. 100% recommend for all your jewelry needs',
+    quoteEs:
+      'Vendedor muy honesto. Lo recomiendo al 100% para todas sus necesidades de joyería',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
+  {
+    name: 'Krish Pr',
+    quote:
+      'Phenomenal service and unbeatable prices. Just visit in the area',
+    quoteEs:
+      'Servicio fenomenal y precios inmejorables. Solo visite la zona',
+    meta: 'Google review',
+    metaEs: 'Reseña de Google',
+  },
 ];

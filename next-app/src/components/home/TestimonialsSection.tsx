@@ -65,10 +65,37 @@ export default function TestimonialsSection({ locale, compact = false, variant =
     </>
   );
 
+  /**
+   * Rendered by BOTH variants, which is why the review CTA lives here rather
+   * than beside either layout — the marquee (homepage) and the grid (product
+   * pages) both end with this block.
+   *
+   * A plain <a>, never next/link: `/review` is a route handler that 302s to
+   * Google, and a client-side navigation has no page to render. `_blank` keeps
+   * the visitor's place on the site, matching the per-card "Read on Google".
+   *
+   * ⚠️ The aria-label must BEGIN with the visible text or axe flags
+   * label-content-name-mismatch — same rule as the card links below.
+   */
   const footnote = (
-    <p className="text-center mt-8 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-      {isEs ? 'Reseñas de clientes en Google.' : 'Client reviews on Google.'}
-    </p>
+    <div className="mt-8 text-center">
+      <a
+        href="/review"
+        className="outline-button"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={
+          isEs
+            ? 'Dejar una Reseña en Google (se abre en una pestaña nueva)'
+            : 'Leave a Review on Google (opens in a new tab)'
+        }
+      >
+        {isEs ? 'Dejar una Reseña' : 'Leave a Review'}
+      </a>
+      <p className="mt-3 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+        {isEs ? 'Reseñas de clientes en Google.' : 'Client reviews on Google.'}
+      </p>
+    </div>
   );
 
   /**

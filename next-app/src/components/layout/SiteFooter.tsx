@@ -131,6 +131,26 @@ export default function SiteFooter({ locale = 'en' }: Props) {
                 {label}
               </Link>
             ))}
+            {/* Deliberately NOT a companyLinks entry. Two reasons it cannot
+                use the shared map: `p()` would locale-prefix it to
+                /es/review, which 404s (the route is top-level and excluded
+                from the proxy matcher); and it must be a plain <a>, because
+                /review is a route handler that 302s to Google and there is no
+                page for a client-side navigation to render. */}
+            <a
+              href="/review"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover-underline-grow justify-self-center py-1.5 text-[0.68rem] leading-tight md:w-fit md:justify-self-auto md:py-0 md:text-sm"
+              style={{ color: 'var(--color-on-surface-variant)' }}
+              aria-label={
+                isEs
+                  ? 'Deje una Reseña en Google (se abre en una pestaña nueva)'
+                  : 'Leave a Review on Google (opens in a new tab)'
+              }
+            >
+              {isEs ? 'Deje una Reseña' : 'Leave a Review'}
+            </a>
           </nav>
 
           <nav className="col-span-2 grid grid-cols-2 gap-x-4 gap-y-1 md:col-span-1 md:flex md:flex-col md:gap-3" aria-label={isEs ? 'Enlaces legales' : 'Legal links'}>
