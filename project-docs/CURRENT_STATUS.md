@@ -2,11 +2,41 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-08-27**.
+> in `DECISIONS.md`. Last reconciled: **2026-08-29**.
 
 ## Start Here (handoff, end of the 2026-08-27 Search Console session)
 
 **Read this, then `TASKS.md`.**
+
+### 🟡 2026-08-29 (later) — /sell value guide + city-intro extensions + /silver-services flatware band BUILT, not deployed
+
+`/sell` (the hub — was 444 words, thinner than its own city pages, position 64)
+gained the karat-purity table, the weight × purity × spot math with a worked
+example, and the "Before You Sell" band, in both locales. ⛔ **Deliberately NOT
+added to the six city pages** — they are 69% verbatim-identical already, and
+their template renders the site's best-ranking pages (`/es/sell/cape-coral`
+position 5.3). Contextual link added to `/silver-services` (position 12.2, the
+striking-distance page and the plan's step 2). `CONTENT_LAST_MODIFIED` bumped
+to 2026-08-29. Gate green; detail in `CHANGELOG.md`.
+
+### 🟢 2026-08-29 — everything is DEPLOYED, verified, and nothing is outstanding
+
+All 2026-08-27/28 work is live and production-verified: `robots.txt` unblocked,
+`nofollow` on the inquire links, the **bilingual sitemap (198 URLs, 99 EN / 99
+ES)**, the `sameAs` entity fix, `/review` (302 → the Google review form, linked
+from the testimonials CTA and the footer in both locales), and **22 testimonials**.
+
+✅ **Saturday hours resolved by the owner** in Admin → Settings → Store Hours.
+Production emits two specs — Mon–Fri 11:00–15:00 and **Saturday 11:00–16:00** —
+matching the Google Business Profile exactly. 🟢 First production proof the
+split-week JSON-LD grouping works when one day diverges.
+
+✅ **Google re-read the sitemap unprompted**: last read Aug 28, Success,
+**198 discovered pages**. No resubmit needed — considered and skipped as a no-op.
+
+◻ Only open item: **7 remaining Request Indexing calls** (daily quota, ~10/day,
+shared per site). 🟢 Two of the batch were found already indexed, so Google is
+reaching these on its own regardless.
 
 ### 🔴 2026-08-28 (later) — reviews 16→22, `/review` links BUILT; Saturday hours need an ADMIN fix
 

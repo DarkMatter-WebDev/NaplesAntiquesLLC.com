@@ -5,7 +5,7 @@
 
 ## ◻ OPEN — needs a human
 
-### 🔴 2026-08-27 — DEPLOY the two SEO fixes (built, verified, undeployed)
+### ✅ DONE — the 2026-08-27/28 SEO batches are DEPLOYED and verified live
 
 Both changes sit in the working folder only; production is unchanged. No SQL,
 no env vars, nothing to run in Supabase.
@@ -34,21 +34,39 @@ longer lists `/account` or `/checkout` and still lists `/admin`, `/api`,
 from "Blocked by robots.txt" to "Excluded by `noindex`" over some weeks — both
 are non-indexed states, so nothing that currently ranks changes.
 
-### 🔴 2026-08-28 — SET SATURDAY TO 11:00–16:00 IN THE ADMIN PANEL
+### 🔴 2026-08-29 — DEPLOY the content batch: /sell value guide + city intros + /silver-services flatware band (built, gated, staged)
 
-Google Business Profile says **Saturday 11 AM–4 PM**; the site says 11–3. Owner
-confirmed 11–4 is correct, so the site is stale. Mon–Fri and Sunday already agree.
+One file of app code (`next-app/src/app/[locale]/sell/page.tsx`) plus the
+`CONTENT_LAST_MODIFIED` bump in `sitemap.ts`. No SQL, no env vars. After
+deploying: spot-check `/sell` and `/es/sell` render the table and the three
+links; city pages must be unchanged.
 
-**Admin → Settings → Store Hours → Saturday → closes 16:00.** No deploy, no SQL —
-it is a DB value and propagates via `revalidatePath('/', 'layout')`.
+### ✅ DONE 2026-08-29 — /silver-services flatware band built (mockup approved,
+price-both-ways claim owner-confirmed). In the deploy batch above. After deploy,
+watch this page's position for "flatware" queries over the coming weeks — it is
+the likeliest first non-brand click on the site.
 
-⚠️ Until it is set, the visible hours table AND the `openingHoursSpecification`
-JSON-LD both understate Saturday, and Google compares the two against the
-verified profile.
+### ✅ DONE 2026-08-29 — per-city local grounding added (data-only, owner-authorized)
 
-ℹ️ The `HOURS` fallback in `business-location.ts` cannot express this (one
-`opens`/`closes` for every open day) and is knowingly one hour short on Saturday.
-It only renders if the DB row is null or unreachable.
+12 intro strings extended in `service-areas.ts` with verifiable local detail;
+template untouched. ◻ Standing invitation: if the owner ever supplies REAL
+customer-pattern detail per city ("Marco sellers bring X"), it upgrades these —
+researched geography is the floor, owner knowledge is the ceiling.
+
+### ✅ DONE 2026-08-29 — Saturday hours corrected; site and Google now agree
+
+Owner set it in **Admin → Settings → Store Hours**. Verified on production:
+the JSON-LD emits **two** specs — `['Monday'…'Friday'] 11:00–15:00` and
+`['Saturday'] 11:00–16:00` — and the visible table reads
+`Saturday 11:00 AM – 4:00 PM`. Matches the Google Business Profile exactly.
+
+🟢 This is the first production proof that the **split-week grouping works in
+the wild**: `openingHoursSchema()` correctly split one uniform block into two
+when a single day diverged, rather than flattening it.
+
+ℹ️ The `HOURS` fallback in `business-location.ts` still cannot express per-day
+times and remains one hour short on Saturday by design. It renders only if
+`shop_settings.store_hours` is null or unreachable; its docblock says so.
 
 ### ◻ 2026-08-28 — owner follow-ups on the `/review` work
 
@@ -63,28 +81,26 @@ It only renders if the DB row is null or unreachable.
   disallows self-serving review markup on LocalBusiness and it risks a
   structured-data manual action.
 
-### ◻ 2026-08-27 — 18 Request Indexing calls still owed (retry tomorrow)
+### ◻ 2026-08-28 — 7 Request Indexing calls still owed (quota is a ROLLING window)
 
-Only **1 of 19** live product URLs was accepted before **Quota Exceeded**
-(`bill-tompkins-...-coffee-pot-early-19th-century-55`, $2,993 — "added to a
-priority crawl queue"). ⚠️ The quota is **per site, shared across properties** —
-the new Domain property returns the same error, so it is not a workaround.
+⚠️ **2026-08-29 ~8:30 AM attempt: Quota Exceeded on the FIRST request of the
+day.** The daily quota is a rolling ~24-hour window, not a midnight reset —
+yesterday, 11 requests burned ~9–10 AM block until that window rolls off.
+Retry mid-afternoon or later.
 
-The 18 remaining are all `InStock`, all in the sitemap, all `Last crawled: N/A`.
-Search Console → **URL Inspection** → paste URL → **REQUEST INDEXING**, ~10/day:
+**11 of the 18 are now requested.** The daily quota ran out on the 12th attempt
+("Quota Exceeded — try submitting this again tomorrow"), same as 2026-08-27.
+⚠️ The quota is **per SITE, shared across properties** — the Domain property
+returns the same error, so it is not a workaround. Budget ~10–11/day.
+
+🟢 **Two of the 18 turned out to be ALREADY INDEXED** — `…teaspoon-73` and
+`…monogrammed-mad-104` both now report **"URL is on Google"**. Neither was
+indexed as of the 8/20 report, so Google crawled them in between: evidence the
+Aug 27 sitemap resubmission is landing.
+
+**Still owed — paste each into URL Inspection → REQUEST INDEXING:**
 
 ```
-https://naplesestatejewelry.com/shop/antique-bhutanese-koma-garment-hook-silver-with-gold-wash-66
-https://naplesestatejewelry.com/shop/art-nouveau-whiting-mfg-co-sterling-silver-large-serving-fork-lily-pattern-antique-94
-https://naplesestatejewelry.com/shop/gorham-chantilly-sterling-silver-salt-spoon-monogrammed-81
-https://naplesestatejewelry.com/shop/joseph-mayer-brothers-sterling-silver-george-washington-souvenir-spoon-124
-https://naplesestatejewelry.com/shop/pair-of-antique-english-sterling-silver-salt-cellars-with-cobalt-blue-glass-liners-74
-https://naplesestatejewelry.com/shop/reed-barton-francis-i-sterling-silver-iced-tea-spoon-116
-https://naplesestatejewelry.com/shop/reed-barton-francis-i-sterling-silver-teaspoon-73
-https://naplesestatejewelry.com/shop/set-of-three-graduated-japanese-silver-tazza-by-mitsubishi-mihara-54
-https://naplesestatejewelry.com/shop/sterling-silver-monogram-brooch-pendant-openwork-jc-initials-dual-use-pin-bail-79
-https://naplesestatejewelry.com/shop/tiffany-co-sterling-silver-punch-ladle-acanthus-pattern-pat-1895-53
-https://naplesestatejewelry.com/shop/victorian-silver-napkin-ring-w-applied-running-rabbit-hare-figure-and-engraved-decoration-monogrammed-mad-104
 https://naplesestatejewelry.com/shop/vintage-sterling-silver-amethyst-cabochon-earrings-convertible-pendants-93
 https://naplesestatejewelry.com/shop/vintage-sterling-silver-men-s-cufflinks-with-carved-figural-scene-80
 https://naplesestatejewelry.com/shop/whiting-lily-pattern-sterling-silver-teaspoon-monogrammed-art-nouveau-101
@@ -94,8 +110,23 @@ https://naplesestatejewelry.com/shop/william-suckling-sterling-silver-footed-sal
 https://naplesestatejewelry.com/shop/zina-sterling-silver-dragonfly-brooch-78
 ```
 
-ℹ️ This is an accelerator, not a repair — the sitemap was resubmitted and read
-successfully on Aug 27, so Google reaches these on its own cadence regardless.
+✅ Requested 2026-08-28 (all show "✓ Indexing requested"): koma-garment-hook-66,
+art-nouveau-whiting-fork-94, gorham-chantilly-81, joseph-mayer-124,
+english-salt-cellars-74, iced-tea-spoon-116, teaspoon-73, japanese-tazza-54,
+monogram-brooch-79, tiffany-punch-ladle-53, victorian-napkin-ring-104.
+✅ Requested 2026-08-27: bill-tompkins-coffee-pot-55.
+
+⚠️ **UI trap for whoever finishes these:** the green "Indexing requested" toast
+AUTO-DISMISSES after ~20s, so a screenshot taken late looks like nothing
+happened. The reliable signal is the button row itself changing to
+**"✓ Indexing requested · REQUEST AGAIN"**. Re-clicking is harmless — Google
+states resubmitting does not change queue position.
+
+⚠️ The inspection search box needs a click in one round trip and the typing in
+the NEXT one; typing immediately after the click silently goes nowhere.
+
+ℹ️ Still an accelerator, not a repair — the sitemap is submitted and Google is
+reaching these on its own, as the two already-indexed pages show.
 
 ### 🟡 2026-08-27 — the real ranking problem is CTR, not indexing
 

@@ -1,6 +1,161 @@
 
 # Changelog
 
+## 2026-08-29 (evening) — /silver-services flatware band (step 2 of the content plan)
+
+The striking-distance page (position **12.2**, 88 impressions, 0 clicks — the
+closest page on the site to page 1) covered identification and testing but said
+nothing about **flatware**, which is what its queries actually ask ("silver
+sterling flatware naples"; "best place to sell silver flatware near me" already
+produced the site's only #1-position click). Mockup approved before build;
+owner confirmed the one business claim in it: **"we price both ways — melt vs.
+pattern value — and pay whichever is higher."**
+
+New gray band before "Our Scientific Testing Method", both locales: sterling
+vs. silverplate marks (Sterling/925/lion passant vs. EPNS, quadruple plate,
+hotel ware — the #1 seller confusion, with the free-sorting promise); collected
+patterns that can beat melt (Gorham Chantilly, Reed & Barton Francis I, Towle
+Old Master, Wallace Grand Baroque, Tiffany, Whiting — Chantilly and Francis I
+genuinely in the shop's own inventory, and the copy says so); weighted pieces
+(cement inside a thin shell, priced on the silver actually there); monograms &
+"leave the tarnish alone"; closing link to the /sell value guide's math.
+
+⚠️ This file is **CRLF** (the /sell page is LF) — inserted with converted line
+endings; verified 432 CRLF / 0 bare LF after the edit.
+
+Gate: `tsc` clean · lint clean · **1176/1176** · build **457/457**. Built HTML
+probed 6/6 in each locale; page grew **624 → 900 words EN / 963 ES**.
+
+ℹ️ Same session: Request Indexing attempt at ~8:30 AM hit **Quota Exceeded on
+the first request of the day** — the quota is a **rolling ~24 h window**, not a
+midnight reset (yesterday's 11-request burst ran ~9–10 AM). The 7 remaining
+URLs need a mid-afternoon retry; list in `TASKS.md`.
+
+## 2026-08-29 (later still) — city intros extended with real local grounding (data-only)
+
+Step 3 of the content plan, owner-authorized ("research unique good city
+sentences now and add it"). **Pure data edit** — 12 `introEn`/`introEs` strings
+in `service-areas.ts` extended; the `[city]` template was not touched, which was
+the whole point (it renders the ES winners: cape-coral 5.3, bonita-springs 9.0).
+
+**The line held while writing:** additions use only durable, verifiable facts —
+the Naples Art District location, walk-ins (advertised on the homepage), the
+photos-first submit flow (advertised on /contact), hedged drive times ("about
+40 minutes up Collier Boulevard"), and community character in the same genre
+the existing copy already uses ("downsizing in Old Naples"). ⛔ No invented
+customer history, no specific claims about what people in a city have sold us.
+
+Per-city hooks: Naples = Art District + walk-ins; Marco = seasonal/condo moves,
+whole-jewelry-box framing; Bonita = cottages-vs-Bonita Bay towers, straight
+US-41 run; Estero = master-planned/inheritance framing, Coconut Point; Fort
+Myers = oldest-city heritage, McGregor/River District, older estates; Cape =
+canal-by-canal original owners + **send photos first** (real workflow).
+
+Gate: `tsc` clean · lint clean · **1176/1176** · build **457/457**. Built HTML
+probed per city in BOTH locales (12/12 present). New EN word counts 947–999
+(from ~902–940), all growth in the unique-content region — this LOWERS the
+shared-content ratio measured at 69%.
+
+## 2026-08-29 (later) — /sell hub deepened with the value guide; city pages deliberately untouched
+
+The revised content plan's step 1, built after a mockup was approved. Two new
+bands on `/sell` between "What We Buy" and "Areas We Serve": **"What Your Gold
+Is Actually Worth"** (purity-by-mark table incl. sterling 925, the
+weight × purity × spot formula with the troy-ounce 31.1 g note, and a worked
+example at an ILLUSTRATIVE $2,600 spot — framed as illustrative in the copy)
+and **"Before You Sell"** (bring everything / never clean coins or polish
+sterling / why offers differ — the spread is the only variable). Ends with the
+"we do the math out loud" line. Both locales, genuinely written Spanish.
+
+⚠️ **Fact-check that mattered:** the external suggestion doc said 14k = 58.5%.
+Wrong — 14/24 = **58.3%**; "585" is the European fineness stamp. Shipped the
+correct figure with "(585)" noted on the mark.
+
+⛔ **Why the city pages were NOT given this content** (the double-checked plan,
+recorded so nobody "finishes the job" later):
+1. Sentence-level measurement showed the six `/sell/[city]` pages are already
+   **69% verbatim-identical** to each other (city name normalised). Adding
+   shared content raises that further.
+2. The city template renders **12 pages at once — including the site's best
+   performers** (`/es/sell/cape-coral` at position 5.3, `/es/sell/bonita-springs`
+   at 9.0). Editing a file shared with the winners to chase `/sell/naples`
+   (52.5) risks the wrong pages.
+3. City-page uniqueness must come from real owner-supplied local detail into
+   `service-areas.ts` data fields, not new template sections.
+The guide therefore lives on `/sell` ONLY, and city pages link down via the
+existing hub link. Contextual links added: sterling → `/silver-services`
+(deliberate — the striking-distance page at position 12.2), coins → `/bullion`,
+CTA → `/free-evaluation`.
+
+ℹ️ Also corrected en route: the earlier claim that template duplication caused
+the .co's 66 unindexed pages was unverified and is contradicted by all six .com
+city pages being indexed and drawing impressions. Duplication is a dilution
+concern, not an indexing blocker here.
+
+`CONTENT_LAST_MODIFIED` in `sitemap.ts` bumped 2026-08-17 → **2026-08-29** per
+its own documented procedure (fixed date, bumped on meaningful content change).
+
+Gate: `tsc` clean · lint clean · **1176/1176** (2 eBay-webhook tests flaked at
+~5.7 s under load on the first run, passed in isolation at 445 ms and on the
+full-suite rerun — not related to this change) · build **457/457**. Built HTML
+verified in BOTH locales: table figures, worked example, and all three
+contextual links present; `/sell/naples` unchanged at 936 words with zero
+guide leakage.
+
+## 2026-08-29 — everything from 08-27/28 is DEPLOYED and verified live
+
+Production-verified, not assumed. Nothing outstanding from those batches.
+
+| Check | Result |
+| --- | --- |
+| `robots.txt` | no `/account` or `/checkout`; `/admin`, `/api`, `/shop-modern` kept |
+| `sitemap.xml` | **198 `<loc>`** = 99 EN / 99 ES, paired, 198 `x-default`, 0 `noindex` leaks |
+| `/review` | **302 → `g.page/r/CcAn8whCTJ_sEBM/review`** |
+| `/review` links | **2 anchors** on `/` and on `/es` (testimonials CTA + footer) |
+| Testimonials | **44 `<figure>`** = 22 reviews × 2 marquee halves; all 6 new reviewers live |
+| `sameAs` | GBP CID + Instagram + Facebook; **0** competitor references |
+| Hours | Mon–Fri 11:00–15:00 **+ Saturday 11:00–16:00** |
+
+### ✅ Saturday hours fixed by the owner, and the split-week grouping is proven
+
+The 08-28 mismatch (Google said Saturday 11–4, the site said 11–3) is resolved
+in **Admin → Settings → Store Hours** — a DB value, no deploy. Production now
+emits **two** `OpeningHoursSpecification` blocks where it previously emitted one:
+
+```
+['Monday','Tuesday','Wednesday','Thursday','Friday'] 11:00 - 15:00
+['Saturday']                                         11:00 - 16:00
+```
+
+🟢 First production proof that `openingHoursSchema()` **splits** a week when one
+day diverges instead of flattening it. Visible table agrees
+(`Saturday 11:00 AM – 4:00 PM`). Site and Google Business Profile now match exactly.
+
+### ✅ Google re-read the bilingual sitemap on its own — no resubmit needed
+
+Search Console: `/sitemap.xml` · submitted **Aug 27** · **last read Aug 28** ·
+Success · **198 discovered pages**. Google ingested the doubled sitemap without
+a manual nudge, so all 99 Spanish URLs are now submitted and discovered — the
+first time any `/es` URL has been.
+
+ℹ️ **A resubmit was considered and deliberately skipped.** The sitemap URL and
+structure did not change in the latest deploy, and Google had already re-read it
+after the change. Resubmitting would have been a no-op.
+
+### Request Indexing: 12 of 19 done, 7 owed
+
+11 requested 2026-08-28 before the daily quota stopped it at the 12th attempt
+(plus 1 on 08-27). 🟢 **Two of the batch turned out already indexed** —
+`…teaspoon-73` and `…monogrammed-mad-104` both report "URL is on Google",
+neither of which was indexed at the 8/20 report. Further evidence the sitemap
+work is landing on its own. Remaining 7 listed in `TASKS.md`.
+
+⚠️ **UI traps worth not re-learning:** the green "Indexing requested" toast
+AUTO-DISMISSES after ~20s, so a late screenshot looks like failure — the durable
+signal is the button row flipping to **"✓ Indexing requested · REQUEST AGAIN"**.
+And the inspection search box needs the click in one round trip and the typing in
+the NEXT; typing straight after the click silently goes nowhere.
+
 ## 2026-08-28 (later) — 6 new reviews, `/review` links, and a Saturday hours mismatch
 
 ### Testimonials 16 → 22, read verbatim from the live profile

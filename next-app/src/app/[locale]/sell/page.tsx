@@ -111,6 +111,131 @@ export default async function SellHubPage({ params }: Props) {
           </div>
         </section>
 
+        {/* Value guide — the math behind an offer. Added 2026-08-29 to deepen
+            the hub: it sat at ~444 words, thinner than its own city pages.
+            ⛔ This content lives HERE and only here. Adding it to the six
+            /sell/[city] pages would raise their already-high shared-content
+            ratio — the city pages LINK here instead. Purities are the exact
+            karat fractions (14/24 = 58.3%; the "585" stamp is the European
+            fineness mark). The worked example uses an ILLUSTRATIVE spot price
+            and says so — never let it read as a live quote. */}
+        <section className="border-t border-[#d0c5af]">
+          <div className="ultrawide-page mx-auto max-w-[1440px] px-4 py-20 md:px-8">
+            <h2 className="mb-3 text-center text-3xl font-bold text-[#1a1c1c] md:text-4xl" style={{ fontFamily: 'var(--font-headline)' }}>
+              {isEs ? 'Lo Que Realmente Vale Su Oro' : 'What Your Gold Is Actually Worth'}
+            </h2>
+            <p className="mx-auto mb-12 max-w-xl text-center text-sm leading-relaxed text-[#4d4635]">
+              {isEs
+                ? 'Cada oferta que reciba parte de los mismos tres números: el peso, la pureza y el precio spot del día. Esta es la matemática que nadie le muestra — para que pueda verificar el número de cualquier comprador, incluido el nuestro.'
+                : 'Every offer you will ever get starts from the same three numbers: weight, purity, and the live spot price. Here is the math no one shows you — so you can check any buyer’s number, including ours.'}
+            </p>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="rounded-2xl border border-[#d0c5af] bg-white p-6 shadow-[0_10px_28px_rgba(38,28,6,0.04)] md:p-8">
+                <h3 className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[#735c00]" style={{ fontFamily: 'var(--font-label)' }}>
+                  {isEs ? 'Pureza según el sello' : 'Purity by mark'}
+                </h3>
+                <table className="w-full border-collapse text-sm text-[#1a1c1c]">
+                  <thead>
+                    <tr className="border-b border-[#d0c5af] text-left">
+                      <th scope="col" className="py-2 pr-4 font-bold">{isEs ? 'Sello' : 'Mark'}</th>
+                      <th scope="col" className="py-2 text-right font-bold">{isEs ? 'Metal fino' : 'Fine metal content'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b border-[#e2e2e2]"><th scope="row" className="py-2 pr-4 text-left font-semibold">10k</th><td className="py-2 text-right text-[#4d4635]">{isEs ? '41.7% de oro' : '41.7% gold'}</td></tr>
+                    <tr className="border-b border-[#e2e2e2]"><th scope="row" className="py-2 pr-4 text-left font-semibold">14k (585)</th><td className="py-2 text-right text-[#4d4635]">{isEs ? '58.3% de oro' : '58.3% gold'}</td></tr>
+                    <tr className="border-b border-[#e2e2e2]"><th scope="row" className="py-2 pr-4 text-left font-semibold">18k (750)</th><td className="py-2 text-right text-[#4d4635]">{isEs ? '75.0% de oro' : '75.0% gold'}</td></tr>
+                    <tr className="border-b border-[#e2e2e2]"><th scope="row" className="py-2 pr-4 text-left font-semibold">22k</th><td className="py-2 text-right text-[#4d4635]">{isEs ? '91.7% de oro' : '91.7% gold'}</td></tr>
+                    <tr className="border-b border-[#e2e2e2]"><th scope="row" className="py-2 pr-4 text-left font-semibold">24k</th><td className="py-2 text-right text-[#4d4635]">{isEs ? '99.9% de oro' : '99.9% gold'}</td></tr>
+                    <tr><th scope="row" className="py-2 pr-4 text-left font-semibold">{isEs ? 'Esterlina (925)' : 'Sterling (925)'}</th><td className="py-2 text-right text-[#4d4635]">{isEs ? '92.5% de plata' : '92.5% silver'}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex flex-col gap-6">
+                <div className="rounded-2xl border border-[#d0c5af] bg-white p-6 shadow-[0_10px_28px_rgba(38,28,6,0.04)] md:p-8">
+                  <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-[#735c00]" style={{ fontFamily: 'var(--font-label)' }}>
+                    {isEs ? 'La fórmula' : 'The formula'}
+                  </h3>
+                  <p className="mb-2 text-lg font-bold text-[#1a1c1c]" style={{ fontFamily: 'var(--font-headline)' }}>
+                    {isEs ? 'peso × pureza × precio spot' : 'weight × purity × spot price'}
+                  </p>
+                  <p className="text-sm leading-relaxed text-[#4d4635]">
+                    {isEs
+                      ? 'El spot se cotiza por onza troy — 31.1 gramos, algo más pesada que la onza común. Divida el precio spot entre 31.1 para obtener la tarifa por gramo.'
+                      : 'Spot is quoted per troy ounce — 31.1 grams, a little heavier than a kitchen ounce. Divide the spot price by 31.1 for the per-gram rate.'}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-[#d0c5af] bg-white p-6 shadow-[0_10px_28px_rgba(38,28,6,0.04)] md:p-8">
+                  <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-[#735c00]" style={{ fontFamily: 'var(--font-label)' }}>
+                    {isEs ? 'Ejemplo práctico' : 'Worked example'}
+                  </h3>
+                  <p className="text-sm leading-relaxed text-[#4d4635]">
+                    {isEs
+                      ? 'Una cadena de 14k de 20 gramos contiene 20 × 58.3% ≈ 11.7 gramos de oro puro. Con el spot a un precio ilustrativo de $2,600 por onza, su valor de fundición es 11.7 × ($2,600 ÷ 31.1) ≈ $978. Ese valor de fundición es el piso sobre el que se construye una oferta honesta.'
+                      : 'A 20-gram 14k chain holds 20 × 58.3% ≈ 11.7 grams of pure gold. With spot at an illustrative $2,600 per ounce, its melt value is 11.7 × ($2,600 ÷ 31.1) ≈ $978. That melt figure is the floor an honest offer is built on.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <p className="mx-auto mt-10 max-w-3xl text-center text-base leading-relaxed text-[#1a1c1c]">
+              {isEs
+                ? 'La fundición es el piso, no el techo. Las piezas firmadas, antiguas y de colección pueden valer bastante más intactas — y así las valoramos. Esa es la diferencia entre un comprador de oro y un comprador de joyería de patrimonio.'
+                : 'Melt is the floor, not the ceiling. Signed, antique, and collectible pieces can be worth well more intact — and we price them that way. That is the difference between a gold buyer and an estate jewelry buyer.'}
+            </p>
+
+            <h2 className="mb-8 mt-16 text-center text-3xl font-bold text-[#1a1c1c] md:text-4xl" style={{ fontFamily: 'var(--font-headline)' }}>
+              {isEs ? 'Antes de Vender' : 'Before You Sell'}
+            </h2>
+            <div className="grid gap-6 md:grid-cols-3">
+              <div className="rounded-2xl border border-[#d0c5af] bg-white p-6 shadow-[0_10px_28px_rgba(38,28,6,0.04)]">
+                <h3 className="mb-2 text-lg font-bold text-[#1a1c1c]" style={{ fontFamily: 'var(--font-headline)' }}>
+                  {isEs ? 'Traiga todo' : 'Bring everything'}
+                </h3>
+                <p className="text-sm leading-relaxed text-[#4d4635]">
+                  {isEs ? (
+                    <>Cadenas rotas, aretes sueltos, oro dental, anillos de graduación, piezas sin sello, cajas de relojes de oro — el valor está en el metal, no en la condición. La <Link href={p('/silver-services')} className="font-semibold text-[#735c00] underline">platería esterlina</Link> también cuenta, incluso los juegos incompletos.</>
+                  ) : (
+                    <>Broken chains, single earrings, dental gold, class rings, unmarked pieces, gold watch cases — the value is in the metal, not the condition. <Link href={p('/silver-services')} className="font-semibold text-[#735c00] underline">Sterling flatware</Link> counts too, even incomplete sets.</>
+                  )}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-[#d0c5af] bg-white p-6 shadow-[0_10px_28px_rgba(38,28,6,0.04)]">
+                <h3 className="mb-2 text-lg font-bold text-[#1a1c1c]" style={{ fontFamily: 'var(--font-headline)' }}>
+                  {isEs ? 'No limpie nada' : 'Don’t clean anything'}
+                </h3>
+                <p className="text-sm leading-relaxed text-[#4d4635]">
+                  {isEs ? (
+                    <>Nunca limpie una <Link href={p('/bullion')} className="font-semibold text-[#735c00] underline">moneda de colección</Link> — los coleccionistas pagan por las superficies originales, y una moneda limpiada vale menos de forma permanente. No pula la plata ni pague reparaciones antes de vender; ninguna de las dos suma un dólar a la oferta.</>
+                  ) : (
+                    <>Never clean a <Link href={p('/bullion')} className="font-semibold text-[#735c00] underline">collectible coin</Link> — collectors pay for original surfaces, and a cleaned coin is permanently worth less. Skip polishing sterling and skip pre-sale repairs; neither adds a dollar to the offer.</>
+                  )}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-[#d0c5af] bg-white p-6 shadow-[0_10px_28px_rgba(38,28,6,0.04)]">
+                <h3 className="mb-2 text-lg font-bold text-[#1a1c1c]" style={{ fontFamily: 'var(--font-headline)' }}>
+                  {isEs ? 'Por qué las ofertas varían' : 'Why offers differ'}
+                </h3>
+                <p className="text-sm leading-relaxed text-[#4d4635]">
+                  {isEs
+                    ? 'Todos los compradores ven el mismo precio spot. La única variable es el porcentaje de la fundición que realmente pagan — el margen. Conociendo la matemática de arriba, puede escuchar una oferta y saber exactamente qué parte se está quedando el comprador.'
+                    : 'Every buyer watches the same spot price. The only variable is the percentage of melt they actually pay — the spread. Once you know the math above, you can hear an offer and know exactly what cut is being kept.'}
+                </p>
+              </div>
+            </div>
+
+            <p className="mx-auto mt-10 max-w-2xl text-center text-base leading-relaxed text-[#1a1c1c]">
+              {isEs ? (
+                <>Nosotros hacemos la cuenta en voz alta — el peso en la báscula frente a usted, la pureza probada frente a usted y el spot del día en la pantalla. Traiga sus piezas al salón o <Link href={p('/free-evaluation')} className="font-semibold text-[#735c00] underline">agende una evaluación gratuita</Link>.</>
+              ) : (
+                <>We do the math out loud — weight on the scale in front of you, purity tested in front of you, and the day’s spot on the screen. Bring your pieces by the showroom, or <Link href={p('/free-evaluation')} className="font-semibold text-[#735c00] underline">book a free evaluation</Link>.</>
+              )}
+            </p>
+          </div>
+        </section>
+
         {/* Areas we serve */}
         <section className="border-y border-[#d0c5af] bg-[#f3f3f3] py-20">
           <div className="ultrawide-page mx-auto max-w-[1440px] px-4 md:px-8">

@@ -9,7 +9,7 @@ const BASE = 'https://naplesestatejewelry.com';
 // page content is meaningfully updated) avoids sending a churning "modified now"
 // signal on every crawl, which dilutes the freshness signal for pages that did
 // not actually change.
-const CONTENT_LAST_MODIFIED = new Date('2026-08-17');
+const CONTENT_LAST_MODIFIED = new Date('2026-08-29');
 
 // Both locale prefixes the app serves. EVERY public page exists in both, so each
 // language version gets its OWN <url> entry — Google's documented pattern —
