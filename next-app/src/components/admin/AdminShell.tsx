@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { startRouteProgress } from '@/components/layout/RouteProgressBar';
 import { createClient } from '@/lib/supabase/client';
 import { copyTextToClipboard } from '@/lib/clipboard';
+import { encodeCanvasForUpload, extensionForImageType } from '@/lib/image-encode';
 import {
   PRODUCT_METAL_VARIANTS,
   PRODUCT_METAL_TYPES,
@@ -2911,12 +2912,17 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   }
 
   const uploadImageBlob = useCallback(async (blob: Blob): Promise<string | null> => {
-    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.webp`;
+    // ⛔ The extension and contentType come from the BLOB, never from what the
+    // encoder was asked to produce. Hardcoding `.webp` here is what put 46
+    // PNG files into the bucket under WebP names — see `lib/image-encode.ts`.
+    const contentType = blob.type || 'image/png';
+    const extension = extensionForImageType(contentType);
+    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
     const path = `products/${filename}`;
 
     const { error } = await supabase.storage
       .from(PRODUCT_IMAGES_BUCKET)
-      .upload(path, blob, { contentType: 'image/webp', cacheControl: '31536000', upsert: false });
+      .upload(path, blob, { contentType, cacheControl: '31536000', upsert: false });
 
     if (error) {
       flash(`Upload failed: ${error.message}`, false);
@@ -2990,10 +2996,16 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       canvas.height = Math.round(bitmap.height * scale);
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-      const blob = await new Promise<Blob>((res) =>
-        canvas.toBlob((b) => res(b!), 'image/webp', 0.85)
-      );
-      return uploadImageBlob(blob);
+      const encoded = await encodeCanvasForUpload(canvas, 0.85);
+      if (!encoded.isPreferred) {
+        // Say so rather than silently shipping a heavier format. A PNG here is
+        // 1-3 MB against 20-60 KB for WebP, and it used to be invisible.
+        flash(
+          `This browser could not save WebP, so the photo was stored as ${encoded.extension.toUpperCase()} (larger file). Uploading from Chrome or Edge keeps photos small.`,
+          false,
+        );
+      }
+      return uploadImageBlob(encoded.blob);
     }
 
     let successCount = 0;
@@ -3071,10 +3083,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       if (!ctx) throw new Error('Crop canvas is unavailable.');
 
       ctx.drawImage(image, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-      const blob = await new Promise<Blob>((resolve, reject) =>
-        canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Could not create cropped image.')), 'image/webp', 0.9)
-      );
-      const croppedUrl = await uploadImageBlob(blob);
+      const encoded = await encodeCanvasForUpload(canvas, 0.9);
+      const croppedUrl = await uploadImageBlob(encoded.blob);
       if (!croppedUrl) return;
 
       setEditing((prev) => {

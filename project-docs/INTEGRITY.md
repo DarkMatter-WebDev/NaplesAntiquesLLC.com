@@ -1,6 +1,6 @@
 # Integrity Rules And Pre-Publish Checklist
 
-> Current rules for the Next.js app. Last reconciled: **2026-08-03**.
+> Current rules for the Next.js app. Last reconciled: **2026-08-30**.
 
 ## Verification Commands
 
@@ -14,8 +14,16 @@ npm run build
 npm audit --omit=dev
 ```
 
-`npm run build` is the publish gate and must exit 0. Current local baseline:
-696/696 tests, TypeScript, lint, and a 443-page production build pass.
+`npm run build` is the publish gate and must exit 0. Current local baseline
+(measured 2026-08-30): **1176/1176 tests across 112 files**, TypeScript clean,
+lint clean, and a build that exits 0 with **60 prerendered routes = 27 EN +
+27 ES**.
+
+⛔ **Do not record the build's `(N/N) static pages` line as the baseline.** It
+is a progress counter that scales with the product catalog, not a page count —
+the older "443-page build" figure here was that counter. Assert
+**`en === es`** on the prerender manifest instead; see `STRUCTURE.md` for the
+one-line command and the full reasoning.
 
 ## Rules
 

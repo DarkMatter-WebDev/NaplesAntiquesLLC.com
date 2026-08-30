@@ -4,7 +4,32 @@ import { carouselImageLoading, productThumbnailLoading } from '@/lib/storefront-
 describe('storefront image loading', () => {
   it('eager-loads visible carousel cards while prioritizing only the front slot', () => {
     expect(carouselImageLoading(0)).toEqual({ loading: 'eager', fetchPriority: 'high' });
-    expect(carouselImageLoading(1)).toEqual({ loading: 'eager', fetchPriority: 'low' });
+    // Slot 1 is `auto`, not `low` — see below.
+    expect(carouselImageLoading(1)).toEqual({ loading: 'eager', fetchPriority: 'auto' });
+    expect(carouselImageLoading(2)).toEqual({ loading: 'eager', fetchPriority: 'low' });
+  });
+
+  // REGRESSION 2026-08-30. Owner-reported: on a cold load the SECOND card stayed
+  // blank until it had nearly rotated off-screen. Priority was binary (slot 0
+  // high, all others low) while urgency is graduated — slot 1 is adjacent to the
+  // front card and among the first seen, yet it shared a bandwidth lane with
+  // slot 7, which is not seen for far longer.
+  it('gives the next-visible card its own lane, without touching the LCP lane', () => {
+    expect(carouselImageLoading(1).fetchPriority).toBe('auto');
+    // NOT 'high': that lane belongs to the front card alone.
+    expect(carouselImageLoading(1).fetchPriority).not.toBe('high');
+    // NOT 'low': that is the starvation this fixes.
+    expect(carouselImageLoading(1).fetchPriority).not.toBe('low');
+    // The 2026-08-14 bandwidth fix still holds for the REST of the ring.
+    for (const slot of [2, 3, 4, 5, 6, 7]) {
+      expect(carouselImageLoading(slot).fetchPriority).toBe('low');
+    }
+  });
+
+  it('a parked pane gets no exception — slot 1 included', () => {
+    // Panes B and C are offscreen; nothing in them should out-rank the visible
+    // hero, so the slot-1 exception must not leak into the deferred path.
+    expect(carouselImageLoading(1, true).fetchPriority).toBe('low');
   });
 
   it('never lets a parked slideshow claim the LCP priority lane', () => {
@@ -31,9 +56,11 @@ describe('storefront image loading', () => {
     expect(visible[0].fetchPriority).toBe('high');
     expect(parked.filter((v) => v.fetchPriority === 'high')).toHaveLength(0);
 
-    // (A runtime check for `auto` would be dead code — the return type is
-    // `'high' | 'low'`, so tsc rejects reintroducing it outright, which is a
-    // stronger guarantee than a test.)
+    // At most ONE card may sit at `auto`. The 2026-08-14 regression was nine of
+    // them at once (157KB competing before FCP); one small image is not that.
+    expect(visible.filter((v) => v.fetchPriority === 'auto').length).toBeLessThanOrEqual(1);
+    expect(parked.filter((v) => v.fetchPriority === 'auto')).toHaveLength(0);
+
     // Every card still downloads — `lazy` here would reintroduce pop-in.
     expect([...visible, ...parked].every((v) => v.loading === 'eager')).toBe(true);
   });

@@ -101,7 +101,12 @@ objects, or bulk database updates:
 - Images/files live in object storage or app assets; database rows store URL/path
   strings only, never base64/blob payloads.
 - New uploads should downscale and encode to WebP with a longest-edge cap near
-  2048px.
+  2048px. ⛔ **Verify the encode actually happened — do not assume it.**
+  `canvas.toBlob` silently substitutes PNG when it cannot produce the requested
+  type, so `blob.type` must be checked and the filename/`contentType` derived
+  from it. This rule was stated here and silently violated for months (46+ live
+  product images were PNG under `.webp` names); see `project-docs/DECISIONS.md`
+  → *"Media"*.
 - Uploaded objects should use immutable cache headers where appropriate.
 - Every responsive/fill image should have accurate `sizes`.
 - Remove orphaned objects on remove/replace/delete paths, and keep the Storage

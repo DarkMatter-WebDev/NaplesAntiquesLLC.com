@@ -1,6 +1,113 @@
 
 # Changelog
 
+## 2026-08-30 — `nanoid` high-severity advisory closed (pre-existing)
+
+Surfaced by running the `INTEGRITY.md` pre-publish checklist item that had been
+skipped: `npm audit --omit=dev` exited 1 on **nanoid <3.3.18** (GHSA-2v37-7h3g-55p8,
+high — custom generators can loop indefinitely at size zero).
+
+Transitive and build-time only: `next@16.2.12 → postcss@8.5.23 (overridden) →
+nanoid@3.3.16`, with **no direct use in `src/`**. Practical exposure here was
+nil, but it is a checklist item and the fix is contained.
+
+Closed with an `overrides` entry — `"nanoid": "^3.3.18"` — following the pattern
+already established in `package.json` for `js-yaml`, `postcss` and `sharp`.
+Resolves to **3.3.18**; `npm audit --omit=dev` now reports **0 vulnerabilities,
+exit 0**.
+
+Re-gated from a deleted `.next` after the dependency change: `tsc` clean · lint
+clean · **1186/1186 across 113 files** · build exit 0 · **60 prerendered routes
+= 27 EN + 27 ES**.
+
+## 2026-08-30 — the upload path was silently saving PNG under `.webp` names
+
+Owner report: on first load the **second** hero-carousel card (a thick gold
+ring) stays blank until it has nearly rotated off-screen, while the rest appear
+normally. Root-caused to a live upload bug, not to the carousel.
+
+**The defect.** `canvas.toBlob(cb, 'image/webp', q)` does **not** fail when the
+browser cannot encode WebP — per spec the user agent silently substitutes
+`image/png`. `AdminShell.tsx` called it, never inspected `blob.type`, then
+hardcoded **both** a `.webp` filename (`:2914`) and
+`contentType: 'image/webp'` (`:2919`).
+
+**Scope: 46 of 67 live product images are PNG wearing a `.webp` name.** The
+healthy WebP files are the OLDEST, so this began partway through the catalog's
+life — consistent with the owner switching to a browser without canvas WebP
+encoding.
+
+**Measured impact** (`sharp`, re-encoding the real source at the card's own
+640px / q82):
+
+| Image | Source | Served now | Properly encoded | Waste |
+| --- | --- | --- | --- | --- |
+| slot 4 | 2,293 KB **PNG** | 221 KB | **38 KB** | 183 KB |
+| slot 5 | 2,297 KB **PNG** | 245 KB | **39 KB** | 206 KB |
+| slot 0 (control) | 58 KB WebP | 54 KB | 17 KB | — |
+
+⛔ **38 KB proves it is the PNG source, not photo complexity.** A lossless-PNG
+source makes the optimizer emit a ~6× heavier WebP than a sane source does.
+
+### 🔴 CORRECTION — the PNGs were NOT what blanked the ring
+
+Recorded because the wrong conclusion was reached twice on the way here, both
+times from a badly-scoped measurement.
+
+**At the width browsers actually download, the PNGs were never the problem.**
+The card's `sizes` resolves to ~504px, so the browser picks **`w=640`** from the
+srcset — and at `w=640` the optimizer downscales the PNG anyway, delivering
+**36–38 KB**. Verified after the re-encode: `cached == fresh`, i.e. the numbers
+did not move. The earlier "221 KB vs 38 KB, ~6× waste" claim compared the
+**`w=3840` `src` fallback** (which no browser fetches) against a `w=640`
+re-encode. Not like-for-like, and it should not have been reported as impact.
+
+**The actual cause is `fetchPriority`.** `storefront-image-loading.ts` set slot 0
+`high` and **every other slot `low`** — priority was binary while urgency is
+graduated. Slot 1 sits adjacent to the front card and is among the first seen,
+yet it shared a bandwidth lane with slot 7, which is not seen for far longer.
+HTTP/2 round-robins same-priority streams, so a ~10 KB image queued behind the
+rest of the ring and the script/font/CSS graph genuinely arrives late.
+
+**Fixed:** slot 1 → **`auto`**. Deliberately not `high` — that lane belongs to
+the front card alone. This adds ONE image at default priority, which is not the
+nine-images/157 KB-before-FCP regression the file's 2026-08-14 note guards
+against; that note now says so explicitly. +2 regression tests, and the
+"exactly one `high`" invariant is joined by "at most one `auto`, never parked".
+
+⚠️ **Two measurement traps, both of which produced confident wrong answers:**
+
+1. **A plain `curl` sends `Accept: */*`**, so an image CDN returns the
+   unoptimized original — reporting 2.3 MB where a browser gets 221 KB.
+2. **The `src` attribute is a FALLBACK.** Browsers use `srcset` + `sizes`. This
+   site's `src` is `w=3840`; the real fetch is `w=640`. Measuring `src` measures
+   bytes nobody downloads.
+
+⛔ Before quoting image impact: send browser `Accept` headers **and** resolve
+`sizes` to the width actually requested.
+
+ℹ️ The re-encode remains worth having on its own merits — 1,116.9 MB → 99.4 MB
+at origin, far cheaper cold transforms, and the bucket no longer lying about its
+own contents — it simply was not the fix for this symptom.
+
+### Fixed in code (prevents recurrence; does NOT repair existing files)
+
+New `src/lib/image-encode.ts`: try WebP, verify `blob.type` actually matches,
+fall back to **JPEG** (an order of magnitude smaller than PNG for a photo), and
+in the worst case return the blob with its REAL type so the caller labels it
+honestly. `uploadImageBlob` now derives filename extension and `contentType`
+from the blob instead of hardcoding WebP, and the uploader flashes a warning
+when it had to fall back. Both `toBlob` call sites (upload `:2994`, crop
+`:3075`) use it.
+
+Gate: `tsc` clean · lint clean · **1184/1184 across 113 files** (+8 new,
+including a regression test asserting a PNG is never labelled `.webp`) ·
+build clean at **60 prerendered routes = 27 EN + 27 ES**.
+
+◻ **The 46 existing images still need re-encoding** — that is what actually
+fixes the owner's symptom, and it is a production Storage mutation. Plan and
+approval gate in `TASKS.md`.
+
 ## 2026-08-30 — the "static page count" invariant was never an invariant
 
 `STRUCTURE.md` recorded 456, a `CURRENT_STATUS.md` entry recorded 458, and the
@@ -100,10 +207,30 @@ chrome**; `/faq`, `/bullion`, `/shipping` unchanged at 0/23 with EN chrome.
 ℹ️ `/es/account` reports no footer because it 302s to `/es/account/sign-in`,
 which has never rendered one — pre-existing, not a regression.
 
-Final gate: `tsc` clean · lint clean · **1176/1176 (112 files)** · build
-**457/457**.
+Final gate: `tsc` clean · lint clean · **1176/1176 (112 files)** · build clean
+at **60 prerendered routes = 27 EN + 27 ES**.
 
-⚠️ **Undeployed** — production still serves the broken footers.
+### ✅ DEPLOYED and production-verified the same day
+
+All five `/es` pages read **22/23 Spanish footer links with ES chrome**, exactly
+matching the `/es/sell` control; they were **0/23 with an English footer**.
+Negative control passes: `/faq`, `/bullion`, `/shipping` still read **0** `/es/`
+footer links with English chrome.
+
+🔴 **The first production check reported two false failures**, both caused by
+the verification command rather than the deploy — worth recording, because the
+naive command is the obvious one to reach for:
+
+| Symptom | Cause |
+| --- | --- |
+| `/es/*` read **24**, expected 22 | Unscoped grep counted header-nav links (`/es/sell`, `/es/bullion`, `/es/services`) |
+| English `/faq` read **1**, expected 0 | That hit is `href="/es/faq"` — the **language switcher**, which every English page correctly has |
+
+⛔ **A footer assertion must be scoped to the `<footer>`.** "0 `/es/` links on
+an English page" is only true of the footer, never of the page. Re-measured
+footer-scoped, production matched the dev numbers exactly. The corrected
+one-liner is in `TASKS.md`; had it not been re-run, a correct deploy would have
+been read as broken.
 
 ℹ️ Page-count drift noted, NOT introduced here: `STRUCTURE.md` records 456 and
 a `CURRENT_STATUS.md` entry records 458; the tree actually builds **457**.

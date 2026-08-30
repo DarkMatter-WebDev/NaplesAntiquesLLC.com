@@ -1,34 +1,115 @@
 ﻿# Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-08-29**.
+> in `CHANGELOG.md`. Last reconciled: **2026-08-30**.
 
 ## ◻ OPEN — needs a human
 
-### 🔴 DEPLOY the Spanish footer fix (2026-08-30; no SQL, no env vars)
+### ✅ DONE 2026-08-30 — blank carousel card fixed; 659 PNGs re-encoded
+
+Two separate problems, found together. **Both fixed locally; NOT yet deployed.**
+
+**1. The reported symptom — the second card stayed blank.** Cause was
+`fetchPriority`, not payload: slot 0 was `high` and *every* other slot `low`, so
+slot 1 (adjacent to the front card, among the first seen) shared a bandwidth
+lane with slot 7. Fixed in `src/lib/storefront-image-loading.ts` — slot 1 is now
+**`auto`** (never `high`; that lane is the front card's). +2 regression tests.
+
+🔴 **An earlier note here said NOT to touch that file in the same pass, on the
+theory that image payload was the dominant cause. That theory was WRONG** — see
+the correction in `CHANGELOG.md`. At the width browsers actually request
+(`w=640`, resolved from `sizes`) the heavy images deliver 36–38 KB, and
+re-encoding did not move that number at all.
+
+**2. 659 of 882 bucket objects were PNG under `.webp` names** (75%, 1,116.9 MB).
+Re-encoded to real WebP: **1,116.9 MB → 99.4 MB (91.1% smaller)**, 659 uploaded,
+**0 failed, 0 skipped**. Origin objects now return `image/webp`.
+
+- Backups: `C:\Users\rcman\NEJ-image-backup-2026-08-30` — 659 files under their
+  TRUE extension plus `_manifest.json`; counts matched before any write, and the
+  re-encode read from that archive rather than re-downloading.
+- Uploaded to the SAME object paths (`upsert`), so `products.image_urls` and any
+  eBay/Etsy listing pointing at those URLs still resolve.
+- ⚠️ **Transparency guard ran on every one of the 659**, not a sample: 0 had
+  real transparency, so dropping the (fully opaque) alpha channel was lossless.
+
+◻ **Owner glance:** the admin now **warns** when a browser cannot save WebP. If
+that appears while uploading, that browser is the source — add photos from
+Chrome or Edge instead.
+
+ℹ️ No cache purge was needed. The `w=640` transforms were verified with
+`cached == fresh`, so nothing stale is being served at the delivered width.
+
+### ✅ DEPLOYED AND PRODUCTION-VERIFIED 2026-08-30 — the Spanish footer fix
 
 Five pages passed no `locale` to `SiteFooter`, so their `/es` versions served
 an English footer whose 23 links all dropped the `/es` prefix — every footer
-click ejected a Spanish visitor into the English site. Production still does
-this.
+click ejected a Spanish visitor into the English site. **Fixed, deployed, and
+confirmed live.** No SQL, no env vars. Nothing outstanding.
+
+**Production, footer-scoped, all five at 22/23 Spanish links + ES chrome**
+(they were **0/23 with an English footer**), matching the `/es/sell` control
+exactly:
+
+| Page | Footer `/es/` | Footer total | Chrome |
+| --- | --- | --- | --- |
+| `/es/faq`, `/es/bullion`, `/es/gold-services`, `/es/silver-services`, `/es/estate-services` | **22** | 23 | Spanish |
+| `/es/sell` (control, untouched) | 22 | 23 | Spanish |
+| `/faq`, `/bullion`, `/shipping` (negative control) | **0** | 23 | English |
+
+The negative control is the one that mattered — a fix that over-applied would
+have looked identical on the positive check alone.
 
 Files (one token each, `locale={locale}` added):
 `src/app/[locale]/{silver-services,gold-services,faq,estate-services,bullion}/page.tsx`,
 plus `components/layout/SiteFooter.tsx` — the prop is now **required**
 (`locale: string`, no default), so this cannot silently recur.
 
-Gate: `tsc` clean · lint clean · **1176/1176 (112 files)** · build **457/457**.
+Gate: `tsc` clean · lint clean · **1176/1176 (112 files)** · build exits 0 with
+**60 prerendered routes = 27 EN + 27 ES** (⛔ do not read the `(N/N)` progress
+line as a page count — see `STRUCTURE.md`).
 
-**After deploying, the 20-second check** — run against production and expect
-22 Spanish links on each, versus 0 today:
+✅ **STAGING SYNCED 2026-08-30 — ready to copy to the repo folder and push.**
+Dry run queued exactly **11 files** (the 6 app files above + 5 memory docs),
+real run **11 copied / 0 Extras / 0 Mismatch / 0 FAILED**, follow-up dry run
+**0 to copy, exit 0**. **888 files / 20.24 MB** on disk (robocopy total 891 =
+the documented 3 `/XF`-excluded files — not a missing-file bug).
+
+Leak check clean — 0 `.git` (dir *or* file), 0 `worktrees`, 0 `node_modules`,
+0 `.next`, 0 `.env*`, 0 `*.log`, 0 `*.tsbuildinfo`, 0 `next-env.d.ts`, 0
+`*.pem` — against a **positive control of 181 `.tsx`, matching in source and
+staging**, so the zeros are real rather than a broken scan.
+
+Staged-content checks: `SiteFooter.tsx` has `locale: string` with **no** `?:`
+and **no** `= 'en'`; all six pages (the five fixed + `sell` as control) carry
+`locale={locale}`; **0** bare `<SiteFooter />` anywhere under staged
+`next-app/src`. Hidden paths present: `.github/workflows/scheduled-jobs.yml`,
+`.gitignore`, `.claude/launch.json`, `next-app/.npmrc`, `netlify.toml`. The
+standing CSP hazard reads **1 hit each** for `maps.google.com` in root
+`netlify.toml` and `next-app/next.config.ts`.
+
+ℹ️ Recording this result drifts staging by memory docs only — the owner's
+accepted standing preference.
+
+🔴 **The re-check command MUST be footer-scoped.** A whole-page grep for
+`href="/es/` is the obvious version and it is WRONG — it counts header nav and
+the language switcher too. Run this instead (expect **22 / ES** on `/es/*`,
+**0 / EN** on the English twins):
 
 ```bash
-for p in faq bullion gold-services silver-services estate-services; do echo -n "$p: "; curl -s "https://naplesestatejewelry.com/es/$p" | grep -o 'href="/es/[^"]*"' | sort -u | wc -l; done
+for u in es/faq es/bullion es/gold-services es/silver-services es/estate-services faq bullion; do h=$(curl -s "https://naplesestatejewelry.com/$u"); f=$(printf '%s' "$h" | sed -n 's/.*<footer/<footer/p' | sed 's#</footer>.*#</footer>#'); printf "%-24s es=%-4s total=%-4s %s\n" "/$u" "$(printf '%s' "$f" | grep -o 'href="/es/[^"]*"' | wc -l)" "$(printf '%s' "$f" | grep -o 'href="/[^"]*"' | wc -l)" "$(printf '%s' "$f" | grep -qo 'Vender Oro' && echo ES || echo EN)"; done
 ```
 
-⚠️ Negative control matters here: confirm an ENGLISH page (`/faq`) still has
-**zero** `/es/` footer links. A fix that over-applied would look identical on
-the first check.
+⚠️ **The trap, measured 2026-08-30 — an unscoped grep reports two false
+signals at once**, and both look like the deploy failed:
+
+- `/es/*` reads **24**, not 22. The 3 extra unique hits are header-nav links
+  (`/es/sell`, `/es/bullion`, `/es/services`), which were always correct.
+- An English page reads **1**, not 0. That hit is `href="/es/faq"` — the
+  **language switcher**, which every English page correctly has.
+
+⛔ So "0 `/es/` links on an English page" is only true of the FOOTER. State the
+scope in any future check, or the negative control invents a regression.
 
 ✅ **DONE in the same session — the prop is now required**, so a missing
 `locale` is `TS2741` at the call site instead of a silent English footer.

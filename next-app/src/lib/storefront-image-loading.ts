@@ -26,13 +26,32 @@
  * pixel. On a fast connection this is invisible; on a first-time mobile visitor
  * it was the difference between a blank white screen for seconds and a page.
  *
- * Do NOT restore `auto` here without re-measuring `KBbeforeFCP` on production.
+ * Do NOT restore `auto` here for the WHOLE ring without re-measuring
+ * `KBbeforeFCP` on production. The 2026-08-14 problem was NINE images at 157KB
+ * all competing before first paint; the single exception below is not that.
+ *
+ * ⚠️ **Slot 1 is `auto`, not `low` (2026-08-30).** Priority was binary while
+ * urgency is graduated: slot 1 sits adjacent to the front card and is among the
+ * first to rotate into view, but it shared the `low` lane with slot 7, which is
+ * not seen for far longer. Owner-reported symptom: on a cold load the second
+ * card stayed BLANK until it had nearly rotated off-screen. HTTP/2 shares
+ * bandwidth between same-priority streams, so a ~10KB image queued behind the
+ * rest of the ring plus the script/font/CSS graph genuinely arrives late.
+ *
+ * `auto` — not `high` — is deliberate: `high` is the LCP lane and belongs to
+ * the front card alone. This adds ONE image at default priority (~10-18KB at
+ * the delivered width), which is not the 533KB-before-FCP regression the note
+ * above exists to prevent.
  */
 export function carouselImageLoading(slot: number, deferred = false) {
-  return {
-    loading: 'eager' as const,
-    fetchPriority: slot === 0 && !deferred ? 'high' as const : 'low' as const,
-  };
+  const fetchPriority = deferred
+    ? ('low' as const)
+    : slot === 0
+      ? ('high' as const)
+      : slot === 1
+        ? ('auto' as const)
+        : ('low' as const);
+  return { loading: 'eager' as const, fetchPriority };
 }
 
 export function productThumbnailLoading(index: number) {

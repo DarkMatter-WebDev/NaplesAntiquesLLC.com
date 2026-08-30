@@ -4,7 +4,92 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-08-27**.
+> compaction. Last reconciled: **2026-08-30**.
+
+## Media (2026-08-30)
+
+### `canvas.toBlob` silently returns PNG — the requested type is a REQUEST, not a result
+
+⛔ **Never trust the `type` argument you passed to `toBlob`.** The spec says a
+user agent that cannot encode the requested type falls back to `image/png`, with
+no error and no warning. The upload path asked for `'image/webp'`, never read
+`blob.type`, and hardcoded both a `.webp` filename and
+`contentType: 'image/webp'` — so **PNG bytes were stored under WebP names for
+months**, defeating the image optimizer and every audit that trusted the
+extension.
+
+**The rule: `blob.type` is the only truth.** Compare it to what you asked for,
+and label the upload from the blob — never from intent. `src/lib/image-encode.ts`
+owns this; both `AdminShell` encode sites go through it.
+
+⛔ **The fallback must be JPEG, not PNG.** These are photographs: at 2048px a
+lossless PNG is 1–3 MB against 20–60 KB for WebP and ~10× smaller than PNG for
+JPEG. PNG is never an acceptable product-photo format here.
+
+⚠️ **An intention in `AGENTS.md` is not a guarantee.** The optimization defaults
+already said uploads must "encode to WebP with a longest-edge cap near 2048px".
+The cap was honoured (files really were 2048px) and the encode silently was not.
+A format requirement needs a *verification step*, not just a stated default.
+
+### Measuring delivered image bytes: two traps that both give confident wrong answers
+
+Both were hit on 2026-08-30, and each produced a stated conclusion that was
+wrong.
+
+1. ⛔ **A plain `curl` sends `Accept: */*`**, so an image CDN returns the
+   unoptimized original — 2.3 MB reported where a browser receives 221 KB.
+   Always send `Accept: image/avif,image/webp,...`.
+2. ⛔ **`src` is a FALLBACK, not what the browser fetches.** Browsers use
+   `srcset` + `sizes`. This site's `src` is `w=3840` while the real request is
+   `w=640` — so measuring `src` measures bytes nobody downloads, and comparing
+   `src` bytes against a `w=640` re-encode is not like-for-like.
+
+**Resolve `sizes` to the actual width first, then measure with browser `Accept`
+headers.** Anything else is not user impact.
+
+⚠️ **And `extractChannel(3).stats()` does NOT return the alpha channel** — it
+returns channel 0 (red). Reading it as alpha reported `min=0` on fully-opaque
+images, which looks exactly like real transparency and nearly aborted a correct
+1 GB repair. Use `stats.isOpaque`, or `stats.channels[3]`.
+
+ℹ️ To separate "this photo is genuinely detailed" from "this source is wrong",
+re-encode the real source **at the delivered width** and compare like with like.
+
+## Buy-Side Channels (2026-08-30)
+
+### ⛔ No mail-in / "ship us your items" page — REJECTED, do not re-propose
+
+Proposed 2026-08-30 (a page explaining that customers nationwide can ship items
+in, with immediate payout). **Owner rejected it after the research below.** Two
+independent reasons, either one sufficient:
+
+**1. Florida licenses it as a separate business class.** Ch. 538 **Part III**
+(§538.31–.37) covers any FL business that contracts to buy precious metals or
+jewelry "through an Internet website, the United States mail, or telemarketing".
+It is a distinct registration from a standard secondhand dealer license
+(Form DR-1S). It also carries real operating duties: the seller's government ID
+number on file, a **sworn statement under penalty of perjury** before payment,
+transaction reporting to law enforcement **within 24 hours**, 2-year record
+retention, a **10-day hold** before resale, and — §538.33 — payment restricted
+to **check to a lawful bank account or a licensed money services business**, so
+**cash is not permitted** on a mail-in deal.
+
+**2. The site already argues the opposite, in indexed copy.** A mail-in page
+would have contradicted shipped production content:
+
+- `sell/[city]/page.tsx:110` — *"We test and weigh everything in front of you —
+  no mailing off your valuables."* (6 cities × 2 locales = 12 live pages)
+- `sell/[city]/page.tsx:126` — *"typically more than a pawn shop or mail-in
+  buyer"*, which is emitted into **FAQPage JSON-LD**, so it is in Google's index
+- `PROJECT_OVERVIEW.md:24` names national mail-in buyers as the competitor the
+  brand is positioned against
+- sitewide `JewelryStore` `areaServed` lists exactly six Florida cities
+
+⚠️ **If it is ever revisited**, the license is the gating question, not the
+copy — and the copy sweep is 12+ pages plus schema, not a new route. A smaller
+alternative was offered (an "I don't live in Naples" FAQ item + a `/sell` band,
+needing no license) and was **also declined**; the owner chose to leave the
+local positioning alone.
 
 ## Layout (2026-08-30)
 
@@ -39,6 +124,21 @@ Match `'/es'` exactly or `'/es/'`.
 
 ℹ️ `/account/sign-in` legitimately renders no footer, so a footer audit must
 treat "no footer element" as a signal to check for a redirect, not a failure.
+
+### A locale assertion about CHROME must be scoped to that chrome element
+
+⛔ Never verify a footer claim with a whole-page grep. Checking production
+after the fix above with a page-wide `href="/es/` count produced **two
+simultaneous false failures**: `/es/*` read 24 instead of 22 (header nav adds
+`/es/sell`, `/es/bullion`, `/es/services`) and English pages read 1 instead of
+0 (the **language switcher**, which every English page correctly has). Both
+read as a failed deploy; the deploy was fine.
+
+⚠️ **"An English page has zero `/es/` links" is FALSE as stated** — it is true
+only of the footer. Any check phrased that way will manufacture a regression.
+Extract the element first (`sed -n 's/.*<footer/<footer/p'`, or
+`querySelector('footer')` in the browser), then count. Working command in
+`TASKS.md`.
 
 ## Buy-Side Content Strategy (2026-08-29)
 

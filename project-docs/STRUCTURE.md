@@ -1,7 +1,7 @@
 # Structure And Build Integrity
 
 > Canonical project map and single sources of truth. Last reconciled:
-> **2026-08-03**.
+> **2026-08-30**.
 
 ## Runtime Shape
 

@@ -2,24 +2,92 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-08-29**.
+> in `DECISIONS.md`. Last reconciled: **2026-08-30**.
 
-## Start Here (handoff, end of the 2026-08-29 SEO/content session)
+## Start Here (handoff, end of the 2026-08-30 footer/docs session)
 
 **Read this, then `TASKS.md`.**
 
-### 🔴 2026-08-30 — Spanish footer fix BUILT, NOT deployed
+### 🔴 2026-08-30 (later) — blank carousel card FIXED + 659 PNGs re-encoded; NOT deployed
+
+Owner-reported: on first load the second hero card (a thick gold ring) stayed
+blank until it had nearly rotated off-screen.
+
+**Cause: `fetchPriority`, not payload.** Slot 0 was `high` and *every* other slot
+`low`, so slot 1 — adjacent to the front card, among the first seen — shared a
+bandwidth lane with slot 7. Now **`auto`** for slot 1 only (never `high`).
+`src/lib/storefront-image-loading.ts`, +2 regression tests.
+
+**Found along the way: 659 of 882 bucket objects (75%) were PNG under `.webp`
+names**, because `canvas.toBlob` silently substitutes PNG and the upload
+hardcoded a `.webp` name and content-type. Re-encoded: **1,116.9 MB → 99.4 MB**,
+0 failed, backups at `C:\Users\rcman\NEJ-image-backup-2026-08-30`. Upload path
+fixed so it cannot recur (`src/lib/image-encode.ts`).
+
+Also closed a pre-existing **high-severity `nanoid`** advisory found by running
+the `npm audit --omit=dev` checklist item (transitive via postcss, build-time
+only, no direct use). `overrides` entry → 3.3.18; audit now **0 vulnerabilities**.
+
+Gate from a deleted `.next`: `tsc` · lint · **1186/1186 (113 files)** · build
+exit 0 · **60 routes = 27 EN + 27 ES**. ✅ Visual before/after confirmed on 3
+re-encoded images (colour, gemstones and fine repoussé detail all preserved).
+✅ Production product pages 200 with images serving as `image/webp`.
+
+🔴 **Undeployed** — the Storage re-encode IS live (it is data, not code), but
+the code fixes are not.
+
+◻ **The one thing NOT verifiable from here:** whether the blank-card symptom is
+actually gone. It needs a real cold load on a throttled connection, so it is an
+owner check after deploy.
+
+ℹ️ Backups (1.1 GB) at `C:\Users\rcman\NEJ-image-backup-2026-08-30` are the only
+rollback for the re-encode. Keep until the owner is satisfied, then delete.
+
+⚠️ **Read the `CHANGELOG.md` correction before trusting any earlier note here
+about image sizes.** Two measurement traps produced confident wrong answers:
+`curl` without browser `Accept` headers, and measuring the `src` fallback
+(`w=3840`) instead of the width `sizes` actually resolves to (`w=640`).
+
+### 🟢 2026-08-30 — earlier in the session: footer + docs work (all deployed)
+
+Two things happened today, both closed out. **Nothing is undeployed, no SQL, no
+env vars, no manual steps owed** beyond the standing Request Indexing item.
+
+1. **A Spanish-footer locale bug** — found, fixed, deployed, verified live, and
+   made structurally impossible to repeat (`SiteFooter`'s `locale` prop is now
+   required). Details below.
+2. **The "static page count" invariant was retired** — it was never an
+   invariant. `STRUCTURE.md` and `INTEGRITY.md` now carry the stable measure
+   instead. Details below and in `CHANGELOG.md`.
+
+◻ **Still the only open item, unchanged from 08-29:** the **7 Request Indexing
+calls**, still property-wide quota-blocked. ⛔ Next attempt: submit ONE url and
+continue only if it succeeds (list + rule in `TASKS.md`).
+
+⛔ **A mail-in / "ship us your items" page was proposed and REJECTED this
+session** — do not re-propose it without reading `DECISIONS.md` first. Florida
+licenses it separately (Ch. 538 Part III), and the site's own copy actively
+argues against mail-in.
+
+### 🟢 2026-08-30 — Spanish footer fix DEPLOYED and production-verified
 
 Five pages rendered `<SiteFooter />` with no `locale`, so on `/es` the footer
 came out in English **and stripped `/es` from all 23 hrefs** — every footer
 link ejected Spanish visitors into the English site. Fixed in
 `silver-services`, `gold-services`, `faq`, `estate-services`, `bullion` by
-passing `locale={locale}`.
+passing `locale={locale}`, then the prop was made **required**.
 
-Verified by parsing fetched HTML: all five now match the `/es/sell` control at
-**22/23 Spanish links + ES chrome** (the 1 is `/review`, by design), and the
-English pages are unchanged at 23/23 unprefixed. Gate: `tsc` · lint ·
-**1176/1176 (112 files)** · build **457/457**. No SQL, no env vars.
+✅ **Confirmed on production**, footer-scoped: all five now read **22/23
+Spanish links + ES chrome**, matching the `/es/sell` control exactly (the 1 is
+`/review`, by design). They were **0/23 with an English footer**. Negative
+control passes — `/faq`, `/bullion`, `/shipping` still read **0** `/es/` footer
+links with English chrome. Gate: `tsc` · lint · **1176/1176 (112 files)** ·
+build clean at **60 prerendered routes = 27 EN + 27 ES**. No SQL, no env vars.
+
+🔴 **If you ever re-check this, scope the grep to the `<footer>`.** A
+whole-page `href="/es/` grep reports 24 on `/es/*` (header nav) and 1 on
+English pages (the language switcher) — two false alarms that both read as a
+failed deploy. Command and full trap in `TASKS.md`.
 
 ✅ **The prop is now REQUIRED** (`locale: string`, no default), so this cannot
 silently recur — a missing prop is `TS2741` at the call site. Mutation-tested.
@@ -27,6 +95,13 @@ It needed no call-site changes: all 21 already passed `locale={locale}`.
 
 ⛔ Durable rule in `DECISIONS.md` → *"`SiteFooter`'s `locale` prop is REQUIRED —
 never give it a default again"*. Detail in `CHANGELOG.md` 2026-08-30.
+
+✅ **Staging synced and PUSHED** (2026-08-30): 11 files queued and copied,
+0 Extras / 0 Mismatch / 0 FAILED, follow-up dry run 0. 888 files / 20.24 MB.
+Leak check clean against a **181 `.tsx` positive control**; staged `SiteFooter`
+verified to carry the required prop and **0** bare `<SiteFooter />` remain.
+Full evidence in `TASKS.md`. (Staging now drifts by memory docs only — the
+owner's accepted standing preference.)
 
 ### ✅ 2026-08-30 — the "static page count" invariant is RECONCILED (it was never an invariant)
 
@@ -47,7 +122,7 @@ The `<Suspense>`/`RouteProgressBar` regression it was meant to catch is real and
 still guarded; `STRUCTURE.md` now carries the one-line manifest command to use
 instead. Historical 454/456/458 figures in entries below are left as written.
 
-### 🟢 2026-08-29 END OF SESSION (latest) — content batch DEPLOYED + verified; one quota-blocked item remains
+### 🟢 2026-08-29 END OF SESSION — content batch DEPLOYED + verified; one quota-blocked item remains
 
 **Everything from the 3-day SEO session (08-27 → 08-29) is live and
 production-verified.** The final batch — `/sell` value guide, 12 city-intro
