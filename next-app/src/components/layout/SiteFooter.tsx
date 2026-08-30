@@ -5,11 +5,24 @@ import ShowroomAddress from '@/components/ShowroomAddress';
 import ShowroomHours from '@/components/ShowroomHours';
 import CopyAddressButton from '@/components/CopyAddressButton';
 
+/**
+ * `locale` is REQUIRED, and deliberately has no default.
+ *
+ * It drives both the link labels and `p()`, which prefixes every href with
+ * `/es`. When it was optional and defaulted to `'en'`, five pages omitted it
+ * and their Spanish versions served an English footer whose ~22 links all
+ * dropped the `/es` prefix — every footer click ejected a Spanish visitor into
+ * the English site. That failed silently: the pages still built, still
+ * rendered, and still passed tests.
+ *
+ * ⛔ Do not reintroduce a default. The missing prop must stay a compile error;
+ * that is the only check that catches this. See `DECISIONS.md` → "Layout".
+ */
 interface Props {
-  locale?: string;
+  locale: string;
 }
 
-export default function SiteFooter({ locale = 'en' }: Props) {
+export default function SiteFooter({ locale }: Props) {
   const isEs = locale === 'es';
   const p = (path: string) => (isEs ? `/es${path}` : path);
 

@@ -199,7 +199,7 @@ export default async function FaqPage({ params }: Props) {
         </section>
 
       </main>
-      <SiteFooter />
+      <SiteFooter locale={locale} />
     </>
   );
 }

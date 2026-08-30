@@ -235,7 +235,7 @@ export default async function BullionPage({ params }: Props) {
         </section>
 
       </main>
-      <SiteFooter />
+      <SiteFooter locale={locale} />
     </>
   );
 }

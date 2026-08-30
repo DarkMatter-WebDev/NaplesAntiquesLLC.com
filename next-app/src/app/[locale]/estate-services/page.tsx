@@ -230,7 +230,7 @@ export default async function EstateServicesPage({ params }: Props) {
         </section>
 
       </main>
-      <SiteFooter />
+      <SiteFooter locale={locale} />
     </>
   );
 }

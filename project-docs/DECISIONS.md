@@ -6,6 +6,73 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-08-27**.
 
+## Layout (2026-08-30)
+
+### `SiteFooter`'s `locale` prop is REQUIRED — never give it a default again
+
+`SiteFooter({ locale = 'en' })` silently degraded: omit the prop on a `/es`
+page and the footer rendered English labels **and stripped `/es` from all 22
+hrefs**, ejecting the visitor into the English site. It failed invisibly — the
+page still built, still rendered, still passed tests. Five pages carried this
+for an unknown length of time.
+
+Both halves fixed 2026-08-30: the five call sites, then the signature itself
+(`locale: string`, no default). A missing prop is now **TS2741 at the call
+site** — mutation-tested by removing it from `bullion/page.tsx` and confirming
+the error, then reverting.
+
+⛔ **Do not reintroduce a default.** The compile error is the only check that
+catches this class of bug; a default converts it back into silent breakage.
+
+ℹ️ Making it required cost nothing, because all 21 call sites already passed
+`locale={locale}` — the five broken ones were the only holdouts, and
+`LegalPolicyPage` already required `locale` itself. An earlier note in this
+file called the change a "build-wide refactor" and deferred it; **that
+assessment was wrong** and the enumeration disproved it. Enumerate call sites
+before sizing a signature change.
+
+⚠️ A locale bug in *chrome* is invisible to page-level tests — nothing in the
+1176-test suite caught it. It was found by parsing fetched HTML and counting
+`/es`-prefixed footer hrefs against a known-good page. The first attempt at
+that count was WRONG, because `'/estate-jewelry'.startsWith('/es')` is true.
+Match `'/es'` exactly or `'/es/'`.
+
+ℹ️ `/account/sign-in` legitimately renders no footer, so a footer audit must
+treat "no footer element" as a signal to check for a redirect, not a failure.
+
+## Buy-Side Content Strategy (2026-08-29)
+
+### Deep educational content lives ONCE, on the hub — never templated across city pages
+
+The karat table, melt math, and before-you-sell guidance live on `/sell` only.
+The six `/sell/[city]` pages measured **69% verbatim-identical** to each other
+(sentence-level, city name normalised); adding shared content raises that
+ratio. ⛔ Do not "finish the job" by copying the guide into the city template.
+
+### The city template renders the WINNERS — restructure it never, extend it via data only
+
+`sell/[city]/page.tsx` renders 12 pages at once, including the site's
+best-ranking pages (`/es/sell/cape-coral` pos ~5, `/es/sell/bonita-springs`
+~9). City differentiation goes into `service-areas.ts` intro strings (done
+2026-08-29 with verifiable local grounding — Art District, drive times,
+community character). ⛔ No invented customer history — "what people in X bring
+us" claims require the owner's word first.
+
+### /silver-services is the striking-distance page — content effort goes there before /sell/naples
+
+At position ~12 it can plausibly reach page 1; `/sell/naples` at ~52 cannot be
+copywritten onto page 1 (that ceiling is backlinks/authority). The flatware
+band (silverplate marks, patterns-beat-melt with the owner-confirmed
+"price both ways, pay the higher" claim, weighted pieces) exists for this.
+
+### GSC Request Indexing quota: assume ~10/day, property-wide, HARSHER than rolling-24h
+
+Confirmed across 3 days: shared across properties of the same site, and failed
+attempts appear to extend the block. **Submit one URL first; continue only if
+it succeeds.** The toast auto-dismisses in ~20 s — the durable success signal
+is the button row flipping to "✓ Indexing requested". Manual requests are an
+accelerator only: 2 of 19 product pages indexed organically with no request.
+
 ## Crawling & Indexing
 
 ### A page that can say `noindex` must NEVER also be blocked in `robots.txt`

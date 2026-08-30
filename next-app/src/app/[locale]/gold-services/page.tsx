@@ -316,7 +316,7 @@ export default async function GoldServicesPage({ params }: Props) {
         </section>
 
       </main>
-      <SiteFooter />
+      <SiteFooter locale={locale} />
     </>
   );
 }

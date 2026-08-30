@@ -1,6 +1,139 @@
 
 # Changelog
 
+## 2026-08-30 — the "static page count" invariant was never an invariant
+
+`STRUCTURE.md` recorded 456, a `CURRENT_STATUS.md` entry recorded 458, and the
+build emitted 457. **All three were correct when written**, so this was
+reconciled by measuring rather than by picking a number.
+
+**What the line actually is.** `✓ Generating static pages (457/457)` is a
+progress counter for the generation phase, not a count of emitted pages. Two
+measurements settle it:
+
+| Probe | Result |
+| --- | --- |
+| `.next/prerender-manifest.json` routes | **60** |
+| `.html` files under `.next/server/app` | 56 |
+| Product pages in either | **0** |
+| Build progress line | 457 |
+
+**Why it drifts.** `shop/[id]/page.tsx:187` runs `generateStaticParams()` over
+every product with status `available` **or** `sold`, two entries per product, so
+the generation phase scales with the catalog. Those pages are then **not**
+prerendered — `/[locale]/shop/[id]` builds as **ƒ dynamic** because it reads
+visibility from the session. So the counter moves when the catalog changes while
+nothing about the routes did.
+
+ℹ️ This also explains the 2026-08-24 note that read as a puzzle at the time: the
+sitemap fell 107 → 105 on two sales while "the build prerendered the same 456
+pages". Correct and consistent — `sold` is inside that filter, so a sale removes
+a product from the sitemap without removing it from generation.
+
+**The stable numbers**, now in `STRUCTURE.md`: **60 prerendered routes = 27 EN +
+27 ES + 6 non-locale** (`_global-error`, `_not-found`, `favicon.ico`,
+`icon.png`, `robots.txt`, `sitemap.xml`).
+
+⭐ **`en === es` is the assertion worth keeping** — it checks the EN/ES pairing
+rule directly and, unlike the progress counter, inventory cannot move it. The
+`<Suspense>`/`RouteProgressBar` prerender-collapse regression is still guarded;
+`STRUCTURE.md` carries a one-line manifest command in place of the old
+"check the page count" instruction.
+
+⛔ Historical 443/454/456/458 figures in older entries are left as written —
+they record what was true at the time.
+
+## 2026-08-30 — five Spanish pages served an ENGLISH footer that ejected visitors out of `/es`
+
+Found while researching an unrelated page proposal, then measured and fixed.
+
+`SiteFooter` takes `locale?: string` and **defaults it to `'en'`**
+(`SiteFooter.tsx:12`). That default feeds both the link labels and `p()`, the
+helper that prefixes every footer href with `/es` (`:14`). Five pages rendered
+`<SiteFooter />` with no prop, so their `/es` versions emitted English labels
+**and stripped `/es` from every href** — a Spanish visitor touching any footer
+link was silently dropped into the English site. 16 other call sites passed
+`locale` correctly, so this was drift, not a design choice.
+
+Measured from fetched HTML before the fix:
+
+| Page | Footer links keeping Spanish | Chrome |
+| --- | --- | --- |
+| `/es/faq` (broken) | **0 / 23** | English |
+| `/es/sell` (control) | 22 / 23 | Spanish |
+
+Fixed by adding `locale={locale}` in five files — `silver-services:429`,
+`gold-services:319`, `faq:202`, `estate-services:233`, `bullion:238`. `locale`
+was already destructured from `params` in every one, so nothing else moved.
+
+After: all five match the control exactly — **22/23 Spanish links, ES chrome**.
+The 1 remaining unprefixed link is `/review`, which is deliberately outside
+`companyLinks` because `p()` would break it (`SiteFooter.tsx:134-153`).
+Negative control passes: `/faq` and `/bullion` still emit 23/23 unprefixed
+links with English chrome, so the fix does not over-apply.
+
+Gate: `tsc` clean · lint clean · **1176/1176 (112 files)** · build
+**457/457**. A prop on an existing element cannot change the prerender count.
+
+### Then the prop was made REQUIRED — and it cost nothing
+
+Same session, second pass. `Props.locale` went `locale?: string` (defaulting to
+`'en'`) → **`locale: string`, no default**, so a missing prop is now a compile
+error rather than a silent English footer.
+
+⚠️ **The earlier "build-wide refactor" assessment in this file was wrong.**
+Enumerating every usage showed **all 21 call sites already passed
+`locale={locale}`** — the five fixed above were the only holdouts, and
+`LegalPolicyPage` already required `locale` itself (`:12`). The root
+`not-found.tsx` only *mentions* SiteFooter in a comment explaining why it
+deliberately does not render it. Zero call sites needed changing. Enumerate
+before sizing a signature change.
+
+**Mutation-tested, not assumed:** removing `locale` from `bullion/page.tsx`
+produced `TS2741: Property 'locale' is missing in type '{}' but required in
+type 'Props'` at line 238, then it was reverted. That is the proof the guard
+bites.
+
+Runtime re-verified across 11 paths: the five fixed pages, `/es/sell` and
+`/es/shipping` (the `LegalPolicyPage` route) all at **22/23 Spanish links + ES
+chrome**; `/faq`, `/bullion`, `/shipping` unchanged at 0/23 with EN chrome.
+ℹ️ `/es/account` reports no footer because it 302s to `/es/account/sign-in`,
+which has never rendered one — pre-existing, not a regression.
+
+Final gate: `tsc` clean · lint clean · **1176/1176 (112 files)** · build
+**457/457**.
+
+⚠️ **Undeployed** — production still serves the broken footers.
+
+ℹ️ Page-count drift noted, NOT introduced here: `STRUCTURE.md` records 456 and
+a `CURRENT_STATUS.md` entry records 458; the tree actually builds **457**.
+Worth reconciling in a future session.
+
+## 2026-08-29 (end of session) — content batch DEPLOYED and production-verified
+
+Owner deployed; every piece verified live by direct probes, both locales:
+
+| Piece | Verified |
+| --- | --- |
+| `/sell` value guide | 200 · one `<h1>` · 6/6 numeric probes EN and ES (788/836 words) |
+| City intros ×12 | all 6 cities probed in both locales; **0** guide leakage into city pages |
+| `/silver-services` flatware band | 6/6 probes EN and ES · **624 → 900/963 words** |
+| Sitemap | 198 `<loc>`; **exactly 40** entries carry `lastmod 2026-08-29` (14 static + 6 city × 2 locales — the `CONTENT_LAST_MODIFIED` set; product dates untouched) |
+| Smoke | `/`, `/es`, `/shop`, `/contact`, `/gold-services` all 200 |
+
+🟢 Clicks ticked 44 → **49** on the GSC performance card during the 3-day session.
+
+### 🔴 Request Indexing remains quota-blocked — and the model of the quota changed again
+
+The later-day retry ALSO returned property-wide **Quota Exceeded** (confirmed
+with two different URLs, then stopped). So it is not a simple rolling 24 h from
+the 08-28 burst: failed attempts may extend the window, or the real allowance
+is smaller than the assumed ~10/day. ⛔ Standing rule recorded in `TASKS.md`:
+**submit ONE url first; continue only if it succeeds** — probing with retries
+may itself keep the window closed. 12 of 19 product URLs are requested; 7
+remain (list in `TASKS.md`); 2 of the original 19 indexed organically with no
+request at all.
+
 ## 2026-08-29 (evening) — /silver-services flatware band (step 2 of the content plan)
 
 The striking-distance page (position **12.2**, 88 impressions, 0 clicks — the

@@ -1,9 +1,50 @@
 ﻿# Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-08-27**.
+> in `CHANGELOG.md`. Last reconciled: **2026-08-29**.
 
 ## ◻ OPEN — needs a human
+
+### 🔴 DEPLOY the Spanish footer fix (2026-08-30; no SQL, no env vars)
+
+Five pages passed no `locale` to `SiteFooter`, so their `/es` versions served
+an English footer whose 23 links all dropped the `/es` prefix — every footer
+click ejected a Spanish visitor into the English site. Production still does
+this.
+
+Files (one token each, `locale={locale}` added):
+`src/app/[locale]/{silver-services,gold-services,faq,estate-services,bullion}/page.tsx`,
+plus `components/layout/SiteFooter.tsx` — the prop is now **required**
+(`locale: string`, no default), so this cannot silently recur.
+
+Gate: `tsc` clean · lint clean · **1176/1176 (112 files)** · build **457/457**.
+
+**After deploying, the 20-second check** — run against production and expect
+22 Spanish links on each, versus 0 today:
+
+```bash
+for p in faq bullion gold-services silver-services estate-services; do echo -n "$p: "; curl -s "https://naplesestatejewelry.com/es/$p" | grep -o 'href="/es/[^"]*"' | sort -u | wc -l; done
+```
+
+⚠️ Negative control matters here: confirm an ENGLISH page (`/faq`) still has
+**zero** `/es/` footer links. A fix that over-applied would look identical on
+the first check.
+
+✅ **DONE in the same session — the prop is now required**, so a missing
+`locale` is `TS2741` at the call site instead of a silent English footer.
+Mutation-tested (removed it from `bullion`, confirmed the error, reverted).
+⚠️ It needed **no** call-site changes: all 21 already passed `locale={locale}`.
+The earlier "touches LegalPolicyPage / not-found / shop / checkout / account"
+sizing was wrong — `LegalPolicyPage` already required `locale`, and root
+`not-found.tsx` never renders a footer. ⛔ Never reintroduce a default.
+
+✅ **DONE 2026-08-30 — the 456/457/458 disagreement is resolved, and the answer
+is that it was never an invariant.** The `(N/N) static pages` build line is a
+progress counter that scales with the CATALOG (`shop/[id]` enumerates every
+available/sold product during generation, then renders dynamically anyway — 0
+product pages are prerendered). ⛔ Do not pin it to a number or treat a delta as
+a defect. The stable figures are in `STRUCTURE.md`: **60 prerendered routes =
+27 EN + 27 ES + 6 non-locale**, with **`en === es`** as the check worth making.
 
 ### ✅ DONE — the 2026-08-27/28 SEO batches are DEPLOYED and verified live
 
@@ -34,7 +75,7 @@ longer lists `/account` or `/checkout` and still lists `/admin`, `/api`,
 from "Blocked by robots.txt" to "Excluded by `noindex`" over some weeks — both
 are non-indexed states, so nothing that currently ranks changes.
 
-### 🔴 2026-08-29 — DEPLOY the content batch: /sell value guide + city intros + /silver-services flatware band (built, gated, staged)
+### ✅ DONE 2026-08-29 — content batch DEPLOYED and production-verified (probes in `CHANGELOG.md`)
 
 One file of app code (`next-app/src/app/[locale]/sell/page.tsx`) plus the
 `CONTENT_LAST_MODIFIED` bump in `sitemap.ts`. No SQL, no env vars. After
@@ -83,10 +124,11 @@ times and remains one hour short on Saturday by design. It renders only if
 
 ### ◻ 2026-08-28 — 7 Request Indexing calls still owed (quota is a ROLLING window)
 
-⚠️ **2026-08-29 ~8:30 AM attempt: Quota Exceeded on the FIRST request of the
-day.** The daily quota is a rolling ~24-hour window, not a midnight reset —
-yesterday, 11 requests burned ~9–10 AM block until that window rolls off.
-Retry mid-afternoon or later.
+⚠️ **Still quota-blocked at the 2026-08-29 later-day retry too** — confirmed
+property-wide with two different URLs. The window is harsher than a simple
+rolling 24 h from the 08-28 burst; failed attempts may extend it, or the real
+daily allowance is smaller than the ~10 assumed. ⛔ Do not burn retries probing:
+tomorrow, submit ONE url — continue only if it succeeds.
 
 **11 of the 18 are now requested.** The daily quota ran out on the 12th attempt
 ("Quota Exceeded — try submitting this again tomorrow"), same as 2026-08-27.

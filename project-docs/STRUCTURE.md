@@ -138,16 +138,58 @@ let additional loose app assets accumulate at root.
 
 `src/app/[locale]/shop/(list)/page.tsx` remains a thin Next route entry with
 only supported route exports. The reusable implementation lives beside it in
-`shop-page-renderer.tsx` and is shared with `/shop-modern`. The production build
-completed successfully on **2026-08-21: 456 pages** (454 until the two `reconcile-status` API routes were added that day), with TypeScript and lint
-also passing. (The 443-page figure previously recorded here was 2026-08-03.)
+`shop-page-renderer.tsx` and is shared with `/shop-modern`.
 
-⚠️ **The static page count is a structural invariant, not just a statistic.**
-`[locale]/layout.tsx` reads `useSearchParams` through `RouteProgressBar`, and
-that hook client-renders everything up to the nearest `<Suspense>` boundary. The
-boundary around that component is the only thing keeping the deopt contained; if
-it is removed, the build still succeeds and the page count silently collapses.
-Check the count after touching the root layout.
+### ⚠️ The `(N/N) static pages` build line is NOT the prerendered page count
+
+Reconciled by measurement 2026-08-30, after this file (456), `CURRENT_STATUS.md`
+(458) and the actual build (457) all disagreed. **All three were "right" when
+written; the figure simply is not stable.**
+
+`✓ Generating static pages (457/457)` is a **progress counter for the
+generation phase**. It is not the number of pages emitted, and it moves on its
+own:
+
+- `shop/[id]/page.tsx:187` runs `generateStaticParams()` over every product with
+  status `available` **or** `sold`, two entries per product. The generation
+  phase therefore **scales with the catalog**, and adding or permanently
+  removing a product shifts the counter without any code change. (Marking an
+  item *sold* does not — `sold` is in that filter, which is why a 2-product
+  sale once left the counter unmoved while the sitemap dropped by 2.)
+- None of those product pages are actually prerendered. `/[locale]/shop/[id]`
+  builds as **ƒ dynamic**, because the page decides visibility from the session.
+
+⛔ **Do not treat that line as an invariant, and do not "correct" it to a fixed
+number.** Measure it if you want, but a delta is not by itself a defect.
+
+### The numbers that ARE stable
+
+From `.next/prerender-manifest.json` (authoritative) on 2026-08-30:
+
+| Measure | Value |
+|---|---|
+| Prerendered routes, total | **60** |
+| — English | **27** |
+| — Spanish | **27** |
+| — non-locale (`_global-error`, `_not-found`, `favicon.ico`, `icon.png`, `robots.txt`, `sitemap.xml`) | **6** |
+| Prerendered product pages | **0** |
+| `.html` files under `.next/server/app` | 56 |
+
+**`en === es` is the invariant worth asserting** — it is a direct check of the
+"Keep EN/ES route behavior paired" rule, and unlike the progress counter it
+cannot be moved by inventory.
+
+⚠️ **The regression this guards against is real, so keep guarding it — just with
+the right number.** `[locale]/layout.tsx` reads `useSearchParams` through
+`RouteProgressBar`, and that hook client-renders everything up to the nearest
+`<Suspense>` boundary. The boundary around that component is the only thing
+keeping the deopt contained; remove it and the build still succeeds while
+prerendering silently collapses. After touching the root layout, check the
+manifest, not the progress line:
+
+```bash
+node -e "const m=require('./.next/prerender-manifest.json');const r=Object.keys(m.routes);console.log(r.length,'routes | en',r.filter(x=>x.startsWith('/en')).length,'| es',r.filter(x=>x.startsWith('/es')).length)"
+```
 
 ## Cleanup Notes
 

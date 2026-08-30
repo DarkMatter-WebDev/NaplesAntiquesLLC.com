@@ -4,11 +4,72 @@
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
 > in `DECISIONS.md`. Last reconciled: **2026-08-29**.
 
-## Start Here (handoff, end of the 2026-08-27 Search Console session)
+## Start Here (handoff, end of the 2026-08-29 SEO/content session)
 
 **Read this, then `TASKS.md`.**
 
-### 🟡 2026-08-29 (later) — /sell value guide + city-intro extensions + /silver-services flatware band BUILT, not deployed
+### 🔴 2026-08-30 — Spanish footer fix BUILT, NOT deployed
+
+Five pages rendered `<SiteFooter />` with no `locale`, so on `/es` the footer
+came out in English **and stripped `/es` from all 23 hrefs** — every footer
+link ejected Spanish visitors into the English site. Fixed in
+`silver-services`, `gold-services`, `faq`, `estate-services`, `bullion` by
+passing `locale={locale}`.
+
+Verified by parsing fetched HTML: all five now match the `/es/sell` control at
+**22/23 Spanish links + ES chrome** (the 1 is `/review`, by design), and the
+English pages are unchanged at 23/23 unprefixed. Gate: `tsc` · lint ·
+**1176/1176 (112 files)** · build **457/457**. No SQL, no env vars.
+
+✅ **The prop is now REQUIRED** (`locale: string`, no default), so this cannot
+silently recur — a missing prop is `TS2741` at the call site. Mutation-tested.
+It needed no call-site changes: all 21 already passed `locale={locale}`.
+
+⛔ Durable rule in `DECISIONS.md` → *"`SiteFooter`'s `locale` prop is REQUIRED —
+never give it a default again"*. Detail in `CHANGELOG.md` 2026-08-30.
+
+### ✅ 2026-08-30 — the "static page count" invariant is RECONCILED (it was never an invariant)
+
+`STRUCTURE.md` said 456, an entry below says 458, the build says 457 — **all
+three were correct when written.** Measured this session: the
+`✓ Generating static pages (N/N)` line is a **progress counter**, not a page
+count, and it moves with the **catalog**, because
+`shop/[id]/page.tsx:187` enumerates every `available`/`sold` product (2 per
+product) during that phase. None of those pages are prerendered — `/shop/[id]`
+builds as **ƒ dynamic**, since it reads visibility from the session.
+
+⛔ **Stop treating that line as an invariant.** The stable figures, from
+`.next/prerender-manifest.json`: **60 prerendered routes = 27 EN + 27 ES + 6
+non-locale, 0 product pages.** ⭐ **`en === es` is the check worth making** —
+it directly asserts the EN/ES pairing rule and inventory cannot move it.
+
+The `<Suspense>`/`RouteProgressBar` regression it was meant to catch is real and
+still guarded; `STRUCTURE.md` now carries the one-line manifest command to use
+instead. Historical 454/456/458 figures in entries below are left as written.
+
+### 🟢 2026-08-29 END OF SESSION (latest) — content batch DEPLOYED + verified; one quota-blocked item remains
+
+**Everything from the 3-day SEO session (08-27 → 08-29) is live and
+production-verified.** The final batch — `/sell` value guide, 12 city-intro
+extensions, `/silver-services` flatware band, `CONTENT_LAST_MODIFIED` bump —
+deployed and probed in both locales (table in `CHANGELOG.md`). Clicks ticked
+44 → 49 during the session.
+
+**◻ The ONLY open item: 7 Request Indexing calls**, still property-wide
+quota-blocked even at a later-day retry. ⛔ Next attempt: submit ONE url,
+continue only if it succeeds (rule + url list in `TASKS.md`).
+
+**👀 Watch over the coming weeks (no action):** `/silver-services` position on
+flatware queries (was ~12 — likeliest first non-brand click), the ~100 Spanish
+URLs newly submitted via the bilingual sitemap, the 40 pages re-signalled with
+`lastmod 2026-08-29`, and the two `/account` rows migrating from "Blocked by
+robots.txt" to "Excluded by noindex".
+
+**🟡 The real ceilings, unchanged:** Google Business Profile (reviews via
+`/review`, the Spanish-speaking market) and backlinks. Content is now ahead of
+authority.
+
+### 🟡 2026-08-29 (mid-session) — /sell value guide + city-intro extensions + /silver-services flatware band BUILT — superseded by the block above
 
 `/sell` (the hub — was 444 words, thinner than its own city pages, position 64)
 gained the karat-purity table, the weight × purity × spot math with a worked

@@ -426,7 +426,7 @@ export default async function SilverServicesPage({ params }: Props) {
         </section>
 
       </main>
-      <SiteFooter />
+      <SiteFooter locale={locale} />
     </>
   );
 }
