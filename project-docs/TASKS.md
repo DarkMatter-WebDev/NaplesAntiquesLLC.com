@@ -5,7 +5,89 @@
 
 ## ◻ OPEN — needs a human
 
-### 🔴 DEPLOY the 2026-08-30 SEO growth batch (no SQL, no env vars)
+### 🔴 DEPLOY the hero reveal-gate fix (2 files, no SQL, no env vars)
+
+The backfill below fixed cache lifetimes but the owner STILL reproduced the
+blank second card (regular Chrome, incognito, Edge). Second root-cause layer:
+**both hero reveal gates waited on ALL 8 ring images with an 1800 ms cap** —
+the inline `nej-hero-go` script in `(home)/page.tsx` and the React gate in
+`HomeHero.tsx`. On any cold or stale-revalidating load the slowest of eight
+always lost to the cap, so the hero unveiled with unready cards blank; slot 1
+(the men's diamond ring, second-most-visible) is the one the owner catches.
+The cap itself is LCP-load-bearing (PSI bimodal warning, 08-23) and was NOT
+touched.
+
+**Fix (gated, awaiting the owner's usual copy + push):** both gates now wait
+on the **first two** card images only — the cards actually facing the visitor
+at reveal, both `<link rel=preload>`ed at high/auto — and await
+**`img.decode()`**, not just `load`, so a loaded-but-undecoded frame can't
+paint blank. Two small preloaded images can beat the cap where eight never
+could; reveal gets EARLIER on warm loads. Files:
+`src/app/[locale]/(home)/page.tsx` (inline script) +
+`src/components/home/HomeHero.tsx` (React gate — comments on both demand they
+stay in step). Gate: `tsc` clean · lint clean · **1186/1186 (113 files)** ·
+build **66 = 30 EN + 30 ES + 6** · dev-server verified (`nej-hero-go` +
+`.is-ready` both flip, 0 console errors).
+
+**After deploy, the owner's cold-load test is the acceptance test** (their
+browsers still hold stale 1h-header copies until first revisit, so the FIRST
+load may still revalidate — judge from the second cold-ish load onward).
+If a slow connection still misses the cap for slot 1, the held-in-reserve
+lever is `fetchPriority: 'high'` on slot 1 (contradicts the documented
+one-high rule — would need PSI re-measurement across multiple runs).
+
+### ✅ DONE 2026-08-31 (owner-approved) — cache-metadata backfill for pre-08-30 Storage objects
+
+**Executed and verified same day.** Dry-run inventory: 942 objects in
+`product-images`, **197 at `max-age=3600`** (all June-era; both hero rings in
+the list), 745 already year-long. Backfill: **197/197 re-uploaded with the
+same bytes** (sha256-verified identical before/after, 10.8 MB round-tripped,
+0 failures, `update()` so URLs unchanged). Post-state: inventory reads
+**942/942 at `max-age=31536000`**; fresh `/_next/image` variants of BOTH hero
+rings now serve `public,max-age=31536000` and store at the edge for a year;
+28 homepage-srcset variants (w=384–1080, Chrome Accept header) pre-warmed.
+Old 1-hour edge entries expire within the hour and re-derive year-long.
+**Cold-load blank-second-card should now be structurally gone** — owner
+should confirm on a genuinely cold load (e.g. tomorrow morning).
+
+**Symptom (owner-reported 2026-08-31):** the hero's second card (men's 10K
+diamond ring) is blank again on COLD loads until it nearly rotates away; warm
+loads are fine. The 08-30 `fetchPriority` fix is live and working (verified:
+HTML emits high/auto/low + preloads; the ring is fetched 2nd; 10.6 KB WebP) —
+the 08-30 "fixed" confirmation was simply a warm load.
+
+**Root cause (proven 6/6):** Netlify's image CDN sets the transformed
+response's TTL from the SOURCE object's stored `cacheControl` metadata.
+Objects re-uploaded by the 08-30 re-encode carry `31536000` → transforms
+cache **1 year**. The ~223 objects that were already valid WebP and were
+therefore SKIPPED by the re-encode — including BOTH hero ring images (slot 0
+`jsltovk1sr`, slot 1 `rqs5cw4bp89`, both June-17 uploads) — still carry the
+old 1-hour metadata → transforms cache **max-age=3600**. On a low-traffic
+site that means nearly every real visitor hits an expired edge entry, the
+cold transform takes longer than the hero reveal's 1800 ms fallback
+(`HomeHero.tsx`), and the second card unveils blank. ⚠️ The public Supabase
+endpoint reports `Cache-Control: no-cache` for BOTH groups — do not probe
+origin headers to tell them apart; correlate `Last-Modified` (< Aug 30 =
+short group) with a fresh `/_next/image` variant's `max-age`.
+ℹ️ `images.minimumCacheTTL` in next.config.ts is a no-op on Netlify — the
+image CDN derives TTL from source metadata, not from Next config. New
+uploads are already fine (`AdminShell.tsx:2925` sets `31536000`).
+
+**Proposed fix (production Storage mutation — dry-run first, then approval):**
+re-upload every `product-images` object with `Last-Modified` before the
+08-30 re-encode window using the SAME bytes and `cacheControl: '31536000'`
+(supabase `update()`), then verify a fresh ring variant serves
+`max-age=31536000` and bytes hash-match. Backups from 08-30 still exist at
+`C:\Users\rcman\NEJ-image-backup-2026-08-30`. No code change needed.
+
+### ✅ DEPLOYED 2026-08-31 — the 2026-08-30 SEO growth batch (no SQL, no env vars)
+
+**Production verified 2026-08-31 after the owner's push:** all 7 new/changed
+routes return 200 in both locales; `/sell/naples` renders the buyer-noun H1 +
+showroom band; `robots.txt` shows `Allow: /api/merchant-feed`; the feed
+returns 200 with **76 items / 0 skipped / 0 sold** (sold rope chain absent,
+Gorham knife present), headers `Content-Type: application/xml` +
+`X-Robots-Tag: noindex`. Merchant Center swap + GSC follow-ups below.
 
 Everything is gated (`tsc` · lint · **1186/1186 (113 files)** · build exit 0 ·
 **66 prerendered = 30 EN + 30 ES + 6 non-locale**) and dev-server-verified in
@@ -44,6 +126,21 @@ gold + one silver product page (crossover band). Then request indexing for the
 production check now expects **24/25** links (was 22/23) — the two new footer
 links are the delta, not a regression.
 
+🟡 **GSC indexing 2026-08-31: 1 of 6 done, then QUOTA EXCEEDED.**
+`/jewelry-appraisal` (EN) requested successfully. Two blind Enter keypresses
+then re-fired "REQUEST AGAIN" on that same URL (duplicates don't change queue
+position but DO burn quota) and the 4th submission returned "Quota Exceeded —
+try again tomorrow". ⚠️ **GSC UI trap to add to the list: after a request,
+keyboard focus stays on the REQUEST AGAIN button — Enter re-submits it, and
+typing goes nowhere until the inspect box is re-focused via its element ref
+(coordinate clicks + type were silently swallowed).** Compensations done:
+sitemap.xml **resubmitted** ("Sitemap submitted successfully") so the 6 new
+URLs enter normal discovery.
+◻ **OWED next session (2026-09-01+, quota resets daily):** request indexing
+for the remaining 5 — `/es/jewelry-appraisal`,
+`/silver-services/flatware-value` + `/es/…`, `/diamond-buyers` + `/es/…`
+(and optionally re-inspect `/sell/naples` for the retitle).
+
 **◻ Owner follow-ups from the SEO session:**
 
 1. **GBP photo batch** (audit item 4, owner-held): exterior with the Sharon
@@ -79,12 +176,43 @@ links are the delta, not a regression.
    disallow (specific rule wins) and the route sends `X-Robots-Tag: noindex`.
    Verified on dev: 200, 76 items, 76/76 ids unique (max 7 chars), 0 sold
    items, 0 unescaped entities, headers correct.
-   🔴 **AFTER DEPLOY, in Merchant Center:** (1) Products & store → add data
-   source → scheduled fetch of `https://naplesestatejewelry.com/api/merchant-feed`,
-   daily; (2) once it imports, disable "products found by Google" (Settings →
-   data sources) — that removes the crawl duplicates and the sold OOS clutter;
-   (3) leave "automatic item updates" ON — between fetches it reads the product
-   page's `SoldOut` JSON-LD as the fast corrective when a piece sells.
+   ✅ **MERCHANT CENTER SWAP DONE 2026-08-31** (on the owner's tab, at their
+   request): (1) feed added as a data source — named **"Website Feed
+   (naplesestatejewelry.com)"**, File (URL) scheduled fetch daily at 12:00 AM,
+   countries **United States only** (defaults offered all ~246 — changed),
+   language English, feed label `US`, marketing methods Free listings + Free
+   local listings; first manual fetch 7:51 AM ET = **76 total updated
+   products, "All recognized" attributes, "No issues found"** in the file;
+   (2) "Found by Google" crawl source **stopped** ("Stop managing products"
+   confirmed — its 106 entries incl. the sold/dual-locale clutter will drain);
+   (3) automatic item updates left ON.
+   ◻ **Watch (re-check in a few days):**
+   - Source header showed **59** products vs 76 in the file right after the
+     swap — attribution lag while the stopped crawl source drains; the 12 AM
+     scheduled fetch should reconcile it to 76. Chase only if it persists.
+   - **`nej-108` (William Suckling salt cellar) "Not approved": "Dangerous
+     knives"** — an automated false positive (it is a salt cellar); MC notes
+     "other products may have the same issue," so expect the same flag on the
+     Gorham carving knife / Whiting grape shears.
+     ✅ **Dispute submitted 2026-08-31 at the owner's request** — reason "My
+     product meets the policy requirements", banner now reads "Review
+     requested on Aug 31, 2026. It can take a few days to complete."
+     ⚠️ If NOT approved, MC enforces a multi-day cooldown before the next
+     request. If the knife/shears get the same flag, THEIR truthful dispute
+     reason is "designed as a utility and household purposes" (they are real
+     cutlery), not "meets the policy requirements".
+   - **ℹ️ "Unsupported image type [additional_image_link]"** (info-level, on
+     nej-108 and likely catalog-wide): MC accepts only **JPEG/PNG/GIF** for
+     additional images and the whole catalog is WebP by design — so listings
+     keep the main image but lose the extra gallery shots. Main `image_link`
+     drew no format complaint (watch whether one appears after full
+     processing — that would be a real problem). Optional fix later: a
+     transcode route (sharp WebP→JPEG) or Supabase image transformations for
+     the feed's `additional_image_link` URLs only — do NOT convert the site's
+     stored images (the WebP pipeline is a deliberate site-wide rule).
+   - Product images showed "In progress" (Google still crawling them) and
+     everything sits "Under review" until the ≤10-day store review finishes —
+     both normal, no action.
 3. ✅ **DONE 2026-08-31 — "Recently Through Our Doors" proof strip BUILT on
    /silver-services** (owner approved the mockup). Owner had suggested mock
    set specs + internet photos; DECLINED — fabricated purchase records and

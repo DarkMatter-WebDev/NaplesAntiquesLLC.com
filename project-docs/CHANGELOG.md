@@ -43,8 +43,57 @@ disable "products found by Google", keep automatic item updates ON) are in
 
 Gate after all of it: `tsc` clean · lint clean · **1186/1186 (113 files)** ·
 build exit 0 · **66 prerendered = 30 EN + 30 ES + 6 non-locale** · zero
-console errors on touched pages, both locales. Still awaiting the owner's
-staging sync + deploy.
+console errors on touched pages, both locales.
+
+**2026-08-31 (later still) — the backfill was necessary but NOT sufficient:
+reveal-gate fix (BUILT, awaits deploy).** The owner still reproduced the
+blank second card post-backfill in three browsers. Second layer: both hero
+reveal gates (inline `nej-hero-go` in `(home)/page.tsx` + React gate in
+`HomeHero.tsx`) waited on ALL 8 ring images under the 1800 ms cap — on
+cold/stale loads the slowest of eight always lost, so the hero unveiled with
+blank cards; the stale-1h-header browser copies made even "warm" visits
+revalidate all 8 (measured: 8×304s landing at 2.3 s vs a 1.8 s cap). Fix:
+both gates now wait on the FIRST TWO card images only (the ones facing the
+visitor at reveal, both preloaded high/auto) and await `img.decode()`. The
+LCP-load-bearing cap is untouched; reveal can only get earlier. Gate: tsc ·
+lint · 1186/1186 · build 66 = 30+30+6 · dev-verified. Owner cold-load test
+after deploy is the acceptance test.
+
+**2026-08-31 (later) — hero cold-load "blank second card" root-caused +
+Storage cache-metadata backfill (owner-approved).** Owner re-saw the blank
+second hero card after the deploy; investigation showed the 08-30
+`fetchPriority` fix live and correct (high/auto/low + preloads in HTML, ring
+fetched 2nd, 10.6 KB) — the 08-30 "fixed" confirmation had been a warm load.
+Real cause: **Netlify's image CDN takes the transformed response TTL from the
+Supabase object's stored `cacheControl` metadata.** The 08-30 re-encode gave
+its 659 objects `31536000` as a side effect, but the 197 already-valid WebPs
+it skipped — including BOTH hero ring images — kept `max-age=3600`, so their
+transforms went cold hourly and the cold derive outran the hero's 1800 ms
+reveal fallback. Proven 6/6 by correlating Last-Modified with fresh-variant
+TTLs. Fix: re-uploaded all 197 with identical bytes (sha256-verified, 0
+failures) + `cacheControl: '31536000'`; inventory now 942/942 year-long;
+fresh hero-ring variants serve `max-age=31536000`; 28 srcset variants
+pre-warmed. ⚠️ Traps recorded: `images.minimumCacheTTL` is a **no-op on
+Netlify** (the 08-23 change never took effect in production), and the public
+Supabase endpoint reports `Cache-Control: no-cache` regardless of metadata —
+tell the groups apart by fresh-variant TTL, never by origin headers.
+
+**2026-08-31 — DEPLOYED + swap executed.** Staging synced (15 files, dry-run
+0 to copy), owner pushed. Production verified via curl: 7 routes × 200 both
+locales, buyer-noun H1 + showroom band live on `/sell/naples`, feed 200 with
+76 items / 0 skipped / 0 sold and `X-Robots-Tag: noindex`, robots carve-out
+live. Merchant Center swap done on the owner's tab: feed source "Website Feed
+(naplesestatejewelry.com)" (US-only, English, label `US`, daily 12:00 AM;
+first fetch = 76 updated, all attributes recognized, no file issues) and the
+"Found by Google" crawl source stopped. Found in passing: `nej-108` (salt
+cellar) disapproved by an automated **"Dangerous knives"** false positive —
+dispute submitted same day at the owner's request ("meets the policy
+requirements"; review takes a few days). Also surfaced: MC drops
+`additional_image_link` images in WebP (JPEG/PNG/GIF only — info-level;
+main image unaffected so far; fix options in TASKS). GSC: `/jewelry-appraisal` indexing
+requested, then daily quota exhausted (duplicate re-submits — the focus
+stays on REQUEST AGAIN and Enter re-fires it; trap recorded in TASKS);
+remaining 5 URLs owed tomorrow; sitemap.xml resubmitted successfully.
 
 ## 2026-08-30 (SEO growth session) — audit, GBP build-out, 3 new pages, /sell/naples retarget, link pass — BUILT, NOT DEPLOYED
 

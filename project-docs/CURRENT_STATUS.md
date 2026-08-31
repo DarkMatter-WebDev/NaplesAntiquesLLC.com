@@ -8,13 +8,17 @@
 
 **Read this, then `TASKS.md`.**
 
-### 🔴 ONE THING PENDING: the SEO batch is BUILT + VERIFIED but NOT DEPLOYED
+### ✅ THE SEO BATCH IS DEPLOYED (2026-08-31) and production-verified
 
 A full local-SEO growth audit (Claude artifact, owner has the link) was
-implemented item by item with owner approval. **Staging was synced 2026-08-31
-(894 files, dry-run-verified 0 to copy) — the batch now awaits only the
-owner's copy-to-repo + push; GBP changes are already live.** No SQL, no env
-vars.
+implemented item by item with owner approval. Staging synced 2026-08-31 (894
+files, dry-run 0 to copy), owner pushed the same morning, and production was
+verified: all new/changed routes 200 in both locales, new `/sell/naples` H1 +
+showroom band live, feed live (76 items / 0 sold, correct headers), robots
+carve-out live. **The Merchant Center swap is also DONE** (feed source added
+US-only + daily, crawl source stopped) — details and watch-items in
+`TASKS.md`. GSC: 1 of 6 indexing requests landed before quota ran out
+(remaining 5 owed next session); sitemap resubmitted. No SQL, no env vars.
 
 **What deploys with the next push** (gate: `tsc` · lint · **1186/1186 (113
 files)** · build exit 0 · **66 prerendered = 30 EN + 30 ES + 6 non-locale** ·

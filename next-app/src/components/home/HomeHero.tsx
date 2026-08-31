@@ -111,21 +111,30 @@ export default function HomeHero({
     // so the Carousel's <img> elements already exist. The offscreen preloader is
     // excluded via its aria-hidden wrapper — those are the NEXT photos to cycle
     // in, and blocking the fade on them would hold the spinner far too long.
+    //
+    // ⚠️ FIRST TWO slots only, decode-awaited (2026-08-31) — keep in step with
+    // the inline `nej-hero-go` script in (home)/page.tsx, which mirrors these
+    // semantics pre-hydration. Waiting on ALL ring images meant the slowest of
+    // eight always lost to the 1800ms cap on cold/stale loads, and the hero
+    // unveiled with the second card (slot 1) blank. Slots 0-1 are the cards
+    // actually facing the visitor at reveal and both are preloaded
+    // (high/auto); the rest fade in edge-on where a late photo is invisible.
+    // `decode()` prevents a loaded-but-undecoded blank frame at the reveal.
     const renderedImages = sectionRef.current
-      ? Array.from(sectionRef.current.querySelectorAll('img')).filter(
-          (img) => !img.closest('[aria-hidden="true"]'),
-        )
+      ? Array.from(sectionRef.current.querySelectorAll('img'))
+          .filter((img) => !img.closest('[aria-hidden="true"]'))
+          .slice(0, 2)
       : [];
 
-    const imagePromises = renderedImages.map(
-      (img) =>
-        img.complete
-          ? Promise.resolve()
-          : new Promise<void>((resolve) => {
-              img.addEventListener('load', () => resolve(), { once: true });
-              img.addEventListener('error', () => resolve(), { once: true });
-            }),
-    );
+    const imagePromises = renderedImages.map((img) => {
+      const loaded = img.complete
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => {
+            img.addEventListener('load', () => resolve(), { once: true });
+            img.addEventListener('error', () => resolve(), { once: true });
+          });
+      return loaded.then(() => (img.decode ? img.decode().catch(() => undefined) : undefined));
+    });
     const fontsReady = 'fonts' in document ? document.fonts.ready.catch(() => undefined) : Promise.resolve();
 
     Promise.allSettled([...imagePromises, fontsReady]).then(() => {

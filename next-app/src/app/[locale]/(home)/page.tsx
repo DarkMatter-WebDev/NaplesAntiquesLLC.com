@@ -200,14 +200,25 @@ export default async function HomePage({ params }: Props) {
             .is-ready — on throttled mobile that hydration wait was ~2.5s of
             pure LCP render delay (the LCP element IS the front card image;
             measured on production 2026-08-23). This script replicates the
-            gate's exact semantics — wait for pane A's rendered card images
-            (preloader excluded via its aria-hidden wrapper), capped at the
-            same 1800ms — but runs at parse time, then stamps `nej-hero-go`
+            gate's exact semantics — wait for pane A's FIRST TWO rendered card
+            images (preloader excluded via its aria-hidden wrapper), capped at
+            the same 1800ms — but runs at parse time, then stamps `nej-hero-go`
             on <html>, which HomeHero's CSS maps to the SAME fade animation
             as .is-ready. React never manages <html> classes, so hydration
             cannot strip it. Placed AFTER the stack so pane A's <img>s exist
             when it runs (panes B/C mount only post-hydration, so they are
             structurally excluded here and keep their own gates).
+            ⚠️ FIRST TWO, and decode-awaited (2026-08-31): the gate used to
+            wait on ALL ring images, so on any cold or stale-revalidating load
+            the slowest of eight always lost to the 1800ms cap and the hero
+            unveiled with blank cards — the owner kept catching slot 1 (the
+            second-most-visible card) empty until it had nearly rotated away.
+            Slots 0 and 1 are the only cards facing the visitor at reveal, both
+            are <link rel=preload>ed (high/auto — storefront-image-loading.ts),
+            and two small preloaded images can genuinely beat the cap where
+            eight never could. `img.decode()` is awaited so "loaded 10ms before
+            the cap but not yet decoded" cannot paint a blank frame either.
+            The cap itself is untouched — see the PSI warning below.
             Fonts are deliberately NOT awaited (the React gate still waits on
             them for its own purposes): they only affect the card price
             captions, and font-display handles the swap — waiting on ~87KB of
@@ -216,7 +227,7 @@ export default async function HomePage({ params }: Props) {
             intermittent ~71 mode (9s hero-image LCP); see HomeHero.tsx. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){var d=false;var go=function(){if(d)return;d=true;document.documentElement.classList.add('nej-hero-go')};var t=setTimeout(go,1800);var s=document.querySelector('.home-hero-stack-pane--a .home-carousel-hero');var im=s?[].filter.call(s.querySelectorAll('img'),function(i){return !i.closest('[aria-hidden="true"]')}):[];Promise.all(im.map(function(i){return i.complete?0:new Promise(function(r){i.addEventListener('load',r,{once:true});i.addEventListener('error',r,{once:true})})})).then(function(){clearTimeout(t);go()})})();`,
+            __html: `(function(){var d=false;var go=function(){if(d)return;d=true;document.documentElement.classList.add('nej-hero-go')};var t=setTimeout(go,1800);var s=document.querySelector('.home-hero-stack-pane--a .home-carousel-hero');var im=s?[].filter.call(s.querySelectorAll('img'),function(i){return !i.closest('[aria-hidden="true"]')}).slice(0,2):[];Promise.all(im.map(function(i){var p=i.complete?Promise.resolve():new Promise(function(r){i.addEventListener('load',r,{once:true});i.addEventListener('error',r,{once:true})});return p.then(function(){return i.decode?i.decode().catch(function(){}):0})})).then(function(){clearTimeout(t);go()})})();`,
           }}
         />
 
