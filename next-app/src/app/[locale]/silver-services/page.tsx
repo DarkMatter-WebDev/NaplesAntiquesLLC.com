@@ -8,6 +8,7 @@ import TradingViewMini from '@/components/trading/TradingViewMini';
 import { fetchSpotData } from '@/lib/spot-price';
 import { AppIcon } from '@/components/AppIcon';
 import ClayMark, { type ClayMarkName } from '@/components/ClayMark';
+import { TESTIMONIALS } from '@/lib/testimonials';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -271,9 +272,13 @@ export default async function SilverServicesPage({ params }: Props) {
                 {isEs ? 'Patrones que pueden superar la fundición' : 'Patterns that can beat melt'}
               </span>
               <p className="mt-3 text-sm leading-relaxed text-[#4d4635]">
+                {/* Aligned 2026-08-31 with the owner's top-tier-only framing rule
+                    (DECISIONS → "Premium-pattern framing"): no maker list implying
+                    broad premiums, no discounting ordinary sets. The price-both-ways
+                    promise and the we-stock-these credibility stay. */}
                 {isEs
-                  ? 'Las combinaciones coleccionadas de fabricante y patrón — Gorham Chantilly, Reed & Barton Francis I, Towle Old Master, Wallace Grand Baroque, Tiffany, Whiting — pueden valer más como cubertería que como metal. Calculamos el precio de ambas formas, pieza por pieza, y pagamos el que resulte mayor. Chantilly y Francis I son patrones que también vendemos en nuestra propia tienda: este es nuestro terreno.'
-                  : 'Collected maker-and-pattern combinations — Gorham Chantilly, Reed & Barton Francis I, Towle Old Master, Wallace Grand Baroque, Tiffany, Whiting — can be worth more as flatware than as metal. We price both ways, piece by piece, and pay whichever is higher. Chantilly and Francis I are patterns we also sell in our own shop: this is our lane.'}
+                  ? 'Un pequeño grupo de primer nivel — patrones como Tiffany Chrysanthemum, los diseños de Georg Jensen y nombres de ese calibre — puede valer más como cubertería que como metal, y las piezas de servir inusuales a veces también. Por eso calculamos el precio de ambas formas, pieza por pieza, y pagamos el que resulte mayor. Gorham Chantilly y Reed & Barton Francis I son patrones que también vendemos en nuestra propia tienda: este es nuestro terreno.'
+                  : 'A small top tier — patterns such as Tiffany Chrysanthemum, Georg Jensen designs, and names of that caliber — can be worth more as flatware than as metal, and unusual serving pieces sometimes join them. That is why we price every set both ways, piece by piece, and pay whichever is higher. Gorham Chantilly and Reed & Barton Francis I are patterns we also sell in our own shop: this is our lane.'}
               </p>
             </div>
 
@@ -302,11 +307,108 @@ export default async function SilverServicesPage({ params }: Props) {
 
             <p className="text-center text-sm leading-relaxed text-[#4d4635]">
               {isEs ? (
-                <>La matemática detrás de cualquier oferta de plata — peso × pureza × el precio spot del día — está en nuestra <Link href="/es/sell" className="font-semibold text-[#735c00] underline">página de venta</Link>, con ejemplo práctico incluido.</>
+                <>¿No está seguro de lo que vale su juego? Nuestra <Link href="/es/silver-services/flatware-value" className="font-semibold text-[#735c00] underline">guía del valor de la cubertería</Link> recorre toda la matemática — esterlina vs. chapado, la trampa de los cuchillos y cuándo un patrón supera la fundición.</>
               ) : (
-                <>The math behind any silver offer — weight × purity × the live spot price — is on our <Link href="/sell" className="font-semibold text-[#735c00] underline">sell page</Link>, worked example included.</>
+                <>Not sure what your set is worth? Our <Link href="/silver-services/flatware-value" className="font-semibold text-[#735c00] underline">flatware value guide</Link> walks the full math — sterling vs. plate, the knife trap, and when patterns beat melt.</>
               )}
             </p>
+          </div>
+        </section>
+
+        {/* Recently Through Our Doors — proof strip (2026-08-31, owner-approved
+            mockup). ⚠️ REAL pieces only: these are actual catalog items (every
+            shop piece was bought from a local seller — that is what "through
+            our doors" means), the photos are our own product shots, and the
+            links go to live product pages, which persist after a sale. Never
+            swap in mock sets, stock photos, or invented specs — provability is
+            the point of a proof strip, and fabricated purchase records were
+            explicitly declined (see TASKS 2026-08-31). The quote renders from
+            the single testimonial source, verbatim rule and all. Curated by
+            hand: swap the three entries whenever the owner wants new features. */}
+        <section className="py-20">
+          <div className="ultrawide-page mx-auto max-w-[1440px] px-4 md:px-8">
+            <h2 className="mb-3 text-center text-3xl font-bold text-[#1a1c1c] md:text-4xl" style={{ fontFamily: 'var(--font-headline)' }}>
+              {isEs ? 'Recién Pasaron por Nuestras Manos' : 'Recently Through Our Doors'}
+            </h2>
+            <p className="mx-auto mb-10 max-w-xl text-center text-sm leading-relaxed text-[#4d4635]">
+              {isEs
+                ? 'Cada pieza de plata en nuestra tienda fue comprada a un vendedor del suroeste de Florida — muchas veces sobre este mismo mostrador. Algunas que llegaron recientemente:'
+                : 'Every silver piece in our shop was bought from a Southwest Florida seller — often across this very counter. A few that came through recently:'}
+            </p>
+            <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 md:grid-cols-3">
+              {[
+                {
+                  href: isEs ? '/es/shop/tiffany-co-sterling-silver-punch-ladle-acanthus-pattern-pat-1895-53' : '/shop/tiffany-co-sterling-silver-punch-ladle-acanthus-pattern-pat-1895-53',
+                  img: 'https://evzluixourmsefwdsieu.supabase.co/storage/v1/object/public/product-images/products/1782170694128-nykplolon98.webp',
+                  kEn: 'Top-tier maker',
+                  kEs: 'Fabricante de primer nivel',
+                  tEn: 'Tiffany & Co. Sterling Punch Ladle — Acanthus, Pat. 1895',
+                  tEs: 'Cucharón de Ponche Tiffany & Co. — Acanthus, Pat. 1895',
+                  altEn: 'Tiffany & Co. sterling silver punch ladle in the Acanthus pattern',
+                  altEs: 'Cucharón de ponche Tiffany & Co. de plata esterlina, patrón Acanthus',
+                },
+                {
+                  href: isEs ? '/es/shop/whiting-sterling-silver-handled-grape-shears-with-german-steel-blades-127' : '/shop/whiting-sterling-silver-handled-grape-shears-with-german-steel-blades-127',
+                  img: 'https://evzluixourmsefwdsieu.supabase.co/storage/v1/object/public/product-images/products/1784566893659-wxbgr1ugg4p.webp',
+                  kEn: 'Unusual serving piece',
+                  kEs: 'Pieza de servir inusual',
+                  tEn: 'Whiting Sterling-Handled Grape Shears, German Steel Blades',
+                  tEs: 'Tijeras para Uvas Whiting con Mango de Plata Esterlina',
+                  altEn: 'Whiting sterling silver handled grape shears with German steel blades',
+                  altEs: 'Tijeras para uvas Whiting con mango de plata esterlina y hojas de acero alemán',
+                },
+                {
+                  href: isEs ? '/es/shop/bill-tompkins-american-coin-silver-hand-chased-repousse-coffee-pot-early-19th-century-55' : '/shop/bill-tompkins-american-coin-silver-hand-chased-repousse-coffee-pot-early-19th-century-55',
+                  img: 'https://evzluixourmsefwdsieu.supabase.co/storage/v1/object/public/product-images/products/1782676328908-a4nxdwju3zi.webp',
+                  kEn: 'Estate hollowware',
+                  kEs: 'Hollowware de patrimonio',
+                  tEn: 'Ball, Tompkins & Black Coin Silver Repoussé Coffee Pot, Early 19th C.',
+                  tEs: 'Cafetera Repujada de Plata Coin Ball, Tompkins & Black, Principios del S. XIX',
+                  altEn: 'Ball, Tompkins & Black American coin silver hand-chased repoussé coffee pot',
+                  altEs: 'Cafetera americana de plata coin repujada a mano de Ball, Tompkins & Black',
+                },
+              ].map((piece) => (
+                <Link
+                  key={piece.href}
+                  href={piece.href}
+                  className="group overflow-hidden rounded-2xl border border-[#d0c5af] bg-white shadow-[0_14px_38px_rgba(38,28,6,0.05)] transition-all hover:-translate-y-0.5 hover:shadow-xl"
+                >
+                  <div className="relative aspect-square w-full bg-[#f3f3f3]">
+                    <Image
+                      src={piece.img}
+                      alt={isEs ? piece.altEs : piece.altEn}
+                      fill
+                      sizes="(max-width: 767px) 100vw, 33vw"
+                      className="object-cover"
+                    />
+                  </div>
+                  <div className="p-5">
+                    <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#735c00]" style={{ fontFamily: 'var(--font-label)' }}>
+                      {isEs ? piece.kEs : piece.kEn}
+                    </p>
+                    <p className="text-[15px] font-bold leading-snug text-[#1a1c1c]" style={{ fontFamily: 'var(--font-headline)' }}>
+                      {isEs ? piece.tEs : piece.tEn}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            {(() => {
+              const linda = TESTIMONIALS.find((t) => t.name === 'Linda Cusumano');
+              if (!linda) return null;
+              return (
+                <figure className="mx-auto mt-12 max-w-2xl text-center">
+                  <blockquote>
+                    <p className="text-lg leading-relaxed text-[#1a1c1c]" style={{ fontFamily: 'var(--font-headline)' }}>
+                      “{isEs ? linda.quoteEs : linda.quote}”
+                    </p>
+                  </blockquote>
+                  <figcaption className="mt-3 text-xs font-bold uppercase tracking-[0.14em] text-[#8a8677]" style={{ fontFamily: 'var(--font-label)' }}>
+                    Linda Cusumano · {isEs ? 'Reseña de Google' : 'Google review'}
+                  </figcaption>
+                </figure>
+              );
+            })()}
           </div>
         </section>
 

@@ -4,11 +4,90 @@
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
 > in `DECISIONS.md`. Last reconciled: **2026-08-30**.
 
-## Start Here (handoff, end of the 2026-08-30 footer/docs session)
+## Start Here (handoff, end of the 2026-08-30 SEO growth session — SUPERSEDES the block below)
 
 **Read this, then `TASKS.md`.**
 
-### 🔴 2026-08-30 (later) — blank carousel card FIXED + 659 PNGs re-encoded; NOT deployed
+### 🔴 ONE THING PENDING: the SEO batch is BUILT + VERIFIED but NOT DEPLOYED
+
+A full local-SEO growth audit (Claude artifact, owner has the link) was
+implemented item by item with owner approval. **Staging was synced 2026-08-31
+(894 files, dry-run-verified 0 to copy) — the batch now awaits only the
+owner's copy-to-repo + push; GBP changes are already live.** No SQL, no env
+vars.
+
+**What deploys with the next push** (gate: `tsc` · lint · **1186/1186 (113
+files)** · build exit 0 · **66 prerendered = 30 EN + 30 ES + 6 non-locale** ·
+0 console errors):
+
+1. `/sell/naples` retargeted to "Jewelry Buyers in Naples, FL" (buyer-noun
+   family; ends the homepage title cannibalization) + Naples-only showroom
+   band + walk-in FAQ. Other 5 city pages behaviorally unchanged (verified).
+2. **3 NEW pages ×2 locales**: `/jewelry-appraisal` (free verbal offers vs
+   written insurance appraisals — we REFER paperwork out, owner decision),
+   `/silver-services/flatware-value` (the flatware value guide),
+   `/diamond-buyers` (lab-grown: we BUY them, priced against their lower
+   resale market — owner decision).
+3. Internal-link pass: city-card headings → service pages; product pages get
+   a category-gated "we buy gold/silver" crossover band; footer gains "Sell
+   Diamonds" + "Free Appraisals"; sitemap +6 URLs.
+4. **`/api/merchant-feed`** (2026-08-31): Google Shopping feed — available
+   products only, `nej-<inventory#>` ids, canonical pricing, fail-closed 503
+   on stale spot, `X-Robots-Tag: noindex`, robots.txt carve-out. After deploy:
+   Merchant Center swap (scheduled daily fetch on, crawl source off) — steps
+   in `TASKS.md`.
+
+⚠️ **After deploy, the footer-scoped ES re-check reads 24/25, not 22/23** —
+that is the new links landing, not a regression (trap note in `CHANGELOG.md`).
+
+**GBP is transformed and LIVE** (detail in `CHANGELOG.md`): services filled
+across all 7 categories (Diamond buyer added), ALL 23 reviews replied
+(owner-approved each), first Google Post published (silver/flatware + Learn
+more → /silver-services), booking link → /free-evaluation, Facebook social
+link, opening date Jan 2010. ⛔ GBP Q&A seeding is impossible — Google retired
+the module on this listing. ✅ **All 7 owed Request Indexing calls went
+through** — that standing item is CLOSED.
+
+**◻ Open owner items:** GBP photo batch (item 4, owner-held); Merchant Center
+product feed (needs owner ToS clicks at merchants.google.com); flatware
+"recent purchases" proof-strip data (2–3 real lots); decide whether to align
+the /silver-services maker card with the new top-tier-only framing; decide
+Facebook grow-vs-retire; gov-ID line question (owner rejected the gov-ID Q&A
+for GBP — the /sell/naples checklist still carries the ID line, owner has not
+yet said whether to remove it there too).
+
+### (superseded) Start Here from the earlier 2026-08-30 footer/docs session
+
+**Read this, then `TASKS.md`.**
+
+### 🟢 END OF SESSION 2026-08-30 — four things shipped, nothing pending
+
+All deployed and verified. **No SQL, no env vars, no manual steps owed** beyond
+the standing Request Indexing item (7 URLs, still quota-blocked).
+
+1. **Spanish-footer locale bug** — five pages served an English footer that
+   stripped `/es` from every link. Fixed, deployed, and made structurally
+   impossible to repeat (`SiteFooter`'s `locale` prop is now required).
+2. **The "static page count" invariant was retired** — it was never an
+   invariant. `STRUCTURE.md`/`INTEGRITY.md` carry the stable measure instead.
+3. **Blank hero-carousel card** — owner-reported, deployed, **owner-confirmed
+   fixed**.
+4. **659 of 882 bucket objects were PNG under `.webp` names** (1,116.9 MB →
+   99.4 MB), plus a pre-existing high-severity `nanoid` advisory closed.
+
+⚠️ **Read this before trusting any measurement in today's entries.** Four
+measuring mistakes were made and corrected; two would have caused real harm —
+one declared a healthy deploy broken, one nearly aborted a correct 1 GB repair.
+All four are durable traps in `DECISIONS.md`: unscoped `grep` for a chrome
+assertion, `curl` without browser `Accept` headers, measuring the `src` fallback
+instead of the `srcset`/`sizes` width, and `extractChannel(3).stats()` returning
+RED rather than alpha.
+
+ℹ️ **The session's own lesson: a green gate is not a fixed symptom.** The
+carousel fix was proven only by the owner's cold load, and the payload theory
+that looked well-evidenced turned out to be wrong.
+
+### 🟢 2026-08-30 (later) — blank carousel card DEPLOYED, OWNER-CONFIRMED FIXED
 
 Owner-reported: on first load the second hero card (a thick gold ring) stayed
 blank until it had nearly rotated off-screen.
@@ -33,12 +112,13 @@ exit 0 · **60 routes = 27 EN + 27 ES**. ✅ Visual before/after confirmed on 3
 re-encoded images (colour, gemstones and fine repoussé detail all preserved).
 ✅ Production product pages 200 with images serving as `image/webp`.
 
-🔴 **Undeployed** — the Storage re-encode IS live (it is data, not code), but
-the code fixes are not.
+✅ **DEPLOYED and confirmed.** Production emits `high / auto / low…` across the
+ring, and origin objects still return `image/webp`. **The owner confirmed the
+symptom is gone** — the second card now appears with the rest instead of
+staying blank until it has nearly rotated away.
 
-◻ **The one thing NOT verifiable from here:** whether the blank-card symptom is
-actually gone. It needs a real cold load on a throttled connection, so it is an
-owner check after deploy.
+🟢 That closes the loop the gate could not: no test proved the symptom fixed,
+only a real cold load could, and it did.
 
 ℹ️ Backups (1.1 GB) at `C:\Users\rcman\NEJ-image-backup-2026-08-30` are the only
 rollback for the re-encode. Keep until the owner is satisfied, then delete.

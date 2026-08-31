@@ -33,6 +33,27 @@ export interface ServiceArea {
    */
   travelEn: string;
   travelEs: string;
+  /**
+   * Optional per-city metadata/H1 overrides. Set ONLY where a city must target
+   * a different query family than the shared template. Naples carries them
+   * because its templated title ("Sell Gold, Jewelry & Silver in Naples, FL")
+   * was two words away from the homepage's, and Google split the same queries
+   * across both pages (homepage pos 18.3 / this page 49.6, GSC Aug 2026).
+   * Naples now owns the buyer-noun family ("jewelry buyers naples") while the
+   * homepage keeps the sell-verb phrasing. Absent → template strings apply.
+   */
+  metaTitleEn?: string;
+  metaTitleEs?: string;
+  metaDescEn?: string;
+  metaDescEs?: string;
+  h1En?: string;
+  h1Es?: string;
+  /**
+   * The one city that physically hosts the showroom renders a walk-in band
+   * (address, live hours, what-to-bring). Address/landmark/hours come from
+   * their single sources — never hardcoded here.
+   */
+  hasShowroom?: boolean;
 }
 
 export const SERVICE_AREAS: ServiceArea[] = [
@@ -47,6 +68,15 @@ export const SERVICE_AREAS: ServiceArea[] = [
       'Naples es nuestra base — el dueño nació y creció aquí con más de 15 años comprando oro, joyería de patrimonio y plata esterlina a familias locales. Traiga sus piezas a nuestro salón en North Naples o, si está reduciendo su hogar en Old Naples, liquidando un patrimonio en Pelican Bay o vaciando un joyero en Golden Gate, pídanos que vayamos a usted. En ambos casos recibe una oferta honesta, privada y al mejor precio. El salón está en el Naples Art District, en North Naples, y puede entrar sin cita durante el horario de atención — con un solo anillo o la bandeja completa.',
     travelEn: 'Our showroom is right here in Naples, and we still offer same-day in-home appointments across the city on request.',
     travelEs: 'Nuestro salón está aquí mismo en Naples, y seguimos ofreciendo citas a domicilio el mismo día en toda la ciudad a pedido.',
+    metaTitleEn: 'Jewelry Buyers in Naples, FL',
+    metaTitleEs: 'Compradores de Joyas en Naples, FL',
+    metaDescEn:
+      'Local jewelry buyers in Naples, FL. We buy gold, silver, diamonds, watches & estate jewelry at our Shirley St showroom — free evaluation, paid on the spot. Call (239) 404-8505.',
+    metaDescEs:
+      'Compradores locales de joyas en Naples, FL. Compramos oro, plata, diamantes, relojes y joyería de patrimonio en nuestro salón de Shirley St — evaluación gratuita y pago inmediato. (239) 404-8505.',
+    h1En: 'Jewelry, Gold & Silver Buyers in Naples, FL',
+    h1Es: 'Compradores de Joyas, Oro y Plata en Naples, FL',
+    hasShowroom: true,
   },
   {
     slug: 'marco-island',

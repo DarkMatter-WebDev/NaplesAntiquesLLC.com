@@ -6,6 +6,61 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-08-30**.
 
+## SEO & GBP (2026-08-30)
+
+### /sell/naples owns the buyer-noun family — never re-duplicate the homepage title
+
+The Naples city page's templated title was two words away from the homepage's,
+and GSC showed Google splitting the same queries across both (homepage 18.3 /
+city page 49.6). The split is now deliberate: **homepage = sell-verb ("Sell
+Jewelry, Gold & Silver in Naples"), /sell/naples = buyer-noun ("Jewelry Buyers
+in Naples, FL"), /estate-jewelry = "Estate Jewelry Buyer"**. Implemented as
+optional per-city override fields in `service-areas.ts` set ONLY on Naples —
+the other five cities keep the template, because that template renders the
+site's best-ranking pages. ⛔ Do not "harmonize" these titles back together,
+and do not add overrides to other cities without the same evidence of a split.
+
+### Premium-pattern framing: top tier only, and never discount the rest (owner rule)
+
+Owner, 2026-08-30: only certain Tiffany and top-top-tier names (Georg Jensen
+caliber) genuinely carry collector premiums — but copy must not negatively
+price-anchor ordinary sets either, because that drives sellers away before
+they come in. The wording that satisfies both: *"a small top tier — patterns
+such as Tiffany Chrysanthemum, Georg Jensen — can carry genuine collector
+premiums… we check every set against the collector market before we price it
+as silver."* Used on `/silver-services/flatware-value`. ℹ️ The older
+/silver-services card naming six makers (approved 2026-08-29) predates this
+rule; aligning it is an open owner decision in `TASKS.md` — do not silently
+rewrite it.
+
+### /jewelry-appraisal: we do NOT sell written insurance appraisals — the honesty IS the differentiator
+
+Owner decision 2026-08-30 ("build it, b"): the page says plainly that we do
+free verbal market appraisals backed by a real offer, and REFER written
+insurance appraisals to certified independent appraisers. ⛔ Do not soften
+this into "we do everything" — the contrast with fee-based appraisers is the
+page's positioning, and the GBP holds the appraisal pack slot it supports.
+
+### Lab-grown diamonds: we buy them, priced against their (much lower) resale market
+
+Owner decision 2026-08-30 ("a"). The /diamond-buyers FAQ states it with the
+reason (production keeps getting cheaper; resale prices follow). Keep the
+explanation — the honest "why" is what stops the number from feeling like a
+lowball.
+
+### GBP operational facts worth not re-discovering
+
+- **Public Q&A is retired on this listing** (only "Ask Maps" remains, checked
+  on both Search and Maps 2026-08-30). Seed FAQs on the site instead.
+- GBP post images reject WebP — convert to JPG first.
+- Profile edits publish through a "pending review, up to ~1 day" state;
+  services/categories/date all went through same-day.
+- Google previously REJECTED the two wheelchair-accessibility attributes;
+  leave them alone.
+- Opening date is set to **January 2010** (owner gave the year; month is a
+  required field and January was the neutral default — adjust only with a
+  real month from the owner).
+
 ## Media (2026-08-30)
 
 ### `canvas.toBlob` silently returns PNG — the requested type is a REQUEST, not a result

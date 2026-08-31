@@ -1,7 +1,175 @@
 
 # Changelog
 
-## 2026-08-30 — `nanoid` high-severity advisory closed (pre-existing)
+## 2026-08-31 — parked SEO decisions resolved; silver card aligned; proof strip built (joins the undeployed batch)
+
+Owner worked through the four parked decisions from the 08-30 SEO session:
+
+1. **/silver-services maker card — light align** (owner choice): the
+   six-maker list ("Gorham Chantilly, Reed & Barton Francis I, Towle Old
+   Master, Wallace Grand Baroque, Tiffany, Whiting") became the top-tier
+   framing ("patterns such as Tiffany Chrysanthemum, Georg Jensen"), keeping
+   the price-both-ways promise and the we-stock-Chantilly/Francis-I line.
+2. **Gov-ID checklist line on /sell/naples — KEEP** (practical prep, distinct
+   from the vetoed GBP-Q&A surface).
+3. **Facebook — keep + grow lightly** (auto-posting already feeds it; now a
+   GBP + SAME_AS citation; never retire silently).
+4. **Proof strip — BUILT.** Owner suggested mock set specs + internet photos
+   (doesn't stock full sets); DECLINED as fabricated social proof. Shipped the
+   real version: "Recently Through Our Doors" band on /silver-services — three
+   actual catalog pieces (Tiffany Acanthus punch ladle 53, Whiting grape
+   shears 127, Ball Tompkins & Black coffee pot 55; own photos via next/image
+   with accurate `sizes`; links to live product pages) + Linda Cusumano's
+   quote rendered from `testimonials.ts` (single source, no duplication).
+
+Also this session: **Merchant Center setup completed 5/5** (2026-08-30 late) —
+price-based shipping table mirroring `checkout-shipping.ts` exactly, 2-day max
+handling (owner-set), returns = defective-only with /returns-refunds URL.
+⚠️ Re-pricing the site's shipping tiers now requires updating the MC table in
+the same change — nothing syncs them.
+
+**Also 2026-08-31 — Google Merchant product feed built** (owner-flagged: the
+crawl source had ingested sold pages — correctly Out of stock, so no
+mislisting — plus both locales of every product). New `/api/merchant-feed`:
+Google Shopping RSS of AVAILABLE products only, one entry per product keyed
+`nej-<inventory#>` (g:id is capped at 50 chars; slugs exceed it), priced by
+the canonical `getProductPriceValue`, failing closed (503) on stale spot like
+every marketplace write so Google retains its last good copy. `robots.ts` now
+carves the exact feed path out of the `/api` disallow; the route sends
+`X-Robots-Tag: noindex`. Dev-verified: 200 · 76 items · unique ids · 0 sold ·
+0 unescaped entities. Post-deploy Merchant Center steps (add scheduled fetch,
+disable "products found by Google", keep automatic item updates ON) are in
+`TASKS.md`.
+
+Gate after all of it: `tsc` clean · lint clean · **1186/1186 (113 files)** ·
+build exit 0 · **66 prerendered = 30 EN + 30 ES + 6 non-locale** · zero
+console errors on touched pages, both locales. Still awaiting the owner's
+staging sync + deploy.
+
+## 2026-08-30 (SEO growth session) — audit, GBP build-out, 3 new pages, /sell/naples retarget, link pass — BUILT, NOT DEPLOYED
+
+A full local-SEO growth audit (published as a Claude artifact for the owner)
+followed by implementation of its top-10 list, worked one item at a time with
+owner approval at each step. **All app changes are locally gated and verified;
+nothing is deployed.** All GBP changes are LIVE (they publish independently of
+the site).
+
+### The audit's headline findings (evidence in the artifact)
+
+- GSC .com property (Aug 1–28, its full history): **55 clicks / 1.3K
+  impressions / avg pos 33.7**, homepage carrying 48 of 55 clicks. 192 queries
+  and 66 pages exported in full.
+- **The GBP already held the #1 local-pack slot for "estate jewelry buyers
+  naples fl" AND "jewelry appraisal naples fl"** (observed from the owner's
+  signed-in browser in Naples — directional) with only 23 reviews, while the
+  profile ran near-empty: 2 services, 0 posts ever, 1 review reply, no booking
+  link, logo cover, <50 discovery-search appearances (ONE recorded term).
+- Momentum clusters: silver/flatware (pos 1.0 "best place to sell silver
+  flatware near me"; pack justification literally cites the site's flatware
+  copy), ~30 Spanish near-me queries at pos 2–12, buyer-noun head terms at
+  7–11.
+- Key defect: homepage ↔ /sell/naples title near-duplicate split the same
+  queries (18.3 vs 49.6).
+- Competitor facts: Covenant 172 reviews, Gold Center runs ads on the money
+  query, Provident 488, Chernysh ranks via a where-to-sell guide,
+  naplesjewelrybuyers.com (near-namesake competitor) sits on the brand SERP.
+
+### GBP changes (all LIVE, some "pending review" per Google's normal flow)
+
+1. **Services filled out across all 6 (now 7) categories** — 18 added (Gold
+   jewelry buying, Diamond & engagement ring buying, Luxury watch buying,
+   Sterling silver buying, Full estate purchases, Free jewelry evaluations,
+   Home visits by appointment; Coin dealer ×2; Gold dealer ×3; Jewelry store
+   ×4; Estate liquidator ×2; Jewelry appraiser ×2).
+2. **All 23 reviews now have owner replies** — 19 drafted by Claude, each
+   individually approved+submitted by the owner (some hand-edited); 3 had
+   existing replies; Unreplied tab reads empty. Mayelin Pérez's reply is in
+   Spanish.
+3. **First Google Post published** (owner clicked Post): silver/flatware
+   "what we're buying now" update with the sterling-spread photo (converted
+   from `pages/silver.webp` to JPG — GBP rejects WebP) and a Learn-more
+   button → /silver-services. Suggested weekly rotation: new arrival → what
+   we're buying → review spotlight → showroom note.
+4. **"Diamond buyer" category added** (7th).
+5. **Booking link** → https://naplesestatejewelry.com/free-evaluation.
+6. **Facebook added to social profiles** (was Instagram-only; FB page shows
+   on the brand SERP with 1 follower — growth or retirement still an open
+   owner decision).
+7. **Opening date set: January 2010** (owner said 2010; month is a required
+   field, January chosen as the neutral default).
+8. ⛔ **GBP Q&A seeding is NOT POSSIBLE** — Google retired the public Q&A
+   module on this listing (only the "Ask Maps" AI button remains, on both
+   Search and Maps). The 5 owner-approved Q&As live on as FAQ schema on the
+   new pages instead.
+9. Google had previously REJECTED two accessibility attributes (wheelchair
+   parking/restroom) — left untouched.
+10. Merchant Center product feed NOT finished — the dashboard banner is
+    transient and the manual per-product form needs photo picks; handed to
+    the owner with the direct path (merchants.google.com).
+
+### App changes (all gated: tsc · lint · 1186/1186 (113 files) · build exit 0 · 66 prerendered = 30 EN + 30 ES + 6 non-locale · 0 console errors on every page touched)
+
+1. **/sell/naples retargeted to the buyer-noun family** (mockup approved
+   first). Data-driven per-city overrides added to `service-areas.ts`
+   (`metaTitle*/metaDesc*/h1*/hasShowroom`), set ONLY on Naples: title
+   "Jewelry Buyers in Naples, FL", H1 "Jewelry, Gold & Silver Buyers in
+   Naples, FL" (ES mirrored). New Naples-only showroom band (ShowroomAddress +
+   ShowroomHours over the admin schedule — no hardcoded days; landmark KEPT,
+   owner call), what-to-bring checklist, walk-in FAQ (+schema). Other 5 city
+   pages byte-identical in behavior (verified against marco-island).
+2. **NEW /jewelry-appraisal (+ES)** — free-verbal-offer vs written-insurance
+   honesty framing; owner chose the REFERRAL stance (we don't sell paperwork).
+   6-question FAQPage schema, breadcrumbs, footer "Free Appraisals" link,
+   sitemap entry. Rationale: pack ranked #1 for "jewelry appraisal naples fl"
+   while the site sat at pos 74 with no page.
+3. **NEW /silver-services/flatware-value (+ES)** — sterling-vs-plate marks
+   tables, weight × 92.5% × spot math with ILLUSTRATIVE $35 worked example
+   (house style from /sell), the knife trap, monogram/polish FAQ. ⚠️ Premium
+   framing per owner: only "a small top tier — patterns such as Tiffany
+   Chrysanthemum, Georg Jensen" — no maker list, no discounting ordinary
+   sets. /silver-services' flatware band closing line now links the guide
+   (replacing its /sell math pointer).
+4. **NEW /diamond-buyers (+ES)** — resale-vs-insurance-appraisal honesty
+   framing, 4Cs/market/mounting cards, dignified "life's timeline" section,
+   5-question FAQ schema. Lab-grown stance (owner decision): we BUY them,
+   priced honestly against their much lower resale market. Footer "Sell
+   Diamonds" link, sitemap entry, /jewelry-appraisal diamonds card retargeted
+   here.
+5. **Internal-link pass**: city-page "what we buy" card headings are now
+   contextual links (gold→/gold-services, jewelry→/estate-jewelry,
+   silver→/silver-services, diamonds→/diamond-buyers, coins→/bullion;
+   watches deliberately unlinked until a watch page exists). Product pages
+   gained a category-gated buy-side crossover band after RelatedProductsStrip
+   (Silver→/silver-services, Gold→/gold-services, both +/jewelry-appraisal).
+   ⚠️ The homepage→/silver-services body link was DEFERRED deliberately: the
+   BUY card is a single stretched link (nested anchor breaks it) and homepage
+   edits are mockup-gated + LCP-sensitive; the footer already links silver
+   sitewide.
+6. Sitemap gains 3 URLs ×2 locales (jewelry-appraisal, flatware-value,
+   diamond-buyers).
+
+### GSC
+
+- **All 7 owed Request Indexing calls WENT THROUGH** (no quota block — the
+  first success since 2026-08-28; the standing TASKS item is closed).
+  Salt-cellar URL showed `Last crawl: Aug 29` — Google is reaching these on
+  its own too.
+
+### ⚠️ Traps and notes for future sessions
+
+- **The footer link count changed**: the "Sell to us" column gained "Sell
+  Diamonds" and "Free Appraisals". The footer-scoped production re-check from
+  2026-08-30 that expects **22/23** will read **24/25** after this deploys —
+  that is the fix landing, not a regression.
+- GBP dialogs (in-search editor) render inside an iframe invisible to
+  the a11y tree: `find`/`read_page` can't see them, mouse-wheel scroll doesn't
+  work on their lists (drag the thin scrollbar), and dialogs can take 10s+ to
+  render — typing before render lands nowhere, and two custom-service fields
+  filled in one batch concatenate into the first field. Screenshot-verify
+  every step.
+- GBP post images: WebP is rejected; convert to JPG first (sharp one-liner).
+- The GSC URL-inspection box still needs its click and its typing in separate
+  round trips (documented trap held true).
 
 Surfaced by running the `INTEGRITY.md` pre-publish checklist item that had been
 skipped: `npm audit --omit=dev` exited 1 on **nanoid <3.3.18** (GHSA-2v37-7h3g-55p8,
@@ -68,6 +236,10 @@ graduated. Slot 1 sits adjacent to the front card and is among the first seen,
 yet it shared a bandwidth lane with slot 7, which is not seen for far longer.
 HTTP/2 round-robins same-priority streams, so a ~10 KB image queued behind the
 rest of the ring and the script/font/CSS graph genuinely arrives late.
+
+✅ **DEPLOYED and OWNER-CONFIRMED FIXED.** Production emits `high` (slot 0) /
+`auto` (slot 1) / `low` (2–7); the second card now appears with the rest.
+🟢 This is the diagnosis that held — the payload theory did not.
 
 **Fixed:** slot 1 → **`auto`**. Deliberately not `high` — that lane belongs to
 the front card alone. This adds ONE image at default priority, which is not the

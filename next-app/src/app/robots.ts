@@ -4,7 +4,12 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: '*',
-      allow: '/',
+      // `/api/merchant-feed` is the Google Merchant Center product feed
+      // (2026-08-31): the fetcher respects robots.txt, so the exact path is
+      // carved out of the `/api` disallow below — the longer (more specific)
+      // rule wins. The route itself sends `X-Robots-Tag: noindex`, so being
+      // fetchable never makes it a search result.
+      allow: ['/', '/api/merchant-feed'],
       // Only paths that cannot express their own `noindex` belong here.
       // `/admin` renders real metadata when an admin is signed in, `/api`
       // serves no HTML, and `/shop-modern` is not linked anywhere — so a

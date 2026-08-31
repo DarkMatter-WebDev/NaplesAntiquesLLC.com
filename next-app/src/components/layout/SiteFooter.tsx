@@ -32,8 +32,10 @@ export default function SiteFooter({ locale }: Props) {
     { label: isEs ? 'Vender Oro' : 'Sell Gold', href: p('/gold-services') },
     { label: isEs ? 'Vender Plata' : 'Sell Sterling Silver', href: p('/silver-services') },
     { label: isEs ? 'Vender Joyería' : 'Sell Estate Jewelry', href: p('/estate-jewelry') },
+    { label: isEs ? 'Vender Diamantes' : 'Sell Diamonds', href: p('/diamond-buyers') },
     { label: isEs ? 'Programa de Intercambio' : 'Trade-In Program', href: p('/trade-in') },
     { label: isEs ? 'Evaluación Gratuita' : 'Free Evaluation', href: p('/free-evaluation') },
+    { label: isEs ? 'Tasaciones Gratis' : 'Free Appraisals', href: p('/jewelry-appraisal') },
     { label: isEs ? 'Tienda' : 'Shop', href: p('/shop') },
   ];
 

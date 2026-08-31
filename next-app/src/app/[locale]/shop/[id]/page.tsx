@@ -995,6 +995,45 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
         {/* "You might also like" — same-category available pieces (2026-08-04) */}
         <RelatedProductsStrip current={p} spotData={spotData} locale={locale} />
 
+        {/* Buy-side crossover band (2026-08-30, SEO internal-link pass): a
+            shopper on a silver piece is the likeliest visitor to OWN similar
+            pieces, so the band passes that intent — and link equity from the
+            ranking product pages — to the matching service page. Category is
+            'Gold' | 'Silver', so exactly one variant renders on every product. */}
+        <section className="border-t border-[#d0c5af] bg-[#f3f3f3] py-10">
+          <div className="mx-auto max-w-3xl px-4 text-center md:px-8">
+            <p className="text-base leading-relaxed text-[#4d4635]">
+              {p.category === 'Silver' ? (
+                isEs ? (
+                  <>
+                    ¿Tiene piezas como esta? Compramos cubertería, holloware y joyería de plata esterlina —{' '}
+                    <Link href="/es/silver-services" className="font-semibold text-[#735c00] underline underline-offset-2">venda su plata esterlina en Naples</Link>{' '}
+                    o solicite una <Link href="/es/jewelry-appraisal" className="font-semibold text-[#735c00] underline underline-offset-2">tasación gratuita</Link>.
+                  </>
+                ) : (
+                  <>
+                    Have pieces like this one? We buy sterling silver flatware, hollowware, and jewelry —{' '}
+                    <Link href="/silver-services" className="font-semibold text-[#735c00] underline underline-offset-2">sell your sterling silver in Naples</Link>{' '}
+                    or get a <Link href="/jewelry-appraisal" className="font-semibold text-[#735c00] underline underline-offset-2">free appraisal</Link>.
+                  </>
+                )
+              ) : isEs ? (
+                <>
+                  ¿Tiene oro como este? Compramos joyería, cadenas y monedas de oro de 10k–24k —{' '}
+                  <Link href="/es/gold-services" className="font-semibold text-[#735c00] underline underline-offset-2">venda su oro en Naples</Link>{' '}
+                  o solicite una <Link href="/es/jewelry-appraisal" className="font-semibold text-[#735c00] underline underline-offset-2">tasación gratuita</Link>.
+                </>
+              ) : (
+                <>
+                  Have gold like this? We buy 10k–24k gold jewelry, chains, and coins —{' '}
+                  <Link href="/gold-services" className="font-semibold text-[#735c00] underline underline-offset-2">sell your gold in Naples</Link>{' '}
+                  or get a <Link href="/jewelry-appraisal" className="font-semibold text-[#735c00] underline underline-offset-2">free appraisal</Link>.
+                </>
+              )}
+            </p>
+          </div>
+        </section>
+
         {/* Curated Google reviews — same list as the homepage (2026-08-04) */}
         <TestimonialsSection locale={locale} compact />
       </main>

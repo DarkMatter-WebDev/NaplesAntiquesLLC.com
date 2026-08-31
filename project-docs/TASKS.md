@@ -5,9 +5,131 @@
 
 ## ◻ OPEN — needs a human
 
-### ✅ DONE 2026-08-30 — blank carousel card fixed; 659 PNGs re-encoded
+### 🔴 DEPLOY the 2026-08-30 SEO growth batch (no SQL, no env vars)
 
-Two separate problems, found together. **Both fixed locally; NOT yet deployed.**
+Everything is gated (`tsc` · lint · **1186/1186 (113 files)** · build exit 0 ·
+**66 prerendered = 30 EN + 30 ES + 6 non-locale**) and dev-server-verified in
+both locales.
+
+✅ **STAGING SYNCED 2026-08-31 — ready to copy to the repo and push.**
+15 files copied (11 app + 4 project-docs), 4 new dirs, 0 failed; follow-up dry
+run **0 to copy**. **894 files / 20.38 MB** on disk (robocopy total 897 = the
+documented 3 `/XF`-excluded). The 3 new pages + `api/merchant-feed/route.ts`
+literal-path-verified in staging (⚠️ `Test-Path` needs `-LiteralPath` for
+`[locale]` paths — brackets are wildcards otherwise); `.git` absent.
+(ℹ️ Doc-recording + docs-only re-sync done — the standing 2nd-sync step.)
+
+**Files:**
+
+- `src/lib/service-areas.ts` — per-city override fields + Naples entry
+  (buyer-noun title/H1/meta, `hasShowroom`)
+- `src/app/[locale]/sell/[city]/page.tsx` — metadata/H1 overrides, showroom
+  band, walk-in FAQ, card-heading links
+- `src/app/[locale]/jewelry-appraisal/page.tsx` — NEW
+- `src/app/[locale]/silver-services/flatware-value/page.tsx` — NEW
+- `src/app/[locale]/diamond-buyers/page.tsx` — NEW
+- `src/app/[locale]/silver-services/page.tsx` — flatware band closing line now
+  links the guide
+- `src/app/[locale]/shop/[id]/page.tsx` — buy-side crossover band
+- `src/components/layout/SiteFooter.tsx` — +"Sell Diamonds", +"Free Appraisals"
+- `src/app/sitemap.ts` — +3 paths
+- `src/app/api/merchant-feed/route.ts` — NEW (2026-08-31, Google Merchant
+  product feed; see the Merchant Center block below)
+- `src/app/robots.ts` — `/api/merchant-feed` carved out of the `/api` disallow
+
+**After deploying:** spot-check `/sell/naples` + `/es/sell/naples` (new H1 +
+showroom band with live hours), the three new pages in both locales, and one
+gold + one silver product page (crossover band). Then request indexing for the
+6 new URLs in GSC (quota permitting — it reset today). ⚠️ The footer-scoped ES
+production check now expects **24/25** links (was 22/23) — the two new footer
+links are the delta, not a regression.
+
+**◻ Owner follow-ups from the SEO session:**
+
+1. **GBP photo batch** (audit item 4, owner-held): exterior with the Sharon
+   Lynch entrance, interior, testing bench/XRF in use, Chris at work, a
+   flatware lot on the scale — then set a real photo as cover.
+2. ✅ **Merchant Center setup COMPLETED 2026-08-30 (5/5 tasks, "You're all
+   set")** — done in-session at the owner's request. Shipping = price-based
+   table mirroring `checkout-shipping.ts` Standard tiers exactly
+   ($0.01–99.99→$19 · 100–249.99→$25 · 250–599.99→$29 · 600–999.99→$35 ·
+   1,000–2,499.99→$59 · 2,500–14,999.99→$99 (the two $99 bands merged) ·
+   15,000+→$165), max handling 2 business days (owner-set). Returns =
+   "defective products only" (maps to the site's 5-day misrepresentation
+   guarantee), no exchanges, policy URL /returns-refunds, match-my-website
+   attestation confirmed (Google may review, up to 10 days).
+   ◻ **Watch:** products list read "No products added yet" right after setup —
+   the "products found by Google" crawl source needs hours-to-days to ingest
+   the site's Product schema. If still empty after ~a week, set up a real feed.
+   ℹ️ A "Link to Business Profile" dialog offered ONLY the Surette profile
+   (NEJ's likely already associated) — deliberately cancelled; never link the
+   wrong business there.
+   ⚠️ If the site's shipping tiers in `checkout-shipping.ts` are ever
+   re-priced, update this Merchant Center table in the same change — nothing
+   syncs them automatically.
+   🆕 **2026-08-31 — the crawl source ingested 106 entries including all sold
+   pages (correctly Out of stock, nothing mislisted — every entry was still
+   "Under review") and BOTH locales of each product.** Owner flagged it. Fix
+   BUILT: `/api/merchant-feed` (Google Shopping RSS; available products only;
+   one entry per product keyed `nej-<inventory#>` — g:id caps at 50 chars so
+   slugs can't be the key; canonical `getProductPriceValue` prices; fails
+   closed with 503 when live spot is down, exactly like eBay/Etsy pushes, so
+   Google keeps its last good copy; skip counts in an XML comment, never
+   silent). `robots.ts` carves `/api/merchant-feed` out of the `/api`
+   disallow (specific rule wins) and the route sends `X-Robots-Tag: noindex`.
+   Verified on dev: 200, 76 items, 76/76 ids unique (max 7 chars), 0 sold
+   items, 0 unescaped entities, headers correct.
+   🔴 **AFTER DEPLOY, in Merchant Center:** (1) Products & store → add data
+   source → scheduled fetch of `https://naplesestatejewelry.com/api/merchant-feed`,
+   daily; (2) once it imports, disable "products found by Google" (Settings →
+   data sources) — that removes the crawl duplicates and the sold OOS clutter;
+   (3) leave "automatic item updates" ON — between fetches it reads the product
+   page's `SoldOut` JSON-LD as the fast corrective when a piece sells.
+3. ✅ **DONE 2026-08-31 — "Recently Through Our Doors" proof strip BUILT on
+   /silver-services** (owner approved the mockup). Owner had suggested mock
+   set specs + internet photos; DECLINED — fabricated purchase records and
+   unowned photos. The strip is 100% real instead: three catalog pieces
+   (Tiffany Acanthus punch ladle 53, Whiting grape shears 127, Ball Tompkins &
+   Black coffee pot 55 — own product photos via next/image + supabase remote,
+   accurate `sizes`, cards link to live product pages which persist after
+   sale) + Linda Cusumano's quote rendered FROM `testimonials.ts` (already
+   there verbatim — no duplication, single-source rule holds). Both locales
+   verified on dev; gate green (1186/1186 · 66 routes = 30/30); zero console
+   errors. ⛔ Never swap in mock sets/stock photos — provability is the point.
+   ℹ️ Curated by hand: swap the three entries in `silver-services/page.tsx`
+   whenever the owner wants new features. Deploys with the batch above.
+4. ✅ **DONE 2026-08-31 — /silver-services maker card aligned** with the
+   top-tier-only rule (owner chose "light align"): list → "patterns such as
+   Tiffany Chrysanthemum, Georg Jensen"; price-both-ways promise and the
+   we-stock-Chantilly/Francis-I line KEPT. Both locales, gate green
+   (1186/1186, 66 routes), verified on dev. Deploys with the batch above.
+5. ✅ **DECIDED 2026-08-31 — Facebook stays, grow lightly.** Auto-posting
+   already feeds it; it's linked on GBP + in SAME_AS. Growth = invite
+   customers/friends, link it from receipts/email footer. Never retire it
+   silently — it's a citation now.
+6. ✅ **DECIDED 2026-08-31 — the gov-ID checklist line on /sell/naples
+   STAYS** (owner call): practical what-to-bring prep is a different surface
+   than a GBP Q&A headline. The GBP-Q&A veto still stands (module is retired
+   anyway).
+7. **Weekly GBP post cadence** (rotation: new arrival → what we're buying →
+   review spotlight → showroom note; reuse admin social-queue cards; convert
+   WebP→JPG before upload).
+8. **Review replies**: keep the 48-hour SLA — reply to each new review from
+   Read Reviews (all 23 are answered as of 2026-08-30).
+
+### ✅ DONE 2026-08-30 — ALL 7 owed Request Indexing calls submitted successfully
+
+Quota was open; all seven product URLs (amethyst earrings 93, cufflinks 80,
+Whiting teaspoon 101, grape shears 127, William Henry 90, salt cellar 108,
+Zina brooch 78) show "Indexing requested". The salt cellar had already been
+crawled Aug 29 on Google's own — the sitemap is working. This closes the item
+open since 2026-08-28.
+
+### ✅ DONE 2026-08-30 — blank carousel card DEPLOYED + owner-confirmed fixed
+
+Two separate problems, found together. **Both shipped. Nothing outstanding.**
+Production emits `high / auto / low…`; owner confirmed the second card now
+appears with the rest.
 
 **1. The reported symptom — the second card stayed blank.** Cause was
 `fetchPriority`, not payload: slot 0 was `high` and *every* other slot `low`, so
@@ -33,9 +155,34 @@ Re-encoded to real WebP: **1,116.9 MB → 99.4 MB (91.1% smaller)**, 659 uploade
 - ⚠️ **Transparency guard ran on every one of the 659**, not a sample: 0 had
   real transparency, so dropping the (fully opaque) alpha channel was lossless.
 
+✅ **STAGING SYNCED 2026-08-30 (2nd sync) — ready to copy to the repo and push.**
+Dry run queued exactly **12 files** — the 5 source/test files, `package.json` +
+`package-lock.json`, `AGENTS.md`, and 4 memory docs. Real run **12 copied /
+0 Extras / 0 Mismatch / 0 FAILED**; follow-up dry run **0, exit 0**.
+**890 files / 20.27 MB** (robocopy total 893 = the documented 3 `/XF`-excluded).
+
+Leak check clean — 0 `.git` (dir *or* file), 0 `worktrees`, 0 `node_modules`,
+0 `.next`, 0 `.env*`, 0 `*.log`, 0 `*.tsbuildinfo`, 0 `next-env.d.ts`, 0
+`*.pem` — against a **positive control of 181 `.tsx` matching source exactly**.
+
+Staged-content checks (bytes, not just filenames): `image-encode.ts` present and
+compares `blob.type === type` with a JPEG fallback; `storefront-image-loading.ts`
+carries the slot-1 `auto` branch; `AdminShell.tsx` imports the helper and has
+**no** hardcoded `.webp` filename or `contentType`; `package.json` carries the
+nanoid override; `AGENTS.md` carries the verify-the-encode rule. Hidden paths
+present; CSP hazard reads 1 hit each.
+
 ◻ **Owner glance:** the admin now **warns** when a browser cannot save WebP. If
 that appears while uploading, that browser is the source — add photos from
 Chrome or Edge instead.
+
+✅ **VERIFIED AFTER DEPLOY.** Production carousel emits `high` (slot 0) /
+`auto` (slot 1) / `low` (2–7), and **the owner confirmed the symptom is gone**.
+
+⚠️ Worth remembering how this was closed: **no automated check could prove it.**
+The gate proved the markup correct; only a real cold load could prove the card
+appears. When a symptom is timing/bandwidth-shaped, plan for an owner check
+rather than treating a green gate as confirmation.
 
 ℹ️ No cache purge was needed. The `w=640` transforms were verified with
 `cached == fresh`, so nothing stale is being served at the delivered width.

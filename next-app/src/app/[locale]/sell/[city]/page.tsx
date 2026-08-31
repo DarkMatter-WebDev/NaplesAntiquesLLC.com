@@ -4,10 +4,12 @@ import Link from 'next/link';
 import { pageMetadata } from '@/lib/seo';
 import { jsonLdHtml } from '@/lib/json-ld';
 import { SERVICE_AREAS, getServiceArea } from '@/lib/service-areas';
-import { SAME_AS } from '@/lib/business-location';
+import { SAME_AS, mapsUrl } from '@/lib/business-location';
 import { routing } from '@/i18n/routing';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
+import ShowroomAddress from '@/components/ShowroomAddress';
+import ShowroomHours from '@/components/ShowroomHours';
 import ClayMark from '@/components/ClayMark';
 
 interface Props {
@@ -25,12 +27,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const area = getServiceArea(city);
   if (!area) return {};
   const isEs = locale === 'es';
+  // Per-city overrides (today: Naples only) retarget a page away from the
+  // template's query family — see the note on the fields in service-areas.ts.
   const title = isEs
-    ? `Vender Oro, Joyería y Plata en ${area.city}, FL`
-    : `Sell Gold, Jewelry & Silver in ${area.city}, FL`;
+    ? (area.metaTitleEs ?? `Vender Oro, Joyería y Plata en ${area.city}, FL`)
+    : (area.metaTitleEn ?? `Sell Gold, Jewelry & Silver in ${area.city}, FL`);
   const description = isEs
-    ? `Compramos oro, joyería, plata, diamantes y relojes en ${area.city}, FL. Evaluación gratuita en nuestro salón de Naples o a domicilio.`
-    : `Sell gold, jewelry, silver, diamonds & watches in ${area.city}, FL. Free appraisals at our Naples showroom or at your home. Call (239) 404-8505.`;
+    ? (area.metaDescEs ?? `Compramos oro, joyería, plata, diamantes y relojes en ${area.city}, FL. Evaluación gratuita en nuestro salón de Naples o a domicilio.`)
+    : (area.metaDescEn ?? `Sell gold, jewelry, silver, diamonds & watches in ${area.city}, FL. Free appraisals at our Naples showroom or at your home. Call (239) 404-8505.`);
   // Same blank-card defect as /sell, across every city page.
   return pageMetadata({ title, description, path: `/sell/${area.slug}`, locale });
 }
@@ -49,10 +53,14 @@ export default async function SellCityPage({ params }: Props) {
   const canonicalUrl = `https://naplesestatejewelry.com${isEs ? '/es' : ''}/sell/${area.slug}`;
 
   // Each card's heading front-loads a high-intent "<thing> buyers in <city>"
-  // phrase so the page can rank for every buy-side combination.
+  // phrase so the page can rank for every buy-side combination. `href` (added
+  // 2026-08-30, SEO internal-link pass) turns each heading into a contextual
+  // link to the matching service page — the anchors these pages were already
+  // ranking near. Watches has no service page yet, so it stays unlinked.
   const whatWeBuy = [
     {
       mark: 'goldbar',
+      href: p('/gold-services'),
       titleEn: `Sell Gold in ${area.city}`,
       titleEs: `Vender Oro en ${area.city}`,
       descEn: `Gold buyers in ${area.city} for 10k–24k jewelry, chains, class rings, dental gold, coins, and bullion — paid by live gold-spot weight, not a flat lowball.`,
@@ -60,6 +68,7 @@ export default async function SellCityPage({ params }: Props) {
     },
     {
       mark: 'chain',
+      href: p('/estate-jewelry'),
       titleEn: `Sell Jewelry in ${area.city}`,
       titleEs: `Vender Joyería en ${area.city}`,
       descEn: `Estate and designer jewelry buyers in ${area.city} — Tiffany, Cartier, David Yurman, and unsigned heirloom pieces. We buy necklaces, bracelets, rings, and earrings.`,
@@ -67,6 +76,7 @@ export default async function SellCityPage({ params }: Props) {
     },
     {
       mark: 'flatware',
+      href: p('/silver-services'),
       titleEn: `Sell Sterling Silver in ${area.city}`,
       titleEs: `Vender Plata Esterlina en ${area.city}`,
       descEn: `Sterling silver buyers in ${area.city} for flatware, tea sets, trays, holloware, and .925 jewelry. Full estates and single pieces welcome.`,
@@ -74,6 +84,7 @@ export default async function SellCityPage({ params }: Props) {
     },
     {
       mark: 'ring',
+      href: p('/diamond-buyers'),
       titleEn: `Sell Diamonds in ${area.city}`,
       titleEs: `Vender Diamantes en ${area.city}`,
       descEn: `Diamond buyers in ${area.city} for loose stones and mounted diamonds — engagement rings, tennis bracelets, and studs, certified or not.`,
@@ -81,6 +92,7 @@ export default async function SellCityPage({ params }: Props) {
     },
     {
       mark: 'coins',
+      href: p('/bullion'),
       titleEn: `Sell Coins & Bullion in ${area.city}`,
       titleEs: `Vender Monedas y Lingotes en ${area.city}`,
       descEn: `Coin and bullion buyers in ${area.city} — gold and silver Eagles, Krugerrands, Maple Leafs, sovereigns, junk silver, and bars of any mint.`,
@@ -88,6 +100,7 @@ export default async function SellCityPage({ params }: Props) {
     },
     {
       mark: 'watch',
+      href: null,
       titleEn: `Sell Watches in ${area.city}`,
       titleEs: `Vender Relojes en ${area.city}`,
       descEn: `Luxury watch buyers in ${area.city} — Rolex, Omega, Cartier, and vintage timepieces, running or not, with or without box and papers.`,
@@ -152,6 +165,17 @@ export default async function SellCityPage({ params }: Props) {
     },
   ];
 
+  if (area.hasShowroom) {
+    // Only the showroom city gets the walk-in question — on the other five
+    // pages the honest answer is the travel/home-visit one already above.
+    faqs.push({
+      qEn: `Do I need an appointment to sell jewelry in ${area.city}?`,
+      qEs: `¿Necesito una cita para vender joyas en ${area.city}?`,
+      aEn: `No — walk into our Shirley St showroom during open hours and we will evaluate your pieces on the spot. Appointments are available too, including private home visits anywhere in Southwest Florida.`,
+      aEs: `No — entre a nuestro salón de Shirley St durante el horario de atención y evaluamos sus piezas en el acto. También ofrecemos citas, incluidas visitas privadas a domicilio en todo el suroeste de Florida.`,
+    });
+  }
+
   const otherAreas = SERVICE_AREAS.filter((a) => a.slug !== area.slug);
 
   const localBusinessLd = {
@@ -210,8 +234,8 @@ export default async function SellCityPage({ params }: Props) {
               </span>
               <h1 className="mb-6 text-4xl font-bold leading-tight text-white md:text-5xl" style={{ fontFamily: 'var(--font-headline)' }}>
                 {isEs
-                  ? `Venda Oro, Joyería y Plata Esterlina en ${area.city}, FL`
-                  : `Sell Gold, Jewelry & Sterling Silver in ${area.city}, FL`}
+                  ? (area.h1Es ?? `Venda Oro, Joyería y Plata Esterlina en ${area.city}, FL`)
+                  : (area.h1En ?? `Sell Gold, Jewelry & Sterling Silver in ${area.city}, FL`)}
               </h1>
               <p className="mb-8 max-w-xl text-lg leading-relaxed text-[#d7d0c3]">
                 {isEs
@@ -248,6 +272,80 @@ export default async function SellCityPage({ params }: Props) {
           </div>
         </section>
 
+        {/* Showroom walk-in band — only the city that physically hosts the
+            showroom. Address, landmark, and hours render through their single
+            sources (ShowroomAddress / ShowroomHours over the admin-editable
+            schedule); never hardcode days or the address here. */}
+        {area.hasShowroom && (
+          <section className="ultrawide-page mx-auto max-w-[1440px] px-4 py-16 md:px-8">
+            <div className="mx-auto grid max-w-5xl grid-cols-1 gap-10 md:grid-cols-[1.2fr_1fr]">
+              <div>
+                <h2 className="mb-4 text-3xl font-bold text-[#1a1c1c] md:text-4xl" style={{ fontFamily: 'var(--font-headline)' }}>
+                  {isEs ? `Visite el Salón en ${area.city}` : `Visit the ${area.city} Showroom`}
+                </h2>
+                <p className="mb-6 max-w-xl text-sm leading-relaxed text-[#4d4635]">
+                  {isEs ? (
+                    <>
+                      Sin cita durante el horario de atención — entre con un solo anillo o un patrimonio completo. Todo se prueba y se pesa frente a usted, ya sea{' '}
+                      <Link href={p('/silver-services')} className="font-semibold text-[#735c00] underline underline-offset-2">cubertería de plata esterlina</Link>,{' '}
+                      <Link href={p('/gold-services')} className="font-semibold text-[#735c00] underline underline-offset-2">joyería de oro</Link> o una{' '}
+                      <Link href={p('/estate-jewelry')} className="font-semibold text-[#735c00] underline underline-offset-2">colección de patrimonio</Link>.
+                    </>
+                  ) : (
+                    <>
+                      No appointment needed during open hours — walk in with a single ring or a full estate. Everything is tested and weighed in front of you, whether it is{' '}
+                      <Link href={p('/silver-services')} className="font-semibold text-[#735c00] underline underline-offset-2">sterling silver flatware</Link>,{' '}
+                      <Link href={p('/gold-services')} className="font-semibold text-[#735c00] underline underline-offset-2">gold jewelry</Link>, or an{' '}
+                      <Link href={p('/estate-jewelry')} className="font-semibold text-[#735c00] underline underline-offset-2">estate collection</Link>.
+                    </>
+                  )}
+                </p>
+                <ShowroomAddress locale={locale} className="mb-5 text-base text-[#1a1c1c]" />
+                <div className="mb-6 max-w-sm border-t border-[#d0c5af] pt-4">
+                  <ShowroomHours locale={locale} layout="rows" />
+                </div>
+                <div className="flex flex-wrap gap-4">
+                  <a href={mapsUrl()} target="_blank" rel="noopener noreferrer" className="gold-button">
+                    {isEs ? 'CÓMO LLEGAR' : 'GET DIRECTIONS'}
+                  </a>
+                  <a href="tel:2394048505" className="outline-button">
+                    {isEs ? 'LLAMAR O TEXTO (239) 404-8505' : 'CALL OR TEXT (239) 404-8505'}
+                  </a>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-[#d0c5af] bg-white p-7 shadow-[0_14px_38px_rgba(38,28,6,0.05)]">
+                <h3 className="mb-4 text-lg font-bold text-[#1a1c1c]" style={{ fontFamily: 'var(--font-headline)' }}>
+                  {isEs ? 'Qué traer' : 'What to bring'}
+                </h3>
+                <ul className="flex flex-col gap-3">
+                  {(isEs
+                    ? [
+                        'Las piezas — en cualquier condición, limpias o no, incluso rotas',
+                        'Una identificación oficial con foto (Florida la exige cuando compramos metales preciosos)',
+                        'Cajas, papeles o certificados si los tiene — ayudan, pero nunca son obligatorios',
+                      ]
+                    : [
+                        'The pieces themselves — any condition, cleaned or not, broken included',
+                        'A government photo ID (Florida requires it when we buy precious metals)',
+                        'Boxes, papers, or certificates if you have them — helpful, never required',
+                      ]
+                  ).map((item) => (
+                    <li key={item} className="flex items-start gap-3 text-sm leading-relaxed text-[#4d4635]">
+                      <span aria-hidden="true" className="mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full bg-[#e9c349] text-[11px] font-bold text-[#1a1c1c]">✓</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-5 text-xs leading-relaxed text-[#8a8677]">
+                  {isEs
+                    ? '¿Prefiere no transportar objetos de valor? Las visitas a domicilio siguen disponibles con cita en todo el suroeste de Florida.'
+                    : 'Rather not carry valuables? Home visits stay available by appointment throughout Southwest Florida.'}
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* What we buy */}
         <section className="ultrawide-page mx-auto max-w-[1440px] px-4 py-20 md:px-8">
           <div className="mb-12 max-w-2xl">
@@ -265,7 +363,13 @@ export default async function SellCityPage({ params }: Props) {
               <div key={item.mark} className="rounded-2xl border border-[#d0c5af] bg-white p-7 shadow-[0_14px_38px_rgba(38,28,6,0.05)] transition-all hover:-translate-y-0.5 hover:shadow-xl">
                 <ClayMark name={item.mark} size={88} className="mb-4 block" />
                 <h3 className="mb-2 text-lg font-bold text-[#1a1c1c]" style={{ fontFamily: 'var(--font-headline)' }}>
-                  {isEs ? item.titleEs : item.titleEn}
+                  {item.href ? (
+                    <Link href={item.href} className="transition-colors hover:text-[#735c00]">
+                      {isEs ? item.titleEs : item.titleEn}
+                    </Link>
+                  ) : (
+                    isEs ? item.titleEs : item.titleEn
+                  )}
                 </h3>
                 <p className="text-sm leading-relaxed text-[#4d4635]">{isEs ? item.descEs : item.descEn}</p>
               </div>
