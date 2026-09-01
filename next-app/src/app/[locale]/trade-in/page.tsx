@@ -5,6 +5,7 @@ import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import ClayMark from '@/components/ClayMark';
+import LinkedPhrase from '@/components/LinkedPhrase';
 
 // The named trade-in program page (2026-08-04, from the mels-treasures.com
 // review — their "Gold Exchange Program"). This page NAMES a service the store
@@ -36,7 +37,7 @@ const STEPS = [
     titleEn: '1. Show Us What You Have',
     titleEs: '1. Muéstrenos Lo Que Tiene',
     descEn:
-      'Text photos of your gold or silver — broken chains, single earrings, old class rings, sterling flatware, coins — or book a private appointment. Mixed and unsorted is completely normal.',
+      'Text photos of your gold or silver — broken chains, single earrings, old class rings, sterling silver flatware, coins — or book a private appointment. Mixed and unsorted is completely normal.',
     descEs:
       'Envíe fotos de su oro o plata — cadenas rotas, aretes sueltos, anillos antiguos, cubiertos de plata esterlina, monedas — o agende una cita privada. Que esté mezclado y sin clasificar es completamente normal.',
   },
@@ -117,7 +118,21 @@ export default async function TradeInPage({ params }: Props) {
                   <h3 className="font-[family-name:var(--font-headline)] font-bold text-lg mb-2">
                     {isEs ? titleEs : titleEn}
                   </h3>
-                  <p className="text-[#4d4635] text-sm leading-relaxed">{isEs ? descEs : descEn}</p>
+                  <p className="text-[#4d4635] text-sm leading-relaxed">
+                    {/* Step 1 names sterling flatware; link it to the page that
+                        owns the term without forking the STEPS string into JSX
+                        (2026-09-01). Other steps render the plain string. */}
+                    {mark === 'camera' ? (
+                      <LinkedPhrase
+                        text={isEs ? descEs : descEn}
+                        phrase={isEs ? 'cubiertos de plata esterlina' : 'sterling silver flatware'}
+                        href={p('/silver-services')}
+                        className="text-[#735c00] underline underline-offset-2"
+                      />
+                    ) : (
+                      isEs ? descEs : descEn
+                    )}
+                  </p>
                 </div>
               ))}
             </div>

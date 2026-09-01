@@ -60,6 +60,7 @@ export default async function HomePage({ params }: Props) {
   const storeHref = isEs ? '/es/shop' : '/shop';
   const evalHref = isEs ? '/es/free-evaluation' : '/free-evaluation';
   const contactHref = isEs ? '/es/contact' : '/contact';
+  const silverHref = isEs ? '/es/silver-services' : '/silver-services';
 
   const carousel = await getHomeCarouselPayload(HOME_CAROUSEL_FALLBACK);
   // Admin-editable announcement strip; null when switched off or empty.
@@ -237,15 +238,23 @@ export default async function HomePage({ params }: Props) {
           style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-low)' }}
         >
           <PageContainer max="content">
-          <CardGrid className="md:grid-cols-3">
-            {[
+          {/* Four cards since 2026-09-01 (was three). Columns are pinned 1 / 2 / 4
+              by `.home-services-grid` in globals.css — skipping 3 for the same
+              reason the reviews grid does: auto-fit chooses three in the
+              ~850-1150px band and strands the fourth card alone on a row.
+              ⚠️ NOT a Tailwind class: `.responsive-card-grid` is unlayered and
+              `grid-cols-*` utilities are in @layer utilities, so they never win
+              here. The `md:grid-cols-3` this carried before was dead code. */}
+          <CardGrid className="home-services-grid">
+            {([
               {
-                // These three card titles are real <h2> elements, so they carry
+                // These card titles are real <h2> elements, so they carry
                 // heading weight. "in Naples" was added 2026-08-16: the homepage
                 // body mentions Naples 73 times but not ONE heading did, which
                 // under-declared the page's own topic. Cheap signal, no cost to
                 // the copy. (Card titles wrap freely — unlike the announcement
                 // strip above, which is nowrap and length-critical.)
+                mark: 'goldbar',
                 title: isEs ? 'Compramos Oro en Naples' : 'We Buy Gold in Naples',
                 body: isEs
                   ? 'Evaluaciones gratuitas en el acto para todas las piezas de oro.'
@@ -254,6 +263,26 @@ export default async function HomePage({ params }: Props) {
                 cta: isEs ? 'Evaluación gratuita →' : 'Free evaluation →',
               },
               {
+                // Added 2026-09-01 (owner chose this over an inline link in the
+                // gold card). A silver seller landing here had no tile that was
+                // theirs — the only routes were the nav dropdown and the footer —
+                // and /silver-services, the striking-distance page (DECISIONS),
+                // had no body link from the homepage at all. An earlier
+                // homepage→silver link was deferred because the HERO's buy card
+                // is a stretched link; this card is a plain div with one Link,
+                // so nothing nests. The "by weight and by pattern, whichever is
+                // higher" line is the owner-confirmed claim /silver-services
+                // makes; no maker names here (premium-pattern framing rule).
+                mark: 'flatware',
+                title: isEs ? 'Compramos Plata Esterlina en Naples' : 'We Buy Sterling Silver in Naples',
+                body: isEs
+                  ? 'Cubertería, juegos de té y vajilla — valorados por peso y por patrón, y pagamos el que resulte mayor.'
+                  : 'Flatware, tea services, and hollowware — priced by weight and by pattern, and we pay whichever is higher.',
+                href: silverHref,
+                cta: isEs ? 'Vender plata →' : 'Sell silver →',
+              },
+              {
+                mark: 'ring',
                 title: isEs ? 'Vendemos Joyería en Naples' : 'We Sell Estate Jewelry in Naples',
                 body: isEs
                   ? 'Cadenas, pulseras, anillos y piezas de diseñador con precios transparentes.'
@@ -262,6 +291,7 @@ export default async function HomePage({ params }: Props) {
                 cta: isEs ? 'Ver tienda →' : 'Browse shop →',
               },
               {
+                mark: 'phone',
                 title: isEs ? 'Contacto Directo' : 'Direct Contact',
                 body: isEs
                   ? 'Hable con nosotros directamente — sin intermediarios.'
@@ -269,14 +299,16 @@ export default async function HomePage({ params }: Props) {
                 href: contactHref,
                 cta: isEs ? 'Contáctenos →' : 'Contact us →',
               },
-            ].map((item, index) => (
+            ] as const).map((item) => (
               <div
                 key={item.title}
                 className="group flex flex-col gap-3 border-b pb-6 md:border-b-0 md:border-l md:pb-0 md:pl-7"
                 style={{ borderColor: 'rgba(115, 92, 0, 0.16)' }}
               >
                 <div className="transition duration-300 group-hover:-translate-y-0.5">
-                  <ClayMark name={index === 0 ? 'goldbar' : index === 1 ? 'ring' : 'phone'} size={88} />
+                  {/* `mark` per card (was index-based when there were three);
+                      `as const` on the array keeps it a ClayMarkName. */}
+                  <ClayMark name={item.mark} size={88} />
                 </div>
                 {/* h2, not h3: these three cards are top-level page sections
                     with no parent h2 above them, so h3 skipped a level and left

@@ -352,6 +352,36 @@ table {
   }
 }
 
+/* Homepage services strip (2026-09-01, when it went from three cards to four).
+   Same shape as the reviews ladder above, and for the same reason: the shared
+   auto-fit picks THREE columns in the ~850-1150px band, which strands the
+   fourth card alone on a second row (measured: 3 tracks at 900px).
+
+   ⚠️ Why this is a CSS rule and not `md:grid-cols-2 lg:grid-cols-4` on the
+   element: `.responsive-card-grid` is UNLAYERED and Tailwind's grid-cols
+   utilities live in `@layer utilities`, so the utilities can never override
+   it — cascade layers beat order and specificity. The strip carried a dead
+   `md:grid-cols-3` for months without anyone noticing, because auto-fit
+   happened to give three columns anyway. Pin columns for any CardGrid with
+   a rule here, never with a utility class.
+
+   Ladder: one column on phones (auto-fit's own result below ~520px is kept
+   explicit here), two from 640px, four from 1024px. The card's own bottom-
+   rule → left-rule swap still happens at 768px (`md:` on the card). */
+.home-services-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 40rem) {
+  .home-services-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 64rem) {
+  .home-services-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 /* A viewport clamp is safe here even though card width is NOT monotonic in
    viewport width (the 1160px jump to four columns halves the card). The tight
    case is the narrow phone at the BOTTOM of the range, and these ramps reach

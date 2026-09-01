@@ -177,9 +177,20 @@ export default async function BullionPage({ params }: Props) {
                 <span className="text-[#735c00] font-[family-name:var(--font-headline)] not-italic font-bold">
                   {isEs ? 'Consejo:' : 'Tip:'}
                 </span>{' '}
+                {/* "sterling silver" links to the page that owns that query
+                    (2026-09-01). /bullion was already drawing silver-flatware
+                    impressions in Search Console with no path onward — this
+                    was the only sibling sell page with no link to any other. */}
+                {isEs ? 'Si tiene monedas, barras, ' : 'Have coins, bars, '}
+                <Link
+                  href={isEs ? '/es/silver-services' : '/silver-services'}
+                  className="text-[#735c00] underline underline-offset-2 not-italic"
+                >
+                  {isEs ? 'plata esterlina' : 'sterling silver'}
+                </Link>
                 {isEs
-                  ? 'Si tiene monedas, barras, plata esterlina o chatarra mezclada, eso es normal. '
-                  : "Have coins, bars, sterling, or scrap mixed together? That's normal. "}
+                  ? ' o chatarra mezclada, eso es normal. '
+                  : ", or scrap mixed together? That's normal. "}
                 <Link
                   href={isEs ? '/es/contact' : '/contact'}
                   className="text-[#735c00] underline underline-offset-2 not-italic"

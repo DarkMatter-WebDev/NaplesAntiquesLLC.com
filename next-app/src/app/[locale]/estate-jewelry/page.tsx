@@ -28,6 +28,7 @@ interface Props {
 export default async function EstateJewelryPage({ params }: Props) {
   const { locale } = await params;
   const isEs = locale === 'es';
+  const p = (path: string) => (isEs ? `/es${path}` : path);
 
   return (
     <>
@@ -341,6 +342,20 @@ export default async function EstateJewelryPage({ params }: Props) {
                 </div>
               </div>
             </div>
+            {/* Sibling crossover (2026-09-01). This is the top-nav "Sell"
+                destination and, until now, the only sell page with no mention
+                of silver at all — yet an inherited estate is jewelry AND the
+                flatware chest. The FAQ's "Full list →" also lands here, so this
+                line is where that reader finally meets the silver page. Uses
+                the token colours this page is built on, not the #735c00
+                literal the newer pages use. */}
+            <p className="mt-10 text-center text-sm leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
+              {isEs ? (
+                <>¿Vende más que joyería? También compramos <Link href={p('/gold-services')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>chatarra de oro</Link>, <Link href={p('/silver-services')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>cubertería y vajilla de plata esterlina</Link> y <Link href={p('/diamond-buyers')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>diamantes sueltos</Link>.</>
+              ) : (
+                <>Selling more than jewelry? We also buy <Link href={p('/gold-services')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>scrap gold</Link>, <Link href={p('/silver-services')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>sterling silver flatware and hollowware</Link>, and <Link href={p('/diamond-buyers')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>loose diamonds</Link>.</>
+              )}
+            </p>
           </div>
         </section>
 

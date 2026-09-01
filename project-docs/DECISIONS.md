@@ -4,7 +4,42 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-08-30**.
+> compaction. Last reconciled: **2026-08-31**.
+
+## Media & hero loading (2026-08-31)
+
+### Every Storage upload sets `cacheControl: '31536000'` — the CDN TTL IS the object metadata
+
+Netlify's image CDN derives each transformed `/_next/image` response's
+`Cache-Control` from the SOURCE object's stored `cacheControl` metadata, set
+per object at upload time. Three traps proven the hard way: (1)
+`images.minimumCacheTTL` in `next.config.ts` is a **no-op on Netlify** — the
+2026-08-23 change never took effect in production; (2) the public Supabase
+endpoint reports `Cache-Control: no-cache` for EVERY object regardless of its
+metadata, so origin headers cannot distinguish good from bad — probe a
+**fresh** `/_next/image` variant's `max-age` instead; (3) the supabase-js
+default (`3600`) makes transforms expire hourly, which on a low-traffic site
+means nearly every real visitor pays a cold derive. All 942 `product-images`
+objects were backfilled to `31536000` on 2026-08-31 (197 re-uploaded
+byte-identical, sha256-verified). Safe because upload filenames are
+timestamped-unique — a replaced photo is a new URL. ⛔ Any new upload path or
+bulk re-upload script MUST pass `cacheControl: '31536000'`.
+
+### Hero reveal gates wait on the FIRST TWO card images + `decode()` — and the 1800 ms cap is untouchable
+
+The blank-second-card symptom survived both the fetchPriority fix and the
+cache backfill because the reveal gates (inline `nej-hero-go` script in
+`(home)/page.tsx` + React gate in `HomeHero.tsx` — comments on both demand
+they stay in step) waited on ALL 8 ring images, and on cold/stale loads the
+slowest of eight always lost to the 1800 ms cap. Both gates now wait on the
+first two card images only (the cards facing the visitor at reveal, both
+preloaded high/auto) and await `img.decode()` so a loaded-but-undecoded frame
+cannot paint blank. Deployed + owner-confirmed on a genuinely COLD load.
+⛔ Never raise the 1800 ms cap (PSI mobile goes bimodal with a 9 s hero LCP —
+2026-08-23) and never re-widen the gates to all slots. Reserve lever if a
+slow connection still misses: slot 1 → `fetchPriority: 'high'`, only with
+multi-run PSI evidence. ℹ️ A warm-load confirmation proves NOTHING about this
+class of bug — only a cold load exercises the race (burned twice).
 
 ## SEO & GBP (2026-08-30)
 
@@ -219,6 +254,75 @@ At position ~12 it can plausibly reach page 1; `/sell/naples` at ~52 cannot be
 copywritten onto page 1 (that ceiling is backlinks/authority). The flatware
 band (silverplate marks, patterns-beat-melt with the owner-confirmed
 "price both ways, pay the higher" claim, weighted pieces) exists for this.
+
+### The homepage H1 says "Sterling", not "Sterling Silver" — decided on evidence 2026-09-01
+
+Owner asked whether spelling it out would help SEO. **No, and it would cost a
+line.** Search Console (16 months, `.com` URL-prefix property): queries
+containing "sterling" = 15 impressions / 0 clicks, across three queries that
+ALL already contain "silver" as a separate word — no bare-"sterling" query
+reaches the site. Queries containing "silver" = 68 / 1, and by landing page
+`/silver-services` takes 22 against the homepage's 8: the dedicated page
+already owns the phrase (its title has carried it since 08-16). Meanwhile the
+H1's character count is load-bearing (`HomeHeroOverlay.tsx` comment block):
+46 chars is 2 lines on desktop only via the 72rem widening and already 3 on
+phones; the documented 4-line threshold is ~48. "Sterling Silver" is 53.
+⛔ Do not re-propose this from a keyword-density instinct; re-open it only
+with new GSC evidence of bare-"sterling" queries, and re-measure the line
+count first. "Sterling" alone is standard trade shorthand next to "Gold" and
+"Jewelry Buyers"; Google's disambiguation does not need the second word.
+
+### Every sibling sell page links to /silver-services once, in context — except /free-evaluation
+
+Established 2026-09-01 after mapping the inbound graph. The 08-30/31 pages
+had the crossover; the older ones (`/bullion`, `/gold-services`,
+`/estate-jewelry`, `/faq`, `/about`, `/trade-in`) mentioned sterling without
+linking it, and `/estate-jewelry` — the top-nav Sell target — never mentioned
+silver at all. Rules that came out of it:
+
+- **One contextual link per page, anchors varied** ("sterling silver",
+  "sterling silver flatware", "…flatware and hollowware"), never the identical
+  phrase six times. Nav + footer do not count as the contextual link.
+- ⛔ **`/free-evaluation` gets NO outbound category links** even though it
+  names sterling twice. It is the sendable landing page whose sorting detail
+  is the substance (entry above); a link out is a leak from the funnel.
+- **Copy that also feeds JSON-LD or a data array is never forked into JSX to
+  add a link.** Use `components/LinkedPhrase.tsx` (`lib/link-phrase.ts`): it
+  locates the literal phrase at render and links only that span, falling back
+  to plain text if the phrase is reworded away. `/faq`'s items-we-buy answer
+  and `/trade-in`'s step 1 use it. The alternative — a second copy of the
+  sentence — is exactly how visible text drifts from the schema.
+- **The homepage services strip is a design-gated change**, not a text edit:
+  its cards are real `<h2>`s with deliberate "in Naples" headings. The
+  fourth card — "We Buy Sterling Silver in Naples" → `/silver-services` —
+  was mocked up, chosen by the owner (B over an inline link), and built
+  2026-09-01. ℹ️ The 08-30 deferral of a homepage→silver link was about the
+  HERO's BUY card (a stretched link — nested anchors break it); the strip
+  cards are plain `<div>`s with one `<Link>`, so that objection does not
+  apply there. LCP re-measurement after deploy does.
+
+### Column counts on a `CardGrid` are pinned with an UNLAYERED rule in `globals.css`, never a `grid-cols-*` utility
+
+Found 2026-09-01 while adding the fourth services-strip card: the strip's
+`md:grid-cols-3` had **never applied**. A CSSOM walk grouped by cascade
+layer shows `.responsive-card-grid` (and `.responsive-grid`) are
+**unlayered**, while every Tailwind `grid-cols-*` utility lives in
+`@layer utilities` — and an unlayered declaration beats a layered one no
+matter its order in the file or its specificity. The strip had always been
+pure auto-fit; three columns was simply what auto-fit chose for three
+cards. Four cards made it visible: auto-fit picks **3 tracks in the
+~850–1150px band and strands the fourth alone**, measured at 900 and 1024.
+
+The reviews grid hit exactly this in August and answered it with its own
+unlayered `.testimonial-grid` ladder — that is the pattern:
+`.home-services-grid` now pins the strip 1 / 2 / 4 (phones / ≥640px /
+≥1024px). ⛔ Do not "simplify" either back to a utility class; it will look
+like it works at whatever width you happen to check and be inert. If a
+grid needs pinned columns, add a named unlayered rule beside those two.
+⚠️ A related trap: after editing `globals.css` the new rule can be **absent
+from every served stylesheet** in dev until the server is restarted
+(Turbopack CSS staleness) — check the production bundle or restart before
+concluding the CSS is wrong.
 
 ### GSC Request Indexing quota: assume ~10/day, property-wide, HARSHER than rolling-24h
 

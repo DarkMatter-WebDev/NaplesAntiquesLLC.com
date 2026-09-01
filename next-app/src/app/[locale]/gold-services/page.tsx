@@ -46,6 +46,7 @@ const ACQUIRE_ITEMS = [
 export default async function GoldServicesPage({ params }: Props) {
   const { locale } = await params;
   const isEs = locale === 'es';
+  const p = (path: string) => (isEs ? `/es${path}` : path);
   const spot = await fetchSpotData();
   const goldSpot = spot.goldPerTroyOz ? Math.round(spot.goldPerTroyOz).toLocaleString('en-US') : null;
 
@@ -186,6 +187,17 @@ export default async function GoldServicesPage({ params }: Props) {
               </div>
             ))}
           </div>
+          {/* Sibling crossover (2026-09-01) — the same closing line the
+              2026-08-30 pages (/diamond-buyers, /jewelry-appraisal) carry.
+              This page mentioned "sterling" twice and linked nowhere but
+              /free-evaluation; a gold seller with a flatware chest had no path. */}
+          <p className="mt-10 text-center text-sm leading-relaxed text-[#4d4635]">
+            {isEs ? (
+              <>¿Vende más que oro? También compramos <Link href={p('/silver-services')} className="font-semibold text-[#735c00] underline underline-offset-2">plata esterlina</Link>, <Link href={p('/diamond-buyers')} className="font-semibold text-[#735c00] underline underline-offset-2">diamantes</Link> y <Link href={p('/estate-jewelry')} className="font-semibold text-[#735c00] underline underline-offset-2">joyería de patrimonio</Link>.</>
+            ) : (
+              <>Selling more than gold? We also buy <Link href={p('/silver-services')} className="font-semibold text-[#735c00] underline underline-offset-2">sterling silver</Link>, <Link href={p('/diamond-buyers')} className="font-semibold text-[#735c00] underline underline-offset-2">diamonds</Link>, and <Link href={p('/estate-jewelry')} className="font-semibold text-[#735c00] underline underline-offset-2">estate jewelry</Link>.</>
+            )}
+          </p>
         </section>
 
         {/* Decoding Gold Markings */}

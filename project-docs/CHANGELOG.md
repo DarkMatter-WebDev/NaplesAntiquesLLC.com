@@ -1,6 +1,148 @@
 
 # Changelog
 
+## 2026-09-01 — /silver-services internal-linking pass (BUILT, not deployed); homepage H1 "Sterling" kept on evidence
+
+**Owner question:** should the homepage H1 say "Sterling Silver" instead of
+"Sterling" for SEO? **Answer: no — kept as-is**, on two grounds, both durable
+(recorded in `DECISIONS.md`):
+
+1. **Search Console, 16 months, `.com` URL-prefix property:** queries
+   containing "sterling" = **15 impressions / 0 clicks** across exactly three
+   queries, every one of which already contains "silver" as its own word.
+   Nobody reaches the site on a bare "sterling" query. Queries containing
+   "silver" = 68 impressions / 1 click; by landing page the homepage takes
+   **8**, `/silver-services` **22**, `/bullion` **13**. The dedicated page
+   already owns the phrase (its title has been "Sell Sterling Silver in
+   Naples, FL" since 08-16), so the H1 has no query gap to close.
+2. **The H1's length is load-bearing** (comment block in
+   `HomeHeroOverlay.tsx`): 46 chars renders 2 lines on desktop only because
+   the block was widened to 72rem, and is already 3 lines on phone/tablet;
+   the documented 4-line threshold is ~48 chars. "Sterling Silver" = 53.
+
+**Then the follow-up: `/silver-services` internal linking.** Mapped the full
+inbound link graph from source. The pages built in the 08-30/31 SEO batch
+(`/sell`, `/sell/[city]`, `/diamond-buyers`, `/jewelry-appraisal`, product
+pages) all carried a contextual link; the OLDER sibling pages never got one:
+`/bullion` (3 unlinked "sterling" mentions, and its only links were
+`/contact` + `tel:` — not even `/free-evaluation`), `/gold-services` (2
+mentions, links only to `/free-evaluation`), `/estate-jewelry` (ZERO silver
+mentions — the top-nav Sell destination, and where the FAQ's "Full list →"
+lands), `/faq`, `/about`, `/trade-in`. Two anchor-text inconsistencies: the
+footer's ES label read "Vender Plata" (page title: "Vender Plata Esterlina")
+on every page, and `/sell`'s inline anchor "Sterling flatware" / "platería
+esterlina" dropped the target phrase.
+
+**Shipped (rows 1–7 of the audit, owner-approved):**
+
+- `bullion/page.tsx` — Tip box: "coins, bars, **sterling silver**, or scrap"
+  now links (EN/ES).
+- `gold-services/page.tsx` — sibling crossover line after Items We Acquire:
+  "Selling more than gold? We also buy sterling silver, diamonds, and estate
+  jewelry." (+ `p()` helper).
+- `estate-jewelry/page.tsx` — crossover line after the gallery: "…scrap gold,
+  sterling silver flatware and hollowware, and loose diamonds." Uses the
+  page's token colours, not the `#735c00` literal. (+ `p()` helper).
+- `faq/page.tsx` — "sterling silver flatware and hollowware" in the
+  what-do-you-buy answer now links. The answer string also feeds FAQPage
+  JSON-LD, so it is NOT duplicated as JSX — see `LinkedPhrase` below.
+- `about/page.tsx` — "sterling silver" in the Meet Chris paragraph links
+  (hero subtitle deliberately left plain: one link per page).
+- `SiteFooter.tsx` — ES label → "Vender Plata Esterlina".
+- `sell/page.tsx` — anchors → "Sterling silver flatware" / "cubertería de
+  plata esterlina".
+- `trade-in/page.tsx` — step 1 copy → "sterling silver flatware", linked via
+  `LinkedPhrase` (STEPS stays a data array).
+- **NEW `lib/link-phrase.ts` + `components/LinkedPhrase.tsx`** (+ 6 tests):
+  finds a literal phrase inside a plain string at render and wraps only that
+  span in a `<Link>`, falling back to plain text if the phrase is absent. This
+  keeps ONE copy of any sentence that also feeds JSON-LD or a data array;
+  rewording the answer drops the link instead of forking the copy.
+
+⛔ **`/free-evaluation` deliberately NOT linked** although it mentions
+sterling twice: `DECISIONS.md` defines it as the sendable landing page whose
+sorting detail is the substance — an outbound category link there leaks
+people out of the funnel. Anchors were varied on purpose across the six pages
+("sterling silver" / "sterling silver flatware" / "…flatware and hollowware")
+rather than one exact phrase repeated.
+
+**Gate (final tree):** `tsc` clean · lint clean · **1192/1192 across 114
+files** (+6) · build exit 0 · **66 prerendered = 30 EN + 30 ES + 6
+non-locale, `en === es`** · dev-server HTML check of all **14** page/locale
+combos lists the intended `/silver-services` anchor on each, footer reads
+"Vender Plata Esterlina" on every ES page · 0 console errors.
+ℹ️ Browser-pane screenshots came back blank for interior pages this session
+even with nothing hidden in the DOM (opacity 1 up the whole chain); the
+HTML/DOM checks are the verification, not pixels.
+
+**◻ Separate, owner decision pending — the homepage.** The homepage carries
+38 of the site's 44 clicks and has NO body link to `/silver-services` (the
+services strip is Gold → `/free-evaluation`, Shop, Contact; hero Sell →
+`/estate-jewelry`). Two options were mocked up in-chat with the real tokens:
+A = inline link in the gold card (layout untouched); **B = a fourth card "We
+Buy Sterling Silver in Naples" → `/silver-services` (recommended — it gives
+the striking-distance page an `<h2>`-weighted link from the highest-authority
+page)**. Not built; awaiting a yes. Also noted, not changed: the "We Buy
+Gold in Naples" card links to `/free-evaluation`, not `/gold-services`.
+
+ℹ️ Found along the way: `shop-page-renderer.tsx` carries a complete
+"Sterling Tableware & More" buy-side hero behind `isSilverTableware = false`
+— dead code today; a natural two-way link partner if ever switched on.
+
+### Later the same day — homepage services strip: fourth card BUILT (owner chose B)
+
+Owner: "do whatever one is best for capturing clients" → **B**, on the
+client-capture argument more than the SEO one: a silver seller landing on
+the homepage had no tile that was theirs (the routes were the nav dropdown
+and the footer), and the strip is exactly where the page sorts visitors by
+intent. `(home)/page.tsx`: a second card **"We Buy Sterling Silver in
+Naples"** / "Compramos Plata Esterlina en Naples" → `/silver-services`, body
+"Flatware, tea services, and hollowware — priced by weight and by pattern,
+and we pay whichever is higher." (the owner-confirmed claim, no maker
+names), CTA "Sell silver →" / "Vender plata →", clay mark `flatware`. The
+cards' marks moved from an index ternary to a `mark` field (`as const` keeps
+the `ClayMarkName` union). The 08-30 deferral of a homepage→silver link was
+about the HERO's stretched-link buy card; these strip cards are plain
+`<div>`s with one `<Link>`, so nothing nests.
+
+🔴 **Found while building it: the strip's `md:grid-cols-3` had NEVER
+applied.** A CSSOM walk grouped by cascade layer showed `.responsive-card-grid`
+is **unlayered** while every `grid-cols-*` utility sits in `@layer
+utilities` — an unlayered rule beats a layered one regardless of order or
+specificity. The strip had always been pure auto-fit; three columns just
+happened to be what auto-fit chose. With four cards that auto-fit picks
+**3 tracks in the ~850–1150px band and strands the fourth card alone**
+(measured at 900 and 1024). The reviews grid hit the identical trap in
+August and solved it with its own unlayered `.testimonial-grid` rule, so
+the strip now does the same: **`.home-services-grid` in `globals.css`, pinned
+1 / 2 / 4** (phones / from 640px / from 1024px), the dead Tailwind classes
+removed. No other `CardGrid` carries column utilities. Durable rule in
+`DECISIONS.md`.
+
+⚠️ Verifying it needed a dev-server restart: after the `globals.css` edit
+the new rule was **absent from every served stylesheet** even on a
+cache-busted navigation, while the production bundle (`.next/static`)
+carried it verbatim — the documented Turbopack CSS staleness. Stop → clear
+`.next/dev` contents → start, and the rule appeared. The console buffer
+then shows the OLD server's HMR-socket failures plus the transient parse /
+`silverHref is not defined` errors from between the three sequential edits;
+none are live (fresh-tab read + HTTP 200s below).
+
+**Measured ladder on the restarted server (`.home-services-grid`,
+tracks / card tops):** 375px → 1 (stacked) · 700 → 2 (2×2) · 900 → 2 (2×2,
+398px cards) · 1024 → 4 (217px cards, h2s 2/2/2/1 lines) · 1280 → 4
+(250px). 0px horizontal overflow at every width; the `flatware` mark loads
+lazily (`complete`, 108px natural) once scrolled to. The 375px ES capture
+rendered normally (single column, bottom rule between cards).
+
+**Gate (final tree):** `tsc` clean · lint clean · **1192/1192 (114 files)** ·
+build exit 0 · **66 = 30 EN + 30 ES + 6, `en === es`** · `/` and `/es` SSR
+list four strip `<h2>`s with the silver card second and the body anchor
+"Sell silver →" / "Vender plata →". Joins the undeployed 2026-09-01 batch.
+**After deploy: re-check PSI mobile across several runs** — the strip is
+below the fold and adds one lazy 88px WebP, so no movement is expected, but
+the homepage is the LCP-sensitive page and the bimodal rule applies.
+
 ## 2026-08-31 — parked SEO decisions resolved; silver card aligned; proof strip built (joins the undeployed batch)
 
 Owner worked through the four parked decisions from the 08-30 SEO session:
@@ -58,6 +200,9 @@ visitor at reveal, both preloaded high/auto) and await `img.decode()`. The
 LCP-load-bearing cap is untouched; reveal can only get earlier. Gate: tsc ·
 lint · 1186/1186 · build 66 = 30+30+6 · dev-verified. Owner cold-load test
 after deploy is the acceptance test.
+✅ **DEPLOYED 2026-08-31 and OWNER-CONFIRMED FIXED on a genuinely COLD
+load** — the test the 08-30 warm-load confirmation never actually ran.
+Production HTML verified: `.slice(0,2)` + `i.decode` served, cap unchanged.
 
 **2026-08-31 (later) — hero cold-load "blank second card" root-caused +
 Storage cache-metadata backfill (owner-approved).** Owner re-saw the blank

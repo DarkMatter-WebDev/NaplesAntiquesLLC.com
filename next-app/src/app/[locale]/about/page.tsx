@@ -110,9 +110,9 @@ export default async function AboutPage({ params }: Props) {
                 >
                   <p>
                     {isEs ? (
-                      <>Nacido y criado en Naples, Chris ha pasado <strong style={{ color: 'var(--color-primary)' }}>más de 15 años</strong> trabajando directamente con clientes privados en todo el suroeste de Florida para adquirir joyería fina, plata esterlina, antigüedades, oro y colecciones heredadas.</>
+                      <>Nacido y criado en Naples, Chris ha pasado <strong style={{ color: 'var(--color-primary)' }}>más de 15 años</strong> trabajando directamente con clientes privados en todo el suroeste de Florida para adquirir joyería fina, <Link href="/es/silver-services" className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>plata esterlina</Link>, antigüedades, oro y colecciones heredadas.</>
                     ) : (
-                      <>Born and raised in Naples, Chris has spent <strong style={{ color: 'var(--color-primary)' }}>15+ years</strong> working directly with private clients throughout Southwest Florida to acquire fine jewelry, sterling silver, antiques, gold, and inherited collections.</>
+                      <>Born and raised in Naples, Chris has spent <strong style={{ color: 'var(--color-primary)' }}>15+ years</strong> working directly with private clients throughout Southwest Florida to acquire fine jewelry, <Link href="/silver-services" className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>sterling silver</Link>, antiques, gold, and inherited collections.</>
                     )}
                   </p>
                   <p>

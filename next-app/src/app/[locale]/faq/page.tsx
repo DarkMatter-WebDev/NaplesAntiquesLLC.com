@@ -5,6 +5,7 @@ import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
 import { AppIcon } from '@/components/AppIcon';
+import LinkedPhrase from '@/components/LinkedPhrase';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -143,7 +144,17 @@ export default async function FaqPage({ params }: Props) {
                       </>
                     ) : questionEn === 'What types of items do you purchase?' ? (
                       <>
-                        {isEs ? answerEs : answerEn}{' '}
+                        {/* The answer string above also feeds the FAQPage
+                            JSON-LD, so it is NOT duplicated here as JSX —
+                            LinkedPhrase finds the span at render and links it.
+                            Reword the phrase in FAQ_ITEMS and the link simply
+                            drops; the copy cannot fork. (2026-09-01) */}
+                        <LinkedPhrase
+                          text={isEs ? answerEs : answerEn}
+                          phrase={isEs ? 'cubertería y vajilla de plata esterlina' : 'sterling silver flatware and hollowware'}
+                          href={isEs ? '/es/silver-services' : '/silver-services'}
+                          className="text-[#735c00] underline"
+                        />{' '}
                         <Link href={isEs ? '/es/estate-jewelry' : '/estate-jewelry'} className="text-[#735c00] underline">
                           {isEs ? 'Lista completa →' : 'Full list →'}
                         </Link>

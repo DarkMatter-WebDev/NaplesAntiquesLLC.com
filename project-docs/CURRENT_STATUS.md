@@ -2,13 +2,52 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-08-30**.
+> in `DECISIONS.md`. Last reconciled: **2026-09-01**.
 
-## Start Here (handoff, end of the 2026-08-30 SEO growth session — SUPERSEDES the block below)
+## Start Here (handoff, end of the 2026-09-01 silver internal-linking session — SUPERSEDES the blocks below)
 
 **Read this, then `TASKS.md`.**
 
-### ✅ THE SEO BATCH IS DEPLOYED (2026-08-31) and production-verified
+### 🟡 2026-09-01 — /silver-services internal-linking pass BUILT, NOT deployed; homepage option awaits owner
+
+Owner asked whether the homepage H1 should say "Sterling Silver" instead of
+"Sterling". **Decided NO on evidence** (GSC: bare-"sterling" queries = 15
+impressions / 0 clicks in 16 months, all already containing "silver";
+`/silver-services` already owns the phrase and takes 22 of the 68 silver
+impressions vs the homepage's 8; and the H1 would go 46 → 53 chars, past the
+documented 4-line threshold). Rule recorded in `DECISIONS.md`.
+
+The follow-up shipped: **every older sibling sell page now carries one
+contextual link to `/silver-services`** — `/bullion`, `/gold-services`,
+`/estate-jewelry` (previously zero silver mentions), `/faq`, `/about`,
+`/trade-in` — plus two anchor fixes (footer ES "Vender Plata Esterlina";
+`/sell` "Sterling silver flatware"). New `LinkedPhrase` component keeps
+JSON-LD-fed copy single-sourced. ⛔ `/free-evaluation` deliberately NOT
+linked (conversion endpoint). Gate: `tsc` · lint · **1192/1192 (114
+files)** · build exit 0 · **66 = 30 EN + 30 ES + 6** · 14/14 page-locale
+HTML checks · 0 console errors. No SQL, no env vars. Detail: `CHANGELOG.md`.
+
+✅ **Staging synced 2026-09-01 (17 files, 0 Extras, follow-up dry run 0,
+leak check clean vs a 184-`.tsx` control) — awaiting the owner's copy +
+push.** After deploy, spot-check one page per locale for the new link (e.g.
+`/gold-services` + `/es/faq`) and `/` for four strip cards; the
+footer-scoped ES check now expects **"Vender Plata Esterlina"**, not
+"Vender Plata". Evidence in `TASKS.md`.
+
+**✅ Homepage services strip — fourth card BUILT (owner chose B, later
+2026-09-01).** "We Buy Sterling Silver in Naples" → `/silver-services` now
+sits second in the strip, an `<h2>`-weighted link from the page carrying 38
+of 44 clicks. 🔴 Found while building: the strip's `md:grid-cols-3` had
+NEVER applied — `.responsive-card-grid` is unlayered and Tailwind's
+`grid-cols-*` live in `@layer utilities`, so no utility could ever win
+there. Columns are now pinned 1 / 2 / 4 by `.home-services-grid` in
+`globals.css`; measured on a restarted dev server at 375/700/900/1024/1280:
+the fourth card is never stranded, 0px overflow. Re-gated: `tsc` · lint ·
+**1192/1192** · build exit 0 · **66 = 30/30/6**. Deploys with the batch
+above. ◻ After deploy, re-check PSI mobile across several runs (below the
+fold + one lazy 88px WebP — expect no movement; bimodal rule applies).
+
+### (superseded) ✅ THE SEO BATCH IS DEPLOYED (2026-08-31) and production-verified
 
 A full local-SEO growth audit (Claude artifact, owner has the link) was
 implemented item by item with owner approval. Staging synced 2026-08-31 (894
@@ -17,8 +56,16 @@ verified: all new/changed routes 200 in both locales, new `/sell/naples` H1 +
 showroom band live, feed live (76 items / 0 sold, correct headers), robots
 carve-out live. **The Merchant Center swap is also DONE** (feed source added
 US-only + daily, crawl source stopped) — details and watch-items in
-`TASKS.md`. GSC: 1 of 6 indexing requests landed before quota ran out
-(remaining 5 owed next session); sitemap resubmitted. No SQL, no env vars.
+`TASKS.md`. GSC: 1 of 6 indexing requests landed before quota ran out;
+**the remaining 5 are PARKED by owner decision** (sitemap resubmitted covers
+discovery). No SQL, no env vars.
+
+**Also closed 2026-08-31, second deploy of the day:** the recurring hero
+"blank second card on cold loads" was fully root-caused and fixed in three
+layers — fetchPriority (08-30), Storage cacheControl backfill (942/942 at
+31536000), and the reveal gates now waiting on the first two card images +
+`decode()` (cap untouched). **Owner-confirmed fixed on a genuinely COLD
+load.** Durable rules in `DECISIONS.md` → *Media & hero loading (2026-08-31)*.
 
 **What deploys with the next push** (gate: `tsc` · lint · **1186/1186 (113
 files)** · build exit 0 · **66 prerendered = 30 EN + 30 ES + 6 non-locale** ·

@@ -196,9 +196,9 @@ export default async function SellHubPage({ params }: Props) {
                 </h3>
                 <p className="text-sm leading-relaxed text-[#4d4635]">
                   {isEs ? (
-                    <>Cadenas rotas, aretes sueltos, oro dental, anillos de graduación, piezas sin sello, cajas de relojes de oro — el valor está en el metal, no en la condición. La <Link href={p('/silver-services')} className="font-semibold text-[#735c00] underline">platería esterlina</Link> también cuenta, incluso los juegos incompletos.</>
+                    <>Cadenas rotas, aretes sueltos, oro dental, anillos de graduación, piezas sin sello, cajas de relojes de oro — el valor está en el metal, no en la condición. La <Link href={p('/silver-services')} className="font-semibold text-[#735c00] underline">cubertería de plata esterlina</Link> también cuenta, incluso los juegos incompletos.</>
                   ) : (
-                    <>Broken chains, single earrings, dental gold, class rings, unmarked pieces, gold watch cases — the value is in the metal, not the condition. <Link href={p('/silver-services')} className="font-semibold text-[#735c00] underline">Sterling flatware</Link> counts too, even incomplete sets.</>
+                    <>Broken chains, single earrings, dental gold, class rings, unmarked pieces, gold watch cases — the value is in the metal, not the condition. <Link href={p('/silver-services')} className="font-semibold text-[#735c00] underline">Sterling silver flatware</Link> counts too, even incomplete sets.</>
                   )}
                 </p>
               </div>

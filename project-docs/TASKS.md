@@ -1,11 +1,126 @@
 ﻿# Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-08-30**.
+> in `CHANGELOG.md`. Last reconciled: **2026-09-01**.
 
 ## ◻ OPEN — needs a human
 
-### 🔴 DEPLOY the hero reveal-gate fix (2 files, no SQL, no env vars)
+### 🔴 DEPLOY the 2026-09-01 /silver-services internal-linking pass + homepage silver card (no SQL, no env vars)
+
+Built, gated and dev-verified; **not yet copied to the repo or pushed.**
+
+✅ **STAGING SYNCED 2026-09-01 — ready to copy to the repo folder and push.**
+Dry run queued exactly **17 files** — the 10 edited app files, the 3 new
+files (`LinkedPhrase.tsx`, `link-phrase.ts`, its test) and the 4 memory docs
+— i.e. this session file-for-file, nothing leaking in. Real run **17 copied
+/ 0 Extras / 0 Mismatch / 0 FAILED**; follow-up dry run **0 to copy, exit
+0**. **897 files / 20.43 MB** on disk (robocopy total 900 = the documented 3
+`/XF`-excluded). Leak check clean — 0 `.git` (dir *or* file), 0
+`worktrees`, 0 `node_modules`, 0 `.next`, 0 `.env*`, 0 `*.log`, 0
+`*.tsbuildinfo`, 0 `next-env.d.ts`, 0 `*.pem` — against a **positive
+control of 184 `.tsx` matching source exactly**. Staged-content checks
+(bytes, not filenames): the 3 new files present by `-LiteralPath`;
+`globals.css` carries `.home-services-grid` ×3 (base + 2 media);
+`(home)/page.tsx` carries "We Buy Sterling Silver in Naples" and the
+`home-services-grid` class (its single `md:grid-cols-3` hit is the comment
+recording it as dead); `SiteFooter` reads "Vender Plata Esterlina"; `faq`
+and `trade-in` import `LinkedPhrase`; bullion / gold-services /
+estate-jewelry / about each reference `silver-services`; hidden paths
+present (`.github/workflows/scheduled-jobs.yml`, `.gitignore`,
+`.claude/launch.json`, `next-app/.npmrc`, `netlify.toml`); the standing CSP
+hazard reads **1 hit each** for `maps.google.com` in root `netlify.toml` and
+`next-app/next.config.ts`. (ℹ️ Recording this drifts staging by memory docs
+only until the standing docs-only re-sync below — done the same session.)
+
+**Files (all EN + ES):**
+
+- `src/app/[locale]/bullion/page.tsx` — Tip box links "sterling silver"
+- `src/app/[locale]/gold-services/page.tsx` — sibling crossover line (+ `p()`)
+- `src/app/[locale]/estate-jewelry/page.tsx` — sibling crossover line (+ `p()`)
+- `src/app/[locale]/faq/page.tsx` — items-we-buy answer links the phrase via
+  `LinkedPhrase` (JSON-LD string untouched)
+- `src/app/[locale]/about/page.tsx` — Meet Chris paragraph links "sterling silver"
+- `src/app/[locale]/trade-in/page.tsx` — step 1 copy + `LinkedPhrase`
+- `src/app/[locale]/sell/page.tsx` — anchor text only
+- `src/components/layout/SiteFooter.tsx` — ES label → "Vender Plata Esterlina"
+- NEW `src/lib/link-phrase.ts`, `src/lib/__tests__/link-phrase.test.ts`,
+  `src/components/LinkedPhrase.tsx`
+- `src/app/[locale]/(home)/page.tsx` — fourth services-strip card "We Buy
+  Sterling Silver in Naples" → `/silver-services` (owner chose B, later the
+  same day); marks moved to a `mark` field
+- `src/app/globals.css` — NEW `.home-services-grid` (columns pinned 1/2/4;
+  the strip's Tailwind `md:grid-cols-3` had never applied — see DECISIONS)
+
+**Gate (final tree, after the homepage card):** `tsc` clean · lint clean ·
+**1192/1192 (114 files)** · build exit 0 · **66 prerendered = 30 EN + 30 ES
++ 6, `en === es`** · all 14 page/locale combos fetched from the dev server
+list the intended `/silver-services` anchor · `/` and `/es` SSR show four
+strip `<h2>`s with the silver card second · strip ladder measured 1/2/2/4/4
+tracks at 375/700/900/1024/1280 with 0px overflow · 0 live console errors.
+
+**After deploy:** open `/gold-services` and `/es/faq` and confirm the new
+underlined silver link renders and resolves; open `/` and confirm four
+cards with "We Buy Sterling Silver in Naples" second (2×2 on a tablet, four
+across on desktop). ⚠️ The footer-scoped ES check (command under the 08-30
+Spanish-footer entry) now expects the label **"Vender Plata Esterlina"** —
+"Vender Plata" alone means the deploy did not land, not that the footer
+regressed. 📊 Then **re-check PSI mobile across several runs** — the card is
+below the fold with one lazy 88px WebP, so expect no movement; do not react
+to a single number (bimodal rule).
+
+### ✅ DECIDED + BUILT 2026-09-01 — homepage services strip: fourth silver card (owner chose B)
+
+**Built the same day** ("do whatever one is best for capturing clients");
+in the deploy item above. The option record below is kept for the
+reasoning. 🔴 Building it exposed that the strip's `md:grid-cols-3` had
+never applied (cascade layers — `DECISIONS.md`); columns are now pinned by
+`.home-services-grid`.
+
+The homepage carries 38 of the site's 44 clicks and has **no body link to
+`/silver-services`** — the striking-distance page gets nav + footer only.
+The services strip (`(home)/page.tsx` ~L241) is three deliberate `<h2>`
+cards: "We Buy Gold in Naples" → `/free-evaluation`, "We Sell Estate Jewelry
+in Naples" → `/shop`, "Direct Contact" → `/contact`.
+
+Two options were rendered in-chat with the real tokens (Libre Caslon, Hanken
+Grotesk, `#735c00`, `#f3f3f3` strip, `#d0c5af` rule):
+
+- **A — inline link in the gold card, layout untouched.** Retitle to "We Buy
+  Gold & Silver in Naples", body gains an underlined "sterling silver
+  flatware" link; CTA stays Free evaluation →. Cheapest; passes a body link,
+  no heading weight.
+- **B — a fourth card (RECOMMENDED).** "We Buy Sterling Silver in Naples" →
+  `/silver-services`, body "Flatware, tea services, and hollowware — priced by
+  weight and by pattern, whichever is higher.", CTA "Sell silver →", clay mark
+  `flatware`. Grid `md:grid-cols-3` → 4 (or 2×2). Gives the page an
+  `<h2>`-weighted link from the highest-authority page — the exact signal the
+  code comment at ~L243 says the homepage was starved of.
+
+⛔ Per the show-design-before-building rule this stays unbuilt until the
+owner picks. If B: the ClayMark union already has `flatware`; the card body
+should not name makers (premium-pattern framing rule). Also noticed, not
+changed and not part of this decision: the gold card links to
+`/free-evaluation`, not `/gold-services` — presumably conversion-first.
+
+ℹ️ **A homepage→silver body link was DEFERRED once before** (`CHANGELOG.md`
+2026-08-30, item 5): the reasons were that the hero **BUY card is a single
+stretched link** (a nested anchor breaks it), plus mockup-gating and LCP
+sensitivity. Neither option above touches the hero — the services-strip
+cards are plain `<div>`s with one `<Link>` CTA, so A's inline body link and
+B's fourth card nest nothing; and the mockup gate is now satisfied. What
+remains of that deferral is LCP: the strip is below the fold and B adds one
+88px clay-mark WebP, so expect no movement — but re-check PSI **across
+several runs** after deploy, never off a single number (bimodal rule).
+
+### ✅ DEPLOYED 2026-08-31 + OWNER-CONFIRMED ON A COLD LOAD — hero reveal-gate fix
+
+**Owner deployed same day, tested a genuinely COLD load, and confirmed the
+second card now appears with the rest.** (Unlike the 08-30 confirmation,
+which turned out to be a warm load, this one exercised the actual race.)
+Production HTML verified serving the new gate: `.slice(0,2)` + `i.decode`
+present, cap still `setTimeout(go,1800)`. Residual watch: a very slow
+connection could still beat slot 1 past the cap — the reserve lever
+(slot 1 → `fetchPriority: 'high'`, PSI-remeasured) stays documented below.
 
 The backfill below fixed cache lifetimes but the owner STILL reproduced the
 blank second card (regular Chrome, incognito, Edge). Second root-cause layer:
@@ -136,12 +251,30 @@ typing goes nowhere until the inspect box is re-focused via its element ref
 (coordinate clicks + type were silently swallowed).** Compensations done:
 sitemap.xml **resubmitted** ("Sitemap submitted successfully") so the 6 new
 URLs enter normal discovery.
-◻ **OWED next session (2026-09-01+, quota resets daily):** request indexing
-for the remaining 5 — `/es/jewelry-appraisal`,
-`/silver-services/flatware-value` + `/es/…`, `/diamond-buyers` + `/es/…`
-(and optionally re-inspect `/sell/naples` for the retitle).
+⏸ **PARKED (owner decision, end of 2026-08-31 session)** — the remaining 5
+indexing requests (`/es/jewelry-appraisal`, `/silver-services/flatware-value`
++ `/es/…`, `/diamond-buyers` + `/es/…`, optionally re-inspect `/sell/naples`)
+are deliberately on hold, NOT owed on a schedule. The resubmitted sitemap
+already queues all 6 URLs for normal discovery, so this is an accelerant,
+not a requirement. Pick up only when the owner asks (quota resets daily).
 
 **◻ Owner follow-ups from the SEO session:**
+
+0. 🔴 **2026-09-01: the 08-30 GBP silver post was REMOVED by Google and
+   posting was TURNED OFF for the profile** (email, Routing ID DPNB). Cause:
+   the post text ended "Or call/text (239) 404-8505…" and Google's posts
+   content policy flatly bans phone numbers in post content ("To avoid the
+   risk of abuse, we do not allow your post content to include a phone
+   number") — a drafting error on our side; it passed the instant check and
+   was swept by the slower review ~2 days later. The silver/flatware content
+   itself is fine. ⛔ **STANDING RULE: no phone numbers in GBP post text,
+   ever — use the Call button/CTA instead.**
+   ◻ Recovery: wait a few days and check whether the "Add update" button
+   returns on the profile; if posting stays disabled, contact GBP support
+   citing the routing ID. When restored, re-post the SAME text minus the
+   call/text sentence (end instead with "Prefer we come to you? Book a free
+   evaluation at the link below."), keep Learn more → /silver-services and
+   the same JPG. Weekly post cadence is ON HOLD until posting is restored.
 
 1. **GBP photo batch** (audit item 4, owner-held): exterior with the Sharon
    Lynch entrance, interior, testing bench/XRF in use, Chris at work, a

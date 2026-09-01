@@ -30,7 +30,9 @@ export default function SiteFooter({ locale }: Props) {
 
   const shopLinks = [
     { label: isEs ? 'Vender Oro' : 'Sell Gold', href: p('/gold-services') },
-    { label: isEs ? 'Vender Plata' : 'Sell Sterling Silver', href: p('/silver-services') },
+    // "Esterlina" restored 2026-09-01: the page's own ES title is "Vender Plata
+    // Esterlina" and this is the one link to it on EVERY page.
+    { label: isEs ? 'Vender Plata Esterlina' : 'Sell Sterling Silver', href: p('/silver-services') },
     { label: isEs ? 'Vender Joyería' : 'Sell Estate Jewelry', href: p('/estate-jewelry') },
     { label: isEs ? 'Vender Diamantes' : 'Sell Diamonds', href: p('/diamond-buyers') },
     { label: isEs ? 'Programa de Intercambio' : 'Trade-In Program', href: p('/trade-in') },
