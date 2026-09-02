@@ -198,6 +198,14 @@ export default async function EstateServicesPage({ params }: Props) {
                 </div>
               ))}
             </div>
+            {/* Guide link (2026-09-02): what a family should do BEFORE step 01. */}
+            <p className="mt-10 text-center text-sm leading-relaxed text-[#4d4635]">
+              {isEs ? (
+                <>¿No sabe por dónde empezar? Nuestra guía <Link href={isEs ? '/es/estate-services/selling-inherited-jewelry' : '/estate-services/selling-inherited-jewelry'} className="font-semibold text-[#735c00] underline underline-offset-2">Vender joyas heredadas: qué hacer primero</Link> explica qué no tocar, cómo separar lo que tiene y qué necesita un albacea.</>
+              ) : (
+                <>Not sure where to start? Our guide <Link href="/estate-services/selling-inherited-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">Selling inherited jewelry: what to do first</Link> covers what not to touch, how to sort what you have, and what an executor needs.</>
+              )}
+            </p>
           </div>
         </section>
 

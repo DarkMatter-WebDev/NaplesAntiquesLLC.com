@@ -327,6 +327,15 @@ export default async function JewelryAppraisalPage({ params }: Props) {
               </details>
             ))}
           </div>
+          {/* Guide links (2026-09-02): the identification and inheritance
+              guides answer the two questions this page's visitors arrive with. */}
+          <p className="mt-8 text-center text-sm leading-relaxed text-[#4d4635]">
+            {isEs ? (
+              <>¿Quiere saber qué tiene antes de venir? Lea nuestra <Link href={p('/jewelry-appraisal/hallmarks')} className="font-semibold text-[#735c00] underline underline-offset-2">guía de sellos</Link> — o, si está liquidando un patrimonio, <Link href={p('/estate-services/selling-inherited-jewelry')} className="font-semibold text-[#735c00] underline underline-offset-2">qué hacer primero con joyas heredadas</Link>.</>
+            ) : (
+              <>Want to know what you have before you come in? Read our <Link href={p('/jewelry-appraisal/hallmarks')} className="font-semibold text-[#735c00] underline underline-offset-2">hallmark guide</Link> — or, if you are settling an estate, <Link href={p('/estate-services/selling-inherited-jewelry')} className="font-semibold text-[#735c00] underline underline-offset-2">what to do first with inherited jewelry</Link>.</>
+            )}
+          </p>
         </section>
 
         {/* Final CTA */}

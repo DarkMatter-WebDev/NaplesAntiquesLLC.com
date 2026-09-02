@@ -331,6 +331,53 @@ word. The `/sell/[city]` watch card's `href: null` special case is gone —
 if a category card ever needs to be unlinked again, that is a decision to
 record here, not a silent `null`.
 
+### Guide pages live UNDER their parent service page, use the flatware-value template, and may only say what the site already says
+
+Decided 2026-09-01 (owner: "what do you think about building out guide
+pages for seo?" → "start the gold-worth pilot and all the rest"). Three
+shipped in the 09-02 batch: `/gold-services/what-is-my-gold-worth`,
+`/jewelry-appraisal/hallmarks`, `/estate-services/selling-inherited-jewelry`,
+after `/silver-services/flatware-value` (08-30) proved the shape.
+
+- **URL = parent path + topic slug.** A guide is nested under the service
+  page it feeds (`/gold-services/…`, not `/guides/…` or `/blog/…`), so the
+  breadcrumb, the internal-link path and the URL all say the same thing,
+  and the parent lander stays the page that ranks for the money query.
+- **Template:** hero with the clay mark → tables/cards that answer the
+  question → worked math or ordered steps → the "worth more than melt /
+  don't touch it first" turn → exactly one FAQ block (FAQPage schema, five
+  questions) → one CTA to `/free-evaluation`. BreadcrumbList schema Home →
+  parent → guide. Titles ≤ 60 with the brand suffix; EN descriptions ≤ 160.
+- **Linking:** one guide-link line on the parent page and on `/sell`;
+  guides cross-link each other. ⛔ Not in the footer (service landers only)
+  and not on the homepage strip.
+- ⛔ **Claims are limited to copy the site already ships or objective,
+  checkable facts** (karat purities, the 925 standard, EPNS = plate). No
+  pricing method, tooling, or brand preference the owner has not stated.
+  Legal questions (probate, who may sell an estate's jewelry) are deferred
+  to the family's attorney — never answered on the site. Written insurance
+  appraisals stay "referred out" (see the 08-30 appraisal-page rule).
+- **Photos of hallmarks must come from the shop's own bench.** Until the
+  owner supplies them the guides use text tables only — no stock or scraped
+  images of other makers' marks.
+- **Owner reads the FAQ answers before push** — same rule as `/watch-buyers`.
+  Done for all three on 2026-09-02; the owner's corrections are the facts
+  below and override anything the site said before.
+- ⛔ **Dental gold is never priced on the spot.** Owner, 2026-09-02: *"we
+  have to send it off for testing to test the exact karat before we buy. I
+  cannot determine the exact karat in store."* Any page, FAQ, GBP answer, or
+  assistant prompt that mentions dental gold must say it is sent out for
+  testing first and the offer follows the result — never "tested and paid
+  in front of you" like jewelry gold.
+- **Karat marks the guides must carry** (owner, same day): the low and
+  obscure standards — 8k/333, 9k/375 (British, Irish, Australian; real gold
+  below the US 10k minimum), 12k, 15k (older British), 20k, 21k, 23k
+  (Middle Eastern / Thai) — plus the two marks customers misread most:
+  **"14K HGE / 18K HGE" is heavy gold electroplate** (the karat describes
+  the plating; no melt value) and **"14KP" is karat PLUMB, not plated**
+  (exactly 14k, not a minimum). Both guides state these identically; keep
+  them in sync if either changes.
+
 ### Column counts on a `CardGrid` are pinned with an UNLAYERED rule in `globals.css`, never a `grid-cols-*` utility
 
 Found 2026-09-01 while adding the fourth services-strip card: the strip's

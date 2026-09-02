@@ -8,17 +8,33 @@
 
 **Read this, then `TASKS.md`.**
 
-### 🔴 2026-09-01 (night) — /watch-buyers APPROVED + schema logo switched + "Naples Jewelry Buyers" logo REMOVED — one batch, gated, awaiting push
+### 🔴 2026-09-02 batch — THREE SEO GUIDE PAGES built, gated, FAQ copy READ + CORRECTED by the owner, staged — ready to push
 
-`/watch-buyers` ×2 (owner approved the copy), the JSON-LD `logo` now the
-octopus `nav-logo.webp`, `branding/logo.webp` deleted (its only other
-consumer, the `/logo.png` legacy redirect in `netlify.toml`, repointed),
-plus the earlier sitemap-bump/description trim — gated on one tree
-(`tsc` · lint · 1192/1192 · build · **68 = 31/31/6**). GSC: the parked
-requests are still quota-blocked (one attempt, stopped; four remain).
-Citations: audited, kit delivered to the owner; every remaining listing
-needs their own account. Review QR card delivered (no repo asset). Detail:
-`TASKS.md` top items, `CHANGELOG.md`.
+`/gold-services/what-is-my-gold-worth`, `/jewelry-appraisal/hallmarks`,
+`/estate-services/selling-inherited-jewelry` (+ES), each on the
+flatware-value template with FAQPage + BreadcrumbList schema, nested under
+its parent service page, linked from all four parents and `/sell`, in the
+sitemap at 0.6 with `CONTENT_LAST_MODIFIED` → 2026-09-02. Claims limited
+to copy already on the site; legal questions deferred to an attorney; no
+written appraisals promised. **Owner read all 15 FAQ answers on 09-02 and
+corrected four things on the gold guide — ⛔ dental gold is sent out for
+karat testing before purchase (never priced in store), the karat table
+runs 8k–24k incl. 9k/12k/15k/20k/21k/23k, "14K HGE / 18K HGE" = plated,
+"14KP" = plumb NOT plated — mirrored into the hallmarks tables; rules in
+`DECISIONS.md`.** Gate on the corrected tree: `tsc` · lint · build ·
+**74 = 34/34/6** · both guides re-verified over HTTP. **After deploy:**
+the six-URL `npm run indexnow` command in `TASKS.md`, then GSC requests
+as quota allows (12 owed in total now). Detail: `TASKS.md` top item.
+
+### ✅ 2026-09-01 (night) — /watch-buyers + schema logo switch + "Naples Jewelry Buyers" logo removal DEPLOYED and production-verified
+
+Owner pushed; verified over HTTP: JSON-LD `logo` = the octopus on `/`,
+`/es`, `/sell/naples`; `/logo.png` 301 → `nav-logo.webp`; old `logo.webp`
+404; watch pages 200 with 3/3 JSON-LD; sitemap 194; ES footer 25/26;
+IndexNow 200 for the two watch URLs. GSC: parked requests still
+quota-blocked. Citations: audited, kit delivered to the owner; every
+remaining listing needs their own account. Review QR card delivered (no
+repo asset). Detail: `TASKS.md`, `CHANGELOG.md`.
 
 ### ✅ 2026-09-01 — /silver-services internal-linking pass + homepage silver card DEPLOYED and production-verified
 

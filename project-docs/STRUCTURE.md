@@ -69,6 +69,7 @@ let additional loose app assets accumulate at root.
 | Concern | Source |
 |---|---|
 | Localized pages/routes | `next-app/src/app/[locale]/` |
+| SEO guide pages (nested under the parent lander, never `/guides/` or `/blog/`) | `[locale]/silver-services/flatware-value/` (the template), `[locale]/gold-services/what-is-my-gold-worth/`, `[locale]/jewelry-appraisal/hallmarks/`, `[locale]/estate-services/selling-inherited-jewelry/` — each `page.tsx` self-contains its copy, FAQPage + BreadcrumbList JSON-LD, and metadata; listed in `sitemap.ts` at 0.6; content rules in `DECISIONS.md` → *"Guide pages live UNDER their parent"* |
 | Shared layout | `next-app/src/components/layout/` |
 | Product data | Supabase `products` |
 | Product TypeScript contract | `next-app/src/types/product.ts` |

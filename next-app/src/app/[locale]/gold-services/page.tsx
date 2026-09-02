@@ -230,6 +230,15 @@ export default async function GoldServicesPage({ params }: Props) {
               </div>
             ))}
           </div>
+          {/* Guide links (2026-09-02): the karat cards are the teaser; the full
+              math and the mark-reading live on their own guide pages. */}
+          <p className="mt-10 text-center text-sm leading-relaxed text-[#4d4635]">
+            {isEs ? (
+              <>¿Quiere la cuenta completa? Lea <Link href={p('/gold-services/what-is-my-gold-worth')} className="font-semibold text-[#735c00] underline underline-offset-2">cuánto vale su oro</Link> — la fórmula peso × pureza × spot con un ejemplo práctico — o nuestra <Link href={p('/jewelry-appraisal/hallmarks')} className="font-semibold text-[#735c00] underline underline-offset-2">guía de sellos</Link> para saber qué tiene.</>
+            ) : (
+              <>Want the full math? Read <Link href={p('/gold-services/what-is-my-gold-worth')} className="font-semibold text-[#735c00] underline underline-offset-2">what your gold is worth</Link> — the weight × purity × spot formula with a worked example — or our <Link href={p('/jewelry-appraisal/hallmarks')} className="font-semibold text-[#735c00] underline underline-offset-2">hallmark guide</Link> to find out what you have.</>
+            )}
+          </p>
         </section>
 
         {/* Unmarked / Vintage Gold */}

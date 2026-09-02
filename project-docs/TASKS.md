@@ -5,7 +5,115 @@
 
 ## ◻ OPEN — needs a human
 
-### 🔴 DEPLOY the 2026-09-01 (night) batch: /watch-buyers (copy APPROVED) + schema logo switch + "Naples Jewelry Buyers" logo REMOVED (no SQL, no env vars)
+### 🔴 DEPLOY the 2026-09-02 batch: THREE SEO GUIDE PAGES ×2 locales (no SQL, no env vars) — owner should read the FAQ answers first
+
+Owner, after the watch/logo deploy: **"start the gold-worth pilot and all
+the rest of the recommended guides."** All three built on the
+`/silver-services/flatware-value` template (hero → mark/karat tables →
+worked math or sort steps → "worth more than melt" → 5-question FAQ with
+FAQPage + BreadcrumbList schema → CTA with a clay mark), each nested under
+its parent service page so the URL itself carries the topic:
+
+| Page | Title (with brand suffix) | Parent | Mark |
+|---|---|---|---|
+| `/gold-services/what-is-my-gold-worth` | What Is My Gold Worth? (46) | `/gold-services` | `goldbar` |
+| `/jewelry-appraisal/hallmarks` | Hallmarks: Real Gold or Silver? (55) | `/jewelry-appraisal` | `microscope` |
+| `/estate-services/selling-inherited-jewelry` | Selling Inherited Jewelry: A Guide (58) | `/estate-services` | `heirloom` |
+
+**Wiring:** `sitemap.ts` +3 paths (priority 0.6, monthly; `CONTENT_LAST_MODIFIED`
+→ **2026-09-02**, so every lastmod moves on deploy); guide-link lines on
+`/gold-services` (after the karat cards), `/estate-services` (after How It
+Works), `/jewelry-appraisal` (after the FAQ), `/sell` ("Full guides:" line
+after "Melt is the floor"); the guides cross-link each other and the
+flatware guide. NOT in the footer (the footer lists service landers, not
+guides) and NOT on the homepage.
+
+⛔ **Claims are limited to copy the site already ships** — the karat table
+and the 20 g / 14k / $2,600 worked example are the ones on `/sell`; the
+"one evaluation, not five" and executor lines come from `/estate-services`;
+the hallmarks guide says plainly that the shop does **not** issue written
+insurance appraisals and that a stamp is never the final word (touchstone +
+electronic test in the shop; XRF referred out — as `/jewelry-appraisal`
+already states). Legal questions on the inherited-jewelry page (probate,
+who may sell) are deferred to the family's attorney, not answered.
+
+✅ **Owner read the 15 FAQ answers 2026-09-02 and asked for four changes,
+all applied and re-gated** (`tsc` · lint · build exit 0 · 74 = 34/34/6 ·
+both guides ×2 locales re-verified over HTTP, 3/3 JSON-LD, FAQPage text
+updated):
+
+1. **Dental gold** — the shop CANNOT determine its karat in store; dental
+   gold is **sent out for testing to establish the exact karat before
+   purchase**, and the offer is set from that result. The FAQ answer now
+   says exactly that (rule recorded in `DECISIONS.md`).
+2. **Karat table** now runs 8k · 333 through 24k · 999 including 9k, 12k,
+   15k, 20k, 21k, 23k, plus a "14KP · 18KP = plumb" row, with a note under
+   the table on sub-10k gold (real gold, below the US minimum to be sold as
+   "gold") and the odd standards.
+3. **"Marks that do NOT mean solid gold"** now lists **14K HGE · 18K HGE**
+   on its own row ("the karat describes the plating, not the piece").
+4. **14KP = karat plumb, NOT "plated"** — stated in the karat table and
+   the note paragraph.
+
+The same three facts (9K row, karat-prefixed HGE row, KP-is-not-plated)
+were mirrored into the hallmarks guide's gold / not-gold tables so the two
+guides cannot contradict each other; descriptions now read "8k–24k" (gold)
+and "9K–24K" (hallmarks). The hallmarks and inherited-jewelry FAQ answers
+were approved as built.
+
+**Gate (final tree):** `tsc` clean · lint clean (one fix: the hallmarks
+`MarkTable` helper was defined inside the page function —
+`react-hooks/static-components` — now module-level with `isEs` as a prop) ·
+**114/114 test files (1192 tests, unchanged)** · build exit 0 · **74 = 34 EN
++ 34 ES + 6** (was 68 = 31/31/6; +3 per locale) · dev server: all six URLs
+200, one `<h1>`, **3/3 JSON-LD parse** (JewelryStore + BreadcrumbList +
+FAQPage), canonicals per locale, cross-links present, parent-page links on
+all four parents ×2 locales, sitemap **200 `<loc>`** (was 194; +6). Titles
+≤ 58 chars with suffix; EN descriptions trimmed to ≤ 160 (the inherited
+title was 65 and two descriptions 178/191 on the first pass).
+
+✅ **STAGING SYNCED 2026-09-01 (late night) — ready to copy to the repo and
+push.** Dry run queued exactly **13 files** (3 new guide pages, the 4 parent
+pages, `sitemap.ts`, 5 docs) with **0 Extras**, verified BEFORE the real
+run. Real run: **13 copied / 3 new dirs / 0 Extras / 0 Mismatch / 0 FAILED**
+(robocopy exit 1 = copied only); follow-up dry run **0, exit 0**. **902
+files / 20.84 MB** (robocopy total 905 = the documented 3 `/XF`-excluded;
+902 = the previous 899 + the 3 guides). Leak check clean — 0 `.git` (dir
+or file), `worktrees`, `node_modules`, `.next`, `.env*`, `*.log`,
+`*.tsbuildinfo`, `next-env.d.ts`, `*.pem` — against a **189 = 189 `.tsx`
+positive control** (source and staging counted with the same filter; the
+dry run's named 13-file list is the bound on what entered staging). Staged
+content verified by **SHA-256 equality with source** for all three guide
+pages, `sitemap.ts`, `sell/page.tsx`, `TASKS.md`; staged `sitemap.ts`
+carries the 3 guide paths and `new Date('2026-09-02')`. (Docs-only
+re-sync follows this record, per the standing second step.)
+
+✅ **RE-SYNCED 2026-09-02 after the owner's FAQ corrections:** dry run
+queued exactly **5 files** (the two corrected guides + CHANGELOG /
+DECISIONS / TASKS), **0 Extras**; real run 5 copied / 0 Mismatch / 0 FAILED;
+follow-up dry run **0, exit 0**; both guide pages SHA-256-identical to
+source; the staged gold guide carries the dental send-out answer, the
+`14K HGE · 18K HGE` row and the `9k · 375` row; leak check 0 / 0 / 0 / 0
+at **902 files**. Docs-only re-sync follows this record.
+
+**After deploy:** from `next-app/`,
+`npm run indexnow -- --urls=/gold-services/what-is-my-gold-worth,/es/gold-services/what-is-my-gold-worth,/jewelry-appraisal/hallmarks,/es/jewelry-appraisal/hallmarks,/estate-services/selling-inherited-jewelry,/es/estate-services/selling-inherited-jewelry`;
+verify the six URLs 200 with FAQPage schema and the sitemap at 200 URLs
+with `2026-09-02` lastmods; GSC requests when quota allows (see the parked
+list below). Later, owner-supplied: **real photos of hallmarks from the
+shop's own bench** for the hallmarks guide (never stock images) — the page
+is built to take a photo row without restructuring.
+
+### ✅ DEPLOYED + production-verified 2026-09-01 (night): /watch-buyers + schema logo switch + "Naples Jewelry Buyers" logo REMOVED
+
+Verified over HTTP after the owner's push: JSON-LD `logo` reads
+`…/branding/nav-logo.webp` on `/`, `/es`, `/sell/naples`;
+`https://naplesestatejewelry.com/logo.png` **301 → nav-logo.webp**; the old
+`branding/logo.webp` URL **404**; `/watch-buyers` + `/es/watch-buyers` 200
+with 3/3 JSON-LD; sitemap 194; footer-scoped ES check **25/26** as
+predicted. `npm run indexnow -- --urls=/watch-buyers,/es/watch-buyers` →
+**200 OK**. Google refetches the schema logo on its own schedule. Build
+record below is historical.
 
 Owner, 2026-09-01 night: **"approve the watch page copy, switch the logo,
 remove the naples jewelry buyers logo entirely from this site."** All three
@@ -99,7 +207,9 @@ request needed — struck from the list). The first real request,
 returned **Quota Exceeded** immediately, so per the standing rule nothing
 else was tried. Still owed: `/silver-services/flatware-value`,
 `/es/silver-services/flatware-value`, `/diamond-buyers`,
-`/es/diamond-buyers` (+ `/watch-buyers` ×2 once deployed). ℹ️ Driving GSC's
+`/es/diamond-buyers`, `/watch-buyers` ×2 (live since 09-01 night), and the
+three guides ×2 once the 09-02 batch is deployed — **12 in all**, so plan on
+two or three days of quota. ℹ️ Driving GSC's
 inspect box: `find` the combobox ref → `form_input` the URL → `Return`
 (typed keystrokes were swallowed, exactly as the 08-31 trap says); there
 is no working deep-link URL for inspection.

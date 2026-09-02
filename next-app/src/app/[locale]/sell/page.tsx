@@ -185,6 +185,15 @@ export default async function SellHubPage({ params }: Props) {
                 ? 'La fundición es el piso, no el techo. Las piezas firmadas, antiguas y de colección pueden valer bastante más intactas — y así las valoramos. Esa es la diferencia entre un comprador de oro y un comprador de joyería de patrimonio.'
                 : 'Melt is the floor, not the ceiling. Signed, antique, and collectible pieces can be worth well more intact — and we price them that way. That is the difference between a gold buyer and an estate jewelry buyer.'}
             </p>
+            {/* Guide links (2026-09-02): this section is the teaser; the full
+                treatments live on the guide pages. */}
+            <p className="mx-auto mt-6 max-w-3xl text-center text-sm leading-relaxed text-[#4d4635]">
+              {isEs ? (
+                <>Guías completas: <Link href={p('/gold-services/what-is-my-gold-worth')} className="font-semibold text-[#735c00] underline underline-offset-2">cuánto vale su oro</Link> · <Link href={p('/silver-services/flatware-value')} className="font-semibold text-[#735c00] underline underline-offset-2">cuánto vale la cubertería de plata</Link> · <Link href={p('/jewelry-appraisal/hallmarks')} className="font-semibold text-[#735c00] underline underline-offset-2">cómo leer los sellos</Link> · <Link href={p('/estate-services/selling-inherited-jewelry')} className="font-semibold text-[#735c00] underline underline-offset-2">vender joyas heredadas</Link>.</>
+              ) : (
+                <>Full guides: <Link href={p('/gold-services/what-is-my-gold-worth')} className="font-semibold text-[#735c00] underline underline-offset-2">what your gold is worth</Link> · <Link href={p('/silver-services/flatware-value')} className="font-semibold text-[#735c00] underline underline-offset-2">what sterling flatware is worth</Link> · <Link href={p('/jewelry-appraisal/hallmarks')} className="font-semibold text-[#735c00] underline underline-offset-2">how to read hallmarks</Link> · <Link href={p('/estate-services/selling-inherited-jewelry')} className="font-semibold text-[#735c00] underline underline-offset-2">selling inherited jewelry</Link>.</>
+              )}
+            </p>
 
             <h2 className="mb-8 mt-16 text-center text-3xl font-bold text-[#1a1c1c] md:text-4xl" style={{ fontFamily: 'var(--font-headline)' }}>
               {isEs ? 'Antes de Vender' : 'Before You Sell'}

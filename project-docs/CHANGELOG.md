@@ -1,6 +1,52 @@
 
 # Changelog
 
+## 2026-09-02 batch (built the night of 09-01) — three SEO guide pages; watch/logo batch confirmed LIVE
+
+Owner: "pushed and deployed, verify production (especially that we have the
+correct logo now) then start the gold-worth pilot and all the rest of the
+recommended guides."
+
+1. **Production verified** (HTTP, minutes after the push): JSON-LD `logo`
+   is the octopus on `/`, `/es`, `/sell/naples`; `/logo.png` 301 →
+   `nav-logo.webp`; old `logo.webp` 404; `/watch-buyers` ×2 200 with 3/3
+   JSON-LD; sitemap 194; ES footer 25/26; `npm run indexnow` for the two
+   watch URLs → 200 OK.
+2. **Three guide pages ×2 locales** — the "deploy first, then guides"
+   recommendation carried out: `/gold-services/what-is-my-gold-worth`
+   (karat purity table, not-gold marks, weight × purity × spot with the
+   `/sell` worked example, when a piece beats melt),
+   `/jewelry-appraisal/hallmarks` (gold / silver / plate marks, magnet test
+   and its limits, how the shop settles it — touchstone + electronic, XRF
+   referred out — and the standing "no written insurance appraisals" line),
+   `/estate-services/selling-inherited-jewelry` (four things not to do,
+   how to sort, what an executor needs, one evaluation not five; legal
+   questions deferred to the family's attorney). All on the
+   `/silver-services/flatware-value` template with FAQPage + BreadcrumbList
+   schema and a clay mark (`goldbar` / `microscope` / `heirloom`).
+3. **Wiring:** sitemap +3 (0.6, monthly), `CONTENT_LAST_MODIFIED` →
+   2026-09-02; guide-link lines on `/gold-services`, `/estate-services`,
+   `/jewelry-appraisal`, `/sell`; guides cross-link each other and the
+   flatware guide. Footer and homepage deliberately untouched.
+4. **Gate:** `tsc` clean · lint clean after one fix (hallmarks `MarkTable`
+   hoisted out of the page function — `react-hooks/static-components`) ·
+   114/114 test files · build exit 0 · **74 = 34 EN + 34 ES + 6** · six
+   URLs on the dev server: 200, one `<h1>`, 3/3 JSON-LD, per-locale
+   canonicals, cross-links, parent links ×2 locales, sitemap 200 `<loc>`.
+   Title/description lengths trimmed on a second pass (inherited title
+   65 → 58; hallmarks/inherited EN descriptions 178/191 → ≤ 160).
+5. **Owner read all 15 FAQ answers on 2026-09-02** and asked for four
+   changes to the gold-worth guide, applied the same session: the dental
+   gold answer now says the karat cannot be determined in store and dental
+   gold is sent out for testing before purchase; the karat table runs 8k–24k
+   with the obscure standards (9k, 12k, 15k, 20k, 21k, 23k) and a
+   "14KP · 18KP = plumb" row plus an explanatory note; "14K HGE · 18K HGE"
+   has its own not-solid-gold row; and 14KP is explicitly "plumb, not
+   plated". The 9K / HGE / KP facts were mirrored into the hallmarks guide's
+   tables. Re-gated: `tsc` · lint · build exit 0 · 74 = 34/34/6 · both
+   guides ×2 locales re-verified over HTTP (3/3 JSON-LD, FAQPage text
+   updated). Hallmark photos, when added, must be the shop's own.
+
 ## 2026-09-01 (night) — /watch-buyers BUILT (awaiting owner copy read), review QR card delivered, GSC still quota-blocked, citations audited, schema-logo finding
 
 Owner: "did we finish the watch buyers page, what's the review QR card,

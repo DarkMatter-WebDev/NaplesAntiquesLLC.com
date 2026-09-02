@@ -13,7 +13,9 @@ const BASE = 'https://naplesestatejewelry.com';
 // estate-jewelry, faq, about, trade-in, sell + the homepage's fourth
 // services card. Bump this whenever a batch changes page COPY, not for
 // doc-only or infrastructure deploys.
-const CONTENT_LAST_MODIFIED = new Date('2026-09-01');
+// 2026-09-02: three guides added and linked from their parent pages
+// (/gold-services, /estate-services, /jewelry-appraisal) and the /sell hub.
+const CONTENT_LAST_MODIFIED = new Date('2026-09-02');
 
 // Both locale prefixes the app serves. EVERY public page exists in both, so each
 // language version gets its OWN <url> entry — Google's documented pattern —
@@ -51,6 +53,9 @@ const STATIC_PAGES = [
   { path: '/gold-services', priority: 0.8, changeFrequency: 'monthly' },
   { path: '/silver-services', priority: 0.7, changeFrequency: 'monthly' },
   { path: '/silver-services/flatware-value', priority: 0.6, changeFrequency: 'monthly' },
+  { path: '/gold-services/what-is-my-gold-worth', priority: 0.6, changeFrequency: 'monthly' },
+  { path: '/jewelry-appraisal/hallmarks', priority: 0.6, changeFrequency: 'monthly' },
+  { path: '/estate-services/selling-inherited-jewelry', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/bullion', priority: 0.7, changeFrequency: 'weekly' },
   { path: '/trade-in', priority: 0.8, changeFrequency: 'monthly' },
   { path: '/faq', priority: 0.6, changeFrequency: 'monthly' },
