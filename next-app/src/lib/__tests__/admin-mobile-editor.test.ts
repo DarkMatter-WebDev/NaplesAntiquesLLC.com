@@ -69,7 +69,11 @@ describe('admin mobile editor: hide-on-scroll Save row', () => {
     expect(css.lastIndexOf('@media (max-width: 767px)', css.indexOf('.product-editor-footer {'))).toBeGreaterThan(-1);
     expect(block).toMatch(/position: absolute;/);
     expect(block).toMatch(/\.product-editor-footer\[data-hidden='true'\] \{\s*transform: translateY\(110%\);/);
-    // A generous fallback, never 0px — see the note in globals.css.
-    expect(css).toMatch(/\.product-editor-body \{\s*padding-bottom: calc\(1rem \+ var\(--editor-footer-h, 14rem\)\);/);
+    // The reserved space under the row is a flex-item pseudo-element with a
+    // generous fallback — NEVER `padding-bottom` on the body: Safari drops the
+    // block-end padding of a flex-column scroll container, so the padding
+    // version silently did nothing on the owner's phone (2026-09-02).
+    expect(css).toMatch(/\.product-editor-body::after \{\s*content: '';\s*flex: none;\s*height: calc\(1rem \+ var\(--editor-footer-h, 14rem\)\);/);
+    expect(css).not.toMatch(/\.product-editor-body \{\s*padding-bottom:/);
   });
 });

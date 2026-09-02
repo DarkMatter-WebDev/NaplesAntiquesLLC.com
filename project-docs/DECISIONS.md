@@ -55,15 +55,32 @@ minus double-tap zoom) is the value that never breaks scrolling, and pinch
 is cancelled in JS instead. `pan-x pan-y` on the scroller ITSELF (the
 products table) is fine. Guarded by `admin-mobile-editor.test.ts`.
 
-### Overlaid controls must reserve their space from the FIRST painted frame
+### Overlaid controls must reserve their space from the FIRST painted frame — and as a flex ITEM, never `padding-bottom`
 
-The Save row overlays the editor body on phones, so the body pads by the
-row's height. That height is written straight to the DOM in a
-`useLayoutEffect` (not via React state after a ResizeObserver), and the
-CSS fallback is a generous `14rem`, not `0px`: with every accordion
-collapsed the content is just short of scrollable, so a frame without the
-padding traps the last accordions under the row with no way to reach
-them. Too much padding costs blank scroll room; too little traps content.
+The Save row overlays the editor body on phones, so the body reserves the
+row's height below its content. Two rules, each learned from a live
+failure on 2026-09-02:
+
+1. ⛔ **Never reserve it with `padding-bottom` on the scroll container.**
+   The body is `display: flex; flex-direction: column; overflow-y: auto`,
+   and **Safari (incl. iOS) discards the block-end padding of such a
+   container** — Chrome honours it, so every desktop measurement and the
+   pane replica looked healthy while the owner's phone had no reserved
+   space at all: with every accordion collapsed nothing scrolled and the
+   last accordions were trapped under the row. The space is
+   `.product-editor-body::after { flex: none; height: … }`, which every
+   engine counts in `scrollHeight`. Guarded by `admin-mobile-editor.test.ts`.
+2. The height is written straight to the DOM in a `useLayoutEffect` (not
+   via React state after a ResizeObserver), and the CSS fallback is a
+   generous `14rem`, not `0px`, so the space exists on the first painted
+   frame and even before JS. Too much costs blank scroll room; too little
+   traps content.
+
+⚠️ Measurement lesson: a scroll-geometry claim verified only in Chromium
+is not verified for the owner's phone. When Safari is the reporting
+engine, prefer constructs with no known WebKit divergence (real elements
+over end-padding, explicit heights over intrinsic ones) and let the owner
+confirm.
 
 ### The editor's Save row overlays and hides on scroll on PHONES only
 

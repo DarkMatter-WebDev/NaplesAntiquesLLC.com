@@ -1,7 +1,37 @@
 
 # Changelog
 
-## 2026-09-02 (night, follow-up) — phone editor could not scroll on iOS Safari: FIXED (BUILT, gated, staged — deploy owed)
+## 2026-09-02 (night, follow-up 2) — editor STILL locked on Safari mobile: the reserved space must be a flex item, not padding (BUILT, gated, staged — deploy owed)
+
+Owner, on Safari mobile with follow-up 1 LIVE (verified: production CSS
+carried `touch-action: manipulation` and the 14rem padding rule): "still
+can't scroll down… can't reach the Facebook accordion unless I expand an
+upper accordion first… once I close it, the window locks again."
+
+**That last clause is the diagnosis:** the lock tracks CONTENT HEIGHT, not
+touch handling. With every accordion collapsed the body is shorter than
+the scroller, nothing scrolls, and the last accordions sit under the
+overlaid Save row. The bottom padding that was supposed to reserve that
+space is `padding-bottom` on a `display: flex; flex-direction: column;
+overflow-y: auto` element — and **Safari (incl. iOS) discards the
+block-end padding of a flex-column scroll container**. Chrome honours it,
+which is why the real-editor measurement in the owner's Chrome (padding
+176px, scrollable) and the pane replica both looked healthy. Follow-up 1's
+`touch-action` change was correct hygiene but not the cause.
+
+**Fix:** the reserved space is now a real flex item —
+`.product-editor-body::after { content: ''; flex: none; height: calc(1rem +
+var(--editor-footer-h, 14rem)) }` — which every engine counts in
+`scrollHeight`. The body's `padding-bottom` rule is gone (guard test
+asserts both). No JS change; the layout-effect measurement and the 14rem
+fallback still feed the var.
+
+Gate: `tsc` · lint · **1202/1202 (117 files)** · build exit 0 · 74 =
+34/34/6 · built CSS has the `::after` rule and no `padding-bottom` on the
+body. Replica in the pane at 375×812 re-run (Chromium counts both forms,
+so it only proves the rule applies; Safari is the owner's check).
+
+## 2026-09-02 (night, follow-up) — phone editor could not scroll on iOS Safari: touch-action + padding timing (superseded by follow-up 2 for the scroll lock; the `manipulation` change stands)
 
 Owner, on **Safari mobile** after the deploy: "when I first open [Edit
 item] the entire page is locked and I can't scroll at all to see the lower

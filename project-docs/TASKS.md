@@ -5,16 +5,29 @@
 
 ## ◻ OPEN — needs a human
 
-### 🔴 DEPLOY the 2026-09-02 (night follow-up) editor scroll fix — then OWNER walkthrough on Safari mobile (no SQL, no env vars)
+### 🔴 DEPLOY the 2026-09-02 (night follow-up 2) editor scroll fix — then OWNER walkthrough on Safari mobile (no SQL, no env vars)
 
-Owner on Safari mobile after the previous deploy: editor "locked", no
-vertical scroll, lower accordions unreachable, Save row stuck, until an
-accordion was opened. Fixed in `globals.css` (`touch-action: manipulation`
-instead of `pan-x pan-y`; padding fallback `14rem`) and `AdminShell.tsx`
-(`useLayoutEffect` writes `--editor-footer-h` to the DOM before paint).
+Follow-up 1 went live and the owner STILL could not scroll with all
+accordions collapsed ("locks again when I close the accordion"). Real
+cause: **Safari ignores `padding-bottom` on a flex-column scroll
+container**, so the space reserved under the overlaid Save row never
+existed on the phone. Now a `.product-editor-body::after` flex item with an
+explicit height (`globals.css`), guard test updated. `touch-action:
+manipulation` and the layout-effect measurement from follow-up 1 stand.
 Gate: `tsc` · lint · **1202/1202 / 117 files** · build exit 0 · 74 =
-34/34/6. Replica-verified in the pane at 375×812; the real editor is
-behind login.
+34/34/6 · built CSS has the `::after` rule and no body `padding-bottom`.
+The real editor is behind login and the failing engine is Safari, which
+nothing here can run — the walkthrough below IS the verification.
+
+✅ **STAGING SYNCED 2026-09-02 (night follow-up 2) — ready to copy to the
+repo and push.** Dry run queued exactly **6 files** (globals.css, the
+editor guard test, 4 docs) with **0 Extras**, verified BEFORE the real
+run; real run **6 copied / 0 Mismatch / 0 FAILED**; follow-up dry run
+**0, exit 0**; **909 files** on disk (robocopy 912 = the documented 3
+`/XF`-excluded). Leak check 0 `.git` (dir/file), `.env*`, `node_modules`,
+`.next`; **191 = 191 `.tsx`** control; `globals.css` SHA-256 equal; staged
+CSS has the `::after` rule and **0** body `padding-bottom` calc lines.
+(Docs-only re-sync follows this record.)
 
 ✅ **STAGING SYNCED 2026-09-02 (night follow-up) — ready to copy to the
 repo and push.** Dry run queued exactly **7 files** (AdminShell,

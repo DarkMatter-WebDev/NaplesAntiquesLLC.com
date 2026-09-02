@@ -3091,8 +3091,19 @@ html[data-nej-cookies-ok] [data-cookie-notice] {
   .product-editor-modal {
     position: relative;
   }
-  .product-editor-body {
-    padding-bottom: calc(1rem + var(--editor-footer-h, 14rem));
+  /* 🔴 A real flex item, NOT `padding-bottom`. Safari (including iOS)
+     discards the block-end padding of a scroll container that is a flex
+     column, so the body's padding version of this never existed on the
+     owner's phone: with every accordion collapsed the content was shorter
+     than the scroller, nothing scrolled, and the last accordions sat under
+     the Save row with no way to reach them — "it locks again the moment I
+     close the accordion" (2026-09-02, second report). Chrome honours the
+     padding, which is why every measurement here looked fine. An empty
+     pseudo-element with an explicit height is counted by every engine. */
+  .product-editor-body::after {
+    content: '';
+    flex: none;
+    height: calc(1rem + var(--editor-footer-h, 14rem));
   }
   .product-editor-footer {
     position: absolute;

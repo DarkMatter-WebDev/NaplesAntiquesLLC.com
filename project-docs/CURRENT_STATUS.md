@@ -8,15 +8,19 @@
 
 **Read this, then `TASKS.md`.**
 
-🔴 **DEPLOY OWED (2026-09-02, night follow-up): the phone editor could not
-scroll on iOS Safari after the deploy below** — `touch-action: pan-x
-pan-y` on the modal (WebKit nested-scroll quirk) → now `manipulation`,
-plus the Save-row padding written in a layout effect with a 14rem CSS
-fallback. Built, gated (1202/1202 · build 74 = 34/34/6), replica-verified
-at 375px, **staged**. Owner-side after the push: Safari mobile → Edit AND
-Add Product → scroll works immediately, lower accordions reachable, row
-hides/returns, no zoom, no sideways pan. Detail: `CHANGELOG.md` 2026-09-02
-(night, follow-up); checklist in `TASKS.md`.
+🔴 **DEPLOY OWED (2026-09-02, night follow-up 2): the phone editor still
+could not scroll on Safari mobile with follow-up 1 live.** Real cause:
+**Safari drops the block-end padding of a flex-column scroll container**,
+so the space reserved under the overlaid Save row never existed on the
+phone; with all accordions collapsed nothing scrolled and the last
+accordions were unreachable ("locks again when I close the accordion").
+The space is now a `::after` flex item with an explicit height (every
+engine counts it). Follow-up 1's `touch-action: manipulation` stands. Built,
+gated (1202/1202 · build 74 = 34/34/6), **staged**. Owner-side after the
+push: Safari mobile → Edit AND Add Product → scroll works immediately with
+everything collapsed, Facebook accordion reachable, row hides/returns.
+Detail: `CHANGELOG.md` 2026-09-02 (night, follow-up 2); checklist in
+`TASKS.md`.
 
 ✅ **2026-09-02 (late night): the phone listing-editor + thumbnail-rail batch
 is DEPLOYED and production-verified** (routes 200, deployed CSS carries the
