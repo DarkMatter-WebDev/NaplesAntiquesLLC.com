@@ -5,9 +5,169 @@
 
 ## ◻ OPEN — needs a human
 
-### 🔴 DEPLOY the 2026-09-01 /silver-services internal-linking pass + homepage silver card (no SQL, no env vars)
+### 🔴 DEPLOY the IndexNow key file + matcher fix (2026-09-01, no SQL, no env vars) — then run `npm run indexnow`
 
-Built, gated and dev-verified; **not yet copied to the repo or pushed.**
+Owner approved ("go ahead with 1 and 2"). Built and gated; **not yet
+pushed.** Nothing works until the key file is live, by design.
+
+✅ **STAGING SYNCED 2026-09-01 (late) — ready to copy to the repo and
+push.** Dry run queued exactly **8 files** (the 4 app files below + 4
+memory docs), **0 Extras**; real run **8 copied / 0 Mismatch / 0 FAILED**;
+follow-up dry run **0, exit 0**. **899 files / 20.45 MB** on disk (robocopy
+total 902 = the documented 3 `/XF`-excluded). Leak check clean — 0 `.git`
+(dir *or* file), 0 `worktrees`, 0 `node_modules`, 0 `.next`, 0 `.env*`,
+0 `*.log`, 0 `*.tsbuildinfo`, 0 `next-env.d.ts`, 0 `*.pem` — against a
+**184 = 184 `.tsx` positive control**. Staged content verified by bytes:
+key file present with the exact key, `proxy.ts` carries `|pdf|txt)`,
+`scripts/indexnow-submit.mjs` present, `package.json` carries `"indexnow"`.
+(Docs-only re-sync follows this record, per the standing second step.)
+
+**Files:**
+
+- NEW `next-app/public/5f41b4c6500c156c3ddaec86d7e313b6.txt` — the IndexNow
+  key, served at the site root. ⚠️ **Not a secret** (the protocol requires
+  it to be publicly readable; it is how Bing proves the submitter owns the
+  host) — it is deliberately NOT in `.env`.
+- `next-app/src/proxy.ts` — `txt` added to the matcher's extension
+  exclusions so the key file bypasses the next-intl locale rewrite
+  (`robots.txt` was already carved out by name for the same reason).
+- NEW `next-app/scripts/indexnow-submit.mjs` + `"indexnow"` script in
+  `package.json` — reads every `<loc>` from the LIVE sitemap and POSTs them
+  to `api.indexnow.org` (fans out to Bing, Yandex, Seznam, Naver). Refuses
+  to run until it reads the key back from the live site. `--dry-run` lists
+  without sending; `--urls=/a,/b` submits an explicit list.
+
+**Gate:** `tsc` clean · lint clean · **1192/1192 (114 files)** · build exit 0 ·
+**66 = 30 EN + 30 ES + 6, `en === es`** · dev server: `/<key>.txt` → **200
+`text/plain`, body = key**; `/robots.txt`, `/`, `/es` unaffected (200) ·
+`npm run indexnow -- --dry-run` correctly refuses against production
+(404 — key not live yet).
+
+**After the push (do in this order):**
+
+1. `curl https://naplesestatejewelry.com/5f41b4c6500c156c3ddaec86d7e313b6.txt`
+   → must be 200 with exactly the key (if it is HTML, the matcher change did
+   not deploy).
+2. From `next-app/`: `npm run indexnow -- --dry-run` (expect **198**), then
+   `npm run indexnow` (expect **200** or **202**; 202 = accepted, key
+   validation pending — normal on the first call).
+3. Next day: Bing Webmaster Tools → **IndexNow** should list the submission;
+   Site Explorer's indexed count should start climbing from ~15.
+
+**Standing procedure from now on:** run `npm run indexnow` after any deploy
+that adds, removes or retitles URLs (new product batch, new page, sitemap
+changes). ◻ Optional later: an automatic ping from the product-status hooks
+so a sale drops the product from Bing within minutes — not built; it
+touches the payment-path hooks and deserves its own session.
+
+### ◻ 2026-09-01 — Bing Webmaster Tools: imported from GSC, index is THIN (~15 of 198 URLs); actions below
+
+Owner imported the property into Bing Webmaster Tools (both
+`naplesestatejewelry.co` and `.com` are in the account, alongside the
+owner's other sites). Checked the same evening:
+
+- **Sitemap: fine.** `https://naplesestatejewelry.com/sitemap.xml`
+  imported 9/1/2026, last crawl 9/1/2026, **Success, 198 URLs** — the full
+  bilingual sitemap. Nothing to do.
+- **Index coverage: thin.** `site:naplesestatejewelry.com` on Bing returns
+  **~15 results** (`/`, `/shop`, `/about`, `/faq`, `/free-evaluation`,
+  `/silver-services`, `/es`, `/es/bullion`…) against Google's ~192. URL
+  Inspection: `/` and `/silver-services` **Indexed**, but **`/sell/naples`
+  is "Discovered but not crawled"** — i.e. the six city pages (the
+  best-ranking family on Google) are absent from Bing. No block anywhere:
+  Bingbot fetches return 200 with no robots directives and correct
+  canonicals; `robots.txt` allows `/` and declares the sitemap.
+  Site Explorer / Recommendations / URL Submission all still say "no data"
+  — the 48-hour post-import processing banner is literal; re-check after
+  2026-09-03.
+- **IndexNow: not set up.** Would need a key file served from the site
+  root (`next-app/public/<key>.txt`) plus one bulk POST of the 198 sitemap
+  URLs to `api.indexnow.org`, and ideally a ping when products change (the
+  reconcile sweep or admin save). It pushes the whole site into Bing,
+  Yandex, Seznam, Naver at once and keeps sold-out product pages current.
+  Small code change — **ask before doing**.
+- **"Alt attribute missing" notice (4 on `/`, 3 on `/silver-services`) is
+  a FALSE POSITIVE.** Every flagged `<img>` is a decorative clay mark with
+  `alt=""` + `aria-hidden="true"` — the correct pattern (Lighthouse a11y is
+  100). ⛔ Do not add alt text to them to satisfy Bing; it would make screen
+  readers announce decoration.
+- **Bing Places for Business — unverified.** A Bing search for the business
+  name + street showed no local panel, only organic results, which usually
+  means no (or an unclaimed) listing. bingplaces.com was not signed in, so
+  this needs the owner: sign in and use **"Import from Google Business
+  Profile"** — it mirrors the GBP (hours, photos, categories) and is the
+  Bing/Copilot/DuckDuckGo-adjacent equivalent of the GBP work already done.
+- ℹ️ `site:` trap: with `&count=30` Bing silently redirected (`rdr=1`) to
+  generic cruise/landscaping results that looked like "zero indexed";
+  without the param it returned the real ~15. Verify with a brand query
+  or URL Inspection before concluding a domain is absent.
+
+✅ **DONE 2026-09-01 (late) — 27 URLs submitted via URL Inspection →
+Request indexing, every one "Success : URL submitted successfully".**
+EN: the 6 `/sell/[city]` pages, `/sell`, `/gold-services`, `/estate-jewelry`,
+`/bullion`, `/trade-in`, `/estate-services`, `/jewelry-appraisal`,
+`/diamond-buyers`, `/silver-services/flatware-value`. ES: the 6 city pages,
+`/es/silver-services`, `/es/gold-services`, `/es/estate-jewelry`,
+`/es/jewelry-appraisal`, `/es/diamond-buyers`,
+`/es/silver-services/flatware-value`. Bing's quota read **100/day** and
+ended at 59 (two Chrome-extension drops forced ~14 resubmits; duplicates
+are harmless). Method: `urlinspection?urlToInspect=<double-URL-encoded>`
+deep link → JS-click "Request indexing" → "Submit".
+
+🔴 **Found while submitting — the 08-30 pages were stuck on the 404's
+`noindex`.** `/jewelry-appraisal` and `/diamond-buyers` showed "Crawl
+allowed: Yes · Page Fetch: Successful · **Indexing allowed: No**" with a
+last crawl of **31 Aug 10:36** — Bing fetched them before that morning's
+deploy landed and recorded the not-found page, which correctly carries
+`<meta name="robots" content="noindex">`. The live pages have no robots
+directive. Re-requesting them forces a fresh fetch. ⛔ Standing rule (also
+in DECISIONS): **after any deploy that adds pages, request indexing in BWT
+or run `npm run indexnow` the same day**, so Bing's first fetch is the real
+page, not the 404.
+
+ℹ️ Bing's SEO analyzer flags two indexed pages: `/sell` **"Title too long"**
+(76 chars with the brand suffix — Google-trimmed on 08-16 to keep the
+qualifier, Bing's limit is tighter) and `/silver-services/flatware-value`
+**"Meta Description too long or too short"** (173 chars). Cosmetic; decide
+whether Bing's thresholds are worth a retitle before touching either.
+
+**Still owner-side:** Bing Places import from GBP; re-check Site Explorer
+after 2026-09-03 for the indexed count (was ~15) and any crawl errors.
+
+### ✅ DEPLOYED 2026-09-01 + PRODUCTION-VERIFIED — /silver-services internal-linking pass + homepage silver card (no SQL, no env vars)
+
+**Owner pushed the same evening; production verified minutes later (CDN
+`Age` 39–42s).** All **14** page/locale combos return 200 with the intended
+`/silver-services` body anchor (bullion / gold-services / about →
+"sterling silver" / "plata esterlina"; estate-jewelry + faq → "…flatware and
+hollowware" / "cubertería y vajilla…"; sell → "Sterling silver flatware";
+trade-in → "sterling silver flatware" / "cubiertos de plata esterlina").
+Homepage `/` and `/es` serve **four strip `<h2>`s with the silver card
+second** and the "Sell silver →" / "Vender plata →" anchor; the
+`home-services-grid` class is in the HTML and **1 of 3 deployed CSS bundles
+carries `.home-services-grid`**. ES footer reads "Vender Plata Esterlina"
+on every ES page. Footer-scoped ES check: **24/25 + ES chrome** on `/es/*`,
+**0/25 + EN chrome** on the English twins — identical to the 08-31 figures,
+no regression.
+
+✅ **PSI re-check DONE the same evening — no movement, nothing outstanding.**
+Mobile ×5 (pagespeed.web.dev, Moto G Power / Slow 4G, Lighthouse 13.4.1):
+**72 · 91 · 79 · 77 · 79** (median 79) — the documented bimodal shape
+exactly: the 72 was the hero-image mode (LCP 9.1s, LCP element = a
+carousel card `<img fetchpriority="low">`, element render delay 2,950ms),
+the 77/79/79 the banner mode (LCP 4.4–4.5s), the 91 a high draw (LCP
+3.3s). A11y / Best Practices / SEO **100 / 100 / 100 on all five**, CLS 0
+on all five. Desktop ×3: **70 · 95 · 99** — the 70 was a slow-worker draw
+(TBT 620ms against 160ms and 20ms on the other two, with LCP 0.9s / 0.5s /
+0.5s), i.e. the "TBT-noise draw" the 08-23 entry already describes.
+Baseline for comparison (08-23): mobile 98/80/80/71, desktop 86 (TBT
+noise) and 96–98. ⛔ Still the standing rule: never change code off a
+single PSI run. ℹ️ Method notes: the keyless PSI API 429s immediately —
+use the web UI; the Browser pane's `wait` caps at 10s per step; two
+parallel lanes both finish but slow each other, and one run came back
+"Unable to resolve <url>" (Google-side transient, the site was serving).
+
+📜 Build record (kept for the file list and gate):
 
 ✅ **STAGING SYNCED 2026-09-01 — ready to copy to the repo folder and push.**
 Dry run queued exactly **17 files** — the 10 edited app files, the 3 new

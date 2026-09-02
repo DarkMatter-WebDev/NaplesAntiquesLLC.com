@@ -1,7 +1,64 @@
 
 # Changelog
 
-## 2026-09-01 — /silver-services internal-linking pass (BUILT, not deployed); homepage H1 "Sterling" kept on evidence
+## 2026-09-01 (late) — Bing Webmaster Tools checked; IndexNow BUILT (not deployed); Bing indexing requests submitted
+
+Owner imported the property into Bing Webmaster Tools from GSC and asked for
+a status check. Sitemap fine (imported + crawled same day, Success, 198
+URLs) but Bing's index held **~15 of 198 URLs** and `/sell/naples` was
+"Discovered but not crawled" — no block (Bingbot 200s, clean robots,
+correct canonicals); Bing had simply not crawled a day-old property. The
+"alt attribute missing" notice is a false positive on decorative clay marks
+(`alt=""` + `aria-hidden`, Lighthouse a11y 100) — not changed. Bing Places
+unverified (not signed in; no local panel on a name + street search).
+Full findings in `TASKS.md`.
+
+**Two actions approved by the owner:**
+
+1. **Manual "Request indexing" in BWT URL Inspection** for the pages that
+   matter (city pages, service hubs, the 08-30 pages, ES twins). Bing's
+   daily quota showed **100 URLs**; **27 distinct URLs** (15 EN + 12 ES)
+   each returned "Success : URL submitted successfully", quota ending at
+   59 after resubmits forced by two Chrome-extension drops. Driven via deep
+   links (`urlinspection?urlToInspect=<double-encoded URL>`) + a JS click
+   on "Request indexing" → "Submit". 🔴 Found on the way: `/jewelry-appraisal`
+   and `/diamond-buyers` were "Indexing allowed: No" from a **31 Aug 10:36
+   crawl that predated that morning's deploy** — Bing had recorded the
+   not-found page's `noindex` (verified: a bogus URL returns 404 with
+   `<meta name="robots" content="noindex">`). Re-requested; rule recorded
+   in `DECISIONS.md`. Bing's analyzer also flags `/sell` "Title too long"
+   (76) and `/silver-services/flatware-value` "Meta Description too long"
+   (173) — cosmetic, parked in `TASKS.md`.
+2. **IndexNow, built:** `public/5f41b4c6500c156c3ddaec86d7e313b6.txt`
+   (public key file), `txt` added to the `proxy.ts` matcher's extension
+   exclusions so it is served verbatim at the root (robots.txt precedent),
+   and `scripts/indexnow-submit.mjs` (`npm run indexnow`) which reads the
+   live sitemap's `<loc>`s and POSTs them to `api.indexnow.org` — refusing
+   to run until it reads the key back from the live site. Gate: `tsc` ·
+   lint · **1192/1192** · build exit 0 · **66 = 30/30/6** · dev server
+   serves `/<key>.txt` as 200 `text/plain` with the key. ⚠️ Joins the next
+   push; the first real `npm run indexnow` happens after deploy.
+
+## 2026-09-01 — /silver-services internal-linking pass + homepage silver card DEPLOYED; homepage H1 "Sterling" kept on evidence
+
+✅ **DEPLOYED and production-verified the same evening** (staging synced
+17 files → owner pushed → checked at CDN `Age` ≈40s): all 14 page/locale
+combos 200 with the intended `/silver-services` body anchors; `/` and `/es`
+serve four strip `<h2>`s with "We Buy Sterling Silver in Naples" /
+"Compramos Plata Esterlina en Naples" second and the "Sell silver →" /
+"Vender plata →" anchor; the `home-services-grid` class is in the HTML and
+1 of 3 deployed CSS bundles carries `.home-services-grid`; ES footer reads
+"Vender Plata Esterlina" everywhere; footer-scoped ES check 24/25 + ES
+chrome on `/es/*`, 0/25 + EN on English twins — unchanged from 08-31.
+**PSI re-check (same evening, pagespeed.web.dev, Lighthouse 13.4.1):**
+mobile ×5 = **72 · 91 · 79 · 77 · 79**, desktop ×3 = **70 · 95 · 99**;
+a11y/BP/SEO 100 on all eight, CLS 0 on all mobile runs. Same bimodal
+mobile shape as 08-23 (72 = hero-card-image LCP mode at 9.1s; 77–79 =
+banner mode at 4.4–4.5s; 91 = high draw at 3.3s) and the desktop 70 was a
+TBT-noise draw (620ms vs 160/20ms; LCP 0.5–0.9s throughout). No movement
+from the strip change, as expected for a below-the-fold card with one lazy
+88px WebP. Detail of what shipped follows. (Heading said "BUILT, not
+deployed" until the push.)
 
 **Owner question:** should the homepage H1 say "Sterling Silver" instead of
 "Sterling" for SEO? **Answer: no — kept as-is**, on two grounds, both durable

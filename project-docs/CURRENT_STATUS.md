@@ -8,7 +8,28 @@
 
 **Read this, then `TASKS.md`.**
 
-### 🟡 2026-09-01 — /silver-services internal-linking pass BUILT, NOT deployed; homepage option awaits owner
+### ✅ 2026-09-01 — /silver-services internal-linking pass + homepage silver card DEPLOYED and production-verified
+
+**Everything below is LIVE** (owner pushed the same evening; verified over
+HTTP minutes later — 14/14 link combos, four homepage strip cards in both
+locales, `.home-services-grid` in the deployed CSS, ES footer "Vender Plata
+Esterlina", footer-scoped ES check unchanged at 24/25). No SQL, no env vars.
+✅ **PSI re-checked the same evening: mobile 72 · 91 · 79 · 77 · 79 (median
+79), desktop 70 · 95 · 99 — the documented distribution, no movement;
+a11y/BP/SEO 100 on every run.** Nothing outstanding from the deploy. The
+narrative below is the build record.
+
+**🆕 Bing Webmaster Tools (owner imported from GSC 2026-09-01):** sitemap
+imported and crawled the same day (Success, 198 URLs), but Bing's index
+held only **~15 URLs** and the city pages were "Discovered but not
+crawled". No block (Bingbot 200s, clean robots). **Done the same evening:
+27 key URLs (EN + ES) submitted via Request indexing, all "Success"; the
+two 08-30 pages were stuck on the 404's `noindex` from a pre-deploy crawl
+and were re-requested. IndexNow BUILT (key file + `proxy.ts` `txt`
+exclusion + `npm run indexnow`) — 🔴 awaits the owner's push, then the
+first `npm run indexnow`.** Bing Places unverified (owner); the "alt
+missing" notice is a false positive on decorative marks — do not "fix" it.
+Detail in `TASKS.md` (top two items).
 
 Owner asked whether the homepage H1 should say "Sterling Silver" instead of
 "Sterling". **Decided NO on evidence** (GSC: bare-"sterling" queries = 15

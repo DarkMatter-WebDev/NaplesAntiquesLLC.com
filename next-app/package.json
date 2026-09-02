@@ -11,6 +11,7 @@
     "test": "vitest run",
     "check:compression": "node scripts/check-compression.mjs",
     "measure:routes": "node scripts/measure-routes.mjs",
+    "indexnow": "node scripts/indexnow-submit.mjs",
     "ebay:pin-fashion-categories": "node scripts/pin-ebay-fashion-categories.mjs"
   },
   "dependencies": {

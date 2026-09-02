@@ -146,6 +146,10 @@ export const config = {
     // used in social posts, and `review` is the short review-ask redirect.
     // Both are top-level route handlers and must bypass the locale rewrite,
     // or next-intl sends them to a /[locale]/... page that does not exist.
-    '/((?!_next/static|_next/image|favicon.ico|icon|api/|p/|review|robots.txt|sitemap.*\\.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff2?|mp4|webm|mov|ogg|pdf)).*)',
+    // `txt` joined the extension list 2026-09-01: the IndexNow key file
+    // (public/<key>.txt) must be served verbatim at the root or Bing cannot
+    // verify submissions — robots.txt was already carved out by name for the
+    // same reason. A .txt URL never has a locale meaning.
+    '/((?!_next/static|_next/image|favicon.ico|icon|api/|p/|review|robots.txt|sitemap.*\\.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff2?|mp4|webm|mov|ogg|pdf|txt)).*)',
   ],
 };

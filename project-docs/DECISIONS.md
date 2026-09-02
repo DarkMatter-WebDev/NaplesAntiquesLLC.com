@@ -324,6 +324,37 @@ from every served stylesheet** in dev until the server is restarted
 (Turbopack CSS staleness) — check the production bundle or restart before
 concluding the CSS is wrong.
 
+### Bing gets IndexNow pushes after every URL-changing deploy; the key is public by design
+
+Decided 2026-09-01 after the BWT import showed ~15 of 198 URLs indexed and
+the city pages uncrawled. Bing's own crawl of a small property is slow;
+IndexNow is the sanctioned push (one POST fans out to Bing, Yandex, Seznam,
+Naver). The pieces: `public/<key>.txt` at the site root, `txt` in the
+`proxy.ts` matcher exclusions (a `.txt` URL never has a locale meaning —
+without that the key file would be locale-rewritten and Bing could never
+verify), and `npm run indexnow` (`scripts/indexnow-submit.mjs`), which reads
+the LIVE sitemap and refuses to submit until it has read the key back from
+production.
+
+- ⛔ **The key is not a secret** — the protocol requires it to be readable
+  at `keyLocation`. Do not move it to `.env`/Netlify; do not "fix" the
+  public file. Rotating it means a new file + the constant in the script.
+- **Run `npm run indexnow` after any deploy that adds, removes or retitles
+  URLs.** The sitemap already drops sold products, so a run after a sale
+  batch tells Bing to drop them too.
+- Bing's manual "Request indexing" (URL Inspection) had a **100/day** quota
+  on 2026-09-01 — far more generous than GSC's ~10 — and is driven fastest
+  via `urlinspection?urlToInspect=<double-URL-encoded>` deep links.
+- ⛔ **A page Bing fetches before its deploy lands is recorded as
+  `noindex`** — the not-found page carries `<meta name="robots"
+  content="noindex">` (correct), and Bing keeps that verdict until it
+  re-fetches. `/jewelry-appraisal` and `/diamond-buyers` sat on "Indexing
+  allowed: No" from a 31 Aug 10:36 crawl for a day. So: **the same day any
+  deploy adds pages, request indexing for them in BWT or run
+  `npm run indexnow`.** The sitemap alone does not un-stick them quickly.
+- ℹ️ Automatic pings from the product-status hooks would be the next step;
+  not built — it touches the payment-path hooks (see the `after()` rules).
+
 ### GSC Request Indexing quota: assume ~10/day, property-wide, HARSHER than rolling-24h
 
 Confirmed across 3 days: shared across properties of the same site, and failed
