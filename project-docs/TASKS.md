@@ -5,10 +5,201 @@
 
 ## ◻ OPEN — needs a human
 
-### 🔴 DEPLOY the IndexNow key file + matcher fix (2026-09-01, no SQL, no env vars) — then run `npm run indexnow`
+### 🔴 DEPLOY the 2026-09-01 (night) batch: /watch-buyers (copy APPROVED) + schema logo switch + "Naples Jewelry Buyers" logo REMOVED (no SQL, no env vars)
 
-Owner approved ("go ahead with 1 and 2"). Built and gated; **not yet
-pushed.** Nothing works until the key file is live, by design.
+Owner, 2026-09-01 night: **"approve the watch page copy, switch the logo,
+remove the naples jewelry buyers logo entirely from this site."** All three
+done and gated on one tree:
+
+- `/watch-buyers` ×2 — copy approved as built (record below).
+- **Schema `logo` → `nav-logo.webp`** in `[locale]/layout.tsx` and
+  `sell/[city]/page.tsx` (the octopus; 157×120 clears Google's 112px
+  minimum — a larger square version would be an upgrade whenever the owner
+  has one).
+- **`public/assets/images/branding/logo.webp` DELETED** (hash-verified
+  backup in the session scratchpad only, not the repo). Its only other
+  reference, the legacy `/logo.png` redirect in root `netlify.toml`, now
+  points at `nav-logo.webp`. `logo2.webp` ("Naples Antiques & Estate
+  Jewelry" wordmark, reached only by the `/logo2.png` legacy redirect) was
+  NOT touched — not asked for; flag if it should go too.
+
+**Gate (final tree):** `tsc` clean · lint clean · 1192/1192 · build exit 0 ·
+**68 = 31 EN + 31 ES + 6** · dev server: JSON-LD `logo` reads
+`…/branding/nav-logo.webp` on `/`, `/es`, `/sell/naples`; `nav-logo.webp`
+200 (16,174 B); `logo.webp` **404**; `/watch-buyers` + `/es/watch-buyers`
+200 with 3/3 JSON-LD, crossover/footer/city-card links, 2 sitemap entries.
+
+✅ **STAGING SYNCED 2026-09-01 (night) — ready to copy to the repo and
+push.** Dry run queued exactly **12 files** (`netlify.toml`, `sitemap.ts`,
+`layout.tsx`, `jewelry-appraisal`, `sell/[city]`, NEW `watch-buyers`,
+`SiteFooter.tsx` + 5 memory docs) and exactly **1 Extra — the removed
+`branding/logo.webp`**, verified by name BEFORE the real run (the guard
+allows that one file and nothing else). Real run: **12 copied / 1 new dir /
+1 Extra deleted / 0 Mismatch / 0 FAILED** (robocopy exit 3 = copied +
+extras removed); follow-up dry run **0, exit 0**. **899 files / 20.49 MB**
+(robocopy total 902 = the documented 3 `/XF`-excluded). Leak check clean —
+0 `.git` (dir or file), `worktrees`, `node_modules`, `.next`, `.env*`,
+`*.log`, `*.tsbuildinfo`, `next-env.d.ts`, `*.pem` — against a **185 = 185
+`.tsx` positive control** (184 + the watch page). Staged content verified
+(UTF-8 reads): watch page present, `logo.webp` gone, `layout.tsx` schema
+logo = `nav-logo.webp`, `netlify.toml` `/logo.png` → `nav-logo.webp`,
+`sitemap.ts` carries `/watch-buyers`.
+
+**After deploy:** `npm run indexnow -- --urls=/watch-buyers,/es/watch-buyers`
+from `next-app/`; request both in GSC when quota allows; confirm
+`https://naplesestatejewelry.com/logo.png` 301s to the octopus and the old
+`logo.webp` URL 404s; the footer-scoped ES check now expects **25/26**.
+Google will refetch the schema logo on its own schedule.
+
+📜 Build record (the page):
+
+The one buy category with no service page. Evidence: every `/sell/[city]`
+card already said "Rolex, Omega, Cartier, and vintage timepieces, running or
+not, with or without box and papers" and **linked nowhere** (`href: null`,
+comment "no service page yet"), and GSC shows queries with no lander —
+"sell jewelry watch naples", "fort myers cartier watch buyer", "sell rolex
+submariner fort myers", "vintage watch buyer near me", "sell watches for
+cash". Built on the `/diamond-buyers` template (same honest resale-vs-retail
+framing, 3 offer factors, timeline band, 5-question FAQ with FAQPage
+schema, crossover line, final CTA with the `watch` clay mark).
+
+⛔ **Every claim was taken from copy the site already ships** (city cards,
+`/free-evaluation`, the FAQ's signed-brand list incl. Patek Philippe) or is
+an objective secondary-market fact. Nothing about pricing method,
+authentication tooling, or brand preferences was invented. **The owner
+should read the FAQ answers and the three factor cards before this goes
+live** — especially "Which brands do you buy?" and "Do you buy watches that
+are not running?" — and correct anything that is not how they actually
+operate.
+
+**Files:** NEW `src/app/[locale]/watch-buyers/page.tsx`; `sitemap.ts`
+(+`/watch-buyers`, priority 0.8); `SiteFooter.tsx` (+"Sell Watches" /
+"Vender Relojes"); `sell/[city]/page.tsx` (watch card now links);
+`jewelry-appraisal/page.tsx` (watch card → `/watch-buyers` instead of the
+evaluation form).
+
+**Gate:** `tsc` clean · lint clean · **1192/1192** · build exit 0 ·
+**68 prerendered = 31 EN + 31 ES + 6** · dev server: both locales 200, one
+`<h1>`, titles 50/52 chars, descriptions 151/165, **3/3 JSON-LD blocks
+parse** (JewelryStore + BreadcrumbList + FAQPage), crossover anchors to
+gold / diamonds / sterling silver / estate jewelry, footer "Sell Watches",
+`/sell/naples` card links, 2 sitemap entries.
+
+**NOT staged yet** — staging still holds the sitemap-bump/description batch
+above. On the owner's yes: sync staging (expect ~5 app files + docs), push,
+then `npm run indexnow -- --urls=/watch-buyers,/es/watch-buyers` and a GSC
+request for both once quota allows. ⚠️ The ES footer check will then read
+**25/26**.
+
+### ◻ GSC: 4 parked indexing requests still owed — quota was EXCEEDED on the first try 2026-09-01 (late)
+
+`/es/jewelry-appraisal` turned out to be **already "URL is on Google"** (no
+request needed — struck from the list). The first real request,
+`/silver-services/flatware-value` ("Discovered – currently not indexed"),
+returned **Quota Exceeded** immediately, so per the standing rule nothing
+else was tried. Still owed: `/silver-services/flatware-value`,
+`/es/silver-services/flatware-value`, `/diamond-buyers`,
+`/es/diamond-buyers` (+ `/watch-buyers` ×2 once deployed). ℹ️ Driving GSC's
+inspect box: `find` the combobox ref → `form_input` the URL → `Return`
+(typed keystrokes were swallowed, exactly as the 08-31 trap says); there
+is no working deep-link URL for inspection.
+
+### ◻ Citations audit 2026-09-01 (late) — mostly a clean slate; two things to know
+
+Searched Bing for the business name on the usual directories:
+
+- **Yelp — claimed and current.** 6240 Shirley St, (239) 404-8505, 11–3
+  hours, 3 reviews, "Visit us on Shirley Street". (Bing's cached snippet
+  still shows the OLD "private, mobile, appointment-only" copy — that is
+  Bing's cache, not the live listing.)
+- **Instagram, Facebook** — exist (in `SAME_AS`). The Facebook page is
+  public (bio: "Trusted estate jewelry buyer serving Southwest Florida…",
+  category Jewelry/watches, website `.com`); its About text did not expose
+  phone/address/hours to a read, so ◻ the owner should confirm those three
+  fields are filled in with the NAP below.
+- ✅ **Citation kit delivered to the owner 2026-09-01 (night)** — a
+  ready-to-paste file (NAP, hours, GBP description + short version,
+  categories, service area, socials, photo list, and the six directories to
+  create in order with their start URLs). Every one of those needs the
+  owner's own account, which is the boundary of what can be done from here.
+- **Bizapedia** (scrapes Sunbiz) shows the LLC's registered **principal
+  address 4243 30th Ave SW, Naples 34116**, not the showroom. That is the
+  state filing, not a directory to edit — if the owner wants the public
+  record to read Shirley St, it is a Sunbiz principal/mailing-address
+  update (an LLC filing decision, not a site task).
+- **Not found anywhere:** BBB, YellowPages, Nextdoor, MapQuest, Chamber of
+  Commerce, Manta, Foursquare, Apple Business Connect (not checkable
+  without login). These are the citation opportunities.
+
+**The NAP to use everywhere, verbatim** (from `business-location.ts` /
+the JSON-LD): **Naples Estate Jewelry · 6240 Shirley St, Ste 104, Naples,
+FL 34109 · (239) 404-8505 · https://naplesestatejewelry.com** · hours from
+Admin → Store Hours (currently Mon–Fri 11–3, Sat 11–4). ⛔ Never "Naples
+Antiques LLC" (legal entity, not a trading name) and never the `.co`.
+Suggested order: Apple Business Connect (Apple Maps + DuckDuckGo), then
+Nextdoor, BBB, YellowPages, Chamber. All need the owner's accounts.
+
+### ✅ RESOLVED (deploy item above) — brand asset finding — the JSON-LD `logo` was the WRONG mark
+
+`[locale]/layout.tsx:51` and `sell/[city]/page.tsx:191` set the JewelryStore
+`logo` to `/assets/images/branding/logo.webp`, which is a **160×160 "Naples
+Jewelry Buyers"** artwork — a different trading name (the one removed from
+`sameAs` on 08-28). `logo2.webp` is "Naples Antiques & Estate Jewelry"
+(the legal-entity wordmark, also not the brand). The only current-brand
+file is `nav-logo.webp`, the octopus (157×120 — clears Google's 112px
+minimum). ◻ Owner call: point the schema `logo` at `nav-logo.webp` now
+(consistent with the favicon decision of 08-16), and ideally supply a
+square octopus + wordmark logo for schema/social later. Two-line change
+once decided.
+
+### 🔴 DEPLOY the 2026-09-01 (latest) pre-deploy finish: sitemap `lastmod` bump + description trim (no SQL, no env vars)
+
+Two app files + two structure docs, gated (`tsc` · lint · **1192/1192** ·
+build exit 0 · 66 = 30/30/6), dev-verified (`/about` `<lastmod>` =
+`2026-09-01`; EN description 151 chars, ES 190):
+
+- `next-app/src/app/sitemap.ts` — `CONTENT_LAST_MODIFIED` 08-29 → **09-01**
+  (today's copy changes on 7 pages + the homepage card were unsignalled)
+- `next-app/src/app/[locale]/silver-services/flatware-value/page.tsx` —
+  description trimmed (EN 173 → 151, ES 210 → 190); claims unchanged
+- `project-docs/STRUCTURE.md`, `project-docs/INTEGRITY.md` — IndexNow,
+  sitemap-freshness and `LinkedPhrase` rows; checklist line
+
+✅ **STAGING SYNCED 2026-09-01 (latest) — ready to copy to the repo and
+push.** Final-tree `tsc` 0 · lint 0. Dry run queued exactly **7 files** (the
+2 app files + `STRUCTURE.md`, `INTEGRITY.md`, `CHANGELOG.md`,
+`CURRENT_STATUS.md`, `TASKS.md`), **0 Extras**; real run **7 copied / 0
+Mismatch / 0 FAILED**; follow-up dry run **0, exit 0**. **899 files / 20.46
+MB** (robocopy total 902 = the documented 3 `/XF`-excluded). Leak check
+clean — 0 `.git`, `worktrees`, `node_modules`, `.next`, `.env*`, `*.log`,
+`*.tsbuildinfo`, `next-env.d.ts`, `*.pem` — against a **184 = 184 `.tsx`
+positive control**. Staged `sitemap.ts` carries `new Date('2026-09-01')`;
+the staged flatware page was verified by **SHA-256 equality with source**
+(⚠️ a `Get-Content -Raw` substring check on the `×` character read False
+under PowerShell 5.1's default encoding — a false negative; use
+`-Encoding UTF8` or a hash for any file containing non-ASCII).
+
+**After deploy:** nothing to run — this batch changes no URLs (IndexNow not
+needed); Google picks the new `lastmod` up on its next sitemap read.
+ℹ️ Bing's "Title too long" on `/sell` (76 chars) was deliberately NOT
+acted on — see `CHANGELOG.md`.
+
+### ✅ DEPLOYED 2026-09-01 (late) + FIRST INDEXNOW PUSH DONE — key file + matcher fix + `npm run indexnow`
+
+Owner approved ("go ahead with 1 and 2"), pushed and deployed the same
+night. **Verified on production:** `/5f41b4c6500c156c3ddaec86d7e313b6.txt`
+→ **200 `text/plain`, body = the key** (CDN `Age` 0); `/`, `/es`,
+`/robots.txt`, `/sell/naples` all 200 (the matcher change broke nothing).
+`npm run indexnow -- --dry-run` read **192** URLs from the live sitemap;
+`npm run indexnow` → **IndexNow 202 Accepted for 192 URLs** (202 = accepted,
+key validation pending — the normal first-call response). ℹ️ 192, not the
+198 Bing imported this morning: the sitemap drops sold products, so the
+delta is inventory movement, not a missing page. ◻ Next day: Bing
+Webmaster Tools → IndexNow should list the submission and Site Explorer's
+indexed count should start climbing from ~15. Standing procedure: run
+`npm run indexnow` after any deploy that adds, removes or retitles URLs.
+
+📜 Build record:
 
 ✅ **STAGING SYNCED 2026-09-01 (late) — ready to copy to the repo and
 push.** Dry run queued exactly **8 files** (the 4 app files below + 4
@@ -131,8 +322,36 @@ qualifier, Bing's limit is tighter) and `/silver-services/flatware-value`
 **"Meta Description too long or too short"** (173 chars). Cosmetic; decide
 whether Bing's thresholds are worth a retitle before touching either.
 
-**Still owner-side:** Bing Places import from GBP; re-check Site Explorer
-after 2026-09-03 for the indexed count (was ~15) and any crawl errors.
+✅ **Bing Places for Business — IMPORTED from the Google Business Profile
+2026-09-01 (late).** Owner signed in (Microsoft account, then the Google
+consent); the "Import from your Google Business Profile" path ran with
+**weekly GBP→Bing sync ON** (recommended default, kept deliberately: the
+owner changes hours on the fly and the GBP is the copy they maintain).
+Result: **verified instantly, "Pending publish" — Bing's ETA 7–12 days**,
+`bizid f818777b-f86a-49a8-82b4-9d7025178d85`, GBP store code
+`04174729584373572986`. Every imported field checked against the live
+JSON-LD: name, phone, 6240 Shirley St Suite 104 / 34109-6253, `.com` URL,
+hours **Mon–Fri 11–3 · Sat 11–4** (matches the admin-panel hours the site
+serves today), the six `areaServed` cities as service areas, "customers
+visit this address — show full address" (store-first), Instagram + Facebook
+(+ WhatsApp from GBP), 12 photos, the GBP description.
+
+- ✅ **Email added by the owner the same night:**
+  `info@naplesestatejewelry.com` (the one monitored mailbox) — verified on
+  the listing.
+- One cosmetic item left alone — **Categories:** primary "Gold buyer"; additional "Coin dealers, **Gold
+  buyer** (duplicate of the primary), Diamond dealer, Jewelry store, Estate
+  liquidation, Professional services". The duplicate comes from two GBP
+  categories mapping to one Bing category; with weekly sync on, a manual
+  dedupe may be re-imported. Cosmetic — Bing will likely collapse it on
+  publish. Leave unless it survives publication.
+⚠️ Name/address/phone/website are LOCKED in Bing ("update your information
+in Google and sync again") — NAP changes go through the GBP, never Bing.
+
+**Still owner-side:** re-check BWT Site Explorer after 2026-09-03 for the
+indexed count (was ~15) and any crawl errors; watch for Bing's "listing
+published" email (7–12 days), then search the business name on Bing to see
+the local panel.
 
 ### ✅ DEPLOYED 2026-09-01 + PRODUCTION-VERIFIED — /silver-services internal-linking pass + homepage silver card (no SQL, no env vars)
 

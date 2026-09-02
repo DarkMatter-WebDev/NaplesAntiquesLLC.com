@@ -8,6 +8,18 @@
 
 **Read this, then `TASKS.md`.**
 
+### 🔴 2026-09-01 (night) — /watch-buyers APPROVED + schema logo switched + "Naples Jewelry Buyers" logo REMOVED — one batch, gated, awaiting push
+
+`/watch-buyers` ×2 (owner approved the copy), the JSON-LD `logo` now the
+octopus `nav-logo.webp`, `branding/logo.webp` deleted (its only other
+consumer, the `/logo.png` legacy redirect in `netlify.toml`, repointed),
+plus the earlier sitemap-bump/description trim — gated on one tree
+(`tsc` · lint · 1192/1192 · build · **68 = 31/31/6**). GSC: the parked
+requests are still quota-blocked (one attempt, stopped; four remain).
+Citations: audited, kit delivered to the owner; every remaining listing
+needs their own account. Review QR card delivered (no repo asset). Detail:
+`TASKS.md` top items, `CHANGELOG.md`.
+
 ### ✅ 2026-09-01 — /silver-services internal-linking pass + homepage silver card DEPLOYED and production-verified
 
 **Everything below is LIVE** (owner pushed the same evening; verified over
@@ -25,11 +37,12 @@ held only **~15 URLs** and the city pages were "Discovered but not
 crawled". No block (Bingbot 200s, clean robots). **Done the same evening:
 27 key URLs (EN + ES) submitted via Request indexing, all "Success"; the
 two 08-30 pages were stuck on the 404's `noindex` from a pre-deploy crawl
-and were re-requested. IndexNow BUILT (key file + `proxy.ts` `txt`
-exclusion + `npm run indexnow`) — 🔴 awaits the owner's push, then the
-first `npm run indexnow`.** Bing Places unverified (owner); the "alt
-missing" notice is a false positive on decorative marks — do not "fix" it.
-Detail in `TASKS.md` (top two items).
+and were re-requested. IndexNow DEPLOYED and the first push done the same
+night — key file live (200 `text/plain`), `npm run indexnow` → 202
+Accepted for 192 URLs. Bing Places IMPORTED from the GBP the same night
+(verified, "Pending publish" 7–12 days, weekly sync on, every field matches
+the site's JSON-LD).** The "alt missing" notice is a false positive on
+decorative marks — do not "fix" it. Detail in `TASKS.md` (top two items).
 
 Owner asked whether the homepage H1 should say "Sterling Silver" instead of
 "Sterling". **Decided NO on evidence** (GSC: bare-"sterling" queries = 15

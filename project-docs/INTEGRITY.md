@@ -91,6 +91,9 @@ the same session report to all four files.
 - [ ] `npx tsc --noEmit` passes.
 - [ ] `npm run lint` passes.
 - [ ] `npm run build` exits 0.
+- [ ] If the batch changes page COPY, `CONTENT_LAST_MODIFIED` in `sitemap.ts`
+      is bumped; if it adds, removes or retitles URLs, run `npm run indexnow`
+      from `next-app/` AFTER the deploy is live (it refuses to run before).
 - [ ] `npm audit --omit=dev` has no unresolved production vulnerability.
 - [ ] EN and ES render correctly for changed customer-facing behavior.
 - [ ] Responsive checks cover 320px mobile, tablet, short desktop, and wide

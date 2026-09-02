@@ -48,7 +48,11 @@ const buildJsonLd = (schedule: StoreHoursSchedule) => ({
   // Workspace, but the mailbox/alias must exist there or inquiries bounce.
   email: 'info@naplesestatejewelry.com',
   image: 'https://naplesestatejewelry.com/assets/images/pages/trust.webp',
-  logo: 'https://naplesestatejewelry.com/assets/images/branding/logo.webp',
+  // The octopus mark — the same artwork as the header and favicon (2026-09-01;
+  // owner: the old `logo.webp` was a "Naples Jewelry Buyers" artwork, a
+  // different trading name, and was removed from the site). 157×120 clears
+  // Google's 112px minimum; supply a larger square version to upgrade.
+  logo: 'https://naplesestatejewelry.com/assets/images/branding/nav-logo.webp',
   // Day-agnostic on purpose: hours are admin-editable, so naming days here
   // would go stale. The exact schedule lives in openingHoursSpecification.
   description:

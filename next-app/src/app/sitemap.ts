@@ -9,7 +9,11 @@ const BASE = 'https://naplesestatejewelry.com';
 // page content is meaningfully updated) avoids sending a churning "modified now"
 // signal on every crawl, which dilutes the freshness signal for pages that did
 // not actually change.
-const CONTENT_LAST_MODIFIED = new Date('2026-08-29');
+// 2026-09-01: /silver-services crossover lines on bullion, gold-services,
+// estate-jewelry, faq, about, trade-in, sell + the homepage's fourth
+// services card. Bump this whenever a batch changes page COPY, not for
+// doc-only or infrastructure deploys.
+const CONTENT_LAST_MODIFIED = new Date('2026-09-01');
 
 // Both locale prefixes the app serves. EVERY public page exists in both, so each
 // language version gets its OWN <url> entry — Google's documented pattern —
@@ -43,6 +47,7 @@ const STATIC_PAGES = [
   { path: '/jewelry-appraisal', priority: 0.8, changeFrequency: 'monthly' },
   { path: '/estate-jewelry', priority: 0.8, changeFrequency: 'monthly' },
   { path: '/diamond-buyers', priority: 0.8, changeFrequency: 'monthly' },
+  { path: '/watch-buyers', priority: 0.8, changeFrequency: 'monthly' },
   { path: '/gold-services', priority: 0.8, changeFrequency: 'monthly' },
   { path: '/silver-services', priority: 0.7, changeFrequency: 'monthly' },
   { path: '/silver-services/flatware-value', priority: 0.6, changeFrequency: 'monthly' },

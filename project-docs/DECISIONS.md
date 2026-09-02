@@ -301,6 +301,36 @@ silver at all. Rules that came out of it:
   cards are plain `<div>`s with one `<Link>`, so that objection does not
   apply there. LCP re-measurement after deploy does.
 
+### The brand mark is the octopus, everywhere — including the JSON-LD `logo`; the "Naples Jewelry Buyers" artwork is gone
+
+Owner, 2026-09-01: *"switch the logo… remove the naples jewelry buyers logo
+entirely from this site."* Until then the sitewide JewelryStore `logo` (and
+every `/sell/[city]` copy of it) pointed at `branding/logo.webp`, a 160×160
+"Naples Jewelry Buyers" artwork — a different trading name, the one already
+removed from `sameAs` on 08-28 — so Google was being told this business's
+logo was another brand's. Now: `logo` = `/assets/images/branding/nav-logo.webp`
+(the octopus the header and favicon use; 157×120 clears the 112px minimum),
+`logo.webp` deleted, the `/logo.png` legacy redirect repointed.
+
+- ⛔ Never reintroduce a "Naples Jewelry Buyers" or "Naples Antiques" mark
+  as this site's logo, favicon, social card, or schema image. The brand is
+  "Naples Estate Jewelry" (no "Co"), and its mark is the octopus.
+- `logo2.webp` ("Naples Antiques & Estate Jewelry" wordmark) still exists
+  only because the owner did not ask for it to go; it is reached solely by
+  the `/logo2.png` legacy redirect. Remove on request.
+- Upgrade path: a larger square octopus (+ wordmark) for schema and social
+  previews, supplied by the owner — do not upscale the 157px source.
+
+### `/watch-buyers` exists — every buy category now has a lander, and city cards link to all six
+
+Built and approved 2026-09-01. Claims on it are limited to what the site
+already said (city cards, `/free-evaluation`, the FAQ's signed-brand list)
+plus objective secondary-market facts; add specifics (authentication
+tooling, brand preferences, quartz/fashion watches) only with the owner's
+word. The `/sell/[city]` watch card's `href: null` special case is gone —
+if a category card ever needs to be unlinked again, that is a decision to
+record here, not a silent `null`.
+
 ### Column counts on a `CardGrid` are pinned with an UNLAYERED rule in `globals.css`, never a `grid-cols-*` utility
 
 Found 2026-09-01 while adding the fourth services-strip card: the strip's

@@ -214,9 +214,12 @@
   to = "/assets/images/shop/:splat"
   status = 301
 
+# 2026-09-01: logo.webp (a "Naples Jewelry Buyers" artwork — a different
+# trading name) was removed from the site at the owner's request; the legacy
+# URL now resolves to the octopus brand mark the header, favicon and JSON-LD use.
 [[redirects]]
   from = "/logo.png"
-  to = "/assets/images/branding/logo.webp"
+  to = "/assets/images/branding/nav-logo.webp"
   status = 301
 
 [[redirects]]

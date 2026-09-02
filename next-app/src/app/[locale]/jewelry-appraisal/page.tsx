@@ -92,7 +92,7 @@ export default async function JewelryAppraisalPage({ params }: Props) {
     },
     {
       mark: 'watch' as ClayMarkName,
-      href: evalHref,
+      href: p('/watch-buyers'),
       titleEn: 'Watches',
       titleEs: 'Relojes',
       descEn: 'Rolex, Omega, Cartier, and vintage pieces, running or not.',

@@ -45,7 +45,9 @@ NaplesEstateJewelry.co/
     |   `-- functions/             # scheduled marketplace + social-drip triggers
     |-- messages/
     |-- public/
-    |   `-- assets/
+    |   |-- assets/
+    |   `-- <indexnow-key>.txt      # IndexNow key file; public by protocol design
+    |-- scripts/                   # dev-cache guard, route/compression probes, indexnow-submit
     `-- src/
         |-- app/
         |-- assets/                # vendored static TTFs for the social ad card
@@ -94,10 +96,13 @@ let additional loose app assets accumulate at root.
 | Supabase clients | `next-app/src/lib/supabase/client.ts` and `server.ts` |
 | Translations | `next-app/messages/en.json` and `es.json` |
 | Local runtime assets | `next-app/public/assets/` |
+| Search-engine push after URL changes (Bing/Yandex/Seznam/Naver) | `npm run indexnow` → `next-app/scripts/indexnow-submit.mjs`, keyed by `public/5f41b4c6500c156c3ddaec86d7e313b6.txt`. The key is public by protocol design (never in `.env`); `txt` is excluded from the `proxy.ts` matcher so the file is served verbatim at the root. The script reads the LIVE sitemap and refuses to submit until it reads the key back from production |
+| Sitemap freshness signal | `CONTENT_LAST_MODIFIED` in `next-app/src/app/sitemap.ts` — bumped by hand when a batch changes page COPY (not for doc-only or infrastructure deploys); `/shop` alone uses "now" |
+| A link inside copy that ALSO feeds JSON-LD or a data array | `next-app/components/LinkedPhrase.tsx` over `lib/link-phrase.ts`: finds the literal phrase at render and links only that span, falling back to plain text. Used by `/faq` (FAQPage answer) and `/trade-in` (STEPS). ⚠️ Never fork such a sentence into a second JSX copy — that is how visible text drifts from the schema |
 | SEO robots/sitemap | `next-app/src/app/robots.ts` and `sitemap.ts` |
 | Page titles, descriptions, canonicals and social cards | `next-app/src/lib/seo.ts` — `pageMetadata()`. Public pages call it rather than hand-rolling `openGraph`; a hand-rolled block that omits `images` silently ships a blank share card |
 | `noindex` legal pages (and their sitemap exclusion) | `next-app/src/lib/legal-metadata.ts` — `LEGAL_NOINDEX_PATHS`, which `sitemap.ts` subtracts |
-| Brand mark (header + browser tab, one artwork) | `public/assets/images/branding/nav-logo.webp`, `src/app/icon.png`, `src/app/favicon.ico` |
+| Brand mark (header + browser tab + JSON-LD `logo`, one artwork) | `public/assets/images/branding/nav-logo.webp`, `src/app/icon.png`, `src/app/favicon.ico`; the schema `logo` in `[locale]/layout.tsx` and `sell/[city]/page.tsx` points at the same file. ⛔ `branding/logo.webp` (a "Naples Jewelry Buyers" mark) was removed 2026-09-01 — never bring it back |
 | Touch photo-swipe gesture (product gallery AND shop cards) | `next-app/src/lib/photo-swipe.ts` — thresholds and axis arbitration included. It was duplicated per surface until 2026-08-17, and the gallery's copy silently missed the fix the cards got, so **both surfaces must keep importing this** |
 | Route-change progress bar | `next-app/src/components/layout/RouteProgressBar.tsx`, mounted once in `[locale]/layout.tsx` **inside `<Suspense>`**. Navigations begun in code arm it via its `startRouteProgress(href)` export rather than a second indicator |
 | Showroom address, hours, and shared-suite wayfinding copy | `next-app/src/lib/business-location.ts` — schema, footer, checkout, receipts and page copy all read from it. ⚠️ Since 2026-08-25 the weekly HOURS are admin-editable data (`shop_settings.store_hours` via `src/lib/store-hours.ts`); the formatters here are pure and take the schedule as a parameter, and `HOURS` is only the fallback default. The phone number was never centralised and is now hardcoded in 105 places across 37 files; the address must not repeat that |

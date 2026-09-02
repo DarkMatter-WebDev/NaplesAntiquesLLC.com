@@ -56,7 +56,8 @@ export default async function SellCityPage({ params }: Props) {
   // phrase so the page can rank for every buy-side combination. `href` (added
   // 2026-08-30, SEO internal-link pass) turns each heading into a contextual
   // link to the matching service page — the anchors these pages were already
-  // ranking near. Watches has no service page yet, so it stays unlinked.
+  // ranking near. Watches got its page (/watch-buyers) on 2026-09-01, so all
+  // six cards now link.
   const whatWeBuy = [
     {
       mark: 'goldbar',
@@ -100,7 +101,7 @@ export default async function SellCityPage({ params }: Props) {
     },
     {
       mark: 'watch',
-      href: null,
+      href: p('/watch-buyers'),
       titleEn: `Sell Watches in ${area.city}`,
       titleEs: `Vender Relojes en ${area.city}`,
       descEn: `Luxury watch buyers in ${area.city} — Rolex, Omega, Cartier, and vintage timepieces, running or not, with or without box and papers.`,
@@ -187,7 +188,7 @@ export default async function SellCityPage({ params }: Props) {
     telephone: '+12394048505',
     email: 'info@naplesestatejewelry.com',
     image: 'https://naplesestatejewelry.com/assets/images/pages/trust.webp',
-    logo: 'https://naplesestatejewelry.com/assets/images/branding/logo.webp',
+    logo: 'https://naplesestatejewelry.com/assets/images/branding/nav-logo.webp',
     description: isEs ? area.introEs : area.introEn,
     priceRange: '$$',
     currenciesAccepted: 'USD',

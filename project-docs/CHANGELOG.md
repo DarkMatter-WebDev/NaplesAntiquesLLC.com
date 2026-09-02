@@ -1,6 +1,79 @@
 
 # Changelog
 
+## 2026-09-01 (night) — /watch-buyers BUILT (awaiting owner copy read), review QR card delivered, GSC still quota-blocked, citations audited, schema-logo finding
+
+Owner: "did we finish the watch buyers page, what's the review QR card,
+citations? … do what we can now."
+
+1. **`/watch-buyers` ×2 locales BUILT, not staged.** The last buy category
+   without a lander; every city card already made the claim and linked
+   nowhere. `/diamond-buyers` template; claims limited to copy already on
+   the site. Gate: `tsc` · lint · 1192/1192 · build exit 0 · **68 = 31 EN +
+   31 ES + 6** · both locales verified on the dev server (one h1, 3/3
+   JSON-LD, crossover + footer + city-card links, 2 sitemap entries). Wiring:
+   sitemap, footer "Sell Watches", city-card `href`, appraisal-page card.
+   Held back from staging until the owner reads the FAQ answers — the
+   no-invented-claims rule (`TASKS.md`).
+2. **Review QR card** — the 08-28 follow-up: a print-ready 4×6 in @ 300 dpi
+   PNG encoding `https://naplesestatejewelry.com/review` (the route handler
+   that 302s to the Google review form, so the card never goes stale),
+   rendered with the vendored Libre Caslon / Hanken Grotesk TTFs and the
+   octopus mark, error-correction level H. Generated with Python + Pillow +
+   `segno` in the session scratchpad and sent to the owner — **no asset or
+   dependency added to the repo** (the 08-28 note asked before adding one).
+3. **GSC parked requests:** `/es/jewelry-appraisal` found already indexed;
+   the first real request hit **Quota Exceeded** — stopped per the rule.
+   Four remain. Method note: `form_input` on the inspect combobox works
+   where typed keystrokes are swallowed.
+4. **Citations audit:** Yelp claimed + current (Bing's snippet is stale);
+   Instagram/Facebook exist; Bizapedia shows the Sunbiz principal address
+   (4243 30th Ave SW), not the showroom; nothing on BBB / YellowPages /
+   Nextdoor / MapQuest / Chamber / Manta / Foursquare. NAP block + order of
+   attack in `TASKS.md`.
+5. 🔴 **Found: the sitewide JSON-LD `logo` is `branding/logo.webp`, a
+   "Naples Jewelry Buyers" mark** (the trading name removed from `sameAs` on
+   08-28); `logo2.webp` is the "Naples Antiques & Estate Jewelry" wordmark.
+   Neither is the brand. Recommended fix (owner call): `nav-logo.webp`.
+
+**Owner's answer the same night: "approve the watch page copy, switch the
+logo, remove the naples jewelry buyers logo entirely, do any citations work
+you can."** Done: schema `logo` → `nav-logo.webp` (both emitters);
+`logo.webp` deleted (backup outside the repo); the `/logo.png` legacy
+redirect in `netlify.toml` repointed to the octopus; `/watch-buyers`
+approved as built. Gate on the final tree: `tsc` · lint · 1192/1192 · build
+exit 0 · 68 = 31/31/6 · dev-server JSON-LD reads the octopus URL, old file
+404s. Citations: a ready-to-paste kit (NAP, hours, GBP description,
+categories, socials, six directories with start URLs) sent to the owner —
+each listing needs the owner's own account, which is where the work stops.
+Facebook page checked: public, bio + category correct; phone/address not
+readable from the About text — owner to confirm.
+
+## 2026-09-01 (latest) — pre-deploy finish: sitemap `lastmod` bump, flatware-value description trim, repo-map/checklist updates
+
+Owner asked what else could be finished before the next push. Three small
+things, all gated (`tsc` · lint · **1192/1192** · build):
+
+1. **`CONTENT_LAST_MODIFIED` → `2026-09-01`** in `sitemap.ts`. It still
+   read 08-29, so the seven pages whose copy changed today (the
+   `/silver-services` crossover lines + the homepage's fourth card) were not
+   signalled to Google; IndexNow had already told Bing. Dev-server check:
+   `/about` `<lastmod>` now `2026-09-01`.
+2. **`/silver-services/flatware-value` meta description trimmed** — EN
+   **173 → 151** chars (Bing flagged "too long"; Google truncates ~160), ES
+   210 → 190. Only "with a worked example" / "con ejemplo práctico" was
+   dropped; every claim stays. ES deliberately left readable rather than
+   squeezed under 160 — Bing has not indexed the ES twin.
+3. **`STRUCTURE.md`** gains `scripts/` and the IndexNow key file in the
+   tree plus three single-source rows (IndexNow push, sitemap freshness,
+   `LinkedPhrase`); **`INTEGRITY.md`**'s pre-publish checklist gains the
+   `CONTENT_LAST_MODIFIED` / `npm run indexnow` line.
+
+Not done, deliberately: `/sell`'s 76-char title (Bing "too long") — the
+08-16 decision kept the brand suffix and the local qualifier on purpose;
+re-open only with a Bing-specific reason. The five parked GSC indexing
+requests remain the owner's call.
+
 ## 2026-09-01 (late) — Bing Webmaster Tools checked; IndexNow BUILT (not deployed); Bing indexing requests submitted
 
 Owner imported the property into Bing Webmaster Tools from GSC and asked for
@@ -36,8 +109,21 @@ Full findings in `TASKS.md`.
    live sitemap's `<loc>`s and POSTs them to `api.indexnow.org` — refusing
    to run until it reads the key back from the live site. Gate: `tsc` ·
    lint · **1192/1192** · build exit 0 · **66 = 30/30/6** · dev server
-   serves `/<key>.txt` as 200 `text/plain` with the key. ⚠️ Joins the next
-   push; the first real `npm run indexnow` happens after deploy.
+   serves `/<key>.txt` as 200 `text/plain` with the key. ✅ **Owner pushed
+   and deployed the same night; verified live** (key 200 `text/plain`
+   verbatim, routes unaffected) and the first push ran: **IndexNow 202
+   Accepted for 192 URLs** (192 = the live sitemap; the morning's 198 had
+   since lost sold products). Standing procedure: `npm run indexnow` after
+   any URL-changing deploy.
+3. **Bing Places for Business imported from the GBP** (owner handled the
+   Microsoft sign-in and the Google consent; the rest was driven in
+   Chrome). Instant verification, **"Pending publish" (7–12 days)**, weekly
+   GBP→Bing sync ON. Every imported field verified against the live
+   JSON-LD — NAP, `.com` URL, Mon–Fri 11–3 / Sat 11–4, the six service-area
+   cities, socials, 12 photos. Not touched: the empty Bing-specific email
+   field and a duplicated "Gold buyer" category (GBP mapping artifact,
+   likely collapsed on publish) — both parked in `TASKS.md`. NAP fields are
+   locked to the Google sync in Bing.
 
 ## 2026-09-01 — /silver-services internal-linking pass + homepage silver card DEPLOYED; homepage H1 "Sterling" kept on evidence
 

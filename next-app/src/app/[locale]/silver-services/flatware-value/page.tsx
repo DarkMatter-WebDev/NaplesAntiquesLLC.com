@@ -30,8 +30,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ? 'Guía del Valor de la Cubertería de Plata'
       : 'Sterling Silver Flatware Value Guide',
     description: isEs
-      ? 'Cuánto vale realmente la cubertería de plata esterlina: sellos de esterlina vs. chapado, la matemática peso × 92.5% × spot con ejemplo práctico, la trampa de los cuchillos y cuándo un patrón supera la fundición.'
-      : 'What sterling silver flatware is actually worth: sterling vs. plate marks, the weight × 92.5% × spot math with a worked example, the knife trap, and when patterns beat melt.',
+      // Trimmed 2026-09-01 (measured: EN 173 → 151, ES 210 → 190 chars): Bing's
+      // analyzer flagged the EN description as too long and Google truncates
+      // near 160. "with a worked example" / "con ejemplo práctico" was the only
+      // clause dropped — every claim stays. ES still runs long; Spanish does,
+      // and Bing has not indexed the ES twin, so it was left readable rather
+      // than squeezed under 160.
+      ? 'Cuánto vale realmente la cubertería de plata esterlina: sellos de esterlina vs. chapado, la matemática peso × 92.5% × spot, la trampa de los cuchillos y cuándo un patrón supera la fundición.'
+      : 'What sterling silver flatware is actually worth: sterling vs. plate marks, the weight × 92.5% × spot math, the knife trap, and when patterns beat melt.',
     path: '/silver-services/flatware-value',
     locale,
   });
