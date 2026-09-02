@@ -8,8 +8,25 @@
 
 **Read this, then `TASKS.md`.**
 
-🟡 **ONE THING IN FLIGHT (2026-09-02 night): the phone listing-editor batch
-is BUILT and gated but NOT deployed and NOT browser-verified.** Admin-only
+🔴 **DEPLOY OWED (2026-09-02, night follow-up): the phone editor could not
+scroll on iOS Safari after the deploy below** — `touch-action: pan-x
+pan-y` on the modal (WebKit nested-scroll quirk) → now `manipulation`,
+plus the Save-row padding written in a layout effect with a 14rem CSS
+fallback. Built, gated (1202/1202 · build 74 = 34/34/6), replica-verified
+at 375px, **staged**. Owner-side after the push: Safari mobile → Edit AND
+Add Product → scroll works immediately, lower accordions reachable, row
+hides/returns, no zoom, no sideways pan. Detail: `CHANGELOG.md` 2026-09-02
+(night, follow-up); checklist in `TASKS.md`.
+
+✅ **2026-09-02 (late night): the phone listing-editor + thumbnail-rail batch
+is DEPLOYED and production-verified** (routes 200, deployed CSS carries the
+editor rules, lightbox/page rail at 1920 move one card per click against
+production). Staging equals source. Two owner-only checks remain in
+`TASKS.md`: the phone editor (behind login) and a real-click look at the
+lightbox on the 1920px computer. The block below is the build record.
+
+🟡 (superseded) **The phone listing-editor batch
+was BUILT and gated before deploy.** Admin-only
 viewport zoom lock (new `admin/layout.tsx`), 16px editor inputs on touch +
 `touch-action` + two-finger guard (the accidental zoom was iOS tap-to-zoom
 on 14px inputs, not a pinch), and the mockup-approved hide-on-scroll Save

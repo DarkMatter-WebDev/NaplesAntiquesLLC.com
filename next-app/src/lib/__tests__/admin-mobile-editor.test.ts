@@ -35,7 +35,10 @@ describe('admin mobile editor: zoom lock', () => {
     expect(css).toMatch(
       /@media \(hover: none\) \{\s*\.product-editor-modal :is\(input, select, textarea\) \{\s*font-size: 1rem;/,
     );
-    expect(css).toMatch(/\.product-editor-modal \{\s*touch-action: pan-x pan-y;/);
+    // `manipulation`, never `pan-x pan-y`: the latter locked vertical scrolling
+    // of the editor on the owner's phone until a layout change (2026-09-02).
+    expect(css).toMatch(/\.product-editor-modal \{\s*touch-action: manipulation;/);
+    expect(css).not.toMatch(/\.product-editor-modal \{\s*touch-action: pan-x pan-y;/);
   });
 
   it('cancels two-finger touches from a non-passive listener while the editor is open', () => {
@@ -51,7 +54,13 @@ describe('admin mobile editor: hide-on-scroll Save row', () => {
     expect(shell).toMatch(/className="product-editor-footer /);
     expect(shell).toMatch(/data-hidden=\{editorFooterHidden \? 'true' : 'false'\}/);
     expect(shell).toMatch(/onScroll=\{handleEditorBodyScroll\}/);
-    expect(shell).toMatch(/'--editor-footer-h': `\$\{editorFooterHeight\}px`/);
+    // The row's height reaches CSS as a DOM write inside a LAYOUT effect, not
+    // React state: it must be there on the first painted frame, or an editor
+    // with every accordion collapsed cannot scroll (2026-09-02 night).
+    const layoutEffect = shell.slice(shell.indexOf('useLayoutEffect(() => {'), shell.indexOf('}, [editorOpen]);'));
+    expect(layoutEffect).toMatch(/modal\.style\.setProperty\('--editor-footer-h', `\$\{footer\.offsetHeight\}px`\)/);
+    expect(layoutEffect).toMatch(/measure\(\);\s*const observer/);
+    expect(shell).not.toMatch(/'--editor-footer-h': `\$\{editorFooterHeight\}px`/);
   });
 
   it('only overlays and animates the row on phones', () => {
@@ -60,6 +69,7 @@ describe('admin mobile editor: hide-on-scroll Save row', () => {
     expect(css.lastIndexOf('@media (max-width: 767px)', css.indexOf('.product-editor-footer {'))).toBeGreaterThan(-1);
     expect(block).toMatch(/position: absolute;/);
     expect(block).toMatch(/\.product-editor-footer\[data-hidden='true'\] \{\s*transform: translateY\(110%\);/);
-    expect(css).toMatch(/\.product-editor-body \{\s*padding-bottom: calc\(1rem \+ var\(--editor-footer-h, 0px\)\);/);
+    // A generous fallback, never 0px — see the note in globals.css.
+    expect(css).toMatch(/\.product-editor-body \{\s*padding-bottom: calc\(1rem \+ var\(--editor-footer-h, 14rem\)\);/);
   });
 });

@@ -1,7 +1,61 @@
 
 # Changelog
 
-## 2026-09-02 (late night) — thumbnail rail "fast total cycle" on wide monitors FIXED (BUILT, gated, NOT deployed — bundles with the editor batch)
+## 2026-09-02 (night, follow-up) — phone editor could not scroll on iOS Safari: FIXED (BUILT, gated, staged — deploy owed)
+
+Owner, on **Safari mobile** after the deploy: "when I first open [Edit
+item] the entire page is locked and I can't scroll at all to see the lower
+accordions… the lower save menu bar is locked too… after I open an
+accordion it unlocks." Vertical scrolling must always work; only
+horizontal is unwanted; may affect Add Product too.
+
+**Diagnosis.** Measured the REAL editor on production (old code) in the
+owner's un-maximised desk Chrome at 500×715 (`< 768px` layout): body
+`scrollHeight 777 > clientHeight 550`, padding-bottom 176px applied,
+`--editor-footer-h: 160px` set, programmatic scroll moved — the geometry
+was fine in Chrome. So the lock was iOS touch handling: the modal carried
+`touch-action: pan-x pan-y`, and WebKit is unreliable about nested
+overflow scrollers under `pan-*` values on an ANCESTOR until a layout
+change re-evaluates it — which is exactly what opening an accordion does.
+(The products table uses `pan-x pan-y` on the scroller ITSELF and works —
+consistent with the ancestor-only failure.) The row "locked" because no
+scroll events ever fired.
+
+**Fix (two layers, both cheap):**
+1. `.product-editor-modal { touch-action: manipulation }` — every scroll
+   gesture allowed, double-tap zoom off; pinch is still cancelled by the
+   non-passive two-finger `touchmove` guard + `gesturestart`.
+2. The Save row's height now reaches CSS as a DOM write in a
+   **`useLayoutEffect`** (`modal.style.setProperty('--editor-footer-h', …)`,
+   then a ResizeObserver) instead of a ResizeObserver → React state
+   round-trip, so the first painted frame already has the bottom padding;
+   and the CSS fallback went from `0px` to **`14rem`** so the padding exists
+   even before JS. This closes the other way the editor could trap content
+   (all accordions collapsed → content just short of scrollable, last
+   accordions under the overlaid row).
+
+**Verified:** replica of the editor (same classes, 8 collapsed panels,
+6-button row) in the pane at 375×812 — fallback-only: padding 240px,
+scrollable; measured var: 87px of travel, last panel clears the row at
+the end; hidden state translates the row fully offscreen;
+`touch-action: manipulation` computed. Gate: `tsc` · lint · **1202/1202
+(117 files)** · build exit 0 · 74 = 34/34/6 · built CSS carries
+`manipulation`. ⛔ The real thing is still owner-verified only (Safari
+mobile, behind login) — see `TASKS.md`. The editor opened for measurement
+in the owner's Chrome was closed via ✕ Close → "Close"; nothing saved.
+
+## 2026-09-02 (late night) — editor + thumbnail-rail batch DEPLOYED and production-verified
+
+Owner pushed. Verified over HTTP: `/`, `/shop`, `/es/shop`, the bracelet
+product page 200; `/admin` 307 (login) as designed; the deployed CSS chunk
+carries all three editor rules (16px touch inputs, `touch-action`, the
+`data-hidden` footer transform). Verified behaviourally in the pane at
+1920×983 against production: lightbox 144 → 216 → 288 → 360 with the scroll
+position never dropping toward 0 (the pre-fix signature), page rail 360 →
+432 → 504. Still owner-side, not provable from here: the phone editor
+(behind login) and a real-click pass on the 1920px computer.
+
+## 2026-09-02 (late night) — thumbnail rail "fast total cycle" on wide monitors FIXED (build record)
 
 Owner: in the product lightbox, clicking the arrow made the thumbnail strip
 "do a really fast total cycle instead of just progressing once". Could not

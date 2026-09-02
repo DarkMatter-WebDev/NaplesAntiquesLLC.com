@@ -5,7 +5,51 @@
 
 ## ◻ OPEN — needs a human
 
-### 🔴 2026-09-02 (night) — phone listing editor batch: OWNER PHONE CHECK, then DEPLOY (bundle it; no SQL, no env vars)
+### 🔴 DEPLOY the 2026-09-02 (night follow-up) editor scroll fix — then OWNER walkthrough on Safari mobile (no SQL, no env vars)
+
+Owner on Safari mobile after the previous deploy: editor "locked", no
+vertical scroll, lower accordions unreachable, Save row stuck, until an
+accordion was opened. Fixed in `globals.css` (`touch-action: manipulation`
+instead of `pan-x pan-y`; padding fallback `14rem`) and `AdminShell.tsx`
+(`useLayoutEffect` writes `--editor-footer-h` to the DOM before paint).
+Gate: `tsc` · lint · **1202/1202 / 117 files** · build exit 0 · 74 =
+34/34/6. Replica-verified in the pane at 375×812; the real editor is
+behind login.
+
+✅ **STAGING SYNCED 2026-09-02 (night follow-up) — ready to copy to the
+repo and push.** Dry run queued exactly **7 files** (AdminShell,
+globals.css, the editor guard test, 4 docs) with **0 Extras**, verified
+BEFORE the real run; real run **7 copied / 0 Mismatch / 0 FAILED**;
+follow-up dry run **0, exit 0**; **909 files** on disk (robocopy 912 = the
+documented 3 `/XF`-excluded). Leak check 0 `.git` (dir/file), `.env*`,
+`node_modules`, `.next`; **191 = 191 `.tsx`** positive control; SHA-256
+equality for the three app files; staged `globals.css` carries
+`touch-action: manipulation` and **0** `pan-x pan-y` on the modal.
+(Docs-only re-sync follows this record.)
+
+◻ **Owner walkthrough after the push — Safari mobile, production admin:**
+1. **Edit an item** (all accordions collapsed as it opens): scroll DOWN
+   immediately — it must move; the last accordions come up from under the
+   Save row; the row slides away; scroll up a little — it returns; at the
+   very bottom it is visible and the last accordion sits above it.
+2. Open an accordion (Details), scroll inside the long form, tap into a
+   field — no zoom; pinch — nothing; try to drag sideways — nothing.
+3. **Add Product** (5-button row): same as 1–2.
+4. Close without saving (✕ Close → Close) — table behind is intact.
+If any step fails, say which number and what happened.
+
+### ✅ DEPLOYED + production-verified 2026-09-02 (late night): phone editor zoom lock + hide-on-scroll Save row + thumbnail-rail fix
+
+Owner: "pushed and deployed, verify production." Over HTTP: `/`, `/shop`,
+`/es/shop`, product page 200; `/admin` 307; deployed CSS chunk has all
+three editor rules. In the pane at 1920 against **production**: lightbox
+144 → 216 → 288 → 360 (never toward 0), page rail 360 → 432 → 504.
+◻ **Owner-only, still open:** (1) phone editor — tap a field (no zoom),
+pinch (nothing), scroll (Save row ducks/returns), New + Edit; (2) on the
+1920px computer, click through a product lightbox on production — one
+thumbnail per click. Build record follows.
+
+### 📜 Build record — 2026-09-02 (night) phone listing editor batch
 
 Built and gated (`tsc` · lint · **1200/1200 / 116 files** · build exit 0 ·
 74 = 34/34/6) but **unverified in any browser** — the editor is behind admin

@@ -1,7 +1,7 @@
 'use client';
 
 import { adminGetProduct, adminUpdateProductStatus, adminRevalidateProduct } from '@/app/actions/admin-products';
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -1839,7 +1839,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const editorFooterRef = useRef<HTMLDivElement>(null);
   const editorScrollLastY = useRef(0);
   const [editorFooterHidden, setEditorFooterHidden] = useState(false);
-  const [editorFooterHeight, setEditorFooterHeight] = useState(0);
   const editorOpen = Boolean(editing);
   const handleEditorBodyScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
     const el = event.currentTarget;
@@ -1851,17 +1850,24 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     else if (delta < -4) setEditorFooterHidden(false);
     if (Math.abs(delta) > 4) editorScrollLastY.current = y;
   }, []);
-  useEffect(() => {
+  // 🔴 The row's height is written to the modal as `--editor-footer-h` DIRECTLY
+  // on the DOM, in a layout effect, before the first paint — NOT through React
+  // state. The first version round-tripped a ResizeObserver reading through
+  // `setState`, so the editor's first painted frame had no bottom padding: with
+  // every accordion collapsed the content was just short enough that nothing
+  // could scroll, and the last accordions sat trapped under the overlaid Save
+  // row until opening one grew the content (owner report, 2026-09-02 night,
+  // "the entire page is locked"). The CSS side keeps a generous fallback for
+  // the var, so the padding exists even if this effect is late.
+  useLayoutEffect(() => {
     if (!editorOpen) return;
     const footer = editorFooterRef.current;
-    // `observe()` delivers an initial measurement on its own, so there is no
-    // synchronous setState here. The reset lives in cleanup: closing the
-    // editor unmounts the row, and the next one must open with it shown.
-    const observer =
-      footer && typeof ResizeObserver !== 'undefined'
-        ? new ResizeObserver(() => setEditorFooterHeight(footer.offsetHeight))
-        : null;
-    observer?.observe(footer as HTMLDivElement);
+    const modal = footer?.parentElement;
+    if (!footer || !modal) return;
+    const measure = () => modal.style.setProperty('--editor-footer-h', `${footer.offsetHeight}px`);
+    measure();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    observer?.observe(footer);
     return () => {
       observer?.disconnect();
       editorScrollLastY.current = 0;
@@ -5230,7 +5236,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             // inside the guaranteed-safe area, at the cost of a little unused space
             // on the rare frame where the toolbar happens to be hidden.
             className="w-full max-w-[100vw] h-svh md:h-auto md:max-w-5xl border flex flex-col overflow-hidden product-editor-modal md:rounded-[8px]"
-            style={{ background: '#f7f8fc', borderColor: '#d9deef', '--editor-footer-h': `${editorFooterHeight}px` } as React.CSSProperties}
+            style={{ background: '#f7f8fc', borderColor: '#d9deef' }}
           >
             {/* Modal header */}
             <div className="flex items-start justify-between px-7 py-5 border-b"

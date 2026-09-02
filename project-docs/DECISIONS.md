@@ -41,9 +41,29 @@ it). The fix that works is the input size: `.product-editor-modal :is(input,
 select, textarea) { font-size: 1rem }` under `@media (hover: none)`, kept
 UNLAYERED so a Tailwind `text-xs` on the same element cannot win. ⛔ Do not
 "tidy" that rule into `@layer` — it stops working silently. Pinch and
-double-tap are handled separately (`touch-action: pan-x pan-y` + the
+double-tap are handled separately (`touch-action: manipulation` + the
 non-passive two-finger `touchmove` guard in `AdminShell`, because React's
 touch props are passive and `preventDefault` there is a no-op).
+
+### ⛔ Never put `touch-action: pan-x pan-y` on an ANCESTOR of a scroller — use `manipulation`
+
+Shipped for one deploy on the editor modal (2026-09-02) and on Safari
+mobile the editor's body could not be scrolled at all until an accordion
+changed the layout. WebKit is unreliable about nested overflow scrollers
+under `pan-*` values applied above them; `manipulation` (all pans + pinch,
+minus double-tap zoom) is the value that never breaks scrolling, and pinch
+is cancelled in JS instead. `pan-x pan-y` on the scroller ITSELF (the
+products table) is fine. Guarded by `admin-mobile-editor.test.ts`.
+
+### Overlaid controls must reserve their space from the FIRST painted frame
+
+The Save row overlays the editor body on phones, so the body pads by the
+row's height. That height is written straight to the DOM in a
+`useLayoutEffect` (not via React state after a ResizeObserver), and the
+CSS fallback is a generous `14rem`, not `0px`: with every accordion
+collapsed the content is just short of scrollable, so a frame without the
+padding traps the last accordions under the row with no way to reach
+them. Too much padding costs blank scroll room; too little traps content.
 
 ### The editor's Save row overlays and hides on scroll on PHONES only
 
