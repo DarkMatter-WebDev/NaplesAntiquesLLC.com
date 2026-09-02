@@ -4,11 +4,60 @@
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
 > in `DECISIONS.md`. Last reconciled: **2026-09-02**.
 
-## Start Here (handoff, end of the 2026-09-02 guide-pages session — SUPERSEDES the blocks below)
+## Start Here (handoff, end of the 2026-09-02 session — SUPERSEDES the blocks below)
 
 **Read this, then `TASKS.md`.**
 
-### 🔴 2026-09-02 (afternoon) — BreadcrumbList schema + VISIBLE breadcrumb trail on every sitemap page, schema aliases dropped — gated, staged, awaiting push
+🟡 **ONE THING IN FLIGHT (2026-09-02 night): the phone listing-editor batch
+is BUILT and gated but NOT deployed and NOT browser-verified.** Admin-only
+viewport zoom lock (new `admin/layout.tsx`), 16px editor inputs on touch +
+`touch-action` + two-finger guard (the accidental zoom was iOS tap-to-zoom
+on 14px inputs, not a pinch), and the mockup-approved hide-on-scroll Save
+row on phones. Gate: `tsc` · lint · **1200/1200 (116 files)** · build ·
+74 = 34/34/6. It sits behind admin login, so the verification is the
+OWNER's phone at `http://10.0.0.208:3007/admin` (dev) — then bundle into
+the next push. Details: `TASKS.md` top item, `CHANGELOG.md` 2026-09-02
+(night). Staging NOT yet re-synced with it.
+
+**Bundled into the same batch (late night): the product-gallery thumbnail
+rail "fast total cycle" is FIXED** — the fit's width re-measure let the
+browser clamp `scrollLeft` to 0 on displays wider than the strip (any
+1920px monitor), so every lightbox arrow click eased from the first
+thumbnail out to the active one. One-line save/restore in
+`ProductImageGallery.tsx` + a source guard; pane-verified at 1920 and 2100
+(lightbox AND page rail). Reproduced on the owner's second computer
+against production, so **after deploy, the owner should re-check the
+lightbox on that 1920px machine** (the only place it ever showed). Gate
+now **1202/1202 (117 files)**. Detail: `CHANGELOG.md` 2026-09-02 (late
+night).
+
+Also learned this session: the newest product (#132, the 10K triple-row
+diamond tennis bracelet, 18 photos) uploaded cleanly but every photo is
+**JPEG** — the browser used could not encode WebP, so the honest fallback
+fired exactly as designed. Nothing mislabeled, cache metadata correct, CDN
+delivers 39 KB at `w=640`. Owner will try Chrome next time.
+
+Otherwise nothing is in flight and staging equals
+source. Two batches went live today, both production-verified: (1) the
+three SEO guide pages (+ owner's FAQ corrections, IndexNow 200 for six),
+and (2) sitewide breadcrumbs — schema AND a visible trail on every sitemap
+page and product page — with the JewelryStore `alternateName` aliases
+dropped. Open work is owner-side only: GSC Request Indexing (12 URLs,
+quota-bound), the standing citation / GBP items in `TASKS.md`, and a look
+at Search Console → Enhancements → Breadcrumbs in mid-September. Owner's
+standing asks from this session: **use their real Chrome, not the in-app
+Browser pane, for browser work**; **each Netlify deploy costs credits, so
+bundle follow-ups before asking them to push**; dental gold is **never**
+priced in store (sent out for karat testing first).
+
+### ✅ 2026-09-02 (evening) — BreadcrumbList schema + VISIBLE breadcrumb trail on every sitemap page, schema aliases dropped — DEPLOYED and production-verified
+
+**LIVE.** HTTP scan of 55 production URLs (EN + ES): one trail + one
+schema each, names identical, homepage clean, `alternateName` gone;
+screenshots in the owner's Chrome match the approved mockup. Nothing to
+submit. The narrative below is the build record.
+
+### 📜 2026-09-02 (afternoon) — build record
 
 Owner asked about Google sitelinks (competitor shows them, we don't).
 Answer recorded in `DECISIONS.md`: algorithmic, brand phrase is generic,
@@ -22,13 +71,6 @@ Bundled into ONE deploy at the owner's request (Netlify credits). Gate:
 prerendered-HTML scan 58/58 pages (one trail + one schema, identical
 names) · visual QA in the owner's Chrome (10 desktop pages) + 375 px pane.
 Nothing to submit after deploy; Google re-reads on its own schedule.
-
-The batch before it (three SEO guide pages) is deployed,
-production-verified, IndexNow-submitted, and documented. The only open work is owner-side and
-quota-bound (GSC Request Indexing, 12 URLs) plus the standing citation /
-GBP items in `TASKS.md`. Owner's standing asks from this session: **use
-their real Chrome, not the in-app Browser pane, for browser work**; dental
-gold is **never** priced in store (sent out for karat testing first).
 
 ### ✅ 2026-09-02 — THREE SEO GUIDE PAGES DEPLOYED and production-verified; IndexNow 200 for all six
 

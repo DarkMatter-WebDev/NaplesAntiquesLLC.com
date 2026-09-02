@@ -3048,3 +3048,57 @@ html.nej-hero-go .home-boot-splash {
 html[data-nej-cookies-ok] [data-cookie-notice] {
   display: none;
 }
+
+/* Admin listing editor on touch screens (owner request, 2026-09-02).
+
+   Two things the owner hit on their phone: tapping a field zoomed the page
+   (iOS Safari auto-zooms any input under 16px, and `.form-field` is 14px), and
+   once zoomed the modal could be panned sideways with the Save row a mis-tap
+   away. Three layers, because iOS ignores `user-scalable=no`:
+   1. `admin/layout.tsx` locks the viewport scale for `/admin/*` only.
+   2. Every input inside the editor is 16px on touch screens — the one size
+      that never triggers tap-to-zoom. Unlayered on purpose so it beats a
+      Tailwind `text-xs` on the same element (unlayered > `@layer utilities`).
+   3. `touch-action: pan-x pan-y` allows scrolling but not pinch or double-tap
+      zoom; `AdminShell` adds a two-finger `touchmove` guard for the rest. */
+@media (hover: none) {
+  .product-editor-modal :is(input, select, textarea) {
+    font-size: 1rem;
+  }
+}
+.product-editor-modal {
+  touch-action: pan-x pan-y;
+  overscroll-behavior: contain;
+}
+
+/* Phones: the Save row overlays the bottom of the editor and ducks out of the
+   way while the form scrolls down, returning on any upward scroll or at either
+   end of the form (mockup approved 2026-09-02). It sits in normal flow on
+   desktop. `--editor-footer-h` is measured by a ResizeObserver in `AdminShell`
+   so the body always has enough bottom padding to scroll the last field clear
+   of the row — the row's height varies between New (5 buttons) and Edit (6). */
+@media (max-width: 767px) {
+  .product-editor-modal {
+    position: relative;
+  }
+  .product-editor-body {
+    padding-bottom: calc(1rem + var(--editor-footer-h, 0px));
+  }
+  .product-editor-footer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #f7f8fc;
+    transition: transform 0.22s ease;
+    will-change: transform;
+  }
+  .product-editor-footer[data-hidden='true'] {
+    transform: translateY(110%);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .product-editor-footer {
+      transition: none;
+    }
+  }
+}

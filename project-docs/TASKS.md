@@ -5,7 +5,68 @@
 
 ## ◻ OPEN — needs a human
 
-### 🔴 DEPLOY the 2026-09-02 (afternoon) batch: BreadcrumbList schema + VISIBLE breadcrumb trail on every sitemap page + JewelryStore `alternateName` aliases DROPPED (no SQL, no env vars)
+### 🔴 2026-09-02 (night) — phone listing editor batch: OWNER PHONE CHECK, then DEPLOY (bundle it; no SQL, no env vars)
+
+Built and gated (`tsc` · lint · **1200/1200 / 116 files** · build exit 0 ·
+74 = 34/34/6) but **unverified in any browser** — the editor is behind admin
+login. What changed: NEW `src/app/[locale]/admin/layout.tsx` (viewport
+lock, `/admin/*` only), `globals.css` (16px editor inputs on touch,
+`touch-action: pan-x pan-y`, phone-only overlay + slide for
+`.product-editor-footer`), `AdminShell.tsx` (two-finger guard in the
+scroll-lock effect; `onScroll` direction tracking; ResizeObserver →
+`--editor-footer-h`), NEW `src/lib/__tests__/admin-mobile-editor.test.ts`.
+
+◻ **Owner, on the phone (dev server up, same Wi-Fi):**
+`http://10.0.0.208:3007/admin` → open any listing, then check:
+1. Tap into a text field — the page must NOT zoom.
+2. Pinch and double-tap inside the form — nothing zooms; no sideways pan.
+3. Scroll the form down — the Save row slides off the bottom; scroll up a
+   little — it comes back; at the very bottom it is visible.
+4. New listing (5 buttons) AND Edit (6 buttons): the last field can be
+   scrolled clear of the row in both.
+5. Desktop editor: unchanged (row in normal flow, no animation).
+If anything is off, say which number.
+
+◻ **Also in this batch (late night): thumbnail-rail "fast total cycle" fix**
+(`src/components/shop/ProductImageGallery.tsx` `fitWholeThumbnailCards` —
+`scrollLeft` saved before the width re-measure and restored after; NEW
+`src/lib/__tests__/product-gallery-fit-scroll.test.ts`). Pane-verified at
+1920 and 2100. ◻ **After deploy, owner:** on the **other computer (the
+1920px display)**, open a product lightbox on production and click the
+arrow a few times — the strip should move exactly one thumbnail per click,
+no sweep from the start. Gate for the whole batch now **1202/1202 / 117
+files** · build exit 0 · 74 = 34/34/6.
+
+✅ **STAGING SYNCED 2026-09-02 (late night) — ready to copy to the repo and
+push.** Dry run queued exactly **12 files** (AdminShell, ProductImageGallery,
+globals.css, NEW admin `layout.tsx`, NEW `admin-mobile-editor.test.ts`, NEW
+`product-gallery-fit-scroll.test.ts`, 6 docs) with **0 Extras**, verified
+BEFORE the real run; real run **12 copied / 0 Mismatch / 0 FAILED** (exit 1
+= copied only); follow-up dry run **0, exit 0**. **909 files / 20.63 MB**
+(robocopy total 912 = the documented 3 `/XF`-excluded; 909 = 906 + the 3
+new files). Leak check clean — 0 `.git` (dir or file), `worktrees`,
+`node_modules`, `.next`, `.env*`, `*.log`, `*.tsbuildinfo`, `next-env.d.ts`
+— against a **191 = 191 `.tsx` positive control**; `.github/workflows`
+present. SHA-256 equality with source for the admin layout, AdminShell,
+ProductImageGallery, globals.css, the fit-scroll test and this file. (Docs-only
+re-sync follows this record.) Nothing to submit after deploy (no URL or copy
+changes — `CONTENT_LAST_MODIFIED` untouched).
+
+### ✅ DEPLOYED + production-verified 2026-09-02 (evening): BreadcrumbList schema + VISIBLE breadcrumb trail on every sitemap page + `alternateName` aliases DROPPED
+
+Owner: "pushed and deployed, verify production, use same chrome window."
+HTTP scan minutes later: **55 URLs** (27 sitemap pages + `/sell/naples` + a
+product page, EN and ES) — every one 200 with **exactly one visible trail
+and one BreadcrumbList whose names match**; trail between `<main>` and
+`<h1>` on all but `/shop` ×2, where the `<h1>` is the screen-reader-only
+heading that sits above the container by design. Homepage: no trail, no
+breadcrumb schema, **`alternateName` absent** (both locales). Screenshots in
+the owner's Chrome: `/gold-services`, a product page, `/es/estate-services`,
+`/contact` render as mocked. Nothing to submit; Google re-reads on its own
+schedule — check Search Console → Enhancements → Breadcrumbs in 1–2 weeks.
+Build record follows.
+
+### 📜 Build record — the 2026-09-02 (afternoon) batch: BreadcrumbList schema + VISIBLE breadcrumb trail on every sitemap page + JewelryStore `alternateName` aliases DROPPED (no SQL, no env vars)
 
 **Added after the first staging sync, same afternoon (owner: "should we do
 the follow up now? remember I pay for every deploy through Netlify

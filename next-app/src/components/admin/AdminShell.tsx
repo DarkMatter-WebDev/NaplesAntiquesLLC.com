@@ -1802,6 +1802,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   // scrolled/panned behind the fixed modal on touch devices, which is exactly
   // the kind of background bleed-through that makes a fixed-position overlay
   // feel like it's the one scrolling horizontally.
+  //
+  // The touch listeners are the third zoom-lock layer for the owner's phone
+  // (see `admin/layout.tsx`): iOS ignores `user-scalable=no`, and React's own
+  // touch handlers are passive, so a two-finger move has to be cancelled from a
+  // native non-passive listener. `gesturestart` is Safari's pinch event.
   useEffect(() => {
     if (!editing) return;
     const { style } = document.body;
@@ -1809,11 +1814,60 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     const previousOverscroll = style.overscrollBehavior;
     style.overflow = 'hidden';
     style.overscrollBehavior = 'none';
+    const blockPinch = (event: TouchEvent) => {
+      if (event.touches.length > 1) event.preventDefault();
+    };
+    const blockGesture = (event: Event) => event.preventDefault();
+    document.addEventListener('touchstart', blockPinch, { passive: false });
+    document.addEventListener('touchmove', blockPinch, { passive: false });
+    document.addEventListener('gesturestart', blockGesture);
     return () => {
       style.overflow = previousOverflow;
       style.overscrollBehavior = previousOverscroll;
+      document.removeEventListener('touchstart', blockPinch);
+      document.removeEventListener('touchmove', blockPinch);
+      document.removeEventListener('gesturestart', blockGesture);
     };
   }, [editing]);
+
+  // Phone-only hide-on-scroll for the editor's Save row (mockup approved
+  // 2026-09-02). Direction is read from the modal body's own scroll, not the
+  // window — the page underneath is locked while the editor is open. The row
+  // ducks after 12px of downward travel, returns on 4px upward, and is always
+  // shown at either end so neither the first field nor the last is ever
+  // covered. The 4px dead-band keeps a resting thumb from flickering it.
+  const editorFooterRef = useRef<HTMLDivElement>(null);
+  const editorScrollLastY = useRef(0);
+  const [editorFooterHidden, setEditorFooterHidden] = useState(false);
+  const [editorFooterHeight, setEditorFooterHeight] = useState(0);
+  const editorOpen = Boolean(editing);
+  const handleEditorBodyScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    const el = event.currentTarget;
+    const y = el.scrollTop;
+    const delta = y - editorScrollLastY.current;
+    const atEnd = y + el.clientHeight >= el.scrollHeight - 4;
+    if (atEnd || y <= 0) setEditorFooterHidden(false);
+    else if (delta > 12) setEditorFooterHidden(true);
+    else if (delta < -4) setEditorFooterHidden(false);
+    if (Math.abs(delta) > 4) editorScrollLastY.current = y;
+  }, []);
+  useEffect(() => {
+    if (!editorOpen) return;
+    const footer = editorFooterRef.current;
+    // `observe()` delivers an initial measurement on its own, so there is no
+    // synchronous setState here. The reset lives in cleanup: closing the
+    // editor unmounts the row, and the next one must open with it shown.
+    const observer =
+      footer && typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(() => setEditorFooterHeight(footer.offsetHeight))
+        : null;
+    observer?.observe(footer as HTMLDivElement);
+    return () => {
+      observer?.disconnect();
+      editorScrollLastY.current = 0;
+      setEditorFooterHidden(false);
+    };
+  }, [editorOpen]);
 
   useEffect(() => {
     if (!previewImg) return;
@@ -5176,7 +5230,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             // inside the guaranteed-safe area, at the cost of a little unused space
             // on the rare frame where the toolbar happens to be hidden.
             className="w-full max-w-[100vw] h-svh md:h-auto md:max-w-5xl border flex flex-col overflow-hidden product-editor-modal md:rounded-[8px]"
-            style={{ background: '#f7f8fc', borderColor: '#d9deef' }}
+            style={{ background: '#f7f8fc', borderColor: '#d9deef', '--editor-footer-h': `${editorFooterHeight}px` } as React.CSSProperties}
           >
             {/* Modal header */}
             <div className="flex items-start justify-between px-7 py-5 border-b"
@@ -5196,7 +5250,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               </button>
             </div>
 
-            <div className="product-editor-body p-4 md:p-7 flex flex-col gap-4 md:gap-5 overflow-y-auto overflow-x-hidden flex-1 min-h-0">
+            <div
+              className="product-editor-body p-4 md:p-7 flex flex-col gap-4 md:gap-5 overflow-y-auto overflow-x-hidden flex-1 min-h-0"
+              onScroll={handleEditorBodyScroll}
+            >
 
               {/* Photos */}
               <div
@@ -6471,7 +6528,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-2 px-3 py-4 border-t [&>button]:w-full md:flex md:items-center md:gap-1.5 md:[&>button]:w-auto"
+            <div
+              ref={editorFooterRef}
+              data-hidden={editorFooterHidden ? 'true' : 'false'}
+              className="product-editor-footer grid grid-cols-2 gap-2 px-3 py-4 border-t [&>button]:w-full md:flex md:items-center md:gap-1.5 md:[&>button]:w-auto"
               style={{ borderColor: 'var(--color-outline-variant)', paddingBottom: 'max(1rem, calc(1rem + env(safe-area-inset-bottom, 0px)))' }}>
               {/* Clone — edit mode only, pushed to the left */}
               {!isNew && (

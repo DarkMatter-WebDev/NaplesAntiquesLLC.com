@@ -4,7 +4,57 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-08-31**.
+> compaction. Last reconciled: **2026-09-02**.
+
+## Thumbnail rails on wide displays (2026-09-02)
+
+### The rail fit must save and restore `scrollLeft` around its width re-measure
+
+`fitWholeThumbnailCards` clears the track's inline width for one layout to
+measure its parent. On any display wider than the whole strip (26 cards ≈
+1880px — every 1920px monitor for the lightbox, ~2008px+ for the page rail)
+that layout has no overflow and the browser clamps `scrollLeft` to 0 for
+good; the eased navigation then started from the first thumbnail on every
+click. ⛔ Keep the read-before-clear / restore-after-snap pair (guarded by
+`product-gallery-fit-scroll.test.ts`). ⚠️ This class of bug is invisible on
+laptops, in the in-app pane at its default size, and on reduced-motion
+machines — test rail behaviour at the widest display the owner actually
+uses, and record `prefers-reduced-motion` with every measurement. Detail:
+`CHANGELOG.md` 2026-09-02 (late night).
+
+## Admin on a phone (2026-09-02)
+
+### The viewport zoom lock is `/admin/*` ONLY — never lift it to the public site
+
+`src/app/[locale]/admin/layout.tsx` exports `maximumScale: 1, userScalable:
+false`. That is acceptable for the owner's own tool and NOT for customers:
+disabling zoom on public pages is a WCAG 1.4.4 failure and Lighthouse
+a11y drops from the 100 the site holds. The source guard in
+`admin-mobile-editor.test.ts` fails if `userScalable`/`maximumScale` ever
+appears in `[locale]/layout.tsx` or `app/layout.tsx`.
+
+### "Accidental zoom" on iOS is tap-to-zoom on sub-16px inputs, not a pinch
+
+Any `input`/`select`/`textarea` under 16px auto-zooms iOS Safari on focus,
+and `.form-field` is 14px. `user-scalable=no` does NOT stop it (iOS ignores
+it). The fix that works is the input size: `.product-editor-modal :is(input,
+select, textarea) { font-size: 1rem }` under `@media (hover: none)`, kept
+UNLAYERED so a Tailwind `text-xs` on the same element cannot win. ⛔ Do not
+"tidy" that rule into `@layer` — it stops working silently. Pinch and
+double-tap are handled separately (`touch-action: pan-x pan-y` + the
+non-passive two-finger `touchmove` guard in `AdminShell`, because React's
+touch props are passive and `preventDefault` there is a no-op).
+
+### The editor's Save row overlays and hides on scroll on PHONES only
+
+Owner-requested, mockup-approved 2026-09-02. Below 768px
+`.product-editor-footer` is absolute at the modal's bottom and translates
+away after 12px of downward scroll, returning on 4px up and at either end
+of the form; the body pads by a ResizeObserver-measured
+`--editor-footer-h` so the last field is never trapped under it. Desktop
+keeps the row in flow with no animation — a mouse wheel does not need the
+space back. ⛔ Keep the "always shown at the bottom" rule: without it the
+final field and the Save buttons are unreachable together on a short form.
 
 ## Media & hero loading (2026-08-31)
 

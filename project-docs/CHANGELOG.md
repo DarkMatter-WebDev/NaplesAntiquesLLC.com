@@ -1,6 +1,110 @@
 
 # Changelog
 
+## 2026-09-02 (late night) — thumbnail rail "fast total cycle" on wide monitors FIXED (BUILT, gated, NOT deployed — bundles with the editor batch)
+
+Owner: in the product lightbox, clicking the arrow made the thumbnail strip
+"do a really fast total cycle instead of just progressing once". Could not
+be reproduced in the in-app pane (368–1280px), in the owner's desk Chrome
+(reduced motion → instant jumps), or with scripted clicks — **it reproduced
+only with real clicks on the owner's OTHER computer, a 1920px display,
+against production**, with a `scrollLeft` setter monitor injected via the
+Chrome extension: every click logged `0 1 3 7 46 … 1008`, i.e. the strip
+started from **0** each time and eased across the whole rail.
+
+**Root cause** (`fitWholeThumbnailCards`, `ProductImageGallery.tsx`): the
+fit clears the track's inline width to re-measure its parent. For that one
+layout the track is as wide as its content (26 cards ≈ 1880px). On a screen
+wider than that the track has no overflow, and the browser **clamps
+`scrollLeft` to 0** and does not restore it when the snapped width comes
+back. `positionThumbnailPair` then reads `startLeft = 0`. Narrower windows
+always overflow (no clamp) and reduced-motion machines use the `auto`
+branch (no visible sweep) — which is exactly why it hid from every earlier
+check. The page rail (`max-w-[calc(100vw-8rem)]`) hits the same clamp from
+~2008px and was fixed by the same change.
+
+**Fix:** read `scrollLeft` before the width is cleared, restore it after the
+snap (+ a source guard, `product-gallery-fit-scroll.test.ts`). Verified in
+the pane at 1920 (lightbox: 144 → 216 → 288 → 360, wrap still one eased
+card + instant reset) and at 2100 (page rail: same). Pre-fix at 1920 the
+pane showed the 0-start sweep, so the reproduction is real, not theoretical.
+
+Gate: `tsc` · lint · **1202/1202 tests across 117 files** · build exit 0 ·
+74 = 34/34/6. ⚠️ A separate, legitimate behaviour was noticed on the way:
+if the visitor wheel-/trackpad-scrolls the strip away from the active pair
+and then clicks the bar, the strip eases back the whole distance (~480ms).
+Left as is — it is the user's own scroll being honoured — noted here in
+case it is ever reported.
+
+**Traps for whoever measures this next:** (1) a Chrome tab with
+`visibilityState: hidden` runs no `requestAnimationFrame` and clamps
+`setTimeout` to 1s — a rAF-driven animation looks like an instant jump and
+a sampling loop returns one reading; check visibility before believing
+either. (2) `.click()` and real mouse clicks behaved identically here, but
+the two Chromes did not: one had OS-level reduced motion. Record
+`matchMedia('(prefers-reduced-motion: reduce)')` with every measurement.
+(3) The bug was width-gated; always test the widest display the owner
+actually uses, not the pane's default.
+
+## 2026-09-02 (night) — phone listing editor: zoom lock + hide-on-scroll Save row (BUILT, gated, NOT deployed — owner phone check owed)
+
+Owner, from their phone: the Add/Edit listing window could be zoomed by
+accident, then panned sideways, with the Save row a mis-tap away while
+zooming back out; and they wanted the bottom button row to duck on
+scroll-down and return on scroll-up "like popular mobile sites". Mockup
+approved ("approve the look, go ahead and build all three").
+
+**Root cause of the zoom:** not a pinch. `.form-field` is 14px
+(`globals.css`), and iOS Safari auto-zooms the page on focus of any input
+under 16px. Three layers, because iOS ignores `user-scalable=no`:
+
+1. NEW `src/app/[locale]/admin/layout.tsx` — passthrough layout exporting a
+   `viewport` with `maximumScale: 1, userScalable: false` for `/admin/*`
+   only. Public pages keep the zoomable default (accessibility).
+2. `globals.css`: `.product-editor-modal :is(input, select, textarea)` →
+   `font-size: 1rem` under `@media (hover: none)`; unlayered so it beats a
+   Tailwind `text-xs`. `.product-editor-modal { touch-action: pan-x pan-y;
+   overscroll-behavior: contain }` — scroll yes, pinch and double-tap no.
+3. `AdminShell.tsx`, inside the existing body-scroll-lock effect: native
+   non-passive `touchstart`/`touchmove` listeners cancel any two-finger
+   move, plus Safari's `gesturestart`. (React's own touch handlers are
+   passive, so this cannot be a JSX prop.)
+
+**Save row (phones only, `< 768px`):** `.product-editor-footer` is
+`position: absolute; bottom: 0` inside the (now `relative`) modal and
+translates `110%` down when `data-hidden="true"`; the body's
+`padding-bottom` is `1rem + var(--editor-footer-h)`, measured by a
+ResizeObserver (the row is 5 buttons on New, 6 on Edit). Direction comes
+from the modal body's `onScroll`: hide after 12px down, show on 4px up,
+always shown at either end; 4px dead-band. `prefers-reduced-motion` drops
+the transition. Desktop is untouched — the row stays in normal flow.
+
+**Gate:** `tsc` clean · lint clean (one `react-hooks/set-state-in-effect`
+fixed by moving the reset into cleanup and letting `observe()` deliver the
+first measurement) · **1200/1200 tests across 116 files** (+5, NEW
+`src/lib/__tests__/admin-mobile-editor.test.ts` — source guards for all
+three layers, the footer wiring, and that the public layouts carry NO
+viewport lock) · build exit 0 · **74 = 34 EN + 34 ES + 6**.
+
+⚠️ **Dev-server trap hit exactly as documented:** after the CSS edit, a
+CSSOM walk on the running dev server found NONE of the new rules while the
+production bundle carried all three. `preview_stop` → clear the contents
+of `.next/dev` → `preview_start` fixed it; all seven rules then served.
+
+⛔ **Not verified in a browser.** The editor is behind admin login (no
+credential entry from here; the sign-in page's Turnstile also crashes the
+Browser pane). Owner test on the phone at `http://10.0.0.208:3007/admin`
+is the verification — see `TASKS.md`. Deploy is HELD to bundle with
+whatever comes next (owner pays per Netlify deploy).
+
+## 2026-09-02 (evening) — breadcrumb batch DEPLOYED + production-verified
+
+Owner pushed; verified over HTTP: 55 URLs (every sitemap page ×2 locales,
+a city page, a product page) each carry exactly one visible trail and one
+BreadcrumbList with identical names; homepage has neither and no
+`alternateName`. Chrome screenshots of four live pages match the mockup.
+No submissions needed.
+
 ## 2026-09-02 (afternoon) — sitewide BreadcrumbList schema + JewelryStore aliases dropped (sitelinks question)
 
 Owner: "does our site show up in search like this [competitor with

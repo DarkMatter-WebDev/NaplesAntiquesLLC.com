@@ -124,6 +124,18 @@ function fitWholeThumbnailCards(track: HTMLDivElement, inlinePadding: number) {
   if (!thumbnail) return;
 
   cancelThumbnailTrackAnimation(track);
+  // 🔴 Read the scroll position BEFORE the width is cleared, and put it back
+  // after the snap. Clearing the inline width lets the track grow to its
+  // content for one layout, and on a screen wider than the whole strip
+  // (26 cards ≈ 1880px, so any 1920px monitor) that leaves it with no overflow
+  // for that instant — at which point the browser clamps `scrollLeft` to 0 and
+  // never restores it. `positionThumbnailPair` then read a start of 0 and eased
+  // the strip from the very first thumbnail out to the active one on EVERY
+  // click: the owner's "fast total cycle" in the lightbox (2026-09-02, found on
+  // a 1920px display; invisible on narrower windows, where the strip always
+  // overflows, and on reduced-motion machines, which jump instantly). The page
+  // rail is capped at `100vw - 8rem`, so it hits the same clamp from ~2008px.
+  const scrollLeftBeforeFit = track.scrollLeft;
   // Clear the previous snapped width before measuring the space currently
   // offered by the responsive parent.
   track.style.width = '';
@@ -158,6 +170,10 @@ function fitWholeThumbnailCards(track: HTMLDivElement, inlinePadding: number) {
   // The snapped width is exact by construction — never let the flex algorithm
   // shave sub-pixels off it (that clips the last card's right border).
   track.style.flexShrink = '0';
+  // Restore the position the clamp may have zeroed (see above). Reading
+  // `scrollLeft` here forces the layout with the snapped width, so the
+  // assignment lands on a track that overflows again and is honoured.
+  if (track.scrollLeft !== scrollLeftBeforeFit) track.scrollLeft = scrollLeftBeforeFit;
   // Enables the CSS that soft-fades a partial trailing card during the
   // pre-hydration window, before this fit has ever run.
   track.dataset.thumbnailFit = 'true';
