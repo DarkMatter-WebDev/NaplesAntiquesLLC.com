@@ -63,17 +63,26 @@ describe('admin mobile editor: hide-on-scroll Save row', () => {
     expect(shell).not.toMatch(/'--editor-footer-h': `\$\{editorFooterHeight\}px`/);
   });
 
-  it('only overlays and animates the row on phones', () => {
+  it('keeps the row IN FLOW on phones and hides it by collapsing, never by overlaying', () => {
     const css = read('src', 'app', 'globals.css');
-    const block = css.slice(css.indexOf('.product-editor-footer {'));
-    expect(css.lastIndexOf('@media (max-width: 767px)', css.indexOf('.product-editor-footer {'))).toBeGreaterThan(-1);
-    expect(block).toMatch(/position: absolute;/);
-    expect(block).toMatch(/\.product-editor-footer\[data-hidden='true'\] \{\s*transform: translateY\(110%\);/);
-    // The reserved space under the row is a flex-item pseudo-element with a
-    // generous fallback — NEVER `padding-bottom` on the body: Safari drops the
-    // block-end padding of a flex-column scroll container, so the padding
-    // version silently did nothing on the owner's phone (2026-09-02).
-    expect(css).toMatch(/\.product-editor-body::after \{\s*content: '';\s*flex: none;\s*height: calc\(1rem \+ var\(--editor-footer-h, 14rem\)\);/);
+    const start = css.indexOf('.product-editor-footer {');
+    expect(css.lastIndexOf('@media (max-width: 767px)', start)).toBeGreaterThan(-1);
+    const block = css.slice(start, css.indexOf('@media (prefers-reduced-motion: reduce)', start));
+    // ⛔ Three overlay versions (absolute row + body padding, then a `::after`
+    // spacer) all left the editor unscrollable on Safari mobile with every
+    // accordion collapsed (2026-09-02). In flow there is nothing under the row
+    // and no reserved space for a browser to discard.
+    expect(block).not.toMatch(/position: absolute/);
+    expect(block).toMatch(/max-height: calc\(var\(--editor-footer-h, 20rem\) \+ 2px\);/);
+    expect(block).toMatch(/\.product-editor-footer\[data-hidden='true'\] \{[^}]*max-height: 0;[^}]*padding-bottom: 0 !important;/);
+    expect(css).not.toMatch(/\.product-editor-body::after/);
     expect(css).not.toMatch(/\.product-editor-body \{\s*padding-bottom:/);
+  });
+
+  it('ignores the scroll event a toggle causes and has no show-at-end rule', () => {
+    const shell = read('src', 'components', 'admin', 'AdminShell.tsx');
+    const handler = shell.slice(shell.indexOf('const handleEditorBodyScroll'), shell.indexOf('useLayoutEffect(() => {'));
+    expect(handler).toMatch(/editorFooterToggledAt\.current < 300/);
+    expect(handler).not.toMatch(/atEnd/);
   });
 });

@@ -3075,47 +3075,35 @@ html[data-nej-cookies-ok] [data-cookie-notice] {
   overscroll-behavior: contain;
 }
 
-/* Phones: the Save row overlays the bottom of the editor and ducks out of the
-   way while the form scrolls down, returning on any upward scroll or at either
-   end of the form (mockup approved 2026-09-02). It sits in normal flow on
-   desktop. `--editor-footer-h` is written onto the modal by `AdminShell` (a
-   layout effect + ResizeObserver, straight to the DOM) so the body always has
-   enough bottom padding to scroll the last field clear of the row — the row's
-   height varies between New (5 buttons) and Edit (6). ⚠️ The fallback is
-   deliberately GENEROUS, not 0: with the first version's `0px` fallback the
-   first painted frame had no padding, and an editor whose accordions are all
-   collapsed was just short enough that nothing could scroll while the last
-   accordions sat under the row (owner, 2026-09-02 night). Too much padding
-   costs a little blank scroll room; too little traps content. */
+/* Phones: the Save row stays IN FLOW (its own space below the scroll area,
+   exactly the geometry the owner used for months) and hides on scroll-down by
+   COLLAPSING — max-height to 0 while sliding down — so the form grows into the
+   space it leaves. It returns on any upward scroll. Desktop is untouched.
+
+   🔴 Why not an overlay: three overlay versions shipped on 2026-09-02 (body
+   `padding-bottom`, then a `::after` spacer, each with the row absolutely
+   positioned) and on Safari mobile the editor with every accordion collapsed
+   could not scroll at all — the last accordions sat under the row with no
+   way to reach them, while every Chromium measurement looked healthy. In
+   flow, nothing is ever under the row and there is no reserved space for a
+   browser to discard. `--editor-footer-h` (written by `AdminShell` in a
+   layout effect) makes the collapse transition exact; the fallback only
+   affects timing, never reachability. */
 @media (max-width: 767px) {
-  .product-editor-modal {
-    position: relative;
-  }
-  /* 🔴 A real flex item, NOT `padding-bottom`. Safari (including iOS)
-     discards the block-end padding of a scroll container that is a flex
-     column, so the body's padding version of this never existed on the
-     owner's phone: with every accordion collapsed the content was shorter
-     than the scroller, nothing scrolled, and the last accordions sat under
-     the Save row with no way to reach them — "it locks again the moment I
-     close the accordion" (2026-09-02, second report). Chrome honours the
-     padding, which is why every measurement here looked fine. An empty
-     pseudo-element with an explicit height is counted by every engine. */
-  .product-editor-body::after {
-    content: '';
-    flex: none;
-    height: calc(1rem + var(--editor-footer-h, 14rem));
-  }
   .product-editor-footer {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: #f7f8fc;
-    transition: transform 0.22s ease;
-    will-change: transform;
+    flex: none;
+    max-height: calc(var(--editor-footer-h, 20rem) + 2px);
+    overflow: hidden;
+    transition: max-height 0.22s ease, transform 0.22s ease, padding 0.22s ease;
   }
+  /* `!important` beats the inline safe-area padding the row carries; with
+     `box-sizing: border-box` a max-height of 0 cannot go below the padding. */
   .product-editor-footer[data-hidden='true'] {
-    transform: translateY(110%);
+    max-height: 0;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    border-top-width: 0 !important;
+    transform: translateY(1.5rem);
   }
   @media (prefers-reduced-motion: reduce) {
     .product-editor-footer {

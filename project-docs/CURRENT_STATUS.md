@@ -8,7 +8,17 @@
 
 **Read this, then `TASKS.md`.**
 
-🔴 **DEPLOY OWED (2026-09-02, night follow-up 2): the phone editor still
+🔴 **DEPLOY OWED (2026-09-02, night follow-up 3): follow-up 2 went live
+and the collapsed editor STILL could not scroll on Safari mobile.** The
+overlay design is abandoned: the Save row is back IN FLOW (the geometry
+that worked for months) and hides by COLLAPSING its height as it slides
+down, so the form grows into the space. No spacer, no padding, nothing
+under the row. Handler ignores the scroll event a toggle causes and no
+longer forces the row visible at the end. Built, gated (1203/1203 · build
+74 = 34/34/6), **staged**. Detail: `CHANGELOG.md` 2026-09-02 (night,
+follow-up 3). Owner walkthrough in `TASKS.md`.
+
+🟡 (superseded by follow-up 3) **DEPLOY OWED (2026-09-02, night follow-up 2): the phone editor still
 could not scroll on Safari mobile with follow-up 1 live.** Real cause:
 **Safari drops the block-end padding of a flex-column scroll container**,
 so the space reserved under the overlaid Save row never existed on the

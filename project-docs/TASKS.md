@@ -5,19 +5,33 @@
 
 ## ◻ OPEN — needs a human
 
-### 🔴 DEPLOY the 2026-09-02 (night follow-up 2) editor scroll fix — then OWNER walkthrough on Safari mobile (no SQL, no env vars)
+### 🔴 DEPLOY the 2026-09-02 (night follow-up 3) editor scroll fix — then OWNER walkthrough on Safari mobile (no SQL, no env vars)
 
-Follow-up 1 went live and the owner STILL could not scroll with all
-accordions collapsed ("locks again when I close the accordion"). Real
-cause: **Safari ignores `padding-bottom` on a flex-column scroll
-container**, so the space reserved under the overlaid Save row never
-existed on the phone. Now a `.product-editor-body::after` flex item with an
-explicit height (`globals.css`), guard test updated. `touch-action:
-manipulation` and the layout-effect measurement from follow-up 1 stand.
-Gate: `tsc` · lint · **1202/1202 / 117 files** · build exit 0 · 74 =
-34/34/6 · built CSS has the `::after` rule and no body `padding-bottom`.
-The real editor is behind login and the failing engine is Safari, which
-nothing here can run — the walkthrough below IS the verification.
+Follow-up 2 (`::after` spacer) went live and the collapsed editor STILL
+could not scroll on Safari mobile. **The overlay design is abandoned:**
+the Save row is back in normal flow below the scroll area (the geometry
+that worked for months) and hides by collapsing its height (`max-height`
+→ 0, paddings/border to 0 with `!important`, small slide) so the form
+grows into the space. Handler: 300 ms lock after a toggle, no
+show-at-end rule (returns on any upward nudge or at the top). Files:
+`globals.css`, `AdminShell.tsx` (handler only), the guard test. Gate:
+`tsc` · lint · **1203/1203 / 117 files** · build exit 0 · 74 = 34/34/6 ·
+built CSS has the collapse rules and no overlay/spacer/padding rules.
+Chromium replica at 375×812: all collapsed + row shown → body 534 / scroll
+621 (scrollable, last accordion below the fold — NOT under anything);
+hidden → row 0px, body 709, everything visible; shown again → restored;
+Details expanded → scrollable 1537; tall + hidden → grows, scrollTop kept.
+Safari is the owner's check — the walkthrough below IS the verification.
+
+✅ **STAGING SYNCED 2026-09-02 (night follow-up 3) — ready to copy to the
+repo and push.** Dry run queued exactly **8 files** (globals.css,
+AdminShell, the editor guard test, 5 docs) with **0 Extras**, verified
+BEFORE the real run; real run **8 copied / 0 Mismatch / 0 FAILED**;
+follow-up dry run **0, exit 0**; **909 files** on disk (robocopy 912 = the
+documented 3 `/XF`-excluded). Leak check 0 `.git` (dir/file), `.env*`,
+`node_modules`, `.next`; **191 = 191 `.tsx`** control; SHA-256 equal for
+the three app files; staged CSS has the collapse `max-height` rule and
+**0** `::after` lines. (Docs-only re-sync follows this record.)
 
 ✅ **STAGING SYNCED 2026-09-02 (night follow-up 2) — ready to copy to the
 repo and push.** Dry run queued exactly **6 files** (globals.css, the

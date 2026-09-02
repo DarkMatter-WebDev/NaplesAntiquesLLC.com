@@ -1,7 +1,49 @@
 
 # Changelog
 
-## 2026-09-02 (night, follow-up 2) — editor STILL locked on Safari mobile: the reserved space must be a flex item, not padding (BUILT, gated, staged — deploy owed)
+## 2026-09-02 (night, follow-up 3) — editor STILL locked on Safari mobile with the `::after` spacer LIVE: the Save row goes back IN FLOW and hides by collapsing (BUILT, gated, staged — deploy owed)
+
+Follow-up 2 was verified live (production CSS carried the `::after` rule)
+and the owner reported "still exactly like it was… only when all
+accordions are collapsed I can't scroll down to reach Facebook."
+
+**Decision: stop chasing which Safari quirk discards the reserved space.**
+Three overlay variants (absolute row + body `padding-bottom`, then a
+14rem fallback, then a `::after` flex-item spacer) all left the collapsed
+editor unscrollable on the owner's phone while every Chromium measurement
+— the in-app pane replica AND the real editor in the owner's Chrome at
+500×715 — looked healthy. The pre-batch geometry (row in normal flow
+below the scroll area) worked on that phone for months, so the row is
+back in flow and the hide is a COLLAPSE instead of an overlay:
+
+- `globals.css` (phones only): `.product-editor-footer { flex: none;
+  max-height: calc(var(--editor-footer-h, 20rem) + 2px); overflow: hidden;
+  transition: max-height, transform, padding }`; `[data-hidden='true']`
+  → `max-height: 0`, paddings and top border to 0 with `!important` (the
+  row carries inline safe-area padding, and with `box-sizing: border-box`
+  a max-height cannot go below padding), small `translateY`. No
+  `position: absolute`, no `::after`, no body padding — nothing is ever
+  under the row.
+- `AdminShell.tsx` scroll handler: hiding GROWS the scroll area by the
+  row's height and showing shrinks it, so (1) events within 300 ms of a
+  toggle are ignored (the browser re-clamps `scrollTop` when the area
+  changes and that emits a scroll event), and (2) the "show at the end"
+  rule is gone — in flow, hiding already exposes the last field, and
+  show-at-end would oscillate (show → shrink → not at end → hide → grow →
+  at end…) under a resting thumb. Returns on any upward nudge or at the
+  top.
+- Guard test rewritten accordingly (asserts no absolute/`::after`/padding,
+  the collapse rules, the toggle lock, and no `atEnd`).
+
+Deviation from the approved mockup: the row no longer forces itself
+visible at the very bottom of the form (a small scroll-up brings it back).
+
+Gate: `tsc` · lint · **1203/1203 (117 files)** (+1 guard) · build exit 0 ·
+74 = 34/34/6 · built CSS has the collapse rules and no overlay/spacer rules.
+Replica in the pane at 375×812: hidden → row height 0 and the body grows
+by the row's height; shown → restored. Safari is the owner's check.
+
+## 2026-09-02 (night, follow-up 2) — editor STILL locked on Safari mobile: the reserved space must be a flex item, not padding (superseded by follow-up 3)
 
 Owner, on Safari mobile with follow-up 1 LIVE (verified: production CSS
 carried `touch-action: manipulation` and the 14rem padding rule): "still

@@ -1833,21 +1833,41 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   // Phone-only hide-on-scroll for the editor's Save row (mockup approved
   // 2026-09-02). Direction is read from the modal body's own scroll, not the
   // window — the page underneath is locked while the editor is open. The row
-  // ducks after 12px of downward travel, returns on 4px upward, and is always
-  // shown at either end so neither the first field nor the last is ever
-  // covered. The 4px dead-band keeps a resting thumb from flickering it.
+  // ducks after 12px of downward travel, returns on 4px upward or at the top.
+  // The 4px dead-band keeps a resting thumb from flickering it.
+  //
+  // The row is IN FLOW on phones and collapses when hidden (see globals.css),
+  // so the scroll area GROWS by the row's height on hide and shrinks on show.
+  // Two consequences shape this handler: (1) a toggle can itself emit a scroll
+  // event (the browser re-clamps scrollTop when the area changes), so events
+  // inside a short window after a toggle are ignored; (2) there is no "show at
+  // the end" rule — with the row in flow, hiding it already exposes the last
+  // field, and a show-at-end rule would fight the growth (show → shrink → not
+  // at end → hide → grow → at end…) while a thumb rests at the bottom.
   const editorFooterRef = useRef<HTMLDivElement>(null);
   const editorScrollLastY = useRef(0);
+  const editorFooterToggledAt = useRef(0);
   const [editorFooterHidden, setEditorFooterHidden] = useState(false);
   const editorOpen = Boolean(editing);
   const handleEditorBodyScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
     const el = event.currentTarget;
     const y = el.scrollTop;
+    const now = performance.now();
+    if (now - editorFooterToggledAt.current < 300) {
+      editorScrollLastY.current = y;
+      return;
+    }
     const delta = y - editorScrollLastY.current;
-    const atEnd = y + el.clientHeight >= el.scrollHeight - 4;
-    if (atEnd || y <= 0) setEditorFooterHidden(false);
-    else if (delta > 12) setEditorFooterHidden(true);
-    else if (delta < -4) setEditorFooterHidden(false);
+    const toggle = (hidden: boolean) => {
+      setEditorFooterHidden((current) => {
+        if (current === hidden) return current;
+        editorFooterToggledAt.current = now;
+        return hidden;
+      });
+    };
+    if (y <= 0) toggle(false);
+    else if (delta > 12) toggle(true);
+    else if (delta < -4) toggle(false);
     if (Math.abs(delta) > 4) editorScrollLastY.current = y;
   }, []);
   // 🔴 The row's height is written to the modal as `--editor-footer-h` DIRECTLY

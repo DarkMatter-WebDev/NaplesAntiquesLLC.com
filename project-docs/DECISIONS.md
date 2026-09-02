@@ -55,7 +55,28 @@ minus double-tap zoom) is the value that never breaks scrolling, and pinch
 is cancelled in JS instead. `pan-x pan-y` on the scroller ITSELF (the
 products table) is fine. Guarded by `admin-mobile-editor.test.ts`.
 
-### Overlaid controls must reserve their space from the FIRST painted frame — and as a flex ITEM, never `padding-bottom`
+### ⛔ The editor's Save row is IN FLOW on phones and hides by COLLAPSING — never an overlay (2026-09-02, follow-up 3)
+
+Three overlay variants shipped and failed the same day: the row
+absolutely positioned over the body with the space beneath it reserved by
+(a) `padding-bottom`, (b) `padding-bottom` with a 14rem fallback written
+before first paint, (c) a `::after` flex-item spacer. On Safari mobile,
+with every accordion collapsed, the editor could not scroll and the last
+accordions were trapped under the row — every time — while the same
+markup measured healthy in Chromium (pane replica AND the real editor in
+the owner's Chrome). The pre-batch layout (row in flow) had worked on that
+phone for months. Rule: the row keeps its own space below the scroll area;
+hide = `max-height: 0` (+ paddings/border to 0 `!important`, because the
+row carries inline safe-area padding and border-box max-height cannot go
+below padding) with a small slide, so the scroll area grows into it. The
+handler must ignore scroll events for ~300 ms after a toggle (the browser
+re-clamps `scrollTop` when the area changes) and must NOT force the row
+visible at the end (it would oscillate against the growth). ⚠️ If a future
+change reintroduces an overlay, it must be verified on real Safari before
+it ships — Chromium cannot see this class of failure. Guarded by
+`admin-mobile-editor.test.ts`.
+
+### (superseded 2026-09-02 by the rule above — kept for the Safari facts) Overlaid controls must reserve their space from the FIRST painted frame — and as a flex ITEM, never `padding-bottom`
 
 The Save row overlays the editor body on phones, so the body reserves the
 row's height below its content. Two rules, each learned from a live
