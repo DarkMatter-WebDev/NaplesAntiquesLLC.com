@@ -1,6 +1,64 @@
 
 # Changelog
 
+## 2026-09-02 (afternoon) — sitewide BreadcrumbList schema + JewelryStore aliases dropped (sitelinks question)
+
+Owner: "does our site show up in search like this [competitor with
+sitelinks]? … if it doesn't, how can we make it?" then "go ahead with the
+breadcrumbs and drop the aliases."
+
+1. **Assessment** (from the owner's incognito screenshot; Chrome needed a
+   browser pick, so it was not used): we are the first organic result on
+   "naples estate jewelry" but as one row. Sitelinks are algorithmic, shown
+   for navigational queries; the brand phrase is generic (ads + Yelp lists
+   around us), and brand-search history is short. Controllable inputs:
+   hierarchy/breadcrumbs, one unambiguous name. Site name, `WebSite`
+   schema, `og:site_name`, titles, nav were already right.
+2. **Breadcrumb schema sitewide.** NEW `src/lib/breadcrumb-ld.ts` (+3
+   tests) and `src/components/BreadcrumbJsonLd.tsx`; scripted insertion
+   (with per-file anchor assertions; CRLF/LF mixed in the tree) into 11
+   standard pages, the shop list renderer (both return sites), and
+   `LegalPolicyPage` via a new `path` prop passed by the six sitemap legal
+   pages; `shop/[id]` crumb names localized. 10 → 26 pages with
+   BreadcrumbList; homepage, `/unsubscribe`, `shop-modern` deliberately
+   without. Schema-only — no visible breadcrumb bar (layout change, would
+   need a mockup).
+3. **`alternateName` removed** from the JewelryStore schema in
+   `[locale]/layout.tsx` (was "Naples Jewelry Buyers", "Naples Gold &
+   Silver Buyer").
+4. **Gate:** `tsc` · lint · **1195/1195 across 115 files** · build exit 0 ·
+   74 = 34/34/6 · prerendered-HTML scan of every sitemap page ×2 locales:
+   46/46 BreadcrumbLists parse with correct positions, prefix, and final
+   URL; `alternateName` absent from the built HTML.
+5. **Visible breadcrumb trail added the same afternoon** (owner: "should we
+   do the follow up now? remember I pay for every deploy" → held the deploy;
+   mockup shown with the real tokens → "approve the look, include product
+   pages, go ahead"). NEW `src/components/BreadcrumbTrail.tsx` (+
+   `BreadcrumbTrailFromLd`), placed above the eyebrow of the opening
+   section on all 26 sitemap pages + product pages via scripted insertion
+   with per-file anchor assertions (11 helper pages hoist their crumbs into
+   one `const` feeding both schema and trail; 9 template pages + the
+   product page feed their hand-written LD object; contact = slim centered
+   strip at the top of `<main>`; shop list = top of its container; legal =
+   inside the header card via `LegalPolicyPage`). Tone dark/light per hero,
+   centered where the hero is centered. Verified in the owner's Chrome on
+   the dev server: 10 desktop pages (dark, light, centered, legal, shop
+   list, product, ES, free-evaluation kicker) and at 375 px in the preview
+   pane (two-line wrap, no horizontal overflow). Final gate: `tsc` · lint ·
+   1195/1195 · build exit 0 · 74 = 34/34/6 · prerendered scan 58/58 pages
+   carry exactly one trail + one schema with identical names, trail placed
+   between `<main>` and `<h1>`, homepage none.
+
+## 2026-09-02 — guide batch DEPLOYED + production-verified; IndexNow 200 for all six
+
+Owner: "pushed and deployed, verify production and run the indexnow push."
+Six guide URLs 200 with 3/3 JSON-LD and every owner-corrected string;
+parent links live ×2 locales; sitemap 200 `<loc>` with the guides at
+`2026-09-02` / 0.6; `npm run indexnow -- --urls=<six>` → **200 OK for 6**.
+GSC Request Indexing still quota-bound (12 URLs owed). Owner also asked,
+mid-task, to use their real Chrome rather than the in-app Browser pane for
+browser work — recorded as a standing preference.
+
 ## 2026-09-02 batch (built the night of 09-01) — three SEO guide pages; watch/logo batch confirmed LIVE
 
 Owner: "pushed and deployed, verify production (especially that we have the

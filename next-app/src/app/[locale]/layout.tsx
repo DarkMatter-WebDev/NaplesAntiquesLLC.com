@@ -38,7 +38,11 @@ const buildJsonLd = (schedule: StoreHoursSchedule) => ({
   '@type': 'JewelryStore',
   '@id': 'https://naplesestatejewelry.com/#business',
   name: 'Naples Estate Jewelry',
-  alternateName: ['Naples Jewelry Buyers', 'Naples Gold & Silver Buyer'],
+  // No `alternateName` on purpose (owner, 2026-09-02: "drop the aliases").
+  // "Naples Jewelry Buyers" / "Naples Gold & Silver Buyer" were old trading
+  // names; every alias makes it harder for Google to settle on ONE name for
+  // the business, which is the same step that gates the site-name display and
+  // sitelinks. The brand is "Naples Estate Jewelry" and nothing else.
   url: 'https://naplesestatejewelry.com',
   telephone: '+12394048505',
   // The public contact mailbox moved to .com (owner, 2026-08-08), so the

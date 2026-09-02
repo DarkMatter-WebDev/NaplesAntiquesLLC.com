@@ -1,11 +1,109 @@
 ﻿# Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-09-01**.
+> in `CHANGELOG.md`. Last reconciled: **2026-09-02**.
 
 ## ◻ OPEN — needs a human
 
-### 🔴 DEPLOY the 2026-09-02 batch: THREE SEO GUIDE PAGES ×2 locales (no SQL, no env vars) — owner should read the FAQ answers first
+### 🔴 DEPLOY the 2026-09-02 (afternoon) batch: BreadcrumbList schema + VISIBLE breadcrumb trail on every sitemap page + JewelryStore `alternateName` aliases DROPPED (no SQL, no env vars)
+
+**Added after the first staging sync, same afternoon (owner: "should we do
+the follow up now? remember I pay for every deploy through Netlify
+credits" → held the deploy; mockup approved: "approve the look, include
+product pages, go ahead"):** NEW `src/components/BreadcrumbTrail.tsx` —
+the visible "Home › Sell Gold" line, rendered from the same crumbs / LD
+object as the schema. On all 26 sitemap pages + product pages, above the
+eyebrow of the opening section (placement + tone rules in `DECISIONS.md`).
+**Visual QA done in the owner's Chrome against the dev server:**
+`/gold-services` (dark, left), `/about` (dark, centered),
+`/estate-services` (light, left), `/faq` (light, centered), `/contact`
+(centered strip), `/privacy` (legal card), `/shop` (list), a product page
+(above the back link), `/es/silver-services`, `/free-evaluation` (above
+the kicker pill) — all correct; 375 px in the preview pane: product trail
+wraps to two lines, `scrollWidth` = viewport (no overflow). **Final gate
+on the finished tree:** `tsc` clean · lint clean · 1195/1195 · build exit
+0 · 74 = 34/34/6 · prerendered scan **58/58 pages carry exactly one trail
+and one BreadcrumbList with identical names, trail between `<main>` and
+`<h1>`, homepage none.**
+
+✅ **STAGING RE-SYNCED 2026-09-02 (late afternoon) with the visible trail
+— ready to copy to the repo and push.** Dry run queued exactly **29 files**
+(23 page files, NEW `BreadcrumbTrail.tsx`, `LegalPolicyPage.tsx`, 5 docs)
+with **0 Extras**, verified BEFORE the real run; real run **29 copied / 0
+Mismatch / 0 FAILED**; follow-up dry run **0, exit 0**. **906 files**
+(robocopy total 909 = the documented 3 `/XF`-excluded; 906 = 905 + the
+new component). Leak check clean — 0 `.git`, `worktrees`, `node_modules`,
+`.next`, `.env*`, `*.log` — against a **191 = 191 `.tsx` positive
+control** (190 + `BreadcrumbTrail.tsx`); **23 staged `.tsx` files carry
+`<BreadcrumbTrail`** (= source). SHA-256 equality verified for the
+component, `contact`, `shop/[id]`, the shop renderer, `LegalPolicyPage`,
+`DECISIONS.md`. (Docs-only re-sync follows this record.)
+
+Owner asked why a competitor's brand search shows Google **sitelinks**
+(the indented sub-page rows) and ours does not, then: "go ahead with the
+breadcrumbs and drop the aliases." Sitelinks are algorithmic and cannot be
+requested; this batch fixes the two signals in our control (rationale +
+rules in `DECISIONS.md` → *"Every sitemap page carries BreadcrumbList"*).
+
+**What changed:**
+
+- NEW `src/lib/breadcrumb-ld.ts` (+ 3 tests) and
+  `src/components/BreadcrumbJsonLd.tsx` — one BreadcrumbList shape.
+- 11 standard pages now emit it (`about`, `bullion`, `contact`,
+  `estate-jewelry`, `estate-services`, `faq`, `free-evaluation`,
+  `gold-services`, `services`, `silver-services`, `trade-in`); the shop
+  list renderer (both return sites); `LegalPolicyPage` gained an optional
+  `path` prop and the six sitemap legal pages pass it; `shop/[id]` crumb
+  names localized (Inicio / Tienda). Homepage deliberately none;
+  `/unsubscribe` and `shop-modern` (not in the sitemap) deliberately none.
+- `[locale]/layout.tsx`: `alternateName: ['Naples Jewelry Buyers', 'Naples
+  Gold & Silver Buyer']` removed with a comment explaining why.
+
+**Gate (final tree):** `tsc` clean · lint clean · **1195/1195 tests across
+115 files** (+3) · build exit 0 · **74 = 34 EN + 34 ES + 6** (no new
+routes) · **prerendered HTML scan: 46/46 sitemap pages ×2 locales carry a
+BreadcrumbList that parses, positions 1..n, Home = bare origin / `/es`,
+last item = the page's own canonical URL; homepage has none (by design);
+`alternateName` absent from the built homepage and `/sell/naples`.** The
+three request-rendered pages (`/shop`, `/contact`, `/free-evaluation`)
+**verified on the dev server: 200 ×2 locales, exactly one BreadcrumbList
+each, last item = the page's canonical** (Home › Shop / Inicio › Tienda,
+Contact Us / Contáctenos, Free Evaluation / Evaluación Gratuita).
+
+✅ **STAGING SYNCED 2026-09-02 (afternoon) — ready to copy to the repo and
+push.** Dry run queued exactly **30 files** (24 app files incl. 3 NEW
+`breadcrumb-ld.ts` / its test / `BreadcrumbJsonLd.tsx`, plus 6 docs) with
+**0 Extras**, verified BEFORE the real run. Real run **30 copied / 0
+Mismatch / 0 FAILED**; follow-up dry run **0, exit 0**. **905 files**
+(robocopy total 908 = the documented 3 `/XF`-excluded; 905 = 902 + the 3
+new files). Leak check clean — 0 `.git`, `worktrees`, `node_modules`,
+`.next`, `.env*`, `*.log` — against a **190 = 190 `.tsx` positive
+control** (189 + `BreadcrumbJsonLd.tsx`). Staged content verified by
+SHA-256 equality for the helper, the component, `layout.tsx`,
+`contact/page.tsx`, `LegalPolicyPage.tsx`; the staged `layout.tsx` no
+longer contains the `alternateName` array. (Docs-only re-sync follows
+this record.)
+
+**After deploy:** nothing to submit (no new URLs). Google re-reads schema
+on its own crawl schedule — expect days to weeks before the grey site-name
+line or any sitelinks change, and sitelinks on the generic phrase "naples
+estate jewelry" may never appear. Owner can spot-check any page in Google's
+Rich Results Test; it should list "Breadcrumbs" as detected.
+
+### ✅ DEPLOYED + production-verified 2026-09-02: THREE SEO GUIDE PAGES ×2 locales; IndexNow 200 for all six
+
+Owner: "pushed and deployed, verify production and run the indexnow push."
+Verified over HTTP minutes later: **all six guide URLs 200**, one `<h1>`,
+**3/3 JSON-LD** (JewelryStore + BreadcrumbList + FAQPage), per-locale
+canonicals, no robots meta, and every owner-corrected string live (9k ·
+375, 14KP · 18KP, 14K HGE · 18K HGE, the dental send-out answer, "We do not
+issue written insurance appraisals"). Parent-page guide links live on all
+four parents + `/sell` ×2 locales. Sitemap **200 `<loc>`**, the six guides
+at `2026-09-02` / monthly / 0.6 (56 URLs carry the new lastmod).
+`npm run indexnow -- --urls=<the six>` → **IndexNow 200 OK for 6 URL(s)**.
+**Still owed (owner-side, quota):** GSC Request Indexing — 12 URLs now (4
+parked + `/watch-buyers` ×2 + these six); Bing Request indexing for the
+six is optional (IndexNow already told Bing). Build record follows.
 
 Owner, after the watch/logo deploy: **"start the gold-worth pilot and all
 the rest of the recommended guides."** All three built on the
@@ -199,7 +297,13 @@ then `npm run indexnow -- --urls=/watch-buyers,/es/watch-buyers` and a GSC
 request for both once quota allows. ⚠️ The ES footer check will then read
 **25/26**.
 
-### ◻ GSC: 4 parked indexing requests still owed — quota was EXCEEDED on the first try 2026-09-01 (late)
+### ◻ GSC: 12 indexing requests owed (4 parked + /watch-buyers ×2 + the six 09-02 guides) — quota was EXCEEDED on the first try 2026-09-01 (late); ~10/day, so 2–3 sessions
+
+Order when quota opens: the six guides first (newest, no other discovery
+signal on Google yet), then `/watch-buyers` ×2, then the four parked. Drive
+the inspect box in the owner's Chrome (their standing ask — not the in-app
+pane): `find` the combobox → `form_input` the URL → Return; stop on the
+first "Quota Exceeded".
 
 `/es/jewelry-appraisal` turned out to be **already "URL is on Google"** (no
 request needed — struck from the list). The first real request,

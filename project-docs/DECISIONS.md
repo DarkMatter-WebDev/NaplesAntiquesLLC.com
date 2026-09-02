@@ -331,6 +331,49 @@ word. The `/sell/[city]` watch card's `href: null` special case is gone —
 if a category card ever needs to be unlinked again, that is a decision to
 record here, not a silent `null`.
 
+### Every sitemap page carries BreadcrumbList JSON-LD via ONE helper; the business schema has ONE name and no aliases
+
+Decided 2026-09-02 after the owner asked why a competitor's brand search
+shows Google sitelinks and ours does not. Sitelinks cannot be requested;
+Google grants them algorithmically for navigational (brand) queries, and
+its stated inputs are a clear page hierarchy, compact distinct titles, and
+consistent internal links. "Naples estate jewelry" also reads as a generic
+local query (ads + Yelp lists around us), so sitelinks may never show on
+that phrase — this batch fixes the signals we control, not the query.
+
+- **Breadcrumb schema is sitewide.** `lib/breadcrumb-ld.ts` builds the one
+  shape (Home → parent → page, absolute URLs, `/es` prefix applied once);
+  `components/BreadcrumbJsonLd.tsx` emits it. Every page in `sitemap.ts`
+  except the homepage carries it, plus every product page; `LegalPolicyPage`
+  takes a `path` prop for the six legal pages. Pages NOT in the sitemap
+  (`/unsubscribe`, the noindex `shop-modern` preview) deliberately don't.
+- **A VISIBLE trail accompanies the schema on every one of those pages**
+  (`components/BreadcrumbTrail.tsx`, approved from a mockup the same day —
+  Google's guideline is that breadcrumb markup reflect a trail the visitor
+  can see). Rules: it renders from the SAME crumbs / LD object as the
+  schema (`BreadcrumbTrail` for helper pages, `BreadcrumbTrailFromLd` for
+  the hand-written ones) so the two cannot disagree; it sits directly
+  above the eyebrow label of the opening section (contact: a slim strip at
+  the top of `<main>`; shop list: top of the container; product page: above
+  the back link; legal: inside the header card); `tone="dark"` on dark
+  heroes, `"light"` on light sections; `align="center"` inside centered
+  heroes; earlier crumbs are links, the current page is plain text with
+  `aria-current="page"`; ⛔ never on the homepage; ⛔ no change to the
+  header or its offset (hero heights and the PSI baseline are untouched).
+  A new page gets both pieces or neither.
+- **Crumb names are the page's short name, and a parent's name is the same
+  on every page that cites it**: `/gold-services` = "Sell Gold" / "Vender
+  Oro", `/silver-services` = "Sell Sterling Silver" / "Vender Plata
+  Esterlina", `/estate-services` = "Estate Services" / "Servicios de
+  Patrimonio", `/shop` = "Shop" / "Tienda", `/sell` = "Sell" / "Vender".
+  New pages: use the helper, and pick the parent name from the parent's
+  own crumb, never a new wording.
+- ⛔ **No `alternateName` on the JewelryStore schema.** "Naples Jewelry
+  Buyers" and "Naples Gold & Silver Buyer" were dropped (owner: "drop the
+  aliases"). Google settles on ONE name per entity before it shows a site
+  name or sitelinks; aliases work against that. The name is "Naples Estate
+  Jewelry" — no "Co", no trading names, no legal-entity name.
+
 ### Guide pages live UNDER their parent service page, use the flatware-value template, and may only say what the site already says
 
 Decided 2026-09-01 (owner: "what do you think about building out guide

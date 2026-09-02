@@ -33,6 +33,8 @@ import { ShopNavigationProvider, ShopLoadingOverlay, ShopScrollRestoration } fro
 import ScriptTagWarningGuard from '@/components/shop/ScriptTagWarningGuard';
 import { JEWELRY_ERA_MIN_YEAR, jewelryEraMaxYear, parseYearFilter } from '@/lib/jewelry-eras';
 import SiteHeader from '@/components/layout/SiteHeader';
+import BreadcrumbTrail from '@/components/BreadcrumbTrail';
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd';
 import SiteFooter from '@/components/layout/SiteFooter';
 import {
   filterAvailableShopItemTypeOptions,
@@ -660,6 +662,8 @@ export async function renderShopPage({
   const showingEnd = startIndex + paginatedProducts.length;
 
   const isEs = locale === 'es';
+  // One crumbs array feeds both BreadcrumbJsonLd tags and the visible trail.
+  const crumbs = [{ name: isEs ? 'Tienda' : 'Shop', path: '/shop' }];
   const isModern = variant === 'modern';
   const view: 'gallery' | 'list' = filters.view === 'list' ? 'list' : 'gallery';
   const isSilverTableware = false;
@@ -733,6 +737,7 @@ export async function renderShopPage({
   if (error) {
     return (
       <>
+        <BreadcrumbJsonLd locale={locale} crumbs={crumbs} />
         <SiteHeader />
         <main className="ultrawide-page-wide pt-28 md:pt-32 pb-16 px-4 md:px-8 max-w-7xl mx-auto">
           <p style={{ color: 'var(--color-error)' }}>Failed to load products. Please try again.</p>
@@ -750,6 +755,7 @@ export async function renderShopPage({
 
   return (
     <>
+      <BreadcrumbJsonLd locale={locale} crumbs={crumbs} />
       <SiteHeader />
       <main className={isModern ? 'modern-shop-page pt-20 md:pt-28 pb-20' : 'pt-20 md:pt-32 pb-20'} suppressHydrationWarning>
         {isModern && (
@@ -775,6 +781,7 @@ export async function renderShopPage({
           {locale === 'es' ? 'Comprar Joyería de Patrimonio en Naples, FL' : 'Shop Estate Jewelry in Naples, FL'}
         </h1>
         <div className="mx-auto w-full max-w-[2400px] px-[clamp(1rem,3vw,3rem)]">
+          <BreadcrumbTrail locale={locale} crumbs={crumbs} tone="light" />
 
           {/* Investment transparency note */}
           <section

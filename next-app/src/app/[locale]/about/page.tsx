@@ -3,6 +3,8 @@ import { pageMetadata } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
+import BreadcrumbTrail from '@/components/BreadcrumbTrail';
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd';
 import SiteFooter from '@/components/layout/SiteFooter';
 import { PageContainer, Section } from '@/components/layout/ResponsiveLayout';
 import ShowroomAddress from '@/components/ShowroomAddress';
@@ -33,8 +35,12 @@ export default async function AboutPage({ params }: Props) {
   const { locale } = await params;
   const isEs = locale === 'es';
 
+  // One crumbs array feeds both the JSON-LD and the visible trail.
+  const crumbs = [{ name: isEs ? 'Sobre Chris' : 'About Chris', path: '/about' }];
+
   return (
     <>
+      <BreadcrumbJsonLd locale={locale} crumbs={crumbs} />
       <SiteHeader />
       <main className="site-header-offset">
 
@@ -53,6 +59,7 @@ export default async function AboutPage({ params }: Props) {
             <div className="absolute inset-0 bg-black/50" />
           </div>
           <PageContainer max="narrow" className="text-center relative z-10">
+            <BreadcrumbTrail locale={locale} crumbs={crumbs} tone="dark" align="center" />
             <span
               className="text-xs font-bold uppercase tracking-[0.4em]"
               style={{ color: '#f2ca50', fontFamily: 'var(--font-label)' }}

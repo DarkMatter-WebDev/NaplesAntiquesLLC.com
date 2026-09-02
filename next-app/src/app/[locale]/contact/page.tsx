@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo';
 import SiteHeader from '@/components/layout/SiteHeader';
+import BreadcrumbTrail from '@/components/BreadcrumbTrail';
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd';
 import SiteFooter from '@/components/layout/SiteFooter';
 import { HeroSection, PageContainer } from '@/components/layout/ResponsiveLayout';
 import InquiryForm from '@/components/contact/InquiryForm';
@@ -32,10 +34,17 @@ export default async function ContactPage({ params, searchParams }: Props) {
   const isSubmitted = submitted === '1';
   const inquiryItem = item ? decodeURIComponent(item) : null;
 
+  // One crumbs array feeds both the JSON-LD and the visible trail.
+  const crumbs = [{ name: isEs ? 'Contáctenos' : 'Contact Us', path: '/contact' }];
+
   return (
     <>
+      <BreadcrumbJsonLd locale={locale} crumbs={crumbs} />
       <SiteHeader />
       <main className="site-header-offset">
+        <div className="max-w-4xl mx-auto px-6 md:px-8 pt-8">
+          <BreadcrumbTrail locale={locale} crumbs={crumbs} tone="light" align="center" />
+        </div>
 
         {inquiryItem ? (
           <>

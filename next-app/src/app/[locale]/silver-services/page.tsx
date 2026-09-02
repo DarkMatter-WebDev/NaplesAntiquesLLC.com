@@ -3,6 +3,8 @@ import { pageMetadata } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
+import BreadcrumbTrail from '@/components/BreadcrumbTrail';
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd';
 import SiteFooter from '@/components/layout/SiteFooter';
 import TradingViewMini from '@/components/trading/TradingViewMini';
 import { fetchSpotData } from '@/lib/spot-price';
@@ -50,8 +52,12 @@ export default async function SilverServicesPage({ params }: Props) {
   const spot = await fetchSpotData();
   const silverSpot = spot.silverPerTroyOz ? spot.silverPerTroyOz.toFixed(2) : null;
 
+  // One crumbs array feeds both the JSON-LD and the visible trail.
+  const crumbs = [{ name: isEs ? 'Vender Plata Esterlina' : 'Sell Sterling Silver', path: '/silver-services' }];
+
   return (
     <>
+      <BreadcrumbJsonLd locale={locale} crumbs={crumbs} />
       <SiteHeader />
       <main className="site-header-offset">
 
@@ -70,6 +76,7 @@ export default async function SilverServicesPage({ params }: Props) {
           </div>
           <div className="ultrawide-page relative z-10 max-w-[1440px] mx-auto px-4 md:px-8 w-full">
             <div className="max-w-2xl">
+              <BreadcrumbTrail locale={locale} crumbs={crumbs} tone="light" />
               <span className="text-[#735c00] text-xs font-bold uppercase tracking-[0.2em] mb-4 block">
                 {isEs ? 'Servicios de Plata Privados' : 'Private Silver Estate Services'}
               </span>

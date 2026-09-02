@@ -3,6 +3,8 @@ import { pageMetadata } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
+import BreadcrumbTrail from '@/components/BreadcrumbTrail';
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd';
 import SiteFooter from '@/components/layout/SiteFooter';
 import ClayMark from '@/components/ClayMark';
 import LinkedPhrase from '@/components/LinkedPhrase';
@@ -66,8 +68,12 @@ export default async function TradeInPage({ params }: Props) {
   const isEs = locale === 'es';
   const p = (path: string) => `${isEs ? '/es' : ''}${path}`;
 
+  // One crumbs array feeds both the JSON-LD and the visible trail.
+  const crumbs = [{ name: isEs ? 'Programa de Intercambio' : 'Trade-In Program', path: '/trade-in' }];
+
   return (
     <>
+      <BreadcrumbJsonLd locale={locale} crumbs={crumbs} />
       <SiteHeader />
       <main className="site-header-offset">
 
@@ -86,6 +92,7 @@ export default async function TradeInPage({ params }: Props) {
           </div>
           <div className="absolute inset-0 z-0 bg-[#1a1c1c]/60" />
           <div className="max-w-5xl mx-auto px-6 md:px-8 text-center relative z-10">
+            <BreadcrumbTrail locale={locale} crumbs={crumbs} tone="dark" align="center" />
             <span className="text-[#e9c349] text-xs font-bold uppercase tracking-[0.4em]">
               {isEs ? 'Intercambie, No Funda' : 'Trade It, Don’t Melt It'}
             </span>

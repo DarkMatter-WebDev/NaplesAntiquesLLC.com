@@ -20,6 +20,7 @@ export default async function ReturnsRefundsPage({ params }: Props) {
   return (
     <LegalPolicyPage
       locale={locale}
+      path="/returns-refunds"
       title={spanishCopy?.title ?? 'Returns & Refunds'}
       updated={spanishCopy?.updated}
       intro={spanishCopy?.intro ?? [

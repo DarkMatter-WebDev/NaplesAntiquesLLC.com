@@ -3,6 +3,8 @@ import { pageMetadata } from '@/lib/seo';
 import { jsonLdHtml } from '@/lib/json-ld';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
+import BreadcrumbTrail from '@/components/BreadcrumbTrail';
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd';
 import SiteFooter from '@/components/layout/SiteFooter';
 import { AppIcon } from '@/components/AppIcon';
 import LinkedPhrase from '@/components/LinkedPhrase';
@@ -91,15 +93,20 @@ export default async function FaqPage({ params }: Props) {
     })),
   };
 
+  // One crumbs array feeds both the JSON-LD and the visible trail.
+  const crumbs = [{ name: isEs ? 'Preguntas Frecuentes' : 'FAQ', path: '/faq' }];
+
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(faqLd) }} />
+      <BreadcrumbJsonLd locale={locale} crumbs={crumbs} />
       <SiteHeader />
       <main className="site-header-offset">
 
         {/* Header */}
         <section className="pt-12 pb-16 md:pt-16 md:pb-24 border-b border-[#d0c5af]">
           <div className="max-w-4xl mx-auto px-6 md:px-8 text-center">
+            <BreadcrumbTrail locale={locale} crumbs={crumbs} tone="light" align="center" />
             <span className="text-[#735c00] text-xs font-bold uppercase tracking-[0.4em]">
               {isEs ? 'Preguntas Frecuentes' : 'Common Questions'}
             </span>

@@ -15,9 +15,11 @@ npm audit --omit=dev
 ```
 
 `npm run build` is the publish gate and must exit 0. Current local baseline
-(measured 2026-08-30): **1176/1176 tests across 112 files**, TypeScript clean,
-lint clean, and a build that exits 0 with **60 prerendered routes = 27 EN +
-27 ES**.
+(measured 2026-09-02): **1195/1195 tests across 115 files**, TypeScript clean,
+lint clean, and a build that exits 0 with **74 prerendered routes = 34 EN +
+34 ES + 6 non-locale** (`/_global-error`, `/_not-found`, `/favicon.ico`,
+`/icon.png`, `/robots.txt`, `/sitemap.xml`). Every locale page adds one to
+each side; a lopsided count means a page is missing from one locale.
 
 ⛔ **Do not record the build's `(N/N) static pages` line as the baseline.** It
 is a progress counter that scales with the product catalog, not a page count —

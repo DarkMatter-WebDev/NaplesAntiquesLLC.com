@@ -21,6 +21,7 @@ export default async function CookiePreferencesPage({ params }: Props) {
   return (
     <LegalPolicyPage
       locale={locale}
+      path="/cookie-preferences"
       title={spanishCopy?.title ?? 'Cookie Preferences'}
       updated={spanishCopy?.updated}
       intro={spanishCopy?.intro ?? [

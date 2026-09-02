@@ -33,6 +33,7 @@ import { fetchShopVisibilitySettings, fetchSpecialPriceDefault } from '@/lib/sho
 import { jsonLdHtml } from '@/lib/json-ld';
 import { calcSpotMeltValue, formatUsdPrice, getStorefrontDisplayPrice } from '@/lib/pricing';
 import SiteHeader from '@/components/layout/SiteHeader';
+import { BreadcrumbTrailFromLd } from '@/components/BreadcrumbTrail';
 import SiteFooter from '@/components/layout/SiteFooter';
 import ProductImageGallery from '@/components/shop/ProductImageGallery';
 import ProductBackLink from '@/components/shop/ProductBackLink';
@@ -543,8 +544,8 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Home', item: `https://naplesestatejewelry.com${localePrefix}` },
-      { '@type': 'ListItem', position: 2, name: 'Shop', item: `https://naplesestatejewelry.com${localePrefix}/shop` },
+      { '@type': 'ListItem', position: 1, name: isEs ? 'Inicio' : 'Home', item: `https://naplesestatejewelry.com${localePrefix}` },
+      { '@type': 'ListItem', position: 2, name: isEs ? 'Tienda' : 'Shop', item: `https://naplesestatejewelry.com${localePrefix}/shop` },
       { '@type': 'ListItem', position: 3, name: title, item: canonicalProductUrl },
     ],
   };
@@ -572,6 +573,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
             edges stay aligned — change both together or the back link detaches
             from the gallery beneath it. */}
         <div className="ultrawide-page-medium max-w-7xl mx-auto px-4 md:px-8 mb-6">
+          <BreadcrumbTrailFromLd ld={breadcrumbLd} tone={isDarkPage ? 'dark' : 'light'} className="mb-3" />
           <ProductBackLink
             href={backHref}
             productId={p.id}

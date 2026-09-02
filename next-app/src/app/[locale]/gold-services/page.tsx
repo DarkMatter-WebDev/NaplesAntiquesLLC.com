@@ -3,6 +3,8 @@ import { pageMetadata } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
+import BreadcrumbTrail from '@/components/BreadcrumbTrail';
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd';
 import SiteFooter from '@/components/layout/SiteFooter';
 import TradingViewMini from '@/components/trading/TradingViewMini';
 import { fetchSpotData } from '@/lib/spot-price';
@@ -50,8 +52,12 @@ export default async function GoldServicesPage({ params }: Props) {
   const spot = await fetchSpotData();
   const goldSpot = spot.goldPerTroyOz ? Math.round(spot.goldPerTroyOz).toLocaleString('en-US') : null;
 
+  // One crumbs array feeds both the JSON-LD and the visible trail.
+  const crumbs = [{ name: isEs ? 'Vender Oro' : 'Sell Gold', path: '/gold-services' }];
+
   return (
     <>
+      <BreadcrumbJsonLd locale={locale} crumbs={crumbs} />
       <SiteHeader />
       <main className="site-header-offset">
 
@@ -69,6 +75,7 @@ export default async function GoldServicesPage({ params }: Props) {
           </div>
           <div className="ultrawide-page relative z-10 max-w-[1440px] mx-auto px-4 md:px-8 w-full">
             <div className="max-w-2xl">
+              <BreadcrumbTrail locale={locale} crumbs={crumbs} tone="dark" />
               <span className="text-[#e9c349] font-[family-name:var(--font-body)] text-xs font-bold tracking-[0.2em] uppercase block mb-4">
                 {isEs ? 'Adquisiciones de Oro Privadas' : 'Private Gold Acquisitions'}
               </span>

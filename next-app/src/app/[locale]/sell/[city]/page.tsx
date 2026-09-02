@@ -7,6 +7,7 @@ import { SERVICE_AREAS, getServiceArea } from '@/lib/service-areas';
 import { SAME_AS, mapsUrl } from '@/lib/business-location';
 import { routing } from '@/i18n/routing';
 import SiteHeader from '@/components/layout/SiteHeader';
+import { BreadcrumbTrailFromLd } from '@/components/BreadcrumbTrail';
 import SiteFooter from '@/components/layout/SiteFooter';
 import ShowroomAddress from '@/components/ShowroomAddress';
 import ShowroomHours from '@/components/ShowroomHours';
@@ -230,6 +231,7 @@ export default async function SellCityPage({ params }: Props) {
         <section className="relative flex min-h-[520px] items-center overflow-hidden bg-[#1a1c1c]">
           <div className="ultrawide-page relative z-10 mx-auto w-full max-w-[1440px] px-4 md:px-8">
             <div className="max-w-3xl">
+              <BreadcrumbTrailFromLd ld={breadcrumbLd} />
               <span className="mb-4 block text-xs font-bold uppercase tracking-[0.2em] text-[#e9c349]" style={{ fontFamily: 'var(--font-label)' }}>
                 {isEs ? `Comprador en ${area.city}, ${area.region}` : `${area.city}, ${area.region} Buyer`}
               </span>

@@ -20,6 +20,7 @@ export default async function AccessibilityPage({ params }: Props) {
   return (
     <LegalPolicyPage
       locale={locale}
+      path="/accessibility"
       title={spanishCopy?.title ?? 'Accessibility Statement'}
       updated={spanishCopy?.updated}
       intro={spanishCopy?.intro ?? [

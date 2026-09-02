@@ -20,6 +20,7 @@ export default async function PrivacyPage({ params }: Props) {
   return (
     <LegalPolicyPage
       locale={locale}
+      path="/privacy"
       title={spanishCopy?.title ?? 'Privacy Policy'}
       updated={spanishCopy?.updated}
       intro={spanishCopy?.intro ?? [

@@ -3,6 +3,8 @@ import { pageMetadata } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
+import BreadcrumbTrail from '@/components/BreadcrumbTrail';
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd';
 import SiteFooter from '@/components/layout/SiteFooter';
 import { AppIcon } from '@/components/AppIcon';
 
@@ -91,8 +93,12 @@ export default async function EstateServicesPage({ params }: Props) {
   const { locale } = await params;
   const isEs = locale === 'es';
 
+  // One crumbs array feeds both the JSON-LD and the visible trail.
+  const crumbs = [{ name: isEs ? 'Servicios de Patrimonio' : 'Estate Services', path: '/estate-services' }];
+
   return (
     <>
+      <BreadcrumbJsonLd locale={locale} crumbs={crumbs} />
       <SiteHeader />
       <main className="site-header-offset">
 
@@ -112,6 +118,7 @@ export default async function EstateServicesPage({ params }: Props) {
           <div className="absolute inset-0 z-0 bg-[#f9f9f7]/60" />
           <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#f9f9f7]/75 via-[#f9f9f7]/30 to-[#f9f9f7]/95" />
           <div className="max-w-4xl mx-auto px-6 md:px-8 relative z-10">
+            <BreadcrumbTrail locale={locale} crumbs={crumbs} tone="light" />
             <span className="text-[#735c00] text-xs font-bold uppercase tracking-[0.4em]">
               {isEs ? 'Servicios de Liquidación de Patrimonio' : 'Estate Liquidation Services'}
             </span>

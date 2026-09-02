@@ -3,6 +3,8 @@ import { pageMetadata } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
+import BreadcrumbTrail from '@/components/BreadcrumbTrail';
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd';
 import SiteFooter from '@/components/layout/SiteFooter';
 import { AppIcon } from '@/components/AppIcon';
 
@@ -30,8 +32,12 @@ export default async function EstateJewelryPage({ params }: Props) {
   const isEs = locale === 'es';
   const p = (path: string) => (isEs ? `/es${path}` : path);
 
+  // One crumbs array feeds both the JSON-LD and the visible trail.
+  const crumbs = [{ name: isEs ? 'Comprador de Joyería de Patrimonio' : 'Estate Jewelry Buyer', path: '/estate-jewelry' }];
+
   return (
     <>
+      <BreadcrumbJsonLd locale={locale} crumbs={crumbs} />
       <SiteHeader />
       <main className="site-header-offset">
 
@@ -52,6 +58,7 @@ export default async function EstateJewelryPage({ params }: Props) {
           </div>
           <div className="container mx-auto px-6 md:px-12 relative z-10 py-16">
             <div className="max-w-2xl">
+              <BreadcrumbTrail locale={locale} crumbs={crumbs} tone="dark" />
               <span
                 className="text-xs font-bold uppercase tracking-[0.2em] mb-4 block"
                 style={{ color: '#f2ca50', fontFamily: 'var(--font-label)' }}

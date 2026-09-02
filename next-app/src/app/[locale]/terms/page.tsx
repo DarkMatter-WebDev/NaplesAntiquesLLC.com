@@ -20,6 +20,7 @@ export default async function TermsPage({ params }: Props) {
   return (
     <LegalPolicyPage
       locale={locale}
+      path="/terms"
       title={spanishCopy?.title ?? 'Terms of Service'}
       updated={spanishCopy?.updated}
       intro={spanishCopy?.intro ?? [

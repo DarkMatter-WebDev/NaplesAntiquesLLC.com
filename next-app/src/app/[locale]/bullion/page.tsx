@@ -3,6 +3,8 @@ import { pageMetadata } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
+import BreadcrumbTrail from '@/components/BreadcrumbTrail';
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd';
 import SiteFooter from '@/components/layout/SiteFooter';
 import TradingViewMini from '@/components/trading/TradingViewMini';
 import TradingViewTicker from '@/components/trading/TradingViewTicker';
@@ -63,8 +65,12 @@ export default async function BullionPage({ params }: Props) {
   const { locale } = await params;
   const isEs = locale === 'es';
 
+  // One crumbs array feeds both the JSON-LD and the visible trail.
+  const crumbs = [{ name: isEs ? 'Vender Lingotes y Monedas' : 'Sell Bullion & Coins', path: '/bullion' }];
+
   return (
     <>
+      <BreadcrumbJsonLd locale={locale} crumbs={crumbs} />
       <SiteHeader />
       <main className="site-header-offset">
 
@@ -83,6 +89,7 @@ export default async function BullionPage({ params }: Props) {
           </div>
           <div className="absolute inset-0 z-0 bg-[#1a1c1c]/60" />
           <div className="max-w-5xl mx-auto px-6 md:px-8 text-center relative z-10">
+            <BreadcrumbTrail locale={locale} crumbs={crumbs} tone="dark" align="center" />
             <span className="text-[#e9c349] text-xs font-bold uppercase tracking-[0.4em]">
               {isEs ? 'Servicios de Metales Preciosos' : 'Precious Metals Estate Services'}
             </span>

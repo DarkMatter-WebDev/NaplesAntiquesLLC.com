@@ -4,6 +4,7 @@ import { pageMetadata } from '@/lib/seo';
 import { jsonLdHtml } from '@/lib/json-ld';
 import { SERVICE_AREAS } from '@/lib/service-areas';
 import SiteHeader from '@/components/layout/SiteHeader';
+import { BreadcrumbTrailFromLd } from '@/components/BreadcrumbTrail';
 import SiteFooter from '@/components/layout/SiteFooter';
 import ClayMark from '@/components/ClayMark';
 
@@ -61,6 +62,7 @@ export default async function SellHubPage({ params }: Props) {
         <section className="relative flex min-h-[480px] items-center overflow-hidden bg-[#1a1c1c]">
           <div className="ultrawide-page relative z-10 mx-auto w-full max-w-[1440px] px-4 md:px-8">
             <div className="max-w-3xl">
+              <BreadcrumbTrailFromLd ld={breadcrumbLd} />
               <span className="mb-4 block text-xs font-bold uppercase tracking-[0.2em] text-[#e9c349]" style={{ fontFamily: 'var(--font-label)' }}>
                 {isEs ? 'Compramos en Todo el Suroeste de Florida' : 'We Buy Across Southwest Florida'}
               </span>

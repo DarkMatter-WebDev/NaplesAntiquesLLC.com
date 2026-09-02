@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
+import BreadcrumbTrail from '@/components/BreadcrumbTrail';
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd';
 import SiteFooter from '@/components/layout/SiteFooter';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -51,8 +53,12 @@ export default async function ServicesPage({ params }: Props) {
     },
   ];
 
+  // One crumbs array feeds both the JSON-LD and the visible trail.
+  const crumbs = [{ name: isEs ? 'Servicios' : 'Services', path: '/services' }];
+
   return (
     <>
+      <BreadcrumbJsonLd locale={locale} crumbs={crumbs} />
       <SiteHeader />
       <main className="site-header-offset">
         <section
@@ -60,6 +66,7 @@ export default async function ServicesPage({ params }: Props) {
           style={{ background: 'var(--color-surface-container-low)', borderColor: 'var(--color-outline-variant)' }}
         >
           <div className="container mx-auto px-6 md:px-8 max-w-4xl text-center">
+            <BreadcrumbTrail locale={locale} crumbs={crumbs} tone="light" align="center" />
             <span
               className="text-xs font-bold uppercase tracking-[0.4em]"
               style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}

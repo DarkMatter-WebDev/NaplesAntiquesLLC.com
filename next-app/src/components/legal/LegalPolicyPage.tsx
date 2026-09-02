@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import SiteFooter from '@/components/layout/SiteFooter';
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd';
+import BreadcrumbTrail from '@/components/BreadcrumbTrail';
 
 export interface LegalSection {
   title: string;
@@ -10,6 +12,12 @@ export interface LegalSection {
 
 export interface LegalPolicyPageProps {
   locale: string;
+  /**
+   * Locale-agnostic path of the page (e.g. '/privacy'). When set, the page
+   * emits BreadcrumbList JSON-LD (Home → this page, named by `title`). Leave
+   * unset on pages that are not in the sitemap (e.g. /unsubscribe).
+   */
+  path?: string;
   eyebrow?: string;
   title: string;
   updated?: string;
@@ -20,6 +28,7 @@ export interface LegalPolicyPageProps {
 
 export default function LegalPolicyPage({
   locale,
+  path,
   eyebrow = 'Legal',
   title,
   updated = 'June 19, 2026',
@@ -29,13 +38,17 @@ export default function LegalPolicyPage({
 }: LegalPolicyPageProps) {
   const isEs = locale === 'es';
   const homeHref = isEs ? '/es' : '/';
+  // One crumbs array feeds both the JSON-LD and the visible trail.
+  const crumbs = path ? [{ name: title, path }] : null;
 
   return (
     <>
+      {crumbs && <BreadcrumbJsonLd locale={locale} crumbs={crumbs} />}
       <SiteHeader />
       <main className="px-4 py-14 pt-28 md:px-8 md:py-18 md:pt-32">
         <div className="mx-auto max-w-4xl">
         <header className="mb-8 rounded-2xl border bg-white/78 p-6 shadow-[0_18px_60px_rgba(38,28,6,0.06)] backdrop-blur md:p-8" style={{ borderColor: 'rgba(115, 92, 0, 0.12)' }}>
+          {crumbs && <BreadcrumbTrail locale={locale} crumbs={crumbs} tone="light" />}
           <span className="text-[#735c00] text-xs font-bold uppercase tracking-[0.4em]">
             {eyebrow}
           </span>

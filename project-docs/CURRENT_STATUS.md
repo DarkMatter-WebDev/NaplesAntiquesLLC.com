@@ -2,13 +2,43 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-09-01**.
+> in `DECISIONS.md`. Last reconciled: **2026-09-02**.
 
-## Start Here (handoff, end of the 2026-09-01 silver internal-linking session — SUPERSEDES the blocks below)
+## Start Here (handoff, end of the 2026-09-02 guide-pages session — SUPERSEDES the blocks below)
 
 **Read this, then `TASKS.md`.**
 
-### 🔴 2026-09-02 batch — THREE SEO GUIDE PAGES built, gated, FAQ copy READ + CORRECTED by the owner, staged — ready to push
+### 🔴 2026-09-02 (afternoon) — BreadcrumbList schema + VISIBLE breadcrumb trail on every sitemap page, schema aliases dropped — gated, staged, awaiting push
+
+Owner asked about Google sitelinks (competitor shows them, we don't).
+Answer recorded in `DECISIONS.md`: algorithmic, brand phrase is generic,
+so we fixed the controllable signals — one breadcrumb helper
+(`lib/breadcrumb-ld.ts` + `BreadcrumbJsonLd`) on all 26 sitemap pages
+except `/` plus product pages, a **visible "Home › Sell Gold" trail**
+(`BreadcrumbTrail`, mockup-approved) above the eyebrow of every one of
+those pages, and `alternateName` removed from the JewelryStore schema.
+Bundled into ONE deploy at the owner's request (Netlify credits). Gate:
+`tsc` · lint · **1195/1195 (115 files)** · build · 74 = 34/34/6 ·
+prerendered-HTML scan 58/58 pages (one trail + one schema, identical
+names) · visual QA in the owner's Chrome (10 desktop pages) + 375 px pane.
+Nothing to submit after deploy; Google re-reads on its own schedule.
+
+The batch before it (three SEO guide pages) is deployed,
+production-verified, IndexNow-submitted, and documented. The only open work is owner-side and
+quota-bound (GSC Request Indexing, 12 URLs) plus the standing citation /
+GBP items in `TASKS.md`. Owner's standing asks from this session: **use
+their real Chrome, not the in-app Browser pane, for browser work**; dental
+gold is **never** priced in store (sent out for karat testing first).
+
+### ✅ 2026-09-02 — THREE SEO GUIDE PAGES DEPLOYED and production-verified; IndexNow 200 for all six
+
+**LIVE** (owner pushed the same day; verified over HTTP: six URLs 200 with
+3/3 JSON-LD incl. FAQPage, corrected strings present, parent links live,
+sitemap 200 URLs with the guides at 2026-09-02; `npm run indexnow` → 200 OK
+for 6). Only GSC Request Indexing remains, quota-bound (12 URLs). The
+narrative below is the build record.
+
+### 📜 2026-09-02 batch — THREE SEO GUIDE PAGES built, gated, FAQ copy READ + CORRECTED by the owner (build record)
 
 `/gold-services/what-is-my-gold-worth`, `/jewelry-appraisal/hallmarks`,
 `/estate-services/selling-inherited-jewelry` (+ES), each on the

@@ -27,6 +27,7 @@ export default async function ShippingPage({ params }: Props) {
   return (
     <LegalPolicyPage
       locale={locale}
+      path="/shipping"
       title={spanishCopy?.title ?? 'Shipping Policy'}
       updated={spanishCopy?.updated}
       intro={spanishCopy?.intro}

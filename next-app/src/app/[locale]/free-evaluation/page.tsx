@@ -3,6 +3,8 @@ import { pageMetadata } from '@/lib/seo';
 import Image from 'next/image';
 import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
+import BreadcrumbTrail from '@/components/BreadcrumbTrail';
+import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd';
 import SiteFooter from '@/components/layout/SiteFooter';
 import EvalForm from '@/components/free-evaluation/EvalForm';
 import { AppIcon } from '@/components/AppIcon';
@@ -89,8 +91,12 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
         },
       ];
 
+  // One crumbs array feeds both the JSON-LD and the visible trail.
+  const crumbs = [{ name: isEs ? 'Evaluación Gratuita' : 'Free Evaluation', path: '/free-evaluation' }];
+
   return (
     <>
+      <BreadcrumbJsonLd locale={locale} crumbs={crumbs} />
       <SiteHeader />
       <main className="site-header-offset">
 
@@ -112,6 +118,7 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
                     the kicker, the metal terms and the trust chips below, at
                     12:1. Tinted fill so the pill still reads as a pill now that
                     the border is no longer carrying it alone. */}
+                <BreadcrumbTrail locale={locale} crumbs={crumbs} tone="dark" />
                 <span
                   className="inline-block text-xs font-bold uppercase tracking-[0.4em] border rounded-full px-4 py-1.5 mb-6"
                   style={{
