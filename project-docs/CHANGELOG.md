@@ -1,7 +1,225 @@
 
 # Changelog
 
-## 2026-09-02 (night, follow-up 3) — editor STILL locked on Safari mobile with the `::after` spacer LIVE: the Save row goes back IN FLOW and hides by collapsing (BUILT, gated, staged — deploy owed)
+## 2026-09-02 (late) — phone preview WORKING; option B passed the owner's Safari review; option C (hide-on-scroll) BUILT on top for the same review (NOT deployed)
+
+**Phone preview, resolved.** The owner's phone could not reach
+`10.0.0.208.nip.io:3007` while the raw IP `10.0.0.208:3007` loaded — so
+the LAN path was fine and the failure was name resolution for a public
+name pointing at a private address (iCloud Private Relay or router
+DNS-rebind protection; not diagnosed further). Fallback that worked: the
+PC's mDNS name **`desktop-ssfdjdu.local`** (resolves on the LAN itself;
+verified `ping -4` → 10.0.0.208). Added to the Turnstile widget (driven in
+the owner's Chrome: now **4 of 10** hostnames — `localhost`,
+`naplesestatejewelry.com`, `nip.io`, `desktop-ssfdjdu.local`) and to
+`allowedDevOrigins` (`*.local`, `desktop-ssfdjdu.local`); dev restarted.
+⚠️ Safari mangled the typed URL; the tapped link
+`http://desktop-ssfdjdu.local:3007/account/sign-in` worked. Sign-in
+completed on the phone, so the Turnstile hostname add is proven.
+
+**Option B on the owner's Safari — PASSED:** "the edit listing page is
+scrollable with all the accordions compacted"; ⋯ sheet, no-zoom fields,
+Add Product and Cancel all confirmed ("everything else works"). Owner's
+one note: the row is static — by design in B — and they asked for
+**option C** on top.
+
+**Option C built (`AdminShell.tsx` + `globals.css`, phones only):** the
+compact row collapses on scroll-down (`max-height` → 0, paddings/border
+0, slide + fade; `overflow: hidden` only while hidden so the ⋯ sheet is
+never clipped) and returns on ANY of: scroll up · at the top · a finger
+dragging downward over the form (native passive touch listeners on the
+body — works even when nothing is scrollable) · **1.2s after a hide that
+left nothing to scroll** (the exact "never comes back" case) · opening the
+⋯ sheet (which also pins the row open). 300ms lock after each toggle;
+handler no-ops at ≥ 768px. Gate: `tsc` · lint · **1197/1197 (116
+files)** · build exit 0 · 74 = 34/34/6 · built CSS carries the collapse
+rule. ⛔ Verified on the owner's Safari only when the owner says so — see
+`TASKS.md`.
+
+**Option C, owner's first Safari pass (same night):** "briefly let me
+scroll and the save menu started to disappear, then when I quickly hit
+the bottom of the page the save menu seemed to lock onto the rest of the
+page and only sometimes hides itself now… sporadic"; and "the regenerate
+missing spanish button should hide along with the rest of the lower save
+menu." Two fixes: (1) the Spanish bar (a separate in-flow footer between
+the form and the action row) now carries the same `data-hidden` and both
+bars share one `.product-editor-dock` class that collapses together;
+(2) a **finger-direction hide** — `touchmove` with the finger moving UP
+by 24px while the body still has overflow hides the dock — because at the
+bottom of the form no further scroll event can fire, so a scroll-only hide
+rule could never trigger there ("locks onto the page"). The show side is
+unchanged (scroll up · top · finger down · idle when nothing scrolls · ⋯).
+Gate re-run green (1197/1197 · build 74 = 34/34/6 · built CSS has the
+`.product-editor-dock[data-hidden=true]` rule). Owner re-review pending.
+
+**Third pass (same night):** owner — "regenerate missing spanish still
+doesn't hide" and "the save menu hides for a moment and then
+automatically pops back up." (a) The Spanish bar collapses to 0px in a
+Chromium replica with the shipped attribute and the source carries it
+(two `data-hidden` sites), so the phone was on the previous JS bundle —
+Safari must be reloaded after a code change, not just re-opened. (b) The
+pop-back was the 1.2s idle timer doing its job on a short form — correct
+mechanically, wrong as UX. Replaced by a guard in the setter: **the dock
+never hides unless at least its own height (+24px) of content remains
+below the fold**, so ducking always reveals something and nothing needs
+to pop back; the idle timer stays as a safety net only. Gate re-run green
+(1197/1197 · build 74 = 34/34/6).
+
+**Fourth pass — the phone WAS on fresh code (the chevron fix worked), so
+"Spanish never hides / hides then pops right back" was a real bug, not
+a stale bundle.** Reading the handler again: (1) the short-form guard
+measured the TOTAL scroll range, not the room BELOW the current position
+— sitting near the bottom, the dock hid, the grown area re-clamped
+`scrollTop`, and that clamp arrived as an "up" scroll that showed the
+dock again; (2) the 300ms lock was shorter than the 220ms collapse plus
+the layout/scroll events it emits; (3) iOS rubber-bands past the bottom
+and springs back — a negative delta that is not the user. Fixes: guard on
+`scrollHeight − clientHeight − scrollTop`; lock 450ms; treat any position
+at/past the bottom as no movement. The Spanish bar "never hiding" was the
+same pop-back seen on a smaller element. Gate re-run green.
+
+**Fifth pass — owner: "the regenerate missing spanish button is still
+always visible… remove it from where it's at and fold it into the ⋯
+extras."** Done: on phones the button is a ⋯ sheet item (same disabled
+logic and label); the Spanish bar carries `data-desktop-only` unless a
+result notice is showing, so on a phone it appears only to display that
+notice, then goes away. Desktop unchanged. CSS: the desktop-only rule now
+also matches `.product-editor-dock[data-desktop-only]` and its
+descendants. Gate re-run green. ⚠️ The dev server was serving the OLD
+selector text while the build had the new one (documented Turbopack
+trap) — the phone review runs against dev, so it was restarted with
+`.next/dev` cleared and the rule CSSOM-verified at 375px; the owner then
+confirmed "it's fixed now" after closing and reopening the Safari tab.
+
+**Sixth pass — owner: the "Dashboard / Edit listing / ✕ Close" header is
+too tall on mobile.** Phones now get one slim line: eyebrow hidden
+(`max-md:hidden` on a `<p>` — no unlayered display rule to fight),
+title `text-lg`, `px-4 py-2.5`, `items-center`; desktop keeps the eyebrow,
+`text-3xl` and the original padding via `md:` variants. Gate re-run green.
+
+**Side issue from the same phone session — row action menu "partially
+blocked in some instances" (screenshot: the Edit/Duplicate/Pad/… menu
+under the products table's header row).** Cause: the menu was `position:
+fixed; z-50` but rendered INSIDE the actions `<td>`, which is `sticky`
+with its own z-index — a stacking context — so the sticky header (z-40),
+the totals footer (z-30) and the frozen columns could paint over it. Fix:
+the backdrop + menu now `createPortal` to `document.body` at z-190/z-200
+(above the fullscreen mobile table at z-100); positioning was already in
+viewport coordinates, so nothing else changed. Gate re-run green.
+
+**Follow-up (owner, phone): "I can't re-close the menu; tapping the
+chevron again opens the product preview."** iOS Safari does not
+synthesize `click` for a plain `<div>` when the listener is delegated to
+`<body>` — which is exactly where the portal put the backdrop — so taps on
+it produced no close and fell through to the row title underneath
+(`openProductActions`). Fix: `cursor-pointer` on the backdrop (the
+documented iOS requirement) + `touch-action: manipulation`. ⛔ Deliberately
+NOT closing on pointerdown/touchend: removing the backdrop before the
+tap's click is dispatched sends that click to whatever is underneath —
+the same fall-through. Gate re-run green (1197/1197 · 74 = 34/34/6).
+
+**Second follow-up — still "tap the arrow again → item options modal".**
+The real mechanism, found by reading the row: `<tr
+onClick={handleProductRowClick}>` opens the product actions modal for any
+click whose target is NOT `a, button, input, …, [role=menuitem]`. A React
+portal still bubbles through the REACT tree, so the backdrop's click
+(a plain `<div>`) reached the row handler after closing the menu. Before
+the portal the backdrop was covered by sibling cells, so taps hit the
+chevron button (ignored by the handler) instead — which is why this never
+showed. Fix: `event.stopPropagation()` on the backdrop click and on the
+menu container. Rule recorded in DECISIONS. Gate re-run green.
+
+## 2026-09-02 (late, after the revert) — option B BUILT: compact action row on phones + 16px editor fields; LAN phone preview wired (NOT deployed — owner reviews on the phone first)
+
+Owner: "go with option B, and then set up the server/preview so I can
+open the preview on my mobile with the typical ipaddress:port config…
+I didn't push the revert yet." So the revert and option B travel together
+in the next push, and — for the first time in this saga — the owner
+reviews the change on the actual Safari BEFORE it is deployed.
+
+**Option B (`AdminShell.tsx`, action row of the editor):**
+- Phones (`< 768px`): ONE row — `Cancel` · `Save` · `Save & Close` (gold,
+  `flex-1`) · `⋯`. The ⋯ opens a sheet directly above the row (inside the
+  modal, `position: absolute; bottom: 100%`) with `Clone` (edit only),
+  `Undo`, `Save + Add Another`. Row height ≈ 60px + safe-area, versus the
+  160–190px 2×3 grid. **In flow, never an overlay; no scroll handling.**
+- Desktop (`≥ 768px`): the full row as before; the ⋯ button and sheet do
+  not exist there.
+- The clone handler moved out of the button into `cloneListing()` so both
+  surfaces share it; `editorMoreOpen` state resets in `closeModal()`.
+- New icon `more_horiz` → Lucide `Ellipsis` in `AppIcon.tsx` (an unknown
+  name renders NOTHING by design, and the icon-integrity test guards it).
+- Visibility is done with **unlayered data-attribute CSS**
+  (`[data-desktop-only]`, `[data-phone-only]`), not `max-md:hidden`: the
+  pills' own unlayered `display` beats a layered Tailwind utility, and a
+  375px replica showed all six buttons until this was rewritten.
+
+**Zoom (`globals.css`):** `.product-editor-modal :is(input, select,
+textarea) { font-size: 1rem }` under `(hover: none)` — the one layer that
+stops iOS tap-to-zoom and cannot touch scrolling. No viewport lock, no
+touch guards.
+
+**LAN phone preview:** Turnstile hostnames must be FQDNs (Cloudflare docs,
+fetched), so `http://10.0.0.208:3007` cannot complete a fresh sign-in;
+`10.0.0.208.nip.io` resolves to the LAN IP (verified with nslookup) and the
+dev server answers under that host. Added `*.nip.io` +
+`10.0.0.208.nip.io` to `allowedDevOrigins` in `next.config.ts` (dev-only),
+and the PUBLIC Turnstile site key to `.env.local` (same value as Netlify;
+the dev server logged `Reload env: .env.local`). ⚠️ Owner action required
+once: add `nip.io` to the Turnstile widget's hostnames in the Cloudflare
+dashboard (subdomains are covered automatically), then sign in on the phone
+at `http://10.0.0.208.nip.io:3007/account/sign-in`. Firewall rule "Next dev
+3007 (LAN)" exists (Private profile; the Ethernet profile IS Private). The
+dev server had died mid-session (no listener on 3007) and was restarted.
+
+Gate: `tsc` · lint · **1197/1197 (116 files)** · build exit 0 · 74 =
+34/34/6 · built CSS carries the option-B rules. Pane replica at 375×812:
+16px input confirmed; row fit re-checked after the visibility fix.
+
+## 2026-09-02 (late) — phone listing-editor batch REVERTED to the pre-batch state; audit + plan written instead of a fifth guess
+
+Owner, after follow-up 3 went live: "still not working… on Chrome on my
+iOS mobile it works, but most of the lower menu bar is hidden behind
+Chrome's menu panel at the bottom… on Safari it's all wonky — sometimes I
+can scroll and the bar hides, but then it never comes back… **revert any
+major changes we did and bring us back to the start, then enter a deep
+dive audit to plan out a fix rather than guessing.**"
+
+**Reverted (all of the 2026-09-02 editor batch and its three follow-ups):**
+`src/app/[locale]/admin/layout.tsx` (viewport lock) DELETED;
+`src/lib/__tests__/admin-mobile-editor.test.ts` DELETED; the editor block
+at the end of `globals.css` (16px touch inputs, `touch-action`,
+`overscroll-behavior`, every Save-row rule) REMOVED; `AdminShell.tsx` back
+to the pre-batch scroll-lock effect (no document-level touch listeners),
+no `onScroll`, no footer ref/`data-hidden`/class, no
+`--editor-footer-h`, no `useLayoutEffect` import. The editor is now
+byte-for-byte the layout that worked on the owner's phone for months.
+
+**Kept:** the thumbnail-rail `scrollLeft` fix in `ProductImageGallery.tsx`
++ its guard test (separate concern, production-verified at 1920/2100).
+
+Gate on the reverted tree: `tsc` clean (after the build regenerated
+`.next/types` — the first run failed only on the stale validator entry for
+the deleted layout) · lint clean · **1197/1197 tests across 116 files**
+(= the 1195 pre-batch baseline + the 2 rail-fix guards) · build exit 0 ·
+**74 = 34/34/6** · built CSS carries none of the editor-batch rules.
+
+**Why the follow-up-3 report matters for the plan (recorded, not acted
+on):** (a) "the bar hides then never comes back" is explained by the
+in-flow collapse itself — with every accordion collapsed, hiding the row
+grew the scroll area until the content FIT, so no scroll event could ever
+fire again and the only "show" triggers were scroll events; the Chromium
+replica even showed `scrollable: false` in that state and it was not read
+as the defect it was. (b) "Chrome iOS works but the bar is behind Chrome's
+bottom panel" is almost certainly independent of the batch: the modal is
+`h-svh`, and Chrome iOS's bottom toolbar overlaps the layout viewport in
+a way `svh` does not exclude — the same class of problem `--app-vh` was
+introduced for on the public site (`ViewportHeightToken`). (c) Every
+Chromium measurement this session — pane replicas, the real editor in the
+owner's desk Chrome — passed while Safari failed; the failing engine was
+never measured. The audit and plan: `features/admin-listing-editor-mobile.md`.
+
+## 2026-09-02 (night, follow-up 3 — REVERTED, see above) — editor STILL locked on Safari mobile with the `::after` spacer LIVE: the Save row goes back IN FLOW and hides by collapsing (BUILT, gated, staged — deploy owed)
 
 Follow-up 2 was verified live (production CSS carried the `::after` rule)
 and the owner reported "still exactly like it was… only when all

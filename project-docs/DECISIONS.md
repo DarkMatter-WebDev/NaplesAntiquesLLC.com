@@ -22,9 +22,71 @@ machines — test rail behaviour at the widest display the owner actually
 uses, and record `prefers-reduced-motion` with every measurement. Detail:
 `CHANGELOG.md` 2026-09-02 (late night).
 
-## Admin on a phone (2026-09-02)
+## Admin on a phone (2026-09-02) — ⛔ THE WHOLE BATCH WAS REVERTED the same night; the entries below are FINDINGS, not shipped rules
 
-### The viewport zoom lock is `/admin/*` ONLY — never lift it to the public site
+Owner's instruction after four failed rounds on Safari mobile: revert to
+the pre-batch editor and plan from evidence. What still governs:
+
+- ⛔ **No phone-editor change ships again without being measured on the
+  owner's real Safari first.** Every Chromium measurement (pane replicas,
+  the real editor in the owner's desk Chrome) passed while Safari failed,
+  four times. Chromium cannot stand in for WebKit on scroll geometry or
+  touch handling. The plan (`features/admin-listing-editor-mobile.md`)
+  starts with an instrumented build read on the phone.
+- The public site keeps its zoomable viewport regardless of what the admin
+  does later (WCAG 1.4.4 / Lighthouse a11y 100).
+- If a hide-on-scroll row is ever built again: an in-flow collapse must
+  have a "show" trigger that does not depend on scroll events (a collapsed
+  form can stop being scrollable the moment the row hides — that is the
+  "never comes back" the owner saw); an overlay must be verified on Safari
+  for the all-accordions-collapsed case specifically.
+- Chrome iOS puts its bottom toolbar over an `h-svh` modal; any future
+  editor sizing must account for it (`--app-vh` / `visualViewport`, see
+  the plan), independent of the Save-row work.
+
+### Option B chosen (owner, 2026-09-02): the phone action row is ONE compact line, in flow, with a ⋯ sheet — no hide-on-scroll
+
+`Cancel · Save · Save & Close · ⋯` on phones; `Clone / Undo / Save + Add
+Another` live in the ⋯ sheet (rendered inside the modal, above the row).
+Desktop keeps the full row. This reclaims ~120px permanently with no
+scroll coupling, which is what the hide-on-scroll request was for. Two
+implementation rules: (1) phone/desktop visibility uses unlayered
+`[data-desktop-only]` / `[data-phone-only]` CSS, because the pills' own
+unlayered `display` beats a layered Tailwind `max-md:hidden`; (2) the row
+is reviewed by the owner on Safari via the LAN dev server
+(`desktop-ssfdjdu.local` — nip.io failed on the phone; Turnstile needs an
+FQDN and `.local` is one) BEFORE it ships, per the rule above. The
+16px-fields zoom fix ships with it; the viewport lock and touch guards do
+not. **Option B passed that review 2026-09-02.**
+
+### Portaled overlays inside a clickable row must `stopPropagation` (2026-09-02)
+
+`createPortal` moves DOM, not React ancestry: a click on a portaled
+backdrop or menu still bubbles to its React parents. The products table
+row has `onClick={handleProductRowClick}` (opens the product actions
+modal for any target that is not a button/link/menuitem), so the row
+action menu's backdrop — a plain `<div>`, now portaled to `<body>` so it
+paints above the sticky cells — closed the menu AND opened the modal.
+Rule: any overlay rendered from inside that row (or any other element
+with a row-level click handler) stops propagation on its backdrop and its
+container. Also required on iOS: `cursor: pointer` on a backdrop whose
+listener is delegated at `<body>`, or Safari never emits the click; and
+close on `click` only — never pointerdown/touchend, which removes the
+backdrop before the click is dispatched and lets it fall through.
+
+### Option C on top of B (owner, 2026-09-02): hide-on-scroll for an IN-FLOW row needs show triggers that are not scroll events
+
+Hiding an in-flow row grows the scroll area; with a short form the content
+then FITS, no scroll event can fire, and a scroll-only "show" rule leaves
+the row gone for good (the follow-up-3 failure). Rule for any collapsing
+in-flow control: show on scroll-up AND on a downward finger drag (native
+passive `touchmove` on the scroller) AND on a short idle after a hide that
+left `scrollHeight <= clientHeight` AND when a menu attached to it opens;
+ignore scroll events for ~300ms after each toggle; never force "show at
+the end". `overflow: hidden` only in the hidden state so an attached
+popover above the row is not clipped. Phones only (`< 768px`).
+
+### (reverted) The viewport zoom lock is `/admin/*` ONLY — never lift it to the public site
 
 `src/app/[locale]/admin/layout.tsx` exports `maximumScale: 1, userScalable:
 false`. That is acceptable for the owner's own tool and NOT for customers:

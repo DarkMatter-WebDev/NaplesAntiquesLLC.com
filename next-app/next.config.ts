@@ -52,7 +52,15 @@ const nextConfig: NextConfig = {
   // and internal /_next asset requests aren't blocked when testing from a
   // phone/tablet at http://<your-LAN-IP>:3000. No effect on production/builds.
   // If your LAN IP changes (DHCP), update it here or just add another entry.
-  allowedDevOrigins: ['192.168.119.224', '192.168.119.*', '10.0.0.208', '10.0.0.*'],
+  // `*.nip.io` — a public wildcard DNS (10.0.0.208.nip.io → 10.0.0.208) so the
+  // owner's phone reaches the LAN dev server under a real hostname. Turnstile
+  // widgets only accept FQDNs, so the raw IP cannot complete a sign-in
+  // (2026-09-02). Dev only; production ignores this key.
+  // `*.local` — the desk PC's mDNS name (`desktop-ssfdjdu.local`), the
+  // fallback when a phone cannot use nip.io (iCloud Private Relay or a
+  // router's DNS-rebind protection refuses a public name that resolves to a
+  // LAN address; a `.local` name is answered on the LAN itself).
+  allowedDevOrigins: ['192.168.119.224', '192.168.119.*', '10.0.0.208', '10.0.0.*', '*.nip.io', '10.0.0.208.nip.io', '*.local', 'desktop-ssfdjdu.local'],
   async headers() {
     return [
       {

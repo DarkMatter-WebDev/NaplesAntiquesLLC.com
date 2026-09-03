@@ -1,7 +1,8 @@
 'use client';
 
 import { adminGetProduct, adminUpdateProductStatus, adminRevalidateProduct } from '@/app/actions/admin-products';
-import { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -1336,6 +1337,117 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     onConfirm: () => void;
   } | null>(null);
   // Mobile-only collapse state for the editor's blocks (no effect on desktop).
+  // Phone-only ⋯ sheet on the editor's action row (option B, 2026-09-02).
+  const [editorMoreOpen, setEditorMoreOpen] = useState(false);
+
+  // Option C (owner, 2026-09-02, after reviewing option B on the phone): the
+  // compact action row ducks while the form scrolls down and returns on the
+  // way up. It is IN FLOW and collapses (globals.css), so hiding it GROWS the
+  // scroll area — which is exactly why the first attempt "never came back":
+  // with every accordion collapsed the grown area fit the content, no scroll
+  // event could fire again, and scroll events were the only show trigger.
+  // This version therefore shows the row on ANY of: scroll up · at the top ·
+  // a finger dragging downward over the form (native touch, works even when
+  // nothing is scrollable) · 1.2s after a hide that left nothing to scroll ·
+  // opening the ⋯ sheet. Events within 300ms of a toggle are ignored because
+  // the browser re-clamps scrollTop when the area changes and emits a scroll.
+  // Phones only: the handler no-ops at ≥ 768px, where the CSS never collapses.
+  const [editorRowHidden, setEditorRowHidden] = useState(false);
+  const editorRowHiddenRef = useRef(false);
+  const editorBodyRef = useRef<HTMLDivElement>(null);
+  const editorScrollLastY = useRef(0);
+  const editorRowToggledAt = useRef(0);
+  const editorRowIdleTimer = useRef(0);
+  const setEditorRowHiddenSafe = useCallback((hidden: boolean) => {
+    if (editorRowHiddenRef.current === hidden) return;
+    if (hidden) {
+      // Never hide when hiding would leave nothing to scroll: the dock's own
+      // height joins the scroll area, and a form that then FITS has no way to
+      // ask for the dock back except the idle timer below — which the owner
+      // saw as "hides for a moment and then pops back up" (2026-09-02). The
+      // dock only ducks when there is at least its own height of content
+      // still below the fold, so ducking always reveals something.
+      const body = editorBodyRef.current;
+      const dockHeight = Array.from(
+        body?.parentElement?.querySelectorAll<HTMLElement>('.product-editor-dock') ?? [],
+      ).reduce((sum, el) => sum + el.offsetHeight, 0);
+      // REMAINING room below the current position — not the total range. With
+      // the total range the dock hid while the user sat at the bottom, the
+      // grown area re-clamped scrollTop, and that clamp arrived as an "up"
+      // scroll that showed the dock again: "starts to hide then pops right
+      // back up" (owner, 2026-09-02, second report).
+      const remaining = body ? body.scrollHeight - body.clientHeight - body.scrollTop : 0;
+      if (!body || remaining <= dockHeight + 24) return;
+    }
+    editorRowHiddenRef.current = hidden;
+    editorRowToggledAt.current = performance.now();
+    setEditorRowHidden(hidden);
+    window.clearTimeout(editorRowIdleTimer.current);
+    if (hidden) {
+      // If hiding left nothing to scroll, no scroll event can ever bring the
+      // row back — so bring it back on its own after a moment.
+      editorRowIdleTimer.current = window.setTimeout(() => {
+        const body = editorBodyRef.current;
+        if (body && body.scrollHeight <= body.clientHeight + 2) {
+          editorRowHiddenRef.current = false;
+          editorRowToggledAt.current = performance.now();
+          setEditorRowHidden(false);
+        }
+      }, 1200);
+    }
+  }, []);
+  const handleEditorBodyScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    if (!window.matchMedia('(max-width: 767px)').matches) return;
+    const el = event.currentTarget;
+    const y = el.scrollTop;
+    const maxY = el.scrollHeight - el.clientHeight;
+    // 450ms > the 220ms collapse transition plus the layout/scroll events it
+    // emits while the area is still changing size.
+    if (performance.now() - editorRowToggledAt.current < 450) {
+      editorScrollLastY.current = Math.min(Math.max(y, 0), maxY);
+      return;
+    }
+    // iOS rubber-bands past the bottom and springs back: that spring-back is
+    // a NEGATIVE delta that is not the user scrolling up. Anything at or past
+    // the bottom is treated as "no movement".
+    if (y >= maxY - 1) {
+      editorScrollLastY.current = maxY;
+      return;
+    }
+    const delta = y - editorScrollLastY.current;
+    if (y <= 0) setEditorRowHiddenSafe(false);
+    else if (delta > 12) setEditorRowHiddenSafe(true);
+    else if (delta < -4) setEditorRowHiddenSafe(false);
+    if (Math.abs(delta) > 4) editorScrollLastY.current = y;
+  }, [setEditorRowHiddenSafe]);
+  const editorOpenForRow = Boolean(editing);
+  useEffect(() => {
+    if (!editorOpenForRow) return;
+    const body = editorBodyRef.current;
+    if (!body) return;
+    let startY: number | null = null;
+    const onTouchStart = (event: TouchEvent) => { startY = event.touches[0]?.clientY ?? null; };
+    const onTouchMove = (event: TouchEvent) => {
+      if (startY === null) return;
+      const dy = (event.touches[0]?.clientY ?? startY) - startY;
+      // Finger moving DOWN the screen = the user wants to go back up → show.
+      if (dy > 24 && editorRowHiddenRef.current) { startY = null; setEditorRowHiddenSafe(false); }
+      // Finger moving UP = reading onward → hide (the setter refuses when the
+      // form is too short to reveal anything). This is what lets the dock duck
+      // when the body is already at its bottom and no scroll event can fire.
+      else if (dy < -24 && !editorRowHiddenRef.current) { startY = null; setEditorRowHiddenSafe(true); }
+    };
+    body.addEventListener('touchstart', onTouchStart, { passive: true });
+    body.addEventListener('touchmove', onTouchMove, { passive: true });
+    return () => {
+      body.removeEventListener('touchstart', onTouchStart);
+      body.removeEventListener('touchmove', onTouchMove);
+      window.clearTimeout(editorRowIdleTimer.current);
+      editorRowHiddenRef.current = false;
+      editorScrollLastY.current = 0;
+      setEditorRowHidden(false);
+    };
+  }, [editorOpenForRow, setEditorRowHiddenSafe]);
   const [openEditorSections, setOpenEditorSections] = useState<{ photos: boolean; video: boolean; ai: boolean; details: boolean; etsy: boolean; ebay: boolean; instagram: boolean; facebook: boolean }>({
     photos: false,
     video: false,
@@ -1802,11 +1914,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   // scrolled/panned behind the fixed modal on touch devices, which is exactly
   // the kind of background bleed-through that makes a fixed-position overlay
   // feel like it's the one scrolling horizontally.
-  //
-  // The touch listeners are the third zoom-lock layer for the owner's phone
-  // (see `admin/layout.tsx`): iOS ignores `user-scalable=no`, and React's own
-  // touch handlers are passive, so a two-finger move has to be cancelled from a
-  // native non-passive listener. `gesturestart` is Safari's pinch event.
   useEffect(() => {
     if (!editing) return;
     const { style } = document.body;
@@ -1814,86 +1921,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     const previousOverscroll = style.overscrollBehavior;
     style.overflow = 'hidden';
     style.overscrollBehavior = 'none';
-    const blockPinch = (event: TouchEvent) => {
-      if (event.touches.length > 1) event.preventDefault();
-    };
-    const blockGesture = (event: Event) => event.preventDefault();
-    document.addEventListener('touchstart', blockPinch, { passive: false });
-    document.addEventListener('touchmove', blockPinch, { passive: false });
-    document.addEventListener('gesturestart', blockGesture);
     return () => {
       style.overflow = previousOverflow;
       style.overscrollBehavior = previousOverscroll;
-      document.removeEventListener('touchstart', blockPinch);
-      document.removeEventListener('touchmove', blockPinch);
-      document.removeEventListener('gesturestart', blockGesture);
     };
   }, [editing]);
-
-  // Phone-only hide-on-scroll for the editor's Save row (mockup approved
-  // 2026-09-02). Direction is read from the modal body's own scroll, not the
-  // window — the page underneath is locked while the editor is open. The row
-  // ducks after 12px of downward travel, returns on 4px upward or at the top.
-  // The 4px dead-band keeps a resting thumb from flickering it.
-  //
-  // The row is IN FLOW on phones and collapses when hidden (see globals.css),
-  // so the scroll area GROWS by the row's height on hide and shrinks on show.
-  // Two consequences shape this handler: (1) a toggle can itself emit a scroll
-  // event (the browser re-clamps scrollTop when the area changes), so events
-  // inside a short window after a toggle are ignored; (2) there is no "show at
-  // the end" rule — with the row in flow, hiding it already exposes the last
-  // field, and a show-at-end rule would fight the growth (show → shrink → not
-  // at end → hide → grow → at end…) while a thumb rests at the bottom.
-  const editorFooterRef = useRef<HTMLDivElement>(null);
-  const editorScrollLastY = useRef(0);
-  const editorFooterToggledAt = useRef(0);
-  const [editorFooterHidden, setEditorFooterHidden] = useState(false);
-  const editorOpen = Boolean(editing);
-  const handleEditorBodyScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
-    const el = event.currentTarget;
-    const y = el.scrollTop;
-    const now = performance.now();
-    if (now - editorFooterToggledAt.current < 300) {
-      editorScrollLastY.current = y;
-      return;
-    }
-    const delta = y - editorScrollLastY.current;
-    const toggle = (hidden: boolean) => {
-      setEditorFooterHidden((current) => {
-        if (current === hidden) return current;
-        editorFooterToggledAt.current = now;
-        return hidden;
-      });
-    };
-    if (y <= 0) toggle(false);
-    else if (delta > 12) toggle(true);
-    else if (delta < -4) toggle(false);
-    if (Math.abs(delta) > 4) editorScrollLastY.current = y;
-  }, []);
-  // 🔴 The row's height is written to the modal as `--editor-footer-h` DIRECTLY
-  // on the DOM, in a layout effect, before the first paint — NOT through React
-  // state. The first version round-tripped a ResizeObserver reading through
-  // `setState`, so the editor's first painted frame had no bottom padding: with
-  // every accordion collapsed the content was just short enough that nothing
-  // could scroll, and the last accordions sat trapped under the overlaid Save
-  // row until opening one grew the content (owner report, 2026-09-02 night,
-  // "the entire page is locked"). The CSS side keeps a generous fallback for
-  // the var, so the padding exists even if this effect is late.
-  useLayoutEffect(() => {
-    if (!editorOpen) return;
-    const footer = editorFooterRef.current;
-    const modal = footer?.parentElement;
-    if (!footer || !modal) return;
-    const measure = () => modal.style.setProperty('--editor-footer-h', `${footer.offsetHeight}px`);
-    measure();
-    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
-    observer?.observe(footer);
-    return () => {
-      observer?.disconnect();
-      editorScrollLastY.current = 0;
-      setEditorFooterHidden(false);
-    };
-  }, [editorOpen]);
 
   useEffect(() => {
     if (!previewImg) return;
@@ -2932,6 +2964,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   }
 
   function closeModal() {
+    setEditorMoreOpen(false);
     resetSpanishTranslation();
     setEditorConfirm(null);
     setShowMicPrompt(false);
@@ -2982,6 +3015,35 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       onConfirm: () => { setEditorConfirm(null); void discardEditorDraft(); },
     });
   }
+  // Duplicate the open listing into a new draft (edit mode only). Shared by
+  // the desktop row and the phone ⋯ sheet.
+  function cloneListing() {
+                    if (!editing) return;
+                    resetSpanishTranslation();
+                    const clone = {
+                      ...editing,
+                      id: '',
+                      inventory_number: getNextInventoryNumber(products),
+                      sku: null,
+                      slug: null,
+                      title: `${editing.title} (Copy)`,
+                      title_es: editing.title_es ? `${editing.title_es} (Copia)` : null,
+                      status: 'draft' as ProductStatus,
+                      sort_order: products.length > 0
+                        ? Math.max(...products.map(p => p.sort_order ?? 0)) + 1
+                        : 1,
+                    };
+                    originalRef.current = null;
+                    setFormErrors([]);
+                    setQuickEntry('');
+                    setQuickAddMode(false);
+                    setInventoryNumberManual(false);
+                    setLengthInput(getProductLength(editing as Product));
+                    setEditing(clone);
+                    setIsNew(true);
+                    resetUndoHistory();
+  }
+
   function requestSaveEditor(afterSave: 'stay' | 'another' | 'close') {
     setEditorConfirm({
       title: 'Save this listing?',
@@ -4919,12 +4981,38 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                         >
                           <AppIcon name={actionMenuId === p.id ? 'arrow_drop_up' : 'arrow_drop_down'} className="text-xl leading-none" aria-hidden="true" />
                         </button>
-                        {actionMenuId === p.id && actionMenuPos && (
+                        {/* Portaled to <body>: this cell is `sticky` with a z-index,
+                            i.e. its own stacking context, so a `fixed` menu rendered
+                            inside it sat BELOW the sticky header (z-40), the totals
+                            footer and the frozen columns — "partially blocked" on the
+                            owner's phone (2026-09-02). From <body> it rides above
+                            everything, including the fullscreen mobile table (z-100). */}
+                        {actionMenuId === p.id && actionMenuPos && typeof document !== 'undefined' && createPortal(
                           <>
-                            <div className="fixed inset-0 z-40" onClick={closeActionMenu} aria-hidden="true" />
+                            {/* `cursor-pointer` is load-bearing on iOS: Safari does not
+                                synthesize `click` for a plain div when the (React) listener
+                                sits on <body>, which is where this portal lives — the
+                                backdrop then swallowed taps without closing (owner,
+                                2026-09-02: "can't re-close the menu"). ⛔ Close on `click`
+                                ONLY: closing on pointerdown/touchend removes the backdrop
+                                before the tap's click is dispatched, and that click then
+                                lands on whatever sits underneath (a row title opens the
+                                product actions) — the very fall-through being fixed. */}
+                            <div
+                              className="fixed inset-0 z-[190] cursor-pointer"
+                              style={{ touchAction: 'manipulation' }}
+                              // ⛔ stopPropagation is load-bearing: a portal still bubbles
+                              // through the REACT tree, so this click would reach the
+                              // row's onClick (handleProductRowClick → the product actions
+                              // modal) — "tap the arrow again and the item options modal
+                              // opens instead of closing the menu" (owner, 2026-09-02).
+                              onClick={(event) => { event.stopPropagation(); closeActionMenu(); }}
+                              aria-hidden="true"
+                            />
                             <div
                               role="menu"
-                              className="fixed z-50 flex min-w-[150px] flex-col overflow-hidden rounded-md border shadow-lg"
+                              onClick={(event) => event.stopPropagation()}
+                              className="fixed z-[200] flex min-w-[150px] flex-col overflow-hidden rounded-md border shadow-lg"
                               style={{
                                 right: actionMenuPos.right,
                                 ...(actionMenuPos.top != null ? { top: actionMenuPos.top } : { bottom: actionMenuPos.bottom }),
@@ -4937,7 +5025,8 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                             >
                               {renderProductActions(p, 'menu')}
                             </div>
-                          </>
+                          </>,
+                          document.body,
                         )}
                       </div>
                     </td>
@@ -5258,14 +5347,16 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             className="w-full max-w-[100vw] h-svh md:h-auto md:max-w-5xl border flex flex-col overflow-hidden product-editor-modal md:rounded-[8px]"
             style={{ background: '#f7f8fc', borderColor: '#d9deef' }}
           >
-            {/* Modal header */}
-            <div className="flex items-start justify-between px-7 py-5 border-b"
+            {/* Modal header. Phones: one slim line — title + ✕ Close, no eyebrow —
+                so it stops eating the top of a small screen (owner, 2026-09-02).
+                Desktop keeps the eyebrow and the large title. */}
+            <div className="flex items-center justify-between px-4 py-2.5 border-b md:items-start md:px-7 md:py-5"
               style={{ borderColor: '#dfe3f0', background: '#fbfbff' }}>
               <div>
-                <p className="text-[0.66rem] font-bold uppercase tracking-[0.24em]" style={{ color: '#7a7391', fontFamily: 'var(--font-label)' }}>
+                <p className="max-md:hidden text-[0.66rem] font-bold uppercase tracking-[0.24em]" style={{ color: '#7a7391', fontFamily: 'var(--font-label)' }}>
                   Dashboard
                 </p>
-                <h2 className="mt-2 text-3xl font-bold" style={{ fontFamily: 'var(--font-headline)', color: '#111827', letterSpacing: 0 }}>
+                <h2 className="text-lg font-bold md:mt-2 md:text-3xl" style={{ fontFamily: 'var(--font-headline)', color: '#111827', letterSpacing: 0 }}>
                   {isNew ? 'New listing' : 'Edit listing'}
                 </h2>
               </div>
@@ -5277,8 +5368,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
             </div>
 
             <div
-              className="product-editor-body p-4 md:p-7 flex flex-col gap-4 md:gap-5 overflow-y-auto overflow-x-hidden flex-1 min-h-0"
+              ref={editorBodyRef}
               onScroll={handleEditorBodyScroll}
+              className="product-editor-body p-4 md:p-7 flex flex-col gap-4 md:gap-5 overflow-y-auto overflow-x-hidden flex-1 min-h-0"
             >
 
               {/* Photos */}
@@ -6524,13 +6616,21 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               </div>
             )}
 
-            {/* Modal footer — 2-up grid on mobile (so nothing overflows), single row on desktop */}
+            {/* Spanish bar. Part of the phone "dock" with the action row below it:
+                both collapse together on scroll-down (option C, owner 2026-09-02
+                — "the regenerate missing spanish button should hide along with the
+                rest of the lower save menu"). */}
             <div
-              className="px-3 py-3 border-t flex flex-col gap-2 sm:flex-row sm:items-center"
+              data-hidden={editorRowHidden && !editorMoreOpen ? 'true' : 'false'}
+              // Phones: the button lives in the ⋯ sheet (owner, 2026-09-02), so
+              // this bar exists there ONLY while a result notice is showing.
+              {...(spanishTranslationNotice ? {} : { 'data-desktop-only': '' })}
+              className="product-editor-dock px-3 py-3 border-t flex flex-col gap-2 sm:flex-row sm:items-center"
               style={{ borderColor: 'var(--color-outline-variant)' }}
             >
               <button
                 type="button"
+                data-desktop-only=""
                 onClick={regenerateMissingSpanish}
                 disabled={translatingSpanish || saving || buildMissingSpanishCopyRequest(editing).targets.length === 0}
                 className="outline-button text-sm inline-flex w-full items-center justify-center gap-1.5 disabled:opacity-40 sm:w-auto"
@@ -6554,43 +6654,75 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               )}
             </div>
 
+            {/* Action row. Desktop: every action in one line, as it has always
+                been. Phones (< 768px): ONE compact row — Cancel · Save · Save &
+                Close · ⋯ — with Clone / Undo / Save + Add Another behind the ⋯
+                sheet. This is "option B" from features/admin-listing-editor-mobile.md
+                (owner, 2026-09-02): the 2×3 grid took 160–190px of a phone
+                screen; a single row takes ~60px, reclaiming the space the
+                hide-on-scroll attempts were after, with no scroll coupling at
+                all. The row stays IN FLOW — never an overlay (see DECISIONS,
+                "Admin on a phone"). */}
             <div
-              ref={editorFooterRef}
-              data-hidden={editorFooterHidden ? 'true' : 'false'}
-              className="product-editor-footer grid grid-cols-2 gap-2 px-3 py-4 border-t [&>button]:w-full md:flex md:items-center md:gap-1.5 md:[&>button]:w-auto"
-              style={{ borderColor: 'var(--color-outline-variant)', paddingBottom: 'max(1rem, calc(1rem + env(safe-area-inset-bottom, 0px)))' }}>
+              data-hidden={editorRowHidden && !editorMoreOpen ? 'true' : 'false'}
+              className="product-editor-dock product-editor-actions relative flex items-center gap-2 px-3 py-3 border-t md:gap-1.5 md:py-4 md:flex-wrap"
+              style={{ borderColor: 'var(--color-outline-variant)', paddingBottom: 'max(0.75rem, calc(0.75rem + env(safe-area-inset-bottom, 0px)))' }}>
+              {editorMoreOpen && (
+                <div
+                  className="product-editor-more-sheet absolute bottom-full left-0 right-0 z-10 flex flex-col gap-2 border-t border-b px-3 py-3"
+                  style={{ background: '#fbfbff', borderColor: 'var(--color-outline-variant)', boxShadow: '0 -8px 24px rgba(17, 24, 39, 0.12)' }}
+                  role="menu"
+                  aria-label="More actions"
+                >
+                  {!isNew && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => { setEditorMoreOpen(false); cloneListing(); }}
+                      disabled={translatingSpanish || saving}
+                      className="outline-button text-sm disabled:opacity-40 w-full"
+                    >
+                      Clone
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => { setEditorMoreOpen(false); undoEdit(); }}
+                    disabled={!canUndoEdit || saving || translatingSpanish}
+                    className="outline-button text-sm disabled:opacity-40 w-full flex items-center justify-center gap-1.5"
+                  >
+                    <AppIcon name="undo" className="text-base leading-none" aria-hidden="true" />
+                    Undo
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => { setEditorMoreOpen(false); requestSaveEditor('another'); }}
+                    disabled={saving || translatingSpanish}
+                    className="outline-button text-sm disabled:opacity-50 w-full"
+                  >
+                    Save + Add Another
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => { setEditorMoreOpen(false); regenerateMissingSpanish(); }}
+                    disabled={translatingSpanish || saving || buildMissingSpanishCopyRequest(editing).targets.length === 0}
+                    className="outline-button text-sm disabled:opacity-40 w-full"
+                  >
+                    {translatingSpanish ? 'Generating Spanish...' : 'Regenerate Missing Spanish'}
+                  </button>
+                </div>
+              )}
               {/* Clone — edit mode only, pushed to the left */}
               {!isNew && (
                 <button
                   type="button"
-                  onClick={() => {
-                    if (!editing) return;
-                    resetSpanishTranslation();
-                    const clone = {
-                      ...editing,
-                      id: '',
-                      inventory_number: getNextInventoryNumber(products),
-                      sku: null,
-                      slug: null,
-                      title: `${editing.title} (Copy)`,
-                      title_es: editing.title_es ? `${editing.title_es} (Copia)` : null,
-                      status: 'draft' as ProductStatus,
-                      sort_order: products.length > 0
-                        ? Math.max(...products.map(p => p.sort_order ?? 0)) + 1
-                        : 1,
-                    };
-                    originalRef.current = null;
-                    setFormErrors([]);
-                    setQuickEntry('');
-                    setQuickAddMode(false);
-                    setInventoryNumberManual(false);
-                    setLengthInput(getProductLength(editing as Product));
-                    setEditing(clone);
-                    setIsNew(true);
-                    resetUndoHistory();
-                  }}
+                  onClick={cloneListing}
                   disabled={translatingSpanish || saving}
                   className="outline-button text-sm disabled:opacity-40"
+                  data-desktop-only=""
                 >
                   Clone
                 </button>
@@ -6600,6 +6732,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 onClick={undoEdit}
                 disabled={!canUndoEdit || saving || translatingSpanish}
                 className="outline-button text-sm disabled:opacity-40 flex items-center justify-center gap-1.5"
+                data-desktop-only=""
                 title="Undo the last change"
               >
                 <AppIcon name="undo" className="text-base leading-none" aria-hidden="true" />
@@ -6611,11 +6744,22 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
               <button type="button" onClick={() => requestSaveEditor('stay')} disabled={saving || translatingSpanish} className="outline-button text-sm disabled:opacity-50">
                 {saving ? 'Saving…' : 'Save'}
               </button>
-              <button type="button" onClick={() => requestSaveEditor('another')} disabled={saving || translatingSpanish} className="outline-button text-sm disabled:opacity-50">
+              <button type="button" onClick={() => requestSaveEditor('another')} disabled={saving || translatingSpanish} className="outline-button text-sm disabled:opacity-50" data-desktop-only="">
                 Save + Add Another
               </button>
-              <button type="button" onClick={() => requestSaveEditor('close')} disabled={saving || translatingSpanish} className="gold-button gold-button-gradient text-sm disabled:opacity-50">
-                {saving ? 'Saving…' : 'Save and Close'}
+              <button type="button" onClick={() => requestSaveEditor('close')} disabled={saving || translatingSpanish} className="gold-button gold-button-gradient text-sm disabled:opacity-50 max-md:flex-1">
+                {saving ? 'Saving…' : (<><span data-phone-only="">Save &amp; Close</span><span data-desktop-only="">Save and Close</span></>)}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEditorRowHiddenSafe(false); setEditorMoreOpen((open) => !open); }}
+                className="product-editor-more-button"
+                aria-label="More actions"
+                aria-haspopup="menu"
+                aria-expanded={editorMoreOpen}
+                style={{ borderColor: 'color-mix(in srgb, var(--color-primary) 50%, transparent)', color: 'var(--color-primary)' }}
+              >
+                <AppIcon name="more_horiz" className="text-2xl leading-none" aria-hidden="true" />
               </button>
             </div>
           </div>

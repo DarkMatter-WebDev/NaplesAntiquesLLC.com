@@ -3049,64 +3049,92 @@ html[data-nej-cookies-ok] [data-cookie-notice] {
   display: none;
 }
 
-/* Admin listing editor on touch screens (owner request, 2026-09-02).
+/* Admin listing editor on phones — option B (owner, 2026-09-02; see
+   features/admin-listing-editor-mobile.md). Two rules, both deliberately
+   small after four failed deploys of the previous approach:
 
-   Two things the owner hit on their phone: tapping a field zoomed the page
-   (iOS Safari auto-zooms any input under 16px, and `.form-field` is 14px), and
-   once zoomed the modal could be panned sideways with the Save row a mis-tap
-   away. Three layers, because iOS ignores `user-scalable=no`:
-   1. `admin/layout.tsx` locks the viewport scale for `/admin/*` only.
-   2. Every input inside the editor is 16px on touch screens — the one size
-      that never triggers tap-to-zoom. Unlayered on purpose so it beats a
-      Tailwind `text-xs` on the same element (unlayered > `@layer utilities`).
-   3. `touch-action: manipulation` keeps every scroll gesture and removes only
-      double-tap zoom; the two-finger `touchmove` guard in `AdminShell` cancels
-      pinch. ⛔ Not `pan-x pan-y`: that value shipped first and the owner's
-      phone could not scroll the editor at all until an accordion changed the
-      layout (2026-09-02 night). iOS is unreliable with nested scrollers under
-      pan-* values; `manipulation` is the one every mobile site relies on. */
+   1. Inputs inside the editor are 16px on touch screens. iOS Safari zooms
+      the page on focus of any field under 16px, and `.form-field` is 14px —
+      that is the "accidental zoom" the owner reported. Unlayered so a
+      Tailwind `text-xs` on the same element cannot win. This rule cannot
+      affect scrolling.
+   2. The action row is one compact line on phones. Pills lose their wide
+      padding so Cancel · Save · Save & Close · ⋯ fit a 375px screen. The row
+      stays in normal flow (⛔ never an overlay — DECISIONS, "Admin on a
+      phone"). No scroll handling of any kind. */
 @media (hover: none) {
   .product-editor-modal :is(input, select, textarea) {
     font-size: 1rem;
   }
 }
-.product-editor-modal {
-  touch-action: manipulation;
-  overscroll-behavior: contain;
+.product-editor-more-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+}
+@media (max-width: 767px) {
+  .product-editor-actions .outline-button,
+  .product-editor-actions .gold-button {
+    padding-left: 0.8rem;
+    padding-right: 0.8rem;
+    white-space: nowrap;
+  }
+  .product-editor-more-sheet .outline-button {
+    padding-top: 0.8rem;
+    padding-bottom: 0.8rem;
+  }
+}
+/* Which action-row items exist on which screen. Unlayered on purpose: the
+   pills' own `.outline-button` / `.gold-button` display rules are unlayered
+   too, so a Tailwind `max-md:hidden` (layered) LOSES to them — the desktop
+   buttons stayed visible at 375px until this was written as plain CSS. */
+@media (max-width: 767px) {
+  .product-editor-actions [data-desktop-only],
+  .product-editor-dock[data-desktop-only],
+  .product-editor-dock [data-desktop-only] {
+    display: none !important;
+  }
+}
+@media (min-width: 768px) {
+  .product-editor-actions [data-phone-only],
+  .product-editor-more-button,
+  .product-editor-more-sheet {
+    display: none !important;
+  }
 }
 
-/* Phones: the Save row stays IN FLOW (its own space below the scroll area,
-   exactly the geometry the owner used for months) and hides on scroll-down by
-   COLLAPSING — max-height to 0 while sliding down — so the form grows into the
-   space it leaves. It returns on any upward scroll. Desktop is untouched.
-
-   🔴 Why not an overlay: three overlay versions shipped on 2026-09-02 (body
-   `padding-bottom`, then a `::after` spacer, each with the row absolutely
-   positioned) and on Safari mobile the editor with every accordion collapsed
-   could not scroll at all — the last accordions sat under the row with no
-   way to reach them, while every Chromium measurement looked healthy. In
-   flow, nothing is ever under the row and there is no reserved space for a
-   browser to discard. `--editor-footer-h` (written by `AdminShell` in a
-   layout effect) makes the collapse transition exact; the fallback only
-   affects timing, never reachability. */
+/* Option C (owner, 2026-09-02): on phones the "dock" — the Spanish bar AND the compact action row, both carrying `data-hidden` — ducks while
+   the form scrolls down and returns on the way up. It stays IN FLOW and
+   COLLAPSES — max-height to 0, paddings/border to 0 (`!important` because the
+   row carries inline safe-area padding and a border-box max-height cannot go
+   below padding), a small slide and a fade — so the form grows into the space.
+   `overflow: hidden` only while hidden: when shown, the ⋯ sheet sits ABOVE the
+   row (absolute, bottom: 100%) and must not be clipped. The show triggers that
+   do not depend on scroll events live in `AdminShell` — read that comment
+   before touching this. Desktop never collapses. */
 @media (max-width: 767px) {
-  .product-editor-footer {
+  .product-editor-dock {
     flex: none;
-    max-height: calc(var(--editor-footer-h, 20rem) + 2px);
-    overflow: hidden;
-    transition: max-height 0.22s ease, transform 0.22s ease, padding 0.22s ease;
+    max-height: 8rem;
+    transition: max-height 0.22s ease, transform 0.22s ease, padding 0.22s ease, opacity 0.18s ease;
   }
-  /* `!important` beats the inline safe-area padding the row carries; with
-     `box-sizing: border-box` a max-height of 0 cannot go below the padding. */
-  .product-editor-footer[data-hidden='true'] {
+  .product-editor-dock[data-hidden='true'] {
     max-height: 0;
+    overflow: hidden;
     padding-top: 0 !important;
     padding-bottom: 0 !important;
     border-top-width: 0 !important;
-    transform: translateY(1.5rem);
+    transform: translateY(1rem);
+    opacity: 0;
   }
   @media (prefers-reduced-motion: reduce) {
-    .product-editor-footer {
+    .product-editor-dock {
       transition: none;
     }
   }

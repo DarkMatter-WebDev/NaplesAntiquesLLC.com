@@ -5,7 +5,239 @@
 
 ## ◻ OPEN — needs a human
 
-### 🔴 DEPLOY the 2026-09-02 (night follow-up 3) editor scroll fix — then OWNER walkthrough on Safari mobile (no SQL, no env vars)
+### ✅ 2026-09-02 (end of night) — phone-editor batch APPROVED on the owner's Safari ("good"); READY TO PUSH (no SQL, no env vars in Netlify)
+
+Everything below this heading is the build/review record. What ships in
+the push: revert of the overlay batch · option B compact row + ⋯ sheet ·
+option C dock (hide-on-scroll with non-scroll show triggers) · 16px fields
+· slim header · portaled row action menu · thumbnail-rail fix. ◻ After
+deploy: one owner spot-check of Edit + Add Product on the phone against
+production; nothing to submit.
+
+### 📜 build/review record — 2026-09-02 (late) — OPTION B built; OWNER PHONE REVIEW on the LAN dev server, THEN push (revert + option B together; no SQL, no env vars in Netlify)
+
+What is built (unpushed): the editor's action row is one compact line on
+phones — `Cancel` · `Save` · `Save & Close` · `⋯` (sheet: Clone / Undo /
+Save + Add Another) — in flow, no scroll handling; desktop unchanged; and
+editor fields are 16px on touch screens so iOS stops tap-to-zoom. Gate:
+`tsc` · lint · **1197/1197 / 116 files** · build exit 0 · 74 = 34/34/6.
+
+✅ **Cloudflare DONE 2026-09-02 (driven in the owner's Chrome):** Turnstile
+widget "Naples Estate Jewelry auth" (`0x4AAAAAAEa0eMDYdUm0JTws`) →
+Hostname management → **`nip.io` added**; the dashboard confirmed
+"Successfully updated site settings" and the widget now lists **3 of 10**
+hostnames: `localhost`, `naplesestatejewelry.com`, `nip.io` (subdomains
+covered automatically). ⚠️ Trap: pressing Enter in the hostname box
+SUBMITS the whole form without adding the entry — pick the dropdown's
+"Add … as a custom hostname" option, then click Update.
+
+◻ **Then, on the phone (same Wi-Fi as the desk PC; dev server running):**
+`http://10.0.0.208.nip.io:3007/account/sign-in` → sign in →
+`http://10.0.0.208.nip.io:3007/admin`. The dev server, the firewall rule
+("Next dev 3007 (LAN)", Private profile) and `allowedDevOrigins` are all
+in place; `nslookup 10.0.0.208.nip.io` → 10.0.0.208 verified.
+
+🔴 **2026-09-02: owner's phone "couldn't establish a connection" to the
+nip.io address.** Verified on the PC side afterwards: listener on
+`0.0.0.0:3007` and `[::]:3007`; Private firewall profile ACTIVE with the
+single allow rule for 3007; the PC answers under all three Host names
+(IP, nip.io, `.local`). So the failure is on the phone/network side.
+**Troubleshooting ladder (owner, in this order):**
+1. `http://10.0.0.208:3007` — raw IP. If THIS loads (even just the shop),
+   the network path is fine and the problem is name resolution for nip.io
+   — on an iPhone that is almost always **iCloud Private Relay** (Settings →
+   Wi-Fi → ⓘ on this network → turn OFF "Limit IP Address Tracking", or
+   Settings → Apple ID → iCloud → Private Relay off for now) or a router's
+   DNS-rebind protection refusing a public name that points at a LAN IP.
+2. `http://desktop-ssfdjdu.local:3007` — the PC's mDNS name; iOS resolves
+   `.local` on the LAN itself, no public DNS involved. **Added to the
+   Turnstile widget (4 of 10 hostnames now) and to `allowedDevOrigins`**,
+   so sign-in works there too.
+3. If the raw IP does NOT load: the phone is not on the same network —
+   cellular, a guest SSID, or a Wi-Fi with client/AP isolation. Join the
+   same SSID as the desk PC (Ethernet, 10.0.0.x) and retry 1.
+4. Still nothing: on the PC run `netsh advfirewall show currentprofile`
+   (must say Private, State ON) and `netstat -ano | findstr :3007`.
+
+⚠️ **Resolved 2026-09-02: raw IP loaded → name resolution. The phone uses
+`http://desktop-ssfdjdu.local:3007` (tap a link; typing it in Safari gets
+mangled).** 🔴 **Separate trap, hit three times the same evening: the
+in-app preview dev server DIES when the session idles** (no listener on
+3007, stale server id). "Can't load it on my mobile again" after a pause
+= restart the dev server first (`netstat -ano | findstr :3007` empty →
+`preview_start`, or the owner runs `npm run dev` in their own terminal
+from `next-app/`, which survives the pane), THEN suspect the network.
+
+✅ **Option B PASSED the owner's Safari review 2026-09-02** ("scrollable
+with all the accordions compacted… everything else works"): one-line row,
+⋯ sheet, no-zoom fields, Add Product, Cancel. Phone reached the dev server
+via **`http://desktop-ssfdjdu.local:3007`** (tap the link; Safari mangles
+it when typed) — nip.io failed on the phone (Private Relay / DNS rebind,
+raw IP worked), `.local` added to Turnstile (4/10) + `allowedDevOrigins`.
+
+◻ **Option C — second pass after the owner's first Safari look** ("locks
+onto the page at the bottom, sporadic"; "Regenerate Missing Spanish should
+hide too"): the Spanish bar and the action row are now ONE dock that
+collapses together, and a finger moving UP over the form hides the dock
+even when the body is already at its bottom (no scroll event possible
+there). **Owner re-review on Safari, same URL — `Edit an item`, then:**
+1. Everything collapsed (short form): the dock should **NOT hide at all**
+   — it only ducks when at least its own height of content remains below
+   the fold (third pass; the earlier "hides then pops back" is gone).
+   ⚠️ Reload Safari after each code change (pull down to refresh). The
+   fourth pass fixed the real pop-back (guard on room BELOW the current
+   position; 450ms lock; bottom rubber-band ignored) — the "Spanish never
+   hides" was that same pop-back, not a stale bundle. **Test in the MIDDLE
+   of a long form (Details open) first, then at the bottom.**
+2. Open Details (long form): scroll down — the row collapses away (on a
+   phone there is no separate Spanish bar any more — **Regenerate Missing
+   Spanish is in the ⋯ sheet**; a bar appears only to show its result
+   notice); scroll up a touch — it returns; drag a finger downward
+   anywhere on the form — it returns; at the very top — visible.
+   **Scroll to the very bottom, then drag a finger UP again — the dock
+   should hide even though nothing scrolls** (this was the "locks" case).
+3. With the row hidden, tap where it was — nothing happens (it is gone,
+   not invisible); scroll up — it returns; tap `⋯` — sheet opens and the
+   row stays open while the sheet is up.
+4. **Add Product**: same.
+5. Anything flicker or get stuck hidden? Say which step.
+5b. **Header:** on the phone the top of the editor is one slim line
+   ("Edit listing" + ✕ Close, no "Dashboard" eyebrow); desktop unchanged.
+6. **Products table — the arrow (▾) menu on a row:** open it on the first
+   row, a middle row, and the last row, in the inline table AND in "Open
+   Product Table" fullscreen — it must sit fully on top every time (it was
+   rendering under the sticky header/footer/frozen columns; now portaled to
+   `<body>`). **Then tap anywhere outside it (including the chevron) — it
+   must close on that tap and NOTHING else may open** (iOS needed
+   `cursor: pointer` on the backdrop; closing is on `click` only; and the
+   backdrop/menu now `stopPropagation` so the click cannot bubble to the
+   row's own handler, which is what opened the item options modal).
+
+◻ **After the yes:** push (staging carries revert + B + C). Nothing to
+submit after deploy.
+
+✅ **STAGING RE-SYNCED 2026-09-02 (slim phone header):** dry run exactly
+**3 files** (`AdminShell.tsx`, CHANGELOG, TASKS), **0 Extras**; real
+**3 / 0 / 0**; follow-up **0**; 908 on disk; leak check clean; 190 = 190
+`.tsx`; AdminShell hash equal; staged slim-header classes present. Gate:
+1197/1197 · build 74 = 34/34/6. Replica at 375px: header **101px → 49px**
+(eyebrow hidden, title 30px → 18px, padding 20 → 10). (Earlier records
+below.)
+
+✅ **STAGING RE-SYNCED 2026-09-02 (Spanish button → ⋯ sheet on phones):**
+dry run exactly **4 files** (`globals.css`, `AdminShell.tsx`, CHANGELOG,
+TASKS), **0 Extras**; real **4 / 0 / 0**; follow-up **0**; 908 on disk;
+leak check clean; 190 = 190 `.tsx`; both app hashes equal; staged sheet
+item present. Gate: 1197/1197 · build 74 = 34/34/6. 🔴 **Dev-server trap
+hit AGAIN here:** a Chromium replica at 375px showed the Spanish bar still
+displayed because the running dev server served the OLD
+`[data-desktop-only]` rule while the production build carried the new
+one — the phone tests run against that dev server, so some of tonight's
+"still visible" reports may have been stale dev CSS. Fixed by stop → clear
+`.next/dev` → start, then a CSSOM re-check. (Earlier records below.)
+
+✅ **STAGING RE-SYNCED 2026-09-02 (dock pop-back: remaining-room guard,
+450ms lock, bottom bounce ignored):** dry run exactly **3 files**
+(`AdminShell.tsx`, CHANGELOG, TASKS), **0 Extras**; real **3 / 0 / 0**;
+follow-up **0**; 908 on disk; leak check clean; 190 = 190 `.tsx`;
+AdminShell hash equal; staged guard present. Gate: 1197/1197 · build 74 =
+34/34/6. (Earlier records below.)
+
+✅ **STAGING RE-SYNCED 2026-09-02 (menu backdrop/menu stopPropagation):**
+dry run exactly **4 files** (`AdminShell.tsx`, CHANGELOG, DECISIONS,
+TASKS), **0 Extras**; real **4 / 0 / 0**; follow-up **0**; 908 on disk;
+leak check clean; 190 = 190 `.tsx`; AdminShell hash equal; staged
+stopPropagation present. Gate: 1197/1197 · build 74 = 34/34/6. (Earlier
+records below.)
+
+✅ **STAGING RE-SYNCED 2026-09-02 (menu backdrop tappable on iOS):** dry
+run exactly **3 files** (`AdminShell.tsx`, CHANGELOG, TASKS), **0
+Extras**; real **3 / 0 / 0**; follow-up **0**; 908 on disk; leak check
+clean; 190 = 190 `.tsx`; AdminShell hash equal; staged backdrop has
+`cursor-pointer` and NO pointerdown close. Gate: 1197/1197 · build 74 =
+34/34/6. (Earlier records below.)
+
+✅ **STAGING RE-SYNCED 2026-09-02 (row action menu portaled to `<body>`):**
+dry run exactly **3 files** (`AdminShell.tsx`, CHANGELOG, TASKS), **0
+Extras**; real **3 / 0 / 0**; follow-up **0**; 908 on disk; leak check
+clean; 190 = 190 `.tsx`; AdminShell hash equal; staged portal present. Gate
+re-run: 1197/1197 · build 74 = 34/34/6. (Earlier records below.)
+
+✅ **STAGING RE-SYNCED 2026-09-02 (option C, third pass: no-hide-on-short-form
+guard):** dry run exactly **3 files** (`AdminShell.tsx`, CHANGELOG, TASKS),
+**0 Extras**; real **3 / 0 / 0**; follow-up **0**; 908 on disk; leak check
+clean; 190 = 190 `.tsx`; AdminShell hash equal; staged guard present. Gate
+re-run: 1197/1197 · build 74 = 34/34/6. (Earlier records below.)
+
+✅ **STAGING RE-SYNCED 2026-09-02 (option C, second pass: dock + finger-up
+hide):** dry run exactly **4 files** (`globals.css`, `AdminShell.tsx`,
+CHANGELOG, TASKS), **0 Extras**; real **4 / 0 / 0**; follow-up **0**; 908
+on disk; leak check clean; 190 = 190 `.tsx`; both app hashes equal; staged
+dock refs shell 2 / css 3; dev CSSOM serves the `.product-editor-dock`
+rules. Gate re-run: 1197/1197 · build 74 = 34/34/6. (Earlier record below.)
+
+✅ **STAGING SYNCED 2026-09-02 (late, option C) — ready to copy to the repo
+and push once the phone review says yes.** Dry run queued exactly **6
+files** (`globals.css`, `AdminShell.tsx`, 4 docs) with **0 Extras**,
+verified BEFORE the real run; real run **6 copied / 0 Mismatch / 0
+FAILED**; follow-up dry run **0, exit 0**; **908 files** on disk (robocopy
+911 = the documented 3 `/XF`-excluded). Leak check 0 `.git` (dir/file),
+`.env*`, `node_modules`, `.next`; **190 = 190 `.tsx`** control; SHA-256
+equal for both app files; staged shell has the option-C handler (8
+refs). Gate on this tree: `tsc` · lint · **1197/1197 / 116 files** · build
+exit 0 · 74 = 34/34/6 · built CSS carries the collapse rule; dev CSSOM
+serves it. (Docs-only re-sync follows this record.)
+
+◻ **After the yes:** push. Staging already carries the revert + option B +
+the 16px fields (record below); re-sync only if wording/size tweaks land
+first. Nothing to submit after deploy.
+
+✅ **STAGING SYNCED 2026-09-02 (late, option B) — ready to copy to the repo
+and push once the phone review says yes.** Dry run queued exactly **10
+files** (`next.config.ts`, `globals.css`, `AppIcon.tsx`, `AdminShell.tsx`,
+6 docs) with **0 Extras**, verified BEFORE the real run; real run **10
+copied / 0 Mismatch / 0 FAILED**; follow-up dry run **0, exit 0**; **908
+files** on disk (robocopy 911 = the documented 3 `/XF`-excluded). Leak
+check 0 `.git` (dir/file), `.env*` (the Turnstile key stays local),
+`node_modules`, `.next`; **190 = 190 `.tsx`** control; SHA-256 equal for
+the four app files; staged `AppIcon.tsx` has `more_horiz: Ellipsis`,
+staged shell has the ⋯ button. (Docs-only re-sync follows this record.)
+
+### ✅ (bundled into the item above) DEPLOY the 2026-09-02 (late) REVERT of the phone listing-editor batch — then read the plan (no SQL, no env vars)
+
+Owner: "revert any major changes we did and bring us back to the start,
+then enter a deep dive audit to plan out a fix rather than guessing."
+Done: the editor is byte-for-byte the pre-batch layout (viewport lock,
+16px touch inputs, `touch-action`, touch guards and the hide-on-scroll row
+all removed); the thumbnail-rail fix stays. Gate: `tsc` · lint ·
+**1197/1197 / 116 files** · build exit 0 · 74 = 34/34/6 · built CSS has no
+editor-batch rules. Staged (record below).
+
+◻ **Owner after the push (Safari mobile):** open Edit and Add Product once
+each — they should behave exactly as they did before today: scroll works
+with everything collapsed, the Save row sits below the form and never
+hides, tap-to-zoom on fields is back (it was never fixed for real).
+
+◻ **Then read `features/admin-listing-editor-mobile.md`** — the audit of
+what happened, what is actually known vs assumed, and a plan whose first
+step is a diagnostic build measured on the owner's own Safari and Chrome
+iOS BEFORE any fix is chosen. Pick an option there; nothing gets built
+until then.
+
+✅ **STAGING SYNCED 2026-09-02 (late, the revert) — ready to copy to the
+repo and push.** Dry run queued exactly **9 files to copy + 2 Extras to
+delete** (the deleted admin `layout.tsx` and guard test — expected) —
+verified BEFORE the real run; real run **9 copied / 2 extras removed / 0
+Mismatch / 0 FAILED** (exit 3 = copied + deleted); follow-up dry run **0,
+exit 0**; **908 files** on disk (robocopy 911 = the documented 3
+`/XF`-excluded; 908 = 909 − 2 deleted + the new audit doc). Leak check 0
+`.git` (dir/file), `.env*`, `node_modules`, `.next`; **190 = 190 `.tsx`**
+control (was 191 with the deleted layout); staged admin layout and guard
+test ABSENT, audit doc PRESENT; SHA-256 equal for `globals.css`,
+`AdminShell.tsx`, `ProductImageGallery.tsx`; **0** editor-batch residue in
+the staged CSS and shell. (Docs-only re-sync follows this record.)
+
+### 📜 (REVERTED 2026-09-02 late) follow-up 3 record — the phone editor hide-on-scroll attempt
 
 Follow-up 2 (`::after` spacer) went live and the collapsed editor STILL
 could not scroll on Safari mobile. **The overlay design is abandoned:**

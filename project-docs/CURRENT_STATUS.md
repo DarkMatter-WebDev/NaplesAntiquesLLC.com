@@ -8,7 +8,45 @@
 
 **Read this, then `TASKS.md`.**
 
-🔴 **DEPLOY OWED (2026-09-02, night follow-up 3): follow-up 2 went live
+✅ **READY TO PUSH (2026-09-02, end of night): the whole phone-editor
+batch PASSED the owner's Safari review over the LAN dev server
+(`http://desktop-ssfdjdu.local:3007`) — owner: "good".** Contents of the
+push: the revert of the failed overlay batch · option B compact action
+row + ⋯ sheet (Clone / Undo / Save + Add Another / Regenerate Missing
+Spanish) · option C hide-on-scroll dock with non-scroll show triggers and
+the remaining-room guard · 16px editor fields on touch · slim phone header
+(101 → 49px) · row action menu portaled to `<body>` with a tappable,
+non-bubbling backdrop · thumbnail-rail `scrollLeft` fix. Gate 1197/1197 ·
+build 74 = 34/34/6 · staging synced (follow-up dry run 0). After deploy:
+nothing to submit; owner spot-checks Edit/Add on the phone against
+production once. Records: `TASKS.md` top; `CHANGELOG.md` 2026-09-02.
+
+🟡 (superseded) **IN FLIGHT (2026-09-02, late): option B is BUILT on top of the revert
+and awaits the OWNER's phone review on the LAN dev server before the
+push.** Compact one-line action row on phones (Cancel · Save · Save &
+Close · ⋯ sheet), in flow, no scroll logic; 16px editor fields on touch
+(stops iOS tap-to-zoom). Phone URL `http://10.0.0.208.nip.io:3007/admin`
+— needs the owner to add `nip.io` to the Turnstile widget hostnames in
+Cloudflare once (raw IPs are not accepted). Gate green (1197/1197 · build
+74 = 34/34/6). Staged together with the revert. Detail + owner checklist:
+`TASKS.md` top; design rationale: `features/admin-listing-editor-mobile.md`.
+
+✅ (done, bundled with the above) **2026-09-02, late: the phone listing-editor batch is
+REVERTED — the editor is back to the layout that worked for months.**
+Follow-up 3 went live and Safari mobile was "wonky" (row hid and never
+returned — the in-flow collapse grew the scroll area until nothing could
+scroll, so no event could bring it back) while Chrome iOS worked but put
+the row behind Chrome's bottom toolbar (`h-svh` does not exclude it).
+Owner: revert, then audit and PLAN instead of guessing. Reverted: admin
+viewport lock, 16px touch inputs, `touch-action`, touch guards, the whole
+hide-on-scroll row. Kept: the thumbnail-rail fix. Gate on the reverted
+tree: `tsc` · lint · **1197/1197 (116 files)** · build 74 = 34/34/6.
+**The audit + plan: `features/admin-listing-editor-mobile.md`** — step 1
+is an instrumented diagnostic build measured on the owner's actual Safari
+before any fix is chosen. Nothing is to be built until the owner picks
+from the plan.
+
+🟡 (superseded by the revert) **DEPLOY OWED (2026-09-02, night follow-up 3): follow-up 2 went live
 and the collapsed editor STILL could not scroll on Safari mobile.** The
 overlay design is abandoned: the Save row is back IN FLOW (the geometry
 that worked for months) and hides by COLLAPSING its height as it slides

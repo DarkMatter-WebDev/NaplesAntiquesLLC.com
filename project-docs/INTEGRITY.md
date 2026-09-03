@@ -15,7 +15,7 @@ npm audit --omit=dev
 ```
 
 `npm run build` is the publish gate and must exit 0. Current local baseline
-(measured 2026-09-02, late night): **1203/1203 tests across 117 files**, TypeScript clean,
+(measured 2026-09-02, after the editor-batch revert): **1197/1197 tests across 116 files**, TypeScript clean,
 lint clean, and a build that exits 0 with **74 prerendered routes = 34 EN +
 34 ES + 6 non-locale** (`/_global-error`, `/_not-found`, `/favicon.ico`,
 `/icon.png`, `/robots.txt`, `/sitemap.xml`). Every locale page adds one to
