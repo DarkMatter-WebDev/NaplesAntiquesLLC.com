@@ -8,7 +8,21 @@
 
 **Read this, then `TASKS.md`.**
 
-🟡 **Later on 09-03 — Bing checked; one app fix STAGED, awaiting the next
+🟡 **09-03 night — "Don't Melt It Yet" page + resale hook BUILT and STAGED,
+awaiting the owner's push.** `/sell/dont-melt-it` (+ES) on the guide
+template (mockup approved as is), sitemap + `/sell` hub link, hook sentence
+on the homepage gold card and in every city intro. Gate: `tsc` · lint · **1197/1197 (116 files)** · `npm run build` exit 0 · **76 = 35 EN + 35 ES + 6** · prerendered EN + ES page each with BreadcrumbList + FAQPage JSON-LD and one `<h1>`; "melt-only buyers" present in the homepage HTML, the melt sentence present in the city HTML.
+After the push: verify, `npm run indexnow` for the two URLs, GSC requests
+when quota allows — checklist at the top of `TASKS.md`.
+
+✅ **09-03 evening — the two-file bundle below is DEPLOYED and
+production-verified** (`/sell/nowhere-xyz` → 404, city pages 200, footer
+`8505</a> <a` live on four pages, smoke 200). Nothing in flight; staging
+equals source. Next looks: GSC ~09-10 (Pages report refresh, Breadcrumbs),
+Bing ~09-10 (six re-requested URLs), and the `/shop` snippet whenever Google
+re-reads the footer.
+
+🟡 **(superseded) Later on 09-03 — Bing checked; one app fix STAGED, awaiting the next
 push.** Bing: sitemap resubmitted (was on the 9/1 198-URL copy), six URLs
 re-requested. Bing's "Indexing allowed: No" verdicts are NOT a `noindex` we
 serve (verified every crawler variant + Bing's own Live test passes) — it is
@@ -18,8 +32,7 @@ whitespace between them, fixed with a `{' '}` text node (owner's
 pre-deploy ask); (b) **a real bug:
 unknown `/sell/<slug>` URLs return 500 in production.** Fix =
 `dynamicParams = false` on the city route, gated (`tsc` · lint · 1197/1197 ·
-build · manifest `fallback: false`), **staged, NOT deployed — bundle it into
-the next push.** Details: `TASKS.md` top two items, `CHANGELOG.md` 09-03.
+build · manifest `fallback: false`), **deployed the same evening — see the ✅ block above.** Details: `TASKS.md` top two items, `CHANGELOG.md` 09-03.
 
 🟢 **2026-09-03 — Search Console is current with everything deployed
 through 09-02.** Read in the owner's Chrome: sitemap **last read Sep 3,
@@ -36,7 +49,8 @@ hurt** (read-only views; the Domain property is the superset and carries the
 AI "Include" setting the URL-prefix property inherits; the URL-prefix one
 holds the history) — rule in `DECISIONS.md`. ⛔ The Domain property's
 "unused verification token" is the DNS TXT that verifies both properties —
-never REMOVE it; the optional fix is to add `info@` as an owner (`TASKS.md`).
+never REMOVE it. `info@naplesestatejewelry.com` was ADDED as Owner on both
+`.com` properties later on 09-03 (owner's call); unused tokens now 0.
 Housekeeping: stray `scripts/__pycache__/` deleted, `__pycache__/` + `*.pyc`
 now gitignored. No app code changed. Next look: the ~2026-09-10 recheck in
 `TASKS.md`. Record: `CHANGELOG.md` 2026-09-03.

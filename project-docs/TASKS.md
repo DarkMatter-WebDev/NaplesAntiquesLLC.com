@@ -5,7 +5,35 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 STAGED, NOT DEPLOYED 2026-09-03 — two-file bundle: unknown `/sell/<city>` slugs 500 in production (fix) + footer phone/email run-together in Google snippets (fix)
+### 🟡 STAGED, NOT DEPLOYED 2026-09-03 (night) — "Don't Melt It Yet" page + homepage/city resale hook; owner approved the mockup "as is"
+
+New `/sell/dont-melt-it` (+ES) on the guide template, sitemap + `/sell` hub
+link, the hook sentence on the homepage gold card and in all six city
+intros (`service-areas.ts`, per-city wording). Gate: `tsc` · lint · **1197/1197 (116 files)** · `npm run build` exit 0 · **76 = 35 EN + 35 ES + 6** · prerendered EN + ES page each with BreadcrumbList + FAQPage JSON-LD and one `<h1>`; "melt-only buyers" present in the homepage HTML, the melt sentence present in the city HTML.
+Record: `CHANGELOG.md` 2026-09-03 (night).
+
+◻ **Owner: push.** Then, same day:
+1. Verify: `curl -sI https://naplesestatejewelry.com/sell/dont-melt-it` → 200
+   (and `/es/sell/dont-melt-it`); homepage HTML contains "melt-only buyers";
+   `/sell/cape-coral` contains "melt counter"; `/sitemap.xml` lists both new
+   URLs (count 206).
+2. `npm run indexnow -- --urls=/sell/dont-melt-it,/es/sell/dont-melt-it`
+   from `next-app/`.
+3. GSC → URL Inspection → Request Indexing for both (stop on the first
+   "Quota exceeded"; 9 went through on 09-03 morning, so tomorrow is safer).
+4. Optional: GBP post with the hook ("Don't melt it yet — we price jewelry
+   both ways and pay the higher number" → link to the page). ⛔ No phone
+   number in the post text.
+
+### ✅ DEPLOYED + production-verified 2026-09-03 (evening) — two-file bundle: unknown `/sell/<city>` slugs 500 → 404 (fix) + footer phone/email run-together in Google snippets (fix)
+
+Owner pushed; verified over HTTP: `/sell/nowhere-xyz` + ES → **404**
+(real not-found page), four real city pages **200**, footer separator
+`8505</a> <a href="mailto:` live on `/`, `/shop`, `/about`, `/es/faq`,
+smoke 200 ×4. Nothing left to do except wait for Google to re-read the
+footer (the `/shop` snippet corrects itself on its own schedule). The text
+below is the pre-deploy build record.
+
 
 **Footer snippet fix (owner's pre-deploy ask):** Google's `/shop` snippet read
 `(239) 404-8505info@naplesestatejewelry.com` because `SiteFooter.tsx`
@@ -22,7 +50,7 @@ in `next-app/src/app/[locale]/sell/[city]/page.tsx` (all cities are
 enumerated by `generateStaticParams`). Gated: `tsc` · lint · 1197/1197 (116
 files) · build exit 0 · prerender manifest `fallback: false`, 12 city
 pages. ◻ **Owner: include in the next push** (no deploy of its own — Netlify
-credits). ◻ After deploy: `curl -I https://naplesestatejewelry.com/sell/nowhere-xyz`
+credits). ✅ Done 09-03 evening — after deploy: `curl -I https://naplesestatejewelry.com/sell/nowhere-xyz`
 → 404, and `/sell/naples` still 200.
 
 ### ◻ Bing Webmaster Tools — recheck ~2026-09-10 (six URLs re-requested + sitemap resubmitted 09-03)
@@ -50,8 +78,17 @@ is calendar work:
   re-crawled; the 7 product URLs requested 08-30 should drop out of
   "Discovered – currently not indexed". If a URL is still unindexed after
   ~10 days, request it once more.
-- ◻ **Optional tidy-up:** the Domain property flags "1 unused verification
-  token" — the DNS TXT whose token owner is `info@naplesestatejewelry.com`.
+- ✅ **DONE 09-03 (owner: "add info@ as owner on both"):** `info@naplesestatejewelry.com`
+  added as **Owner** on the URL-prefix AND the Domain property; both show it
+  "Verified" and "Unused ownership tokens (0)". Zero ranking effect —
+  permissions are access control only. The Overview "unused token"
+  recommendation card was still cached minutes later; it clears on its own.
+  Background (was):** the
+  ONLY listed owner on BOTH `.com` properties is **`info@surettesystems.com`**
+  (display name "Devon Taylor" — a nickname on that account, not a second
+  person). `info@naplesestatejewelry.com` is NOT a user on either property;
+  it only owns the DNS TXT token, which is why the Domain property lists
+  that token as "unused" (the URL-prefix property shows 0 unused).
   ⛔ Never REMOVE it (it verifies both `.com` properties). To silence the
   notice, add `info@naplesestatejewelry.com` as an **Owner** on both `.com`
   properties (Settings → Users and permissions → Add user). Owner's call.

@@ -1,6 +1,73 @@
 
 # Changelog
 
+## 2026-09-03 (night) — "Don't Melt It Yet" resale-vs-melt page BUILT + homepage/city hook; STAGED for the owner's push
+
+Owner's idea, same evening: most Naples gold/silver buyers are melters and
+cannot pay above metal value; we resell, so we can. Mockup rendered first
+(Claude artifact, real tokens, flatware-guide template) and **approved "as
+is"** with the homepage + city hook added to the scope.
+
+**New page `/sell/dont-melt-it` (+ `/es`)** —
+`src/app/[locale]/sell/dont-melt-it/page.tsx`, on the guide template: dark
+hero with the visible breadcrumb trail (Home › Sell to Us › Don't Melt It
+Yet), the **two-price ledger** (a melt-only buyer's single number next to
+"the same number, then a second look", reusing the 20 g 14k / $2,600 /
+≈ $978 example already on `/sell` — no resale figure or percentage is ever
+stated), the "often above melt / honestly melt" lists (Tiffany & Co.,
+Cartier, David Yurman from `/estate-jewelry`; dental gold sent out for
+testing; HGE/GF = plated), the three-step counter flow, six FAQs (FAQPage
+schema), and the dark CTA. BreadcrumbList via `lib/breadcrumb-ld.ts`. Title
+"Don't Melt Your Jewelry Yet | …" (51 chars). Promise wording is the
+owner-confirmed flatware line: **"we price it both ways and pay whichever is
+higher"** — never "we always pay more than melt". Competitors are the
+*model* ("melters", "melt-only counters"), never a name.
+
+**Wiring:** sitemap entry (0.6 monthly) + `CONTENT_LAST_MODIFIED` →
+2026-09-03; `/sell` hub "Full guides" line gains the fifth link (EN + ES).
+
+**Hook copy (owner: "add the homepage and city page hook too"):**
+- Homepage gold card body: "Free appraisals on gold jewelry, coins, and
+  bullion. Unlike melt-only buyers, we price jewelry as metal and as jewelry
+  and pay whichever is higher." (+ ES).
+- Every city intro in `service-areas.ts` gets ONE sentence in its own
+  wording (per-city strings only — the template stays shared-content-free
+  per the city-page rule): Naples "priced two ways… paid the higher of the
+  two"; Marco "nearest melt counter, where a signed bracelet is worth exactly
+  what it weighs"; Bonita replaces "no pawn-shop lowballs"; Estero "a slice
+  of melt value and nothing more"; Fort Myers "most of those storefronts
+  melt everything they buy"; Cape Coral replaces "rather than a pawn-shop
+  counter" with "rather than a melt counter". ⛔ "pawn-shop" no longer
+  appears in any city intro.
+
+**Gate:** `tsc` · lint · **1197/1197 (116 files)** · `npm run build` exit 0 · **76 = 35 EN + 35 ES + 6** · prerendered EN + ES page each with BreadcrumbList + FAQPage JSON-LD and one `<h1>`; "melt-only buyers" present in the homepage HTML, the melt sentence present in the city HTML
+
+**After the owner pushes:** verify `/sell/dont-melt-it` + `/es/...` 200 with
+2 JSON-LD blocks and the trail; `curl -s https://naplesestatejewelry.com/ |
+grep -c "melt-only buyers"` → 1; a city page carries its sentence; sitemap
+count +2; then `npm run indexnow -- --urls=/sell/dont-melt-it,/es/sell/dont-melt-it`
+and ONE GSC Request Indexing per locale (quota permitting). Also a GBP post
+with the same hook (no phone number in the text).
+
+## 2026-09-03 (evening) — two-file bundle DEPLOYED and production-verified: `/sell/<city>` 500 → 404, footer phone/email separator
+
+Owner: "pushed and deployed." Verified over HTTP minutes later:
+
+- `/sell/nowhere-xyz` and `/es/sell/nowhere-xyz` → **404**, serving the real
+  not-found page (`Page Not Found | Naples Estate Jewelry`, `noindex`) —
+  was a plain-text 500 this morning.
+- `/sell/naples`, `/sell/marco-island`, `/sell/bonita-springs`,
+  `/es/sell/cape-coral` → **200** (the `dynamicParams = false` route still
+  serves every enumerated city).
+- Footer on `/`, `/shop`, `/about`, `/es/faq` now ships
+  `404-8505</a> <a href="mailto:info@` — the whitespace text node is live,
+  so Google's next read of the footer sees two tokens. The `/shop` snippet
+  will keep showing `8505info@` until Google re-crawls (weeks, not days);
+  nothing to submit.
+- Smoke: `/`, `/shop`, `/sitemap.xml`, `/robots.txt` → 200.
+
+Nothing outstanding from this deploy. Records below are the build story.
+
 ## 2026-09-03 — Search Console review after the 09-01/09-02 deploys; 8 indexing requests landed; the two-`.com`-property question answered
 
 Read in the owner's Chrome (`https://naplesestatejewelry.com/` URL-prefix
@@ -68,8 +135,11 @@ the history back to Aug 2. Keep both; read history in the URL-prefix one.
 **Domain property recommendation — "1 unused verification token":** the DNS
 TXT `google-site-verification=…` token, whose token owner is
 `info@naplesestatejewelry.com`. It is "unused" only because that Google
-account is not listed under Users and permissions (the sole listed owner is
-the account that ran this session). ⛔ **Do not click REMOVE** — that TXT
+account is not listed under Users and permissions. Checked on the owner's
+follow-up question: the sole listed owner on BOTH `.com` properties is
+`info@surettesystems.com`, displayed as "Devon Taylor" (a nickname on that
+account); `info@naplesestatejewelry.com` is not a user anywhere, it only
+owns the TXT token. ⛔ **Do not click REMOVE** — that TXT
 record is what verifies BOTH `.com` properties. Optional tidy-up in
 `TASKS.md`: add `info@` as an owner so the token is no longer "unused".
 
@@ -155,6 +225,13 @@ re-reads the footer on its own schedule — expect the snippet to correct
 itself over the following weeks, not on deploy day. The `/shop` result
 used the footer because the query matched that sentence; the page's own
 meta description is unchanged.
+
+**Owner follow-up — `info@naplesestatejewelry.com` added as Owner on both
+`.com` properties** (owner asked, after confirming it has no ranking effect:
+Search Console permissions are access control and alert routing only).
+Both Users pages now list two Owners, both Verified, and "Unused ownership
+tokens (0)". Continuity: the business's own Workspace account now controls
+its Search Console alongside `info@surettesystems.com`.
 
 **Housekeeping:** deleted the stray `next-app/scripts/__pycache__/`
 (orphaned `.pyc` of a script no longer in the tree) and added

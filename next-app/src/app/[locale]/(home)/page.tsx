@@ -256,9 +256,13 @@ export default async function HomePage({ params }: Props) {
                 // strip above, which is nowrap and length-critical.)
                 mark: 'goldbar',
                 title: isEs ? 'Compramos Oro en Naples' : 'We Buy Gold in Naples',
+                // Resale-vs-melt hook (owner, 2026-09-03; mockup approved): the
+                // one claim melt-only buyers cannot copy. Same owner-confirmed
+                // "both ways, whichever is higher" wording as the silver card and
+                // /sell/dont-melt-it — never "we always pay more than melt".
                 body: isEs
-                  ? 'Evaluaciones gratuitas en el acto para todas las piezas de oro.'
-                  : 'Free appraisals on all gold jewelry, coins, and bullion — visit us or we come to you.',
+                  ? 'Evaluaciones gratuitas en el acto. A diferencia de quienes solo funden, valoramos la joyería como metal y como joya, y pagamos el mayor.'
+                  : 'Free appraisals on gold jewelry, coins, and bullion. Unlike melt-only buyers, we price jewelry as metal and as jewelry and pay whichever is higher.',
                 href: evalHref,
                 cta: isEs ? 'Evaluación gratuita →' : 'Free evaluation →',
               },

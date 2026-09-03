@@ -779,7 +779,8 @@ a URL-prefix property may coexist. What differs between ours:
   once, visible in both), the DNS TXT verification (one record, both
   properties). The Domain property lists that TXT as an "unused
   verification token" because its token owner (`info@naplesestatejewelry.com`)
-  is not a listed user — ⛔ **never REMOVE the token**; add `info@` as an
+  is not a listed user — the only listed owner on both properties is
+  `info@surettesystems.com`, shown as "Devon Taylor" (an account nickname) — ⛔ **never REMOVE the token**; add `info@` as an
   owner if the notice bothers anyone.
 
 Rule: keep both; do nothing to "fix" it; never delete a property.
@@ -831,6 +832,33 @@ unknown slug 404s without rendering (prerender manifest: `fallback: false`).
 Apply the same to any future static route whose params are fully enumerated.
 `shop/[id]` is different — it is ISR (`revalidate = 300`) and must keep
 accepting new product ids, and it already 404s correctly.
+
+### The resale-vs-melt positioning: "we price it both ways", never "we pay more than melt" (2026-09-03)
+
+Owner's insight: nearly every competing gold/silver buyer in Naples is a
+melter (refiner-backed counter or mail-in). A melter can only pay a share of
+metal value; a reseller with a showroom can price a piece as jewelry. That is
+the one differentiator competitors structurally cannot copy, so it now has a
+page (`/sell/dont-melt-it`) and a one-sentence hook on the homepage gold card
+and in each city intro. Rules for anyone touching this copy:
+
+- The promise is exactly the flatware wording the owner confirmed on
+  2026-08-30: **"we price it both ways and pay whichever is higher."** ⛔ Never
+  "we always pay more than melt", never a resale percentage or dollar figure,
+  never a premium promise for a category. The page says plainly that some
+  pieces are honestly melt.
+- The melt example is the `/sell` example (20 g 14k, illustrative $2,600
+  spot, ≈ $978). Change both or neither.
+- Speak about the model ("melters", "melt-only counters", "mail-in buyers"),
+  ⛔ never a competitor's name.
+- Category lists were approved line by line by the owner on 09-03; designer
+  names come from `/estate-jewelry`; dental gold and HGE rules from the gold
+  guide apply. Class rings, coins and watches are deliberately unlisted —
+  ask the owner before adding them.
+- City pages: the hook lives in each city's OWN intro string with its own
+  wording (`service-areas.ts`), never in the shared template — the 69%
+  verbatim-identical rule. "pawn-shop" was retired from every intro in the
+  same pass; the melt framing is the stronger and truer contrast.
 
 ### Adjacent inline elements need an explicit whitespace text node — JSX eats the newline (2026-09-03)
 
