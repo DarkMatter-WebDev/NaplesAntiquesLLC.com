@@ -160,7 +160,8 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
-    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+    # microphone=(self): the admin listing assistant's tap-to-talk. Mirror of next.config.ts.
+    Permissions-Policy = "geolocation=(), microphone=(self), camera=()"
     # Enforcing CSP. Allowlist covers all third parties in use: Supabase (data/images),
     # gold-api.com (spot prices), Google Fonts, TradingView embed widgets (service-page
     # price charts), PayPal (checkout SDK/iframe), and Cloudflare Turnstile

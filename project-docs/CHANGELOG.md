@@ -1,6 +1,41 @@
 
 # Changelog
 
+## 2026-09-02 (end of night) — Smart Listing Assistant microphone was blocked by our own Permissions-Policy header (FIXED, in the same push)
+
+Owner (desk Chrome): "Microphone access was denied. Check your browser
+permissions and try again." with no prompt ever shown. Cause: the site
+sends `Permissions-Policy: … microphone=() …` on every response — in
+`next.config.ts` (dev) AND root `netlify.toml` (production) — which
+forbids microphone use in every document, so the Web Speech API
+(`SpeechRecognition`, used by tap-to-talk) fails immediately with
+`not-allowed`; that is the branch that prints this notice. Changed to
+`microphone=(self)` in BOTH files (the two-file header rule; camera and
+geolocation stay off). ⚠️ Still true after the fix: browsers only grant the
+mic in a **secure context** — production (https) and `localhost` — so the
+LAN dev URL over plain http (`desktop-ssfdjdu.local:3007`) will keep
+denying it; test voice on `http://localhost:3007` at the desk or on
+production after deploy. This may also be the long-open "tap to talk says
+listening but no text lands" note in the assistant memory.
+
+**Q: can the assistant change an EXISTING listing?** Yes by design: the
+AI panel is not gated on `isNew`; "Generate Listing" applies every
+non-null field the model returns as an unconditional overwrite of the 19
+AI-scoped fields (never status/location; weight only when stated;
+internal notes untouched) with "Undo AI Fill" as the safety net. ⚠️ Gap
+worth knowing: Spanish is translated at save time ONLY for EMPTY Spanish
+fields, so regenerating the English of a listing that already has Spanish
+leaves the OLD Spanish in place (title/description mismatch) unless the
+Spanish fields are cleared first. **Owner chose option (b) → BUILT:** in
+`handleSave`, a Spanish field (title / description / public notes) is now
+translated when it is empty OR when its English counterpart changed
+during this edit while the Spanish itself was left untouched (compared
+against `originalRef`). Spanish the admin edited by hand in the same
+session is never overwritten. This also lifts the old `isNew &&` gate —
+existing listings are translated on save too, which they never were
+before (only the manual "Regenerate Missing Spanish" covered them).
+Failure stays non-blocking. Gate re-run green (1197/1197 · 74 = 34/34/6).
+
 ## 2026-09-02 (late) — phone preview WORKING; option B passed the owner's Safari review; option C (hide-on-scroll) BUILT on top for the same review (NOT deployed)
 
 **Phone preview, resolved.** The owner's phone could not reach

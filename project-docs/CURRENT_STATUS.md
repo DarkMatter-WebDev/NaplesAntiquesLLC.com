@@ -16,7 +16,11 @@ row + ⋯ sheet (Clone / Undo / Save + Add Another / Regenerate Missing
 Spanish) · option C hide-on-scroll dock with non-scroll show triggers and
 the remaining-room guard · 16px editor fields on touch · slim phone header
 (101 → 49px) · row action menu portaled to `<body>` with a tappable,
-non-bubbling backdrop · thumbnail-rail `scrollLeft` fix. Gate 1197/1197 ·
+non-bubbling backdrop · thumbnail-rail `scrollLeft` fix · Permissions-Policy
+`microphone=(self)` (the assistant's tap-to-talk was blocked by our own
+header; mic still needs https/localhost) · save-time Spanish re-translation
+when the English changed (existing listings included; hand-edited Spanish
+never overwritten). Gate 1197/1197 ·
 build 74 = 34/34/6 · staging synced (follow-up dry run 0). After deploy:
 nothing to submit; owner spot-checks Edit/Add on the phone against
 production once. Records: `TASKS.md` top; `CHANGELOG.md` 2026-09-02.

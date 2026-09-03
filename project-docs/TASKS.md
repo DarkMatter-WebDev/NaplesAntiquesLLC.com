@@ -10,9 +10,24 @@
 Everything below this heading is the build/review record. What ships in
 the push: revert of the overlay batch · option B compact row + ⋯ sheet ·
 option C dock (hide-on-scroll with non-scroll show triggers) · 16px fields
-· slim header · portaled row action menu · thumbnail-rail fix. ◻ After
-deploy: one owner spot-check of Edit + Add Product on the phone against
-production; nothing to submit.
+· slim header · portaled row action menu · thumbnail-rail fix · **the
+Permissions-Policy microphone fix (`microphone=(self)` in next.config.ts
++ netlify.toml)**. ◻ After deploy: one owner spot-check of Edit + Add
+Product on the phone against production; nothing to submit.
+
+◻ **Owner, microphone:** after the deploy, open the assistant on
+production (https) in Chrome and tap "Let's begin" — Chrome should now
+PROMPT for the mic (allow it). On the desk it also works at
+`http://localhost:3007`. It will NOT work on the LAN `http://…local:3007`
+URL — browsers only grant the mic on https or localhost; that is not a bug.
+
+✅ **Owner chose (b) — built:** on save, Spanish title/description/notes
+are re-translated when empty OR when the English changed and the Spanish
+was not hand-edited in the same session; existing listings included (they
+were never auto-translated on save before). ◻ **Owner spot-check after
+deploy:** open an existing listing with Spanish, run "Generate Listing"
+(or just edit the English title), Save — the Spanish title should be new;
+edit a Spanish field by hand and Save — that one must stay as typed.
 
 ### 📜 build/review record — 2026-09-02 (late) — OPTION B built; OWNER PHONE REVIEW on the LAN dev server, THEN push (revert + option B together; no SQL, no env vars in Netlify)
 
@@ -115,6 +130,21 @@ there). **Owner re-review on Safari, same URL — `Edit an item`, then:**
 
 ◻ **After the yes:** push (staging carries revert + B + C). Nothing to
 submit after deploy.
+
+✅ **STAGING RE-SYNCED 2026-09-02 (save-time Spanish re-translation, option
+b):** dry run exactly **4 files** (`AdminShell.tsx`, CHANGELOG,
+CURRENT_STATUS, TASKS), **0 Extras**; real **4 / 0 / 0**; follow-up
+**0**; 908 on disk; leak check clean; 190 = 190 `.tsx`; AdminShell hash
+equal; staged `needsSpanish` present. Gate: `tsc` · lint · 1197/1197 ·
+build 74 = 34/34/6. (Earlier records below.)
+
+✅ **STAGING RE-SYNCED 2026-09-02 (microphone Permissions-Policy):** dry
+run exactly **5 files** (`netlify.toml`, `next.config.ts`, CHANGELOG,
+CURRENT_STATUS, TASKS), **0 Extras**; real **5 / 0 / 0**; follow-up
+**0**; 908 on disk; leak check clean; 190 = 190 `.tsx`; both config
+hashes equal; staged `microphone=(self)` present in both. Gate: `tsc` ·
+lint · 1197/1197 · build 74 = 34/34/6. Dev restarted for the config
+change. (Earlier records below.)
 
 ✅ **STAGING RE-SYNCED 2026-09-02 (slim phone header):** dry run exactly
 **3 files** (`AdminShell.tsx`, CHANGELOG, TASKS), **0 Extras**; real

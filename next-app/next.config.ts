@@ -23,7 +23,11 @@ const CONTENT_SECURITY_POLICY = [
 
 const SECURITY_HEADERS = [
   { key: 'Content-Security-Policy', value: CONTENT_SECURITY_POLICY },
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()' },
+  // microphone=(self): the admin Smart Listing Assistant's tap-to-talk needs it.
+  // `microphone=()` (the previous value) forbids the mic in EVERY document, so
+  // Chrome denied it with no prompt (owner, 2026-09-02). Same value must live in
+  // root netlify.toml — the two-file header rule.
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=(), browsing-topics=()' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains; preload' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },

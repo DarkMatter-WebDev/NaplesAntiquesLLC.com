@@ -3542,15 +3542,30 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     if (!editing || translatingSpanish) return;
     setSaving(true);
 
-    // English now / Spanish on save: the listing AI generates English only, so fill any
-    // missing Spanish title/description by translating the English at save time.
+    // English now / Spanish on save: the listing AI generates English only, so
+    // translate at save time. A Spanish field is (re)translated when it is EMPTY,
+    // or — owner's "option (b)", 2026-09-02 — when its English counterpart CHANGED
+    // during this edit while the Spanish was left untouched (e.g. the assistant
+    // regenerated the English of an existing listing). Spanish the admin edited
+    // by hand in this session is never overwritten. This now runs for existing
+    // listings too; previously only brand-new ones were translated on save.
     let nextTitleEs = editing.title_es ?? null;
     let nextDescriptionEs = editing.description_es ?? null;
     let nextPublicNotesEs = editing.public_notes_es ?? null;
-    const needTitleEs = !!editing.title?.trim() && !editing.title_es?.trim();
-    const needDescriptionEs = !!editing.description?.trim() && !editing.description_es?.trim();
-    const needNotesEs = !!editing.public_notes?.trim() && !editing.public_notes_es?.trim();
-    if (isNew && (needTitleEs || needDescriptionEs || needNotesEs)) {
+    const original = isNew ? null : originalRef.current;
+    const text = (value: string | null | undefined) => (value ?? '').trim();
+    const needsSpanish = (en: string | null | undefined, es: string | null | undefined, originalEn: string | null | undefined, originalEs: string | null | undefined) => {
+      if (!text(en)) return false;
+      if (!text(es)) return true;
+      if (!original) return false;
+      const englishChanged = text(en) !== text(originalEn);
+      const spanishUntouched = text(es) === text(originalEs);
+      return englishChanged && spanishUntouched;
+    };
+    const needTitleEs = needsSpanish(editing.title, editing.title_es, original?.title, original?.title_es);
+    const needDescriptionEs = needsSpanish(editing.description, editing.description_es, original?.description, original?.description_es);
+    const needNotesEs = needsSpanish(editing.public_notes, editing.public_notes_es, original?.public_notes, original?.public_notes_es);
+    if (needTitleEs || needDescriptionEs || needNotesEs) {
       try {
         const res = await fetch('/api/admin/translate', {
           method: 'POST',
