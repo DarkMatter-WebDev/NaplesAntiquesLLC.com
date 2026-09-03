@@ -1,6 +1,178 @@
 
 # Changelog
 
+## 2026-09-03 — Search Console review after the 09-01/09-02 deploys; 8 indexing requests landed; the two-`.com`-property question answered
+
+Read in the owner's Chrome (`https://naplesestatejewelry.com/` URL-prefix
+property unless noted). No app code changed this session.
+
+**Where search stands (28 days to 9/1):** **74 clicks · 1.96K impressions ·
+3.8% CTR · average position 31.7** (8/25 audit: 44 · 1.09K · 4% · 36.7).
+Homepage 60 clicks / 645 impressions; `/about` 4; `/sell/naples` 1 / 342;
+`/sell/marco-island` 1 / 196; `/shop` 1 / 190. Top queries: "naples estate
+jewelry" 23 / 82, "estate jewelry naples fl" 2 / 37, "estate jewelry buyers"
+**0 / 86**, "custom rings in marco island" 0 / 49. 85 pages and 274 queries
+had impressions. Domain property (data only since 8/26): 30 clicks.
+
+**Sitemap:** `/sitemap.xml` submitted Aug 31, **last read Sep 3, 2026,
+Success, 204 URLs** — Google already holds the 09-02 guides. The same row
+shows in the Domain property (one submission, two views).
+
+**Page indexing** (report stamped **8/27**, so it predates both deploys):
+207 indexed / 204 not. Buckets: 128 "alternate page with proper canonical"
+(the `/contact?item=` variants — correct), 45 redirects (`.co` → `.com`,
+`/en/*`), 13 `noindex` (legal + account pages), 3 404s, 2 robots.txt, 7
+"Discovered – currently not indexed" (the seven product URLs requested
+08-30 — the report is older than the requests, do not re-request), 6
+"Crawled – currently not indexed" (two products crawled Aug 28 plus two
+favicon and two font asset URLs — noise). The three 404s are `/oz`, `/$`
+and `/&`: Googlebot lifting "…/oz" and "$" out of price text
+(`gold-services/page.tsx:135`, `shop/[id]/page.tsx:832`), not real links —
+nothing to fix.
+
+**Breadcrumbs enhancement:** 35 valid / 0 invalid, last update 9/1 — before
+the sitewide trail deployed; recheck mid-September. Removals: none. Security
+& manual actions: none. robots.txt Valid. Crawl stats 12.2K requests / 90 d.
+
+**URL inspection of the 12 owed URLs:**
+- ✅ Already indexed, no request needed (Google got there via the sitemap):
+  `/es/watch-buyers`, `/es/silver-services/flatware-value`,
+  `/diamond-buyers`, `/es/diamond-buyers` — each also reports "Breadcrumbs:
+  1 valid item detected".
+- ✅ **Requested today, all "Indexing requested":** the six guide URLs
+  (`/gold-services/what-is-my-gold-worth`, `/jewelry-appraisal/hallmarks`,
+  `/estate-services/selling-inherited-jewelry`, each EN + ES — all
+  "Discovered – currently not indexed" via the sitemap; the ES gold guide was
+  "URL is unknown to Google"), `/watch-buyers` (Discovered, referred from
+  its ES twin), and `/silver-services/flatware-value` ("Crawled – currently
+  not indexed", last crawl Sep 2 4:19 PM, Googlebot smartphone, fetch OK).
+- One "Oops! Something went wrong… try again later" on the ES inherited
+  guide was transient — the retry two minutes later succeeded. ⚠️ The
+  REQUEST-AGAIN focus trap fired once and re-submitted the EN gold guide
+  (harmless per Google, but it cost a quota unit). 9 submissions went
+  through with no "Quota exceeded", so the daily allowance is at least 9.
+  The sequence that avoids the trap is in `DECISIONS.md` → *Search Console*.
+
+**`.co` property:** banner "This site is currently moving to
+naplesestatejewelry.com"; Settings → Change of address reads "This site is
+currently moving"; 34 indexed / 126 not; clicks tapered to 0 from ~8/14.
+The move is draining exactly as intended — leave it alone.
+
+**Two `.com` properties — owner asked whether it hurts.** No. Recorded in
+`DECISIONS.md`: properties are read-only views, Google's index and ranking
+do not know or care how many exist; the Domain property is the superset
+(all protocols/hosts) and carries the "Search generative AI: Include"
+setting that the URL-prefix property INHERITS; the URL-prefix property holds
+the history back to Aug 2. Keep both; read history in the URL-prefix one.
+
+**Domain property recommendation — "1 unused verification token":** the DNS
+TXT `google-site-verification=…` token, whose token owner is
+`info@naplesestatejewelry.com`. It is "unused" only because that Google
+account is not listed under Users and permissions (the sole listed owner is
+the account that ran this session). ⛔ **Do not click REMOVE** — that TXT
+record is what verifies BOTH `.com` properties. Optional tidy-up in
+`TASKS.md`: add `info@` as an owner so the token is no longer "unused".
+
+**Later the same day — owner asked about sitelinks and the site-name line.**
+The label above the URL in a result is Google's **site name**. Ours still
+renders as `naplesestatejewelry.com` even though the homepage was crawled at
+4:51 AM today and carries the `WebSite` entity, `og:site_name` and a
+brand-first title since Aug 15; Google is now also stripping the leading
+brand from the title, which means it sees the brand as redundant with its
+site line — a connection made, a display not yet flipped. Nothing further to
+code; it is re-evaluation timing on a one-month-old `.com` with parked-page
+history. Sitelinks: the 09-02 answer stands (algorithmic, brand phrase is a
+generic local query, breadcrumbs shipped). Notes in `DECISIONS.md` under the
+homepage-title section.
+
+**Later again — Bing Webmaster Tools check, and a production 500 found on the way.**
+
+Bing (owner's Chrome, `naplesestatejewelry.com` property): sitemap last
+crawled **9/1, 198 URLs** (Google already has 204) — **resubmitted today**
+via Submit sitemap, status "Processing". Home still says "data being
+processed, up to 48 hours"; Search Performance, Site Explorer, URL
+Submission and Recommendations all "No pages found / No data" — still the
+import lag, not an error. `site:` search redirected to junk again (known
+trap). URL Inspection results:
+
+| URL | Bing Index tab |
+| --- | --- |
+| `/estate-services/selling-inherited-jewelry`, `/watch-buyers`, `/es/gold-services/what-is-my-gold-worth` | **Indexed** (each "1 Markup type found") |
+| `/gold-services/what-is-my-gold-worth` | not indexed — crawled 9/2 16:03, "Indexing allowed: No" |
+| `/jewelry-appraisal/hallmarks` | not indexed — crawled **9/3 01:36**, "Indexing allowed: No" |
+| `/sell/naples` | not indexed — crawled 9/2 05:14, "Indexing allowed: No" |
+| `/sell/marco-island` | not indexed — crawled **8/20**, "Indexing allowed: No" |
+| `/jewelry-appraisal`, `/diamond-buyers` | unchanged since 8/31 10:36 (the 9/1 re-request produced no recrawl) |
+
+🔴 **The 09-01 explanation ("Bing crawled the 404 before the deploy") does
+not hold**: `/sell/marco-island` has existed for months and `/hallmarks` was
+crawled after both 09-02 deploys, yet both read "Indexing allowed: No".
+Checked from here: every one of those URLs returns **200 with no
+`X-Robots-Tag` and no robots meta** to a Bingbot user agent, with no
+`Accept` header, with `Accept-Language: es`, and as a HEAD request;
+`http://` and `www.` 301 once to the canonical; and **Bing's own Live URL
+test on `/sell/naples` returned "URL can be indexed by Bing"** at 12:21.
+Conclusion recorded in `DECISIONS.md`: Bing's "Indexing allowed: No" on
+this property is its *index-selection* verdict for a two-day-old import,
+not evidence of a `noindex` we serve. Re-requested all six (gold guide,
+hallmarks, `/sell/naples`, `/sell/marco-island`, `/jewelry-appraisal`,
+`/diamond-buyers`) — each "Success: URL submitted". Recheck ~09-10; if the
+crawl dates refresh and the verdict is still "No", the next step is the
+Netlify request log filtered to Bingbot, not more code.
+
+🔴 **Found while probing: an unknown city slug returned a plain-text 500,
+not a 404.** `curl https://naplesestatejewelry.com/sell/nowhere-xyz` → **500
+"Internal Server Error"** (EN and ES); `/shop/<bad>` and `/gold-services/<bad>`
+404 correctly. `sell/[city]/page.tsx` already calls `notFound()` for an
+unknown slug, but the route is fully static with `generateStaticParams`, and
+on Netlify's Next runtime the on-demand render of an unlisted param
+surfaced as a 500. **Fix STAGED (not deployed):** `export const dynamicParams
+= false;` in `sell/[city]/page.tsx` — every city is enumerated, so unknown
+slugs now 404 without rendering. Gate: `tsc` · lint · **1197/1197 (116
+files)** · `npm run build` exit 0 · `.next/prerender-manifest.json` shows
+`/[locale]/sell/[city] → fallback: false` with 12 city pages prerendered.
+⚠️ Bundle it with the next deploy (owner pays per deploy); verify after
+with `curl -I https://naplesestatejewelry.com/sell/nowhere-xyz` → 404.
+Not related to Bing's verdicts (real city URLs never 500).
+
+**Pre-deploy ask — the Google snippet's run-together
+"(239) 404-8505info@naplesestatejewelry.com" (seen on the `/shop` result).**
+Root cause found in the served HTML: `SiteFooter.tsx` renders the phone
+anchor and the email anchor as siblings on separate JSX lines, and JSX
+drops that newline, so production ships `…404-8505</a><a href="mailto:…`
+with **no whitespace between two inline elements**. The flex column stacks
+them visually, but a text extractor sees one word. Google keeps block
+boundaries (the snippet did print "appraisals. (239)…") and only merges
+abutting inline elements, which is exactly this pair. The 08-15 note that
+blamed "Google concatenating structured-data fields" was wrong — the JSON-LD
+was never involved. **Fix STAGED (same bundle):** an explicit `{' '}` text
+node between the two anchors in `SiteFooter.tsx`. Whitespace-only text runs
+are not rendered inside a flex container (CSS Flexbox §4), so the footer is
+pixel-identical; confirmed in the prerendered HTML as `404-8505</a> <a
+href="mailto:`. Gate re-run on the two-file batch (city `dynamicParams` +
+footer): `tsc` · lint · **1197/1197 (116 files)** · build exit 0. Google
+re-reads the footer on its own schedule — expect the snippet to correct
+itself over the following weeks, not on deploy day. The `/shop` result
+used the footer because the query matched that sentence; the page's own
+meta description is unchanged.
+
+**Housekeeping:** deleted the stray `next-app/scripts/__pycache__/`
+(orphaned `.pyc` of a script no longer in the tree) and added
+`__pycache__/` + `*.pyc` to `next-app/.gitignore`.
+
+## 2026-09-02 (end of night) — phone-editor batch DEPLOYED and production-verified
+
+Owner: "pushed and deployed successfully, update docs and end session."
+Verified over HTTP: `/`, `/shop`, the bracelet product page 200; `/admin`
+307 (login); `Permissions-Policy: camera=(), microphone=(self), …` live;
+the deployed CSS chunk carries `.product-editor-dock[data-hidden=true]`
+and `.product-editor-more-button` with zero overlay/spacer residue. The
+batch had passed the owner's own Safari review over the LAN dev server
+before the push (`http://desktop-ssfdjdu.local:3007`, with `nip.io` and
+the `.local` name added to the Turnstile widget). Owner spot-checks
+against production are listed in `TASKS.md`. Staging equals source. The
+dev server is stopped.
+
 ## 2026-09-02 (end of night) — Smart Listing Assistant microphone was blocked by our own Permissions-Policy header (FIXED, in the same push)
 
 Owner (desk Chrome): "Microphone access was denied. Check your browser

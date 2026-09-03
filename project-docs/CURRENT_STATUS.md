@@ -2,16 +2,58 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-09-02**.
+> in `DECISIONS.md`. Last reconciled: **2026-09-03**.
 
-## Start Here (handoff, end of the 2026-09-02 session — SUPERSEDES the blocks below)
+## Start Here (handoff, end of the 2026-09-03 session — SUPERSEDES the blocks below)
 
 **Read this, then `TASKS.md`.**
 
-✅ **READY TO PUSH (2026-09-02, end of night): the whole phone-editor
-batch PASSED the owner's Safari review over the LAN dev server
-(`http://desktop-ssfdjdu.local:3007`) — owner: "good".** Contents of the
-push: the revert of the failed overlay batch · option B compact action
+🟡 **Later on 09-03 — Bing checked; one app fix STAGED, awaiting the next
+push.** Bing: sitemap resubmitted (was on the 9/1 198-URL copy), six URLs
+re-requested. Bing's "Indexing allowed: No" verdicts are NOT a `noindex` we
+serve (verified every crawler variant + Bing's own Live test passes) — it is
+index selection on a 2-day-old import; recheck ~09-10. **Two fixes staged:** (a) the Google-snippet run-together
+`(239) 404-8505info@…` — the footer shipped the two anchors with no
+whitespace between them, fixed with a `{' '}` text node (owner's
+pre-deploy ask); (b) **a real bug:
+unknown `/sell/<slug>` URLs return 500 in production.** Fix =
+`dynamicParams = false` on the city route, gated (`tsc` · lint · 1197/1197 ·
+build · manifest `fallback: false`), **staged, NOT deployed — bundle it into
+the next push.** Details: `TASKS.md` top two items, `CHANGELOG.md` 09-03.
+
+🟢 **2026-09-03 — Search Console is current with everything deployed
+through 09-02.** Read in the owner's Chrome: sitemap **last read Sep 3,
+Success, 204 URLs**; 28-day performance **74 clicks · 1.96K impressions ·
+position 31.7** (up from 44 · 1.09K · 36.7 at the 8/25 audit); Breadcrumbs
+35 valid / 0 invalid (stamped 9/1, pre-trail); no removals, no manual
+actions, robots.txt Valid. The page-indexing report is stamped **8/27**, so
+it does not yet reflect the 09-01/09-02 deploys. **All 12 owed indexing
+requests are settled:** 4 URLs were already indexed on their own
+(`/es/watch-buyers`, `/es/silver-services/flatware-value`, both
+`/diamond-buyers`), the other 8 were requested today and each returned
+"Indexing requested" — no quota wall hit. **Two `.com` properties do not
+hurt** (read-only views; the Domain property is the superset and carries the
+AI "Include" setting the URL-prefix property inherits; the URL-prefix one
+holds the history) — rule in `DECISIONS.md`. ⛔ The Domain property's
+"unused verification token" is the DNS TXT that verifies both properties —
+never REMOVE it; the optional fix is to add `info@` as an owner (`TASKS.md`).
+Housekeeping: stray `scripts/__pycache__/` deleted, `__pycache__/` + `*.pyc`
+now gitignored. No app code changed. Next look: the ~2026-09-10 recheck in
+`TASKS.md`. Record: `CHANGELOG.md` 2026-09-03.
+
+## (superseded) Start Here — end of the 2026-09-02 session
+
+**Read this, then `TASKS.md`.**
+
+✅ **DEPLOYED + production-verified 2026-09-02 (end of night) — owner:
+"pushed and deployed successfully".** Verified over HTTP: `/`, `/shop`,
+product page 200; `/admin` 307; `Permissions-Policy` now
+`microphone=(self)`; deployed CSS carries the dock/⋯ rules with no overlay
+residue. Staging equals source. **Owner spot-checks still owed on the
+phone against production** (Edit + Add Product; a Spanish re-translation
+save; the mic on https) — `TASKS.md` top. The batch had PASSED the owner's
+Safari review over the LAN dev server (`http://desktop-ssfdjdu.local:3007`)
+before the push. Contents of the push: the revert of the failed overlay batch · option B compact action
 row + ⋯ sheet (Clone / Undo / Save + Add Another / Regenerate Missing
 Spanish) · option C hide-on-scroll dock with non-scroll show triggers and
 the remaining-room guard · 16px editor fields on touch · slim phone header

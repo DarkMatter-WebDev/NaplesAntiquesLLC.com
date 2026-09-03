@@ -759,6 +759,99 @@ carries live Workspace MX, root SPF and `p=quarantine` DMARC.
 Adding a second property does not buy more; both return "Quota Exceeded"
 together.
 
+### Two `.com` properties (URL-prefix + Domain) are the recommended setup — they do not hurt (confirmed 2026-09-03)
+
+Owner asked whether having both `https://naplesestatejewelry.com/` and
+`sc-domain:naplesestatejewelry.com` is hurting the site. **No.** Search
+Console properties are read-only *views* of Google's index; ranking,
+crawling and indexing do not know how many properties observe a site. There
+is no duplicate-content or split-signal effect. Google itself recommends a
+Domain property (it is the superset: http, https, www, every subdomain) and
+a URL-prefix property may coexist. What differs between ours:
+
+- **History:** the URL-prefix property has data from Aug 2, 2026; the Domain
+  property only from Aug 26. Read history in the URL-prefix property.
+- **Settings:** "Search generative AI" is set to **Include** on the Domain
+  property and the URL-prefix property shows *"Inherit from:
+  naplesestatejewelry.com"* — the Domain property is where that control
+  lives. Keep it for that reason alone.
+- **Shared:** Request Indexing quota (per site), the sitemap row (submitted
+  once, visible in both), the DNS TXT verification (one record, both
+  properties). The Domain property lists that TXT as an "unused
+  verification token" because its token owner (`info@naplesestatejewelry.com`)
+  is not a listed user — ⛔ **never REMOVE the token**; add `info@` as an
+  owner if the notice bothers anyone.
+
+Rule: keep both; do nothing to "fix" it; never delete a property.
+
+### GSC inspect box — the sequence that works from Chrome MCP (2026-09-03)
+
+`find` the "Inspect any URL" combobox once (its ref survives SPA
+navigation) → `form_input` the full URL → `left_click` the box **by
+coordinate, not by ref** → key `End` → key `Return` → wait ~10 s. After a
+REQUEST INDEXING click, wait ~26 s for the toast, screenshot it, then press
+`Escape` before anything else. ⛔ Never press `Return` while the row reads
+"✓ Indexing requested · REQUEST AGAIN" — focus is on that button and it
+re-submits (burned one quota unit today). A red "Oops! Something went wrong"
+is transient (retry once); "Quota exceeded" is not (stop for the day). Deep
+links to `/inspect?id=<url>` and `/change-of-address` return Google 404s —
+drive the UI.
+
+### Bing's "Indexing allowed: No" is an index-selection verdict, not proof of a `noindex` (2026-09-03)
+
+The 09-01 reading — Bing crawled the new pages before the deploy and cached
+the 404's `noindex` — was disproved on 09-03: `/sell/marco-island` (months
+old, crawled 8/20) and `/jewelry-appraisal/hallmarks` (crawled 9/3 01:36,
+after every deploy) both show "Crawl allowed: Yes · Page Fetch: Successful ·
+**Indexing allowed: No**", while the server returns 200 with no robots
+directive to a Bingbot UA under every header variant tried, and Bing's own
+**Live URL test says "URL can be indexed by Bing"**. Bing shows the same
+triad for pages it has simply not selected yet on a young property. Rules:
+
+- ⛔ Do not chase this in app code (no robots changes, no header changes, no
+  redeploy "to fix Bing"). Re-request the URL, resubmit the sitemap, wait.
+- The one server-side check that would change the verdict is the Netlify
+  request log filtered to `bingbot` for the affected paths — use it only if
+  the crawl date advances and the verdict stays "No".
+- ⛔ `site:naplesestatejewelry.com` on Bing redirects to junk (`rdr=1`); it is
+  not an index count. Use URL Inspection per page.
+- BWT dialogs (Request indexing → Submit, Submit sitemap) do not open from
+  accessibility-ref clicks in Chrome MCP; drive them with `javascript_tool`
+  (find the button by text, `.click()`, set inputs via the native value
+  setter + `input` event). Deep link:
+  `urlinspection?siteUrl=…&urlToInspect=<double-URL-encoded>`.
+
+### Static `[param]` routes with `generateStaticParams` must set `dynamicParams = false` (2026-09-03)
+
+`/sell/nowhere-xyz` returned a plain-text **500** in production even though
+the page calls `notFound()` for an unknown slug: the route is fully static,
+and Netlify's Next runtime rendering an unlisted param on demand surfaced the
+not-found as a 500. `sell/[city]` now exports `dynamicParams = false`, so an
+unknown slug 404s without rendering (prerender manifest: `fallback: false`).
+Apply the same to any future static route whose params are fully enumerated.
+`shop/[id]` is different — it is ISR (`revalidate = 300`) and must keep
+accepting new product ids, and it already 404s correctly.
+
+### Adjacent inline elements need an explicit whitespace text node — JSX eats the newline (2026-09-03)
+
+Google's snippet for `/shop` printed `(239) 404-8505info@naplesestatejewelry.com`.
+The 08-15 explanation (Google concatenating structured-data fields) was wrong:
+the served footer HTML was literally `…404-8505</a><a href="mailto:…`. JSX
+removes the newline between sibling elements, the flex column hid it
+visually, and text extractors (Google's snippet builder, screen readers,
+copy-paste) saw one token. Block boundaries are respected by Google; only
+abutting **inline** elements merge.
+
+Rule: when two inline elements with text sit next to each other in JSX and
+are separated only by CSS (flex/grid gap, margins), put `{' '}` between
+them. Inside a flex or grid container the whitespace-only text node is not
+rendered, so layout is unchanged; in an inline context it renders as a
+normal space, which is also what you want. Do not "fix" this with CSS or by
+changing the schema. ℹ️ Footer nav link lists are also adjacent anchors
+(`Sell GoldSell Sterling Silver` to an extractor); left alone on 09-03
+because Google does not build snippets from link lists — revisit only if a
+snippet ever shows it.
+
 ## Homepage Announcement Banner
 
 ### The strip's copy is admin data, and its LENGTH is enforced, not remembered
@@ -1992,10 +2085,30 @@ on its own schedule; expect days to weeks. A search result that looks unchanged
 the day after deploying is not evidence of a fault, and Google may still rewrite
 a title it considers a poor match.
 
-ℹ️ Not a bug, so nobody re-investigates it: the snippet's run-together
-`(239) 404-8505info@naplesestatejewelry.com` is **Google concatenating contact
-fields from structured data**. The meta description ends at
-`Call (239) 404-8505.` and contains no email — verified in the served HTML.
+ℹ️ **Measured 2026-09-03, 19 days after the `WebSite` entity shipped:** the
+homepage had been crawled that same morning (URL inspection: last crawl Sep 3,
+4:51 AM, Googlebot smartphone) and the result STILL showed the bare domain as
+the site name — with Google now also stripping the LEADING brand from the
+homepage title ("Sell Jewelry, Gold & Silver in Naples, FL"). Read that as
+Google treating "Naples Estate Jewelry" as redundant with the site line it
+prints, i.e. it has connected the name to the domain but has not flipped the
+display yet. Everything controllable is in place (`WebSite` name/url on the
+canonical homepage, `og:site_name`, brand-first title, one name everywhere,
+GBP name identical). Two things work against a fast flip and cannot be coded
+around: the `.com` is one month old to Google as this business (Change of
+Address Aug 2), and its referrer history includes the GoDaddy "for sale"
+parked page it used to be. ⛔ Do not "fix" this with an `alternateName`, a
+title change, or a re-deploy — recheck the brand SERP every couple of weeks
+instead. The one harmless nit, only if a deploy is already happening: the
+`WebSite.url` is `https://naplesestatejewelry.com` while Google's normalized
+canonical is `https://naplesestatejewelry.com/` (trailing slash); Google's own
+example uses the slash. Zero evidence it matters.
+
+⚠️ SUPERSEDED 2026-09-03: the snippet's run-together
+`(239) 404-8505info@naplesestatejewelry.com` was NOT structured data — it was
+the footer's two inline anchors shipping with no whitespace between them
+(`</a><a`). See *Adjacent inline elements need an explicit whitespace text
+node* below. Fixed in `SiteFooter.tsx`.
 
 ### The favicon is the octopus mark, cropped from the existing nav logo
 

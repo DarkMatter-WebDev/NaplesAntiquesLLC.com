@@ -88,6 +88,13 @@ export default function SiteFooter({ locale }: Props) {
             >
               (239) 404-8505
             </a>
+            {/* The explicit space is for text extractors, not layout: JSX drops
+                the newline between sibling elements, so the phone and email
+                anchors shipped as `</a><a` and Google's snippet for /shop read
+                "(239) 404-8505info@naplesestatejewelry.com" (owner, 2026-09-03).
+                A whitespace-only text node is not rendered inside a flex
+                container, so the stack is unchanged. */}
+            {' '}
             <a
               href="mailto:info@naplesestatejewelry.com"
               className="text-xs md:text-sm md:mt-1"

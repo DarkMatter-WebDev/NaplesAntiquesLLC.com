@@ -1,19 +1,98 @@
 ﻿# Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-09-02**.
+> in `CHANGELOG.md`. Last reconciled: **2026-09-03**.
 
 ## ◻ OPEN — needs a human
 
-### ✅ 2026-09-02 (end of night) — phone-editor batch APPROVED on the owner's Safari ("good"); READY TO PUSH (no SQL, no env vars in Netlify)
+### 🟡 STAGED, NOT DEPLOYED 2026-09-03 — two-file bundle: unknown `/sell/<city>` slugs 500 in production (fix) + footer phone/email run-together in Google snippets (fix)
 
-Everything below this heading is the build/review record. What ships in
-the push: revert of the overlay batch · option B compact row + ⋯ sheet ·
-option C dock (hide-on-scroll with non-scroll show triggers) · 16px fields
-· slim header · portaled row action menu · thumbnail-rail fix · **the
-Permissions-Policy microphone fix (`microphone=(self)` in next.config.ts
-+ netlify.toml)**. ◻ After deploy: one owner spot-check of Edit + Add
-Product on the phone against production; nothing to submit.
+**Footer snippet fix (owner's pre-deploy ask):** Google's `/shop` snippet read
+`(239) 404-8505info@naplesestatejewelry.com` because `SiteFooter.tsx`
+shipped the two anchors as `</a><a` with no whitespace. A `{' '}` text
+node now separates them (layout-inert inside the flex column; verified in
+the prerendered HTML). ◻ After deploy: `curl -s https://naplesestatejewelry.com/about | grep -o '8505</a> <a'`
+should match. Google refreshes the snippet on its own schedule (weeks).
+
+**City 500 fix:**
+
+`https://naplesestatejewelry.com/sell/nowhere-xyz` (and `/es/...`) returns a
+plain-text **500** instead of 404. Fix: `export const dynamicParams = false;`
+in `next-app/src/app/[locale]/sell/[city]/page.tsx` (all cities are
+enumerated by `generateStaticParams`). Gated: `tsc` · lint · 1197/1197 (116
+files) · build exit 0 · prerender manifest `fallback: false`, 12 city
+pages. ◻ **Owner: include in the next push** (no deploy of its own — Netlify
+credits). ◻ After deploy: `curl -I https://naplesestatejewelry.com/sell/nowhere-xyz`
+→ 404, and `/sell/naples` still 200.
+
+### ◻ Bing Webmaster Tools — recheck ~2026-09-10 (six URLs re-requested + sitemap resubmitted 09-03)
+
+Bing reads "Indexing allowed: No" on `/sell/naples`, `/sell/marco-island`,
+`/jewelry-appraisal`, `/diamond-buyers`, the gold guide and the hallmarks
+guide even though the server never sends `noindex` and Bing's Live URL test
+passes — see `CHANGELOG.md` 09-03 and `DECISIONS.md`. All six re-requested
+("Success"), sitemap resubmitted (Processing). On the recheck: if "Last
+crawl" has advanced past 09-03 and the verdict is still "No", pull the
+Netlify request log filtered to `bingbot` for those paths before touching
+code. If Bing's dashboards (Search Performance, Site Explorer) are still
+"No data" after 09-05, that is worth a Bing support ticket — the import
+was 09-01.
+
+### ✅ DONE 2026-09-03 — Search Console reviewed; all 12 owed indexing requests settled (8 requested today, 4 were already indexed); two-property question answered
+
+Full read-out in `CHANGELOG.md` 2026-09-03. Nothing to deploy. What is left
+is calendar work:
+
+- ◻ **~2026-09-10 recheck (owner or next session):** the Pages report was
+  stamped 8/27 today — it should refresh and show the 8 requested URLs
+  moving from "Discovered/Crawled – not indexed" to indexed; the Breadcrumbs
+  report (35 valid on 9/1) should climb once the 09-02 sitewide trail is
+  re-crawled; the 7 product URLs requested 08-30 should drop out of
+  "Discovered – currently not indexed". If a URL is still unindexed after
+  ~10 days, request it once more.
+- ◻ **Optional tidy-up:** the Domain property flags "1 unused verification
+  token" — the DNS TXT whose token owner is `info@naplesestatejewelry.com`.
+  ⛔ Never REMOVE it (it verifies both `.com` properties). To silence the
+  notice, add `info@naplesestatejewelry.com` as an **Owner** on both `.com`
+  properties (Settings → Users and permissions → Add user). Owner's call.
+- ℹ️ The `.co` property is draining as intended (34 indexed / 126 not, 0
+  clicks since mid-August). Leave the Change of Address alone.
+
+✅ **Staging synced 2026-09-03** — dry run listed exactly the 5 touched
+files (4 docs + `next-app/.gitignore`) and 1 Extra (the deleted
+`scripts/__pycache__/`); real run copied 5 / removed 1; follow-up dry run
+**0 / 0 Extras, exit 0**; 910 files; leak check 0 (`.git`, `node_modules`,
+`.next`, `__pycache__`, `.env*`, `.pyc`, `.log`) against a **191 `.tsx`**
+positive control; `CHANGELOG.md` hash matches. Nothing to deploy from this
+session (docs + a gitignore line only).
+
+### ✅ DEPLOYED + production-verified 2026-09-02 (end of night) — phone-editor batch + mic header + save-time Spanish re-translation
+
+Owner: "pushed and deployed successfully." Over HTTP: `/`, `/shop`, the
+bracelet product page 200; `/admin` 307; `Permissions-Policy:
+microphone=(self)` live; deployed CSS has `.product-editor-dock` +
+`.product-editor-more-button`, 0 overlay/spacer residue. What shipped:
+revert of the overlay batch · option B compact row + ⋯ sheet (Clone /
+Undo / Save + Add Another / Regenerate Missing Spanish) · option C dock
+(hide-on-scroll, non-scroll show triggers, remaining-room guard) · 16px
+touch fields · slim phone header · row action menu portaled to `<body>`
+(tappable, non-bubbling backdrop) · thumbnail-rail `scrollLeft` fix ·
+microphone allowed for the site's own origin · Spanish re-translated on
+save when the English changed and the Spanish was untouched.
+
+◻ **Owner spot-checks on the phone against PRODUCTION (the only things
+not provable from here):**
+1. Edit an item — one-line row, `⋯` sheet, dock hides/returns with Details
+   open, no zoom on field tap, slim header. Add Product the same.
+2. Open a listing with Spanish, change the English title (or run the
+   assistant), Save → Spanish title is new; hand-edit a Spanish field, Save
+   → stays as typed.
+3. Assistant tap-to-talk on https (desk Chrome or phone) — the mic prompt
+   appears and words land in the box. (Plain-http LAN dev will still refuse
+   the mic; that is the browser, not us.)
+Nothing to submit (no URL or public-copy changes).
+
+Everything below this heading is the build/review record.
 
 ◻ **Owner, microphone:** after the deploy, open the assistant on
 production (https) in Chrome and tap "Let's begin" — Chrome should now
@@ -691,7 +770,14 @@ then `npm run indexnow -- --urls=/watch-buyers,/es/watch-buyers` and a GSC
 request for both once quota allows. ⚠️ The ES footer check will then read
 **25/26**.
 
-### ◻ GSC: 12 indexing requests owed (4 parked + /watch-buyers ×2 + the six 09-02 guides) — quota was EXCEEDED on the first try 2026-09-01 (late); ~10/day, so 2–3 sessions
+### ✅ DONE 2026-09-03 (record) — GSC: 12 indexing requests owed (4 parked + /watch-buyers ×2 + the six 09-02 guides) — quota was EXCEEDED on the first try 2026-09-01 (late); ~10/day, so 2–3 sessions
+
+✅ **Settled 2026-09-03:** 4 were already indexed (`/es/watch-buyers`,
+`/es/silver-services/flatware-value`, `/diamond-buyers`,
+`/es/diamond-buyers`); the other 8 were requested and each returned
+"Indexing requested" (six guides, `/watch-buyers`,
+`/silver-services/flatware-value`). Recheck item at the top of this file.
+The text below is the pre-09-03 record.
 
 Order when quota opens: the six guides first (newest, no other discovery
 signal on Google yet), then `/watch-buyers` ×2, then the four parked. Drive

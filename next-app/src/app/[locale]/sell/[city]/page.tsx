@@ -17,6 +17,14 @@ interface Props {
   params: Promise<{ locale: string; city: string }>;
 }
 
+// Every city this route serves is enumerated below, so an unknown slug must
+// 404 without rendering. Without this, Netlify's Next runtime tried to render
+// the unlisted param on demand and the `notFound()` inside a fully static
+// route surfaced as a plain-text **500** in production (`/sell/nowhere-xyz`,
+// found 2026-09-03 while checking Bing's crawl verdicts). Add a city by adding
+// it to SERVICE_AREAS, never by loosening this.
+export const dynamicParams = false;
+
 export function generateStaticParams() {
   return routing.locales.flatMap((locale) =>
     SERVICE_AREAS.map((area) => ({ locale, city: area.slug })),
