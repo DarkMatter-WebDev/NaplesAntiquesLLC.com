@@ -1,6 +1,118 @@
 
 # Changelog
 
+## 2026-09-03 (evening, session 2) — `/card` business-card landing page BUILT + STAGED
+
+Owner is printing business cards and asked whether the QR should go to
+the website or Instagram. Answer: a dedicated page on the site (stable
+URL, destinations editable later, older clients don't use Instagram, the
+site already single-sources address/hours/links). Owner: "/card is fine".
+
+**Process:** mockup first (owner's standing rule) — rev 1 → owner picks
+(Review gold, tagline kept, hours as shown, Facebook tile added, bare
+page, noindex, prefilled text) → rev 2 → "bold the days on the hours
+line" → rev 3 approved. Four more asks arrived mid-build and were applied:
+a slim EN/ES toggle at the very top ("even if a Spanish speaking customer
+scans the same QR"), the business name above the octopus ("compact the
+other buttons if we need to"), an obvious way to the homepage, and
+"compact the four largest buttons a bit more … add a button for get
+directions somewhere that it makes sense … unnecessary blank space under
+the two-up buttons" — Directions moved out of the primary stack to sit
+under the address, the stack tightened (46px pills), the `mt-auto` gap
+replaced by fixed spacing.
+
+**Built:**
+
+- `src/app/[locale]/card/page.tsx` — bare page (no `SiteHeader`,
+  `SiteFooter`, breadcrumb). Top-to-bottom: EN/ES toggle bar (plain
+  anchors, `aria-current`) · wordmark h1 + octopus, both one home link ·
+  "Gold, Sterling & Jewelry Buyers" / "Naples, FL" on two deliberate
+  lines (the phrase cannot fit one line at 375px) · `CardTodayHours` ·
+  bold-days summary line built from `hoursSegmentsCompact()` with
+  TRAILING middots (a wrapped Spanish line must not start with a lone
+  dot) · Call (`.dark-button`) · Text (`.outline-button`,
+  `sms:2394048505?&body=…` — the `?&` form works on iOS and Android) ·
+  **Leave a Google Review (`.gold-button`, `GOOGLE_REVIEW_URL`)** · 2×2
+  tiles What We Buy → `/sell`, Shop, Instagram, Facebook (inline brand
+  glyphs; lucide-react 1.x ships no brand icons) · `ShowroomAddress`
+  (landmark included — approved in the mockup) + `CopyAddressButton` ·
+  Get Directions (`mapsUrl()`, under the address) · "Visit Our Website"
+  outline button. Metadata via
+  `pageMetadata` + `robots: { index: false, follow: false }`; NOT added to
+  `sitemap.ts`.
+- `src/components/card/CardTodayHours.tsx` — "Open today 11:00 AM – 3:00
+  PM" + Today chip / "Closed today". Server snapshot renders an empty
+  fixed-height line; the day arrives after mount via
+  `useSyncExternalStore` in the showroom timezone (same reasoning as
+  `ShowroomTodayBadge`: a prerendered "today" would be the build day).
+- `src/lib/business-location.ts` — `INSTAGRAM_URL` / `FACEBOOK_URL`
+  exported and used by `SAME_AS` (one place per URL);
+  `hoursSegmentsCompact(schedule, isEs)` → `[{ days: 'Mon–Fri', times:
+  '11am–3pm' }, { days: 'Sat', times: '11am–4pm' }]` / ES `Lun–Vie 11 a.m.
+  – 3 p.m.` via a new `es-compact` time style + `DAY_ABBR_ES`. Existing
+  formatters and their byte-identity tests untouched.
+- `src/components/AppIcon.tsx` — `sms: MessageSquareText`.
+- `src/lib/__tests__/card-page.test.ts` — source guards (noindex string
+  present, `'/card'` absent from `sitemap.ts`, no SiteHeader/SiteFooter/
+  BreadcrumbTrail, `?&body=` present, the social constants feed `SAME_AS`)
+  + `hoursSegmentsCompact` cases (default week, the real Mon–Fri/Sat split,
+  non-zero minutes, all-closed → `[]`).
+
+**Verification:** `tsc` 0 · lint 0 · vitest **1203/1203, 117 files** (was
+1197/116) · `npm run build` exit 0 five times across the iterations, final
+one on the shipped source: `● /[locale]/card` → `/en/card`, `/es/card`;
+473 static pages. Prerendered `en/card.html` and `es/card.html`: robots
+noindex, canonical per locale, prefilled sms href, 0 chrome markup. Dev
+preview (in-app pane, 375×812): both locales fit a single screen (last
+element bottom 722px, no dead space), all 12 links checked by href, zero
+console errors.
+Viewport emulation reset to desktop afterwards.
+
+**Not done / owner-side:** the push; then generate a STATIC QR from
+`https://naplesestatejewelry.com/card`. The first-visit cookie notice
+covers the bottom third until accepted — existing sitewide behaviour,
+flagged in `TASKS.md` as a decision if the owner wants it suppressed here.
+
+## 2026-09-03 (late) — GBP posting restriction: read-only check, appears reinstated
+
+Owner: "check to see if we are reinstated, but don't post anything."
+Business Profile Manager (owner's Chrome, `info@surettesystems.com`) →
+Naples Estate Jewelry (Verified) → Posts: the 08-30 post is marked
+**Rejected**; **Add post** is available and the composer opens with no
+"posting turned off" notice. Closed without entering anything. Also seen:
+"Google updates (1)" pending on the profile. Nothing posted, nothing
+changed. Owner's closing instruction: **do not post** — GBP posting is
+theirs from here (`TASKS.md`). Session ended with docs reconciled and
+staging equal to source.
+
+## 2026-09-03 (late) — "Don't Melt It Yet" page + resale hook DEPLOYED and production-verified; IndexNow 200; GSC EN requested, ES quota-blocked
+
+Owner: "pushed and deployed." Verified over HTTP minutes later:
+
+- `/sell/dont-melt-it` and `/es/sell/dont-melt-it` → **200**, titles
+  "Don't Melt Your Jewelry Yet | …" / "No Funda Su Joyería Todavía | …",
+  3 JSON-LD blocks each (BreadcrumbList + FAQPage + the sitewide
+  JewelryStore), one `<h1>`.
+- Homepage EN/ES carries the gold-card hook ("melt-only buyers" / "quienes
+  solo funden"); all six city pages carry their own sentence (Naples "priced
+  two ways… paid the higher of the two"; Marco "melt counter, where a signed
+  bracelet…"; Bonita "melt-only counters"; Estero "melt value and nothing
+  more"; Fort Myers "melt everything they buy"; Cape Coral "melt counter —
+  we price every piece both…"); "no pawn-shop lowballs" is gone.
+- `/sell` hub links the page once; `/sitemap.xml` now **206 URLs** including
+  both new ones; smoke `/`, `/shop`, `/sell`, `/sell/naples`, `/robots.txt`
+  → 200.
+- `npm run indexnow -- --urls=/sell/dont-melt-it,/es/sell/dont-melt-it` →
+  **200 OK for 2**. ⚠️ Run it from PowerShell, not Git Bash: MSYS rewrote
+  the leading `/sell/...` into `C:/Program Files/Git/sell/...` inside the
+  `--urls=` argument on the first attempt (the script still reported 200 for
+  2, so one bogus URL was pinged — harmless, but the rule is PowerShell or
+  `MSYS_NO_PATHCONV=1`).
+- GSC: EN page "Indexing requested" (the 10th success of the day); the ES page returned "Quota Exceeded" on the 11th attempt — so the daily allowance is 10, and `/es/sell/dont-melt-it` is OWED tomorrow (one request)
+
+Nothing else outstanding from this deploy. Optional follow-up for the
+owner: a GBP post with the hook (no phone number in the text).
+
 ## 2026-09-03 (night) — "Don't Melt It Yet" resale-vs-melt page BUILT + homepage/city hook; STAGED for the owner's push
 
 Owner's idea, same evening: most Naples gold/silver buyers are melters and

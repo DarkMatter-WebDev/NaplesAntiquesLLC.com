@@ -1,7 +1,7 @@
 # Structure And Build Integrity
 
 > Canonical project map and single sources of truth. Last reconciled:
-> **2026-08-30**.
+> **2026-09-03**.
 
 ## Runtime Shape
 
@@ -71,6 +71,7 @@ let additional loose app assets accumulate at root.
 | Localized pages/routes | `next-app/src/app/[locale]/` |
 | SEO guide pages (nested under the parent lander, never `/guides/` or `/blog/`) | `[locale]/silver-services/flatware-value/` (the template), `[locale]/gold-services/what-is-my-gold-worth/`, `[locale]/jewelry-appraisal/hallmarks/`, `[locale]/estate-services/selling-inherited-jewelry/` — each `page.tsx` self-contains its copy, FAQPage + BreadcrumbList JSON-LD, and metadata; listed in `sitemap.ts` at 0.6; content rules in `DECISIONS.md` → *"Guide pages live UNDER their parent"* |
 | Breadcrumbs — schema AND visible trail (every sitemap page except `/`, plus product pages) | `src/lib/breadcrumb-ld.ts` (the one `BreadcrumbList` shape + tests), `src/components/BreadcrumbJsonLd.tsx` (the script tag), `src/components/BreadcrumbTrail.tsx` (the visible "Home › Sell Gold" line; `BreadcrumbTrailFromLd` variant for pages that build the LD object by hand). Legal pages get both through `LegalPolicyPage`'s `path` prop. Pages that pre-date the helper (`/sell`, `/sell/[city]`, `/shop/[id]`, `/jewelry-appraisal`, `/diamond-buyers`, `/watch-buyers`, the four guides) still build the LD shape by hand and feed it to the trail — same names for the same parents, placement/tone rules in `DECISIONS.md` |
+| Business-card QR landing page (`/card`, `/es/card`; noindex, not in the sitemap, no site chrome) | `[locale]/card/page.tsx` + `src/components/card/CardTodayHours.tsx`; facts from `business-location.ts` + admin hours; rules in `DECISIONS.md` → *"The /card page"*; guarded by `lib/__tests__/card-page.test.ts` |
 | Shared layout | `next-app/src/components/layout/` |
 | Product data | Supabase `products` |
 | Product TypeScript contract | `next-app/src/types/product.ts` |

@@ -115,10 +115,13 @@ export const GOOGLE_REVIEW_URL = 'https://g.page/r/CcAn8whCTJ_sEBM/review';
  * ⛔ Do not list naplesestatejewelry.com or the legacy .co here either — a page
  * does not need to declare itself, and the .co 301-redirects to this domain.
  */
+export const INSTAGRAM_URL = 'https://www.instagram.com/naples_estate_jewelry/';
+export const FACEBOOK_URL = 'https://www.facebook.com/naplesestatejewelry';
+
 export const SAME_AS: readonly string[] = [
   GOOGLE_BUSINESS_PROFILE_URL,
-  'https://www.instagram.com/naples_estate_jewelry/',
-  'https://www.facebook.com/naplesestatejewelry',
+  INSTAGRAM_URL,
+  FACEBOOK_URL,
 ];
 
 /** `6240 Shirley St, Ste 104` */
@@ -259,6 +262,17 @@ const DAY_LABELS_ES: Record<WeekDay, string> = {
   Sunday: 'Domingo',
 };
 
+/** Three-letter Spanish day abbreviations, for the `es-compact` style only. */
+const DAY_ABBR_ES: Record<WeekDay, string> = {
+  Monday: 'Lun',
+  Tuesday: 'Mar',
+  Wednesday: 'Mié',
+  Thursday: 'Jue',
+  Friday: 'Vie',
+  Saturday: 'Sáb',
+  Sunday: 'Dom',
+};
+
 export interface HoursRow {
   day: string;
   time: string;
@@ -309,8 +323,12 @@ export function closedLabel(isEs: boolean): string {
  * - `'en-compact'`: `11am`, `3pm`, `11:30am` — minutes only when non-zero.
  * - `'en-full'`:    `11:00 AM` — always minutes, space, uppercase.
  * - `'es'`:         `11:00 a.m.` — always minutes, space, lowercase + periods.
+ * - `'es-compact'`: `11 a.m.`, `11:30 a.m.` — the ES periods convention with
+ *                   minutes only when non-zero (the `/card` hours line).
  */
-function formatTime(hhmm: string, style: 'en-compact' | 'en-full' | 'es'): string {
+type TimeStyle = 'en-compact' | 'en-full' | 'es' | 'es-compact';
+
+function formatTime(hhmm: string, style: TimeStyle): string {
   const [h24, m] = hhmm.split(':').map(Number);
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
   const isPm = h24 >= 12;
@@ -321,11 +339,14 @@ function formatTime(hhmm: string, style: 'en-compact' | 'en-full' | 'es'): strin
   if (style === 'en-full') {
     return `${h12}:${mm} ${isPm ? 'PM' : 'AM'}`;
   }
+  if (style === 'es-compact') {
+    return `${h12}${m === 0 ? '' : `:${mm}`} ${isPm ? 'p.m.' : 'a.m.'}`;
+  }
   return `${h12}:${mm} ${isPm ? 'p.m.' : 'a.m.'}`;
 }
 
 /** `11am–3pm` (compact, no spaces) or `11:00 AM – 3:00 PM` / `11:00 a.m. – 3:00 p.m.`. */
-function formatTimeRange(opens: string, closes: string, style: 'en-compact' | 'en-full' | 'es'): string {
+function formatTimeRange(opens: string, closes: string, style: TimeStyle): string {
   const joiner = style === 'en-compact' ? '–' : ' – ';
   return `${formatTime(opens, style)}${joiner}${formatTime(closes, style)}`;
 }
@@ -372,18 +393,43 @@ function openSegments(schedule: StoreHoursSchedule): OpenSegment[] {
  * - EN compact: `Tue` / `Tue–Sat` (3-letter, bare en dash).
  * - EN full: `Tuesday` / `Tuesday – Saturday` (spaced en dash).
  * - ES: `Martes` / `Martes a sábado` (first capitalized, second lowercase).
+ * - ES compact: `Mar` / `Mar–Sáb` (3-letter, bare en dash — mirrors EN compact).
  */
-function segmentDaysLabel(days: WeekDay[], style: 'en-compact' | 'en-full' | 'es'): string {
+function segmentDaysLabel(days: WeekDay[], style: TimeStyle): string {
   const first = days[0];
   const last = days[days.length - 1];
   if (style === 'es') {
     const firstEs = DAY_LABELS_ES[first];
     return days.length === 1 ? firstEs : `${firstEs} a ${DAY_LABELS_ES[last].toLowerCase()}`;
   }
+  if (style === 'es-compact') {
+    return days.length === 1 ? DAY_ABBR_ES[first] : `${DAY_ABBR_ES[first]}–${DAY_ABBR_ES[last]}`;
+  }
   if (style === 'en-compact') {
     return days.length === 1 ? first.slice(0, 3) : `${first.slice(0, 3)}–${last.slice(0, 3)}`;
   }
   return days.length === 1 ? first : `${first} – ${last}`;
+}
+
+/**
+ * Compact day/time PAIRS, one per open segment — for a surface that wants to
+ * style the days and the times differently (the `/card` page bolds the days so
+ * `Mon–Fri 11am–3pm · Sat 11am–4pm` reads as parts, not one run of text).
+ * `hoursLine()` is the same information as one flat string; this returns the
+ * parts so the caller can mark them up. Empty when every day is closed.
+ *
+ *   EN: `[{ days: 'Mon–Fri', times: '11am–3pm' }, { days: 'Sat', times: '11am–4pm' }]`
+ *   ES: `[{ days: 'Lun–Vie', times: '11 a.m. – 3 p.m.' }, …]`
+ */
+export function hoursSegmentsCompact(
+  schedule: StoreHoursSchedule,
+  isEs: boolean,
+): { days: string; times: string }[] {
+  const style: TimeStyle = isEs ? 'es-compact' : 'en-compact';
+  return openSegments(schedule).map((s) => ({
+    days: segmentDaysLabel(s.days, style),
+    times: formatTimeRange(s.opens, s.closes, style),
+  }));
 }
 
 /**

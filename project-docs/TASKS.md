@@ -5,7 +5,87 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 STAGED, NOT DEPLOYED 2026-09-03 (night) — "Don't Melt It Yet" page + homepage/city resale hook; owner approved the mockup "as is"
+### 🔴 DEPLOY the 2026-09-03 (evening, session 2) `/card` business-card landing page (no SQL, no env vars)
+
+**What:** `naplesestatejewelry.com/card` (+ `/es/card`) — the page the QR
+code on the new business cards points at. Owner-approved mockup (rev 3)
+plus four mid-build asks: a slim English/Español toggle at the very top
+so a Spanish speaker scanning the same QR switches in one tap, the
+business name above the logo, an obvious way to the homepage (wordmark
+link + "Visit Our Website" button), and a tighter primary stack with Get
+Directions moved down under the address it points at.
+
+**Files:** `src/app/[locale]/card/page.tsx` (new),
+`src/components/card/CardTodayHours.tsx` (new, client "Open today …" line —
+same server-snapshot pattern as `ShowroomTodayBadge`),
+`src/lib/business-location.ts` (`INSTAGRAM_URL` / `FACEBOOK_URL` named
+constants feeding `SAME_AS`; `hoursSegmentsCompact()` + an `es-compact`
+time style), `src/components/AppIcon.tsx` (`sms` icon),
+`src/lib/__tests__/card-page.test.ts` (new: noindex + not in sitemap + no
+chrome + sms form + formatter cases).
+
+**Gate (final source):** `npx tsc --noEmit` exit 0 · `npm run lint` exit 0 ·
+`npx vitest run` **1203/1203 (117 files)** · `npm run build` exit 0, route
+`● /[locale]/card` → `/en/card` + `/es/card` prerendered (473 static
+pages). Prerendered HTML checked: `<meta name="robots" content="noindex,
+nofollow">`, canonical `/card` · `/es/card`, `sms:2394048505?&body=…`
+prefilled in each language, 0 header/footer markup. Dev preview at
+375×812: both locales fit one screen (last element bottom 722px of 812,
+no dead space), no console errors, all 12 links resolve (EN/ES toggle,
+wordmark home, tel, sms, review, /sell, /shop, Instagram, Facebook, Maps,
+website home).
+
+**Staging:** ✅ synced 2026-09-03 (evening, session 2) — dry run listed exactly the 10 touched files + 2 new dirs (the two card folders), 0 Extras; real run copied 10; follow-up dry run 0/0; leak check 0 (.git/.env*/node_modules), 0 worktrees, 0 .next; literal-path hash match on all five app files. 914 files on disk.
+
+◻ **Owner: push** (bundle with anything else pending — nothing else is).
+Then:
+1. `curl -sI https://naplesestatejewelry.com/card` → 200; the HTML carries
+   `noindex, nofollow`. Same for `/es/card`.
+2. Open it on your phone: tap Call, Text (the SMS app should open with
+   "Hi Chris, I have your card and I'd like to ask about " typed in),
+   Get Directions, Leave a Google Review, and Español.
+3. Generate the QR from **`https://naplesestatejewelry.com/card`** — a
+   static QR from any free generator; ⛔ never a paid "dynamic QR" service
+   (the page is the dynamic part). Print the URL under the QR in plain
+   text too.
+4. Nothing to submit to Google or Bing — the page is deliberately noindex
+   and not in the sitemap. Do not request indexing for it.
+
+ℹ️ The sitewide cookie notice appears on a first visit to `/card` like on
+every page; it covers the bottom third until Accept is tapped. That is
+existing site policy, unchanged here — say so if you want the notice
+suppressed on this one page (it is a decision, not a bug).
+
+### 🟢 2026-09-03 (late) — GBP posting looks REINSTATED (read-only check, nothing posted)
+
+Owner asked to check the posting restriction (phone number in the 08-30
+post). In Business Profile Manager → Naples Estate Jewelry → Posts: the
+08-30 silver post shows **Rejected**; the **Add post** button is present
+and the composer opens normally (Update / Offer / Event, description,
+media, Schedule, Post) with **no restriction banner**. Closed without
+typing or publishing. ⛔ **Owner instruction at session end: DO NOT POST.**
+Any GBP post (the silver repost minus the phone number, or the "Don't melt
+it yet" hook) is the owner's to publish, when they choose — ⛔ never a phone
+number in post text; use the Call button. Note the
+Manager also shows **"Google updates (1)"** pending on the profile (the
+pencil icon carries a red dot) — review it under Edit profile before it
+auto-applies.
+
+### ◻ 2026-09-04 — ONE GSC Request Indexing owed: `https://naplesestatejewelry.com/es/sell/dont-melt-it`
+
+The EN twin was requested 09-03 (10th success of the day); the ES request hit
+"Quota Exceeded" on the 11th. Submit it first thing next session, then stop.
+IndexNow already covered both URLs (200 OK for 2).
+
+### ✅ DEPLOYED + production-verified 2026-09-03 (late) — "Don't Melt It Yet" page + homepage/city resale hook
+
+Owner pushed; verified: both URLs 200 with 3 JSON-LD blocks and one h1,
+hook live on `/` (EN + ES) and all six city pages, `/sell` hub link, sitemap
+206, smoke 200 ×5. IndexNow 200 for 2 (from PowerShell — Git Bash mangles
+the `--urls=` paths). GSC: EN page "Indexing requested" (the 10th success of the day); the ES page returned "Quota Exceeded" on the 11th attempt — so the daily allowance is 10, and `/es/sell/dont-melt-it` is OWED tomorrow (one request). ◻ Optional: GBP post with the hook
+(⛔ no phone number in the text). ◻ ~09-10: check both URLs in GSC URL
+Inspection and Bing. The text below is the pre-deploy build record.
+
 
 New `/sell/dont-melt-it` (+ES) on the guide template, sitemap + `/sell` hub
 link, the hook sentence on the homepage gold card and in all six city

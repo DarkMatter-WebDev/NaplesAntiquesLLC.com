@@ -8,7 +8,37 @@
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-03 night — "Don't Melt It Yet" page + resale hook BUILT and STAGED,
+🟡 **09-03 (evening, session 2) — `/card` business-card landing page BUILT
+and STAGED, awaiting the owner's push.** The QR on the new business cards
+prints `naplesestatejewelry.com/card`. New `[locale]/card/page.tsx` (+
+`/es/card`): slim English/Español toggle at the very top, wordmark (home
+link) + octopus, "Gold, Sterling & Jewelry Buyers / Naples, FL", today's
+hours line with the Today chip + a bold-days weekly summary (both from the
+admin-editable hours), then Call (dark) · Text (prefilled "Hi Chris, I have
+your card…") · **Leave a Google Review (gold)**, a 2×2 of What We Buy /
+Shop / Instagram / Facebook, the address with the landmark + copy button,
+then Get Directions and a "Visit Our Website" button (owner moved
+Directions down to the address and asked for a tighter stack). **noindex, off
+the sitemap, no header/footer/breadcrumb** — guarded by
+`lib/__tests__/card-page.test.ts`. Mockup approved rev 3 + four owner
+asks applied mid-build (ES toggle, name line, home links, compaction +
+Directions under the address). Gate: `tsc` ·
+lint · **1203/1203 (117 files)** · `npm run build` exit 0 (`/en/card` +
+`/es/card` prerendered, 473 static pages) · dev preview at 375×812 fits
+one screen in both locales (last element ends at 722px), no console errors. After the push: `curl -sI
+https://naplesestatejewelry.com/card` → 200 with `noindex`; `/es/card`
+same; then **generate the QR from the `.com/card` URL only** (a static QR,
+never a paid dynamic-QR service). Record: `CHANGELOG.md` 09-03 (evening,
+session 2); rules in `DECISIONS.md` → *"The /card page"*.
+
+🟢 **09-03 late — GBP posting appears REINSTATED** (Add post available, composer opens, no block notice; the 08-30 post shows Rejected). Nothing was posted, and the owner's closing instruction is **DO NOT POST** — GBP posting is the owner's call from here; ⛔ no phone numbers in post text. "Google updates (1)" pending on the profile — review it.
+
+✅ **09-03 late — "Don't Melt It Yet" page + resale hook DEPLOYED and
+production-verified** (both URLs 200 + schema, hook live on `/` and all six
+city pages, sitemap 206, IndexNow 200 for 2, GSC: EN page "Indexing requested" (the 10th success of the day); the ES page returned "Quota Exceeded" on the 11th attempt — so the daily allowance is 10, and `/es/sell/dont-melt-it` is OWED tomorrow (one request)). Staging equals
+source; nothing in flight. Optional owner follow-up: a GBP post with the hook.
+
+🟡 **(superseded) 09-03 night — "Don't Melt It Yet" page + resale hook BUILT and STAGED,
 awaiting the owner's push.** `/sell/dont-melt-it` (+ES) on the guide
 template (mockup approved as is), sitemap + `/sell` hub link, hook sentence
 on the homepage gold card and in every city intro. Gate: `tsc` · lint · **1197/1197 (116 files)** · `npm run build` exit 0 · **76 = 35 EN + 35 ES + 6** · prerendered EN + ES page each with BreadcrumbList + FAQPage JSON-LD and one `<h1>`; "melt-only buyers" present in the homepage HTML, the melt sentence present in the city HTML.

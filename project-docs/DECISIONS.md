@@ -4,7 +4,38 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-09-02**.
+> compaction. Last reconciled: **2026-09-03**.
+
+## The `/card` page — the URL printed on the business cards (2026-09-03)
+
+`naplesestatejewelry.com/card` is what the QR on the physical business
+cards encodes. Cards are printed once; everything behind the URL is
+editable. Rules that follow from that:
+
+- ⛔ **The URL never moves.** No rename, no redirect chain, no locale
+  prefix on the printed form (`/card` is English; `/es/card` is reached
+  from the toggle at the top of the page). A broken `/card` is a stack of
+  dead cards in customers' wallets.
+- **noindex and OFF the sitemap, permanently.** It is a thin utility page
+  and must not compete with `/contact` or `/sell` in search. Do not
+  request indexing for it. Guarded by `lib/__tests__/card-page.test.ts`.
+- **No site header, footer or breadcrumb.** The page IS the buttons; the
+  wordmark and the "Visit Our Website" button are the way into the site.
+  The same test asserts this.
+- **Every fact comes from `business-location.ts` and the admin hours** —
+  never retype the phone, address, landmark, hours or social URLs here.
+  `INSTAGRAM_URL` / `FACEBOOK_URL` are the named constants (they also
+  feed `SAME_AS`).
+- **Leave a Google Review is the gold (primary) button** (owner's pick):
+  the card changes hands right after a sale. Call is the dark pill, as on
+  the homepage Visit Us block. Keep that hierarchy. **Get Directions sits
+  under the address**, not in the primary stack (owner, 2026-09-03).
+- **The Text button is prefilled** ("Hi Chris, I have your card and I'd
+  like to ask about ") — the site has no scan analytics, and the phrase is
+  how the owner knows a lead came from a card. Keep the `sms:…?&body=`
+  form: `?&` is the one shape both iOS and Android honour.
+- **A static QR only.** Never a paid "dynamic QR" service — the page is
+  the dynamic part, and such services expire and take the cards with them.
 
 ## Thumbnail rails on wide displays (2026-09-02)
 

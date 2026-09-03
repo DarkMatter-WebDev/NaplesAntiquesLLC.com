@@ -45,6 +45,7 @@ import {
   MailWarning,
   MapPin,
   Menu,
+  MessageSquareText,
   Mic,
   Microscope,
   Minus,
@@ -161,6 +162,8 @@ export const APP_ICONS = {
   science: FlaskConical,
   sell: BadgeDollarSign,
   shopping_bag: ShoppingBag,
+  // Text-message action on the /card page (the QR landing page).
+  sms: MessageSquareText,
   shopping_cart: ShoppingCart,
   star: Star,
   stop_circle: CircleStop,
