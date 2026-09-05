@@ -304,7 +304,7 @@ export default async function GoldWorthGuidePage({ params }: Props) {
         {/* Final CTA */}
         <section className="bg-[#2f3131] py-24 text-center">
           <div className="mx-auto max-w-2xl px-4">
-            <ClayMark name="goldbar" size={96} onDark className="mx-auto mb-6 block" />
+            <ClayMark name="gold-seal" size={96} onDark className="mx-auto mb-6 block" />
             <h2 className="mb-6 text-3xl font-bold text-white md:text-4xl" style={{ fontFamily: 'var(--font-headline)' }}>
               {isEs ? '¿Listo para saber qué vale su oro?' : 'Ready to find out what your gold is worth?'}
             </h2>

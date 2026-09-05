@@ -1,6 +1,216 @@
 
 # Changelog
 
+## 2026-09-05 — owner spot-checked all judgement-call placements in the preview (10 incl. a late one): 6 new icons, 2 swaps, 1 text bump — ALL APPROVED (STAGED)
+
+Walked the owner spot by spot in the dev preview (tab fronted, each mark
+scrolled into view and confirmed loaded), reporting for each whether the
+icon is unique or shared. Outcomes:
+
+| # | Spot | Final mark | Note |
+|---|---|---|---|
+| 1 | /gold-services dark "Confidentiality & Expert Service" | **shield** (new `icon-privacy-shield.png`) | unique; the lock goes back to the Free-Evaluation "Private" pillar only |
+| 2 | /gold-services "XRF Spectrometry" row | **xrf** (new `icon-xrf-spectrometry.png`) | unique |
+| 3 | /gold-services "On-site & lab testing" card | **purity-test** (new `icon-purity-test.png`) at 220px; caption now Caslon 2xl/3xl bold | unique; owner: small text + small icon in the big blank card "looks strange" |
+| 4 | /jewelry-appraisal step "Tested in front of you" | flask | shared (gold acid row, hallmarks CTA, silver assay) — approved as is |
+| 5 | /jewelry-appraisal "Diamonds" card | gemstone | shared with 9 |
+| 6 | /jewelry-appraisal dark CTA "what your pieces are worth" | **dollar** (new `icon-money-dollar-symbol.png`) | was gemstone; owner supplied the dollar mid-check |
+| 7 | /jewelry-appraisal/hallmarks dark CTA | flask | shared — approved |
+| 8 | /sell/[city] dark CTA "Ready to sell in…" (×6) | **dollar** | was cash (twice on one page); now shares only with 6 |
+| 9 | /diamond-buyers dark CTA | gemstone | shared with 5 — approved |
+| 10 | /jewelry-appraisal step 1 "Walk in, or send photos first" | **photo-location** (new `icon-photo-location.png`) | owner spotted the phone-signal there mid-walk and supplied this; unique. phone-signal stays on the homepage card + city "Reach out" step |
+
+New files (same pipeline, 512px WebP + alpha, verified): `mark-shield`
+(44 KB), `mark-xrf` (33), `mark-purity-test` (58), `mark-dollar` (41),
+`mark-photo-location` (48). Union is 24 names; `shield` is back in the union with a real file (the
+guard test's retired list drops it). `scale` no longer appears on the gold
+page; `cash` is list-items only.
+
+Gate on the approved state: `tsc` 0 · lint 0 · vitest 1208/1208 (118
+files) · `npm run build` exit 0.
+
+✅ **Deleted (owner: "delete", 2026-09-05):** the 20 orphaned `clay-*.webp`
+and the root `icon pack/` folder (24 PNGs, ~31 MB). Sequence per
+AGENTS.md: re-verified 0 `clay-` references in `src/` immediately before;
+copied both sets to the session scratchpad (outside the project); removed;
+re-verified (0 clay, 24 mark, folder gone); vitest 1208/1208 (the file
+guard is the proof no mark lost its image); build exit 0; staging
+re-synced without the icon-pack exclusion.
+
+## 2026-09-04 (later) — the WHOLE clay set is replaced: 19 icon-pack marks, 0 clay references (STAGED, awaiting owner verification + push)
+
+Owner added 15 more PNGs to `icon pack/` ("I think all the icons we
+need … make all replacements, being careful to use the correct one on
+each spot"). Same pipeline as the first four: `sharp` resize to 512×512,
+WebP q90 / alpha 100, artwork untouched, format + alpha read back from
+each output (24–80 KB each). `ClayMark` now resolves EVERY name to
+`mark-<name>.webp`; the `ILLUSTRATED_MARKS` split is gone and the header
+comment says the component keeps its clay-era name only to spare ~20 call
+sites. Union is 19 names.
+
+**One-for-one by filename (14):** chain ← gold-chain-infinity · watch ←
+watch-dress · coins ← coins-bullion-reserve · heirloom ←
+antiques-heirloom-box · nocost ← no-cost-zero-fee · pricing ←
+pricing-fair-quote · private ← private-lock · scale ← scale-balance ·
+flask ← flask-test-dropper · magnet ← magnet-horseshoe · house ←
+house-classic · camera ← camera-classic · recycle ← recycle-loop · cash
+← cash-payout-bundle. **New name:** `gemstone` ← jewelry-gemstone.
+
+**Judgement calls (the pack has NO shield and NO microscope; flagged in
+`TASKS.md` for the owner):**
+- /gold-services dark CTA "Confidentiality & Expert Service": shield →
+  **private** (the lock).
+- /gold-services "XRF Spectrometry" row: microscope → **scale** (it sits
+  beside the "Acid & Electronic Testing" row, which keeps the flask —
+  two flasks side by side would read as one thing).
+- /gold-services "On-site & lab testing" hero mark (144px): microscope →
+  **flask**.
+- /jewelry-appraisal step "Tested in front of you": microscope → **flask**.
+- /jewelry-appraisal/hallmarks dark CTA "Want to know for certain?":
+  microscope → **flask**.
+- /jewelry-appraisal dark CTA "Want to know what your pieces are worth?":
+  shield → **gemstone**.
+- /sell/[city] dark CTA "Ready to sell in {city}?": shield → **cash**
+  (the page already shows cash in its list — accepted duplicate).
+- **Gemstone also takes the two DIAMOND spots** that had the signet ring:
+  /diamond-buyers dark CTA and the /jewelry-appraisal "Diamonds" card.
+  The ring stays on the homepage card, /free-evaluation "Diamonds &
+  Rings", /gold-services, /sell, /sell/[city], /trade-in.
+
+Guard: `clay-mark-files.test.ts` rewritten — every union name has
+`mark-<name>.webp`, the component contains no `clay-` fallback, and the
+six retired names (ring, flatware, goldbar, phone, shield, microscope)
+stay out. Retiring them from the union is what made `tsc` find every
+usage.
+
+Verification: `tsc` 0 · lint 0 · vitest **1208/1208 (118 files)** · `npm
+run build` exit 0 · dev preview scrolled end-to-end on /free-evaluation,
+/sell/naples, /jewelry-appraisal, /gold-services, /silver-services,
+/trade-in, /bullion, /jewelry-appraisal/hallmarks: every mark loads,
+0 `clay-` sources left, no console errors.
+
+⚠️ **Still on disk, still not deleted (owner verifies first):** all 20
+`clay-*.webp` (now fully orphaned) and the root `icon pack/` folder (19
+PNGs, ~26 MB). `icon pack/` stays excluded from the staging sync.
+
+## 2026-09-04 — owner's icon pack replaces four clay marks SITEWIDE (STAGED, awaiting owner verification + push)
+
+Owner dropped four finished PNGs into a new root folder `icon pack/`
+(1254×1254, transparent backgrounds, 0.9–2.3 MB each) matching the four
+homepage service-card marks, with the rules: do not alter the artwork,
+only resize; render floating (no background box); convert/compress if
+needed; discard the old ones after they verify. First ask was the
+homepage only; minutes later: "replace the clay ones with the new ones
+everywhere the old ones are used in the site."
+
+- **Assets:** `sharp` resize to 512×512 (lanczos, fit inside) → WebP
+  q90 / alphaQuality 100, written to `public/assets/images/icons/mark-
+  {gold-seal,sterling-flatware,signet-ring,phone-signal}.webp` (86 / 45 /
+  66 / 47 KB; format and alpha verified by reading the files back —
+  corner alpha 0). No crop, no trim, no recolour.
+- **`ClayMark.tsx`:** four new names; an `ILLUSTRATED_MARKS` set makes the
+  component resolve them to `mark-*.webp` instead of `clay-*.webp`. The
+  four clay names `ring` / `flatware` / `goldbar` / `phone` are REMOVED
+  from the `ClayMarkName` union, so a missed usage fails `tsc` (it passed).
+- **Sitewide rename** (exact-count replacements): homepage cards, /bullion,
+  /diamond-buyers, /free-evaluation (2 tiles), /gold-services, the gold
+  guide, /jewelry-appraisal (4), /sell (3), /sell/[city] (4), the flatware
+  guide, /trade-in. Built HTML: gold-seal on 22 pages, signet-ring 22,
+  sterling-flatware 20, phone-signal 16; the four retired clay files are
+  referenced by 0 built pages.
+- **CSS:** the two ring-only optical-scale rules (`.clay-mark[data-mark=
+  ring]` 1.12x and `.fe-icon-mark[data-mark=ring]` 1.05x) were tuned to
+  the hollow clay ring and are removed; the signet ring is solid. The
+  shared `.clay-mark` float drop-shadow stays (that is the "floating"
+  look on light surfaces; `onDark` placements still suppress it).
+- **Guard:** new `lib/__tests__/clay-mark-files.test.ts` — every name in
+  the union has its file on disk under the right prefix, and the four
+  retired names stay retired.
+
+Verification: `tsc` 0 · lint 0 · vitest **1207/1207 (118 files)** · `npm
+run build` exit 0 (473 static pages) · dev preview: homepage grid shows
+the four new marks at 88px with the float shadow; /free-evaluation grid
+(2 new + 4 clay, all loaded), /sell (3 new + coins), /jewelry-appraisal
+(all marks loaded), /diamond-buyers dark CTA ring loads with `filter:
+none`; no console errors.
+
+⚠️ **Not deleted yet, on purpose (owner: "discard old ones after I verify
+the change looks good"):** the four clay files `clay-{ring,flatware,
+goldbar,phone}.webp` (orphaned) and the root `icon pack/` folder with the
+PNG originals. Both are listed in `TASKS.md` for deletion after the
+owner's look. `icon pack/` is EXCLUDED from the staging sync meanwhile
+(6 MB of source PNGs do not belong in the repo).
+
+ℹ️ Mixed sets: /free-evaluation's six-tile grid and /jewelry-appraisal now
+mix two new marks with clay ones (`DECISIONS.md` warned a partial
+upgrade inside one grid reads worse than none). Owner's explicit call;
+the remaining 16 clay marks have no icon-pack counterpart yet.
+
+## 2026-09-04 — `/card` language toggle: soft navigation, no reload flash (STAGED, awaiting push)
+
+Owner (previewing the dev server): "when a user toggles from en to es or
+vice versa, the page has a slight blip … a quick flash reload, can we make
+it transition more smoothly?" Cause: the toggle (and the page's other
+internal links) were plain `<a>` anchors, so every switch was a full
+document load. Fix in `[locale]/card/page.tsx`: the two toggle links are
+Next `<Link prefetch>` (the alternate locale is one tiny static route, so
+prefetching makes the switch instant); the wordmark, What We Buy, Shop and
+Visit Our Website are `<Link prefetch={false}>` (soft navigation without
+pulling the heavy pages for scanners who never tap them). `tel:`, `sms:`,
+Maps, the review link and the two social links stay plain anchors. Same
+mechanism the header's own Español/English link has always used.
+
+Verification: `tsc` 0 · lint 0 · vitest 1204/1204 (117 files) · `npm run
+build` exit 0 · dev preview at 375×812: a marker set on `window` before
+tapping Español was still there after landing on `/es/card` (document not
+reloaded), `lang`, `aria-current`, the Call label and the today line all
+switched; same back to English; no console errors. ⚠️ Verified with
+script-driven clicks — the pane was hidden and physical clicks timed out.
+
+## 2026-09-03 (night) — cookie banner button "Accept" → "Okay" (STAGED, awaiting push)
+
+Owner: "is there a way to offer them the ability to quickly reject or
+maybe accept essential only?" Re-checked the source: essential storage
+only, no analytics/pixels/tag manager, PayPal + Turnstile only where used.
+Explained that a Reject button would be a fake choice and proposed a
+one-tap acknowledgement instead; mocked up "Got it" (current vs option A
+same layout vs option B compact, EN/ES, phone + desktop). Owner: "keep
+accept, got it looks too informal and sloppy" — then, minutes later,
+**"actually do Okay."** Change: the ONE label in
+`components/legal/CookieNotice.tsx` — `Accept`/`Aceptar` → **`Okay`/
+`De acuerdo`** — with a comment pointing at the decision. Copy, layout,
+links and the dismissal mechanism untouched. Decision recorded in
+`DECISIONS.md` → *"Cookie banner: one Okay button"*.
+
+Verification: `tsc` 0 · lint 0 · vitest 1204/1204 (117 files; the gate
+test mentions "Accept" only in comments) · `npm run build` exit 0 · dev
+preview with consent cleared: `/` shows the banner with the button reading
+"Okay", one tap hides it and stamps the attribute + storage key; `/es`
+shows "De acuerdo".
+
+## 2026-09-03 (night) — cookie notice suppressed on `/card` (STAGED, awaiting push)
+
+Owner: "suppress the cookie notice on the card page." The sitewide banner
+was covering the address and the bottom two buttons for every first-time
+scanner. Implemented declaratively rather than by touching the LCP-bearing
+`CookieNotice`: the card page's `<main>` carries `data-no-cookie-notice`,
+and `globals.css` adds `body:has(main[data-no-cookie-notice])
+[data-cookie-notice] { display: none }` right after the consent-gate rule.
+Server-rendered, no JS, no flash; the consent attribute is never stamped, so
+the banner still shows on whatever page the visitor taps through to.
+`card-page.test.ts` gained a guard for both halves. Rule recorded in
+`DECISIONS.md` → *"The /card page"*.
+
+Verification: `tsc` 0 · lint 0 · vitest **1204/1204 (117 files)** ·
+`npm run build` exit 0 · dev preview at 375×812 with the stored consent
+CLEARED: `/card` → banner `display: none`, `:has()` rule present in the
+served CSSOM, `CSS.supports('selector(body:has(main))')` true; `/contact`
+in the same session → banner `display: block` (negative control).
+
+## 2026-09-03 (evening, session 2) — `/card` DEPLOYED + production-verified
+
+Owner: "pushed and deployed, verify it live." Verified over HTTP minutes later: `/card` and `/es/card` → **200**, `<meta name="robots" content="noindex, nofollow">`, canonical per locale, titles "Contact Card | …" / "Tarjeta de Contacto | …", one `<h1>` (Naples Estate Jewelry), prefilled `sms:` href in each language, the `g.page` review link, all four button labels present, **0 header/footer markup**; `/sitemap.xml` still 206 URLs with **0** `/card` entries; smoke `/`, `/shop`, `/sell`, `/contact`, `/es/sell/dont-melt-it`, `/robots.txt` → 200. Docs flipped to deployed; staging re-synced.
+
 ## 2026-09-03 (evening, session 2) — `/card` business-card landing page BUILT + STAGED
 
 Owner is printing business cards and asked whether the QR should go to

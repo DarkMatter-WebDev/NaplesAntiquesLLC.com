@@ -254,7 +254,7 @@ export default async function HomePage({ params }: Props) {
                 // under-declared the page's own topic. Cheap signal, no cost to
                 // the copy. (Card titles wrap freely — unlike the announcement
                 // strip above, which is nowrap and length-critical.)
-                mark: 'goldbar',
+                mark: 'gold-seal',
                 title: isEs ? 'Compramos Oro en Naples' : 'We Buy Gold in Naples',
                 // Resale-vs-melt hook (owner, 2026-09-03; mockup approved): the
                 // one claim melt-only buyers cannot copy. Same owner-confirmed
@@ -277,7 +277,7 @@ export default async function HomePage({ params }: Props) {
                 // so nothing nests. The "by weight and by pattern, whichever is
                 // higher" line is the owner-confirmed claim /silver-services
                 // makes; no maker names here (premium-pattern framing rule).
-                mark: 'flatware',
+                mark: 'sterling-flatware',
                 title: isEs ? 'Compramos Plata Esterlina en Naples' : 'We Buy Sterling Silver in Naples',
                 body: isEs
                   ? 'Cubertería, juegos de té y vajilla — valorados por peso y por patrón, y pagamos el que resulte mayor.'
@@ -286,7 +286,7 @@ export default async function HomePage({ params }: Props) {
                 cta: isEs ? 'Vender plata →' : 'Sell silver →',
               },
               {
-                mark: 'ring',
+                mark: 'signet-ring',
                 title: isEs ? 'Vendemos Joyería en Naples' : 'We Sell Estate Jewelry in Naples',
                 body: isEs
                   ? 'Cadenas, pulseras, anillos y piezas de diseñador con precios transparentes.'
@@ -295,7 +295,7 @@ export default async function HomePage({ params }: Props) {
                 cta: isEs ? 'Ver tienda →' : 'Browse shop →',
               },
               {
-                mark: 'phone',
+                mark: 'phone-signal',
                 title: isEs ? 'Contacto Directo' : 'Direct Contact',
                 body: isEs
                   ? 'Hable con nosotros directamente — sin intermediarios.'
@@ -311,7 +311,9 @@ export default async function HomePage({ params }: Props) {
               >
                 <div className="transition duration-300 group-hover:-translate-y-0.5">
                   {/* `mark` per card (was index-based when there were three);
-                      `as const` on the array keeps it a ClayMarkName. */}
+                      `as const` on the array keeps it a ClayMarkName. The four
+                      marks here are the owner's own icon pack (2026-09-04,
+                      `mark-*.webp`), not the clay set the other pages use. */}
                   <ClayMark name={item.mark} size={88} />
                 </div>
                 {/* h2, not h3: these three cards are top-level page sections

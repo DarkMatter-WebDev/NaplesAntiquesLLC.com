@@ -6,6 +6,60 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-09-03**.
 
+## Illustrated marks: the owner's icon pack is the source, clay is the fallback set (2026-09-04)
+
+The owner now supplies finished mark artwork (`icon pack/` → resized to
+512px, WebP with alpha, `public/assets/images/icons/mark-<name>.webp`).
+Four shipped 2026-09-04 and replaced the clay ring / flatware / goldbar /
+phone sitewide. Rules:
+
+- ⛔ **Never alter the artwork** — resize and encode only. No trim, crop,
+  recolour, background pass or shadow bake. The float comes from the
+  shared `.clay-mark` drop-shadow, not the file.
+- **New marks go through `ClayMark`** (add the name to the union AND to
+  `ILLUSTRATED_MARKS`); `clay-mark-files.test.ts` fails if the file is
+  missing. Retire a clay name from the union when its replacement lands so
+  `tsc` finds every usage.
+- **No per-mark optical scale for icon-pack marks** unless a new one is
+  genuinely hollow; the clay ring's boost went with the clay ring.
+- **Reuse is reviewed, not assumed (2026-09-05):** the owner spot-checks
+  every placement where a mark is a judgement call and wants to know
+  whether it is unique or shared. Outcome table in `CHANGELOG.md`
+  2026-09-05; `dollar` is the "money moment" CTA mark (appraisal + city
+  CTAs), `cash` stays a list-item mark, `shield` is the confidentiality
+  mark, `purity-test` / `xrf` are the gold page's testing marks.
+- **The clay set is fully retired (later 2026-09-04)**: the owner supplied
+  the rest, so every `ClayMarkName` resolves to `mark-<name>.webp` and the
+  component has no `clay-` path at all. The pack has no shield and no
+  microscope; those spots use the lock / flask / scale / gemstone / cash by
+  context (recorded in `CHANGELOG.md`). `gemstone` is the diamond mark —
+  the signet ring means rings/jewelry, not diamonds.
+
+## Cookie banner: one "Okay" button, no Reject / "essential only" pair (2026-09-03)
+
+Owner asked whether the banner should offer a quick Reject or "accept
+essential only" like other sites. Answer, after re-checking the source:
+**no, because there is nothing to reject.** The site stores only essential
+items (Supabase auth cookies, the locale cookie, cart/favorites in browser
+storage, the notice-dismissed flag) and loads no analytics, tag manager,
+pixel or ad script; PayPal and Turnstile load only on checkout / sign-in to
+do what the visitor asked. A "Reject" that rejects nothing while the same
+cookies keep being set is the misleading pattern regulators call out.
+Essential-only storage needs no consent, so the banner is an information
+notice, and its button should read as acknowledgement, not agreement to
+tracking. A "Got it" version was mocked up (two layouts, EN/ES) and
+declined ("too informal and sloppy"); the owner then chose **"Okay"**.
+
+- The button reads **"Okay" / "De acuerdo"**. Title, body copy, layout and
+  the Privacy / Preferences links are unchanged; so is the dismissal
+  mechanism (same storage key, same `<html>` attribute).
+- ⛔ Do not add a Reject / "essential only" button while the site has no
+  optional cookies. The day analytics or an ad pixel is added, that is the
+  moment for a real Accept / Essential-only pair whose second button
+  actually blocks the script — the Cookie Preferences page already says so.
+- Not legal advice; a practical read of GDPR/CCPA-style rules for a site
+  with essential-only storage.
+
 ## The `/card` page — the URL printed on the business cards (2026-09-03)
 
 `naplesestatejewelry.com/card` is what the QR on the physical business
@@ -36,6 +90,20 @@ editable. Rules that follow from that:
   form: `?&` is the one shape both iOS and Android honour.
 - **A static QR only.** Never a paid "dynamic QR" service — the page is
   the dynamic part, and such services expire and take the cards with them.
+- **The EN/ES toggle is a Next `<Link prefetch>`, never a plain anchor**
+  (owner, 2026-09-04: a full reload on the switch read as a "blip / flash").
+  Internal links on the page are `<Link prefetch={false}>`; `tel:`, `sms:`
+  and external links stay `<a>`.
+- **No cookie notice on `/card`** (owner, 2026-09-03): the banner covered
+  the address and bottom buttons for every first-time scanner, and the
+  page sets nothing of its own. The PAGE declares it (`data-no-cookie-notice`
+  on its `<main>`) and `globals.css` resolves it with
+  `body:has(main[data-no-cookie-notice]) [data-cookie-notice] { display: none }`
+  — server-rendered, JS-free, flash-free; a browser without `:has()` just
+  keeps the banner. ⛔ It never stamps `data-nej-cookies-ok`: consent is
+  untouched and the banner still appears on the first site page they tap
+  through to. This is the ONLY page that opts out; do not spread the
+  attribute without asking. Guarded by `card-page.test.ts`.
 
 ## Thumbnail rails on wide displays (2026-09-02)
 

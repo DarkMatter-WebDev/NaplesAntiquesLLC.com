@@ -44,14 +44,14 @@ export default async function JewelryAppraisalPage({ params }: Props) {
 
   const steps = [
     {
-      mark: 'phone' as ClayMarkName,
+      mark: 'photo-location' as ClayMarkName,
       titleEn: 'Walk in, or send photos first',
       titleEs: 'Entre sin cita o envíe fotos primero',
       descEn: 'Come by the Shirley St showroom during open hours, or text a few photos to (239) 404-8505 for a ballpark before you make the trip.',
       descEs: 'Visite el salón de Shirley St durante el horario de atención, o envíe unas fotos al (239) 404-8505 para una idea del valor antes de venir.',
     },
     {
-      mark: 'microscope' as ClayMarkName,
+      mark: 'flask' as ClayMarkName,
       titleEn: 'Tested in front of you',
       titleEs: 'Probado frente a usted',
       descEn: 'Acid testing and XRF analysis for metals, loupe and gauge work for stones, maker and hallmark identification — and GIA coordination for significant diamonds.',
@@ -68,7 +68,7 @@ export default async function JewelryAppraisalPage({ params }: Props) {
 
   const appraiseCards = [
     {
-      mark: 'goldbar' as ClayMarkName,
+      mark: 'gold-seal' as ClayMarkName,
       href: p('/gold-services'),
       titleEn: 'Gold jewelry',
       titleEs: 'Joyería de oro',
@@ -76,7 +76,7 @@ export default async function JewelryAppraisalPage({ params }: Props) {
       descEs: 'Cadenas, anillos y pulseras de 10k–24k — incluso gastadas o rotas.',
     },
     {
-      mark: 'flatware' as ClayMarkName,
+      mark: 'sterling-flatware' as ClayMarkName,
       href: p('/silver-services'),
       titleEn: 'Sterling silver',
       titleEs: 'Plata esterlina',
@@ -84,7 +84,7 @@ export default async function JewelryAppraisalPage({ params }: Props) {
       descEs: 'Juegos de cubiertos, servicios de té, hollowware y joyería .925.',
     },
     {
-      mark: 'ring' as ClayMarkName,
+      mark: 'gemstone' as ClayMarkName,
       href: p('/diamond-buyers'),
       titleEn: 'Diamonds',
       titleEs: 'Diamantes',
@@ -343,7 +343,7 @@ export default async function JewelryAppraisalPage({ params }: Props) {
         {/* Final CTA */}
         <section className="bg-[#2f3131] py-24 text-center">
           <div className="mx-auto max-w-2xl px-4">
-            <ClayMark name="shield" size={96} onDark className="mx-auto mb-6 block" />
+            <ClayMark name="dollar" size={96} onDark className="mx-auto mb-6 block" />
             <h2 className="mb-6 text-3xl font-bold text-white md:text-4xl" style={{ fontFamily: 'var(--font-headline)' }}>
               {isEs ? '¿Quiere saber qué valen sus piezas?' : 'Want to know what your pieces are worth?'}
             </h2>

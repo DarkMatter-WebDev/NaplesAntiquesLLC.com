@@ -111,7 +111,8 @@ export default function CookieNotice({ locale }: { locale: string }) {
           {isEs ? 'Preferencias' : 'Preferences'}
         </Link>
         <button type="button" onClick={accept} className="gold-button col-span-2 justify-center px-3 py-1.5 text-[0.62rem] md:px-4 md:py-2 md:text-[0.68rem]">
-          {isEs ? 'Aceptar' : 'Accept'}
+          {/* Owner, 2026-09-03: an information notice, not a consent choice — the site stores essential items only (see DECISIONS.md → Cookie banner). 'Okay' rather than 'Accept' so it does not read as agreeing to tracking; a Reject button would be a fake choice. */}
+          {isEs ? 'De acuerdo' : 'Okay'}
         </button>
       </div>
     </div>

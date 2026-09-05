@@ -183,7 +183,7 @@ export default async function GoldServicesPage({ params }: Props) {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <ClayMark name="ring" size={112} />
+                      <ClayMark name="signet-ring" size={112} />
                     </div>
                   )}
                 </div>
@@ -263,7 +263,7 @@ export default async function GoldServicesPage({ params }: Props) {
                 </p>
                 <div className="space-y-8">
                   <div className="flex gap-6">
-                    <ClayMark name="microscope" size={64} className="flex-shrink-0 block" />
+                    <ClayMark name="xrf" size={64} className="flex-shrink-0 block" />
                     <div>
                       <h4 className="font-[family-name:var(--font-headline)] text-lg font-bold mb-2">
                         {isEs ? 'Espectrometría XRF' : 'XRF Spectrometry'}
@@ -293,8 +293,15 @@ export default async function GoldServicesPage({ params }: Props) {
               <div className="relative">
                 <div className="flex aspect-[4/5] w-full items-center justify-center rounded-2xl bg-[#e8e8e8] shadow-[0_18px_54px_rgba(38,28,6,0.08)]">
                   <div className="text-center px-8">
-                    <ClayMark name="microscope" size={144} className="mx-auto mb-4 block" />
-                    <p className="text-sm text-[#4d4635]">
+                    {/* Owner, 2026-09-05: the card is a 4:5 canvas, so a 144px mark
+                        with a 14px caption left it mostly blank. Mark up to 220px
+                        (responsive via --clay-size below) and the caption in the
+                        headline face at title size. */}
+                    <ClayMark name="purity-test" size={220} className="mx-auto mb-6 block" />
+                    <p
+                      className="text-2xl font-bold leading-tight md:text-3xl"
+                      style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
+                    >
                       {isEs ? 'Pruebas de laboratorio en el sitio' : 'On-site & lab testing'}
                     </p>
                   </div>

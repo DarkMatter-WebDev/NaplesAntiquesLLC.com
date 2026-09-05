@@ -37,9 +37,9 @@ export default async function SellHubPage({ params }: Props) {
   const p = (path: string) => (isEs ? `/es${path}` : path);
 
   const buyCategories = [
-    { mark: 'goldbar', en: 'Sell Gold', es: 'Vender Oro', href: '/gold-services' },
-    { mark: 'flatware', en: 'Sell Sterling Silver', es: 'Vender Plata Esterlina', href: '/silver-services' },
-    { mark: 'ring', en: 'Sell Estate Jewelry', es: 'Vender Joyería de Patrimonio', href: '/estate-jewelry' },
+    { mark: 'gold-seal', en: 'Sell Gold', es: 'Vender Oro', href: '/gold-services' },
+    { mark: 'sterling-flatware', en: 'Sell Sterling Silver', es: 'Vender Plata Esterlina', href: '/silver-services' },
+    { mark: 'signet-ring', en: 'Sell Estate Jewelry', es: 'Vender Joyería de Patrimonio', href: '/estate-jewelry' },
     { mark: 'coins', en: 'Sell Coins & Bullion', es: 'Vender Monedas y Lingotes', href: '/bullion' },
   ] as const;
 

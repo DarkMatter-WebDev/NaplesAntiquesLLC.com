@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { Metadata } from 'next';
 import Image from 'next/image';
+import Link from 'next/link';
 import { pageMetadata } from '@/lib/seo';
 import { AppIcon } from '@/components/AppIcon';
 import ShowroomAddress from '@/components/ShowroomAddress';
@@ -120,10 +121,17 @@ export default async function CardPage({ params }: Props) {
   const tileIconStyle: CSSProperties = { color: 'var(--color-primary)' };
 
   return (
-    <main className="flex flex-1 flex-col" style={{ background: 'var(--color-background)' }}>
+    // `data-no-cookie-notice`: the sitewide banner is hidden on this page by a
+    // `body:has(main[data-no-cookie-notice])` rule in globals.css (owner,
+    // 2026-09-03). Server-rendered and JS-free, so there is no flash; the
+    // banner still shows on every page the visitor taps through to.
+    <main className="flex flex-1 flex-col" data-no-cookie-notice style={{ background: 'var(--color-background)' }}>
       {/* Language toggle — slim, at the very top, both languages always
-          visible. Plain anchors (full navigation): the page is static and a
-          client router adds nothing here. */}
+          visible. Next <Link>, not a plain anchor (owner, 2026-09-04: the
+          full-document reload showed as a blip/flash on the switch). A client
+          navigation keeps the document and swaps the tree; the alternate
+          locale's route is prefetched (it is one tiny static page), so the
+          switch is instant. The header's own language link works the same way. */}
       <nav
         aria-label={isEs ? 'Idioma' : 'Language'}
         className="flex items-stretch justify-center border-b"
@@ -132,9 +140,10 @@ export default async function CardPage({ params }: Props) {
         {(['en', 'es'] as const).map((lang) => {
           const current = lang === locale;
           return (
-            <a
+            <Link
               key={lang}
               href={lang === 'es' ? '/es/card' : '/card'}
+              prefetch
               hrefLang={lang}
               lang={lang}
               aria-current={current ? 'page' : undefined}
@@ -147,7 +156,7 @@ export default async function CardPage({ params }: Props) {
               }}
             >
               {lang === 'es' ? 'Español' : 'English'}
-            </a>
+            </Link>
           );
         })}
       </nav>
@@ -157,7 +166,7 @@ export default async function CardPage({ params }: Props) {
             Caslon uppercase so it reads as the same wordmark. */}
         <div className="flex flex-col items-center text-center">
           {/* The wordmark is a home link, as on every other page. */}
-          <a href={prefix || '/'} className="flex flex-col items-center no-underline" style={{ color: 'inherit' }}>
+          <Link href={prefix || '/'} prefetch={false} className="flex flex-col items-center no-underline" style={{ color: 'inherit' }}>
           <h1
             className="text-[1.2rem] uppercase leading-none tracking-[0.08em]"
             style={{ color: 'var(--color-on-surface)', fontFamily: 'var(--font-headline)' }}
@@ -172,7 +181,7 @@ export default async function CardPage({ params }: Props) {
             priority
             className="mt-2 h-11 w-auto"
           />
-          </a>
+          </Link>
           {/* Two deliberate lines: the full phrase cannot fit one line at
               375px at this size, and a wrap leaves the separator dangling. */}
           <p
@@ -233,14 +242,14 @@ export default async function CardPage({ params }: Props) {
 
         {/* Secondary links */}
         <div className="mt-3 grid grid-cols-2 gap-2.5">
-          <a href={`${prefix}/sell`} className={tileClass} style={tileStyle}>
+          <Link href={`${prefix}/sell`} prefetch={false} className={tileClass} style={tileStyle}>
             <AppIcon name="diamond" className="text-[1.25rem]" style={tileIconStyle} />
             {isEs ? 'Qué Compramos' : 'What We Buy'}
-          </a>
-          <a href={`${prefix}/shop`} className={tileClass} style={tileStyle}>
+          </Link>
+          <Link href={`${prefix}/shop`} prefetch={false} className={tileClass} style={tileStyle}>
             <AppIcon name="shopping_bag" className="text-[1.25rem]" style={tileIconStyle} />
             {isEs ? 'Tienda' : 'Shop'}
-          </a>
+          </Link>
           <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" className={tileClass} style={tileStyle}>
             <span style={tileIconStyle}><InstagramGlyph /></span>
             Instagram
@@ -274,14 +283,15 @@ export default async function CardPage({ params }: Props) {
         </div>
 
         {/* An unmistakable way off the card and into the full site (owner ask). */}
-        <a
+        <Link
           href={prefix || '/'}
+          prefetch={false}
           className="outline-button mt-2.5"
           style={{ width: '100%', minHeight: '2.75rem', fontSize: '0.72rem', gap: '0.5rem' }}
         >
           {isEs ? 'Visitar Nuestro Sitio Web' : 'Visit Our Website'}
           <AppIcon name="trending_flat" className="text-[1rem]" />
-        </a>
+        </Link>
       </div>
     </main>
   );

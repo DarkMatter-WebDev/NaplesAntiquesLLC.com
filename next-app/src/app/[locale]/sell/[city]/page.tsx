@@ -69,7 +69,7 @@ export default async function SellCityPage({ params }: Props) {
   // six cards now link.
   const whatWeBuy = [
     {
-      mark: 'goldbar',
+      mark: 'gold-seal',
       href: p('/gold-services'),
       titleEn: `Sell Gold in ${area.city}`,
       titleEs: `Vender Oro en ${area.city}`,
@@ -85,7 +85,7 @@ export default async function SellCityPage({ params }: Props) {
       descEs: `Compradores de joyería de patrimonio y de diseñador en ${area.city} — Tiffany, Cartier, David Yurman y piezas heredadas. Compramos collares, pulseras, anillos y aretes.`,
     },
     {
-      mark: 'flatware',
+      mark: 'sterling-flatware',
       href: p('/silver-services'),
       titleEn: `Sell Sterling Silver in ${area.city}`,
       titleEs: `Vender Plata Esterlina en ${area.city}`,
@@ -93,7 +93,7 @@ export default async function SellCityPage({ params }: Props) {
       descEs: `Compradores de plata esterlina en ${area.city} para cubiertos, juegos de té, bandejas, holloware y joyería .925. Aceptamos patrimonios completos y piezas sueltas.`,
     },
     {
-      mark: 'ring',
+      mark: 'signet-ring',
       href: p('/diamond-buyers'),
       titleEn: `Sell Diamonds in ${area.city}`,
       titleEs: `Vender Diamantes en ${area.city}`,
@@ -120,7 +120,7 @@ export default async function SellCityPage({ params }: Props) {
 
   const steps = [
     {
-      mark: 'phone',
+      mark: 'phone-signal',
       titleEn: 'Call or request an estimate',
       titleEs: 'Llame o solicite un estimado',
       descEn: `Call (239) 404-8505 or send a few photos. We give you a ballpark before we ever meet.`,
@@ -457,7 +457,7 @@ export default async function SellCityPage({ params }: Props) {
           <div className="mx-auto max-w-2xl px-4">
             {/* onDark: this band is #2f3131, where a black float shadow is
                 invisible and only costs paint work. */}
-            <ClayMark name="shield" size={96} onDark className="mx-auto mb-6 block" />
+            <ClayMark name="dollar" size={96} onDark className="mx-auto mb-6 block" />
             <h2 className="mb-6 text-3xl font-bold text-white md:text-4xl" style={{ fontFamily: 'var(--font-headline)' }}>
               {isEs ? `¿Listo para vender en ${area.city}?` : `Ready to sell in ${area.city}?`}
             </h2>

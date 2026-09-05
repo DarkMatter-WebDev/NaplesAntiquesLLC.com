@@ -40,6 +40,14 @@ describe('/card page — search and chrome rules', () => {
     expect(PAGE).not.toContain('BreadcrumbTrail');
   });
 
+  it('opts out of the cookie notice via the page attribute + the :has() rule', () => {
+    // Two halves that cannot see each other: the page declares, the stylesheet
+    // resolves. Losing either brings the banner back over the address.
+    const GLOBALS = readFileSync(join(APP, 'globals.css'), 'utf8');
+    expect(PAGE).toMatch(/<main [^>]*data-no-cookie-notice[ >]/);
+    expect(GLOBALS).toContain('body:has(main[data-no-cookie-notice]) [data-cookie-notice]');
+  });
+
   it('uses the cross-platform sms body form and the shared social URLs', () => {
     expect(PAGE).toContain('?&body=');
     expect(PAGE).toContain('INSTAGRAM_URL');

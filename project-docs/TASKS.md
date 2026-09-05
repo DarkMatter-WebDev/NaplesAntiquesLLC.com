@@ -5,7 +5,135 @@
 
 ## ◻ OPEN — needs a human
 
-### 🔴 DEPLOY the 2026-09-03 (evening, session 2) `/card` business-card landing page (no SQL, no env vars)
+### 🔴 DEPLOY the staged bundle (no SQL, no env vars) — icon pack (all pages, owner-approved 10/10, old files DELETED) + `/card` cookie suppression + "Okay" banner button + `/card` soft toggle
+
+✅ **Deleted 2026-09-05 on the owner's "delete":** the 20 orphaned `clay-*.webp` and the root `icon pack/` (24 PNGs). Re-verified 0 `clay-` references in source immediately before; both sets copied to the session scratchpad first (outside the project) as a safety net. After: 0 clay files, 24 mark files, root folder gone; vitest 1208/1208 (file guard green); build exit 0; staging re-synced WITHOUT the icon-pack exclusion (the 20 clay files left staging as EXTRAs, expected).
+
+◻ **Owner: push.** After deploy: spot-check any page with marks (e.g. `/free-evaluation`, `/gold-services`) renders every icon; `/card` shows no cookie banner; homepage banner button reads "Okay"; `/card` Español/English switch has no flash.
+
+**Staging (after deletion):** ✅ synced 2026-09-05 — dry run: 3 docs Newer + exactly the 20 `clay-*.webp` as EXTRAs (the deletions propagating), 0 unexpected; real run copied 3 / removed 20; follow-up dry run 0/0/0 Extras; leak check 0; staging has 0 clay files, 24 mark files, no `icon pack/`. 919 files on disk.
+
+*(Record of the spot checks follows.)*
+
+Spot-check outcomes: `CHANGELOG.md` 2026-09-05 (table, 10 rows). Final
+state: 24 marks, 0 clay references, gate green (tsc 0 · lint 0 · 1208/1208 · build
+exit 0).
+
+✅ DONE 09-05 — was: ◻ **Owner: say "delete" and these go** (dry-run listed, nothing removed
+yet): (a) `next-app/public/assets/images/icons/clay-*.webp` — 20 files,
+orphaned, 0 references in source or built HTML; (b) root `icon pack/` —
+24 source PNGs (~31 MB), every one already converted to its `mark-*.webp`.
+After deleting: `npx vitest run` (the file guard must stay green) and a
+staging re-sync without the `icon pack` exclusion.
+
+◻ Then push the staged bundle: icon pack (all pages) + `/card` cookie
+suppression + "Okay" banner button + `/card` soft toggle.
+
+**Staging (approved state):** ✅ synced 2026-09-05 — dry run listed exactly the 14 touched files (5 new mark-*.webp, 3 pages, ClayMark.tsx, the test, 4 docs), 0 Extras; real run copied 14; follow-up dry run 0/0; leak check 0; `icon pack/` ABSENT from staging; 24 mark-*.webp on staging. 939 files on disk. Gate on this state: tsc 0 · lint 0 · 1208/1208 · build exit 0.
+
+*(Earlier verification text follows.)*
+
+**Update (later 09-04):** all 15 remaining marks are swapped too — see
+`CHANGELOG.md` 09-04 (later). Gate on the final source: `tsc` 0 · lint 0
+· **1208/1208 (118 files)** · build exit 0 · preview: every mark on 8
+pages loads, 0 clay sources.
+
+◻ **Owner: eight spots got a judgement call because the pack has no
+shield and no microscope** — please eyeball these and say if any should
+change (each is a one-word edit):
+1. `/gold-services` bottom dark section "Confidentiality & Expert
+   Service" → the **lock**.
+2. `/gold-services` "XRF Spectrometry" row → the **balance scale** (the
+   Acid-testing row next to it has the flask).
+3. `/gold-services` big "On-site & lab testing" mark → the **flask**.
+4. `/jewelry-appraisal` step "Tested in front of you" → the **flask**.
+5. `/jewelry-appraisal/hallmarks` bottom dark section → the **flask**.
+6. `/jewelry-appraisal` bottom dark section "what your pieces are worth"
+   → the **gemstone**.
+7. `/sell/naples` (all cities) bottom dark section "Ready to sell in…" →
+   the **cash bundle**.
+8. The **gemstone** replaces the ring on `/diamond-buyers` (bottom dark
+   section) and the `/jewelry-appraisal` "Diamonds" card.
+
+◻ **After the OK, delete (not before):** ALL 20 `next-app/public/assets/
+images/icons/clay-*.webp` (orphaned — 0 references) and the root `icon
+pack/` folder (19 PNGs, ~26 MB). Re-run `npx vitest run` after.
+
+**Staging (full swap):** ✅ synced 2026-09-04 (later) — dry run listed exactly the 26 touched files (15 new mark-*.webp, 5 pages, ClayMark.tsx, the test, 4 docs), 0 Extras; real run copied 26; follow-up dry run 0/0; leak check 0; `icon pack/` ABSENT from staging; ClayMark.tsx hash match; 19 mark-*.webp on staging. 934 files on disk.
+
+*(Earlier text for the first four marks follows.)*
+
+Four owner-supplied icons now replace the clay ring / flatware / goldbar /
+phone marks everywhere (`CHANGELOG.md` 09-04). Gate: `tsc` 0 · lint 0 ·
+**1207/1207 (118 files)** · build exit 0 · preview checked on /, /free-
+evaluation, /sell, /jewelry-appraisal, /diamond-buyers.
+
+◻ **Owner: look at the dev preview** (`http://localhost:3007`, then
+`/free-evaluation`, `/sell`, `/jewelry-appraisal`) and confirm the four
+marks look right at their sizes (88–136px). Note the mixed grids on
+/free-evaluation and /jewelry-appraisal (2–4 new marks beside clay ones)
+— the other 16 clay marks have no replacement yet; supply more icons in
+the same style if that bothers you.
+
+◻ **After the owner's OK, delete (not before):** `next-app/public/assets/
+images/icons/clay-{ring,flatware,goldbar,phone}.webp` (orphaned, 0 built
+pages reference them) and the root `icon pack/` folder (PNG originals,
+6 MB). Re-run `npx vitest run` after deleting — `clay-mark-files.test.ts`
+must stay green. Until then `icon pack/` is excluded from the staging
+robocopy (`/XD "$src\icon pack"`).
+
+◻ Then push the whole staged bundle (this + the `/card` cookie
+suppression + the "Okay" banner button + the `/card` soft toggle).
+
+**Staging:** ✅ synced 2026-09-04 — dry run listed exactly the 22 touched files (4 new mark-*.webp, globals.css, 11 pages, ClayMark.tsx, the new test, 4 docs), 0 Extras; real run copied 22; follow-up dry run 0/0; leak check 0; `icon pack/` confirmed ABSENT from staging; literal-path hashes match on ClayMark.tsx and mark-gold-seal.webp. 919 files on disk.
+
+### 🔴 DEPLOY the 2026-09-03 (night) bundle: `/card` cookie-notice suppression + banner button "Okay" (no SQL, no env vars)
+
+**Also in this bundle — cookie banner button "Accept" → "Okay" /
+"De acuerdo"** (owner's pick after asking for a Reject option; nothing to
+reject, see `DECISIONS.md` → *"Cookie banner: one Okay button"*). One label
+in `src/components/legal/CookieNotice.tsx`; copy/layout/links unchanged.
+Gate re-run on the combined source: `tsc` 0 · lint 0 · 1204/1204 · build
+exit 0 · preview: `/` banner reads "Okay" and one tap hides it, `/es`
+reads "De acuerdo". After deploy: on a phone that has not dismissed the
+notice, the homepage banner's button reads "Okay"; `curl -s
+https://naplesestatejewelry.com/ | grep -o '>Okay<'` matches.
+
+**Staging (bundle):** ✅ synced 2026-09-03 (night, after the label change) — dry run listed exactly CookieNotice.tsx + 4 docs, 0 Extras; real run copied 5; follow-up dry run 0/0; leak check 0; literal-path hash match on CookieNotice.tsx. 914 files on disk.
+
+**Also in this bundle — `/card` language toggle is now a soft navigation**
+(owner, 2026-09-04: the switch showed a reload flash). Toggle links are
+Next `<Link prefetch>`, internal links `<Link prefetch={false}>`; external
+and `tel:`/`sms:` links unchanged. Gate re-run: `tsc` 0 · lint 0 ·
+1204/1204 · build exit 0 · preview proves no document reload on either
+switch. After deploy: on the phone, tap Español then English on `/card` —
+no white flash, the page just swaps.
+
+**Staging (bundle, after the toggle change):** ✅ synced 2026-09-04 — dry run listed exactly card page.tsx + 4 docs, 0 Extras; real run copied 5; follow-up dry run 0/0; leak check 0; literal-path hash match on page.tsx. 914 files on disk.
+
+**Original item (card page):**
+
+Owner ask after the deploy: "suppress the cookie notice on the card page."
+Two-line change + a guard: `data-no-cookie-notice` on the card page's
+`<main>` and a `body:has(main[data-no-cookie-notice]) [data-cookie-notice]
+{ display: none }` rule in `globals.css` (next to the consent gate).
+Consent is untouched; the banner still shows on the first regular page a
+visitor opens. Gate: `tsc` 0 · lint 0 · **1204/1204 (117 files)** · build
+exit 0 · preview with consent cleared: `/card` banner hidden, `/contact`
+banner visible. Files: `src/app/[locale]/card/page.tsx`,
+`src/app/globals.css`, `src/lib/__tests__/card-page.test.ts`.
+
+**Staging:** ✅ synced 2026-09-03 (night) — dry run listed exactly the 7 touched files (page.tsx, globals.css, card-page.test.ts + 4 docs), 0 Extras; real run copied 7; follow-up dry run 0/0; leak check 0; literal-path hashes match for globals.css and page.tsx. 914 files on disk.
+
+◻ **Owner: push.** After deploy, on a phone that has NOT accepted the
+notice (or after "Reset" on `/cookie-preferences`): open `/card` → no
+banner; tap Visit Our Website → banner appears on the homepage as before.
+From here: `curl -s https://naplesestatejewelry.com/card | grep -o 'data-no-cookie-notice'`
+matches, and the deployed CSS contains `body:has(main[data-no-cookie-notice])`.
+
+### ✅ DEPLOYED + production-verified 2026-09-03 (evening, session 2) — `/card` business-card landing page
+
+Owner: "pushed and deployed, verify it live." Verified over HTTP minutes later: `/card` and `/es/card` → **200**, `<meta name="robots" content="noindex, nofollow">`, canonical per locale, titles "Contact Card | …" / "Tarjeta de Contacto | …", one `<h1>` (Naples Estate Jewelry), prefilled `sms:` href in each language, the `g.page` review link, all four button labels present, **0 header/footer markup**; `/sitemap.xml` still 206 URLs with **0** `/card` entries; smoke `/`, `/shop`, `/sell`, `/contact`, `/es/sell/dont-melt-it`, `/robots.txt` → 200. Nothing left on our side: ◻ **owner** generates the static QR from `https://naplesestatejewelry.com/card` and taps through on the phone once (Call / Text / Directions / Review / Español). Nothing to submit to Google or Bing — the page is noindex by design. The text below is the pre-deploy build record.
 
 **What:** `naplesestatejewelry.com/card` (+ `/es/card`) — the page the QR
 code on the new business cards points at. Owner-approved mockup (rev 3)
@@ -37,8 +165,7 @@ website home).
 
 **Staging:** ✅ synced 2026-09-03 (evening, session 2) — dry run listed exactly the 10 touched files + 2 new dirs (the two card folders), 0 Extras; real run copied 10; follow-up dry run 0/0; leak check 0 (.git/.env*/node_modules), 0 worktrees, 0 .next; literal-path hash match on all five app files. 914 files on disk.
 
-◻ **Owner: push** (bundle with anything else pending — nothing else is).
-Then:
+✅ Pushed 09-03. After-deploy steps 1 and 4 done by verification; 2 and 3 are the owner's:
 1. `curl -sI https://naplesestatejewelry.com/card` → 200; the HTML carries
    `noindex, nofollow`. Same for `/es/card`.
 2. Open it on your phone: tap Call, Text (the SMS app should open with

@@ -39,7 +39,7 @@ const CHARTS = [
 
 const PROCESS_STEPS = [
   {
-    mark: 'goldbar',
+    mark: 'gold-seal',
     titleEn: '1. Identify & Sort',
     titleEs: '1. Identificar y Clasificar',
     descEn: 'We separate bullion, coins, sterling, scrap gold, platinum, and palladium, then note maker marks, denominations, and purity stamps.',

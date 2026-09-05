@@ -2111,22 +2111,10 @@ body:has([data-site-header]) .route-progress {
   transform-origin: bottom center;
 }
 
-/* Bounding-box parity is not visual parity. A ring is mostly HOLE, so it reads
-   far lighter than a solid goldbar or phone at the same box. Trimming the asset
-   fixed its extents (51% -> 80% fill) and it still looked small, because the
-   shortfall is ink coverage, not size. */
-.clay-mark[data-mark='ring'] {
-  /* Walked down 2.2 -> 1.6 -> 1.25 -> 1.12 on review. A small correction for
-     the hollow-shape shortfall: the ring is mostly empty space, so it reads
-     lighter than a solid mark at the same box.
-
-     Note this scale is NOT the whole story, and the two are easy to conflate.
-     The asset itself was re-padded from 51% to 80% canvas fill, which is a 1.57x
-     optical increase on its own. So scale 1.0 today is already far larger than
-     the state originally reported as too small — there is real headroom below
-     this number if it still reads big. */
-  --clay-scale: 1.12;
-}
+/* No per-mark optical scale any more. The clay ring carried a 1.12x boost for
+   its hollow shape; that ring was retired 2026-09-04 for the owner's signet-
+   ring mark, which is solid and needs none. Add a `[data-mark=…]` rule here
+   only for a NEW hollow mark, and keep it under the row gap (see .fe-icon-mark). */
 
 .clay-mark--on-dark {
   filter: none;
@@ -2138,15 +2126,6 @@ body:has([data-site-header]) .route-progress {
   --clay-size: 6.5rem;
   margin-bottom: 0.6rem;
   transition: transform 0.18s ease;
-}
-
-/* The six category marks are a MATCHED SET, so the ring cannot take the boost a
-   lone mark can — at 2.2x here it was double its neighbours and dominated the
-   grid. Keep this at or below the global ring scale: if it ever exceeds it, the
-   most size-sensitive surface becomes the most boosted one, which is backwards.
-   It must also stay under the row gap, since the mark grows upward. */
-.fe-icon-mark[data-mark='ring'] {
-  --clay-scale: 1.05;
 }
 
 @media (min-width: 640px) {
@@ -3046,6 +3025,18 @@ html.nej-hero-go .home-boot-splash {
    CookieNotice re-stamps it before paint on a client-side language switch,
    which remounts the layout and drops the attribute. */
 html[data-nej-cookies-ok] [data-cookie-notice] {
+  display: none;
+}
+
+/* The /card page (the QR on the business cards) opts out of the notice
+   entirely (owner, 2026-09-03): a first-time scanner saw the banner cover
+   the address and the bottom buttons, and the page sets no cookies of its
+   own. Declared by the PAGE (`data-no-cookie-notice` on its <main>) and
+   resolved here with :has(), so it is server-rendered, JS-free and flash-
+   free; browsers without :has() simply keep the banner. Consent itself is
+   untouched — the banner still appears on whatever page they tap through
+   to, and this rule never stamps the accepted attribute. */
+body:has(main[data-no-cookie-notice]) [data-cookie-notice] {
   display: none;
 }
 

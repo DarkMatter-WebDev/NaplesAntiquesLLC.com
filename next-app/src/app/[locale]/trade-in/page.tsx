@@ -53,7 +53,7 @@ const STEPS = [
       'Todo se prueba y pesa mientras usted observa, y se valora contra el mismo mercado spot en vivo en el que se basan los precios de nuestra tienda. Revisamos los cálculos antes de que decida.',
   },
   {
-    mark: 'ring',
+    mark: 'signet-ring',
     titleEn: '3. Trade Toward Any Piece',
     titleEs: '3. Intercambie Por Cualquier Pieza',
     descEn:

@@ -40,17 +40,17 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
   const categories = isEs
     ? [
         { mark: 'chain' as ClayMarkName, label: 'Oro y Cadenas' },
-        { mark: 'ring' as ClayMarkName, label: 'Diamantes y Anillos' },
+        { mark: 'signet-ring' as ClayMarkName, label: 'Diamantes y Anillos' },
         { mark: 'watch' as ClayMarkName, label: 'Relojes' },
-        { mark: 'flatware' as ClayMarkName, label: 'Plata Esterlina' },
+        { mark: 'sterling-flatware' as ClayMarkName, label: 'Plata Esterlina' },
         { mark: 'coins' as ClayMarkName, label: 'Monedas y Lingotes' },
         { mark: 'heirloom' as ClayMarkName, label: 'Antigüedades y Reliquias' },
       ]
     : [
         { mark: 'chain' as ClayMarkName, label: 'Gold & Chains' },
-        { mark: 'ring' as ClayMarkName, label: 'Diamonds & Rings' },
+        { mark: 'signet-ring' as ClayMarkName, label: 'Diamonds & Rings' },
         { mark: 'watch' as ClayMarkName, label: 'Watches' },
-        { mark: 'flatware' as ClayMarkName, label: 'Sterling Silver' },
+        { mark: 'sterling-flatware' as ClayMarkName, label: 'Sterling Silver' },
         { mark: 'coins' as ClayMarkName, label: 'Coins & Bullion' },
         { mark: 'heirloom' as ClayMarkName, label: 'Antiques & Heirlooms' },
       ];

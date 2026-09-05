@@ -8,8 +8,43 @@
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-03 (evening, session 2) — `/card` business-card landing page BUILT
-and STAGED, awaiting the owner's push.** The QR on the new business cards
+🟡 **09-05 — icon pack COMPLETE and owner-approved spot by spot (10/10):
+24 marks, 0 clay references, BUILT + STAGED.** Five icons arrived during
+the check (shield, XRF, purity-test, dollar, photo-location) and the gold page's lab-
+testing card got a 220px mark + Caslon caption. ✅ Old files DELETED on the owner's word (20 clay + the 24-PNG `icon
+pack/`; backed up to the session scratchpad first). Only the push is
+left. `TASKS.md` top. After
+the OK: delete the four orphaned `clay-*.webp` + the root `icon pack/`
+folder (excluded from staging meanwhile), then push the bundle. Gate
+1207/1207 (118 files) · build exit 0. `TASKS.md` top.
+
+🟡 **09-04 — `/card` EN/ES toggle switched to a soft navigation (Next
+`<Link>`, prefetched) so the switch no longer flashes; internal links on
+the page are `<Link prefetch={false}>`. BUILT + STAGED with the bundle
+below.** Gate green; preview proved no document reload.
+
+🟡 **09-03 (night) — cookie banner button now "Okay" / "De acuerdo"
+(was Accept), BUILT + STAGED with the item below.** Owner asked for a
+Reject / essential-only option; there is nothing to reject (essential
+storage only, no analytics), so the single button became an
+acknowledgement. "Got it" mocked up and declined; "Okay" chosen. One label
+in `CookieNotice.tsx`; rule in `DECISIONS.md` → *"Cookie banner: one
+Okay button"*.
+
+🟡 **09-03 (night) — cookie notice suppressed on `/card`, BUILT + STAGED,
+awaiting the owner's push.** `data-no-cookie-notice` on the card `<main>`
++ a `body:has()` rule in `globals.css`; consent untouched, banner still
+shows on every other page. Gate `tsc` · lint · **1204/1204** · build exit
+0 · preview: `/card` hidden with consent cleared, `/contact` visible.
+After the push: `/card` HTML contains `data-no-cookie-notice`; deployed
+CSS contains `body:has(main[data-no-cookie-notice])`. `TASKS.md` top.
+
+✅ **09-03 (evening, session 2) — `/card` business-card landing page
+DEPLOYED and production-verified** (200 + noindex + canonical + prefilled
+sms + review link + 0 chrome on both locales; sitemap 206 with 0 `/card`
+entries; smoke 200 ×6). Staging equals source; nothing in flight. Owner
+side: generate the static QR from `https://naplesestatejewelry.com/card`,
+tap through on the phone once. Build record (was): The QR on the new business cards
 prints `naplesestatejewelry.com/card`. New `[locale]/card/page.tsx` (+
 `/es/card`): slim English/Español toggle at the very top, wordmark (home
 link) + octopus, "Gold, Sterling & Jewelry Buyers / Naples, FL", today's

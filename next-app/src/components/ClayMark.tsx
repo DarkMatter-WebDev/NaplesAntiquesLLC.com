@@ -2,13 +2,20 @@ import type { CSSProperties } from 'react';
 import Image from 'next/image';
 
 /**
- * A matte-clay illustrated mark from `public/assets/images/icons/clay-*.webp`.
+ * An illustrated mark from `public/assets/images/icons/mark-*.webp` — the
+ * owner's own icon pack (2026-09-04), which replaced the earlier matte-clay
+ * renders one-for-one. The component keeps its historical name and the
+ * `.clay-mark` CSS hook so the ~20 call sites and the stylesheet did not have
+ * to churn; nothing about it is clay any more.
  *
  * These are DECORATIVE illustrations, deliberately not `AppIcon`. Functional UI
  * icons — cart, heart, chevrons, close, form and admin controls — stay Lucide
  * inline SVG, where a stock glyph is correct and `currentColor` recolouring is
- * load-bearing. See DECISIONS, "Illustrated clay marks are IMAGES; functional
- * UI icons stay Lucide SVG".
+ * load-bearing. See DECISIONS, "Illustrated marks: the owner's icon pack".
+ *
+ * ⛔ The artwork is never altered here or in the pipeline — resize to 512px
+ * and encode to WebP with alpha, nothing else. The "float" is the shared
+ * drop-shadow in `.clay-mark`, not baked into the file.
  *
  * Always `aria-hidden`: every placement sits beside a visible text label, so
  * announcing the mark would just duplicate it.
@@ -21,23 +28,27 @@ export type ClayMarkName =
   | 'private'
   // what we buy / sell
   | 'chain'
-  | 'ring'
+  | 'signet-ring'
+  | 'gemstone'
   | 'watch'
-  | 'flatware'
+  | 'sterling-flatware'
   | 'coins'
   | 'heirloom'
-  | 'goldbar'
+  | 'gold-seal'
   // process + trust
-  | 'phone'
+  | 'phone-signal'
+  | 'photo-location'
   | 'scale'
-  | 'shield'
-  | 'microscope'
   | 'flask'
+  | 'xrf'
+  | 'purity-test'
+  | 'shield'
   | 'magnet'
   | 'house'
   | 'camera'
   | 'recycle'
-  | 'cash';
+  | 'cash'
+  | 'dollar';
 
 interface Props {
   name: ClayMarkName;
@@ -66,7 +77,7 @@ const MAX_OPTICAL_SCALE = 3;
 export default function ClayMark({ name, size = 96, onDark = false, className = '' }: Props) {
   return (
     <Image
-      src={`/assets/images/icons/clay-${name}.webp`}
+      src={`/assets/images/icons/mark-${name}.webp`}
       alt=""
       width={Math.round(size * MAX_OPTICAL_SCALE)}
       height={Math.round(size * MAX_OPTICAL_SCALE)}
