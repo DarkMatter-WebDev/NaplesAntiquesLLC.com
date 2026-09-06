@@ -366,8 +366,16 @@ table {
    a rule here, never with a utility class.
 
    Ladder: one column on phones (auto-fit's own result below ~520px is kept
-   explicit here), two from 640px, four from 1024px. The card's own bottom-
-   rule → left-rule swap still happens at 768px (`md:` on the card). */
+   explicit here), two from 640px, THREE from 1024px. The card's own bottom-
+   rule → left-rule swap still happens at 768px (`md:` on the card).
+
+   Five cards since 2026-09-05 (the "We Buy Estate Jewelry" card joined the
+   strip; owner chose "option B": three across with the second row of two
+   CENTERED under the first, rather than five narrow columns). A 3-column
+   grid cannot center a 2-card row, so the desktop grid is SIX half-width
+   tracks: every card spans two, and cards 4 and 5 are pinned to tracks 2–3
+   and 4–5. Keep the nth-child pins in step with the card count — a sixth
+   card would need them removed. */
 .home-services-grid {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -378,7 +386,16 @@ table {
 }
 @media (min-width: 64rem) {
   .home-services-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .home-services-grid > * {
+    grid-column: span 2;
+  }
+  .home-services-grid > :nth-child(4) {
+    grid-column: 2 / 4;
+  }
+  .home-services-grid > :nth-child(5) {
+    grid-column: 4 / 6;
   }
 }
 

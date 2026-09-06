@@ -17,7 +17,14 @@ const BASE = 'https://naplesestatejewelry.com';
 // (/gold-services, /estate-services, /jewelry-appraisal) and the /sell hub.
 // 2026-09-03: /sell/dont-melt-it added (linked from /sell), plus the
 // resale-vs-melt hook sentence on the homepage gold card and every city intro.
-const CONTENT_LAST_MODIFIED = new Date('2026-09-03');
+// 2026-09-05: fifth homepage services card (We Buy Estate Jewelry in Naples)
+// and the gold page's lab-testing caption; icon swap alone would not count.
+// 2026-09-06: /silver-services gained the illustrated "Reading Silver Marks"
+// section and photos in three existing slots; later the same day the section
+// moved to its own guide, /silver-services/silver-marks, and the lander was
+// reordered around buying. Night: the gold twin, /gold-services/gold-marks,
+// plus a teaser on /gold-services and links from the hallmarks page.
+const CONTENT_LAST_MODIFIED = new Date('2026-09-06');
 
 // Both locale prefixes the app serves. EVERY public page exists in both, so each
 // language version gets its OWN <url> entry — Google's documented pattern —
@@ -55,11 +62,16 @@ const STATIC_PAGES = [
   { path: '/gold-services', priority: 0.8, changeFrequency: 'monthly' },
   { path: '/silver-services', priority: 0.7, changeFrequency: 'monthly' },
   { path: '/silver-services/flatware-value', priority: 0.6, changeFrequency: 'monthly' },
+  { path: '/silver-services/silver-marks', priority: 0.6, changeFrequency: 'monthly' },
+  { path: '/gold-services/gold-marks', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/gold-services/what-is-my-gold-worth', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/jewelry-appraisal/hallmarks', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/estate-services/selling-inherited-jewelry', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/sell/dont-melt-it', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/bullion', priority: 0.7, changeFrequency: 'weekly' },
+  // 2026-09-06: live-prices destination page (social + About menu); low
+  // priority on purpose — a link target, not a ranking page.
+  { path: '/spot-prices', priority: 0.5, changeFrequency: 'daily' },
   { path: '/trade-in', priority: 0.8, changeFrequency: 'monthly' },
   { path: '/faq', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/estate-services', priority: 0.8, changeFrequency: 'monthly' },

@@ -7,6 +7,7 @@ import BreadcrumbTrail from '@/components/BreadcrumbTrail';
 import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd';
 import SiteFooter from '@/components/layout/SiteFooter';
 import TradingViewMini from '@/components/trading/TradingViewMini';
+import GoldMarksTeaser from '@/components/gold/GoldMarksTeaser';
 import { fetchSpotData } from '@/lib/spot-price';
 import { AppIcon } from '@/components/AppIcon';
 import ClayMark from '@/components/ClayMark';
@@ -123,6 +124,11 @@ export default async function GoldServicesPage({ params }: Props) {
                   {isEs
                     ? 'El precio spot es el punto de partida del mercado en vivo para el oro. Verificamos el quilataje, peso y forma de sus artículos, y le explicamos cómo el mercado actual se traduce en una oferta clara.'
                     : 'Spot price is the live market starting point for gold. We verify the karat, weight, and form of your items, then explain how the current market translates into a clear offer.'}
+                </p>
+                <p className="mt-4 text-sm">
+                  <Link href={isEs ? '/es/spot-prices' : '/spot-prices'} className="font-semibold text-[#735c00] underline underline-offset-2">
+                    {isEs ? 'Gráficos a tamaño completo del oro, la plata, el platino y el paladio →' : 'Full-size charts for gold, silver, platinum and palladium →'}
+                  </Link>
                 </p>
               </div>
               <div className="lg:col-span-7">
@@ -247,6 +253,11 @@ export default async function GoldServicesPage({ params }: Props) {
             )}
           </p>
         </section>
+
+        {/* Gold marks — teaser for the illustrated guide at
+            /gold-services/gold-marks (2026-09-06, the gold twin of the silver
+            lander's teaser). Sits right after "Decoding Gold Markings". */}
+        <GoldMarksTeaser locale={locale} />
 
         {/* Unmarked / Vintage Gold */}
         <section className="bg-[#f3f3f3] py-20">

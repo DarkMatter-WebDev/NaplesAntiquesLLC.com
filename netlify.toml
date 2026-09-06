@@ -291,16 +291,6 @@
   status = 301
 
 [[redirects]]
-  from = "/about-if-we-had-a-store.png"
-  to = "/assets/images/pages/about-if-we-had-a-store.webp"
-  status = 301
-
-[[redirects]]
-  from = "/antiques.jpeg"
-  to = "/assets/images/pages/antiques.webp"
-  status = 301
-
-[[redirects]]
   from = "/bullion.jpg"
   to = "/assets/images/pages/bullion.webp"
   status = 301
@@ -316,18 +306,8 @@
   status = 301
 
 [[redirects]]
-  from = "/homepage-hero-bangles.png"
-  to = "/assets/images/pages/homepage-hero-bangles.webp"
-  status = 301
-
-[[redirects]]
   from = "/jeweler.jpg"
   to = "/assets/images/pages/jeweler.webp"
-  status = 301
-
-[[redirects]]
-  from = "/money.jpg"
-  to = "/assets/images/pages/money.webp"
   status = 301
 
 [[redirects]]
@@ -372,7 +352,3 @@
   to = "/assets/images/shop/shop-new-listing-06-05.webp"
   status = 301
 
-[[redirects]]
-  from = "/watch.jpg"
-  to = "/assets/images/pages/watch.jpg"
-  status = 301

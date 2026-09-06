@@ -1,15 +1,146 @@
-﻿# Tasks
+# Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
 > in `CHANGELOG.md`. Last reconciled: **2026-09-03**.
 
 ## ◻ OPEN — needs a human
 
-### 🔴 DEPLOY the staged bundle (no SQL, no env vars) — icon pack (all pages, owner-approved 10/10, old files DELETED) + `/card` cookie suppression + "Okay" banner button + `/card` soft toggle
+### 🔴 DEPLOY the staged batch (no SQL, no env vars): homepage fifth card + /silver-services hero fix + silver marks GUIDE PAGE + lander reorder + /spot-prices live-prices page + GOLD marks guide
+
+**Expand hint (2026-09-06, late night +):** every photo bank on both marks
+guides now opens with "Tap or click any photo to expand it" (EN/ES), from
+the shared gallery component.
+
+**Gold marks guide (2026-09-06 late night, owner-approved mockup):** new
+`/gold-services/gold-marks` (EN + ES) — 31 stamp photos in five blocks (5
+from the shop, 26 from eBay sold listings found by searching the item and
+digging through the gallery, per the owner), click-to-expand; teaser on
+/gold-services; the hallmarks page links to both guides; the silver guide
+links to the gold one. After the push: request GSC indexing for the new URL
+(EN + ES). Owner to read the captions once; two marks are text-only until a
+bench photo exists (French eagle head, 22K/916) and the 999.9 bar photo is
+the one to replace first. Details in `CHANGELOG.md` 09-06 (late night).
+
+
+**Photo audit + cleanup (2026-09-06 night):** every public page scanned —
+no placeholder boxes left; the only true stand-in is the /free-evaluation
+desk photo (owner still owes a real bench photo). Seven unused page images
+deleted on the owner's word and the five dead image redirects that pointed
+at them dropped from `netlify.toml`. Stock-photo replacement candidates are
+listed in `CHANGELOG.md` 09-06 (night) for whenever the owner wants to
+supply bench photos.
+
+**Live-prices page (2026-09-06 night, owner-approved mockup):** new
+`/spot-prices` (EN + ES) — four live spot figures as text, the ticker, four
+full-size TradingView charts with range tabs, a per-gram karat table tagged
+"not an offer", weigh/test/price, sell links, CTA. Linked from About ▾
+("Live Metal Prices"), the footer, and the spot sections of /bullion,
+/gold-services and /silver-services; `/live` is a 307 alias for social.
+After the push: verify `https://naplesestatejewelry.com/live` redirects on
+production (this one is in `legacy-redirects.ts`, the path that works past
+the edge proxy — verify anyway) and that the hero shows live numbers, not
+"—". Details in `CHANGELOG.md` 09-06 (night).
+
+
+**Silver page split (2026-09-06 evening, owner-approved mockup):** the
+26-photo marks section now lives on its own guide page
+`/silver-services/silver-marks` (EN + ES, sitemap 0.6, breadcrumb, dark
+hero with the mug-base hallmarks visible per the owner's note), and the
+lander is reordered around buying: what we buy (tiles) → how we buy
+(testing) → Sterling or Plate? (identifying cards + flatware content merged)
+→ four-photo teaser linking to the guide → recently → CTA. Lander ~930
+words, was 2,320. After the push: request indexing for the new URL in GSC
+(EN + ES) — the guide starts from zero. Details in `CHANGELOG.md` 09-06
+(evening).
+
+
+**Silver marks section (2026-09-06, revised same day after the owner's
+review):** new illustrated section on /silver-services — 26 mark photos
+(16 from the shop's own listings, 10 from eBay by the owner's decision),
+click-to-expand, EN + ES; the Sterling box (tea service) and the flatware
+section (Gorham Chantilly) carry eBay sold-listing photos, the Silver Plate
+box the E.P.N.S. stamp; the Estate Flatware and Tea Services tiles in
+"Fine Silver Estate Services" carry eBay sold-listing photos too (those
+tiles are now square and served at their real size — they were being
+upscaled from a fixed 300×400, which read as blur; the Bullion & Coins
+tile now shows a silver bar + Britannia coin, `silver-bullion.webp`, instead
+of the gold photo). Blurry or
+miscropped tiles were replaced or re-cropped, the D.Y. photos rotated
+upright, and every changed file renamed `-v2` so no cache serves the old
+bytes. Two owner-requested paragraphs added (marks come in every size and
+can be hard to find; the photos are a small fraction of all marks and
+identification takes an expert).
+Gate: `tsc` 0 · lint 0 · **1211/1211 (119 files)** · build exit 0 ·
+preview-verified (tiles, lightbox, ES, phone). Detail + photo provenance:
+`CHANGELOG.md` 2026-09-06. After deploy: open `/silver-services`, scroll
+to "Reading the Marks on Your Silver", tap a photo — it should open
+full-size and close with the × or Esc; check the same on the phone.
+◻ Owner: read the captions once for anything you would phrase
+differently from behind the counter (each is one line in
+`SilverMarksSection.tsx`).
+◻ Root `pics/silver/` (the owner's 42-image source cache, ~1 MB) is EXCLUDED
+from the staging sync (`/XD "$srcpics"`) and still on disk — say "delete"
+and it goes, like `icon pack/` did. Nothing in the app reads it.
+
+**Staging (expand hint):** ✅ synced 2026-09-06 (late night +) — dry run listed exactly the 5 touched files (MarkGallery.tsx, SilverMarksSection.tsx, GoldMarksSection.tsx + 2 docs), 0 Extras, checked against the expected list; real run copied 5; follow-up dry run 0/0/0; leak check 0; MarkGallery.tsx hash MATCH. 1055 files on disk. Gate: tsc 0 · lint 0 · 1225/1225 · build exit 0, 479 static pages.
+
+**Staging (gold marks guide):** ✅ synced 2026-09-06 (late night) — dry run listed exactly the 76 touched files (62 gold-marks images NEW in a new folder, gold-marks/page.tsx NEW, GoldMarksSection.tsx NEW, GoldMarksTeaser.tsx NEW, gold-marks-guide.test.ts NEW, MarkGallery.tsx, gold-services page.tsx, hallmarks page.tsx, silver-marks page.tsx, sitemap.ts + 5 docs) and 3 new dirs, 0 Extras, checked against the expected list (and the image count = 62) before the real run; real run copied 76 / 3 dirs; follow-up dry run 0/0/0; leak check 0; hashes MATCH on the guide page, the section, MarkGallery and a tile; 62 gold-marks files on staging. 1055 files on disk. Gate: tsc 0 · lint 0 · 1225/1225 (122 files) · build exit 0, 479 static pages (built EN + ES guide: 31 tiles each; built gold lander: 5 links into the guide; built hallmarks page: one link to each guide).
+
+**Staging (photo audit cleanup):** ✅ synced 2026-09-06 (night, later) — dry run listed exactly the 4 touched files (netlify.toml + 3 docs) and the 7 deleted page images as EXTRAs, 0 unexpected, checked against the expected list before the real run; real run copied 4 / removed 7; follow-up dry run 0/0/0; leak check 0; netlify.toml hash MATCH; 18 page images on staging, watch.jpg ABSENT. 989 files on disk. Gate: vitest 1221/1221 · build exit 0, 477 static pages (tsc/lint unaffected — no TypeScript touched).
+
+**Staging (/spot-prices):** ✅ synced 2026-09-06 (night) — dry run listed exactly the 18 touched files (spot-prices/page.tsx NEW, TradingViewSymbolOverview.tsx NEW, spot-prices-page.test.ts NEW, spot-price.ts, legacy-redirects.ts, SiteHeader.tsx, SiteFooter.tsx, en.json, es.json, bullion/gold-services/silver-services page.tsx, sitemap.ts + 5 docs) and 1 new dir, 0 Extras, checked against the expected list before the real run; real run copied 18 / 1 dir; follow-up dry run 0/0/0; leak check 0; hashes MATCH on the page, spot-price.ts, legacy-redirects.ts, SiteHeader.tsx and es.json. 996 files on disk. Gate: tsc 0 · lint 0 · 1221/1221 (121 files) · build exit 0, 477 static pages (EN + ES spot-prices HTML prerendered with the four figures and the not-an-offer tag; bullion HTML links to /spot-prices).
+
+**Staging (silver page split):** ✅ synced 2026-09-06 (evening) — dry run listed exactly the 10 touched files (silver-marks/page.tsx NEW, SilverMarksTeaser.tsx NEW, silver-marks-guide.test.ts NEW, silver-services page.tsx, sitemap.ts, SilverMarksSection.tsx + 4 docs) and 1 new dir, 0 Extras, checked against the expected list before the real run; real run copied 10 / 1 dir; follow-up dry run 0/0/0; leak check 0; hashes MATCH on the guide page, lander page, teaser and sitemap.ts; 0 .tmp files in next-app. 993 files on disk. Gate: tsc 0 · lint 0 · 1216/1216 (120 files) · build exit 0, 475 static pages (built EN + ES guide: 26 tiles each; built lander: 5 links into the guide, 0 #silver-marks).
+
+**Staging (after the third review — tiles + bullion photo):** ✅ synced 2026-09-06 — dry run listed exactly the 6 touched files (silver-bullion.webp NEW, ebay-flatware-set-v2.webp NEW, silver-services page.tsx + 3 docs) and the retired ebay-flatware-set.webp as the only EXTRA; real run copied 6 / removed 1; follow-up dry run 0/0/0; leak check 0 (.git/.env*/node_modules/.next/pics/worktrees); hashes MATCH on page.tsx, silver-bullion.webp and the -v2 flatware tile; 66 silver-marks files on staging, old flatware file ABSENT. 990 files on disk. Gate: tsc 0 · lint 0 · 1211/1211 · build exit 0 (built page: silver-bullion + flatware-v2 + tea-tray each 12 refs, gold bullion.webp 0, sizes 33vw, 68vw present).
+
+**Staging (after the second review):** ✅ synced 2026-09-06 — dry run listed exactly the 20 touched files (12 renamed -v2 images, 2 new tile photos, section, page, test + 3 docs) and the 12 old-name image files as EXTRAs, 0 unexpected; real run copied 20 / removed 12; follow-up dry run 0/0/0; leak check 0; `pics/` ABSENT; 66 image files on staging. 989 files on disk. Gate: tsc 0 · lint 0 · 1211/1211 · build exit 0 (built page: 6 -v2 refs, 0 old refs, both tile photos, both new paragraphs).
+
+**Staging (after the photo review):** ✅ synced 2026-09-06 — dry run listed exactly the 20 touched files (6 new + 10 replaced images, section, page, 2 docs) and the 6 retired image files as EXTRAs, 0 unexpected; real run copied 20 / removed 6; follow-up dry run 0/0/0; leak check 0; `pics/` ABSENT; 64 image files on staging. 987 files on disk. Gate on this source: tsc 0 · lint 0 · 1211/1211 · build exit 0 (built page: tea service + Chantilly present, 0 stale refs).
+
+**Staging (silver marks, first pass):** ✅ synced 2026-09-06 — dry run listed exactly the 74 touched files (64 silver-marks images, 2 components, the new test, silver page, sitemap.ts + 5 docs), 0 Extras; real run copied 74; follow-up dry run 0/0; leak check 0; `pics/` ABSENT from staging; 64 image files on staging. 987 files on disk.
+
+
+**Silver hero (2026-09-06):** the light hero's gradient left the text over
+the photo on phones/tablets (body text 1.06:1 at 375px). One className
+change: 90% wash below `lg`, stronger gradient from `lg`. Modelled worst
+body contrast now ≥7.4:1 at every width; preview-verified at 375 and
+1200; gate green (tsc 0 · lint 0 · 1208/1208 · build exit 0). Detail:
+`CHANGELOG.md` 2026-09-06. After deploy: open `/silver-services` on the
+phone — the headline and paragraph sit on a near-solid off-white with the
+silver faint behind; on desktop the silver photo still shows on the right.
+
+**Staging (silver hero):** ✅ synced 2026-09-06 — dry run listed exactly the 5 touched files (silver-services page.tsx + 4 docs), 0 Extras; real run copied 5; follow-up dry run 0/0; leak check 0; page.tsx hash match. 920 files on disk. Built `en/silver-services.html` carries the new overlay classes.
+
+**Homepage fifth card (2026-09-05):**
+
+Owner chose option B from the mockup. Files: `src/app/[locale]/(home)/page.tsx`
+(card + `estateHref`), `src/app/globals.css` (`.home-services-grid` 6-track
+desktop rule + nth-child pins), `src/app/sitemap.ts` (lastmod 2026-09-05).
+Gate: `tsc` 0 · lint 0 · **1208/1208 (118 files)** · build exit 0 ·
+preview measured at 1200 / 768 / 375 (3+2 centered / 2+2+1 / stacked).
+Detail: `CHANGELOG.md` 2026-09-05 (later).
+
+✅ **Icon supplied and swapped in** (`mark-estate-jewelry.webp`, from
+`icons/icon-estate-jewelry-collection.png`); gate re-run green. ◻ **Owner:
+the root `icons/` folder is DELETED** (owner: "yes, delete", 2026-09-05; the one source PNG was backed up to the session scratchpad first; vitest 1208/1208 after; staging re-synced with no exclusion).
+
+◻ **Owner: push.** After deploy:
+
+**Staging (with the dedicated icon):** ✅ synced 2026-09-05 — dry run listed exactly the 7 touched files (mark-estate-jewelry.webp, homepage page.tsx, ClayMark.tsx + 4 docs), 0 Extras; real run copied 7; follow-up dry run 0/0; leak check 0; root `icons/` ABSENT from staging; 25 mark-*.webp on staging; hash match on the new mark. 920 files on disk. Gate: tsc 0 · lint 0 · 1208/1208 · build exit 0 (built homepage carries `mark-estate-jewelry.webp`).
+`curl -s https://naplesestatejewelry.com/ | grep -c "We Buy Estate Jewelry in Naples"`
+→ ≥1; on a desktop browser the strip is three cards over two centered
+cards; `/sitemap.xml` lastmod on `/` reads 2026-09-05.
+
+**Staging:** ✅ synced 2026-09-05 (later) — dry run listed exactly the 7 touched files (globals.css, sitemap.ts, homepage page.tsx + 4 docs), 0 Extras; real run copied 7; follow-up dry run 0/0; leak check 0; globals.css hash match. 919 files on disk. Final gate on this source: tsc 0 · lint 0 · 1208/1208 · build exit 0.
+
+### ✅ DEPLOYED + production-verified 2026-09-05 — icon pack (all pages) + `/card` cookie suppression + "Okay" banner button + `/card` soft toggle
+
+Owner: "pushed and deployed, verify it live" (2026-09-05). Verified over HTTP: 13 mark pages (EN + one ES) reference only `mark-*.webp` — clay references 0 on every one; the seven newest marks (shield, xrf, purity-test, dollar, photo-location, gemstone, gold-seal) all 200 `image/webp`; `clay-ring.webp` → 404 (retired files gone); gold page serves `mark-purity-test` with the "On-site & lab testing" caption; `/card` 200 with `data-no-cookie-notice` in the HTML, noindex, both toggle hrefs, and the deployed CSS carries `body:has(main[data-no-cookie-notice]) [data-cookie-notice]{display:none}`; homepage button `>Okay<` (EN) / `>De acuerdo<` (ES), no `>Accept<` left; smoke `/`, `/shop`, `/sell`, `/contact`, `/es/card`, `/sitemap.xml`, `/robots.txt` → 200. Nothing left on our side; staging equals source. The text below is the pre-deploy record.
 
 ✅ **Deleted 2026-09-05 on the owner's "delete":** the 20 orphaned `clay-*.webp` and the root `icon pack/` (24 PNGs). Re-verified 0 `clay-` references in source immediately before; both sets copied to the session scratchpad first (outside the project) as a safety net. After: 0 clay files, 24 mark files, root folder gone; vitest 1208/1208 (file guard green); build exit 0; staging re-synced WITHOUT the icon-pack exclusion (the 20 clay files left staging as EXTRAs, expected).
 
-◻ **Owner: push.** After deploy: spot-check any page with marks (e.g. `/free-evaluation`, `/gold-services`) renders every icon; `/card` shows no cookie banner; homepage banner button reads "Okay"; `/card` Español/English switch has no flash.
+✅ Pushed + verified 09-05 (see above). Was: ◻ **Owner: push.** After deploy: spot-check any page with marks (e.g. `/free-evaluation`, `/gold-services`) renders every icon; `/card` shows no cookie banner; homepage banner button reads "Okay"; `/card` Español/English switch has no flash.
 
 **Staging (after deletion):** ✅ synced 2026-09-05 — dry run: 3 docs Newer + exactly the 20 `clay-*.webp` as EXTRAs (the deletions propagating), 0 unexpected; real run copied 3 / removed 20; follow-up dry run 0/0/0 Extras; leak check 0; staging has 0 clay files, 24 mark files, no `icon pack/`. 919 files on disk.
 

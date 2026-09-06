@@ -8,7 +8,62 @@
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-05 — icon pack COMPLETE and owner-approved spot by spot (10/10):
+🟡 **09-06 (late night) — `/gold-services/gold-marks` BUILT + STAGED** (EN +
+ES): the gold twin of the silver marks guide — 31 stamp photos (5 shop, 26
+eBay sold listings, found by searching the item and reading the gallery —
+the owner's method), teaser on /gold-services, hallmarks page links to both
+guides, silver guide links to gold. Gate green, preview-verified, 1225
+tests, 479 static pages. Rides with the push below; after the push request
+GSC indexing for the new URL.
+
+🟡 **09-06 (night) — photo audit: no placeholder slots left anywhere; 7
+unused page images DELETED + 5 dead `netlify.toml` image redirects dropped
+(owner's word, backed up in the session scratchpad). Only true stand-in
+left: the /free-evaluation desk photo (owner owes a bench photo).**
+
+🟡 **09-06 (night) — `/spot-prices` live-prices page BUILT + STAGED** (EN +
+ES): live spot for four metals as text, ticker, four full-size TradingView
+charts with range tabs, per-gram karat table tagged "not an offer", linked
+from About ▾ / footer / the three sell pages, `/live` alias. Owner-approved
+mockup, gate green, preview-verified (live figures + 5 TradingView frames),
+1221 tests, 477 static pages. Rides with the push below; after the push
+check `/live` redirects on production and the hero shows numbers.
+
+🟡 **09-06 (evening) — `/silver-services` SPLIT + STAGED:** the marks section
+moved to a new guide page `/silver-services/silver-marks` (EN + ES, sitemap,
+breadcrumb, dark hero with the mug-base hallmarks in view) and the lander
+was reordered around buying (what we buy → how we buy → sterling or plate →
+four-photo teaser into the guide → recently → CTA; ~930 words, was 2,320).
+Owner-approved mockup, gate green, preview-verified, 1216 tests. Rides with
+the push below; after the push request GSC indexing for the new URL.
+
+🟡 **09-06 — `/silver-services` "Reading the Marks on Your Silver" section
+BUILT + STAGED** (26 mark photos — 16 own, 10 eBay by owner decision —
+with click-to-expand; the two grey boxes and the flatware section now have
+photos; EN + ES). Third same-day review: the "Fine Silver Estate Services"
+tiles are square and served at real size (they were upscaled = "fuzzy"),
+the flatware photo is rotated upright, and Bullion & Coins shows a SILVER
+bar + Britannia coin (`silver-bullion.webp`, owner-supplied Pexels photo)
+instead of gold. Rides with the fifth-card + hero-fix push. Gate green,
+preview-verified. `TASKS.md` top; provenance in `CHANGELOG.md` 09-06.
+
+🟡 **09-06 — `/silver-services` hero readability FIXED and STAGED** (owner
+saw unreadable text on the phone; measured body contrast was 1.06:1 at
+375px because the light gradient only covered the left half; now a 90%
+wash below `lg` and a stronger gradient above — worst body contrast
+≥7.4:1 at every width). Rides with the fifth-card push. `TASKS.md` top.
+
+🟡 **09-05 (later) — homepage services strip has a FIFTH card, "We Buy
+Estate Jewelry in Naples" (second, links `/estate-jewelry`), laid out
+3 + 2 with the second row centered (owner: "option b"). BUILT + STAGED,
+awaiting push.** Its own mark (`estate-jewelry`) is in; the root `icons/` source folder was
+deleted on the owner's word (backed up to the scratchpad first).
+Sitemap lastmod bumped to 09-05. Gate green; preview measured at three
+widths. `TASKS.md` top.
+
+✅ **09-05 — the whole 09-04/09-05 bundle is DEPLOYED and production-verified** (icon pack on every page with 0 clay references and retired files 404; `/card` cookie suppression live in HTML + CSS; banner button "Okay"/"De acuerdo"; `/card` toggle hrefs live; smoke 200 ×7). Staging equals source; nothing in flight. Detail: `TASKS.md` top, `CHANGELOG.md` 09-05.
+
+✅ (deployed) **09-05 — icon pack COMPLETE and owner-approved spot by spot (10/10):
 24 marks, 0 clay references, BUILT + STAGED.** Five icons arrived during
 the check (shield, XRF, purity-test, dollar, photo-location) and the gold page's lab-
 testing card got a 220px mark + Caslon caption. ✅ Old files DELETED on the owner's word (20 clay + the 24-PNG `icon

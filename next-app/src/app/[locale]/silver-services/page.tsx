@@ -11,6 +11,7 @@ import { fetchSpotData } from '@/lib/spot-price';
 import { AppIcon } from '@/components/AppIcon';
 import ClayMark, { type ClayMarkName } from '@/components/ClayMark';
 import { TESTIMONIALS } from '@/lib/testimonials';
+import SilverMarksTeaser from '@/components/silver/SilverMarksTeaser';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -40,9 +41,9 @@ interface Props {
 // per-item rather than one shared fallback, which previously drew the same
 // flatware icon beside both "Estate Flatware" and "Tea Services".
 const GALLERY_ITEMS = [
-  { key: 'flatware', titleEn: 'Estate Flatware', titleEs: 'Cubertería de Patrimonio', subEn: 'Full Sets & Individual Pieces', subEs: 'Juegos Completos y Piezas Individuales', img: null, icon: 'dining' },
-  { key: 'tea', titleEn: 'Tea Services', titleEs: 'Servicios de Té', subEn: 'Holloware & Serving Trays', subEs: 'Vajilla y Bandejas', img: null, icon: 'emoji_food_beverage' },
-  { key: 'coins', titleEn: 'Bullion & Coins', titleEs: 'Lingotes y Monedas', subEn: '99.9% Pure Investment Silver', subEs: 'Plata de Inversión 99.9% Pura', img: '/assets/images/pages/bullion.webp', icon: 'toll' },
+  { key: 'flatware', titleEn: 'Estate Flatware', titleEs: 'Cubertería de Patrimonio', subEn: 'Full Sets & Individual Pieces', subEs: 'Juegos Completos y Piezas Individuales', img: '/assets/images/pages/silver-marks/ebay-flatware-set-v2.webp', icon: 'dining' },
+  { key: 'tea', titleEn: 'Tea Services', titleEs: 'Servicios de Té', subEn: 'Holloware & Serving Trays', subEs: 'Vajilla y Bandejas', img: '/assets/images/pages/silver-marks/ebay-tea-tray-service.webp', icon: 'emoji_food_beverage' },
+  { key: 'coins', titleEn: 'Bullion & Coins', titleEs: 'Lingotes y Monedas', subEn: '99.9% Pure Investment Silver', subEs: 'Plata de Inversión 99.9% Pura', img: '/assets/images/pages/silver-bullion.webp', icon: 'toll' },
   { key: 'jewelry', titleEn: 'Fine Jewelry', titleEs: 'Joyería Fina', subEn: 'Designer & Vintage Collections', subEs: 'Colecciones de Diseñador y Vintage', img: '/assets/images/pages/ring.jpg', icon: 'diamond' },
 ];
 
@@ -61,6 +62,7 @@ export default async function SilverServicesPage({ params }: Props) {
       <SiteHeader />
       <main className="site-header-offset">
 
+
         {/* Hero */}
         <section className="relative h-[640px] flex items-center overflow-hidden">
           <div className="absolute inset-0 z-0">
@@ -72,7 +74,16 @@ export default async function SilverServicesPage({ params }: Props) {
               className="object-cover grayscale opacity-80"
               priority
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#f9f9f7] via-[#f9f9f7]/60 to-transparent" />
+            {/* Text-holding wash. The old left→right gradient (solid → 60% at the
+                midpoint → transparent) only protected text that stayed in the
+                left half — true on desktop, false on phones and tablets where
+                the text box spans ~92% of the width. Measured 2026-09-06 from
+                the real image: body text 1.06:1 at 375px, 1.46:1 at 768px
+                (AA needs 4.5:1). Below lg the whole hero gets a 90% wash (the
+                photo stays as texture); from lg the gradient holds solid to
+                45%, 90% at 60% (past the 704px text edge at 1200px) and fades
+                to 30% at the right so the silver still shows. */}
+            <div className="absolute inset-0 bg-[#f9f9f7]/90 lg:bg-transparent lg:bg-gradient-to-r lg:from-[#f9f9f7] lg:from-45% lg:via-[#f9f9f7]/90 lg:via-60% lg:to-[#f9f9f7]/30" />
           </div>
           <div className="ultrawide-page relative z-10 max-w-[1440px] mx-auto px-4 md:px-8 w-full">
             <div className="max-w-2xl">
@@ -124,6 +135,11 @@ export default async function SilverServicesPage({ params }: Props) {
                     ? 'El precio spot establece la línea de base del mercado en vivo para la plata. Para plata esterlina, monedas y lingotes, confirmamos el peso y la pureza, luego explicamos una oferta directa.'
                     : 'Spot price gives us the live market baseline for silver. For sterling, coins, and bullion, we confirm weight and purity first, then use the current market to explain a straightforward offer.'}
                 </p>
+                <p className="mt-4 text-sm">
+                  <Link href={isEs ? '/es/spot-prices' : '/spot-prices'} className="font-semibold text-[#735c00] underline underline-offset-2">
+                    {isEs ? 'Gráficos a tamaño completo de la plata, el oro, el platino y el paladio →' : 'Full-size charts for silver, gold, platinum and palladium →'}
+                  </Link>
+                </p>
               </div>
               <div className="lg:col-span-7">
                 <div className="overflow-hidden rounded-2xl border border-[#d0c5af] bg-white shadow-[0_18px_54px_rgba(38,28,6,0.07)]">
@@ -147,13 +163,122 @@ export default async function SilverServicesPage({ params }: Props) {
           </div>
         </section>
 
-        {/* Identifying Silver Guide */}
+        {/* Fine Silver Estate Services — "what we buy". Moved up from the
+            bottom of the page 2026-09-06 (owner-approved split mockup): a
+            seller should meet what we buy right after the spot price, not
+            after 1,300 words about hallmarks. */}
         <section className="ultrawide-page py-20 max-w-[1440px] mx-auto px-4 md:px-8">
-          <div className="text-center mb-20">
+          <div className="mb-12 flex items-end justify-between">
+            <div>
+              <span className="text-xs font-bold text-[#735c00] uppercase tracking-[0.2em] mb-3 block">
+                {isEs ? 'Qué compramos' : 'What We Buy'}
+              </span>
+              <h2 className="font-[family-name:var(--font-headline)] text-3xl md:text-4xl font-bold">
+                {isEs ? 'Servicios de Plata Fina' : 'Fine Silver Estate Services'}
+              </h2>
+              <p className="text-sm text-[#4d4635] mt-2">
+                {isEs
+                  ? 'Especializados en colecciones de patrimonio de alto valor y lingotes profesionales.'
+                  : 'Specializing in high-value estate collections and professional bullion.'}
+              </p>
+            </div>
+            <div className="hidden md:block h-px flex-grow mx-8 bg-[#d0c5af]" />
+          </div>
+          {/* 2026-09-06: tiles were 3:4 portrait with a fixed 300×400 next/image —
+              rendered at ~450px wide on a 2-column tablet view, so a landscape
+              photo was cropped to portrait AND upscaled ("fuzzy", owner). Now
+              square, four across from md, and `fill` + `sizes` so the image
+              is served at the tile's real size. `sizes` is ~1.5x the tile width because
+              object-cover scales a 3:2 landscape photo to the SQUARE tile's height. */}
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
+            {GALLERY_ITEMS.map(({ key, titleEn, titleEs, subEn, subEs, img, icon }) => (
+              <div key={key} className="group cursor-pointer">
+                <div className="relative mb-4 aspect-square overflow-hidden rounded-2xl bg-[#e8e8e8] shadow-[0_14px_38px_rgba(38,28,6,0.08)]">
+                  {img ? (
+                    <Image
+                      src={img}
+                      alt={isEs ? titleEs : titleEn}
+                      fill
+                      sizes="(min-width: 768px) 33vw, 68vw"
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <AppIcon name={icon}
+                        className="text-[#7f7663]"
+                        style={{ fontSize: '3rem' }}
+                       />
+                    </div>
+                  )}
+                </div>
+                <h4 className="text-xs font-bold uppercase tracking-widest text-[#1a1c1c]">
+                  {isEs ? titleEs : titleEn}
+                </h4>
+                <p className="text-xs text-[#4d4635] mt-1">{isEs ? subEs : subEn}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Scientific Testing Method — "how we buy" (moved up 2026-09-06). */}
+        <section className="bg-[#2f3131] text-white py-20">
+          <div className="ultrawide-page max-w-[1440px] mx-auto px-4 md:px-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-1">
+                <h2 className="font-[family-name:var(--font-headline)] text-3xl font-bold mb-6">
+                  {isEs ? 'Nuestro Método de Prueba Científica' : 'Our Scientific Testing Method'}
+                </h2>
+                <p className="text-sm text-[#d7d0c3] mb-8 leading-relaxed">
+                  {isEs
+                    ? 'Empleamos estándares analíticos rigurosos para asegurar que reciba el máximo valor por sus activos. Nuestras pruebas no destructivas protegen la integridad de sus piezas.'
+                    : 'We employ rigorous analytical standards to ensure you receive the maximum value for your assets. Our non-destructive testing protects the integrity of your pieces.'}
+                </p>
+                <div className="flex items-center gap-2 text-[#e9c349]">
+                  <AppIcon name="verified_user" className="text-lg" />
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    {isEs ? 'REVISIÓN CUIDADOSA DEL MERCADO' : 'CAREFUL MARKET REVIEW'}
+                  </span>
+                </div>
+              </div>
+              <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6">
+                {[
+                  { mark: 'scale', titleEn: 'Precision Weight', titleEs: 'Peso de Precisión', descEn: 'Using calibrated Ohaus scales to measure in Troy ounces and Grams for pinpoint accuracy.', descEs: 'Usando básculas Ohaus calibradas para medir en onzas Troy y gramos con precisión.' },
+                  { mark: 'magnet', titleEn: 'Magnetism', titleEs: 'Magnetismo', descEn: 'Silver is non-magnetic. We use rare-earth neodymium testing to identify ferrous cores.', descEs: 'La plata no es magnética. Usamos pruebas de neodimio para identificar núcleos ferrosos.' },
+                  { mark: 'flask', titleEn: 'Assay Analysis', titleEs: 'Análisis de Ensayo', descEn: 'Onsite acid testing at your appointment; offsite XRF spectrometry when exact assay documentation is needed.', descEs: 'Prueba ácida en el sitio; espectrometría XRF externa cuando se necesita documentación exacta.' },
+                ].map(({ mark, titleEn, titleEs, descEn, descEs }) => (
+                  <div key={mark} className="rounded-2xl border border-white/10 bg-white/5 p-8 shadow-[0_16px_44px_rgba(0,0,0,0.12)]">
+                    {/* onDark: this section is a dark band, so the float shadow
+                        would be invisible. The gold disc went with the icon —
+                        gold clay on a #735c00 circle is gold on gold. */}
+                    <ClayMark name={mark as ClayMarkName} size={80} onDark className="mb-6 block" />
+                    <h4 className="font-[family-name:var(--font-headline)] text-lg font-bold mb-4 text-[#e9c349]">
+                      {isEs ? titleEs : titleEn}
+                    </h4>
+                    <p className="text-sm text-[#d7d0c3] leading-relaxed">{isEs ? descEs : descEn}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Sterling or plate? — 2026-09-06: the former "Identifying Silver: A
+            Professional Guide" cards and the "Flatware, Tea Services & the
+            Silverplate Question" section were two answers to the same
+            question on one page. Merged under one heading (owner-approved
+            split mockup). The illustrated marks section now lives at
+            /silver-services/silver-marks and is teased below. */}
+        <section className="ultrawide-page py-20 max-w-[1440px] mx-auto px-4 md:px-8">
+          <div className="text-center mb-14">
             <h2 className="font-[family-name:var(--font-headline)] text-3xl md:text-4xl font-bold mb-4">
-              {isEs ? 'Identificando la Plata: Una Guía Profesional' : 'Identifying Silver: A Professional Guide'}
+              {isEs ? '¿Esterlina o Chapada? La Diferencia lo Es Casi Todo' : 'Sterling or Plate? The Difference Is Nearly Everything'}
             </h2>
-            <div className="w-20 h-px bg-[#735c00] mx-auto" />
+            <div className="w-20 h-px bg-[#735c00] mx-auto mb-6" />
+            <p className="max-w-xl mx-auto text-sm leading-relaxed text-[#4d4635]">
+              {isEs
+                ? 'La pregunta que más respondemos: ¿es esterlina o es chapada? El sello lo dice — la esterlina vale su peso, el chapado es casi todo metal base.'
+                : 'The most common question we answer: is it sterling, or is it plated? The mark tells you — sterling is worth its weight, plate is mostly base metal.'}
+            </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
             {/* Sterling Silver */}
@@ -183,12 +308,17 @@ export default async function SilverServicesPage({ params }: Props) {
                   </li>
                 ))}
               </ul>
-              <div className="aspect-video overflow-hidden rounded-xl bg-[#f3f3f3]">
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-[#735c00] font-[family-name:var(--font-body)] text-xs uppercase tracking-widest">
-                    {isEs ? '925 — Plata Esterlina' : '925 — Sterling Silver'}
-                  </span>
-                </div>
+              {/* Was a grey placeholder until 2026-09-06: a repoussé sterling
+                  tea and coffee service with kettle on stand (eBay sold-listing
+                  photo, owner's choice; provenance in CHANGELOG 2026-09-06). */}
+              <div className="relative aspect-video overflow-hidden rounded-xl bg-[#f3f3f3]">
+                <Image
+                  src="/assets/images/pages/silver-marks/ebay-tea-service.webp"
+                  alt={isEs ? 'Juego de té y café de plata esterlina repujada' : 'Repoussé sterling silver tea and coffee service'}
+                  fill
+                  sizes="(min-width: 768px) 45vw, 90vw"
+                  className="object-cover"
+                />
               </div>
             </div>
 
@@ -219,108 +349,127 @@ export default async function SilverServicesPage({ params }: Props) {
                   </li>
                 ))}
               </ul>
-              <div className="aspect-video overflow-hidden rounded-xl bg-[#f3f3f3]">
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-[#7f7663] font-[family-name:var(--font-body)] text-xs uppercase tracking-widest">
-                    {isEs ? 'EPNS — Metal Base Chapado' : 'EPNS — Silver Plated Base Metal'}
-                  </span>
-                </div>
+              {/* Was a grey placeholder until 2026-09-06: the E.P.N.S. stamp
+                  itself, large — the thing a seller should go and look for. */}
+              <div className="relative aspect-video overflow-hidden rounded-xl bg-[#f3f3f3]">
+                <Image
+                  src="/assets/images/pages/silver-marks/ebay-epns-crafton.webp"
+                  alt={isEs ? 'Sello E.P.N.S. bajo una tetera chapada' : 'E.P.N.S. stamp under a plated teapot'}
+                  fill
+                  sizes="(min-width: 768px) 45vw, 90vw"
+                  className="object-cover"
+                />
               </div>
             </div>
           </div>
-        </section>
 
-        {/* Flatware & silverplate — added 2026-08-29 (step 2 of the content
-            plan; owner approved the mockup and confirmed the price-both-ways
-            claim). This page sits at ~position 12 for silver/flatware queries
-            and said nothing about flatware specifically. All statements are
-            objective silver-domain facts; Chantilly and Francis I really are
-            patterns carried in the shop. There is no /es prefix helper on this
-            page, so hrefs are built inline like its other links. */}
-        <section className="bg-[#f3f3f3] border-t border-[#d0c5af] py-20">
-          <div className="ultrawide-page max-w-[1440px] mx-auto px-4 md:px-8">
-            <div className="text-center mb-14">
-              <h2 className="font-[family-name:var(--font-headline)] text-3xl md:text-4xl font-bold mb-4">
-                {isEs ? 'Cubertería, Juegos de Té y la Cuestión del Chapado' : 'Flatware, Tea Services & the Silverplate Question'}
-              </h2>
-              <div className="w-20 h-px bg-[#735c00] mx-auto mb-6" />
-              <p className="max-w-xl mx-auto text-sm leading-relaxed text-[#4d4635]">
-                {isEs
-                  ? 'La pregunta que más respondemos: ¿es esterlina o es chapada? El sello lo dice — y la diferencia lo es casi todo.'
-                  : 'The most common question we answer: is it sterling, or is it plated? The mark tells you — and the difference is nearly everything.'}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div className="rounded-2xl border border-[#d0c5af] bg-white p-8 shadow-[0_10px_28px_rgba(38,28,6,0.04)]">
-                <span className="text-[10px] font-bold text-[#735c00] uppercase tracking-widest">
-                  {isEs ? 'Maciza — vale la fundición o más' : 'Solid — worth melt or more'}
-                </span>
-                <p className="mt-3 text-sm leading-relaxed text-[#4d4635]">
-                  {isEs
-                    ? 'Busque Sterling, 925 o el león inglés (lion passant). Los fabricantes americanos posteriores a 1868 casi siempre lo indican por escrito. Si dice sterling, cada gramo cuenta — cubertería, juegos de té, bandejas y piezas de servir por igual.'
-                    : 'Look for Sterling, 925, or the English lion passant. American makers after about 1868 nearly always say it outright. If it says sterling, every gram counts — flatware, tea services, trays, and serving pieces alike.'}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-[#d0c5af] bg-white p-8 shadow-[0_10px_28px_rgba(38,28,6,0.04)]">
-                <span className="text-[10px] font-bold text-[#993c1d] uppercase tracking-widest">
-                  {isEs ? 'Chapada — casi todo metal base' : 'Plated — mostly base metal'}
-                </span>
-                <p className="mt-3 text-sm leading-relaxed text-[#4d4635]">
-                  {isEs
-                    ? "EPNS, 'quadruple plate', 'silver on copper' y la mayoría de la vajilla de hotel son una capa fina de plata sobre metal base, con poco valor de fundición. Le diremos cuál es cuál gratis — antes de que cruce la ciudad cargando un cofre con esperanzas."
-                    : "EPNS, 'quadruple plate,' 'silver on copper,' and most hotel ware are a thin silver skin over base metal, with little melt value. We will tell you which is which for free — before you haul a chest across town hoping."}
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-[#d0c5af] bg-white p-8 shadow-[0_10px_28px_rgba(38,28,6,0.04)] mb-6">
+          {/* Flatware & silverplate — added 2026-08-29 (step 2 of the content
+              plan; owner approved the mockup and confirmed the price-both-ways
+              claim). All statements are objective silver-domain facts;
+              Chantilly and Francis I really are patterns carried in the shop.
+              There is no /es prefix helper on this page, so hrefs are built
+              inline like its other links. Folded under the Sterling-or-Plate
+              heading 2026-09-06. */}
+          <div className="text-center mt-16 mb-10">
+            <h3 className="font-[family-name:var(--font-headline)] text-2xl md:text-3xl font-bold">
+              {isEs ? 'Cubertería, Juegos de Té y la Cuestión del Chapado' : 'Flatware, Tea Services & the Silverplate Question'}
+            </h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="rounded-2xl border border-[#d0c5af] bg-white p-8 shadow-[0_10px_28px_rgba(38,28,6,0.04)]">
               <span className="text-[10px] font-bold text-[#735c00] uppercase tracking-widest">
-                {isEs ? 'Patrones que pueden superar la fundición' : 'Patterns that can beat melt'}
+                {isEs ? 'Maciza — vale la fundición o más' : 'Solid — worth melt or more'}
               </span>
               <p className="mt-3 text-sm leading-relaxed text-[#4d4635]">
-                {/* Aligned 2026-08-31 with the owner's top-tier-only framing rule
-                    (DECISIONS → "Premium-pattern framing"): no maker list implying
-                    broad premiums, no discounting ordinary sets. The price-both-ways
-                    promise and the we-stock-these credibility stay. */}
                 {isEs
-                  ? 'Un pequeño grupo de primer nivel — patrones como Tiffany Chrysanthemum, los diseños de Georg Jensen y nombres de ese calibre — puede valer más como cubertería que como metal, y las piezas de servir inusuales a veces también. Por eso calculamos el precio de ambas formas, pieza por pieza, y pagamos el que resulte mayor. Gorham Chantilly y Reed & Barton Francis I son patrones que también vendemos en nuestra propia tienda: este es nuestro terreno.'
-                  : 'A small top tier — patterns such as Tiffany Chrysanthemum, Georg Jensen designs, and names of that caliber — can be worth more as flatware than as metal, and unusual serving pieces sometimes join them. That is why we price every set both ways, piece by piece, and pay whichever is higher. Gorham Chantilly and Reed & Barton Francis I are patterns we also sell in our own shop: this is our lane.'}
+                  ? 'Busque Sterling, 925 o el león inglés (lion passant). Los fabricantes americanos posteriores a 1868 casi siempre lo indican por escrito. Si dice sterling, cada gramo cuenta — cubertería, juegos de té, bandejas y piezas de servir por igual.'
+                  : 'Look for Sterling, 925, or the English lion passant. American makers after about 1868 nearly always say it outright. If it says sterling, every gram counts — flatware, tea services, trays, and serving pieces alike.'}
               </p>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-              <div className="rounded-2xl border border-[#d0c5af] bg-white p-8 shadow-[0_10px_28px_rgba(38,28,6,0.04)]">
-                <span className="text-[10px] font-bold text-[#735c00] uppercase tracking-widest">
-                  {isEs ? 'Piezas con relleno' : 'Weighted pieces'}
-                </span>
-                <p className="mt-3 text-sm leading-relaxed text-[#4d4635]">
-                  {isEs
-                    ? 'Los candelabros y compotas marcados weighted o reinforced son en su mayoría cemento o brea dentro de una capa fina de esterlina. Los valoramos con honestidad, por la plata que realmente contienen — sin sorpresas en el mostrador.'
-                    : 'Candlesticks and compotes marked weighted or reinforced are mostly cement or pitch inside a thin sterling shell. We price them honestly, on the silver that is actually there — no surprises at the counter.'}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-[#d0c5af] bg-white p-8 shadow-[0_10px_28px_rgba(38,28,6,0.04)]">
-                <span className="text-[10px] font-bold text-[#735c00] uppercase tracking-widest">
-                  {isEs ? 'Monogramas y pulido' : 'Monograms & polish'}
-                </span>
-                <p className="mt-3 text-sm leading-relaxed text-[#4d4635]">
-                  {isEs
-                    ? 'Un monograma rara vez cambia una oferta por valor de fundición, y en los patrones coleccionados importa menos de lo que se teme. Y deje la pátina en paz — pulir quita plata y no suma nada al precio.'
-                    : 'A monogram rarely changes a melt-value offer, and on collected patterns it matters less than sellers fear. And leave the tarnish alone — polishing removes silver and adds nothing to the price.'}
-                </p>
-              </div>
+            <div className="rounded-2xl border border-[#d0c5af] bg-white p-8 shadow-[0_10px_28px_rgba(38,28,6,0.04)]">
+              <span className="text-[10px] font-bold text-[#993c1d] uppercase tracking-widest">
+                {isEs ? 'Chapada — casi todo metal base' : 'Plated — mostly base metal'}
+              </span>
+              <p className="mt-3 text-sm leading-relaxed text-[#4d4635]">
+                {isEs
+                  ? "EPNS, 'quadruple plate', 'silver on copper' y la mayoría de la vajilla de hotel son una capa fina de plata sobre metal base, con poco valor de fundición. Le diremos cuál es cuál gratis — antes de que cruce la ciudad cargando un cofre con esperanzas."
+                  : "EPNS, 'quadruple plate,' 'silver on copper,' and most hotel ware are a thin silver skin over base metal, with little melt value. We will tell you which is which for free — before you haul a chest across town hoping."}
+              </p>
             </div>
+          </div>
 
-            <p className="text-center text-sm leading-relaxed text-[#4d4635]">
-              {isEs ? (
-                <>¿No está seguro de lo que vale su juego? Nuestra <Link href="/es/silver-services/flatware-value" className="font-semibold text-[#735c00] underline">guía del valor de la cubertería</Link> recorre toda la matemática — esterlina vs. chapado, la trampa de los cuchillos y cuándo un patrón supera la fundición.</>
-              ) : (
-                <>Not sure what your set is worth? Our <Link href="/silver-services/flatware-value" className="font-semibold text-[#735c00] underline">flatware value guide</Link> walks the full math — sterling vs. plate, the knife trap, and when patterns beat melt.</>
-              )}
+          <div className="rounded-2xl border border-[#d0c5af] bg-white p-8 shadow-[0_10px_28px_rgba(38,28,6,0.04)] mb-6">
+            <span className="text-[10px] font-bold text-[#735c00] uppercase tracking-widest">
+              {isEs ? 'Patrones que pueden superar la fundición' : 'Patterns that can beat melt'}
+            </span>
+            <p className="mt-3 text-sm leading-relaxed text-[#4d4635]">
+              {/* Aligned 2026-08-31 with the owner's top-tier-only framing rule
+                  (DECISIONS → "Premium-pattern framing"): no maker list implying
+                  broad premiums, no discounting ordinary sets. The price-both-ways
+                  promise and the we-stock-these credibility stay. */}
+              {isEs
+                ? 'Un pequeño grupo de primer nivel — patrones como Tiffany Chrysanthemum, los diseños de Georg Jensen y nombres de ese calibre — puede valer más como cubertería que como metal, y las piezas de servir inusuales a veces también. Por eso calculamos el precio de ambas formas, pieza por pieza, y pagamos el que resulte mayor. Gorham Chantilly y Reed & Barton Francis I son patrones que también vendemos en nuestra propia tienda: este es nuestro terreno.'
+                : 'A small top tier — patterns such as Tiffany Chrysanthemum, Georg Jensen designs, and names of that caliber — can be worth more as flatware than as metal, and unusual serving pieces sometimes join them. That is why we price every set both ways, piece by piece, and pay whichever is higher. Gorham Chantilly and Reed & Barton Francis I are patterns we also sell in our own shop: this is our lane.'}
             </p>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+            <div className="rounded-2xl border border-[#d0c5af] bg-white p-8 shadow-[0_10px_28px_rgba(38,28,6,0.04)]">
+              <span className="text-[10px] font-bold text-[#735c00] uppercase tracking-widest">
+                {isEs ? 'Piezas con relleno' : 'Weighted pieces'}
+              </span>
+              <p className="mt-3 text-sm leading-relaxed text-[#4d4635]">
+                {isEs
+                  ? 'Los candelabros y compotas marcados weighted o reinforced son en su mayoría cemento o brea dentro de una capa fina de esterlina. Los valoramos con honestidad, por la plata que realmente contienen — sin sorpresas en el mostrador.'
+                  : 'Candlesticks and compotes marked weighted or reinforced are mostly cement or pitch inside a thin sterling shell. We price them honestly, on the silver that is actually there — no surprises at the counter.'}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[#d0c5af] bg-white p-8 shadow-[0_10px_28px_rgba(38,28,6,0.04)]">
+              <span className="text-[10px] font-bold text-[#735c00] uppercase tracking-widest">
+                {isEs ? 'Monogramas y pulido' : 'Monograms & polish'}
+              </span>
+              <p className="mt-3 text-sm leading-relaxed text-[#4d4635]">
+                {isEs
+                  ? 'Un monograma rara vez cambia una oferta por valor de fundición, y en los patrones coleccionados importa menos de lo que se teme. Y deje la pátina en paz — pulir quita plata y no suma nada al precio.'
+                  : 'A monogram rarely changes a melt-value offer, and on collected patterns it matters less than sellers fear. And leave the tarnish alone — polishing removes silver and adds nothing to the price.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Flatware photo — 2026-09-06 (eBay sold-listing photo, owner's
+              choice). Gorham Chantilly: a place setting with its serving
+              pieces — the pattern the shop itself stocks. */}
+          <figure className="mx-auto mb-10 max-w-3xl overflow-hidden rounded-2xl border border-[#d0c5af] bg-white shadow-[0_10px_28px_rgba(38,28,6,0.04)]">
+            <div className="relative aspect-[16/9]">
+              <Image
+                src="/assets/images/pages/silver-marks/ebay-flatware-chantilly.webp"
+                alt={isEs ? 'Cubertería Gorham Chantilly con piezas de servir' : 'Gorham Chantilly flatware with serving pieces'}
+                fill
+                sizes="(min-width: 1024px) 768px, 90vw"
+                className="object-cover"
+              />
+            </div>
+            <figcaption className="px-5 py-3 text-center text-xs leading-relaxed text-[#4d4635]">
+              {isEs
+                ? 'Un servicio completo con sus piezas de servir — aquí Gorham Chantilly — es lo que más buscan los coleccionistas de un patrón.'
+                : 'A full service with its serving pieces — here Gorham Chantilly — is what collectors of a pattern want most.'}
+            </figcaption>
+          </figure>
+
+          <p className="text-center text-sm leading-relaxed text-[#4d4635]">
+            {isEs ? (
+              <>¿No está seguro de lo que vale su juego? Nuestra <Link href="/es/silver-services/flatware-value" className="font-semibold text-[#735c00] underline">guía del valor de la cubertería</Link> recorre toda la matemática — esterlina vs. chapado, la trampa de los cuchillos y cuándo un patrón supera la fundición.</>
+            ) : (
+              <>Not sure what your set is worth? Our <Link href="/silver-services/flatware-value" className="font-semibold text-[#735c00] underline">flatware value guide</Link> walks the full math — sterling vs. plate, the knife trap, and when patterns beat melt.</>
+            )}
+          </p>
         </section>
+
+        {/* Reading the marks — teaser. The 26-photo section itself moved to
+            /silver-services/silver-marks on 2026-09-06 (owner: the lander
+            should explain how and what we buy; the guide is one click
+            deeper). Four photos + the link; copy in the component. */}
+        <SilverMarksTeaser locale={locale} />
 
         {/* Recently Through Our Doors — proof strip (2026-08-31, owner-approved
             mockup). ⚠️ REAL pieces only: these are actual catalog items (every
@@ -416,93 +565,6 @@ export default async function SilverServicesPage({ params }: Props) {
                 </figure>
               );
             })()}
-          </div>
-        </section>
-
-        {/* Scientific Testing Method */}
-        <section className="bg-[#2f3131] text-white py-20">
-          <div className="ultrawide-page max-w-[1440px] mx-auto px-4 md:px-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-1">
-                <h2 className="font-[family-name:var(--font-headline)] text-3xl font-bold mb-6">
-                  {isEs ? 'Nuestro Método de Prueba Científica' : 'Our Scientific Testing Method'}
-                </h2>
-                <p className="text-sm text-[#d7d0c3] mb-8 leading-relaxed">
-                  {isEs
-                    ? 'Empleamos estándares analíticos rigurosos para asegurar que reciba el máximo valor por sus activos. Nuestras pruebas no destructivas protegen la integridad de sus piezas.'
-                    : 'We employ rigorous analytical standards to ensure you receive the maximum value for your assets. Our non-destructive testing protects the integrity of your pieces.'}
-                </p>
-                <div className="flex items-center gap-2 text-[#e9c349]">
-                  <AppIcon name="verified_user" className="text-lg" />
-                  <span className="text-xs font-bold uppercase tracking-wider">
-                    {isEs ? 'REVISIÓN CUIDADOSA DEL MERCADO' : 'CAREFUL MARKET REVIEW'}
-                  </span>
-                </div>
-              </div>
-              <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6">
-                {[
-                  { mark: 'scale', titleEn: 'Precision Weight', titleEs: 'Peso de Precisión', descEn: 'Using calibrated Ohaus scales to measure in Troy ounces and Grams for pinpoint accuracy.', descEs: 'Usando básculas Ohaus calibradas para medir en onzas Troy y gramos con precisión.' },
-                  { mark: 'magnet', titleEn: 'Magnetism', titleEs: 'Magnetismo', descEn: 'Silver is non-magnetic. We use rare-earth neodymium testing to identify ferrous cores.', descEs: 'La plata no es magnética. Usamos pruebas de neodimio para identificar núcleos ferrosos.' },
-                  { mark: 'flask', titleEn: 'Assay Analysis', titleEs: 'Análisis de Ensayo', descEn: 'Onsite acid testing at your appointment; offsite XRF spectrometry when exact assay documentation is needed.', descEs: 'Prueba ácida en el sitio; espectrometría XRF externa cuando se necesita documentación exacta.' },
-                ].map(({ mark, titleEn, titleEs, descEn, descEs }) => (
-                  <div key={mark} className="rounded-2xl border border-white/10 bg-white/5 p-8 shadow-[0_16px_44px_rgba(0,0,0,0.12)]">
-                    {/* onDark: this section is a dark band, so the float shadow
-                        would be invisible. The gold disc went with the icon —
-                        gold clay on a #735c00 circle is gold on gold. */}
-                    <ClayMark name={mark as ClayMarkName} size={80} onDark className="mb-6 block" />
-                    <h4 className="font-[family-name:var(--font-headline)] text-lg font-bold mb-4 text-[#e9c349]">
-                      {isEs ? titleEs : titleEn}
-                    </h4>
-                    <p className="text-sm text-[#d7d0c3] leading-relaxed">{isEs ? descEs : descEn}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Fine Silver Estate Services Gallery */}
-        <section className="ultrawide-page py-20 max-w-[1440px] mx-auto px-4 md:px-8">
-          <div className="mb-12 flex items-end justify-between">
-            <div>
-              <h2 className="font-[family-name:var(--font-headline)] text-3xl md:text-4xl font-bold">
-                {isEs ? 'Servicios de Plata Fina' : 'Fine Silver Estate Services'}
-              </h2>
-              <p className="text-sm text-[#4d4635] mt-2">
-                {isEs
-                  ? 'Especializados en colecciones de patrimonio de alto valor y lingotes profesionales.'
-                  : 'Specializing in high-value estate collections and professional bullion.'}
-              </p>
-            </div>
-            <div className="hidden md:block h-px flex-grow mx-8 bg-[#d0c5af]" />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {GALLERY_ITEMS.map(({ key, titleEn, titleEs, subEn, subEs, img, icon }) => (
-              <div key={key} className="group cursor-pointer">
-                <div className="mb-4 aspect-[3/4] overflow-hidden rounded-2xl bg-[#e8e8e8] shadow-[0_14px_38px_rgba(38,28,6,0.08)]">
-                  {img ? (
-                    <Image
-                      src={img}
-                      alt={isEs ? titleEs : titleEn}
-                      width={300}
-                      height={400}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <AppIcon name={icon}
-                        className="text-[#7f7663]"
-                        style={{ fontSize: '3rem' }}
-                       />
-                    </div>
-                  )}
-                </div>
-                <h4 className="text-xs font-bold uppercase tracking-widest text-[#1a1c1c]">
-                  {isEs ? titleEs : titleEn}
-                </h4>
-                <p className="text-xs text-[#4d4635] mt-1">{isEs ? subEs : subEn}</p>
-              </div>
-            ))}
           </div>
         </section>
 

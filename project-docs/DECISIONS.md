@@ -6,6 +6,99 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-09-03**.
 
+## Silver-marks photos: the shop's own first, eBay by the owner's call, provenance always recorded (2026-09-06)
+
+The marks section shows 26 photographs. Rules:
+
+- **Own product photos first.** The catalog already had usable mark shots
+  for 16 of 26 slots (scan the listings before reaching for the web).
+  Own tiles carry the "from our shop" tag; that tag is a provability
+  claim — never put it on a borrowed photo.
+- **Borrowed photos are eBay listing photos only**, chosen by the owner
+  after a rights discussion (web/Google images and auction-house catalog
+  photos carry real demand-letter risk; individual eBay sellers rarely
+  enforce, but the exposure is not zero — not legal advice). Every
+  borrowed image is listed with its listing URL and image id in
+  `CHANGELOG.md` 2026-09-06 so it can be swapped or removed in minutes if
+  anyone asks. Replace them with shop photos as plated / continental
+  pieces cross the counter.
+- **Captions state only what the photo shows** (reading of the mark,
+  maker if stamped, city/date if the hallmark gives it). No attribution
+  that is not on the piece.
+- **Every tile expands to the whole photograph** (`MarkGallery`): tiles
+  are tight crops, so the full image is the record. Native `<dialog>`,
+  keyboard-openable tiles, full image loaded on open only.
+- **eBay photo research: search the ITEM, then read the gallery (owner,
+  2026-09-06).** "Dont directly search for a hallmark … a seller wont list
+  it with that title." Search "14k gold", "9ct gold", "gold filled" etc. in
+  sold + completed listings, pull every gallery image, and pick the stamp
+  close-ups by eye at full size. The shop's own catalog is scanned first;
+  it photographs pieces, not stamps, so expect only a handful of usable
+  marks from it. Every chosen photo's listing URL + image id goes in the
+  CHANGELOG so it can be swapped. The gold guide follows the silver-marks
+  photo rules (captions say only what the photo shows; changed photo = new
+  file name).
+- **Live-prices page (`/spot-prices`, 2026-09-06).** A link target for
+  social posts and the About menu, not a ranking page: the TradingView
+  charts index as nothing, so the page carries the spot figures and the
+  per-gram karat table as server-rendered text. Rules: every number is
+  metal value at spot and is tagged "not an offer"; no buyer margin is ever
+  stated; karat fractions must equal the gold-worth guide's
+  (test-enforced); the feed returns NULLS on failure and the page says so —
+  never print the pricing fallback from `fetchSpotData()` as if it were
+  live; keep the embeds off the homepage and the Sell flow (PSI mobile is
+  bimodal). `/live` is a 307 convenience alias; `/spot-prices` is canonical.
+- **A changed photo gets a new file name.** `next/image` and the Netlify
+  image CDN cache by URL; re-cropping or rotating a file under the same
+  name showed the OLD picture to the owner twice on 2026-09-06. Suffix
+  `-v2`, `-v3` … and update the key.
+- Facts in the copy are checked against references before they ship
+  (recorded in the CHANGELOG entry); the hallmarks guide at
+  `/jewelry-appraisal/hallmarks` stays the sitewide reference and the
+  section links to it rather than duplicating it.
+
+## Hero text over photos is measured, not eyeballed — and a light hero needs a wash that covers the TEXT BOX (2026-09-06)
+
+The silver hero shipped for weeks with body text at 1.06:1 on phones
+(AA: 4.5:1) because its left→right gradient was designed on a desktop,
+where the text stays in the solid left half. On a phone the text box is
+~92% of the viewport and the same gradient leaves its right half on the
+photo. Rules:
+
+- **Any text over a photo is checked numerically at 375 / 768 / 1200 /
+  1440** before it ships: composite the image (object-cover crop, filter,
+  opacity), the overlay and the text colour, and take the WORST pixel
+  contrast inside the text box, not the average. A screenshot on the
+  desk monitor proves nothing about the phone. Script pattern: `sharp`
+  crop → apply overlay alpha per x → WCAG luminance; run it from
+  `next-app/` (it needs the app's `sharp`).
+- **The overlay is defined relative to the TEXT BOX, not the viewport.**
+  Below `lg` (where the text spans the width) use a flat wash (≥85% of
+  the page background); from `lg` the gradient must stay ≥90% opaque past
+  the text box's right edge (`max-w-2xl` = 704px at 1200) before fading.
+- **Dark heroes are the site default** (#1a1c1c, photo at 40%, white
+  text — gold, estate, diamonds, watches, appraisal). Silver is the one
+  light hero and keeps that look by owner choice; the rules above are
+  what make a light hero legible, not a reason to darken it.
+
+## Homepage services strip: five cards, buy-side leads, 3 + 2 centered on desktop (2026-09-05)
+
+The strip is Gold · **Buy Estate Jewelry** · Silver · Sell (shop) ·
+Contact. The buy-side jewelry card exists because buying is the primary
+business and the strip previously only said "We SELL Estate Jewelry" —
+its title is a real `<h2>` and its link is the homepage's one descriptive
+internal link to `/estate-jewelry`. Rules:
+
+- **Card copy makes no claim the linked page does not make.** The buy
+  card's body is lifted from `/estate-jewelry` (maker / gemstones / era;
+  immediate payment upon agreement). Same rule as the silver card.
+- **Desktop is 3 + 2 with the second row CENTERED** (owner chose this over
+  five narrow columns). Implemented as six half-width tracks with
+  `nth-child` pins in `.home-services-grid` — adding or removing a card
+  means updating those pins, or the last row drifts left.
+- A shared mark is acceptable as a stand-in, never as the final state —
+  the card got its own `estate-jewelry` mark the same day.
+
 ## Illustrated marks: the owner's icon pack is the source, clay is the fallback set (2026-09-04)
 
 The owner now supplies finished mark artwork (`icon pack/` → resized to

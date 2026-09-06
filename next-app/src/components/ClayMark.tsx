@@ -30,6 +30,7 @@ export type ClayMarkName =
   | 'chain'
   | 'signet-ring'
   | 'gemstone'
+  | 'estate-jewelry'
   | 'watch'
   | 'sterling-flatware'
   | 'coins'

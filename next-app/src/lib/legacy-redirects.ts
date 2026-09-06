@@ -30,6 +30,10 @@ export const LEGACY_REDIRECTS: Record<string, LegacyRedirect> = {
   '/auction-terms': { to: '/terms', permanent: true },
   '/vendor-terms': { to: '/terms', permanent: true },
 
+  // Short spoken/social alias for the live-prices page (2026-09-06). 307 on
+  // purpose: /live is a convenience, /spot-prices is the canonical URL.
+  '/live': { to: '/spot-prices', permanent: false },
+
   // Cart / saved items are drawers, not pages — keep habitual URLs off 404.
   '/cart': { to: '/shop', permanent: false },
   '/wishlist': { to: '/shop', permanent: false },

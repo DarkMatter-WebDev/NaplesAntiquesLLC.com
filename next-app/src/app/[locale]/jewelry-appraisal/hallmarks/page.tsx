@@ -200,6 +200,15 @@ export default async function HallmarksGuidePage({ params }: Props) {
               <MarkTable rows={goldMarks} isEs={isEs} accent="#735c00" label={isEs ? 'Sellos que significan oro macizo' : 'Marks that mean solid gold'} />
               <MarkTable rows={notGoldMarks} isEs={isEs} accent="#993c1d" label={isEs ? 'Sellos que significan capa de oro' : 'Marks that mean a gold layer'} />
             </div>
+            {/* 2026-09-06: the illustrated gold marks guide (31 photos) lives at
+                /gold-services/gold-marks. */}
+            <p className="mt-6 max-w-2xl text-sm leading-relaxed text-[#4d4635]">
+              {isEs ? (
+                <>¿Quiere ver los sellos de verdad? Nuestra <Link href={p('/gold-services/gold-marks')} className="font-semibold text-[#735c00] underline underline-offset-2">guía ilustrada de sellos de oro</Link> muestra 31 fotos — 10K, 14K, 18K y 14KP; 585, 750 y 375; gold-filled, HGE y vermeil; sellos británicos; firmas de Cartier y Tiffany; y PT950.</>
+              ) : (
+                <>Want to see the real thing? Our <Link href={p('/gold-services/gold-marks')} className="font-semibold text-[#735c00] underline underline-offset-2">illustrated gold marks guide</Link> shows 31 photographs — 10K, 14K, 18K and 14KP; 585, 750 and 375; gold-filled, HGE and vermeil; British hallmarks; Cartier and Tiffany signatures; and PT950.</>
+              )}
+            </p>
           </div>
         </section>
 
@@ -217,6 +226,15 @@ export default async function HallmarksGuidePage({ params }: Props) {
             <MarkTable rows={silverMarks} isEs={isEs} accent="#735c00" label={isEs ? 'Sellos que significan plata maciza' : 'Marks that mean solid silver'} />
             <MarkTable rows={plateMarks} isEs={isEs} accent="#993c1d" label={isEs ? 'Sellos que significan chapado' : 'Marks that mean plate'} />
           </div>
+          {/* 2026-09-06: the illustrated silver marks guide (26 photos, most
+              from the shop's own pieces) lives at /silver-services/silver-marks. */}
+          <p className="mt-6 max-w-2xl text-sm leading-relaxed text-[#4d4635]">
+            {isEs ? (
+              <>¿Quiere ver los sellos de verdad? Nuestra <Link href={p('/silver-services/silver-marks')} className="font-semibold text-[#735c00] underline underline-offset-2">guía ilustrada de sellos de plata</Link> muestra 26 fotos — E.P.N.S. y EPBM, el león británico, STERLING y plata de moneda, 925 y los sellos del mundo — la mayoría de piezas que pasaron por nuestro mostrador.</>
+            ) : (
+              <>Want to see the real thing? Our <Link href={p('/silver-services/silver-marks')} className="font-semibold text-[#735c00] underline underline-offset-2">illustrated silver marks guide</Link> shows 26 photographs — E.P.N.S. and EPBM, the British lion, STERLING and coin silver, 925 and the world marks — most from pieces that came across our own counter.</>
+            )}
+          </p>
         </section>
 
         {/* Tests and their limits */}

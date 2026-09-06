@@ -61,6 +61,7 @@ export default async function HomePage({ params }: Props) {
   const evalHref = isEs ? '/es/free-evaluation' : '/free-evaluation';
   const contactHref = isEs ? '/es/contact' : '/contact';
   const silverHref = isEs ? '/es/silver-services' : '/silver-services';
+  const estateHref = isEs ? '/es/estate-jewelry' : '/estate-jewelry';
 
   const carousel = await getHomeCarouselPayload(HOME_CAROUSEL_FALLBACK);
   // Admin-editable announcement strip; null when switched off or empty.
@@ -265,6 +266,22 @@ export default async function HomePage({ params }: Props) {
                   : 'Free appraisals on gold jewelry, coins, and bullion. Unlike melt-only buyers, we price jewelry as metal and as jewelry and pay whichever is higher.',
                 href: evalHref,
                 cta: isEs ? 'Evaluación gratuita →' : 'Free evaluation →',
+              },
+              {
+                // Added 2026-09-05 (owner: "we mainly buy jewelry" — the strip
+                // had We Buy Gold / We Buy Silver / We SELL Jewelry, and no
+                // buy-side jewelry card at all). Second so the two buy-side
+                // services lead. Claims are the estate-jewelry page's own
+                // (maker / gemstones / era; immediate payment upon agreement).
+                // Dedicated mark (owner's icon-estate-jewelry-collection, 2026-09-05)
+                // — the gemstone was a stand-in until it arrived.
+                mark: 'estate-jewelry',
+                title: isEs ? 'Compramos Joyería de Patrimonio en Naples' : 'We Buy Estate Jewelry in Naples',
+                body: isEs
+                  ? 'Piezas firmadas, de diseñador y antiguas, evaluadas por fabricante, gemas y época — con precio de joyería, no solo de metal. Pago inmediato al llegar a un acuerdo.'
+                  : 'Signed, designer, and antique pieces evaluated for maker, gemstones, and era — priced as jewelry, not just metal. Immediate payment upon agreement.',
+                href: estateHref,
+                cta: isEs ? 'Vender joyería →' : 'Sell jewelry →',
               },
               {
                 // Added 2026-09-01 (owner chose this over an inline link in the

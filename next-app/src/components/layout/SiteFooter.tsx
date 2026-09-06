@@ -44,6 +44,7 @@ export default function SiteFooter({ locale }: Props) {
 
   const companyLinks = [
     { label: isEs ? 'Nosotros' : 'About', href: p('/about') },
+    { label: isEs ? 'Precios de Metales en Vivo' : 'Live Metal Prices', href: p('/spot-prices') },
     { label: isEs ? 'Contacto' : 'Contact', href: p('/contact') },
     { label: isEs ? 'Mi Cuenta' : 'My Account', href: p('/account') },
   ];

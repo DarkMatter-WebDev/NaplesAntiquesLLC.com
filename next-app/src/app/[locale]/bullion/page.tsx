@@ -149,6 +149,11 @@ export default async function BullionPage({ params }: Props) {
                 ? 'Gráficos cortesía de TradingView. Los precios spot son un punto de referencia, no una promesa de pago. Las ofertas finales se basan en el spot en vivo, el peso verificado, la pureza, la forma y el margen acordado.'
                 : 'Charts powered by TradingView. Spot prices are a reference point, not a promise of payout. Final offers are based on live spot, verified weight and purity, form, and agreed margin.'}
             </p>
+            <p className="mt-4 text-center text-sm">
+              <Link href={isEs ? '/es/spot-prices' : '/spot-prices'} className="font-semibold text-[#735c00] underline underline-offset-2">
+                {isEs ? 'Vea cada gráfico a tamaño completo, con rangos de un día a cinco años →' : 'See each chart full size, with ranges from one day to five years →'}
+              </Link>
+            </p>
           </div>
         </section>
 
