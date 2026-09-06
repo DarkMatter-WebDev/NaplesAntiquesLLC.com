@@ -5,7 +5,44 @@
 
 ## ◻ OPEN — needs a human
 
-### 🔴 DEPLOY the staged batch (no SQL, no env vars): homepage fifth card + /silver-services hero fix + silver marks GUIDE PAGE + lander reorder + /spot-prices live-prices page + GOLD marks guide
+✅ **RESOLVED 2026-09-07 — unknown root-level image paths now 404** (were
+500). Fix: `dynamicParams = false` on the home route; reproduced and
+verified on a production start; see `CHANGELOG.md` 2026-09-07. Confirm on
+production after the push: `/money.jpg` → 404.
+
+### 🔴 DEPLOY the staged change (no SQL, no env vars): old-site image URLs 500 → 404
+
+One file: `[locale]/(home)/page.tsx` gains `export const dynamicParams =
+false` (page-scoped). After the push: `https://naplesestatejewelry.com/money.jpg`
+and `/nonexistent-xyz.jpg` → 404 (branded not-found page); `/`, `/es`, a
+product page, `/sell/naples` → 200. Details in `CHANGELOG.md` 2026-09-07.
+
+### ✅ DEPLOYED 2026-09-06 (late night) — homepage fifth card + /silver-services hero fix + silver marks GUIDE PAGE + lander reorder + /spot-prices live-prices page + GOLD marks guide + expand hints + image cleanup
+
+Owner: "pushed and deployed, verify it live." Verified over HTTP on
+production (2026-09-06, late night): every new/changed URL 200 (EN + ES
+guides, /spot-prices EN + ES, hallmarks, bullion, sitemap); `/live` → 307 →
+`/spot-prices` → 200; homepage carries `mark-estate-jewelry.webp`; silver
+lander has the new h2 order (spot · estate tiles · testing · Sterling or
+Plate · marks teaser · recently · CTA), the lg:from-45% hero wash, the -v2
+flatware tile and `silver-bullion.webp`, 5 links into the silver guide and
+NO `#silver-marks` section; silver guide 26 tiles + 5 expand hints + gold
+link + BreadcrumbList; gold lander 5 teaser links + /spot-prices link; gold
+guide 31 tiles + 5 hints + 5 shop tags + silver link + Disney hero;
+hallmarks page links to both guides; /spot-prices renders the four figures
+as text with "not an offer" and the Updated line (ISR); bullion links to
+/spot-prices; sitemap lists all three new URLs EN + ES; new images serve
+`image/webp`; the seven deleted images and their old redirect sources 404
+(expected). "Live Metal Prices" in the header/footer HTML.
+
+**Still owed after this deploy:** GSC indexing requests for the three new
+URLs (EN + ES each: silver-marks, gold-marks, spot-prices) — see the GSC
+quota note in memory; owner to read the gold captions once; two text-only
+marks (French eagle head, 22K/916) and the 999.9 bar photo to replace from
+the bench when convenient; the /free-evaluation desk photo.
+
+The text below is the pre-deploy record.
+
 
 **Expand hint (2026-09-06, late night +):** every photo bank on both marks
 guides now opens with "Tap or click any photo to expand it" (EN/ES), from
@@ -78,9 +115,10 @@ full-size and close with the × or Esc; check the same on the phone.
 ◻ Owner: read the captions once for anything you would phrase
 differently from behind the counter (each is one line in
 `SilverMarksSection.tsx`).
-◻ Root `pics/silver/` (the owner's 42-image source cache, ~1 MB) is EXCLUDED
-from the staging sync (`/XD "$srcpics"`) and still on disk — say "delete"
-and it goes, like `icon pack/` did. Nothing in the app reads it.
+✅ Root `pics/silver/` DELETED 2026-09-07 on the owner's word (backed up in
+the session scratchpad first; nothing in the app read it).
+
+**Staging (500 fix + pics deleted):** ✅ synced 2026-09-07 — dry run listed exactly the 4 touched files ((home)/page.tsx + 3 docs), 0 Extras, run WITHOUT the pics exclusion now that the folder is gone; real run copied 4; follow-up dry run 0/0/0; leak check 0; home page hash MATCH. Gate: tsc 0 - lint 0 - 1225/1225 - build exit 0, 479 static pages; production-start check: unknown image paths 404, everything else 200.
 
 **Staging (expand hint):** ✅ synced 2026-09-06 (late night +) — dry run listed exactly the 5 touched files (MarkGallery.tsx, SilverMarksSection.tsx, GoldMarksSection.tsx + 2 docs), 0 Extras, checked against the expected list; real run copied 5; follow-up dry run 0/0/0; leak check 0; MarkGallery.tsx hash MATCH. 1055 files on disk. Gate: tsc 0 · lint 0 · 1225/1225 · build exit 0, 479 static pages.
 

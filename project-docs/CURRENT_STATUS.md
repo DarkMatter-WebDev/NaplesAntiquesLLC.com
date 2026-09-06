@@ -8,6 +8,21 @@
 
 **Read this, then `TASKS.md`.**
 
+🟡 **09-07 — old-site image URLs 500 → 404, STAGED (one file:
+`dynamicParams = false` on the home route; reproduced + verified on a
+production start). Root `pics/` cache DELETED on the owner's word.** After
+the push check `/money.jpg` → 404 on production.
+
+✅ **09-06 (late night) — the whole 09-05/09-06 bundle is DEPLOYED and
+production-verified** (owner: "pushed and deployed, verify it live"):
+homepage fifth card, silver hero fix, silver marks guide + lander reorder +
+tile fixes, `/spot-prices` (+ `/live` alias), gold marks guide + teaser +
+hallmarks links, expand hints, seven unused images deleted. Every URL 200,
+`/live` 307 → 200, sitemap carries the three new URLs EN + ES. Staging
+equals source. **Owed: GSC indexing requests for silver-marks, gold-marks
+and spot-prices (EN + ES).** The 🟡 blocks below are the pre-deploy record.
+
+
 🟡 **09-06 (late night) — `/gold-services/gold-marks` BUILT + STAGED** (EN +
 ES): the gold twin of the silver marks guide — 31 stamp photos (5 shop, 26
 eBay sold listings, found by searching the item and reading the gallery —

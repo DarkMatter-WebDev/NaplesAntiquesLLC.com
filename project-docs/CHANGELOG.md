@@ -33,6 +33,47 @@ legacy image redirects in the root `netlify.toml` (old static-site URLs
 paths); a 301 to a missing file is a 404 with extra steps, so those five
 rules were removed too. 18 page images remain (+ the silver-marks folder).
 
+## 2026-09-07 — old-site image URLs: 500 → 404 (home route `dynamicParams = false`); root `pics/` cache DELETED (STAGED, awaiting push)
+
+Owner: "delete the pics/silver cache folder, and do what you need to to fix
+that old-site images urls issue."
+
+**The 500.** Reproduced with `next build` + `next start` (dev never shows
+it — dev renders everything dynamically): `/nonexistent-xyz.jpg` → 500,
+server log `Page changed from static to dynamic at runtime
+/nonexistent-xyz.png, reason: headers`. Chain: the locale proxy's matcher
+excludes paths with a file extension (so real static files are never
+rewritten), so a locale-less `/money.jpg` reaches the app router as
+`/[locale]` with locale = "money.jpg"; the `[locale]` layout is statically
+generated for en/es, and rendering an unknown param on demand hits a
+dynamic API (headers) inside a static route → Next throws instead of
+404ing. **Fix:** `export const dynamicParams = false` on the HOME page
+(`[locale]/(home)/page.tsx`) — the only route `/<anything>.jpg` can match —
+so locales outside `generateStaticParams` (en, es) 404 without rendering.
+Page-scoped on purpose: the same flag on the `[locale]` layout could 404
+product pages published after a build. Verified on a production start:
+`/nonexistent-xyz.jpg`, `.png`, `/money.jpg` → 404 (the branded root
+not-found page: "Page Not Found / Go Home / Browse Shop"); `/`, `/es`,
+`/sell/naples`, `/gold-services/gold-marks`, `/shop`, a product page,
+`/favicon.ico` → 200; the surviving old-site image redirects
+(`/bullion.jpg`, `/chris.png`) are handled by netlify.toml before this and
+still 301. ℹ️ `next start` logs `Error: Internal: NoFallbackError` once per
+such 404 — that is Next's internal signal for a `dynamicParams=false` miss,
+not a failure. Verify on production after the push:
+`https://naplesestatejewelry.com/money.jpg` → 404.
+
+**`pics/` deleted.** The owner's 42-image silver source cache (~1.1 MB)
+that fed the marks section — nothing in the app read it, it was excluded
+from every staging sync (`/XD "$src\pics"`), and it is backed up in the
+session scratchpad (`deleted-2026-09-06-pics-silver/`). The `/XD` exclusion
+in the sync command is now moot; harmless if left.
+
+## 2026-09-06 (late night) — bundle DEPLOYED + production-verified (fifth homepage card · silver hero fix · silver marks guide + lander reorder + tile fixes · /spot-prices + /live · gold marks guide + teaser + hallmarks links · expand hints · image cleanup)
+
+Owner: "pushed and deployed, verify it live." Verified over HTTP — details
+in `TASKS.md` (the ✅ DEPLOYED item). Nothing left on our side; the three
+new URLs (EN + ES) still need GSC indexing requests.
+
 ## 2026-09-06 (late night, +) — both marks guides: "Tap or click any photo to expand it" note above every photo bank (STAGED, awaiting push)
 
 Owner: "on the silver and gold illustrated guides, add a note for the user

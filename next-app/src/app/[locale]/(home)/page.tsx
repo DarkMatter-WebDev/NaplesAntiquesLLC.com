@@ -21,6 +21,18 @@ import { getHomeBanner } from '@/lib/home-banner-server';
 import { resolveHomeBanner } from '@/lib/home-banner';
 import type { CarouselItem } from '../../../../carousel/lib/carouselData';
 
+// 2026-09-06: a locale-less path with a file extension (`/money.jpg`, an old
+// static-site image URL) bypasses the locale proxy (its matcher excludes
+// extensions so real static files are not rewritten) and lands here as
+// `/[locale]` with locale = "money.jpg". Rendering that on demand tripped
+// Next's "page changed from static to dynamic at runtime (headers)" error —
+// a 500 on production for every dead old-site image URL. With
+// `dynamicParams = false` the home route only serves the locales from the
+// layout's generateStaticParams (en, es) and 404s everything else without
+// rendering. Page-scoped on purpose: the same flag on the [locale] layout
+// would risk 404-ing product pages published after a build.
+export const dynamicParams = false;
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   const isEs = locale === 'es';
