@@ -8,6 +8,13 @@ import { normalizeProductQuantity, normalizeProductStatus } from '@/types/produc
 import { EbayApiError, ebayFetch, ebayTradingGetItemStatus, type EbayTradingItemStatus } from './client';
 import { EBAY_BULK_ENQUEUE_LIMIT, EBAY_EXCLUDED_PRODUCT_IDS } from './guards';
 import { MAX_PRICE_PUSH_ATTEMPTS } from '@/lib/marketplace-price-chip';
+import {
+  classifyDriftRepair,
+  countDriftRepairs,
+  driftRepairOutcomeLevel,
+  formatDriftRepairSummary,
+  type DriftRepairOutcome,
+} from '@/lib/marketplace-drift-repair';
 import { ensureFreshAccessToken } from './auth';
 import {
   buildMappedPayload,
@@ -1933,7 +1940,12 @@ export function detectEbayStatusDrift(
 export interface EbayReconcileResult {
   scanned: number;
   drifted: number;
+  /** Direct withdraw/hide/restore succeeded and the drift is gone. */
   repaired: number;
+  /** eBay refused the write but already showed the listing ended; local row pulled in line. */
+  reconciled: number;
+  /** Still drifted after the write AND the read-only check. */
+  failed: number;
   remaining: number;
   skipped: boolean;
 }
@@ -1949,7 +1961,7 @@ const RECONCILE_BUDGET_MS = 20_000;
 export async function reconcileEbayStatusDrift(): Promise<EbayReconcileResult> {
   const deadlineAt = Date.now() + RECONCILE_BUDGET_MS;
   const service = createServiceClient();
-  const empty: EbayReconcileResult = { scanned: 0, drifted: 0, repaired: 0, remaining: 0, skipped: true };
+  const empty: EbayReconcileResult = { scanned: 0, drifted: 0, repaired: 0, reconciled: 0, failed: 0, remaining: 0, skipped: true };
 
   try {
     const connectionRow = await getConnection(service);
@@ -1970,7 +1982,7 @@ export async function reconcileEbayStatusDrift(): Promise<EbayReconcileResult> {
       .in('sync_state', ['published', 'out_of_date', 'hidden_oos', 'ended']);
     if (error) throw new Error(error.message);
     const listings = (listingRows ?? []) as EbayListingRow[];
-    if (!listings.length) return { scanned: 0, drifted: 0, repaired: 0, remaining: 0, skipped: false };
+    if (!listings.length) return { scanned: 0, drifted: 0, repaired: 0, reconciled: 0, failed: 0, remaining: 0, skipped: false };
 
     const { data: productRows } = await service
       .from('products')
@@ -1985,22 +1997,33 @@ export async function reconcileEbayStatusDrift(): Promise<EbayReconcileResult> {
       (listing) => detectEbayStatusDrift(listing, products.get(listing.product_id) ?? null) !== null,
     );
 
-    let repaired = 0;
+    // One outcome per attempted listing. A repair is counted from the state
+    // that FOLLOWED the attempt, never from the attempt itself — see
+    // marketplace-drift-repair.ts for why (inventory #75 was "repaired" 197
+    // times while eBay refused every write with HTTP 400).
+    const outcomes: DriftRepairOutcome[] = [];
     for (const listing of drifted) {
       // Checked per product, not per batch: one repair is one marketplace call,
       // so the overshoot is a single item.
-      if (repaired > 0 && Date.now() > deadlineAt) break;
-      // Delegate. handleProductStatusChange re-reads state and owns the
-      // withdraw-vs-quantity-zero choice, the backoff and the logging.
-      await handleProductStatusChange([listing.product_id]);
-      repaired += 1;
+      if (outcomes.length > 0 && Date.now() > deadlineAt) break;
+      outcomes.push(
+        await repairEbayStatusDrift(
+          service,
+          connectionRow,
+          listing.product_id,
+          detectEbayStatusDrift(listing, products.get(listing.product_id) ?? null),
+        ),
+      );
     }
 
+    const counts = countDriftRepairs(outcomes);
     const result: EbayReconcileResult = {
       scanned: listings.length,
       drifted: drifted.length,
-      repaired,
-      remaining: drifted.length - repaired,
+      repaired: counts.repaired,
+      reconciled: counts.reconciled,
+      failed: counts.failed,
+      remaining: drifted.length - outcomes.length,
       skipped: false,
     };
     // Logged even on a clean run: "the sweep ran and found nothing" is the
@@ -2008,8 +2031,8 @@ export async function reconcileEbayStatusDrift(): Promise<EbayReconcileResult> {
     // from a cron that stopped firing.
     await insertSyncLog(service, {
       action: 'reconcile_status',
-      outcome: result.remaining ? 'warning' : 'ok',
-      message: `eBay status reconcile: ${result.scanned} scanned, ${result.drifted} drifted, ${result.repaired} repaired, ${result.remaining} deferred.`,
+      outcome: driftRepairOutcomeLevel(result),
+      message: formatDriftRepairSummary('eBay', result),
       detail: { ...result },
     });
     return result;
@@ -2034,39 +2057,125 @@ export async function handleProductStatusChange(productIds: string[]): Promise<v
 
     for (const productId of productIds) {
       try {
-        const listing = await getListing(service, productId);
-        if (!listing?.ebay_listing_id) continue;
-
-        const { data: productRow } = await service.from('products').select('status, quantity').eq('id', productId).maybeSingle();
-        if (!productRow) continue;
-        const status = normalizeProductStatus(productRow.status);
-        const quantity = normalizeProductQuantity(productRow.quantity);
-        const isSoldOut = status === 'sold' || quantity <= 0;
-
-        if (status === 'archived' || status === 'draft') {
-          if (listing.sync_state !== 'ended') await withdrawListing(service, listing, productId);
-        } else if (isSoldOut) {
-          if (listing.sync_state === 'published' || listing.sync_state === 'out_of_date') {
-            if (connectionRow.sold_handling === 'withdraw') {
-              await withdrawListing(service, listing, productId);
-            } else {
-              await hideListingQuantityZero(service, listing, productId);
-            }
-          }
-        } else if (status === 'available' && quantity > 0 && listing.sync_state === 'hidden_oos') {
-          await restoreListingQuantity(service, listing, productId, productRow.quantity);
-        }
+        await applyEbayProductStatus(service, connectionRow, productId);
       } catch (err) {
-        const service2 = createServiceClient();
-        await insertSyncLog(service2, {
-          product_id: productId,
-          action: 'status_change_hook',
-          outcome: 'error',
-          message: err instanceof Error ? err.message : 'Unknown error.',
-        });
+        await logEbayStatusRefusal(productId, err);
       }
     }
   } catch {
     // Never throw — fire-and-forget contract.
   }
+}
+
+/**
+ * Apply the product's CURRENT status to its eBay listing (withdraw, quantity
+ * zero, or restore — the owner's sold_handling choice decides which). Re-reads
+ * both rows so a stale caller cannot act on old state. THROWS on an eBay
+ * refusal; the caller decides what a refusal means (the hook logs it, the
+ * sweep falls back to a read-only status check).
+ */
+async function applyEbayProductStatus(
+  service: SupabaseClient,
+  connectionRow: EbayConnectionRow,
+  productId: string,
+): Promise<'repaired' | 'noop'> {
+  const listing = await getListing(service, productId);
+  if (!listing?.ebay_listing_id) return 'noop';
+
+  const { data: productRow } = await service.from('products').select('status, quantity').eq('id', productId).maybeSingle();
+  if (!productRow) return 'noop';
+  const status = normalizeProductStatus(productRow.status);
+  const quantity = normalizeProductQuantity(productRow.quantity);
+  const isSoldOut = status === 'sold' || quantity <= 0;
+
+  if (status === 'archived' || status === 'draft') {
+    if (listing.sync_state === 'ended') return 'noop';
+    await withdrawListing(service, listing, productId);
+    return 'repaired';
+  }
+  if (isSoldOut) {
+    if (listing.sync_state !== 'published' && listing.sync_state !== 'out_of_date') return 'noop';
+    if (connectionRow.sold_handling === 'withdraw') {
+      await withdrawListing(service, listing, productId);
+    } else {
+      await hideListingQuantityZero(service, listing, productId);
+    }
+    return 'repaired';
+  }
+  if (status === 'available' && quantity > 0 && listing.sync_state === 'hidden_oos') {
+    await restoreListingQuantity(service, listing, productId, productRow.quantity);
+    return 'repaired';
+  }
+  return 'noop';
+}
+
+async function logEbayStatusRefusal(productId: string, err: unknown): Promise<void> {
+  try {
+    const service = createServiceClient();
+    const listing = await getListing(service, productId);
+    await insertSyncLog(service, {
+      product_id: productId,
+      listing_id: listing?.ebay_listing_id ?? null,
+      action: 'status_change_hook',
+      outcome: 'error',
+      message: err instanceof EbayApiError
+        ? `eBay refused the status change (HTTP ${err.status}): ${err.operatorMessage}`
+        : err instanceof Error ? err.message : 'Unknown error.',
+      detail: err instanceof EbayApiError ? { status: err.status, code: err.code, response: err.detail ?? null } : null,
+    });
+  } catch {
+    // Logging must never throw out of a fire-and-forget hook.
+  }
+}
+
+/**
+ * One drifted listing, for the sweep. eBay refuses a quantity or withdraw
+ * write on a listing it has already ended (a `Completed` item — inventory #75,
+ * 2026-09-07 — answered every write with HTTP 400 for 17 days), so a refused
+ * write is followed by the read-only status check, which maps eBay's real
+ * state into the local row (`reconcileEbayStateFromOffer` + the relist chain).
+ * The outcome is judged from the re-read state afterwards, never from the
+ * write's own return.
+ */
+async function repairEbayStatusDrift(
+  service: SupabaseClient,
+  connectionRow: EbayConnectionRow,
+  productId: string,
+  driftBefore: EbayStatusDrift,
+): Promise<DriftRepairOutcome> {
+  if (driftBefore === null) return 'noop';
+  let directError = false;
+  try {
+    await applyEbayProductStatus(service, connectionRow, productId);
+  } catch (err) {
+    directError = true;
+    await logEbayStatusRefusal(productId, err);
+    // checkListingStatus never throws — a failed check returns error: true and
+    // leaves the row alone, which the re-read below then reports as 'failed'.
+    await checkListingStatus(productId);
+  }
+
+  const listingAfter = await getListing(service, productId);
+  const { data: productAfter } = await service.from('products').select('status, quantity').eq('id', productId).maybeSingle();
+  const driftAfter = listingAfter ? detectEbayStatusDrift(listingAfter, productAfter ?? null) : null;
+  const outcome = classifyDriftRepair({ driftBefore, directError, driftAfter });
+
+  if (outcome === 'reconciled') {
+    await insertSyncLog(service, {
+      product_id: productId,
+      listing_id: listingAfter?.ebay_listing_id ?? null,
+      action: 'reconcile_status',
+      outcome: 'warning',
+      message: `eBay refused the status change but already shows this listing closed on its side — local state reconciled to ${listingAfter?.sync_state ?? 'unknown'}.`,
+    });
+  } else if (outcome === 'failed') {
+    await insertSyncLog(service, {
+      product_id: productId,
+      listing_id: listingAfter?.ebay_listing_id ?? null,
+      action: 'reconcile_status',
+      outcome: 'error',
+      message: `Still out of sync after the status change and a status check (product ${productAfter?.status ?? 'unknown'}, listing ${listingAfter?.sync_state ?? 'unknown'}) — needs a look in Admin.`,
+    });
+  }
+  return outcome;
 }

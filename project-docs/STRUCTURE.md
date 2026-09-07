@@ -42,7 +42,7 @@ NaplesEstateJewelry.co/
     |-- next.config.ts
     |-- netlify/
     |   |-- edge-functions/
-    |   `-- functions/             # scheduled marketplace + social-drip triggers
+    |   `-- functions/             # DEAD Netlify scheduled functions (never ran; pg_cron owns triggers since 2026-09-07 — delete after the overlap, TASKS.md)
     |-- messages/
     |-- public/
     |   |-- assets/

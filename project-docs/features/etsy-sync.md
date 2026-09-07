@@ -47,6 +47,16 @@ retains a unique accumulated warning set across all bounded image requests and
 does not use display text alone as a React key, preventing identical source-size
 advisories from triggering the Next.js duplicate-key overlay.
 
+**2026-09-07 reconcile-on-refusal:** a refused delist/relist (Etsy will not
+change the state of a listing it already closed — a sold single-quantity
+listing sits in `edit`, quantity 0, and `updateListing` answers "/quantity :
+cannot be empty") no longer loops. The hook logs the refusal as a
+`status_change_hook` error row (was console-only); the 30-minute sweep then
+runs the read-only status check, which maps `edit`/`sold_out` → `delisted`,
+and counts the listing as **reconciled**, not repaired. Summary row:
+`N scanned, D drifted, R repaired, C reconciled, F failed, X deferred`.
+Shared pure bookkeeping: `src/lib/marketplace-drift-repair.ts`.
+
 **2026-07-21 status-drift fix:** An active Etsy status check preserves local
 `out_of_date` instead of replacing it with `active`. Remote lifecycle and local
 content freshness remain independent, and the result explains that the listing

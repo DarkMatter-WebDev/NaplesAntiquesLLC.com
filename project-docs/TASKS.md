@@ -5,7 +5,129 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 STAGED 2026-09-07 (later still) — admin "Subscribed" column + "Joined" line + Eastern-time stamps (no SQL, no env vars)
+### 🟡 STAGED 2026-09-07 (day, later) — status-sweep reconcile-on-refusal + honest repair counts (no SQL, no env vars) — awaiting push
+
+Built on the owner's word ("build the delist loop fix"). 4 app files + 1 new
+test; details and the dev-server proof in `CHANGELOG.md` 2026-09-07 (day,
+later). Gate: `tsc` 0 · lint 0 · **1235/1235 (123 files)** · `npm run build`
+exit 0 · dev run: both channels `1 drifted → 1 reconciled`, second run
+`0 drifted`; #19 now `delisted`, #75 now `hidden_oos`.
+
+◻ **Owner: push** (bundle with anything else pending — nothing else is in
+flight). After the deploy, the next two production sweep rows
+(`ebay_sync_log` / `etsy_sync_log`, action `reconcile_status`) should read
+`… 0 drifted, 0 repaired, 0 reconciled, 0 failed, 0 deferred.` — the new
+six-number format is itself the proof the new code is live. Nothing else to
+check; the two stale rows were reconciled from the dev run already.
+
+**Staging (sweep fix):** ✅ synced 2026-09-07 (day, later) — dry run listed exactly the 10 touched files (marketplace-drift-repair.ts NEW, marketplace-drift-repair.test.ts NEW, etsy/sync.ts, ebay/sync.ts + CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS, features/etsy-sync.md, features/ebay-sync.md), 0 Extras; real run copied 10; follow-up dry run 0/0/0; leak check 0; hashes MATCH on the four code files and TASKS.md. 1055 files on disk. Gate: tsc 0 · lint 0 · 1235/1235 (123 files) · build exit 0 · dev run both channels 1 reconciled → second run 0 drifted. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### 🟢 LIVE 2026-09-07 (day) — all seven scheduled jobs now fire from Supabase pg_cron (verified); GitHub + Netlify overlap window OPEN; cleanup owed; two owner decisions
+
+`supabase/scheduled-jobs-pg-cron-2026-09.sql` run by the owner 2026-09-07
+~13:20Z (the four `*_CRON_SECRET` values added to Vault first). Verified from
+the logs: manual fire 13:22:44Z; first scheduled fire **13:30:03Z Etsy /
+13:30:10Z eBay**. No app code changed. Detail: `CHANGELOG.md` 2026-09-07 (day).
+
+◻ **Next session — confirm the remaining secrets and the daily cadence**
+(read-only, service key; count-script pattern in memory
+`github-cron-degraded-2026-08-27`):
+1. `instagram_sync_log` / `facebook_sync_log` `scheduled_drip` rows at 16:00Z,
+   17:00Z … on 09-07 — proves `INSTAGRAM_CRON_SECRET` / `FACEBOOK_CRON_SECRET`
+   in Vault (a 401 writes no row). Then `refresh-token` on Monday 09-14 12:15Z.
+2. `scheduled_price_push` rows on 09-08 at **11:15Z (Etsy) / 11:45Z (eBay)
+   sharp**. GitHub's copies arrive 30 min to 10 h later — two rows/day per
+   channel is EXPECTED during the overlap.
+3. `reconcile_status` rows/day per channel → **48**. Supabase dashboard →
+   Integrations → Cron lists the seven `nej-*` jobs with run history;
+   `net._http_response` holds each call's HTTP status for ~6 h.
+◻ **After 1–2 clean days — remove the duplicates (one small batch; bundle with
+whatever else is pending):** delete the `schedule:` block from
+`.github/workflows/scheduled-jobs.yml` (keep `workflow_dispatch` for manual
+runs; rewrite its header), delete `next-app/netlify/functions/*.mts` (5 files,
+never executed once), and fix the copy in `ARCHITECTURE.md`, `DECISIONS.md`
+and Admin Settings that names "the Netlify function log" as the place to look
+(`resolvePricePushHealth` copy). Then `npm run build`. Rollback if pg_cron
+ever misbehaves: `select cron.unschedule(jobname) from cron.job where jobname
+like 'nej-%';` — the GitHub schedule is still there until this cleanup.
+✅ **Delist-retry loop — FIXED (built + dev-verified, staged above).**
+◻ **Owner decision — inbound marketplace-sale detection (proposed 09-07, NOT
+built).** Today a sale on eBay/Etsy is marked sold on the site by hand, and
+the hook then closes the other marketplace. Proposal: **stage 1 detect-only** —
+from the 30-min sweep, poll eBay orders (`sell.fulfillment.readonly`; needs a
+one-time OAuth reconnect) and Etsy shop receipts (`transactions_r`; reconnect),
+match line items by SKU (both listing tables store it), and when a paid,
+uncancelled order names a product still `available`, write a log row and email
+the owner. **Stage 2** — flip to auto-mark-sold through the same path checkout
+uses (which triggers the existing cross-channel delist) once real sales have
+proven the match. **Stage 3 (optional)** — eBay sale webhook for seconds-level
+response (Etsy has no order webhooks). Bundle an admin "last sweep ran N min
+ago" line (red past an hour) so a stalled scheduler is visible — the GitHub
+degradation went unnoticed for eleven days. Rationale: `DECISIONS.md` →
+*"A scheduler is judged by its log rows"*.
+
+**Staging (pg_cron + docs):** ✅ synced 2026-09-07 (day) — dry run listed exactly the 8 touched files (scheduled-jobs-pg-cron-2026-09.sql NEW, scheduled-jobs.yml + CHANGELOG, CURRENT_STATUS, DECISIONS, ARCHITECTURE, STRUCTURE, TASKS), 0 Extras; real run copied 8; follow-up dry run 0/0/0; leak check 0; launch.json present; hashes MATCH on the SQL file, the workflow, TASKS.md and DECISIONS.md. 1053 files on disk. No app code touched, so no build gate this batch (tsc/lint/tests/build unaffected). Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### ✅ 2026-09-07 (night) — six GSC indexing requests SETTLED; `/es/sell/dont-melt-it` already indexed; IndexNow 200 for 6
+
+Owner: "work through all open items you can." Done in the owner's Chrome
+(`.com` URL-prefix property) and from PowerShell:
+
+- **GSC Request Indexing — all six owed requests SETTLED**, each returned
+  "Indexing requested · URL was added to a priority crawl queue":
+  `/silver-services/silver-marks`, `/es/silver-services/silver-marks`,
+  `/gold-services/gold-marks`, `/es/gold-services/gold-marks`,
+  `/spot-prices`, `/es/spot-prices`. Every one inspected first and read
+  "URL is not on Google · URL is unknown to Google" before the request.
+  No quota wall (6 of the ~10/day used).
+- **`/es/sell/dont-melt-it` (owed since 09-04) needed NO request** —
+  inspection read "URL is on Google · Page is indexed"; quota saved.
+- **IndexNow (Bing)**: `npm run indexnow -- --urls=<the six>` from
+  PowerShell → **200 OK for 6**.
+- Not touched (not due or owner-only): the two GSC validations ("Page with
+  redirect" 46, "Blocked by robots.txt" 2) — read ~09-20; Bing recheck
+  ~09-10; the optional `#item=` contact-link change; GBP "Google updates
+  (1)"; the /free-evaluation bench photo; caption read-through.
+
+⚠️ **URL-inspection driving method that WORKS (recorded because three
+others silently failed tonight):** `form_input` sets the box but Return
+never submits; `type` after a coordinate click is swallowed; `type` after
+a ref click is swallowed too. What works: one `javascript_tool` call that
+finds the visible `input[role="combobox"]` whose aria-label starts with
+"Inspect", sets the value through the native `HTMLInputElement` value
+setter, dispatches `input`, then dispatches keydown/keypress/keyup
+`Enter` on it — the inspection runs (new `id=` in the tab URL, ~18 s).
+Then confirm the inspected URL from the page text, click REQUEST INDEXING
+by COORDINATE (the ref click did nothing; at the 1568-wide pane it sits at
+(1110, 260) in both the on-Google and not-on-Google layouts), wait ~40 s
+for "Testing if live URL can be indexed", read the `[role=dialog]` text
+for "Indexing requested" / "Quota exceeded", then click Dismiss by ref.
+This dispatches Enter on the input directly, so the REQUEST-AGAIN focus
+trap never fires. The direct `inspect?…&id=<url>` deep link 404s — the
+`id` is an opaque token, not the URL.
+
+**What is left, with dates:**
+- ◻ ~2026-09-10 — Bing Webmaster Tools recheck (six re-requested URLs,
+  sitemap resubmitted 09-03; also whether IndexNow's six show under
+  Webmaster Tools → IndexNow).
+- ◻ ~2026-09-20 — GSC → Pages: read the two validations started 9/6
+  ("Page with redirect" 46 → expect pass as the `/en/...` 308s are
+  recrawled; "Blocked by robots.txt" 2 → expect pass, pages move to the
+  noindex bucket). Also glance at whether the six new URLs went from
+  "unknown" to indexed.
+- ◻ Owner decision — the optional `#item=` change for the 129 "alternate
+  canonical" `/contact?item=` URLs (not built; Google says no action).
+- ◻ Owner — GBP "Google updates (1)" review; /free-evaluation bench photo;
+  read the marks-guide captions once.
+
+### ✅ DEPLOYED 2026-09-07 (end of session) — admin "Subscribed" column + "Joined" line + Eastern-time stamps (owner-verified on production)
+
+Owner: "pushed and deployed, manually verified" (2026-09-07, end of
+session) — the owner checked the Subscribed column and the Joined line on
+production themselves (admin is behind login, so that is the only
+verification possible). Staging equals source; nothing in flight. The text below is the pre-deploy record.
+
+### (pre-deploy record) 🟡 STAGED 2026-09-07 (later still) — admin "Subscribed" column + "Joined" line + Eastern-time stamps (no SQL, no env vars)
 
 Owner asked for a timestamp on the Subscribers and Users tables. Both
 values were already in the database; this is display only. Details in
@@ -463,11 +585,12 @@ Manager also shows **"Google updates (1)"** pending on the profile (the
 pencil icon carries a red dot) — review it under Edit profile before it
 auto-applies.
 
-### ◻ 2026-09-04 — ONE GSC Request Indexing owed: `https://naplesestatejewelry.com/es/sell/dont-melt-it`
+### ✅ CLOSED 2026-09-07 — the ES dont-melt-it request was never needed: URL inspection on 09-07 read "URL is on Google · Page is indexed"
 
-The EN twin was requested 09-03 (10th success of the day); the ES request hit
-"Quota Exceeded" on the 11th. Submit it first thing next session, then stop.
-IndexNow already covered both URLs (200 OK for 2).
+(Original item, 2026-09-04: ONE GSC Request Indexing owed for
+`https://naplesestatejewelry.com/es/sell/dont-melt-it`. The EN twin was
+requested 09-03; the ES request hit "Quota Exceeded" on the 11th. IndexNow
+had covered both URLs.)
 
 ### ✅ DEPLOYED + production-verified 2026-09-03 (late) — "Don't Melt It Yet" page + homepage/city resale hook
 

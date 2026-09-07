@@ -5,6 +5,13 @@ import { fetchSpotData } from '@/lib/spot-price';
 import { getMarketplaceShippingTier } from '@/lib/checkout-shipping';
 import { getMarketplaceShippingProfileMap, resolveTierExternalId } from '@/lib/marketplace-shipping';
 import { MAX_PRICE_PUSH_ATTEMPTS } from '@/lib/marketplace-price-chip';
+import {
+  classifyDriftRepair,
+  countDriftRepairs,
+  driftRepairOutcomeLevel,
+  formatDriftRepairSummary,
+  type DriftRepairOutcome,
+} from '@/lib/marketplace-drift-repair';
 import type { Product, SpotData } from '@/types/product';
 import { normalizeProductJewelryType, normalizeProductQuantity, normalizeProductStatus } from '@/types/product';
 import { ensureFreshAccessToken } from './auth';
@@ -1377,7 +1384,12 @@ export function detectEtsyStatusDrift(
 export interface EtsyReconcileResult {
   scanned: number;
   drifted: number;
+  /** Direct delist/relist succeeded and the drift is gone. */
   repaired: number;
+  /** Etsy refused the write but already showed the listing closed; local row pulled in line. */
+  reconciled: number;
+  /** Still drifted after the write AND the read-only check. */
+  failed: number;
   remaining: number;
   skipped: boolean;
 }
@@ -1392,7 +1404,7 @@ const RECONCILE_BUDGET_MS = 20_000;
 export async function reconcileEtsyStatusDrift(): Promise<EtsyReconcileResult> {
   const deadlineAt = Date.now() + RECONCILE_BUDGET_MS;
   const service = createServiceClient();
-  const empty: EtsyReconcileResult = { scanned: 0, drifted: 0, repaired: 0, remaining: 0, skipped: true };
+  const empty: EtsyReconcileResult = { scanned: 0, drifted: 0, repaired: 0, reconciled: 0, failed: 0, remaining: 0, skipped: true };
 
   try {
     const connection = await getConnection(service);
@@ -1415,7 +1427,7 @@ export async function reconcileEtsyStatusDrift(): Promise<EtsyReconcileResult> {
       .in('sync_state', [...LIVE_LISTING_STATES, 'delisted']);
     if (error) throw new Error(error.message);
     const rows = (listingRows ?? []) as EtsyListingRow[];
-    if (!rows.length) return { scanned: 0, drifted: 0, repaired: 0, remaining: 0, skipped: false };
+    if (!rows.length) return { scanned: 0, drifted: 0, repaired: 0, reconciled: 0, failed: 0, remaining: 0, skipped: false };
 
     const { data: productRows } = await service
       .from('products')
@@ -1429,26 +1441,33 @@ export async function reconcileEtsyStatusDrift(): Promise<EtsyReconcileResult> {
       (row) => detectEtsyStatusDrift(row, products.get(row.product_id) ?? null) !== null,
     );
 
-    let repaired = 0;
+    // One outcome per attempted listing. A repair is counted from the state
+    // that FOLLOWED the attempt, never from the attempt itself — see
+    // marketplace-drift-repair.ts for why.
+    const outcomes: DriftRepairOutcome[] = [];
     for (const row of drifted) {
-      if (repaired > 0 && Date.now() > deadlineAt) break;
-      await handleProductStatusChange([row.product_id]);
-      repaired += 1;
+      if (outcomes.length > 0 && Date.now() > deadlineAt) break;
+      outcomes.push(
+        await repairEtsyStatusDrift(service, row.product_id, detectEtsyStatusDrift(row, products.get(row.product_id) ?? null)),
+      );
     }
 
+    const counts = countDriftRepairs(outcomes);
     const result: EtsyReconcileResult = {
       scanned: rows.length,
       drifted: drifted.length,
-      repaired,
-      remaining: drifted.length - repaired,
+      repaired: counts.repaired,
+      reconciled: counts.reconciled,
+      failed: counts.failed,
+      remaining: drifted.length - outcomes.length,
       skipped: false,
     };
     // Logged even on a clean run — a silent no-op is indistinguishable from a
     // cron that stopped firing.
     await insertSyncLog(service, {
       action: 'reconcile_status',
-      outcome: result.remaining ? 'warning' : 'ok',
-      message: `Etsy status reconcile: ${result.scanned} scanned, ${result.drifted} drifted, ${result.repaired} repaired, ${result.remaining} deferred.`,
+      outcome: driftRepairOutcomeLevel(result),
+      message: formatDriftRepairSummary('Etsy', result),
       detail: { ...result },
     });
     return result;
@@ -1468,25 +1487,113 @@ export async function handleProductStatusChange(productIds: string[]): Promise<v
 
     for (const productId of productIds) {
       try {
-        const listing = await getListing(service, productId);
-        if (!listing?.etsy_listing_id) continue; // never synced to Etsy — nothing to do
-
-        const { data: product } = await service.from('products').select('status').eq('id', productId).maybeSingle();
-        if (!product) continue;
-        const status = normalizeProductStatus(product.status);
-
-        if (status !== 'available' && LIVE_LISTING_STATES.includes(listing.sync_state)) {
-          await runDelist(productId);
-        } else if (status === 'available' && listing.sync_state === 'delisted') {
-          await runReactivate(productId);
-        }
+        await applyEtsyProductStatus(service, productId);
       } catch (err) {
         console.error(`Etsy auto-delist/relist failed for product ${productId}:`, err);
+        // A refusal used to stop here, in the console nobody reads on Netlify.
+        // It now leaves a row the admin can see, like the eBay hook always did.
+        await logEtsyStatusRefusal(service, productId, err);
       }
     }
   } catch (err) {
     console.error('Etsy auto-delist/relist hook failed:', err);
   }
+}
+
+/**
+ * Apply the product's CURRENT status to its Etsy listing — delist a live
+ * listing whose product is no longer available, reactivate a delisted one
+ * whose product is available again. Re-reads both rows so a stale caller
+ * cannot act on old state. THROWS on an Etsy refusal; the caller decides what
+ * a refusal means (the hook logs it, the sweep falls back to a read-only
+ * status check).
+ */
+async function applyEtsyProductStatus(service: SupabaseClient, productId: string): Promise<'repaired' | 'noop'> {
+  const listing = await getListing(service, productId);
+  if (!listing?.etsy_listing_id) return 'noop'; // never synced to Etsy — nothing to do
+  const { data: product } = await service.from('products').select('status').eq('id', productId).maybeSingle();
+  if (!product) return 'noop';
+
+  const drift = detectEtsyStatusDrift(listing, product);
+  if (drift === 'delist') {
+    await runDelist(productId);
+    return 'repaired';
+  }
+  if (drift === 'restore') {
+    await runReactivate(productId);
+    return 'repaired';
+  }
+  return 'noop';
+}
+
+async function logEtsyStatusRefusal(service: SupabaseClient, productId: string, err: unknown): Promise<void> {
+  try {
+    const listing = await getListing(service, productId);
+    await insertSyncLog(service, {
+      product_id: productId,
+      listing_id: listing?.etsy_listing_id ?? null,
+      action: 'status_change_hook',
+      outcome: 'error',
+      message: err instanceof EtsyApiError
+        ? `Etsy refused the status change (HTTP ${err.status}): ${err.operatorMessage}`
+        : err instanceof Error ? err.message : 'Unknown error.',
+      detail: err instanceof EtsyApiError ? { status: err.status, code: err.code, response: err.detail ?? null } : null,
+    });
+  } catch (logErr) {
+    console.error('Etsy status refusal could not be logged:', logErr);
+  }
+}
+
+/**
+ * One drifted listing, for the sweep. Etsy will not change the state of a
+ * listing it has already closed — a sold single-quantity listing sits in
+ * `edit` with quantity 0 (inventory #19, 2026-09-07) — so a refused delist is
+ * followed by the read-only status check, which maps Etsy's real state into
+ * the local row (`reconcileSyncStateFromEtsy`). The outcome is judged from the
+ * re-read state afterwards, never from the write's own return.
+ */
+async function repairEtsyStatusDrift(
+  service: SupabaseClient,
+  productId: string,
+  driftBefore: EtsyStatusDrift,
+): Promise<DriftRepairOutcome> {
+  if (driftBefore === null) return 'noop';
+  let directError = false;
+  try {
+    await applyEtsyProductStatus(service, productId);
+  } catch (err) {
+    directError = true;
+    await logEtsyStatusRefusal(service, productId, err);
+    try {
+      await checkListingStatus(productId);
+    } catch (checkErr) {
+      console.error(`Etsy status check after a refused status change failed for product ${productId}:`, checkErr);
+    }
+  }
+
+  const listingAfter = await getListing(service, productId);
+  const { data: productAfter } = await service.from('products').select('status').eq('id', productId).maybeSingle();
+  const driftAfter = listingAfter ? detectEtsyStatusDrift(listingAfter, productAfter ?? null) : null;
+  const outcome = classifyDriftRepair({ driftBefore, directError, driftAfter });
+
+  if (outcome === 'reconciled') {
+    await insertSyncLog(service, {
+      product_id: productId,
+      listing_id: listingAfter?.etsy_listing_id ?? null,
+      action: 'reconcile_status',
+      outcome: 'warning',
+      message: `Etsy refused the status change but already shows this listing ${listingAfter?.listing_state ?? 'closed'} on its side — local state reconciled to ${listingAfter?.sync_state ?? 'unknown'}.`,
+    });
+  } else if (outcome === 'failed') {
+    await insertSyncLog(service, {
+      product_id: productId,
+      listing_id: listingAfter?.etsy_listing_id ?? null,
+      action: 'reconcile_status',
+      outcome: 'error',
+      message: `Still out of sync after the status change and a status check (product ${productAfter?.status ?? 'unknown'}, listing ${listingAfter?.sync_state ?? 'unknown'}) — needs a look in Admin.`,
+    });
+  }
+  return outcome;
 }
 
 const PRICE_PRODUCT_COLUMNS = [

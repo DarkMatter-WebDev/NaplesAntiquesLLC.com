@@ -1,7 +1,168 @@
 
 # Changelog
 
-## 2026-09-07 (later still) — admin Subscribers table gains a "Subscribed" column; Users phone cards gain a "Joined" line; every admin Created/Updated stamp now reads in Eastern time (STAGED, awaiting push)
+## 2026-09-07 (day, later) — marketplace status sweeps: reconcile-on-refusal + honest repair counts BUILT, dev-verified, STAGED (no SQL, no env vars)
+
+Owner: "build the delist loop fix." Both status-drift sweeps had counted every
+repair ATTEMPT as "repaired" — Etsy #19 (sold on Etsy → Etsy state `edit`,
+quantity 0) and eBay #75 (eBay `Completed`) were "repaired" every run since
+late August while the marketplace refused every write. Correction to the
+morning entry: **eBay was never silent** — its hook wrote a
+`status_change_hook` error row on every attempt (197 rows for #75 since
+08-21, all reading the bare "eBay API error (HTTP 400)."); it was the SWEEP
+that counted the failed attempt as a repair. Etsy really was console-only.
+
+**What changed (app code, 4 files + 1 test):**
+- New `src/lib/marketplace-drift-repair.ts` (pure, shared by both channels the
+  way `marketplace-shipping` is): `classifyDriftRepair` judges an attempt from
+  the RE-READ state afterwards — `repaired` (direct write succeeded, drift
+  gone) · `reconciled` (write refused, read-only status check found the
+  listing already closed and pulled the local row in line) · `failed` (still
+  drifted) · `noop`; plus `countDriftRepairs`, `formatDriftRepairSummary`,
+  `driftRepairOutcomeLevel`. Test: `src/lib/__tests__/marketplace-drift-repair.test.ts`.
+- `lib/etsy/sync.ts`: the hook's per-product body is now `applyEtsyProductStatus`
+  (re-reads both rows, uses `detectEtsyStatusDrift`, THROWS on refusal); the
+  hook logs a refusal as a `status_change_hook` error row (was `console.error`
+  only); new `repairEtsyStatusDrift` = apply → on refusal log it, run
+  `checkListingStatus` (maps `edit`/`sold_out` → delisted), re-read, classify,
+  and write a `reconcile_status` row per reconciled/failed listing. Summary row
+  now `N scanned, D drifted, R repaired, C reconciled, F failed, X deferred`;
+  outcome `warning` when anything failed or was deferred. `EtsyReconcileResult`
+  gains `reconciled` + `failed`.
+- `lib/ebay/sync.ts`: the same shape — `applyEbayProductStatus` (keeps the
+  owner's `sold_handling` choice), `logEbayStatusRefusal` (now records
+  `{status, code, response}` in `detail`, so the bare "HTTP 400" has its
+  redacted body next to it), `repairEbayStatusDrift` (fallback =
+  `checkListingStatus`, which never throws). `EbayReconcileResult` gains the
+  same two fields. Routes unchanged (they return the result as-is).
+
+**Verified on the dev server against the live database** (the two routes
+POSTed once each with the cron secret): Etsy → `128 scanned, 1 drifted, 0
+repaired, 1 reconciled, 0 failed`; log rows for #19: `status_change_hook`
+error "Etsy refused the status change (HTTP 400): … There was a problem with
+/quantity : cannot be empty" → `check_status` ok "listing state: edit" →
+`reconcile_status` warning "reconciled to delisted"; `etsy_listings` row now
+`delisted` / `inactive`. eBay → `124 scanned, 1 drifted, 0 repaired, 1
+reconciled, 0 failed`; #75 → `status_change_hook` error → `verify` ok →
+`reconcile_status` warning "reconciled to hidden_oos" (eBay's GetOffer reports
+the ended item as out-of-stock; `hidden_oos` is not a drift for a sold
+product, so it is a correct end state). **Second run of both sweeps: `0
+drifted`.** Gate: `tsc` 0 · lint 0 · **1235/1235 (123 files)** · `npm run
+build` exit 0.
+
+**After the push:** the 14:30/15:00 UTC production sweeps should read
+`… 0 drifted, 0 repaired, 0 reconciled, 0 failed, 0 deferred.` (the two rows
+are already reconciled, so production has nothing left to do); the next time a
+marketplace-sold item is marked sold on the site, expect one `status_change_hook`
+error + one `reconcile_status` warning for it, then silence. Rule recorded in
+`DECISIONS.md` → *"A scheduler is judged by its log rows"* (rule 3).
+
+## 2026-09-07 (day) — scheduled jobs moved to Supabase pg_cron (LIVE, verified 13:30 UTC); GitHub `schedule` found degraded since 08-27; Netlify scheduled functions re-confirmed dead; silent delist-retry loop found on both channels
+
+Owner asked whether a marketplace sale could mark the site product sold
+(answer: not built — Phase 3 order ingest was scoped out in July; proposal now
+in `TASKS.md`), then whether the Netlify scheduled-function fault had been
+fixed. Checking that from the sync logs (service key, read-only) and GitHub's
+public runs API found something bigger:
+
+- **Netlify scheduled functions: still dead.** Exactly one
+  `scheduled_price_push` row per channel per day for 30 days, none at the cron
+  minute (11:15Z / 11:45Z). The overlap design (both the `.mts` files and the
+  GitHub workflow deployed) would have shown TWO rows/day had Netlify woken up.
+- **GitHub Actions `schedule` degraded on 2026-08-27 and stayed degraded.**
+  Workflow runs created per day: 38 · 47 · 48 · 30 (08-23 → 08-26) → 7 · 6 ·
+  12 · 13 · 10 · 13 · 13 · 13 · 14 · 16 · 15 (08-27 → 09-06). Every created
+  run succeeded (0 failures in 300) — GitHub simply stopped creating most of
+  them. Repo public and pushed daily, so not the 60-day auto-disable. Effect:
+  the "every 30 min" reconcile sweep ran 2–9×/day per channel (was 32–41;
+  gaps of 5 h on 09-07: 00:32 → 05:18 → 10:30), price pushes landed
+  13:50–21:31Z instead of ~11:30Z, Instagram drips 12/day → 2–4/day.
+- **Decision: Supabase `pg_cron` + `pg_net` now own all seven triggers**
+  (owner picked it over cron-job.org: no new vendor, secrets in Vault,
+  minute-accurate, run history in the dashboard). New
+  `supabase/scheduled-jobs-pg-cron-2026-09.sql` — same routes, UTC schedules
+  and secret names as the workflow; **no app code change** (the routes are
+  trigger-agnostic). Owner added the four `*_CRON_SECRET` values to Vault and
+  ran the script. Verified from the logs: manual `net.http_post` → Etsy
+  reconcile row at 13:22:44Z (the route logs only after the secret check, so
+  that is a 200); first scheduled fire **13:30:03Z (Etsy) / 13:30:10Z (eBay)**,
+  seconds after the boundary — both secrets proven. Instagram / Facebook
+  secrets get proven by the first 16:00Z drip rows (check next session).
+- **GitHub schedule and the five Netlify `.mts` files are deliberately LEFT IN
+  PLACE for a 1–2 day overlap** (every job no-ops when nothing is due);
+  cleanup item in `TASKS.md`. Header note added to the workflow file.
+- **Found while reading the rows: both sweeps have reported "1 drifted, 1
+  repaired" every run since late August while repairing nothing.** Etsy #19
+  (David Yurman bangle — sold ON ETSY per the owner, marked sold on the site
+  08-25) is still `active` locally; Etsy's real state is `edit`, quantity 0
+  (its sold-single-quantity state, documented in `reconcileSyncStateFromEtsy`).
+  eBay #75 (Egyptian silver tray; sold; listing `published` locally since
+  08-21); eBay's real state is `Completed`. In both cases the marketplace had
+  already closed the listing, so the auto-delist's state change is refused,
+  the error is swallowed by `handleProductStatusChange`'s catch (Etsy: console
+  only, no log row; eBay: a `status_change_hook` error row each time — 197 of
+  them for #75 — but no local update either way), and the sweep counts the
+  attempt as "repaired". Nothing is for sale that shouldn't be; the local listing rows
+  and the sweep's counters are wrong. Fix proposed (NOT built): on a refused
+  delist, run the existing read-only status reconcile for that listing
+  (already maps `edit`/`sold_out` → delisted and `Completed`/`ENDED` →
+  ended), log the refusal with the marketplace's message, and count
+  `repaired` only on an actual state change.
+- Read-only probes used: `net._http_response` and sync-log queries via the
+  service key; the two marketplace states via the app's own clients under
+  `vite-node --config vitest.config.ts` (scratchpad script, not kept).
+
+Docs: this entry; `TASKS.md` (verify → cleanup → two owner decisions);
+`CURRENT_STATUS.md`; `DECISIONS.md` (pg_cron owns triggers; a scheduler is
+judged by its log rows); `ARCHITECTURE.md`; `STRUCTURE.md`; workflow header.
+Memory: `github-cron-degraded-2026-08-27`.
+
+## 2026-09-07 (night) — open items worked: six GSC indexing requests settled, ES dont-melt-it found indexed, IndexNow 200 for 6
+
+Owner: "work through all open items you can." Done in the owner's Chrome
+(`.com` URL-prefix property) and from PowerShell:
+
+- **GSC Request Indexing — all six owed requests SETTLED**, each returned
+  "Indexing requested · URL was added to a priority crawl queue":
+  `/silver-services/silver-marks`, `/es/silver-services/silver-marks`,
+  `/gold-services/gold-marks`, `/es/gold-services/gold-marks`,
+  `/spot-prices`, `/es/spot-prices`. Every one inspected first and read
+  "URL is not on Google · URL is unknown to Google" before the request.
+  No quota wall (6 of the ~10/day used).
+- **`/es/sell/dont-melt-it` (owed since 09-04) needed NO request** —
+  inspection read "URL is on Google · Page is indexed"; quota saved.
+- **IndexNow (Bing)**: `npm run indexnow -- --urls=<the six>` from
+  PowerShell → **200 OK for 6**.
+- Not touched (not due or owner-only): the two GSC validations ("Page with
+  redirect" 46, "Blocked by robots.txt" 2) — read ~09-20; Bing recheck
+  ~09-10; the optional `#item=` contact-link change; GBP "Google updates
+  (1)"; the /free-evaluation bench photo; caption read-through.
+
+⚠️ **URL-inspection driving method that WORKS (recorded because three
+others silently failed tonight):** `form_input` sets the box but Return
+never submits; `type` after a coordinate click is swallowed; `type` after
+a ref click is swallowed too. What works: one `javascript_tool` call that
+finds the visible `input[role="combobox"]` whose aria-label starts with
+"Inspect", sets the value through the native `HTMLInputElement` value
+setter, dispatches `input`, then dispatches keydown/keypress/keyup
+`Enter` on it — the inspection runs (new `id=` in the tab URL, ~18 s).
+Then confirm the inspected URL from the page text, click REQUEST INDEXING
+by COORDINATE (the ref click did nothing; at the 1568-wide pane it sits at
+(1110, 260) in both the on-Google and not-on-Google layouts), wait ~40 s
+for "Testing if live URL can be indexed", read the `[role=dialog]` text
+for "Indexing requested" / "Quota exceeded", then click Dismiss by ref.
+This dispatches Enter on the input directly, so the REQUEST-AGAIN focus
+trap never fires. The direct `inspect?…&id=<url>` deep link 404s — the
+`id` is an opaque token, not the URL.
+
+## 2026-09-07 (end of session) — admin timestamps DEPLOYED + owner-verified
+
+Owner: "pushed and deployed, manually verified" (2026-09-07, end of
+session) — the owner checked the Subscribed column and the Joined line on
+production themselves (admin is behind login, so that is the only
+verification possible). Staging equals source; nothing in flight.
+
+## 2026-09-07 (later still) — admin Subscribers table gains a "Subscribed" column; Users phone cards gain a "Joined" line; every admin Created/Updated stamp now reads in Eastern time (deployed the same evening — see above)
 
 Owner: "add a timestamp to the subscribers table and users table so I can
 see when a user subscribed to the mailing list, and when a user made their

@@ -5308,6 +5308,16 @@ Manual-priced items and an already-locked sold price do not depend on live spot.
 
 ### Daily marketplace price runs are bounded and observable
 
+**Superseded 2026-09-07 — Supabase `pg_cron` owns every trigger.** GitHub
+`schedule` degraded on 2026-08-27 (it created 6–16 of the ~64 expected runs a
+day for eleven days, every created run succeeding) and Netlify's scheduler was
+still dead, so all seven jobs moved to `pg_cron` + `pg_net` inside the existing
+Supabase project (`supabase/scheduled-jobs-pg-cron-2026-09.sql`), secrets in
+Vault, same routes and UTC schedules, zero app change. Chosen over cron-job.org:
+no new vendor or account, secrets stay in-house, minute-accurate, run history
+in the dashboard. A rotated cron secret now has a FOURTH home: Supabase Vault.
+The paragraph below is the 2026-08-11 record.
+
 **GitHub Actions owns the daily trigger** — one staggered job per marketplace in
 `.github/workflows/scheduled-jobs.yml` (Etsy 11:15 UTC, eBay 11:45 UTC). It
 replaced the Netlify scheduled functions on 2026-08-11 because those never
@@ -5359,6 +5369,37 @@ a new deploy), the GitHub Actions repository secret, and `.env.local`.
    because that string is only the FALLBACK for an envelope with no top-level
    message. A generic operator message is a signal the real reason is in
    `detail`.
+
+### A scheduler is judged by its log rows, and sub-daily work never rides on GitHub `schedule`
+
+Added 2026-09-07. GitHub documents `schedule` as best-effort, and for eleven
+days it was exactly that: from 2026-08-27 it created 6–16 of the ~64 runs a day
+this workflow asks for — 0 failures, 300/300 created runs green — so nothing
+was red anywhere. Three rules:
+
+1. **Count log rows per day, not run outcomes.** A green run list proves the
+   runs that happened; only the expected number of `reconcile_status` /
+   `scheduled_price_push` rows proves the schedule. Anything a design calls
+   "every 30 minutes" must be verified as 48 rows/day, and re-verified before a
+   new feature is allowed to depend on that cadence.
+2. **GitHub `schedule` is not a scheduler for anything sub-daily.** It stays
+   as a manual `workflow_dispatch` surface only; the cron entries go once the
+   pg_cron overlap window closes.
+3. **A silently swallowed repair is a lie in the counters.** The reconcile
+   sweeps counted every `handleProductStatusChange` call as "repaired" while
+   the marketplace was refusing the state change (Etsy `edit`, eBay
+   `Completed`) and the error went only to the console. A sweep may count a
+   repair only when local state actually changed, and a refusal must write a
+   log row the admin can see.
+
+   **Built 2026-09-07 (day, later):** `src/lib/marketplace-drift-repair.ts`
+   (`classifyDriftRepair` judges from the re-read state: repaired /
+   reconciled / failed / noop) and, per channel, `apply*ProductStatus` (throws
+   on refusal) + `repair*StatusDrift` (refusal → log row → read-only status
+   check → re-read → classify). The summary row carries all four numbers.
+   Reconcile-on-refusal is the right response because a marketplace that
+   refuses to close a listing has usually closed it already — that is the
+   inbound "it sold there" signal in its rawest form.
 
 ### An absent record is a fault, not a clean slate
 

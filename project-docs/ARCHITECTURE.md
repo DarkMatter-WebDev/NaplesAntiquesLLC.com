@@ -33,6 +33,15 @@ exclusion is load-bearing for the `.co/api/*` carve-out, which must remain a
 **200 rewrite** because webhook POSTs from Resend, PayPal, and eBay do not follow
 redirects.
 
+**Scheduled work is triggered by Supabase `pg_cron` + `pg_net` (cut over
+2026-09-07)** — seven `nej-*` jobs defined in
+`supabase/scheduled-jobs-pg-cron-2026-09.sql`, each POSTing the matching
+secret-guarded Next route with the `x-cron-secret` read from Supabase Vault at
+fire time. Run history: Supabase dashboard → Integrations → Cron, plus the
+app's own run-summary log rows. The GitHub workflow and the Netlify `.mts`
+files described below are kept only for a short overlap and are scheduled for
+removal (`TASKS.md`). The two paragraphs below are the 2026-08-11 record.
+
 **Scheduled work is triggered by GitHub Actions, not Netlify** (cut over
 2026-08-11). `.github/workflows/scheduled-jobs.yml` runs all five jobs — Etsy and
 eBay price pushes, the Instagram and Facebook drips, and the Instagram token

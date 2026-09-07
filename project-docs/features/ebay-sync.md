@@ -37,6 +37,17 @@
 
 ## What this is
 
+**2026-09-07 reconcile-on-refusal:** a refused withdraw / quantity-zero /
+restore (eBay answers HTTP 400 on a listing it has already ended — a
+`Completed` item) no longer loops. The hook's `status_change_hook` error row
+now carries `{status, code, response}` in `detail`; the 30-minute sweep then
+runs the read-only status check (`reconcileEbayStateFromOffer` + the relist
+chain) and counts the listing as **reconciled**, not repaired (inventory #75
+landed on `hidden_oos`, which eBay reports for the ended item and which is
+not a drift for a sold product). Summary row: `N scanned, D drifted, R
+repaired, C reconciled, F failed, X deferred`. Shared pure bookkeeping:
+`src/lib/marketplace-drift-repair.ts`.
+
 **2026-07-21 status-drift fix:** An active eBay status check preserves local
 `out_of_date` instead of replacing it with `published`. Remote lifecycle and
 local content freshness remain independent, and the result reports **Live,

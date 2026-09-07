@@ -8,7 +8,46 @@
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-07 (later still) — admin timestamps BUILT + STAGED, awaiting push:
+🟡 **09-07 (day, later) — status-sweep fix BUILT + dev-verified + STAGED,
+awaiting push (no SQL, no env vars).** Both marketplace sweeps now count a
+repair from the re-read state, fall back to the read-only status check when
+the marketplace refuses a write, and log every refusal. Dev run against the
+live DB: Etsy #19 → `delisted`, eBay #75 → `hidden_oos`, both channels
+`1 reconciled`, second run `0 drifted`. Gate tsc 0 · lint 0 · **1235/1235
+(123 files)** · build exit 0. After the push the production sweep rows read
+in the new six-number format with all zeros. `TASKS.md` top; `CHANGELOG.md`
+09-07 (day, later).
+
+🟢 **09-07 (day) — ALL SCHEDULED JOBS NOW FIRE FROM SUPABASE pg_cron, verified
+live (13:30:03Z Etsy / 13:30:10Z eBay).** Why: GitHub Actions `schedule` had
+been silently degraded since 08-27 (6–16 runs/day created instead of ~64; the
+"30-min" sweep ran 2–9×/day; price pushes 2–10 h late) and Netlify scheduled
+functions are still dead. `supabase/scheduled-jobs-pg-cron-2026-09.sql` (owner
+ran it; secrets in Vault; **no app code**). GitHub + Netlify copies deliberately
+still in place for a 1–2 day overlap → verify + cleanup items at the top of
+`TASKS.md`. Also found: both reconcile sweeps have reported "1 drifted, 1
+repaired" every run since late August while repairing nothing (Etsy #19 sold
+on Etsy → Etsy state `edit`; eBay #75 → `Completed`; the delist is refused and
+the error swallowed) — fix proposed, owner's call. Owner's opening question
+(auto-mark sold on the site when an item sells on eBay/Etsy): NOT built,
+staged proposal in `TASKS.md`. Record: `CHANGELOG.md` 09-07 (day).
+
+✅ **09-07 (night) — every GSC indexing request the project owed is
+SETTLED**: the six new URLs (silver-marks, gold-marks, spot-prices, EN +
+ES) each returned "Indexing requested"; `/es/sell/dont-melt-it` turned out
+to be already indexed; IndexNow 200 for the six. **Nothing is owed and
+nothing is in flight.** Next looks, none due yet: GSC validations ("Page
+with redirect", "Blocked by robots.txt") ~09-20; Bing recheck ~09-10;
+Breadcrumbs report mid-Sept. Owner-only: the optional `#item=`
+contact-link change, GBP "Google updates (1)", the /free-evaluation bench
+photo, a caption read-through. Working method for URL inspection is in
+`CHANGELOG.md` 09-07 (night) and memory `gsc-url-inspection-method`.
+
+✅ **09-07 (end of session) — admin timestamps DEPLOYED + owner-verified on
+production** (Subscribed column, Joined line, Eastern-time stamps). Staging
+equals source. The block below is the pre-deploy record.
+
+🟡 (superseded) **09-07 (later still) — admin timestamps BUILT + STAGED, awaiting push:
 Subscribers table gains a "Subscribed" column (subscription time, or the
 account creation time tagged "(account)"), Users phone cards gain a
 "Joined" line, and every admin Created / Updated stamp is now pinned to
