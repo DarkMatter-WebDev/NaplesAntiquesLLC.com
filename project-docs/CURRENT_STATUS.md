@@ -8,7 +8,30 @@
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-07 — old-site image URLs 500 → 404, STAGED (one file:
+🟡 **09-07 (later) — Search Console "not indexed" reasons READ + DECODED; one
+code fix STAGED, awaiting push: `/en` and `/en/...` now redirect with a
+308 (was next-intl's 307) so Google consolidates the 46 "Page with
+redirect" URLs instead of recrawling them.** Of the seven reasons, five are
+by design or Google's discretion (the 129 "alternate canonical" URLs are all
+`/contact?item=…` from the nofollow product links; the 13 noindex are the
+legal pages; the 404s `/oz` `/$` `/&` are text and React markers Googlebot
+read as links). The "Blocked by robots.txt" verdict on `/account` is stale
+— **Validate fix started in GSC 9/6**. The Domain property shows the same
+seven, so the "new reasons" email was its first report. Files:
+`proxy.ts`, `lib/legacy-redirects.ts` (+ test). Gate: tsc 0 · lint 0 ·
+**1228/1228 (122 files)** · build exit 0 · dev-verified 308s. After the
+push: curl `/en/shop` → 308, then GSC → "Page with redirect" → Validate
+fix. Table + provenance: `CHANGELOG.md` 09-07 (later); memory
+`gsc-page-indexing-2026-09-07`. **Still owed: GSC indexing requests for
+silver-marks, gold-marks, spot-prices (EN + ES).**
+
+✅ **09-07 — old-site image URLs 500 → 404 DEPLOYED + production-verified**
+(`/money.jpg` → branded 404; redirects, pages, product page, `/live` all
+unchanged). Root `pics/` cache DELETED. Staging equals source. **Still
+owed: GSC indexing requests for silver-marks, gold-marks, spot-prices (EN +
+ES).**
+
+🟡 **09-07 (pre-deploy record) — old-site image URLs 500 → 404, STAGED (one file:
 `dynamicParams = false` on the home route; reproduced + verified on a
 production start). Root `pics/` cache DELETED on the owner's word.** After
 the push check `/money.jpg` → 404 on production.

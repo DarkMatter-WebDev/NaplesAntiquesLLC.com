@@ -1,16 +1,70 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-09-03**.
+> in `CHANGELOG.md`. Last reconciled: **2026-09-07**.
 
 ## ◻ OPEN — needs a human
+
+### 🟡 STAGED 2026-09-07 (later) — `/en/...` redirect 307 → 308 (Search Console "Page with redirect" fix); GSC report decoded
+
+Owner: "analyze my Google Search Console … new reasons prevent pages from
+being indexed … look at what the problems are and fix them." Full table of
+the seven reasons in `CHANGELOG.md` 2026-09-07 (later). Only ONE was a
+defect on our side: next-intl answers `/en` and `/en/...` with a 307
+(temporary), so Google kept 46 stale `/en/...` URLs in "Page with
+redirect" and recrawled them. The proxy now sends a **308** (query string
+preserved) via `resolveDefaultLocalePrefixRedirect` in
+`lib/legacy-redirects.ts`; three tests added. Spanish untouched.
+
+Gate: `tsc` 0 · lint 0 · **1228/1228 (122 files)** · `npm run build` exit 0
+· dev server: `/en`, `/en/shop`, `/en/shop?metal=silver`, `/en/sell/naples`,
+`/en/account`, a product URL → 308 to the bare path; `/english-tea` 404;
+`/`, `/shop`, `/es`, `/es/shop` 200.
+
+◻ **Owner: push** (bundle with anything else pending — nothing else is in
+flight right now). After the deploy:
+- `curl -sI https://naplesestatejewelry.com/en/shop` → `HTTP/2 308` with
+  `location: https://naplesestatejewelry.com/shop`; `/en/shop?metal=silver`
+  → 308 keeping `?metal=silver`; `/en` → 308 → `/`; `/shop` and `/es/shop`
+  → 200.
+- GSC (`.com` URL-prefix property) → Indexing → Pages → **"Page with
+  redirect"** → **Validate fix**. Expect it to pass over 1–2 weeks and the
+  46 to shrink as Google drops the consolidated URLs.
+- Already started 9/6: **Validate fix on "Blocked by robots.txt"**
+  (`/account`, `/es/account` — stale verdict; robots.txt allows them and
+  they emit noindex). Check the result in ~2 weeks; on pass they move to
+  the noindex bucket, which is correct.
+- Still owed from 09-06: GSC **Request indexing** for
+  `/silver-services/silver-marks`, `/gold-services/gold-marks`,
+  `/spot-prices` (EN + ES = 6 requests; daily allowance is 10).
+
+◻ **Owner decision (optional, not built):** the 129 "Alternate page with
+proper canonical tag" URLs are every `/contact?item=<product title>` link
+from the product pages (EN + ES). Google says no action is needed and the
+links are already `rel="nofollow"`. If you want that number to go away,
+the item name can travel in a `#item=` fragment instead of `?item=` (the
+form reads it on mount); it changes how the contact form is prefilled, so
+say the word before it is built.
+
+**Staging (redirect 308 + docs):** ✅ synced 2026-09-07 (later) — dry run listed exactly the 7 touched files (proxy.ts, legacy-redirects.ts, legacy-redirects.test.ts + CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS), 0 Extras; real run copied 7; follow-up dry run 0/0/0; leak check 0 (.git/.env*/node_modules/.next/tsbuildinfo/next-env), `.claude\worktrees` ABSENT, `.claude\launch.json` present; hashes MATCH on proxy.ts, legacy-redirects.ts, the test and TASKS.md. 1052 files on disk. Gate: tsc 0 · lint 0 · 1228/1228 (122 files) · build exit 0. Docs-only re-sync after this line: see below.
 
 ✅ **RESOLVED 2026-09-07 — unknown root-level image paths now 404** (were
 500). Fix: `dynamicParams = false` on the home route; reproduced and
 verified on a production start; see `CHANGELOG.md` 2026-09-07. Confirm on
 production after the push: `/money.jpg` → 404.
 
-### 🔴 DEPLOY the staged change (no SQL, no env vars): old-site image URLs 500 → 404
+### ✅ DEPLOYED 2026-09-07 — old-site image URLs 500 → 404 (production-verified)
+
+Owner: "pushed and deployed, verify it live." Verified over HTTP:
+`/money.jpg`, `/antiques.jpeg`, `/watch.jpg`, `/homepage-hero-bangles.png`,
+`/nonexistent-xyz.jpg|.png|.webp` → 404 with the branded not-found page
+("Page Not Found / Go Home / Browse Shop"); surviving old-site redirects
+`/bullion.jpg`, `/chris.png` → 301; `/nonexistent-xyz` and
+`/es/nonexistent-xyz.jpg` → 404; `/`, `/es`, `/shop`, `/sell/naples`, both
+marks guides, `/spot-prices`, `/favicon.ico`, `/sitemap.xml`, `/robots.txt`
+and a product page → 200; `/live` → 307 → `/spot-prices`. Nothing left on
+our side. The text below is the pre-deploy record.
+
 
 One file: `[locale]/(home)/page.tsx` gains `export const dynamicParams =
 false` (page-scoped). After the push: `https://naplesestatejewelry.com/money.jpg`

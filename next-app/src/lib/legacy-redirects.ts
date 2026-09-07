@@ -90,3 +90,20 @@ export function resolveLegacyRedirect(
   const destination = isEs ? (rule.to === '/' ? '/es' : `/es${rule.to}`) : rule.to;
   return { destination, permanent: rule.permanent };
 }
+
+/**
+ * The default locale never carries its prefix (`localePrefix: 'as-needed'`),
+ * so an EXTERNAL request for `/en` or `/en/...` is a stale URL whose only
+ * correct home is the bare path. next-intl answers those with a 307, which
+ * Google reads as temporary: it kept 40-odd `/en/...` URLs in Search
+ * Console's "Page with redirect" bucket for weeks and recrawled them instead
+ * of consolidating (seen 2026-09-07). The proxy sends them with a 308 instead.
+ *
+ * Returns the bare path (query string is the caller's job), or null when the
+ * path is not `/en`-prefixed. `/english-tea` is NOT prefixed; `/en/` is the
+ * root.
+ */
+export function resolveDefaultLocalePrefixRedirect(pathname: string): string | null {
+  if (pathname !== '/en' && !pathname.startsWith('/en/')) return null;
+  return pathname.slice(3) || '/';
+}

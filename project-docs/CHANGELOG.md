@@ -1,6 +1,67 @@
 
 # Changelog
 
+## 2026-09-07 — Search Console "Page indexing" read in full (7 reasons decoded); `/en/...` redirect 307 → 308 (STAGED, awaiting push); robots.txt validation started in GSC
+
+Owner: "I recently got an email saying that new reasons prevent pages from
+being indexed. Let's look at what the problems are and fix them." Read in
+the owner's Chrome — URL-prefix `.com` property, report stamped 9/3;
+**the Domain property (days old) shows the identical seven reasons**, so
+the email was that property's first report, not a regression. 241
+indexed / 206 not indexed. Every reason's example list was read
+(`document.body.innerText` on the drilldown — `get_page_text` returns the
+stale index page; rows had to be clicked by coordinate after a 5-tick
+scroll, refs and `back` do nothing there).
+
+| Reason | Pages | Actually | Action |
+|---|---|---|---|
+| Alternate page with proper canonical tag | 129 | all `/contact?item=<title>` (EN + ES) — the product page's `rel="nofollow"` "Ask about this item" links; canonical is `/contact` | none (Google: no action needed); optional cleanup below |
+| Page with redirect | 46 | 7 of 10 samples are `/en/...` — next-intl answers those with a **307 (temporary)**, so Google keeps recrawling instead of consolidating; the rest (`/es/`, `/index.html`, `/auctions`) already 308 | **fixed in code (below)**; after deploy → Validate fix |
+| Excluded by 'noindex' | 13 | the six legal pages × 2 locales (+ `/en/shipping`) — deliberate (`LEGAL_NOINDEX_PATHS`) | none |
+| Not found (404) | 5 | `/oz` (the "$/oz" text), `/$` and `/&` (React hydration comment markers in the runtime JS, read as links), one deleted product, one stale crawl of a product that is live again | none — 404 is right |
+| Blocked by robots.txt | 2 | `/account`, `/es/account`, last crawled Aug 4 — STALE: robots.txt has allowed them since the 08 campaign and they emit `noindex` | **Validate fix started 9/6** (URL-prefix property) |
+| Crawled – currently not indexed | 6 | `favicon.ico?…` ×2, `.woff2` ×2, two EN product pages | none |
+| Discovered – currently not indexed | 5 | three ES product pages + `/watch-buyers` + `/estate-services/selling-inherited-jewelry` (both already requested 09-03) | wait |
+
+**The fix — default-locale prefix is now a 308.** New
+`resolveDefaultLocalePrefixRedirect(pathname)` in
+`src/lib/legacy-redirects.ts` returns the bare path for `/en` and
+`/en/...` (`/en` and `/en/` → `/`; `/english-tea` untouched) and null
+otherwise; `src/proxy.ts` calls it after the internal-locale header check
+(so next-intl's own `/en` re-run still renders) and before the
+locale-less rewrite, answering `NextResponse.redirect(url, 308)` with the
+query string preserved. Spanish untouched. Three new tests in
+`legacy-redirects.test.ts`. Rule recorded in `DECISIONS.md` → *"All
+legacy/retired redirects live in lib/legacy-redirects.ts"*, rule 5.
+
+Dev-server check after the change: `/en` · `/en/shop` ·
+`/en/shop?metal=silver` (query kept) · `/en/sell/naples` · `/en/account` ·
+a product URL → **308** to the bare path; `/english-tea` 404; `/`, `/shop`,
+`/es`, `/es/shop` 200; `/auctions` 308, `/live` 307 unchanged. (`/en/` →
+308 → `/en` → 308 → `/` in dev only, because `next dev` normalises the
+trailing slash before the proxy; on Netlify the edge proxy runs first, so
+it is one hop.) Gate: `tsc` 0 · lint 0 · **1228/1228 (122 files)** ·
+`npm run build` exit 0.
+
+**Optional follow-up, NOT done:** move the product-page inquiry link's item
+name from `?item=` to a `#item=` fragment (the form would read
+`location.hash` on mount). That would make the 129 "alternate canonical"
+URLs stop existing instead of merely being consolidated. It changes how the
+contact form is prefilled, so it is the owner's call.
+
+**Not a defect, not changed:** the dev server's very first request after a
+restart 500s once with `SyntaxError: Unexpected end of JSON input { page:
+'/en' }` and then serves 200 forever — a Next dev first-compile race that
+also happens from an empty `.next/dev` (2026-09-01), so no cache guard can
+prevent it. Left alone.
+
+**After the push:** `curl -sI https://naplesestatejewelry.com/en/shop` →
+`308` with `location: /shop`; `/en/shop?metal=silver` → 308 keeping the
+query; `/en` → 308 → `/`; `/shop`, `/es/shop` 200. Then GSC → Pages →
+"Page with redirect" → **Validate fix**. Check the robots.txt validation
+result in ~2 weeks. GSC indexing requests for silver-marks, gold-marks,
+spot-prices (EN + ES) are still owed from 09-06.
+
 ## 2026-09-06 (night) — photo-slot audit of every public page; 7 unused page images DELETED on the owner's word; 5 dead image redirects dropped from netlify.toml (STAGED, awaiting push)
 
 Owner: "check every page to see if we have any other spots that need real
@@ -33,7 +94,7 @@ legacy image redirects in the root `netlify.toml` (old static-site URLs
 paths); a 301 to a missing file is a 404 with extra steps, so those five
 rules were removed too. 18 page images remain (+ the silver-marks folder).
 
-## 2026-09-07 — old-site image URLs: 500 → 404 (home route `dynamicParams = false`); root `pics/` cache DELETED (STAGED, awaiting push)
+## 2026-09-07 — old-site image URLs: 500 → 404 (home route `dynamicParams = false`); root `pics/` cache DELETED — DEPLOYED + production-verified the same day (`/money.jpg` → branded 404; no regressions; see TASKS)
 
 Owner: "delete the pics/silver cache folder, and do what you need to to fix
 that old-site images urls issue."

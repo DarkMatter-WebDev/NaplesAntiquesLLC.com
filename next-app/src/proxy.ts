@@ -2,7 +2,7 @@ import createIntlMiddleware from 'next-intl/middleware';
 import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
 import { routing } from './i18n/routing';
-import { resolveLegacyRedirect } from './lib/legacy-redirects';
+import { resolveDefaultLocalePrefixRedirect, resolveLegacyRedirect } from './lib/legacy-redirects';
 
 const intl = createIntlMiddleware(routing);
 const INTERNAL_LOCALE_HEADER = 'x-naples-internal-locale';
@@ -118,6 +118,18 @@ export async function proxy(request: NextRequest) {
     if (!needsSessionRefresh) return response;
     response.cookies.set('NEXT_LOCALE', 'en', { path: '/', sameSite: 'lax' });
     return refreshSupabaseSession(request, response);
+  }
+
+  // An EXTERNAL `/en` or `/en/...` request (no internal-locale header, so it
+  // is a real visitor or crawler, not next-intl's own re-run) goes home
+  // PERMANENTLY. Left to next-intl below it would be a 307, which Google
+  // treats as temporary and keeps recrawling — 46 such URLs sat in Search
+  // Console's "Page with redirect" bucket on 2026-09-07. Query string kept.
+  const bareDefaultLocalePath = resolveDefaultLocalePrefixRedirect(pathname);
+  if (bareDefaultLocalePath !== null) {
+    const url = request.nextUrl.clone();
+    url.pathname = bareDefaultLocalePath;
+    return NextResponse.redirect(url, 308);
   }
 
   if (!pathname.startsWith('/en') && !pathname.startsWith('/es')) {

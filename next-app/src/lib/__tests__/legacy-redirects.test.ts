@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { LEGACY_REDIRECTS, resolveLegacyRedirect } from '@/lib/legacy-redirects';
+import {
+  LEGACY_REDIRECTS,
+  resolveDefaultLocalePrefixRedirect,
+  resolveLegacyRedirect,
+} from '@/lib/legacy-redirects';
 
 describe('legacy redirect resolution', () => {
   it('matches a locale-less path and keeps it locale-less', () => {
@@ -61,5 +65,27 @@ describe('legacy redirect resolution', () => {
     for (const [source, rule] of Object.entries(LEGACY_REDIRECTS)) {
       expect(LEGACY_REDIRECTS[rule.to], `${source} -> ${rule.to} is itself redirected`).toBeUndefined();
     }
+  });
+});
+
+describe('default-locale prefix redirect (/en -> /, permanent)', () => {
+  it('strips /en from an external default-locale URL, keeping the rest of the path', () => {
+    expect(resolveDefaultLocalePrefixRedirect('/en/shop')).toBe('/shop');
+    expect(resolveDefaultLocalePrefixRedirect('/en/sell/naples')).toBe('/sell/naples');
+    expect(resolveDefaultLocalePrefixRedirect('/en/shop/some-product-42')).toBe('/shop/some-product-42');
+  });
+
+  it('sends /en and /en/ to the site root', () => {
+    expect(resolveDefaultLocalePrefixRedirect('/en')).toBe('/');
+    expect(resolveDefaultLocalePrefixRedirect('/en/')).toBe('/');
+  });
+
+  it('leaves bare, Spanish, and merely en-starting paths alone', () => {
+    expect(resolveDefaultLocalePrefixRedirect('/shop')).toBeNull();
+    expect(resolveDefaultLocalePrefixRedirect('/')).toBeNull();
+    expect(resolveDefaultLocalePrefixRedirect('/es/shop')).toBeNull();
+    expect(resolveDefaultLocalePrefixRedirect('/es')).toBeNull();
+    expect(resolveDefaultLocalePrefixRedirect('/english-tea')).toBeNull();
+    expect(resolveDefaultLocalePrefixRedirect('/entrance')).toBeNull();
   });
 });

@@ -1667,6 +1667,17 @@ Rules:
    convenience URLs that were never real pages (drawers like `/cart`).
 3. Never re-add `redirects()` to `next.config.ts`.
 4. Verify redirects **against the deployed site**, never only locally.
+5. **The default-locale prefix is a 308, issued by the proxy — never
+   next-intl's 307.** `localePrefix: 'as-needed'` means `/en` and `/en/...`
+   are never canonical, yet next-intl answers them with a 307 (temporary), so
+   Google kept 46 `/en/...` URLs in Search Console's "Page with redirect"
+   bucket and recrawled them instead of consolidating (read 2026-09-07).
+   `resolveDefaultLocalePrefixRedirect` in `lib/legacy-redirects.ts` strips
+   the prefix (`/en` and `/en/` → `/`; `/english-tea` is untouched) and
+   `proxy.ts` sends a 308 with the query string preserved, AFTER the
+   internal-locale header check (so next-intl's own `/en` re-run still
+   renders) and BEFORE the locale-less rewrite. Spanish is unaffected —
+   `/es/...` is the canonical form.
 
 ### The primary domain is naplesestatejewelry.com; all app-facing email is .com
 
