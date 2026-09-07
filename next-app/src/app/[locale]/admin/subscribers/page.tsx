@@ -55,6 +55,8 @@ export default async function AdminSubscribersPage({ params }: Props) {
     source: recipient.source,
     subscriberSource: recipient.subscriberSource,
     subscriberEmail: recipient.subscriberEmail,
+    subscribedAt: recipient.subscribedAt,
+    accountCreatedAt: recipient.accountCreatedAt,
   }));
 
   return (

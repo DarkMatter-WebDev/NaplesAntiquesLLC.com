@@ -1679,6 +1679,19 @@ Rules:
    renders) and BEFORE the locale-less rewrite. Spanish is unaffected —
    `/es/...` is the canonical form.
 
+### Admin timestamps display in Eastern time
+
+Every human-readable timestamp on an admin page (`Intl.DateTimeFormat`)
+must pass `timeZone: 'America/New_York'`. Two reasons, found 2026-09-07
+while adding the Subscribers "Subscribed" column: (1) server components
+run on Netlify Lambdas whose clock is UTC, so the Users page's Created /
+Updated columns had been reading four or five hours late for as long as
+they existed; (2) a client component's server render and its browser
+hydration must format identically, and an unpinned zone makes them differ.
+Store times stay UTC (`timestamptz`); only the display is pinned. The
+store-hours formatters are a separate, pure system and are not affected
+(⛔ they never use `Intl` for times — see *"Showroom hours are DATA, and every formatter is pure"*).
+
 ### The primary domain is naplesestatejewelry.com; all app-facing email is .com
 
 Owner decision 2026-08-01, after buying the `.com`: the canonical web domain

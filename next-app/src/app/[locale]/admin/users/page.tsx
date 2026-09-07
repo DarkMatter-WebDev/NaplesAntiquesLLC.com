@@ -39,15 +39,21 @@ type UserOrderSummary = {
   latest: string | null;
 };
 
+// Pinned to Eastern: this is a server component, and Netlify's Lambda clock is
+// UTC, so without the zone every Created/Updated read four or five hours late.
+const dateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZone: 'America/New_York',
+});
+
 function formatDate(value: string | null) {
   if (!value) return '-';
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(value));
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '-' : dateFormatter.format(date);
 }
 
 function displayName(user: SiteUser) {
@@ -198,6 +204,9 @@ export default async function AdminUsersPage({ params }: Props) {
                     <h2 className="text-lg font-bold leading-tight" style={{ color: 'var(--color-on-surface)', fontFamily: 'var(--font-headline)' }}>{displayName(siteUser)}</h2>
                     <p className="mt-1 break-words text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>{siteUser.email || '-'}</p>
                     {siteUser.phone && <p className="mt-1 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>{siteUser.phone}</p>}
+                    <p className="mt-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      Joined {formatDate(siteUser.created_at)}
+                    </p>
                   </div>
                   <span className="shrink-0 rounded-full px-2 py-1 text-[0.58rem] font-bold uppercase tracking-wide" style={{ background: siteUser.marketing_opt_out === true ? 'var(--color-surface-container-high)' : 'rgba(47,107,63,0.12)', color: siteUser.marketing_opt_out === true ? 'var(--color-on-surface-variant)' : '#2f6b3f' }}>
                     {siteUser.marketing_opt_out === true ? 'Opted out' : 'Reachable'}

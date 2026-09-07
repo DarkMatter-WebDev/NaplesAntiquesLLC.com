@@ -8,7 +8,26 @@
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-07 (later) — Search Console "not indexed" reasons READ + DECODED; one
+🟡 **09-07 (later still) — admin timestamps BUILT + STAGED, awaiting push:
+Subscribers table gains a "Subscribed" column (subscription time, or the
+account creation time tagged "(account)"), Users phone cards gain a
+"Joined" line, and every admin Created / Updated stamp is now pinned to
+Eastern time (the server-rendered Users page had been printing UTC).**
+Display-only — no SQL, no env vars. Gate: tsc 0 · lint 0 · **1229/1229
+(122 files)** · build exit 0. Owner eyeballs `/admin/subscribers` and
+`/admin/users` on the dev server (behind login; unverifiable from here),
+then pushes. `TASKS.md` top; `CHANGELOG.md` 09-07 (later still).
+
+✅ **09-07 (later) — `/en/...` 307 → 308 DEPLOYED + production-verified;
+GSC "Page with redirect" validation STARTED 9/6 (and "Blocked by
+robots.txt" validation started earlier the same day).** Verified: nine
+`/en/...` URLs → 308 in one hop with the query string kept; every control
+route unchanged. Staging equals source; nothing in flight. **Still owed:
+GSC indexing requests for silver-marks, gold-marks, spot-prices (EN +
+ES).** Both validations: check the result in ~2 weeks. The block below is
+the pre-deploy record.
+
+🟡 (superseded) **09-07 (later) — Search Console "not indexed" reasons READ + DECODED; one
 code fix STAGED, awaiting push: `/en` and `/en/...` now redirect with a
 308 (was next-intl's 307) so Google consolidates the 46 "Page with
 redirect" URLs instead of recrawling them.** Of the seven reasons, five are

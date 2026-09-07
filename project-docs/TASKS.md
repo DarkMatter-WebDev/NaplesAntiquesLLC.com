@@ -5,7 +5,49 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 STAGED 2026-09-07 (later) — `/en/...` redirect 307 → 308 (Search Console "Page with redirect" fix); GSC report decoded
+### 🟡 STAGED 2026-09-07 (later still) — admin "Subscribed" column + "Joined" line + Eastern-time stamps (no SQL, no env vars)
+
+Owner asked for a timestamp on the Subscribers and Users tables. Both
+values were already in the database; this is display only. Details in
+`CHANGELOG.md` 2026-09-07 (later still). Gate: `tsc` 0 · lint 0 ·
+**1229/1229 (122 files)** · `npm run build` exit 0.
+
+◻ **Owner: look at the dev preview (dev server on port 3007, signed in):**
+1. `http://localhost:3007/admin/subscribers` — the table now has a
+   **Subscribed** column between Source and Actions. Newsletter rows show
+   the sign-up time; account-holder-only rows show the account creation
+   time with "(account)" after it; buyer-only rows show "-". Add a test
+   subscriber and its row should show today's time; delete it after.
+2. `http://localhost:3007/admin/users` on the **phone** (or a narrow
+   window) — each card shows "Joined <date>" under the email. On desktop
+   the existing Created / Updated columns now read in Eastern time.
+◻ **Then push.** After the deploy, open the two production pages once;
+the Users page's Created column should read the local time an account was
+made, not four or five hours later.
+
+**Staging (admin timestamps):** ✅ synced 2026-09-07 (later still) — dry run listed exactly the 10 touched files (marketing.ts, marketing.test.ts, SubscribersManager.tsx, subscribers page.tsx, users page.tsx, marketing/test route.ts + CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS), 0 Extras; real run copied 10; follow-up dry run 0/0/0; leak check 0; hashes MATCH on marketing.ts, SubscribersManager.tsx, users page.tsx, the test and DECISIONS.md. 1052 files on disk. Gate: tsc 0 · lint 0 · 1229/1229 (122 files) · build exit 0. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### ✅ DEPLOYED 2026-09-07 (later) — `/en/...` redirect 307 → 308 (production-verified); GSC "Page with redirect" validation STARTED
+
+Owner: "pushed and deployed, verify it live." Verified over HTTP on
+production (2026-09-07, later): `/en`, `/en/`, `/en/shop`,
+`/en/shop?metal=silver` (query kept), `/en/sell/naples`, `/en/bullion`,
+`/en/contact`, `/en/account` and a `/en/shop/<product>` URL → **308** to the
+bare path (`Location: /shop` etc.), `/en/` resolves in ONE hop; `/english-tea`
+404; `/`, `/es`, `/shop`, `/es/shop`, `/sell/naples`, `/spot-prices`, a
+product page 200; `/live` 307, `/auctions` + `/index.html` + `/es/` 308,
+`/money.jpg` 404 — all unchanged. Then in GSC (URL-prefix property) → "Page
+with redirect" → **Validate fix clicked: "Validation started 9/6/26"** (46
+affected). Staging equals source; nothing in flight.
+
+**Left open (owner / next session):** (1) GSC **Request indexing** for
+`/silver-services/silver-marks`, `/gold-services/gold-marks`,
+`/spot-prices` (EN + ES = 6). (2) ~2026-09-20: read both validation
+results ("Page with redirect" 46, "Blocked by robots.txt" 2) in GSC → Pages.
+(3) The optional `#item=` change for the 129 "alternate canonical" URLs —
+owner's call, not built. The text below is the pre-deploy record.
+
+### (pre-deploy record) 🟡 STAGED 2026-09-07 (later) — `/en/...` redirect 307 → 308 (Search Console "Page with redirect" fix); GSC report decoded
 
 Owner: "analyze my Google Search Console … new reasons prevent pages from
 being indexed … look at what the problems are and fix them." Full table of

@@ -32,6 +32,8 @@ export async function POST(req: Request) {
       source: 'account',
       subscriberSource: null,
       unsubscribeToken: null,
+      subscribedAt: null,
+      accountCreatedAt: null,
       userId: user.id,
       subscriberEmail: null,
     };

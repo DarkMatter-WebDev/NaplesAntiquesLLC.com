@@ -20,6 +20,10 @@ export type MarketingRecipient = {
   unsubscribeToken: string | null;
   userId: string | null;
   subscriberEmail: string | null;
+  /** `homepage_subscribers.subscribed_at` — when the newsletter row was created (null for account/buyer-only recipients). */
+  subscribedAt: string | null;
+  /** `profiles.created_at` — when the site account was made (null when no account matched). */
+  accountCreatedAt: string | null;
 };
 
 export type MarketingSettings = {
@@ -71,14 +75,14 @@ export async function buildMarketingAudience(scope: AudienceScope = 'all', audie
   if (scope === 'subscribers' || scope === 'all') {
     let { data, error } = await supabase
       .from('homepage_subscribers')
-      .select('email, full_name, source, unsubscribe_token, unsubscribed_at')
+      .select('email, full_name, source, unsubscribe_token, unsubscribed_at, subscribed_at')
       .is('unsubscribed_at', null);
 
     if (error?.code === '42703') {
       const fallback = await supabase
         .from('homepage_subscribers')
         .select('email, full_name, source, unsubscribe_token');
-      data = fallback.data?.map((row) => ({ ...row, unsubscribed_at: null })) ?? null;
+      data = fallback.data?.map((row) => ({ ...row, unsubscribed_at: null, subscribed_at: null })) ?? null;
       error = fallback.error;
     }
 
@@ -86,7 +90,7 @@ export async function buildMarketingAudience(scope: AudienceScope = 'all', audie
       const fallback = await supabase
         .from('homepage_subscribers')
         .select('email, full_name');
-      data = fallback.data?.map((row) => ({ ...row, source: null, unsubscribe_token: null, unsubscribed_at: null })) ?? null;
+      data = fallback.data?.map((row) => ({ ...row, source: null, unsubscribe_token: null, unsubscribed_at: null, subscribed_at: null })) ?? null;
       error = fallback.error;
     }
 
@@ -103,6 +107,8 @@ export async function buildMarketingAudience(scope: AudienceScope = 'all', audie
         unsubscribeToken: row.unsubscribe_token ?? null,
         userId: null,
         subscriberEmail: email,
+        subscribedAt: row.subscribed_at ?? null,
+        accountCreatedAt: null,
       });
     }
   }
@@ -110,7 +116,7 @@ export async function buildMarketingAudience(scope: AudienceScope = 'all', audie
   if (scope === 'accounts' || scope === 'all') {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, email, first_name, last_name, full_name, marketing_opt_out')
+      .select('id, email, first_name, last_name, full_name, marketing_opt_out, created_at')
       .eq('marketing_opt_out', false);
 
     if (error) throw new Error(`Could not load account audience. Run the email marketing migration first. ${error.message}`);
@@ -128,6 +134,8 @@ export async function buildMarketingAudience(scope: AudienceScope = 'all', audie
         unsubscribeToken: existing?.unsubscribeToken ?? null,
         userId: row.id ?? null,
         subscriberEmail: existing?.subscriberEmail ?? null,
+        subscribedAt: existing?.subscribedAt ?? null,
+        accountCreatedAt: row.created_at ?? null,
       });
     }
   }
@@ -152,6 +160,8 @@ export async function buildMarketingAudience(scope: AudienceScope = 'all', audie
         unsubscribeToken: existing?.unsubscribeToken ?? null,
         userId: existing?.userId ?? (row.user_id ?? null),
         subscriberEmail: existing?.subscriberEmail ?? null,
+        subscribedAt: existing?.subscribedAt ?? null,
+        accountCreatedAt: existing?.accountCreatedAt ?? null,
       });
     }
   }

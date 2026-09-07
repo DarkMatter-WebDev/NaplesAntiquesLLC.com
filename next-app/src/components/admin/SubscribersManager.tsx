@@ -10,7 +10,29 @@ export type SubscriberRow = {
   source: string | null;
   subscriberSource: string | null;
   subscriberEmail: string | null;
+  /** When the newsletter row was created; null for account/buyer-only rows. */
+  subscribedAt: string | null;
+  /** When the matching site account was created; null when there is none. */
+  accountCreatedAt: string | null;
 };
+
+// Pinned to Eastern so the server render and the owner's browser agree (a
+// hydration mismatch otherwise) and so the time reads as the showroom's clock,
+// not the Netlify region's.
+const dateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZone: 'America/New_York',
+});
+
+function formatDate(value: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : dateFormatter.format(date);
+}
 
 // `row.source` may be a single value ('subscriber'/'account'/'buyer') or a
 // sorted '+'-joined combination (see combineSource in lib/marketing.ts) when
@@ -104,6 +126,7 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
               source: row.source === 'account' ? 'both' : row.source,
               subscriberSource: 'admin_manual',
               subscriberEmail: normalizedEmail,
+              subscribedAt: new Date().toISOString(),
             };
           });
         }
@@ -114,6 +137,8 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
             source: 'subscriber',
             subscriberSource: 'admin_manual',
             subscriberEmail: normalizedEmail,
+            subscribedAt: new Date().toISOString(),
+            accountCreatedAt: null,
           },
           ...current,
         ];
@@ -277,7 +302,7 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
         <table className="w-full min-w-[980px] text-left text-sm">
           <thead style={{ background: 'var(--color-surface-container-low)' }}>
             <tr>
-              {['Name', 'Email', 'Source', 'Actions'].map((heading) => (
+              {['Name', 'Email', 'Source', 'Subscribed', 'Actions'].map((heading) => (
                 <th
                   key={heading}
                   className="px-4 py-3 text-[0.68rem] uppercase tracking-widest font-bold"
@@ -312,6 +337,16 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
                   </td>
                   <td className="px-4 py-3" style={{ color: 'var(--color-on-surface-variant)' }}>
                     {sourceLabel(subscriber)}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    {formatDate(subscriber.subscribedAt) ?? (
+                      formatDate(subscriber.accountCreatedAt) ? (
+                        <span>
+                          {formatDate(subscriber.accountCreatedAt)}
+                          <span className="ml-1 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>(account)</span>
+                        </span>
+                      ) : '-'
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {canManage ? (
@@ -350,7 +385,7 @@ export default function SubscribersManager({ initialRows }: { initialRows: Subsc
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-12 text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
+                <td colSpan={5} className="px-4 py-12 text-center" style={{ color: 'var(--color-on-surface-variant)' }}>
                   No reachable marketing recipients yet.
                 </td>
               </tr>

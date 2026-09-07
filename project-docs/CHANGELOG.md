@@ -1,7 +1,59 @@
 
 # Changelog
 
-## 2026-09-07 — Search Console "Page indexing" read in full (7 reasons decoded); `/en/...` redirect 307 → 308 (STAGED, awaiting push); robots.txt validation started in GSC
+## 2026-09-07 (later still) — admin Subscribers table gains a "Subscribed" column; Users phone cards gain a "Joined" line; every admin Created/Updated stamp now reads in Eastern time (STAGED, awaiting push)
+
+Owner: "add a timestamp to the subscribers table and users table so I can
+see when a user subscribed to the mailing list, and when a user made their
+account." Both stamps already existed in the database
+(`homepage_subscribers.subscribed_at`, `profiles.created_at`), and the
+Users DESKTOP table already had Created / Updated columns — the phone cards
+did not, and the Subscribers table showed no date at all. Display-only
+change; **no SQL to run, no env vars.**
+
+- `lib/marketing.ts` — `MarketingRecipient` gains `subscribedAt` (from
+  `subscribed_at`, null for account/buyer-only recipients) and
+  `accountCreatedAt` (from `profiles.created_at`, null without an account);
+  both survive the account and buyer merges; the two column-missing
+  fallback selects set them null. Test added in `marketing.test.ts` (fake
+  client, four recipient shapes).
+- `admin/subscribers/page.tsx` + `SubscribersManager.tsx` — new
+  **Subscribed** column between Source and Actions: the subscription
+  time, or the account creation time tagged "(account)" when the row is an
+  account holder with no newsletter record, else "-". A subscriber added by
+  hand shows "now" immediately (the API stamps `subscribed_at = now()`).
+- `admin/users/page.tsx` — phone cards show "Joined <date>" under the
+  email; the desktop Created / Updated columns are unchanged.
+- **Eastern time everywhere.** Both formatters are pinned to
+  `America/New_York`. The Users page is a server component and Netlify's
+  clock is UTC, so its Created / Updated stamps had been reading four or
+  five hours late; the client-side Subscribers table would otherwise
+  hydrate against a server render in a different zone. Rule in
+  `DECISIONS.md` → *"Admin timestamps display in Eastern time"*.
+- `api/admin/marketing/test/route.ts` — the synthetic test recipient
+  carries the two new nulls (type completeness only).
+
+Gate: `tsc` 0 · lint 0 · **1229/1229 (122 files)** · `npm run build` exit
+0. Admin pages sit behind login and the sign-in page's Turnstile crashes
+the Browser pane, so the visual check is the OWNER's:
+`http://localhost:3007/admin/subscribers` (Subscribed column) and
+`http://localhost:3007/admin/users` on the phone (Joined line) — see
+`TASKS.md`.
+
+## 2026-09-07 (later) — `/en/...` 308 DEPLOYED + production-verified; GSC "Page with redirect" validation started
+
+Owner: "pushed and deployed, verify it live." Verified over HTTP on
+production (2026-09-07, later): `/en`, `/en/`, `/en/shop`,
+`/en/shop?metal=silver` (query kept), `/en/sell/naples`, `/en/bullion`,
+`/en/contact`, `/en/account` and a `/en/shop/<product>` URL → **308** to the
+bare path (`Location: /shop` etc.), `/en/` resolves in ONE hop; `/english-tea`
+404; `/`, `/es`, `/shop`, `/es/shop`, `/sell/naples`, `/spot-prices`, a
+product page 200; `/live` 307, `/auctions` + `/index.html` + `/es/` 308,
+`/money.jpg` 404 — all unchanged. Then in GSC (URL-prefix property) → "Page
+with redirect" → **Validate fix clicked: "Validation started 9/6/26"** (46
+affected). Staging equals source; nothing in flight.
+
+## 2026-09-07 — Search Console "Page indexing" read in full (7 reasons decoded); `/en/...` redirect 307 → 308 (deployed the same day — see above); robots.txt validation started in GSC
 
 Owner: "I recently got an email saying that new reasons prevent pages from
 being indexed. Let's look at what the problems are and fix them." Read in
