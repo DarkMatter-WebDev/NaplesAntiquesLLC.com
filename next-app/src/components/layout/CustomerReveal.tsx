@@ -173,6 +173,51 @@ function collectRevealElements(root: HTMLElement) {
   });
 }
 
+/** The pathname with a leading `/en` or `/es` removed — the page, regardless of language. */
+export function normalizeRevealPathname(pathname: string): string {
+  return pathname.replace(/^\/(?:en|es)(?=\/|$)/, '') || '/';
+}
+
+/**
+ * Is this navigation the SAME page in the other language?
+ *
+ * Owner, 2026-09-08, on `/card`: "I see the page change to Spanish, and then
+ * I see a flash reload … the reload I'm seeing might be a result of the fade
+ * in effect." Exactly that. The English/Español toggle is a soft navigation,
+ * but the `[locale]` segment changes, so React REMOUNTS the page's DOM; the
+ * new nodes carry no `data-customer-reveal`, and the sweep below stamped them
+ * `pending` (opacity 0, blurred, 18px down) and faded them in over 620ms with
+ * a stagger — the entrance animation of a new page, applied to a page the
+ * visitor was already reading. A language switch must be a text swap, never
+ * an arrival, so it gets no reveal at all; the nodes simply render visible.
+ * Real page changes (home → shop) and first loads keep the animation.
+ */
+export function isLocaleOnlyChange(previousPathname: string | null, nextPathname: string): boolean {
+  if (previousPathname === null || previousPathname === nextPathname) return false;
+  return normalizeRevealPathname(previousPathname) === normalizeRevealPathname(nextPathname);
+}
+
+/**
+ * The pathname the last effect run was for; null until the first run after a
+ * full page load. MODULE scope on purpose, not a ref: this component renders
+ * inside `[locale]/layout.tsx`, and a language switch remounts that whole
+ * subtree — a ref would start empty on the new instance and the switch would
+ * look like a first mount (measured 2026-09-08: the stamp landed 80ms after
+ * the URL change, from the fresh instance's timer). A module variable survives
+ * the remount and resets with the document, which is exactly the lifetime the
+ * question "is this the same page in another language?" needs.
+ */
+let lastRevealPathname: string | null = null;
+/**
+ * The decision made for `lastRevealPathname`, reused when the effect runs
+ * again for the SAME pathname. React StrictMode (dev) mounts every effect
+ * twice, and Fast Refresh can re-run it too; on those second runs the stored
+ * pathname already equals the current one, and a fresh comparison would say
+ * "not a switch" and fade the page after all (measured 2026-09-08). One
+ * decision per pathname, however many times the effect runs for it.
+ */
+let lastRunWasLocaleSwitch = false;
+
 export default function CustomerReveal() {
   const pathname = usePathname();
 
@@ -180,8 +225,12 @@ export default function CustomerReveal() {
     const root = document.querySelector<HTMLElement>('[data-customer-reveal-root]');
     if (!root) return;
 
-    const normalizedPathname = pathname.replace(/^\/(?:en|es)(?=\/|$)/, '') || '/';
+    const normalizedPathname = normalizeRevealPathname(pathname);
     const isAdminRoute = normalizedPathname === '/admin' || normalizedPathname.startsWith('/admin/');
+    const localeSwitch =
+      pathname === lastRevealPathname ? lastRunWasLocaleSwitch : isLocaleOnlyChange(lastRevealPathname, pathname);
+    lastRevealPathname = pathname;
+    lastRunWasLocaleSwitch = localeSwitch;
 
     if (isAdminRoute) {
       root.classList.remove('customer-reveal-enabled');
@@ -192,21 +241,54 @@ export default function CustomerReveal() {
       return;
     }
 
+    let disposed = false;
+
     const runReveal = () => {
+      if (disposed) return;
       root.classList.add('customer-reveal-enabled');
       collectRevealElements(root).forEach((element, index) => {
         revealElement(element, index);
       });
     };
 
+    // A language switch: mark the remounted nodes settled without ever hiding
+    // them, so later sweeps (the observer below) skip them exactly as they
+    // skip any revealed element.
+    const settleWithoutReveal = () => {
+      if (disposed) return;
+      root.classList.add('customer-reveal-enabled');
+      collectRevealElements(root).forEach((element) => {
+        element.dataset.customerReveal = 'done';
+      });
+    };
+
+    // ⚠️ Timing that matters: on a navigation the route commit mutates the DOM
+    // and this OUTGOING page's observer fires first — its frame runs before
+    // React reaches this effect's cleanup, let alone the incoming page's
+    // effect. That is by design for a real page change (the new content is
+    // hidden before it ever paints, then fades in), but it means the language
+    // switch has to be recognised HERE, from the URL the router has already
+    // pushed, not only in the next effect run. The `disposed` flag alone was
+    // measured to be too late (2026-09-08).
+    const sweep = () => {
+      if (disposed) return;
+      const here = window.location.pathname;
+      if (here !== pathname && isLocaleOnlyChange(pathname, here)) {
+        settleWithoutReveal();
+        return;
+      }
+      runReveal();
+    };
+
     const observer = new MutationObserver(() => {
-      window.requestAnimationFrame(runReveal);
+      window.requestAnimationFrame(sweep);
     });
 
     let timer: number | undefined;
     const startReveal = () => {
       timer = window.setTimeout(() => {
-        runReveal();
+        if (localeSwitch) settleWithoutReveal();
+        else runReveal();
         observer.observe(root, { childList: true, subtree: true });
       }, 80);
     };
@@ -218,6 +300,7 @@ export default function CustomerReveal() {
     }
 
     return () => {
+      disposed = true;
       window.removeEventListener('load', startReveal);
       if (timer) window.clearTimeout(timer);
       observer.disconnect();

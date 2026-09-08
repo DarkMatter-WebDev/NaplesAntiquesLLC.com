@@ -1,7 +1,88 @@
 
 # Changelog
 
-## 2026-09-08 (evening) — `/card` reviews button + website label, and the new `/reviews` page (STAGED, awaiting push)
+## 2026-09-08 (late) — language switch no longer plays the entrance fade + `/reviews` loses its count (STAGED, awaiting push)
+
+Owner, minutes after the deploy: "check the /card page, we previously fixed
+a flash that occurred when user switches from en to es, it seems the flash
+is back" → "even in the preview, I see the page change to Spanish, and then
+I see a flash reload" → "the reload I'm seeing might be a result of the
+fade in effect the page seems to have." The last reading was right.
+
+**Diagnosis (what it was NOT):** a `window` marker survived every switch in
+the pane, in the owner's Chrome and on production (13–18 ms soft
+navigations, no `pagehide`); RSC build ids identical across every cached
+variant; `/card` has no loading boundary; the cookie notice never shows;
+nothing in the code reloads or refreshes after a navigation. **What it
+was:** `components/layout/CustomerReveal.tsx` keys its effect on
+`usePathname()`, and a locale switch changes the `[locale]` segment, so
+React remounts the page DOM (measured: `main nav` and `main > div` are new
+nodes). The sweep stamped them `pending` (opacity 0, blur, 18px down) and
+faded them in over 620 ms with a stagger — a new page's arrival, played on
+a page the visitor was already reading. The 09-04 fix (Next `<Link>`) had
+removed the real document reload; this fade was underneath it.
+
+**Fix (`CustomerReveal.tsx`, sitewide — the header's language link on
+every page benefits too):** a pathname change that differs only by locale
+gets no reveal; the remounted nodes are stamped `done` and never hidden.
+Real page changes and first loads are unchanged. Three attempts were
+needed, each defeated by a timing trap now written into the file: (1) the
+OUTGOING page's MutationObserver fires on the route commit and its frame
+runs before React reaches the old effect's cleanup, so the decision is made
+inside that sweep from `window.location.pathname`; (2) `CustomerReveal`
+itself remounts with the `[locale]` layout, so the "last pathname" lives at
+module scope, not in a ref; (3) StrictMode runs the effect twice in dev and
+the second run sees its own pathname, so the decision is stored per
+pathname and reused. Pure helpers `normalizeRevealPathname` /
+`isLocaleOnlyChange` exported + `lib/__tests__/customer-reveal-locale-switch.test.ts`
+(NEW, 3 tests).
+
+**`/reviews` count removed** (owner: "just say Google reviews, quoted word
+for word"): the intro and the meta description no longer carry
+`TESTIMONIALS.length` in either language. `DECISIONS.md` → *"The /reviews
+page"* updated.
+
+Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 · `npx vitest run`
+**1252/1252 (126 files)** · `npm run build` exit 0 (481 static pages).
+Dev proof (MutationObserver counting `data-customer-reveal` stamps, marker
+alive throughout): `/card` → `/es/card` → `/card` → `/es/card` each **0
+`pending` / 0 `visible` / 2 `done`**; `/es/reviews` → `/reviews` (the
+header's language link) 0 / 0 / 26; a real page change `/es/card` →
+`/es/reviews` still 26 `pending` → 52 `visible` → 26 `done` (the fade kept);
+first load of `/card` still reveals (nav + column `done`). `/reviews` and
+`/es/reviews` 200 with the count-free intro and meta, 0 "22" in the HTML.
+⚠️ The pane's console kept replaying a transient "count is not defined"
+from a mid-edit compile long after curl showed clean pages — the buffer
+lies (memory `dev-server-gotchas`).
+
+After the push: on the phone, `/card` → Español → English: the text swaps
+with no fade; `/reviews` intro reads "Google reviews, quoted word for
+word…" with no number; then the two GSC requests + IndexNow still owed from
+the evening batch.
+
+## 2026-09-08 (evening) — `/card` reviews button + `/reviews` page DEPLOYED and production-verified
+
+Owner: "pushed and deployed, verify it live." Verified over HTTP on
+production minutes later: `/reviews` and `/es/reviews` → **200** with
+titles "Customer Reviews | …" / H1 "Reviews" and "Reseñas", per-locale
+canonicals, the intro line, 22 review cards (44 `testimonial-card` = 22 ×
+HTML + RSC), 88 "Read on Google" links to the profile, the `/review` anchor
+×2, BreadcrumbList present, **0** `aggregateRating`, **0** noindex;
+`/card` → 200 with "Read Our Reviews" ×2, "View Full Website &amp; Shop",
+`href="/reviews"`, noindex + `data-no-cookie-notice` intact, **0** "Visit
+Our Website"; `/es/card` → "Leer Nuestras Reseñas" ×2, "Ver Sitio Web y
+Tienda" ×2, `href="/es/reviews"`; `/review` → **302** to the g.page form
+(the anchored matcher did not break the carve-out), `/p/1` → 302 to the
+product, `/live` → 307 to `/spot-prices`; `/sitemap.xml` **212** URLs
+(was 210) carrying `/reviews` + `/es/reviews`, still **0** `/card`;
+`/about` HTML carries two `href="/reviews"` (About menu + footer); the
+homepage still renders the marquee (88 card markers) through the extracted
+`TestimonialCard`; smoke `/about`, `/shop`, `/sell` → 200. Docs flipped to
+deployed; staging re-synced. **Owed: GSC indexing requests for `/reviews`
++ `/es/reviews`, then `npm run indexnow`.** The block below is the
+pre-deploy record.
+
+## 2026-09-08 (evening) — `/card` reviews button + website label, and the new `/reviews` page (pre-deploy record)
 
 Owner: on `/card`, change "Visit Our Website" to something like "View Full
 Website & Shop", add a button beside "Leave a Google Review" that lets

@@ -43,12 +43,13 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   const isEs = locale === 'es';
-  const count = TESTIMONIALS.length;
+  // No count anywhere on the page (owner, 2026-09-08): it would read as "only
+  // N" and drift against the Google total.
   return pageMetadata({
     title: isEs ? 'Reseñas de Clientes' : 'Customer Reviews',
     description: isEs
-      ? `${count} reseñas de Google de personas que vendieron o compraron con Naples Estate Jewelry en Naples, FL — citadas palabra por palabra, cada una enlazada a la original en Google.`
-      : `${count} Google reviews from people who sold to or bought from Naples Estate Jewelry in Naples, FL — quoted word for word, each linked to the original on Google.`,
+      ? 'Reseñas de Google de personas que vendieron o compraron con Naples Estate Jewelry en Naples, FL — citadas palabra por palabra, cada una enlazada a la original en Google.'
+      : 'Google reviews from people who sold to or bought from Naples Estate Jewelry in Naples, FL — quoted word for word, each linked to the original on Google.',
     path: '/reviews',
     locale,
   });
@@ -57,7 +58,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ReviewsPage({ params }: Props) {
   const { locale } = await params;
   const isEs = locale === 'es';
-  const count = TESTIMONIALS.length;
 
   const crumbs: Crumb[] = [{ name: isEs ? 'Reseñas' : 'Reviews', path: '/reviews' }];
 
@@ -91,8 +91,8 @@ export default async function ReviewsPage({ params }: Props) {
               style={{ color: 'var(--color-on-surface-variant)' }}
             >
               {isEs
-                ? `${count} reseñas de Google, citadas palabra por palabra. Cada tarjeta abre la original en Google, y la calificación que cuenta es la de allí.`
-                : `${count} Google reviews, quoted word for word. Every card opens the original on Google, and the rating there is the one that counts.`}
+                ? 'Reseñas de Google, citadas palabra por palabra. Cada tarjeta abre la original en Google, y la calificación que cuenta es la de allí.'
+                : 'Google reviews, quoted word for word. Every card opens the original on Google, and the rating there is the one that counts.'}
             </p>
           </PageContainer>
         </section>

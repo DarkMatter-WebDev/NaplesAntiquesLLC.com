@@ -5,7 +5,48 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 STAGED 2026-09-08 (evening) — `/card` "Read Our Reviews" + "View Full Website & Shop", NEW `/reviews` page — awaiting push (no SQL, no env vars)
+### 🟡 STAGED 2026-09-08 (late) — language switch keeps its text, drops the entrance fade (`CustomerReveal`) + `/reviews` count removed — awaiting push (no SQL, no env vars)
+
+Owner: the EN↔ES toggle on `/card` "flash reload" is back → traced to the
+site-wide entrance fade replaying on the remounted page, not a reload;
+fixed for every locale-only navigation sitewide. Also: no review count on
+`/reviews` (intro + meta, EN + ES). Detail + the three timing traps:
+`CHANGELOG.md` 2026-09-08 (late). Files: `components/layout/CustomerReveal.tsx`,
+`lib/__tests__/customer-reveal-locale-switch.test.ts` (NEW),
+`[locale]/reviews/page.tsx`. Gate: `tsc` 0 · lint 0 · **1252/1252 (126
+files)** · build exit 0 (481 static pages) · dev-verified (0 `pending`
+stamps on four switches, fade intact on a real page change).
+
+◻ **Owner — push** (bundle with anything else pending at your call). After
+the deploy, on the phone: `/card` → Español → English — the text swaps, no
+fade; `/reviews` intro has no number. Tell me "verify it live" for the curl
+checks (`/reviews` HTML must contain 0 "22 Google").
+◻ **Then the two GSC indexing requests + IndexNow** from the item below.
+
+**Staging:** ✅ synced 2026-09-08 (late) — dry run listed exactly the 8 touched files (CustomerReveal.tsx, reviews/page.tsx, customer-reveal-locale-switch.test.ts NEW + CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS), 0 Extras; real run copied 8 / 0 FAILED; follow-up dry run 0/0/0; leak check 0; SHA256 MATCH on CustomerReveal.tsx, reviews page, CHANGELOG. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### ✅ DEPLOYED 2026-09-08 (evening) — `/card` reviews button + `/reviews` page (production-verified) — ◻ GSC indexing requests owed
+
+Owner: "pushed and deployed, verify it live." Verified (detail in
+`CHANGELOG.md` 2026-09-08 evening): `/reviews`, `/es/reviews`, `/card`,
+`/es/card` → 200 with the new content; `/review` → 302 unchanged;
+`/sitemap.xml` 212 URLs with both new ones and 0 `/card`; About menu +
+footer links live; homepage band intact. Staging equals source; nothing in
+flight.
+
+◻ **Owed — GSC:** request indexing for
+`https://naplesestatejewelry.com/reviews` and
+`https://naplesestatejewelry.com/es/reviews` (memory
+`gsc-url-inspection-method` — JS value-setter + dispatched Enter, then a
+coordinate click on REQUEST INDEXING; ⛔ never the "REQUEST AGAIN" focus
+trap), then `npm run indexnow` from `next-app/`. Two requests; do them when
+the owner says so.
+
+**Staging (deploy record):** ✅ synced 2026-09-08 (evening, post-deploy) — dry run listed exactly the 3 flipped docs (CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras; real run copied 3; follow-up dry run 0/0/0; leak check 0; CHANGELOG hash MATCH. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+The block below is the pre-deploy record.
+
+### (pre-deploy record) 🟡 STAGED 2026-09-08 (evening) — `/card` "Read Our Reviews" + "View Full Website & Shop", NEW `/reviews` page
 
 Built on the owner's word ("Option A, those labels, build the /reviews
 page, speech bubbles"). Detail: `CHANGELOG.md` 2026-09-08 (evening). Files:

@@ -8,7 +8,27 @@
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-08 (evening) — `/card` "Read Our Reviews" button + "View Full
+🟡 **09-08 (late) — the `/card` EN↔ES "flash" was the site-wide entrance
+fade replaying on a remounted page, FIXED in `CustomerReveal` (a
+locale-only pathname change gets no reveal, sitewide) + `/reviews` intro
+and meta lose the review count — BUILT + dev-verified + STAGED, awaiting
+push (no SQL, no env vars).** Not a reload (marker survived everywhere);
+three timing traps documented in the file and in `DECISIONS.md` → *"A
+language switch is a text swap"*. Gate tsc 0 · lint 0 · **1252/1252 (126
+files)** · build exit 0 (481 static pages). After the push: phone check of
+the toggle, then the two GSC requests + IndexNow still owed. `TASKS.md`
+top; `CHANGELOG.md` 09-08 (late).
+
+✅ **09-08 (evening) — `/card` reviews button + `/reviews` page DEPLOYED
+and production-verified** (`/reviews` + `/es/reviews` 200 with 22 cards and
+no rating schema; `/card` carries the new pill + label; `/review` still
+302; sitemap 212 with both new URLs, 0 `/card`; About + footer links live;
+homepage band intact). Staging equals source; nothing in flight. **Owed:
+GSC indexing requests for `/reviews` + `/es/reviews` + IndexNow** (the only
+open item from this batch; `TASKS.md` top). The block below is the
+pre-deploy record.
+
+🟡 (superseded) **09-08 (evening) — `/card` "Read Our Reviews" button + "View Full
 Website & Shop" label, and a NEW `/reviews` page (EN + ES) — BUILT +
 dev-verified + STAGED, awaiting push (no SQL, no env vars).** Owner chose a
 page of our own over a Google link. The page renders the 22 verbatim
@@ -30,7 +50,9 @@ marketplace status sweeps now count repairs honestly and reconcile-on-refusal
 deleted, form detection disabled by the owner; the lead forms gained
 required Location + Preferred-contact fields (SQL applied, end-to-end tested,
 deployed, verified). **Evening: the `/card` reviews button + `/reviews`
-page are STAGED, awaiting push (block above).** Next
+page DEPLOYED + production-verified; late: the toggle's entrance-fade
+"flash" FIXED + `/reviews` count removed, STAGED awaiting push (blocks
+above); GSC requests for the two new URLs owed.** Next
 batch when the owner is ready: pg_cron overlap cleanup (GitHub `schedule:`
 block + five Netlify `.mts`) + an admin "last sweep ran N min ago" line —
 after the 09-08 11:15/11:45Z price pushes are seen on the minute. Proposal

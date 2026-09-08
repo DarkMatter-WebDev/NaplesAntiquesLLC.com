@@ -6,6 +6,33 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-09-08**.
 
+## A language switch is a text swap, never an arrival — no entrance fade (2026-09-08)
+
+Owner, on `/card` after the deploy: "I see the page change to Spanish, and
+then I see a flash reload … might be a result of the fade in effect." It
+was the fade. The English/Español toggle is a soft navigation, but the
+`[locale]` segment changes, so React remounts the page's DOM, and
+`CustomerReveal` (the site-wide entrance animation: opacity 0 + blur + 18px
+→ 620ms fade, staggered) treated the new nodes as a new page. Rule, applied
+in `components/layout/CustomerReveal.tsx` for EVERY page, including the
+header's language link:
+
+- A pathname change that differs only by its `/en` / `/es` prefix gets **no
+  reveal**: the remounted nodes are stamped `done` and never hidden. Real
+  page changes and first loads keep the animation unchanged.
+- The decision is made in two places because of timing: in the OUTGOING
+  page's observer sweep (it fires on the route commit, before React runs
+  the old effect's cleanup) from `window.location.pathname`, and in the new
+  effect run from a **module-scope** record of the last pathname
+  (`CustomerReveal` itself remounts with the layout, so a ref would be
+  empty). The decision is stored per pathname so StrictMode's double effect
+  run in dev cannot flip it.
+- Pure helpers `normalizeRevealPathname` / `isLocaleOnlyChange` are
+  exported and guarded by `lib/__tests__/customer-reveal-locale-switch.test.ts`.
+- Proof method for any future "flash" report: a `window` marker (survives
+  = no reload) plus a MutationObserver counting `data-customer-reveal`
+  stamps — a switch must count 0 `pending`.
+
 ## The `/reviews` page — the site's own review list, not a Google link (2026-09-08)
 
 The business card's "Read Our Reviews" button opens `/reviews` (EN) /
@@ -16,8 +43,9 @@ the verbatim reviews plus their Spanish translations already existed in
 `lib/testimonials.ts`. Rules:
 
 - **The page renders `TESTIMONIALS` and nothing else.** No review is typed
-  on the page; the count in the intro and the meta description is
-  `TESTIMONIALS.length`. The list stays reconciled against the live Google
+  on the page. **No count anywhere** (owner, 2026-09-08, minutes after the
+  deploy: "just say Google reviews, quoted word for word") — a number reads
+  as "only N" and drifts against the Google total. The list stays reconciled against the live Google
   profile (the rule at the top of `testimonials.ts`) — on a page that
   invites verification, a vanished review is the same problem as an
   invented one.
