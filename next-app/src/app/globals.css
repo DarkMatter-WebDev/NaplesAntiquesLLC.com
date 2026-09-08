@@ -487,6 +487,42 @@ table {
   letter-spacing: 0.15em;
 }
 
+/* /reviews page (2026-09-08): the whole curated list on its own page. One
+   column on phones, two from 640px — a page ABOUT the reviews reads them in
+   full, so the band's 8-line clamp and its 12px floor are lifted here: the
+   whole quote is the content, not a teaser. The card itself is unchanged
+   (`TestimonialCard`), so it still links to Google and still carries the
+   stretched-link overlay. */
+.reviews-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+@media (min-width: 640px) {
+  .reviews-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+}
+.reviews-grid .testimonial-card {
+  padding: 1.5rem;
+  gap: 0.9rem;
+}
+.reviews-grid .testimonial-card blockquote {
+  font-size: 0.95rem;
+  display: block;
+  -webkit-line-clamp: initial;
+  line-clamp: initial;
+  overflow: visible;
+}
+.reviews-grid .testimonial-card figcaption,
+.reviews-grid .testimonial-google-link {
+  font-size: 0.8rem;
+}
+.reviews-grid .testimonial-card .testimonial-stars {
+  font-size: 0.9rem;
+}
+
 /* Reviews marquee — the homepage presentation (2026-08-18). The grid above is
    still what product pages render; only the homepage band scrolls.
 

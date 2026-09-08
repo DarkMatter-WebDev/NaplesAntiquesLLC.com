@@ -4,7 +4,48 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-09-03**.
+> compaction. Last reconciled: **2026-09-08**.
+
+## The `/reviews` page — the site's own review list, not a Google link (2026-09-08)
+
+The business card's "Read Our Reviews" button opens `/reviews` (EN) /
+`/es/reviews`, a page of our own, rather than the Google profile. Owner's
+choice on a recommendation: the profile link opens the Maps app on most
+phones with no way back, shows Spanish speakers a machine translation, and
+the verbatim reviews plus their Spanish translations already existed in
+`lib/testimonials.ts`. Rules:
+
+- **The page renders `TESTIMONIALS` and nothing else.** No review is typed
+  on the page; the count in the intro and the meta description is
+  `TESTIMONIALS.length`. The list stays reconciled against the live Google
+  profile (the rule at the top of `testimonials.ts`) — on a page that
+  invites verification, a vanished review is the same problem as an
+  invented one.
+- **One card everywhere.** `components/home/TestimonialCard.tsx` is the
+  single rendering (homepage marquee, product-page grid, `/reviews`), each
+  card linking to the original on Google. A change to how a review looks or
+  links is made there, once.
+- **Google stays one tap away.** The page ends with "Leave a Review on
+  Google" (the plain `<a href="/review">` 302 handler — never a Next
+  `<Link>`) and "See All Reviews on Google" (`GOOGLE_REVIEWS_URL`). Nobody
+  is trapped in a curated list, and the copy says the rating that counts is
+  Google's.
+- ⛔ **No `aggregateRating` / `Review` schema** for the business's own
+  reviews, here or anywhere (self-serving review markup on a LocalBusiness
+  is a manual-action risk). BreadcrumbList only. Guarded by
+  `lib/__tests__/reviews-page.test.ts`.
+- **Honest about translation.** The Spanish page says the Spanish versions
+  are our translation (one review, Mayelin Pérez, was written in Spanish and
+  its English is the translation — `testimonials.ts` records which).
+- **A destination, not a ranking page**: sitemap priority 0.5, linked from
+  the About ▾ menu, the footer company column and `/card`. It is NOT added
+  to the homepage band's footnote (the band's own "Leave a Review" CTA is
+  the conversion path there).
+- ⚠️ **`/reviews` is one letter from the `/review` route handler.** The
+  proxy matcher's carve-out is `review$` (anchored) since 2026-09-08; the
+  unanchored `review` prefix it replaced sent `/reviews` around the locale
+  rewrite to a 404. The test above rebuilds the matcher regex from the
+  source and pins both behaviours.
 
 ## Silver-marks photos: the shop's own first, eBay by the owner's call, provenance always recorded (2026-09-06)
 
@@ -177,6 +218,18 @@ editable. Rules that follow from that:
   the card changes hands right after a sale. Call is the dark pill, as on
   the homepage Visit Us block. Keep that hierarchy. **Get Directions sits
   under the address**, not in the primary stack (owner, 2026-09-03).
+- **"Read Our Reviews" is an outline pill directly under the gold review
+  ask** (owner, 2026-09-08), a `<Link prefetch={false}>` to the site's own
+  `/reviews` page (see *"The /reviews page"*), so the gold button stays the
+  one filled button. A paired half-width row was measured and rejected at
+  375px: 112px per half against "Leave a Review" 115px / "Dejar una Reseña"
+  137px. The icon is the `forum` speech bubbles (owner's pick).
+- **The bottom button names both destinations: "View Full Website & Shop"**
+  (owner, 2026-09-08). Spanish is "Ver Sitio Web y Tienda" — the full
+  "Ver Sitio Web Completo y Tienda" measured 252 of the 256px available at
+  375px, so it drops "Completo" in place (the shrink-in-place rule). Pill
+  labels on this page are measured (canvas `measureText` with the pill's
+  computed font), never eyeballed.
 - **The Text button is prefilled** ("Hi Chris, I have your card and I'd
   like to ask about ") — the site has no scan analytics, and the phrase is
   how the owner knows a lead came from a card. Keep the `sms:…?&body=`

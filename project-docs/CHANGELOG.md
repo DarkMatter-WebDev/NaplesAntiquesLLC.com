@@ -1,6 +1,86 @@
 
 # Changelog
 
+## 2026-09-08 (evening) — `/card` reviews button + website label, and the new `/reviews` page (STAGED, awaiting push)
+
+Owner: on `/card`, change "Visit Our Website" to something like "View Full
+Website & Shop", add a button beside "Leave a Google Review" that lets
+people read the reviews — and, asked whether that should be a page of our
+own or a link to Google, chose the page. Recommendation accepted because
+the 22 verbatim reviews and their Spanish translations already existed in
+`lib/testimonials.ts`, the Google profile link opens the Maps app and shows
+Spanish speakers a machine translation, and a page of our own can answer
+the brand + "reviews" query. Mockup (both card options, a page sketch, a
+Spanish phone) approved: Option A, the measured labels, the speech-bubbles
+icon, build the page.
+
+**`/card`** (`[locale]/card/page.tsx`): new outline pill "Read Our Reviews" /
+"Leer Nuestras Reseñas" (`<Link prefetch={false}>` to `/reviews`; new
+`forum` icon = lucide `MessagesSquare` in `AppIcon`) directly under the gold
+review button; bottom button now reads "View Full Website & Shop" / "Ver
+Sitio Web y Tienda". Measured on the live page at 375px (canvas
+`measureText` with the pill's computed font, 11.84px bold + 1.61px
+tracking): the bottom pill has 256px for text — EN 195px; the full Spanish
+"Ver Sitio Web Completo y Tienda" 252px, too close to trust on every phone,
+so it drops "Completo" in place (owner's shrink-in-place rule) at 172px. A
+paired half-width row (Option B) was rejected by the same measurement:
+112px per half against "Leave a Review" 115px and "Dejar una Reseña" 137px.
+
+**`/reviews` + `/es/reviews`** (`[locale]/reviews/page.tsx`, NEW): light
+centred opener (visible breadcrumb, "What Clients Say", H1 "Reviews", intro
+whose count is `TESTIMONIALS.length`), every curated review as the shared
+card in a 1 → 2 column grid with the full quote (no clamp), then "Leave a
+Review on Google" (gold; the plain `<a href="/review">` the band uses) +
+"See All Reviews on Google" (outline; `GOOGLE_REVIEWS_URL`) and an honesty
+note (EN: shown exactly as written on Google; ES: the Spanish versions are
+our translation). BreadcrumbList through `BreadcrumbJsonLd`; ⛔ no
+`aggregateRating` / `Review` schema (existing rule from `/review`). Sitemap
+entry at 0.5 monthly, `CONTENT_LAST_MODIFIED` bumped to 2026-09-08. Linked
+from the About ▾ menu (`nav.reviews` = "Reviews" / "Reseñas", between About
+Us and Live Metal Prices), the footer company column, and `/card`.
+
+**Shared card extracted:** the `card()` function inside
+`TestimonialsSection` moved verbatim to `components/home/TestimonialCard.tsx`
+(props `review`, `isEs`, `isRepeat`); the homepage marquee and product-page
+grid render it exactly as before. `.reviews-grid` in `globals.css`: one
+column, two from 640px, the band's 8-line clamp and 12px floor lifted.
+
+**Proxy matcher fix (would have been a 404):** the matcher's `review`
+carve-out was an unanchored prefix, so `/reviews` bypassed the locale
+rewrite and dev answered 404. Now `review$`. Guarded by the new
+`lib/__tests__/reviews-page.test.ts`, which rebuilds the matcher regex from
+the source and asserts `/reviews` + `/es/reviews` match while `/review`,
+`/p/123` and `/robots.txt` still bypass; the same file guards the sitemap
+entry, the three link locations, the card labels and the no-rating-markup
+rule.
+
+Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 · `npx vitest run`
+**1249/1249 (125 files)** · `npm run build` exit 0 (481 static pages, was
+479; `/en/reviews` + `/es/reviews` prerendered). Dev server: `/reviews`,
+`/es/reviews`, `/card`, `/es/card` → 200; `/review` → 302 to g.page; `/p/1`
+→ 302; `/sitemap.xml` carries both `/reviews` URLs; `/about` HTML carries
+two `href="/reviews"` (menu + footer); pane screenshots at 375 (card, page)
+and desktop (two-column grid); console 0 errors.
+
+After the push: `curl -sI https://naplesestatejewelry.com/reviews` → 200,
+`/es/reviews` → 200, `/review` still 302, `/card` HTML contains "Read Our
+Reviews"; then GSC → request indexing for `/reviews` + `/es/reviews`
+(URL-inspection method in memory `gsc-url-inspection-method`) and
+`npm run indexnow`.
+
+## 2026-09-08 — lead-form fields + Netlify stub deletion DEPLOYED and production-verified
+
+Owner: "pushed and deployed, verify it live." Verified over HTTP on
+production: `/free-evaluation`, `/contact`, `/es/free-evaluation`,
+`/es/contact` → 200 with `name="location_area"` ×1 and
+`name="preferred_contact"` ×3; `/contact?item=…` → 200 with ×0 / ×3 (product
+form asks only the preference); the three Spanish labels present in the ES
+HTML; `/netlify-forms.html` → 404 (ghost-form stub gone; form detection was
+disabled by the owner earlier). API probe: JSON POST with
+`preferred_contact: "email"` and an empty email → **400 "Please enter your
+email address, or choose Call or Text."** — the new validation is live and
+the probe wrote nothing. Staging equals source; nothing in flight.
+
 ## 2026-09-08 — lead forms ask "Where are you located?" + "How should we contact you?" — BUILT, dev-verified, STAGED (⚠️ SQL to run before deploy)
 
 Owner: people were submitting free-evaluation requests from outside the

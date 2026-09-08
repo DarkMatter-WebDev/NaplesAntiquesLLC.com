@@ -46,6 +46,7 @@ import {
   MapPin,
   Menu,
   MessageSquareText,
+  MessagesSquare,
   Mic,
   Microscope,
   Minus,
@@ -125,6 +126,8 @@ export const APP_ICONS = {
   family_restroom: UsersRound,
   favorite: Heart,
   filter_list: ListFilter,
+  // Two speech bubbles — "read the reviews" on /card (owner's pick, 2026-09-08).
+  forum: MessagesSquare,
   gavel: Gavel,
   grid_view: Grid2X2,
   home: House,

@@ -2,11 +2,52 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-09-03**.
+> in `DECISIONS.md`. Last reconciled: **2026-09-08**.
 
-## Start Here (handoff, end of the 2026-09-03 session — SUPERSEDES the blocks below)
+## Start Here (handoff, end of the 2026-09-08 session — SUPERSEDES the blocks below)
 
 **Read this, then `TASKS.md`.**
+
+🟡 **09-08 (evening) — `/card` "Read Our Reviews" button + "View Full
+Website & Shop" label, and a NEW `/reviews` page (EN + ES) — BUILT +
+dev-verified + STAGED, awaiting push (no SQL, no env vars).** Owner chose a
+page of our own over a Google link. The page renders the 22 verbatim
+reviews from `lib/testimonials.ts` through the newly extracted
+`TestimonialCard`, hands off to Google for leaving/seeing all, carries no
+rating schema, sits in the sitemap at 0.5 and in the About ▾ menu + footer.
+Found and fixed on the way: the proxy matcher's `review` carve-out was an
+unanchored prefix that would have 404'd `/reviews` (now `review$`, tested).
+Gate tsc 0 · lint 0 · **1249/1249 (125 files)** · build exit 0 (481 static
+pages). After the push: curl `/reviews`, `/es/reviews`, `/review` (302),
+`/card`; then GSC indexing for the two new URLs + IndexNow. `TASKS.md` top;
+`CHANGELOG.md` 09-08 (evening).
+
+**Session 2026-09-07/08 in one paragraph:** all seven scheduled jobs moved
+from GitHub Actions (silently degraded since 08-27) to Supabase pg_cron
+(verified to the second; 8 `nej-*` jobs incl. history cleanup); the
+marketplace status sweeps now count repairs honestly and reconcile-on-refusal
+(deployed, verified); Netlify Forms confirmed unused since June, ghost stub
+deleted, form detection disabled by the owner; the lead forms gained
+required Location + Preferred-contact fields (SQL applied, end-to-end tested,
+deployed, verified). **Evening: the `/card` reviews button + `/reviews`
+page are STAGED, awaiting push (block above).** Next
+batch when the owner is ready: pg_cron overlap cleanup (GitHub `schedule:`
+block + five Netlify `.mts`) + an admin "last sweep ran N min ago" line —
+after the 09-08 11:15/11:45Z price pushes are seen on the minute. Proposal
+parked: inbound marketplace-sale detection (`TASKS.md`).
+
+**⏰ NEXT SESSION, FIRST THING (owner pings after 7:45 a.m. Eastern
+09-08):** read the 09-08 `scheduled_price_push` rows — expect Etsy
+11:15:0xZ + eBay 11:45:0xZ (pg_cron) plus a later GitHub duplicate each;
+both on the minute = overlap window closed → cleanup batch. Exact steps
+and the if-not branch at the top of `TASKS.md`.
+
+✅ **09-08 — lead-form fields + Netlify stub deletion DEPLOYED and
+production-verified** (five form pages 200 with the fields, ES labels,
+stub 404, API 400 on Email-without-address). Staging equals source;
+nothing in flight; the test inquiry row is gone. Open, owner's timing: pg_cron overlap cleanup + the
+admin "last sweep" line (next batch); the inbound marketplace-sale
+detection proposal. The block below is the pre-deploy record.
 
 🔴 **09-08 — lead forms gain "Where are you located?" (dropdown + city
 reveal + out-of-area note) and "How should we contact you?" (Call · Text ·

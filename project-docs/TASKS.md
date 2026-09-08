@@ -1,11 +1,82 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-09-07**.
+> in `CHANGELOG.md`. Last reconciled: **2026-09-08**.
 
 ## ◻ OPEN — needs a human
 
-### 🔴 STAGED 2026-09-08 — lead-form Location + Preferred-contact fields — ⚠️ SQL TO RUN FIRST, then one test submission, then push
+### 🟡 STAGED 2026-09-08 (evening) — `/card` "Read Our Reviews" + "View Full Website & Shop", NEW `/reviews` page — awaiting push (no SQL, no env vars)
+
+Built on the owner's word ("Option A, those labels, build the /reviews
+page, speech bubbles"). Detail: `CHANGELOG.md` 2026-09-08 (evening). Files:
+`[locale]/card/page.tsx`, `[locale]/reviews/page.tsx` (NEW),
+`components/home/TestimonialCard.tsx` (NEW, extracted from
+`TestimonialsSection.tsx`), `AppIcon.tsx` (`forum`), `globals.css`
+(`.reviews-grid`), `sitemap.ts`, `proxy.ts` (`review$`),
+`SiteHeader.tsx`, `SiteFooter.tsx`, `messages/en.json` + `es.json`,
+`lib/__tests__/reviews-page.test.ts` (NEW). Gate: `tsc` 0 · lint 0 ·
+**1249/1249 (125 files)** · build exit 0 (481 static pages) · dev-verified
+(routes, 302s, sitemap, links, screenshots at 375 + desktop, console 0).
+
+◻ **Owner (optional): eyeball on the dev server** — `/card` (new pill under
+the gold one, new bottom label; tap Español for the short label) and
+`/reviews` (phone: one column, full quotes; desktop: two columns; bottom
+buttons open Google in a new tab).
+◻ **Owner — push.** Bundle at your discretion with the pg_cron overlap
+cleanup below (one deploy). After the deploy: `curl -sI
+https://naplesestatejewelry.com/reviews` → 200, `/es/reviews` → 200,
+`/review` → 302, `/card` HTML contains `Read Our Reviews`.
+◻ **After the deploy — GSC:** request indexing for
+`https://naplesestatejewelry.com/reviews` and `/es/reviews` (the only
+driving method that works is in memory `gsc-url-inspection-method`), then
+`npm run indexnow` from `next-app/`. Two requests owed once live.
+
+**Staging:** ✅ synced 2026-09-08 (evening) — dry run listed exactly the 18 touched files (reviews/page.tsx NEW, TestimonialCard.tsx NEW, reviews-page.test.ts NEW, card/page.tsx, TestimonialsSection.tsx, AppIcon.tsx, globals.css, sitemap.ts, proxy.ts, SiteHeader.tsx, SiteFooter.tsx, en.json, es.json + CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS), 0 Extras; real run copied 18 / 0 FAILED; follow-up dry run 0/0/0; leak check 0 `.env*`; positive control 206 `.tsx`; SHA256 MATCH on reviews page, card page, TestimonialCard, proxy.ts, CHANGELOG. 1061 files on disk (robocopy 1064 = the documented 3 `/XF`-excluded). Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### ◻ 2026-09-08 (after 7:45 a.m. Eastern / 11:45Z) — FIRST THING: read the two price-push rows, then decide the pg_cron overlap cleanup
+
+The last unobserved pg_cron jobs are the two daily price pushes. The owner
+will ping after they are due; do this read-only check (service key, from
+`next-app/`), nothing else first:
+
+1. `etsy_sync_log` / `ebay_sync_log`, action `scheduled_price_push`, rows
+   dated 2026-09-08. **Expect** one row at **11:15:0xZ (Etsy)** and one at
+   **11:45:0xZ (eBay)** — seconds after the minute = pg_cron. A SECOND row
+   per channel minutes-to-hours later is GitHub's overlap copy (expected
+   until the cleanup; harmless — it finds prices unchanged). Pattern to
+   run: the `cron-check.mjs` shape in memory
+   `github-cron-degraded-2026-08-27` (per-day rows with HH:MM + outcome).
+2. `reconcile_status` rows per channel since 00:00Z → every `:00`/`:30`
+   boundary present (the overnight cadence held).
+3. Netlify function log / `net._http_response` are NOT needed — the log
+   rows are the proof.
+
+**If both pushes landed on the minute → the overlap window is CLOSED.**
+Next batch (one push, owner's timing): delete the `schedule:` block from
+`.github/workflows/scheduled-jobs.yml` (keep `workflow_dispatch`; rewrite
+the header), delete `next-app/netlify/functions/*.mts` (5 files), fix the
+"Netlify function log" copy in `ARCHITECTURE.md` / `DECISIONS.md` / Admin
+Settings (`resolvePricePushHealth`), and build the admin "last sweep ran N
+min ago" line (mockup first — it is a visible admin change). Then
+`npm run build` and the usual gate.
+
+**If either push is missing or late →** do NOT remove anything; read
+`cron.job_run_details` for the job (`nej-etsy-price-push` /
+`nej-ebay-price-push`) in the Supabase dashboard → Integrations → Cron,
+and `net._http_response` if within 6 h, and report before deciding.
+
+### ✅ DEPLOYED 2026-09-08 — lead-form Location + Preferred-contact fields + Netlify stub deletion (production-verified)
+
+Owner: "pushed and deployed, verify it live." Verified: all five form pages
+200 with the fields on exactly the right forms (EN + ES), Spanish labels
+present, `/netlify-forms.html` 404, and the API's Email-without-address
+check answers 400 on production. Staging equals source; nothing in flight.
+The leftover test inquiry is GONE (0 rows named TEST delete me — owner
+deleted it). On the next real submission glance at Admin → Inquiries for
+the chips. The
+block below is the pre-deploy record.
+
+### (pre-deploy record) 🔴 STAGED 2026-09-08 — lead-form Location + Preferred-contact fields — ⚠️ SQL TO RUN FIRST, then one test submission, then push
 
 Built on the owner's approval (option A, note kept, all required). Detail:
 `CHANGELOG.md` 2026-09-08. Gate: `tsc` 0 · lint 0 · **1243/1243 (124 files)**
@@ -29,6 +100,8 @@ it as the sender email) — both can be deleted.
 `/free-evaluation`, pick "Outside Southwest Florida" and watch the city line
 + note appear; on the next real submission open Admin → Inquiries and look
 for the chips.
+
+**Staging (deploy record):** ✅ synced 2026-09-08 — dry run listed exactly the 3 touched docs (CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras; real run copied 3; follow-up dry run 0/0/0; leak check 0; CHANGELOG hash MATCH. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
 **Staging (test record):** ✅ synced 2026-09-08 — dry run listed exactly the 3 touched docs (CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras; real run copied 3; follow-up dry run 0/0/0; leak check 0; CHANGELOG hash MATCH. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 

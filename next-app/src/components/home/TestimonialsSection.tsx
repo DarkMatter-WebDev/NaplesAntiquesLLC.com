@@ -1,9 +1,11 @@
 import { CardGrid, PageContainer, Section } from '@/components/layout/ResponsiveLayout';
-import { GOOGLE_REVIEWS_URL, TESTIMONIALS, type Testimonial } from '@/lib/testimonials';
+import { TESTIMONIALS } from '@/lib/testimonials';
+import TestimonialCard from './TestimonialCard';
 import TestimonialMarqueeBand from './TestimonialMarqueeBand';
 
 // Curated customer testimonials, shared by the homepage and product pages so
-// there is exactly one review list (src/lib/testimonials.ts). Server-rendered;
+// there is exactly one review list (src/lib/testimonials.ts) and one card
+// (TestimonialCard.tsx — the /reviews page renders the same card). Server-rendered;
 // the marquee's MOVEMENT is pure CSS, and its one piece of client JS is the
 // tiny TestimonialMarqueeBand island, which only pauses the animation while
 // the band is offscreen (an IntersectionObserver, no per-frame work — the
@@ -98,78 +100,6 @@ export default function TestimonialsSection({ locale, compact = false, variant =
     </div>
   );
 
-  /**
-   * One review card.
-   *
-   * `isRepeat` marks a duplicate rendered only to fill the loop. Those are
-   * hidden from assistive tech and taken out of the tab order — a screen reader
-   * reading the same four reviews four times would be worse than not having the
-   * band — and CSS removes them entirely under `prefers-reduced-motion`.
-   */
-  function card(review: Testimonial, key: string, isRepeat = false) {
-    return (
-      // `product-light-surface`: this card is always white, so on a dark
-      // product page (where these reviews also render) it has to restore
-      // the light text tokens — otherwise the quote inherits near-white
-      // type onto white. Inert everywhere else, including the homepage.
-      <figure
-        key={key}
-        className={`testimonial-card product-light-surface rounded-2xl border bg-white${
-          isRepeat ? ' testimonial-marquee-repeat' : ''
-        }`}
-        style={{ borderColor: 'var(--color-outline-variant)' }}
-        aria-hidden={isRepeat || undefined}
-      >
-        <div className="testimonial-stars" aria-hidden="true" style={{ color: '#e9c349' }}>
-          ★★★★★
-        </div>
-        {/* The quote is truncated in CSS (`-webkit-line-clamp`), never in
-            JS. The full verbatim text stays in the DOM for screen readers
-            and crawlers, and nothing here can accidentally become an
-            edited version of a customer's words — the rule in
-            `lib/testimonials.ts`. The card links to Google, where the
-            untruncated review lives. */}
-        <blockquote style={{ color: 'var(--color-on-surface)' }}>
-          &ldquo;{isEs ? review.quoteEs : review.quote}&rdquo;
-        </blockquote>
-        <figcaption className="mt-auto pt-2" style={{ color: 'var(--color-on-surface-variant)' }}>
-          <strong style={{ color: 'var(--color-on-surface)' }}>{review.name}</strong>
-          {' · '}
-          {isEs ? review.metaEs : review.meta}
-        </figcaption>
-        {/* The whole card is clickable via this link's stretched
-            ::after overlay, rather than an <a> wrapping the figure. That
-            keeps the figure/figcaption semantics intact and gives the
-            link a short accessible name — wrapping the card would make
-            the entire 480-character quote the link text.
-
-            Do NOT rename this class to anything containing "card": that
-            substring makes CustomerReveal stamp the anchor, which turns
-            it into a containing block and silently collapses the overlay.
-            Full explanation sits with the rule in globals.css. */}
-        <a
-          className="testimonial-google-link"
-          href={GOOGLE_REVIEWS_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          tabIndex={isRepeat ? -1 : undefined}
-          // Must BEGIN with the visible text ("Read on Google") or axe flags
-          // label-content-name-mismatch: the accessible name has to contain
-          // the visible label as a contiguous run, so the reviewer's name goes
-          // after the phrase, never inside it.
-          aria-label={
-            isEs
-              ? `Leer en Google: reseña completa de ${review.name} (se abre en una pestaña nueva)`
-              : `Read on Google: ${review.name}'s full review (opens in a new tab)`
-          }
-        >
-          {isEs ? 'Leer en Google' : 'Read on Google'}
-          <span aria-hidden="true"> →</span>
-        </a>
-      </figure>
-    );
-  }
-
   if (variant === 'marquee') {
     const repeatsPerHalf = Math.max(1, Math.ceil(MIN_CARDS_PER_HALF / TESTIMONIALS.length));
     const cardsPerHalf = repeatsPerHalf * TESTIMONIALS.length;
@@ -195,7 +125,7 @@ export default function TestimonialsSection({ locale, compact = false, variant =
         >
           {Array.from({ length: repeatsPerHalf * 2 }).flatMap((_, pass) =>
             TESTIMONIALS.map((review) =>
-              card(review, `${review.name}-${pass}`, pass > 0),
+              <TestimonialCard key={`${review.name}-${pass}`} review={review} isEs={isEs} isRepeat={pass > 0} />,
             ),
           )}
         </TestimonialMarqueeBand>
@@ -218,7 +148,9 @@ export default function TestimonialsSection({ locale, compact = false, variant =
             compaction that a 2-up phone needs, live in `.testimonial-grid` /
             `.testimonial-card` (globals.css). */}
         <CardGrid className="testimonial-grid">
-          {TESTIMONIALS.map((review) => card(review, review.name))}
+          {TESTIMONIALS.map((review) => (
+            <TestimonialCard key={review.name} review={review} isEs={isEs} />
+          ))}
         </CardGrid>
         {footnote}
       </PageContainer>

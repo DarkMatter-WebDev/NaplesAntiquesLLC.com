@@ -162,6 +162,10 @@ export const config = {
     // (public/<key>.txt) must be served verbatim at the root or Bing cannot
     // verify submissions — robots.txt was already carved out by name for the
     // same reason. A .txt URL never has a locale meaning.
-    '/((?!_next/static|_next/image|favicon.ico|icon|api/|p/|review|robots.txt|sitemap.*\\.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff2?|mp4|webm|mov|ogg|pdf|txt)).*)',
+    // ⚠️ `review$` is anchored on purpose (2026-09-08): `/reviews` is a real
+    // localized page, and the unanchored `review` prefix carved it out of the
+    // locale rewrite too — a 404 in dev before the page had a single visitor.
+    // Guarded by lib/__tests__/reviews-page.test.ts.
+    '/((?!_next/static|_next/image|favicon.ico|icon|api/|p/|review$|robots.txt|sitemap.*\\.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff2?|mp4|webm|mov|ogg|pdf|txt)).*)',
   ],
 };

@@ -35,6 +35,14 @@ import { getStoreHours } from '@/lib/store-hours';
  * - **Review is the gold button** (owner's pick): the card usually changes
  *   hands right after a sale, which is when a review ask lands. Call is the
  *   dark pill, as on the homepage Visit Us block.
+ * - **Read Our Reviews sits directly under it** (owner, 2026-09-08): an
+ *   outline pill to the site's own `/reviews` page, so the gold ask stays the
+ *   one filled button. A paired half-width row was measured and rejected —
+ *   "Leave a Review" was already 3px too wide for its half at 375px, and the
+ *   Spanish label 25px too wide.
+ * - **The bottom button says where it goes** ("View Full Website & Shop",
+ *   owner, 2026-09-08). Spanish drops "Completo" in place: the full phrase
+ *   measured 252 of the 256px available at 375px.
  * - **Text is prefilled** ("Hi Chris, I have your card …"): lowers the hurdle
  *   for someone unsure how to start, and tells the owner the lead came from a
  *   card — the site has no scan analytics. `sms:` + `?&body=` is the one
@@ -238,6 +246,13 @@ export default async function CardPage({ params }: Props) {
             <AppIcon name="star" className="text-[1.15rem]" />
             {isEs ? 'Dejar una Reseña en Google' : 'Leave a Google Review'}
           </a>
+          {/* Read the reviews, right under the ask to leave one. An internal
+              page, so a Next Link like the tiles; outline, not gold, so the
+              review ask keeps the hierarchy. */}
+          <Link href={`${prefix}/reviews`} prefetch={false} className="outline-button" style={BIG_BUTTON}>
+            <AppIcon name="forum" className="text-[1.15rem]" />
+            {isEs ? 'Leer Nuestras Reseñas' : 'Read Our Reviews'}
+          </Link>
         </div>
 
         {/* Secondary links */}
@@ -282,14 +297,17 @@ export default async function CardPage({ params }: Props) {
           </a>
         </div>
 
-        {/* An unmistakable way off the card and into the full site (owner ask). */}
+        {/* An unmistakable way off the card and into the full site (owner ask).
+            The label names both destinations because the Shop tile above is
+            easy to miss; the Spanish drops "Completo" in place (measured, see
+            the header comment). */}
         <Link
           href={prefix || '/'}
           prefetch={false}
           className="outline-button mt-2.5"
           style={{ width: '100%', minHeight: '2.75rem', fontSize: '0.72rem', gap: '0.5rem' }}
         >
-          {isEs ? 'Visitar Nuestro Sitio Web' : 'Visit Our Website'}
+          {isEs ? 'Ver Sitio Web y Tienda' : 'View Full Website & Shop'}
           <AppIcon name="trending_flat" className="text-[1rem]" />
         </Link>
       </div>
