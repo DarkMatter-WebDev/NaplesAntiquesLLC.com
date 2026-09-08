@@ -2,6 +2,13 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import {
+  formatLocation,
+  isOutsideServiceArea,
+  parseLocationArea,
+  parsePreferredContact,
+  preferredContactLabel,
+} from '@/lib/inquiry-fields';
 
 const GOLD = '#735c00';
 const BORDER = 'rgba(115,92,0,0.2)';
@@ -16,6 +23,47 @@ export interface Inquiry {
   status: 'new' | 'read' | 'replied';
   created_at: string;
   uploaded_image_urls?: string[] | null;
+  /** 2026-09-08 — absent on rows older than the migration. */
+  location_area?: string | null;
+  location_detail?: string | null;
+  preferred_contact?: string | null;
+}
+
+/**
+ * The two facts the owner asked for, first in the expanded card: how the
+ * sender wants to be reached, and where they are (red when outside Southwest
+ * Florida). Older rows have neither and render nothing.
+ */
+function PreferenceChips({ inquiry }: { inquiry: Inquiry }) {
+  const area = parseLocationArea(inquiry.location_area);
+  const preferred = parsePreferredContact(inquiry.preferred_contact);
+  const location = formatLocation(area, inquiry.location_detail ?? null);
+  if (!preferred && !location) return null;
+  const chip = (text: string, warn: boolean) => (
+    <span
+      style={{
+        display: 'inline-block',
+        fontSize: '0.65rem',
+        fontWeight: 700,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        padding: '0.15rem 0.55rem',
+        borderRadius: 999,
+        background: warn ? '#fde8e8' : '#f7efd7',
+        color: warn ? '#b91c1c' : GOLD,
+        marginRight: '0.4rem',
+        marginBottom: '0.25rem',
+      }}
+    >
+      {text}
+    </span>
+  );
+  return (
+    <div style={{ marginBottom: '0.6rem' }}>
+      {preferred && chip(`Prefers · ${preferredContactLabel(preferred, false)}`, false)}
+      {location && chip(isOutsideServiceArea(area) ? `Outside SWFL · ${inquiry.location_detail?.trim() || 'location not given'}` : location, isOutsideServiceArea(area))}
+    </div>
+  );
 }
 
 function imageList(value: unknown): string[] {
@@ -138,6 +186,7 @@ export default function InquiriesPanel({ inquiries: initial }: Props) {
             {/* Expanded detail */}
             {expanded === inq.id && (
               <div style={{ borderTop: `1px solid ${BORDER}`, padding: '1rem 1rem 0.75rem' }}>
+                <PreferenceChips inquiry={inq} />
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(10rem, 1fr))', gap: '0.5rem 1.5rem', marginBottom: '0.75rem', fontSize: '0.8125rem' }}>
                   <div>
                     <span style={{ color: '#999', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Phone</span>

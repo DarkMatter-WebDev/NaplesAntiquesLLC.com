@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
+import { PreferredContactField } from '@/components/contact/InquiryPreferenceFields';
+import { preferredContactEmailErrorMessage, preferredContactNeedsEmail, type PreferredContact } from '@/lib/inquiry-fields';
 import { isValidPhoneNumber, phoneErrorMessage } from '@/lib/phone';
 
 interface Props {
@@ -15,6 +17,10 @@ export default function InquiryForm({ locale, itemName, submitted: initialSubmit
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  // Buyers of a shop item: only the contact preference is asked here; their
+  // location does not change the answer (owner decision 2026-09-08).
+  const [preferredContact, setPreferredContact] = useState<PreferredContact | ''>('');
+  const [emailError, setEmailError] = useState('');
   const [message, setMessage] = useState(
     isEs ? `Estoy interesado/a en: ${itemName}. ` : `I'm interested in: ${itemName}. `
   );
@@ -36,13 +42,18 @@ export default function InquiryForm({ locale, itemName, submitted: initialSubmit
       return;
     }
     setPhoneError('');
+    if (preferredContactNeedsEmail(preferredContact || null, email)) {
+      setEmailError(preferredContactEmailErrorMessage(isEs));
+      return;
+    }
+    setEmailError('');
     setSending(true);
     setErr('');
     try {
       const res = await fetch('/api/inquire', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ item: itemName, name, phone, email, message, 'bot-field': botField }),
+        body: JSON.stringify({ item: itemName, name, phone, email, message, preferred_contact: preferredContact, 'bot-field': botField }),
       });
       if (!res.ok) throw new Error(await res.text());
       setDone(true);
@@ -166,10 +177,24 @@ export default function InquiryForm({ locale, itemName, submitted: initialSubmit
               type="email"
               autoComplete="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              aria-invalid={emailError !== ''}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (emailError) setEmailError('');
+              }}
               className="form-field"
             />
+            {emailError && (
+              <p className="text-sm" style={{ color: 'var(--color-error, #b91c1c)' }}>{emailError}</p>
+            )}
           </div>
+
+          <PreferredContactField
+            locale={locale}
+            idPrefix="inq"
+            value={preferredContact}
+            onChange={setPreferredContact}
+          />
 
           <div className="grid gap-1">
             <label htmlFor="inq-message" className="form-label">

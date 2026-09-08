@@ -6,6 +6,19 @@ import { PRODUCT_IMAGES_BUCKET } from '@/lib/product-image-storage';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { checkSubmissionForSpam } from '@/lib/spam-heuristics';
 import { normalizePhoneNumber, phoneErrorMessage } from '@/lib/phone';
+import {
+  formatLocation,
+  inquiryPreferenceLines,
+  inquirySubjectSuffix,
+  parseLocationArea,
+  parseLocationDetail,
+  parsePreferredContact,
+  preferredContactEmailErrorMessage,
+  preferredContactLabel,
+  preferredContactNeedsEmail,
+  type LocationArea,
+  type PreferredContact,
+} from '@/lib/inquiry-fields';
 
 export const runtime = 'nodejs';
 
@@ -44,6 +57,13 @@ function inquiryNotificationTitle(kind: InquiryKind, name: string, itemTitle: st
  * its admin_notifications INSERT grant; a failure here never fails the request,
  * since the inquiry row + owner email already captured the submission.
  */
+/** Location + preferred contact as the sender gave them (2026-09-08). All nullable: older forms and the product form send fewer. */
+interface InquiryPreferences {
+  locationArea: LocationArea | null;
+  locationDetail: string | null;
+  preferredContact: PreferredContact | null;
+}
+
 async function notifyAdminOfInquiry(input: {
   kind: InquiryKind;
   itemTitle: string;
@@ -52,6 +72,7 @@ async function notifyAdminOfInquiry(input: {
   email: string | null;
   message: string;
   imageUrls: string[];
+  prefs: InquiryPreferences;
 }) {
   let service;
   try {
@@ -59,10 +80,16 @@ async function notifyAdminOfInquiry(input: {
   } catch {
     return;
   }
+  // The message center is text-only, so the two preferences ride as lines
+  // under the phone, in the order the owner reads them.
+  const extraLines = [
+    ...(input.phone ? [`Phone: ${input.phone}`] : []),
+    ...inquiryPreferenceLines(input.prefs.locationArea, input.prefs.locationDetail, input.prefs.preferredContact),
+  ];
   await createAdminNotification(service, {
     type: 'inquiry',
     title: inquiryNotificationTitle(input.kind, input.name, input.itemTitle),
-    body: input.phone ? `${input.message}\n\nPhone: ${input.phone}` : input.message,
+    body: extraLines.length ? `${input.message}\n\n${extraLines.join('\n')}` : input.message,
     customerName: input.name,
     customerEmail: input.email,
     imageUrls: input.imageUrls,
@@ -87,9 +114,10 @@ interface EmailPayload {
   email: string | null;
   message: string;
   imageUrls: string[];
+  prefs: InquiryPreferences;
 }
 
-async function sendEmails({ itemTitle, name, phone, email, message, imageUrls }: EmailPayload) {
+async function sendEmails({ itemTitle, name, phone, email, message, imageUrls, prefs }: EmailPayload) {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) return;
 
@@ -102,15 +130,23 @@ async function sendEmails({ itemTitle, name, phone, email, message, imageUrls }:
         imageUrls.map((u) => `<p><a href="${esc(u)}">${esc(u)}</a></p>`).join('')
       : '<p><em>No photos attached.</em></p>';
 
+    const location = formatLocation(prefs.locationArea, prefs.locationDetail);
+    const prefHtml =
+      (location ? `<p><strong>Location:</strong> ${esc(location)}</p>` : '') +
+      (prefs.preferredContact
+        ? `<p><strong>Preferred contact:</strong> ${esc(preferredContactLabel(prefs.preferredContact, false))}</p>`
+        : '');
+
     // Notify owner
     await resend.emails.send({
       from: FROM,
       to: OWNER_EMAIL,
-      subject: `New inquiry: ${itemTitle}`,
+      subject: `New inquiry: ${itemTitle}${inquirySubjectSuffix(prefs.locationArea, prefs.locationDetail, prefs.preferredContact)}`,
       html: `<p><strong>Item:</strong> ${esc(itemTitle)}</p>
              <p><strong>Name:</strong> ${esc(name)}</p>
              <p><strong>Phone:</strong> ${esc(phone)}</p>
              <p><strong>Email:</strong> ${email ? esc(email) : 'Not provided'}</p>
+             ${prefHtml}
              <p><strong>Message:</strong></p>
              <p>${esc(message).replace(/\n/g, '<br>')}</p>
              ${photoHtml}`,
@@ -187,27 +223,83 @@ async function handleJsonInquiry(req: Request) {
   if (!normalizedPhone) {
     return NextResponse.json({ error: phoneErrorMessage(false) }, { status: 400 });
   }
+  // The product form asks only for the contact preference (no location).
+  // Lenient on absence — a page loaded before the deploy posts without it —
+  // but "Email" with no address is a visible 400, same contract as the phone.
+  const prefs: InquiryPreferences = {
+    locationArea: null,
+    locationDetail: null,
+    preferredContact: parsePreferredContact(raw.preferred_contact),
+  };
+  if (preferredContactNeedsEmail(prefs.preferredContact, email)) {
+    return NextResponse.json({ error: preferredContactEmailErrorMessage(false) }, { status: 400 });
+  }
 
   // Insert as the anon role, which holds the public-insert grant on inquiries.
   // (The service role is intentionally not used here — it lacks INSERT on the table.)
   const supabase = createPublicClient();
-  const { error } = await supabase.from('inquiries').insert({
+  const error = await insertInquiry(supabase, {
     item_title: item,
     name,
     phone: normalizedPhone,
     email: email || null,
     message,
-  });
+  }, [], prefs);
 
   if (error) {
     console.error('Inquiry insert error:', error);
     return NextResponse.json({ error: 'Failed to save inquiry' }, { status: 500 });
   }
 
-  await notifyAdminOfInquiry({ kind: 'product-inquiry', itemTitle: item, name, phone: normalizedPhone, email: email || null, message, imageUrls: [] });
-  await sendEmails({ itemTitle: item, name, phone: normalizedPhone, email: email || null, message, imageUrls: [] });
+  await notifyAdminOfInquiry({ kind: 'product-inquiry', itemTitle: item, name, phone: normalizedPhone, email: email || null, message, imageUrls: [], prefs });
+  await sendEmails({ itemTitle: item, name, phone: normalizedPhone, email: email || null, message, imageUrls: [], prefs });
 
   return NextResponse.json({ success: true });
+}
+
+interface InquiryBaseRow {
+  item_title: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  message: string;
+}
+
+/**
+ * One insert for both paths. Tries the full row (photos + the 2026-09-08
+ * preference columns); if the database has not had the matching SQL applied
+ * yet (`inquiries-location-contact-2026-09.sql` / `sales-workflow.sql`), the
+ * error names the missing column and the row is retried WITHOUT those columns,
+ * with the same facts folded into the message text so nothing is ever lost.
+ * Returns the insert error, or null.
+ */
+async function insertInquiry(
+  db: ReturnType<typeof createPublicClient>,
+  baseRow: InquiryBaseRow,
+  imageUrls: string[],
+  prefs: InquiryPreferences,
+): Promise<{ message: string } | null> {
+  const fullRow = {
+    ...baseRow,
+    ...(imageUrls.length ? { uploaded_image_urls: imageUrls } : {}),
+    ...(prefs.locationArea ? { location_area: prefs.locationArea } : {}),
+    ...(prefs.locationDetail ? { location_detail: prefs.locationDetail } : {}),
+    ...(prefs.preferredContact ? { preferred_contact: prefs.preferredContact } : {}),
+  };
+  const { error } = await db.from('inquiries').insert(fullRow);
+  if (!error) return null;
+  if (!/uploaded_image_urls|location_area|location_detail|preferred_contact|column|schema cache/i.test(error.message)) {
+    return error;
+  }
+  console.warn('[inquiries] preference/photo columns missing — run supabase/inquiries-location-contact-2026-09.sql; folding into message:', error.message);
+  const extra = [
+    ...inquiryPreferenceLines(prefs.locationArea, prefs.locationDetail, prefs.preferredContact),
+    ...(imageUrls.length ? [`Photos:\n${imageUrls.join('\n')}`] : []),
+  ];
+  const retry = await db
+    .from('inquiries')
+    .insert({ ...baseRow, message: extra.length ? `${baseRow.message}\n\n${extra.join('\n')}` : baseRow.message });
+  return retry.error;
 }
 
 /**
@@ -247,6 +339,18 @@ async function handleLeadForm(req: Request) {
   const normalizedPhone = normalizePhoneNumber(phone);
   if (!normalizedPhone) {
     return NextResponse.json({ error: phoneErrorMessage(false) }, { status: 400 });
+  }
+  // Location + preferred contact (2026-09-08). Required on the form; lenient
+  // here on absence (a form loaded before the deploy), strict on bad values
+  // (unknown value → treated as not given, never stored as free text).
+  const locationArea = parseLocationArea(form.get('location_area'));
+  const prefs: InquiryPreferences = {
+    locationArea,
+    locationDetail: parseLocationDetail(form.get('location_detail'), locationArea),
+    preferredContact: parsePreferredContact(form.get('preferred_contact')),
+  };
+  if (preferredContactNeedsEmail(prefs.preferredContact, email)) {
+    return NextResponse.json({ error: preferredContactEmailErrorMessage(false) }, { status: 400 });
   }
 
   const itemTitle = source === 'free-evaluation' ? 'Free Evaluation Request' : 'Submit Your Item';
@@ -301,31 +405,13 @@ async function handleLeadForm(req: Request) {
   // key was configured.
   const db = createPublicClient();
 
-  const baseRow = {
+  const insertError = await insertInquiry(db, {
     item_title: itemTitle,
     name,
     phone: normalizedPhone,
     email: email || null,
     message,
-  };
-
-  let insertError: { message: string } | null = null;
-  if (imageUrls.length) {
-    const { error } = await db.from('inquiries').insert({ ...baseRow, uploaded_image_urls: imageUrls });
-    if (error && /uploaded_image_urls|column|schema cache/i.test(error.message)) {
-      // uploaded_image_urls column not present yet (sales-workflow.sql not applied) —
-      // keep the URLs in the message so they are never lost.
-      const retry = await db
-        .from('inquiries')
-        .insert({ ...baseRow, message: `${message}\n\nPhotos:\n${imageUrls.join('\n')}` });
-      insertError = retry.error;
-    } else {
-      insertError = error;
-    }
-  } else {
-    const { error } = await db.from('inquiries').insert(baseRow);
-    insertError = error;
-  }
+  }, imageUrls, prefs);
 
   if (insertError) {
     console.error('Inquiry insert error:', insertError);
@@ -334,9 +420,9 @@ async function handleLeadForm(req: Request) {
 
   await notifyAdminOfInquiry({
     kind: source === 'free-evaluation' ? 'free-evaluation' : 'submit-item',
-    itemTitle, name, phone: normalizedPhone, email: email || null, message, imageUrls,
+    itemTitle, name, phone: normalizedPhone, email: email || null, message, imageUrls, prefs,
   });
-  await sendEmails({ itemTitle, name, phone: normalizedPhone, email: email || null, message, imageUrls });
+  await sendEmails({ itemTitle, name, phone: normalizedPhone, email: email || null, message, imageUrls, prefs });
 
   return NextResponse.json({ success: true });
 }

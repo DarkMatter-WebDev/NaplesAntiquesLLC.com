@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
+import { LocationField, PreferredContactField } from '@/components/contact/InquiryPreferenceFields';
+import { parsePreferredContact, preferredContactEmailErrorMessage, preferredContactNeedsEmail } from '@/lib/inquiry-fields';
 import { isValidPhoneNumber, phoneErrorMessage } from '@/lib/phone';
 
 interface Props {
@@ -16,6 +18,7 @@ export default function EvalForm({ locale, submitted }: Props) {
   const [done, setDone] = useState(submitted);
   const [err, setErr] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [emailError, setEmailError] = useState('');
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -37,6 +40,13 @@ export default function EvalForm({ locale, submitted }: Props) {
       return;
     }
     setPhoneError('');
+    // "Email" chosen as the way to reach them, but no email given — point at
+    // the email box instead of sending (the server answers the same with a 400).
+    if (preferredContactNeedsEmail(parsePreferredContact(fd.get('preferred_contact')), String(fd.get('email') ?? ''))) {
+      setEmailError(preferredContactEmailErrorMessage(isEs));
+      return;
+    }
+    setEmailError('');
     setSending(true);
     setErr('');
     try {
@@ -242,10 +252,19 @@ export default function EvalForm({ locale, submitted }: Props) {
               name="email"
               type="email"
               autoComplete="email"
+              aria-invalid={emailError !== ''}
               className="w-full rounded-xl px-3 py-2 text-sm"
               style={{ border: '1px solid #d8d0c2', background: 'white', color: '#1a1c1c' }}
+              onChange={() => emailError && setEmailError('')}
             />
+            {emailError && (
+              <p className="text-sm" style={{ color: 'var(--color-error, #b91c1c)' }}>{emailError}</p>
+            )}
           </div>
+
+          {/* Location + preferred contact (2026-09-08, owner-approved mockup option A) */}
+          <LocationField locale={locale} tone="eval" idPrefix="fe" />
+          <PreferredContactField locale={locale} tone="eval" idPrefix="fe" />
 
           <FormPrivacyNotice locale={locale} />
 

@@ -5370,6 +5370,32 @@ a new deploy), the GitHub Actions repository secret, and `.env.local`.
    message. A generic operator message is a signal the real reason is in
    `detail`.
 
+
+### Lead forms ask where the sender is and how to reach them; the server stays lenient
+
+Added 2026-09-08. Two required fields on the seller forms (Free Evaluation,
+Message Us) and one on the product-inquiry form:
+
+1. **Location is a fixed list, not free text.** Six service-area cities plus
+   "Elsewhere in Southwest Florida" and "Outside Southwest Florida"; only the
+   two catch-alls ask for a city & state and show the out-of-area note. The
+   list is what lets Admin flag `outside-swfl` in red without parsing prose.
+   The note is a heads-up, never a block — an out-of-area sender can still
+   submit (owner's call).
+2. **The form is strict, the API is lenient on absence.** Both fields are
+   `required` in the browser, but the routes accept a submission without them
+   (a page loaded before the deploy) and store nulls. What the API is strict
+   about is VALUES (an unknown value is treated as not given, never stored as
+   free text) and the one fixable mistake: "Email" chosen with an empty email
+   box is a visible 400, never a silent drop — same rule as a bad phone.
+3. **New columns must never lose a submission.** `insertInquiry` tries the
+   full row and, if the migration is missing, retries without the new columns
+   with the same facts folded into the message text. A schema race is not a
+   reason to drop a lead.
+4. **One pure module owns the vocabulary** (`lib/inquiry-fields.ts`): forms,
+   both routes and the admin panel import it. The SQL check constraints mirror
+   it; change both together.
+
 ### A scheduler is judged by its log rows, and sub-daily work never rides on GitHub `schedule`
 
 Added 2026-09-07. GitHub documents `schedule` as best-effort, and for eleven

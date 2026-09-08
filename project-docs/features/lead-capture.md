@@ -20,6 +20,24 @@ so its structure is deliberate and should not be casually rearranged:
 Submissions post to `/api/inquire` with `source: 'free-evaluation'`, same as the
 other inquiry forms below.
 
+## Location + preferred contact (2026-09-08)
+
+Both seller forms (`EvalForm`, `MessageUsForm`) ask **"Where are you
+located?"** (select: Naples · Marco Island · Bonita Springs · Estero · Fort
+Myers · Cape Coral · Elsewhere in Southwest Florida · Outside Southwest
+Florida; the last two reveal a "City & state" line and the out-of-area note)
+and **"How should we contact you?"** (Call · Text · Email pills). The
+product-inquiry form asks only the contact preference. Both are required in
+the browser; choosing Email with an empty email box is an inline error.
+Vocabulary + parsers + display strings: `src/lib/inquiry-fields.ts`; the
+fields: `components/contact/InquiryPreferenceFields.tsx`; storage:
+`inquiries.location_area` / `location_detail` / `preferred_contact`
+(`supabase/inquiries-location-contact-2026-09.sql`). Admin → Inquiries shows
+them as chips (red `Outside SWFL · <city>`); the message center gets
+`Location:` / `Preferred contact:` lines under the phone; the owner email
+gets the two rows and a subject suffix (`· prefers Text · Naples`). Rules in
+`DECISIONS.md` → *"Lead forms ask where the sender is…"*.
+
 ## Summary
 
 Lead capture now happens inside the Next.js app, not the retired root static
@@ -55,9 +73,10 @@ Submitted inquiry records live in Supabase `inquiries`. Admin review lives under
 configured email provider keys when present.
 
 The older Jotform and root static Netlify Form instructions are historical.
-`next-app/public/netlify-forms.html` remains only as a static form-detection
-helper if Netlify Forms compatibility is needed; it is not the primary product
-inventory or inquiry source of truth.
+`next-app/public/netlify-forms.html` (a hidden form-definition stub that only
+made Netlify register four empty "ghost" forms on every deploy) was DELETED
+2026-09-07; Netlify Forms are not part of the inquiry path at all — every
+submission is a row in `inquiries` plus a Resend email. Do not re-add the stub.
 
 ## Bot protection (2026-08-22)
 

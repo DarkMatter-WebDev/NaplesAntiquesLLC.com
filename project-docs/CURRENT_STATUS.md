@@ -8,6 +8,32 @@
 
 **Read this, then `TASKS.md`.**
 
+🔴 **09-08 — lead forms gain "Where are you located?" (dropdown + city
+reveal + out-of-area note) and "How should we contact you?" (Call · Text ·
+Email), both required — BUILT + STAGED; SQL RUN by the owner and an
+end-to-end test submission VERIFIED 09-08 00:12Z (columns populated,
+message-center lines present). Left: owner deletes the leftover test
+inquiry row (one SQL line in `TASKS.md`; the service role cannot), then push. Admin → Inquiries shows the
+two facts as chips (red when outside SWFL); the email subject reads
+`… · prefers Text · Naples`. Gate tsc 0 · lint 0 · **1243/1243 (124 files)**
+· build exit 0. `TASKS.md` top; `CHANGELOG.md` 2026-09-08.**
+
+🟡 **09-07 (night) — Netlify Forms are NOT used (since June; all forms →
+`/api/inquire` → Supabase `inquiries` + Resend); the two recent free-evaluation
+submissions are in the table with photos. Ghost stub
+`public/netlify-forms.html` DELETED + staged (rides with the next push).
+Owner-only click left: Netlify → Forms → Disable form detection (type
+`naplesantiques`). `TASKS.md` top.**
+
+✅ **09-07 (evening) — sweep fix DEPLOYED + production-verified** (20:30Z
+rows on both channels in the new six-number format, all zeros). pg_cron
+cadence 15/15 boundaries 13:30→20:30Z; all four Vault secrets proven (drips
+fired 16:00–20:00Z). pg_cron history cleanup job added (jobid 8, in the
+migration file; eight `nej-*` jobs). Staging equals source; nothing in flight. Open, owner's
+timing: pg_cron overlap cleanup (bundle with the next push) and the
+inbound marketplace-sale detection proposal — `TASKS.md`. The block below
+is the pre-deploy record.
+
 🟡 **09-07 (day, later) — status-sweep fix BUILT + dev-verified + STAGED,
 awaiting push (no SQL, no env vars).** Both marketplace sweeps now count a
 repair from the re-read state, fall back to the read-only status check when

@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
+import { LocationField, PreferredContactField } from '@/components/contact/InquiryPreferenceFields';
+import { parsePreferredContact, preferredContactEmailErrorMessage, preferredContactNeedsEmail } from '@/lib/inquiry-fields';
 import { isValidPhoneNumber, phoneErrorMessage } from '@/lib/phone';
 import { FormGrid, PageContainer, Section } from '@/components/layout/ResponsiveLayout';
 
@@ -15,19 +17,27 @@ export default function MessageUsForm({ locale }: Props) {
   const [done, setDone] = useState(false);
   const [err, setErr] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [photoCount, setPhotoCount] = useState(0);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formEl = e.currentTarget;
+    const fd = new FormData(formEl);
     // Shared rule — this form used to carry its own looser "10 to 15 digits"
     // copy, which accepted unreachable strings like 0000000000.
-    const phoneVal = String(new FormData(formEl).get('phone') ?? '').trim();
+    const phoneVal = String(fd.get('phone') ?? '').trim();
     if (!isValidPhoneNumber(phoneVal)) {
       setPhoneError(phoneErrorMessage(isEs));
       return;
     }
     setPhoneError('');
+    // "Email" chosen as the way to reach them, but no email given.
+    if (preferredContactNeedsEmail(parsePreferredContact(fd.get('preferred_contact')), String(fd.get('email') ?? ''))) {
+      setEmailError(preferredContactEmailErrorMessage(isEs));
+      return;
+    }
+    setEmailError('');
     setSending(true);
     setErr('');
     try {
@@ -136,8 +146,13 @@ export default function MessageUsForm({ locale }: Props) {
                   name="email"
                   type="email"
                   autoComplete="email"
+                  aria-invalid={emailError !== ''}
                   className="form-field"
+                  onChange={() => emailError && setEmailError('')}
                 />
+                {emailError && (
+                  <p className="text-sm" style={{ color: 'var(--color-error, #b91c1c)' }}>{emailError}</p>
+                )}
               </div>
             </FormGrid>
 
@@ -161,6 +176,10 @@ export default function MessageUsForm({ locale }: Props) {
                 <p className="text-sm" style={{ color: 'var(--color-error, #b91c1c)' }}>{phoneError}</p>
               )}
             </div>
+
+            {/* Location + preferred contact (2026-09-08, owner-approved mockup option A) */}
+            <LocationField locale={locale} idPrefix="message" />
+            <PreferredContactField locale={locale} idPrefix="message" />
 
             <div className="grid gap-1">
               <label htmlFor="message-body" className="form-label">

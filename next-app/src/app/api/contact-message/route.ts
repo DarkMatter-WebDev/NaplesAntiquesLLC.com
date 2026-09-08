@@ -4,6 +4,19 @@ import { createAdminNotification } from '@/lib/admin-notify';
 import { PRODUCT_IMAGES_BUCKET } from '@/lib/product-image-storage';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 import { normalizePhoneNumber, phoneErrorMessage } from '@/lib/phone';
+import {
+  formatLocation,
+  inquiryPreferenceLines,
+  inquirySubjectSuffix,
+  parseLocationArea,
+  parseLocationDetail,
+  parsePreferredContact,
+  preferredContactEmailErrorMessage,
+  preferredContactLabel,
+  preferredContactNeedsEmail,
+  type LocationArea,
+  type PreferredContact,
+} from '@/lib/inquiry-fields';
 
 export const runtime = 'nodejs';
 
@@ -26,8 +39,21 @@ function esc(value: string): string {
     .replace(/"/g, '&quot;');
 }
 
+interface MessagePreferences {
+  locationArea: LocationArea | null;
+  locationDetail: string | null;
+  preferredContact: PreferredContact | null;
+}
+
 /** Best-effort owner notification email. Returns true if an email was sent. */
-async function sendOwnerEmail(name: string, email: string, phone: string, message: string, imageUrls: string[]): Promise<boolean> {
+async function sendOwnerEmail(
+  name: string,
+  email: string,
+  phone: string,
+  message: string,
+  imageUrls: string[],
+  prefs: MessagePreferences,
+): Promise<boolean> {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) return false;
   try {
@@ -38,13 +64,20 @@ async function sendOwnerEmail(name: string, email: string, phone: string, messag
         imageUrls.map((u) => `<p><a href="${esc(u)}">${esc(u)}</a></p>`).join('')
       : '';
     const sender = name || phone;
+    const location = formatLocation(prefs.locationArea, prefs.locationDetail);
+    const prefHtml =
+      (location ? `<p><strong>Location:</strong> ${esc(location)}</p>` : '') +
+      (prefs.preferredContact
+        ? `<p><strong>Preferred contact:</strong> ${esc(preferredContactLabel(prefs.preferredContact, false))}</p>`
+        : '');
     const emailOpts: Parameters<InstanceType<typeof Resend>['emails']['send']>[0] = {
       from: FROM,
       to: OWNER_EMAIL,
-      subject: `New website message from ${sender}`,
+      subject: `New website message from ${sender}${inquirySubjectSuffix(prefs.locationArea, prefs.locationDetail, prefs.preferredContact)}`,
       html: `<p><strong>Name:</strong> ${name ? esc(name) : 'Not provided'}</p>
              <p><strong>Email:</strong> ${email ? esc(email) : 'Not provided'}</p>
              <p><strong>Phone:</strong> ${esc(phone)}</p>
+             ${prefHtml}
              <p><strong>Message:</strong></p>
              <p>${esc(message).replace(/\n/g, '<br>')}</p>
              ${photoHtml}`,
@@ -88,6 +121,17 @@ export async function POST(req: Request) {
   }
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 });
+  }
+  // Location + preferred contact (2026-09-08): required on the form, lenient
+  // here on absence, strict on values; "Email" without an address is a 400.
+  const locationArea = parseLocationArea(form.get('location_area'));
+  const prefs: MessagePreferences = {
+    locationArea,
+    locationDetail: parseLocationDetail(form.get('location_detail'), locationArea),
+    preferredContact: parsePreferredContact(form.get('preferred_contact')),
+  };
+  if (preferredContactNeedsEmail(prefs.preferredContact, email)) {
+    return NextResponse.json({ error: preferredContactEmailErrorMessage(false) }, { status: 400 });
   }
 
   // Service-role client: required to upload photos (Storage RLS) and to write the
@@ -135,7 +179,12 @@ export async function POST(req: Request) {
   // Canonical form, so the owner reads the same shape on every message. Phone
   // is required and validated above, so the empty branch this used to have was
   // unreachable.
-  const notificationBody = `${message}\n\nPhone: ${normalizedPhone}`;
+  const notificationBody = [
+    message,
+    '',
+    `Phone: ${normalizedPhone}`,
+    ...inquiryPreferenceLines(prefs.locationArea, prefs.locationDetail, prefs.preferredContact),
+  ].join('\n');
 
   // Insert into the admin message center.
   const sender = name || normalizedPhone;
@@ -152,7 +201,7 @@ export async function POST(req: Request) {
 
   // Best-effort email backup so the message reaches the owner even if the message
   // center write is unavailable (e.g. service role not configured).
-  const emailed = await sendOwnerEmail(name, email, normalizedPhone, message, imageUrls);
+  const emailed = await sendOwnerEmail(name, email, normalizedPhone, message, imageUrls, prefs);
 
   if (!savedToMessages && !emailed) {
     return NextResponse.json({ error: 'Failed to send message' }, { status: 500 });

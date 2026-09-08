@@ -5,6 +5,62 @@
 
 ## ◻ OPEN — needs a human
 
+### 🔴 STAGED 2026-09-08 — lead-form Location + Preferred-contact fields — ⚠️ SQL TO RUN FIRST, then one test submission, then push
+
+Built on the owner's approval (option A, note kept, all required). Detail:
+`CHANGELOG.md` 2026-09-08. Gate: `tsc` 0 · lint 0 · **1243/1243 (124 files)**
+· build exit 0 · dev-verified in the pane (reveal, pills, Email-needs-email
+error) + SSR on all four form pages.
+
+✅ **1. SQL RUN by the owner 2026-09-08** (verify query: 3 columns, nullable).
+✅ **2. End-to-end test submission VERIFIED 2026-09-08 00:12Z** — `inquiries`
+row had all three columns populated, message-center body had both lines
+(detail in `CHANGELOG.md` 2026-09-08). Notification row deleted.
+◻ **2b. Owner — delete the leftover test inquiry** (the service role has no
+DELETE grant on `inquiries`; nothing in the app can delete one either). In
+the SQL editor:
+`delete from public.inquiries where name = 'TEST delete me';` → expect 1
+row. Also: the owner's inbox should hold "New inquiry: Free Evaluation
+Request · prefers Email · Outside Southwest Florida — Sarasota, FL" and a
+customer confirmation addressed to the owner's own address (the test used
+it as the sender email) — both can be deleted.
+◻ **3. Owner — push.** Bundle: this + the `netlify-forms.html` deletion +
+(optionally) the pg_cron overlap cleanup. After the deploy: open
+`/free-evaluation`, pick "Outside Southwest Florida" and watch the city line
++ note appear; on the next real submission open Admin → Inquiries and look
+for the chips.
+
+**Staging (test record):** ✅ synced 2026-09-08 — dry run listed exactly the 3 touched docs (CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras; real run copied 3; follow-up dry run 0/0/0; leak check 0; CHANGELOG hash MATCH. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+**Staging (lead-form fields):** ✅ synced 2026-09-08 — dry run listed exactly the 16 touched files (inquiry-fields.ts NEW, inquiry-fields.test.ts NEW, InquiryPreferenceFields.tsx NEW, inquiries-location-contact-2026-09.sql NEW, EvalForm.tsx, MessageUsForm.tsx, InquiryForm.tsx, inquire/route.ts, contact-message/route.ts, admin/inquiries/page.tsx, InquiriesPanel.tsx + CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS, features/lead-capture.md), 0 Extras; real run copied 16; follow-up dry run 0/0/0; leak check 0; hashes MATCH on 6 spot-checked files. 1058 files on disk. Gate: tsc 0 · lint 0 · 1243/1243 (124 files) · build exit 0 · dev-verified. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### 🟡 STAGED 2026-09-07 (night) — `public/netlify-forms.html` DELETED (ghost Netlify Forms stub); ◻ owner: finish "Disable form detection" in Netlify
+
+Netlify Forms have not been used since June (all forms post to
+`/api/inquire`); the stub only made Netlify list four empty forms. Deleted,
+nothing referenced it, no build impact. Bundle with the next push (the
+overlap cleanup). Detail: `CHANGELOG.md` 2026-09-07 (night).
+
+◻ **Owner (one-time, in Netlify → project `naplesantiques` → Forms):** the
+"Disable form detection" dialog asks you to type `naplesantiques` and press
+the button — the automation was not allowed to type into it. Optional but
+tidy: removes the per-build form scan and the four ghost forms. If it is
+ever re-enabled nothing breaks either way.
+
+**Staging (stub deletion):** ✅ synced 2026-09-07 (night) — dry run listed exactly the 4 touched docs (CHANGELOG, CURRENT_STATUS, TASKS, features/lead-capture.md) plus the deleted stub as the ONE expected EXTRA, 0 unexpected; real run copied 4 / removed 1; follow-up dry run 0/0/0; stub ABSENT on staging; leak check 0; lead-capture.md hash MATCH. No app code touched (static file, never imported — no build gate). Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### ✅ DEPLOYED 2026-09-07 (evening) — status-sweep reconcile-on-refusal + honest repair counts (production-verified 20:30Z)
+
+Owner: "pushed and deployed, verify it live." The 20:30:02Z Etsy and
+20:30:04Z eBay summary rows read `128/124 scanned, 0 drifted, 0 repaired, 0
+reconciled, 0 failed, 0 deferred.` — the six-number format only the new code
+writes (the 20:00/20:01 rows before them are the old format). Staging equals
+source; nothing in flight. Also settled in the same read: pg_cron fired
+**15 of 15** boundaries 13:30→20:30Z on both channels, and the 16:00–20:00Z
+`scheduled_drip` rows prove the Instagram + Facebook Vault secrets. Verify
+items 1 and 3 below are therefore DONE; item 2 (tomorrow's 11:15/11:45Z price
+pushes) is the only observation left. The block below is the pre-deploy record.
+
 ### 🟡 STAGED 2026-09-07 (day, later) — status-sweep reconcile-on-refusal + honest repair counts (no SQL, no env vars) — awaiting push
 
 Built on the owner's word ("build the delist loop fix"). 4 app files + 1 new
@@ -20,6 +76,10 @@ flight). After the deploy, the next two production sweep rows
 six-number format is itself the proof the new code is live. Nothing else to
 check; the two stale rows were reconciled from the dev run already.
 
+**Staging (history cleanup):** ✅ synced 2026-09-07 (evening, later) — dry run listed exactly the 4 touched files (scheduled-jobs-pg-cron-2026-09.sql + CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras; real run copied 4; follow-up dry run 0/0/0; leak check 0; SQL hash MATCH. No app code touched. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+**Staging (deploy record):** ✅ synced 2026-09-07 (evening) — dry run listed exactly the 3 touched docs (CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras; real run copied 3; follow-up dry run 0/0/0; leak check 0; CHANGELOG hash MATCH. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
 **Staging (sweep fix):** ✅ synced 2026-09-07 (day, later) — dry run listed exactly the 10 touched files (marketplace-drift-repair.ts NEW, marketplace-drift-repair.test.ts NEW, etsy/sync.ts, ebay/sync.ts + CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS, features/etsy-sync.md, features/ebay-sync.md), 0 Extras; real run copied 10; follow-up dry run 0/0/0; leak check 0; hashes MATCH on the four code files and TASKS.md. 1055 files on disk. Gate: tsc 0 · lint 0 · 1235/1235 (123 files) · build exit 0 · dev run both channels 1 reconciled → second run 0 drifted. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
 ### 🟢 LIVE 2026-09-07 (day) — all seven scheduled jobs now fire from Supabase pg_cron (verified); GitHub + Netlify overlap window OPEN; cleanup owed; two owner decisions
@@ -32,15 +92,21 @@ the logs: manual fire 13:22:44Z; first scheduled fire **13:30:03Z Etsy /
 ◻ **Next session — confirm the remaining secrets and the daily cadence**
 (read-only, service key; count-script pattern in memory
 `github-cron-degraded-2026-08-27`):
-1. `instagram_sync_log` / `facebook_sync_log` `scheduled_drip` rows at 16:00Z,
-   17:00Z … on 09-07 — proves `INSTAGRAM_CRON_SECRET` / `FACEBOOK_CRON_SECRET`
-   in Vault (a 401 writes no row). Then `refresh-token` on Monday 09-14 12:15Z.
+1. ✅ DONE 09-07 evening — `scheduled_drip` rows at 16:00, 17:00, 18:00,
+   19:00, 20:00Z on BOTH channels: `INSTAGRAM_CRON_SECRET` /
+   `FACEBOOK_CRON_SECRET` in Vault proven. Still to observe (cannot fail on
+   the secret): `refresh-token` on Monday 09-14 12:15Z.
 2. `scheduled_price_push` rows on 09-08 at **11:15Z (Etsy) / 11:45Z (eBay)
    sharp**. GitHub's copies arrive 30 min to 10 h later — two rows/day per
    channel is EXPECTED during the overlap.
-3. `reconcile_status` rows/day per channel → **48**. Supabase dashboard →
-   Integrations → Cron lists the seven `nej-*` jobs with run history;
-   `net._http_response` holds each call's HTTP status for ~6 h.
+3. ✅ DONE 09-07 evening — 15 of 15 `:00`/`:30` boundaries 13:30→20:30Z
+   fired on both channels, each within 2–8 s. (Full-day count of 48 will
+   include GitHub's overlap extras until the cleanup below.) Supabase
+   dashboard → Integrations → Cron lists the seven `nej-*` jobs with run
+   history; `net._http_response` holds each call's HTTP status for ~6 h.
+   ✅ 09-07 evening: `nej-cron-history-cleanup` (daily 03:00Z, prunes
+   `cron.job_run_details` > 7 days) added by the owner, jobid 8; in the
+   migration file. Eight `nej-*` jobs total.
 ◻ **After 1–2 clean days — remove the duplicates (one small batch; bundle with
 whatever else is pending):** delete the `schedule:` block from
 `.github/workflows/scheduled-jobs.yml` (keep `workflow_dispatch` for manual

@@ -8,7 +8,8 @@
 --  landed 2–10 h late). Netlify Scheduled Functions never executed
 --  at all. pg_cron runs on the database instance, minute-accurate.
 --
---  WHAT: seven jobs, identical routes / schedules / secret names to
+--  WHAT: seven trigger jobs (+ one housekeeping job at the end of step 2),
+--  identical routes / schedules / secret names to
 --  .github/workflows/scheduled-jobs.yml. The Next routes are
 --  trigger-agnostic and guarded by an `x-cron-secret` header, so
 --  NO application code changes. Schedules are UTC (pg_cron default).
@@ -175,8 +176,19 @@ select cron.schedule(
 );
 
 
+-- Housekeeping — pg_cron keeps one row per run in cron.job_run_details and
+-- prunes nothing by default (~70 rows/day at this schedule). Supabase's own
+-- recommendation; keeps a week of history for troubleshooting.
+-- (Run by the owner 2026-09-07 evening → jobid 8.)
+select cron.schedule(
+  'nej-cron-history-cleanup',
+  '0 3 * * *',
+  $$ delete from cron.job_run_details where end_time < now() - interval '7 days' $$
+);
+
+
 -- ---------- step 3: verify ----------
--- 3a. Seven active jobs with the schedules above.
+-- 3a. Eight active jobs (seven triggers + the history cleanup) with the schedules above.
 select jobid, jobname, schedule, active from cron.job where jobname like 'nej-%' order by jobname;
 
 -- 3b. Fire ONE reconcile by hand right now (harmless + idempotent — it is
