@@ -11,6 +11,7 @@ import { BreadcrumbTrailFromLd } from '@/components/BreadcrumbTrail';
 import SiteFooter from '@/components/layout/SiteFooter';
 import ShowroomAddress from '@/components/ShowroomAddress';
 import ShowroomHours from '@/components/ShowroomHours';
+import StorefrontPhoto from '@/components/StorefrontPhoto';
 import ClayMark from '@/components/ClayMark';
 
 interface Props {
@@ -324,7 +325,10 @@ export default async function SellCityPage({ params }: Props) {
                   </a>
                 </div>
               </div>
-              <div className="rounded-2xl border border-[#d0c5af] bg-white p-7 shadow-[0_14px_38px_rgba(38,28,6,0.05)]">
+              <div>
+                {/* The door, above "What to bring" (owner, 2026-09-08; no caption). */}
+                <StorefrontPhoto locale={locale} aspect="4:3" className="mb-6" sizes="(min-width: 768px) 40vw, 100vw" />
+                <div className="rounded-2xl border border-[#d0c5af] bg-white p-7 shadow-[0_14px_38px_rgba(38,28,6,0.05)]">
                 <h3 className="mb-4 text-lg font-bold text-[#1a1c1c]" style={{ fontFamily: 'var(--font-headline)' }}>
                   {isEs ? 'Qué traer' : 'What to bring'}
                 </h3>
@@ -352,6 +356,7 @@ export default async function SellCityPage({ params }: Props) {
                     ? '¿Prefiere no transportar objetos de valor? Las visitas a domicilio siguen disponibles con cita en todo el suroeste de Florida.'
                     : 'Rather not carry valuables? Home visits stay available by appointment throughout Southwest Florida.'}
                 </p>
+                </div>
               </div>
             </div>
           </section>

@@ -6,6 +6,7 @@ import {
 import { AppIcon } from '@/components/AppIcon';
 import ShowroomMap from '@/components/ShowroomMap';
 import ShowroomHours from '@/components/ShowroomHours';
+import StorefrontPhoto from '@/components/StorefrontPhoto';
 import CopyAddressButton from '@/components/CopyAddressButton';
 import { PageContainer } from '@/components/layout/ResponsiveLayout';
 
@@ -153,7 +154,9 @@ export default function VisitUsPanel({ locale = 'en' }: Props) {
             {/* Still square and still lazy — both recorded decisions. This page
                 is the one someone opens to answer "where are you", so it gets a
                 slightly larger cap than the homepage's. */}
-            <ShowroomMap locale={locale} maxWidth="34rem" className="mt-7" />
+            {/* The door itself, above the pin (owner, 2026-09-08; no caption). */}
+            <StorefrontPhoto locale={locale} aspect="4:3" className="mx-auto mt-7 max-w-[34rem]" sizes="(min-width: 1024px) 34rem, 100vw" />
+            <ShowroomMap locale={locale} maxWidth="34rem" className="mt-5" />
 
             <p className="responsive-copy mt-7" style={{ color: 'var(--color-on-surface-variant)' }}>
               {isEs

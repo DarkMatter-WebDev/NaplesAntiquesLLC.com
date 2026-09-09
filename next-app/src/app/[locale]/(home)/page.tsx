@@ -14,6 +14,7 @@ import ClayMark from '@/components/ClayMark';
 import { AppIcon } from '@/components/AppIcon';
 import ShowroomMap from '@/components/ShowroomMap';
 import ShowroomHours from '@/components/ShowroomHours';
+import StorefrontPhoto from '@/components/StorefrontPhoto';
 import CopyAddressButton from '@/components/CopyAddressButton';
 import TestimonialsSection from '@/components/home/TestimonialsSection';
 import { getHomeCarouselPayload } from '@/lib/home-carousel-server';
@@ -574,28 +575,33 @@ export default async function HomePage({ params }: Props) {
           }}
         >
           <PageContainer max="content">
-          {/* Two columns: the details you act on, beside the map that
-              orients you. It was a single narrow centred stack until
-              2026-08-23 — phone number, sentence, address, two hours rows and
-              a square map, all down one axis, which is why the hours were
-              grouped into two lossy rows: seven would have pushed the map off
-              the fold. The second column is what pays for the full week.
+          {/* One centred column, then a two-up row of the storefront photo and
+              the map (owner, 2026-09-08, mockup V2). History, so nobody
+              re-derives it: this block was a single narrow stack until
+              2026-08-23; it became two columns (details left, map right) so
+              all seven hours rows would not push the map off the fold; on
+              2026-09-08 it went back to a stack by the owner's choice — the
+              photo-and-map pair beneath is the payoff, and this section sits
+              at the foot of the homepage where the visitor is already
+              scrolling. Recorded in DECISIONS.md as a deliberate reversal.
 
               ⚠️ This section is `max="content"` where the block before it runs
               narrower. That is deliberate — the width IS the feature here. */}
-          <div className="grid gap-12 lg:grid-cols-2 lg:items-start lg:gap-16">
+          <div className="flex flex-col items-center text-center">
 
-            {/* LEFT — what a visitor acts on, in the order they need it:
+            {/* The details a visitor acts on, in the order they need them:
                 where, when, what to expect, then how to start. */}
-            <div>
+            <div className="flex w-full max-w-2xl flex-col items-center">
               <p
-                className="flex items-center gap-3 text-[0.65rem] font-bold uppercase tracking-[0.32em]"
+                className="flex items-center justify-center gap-3 text-[0.65rem] font-bold uppercase tracking-[0.32em]"
                 style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
               >
-                {/* Rule then label. Decorative, so it is hidden from the
-                    accessibility tree rather than read as stray punctuation. */}
+                {/* Rule, label, rule — the column is centred now. Decorative,
+                    so hidden from the accessibility tree rather than read as
+                    stray punctuation. */}
                 <span aria-hidden="true" className="inline-block h-px w-8 flex-shrink-0" style={{ background: 'var(--color-primary)' }} />
                 {isEs ? 'Visítenos' : 'Visit Us'}
+                <span aria-hidden="true" className="inline-block h-px w-8 flex-shrink-0" style={{ background: 'var(--color-primary)' }} />
               </p>
 
               {/* ⚠️ A real <h2>. The old block opened on a styled <p> and a
@@ -622,7 +628,7 @@ export default async function HomePage({ params }: Props) {
                   ⚠️ The copy button is a SIBLING of the maps link, never
                   inside it: a <button> nested in an <a> is invalid HTML, and
                   browsers resolve it by breaking one of the two. */}
-              <div className="mt-8 flex items-start gap-2">
+              <div className="mt-8 flex items-start justify-center gap-2">
                 <a
                   href={mapsUrl()}
                   target="_blank"
@@ -649,7 +655,7 @@ export default async function HomePage({ params }: Props) {
                 locale={locale}
                 layout="rows"
                 highlightToday
-                className="mt-8"
+                className="mt-8 w-full max-w-md"
               />
               {/* When the PHONE is answered — under "or by appointment", which
                   already qualifies the whole table, so the reader gets showroom
@@ -660,7 +666,7 @@ export default async function HomePage({ params }: Props) {
               {(() => {
                 const ph = phoneHours(isEs, 'long');
                 return (
-                  <p className="mt-2 flex items-center gap-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  <p className="mt-2 flex items-center justify-center gap-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
                     <AppIcon name="call" className="text-[0.95rem]" style={{ color: 'var(--color-primary)' }} />
                     <span>
                       {ph.before}
@@ -676,7 +682,7 @@ export default async function HomePage({ params }: Props) {
                   it is true, but the owner's call is that it is assumed in this
                   area and not worth a slot. Do not pad this row to fill it. */}
               <ul
-                className="mt-8 flex flex-wrap gap-x-6 gap-y-2.5 border-t pt-6"
+                className="mt-8 flex w-full max-w-xl flex-wrap justify-center gap-x-6 gap-y-2.5 border-t pt-6"
                 style={{ borderColor: 'var(--color-outline-variant)' }}
               >
                 {(isEs
@@ -693,7 +699,7 @@ export default async function HomePage({ params }: Props) {
                 ))}
               </ul>
 
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="mt-8 flex flex-wrap justify-center gap-3">
                 <a href={mapsUrl()} target="_blank" rel="noopener noreferrer" className="gold-button">
                   {isEs ? 'Cómo Llegar' : 'Get Directions'}
                 </a>
@@ -717,19 +723,23 @@ export default async function HomePage({ params }: Props) {
               </p>
             </div>
 
-            {/* RIGHT — orientation, then the map. */}
-            <div>
-              <p className="responsive-copy" style={{ color: 'var(--color-on-surface-variant)' }}>
-                {isEs
-                  ? 'Estamos en Shirley St, justo al norte de Pine Ridge Rd, con estacionamiento en la puerta. Pase durante el horario de atención, o llámenos antes y concertamos una cita privada.'
-                  : 'We’re on Shirley St just north of Pine Ridge Rd, with parking right at the door. Walk in during showroom hours, or call ahead and we’ll set a private appointment.'}
-              </p>
-              {/* Still SQUARE and still lazy — both are recorded decisions. The
-                  square replaced a letterbox that showed a corridor of Shirley
-                  St with no context north or south of the door, and lazy keeps a
-                  heavy third-party frame off the critical path. It only grows to
-                  fill the wider column. */}
-              <ShowroomMap locale={locale} maxWidth="34rem" className="mt-7" />
+            {/* Orientation sentence, then the storefront photo and the map as
+                two equal squares (owner, 2026-09-08, mockup V2). The photo is
+                the door, the map is the pin; no caption by the owner's call —
+                the alt text carries the cues. Map: still SQUARE and still lazy
+                (both recorded decisions — the square replaced a letterbox that
+                showed a corridor of Shirley St with no context north or south
+                of the door, and lazy keeps a heavy third-party frame off the
+                critical path). The photo is cropped to the same square, toward
+                the door and the curb number. */}
+            <p className="responsive-copy mx-auto mt-10 max-w-2xl" style={{ color: 'var(--color-on-surface-variant)' }}>
+              {isEs
+                ? 'Estamos en Shirley St, justo al norte de Pine Ridge Rd, con estacionamiento en la puerta. Pase durante el horario de atención, o llámenos antes y concertamos una cita privada.'
+                : 'We’re on Shirley St just north of Pine Ridge Rd, with parking right at the door. Walk in during showroom hours, or call ahead and we’ll set a private appointment.'}
+            </p>
+            <div className="mt-6 grid w-full max-w-4xl gap-4 md:grid-cols-2">
+              <StorefrontPhoto locale={locale} aspect="1:1" className="w-full" sizes="(min-width: 1024px) 28rem, (min-width: 768px) 50vw, 100vw" />
+              <ShowroomMap locale={locale} maxWidth="100%" className="w-full" />
             </div>
           </div>
           </PageContainer>

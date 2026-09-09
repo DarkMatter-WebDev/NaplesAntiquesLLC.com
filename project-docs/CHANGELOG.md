@@ -1,7 +1,109 @@
 
 # Changelog
 
-## 2026-09-08 (night, latest) — phone-hours line (card, Visit Us, spot-prices, schema) + call buttons in the gold/silver heroes BUILT + STAGED (awaiting push)
+## 2026-09-08 (late night) — storefront photo on four "come see us" surfaces + homepage Visit Us re-laid out as a centred column with photo/map pair (STAGED, awaiting push)
+
+Owner: "add this storefront pic somewhere in the 'come see us today' areas
+… to help guide customers to the right unit"; then, from three mockups:
+placements A (homepage Visit Us) + B (contact panel) + C (/sell/naples
+showroom band) + D (/card thumbnail), **no caption anywhere**, and for the
+homepage "the hours block centered, and the photo and the map side by side
+under them" — final pick **V2**: the map stays exactly square, the photo is
+cropped square beside it.
+
+- **Asset:** the owner's WhatsApp JPEG (1600×1200, 426KB) →
+  `public/assets/images/pages/showroom-storefront.webp` via sharp
+  (`rotate()` + `fit: inside 1600` + q74 → **1600×1200, 351KB**; the first
+  q82 pass came out LARGER than the JPEG, 462KB, so it was redone leaner).
+  Encode verified: RIFF/WEBP header, `sharp().metadata().format === 'webp'`.
+  The one-off conversion script lived under `scripts/` for two runs and was
+  deleted.
+- **`components/StorefrontPhoto.tsx` (NEW)** — one component so file, alt
+  text and framing stay identical everywhere: `aspect` `4:3` (natural) /
+  `16:9` / `1:1` (crops keep the lower half — the door and the curb number —
+  and trim the sky), required `sizes`, `priority` off by default, no
+  caption. Alt text carries the cues (orange two-story building, white
+  balcony, Suite 104 = centre glass door, 104 painted on the curb) without
+  the neighbouring business's name, which was retired from these surfaces
+  on 08-23; the door sign in the photo shows it anyway.
+- **Homepage Visit Us block re-laid out (V2):** the two-column grid
+  (details left, orientation + map right, since 08-23) is now ONE centred
+  column — eyebrow with a rule on both sides, heading, address, the
+  seven-day table held to `max-w-md` so times stay near days, the
+  appointment + phone-hours lines, the feature chips, both buttons, the
+  email — then the orientation sentence, then **photo and map as two equal
+  squares** (`grid md:grid-cols-2 max-w-4xl`; `ShowroomMap maxWidth="100%"`).
+  Measured at 1100px: both tiles 440×440, same top, photo left of map;
+  heading and hours table centred on the container; at 375px the pair
+  stacks photo-first at 343×343 with no horizontal scroll. ⚠️ This reverses
+  the 08-23 two-column decision deliberately — recorded in `DECISIONS.md`.
+  `ShowroomMap` itself is untouched (a 4:3 option was added for V1 and
+  removed when the owner chose V2; the square is still the rule).
+- **Contact `VisitUsPanel`:** photo (4:3, `max-w-[34rem]`) above the map in
+  the right column. **`/sell/naples` showroom band:** photo (4:3) above the
+  "What to bring" card (the card is now wrapped so both share the right
+  cell; other cities have no band and no photo — verified on
+  `/sell/fort-myers`). **`/card`:** a 16:9 lazy thumbnail between the
+  address and Get Directions (measured 327×184, `loading="lazy"`).
+- Guard: `lib/__tests__/storefront-photo.test.ts` (asset is real WebP under
+  600KB; each of the four surfaces renders `<StorefrontPhoto>` with the
+  agreed aspect and a `sizes`; the map stays square; the component has no
+  caption element).
+
+Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 · `npx vitest run`
+**1271/1271 (129 files)** · `npm run build` exit 0 (481 static pages, 0
+warnings). Dev server: `/`, `/card`, `/contact`, `/sell/naples`,
+`/es/sell/naples` render the image with the alt text; `/sell/fort-myers`
+does not; `/` has exactly one `#visit-us`. ⚠️ The dev log showed two
+transient errors mid-edit (`aspect is not defined` while the map option
+was half-applied; a JSX parse error while the city card was half-wrapped)
+— both gone in the final source. ⚠️ Pane screenshots failed ("image
+omitted", frame collapsing to 800×115) — the hidden-pane trap again — so
+the layout was verified from DOM measurements via JS instead.
+
+## 2026-09-09 (02:49Z) — pg_cron price pushes CONFIRMED on the minute; overlap window closed (read-only check)
+
+Owner: "check to see if the price pushes ran properly … don't change any
+code, just confirm it ran." Service-key read of the sync logs: 09-08
+`scheduled_price_push` Etsy **11:15:04Z** (ok, 1 pushed, 72 unchanged),
+eBay **11:45:04Z** (ok, 0 pushed, 70 unchanged) — pg_cron, four seconds
+after the minute; GitHub's overlap copies at 15:03:40Z / 15:17:52Z (ok, 0
+pushed). `reconcile_status`: 54 of 54 `:00`/`:30` boundaries from 09-08
+00:00Z to 09-09 02:30Z on both channels, all ok, plus 8 off-minute GitHub
+stragglers. With the two daily pushes and the Monday refresh's shared
+secret already proven, all eight `nej-*` jobs have been observed on
+schedule; the cleanup batch is next (`TASKS.md`). Nothing changed.
+
+
+Owner: "pushed and deployed, verify it live." One deploy carried three
+staged batches (FAQ + phone parity on gold/silver; the five description
+trims; the Option C phone-hours line + hero call buttons). Verified over
+HTTP minutes later:
+
+- **FAQ schema:** `/gold-services` + `/silver-services` (EN + ES) → 200
+  with 1 FAQPage / 6 Question each; the diamond, watch (5) and appraisal
+  (6) pages unchanged.
+- **Descriptions, all five landers × EN + ES:** every one ends with the
+  phone and runs 141–157 characters (gold 151/155, silver 149/154, diamond
+  149/156, watch 152/141, appraisal 157/154).
+- **Phone hours:** `/card` and `/es/card` render the line ("Calls answered
+  9am–6pm, every day" / "Llamadas 9 a.m. – 6 p.m., todos los días"); `/`
+  renders the Visit Us line once, has exactly one `#visit-us`, and its
+  JewelryStore schema carries `contactPoint` with opens 09:00 / closes
+  18:00; `/spot-prices` renders the call sentence and the hours span.
+- **Heroes:** `/gold-services` shows FREE EVALUATION + CALL (239) 404-8505,
+  0 "GET AN ESTIMATE"; `/silver-services` shows the call button, the
+  "Today's silver spot price →" text link, 0 "Current Silver Rates".
+- Smoke: `/`, `/shop`, `/sell`, `/reviews`, `/card` → 200; `/review` → 302.
+
+Docs flipped to deployed; staging re-synced. **Owner-only left (Option
+C's other half + the plan's GBP items):** paste "Calls and appointments
+answered 9 AM to 6 PM, seven days a week." into the GBP description; ask
+gold/silver sellers for reviews that name the metal; buying photos; ask
+callers for 30 days where they found us. The block below is the pre-deploy
+record.
+
+## 2026-09-08 (night, latest) — phone-hours line (card, Visit Us, spot-prices, schema) + call buttons in the gold/silver heroes (pre-deploy record)
 
 Owner: "change 9am-8pm to 9am-6pm and build them all as you recommend."
 Everything in the mockup, with the phone hours 9 AM–6 PM, seven days:

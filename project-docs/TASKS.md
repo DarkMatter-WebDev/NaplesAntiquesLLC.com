@@ -5,9 +5,40 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 PLAN 2026-09-08 (night, refined after research) — bring gold + silver calls up to par with diamonds — item 3 BUILT + STAGED (awaiting push); items 1 + 4 verified; items 2, 3(reviews), 5 are the owner's
+### 🟡 STAGED 2026-09-08 (late night) — storefront photo on four surfaces + centred homepage Visit Us with photo/map pair — awaiting push (no SQL, no env vars)
 
-**Status after the build pass (same night):**
+Owner's photo → `showroom-storefront.webp`; new `StorefrontPhoto`
+component; homepage Visit Us re-laid out (centred column, then photo +
+square map side by side — owner's V2); contact panel, `/sell/naples` band
+and `/card` thumbnail; no captions. Detail: `CHANGELOG.md` 2026-09-08
+(late night). Gate tsc 0 · lint 0 · **1271/1271 (129 files)** · build exit
+0. ◻ **Owner — push**, then "verify it live": `/` renders
+`showroom-storefront.webp` with one `#visit-us`; `/card`, `/contact`,
+`/sell/naples` render it; `/sell/fort-myers` does not.
+
+**Staging (storefront photo):** ✅ synced 2026-09-08 (late night) — dry run listed exactly the 13 touched files (showroom-storefront.webp NEW, StorefrontPhoto.tsx NEW, storefront-photo.test.ts NEW; (home)/page.tsx, card, sell/[city], VisitUsPanel.tsx, ShowroomMap.tsx (timestamp only — the 4:3 option was added and reverted) + CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS), 0 Extras; real run copied 13 / 0 FAILED; follow-up dry run 0/0/0; leak check 0; SHA256 MATCH on the photo, StorefrontPhoto, home page, CHANGELOG. The CHANGELOG also carries a 2026-09-09 02:49Z pg_cron entry written by a parallel session — it travelled too. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### ✅ PLAN 2026-09-08 — bring gold + silver calls up to par with diamonds — every site-side item DEPLOYED + production-verified; ◻ four owner-only items remain
+
+Owner: "pushed and deployed, verify it live" (night). Verified: FAQ schema
+on gold + silver (6 Q each), all five buy-side descriptions ≤157 with the
+phone last, the phone-hours line on `/card` + Visit Us + `/spot-prices`,
+`contactPoint` in the schema, call buttons in both heroes, old buttons
+gone; smoke 200s, `/review` 302. Detail: `CHANGELOG.md` 2026-09-08 (night,
+deployed). **Staging equals source; nothing in flight.**
+
+◻ **Owner-only, in this order:** (1) paste into the GBP description:
+"Calls and appointments answered 9 AM to 6 PM, seven days a week." (no
+phone number in that text; main hours stay the showroom's); (2) ask every
+gold/silver seller for a Google review that names what they sold
+(`naplesestatejewelry.com/review`); (3) add gold-testing / flatware
+buying photos to the profile; (4) for 30 days ask callers where they found
+us. Then read GBP Performance → Calls and the GSC silver lander (pos 9.1)
+at the mid-September look.
+
+**Staging (deploy record):** ✅ synced 2026-09-08 (night, post-deploy) — dry run listed exactly the 3 flipped docs (CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras; real run copied 3; follow-up dry run 0/0/0; leak check 0; CHANGELOG hash MATCH. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+**Status after the build pass (same night, pre-deploy record):**
 - ✅ **Item 1 verified read-only:** categories = Jewelry buyer (primary),
   Coin dealer, **Gold dealer**, Diamond buyer, Jewelry store, Estate
   liquidator, Jewelry appraiser. Nothing to add; primary left alone.
@@ -206,7 +237,28 @@ driving method that works is in memory `gsc-url-inspection-method`), then
 
 **Staging:** ✅ synced 2026-09-08 (evening) — dry run listed exactly the 18 touched files (reviews/page.tsx NEW, TestimonialCard.tsx NEW, reviews-page.test.ts NEW, card/page.tsx, TestimonialsSection.tsx, AppIcon.tsx, globals.css, sitemap.ts, proxy.ts, SiteHeader.tsx, SiteFooter.tsx, en.json, es.json + CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS), 0 Extras; real run copied 18 / 0 FAILED; follow-up dry run 0/0/0; leak check 0 `.env*`; positive control 206 `.tsx`; SHA256 MATCH on reviews page, card page, TestimonialCard, proxy.ts, CHANGELOG. 1061 files on disk (robocopy 1064 = the documented 3 `/XF`-excluded). Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
-### ◻ 2026-09-08 (after 7:45 a.m. Eastern / 11:45Z) — FIRST THING: read the two price-push rows, then decide the pg_cron overlap cleanup
+### ✅ 2026-09-09 02:49Z — price pushes CONFIRMED on the minute; pg_cron overlap window CLOSED → ◻ cleanup batch is next (owner's timing)
+
+Owner pinged; read-only check (nothing changed — another agent had worked on
+the project in between). 09-08 `scheduled_price_push`: **Etsy 11:15:04Z**
+(ok, 1 pushed / 72 unchanged) and **eBay 11:45:04Z** (ok, 0 / 70) = pg_cron;
+GitHub's overlap duplicates at 15:03:40Z / 15:17:52Z (ok, 0 pushed —
+harmless). Sweeps: every `:00`/`:30` boundary from 09-08 00:00Z through
+09-09 02:30Z present on both channels (**54 of 54**, all ok; 8 off-minute
+rows = GitHub stragglers). Every one of the eight `nej-*` jobs has now been
+seen firing on schedule.
+
+◻ **Next batch (one push, owner's timing) — the cleanup below** (the
+"if both landed" branch): delete the `schedule:` block from
+`.github/workflows/scheduled-jobs.yml` (keep `workflow_dispatch`; rewrite
+the header), delete `next-app/netlify/functions/*.mts` (5), fix the
+"Netlify function log" copy in `ARCHITECTURE.md` / `DECISIONS.md` / Admin
+Settings (`resolvePricePushHealth`), and build the admin "last sweep ran N
+min ago" line (mockup first). Then the usual gate.
+
+**Staging (price-push confirmation):** ✅ synced 2026-09-09 02:5xZ — dry run listed the 3 touched docs (CHANGELOG, CURRENT_STATUS, TASKS) plus ONE unexpected new file, `next-app/public/assets/images/pages/showroom-storefront.webp` (360 KB, written 09-08 22:42 local, referenced by nothing in code or docs — not this session's work); synced with that file EXCLUDED (`/XF showroom-storefront.webp`) pending the owner's word; real run copied 3; follow-up dry run 0/0/0; image confirmed ABSENT on staging; leak check 0; CHANGELOG hash MATCH. ⚠️ The next sync WITHOUT that exclusion will copy the image — decide first whether it belongs in the repo. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### (record) ◻ 2026-09-08 (after 7:45 a.m. Eastern / 11:45Z) — FIRST THING: read the two price-push rows, then decide the pg_cron overlap cleanup
 
 The last unobserved pg_cron jobs are the two daily price pushes. The owner
 will ping after they are due; do this read-only check (service key, from

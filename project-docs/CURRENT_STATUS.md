@@ -8,15 +8,33 @@
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-08 (night, latest) — Option C BUILT + STAGED: phone hours 9 AM–6 PM
+🟡 **09-08 (late night) — storefront photo (`StorefrontPhoto`, one
+component, no caption) on the homepage Visit Us block, the contact panel,
+the `/sell/naples` band and `/card`; the homepage Visit Us block is now a
+CENTRED column with the photo and the square map side by side beneath it
+(owner's V2; reverses the 08-23 two-column layout on purpose) — BUILT +
+dev-verified + STAGED, awaiting push (no SQL, no env vars).** Gate tsc 0 ·
+lint 0 · **1271/1271 (129 files)** · build exit 0 (481 pages). After the
+push: `/` shows the pair, `/card` the thumbnail. `TASKS.md` top;
+`CHANGELOG.md` 09-08 (late night).
+
+✅ **09-08 (night) — the gold/silver visibility bundle is DEPLOYED and
+production-verified** (FAQ schema on gold + silver; all five buy-side
+descriptions ≤157 with the phone last; phone-hours line on `/card`, the
+Visit Us block and `/spot-prices`; `contactPoint` in the schema; call
+buttons in the gold and silver heroes). **Staging equals source; nothing
+is in flight.** Owner-only left: paste the GBP description sentence
+("Calls and appointments answered 9 AM to 6 PM, seven days a week."),
+reviews that name the metal, buying photos, the 30-day caller question
+(`TASKS.md` top). The blocks below are the pre-deploy record.
+
+🟡 (superseded) **09-08 (night, latest) — Option C BUILT + STAGED: phone hours 9 AM–6 PM
 daily as ONE constant (`PHONE_HOURS`) rendered on `/card`, the homepage
 Visit Us block and `/spot-prices` and as `contactPoint` in the site
 schema; call buttons replace the duplicate/rates buttons in the gold and
 silver heroes; diamond / watch / appraisal descriptions trimmed to the
-phone-last ≤155 rule. GBP main hours stay the showroom's; the owner still
-pastes the description sentence (`TASKS.md`). Gate tsc 0 · lint 0 ·
-**1265/1265 (128 files)** · build exit 0. Awaiting push (no SQL, no env
-vars).**
+phone-last ≤155 rule. Gate tsc 0 · lint 0 · **1265/1265 (128 files)** ·
+build exit 0.**
 
 🟡 **09-08 (night, later) — gold + silver landers: FAQ schema + accordion
 (new `FaqSection`) + phone in the meta description — BUILT + dev-verified +
@@ -106,11 +124,13 @@ block + five Netlify `.mts`) + an admin "last sweep ran N min ago" line —
 after the 09-08 11:15/11:45Z price pushes are seen on the minute. Proposal
 parked: inbound marketplace-sale detection (`TASKS.md`).
 
-**⏰ NEXT SESSION, FIRST THING (owner pings after 7:45 a.m. Eastern
-09-08):** read the 09-08 `scheduled_price_push` rows — expect Etsy
-11:15:0xZ + eBay 11:45:0xZ (pg_cron) plus a later GitHub duplicate each;
-both on the minute = overlap window closed → cleanup batch. Exact steps
-and the if-not branch at the top of `TASKS.md`.
+✅ **09-09 02:49Z — price pushes CONFIRMED on the minute (Etsy 11:15:04Z,
+eBay 11:45:04Z on 09-08; GitHub duplicates 15:03 / 15:17 harmless); sweeps
+54/54 boundaries since 09-08 00:00Z. All eight pg_cron jobs now observed →
+the overlap window is CLOSED. Next batch = the cleanup (GitHub `schedule:`
+block + five Netlify `.mts` + stale copy + admin "last sweep" line with a
+mockup first) — `TASKS.md`. Read-only check; no code or docs beyond this
+note touched.**
 
 ✅ **09-08 — lead-form fields + Netlify stub deletion DEPLOYED and
 production-verified** (five form pages 200 with the fields, ES labels,

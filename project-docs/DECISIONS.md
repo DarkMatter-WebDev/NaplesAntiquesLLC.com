@@ -6,6 +6,35 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-09-08**.
 
+## The storefront photo says "which door"; the homepage Visit Us block is a centred column with the photo and the square map beneath it (2026-09-08)
+
+The owner supplied a photo of the storefront (orange two-story building,
+white balcony, Suite 104 = the centre glass door, 104 on the curb) to
+"help guide customers to the right unit". Rules from the mockups:
+
+- **One component, `components/StorefrontPhoto.tsx`,** renders it
+  everywhere (homepage Visit Us, contact `VisitUsPanel`, the `/sell/naples`
+  showroom band, a 16:9 thumbnail on `/card`) — same file, same alt text,
+  crops keep the lower half where the door and curb number are. A changed
+  photo gets a NEW file name (CDN caches by URL).
+- ⛔ **No caption on any surface** (owner). The alt text carries the cues
+  for screen readers and Google Images; it does NOT name the neighbouring
+  business (retired from these surfaces 2026-08-23) — the door sign in the
+  photo shows it anyway.
+- **Homepage Visit Us layout = centred column, then photo + map as two
+  equal squares** (owner's "V2", after seeing a two-column-with-photo
+  variant and a 4:3 pair). ⚠️ This REVERSES the 2026-08-23 decision that
+  made the block two columns so seven hours rows would not push the map
+  off the fold; the owner chose the stack knowingly — the photo-and-map
+  pair is the payoff and the section sits at the foot of the homepage where
+  the visitor is already scrolling. Do not restore the two columns without
+  asking.
+- **The map stays square.** A 4:3 map option was built for the V1 mockup
+  and removed when V2 was chosen; the 2026-08-18 squareness rule stands,
+  and `ShowroomMap` has no aspect prop.
+- The photo shows the neon OPEN signs lit; the owner was asked whether to
+  reshoot without them and kept this shot.
+
 ## Phone hours are stated in words, never as the Business Profile's main hours ("Option C", 2026-09-08)
 
 The owner answers the phone 9 AM–6 PM, seven days; the showroom is open

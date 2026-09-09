@@ -7,6 +7,7 @@ import { AppIcon } from '@/components/AppIcon';
 import ShowroomAddress from '@/components/ShowroomAddress';
 import CopyAddressButton from '@/components/CopyAddressButton';
 import CardTodayHours from '@/components/card/CardTodayHours';
+import StorefrontPhoto from '@/components/StorefrontPhoto';
 import {
   FACEBOOK_URL,
   GOOGLE_REVIEW_URL,
@@ -306,6 +307,10 @@ export default async function CardPage({ params }: Props) {
             <ShowroomAddress locale={locale} />
             <CopyAddressButton locale={locale} className="mt-0.5" />
           </div>
+          {/* The door, for someone standing in the parking lot (owner,
+              2026-09-08; no caption). Lazy — the buttons above must not wait
+              for it — and 16:9 so it stays a thumbnail, not a hero. */}
+          <StorefrontPhoto locale={locale} aspect="16:9" className="mt-3" sizes="(min-width: 448px) 28rem, 100vw" />
           {/* Directions live with the address they point at (owner, 2026-09-03). */}
           <a
             href={mapsUrl()}
