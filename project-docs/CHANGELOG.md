@@ -1,7 +1,301 @@
 
 # Changelog
 
-## 2026-09-08 (late) — language switch no longer plays the entrance fade + `/reviews` loses its count (STAGED, awaiting push)
+## 2026-09-08 (night, latest) — phone-hours line (card, Visit Us, spot-prices, schema) + call buttons in the gold/silver heroes BUILT + STAGED (awaiting push)
+
+Owner: "change 9am-8pm to 9am-6pm and build them all as you recommend."
+Everything in the mockup, with the phone hours 9 AM–6 PM, seven days:
+
+- **One constant, one formatter** — `PHONE_HOURS = { opens: '09:00',
+  closes: '18:00' }` in `lib/business-location.ts` with `phoneHours()` (three
+  parts so a surface can bold the time), `phoneHoursLabel()` (compact "Calls
+  answered 9am–6pm, every day" for the card; long "9 AM – 6 PM" for the
+  table surfaces; Spanish "Llamadas 9 a.m. – 6 p.m., todos los días") and
+  `phoneContactPointSchema()` (a `ContactPoint` with seven-day
+  `hoursAvailable`). Not an admin field (owner's call): edit the constant
+  and every surface follows.
+- **`/card`:** a third hours line under the segments — phone glyph +
+  "Calls answered **9am–6pm**, every day" — same muted size as the hours
+  line. **Homepage Visit Us:** the same line (long form) under "or by
+  appointment"; deliberately NOT a row in the seven-day table (each row is
+  a day). **`/spot-prices`:** one sentence under the three buttons — "Have
+  gold or silver to sell? Call (239) 404-8505 and we'll walk you from
+  today's spot to a real number for your pieces." + the phone hours in
+  muted small type (keeps the page's not-an-offer rule; no margin stated).
+  **Site schema:** `contactPoint` on the JewelryStore (distinct from the
+  showroom's `openingHoursSpecification`, which must keep matching GBP).
+- **`/gold-services` hero:** the second button was a duplicate link to the
+  same form ("Free Evaluation" beside "Get an Estimate"); it is now
+  CALL (239) 404-8505 in the page's own white-outline style, with the gold
+  button relabelled FREE EVALUATION. **`/silver-services` hero:** "Current
+  Silver Rates" (→ /bullion) became the call button; the rates survive as a
+  text link "Today's silver spot price →" to `/spot-prices` under the
+  buttons. Footer left alone (recommended: keep it short).
+- Guard: `lib/__tests__/phone-hours.test.ts` (4 tests: the three label
+  forms + the constant; the ContactPoint mirrors it; every surface uses the
+  helper; each hero has exactly two `tel:` links and the old buttons are
+  gone).
+
+Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 · `npx vitest run`
+**1265/1265 (128 files)** · `npm run build` exit 0 (481 static pages).
+Dev server: `/card` + `/es/card` render the line (EN/ES), `/` renders the
+Visit Us line and the schema carries `contactPoint` with opens 09:00 /
+closes 18:00, `/spot-prices` + ES render the sentence with the linked
+number and the hours span, gold hero shows FREE EVALUATION + CALL, silver
+hero SCHEDULE EVALUATION + CALL + the rates text link; pane screenshots
+of all five taken. ℹ️ The dev DOM briefly held TWO `#visit-us` sections
+(one hidden) after a client navigation — the SSR HTML and the production
+build have exactly one; a dev-only artifact, not a source duplicate.
+
+## 2026-09-08 (night, later) — diamond / watch / appraisal descriptions trimmed to the phone-last rule (STAGED); phone-hours + call-CTA mockup sent
+
+Owner: "lets do option C, mock up the website line, also do the call
+button change mockup … work through everything we can directly do right
+now." Hours decision = **Option C**: GBP main hours stay the showroom's
+(11–3 / Sat 11–4 — Google's hours must be customer-facing hours, and a
+walk-in at 6 pm would find the door locked); phone availability (owner
+answers 9 AM–8 PM, seven days) goes into the GBP description as a sentence
+(owner pastes; no phone number in that text) and onto the website as a
+line beside the showroom hours.
+
+**Mockup sent (awaiting four answers):** A `/card` hours block gains
+"Calls answered 9am–8pm, every day" under the hours line (EN + ES shown);
+B homepage Visit Us gets the same line under "or by appointment" (the
+seven-day table untouched — a "Phone" row would break "each row is a
+day"); C `/gold-services` hero: the duplicate second button (both went to
+the form) becomes CALL (239) 404-8505 in the page's own white-outline
+style; D `/silver-services` hero: "Current Silver Rates" → the phone, rates
+kept as a small text link to `/spot-prices`; E `/spot-prices`: one sentence
+under the three buttons ("Have gold or silver to sell? Call … we'll walk
+you from today's spot to a real number" + the phone hours), keeping the
+page's not-an-offer rules. Questions: wording / "every day"; footer too?;
+C + D OK?; phone hours as a constant beside the phone number vs an admin
+field.
+
+**Built + staged meanwhile (no design change):** the three older buy-side
+descriptions trimmed to the rule recorded earlier tonight — `/diamond-
+buyers` 200 → 149 EN / 156 ES, `/watch-buyers` had NO phone → 152 / 141,
+`/jewelry-appraisal` ES 172 → 154 (EN 157 unchanged). "Eternity bands"
+kept in the diamond EN (a real query in GSC); "certified or not" dropped
+instead. `service-landers-faq.test.ts` gained a per-lander check: both
+literals end with the phone and are ≤ 160 (5 landers × EN + ES). Gate:
+`tsc` 0 · lint 0 · **1261/1261 (127 files)** · build exit 0 (481 static
+pages) · dev-server lengths verified by curl.
+
+## 2026-09-08 (night) — gold + silver landers gain FAQ schema + phone-in-description (STAGED, awaiting push); GBP plan items verified read-only
+
+Owner: "build the FAQ schema and phone parity on gold and silver, and work
+through all plan items one by one."
+
+**Built (item 3 of the plan):** new `components/FaqSection.tsx` — one
+`faqs` list renders BOTH the visible `<details>` accordion and the FAQPage
+JSON-LD (Google's rule: markup must describe visible questions), same
+markup the diamond page carries inline. `/gold-services` and
+`/silver-services` each get six Q&As (EN + ES) placed before their closing
+CTA, with the sibling-page cross-links line. Every answer restates copy
+already on the page or in the gold-worth guide; the owner's facts are kept
+verbatim in spirit: dental gold is SENT OUT for karat testing and the
+offer follows the result; plated / gold-filled is never bought as gold;
+flatware is priced both ways and paid at the higher, with only the named
+small top tier (Tiffany Chrysanthemum, Georg Jensen). Meta descriptions
+now end with "Call (239) 404-8505" / "Llame al (239) 404-8505" and were
+REWRITTEN to 149–155 characters — the first draft ran 176–192 and Google
+truncates around 155–160 on phones, which would have cut off exactly the
+phone number the change exists for. Guard:
+`lib/__tests__/service-landers-faq.test.ts` (4 tests: one list → two
+outputs; phone ×2 per page; six questions each; the owner's facts).
+
+Gate: `npx tsc --noEmit` 0 · `npm run lint` 0 · `npx vitest run`
+**1256/1256 (128 files)** · `npm run build` exit 0 (481 static pages) ·
+dev server: all four pages 200 with 1 FAQPage / 6 Question / 6 `<details>`
+each, phone in every description (lengths 151 / 155 / 149 / 154), pane
+screenshots of both accordions (silver shown with the flatware answer
+open). ⚠️ The visible FAQ block is a layout addition; it reuses the
+diamond page's owner-approved pattern verbatim and the screenshots were
+shown for a yes before the push — schema without visible questions is not
+an option under Google's guidelines, so this is all-or-nothing.
+
+**Verified read-only in the owner's Chrome (plan items 1 + 4):** Business
+Profile Manager → categories: **Jewelry buyer (primary), Coin dealer, Gold
+dealer, Diamond buyer, Jewelry store, Estate liquidator, Jewelry
+appraiser** — "Gold dealer" and "Coin dealer" are present, nothing to add.
+Hours listed: Mon–Fri 11:00 AM–3:00 PM, Sat 11:00 AM–4:00 PM, Sun closed
+(item 2 is the owner's decision). Description already names gold, sterling
+silver, diamonds, watches, coins, bullion. Website = homepage;
+"Menu or services link" = `/sell/naples`. Services: Jewelry buyer → Estate
+jewelry buying, Gold jewelry buying, Diamond & engagement ring buying,
+Luxury watch buying, Sterling silver buying, Full estate purchases, Free
+jewelry evaluations, Home visits by appointment; Coin dealer → Gold &
+silver coin buying, Bullion buying; Gold dealer → Scrap gold buying,
+Dental gold buying, Gold coin & bullion buying; Jewelry store → Estate
+jewelry sales, Gold chains & bracelets, Luxury watches, Trade-in program;
+Estate liquidator → Whole-estate jewelry & silver purchases, Executor &
+estate settlement support; Jewelry appraiser → Free verbal appraisals,
+On-site XRF & acid testing; **Diamond buyer → no services**. Service
+DESCRIPTIONS were not opened (each needs a click inside the overlay, which
+froze the renderer twice today) — the names carry the gold/silver words
+already. ⚠️ Method note: the edit-profile overlay is a same-origin iframe;
+read it via JS, never screenshot it or loop clicks (two frozen tabs).
+
+## 2026-09-08 (night) — RESEARCH ADDENDUM: the diamond-calls plan re-checked before building — root cause is the local pack, plan reordered
+
+Owner: "do some deep thinking and extra research to refine and double
+check the plan … before we build anything", then: "just in the past few
+weeks I've noticed more diamond activity, so it must've been something we
+did relatively recently." Read-only; nothing built. Refined plan lives in
+`TASKS.md` (top).
+
+**What changed recently:** the GBP rebuild on 08-30 (7 categories incl.
+"Diamond buyer", 18 services, booking link; the one post was later
+rejected) and, the same day, `/diamond-buyers` + footer "Sell Diamonds".
+GBP interactions: Jul 3 → Aug 71.
+
+**Live SERP checks (owner's Chrome, Golden Gate/Naples, personalised —
+caveat):** "sell diamond ring naples fl", "jewelry buyer naples fl", "sell
+jewelry naples fl", "silver buyers naples fl" → we are IN the 3-pack (#3–4;
+the packs are Covenant Jewelry Buyers 5.0/183, Naples Jewelry Buyers
+5.0/39, Gold Silver Naples 4.4/80 "Gold dealer", us 5.0/18 — all "Jewelry
+buyer" except one). "sell gold naples fl" → pack = Park Shore Coin, The
+Gold Center ("Gold dealer", 4.6/63), Covenant; we are absent from the pack
+AND the organic top 8 (thegoldcenter, naplesjewelersinc, Reddit,
+parkshorecoin, Yelp, leifscoins, goldsilvernaples). "sell sterling silver
+naples fl" → NO pack at all; organic #1 naplesjewelrybuyers.com, **#2 us
+(the homepage title)**. "gold buyers naples fl" → no pack rendered;
+organic all gold/coin dealers. Every pack listing showed us "Closed ·
+Opens 11 AM" next to competitors opening 9–10 AM.
+
+**Older Search Console history (`.co` property, 16 months):** 28 clicks /
+562 impressions total; gold 0/12, silver 0/5, diamond 0/26 — the same
+picture before the domain switch; organic non-brand volume has always
+been tiny.
+
+**Web leads (Supabase `inquiries`, last 90 days, read-only):** 16 rows =
+3 real free-evaluation requests (all gold: "18k gold chain & earrings
+15.7 g", "gold", one blank), 11 product-interest clicks on 08-22 (all gold
+items), 2 tests. **Zero diamond web leads.** Social (`instagram_posts` /
+`facebook_posts`, 5 each, all 08-01→08-03): 4 gold, 1 gold+diamond — the
+social feed is gold, not diamond.
+
+**Reviews:** of the 22 verbatim reviews, 3 mention gold, 4 silver, 0
+diamond, 7 "estate". Packs quote review text matching the query, which
+is how Covenant surfaces "Brought in a few gold rings…" on gold queries.
+
+**GBP category facts (web research):** primary category is the #1 local
+pack factor; proximity #2; keywords in the business name #3; "open at
+time of search" #5 (Whitespark 2026 via storerocket.io /
+w3marketinghub.com). Category list (daltonluka.com): "Jewelry buyer",
+"Diamond buyer", "Diamond dealer", "Coin dealer", "Pawn shop", "Jewelry
+appraiser", "Estate liquidator" exist; **no category contains "silver",
+"bullion" or "precious metal"**; "Gold dealer" is real (displayed on The
+Gold Center and Gold Silver Naples in the packs).
+
+**Conclusion (high confidence):** the diamond calls are the Business
+Profile appearing in "Jewelry buyer"-category packs since 08-30 — diamond
+and generic jewelry sellers search those terms and tap Call; gold sellers
+search "sell gold", whose pack is owned by "Gold dealer"-primary coin and
+gold shops; silver rarely gets a pack and is decided organically, where we
+already sit #2 with the homepage on thin volume. The website is not the
+cause (its own leads are gold) and web CTA changes are the weakest lever
+— reordered below GBP work in the plan. Do NOT switch the primary category
+to "Gold dealer" (would forfeit the packs we now hold for a contested
+one); do NOT put "gold" in the GBP name (policy). Cheap owner levers:
+verify "Gold dealer" + "Coin dealer" secondaries, list real extended /
+by-appointment hours if genuinely answered, ask gold/silver sellers for
+reviews that say what they sold, keyword-rich service descriptions +
+buying photos. Website parity (FAQ schema + phone in description on the
+gold/silver landers) stays as a small no-mockup item.
+
+## 2026-09-08 (night) — INVESTIGATION: why the calls are about diamonds (GSC + GBP + site) — findings only, nothing built
+
+Owner: "we seem to be getting a lot of calls about diamonds rather than
+silver or gold … are we doing something when it comes to diamonds that we
+aren't on gold/silver/jewelry searches?" Read-only.
+
+**Search Console (`.com` URL-prefix property, 3-month view; data runs
+2026-08-01 → 09-06):** 95 clicks / 2.86K impressions total. 77 of the 95
+clicks land on the homepage; 28 are the brand query "naples estate
+jewelry" (pos 2.0). Query filters: **contains "diamond" = 0 clicks / 81
+impressions**, avg position ~50 (best: "sell diamond eternity bands
+naples" 12 imp @ 43.6, "sell diamonds naples" 16 imp @ 58.6); **contains
+"gold" = 0 clicks / 123 impressions** ("gold buyers near me" 6 imp @ 7.7,
+"sell gold near me" 6 @ 8.0, "18k gold ring mens naples" 10 @ 13.9);
+**contains "silver" = 1 click / 103 impressions** ("gorham silver naples"
+13 @ 8.2, "silver sterling flatware naples" 18 @ 15.9). Pages:
+`/diamond-buyers` **18 impressions, 0 clicks** (not in the top 30 pages);
+`/gold-services` 159 imp / 0 clicks @ 24.1; `/silver-services` 171 imp / 1
+click @ 9.1 (the closest lander to page 1). **Conclusion: organic web
+search is not producing the diamond calls — it produces almost no
+non-brand calls of any kind.**
+
+**Google Business Profile (Performance overlay, Apr–Sep 2026):** 641
+profile views (529 last month), 84% from Google Search (64% mobile), 16%
+Maps; **74 interactions, 71 of them in August** (Jul 3, Sep not yet
+reported). The searches breakdown exposes only "estate jewelry naples fl"
+(< 15) — GBP hides low-volume terms, so it cannot split diamond vs gold.
+Primary category "Jewelry buyer"; "Diamond buyer" is one of the 7
+categories added 08-30, with the service "Diamond & engagement ring
+buying". **The phone calls come from the profile, not the site** (71 GBP
+interactions in one month vs 95 site clicks in three).
+
+**Site-side asymmetries found (what diamonds get that gold/silver do
+not):** (1) `/diamond-buyers`, `/watch-buyers` and `/jewelry-appraisal`
+carry FAQPage schema and "Call (239) 404-8505" in the meta description;
+`/gold-services` and `/silver-services` have **no FAQ schema** and no
+phone in the description. (2) The diamond page's CTAs are call-first (2
+`tel:` links, "paid on the spot"); the gold and silver heroes send BOTH
+buttons to `/free-evaluation` (silver's second to `/bullion`) — a gold or
+silver visitor is steered to a form, a diamond visitor to the phone. (3)
+**The site pre-answers gold and silver pricing** — `/spot-prices`, the
+karat table, the gold-worth guide, the flatware guide — so those sellers
+can decide without calling; a diamond has no published number, so the
+only way to learn one is to call. (4) Local competition on the brand SERP
+is gold-centric (sponsored "Gems of Note — The Gold Center", "Covenant
+Jewelry Buyers" in Places; "the gold center naples fl" appears in our
+impressions), so gold sellers have obvious alternatives while diamond
+sellers have fewer — a "Jewelry buyer / Diamond buyer" profile collects
+them. (5) Inventory is not the cause: 74 live shop listings = 39 silver,
+33 gold, 13 diamond.
+
+**Not built; proposals parked in `TASKS.md`:** FAQ schema + phone-in-
+description parity for `/gold-services` and `/silver-services`; a call CTA
+in the gold/silver heroes and on `/spot-prices` ("call for today's offer");
+ask callers where they found us for a month; watch the silver lander (pos
+9.1) as the nearest page-1 win.
+
+## 2026-09-08 (night) — GSC indexing for `/reviews` + IndexNow SETTLED
+
+Owner: "do the google search console tasks and the indexnow run, chrome is
+open." `npm run indexnow` (from `next-app/`) → **200 OK for 212 URLs**
+(the sitemap now includes `/reviews` + `/es/reviews`). GSC URL Inspection
+on the `.com` URL-prefix property, driven with the method in memory
+`gsc-url-inspection-method` (JS value-setter + dispatched Enter, then a
+coordinate click on REQUEST INDEXING at (1112, 260) in the 1568-wide
+window): `https://naplesestatejewelry.com/reviews` → "URL is not on
+Google · Discovered – currently not indexed" (discovered via the sitemap
+and the `/es/reviews` referring page) → REQUEST INDEXING → **"Indexing
+requested"**; `https://naplesestatejewelry.com/es/reviews` → **"URL is on
+Google · Page is indexed"** already, so no request was made (no quota
+spent — the Spanish page went in first, as the Spanish pages usually do).
+Nothing is owed. The Chrome tab was closed.
+
+## 2026-09-08 (late) — locale-switch fade fix + `/reviews` count removal DEPLOYED and production-verified
+
+Owner: "pushed and deployed, verify it live, if all is good, update docs
+and end session." Verified: `/reviews`, `/es/reviews`, `/card`, `/es/card`,
+`/about` → **200**; `/review` → 302 unchanged; `/reviews` intro "Google
+reviews, quoted word for word", meta description count-free, **0** "22" in
+either language's HTML, 22 cards; `/card` still carries "Read Our Reviews"
+×2, "View Full Website &amp; Shop", `href="/reviews"`; the deployed reveal
+chunk (`0w3ta-goeh_et.js`) contains the locale-exemption code. Behaviour
+proof in the owner's Chrome on production (MutationObserver counting
+`data-customer-reveal` stamps, `window` marker alive throughout): `/card` →
+`/es/card` → `/card` → `/es/card` each **0 `pending` / 0 `visible` / 2
+`done`**; the real page change `/es/card` → `/es/reviews` still 26
+`pending` → `visible` → `done`. Docs flipped; staging re-synced. **Still
+owed: the two GSC indexing requests for `/reviews` + `/es/reviews` and
+IndexNow.** The block below is the pre-deploy record.
+
+## 2026-09-08 (late) — language switch no longer plays the entrance fade + `/reviews` loses its count (pre-deploy record)
 
 Owner, minutes after the deploy: "check the /card page, we previously fixed
 a flash that occurred when user switches from en to es, it seems the flash

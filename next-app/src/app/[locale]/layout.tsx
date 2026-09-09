@@ -17,6 +17,7 @@ import {
   GEO,
   mapsUrl,
   openingHoursSchema,
+  phoneContactPointSchema,
   postalAddressSchema,
   type StoreHoursSchedule,
   SAME_AS,
@@ -45,6 +46,11 @@ const buildJsonLd = (schedule: StoreHoursSchedule) => ({
   // sitelinks. The brand is "Naples Estate Jewelry" and nothing else.
   url: 'https://naplesestatejewelry.com',
   telephone: '+12394048505',
+  // The phone's OWN hours (9–6, seven days) — distinct from the showroom's
+  // openingHoursSpecification below, which must keep matching the Business
+  // Profile. Owner's "Option C", 2026-09-08; one constant in
+  // business-location.ts feeds this and the three visible surfaces.
+  contactPoint: phoneContactPointSchema(),
   // The public contact mailbox moved to .com (owner, 2026-08-08), so the
   // address customers see now matches the domain they are on. This is the
   // INBOUND address and is only correct while `info@naplesestatejewelry.com`

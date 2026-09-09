@@ -23,9 +23,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const isEs = locale === 'es';
   return pageMetadata({
     title: isEs ? 'Vender Diamantes en Naples, FL' : 'Sell Diamonds in Naples, FL',
+    // ≤ ~155 characters with the phone LAST (2026-09-08 rule, DECISIONS.md):
+    // Google truncates around 155–160 on phones and the number is the point.
     description: isEs
-      ? 'Compradores de diamantes en Naples, FL. Venda anillos de compromiso, argollas de eternidad, aretes y piedras sueltas — con o sin certificado. Evaluación privada y pago inmediato. (239) 404-8505.'
-      : 'Diamond buyers in Naples, FL. Sell engagement rings, eternity bands, studs, and loose stones — certified or not. Private evaluations, honest resale numbers, paid on the spot. Call (239) 404-8505.',
+      ? 'Venda diamantes en Naples, FL — anillos de compromiso, argollas, aretes y piedras sueltas, con o sin certificado. Pago inmediato. Llame al (239) 404-8505.'
+      : 'Sell diamonds in Naples, FL — engagement rings, eternity bands, studs, loose stones. Graded in front of you, paid on the spot. Call (239) 404-8505.',
     path: '/diamond-buyers',
     locale,
   });

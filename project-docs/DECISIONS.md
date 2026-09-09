@@ -6,6 +6,59 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-09-08**.
 
+## Phone hours are stated in words, never as the Business Profile's main hours ("Option C", 2026-09-08)
+
+The owner answers the phone 9 AM–6 PM, seven days; the showroom is open
+Mon–Fri 11–3, Sat 11–4. Google's main hours mean customer-facing hours at
+the location, and "open at time of search" is a pack-ranking factor — so
+the temptation is to list 9–6. Decided against it: a walk-in at 5 pm
+finding a locked door is the worst review there is, and mismatched hours
+draw Google's user-suggested edits. Rules:
+
+- **GBP main hours = showroom hours, always** (and they must keep matching
+  the admin-editable schedule the site renders — NAP consistency).
+- **Phone availability is said in words:** one sentence in the GBP
+  description (owner-pasted; ⛔ no phone number inside GBP description
+  text), and on the site the line "Calls answered 9am–6pm, every day"
+  beside the showroom hours on `/card`, the homepage Visit Us block and
+  `/spot-prices`, plus `ContactPoint.hoursAvailable` in the JewelryStore
+  schema (distinct from `openingHoursSpecification`).
+- **One constant** — `PHONE_HOURS` in `lib/business-location.ts` — feeds
+  every surface through `phoneHours()` / `phoneHoursLabel()` /
+  `phoneContactPointSchema()`. Not an admin field (owner's call): it
+  changes rarely. Guarded by `lib/__tests__/phone-hours.test.ts`.
+- **Never a row in the hours table.** Each row there is a day; the phone
+  line sits under "or by appointment", which already qualifies the table.
+- The "More hours" field is not the place: its types (Delivery, Brunch,
+  Senior hours…) have nothing for a phone.
+
+## Hero buttons on the buy-side landers include the phone (2026-09-08)
+
+The diamond-calls investigation found the calls come from the Business
+Profile while the gold and silver heroes steered every visitor to a form —
+gold even had TWO buttons to the same form. Rule: a buy-side lander's hero
+offers the form AND the phone (`tel:2394048505`, in the hero's own outline
+style, `AppIcon name="call"`); a secondary link that is not one of those
+two (the silver "rates" link) becomes a small text link under the buttons.
+The bottom CTA of each page already had this pair; the hero now matches.
+
+## A meta description that carries the phone number stays near 150 characters (2026-09-08)
+
+The buy-side landers (`/diamond-buyers`, `/watch-buyers`,
+`/jewelry-appraisal`, and since 2026-09-08 `/gold-services` +
+`/silver-services`) end their meta description with "Call (239) 404-8505"
+so a searcher can dial from the result. Google truncates descriptions at
+roughly 155–160 characters on phones, and the number is the LAST thing in
+the string, so a long description cuts off exactly the part the phone is
+there for — the first gold/silver drafts ran 176–192 and were rewritten to
+149–155. Rule: phone last, whole string ≤ ~155 characters, claims only
+from the page's own copy. The diamond, watch and appraisal descriptions
+were trimmed to the same rule the same night (the watch page had no phone
+at all); all five buy-side landers are now guarded by
+`lib/__tests__/service-landers-faq.test.ts` (ends with the phone, ≤ 160).
+FAQ blocks are rendered by `components/FaqSection.tsx` from one list so the
+FAQPage markup can never describe a question the visitor cannot see.
+
 ## A language switch is a text swap, never an arrival — no entrance fade (2026-09-08)
 
 Owner, on `/card` after the deploy: "I see the page change to Spanish, and

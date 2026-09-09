@@ -193,6 +193,73 @@ export function byAppointmentLabel(isEs: boolean): string {
 }
 
 /**
+ * When the PHONE is answered — a different fact from the showroom hours.
+ *
+ * Owner, 2026-09-08 ("Option C" in the diamond-calls plan): the Google
+ * Business Profile's main hours stay the showroom's, because Google's hours
+ * mean customer-facing hours and a walk-in at 5 pm would find the door
+ * locked; the phone, though, is answered 9 AM–6 PM every day. That fact is
+ * stated in words — a sentence in the GBP description (owner-pasted) and one
+ * line beside the showroom hours on `/card`, the homepage Visit Us block and
+ * `/spot-prices` — and as `ContactPoint.hoursAvailable` in the site schema.
+ *
+ * One constant, not an admin field (owner's call, same day): it changes
+ * rarely; edit here and every surface follows. 24-hour strings, like the
+ * store-hours schedule, so the schema helper can reuse them verbatim.
+ */
+export const PHONE_HOURS = { opens: '09:00', closes: '18:00' } as const;
+
+function phoneHour(hhmm: string, isEs: boolean, format: 'compact' | 'long'): string {
+  const hour24 = Number(hhmm.slice(0, 2));
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  const pm = hour24 >= 12;
+  if (isEs) return `${hour12} ${pm ? 'p.m.' : 'a.m.'}`;
+  return format === 'compact' ? `${hour12}${pm ? 'pm' : 'am'}` : `${hour12} ${pm ? 'PM' : 'AM'}`;
+}
+
+/**
+ * The phone-hours line in three parts so a surface can bold the time.
+ * `compact` matches the `/card` hours line ("11am–3pm"); `long` matches the
+ * hours table ("11:00 AM – 3:00 PM"). Spanish uses one shape ("9 a.m. – 6 p.m.")
+ * because that is how `hoursSegmentsCompact` already prints Spanish times.
+ */
+export function phoneHours(isEs: boolean, format: 'compact' | 'long' = 'long'): { before: string; time: string; after: string } {
+  const opens = phoneHour(PHONE_HOURS.opens, isEs, format);
+  const closes = phoneHour(PHONE_HOURS.closes, isEs, format);
+  const time = isEs || format === 'long' ? `${opens} – ${closes}` : `${opens}–${closes}`;
+  return isEs
+    ? { before: 'Llamadas ', time, after: ', todos los días' }
+    : { before: 'Calls answered ', time, after: ', every day' };
+}
+
+export function phoneHoursLabel(isEs: boolean, format: 'compact' | 'long' = 'long'): string {
+  const parts = phoneHours(isEs, format);
+  return `${parts.before}${parts.time}${parts.after}`;
+}
+
+/**
+ * schema.org ContactPoint for the sitewide JewelryStore: the phone with the
+ * hours it is actually answered, seven days. Distinct from
+ * `openingHoursSpecification`, which stays the showroom's admin-editable
+ * schedule and must keep matching the Google Business Profile.
+ */
+export function phoneContactPointSchema() {
+  return {
+    '@type': 'ContactPoint',
+    telephone: '+12394048505',
+    contactType: 'customer service',
+    areaServed: 'US',
+    availableLanguage: ['English', 'Spanish'],
+    hoursAvailable: {
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+      opens: PHONE_HOURS.opens,
+      closes: PHONE_HOURS.closes,
+    },
+  } as const;
+}
+
+/**
  * Monday-first, so the two closed days bookend the open week instead of
  * stacking two "Closed" rows at the top of the list, which is what a
  * Sunday-first US calendar order would do.

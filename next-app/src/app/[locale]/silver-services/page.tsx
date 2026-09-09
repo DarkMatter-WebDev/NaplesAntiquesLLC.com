@@ -12,6 +12,7 @@ import { AppIcon } from '@/components/AppIcon';
 import ClayMark, { type ClayMarkName } from '@/components/ClayMark';
 import { TESTIMONIALS } from '@/lib/testimonials';
 import SilverMarksTeaser from '@/components/silver/SilverMarksTeaser';
+import FaqSection, { type Faq } from '@/components/FaqSection';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -25,9 +26,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: isEs
       ? 'Vender Plata Esterlina en Naples, FL'
       : 'Sell Sterling Silver in Naples, FL',
+    // Phone in the description (2026-09-08): parity with the diamond, watch
+    // and appraisal pages. "By weight or by pattern, whichever is higher" is
+    // the page's own owner-confirmed flatware rule. ⚠️ Kept near 150
+    // characters on purpose — Google truncates around 155–160 on phones and
+    // the phone number is the last thing in the string.
     description: isEs
-      ? 'Servicios privados de plata en Naples, FL. Evaluación experta de cubertería de plata esterlina, holloware, monedas y lingotes con pruebas claras y pago inmediato.'
-      : 'Private silver estate services in Naples FL. Expert evaluation of sterling silver flatware, hollowware, coins, and bullion with clear testing and immediate payment.',
+      ? 'Venda plata esterlina en Naples, FL — cubertería, juegos de té, monedas, lingotes. Valorada por peso o por patrón, la mayor. Llame al (239) 404-8505.'
+      : 'Sell sterling silver in Naples, FL — flatware, tea services, coins, bullion. Priced by weight or pattern, whichever is higher. Call (239) 404-8505.',
     path: '/silver-services',
     locale,
   });
@@ -45,6 +51,53 @@ const GALLERY_ITEMS = [
   { key: 'tea', titleEn: 'Tea Services', titleEs: 'Servicios de Té', subEn: 'Holloware & Serving Trays', subEs: 'Vajilla y Bandejas', img: '/assets/images/pages/silver-marks/ebay-tea-tray-service.webp', icon: 'emoji_food_beverage' },
   { key: 'coins', titleEn: 'Bullion & Coins', titleEs: 'Lingotes y Monedas', subEn: '99.9% Pure Investment Silver', subEs: 'Plata de Inversión 99.9% Pura', img: '/assets/images/pages/silver-bullion.webp', icon: 'toll' },
   { key: 'jewelry', titleEn: 'Fine Jewelry', titleEs: 'Joyería Fina', subEn: 'Designer & Vintage Collections', subEs: 'Colecciones de Diseñador y Vintage', img: '/assets/images/pages/ring.jpg', icon: 'diamond' },
+];
+
+/**
+ * FAQ (2026-09-08) — parity with the diamond, watch and appraisal pages
+ * (the "why are the calls about diamonds?" investigation). Every answer
+ * restates copy already on this page: the sterling-or-plate marks, the
+ * owner-confirmed "price both ways, pay the higher" flatware rule with its
+ * small top tier (never a maker list), weighted pieces priced on the silver
+ * actually there, monograms and tarnish, coins and bullion at spot.
+ */
+const SILVER_FAQS: readonly Faq[] = [
+  {
+    qEn: 'Is my silver sterling or plated?',
+    qEs: '¿Mi plata es esterlina o chapada?',
+    aEn: 'The mark tells you. Sterling is marked "925", "Sterling", or the British lion passant, and every gram counts. Plate is usually marked "EPNS", "Silver on Copper", or "Quadruple Plate" — a thin layer over base metal with little melt value. If there is no mark, we test it in front of you.',
+    aEs: 'El sello lo dice. La esterlina lleva "925", "Sterling" o el león pasante británico, y cada gramo cuenta. El chapado suele decir "EPNS", "Silver on Copper" o "Quadruple Plate" — una capa fina sobre metal base con poco valor de fundición. Si no hay sello, la probamos frente a usted.',
+  },
+  {
+    qEn: 'How do you price sterling flatware and tea services?',
+    qEs: '¿Cómo valoran la cubertería y los juegos de té de plata esterlina?',
+    aEn: 'Both ways, piece by piece: by weight at the live silver spot price, and as a pattern for the small top tier — Tiffany Chrysanthemum, Georg Jensen designs, and names of that caliber — and we pay whichever is higher. A full service with its serving pieces is what collectors of a pattern want most.',
+    aEs: 'De las dos maneras, pieza por pieza: por peso al precio spot de la plata en vivo, y como patrón para el pequeño grupo de élite — Tiffany Chrysanthemum, los diseños de Georg Jensen y nombres de ese calibre — y pagamos la mayor de las dos. Un juego completo con sus piezas de servir es lo que más buscan los coleccionistas de un patrón.',
+  },
+  {
+    qEn: 'Do monograms or tarnish lower the offer?',
+    qEs: '¿Los monogramas o el deslustre bajan la oferta?',
+    aEn: 'A monogram rarely changes a melt-value offer, and on collected patterns it matters less than sellers fear. Leave the tarnish alone — polishing removes silver and adds nothing to the price.',
+    aEs: 'Un monograma rara vez cambia una oferta por valor de fundición, y en los patrones de colección importa menos de lo que temen los vendedores. Deje el deslustre como está — pulir quita plata y no suma nada al precio.',
+  },
+  {
+    qEn: 'What about weighted candlesticks and compotes?',
+    qEs: '¿Y los candelabros y compoteras con peso añadido?',
+    aEn: 'Pieces marked weighted or reinforced are mostly cement or pitch inside a thin sterling shell. We price them honestly, on the silver that is actually there — no surprises at the counter.',
+    aEs: 'Las piezas marcadas weighted o reinforced son en su mayoría cemento o brea dentro de una capa fina de esterlina. Las valoramos con honestidad, por la plata que realmente hay — sin sorpresas en el mostrador.',
+  },
+  {
+    qEn: 'Do you buy silver coins and bullion?',
+    qEs: '¿Compran monedas y lingotes de plata?',
+    aEn: 'Yes. Spot price is the live market baseline; for coins and bullion we confirm weight and purity first, then use the current market to explain a straightforward offer.',
+    aEs: 'Sí. El precio spot es la referencia del mercado en vivo; para monedas y lingotes confirmamos primero el peso y la pureza, y luego usamos el mercado actual para explicar una oferta directa.',
+  },
+  {
+    qEn: 'Do I need an appointment to sell silver in Naples?',
+    qEs: '¿Necesito cita para vender plata en Naples?',
+    aEn: 'No. Walk into our Shirley St showroom in North Naples during open hours, or book a private appointment — including home visits across Southwest Florida. Weighed, tested, and priced in front of you, with immediate payment.',
+    aEs: 'No. Entre a nuestro salón de Shirley St en North Naples durante el horario de atención, o reserve una cita privada — incluidas visitas a domicilio en todo el suroeste de Florida. Pesado, probado y valorado frente a usted, con pago inmediato.',
+  },
 ];
 
 export default async function SilverServicesPage({ params }: Props) {
@@ -108,13 +161,21 @@ export default async function SilverServicesPage({ params }: Props) {
                 >
                   {isEs ? 'PROGRAMAR EVALUACIÓN' : 'Schedule Evaluation'}
                 </Link>
-                <Link
-                  href={isEs ? '/es/bullion' : '/bullion'}
-                  className="outline-button"
-                >
-                  {isEs ? 'PRECIOS DE PLATA' : 'Current Silver Rates'}
-                </Link>
+                {/* 2026-09-08 (mockup approved): "Current Silver Rates" → the
+                    phone. Silver sellers call; the rates survive as the text
+                    link below, pointing at the live-prices page the next
+                    section links as well. */}
+                <a href="tel:2394048505" className="outline-button" style={{ gap: '0.5rem' }}>
+                  <AppIcon name="call" className="text-[1rem]" />
+                  {isEs ? 'LLAMAR (239) 404-8505' : 'CALL (239) 404-8505'}
+                </a>
               </div>
+              <Link
+                href={isEs ? '/es/spot-prices' : '/spot-prices'}
+                className="mt-4 inline-block text-sm font-semibold text-[#735c00] underline underline-offset-2"
+              >
+                {isEs ? 'Precio spot de la plata hoy →' : 'Today’s silver spot price →'}
+              </Link>
             </div>
           </div>
         </section>
@@ -567,6 +628,20 @@ export default async function SilverServicesPage({ params }: Props) {
             })()}
           </div>
         </section>
+
+        {/* FAQ — same block the diamond page carries (FaqSection). */}
+        <FaqSection
+          isEs={isEs}
+          heading={isEs ? 'Preguntas Sobre Vender Plata' : 'Selling Silver FAQ'}
+          faqs={SILVER_FAQS}
+          footer={
+            isEs ? (
+              <>¿Vende más que plata? También compramos <Link href="/es/gold-services" className="font-semibold text-[#735c00] underline underline-offset-2">oro</Link>, <Link href="/es/diamond-buyers" className="font-semibold text-[#735c00] underline underline-offset-2">diamantes</Link> y <Link href="/es/estate-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">joyería de patrimonio</Link>.</>
+            ) : (
+              <>Selling more than silver? We also buy <Link href="/gold-services" className="font-semibold text-[#735c00] underline underline-offset-2">gold</Link>, <Link href="/diamond-buyers" className="font-semibold text-[#735c00] underline underline-offset-2">diamonds</Link>, and <Link href="/estate-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">estate jewelry</Link>.</>
+            )
+          }
+        />
 
         {/* CTA */}
         <section className="bg-[#f3f3f3] border-y border-[#d0c5af] py-24 text-center">

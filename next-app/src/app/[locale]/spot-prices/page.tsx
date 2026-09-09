@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { pageMetadata } from '@/lib/seo';
 import { jsonLdHtml } from '@/lib/json-ld';
+import { phoneHoursLabel } from '@/lib/business-location';
 import { fetchMetalSpotPrices, GRAMS_PER_TROY_OZ, GRAMS_PER_PENNYWEIGHT } from '@/lib/spot-price';
 import SiteHeader from '@/components/layout/SiteHeader';
 import { BreadcrumbTrailFromLd } from '@/components/BreadcrumbTrail';
@@ -170,6 +171,21 @@ export default async function SpotPricesPage({ params }: Props) {
                 {isEs ? 'VENDER LINGOTES Y MONEDAS' : 'SELL BULLION & COINS'}
               </Link>
             </div>
+            {/* One sentence, not a fourth button (2026-09-08, mockup approved):
+                the page's readers are checking a price; this turns that into
+                a call while keeping the page's rules — spot is the reference,
+                the number for THEIR pieces comes after verification, no margin
+                is stated. The phone hours ride along (Option C). */}
+            <p className="mx-auto mt-6 max-w-2xl text-[15px] leading-relaxed text-[#d7d0c3]">
+              {isEs ? '¿Tiene oro o plata para vender? ' : 'Have gold or silver to sell? '}
+              <a href="tel:2394048505" className="whitespace-nowrap font-bold text-[#e9c349]">
+                {isEs ? 'Llame al (239) 404-8505' : 'Call (239) 404-8505'}
+              </a>
+              {isEs
+                ? ' y le llevamos del spot de hoy a un número real por sus piezas. '
+                : ' and we’ll walk you from today’s spot to a real number for your pieces. '}
+              <span className="text-sm text-[#9a917c]">{phoneHoursLabel(isEs)}.</span>
+            </p>
           </div>
         </section>
 

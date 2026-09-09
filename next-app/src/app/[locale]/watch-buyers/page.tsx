@@ -28,9 +28,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const isEs = locale === 'es';
   return pageMetadata({
     title: isEs ? 'Vender Relojes en Naples, FL' : 'Sell Watches in Naples, FL',
+    // Phone added 2026-09-08 (it was the one buy-side lander without it);
+    // ≤ ~155 characters with the number last — see DECISIONS.md.
     description: isEs
-      ? 'Compradores de relojes en Naples, FL. Venda Rolex, Omega, Cartier y relojes vintage — funcionen o no, con o sin caja y papeles. Evaluación privada y pago en el acto.'
-      : 'Watch buyers in Naples, FL. Sell Rolex, Omega, Cartier & vintage watches — running or not, box and papers or not. Private evaluation, paid on the spot.',
+      ? 'Venda relojes en Naples, FL — Rolex, Omega, Cartier y vintage; funcionen o no, con o sin papeles. Pago en el acto. Llame al (239) 404-8505.'
+      : 'Sell watches in Naples, FL — Rolex, Omega, Cartier, vintage; running or not, papers or not. Private evaluation, paid on the spot. Call (239) 404-8505.',
     path: '/watch-buyers',
     locale,
   });

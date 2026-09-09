@@ -8,6 +8,7 @@ import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd';
 import SiteFooter from '@/components/layout/SiteFooter';
 import TradingViewMini from '@/components/trading/TradingViewMini';
 import GoldMarksTeaser from '@/components/gold/GoldMarksTeaser';
+import FaqSection, { type Faq } from '@/components/FaqSection';
 import { fetchSpotData } from '@/lib/spot-price';
 import { AppIcon } from '@/components/AppIcon';
 import ClayMark from '@/components/ClayMark';
@@ -19,9 +20,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: isEs
       ? 'Vender Oro en Naples, FL — Comprador de Oro'
       : 'Sell Gold in Naples, FL — Gold Buyer',
+    // Phone in the description (2026-09-08): parity with the diamond, watch
+    // and appraisal pages — a searcher who wants to call should not have to
+    // click first. Claims are the page's own (tested in front of you, live
+    // spot, immediate payment). ⚠️ Kept near 150 characters ON PURPOSE: Google
+    // truncates around 155–160 on phones, and the phone number is the LAST
+    // thing in the string — a longer sentence would cut off exactly the part
+    // this change exists for.
     description: isEs
-      ? 'Servicios privados de oro en Naples, FL. Evaluación experta de joyería de oro, lingotes, monedas y oro dental con pruebas claras y pago inmediato en todo el suroeste de Florida.'
-      : 'Private gold estate services in Naples FL. Expert evaluation of gold jewelry, bullion, coins, and dental gold with clear testing and immediate payment throughout Southwest Florida.',
+      ? 'Venda oro en Naples, FL — joyería, monedas, lingotes y oro dental. Probado frente a usted, precio spot en vivo, pago inmediato. Llame al (239) 404-8505.'
+      : 'Sell gold in Naples, FL — jewelry, coins, bullion, dental gold. Tested in front of you, priced from live spot, paid immediately. Call (239) 404-8505.',
     path: '/gold-services',
     locale,
   });
@@ -44,6 +52,54 @@ const ACQUIRE_ITEMS = [
   { key: 'jewelry', titleEn: 'Fine Jewelry', titleEs: 'Joyería Fina', descEn: 'Designer pieces, wedding bands, necklaces, and heirloom estates.', descEs: 'Piezas de diseñador, anillos de boda, collares y patrimonios de familia.', img: '/assets/images/pages/gold.webp' },
   { key: 'scrap', titleEn: 'Scrap & Broken', titleEs: 'Chatarra y Roto', descEn: 'Damaged items, single earrings, and tangled chains are still highly valuable.', descEs: 'Los artículos dañados, aretes sueltos y cadenas enredadas siguen siendo muy valiosos.', img: '/assets/images/pages/scrap.jpg' },
   { key: 'dental', titleEn: 'Dental Gold', titleEs: 'Oro Dental', descEn: 'Crowns, bridges, and dental alloys. We provide competitive payouts for all dental gold.', descEs: 'Coronas, puentes y aleaciones dentales. Ofrecemos pagos competitivos para todo el oro dental.', img: '/assets/images/pages/dental.webp' },
+];
+
+/**
+ * FAQ (2026-09-08) — the parity item from the "why are the calls about
+ * diamonds?" investigation: the diamond, watch and appraisal pages carried a
+ * FAQ + FAQPage schema, this page did not. Every answer restates copy that
+ * already exists on this page or in the gold-worth guide; the dental and
+ * plated answers follow the owner's rules (dental gold is SENT OUT for karat
+ * testing and the offer follows the result; plated/gold-filled is never
+ * bought as gold) — see `DECISIONS.md`.
+ */
+const GOLD_FAQS: readonly Faq[] = [
+  {
+    qEn: 'How do you price gold?',
+    qEs: '¿Cómo valoran el oro?',
+    aEn: 'Spot price is the live market starting point. We verify the karat, weight, and form of each piece in front of you, then explain how the current market translates into a clear offer — the same numbers you can follow on our live prices page.',
+    aEs: 'El precio spot es el punto de partida del mercado en vivo. Verificamos los quilates, el peso y la forma de cada pieza frente a usted, y luego explicamos cómo el mercado actual se traduce en una oferta clara — los mismos números que puede seguir en nuestra página de precios en vivo.',
+  },
+  {
+    qEn: 'Do you buy broken, damaged, or unmarked gold?',
+    qEs: '¿Compran oro roto, dañado o sin marcar?',
+    aEn: 'Yes. Damaged items, single earrings, and tangled chains are still gold and still valuable. Unmarked or antique pieces are verified with onsite acid and electronic testing at your appointment, with offsite XRF analysis through trusted lab partners when needed.',
+    aEs: 'Sí. Los artículos dañados, los aretes sueltos y las cadenas enredadas siguen siendo oro y siguen teniendo valor. Las piezas sin marcar o antiguas se verifican con pruebas ácidas y electrónicas en el sitio durante su cita, y con análisis XRF externo a través de laboratorios de confianza cuando hace falta.',
+  },
+  {
+    qEn: 'Do you buy dental gold?',
+    qEs: '¿Compran oro dental?',
+    aEn: 'Crowns, bridges, and dental alloys are real gold alloys and we buy them — but dental alloys vary widely, and the exact karat cannot be determined in the shop. We send dental gold out for testing to establish the exact karat before we buy, and the offer is set from that result rather than an estimate.',
+    aEs: 'Las coronas, los puentes y las aleaciones dentales son aleaciones de oro reales y las compramos — pero varían mucho, y el quilataje exacto no puede determinarse en la tienda. Enviamos el oro dental a analizar para establecer el quilataje exacto antes de comprar, y la oferta se fija a partir de ese resultado, no de una estimación.',
+  },
+  {
+    qEn: 'Do you buy gold-plated or gold-filled jewelry?',
+    qEs: '¿Compran joyería chapada en oro o gold-filled?',
+    aEn: 'We will identify it for free so you know for certain. Priced by gold content, plated pieces carry effectively none and gold-filled only a trace, so neither is bought as gold — but a plated piece can still be signed, antique, or collectible, and that is a different conversation.',
+    aEs: 'La identificamos gratis para que lo sepa con certeza. Valoradas por su contenido de oro, las piezas chapadas prácticamente no tienen y las gold-filled solo una traza, así que ninguna se compra como oro — pero una pieza chapada puede ser firmada, antigua o de colección, y esa es otra conversación.',
+  },
+  {
+    qEn: 'Do you buy gold coins and bullion?',
+    qEs: '¿Compran monedas y lingotes de oro?',
+    aEn: 'Yes — Sovereigns, Eagles, Krugerrands, and bars of any weight or mint, priced from the live spot market once weight and purity are verified in front of you.',
+    aEs: 'Sí — soberanos, Eagles, Krugerrands y barras de cualquier peso o casa de moneda, valorados según el mercado spot en vivo una vez verificados el peso y la pureza frente a usted.',
+  },
+  {
+    qEn: 'Do I need an appointment to sell gold in Naples?',
+    qEs: '¿Necesito cita para vender oro en Naples?',
+    aEn: 'No. Walk into our Shirley St showroom in North Naples during open hours, or book a private appointment — including home visits across Southwest Florida. Tested, weighed, and priced in front of you, with immediate payment.',
+    aEs: 'No. Entre a nuestro salón de Shirley St en North Naples durante el horario de atención, o reserve una cita privada — incluidas visitas a domicilio en todo el suroeste de Florida. Probado, pesado y valorado frente a usted, con pago inmediato.',
+  },
 ];
 
 export default async function GoldServicesPage({ params }: Props) {
@@ -95,15 +151,22 @@ export default async function GoldServicesPage({ params }: Props) {
                   href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
                   className="gold-button"
                 >
-                  {isEs ? 'OBTENER ESTIMADO' : 'GET AN ESTIMATE'}
-                </Link>
-                <Link
-                  href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
-                  className="outline-button"
-                  style={{ borderColor: 'rgba(255,255,255,0.48)', color: 'white', background: 'rgba(255,255,255,0.08)' }}
-                >
                   {isEs ? 'EVALUACIÓN GRATIS' : 'FREE EVALUATION'}
                 </Link>
+                {/* 2026-09-08 (mockup approved): this was a SECOND link to the
+                    same form ("Free Evaluation" beside "Get an Estimate"). The
+                    phone is the action gold sellers actually take — the
+                    diamond-calls investigation found the calls come from the
+                    Business Profile while this hero steered everyone to a form.
+                    Same white-outline style as the page's bottom CTA. */}
+                <a
+                  href="tel:2394048505"
+                  className="outline-button"
+                  style={{ borderColor: 'rgba(255,255,255,0.48)', color: 'white', background: 'rgba(255,255,255,0.08)', gap: '0.5rem' }}
+                >
+                  <AppIcon name="call" className="text-[1rem]" />
+                  {isEs ? 'LLAMAR (239) 404-8505' : 'CALL (239) 404-8505'}
+                </a>
               </div>
             </div>
           </div>
@@ -329,6 +392,20 @@ export default async function GoldServicesPage({ params }: Props) {
             </div>
           </div>
         </section>
+
+        {/* FAQ — same block the diamond page carries (FaqSection). */}
+        <FaqSection
+          isEs={isEs}
+          heading={isEs ? 'Preguntas Sobre Vender Oro' : 'Selling Gold FAQ'}
+          faqs={GOLD_FAQS}
+          footer={
+            isEs ? (
+              <>¿Vende más que oro? También compramos <Link href="/es/silver-services" className="font-semibold text-[#735c00] underline underline-offset-2">plata esterlina</Link>, <Link href="/es/diamond-buyers" className="font-semibold text-[#735c00] underline underline-offset-2">diamantes</Link> y <Link href="/es/estate-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">joyería de patrimonio</Link>.</>
+            ) : (
+              <>Selling more than gold? We also buy <Link href="/silver-services" className="font-semibold text-[#735c00] underline underline-offset-2">sterling silver</Link>, <Link href="/diamond-buyers" className="font-semibold text-[#735c00] underline underline-offset-2">diamonds</Link>, and <Link href="/estate-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">estate jewelry</Link>.</>
+            )
+          }
+        />
 
         {/* Trust CTA */}
         <section className="bg-[#2f3131] py-24 text-center">

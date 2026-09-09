@@ -8,25 +8,71 @@
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-08 (late) — the `/card` EN↔ES "flash" was the site-wide entrance
+🟡 **09-08 (night, latest) — Option C BUILT + STAGED: phone hours 9 AM–6 PM
+daily as ONE constant (`PHONE_HOURS`) rendered on `/card`, the homepage
+Visit Us block and `/spot-prices` and as `contactPoint` in the site
+schema; call buttons replace the duplicate/rates buttons in the gold and
+silver heroes; diamond / watch / appraisal descriptions trimmed to the
+phone-last ≤155 rule. GBP main hours stay the showroom's; the owner still
+pastes the description sentence (`TASKS.md`). Gate tsc 0 · lint 0 ·
+**1265/1265 (128 files)** · build exit 0. Awaiting push (no SQL, no env
+vars).**
+
+🟡 **09-08 (night, later) — gold + silver landers: FAQ schema + accordion
+(new `FaqSection`) + phone in the meta description — BUILT + dev-verified +
+STAGED, awaiting push (no SQL, no env vars).** Descriptions rewritten to
+149–155 chars so the phone survives Google's phone truncation. GBP plan
+items 1 + 4 verified read-only in the owner's Chrome (Gold dealer + Coin
+dealer secondaries present; gold/silver services present; Diamond buyer
+has none); items 2 (hours), reviews-that-name-the-metal, photos and the
+30-day caller question are the owner's. Gate tsc 0 · lint 0 · **1256/1256
+(128 files)** · build exit 0 (481 static pages). `TASKS.md` top;
+`CHANGELOG.md` 09-08 (night, FAQ).
+
+🔎 **09-08 (night) — "why are the calls about diamonds?" INVESTIGATED,
+then the plan item 3 above was built.** Organic search sends ~0 non-brand clicks for any
+material (3 months: diamond 0 / gold 0 / silver 1 click); the calls come
+from the Google Business Profile (71 interactions in August); the site
+publishes gold/silver numbers (`/spot-prices`, guides) so those sellers
+self-serve while a diamond seller can only call; gold/silver landers push
+the form, the diamond lander the phone, and only the diamond/watch/
+appraisal pages carry FAQ schema + the phone in the description.
+**Re-checked with live SERPs, the `.co` history, the leads table and
+GBP research (owner: "it must've been something we did recently" → the
+08-30 GBP rebuild): root cause is local-pack eligibility — we hold the
+"Jewelry buyer" packs (diamond / jewelry / silver-buyer queries) and are
+absent from the gold pack, which "Gold dealer"-primary coin shops own;
+silver has no pack and we are organic #2.** Refined, reordered PLAN at the
+top of `TASKS.md`: GBP owner actions first (verify Gold dealer + Coin
+dealer secondaries, real hours, reviews that name the metal, service
+copy + photos; ⛔ don't switch the primary, ⛔ no "gold" in the name), then
+FAQ-schema/phone parity on the gold + silver landers, CTA changes last.
+Detail: `CHANGELOG.md` 09-08 (night, research addendum + investigation).
+
+✅ **09-08 (late) — locale-switch fade fix + `/reviews` count removal
+DEPLOYED and production-verified** (0 `pending` stamps on three live
+switches in the owner's Chrome, fade intact on a real page change; count
+gone in both languages). **Staging equals source; nothing is in flight.**
+**GSC + IndexNow settled the same night:** `/reviews` → "Indexing
+requested"; `/es/reviews` was already indexed (no request); IndexNow 200
+for 212 URLs. **Nothing is owed.** The block below is the pre-deploy record.
+
+🟡 (superseded) **09-08 (late) — the `/card` EN↔ES "flash" was the site-wide entrance
 fade replaying on a remounted page, FIXED in `CustomerReveal` (a
 locale-only pathname change gets no reveal, sitewide) + `/reviews` intro
-and meta lose the review count — BUILT + dev-verified + STAGED, awaiting
-push (no SQL, no env vars).** Not a reload (marker survived everywhere);
-three timing traps documented in the file and in `DECISIONS.md` → *"A
-language switch is a text swap"*. Gate tsc 0 · lint 0 · **1252/1252 (126
-files)** · build exit 0 (481 static pages). After the push: phone check of
-the toggle, then the two GSC requests + IndexNow still owed. `TASKS.md`
-top; `CHANGELOG.md` 09-08 (late).
+and meta lose the review count — BUILT + dev-verified + STAGED.** Not a
+reload (marker survived everywhere); three timing traps documented in the
+file and in `DECISIONS.md` → *"A language switch is a text swap"*. Gate tsc
+0 · lint 0 · **1252/1252 (126 files)** · build exit 0 (481 static pages).
+`TASKS.md` top; `CHANGELOG.md` 09-08 (late).
 
 ✅ **09-08 (evening) — `/card` reviews button + `/reviews` page DEPLOYED
 and production-verified** (`/reviews` + `/es/reviews` 200 with 22 cards and
 no rating schema; `/card` carries the new pill + label; `/review` still
 302; sitemap 212 with both new URLs, 0 `/card`; About + footer links live;
-homepage band intact). Staging equals source; nothing in flight. **Owed:
-GSC indexing requests for `/reviews` + `/es/reviews` + IndexNow** (the only
-open item from this batch; `TASKS.md` top). The block below is the
-pre-deploy record.
+homepage band intact). Staging equals source; nothing in flight. GSC +
+IndexNow for the new URLs were settled later the same night (see the
+block above). The block below is the pre-deploy record.
 
 🟡 (superseded) **09-08 (evening) — `/card` "Read Our Reviews" button + "View Full
 Website & Shop" label, and a NEW `/reviews` page (EN + ES) — BUILT +
@@ -51,8 +97,10 @@ deleted, form detection disabled by the owner; the lead forms gained
 required Location + Preferred-contact fields (SQL applied, end-to-end tested,
 deployed, verified). **Evening: the `/card` reviews button + `/reviews`
 page DEPLOYED + production-verified; late: the toggle's entrance-fade
-"flash" FIXED + `/reviews` count removed, STAGED awaiting push (blocks
-above); GSC requests for the two new URLs owed.** Next
+"flash" FIXED + `/reviews` count removed, also DEPLOYED + verified (blocks
+above); GSC request for `/reviews` made, `/es/reviews` already indexed,
+IndexNow 200 ×212. Staging equals source; nothing in flight; nothing
+owed.** Next
 batch when the owner is ready: pg_cron overlap cleanup (GitHub `schedule:`
 block + five Netlify `.mts`) + an admin "last sweep ran N min ago" line —
 after the 09-08 11:15/11:45Z price pushes are seen on the minute. Proposal

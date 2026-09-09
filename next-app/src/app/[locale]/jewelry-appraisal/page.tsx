@@ -28,7 +28,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ? 'Tasación de Joyas Gratis en Naples, FL'
       : 'Free Jewelry Appraisal in Naples, FL',
     description: isEs
-      ? 'Tasaciones de joyas gratis en Naples, FL — una oferta real en efectivo, en el acto. Pruebas XRF y de ácido, coordinación con GIA, sin cita previa. Llame al (239) 404-8505.'
+      // ≤ ~155 characters with the phone last (2026-09-08, DECISIONS.md).
+      ? 'Tasaciones de joyas gratis en Naples, FL — oferta real en efectivo, en el acto. Pruebas XRF y de ácido, coordinación con GIA. Llame al (239) 404-8505.'
       : 'Free jewelry appraisals in Naples, FL — a real cash offer, on the spot. XRF and acid testing, GIA coordination, no appointment needed. Call (239) 404-8505.',
     path: '/jewelry-appraisal',
     locale,

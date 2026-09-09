@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo';
 import { jsonLdHtml } from '@/lib/json-ld';
-import { cityLine, mapsUrl, streetLine } from '@/lib/business-location';
+import { cityLine, mapsUrl, phoneHours, streetLine } from '@/lib/business-location';
 import { VISIT_ANCHOR_ID } from '@/lib/home-anchors';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -651,6 +651,25 @@ export default async function HomePage({ params }: Props) {
                 highlightToday
                 className="mt-8"
               />
+              {/* When the PHONE is answered — under "or by appointment", which
+                  already qualifies the whole table, so the reader gets showroom
+                  hours → appointments → phone hours. Deliberately NOT a row in
+                  the table: each row there is a day (owner, 2026-09-08, Option
+                  C; mockup approved). Same footnote size as the appointment
+                  line; the phone glyph marks it as a different fact. */}
+              {(() => {
+                const ph = phoneHours(isEs, 'long');
+                return (
+                  <p className="mt-2 flex items-center gap-2 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    <AppIcon name="call" className="text-[0.95rem]" style={{ color: 'var(--color-primary)' }} />
+                    <span>
+                      {ph.before}
+                      <b className="font-semibold" style={{ color: 'var(--color-on-surface)' }}>{ph.time}</b>
+                      {ph.after}
+                    </span>
+                  </p>
+                );
+              })()}
 
               {/* ⚠️ Every one of these must be TRUE and traceable to something
                   the site already says. "Free parking" is deliberately absent:

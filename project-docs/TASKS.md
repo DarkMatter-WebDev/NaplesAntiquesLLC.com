@@ -5,7 +5,137 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 STAGED 2026-09-08 (late) — language switch keeps its text, drops the entrance fade (`CustomerReveal`) + `/reviews` count removed — awaiting push (no SQL, no env vars)
+### 🟡 PLAN 2026-09-08 (night, refined after research) — bring gold + silver calls up to par with diamonds — item 3 BUILT + STAGED (awaiting push); items 1 + 4 verified; items 2, 3(reviews), 5 are the owner's
+
+**Status after the build pass (same night):**
+- ✅ **Item 1 verified read-only:** categories = Jewelry buyer (primary),
+  Coin dealer, **Gold dealer**, Diamond buyer, Jewelry store, Estate
+  liquidator, Jewelry appraiser. Nothing to add; primary left alone.
+- ◻ **Item 2 (hours) — owner decision:** GBP lists Mon–Fri 11–3, Sat 11–4.
+  Only extend if calls are genuinely answered outside those hours.
+- ◻ **Item 3 (reviews that name the metal) — owner:** suggested ask, at
+  the counter after a gold/silver purchase: "Would you leave us a quick
+  Google review? Mentioning what you sold — the gold chain, the flatware —
+  helps other sellers find us." Link = naplesestatejewelry.com/review (the
+  card's gold button does the same).
+- ✅ **Item 4 verified read-only:** services exist for gold and silver under
+  Jewelry buyer / Coin dealer / Gold dealer (Gold jewelry buying, Sterling
+  silver buying, Scrap gold buying, Dental gold buying, Gold coin & bullion
+  buying, Gold & silver coin buying, Bullion buying). **Diamond buyer has no
+  services** (fine). Service descriptions not opened (overlay freezes the
+  tab); ◻ owner may add buying photos (gold testing, flatware) — GBP-side.
+- 🟡 **Item 6 BUILT + STAGED:** FAQ schema + accordion + phone-in-description
+  on `/gold-services` and `/silver-services` — see `CHANGELOG.md` 2026-09-08
+  (night, FAQ). Rides with the next push. After the deploy: curl both pages
+  for `"@type":"FAQPage"` and the phone in `<meta name="description">`.
+- 🟡 **Item 7 (call CTA in heroes / spot-prices) + the phone-hours line —
+  BUILT + STAGED 2026-09-08 (night, latest)** on the owner's word ("change
+  9am-8pm to 9am-6pm and build them all as you recommend"): `PHONE_HOURS`
+  constant 09:00–18:00 in `business-location.ts`; the line on `/card`, the
+  homepage Visit Us block and `/spot-prices`; `contactPoint` in the site
+  schema; call buttons in the gold and silver heroes; footer left alone.
+  Detail: `CHANGELOG.md` 2026-09-08 (night, latest). Rides with the push.
+  **Option C, owner's half — ◻ paste into the GBP description:** "Calls and
+  appointments answered 9 AM to 6 PM, seven days a week." (no phone number
+  in that text). GBP main hours stay the showroom's.
+  After the deploy: `/card` shows the phone line; `/` HTML contains
+  `"contactPoint"`; `/gold-services` hero shows CALL (239) 404-8505.
+
+**Staging (Option C build):** ✅ synced 2026-09-08 (night, latest) — dry run listed exactly the 13 touched files (phone-hours.test.ts NEW; business-location.ts, layout.tsx, (home)/page.tsx, card, gold-services, silver-services, spot-prices pages + CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS), 0 Extras; real run copied 13 / 0 FAILED; follow-up dry run 0/0/0; leak check 0; SHA256 MATCH on business-location, card, home, layout, CHANGELOG. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+- 🟡 **Also STAGED the same night:** diamond / watch / appraisal meta
+  descriptions trimmed to ≤ 155 with the phone last (watch had NO phone);
+  all five landers now guarded (ends with phone, ≤ 160).
+
+**Staging (description trims):** ✅ synced 2026-09-08 (night, later) — dry run listed exactly the 8 touched files (diamond-buyers, watch-buyers, jewelry-appraisal pages, service-landers-faq.test.ts + CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS), 0 Extras; real run copied 8 / 0 FAILED; follow-up dry run 0/0/0; leak check 0; SHA256 MATCH on diamond, watch, CHANGELOG. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+- ◻ **Measure:** owner asks callers where they found us for 30 days.
+
+**Staging (item 3 build):** ✅ synced 2026-09-08 (night) — dry run listed exactly the 9 touched files (FaqSection.tsx NEW, service-landers-faq.test.ts NEW, gold-services/page.tsx, silver-services/page.tsx + CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS), 0 Extras; real run copied 9 / 0 FAILED; follow-up dry run 0/0/0; leak check 0; SHA256 MATCH on FaqSection, both pages, CHANGELOG. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+Original plan text follows.
+
+Owner: "just in the past few weeks I've noticed more diamond activity, so
+it must've been something we did relatively recently." Findings +
+evidence: `CHANGELOG.md` 2026-09-08 (night, investigation) and the
+research addendum right after it. **Root cause, high confidence: the
+Google Business Profile's local-pack eligibility.** The profile was
+rebuilt on 08-30 (7 categories incl. "Diamond buyer", 18 services,
+booking link); its interactions went Jul 3 → Aug 71. Live SERP checks
+(owner's Chrome, Naples): we ARE in the 3-pack for "sell diamond ring
+naples fl", "jewelry buyer naples fl", "sell jewelry naples fl" and
+"silver buyers naples fl" — every pack made of "Jewelry buyer" listings —
+and we are NOT in the pack for "sell gold naples fl" (Park Shore Coin, The
+Gold Center = "Gold dealer", Covenant), nor in its organic top 8. "sell
+sterling silver naples fl" shows NO pack; organically we are #2 (homepage)
+behind naplesjewelrybuyers.com. The website is not the diamond driver:
+organic search gave 0 diamond clicks in 3 months and the site's own leads
+are GOLD (3 real free-evaluation requests, all gold; 11 product-interest
+clicks, all gold items). Primary category is the #1 pack factor (Whitespark
+2026); there is NO "silver" GBP category at all; "Gold dealer" exists and
+is what wins gold packs.
+
+**Do first — GBP, owner-only, no code (the lever that actually moves calls):**
+1. ◻ **Verify the secondary categories** in Business Profile Manager: "Gold
+   dealer" and "Coin dealer" must be present (recorded 08-30 via their
+   services; confirm). ⛔ Do NOT switch the primary from "Jewelry buyer" to
+   "Gold dealer": that trades the diamond/jewelry/silver packs we now hold
+   (#3–4 behind Covenant 183 reviews / Naples Jewelry Buyers 39) for a gold
+   pack owned by 63–80-review gold dealers — likely a net loss. Revisit only
+   if gold is the business priority AND reviews have doubled.
+2. ◻ **Hours are a ranking factor now** ("open at time of search" = #5,
+   Whitespark 2026). Every pack showed us "Closed · Opens 11 AM" beside
+   competitors opening 9–10 AM. If the owner truly answers 9–11 and 3–5 by
+   phone/appointment, list those as hours (or add "by appointment" hours);
+   if not, leave it — never list hours nobody answers.
+3. ◻ **Reviews that say gold/silver.** We have 18 GBP reviews (competitors
+   39–183); the pack quotes review text matching the query ("Brought in a
+   few gold rings…" is how Covenant wins gold snippets). Of our 22 quoted
+   reviews only 3 mention gold, 4 silver, 0 diamond. Ask every gold/silver
+   seller for a review and ask them to say what they sold (the /review link
+   and the card's gold button already exist).
+4. ◻ **Services + photos:** confirm "Gold jewelry buying" and "Sterling
+   silver buying" service descriptions carry the words people search
+   (scrap gold, 14k, flatware, tea set); add gold-testing / flatware buying
+   photos. GBP posts stay the owner's call — the 08-30 post was REJECTED
+   and the owner said "do not post" (`CHANGELOG.md` 09-03 late).
+5. ⛔ Do not add "gold" to the business NAME on GBP (keywords-in-title is a
+   ranking factor but a policy violation that gets listings suspended).
+
+**Then — website parity (small code, no design change, no mockup):**
+6. ◻ FAQPage schema on `/gold-services` + `/silver-services` (the
+   diamond/watch/appraisal pages have it; silver already has FAQ copy),
+   and "Call (239) 404-8505" in both meta descriptions.
+
+**Optional — website CTA (visible → mockup first; weaker evidence):**
+7. ◻ A call button in the gold/silver heroes (today both buttons go to the
+   form) and a "call for today's offer" line on `/spot-prices`. Downgraded:
+   the web funnel already produces gold leads; the bottleneck is the pack.
+
+**Measure (30 days):** ◻ ask every caller where they found us (GBP hides
+low-volume search terms, so this is the only attribution); ◻ GBP
+Performance → Calls monthly; ◻ GSC: `/silver-services` (pos 9.1) and the
+near-page-1 gold queries ("gold buyers near me" 7.7, "sell gold near me"
+8.0) at the mid-September look. Price-transparency effect (`/spot-prices`
+lets gold/silver sellers self-serve) stays a plausible, unproven factor.
+
+**Staging (plan record):** ✅ synced 2026-09-08 (night) — dry run listed exactly the 3 touched docs (CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras; real run copied 3; follow-up dry run 0/0/0; leak check 0; CHANGELOG hash MATCH. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+**Staging (investigation record):** ✅ synced 2026-09-08 (night) — dry run listed exactly the 3 touched docs (CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras; real run copied 3; follow-up dry run 0/0/0; leak check 0; CHANGELOG hash MATCH. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### ✅ DEPLOYED 2026-09-08 (late) — locale-switch fade fix + `/reviews` count removal (production-verified)
+
+Owner: "pushed and deployed, verify it live, if all is good, update docs and
+end session." Verified (detail in `CHANGELOG.md` 2026-09-08 late): pages
+200, count gone in EN + ES, deployed chunk carries the exemption, and in
+the owner's Chrome on production three switches counted 0 `pending`
+stamps while a real page change still faded. Staging equals source;
+nothing in flight. **The GSC requests + IndexNow were then settled the
+same night (item below) — nothing left from today.**
+
+**Staging (deploy record):** ✅ synced 2026-09-08 (late, post-deploy) — dry run listed exactly the 3 flipped docs (CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras; real run copied 3; follow-up dry run 0/0/0; leak check 0; CHANGELOG hash MATCH. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+The block below is the pre-deploy record.
+
+### (pre-deploy record) 🟡 STAGED 2026-09-08 (late) — language switch keeps its text, drops the entrance fade (`CustomerReveal`) + `/reviews` count removed
 
 Owner: the EN↔ES toggle on `/card` "flash reload" is back → traced to the
 site-wide entrance fade replaying on the remounted page, not a reload;
@@ -34,13 +164,15 @@ Owner: "pushed and deployed, verify it live." Verified (detail in
 footer links live; homepage band intact. Staging equals source; nothing in
 flight.
 
-◻ **Owed — GSC:** request indexing for
-`https://naplesestatejewelry.com/reviews` and
-`https://naplesestatejewelry.com/es/reviews` (memory
-`gsc-url-inspection-method` — JS value-setter + dispatched Enter, then a
-coordinate click on REQUEST INDEXING; ⛔ never the "REQUEST AGAIN" focus
-trap), then `npm run indexnow` from `next-app/`. Two requests; do them when
-the owner says so.
+✅ **GSC + IndexNow SETTLED 2026-09-08 (owner: "do the google search
+console tasks and the indexnow run, chrome is open"):** `/reviews` was
+"Discovered – currently not indexed" → REQUEST INDEXING → **"Indexing
+requested"**; `/es/reviews` was **already "URL is on Google · Page is
+indexed"** → no request made (no quota spent). `npm run indexnow` → **200
+OK for 212 URLs**. Method: memory `gsc-url-inspection-method` (worked
+again, coordinate click at (1112, 260)). Nothing owed.
+
+**Staging (GSC record):** ✅ synced 2026-09-08 (night) — dry run listed exactly the 3 touched docs (CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras; real run copied 3; follow-up dry run 0/0/0; leak check 0; CHANGELOG hash MATCH. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
 **Staging (deploy record):** ✅ synced 2026-09-08 (evening, post-deploy) — dry run listed exactly the 3 flipped docs (CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras; real run copied 3; follow-up dry run 0/0/0; leak check 0; CHANGELOG hash MATCH. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 

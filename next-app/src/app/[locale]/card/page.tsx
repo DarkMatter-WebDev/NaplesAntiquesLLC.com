@@ -15,6 +15,7 @@ import {
   hoursRows,
   hoursSegmentsCompact,
   mapsUrl,
+  phoneHours,
 } from '@/lib/business-location';
 import { getStoreHours } from '@/lib/store-hours';
 
@@ -230,6 +231,27 @@ export default async function CardPage({ params }: Props) {
             ))}
             <span className="whitespace-nowrap">{byAppointmentLabel(isEs)}</span>
           </p>
+          {/* When the phone is answered — a different fact from the showroom
+              hours above (owner, 2026-09-08, "Option C": GBP hours stay the
+              showroom's; phone availability is said in words here and in the
+              GBP description). Same muted size as the hours line; the phone
+              glyph marks it as a different fact. Mockup approved. */}
+          {(() => {
+            const ph = phoneHours(isEs, 'compact');
+            return (
+              <p
+                className="mt-1.5 flex items-center justify-center gap-1.5 text-[0.78rem]"
+                style={{ color: 'var(--color-on-surface-variant)' }}
+              >
+                <AppIcon name="call" className="text-[0.85rem]" style={{ color: 'var(--color-primary)' }} />
+                <span>
+                  {ph.before}
+                  <b className="font-semibold" style={{ color: 'var(--color-on-surface)' }}>{ph.time}</b>
+                  {ph.after}
+                </span>
+              </p>
+            );
+          })()}
         </div>
 
         {/* The primary taps */}
