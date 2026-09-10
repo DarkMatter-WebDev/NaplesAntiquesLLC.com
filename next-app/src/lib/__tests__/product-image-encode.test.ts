@@ -6,7 +6,23 @@ import {
   PRODUCT_IMAGE_MAX_UPLOAD_BYTES,
   encodeProductImageToWebp,
   shrinkImageForAi,
+  toOwnedBuffer,
 } from '@/lib/product-image-encode';
+
+describe('toOwnedBuffer', () => {
+  it('moves SharedArrayBuffer-backed bytes (sharp on Netlify) onto a plain ArrayBuffer a Blob will accept', () => {
+    const shared = new SharedArrayBuffer(6);
+    const view = new Uint8Array(shared);
+    view.set([0x52, 0x49, 0x46, 0x46, 0x00, 0x01]);
+    const sharedBuffer = Buffer.from(shared);
+    expect(sharedBuffer.buffer).toBeInstanceOf(SharedArrayBuffer);
+
+    const owned = toOwnedBuffer(sharedBuffer);
+    expect(owned.buffer).not.toBeInstanceOf(SharedArrayBuffer);
+    expect([...owned]).toEqual([0x52, 0x49, 0x46, 0x46, 0x00, 0x01]);
+    expect(new Blob([owned]).size).toBe(6);
+  });
+});
 
 // Fixtures are generated in memory (a flat colour plus noise so the encoders
 // have something to work on) rather than committed as binaries.
@@ -25,6 +41,7 @@ describe('encodeProductImageToWebp', () => {
     const meta = await sharp(out.buffer).metadata();
 
     expect(meta.format).toBe('webp');
+    expect(out.buffer.buffer).not.toBeInstanceOf(SharedArrayBuffer);
     expect(out.width).toBe(PRODUCT_IMAGE_MAX_EDGE_PX);
     expect(out.height).toBe(1365);
     expect(out.sourceFormat).toBe('jpeg');

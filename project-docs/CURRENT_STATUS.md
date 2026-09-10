@@ -8,6 +8,17 @@
 
 **Read this, then `TASKS.md`.**
 
+🔴 **09-09 (night) — the two batches below were PUSHED AND DEPLOYED, and the
+new photo upload route 502'd on every photo in production
+(`SharedArrayBuffer is not allowed` — sharp's output on Netlify is
+SAB-backed, supabase-js's Blob rejects it; local Node does not reproduce
+it). HOTFIX BUILT + STAGED (`toOwnedBuffer()` copy before upload), **needs a
+re-push**; until then photo uploads in the admin FAIL (the assistant
+rebuild is live and unaffected). No objects were written. Gate tsc 0 ·
+lint 0 · 1275/1275 (130 files) · build exit 0. Verify on production only:
+one phone photo → `[product-images] stored` + a new `.webp` in the bucket.
+`CHANGELOG.md` 2026-09-09 (night).**
+
 🟡 **09-09 (later) — product photos are now encoded to WebP on the SERVER
 (`/api/admin/product-images`, sharp) because WebKit — every iPhone browser —
 cannot encode WebP in a canvas; the assistant's image payload is shrunk to

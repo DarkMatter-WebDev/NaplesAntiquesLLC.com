@@ -1,6 +1,38 @@
 
 # Changelog
 
+## 2026-09-09 (night) — HOTFIX: the deployed WebP upload route 502'd on every photo ("SharedArrayBuffer is not allowed") — owned-buffer copy before Storage upload (BUILT + STAGED, needs a re-push)
+
+Owner, after deploying the two batches below: photos picked on the iPhone
+showed "uploading" for a few moments, then nothing was added. (The greyed
+check mark in the picker is iOS waiting for iCloud originals — unrelated;
+the photos did reach the server.)
+
+**Evidence:** the bucket had **0 new objects** after the attempt; a direct
+POST to the production route from the owner's signed-in Chrome (two
+canvas-made JPEGs, 614 KB and 558 KB) returned **502
+`{"error":"Upload failed: ArrayBuffer: SharedArrayBuffer is not allowed."}`**
+in 2.6 s and 9.2 s — sharp had encoded, the Storage upload threw. On
+Netlify's Node runtime sharp's `toBuffer()` output is backed by a
+**SharedArrayBuffer** (libvips worker threads); undici's `Blob`/`fetch`,
+which supabase-js's `storage.upload` builds on, rejects SAB-backed views.
+Local Node 24 hands back a plain buffer, which is why the dev test passed.
+TypeScript confirms the shape: `Buffer<SharedArrayBuffer>` is not a
+`BlobPart`.
+
+**Fix:** `toOwnedBuffer()` in `product-image-encode.ts` — `Buffer.alloc` (never
+the shared pool) + copy — applied to every encode result, and the result
+type is now `Buffer<ArrayBuffer>`. Test: a `Buffer.from(new
+SharedArrayBuffer(6))` comes back on a plain ArrayBuffer with the same bytes
+and is accepted by `new Blob`; the encode test also asserts the output is
+not SAB-backed. Nothing to clean up — no object was ever written.
+
+**Gate:** tsc 0 · lint 0 · **1275/1275 (130 files)** · build exit 0
+(86 routes = 40 EN + 40 ES + 6). ⚠️ The verification this needs is on
+PRODUCTION only (the failure does not reproduce locally): after the re-push,
+one phone photo → `[product-images] stored` in the Netlify log and a new
+`.webp` object in the bucket.
+
 ## 2026-09-09 (later) — product photos are encoded to WebP on the SERVER (sharp); the assistant's image payload is shrunk (BUILT + dev-verified + STAGED, rides with the batch above; no SQL, no env vars)
 
 Owner: "what can we do to get it to actually encode photos as webp? so far

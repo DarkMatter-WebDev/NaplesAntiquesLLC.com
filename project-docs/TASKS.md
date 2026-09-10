@@ -5,10 +5,24 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 2026-09-09 — Smart Listing Assistant rebuilt (fill-the-form, 50 s timeout) — BUILT + dev-verified + STAGED, awaiting push
+### 🔴 2026-09-09 (night) — RE-PUSH NEEDED: photo-upload hotfix (production 502 "SharedArrayBuffer is not allowed") — BUILT + STAGED
 
-No SQL, no env vars. What changed and why: `CHANGELOG.md` 2026-09-09. Push
-when ready, then:
+The assistant rebuild + server-side WebP were deployed; the upload route
+failed on every photo in production (sharp's Netlify output is SAB-backed;
+supabase-js refuses it; does not reproduce locally). Fix =
+`toOwnedBuffer()` in `lib/product-image-encode.ts`. No objects were written.
+- ◻ Copy to the repo folder and push (staging is synced).
+- ◻ **Verify on production** (the only place it can be verified): upload one
+  photo from the iPhone → it appears in the editor; Netlify log shows
+  `[product-images] stored` with `sourceFormat: 'jpeg'`; the bucket gains a
+  `.webp` object. If it still fails, the flash message names the cause —
+  read it before retrying.
+
+**Staging (hotfix):** ✅ synced 2026-09-09 (night) — dry run listed exactly the 5 touched files (product-image-encode.ts, product-image-encode.test.ts + CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras, 1074 total; real run copied 5 / 0 FAILED; leak check 0 `.env*`; SHA256 MATCH on the encode lib, its test, CHANGELOG. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### ✅ DEPLOYED 2026-09-09 — Smart Listing Assistant rebuilt (fill-the-form, 50 s timeout) + server-side WebP uploads (upload part broken on production until the hotfix above is pushed)
+
+No SQL, no env vars. What changed and why: `CHANGELOG.md` 2026-09-09. Then:
 - ◻ **Verify live:** list one real item from the phone. Expect the form to
   fill in ~12–18 s with at most a few note lines and an **Undo AI Fill**
   button; correct by clearing a field + typing the fact + **Update

@@ -29,8 +29,25 @@ export const PRODUCT_IMAGE_MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 export const AI_IMAGE_MAX_EDGE_PX = 1600;
 const AI_IMAGE_SMALL_ENOUGH_BYTES = 600_000;
 
+/**
+ * Copy bytes into a Buffer that owns a plain ArrayBuffer.
+ *
+ * ⛔ On Netlify's Node runtime sharp returns output on a SharedArrayBuffer
+ * (libvips worker threads). `Blob`/`fetch` — and therefore supabase-js's
+ * `storage.upload` — reject those with "SharedArrayBuffer is not allowed", and
+ * the first production upload after 2026-09-09's deploy 502'd on every photo.
+ * Local Node returns a normal buffer, so the dev test could not see it.
+ * `Buffer.alloc` never uses the shared pool, so the copy is always safe.
+ */
+export function toOwnedBuffer(input: Buffer | Uint8Array): Buffer<ArrayBuffer> {
+  const owned = Buffer.alloc(input.byteLength);
+  owned.set(input);
+  return owned;
+}
+
 export type EncodedWebp = {
-  buffer: Buffer;
+  /** Always on a plain ArrayBuffer — see `toOwnedBuffer`. */
+  buffer: Buffer<ArrayBuffer>;
   width: number;
   height: number;
   bytes: number;
@@ -50,11 +67,11 @@ export async function encodeProductImageToWebp(
   const quality = options.quality ?? PRODUCT_IMAGE_WEBP_QUALITY;
 
   const sourceMetadata = await sharp(input).metadata();
-  const buffer = await sharp(input)
+  const buffer = toOwnedBuffer(await sharp(input)
     .rotate()
     .resize(maxEdge, maxEdge, { fit: 'inside', withoutEnlargement: true })
     .webp({ quality })
-    .toBuffer();
+    .toBuffer());
   const outputMetadata = await sharp(buffer).metadata();
 
   return {
