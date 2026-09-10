@@ -4,19 +4,50 @@
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
 > in `DECISIONS.md`. Last reconciled: **2026-09-08**.
 
-## Start Here (handoff, end of the 2026-09-08 session — SUPERSEDES the blocks below)
+## Start Here (handoff, 2026-09-09 — SUPERSEDES the blocks below)
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-08 (late night) — storefront photo (`StorefrontPhoto`, one
-component, no caption) on the homepage Visit Us block, the contact panel,
-the `/sell/naples` band and `/card`; the homepage Visit Us block is now a
-CENTRED column with the photo and the square map side by side beneath it
-(owner's V2; reverses the 08-23 two-column layout on purpose) — BUILT +
-dev-verified + STAGED, awaiting push (no SQL, no env vars).** Gate tsc 0 ·
-lint 0 · **1271/1271 (129 files)** · build exit 0 (481 pages). After the
-push: `/` shows the pair, `/card` the thumbnail. `TASKS.md` top;
-`CHANGELOG.md` 09-08 (late night).
+🟡 **09-09 (later) — product photos are now encoded to WebP on the SERVER
+(`/api/admin/product-images`, sharp) because WebKit — every iPhone browser —
+cannot encode WebP in a canvas; the assistant's image payload is shrunk to
+1600px WebP before base64. BUILT + dev-verified (460 KB JPEG → 109 KB
+`image/webp` 2048×1365 in 1.9 s; object metadata `max-age=31536000`) +
+STAGED, rides with the assistant batch. Batch conversion of existing
+PNG/JPEG objects deliberately NOT done (buyers already get WebP/AVIF from
+the Image CDN — no UX gain, real risk; parked in `TASKS.md`).** Gate tsc 0 ·
+lint 0 · **1274/1274 (130 files)** · build exit 0. Detail: `CHANGELOG.md`
+2026-09-09 (later).
+
+🟡 **09-09 — Smart Listing Assistant: "AI generation failed" was OUR OWN
+30 s abort (4 production failures at 31–32 s, `This operation was aborted`;
+Netlify's synchronous cap is 60 s, not 26) → the assistant was rebuilt to
+FILL THE FORM on the owner's word: no Accept/Keep review cards, no chat
+thread, no read-aloud/auto-read, no photo banner; `{fields, notes}` (≤5
+short lines), three rules (filled field = correct · fill every empty field ·
+an explicit statement wins), one Undo; abort 50 s with a readable message;
+rate limit counts successes only (30/hr). BUILT + dev-verified in the
+owner's Chrome (11.8 s / 453 tokens and 12.9 s / 493 tokens, rules 1–3 and
+Undo all observed, nothing saved) + STAGED, awaiting push (no SQL, no env
+vars).** Gate tsc 0 · lint 0 · **1270/1270 (129 files)** · build exit 0
+(86 routes = 40 EN + 40 ES + 6). After the push: list one real item on the
+phone and read the Netlify log line (`noteCount`, `elapsedMs`). Open,
+owner's timing: phone uploads are 0.7–2 MB JPEGs (WebKit cannot encode
+WebP) — `TASKS.md`. Detail: `CHANGELOG.md` 2026-09-09; rules in
+`DECISIONS.md` → *"The Smart Listing Assistant fills the form"*.
+
+✅ **09-08 (late night, session end) — storefront photo (`StorefrontPhoto`,
+one component, no caption) on the homepage Visit Us block, the contact
+panel, the `/sell/naples` band and `/card`, with the homepage Visit Us
+block re-laid out as a CENTRED column + photo/square-map pair (owner's V2)
+— DEPLOYED and production-verified.** **Staging equals source; nothing is
+in flight.** Everything left is owner-only or a dated look-back — the
+consolidated list (GBP description paste, reviews naming the metal,
+photos, 30-day caller question; GSC validations ~09-20, Breadcrumbs report
+mid-Sept, Bing ~09-10, GBP Calls + silver lander mid-Sept; optional
+re-request/IndexNow for the changed landers) is the top item in
+`TASKS.md`. Gate at close: tsc 0 · lint 0 · **1271/1271 (129 files)** ·
+build exit 0 (481 pages).
 
 ✅ **09-08 (night) — the gold/silver visibility bundle is DEPLOYED and
 production-verified** (FAQ schema on gold + silver; all five buy-side

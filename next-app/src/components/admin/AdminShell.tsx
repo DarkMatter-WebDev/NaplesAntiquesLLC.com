@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation';
 import { startRouteProgress } from '@/components/layout/RouteProgressBar';
 import { createClient } from '@/lib/supabase/client';
 import { copyTextToClipboard } from '@/lib/clipboard';
-import { encodeCanvasForUpload, extensionForImageType } from '@/lib/image-encode';
+import { encodeCanvasForUpload } from '@/lib/image-encode';
 import {
   PRODUCT_METAL_VARIANTS,
   PRODUCT_METAL_TYPES,
@@ -71,11 +71,9 @@ import {
 } from '@/lib/admin-settings';
 import { PRODUCT_IMAGES_BUCKET, uniqueProductImageStoragePaths } from '@/lib/product-image-storage';
 import {
-  PRODUCT_AUTOFILL_FIELD_LABELS,
+  PRODUCT_AUTOFILL_FIELD_KEYS,
   type ProductAutofillDraft,
   type ProductAutofillFields,
-  type ProductAutofillProposedChange,
-  type ProductAutofillReviewReason,
 } from '@/lib/ai-product-schema';
 import { getSnapshotPrice } from '@/lib/sales';
 import { toAdminProductSummary } from '@/lib/admin-product-summary';
@@ -543,226 +541,34 @@ const QUICK_FILL_FORM_ORDER: QuickFillField[] = [
   'publicNotesEs',
 ];
 
-function formatAiFieldValue(key: string, value: unknown): string {
-  if (key === 'show_spot_price') return value ? 'Shown' : 'Hidden (item flagged not solid/priced by weight)';
-  if (value == null || value === '') return 'Blank';
-  return String(value);
-}
-
-type AiConversationMessage = {
-  role: 'user' | 'assistant';
-  content: string;
-  questions?: string[];
-};
-
-function getAiSpeechText(message: AiConversationMessage): string {
-  return [
-    message.content,
-    ...(message.questions ?? []).map((question) => `Question: ${question}`),
-  ].filter(Boolean).join(' ');
-}
-
-function AiConversationThread({
-  messages,
-  speechState,
-  onReadAloud,
-  onStopReading,
-}: {
-  messages: AiConversationMessage[];
-  speechState: { index: number; status: 'loading' | 'playing' } | null;
-  onReadAloud: (index: number, text: string) => void;
-  onStopReading: () => void;
-}) {
-  if (messages.length === 0) return null;
-
-  return (
-    <div className="grid gap-2" aria-label="AI listing conversation">
-      {messages.map((message, index) => {
-        const isAssistant = message.role === 'assistant';
-        return (
-          <div
-            key={`${message.role}-${index}`}
-            className={`max-w-[92%] rounded-lg border px-3 py-2 text-xs leading-relaxed ${isAssistant ? 'justify-self-start' : 'justify-self-end'}`}
-            style={{
-              borderColor: isAssistant ? '#d9d2ff' : '#d8c68c',
-              background: isAssistant ? '#f7f5ff' : '#fffaf0',
-              color: 'var(--color-on-surface)',
-            }}
-          >
-            <strong
-              className="mb-1 block text-[0.65rem] uppercase tracking-wide"
-              style={{ color: isAssistant ? '#6554c0' : 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
-            >
-              {isAssistant ? 'AI assistant' : 'You'}
-            </strong>
-            <p className="whitespace-pre-wrap">{message.content}</p>
-            {isAssistant && message.questions && message.questions.length > 0 && (
-              <div className="mt-2 border-t pt-2" style={{ borderColor: '#ded8fa' }}>
-                <strong className="block mb-1">A few details would help:</strong>
-                <ul className="list-disc space-y-1 pl-4">
-                  {message.questions.map((question) => <li key={question}>{question}</li>)}
-                </ul>
-              </div>
-            )}
-            {isAssistant && (
-              <div className="mt-2 flex flex-wrap items-center gap-2 border-t pt-2" style={{ borderColor: '#ded8fa' }}>
-                <button
-                  type="button"
-                  className="outline-button text-[0.65rem]"
-                  onClick={() => {
-                    if (speechState?.index === index) onStopReading();
-                    else onReadAloud(index, getAiSpeechText(message));
-                  }}
-                >
-                  <AppIcon name={speechState?.index === index && speechState.status === 'playing' ? 'stop_circle' : 'volume_up'} className="text-sm" aria-hidden="true" />
-                  {speechState?.index === index
-                    ? speechState.status === 'loading' ? 'Preparing voice...' : 'Stop'
-                    : 'Read aloud'}
-                </button>
-                <span className="text-[0.65rem]" style={{ color: 'var(--color-on-surface-variant)' }}>
-                  AI-generated voice
-                </span>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-const AI_REVIEW_REASON_LABELS: Record<ProductAutofillReviewReason, string> = {
-  'changes-existing-value': 'Would replace existing information',
-  'sensitive-field': 'Sensitive fact',
-  'low-confidence': 'Low confidence',
-  'medium-confidence': 'Medium confidence',
-  'missing-confidence': 'Confidence not supplied',
-};
-
-function AiDraftReview({
-  draft,
+// The assistant's short "not filled / unsure" lines, plus the one Undo. There is
+// no accept/keep review step any more — the fields go straight into the form and
+// the admin clears anything wrong, then re-runs with the correction (2026-09-09).
+function AiNotes({
+  notes,
   canUndo,
   onUndo,
-  onAcceptChange,
-  onKeepChange,
-  onAcceptAll,
-  onKeepAll,
 }: {
-  draft: ProductAutofillDraft;
+  notes: string[];
   canUndo: boolean;
   onUndo: () => void;
-  onAcceptChange: (field: keyof ProductAutofillFields) => void;
-  onKeepChange: (field: keyof ProductAutofillFields) => void;
-  onAcceptAll: () => void;
-  onKeepAll: () => void;
 }) {
-  const autoAppliedFields = draft.review?.auto_apply_fields ?? [];
-  const pendingChanges = draft.review?.pending_changes ?? [];
+  if (notes.length === 0 && !canUndo) return null;
 
   return (
-    <div className="grid gap-3 border p-3" style={{ borderColor: 'var(--color-outline-variant)', background: 'rgba(255,255,255,0.62)' }}>
-      <strong className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-        AI Draft Review
-      </strong>
-
-      {autoAppliedFields.length > 0 && (
-        <div className="grid gap-2">
-          <strong className="text-xs" style={{ color: '#166534' }}>Applied automatically</strong>
-          <p className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-            Only high-confidence descriptive information added to previously blank fields is applied automatically.
-          </p>
-          <div className="grid md:grid-cols-2 gap-2">
-            {autoAppliedFields.map((key) => {
-              const value = draft.fields[key];
-              return (
-            <div
-              key={key}
-              className="p-2 border text-xs"
-              style={{ borderColor: 'var(--color-outline-variant)', background: 'var(--color-surface-container-lowest)' }}
-            >
-              <span className="block font-bold uppercase tracking-wide mb-1" style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}>
-                    {PRODUCT_AUTOFILL_FIELD_LABELS[key]}
-              </span>
-              <span style={{ color: 'var(--color-on-surface)' }}>{formatAiFieldValue(key, value)}</span>
-                  {draft.confidence?.[key] && (
-                <span className="block mt-1" style={{ color: 'var(--color-on-surface-variant)' }}>
-                      Confidence: {draft.confidence[key]}
-                </span>
-              )}
-            </div>
-              );
-            })}
-          </div>
-        </div>
+    <div
+      className="grid gap-2 border p-3 text-xs leading-relaxed"
+      style={{ borderColor: 'var(--color-outline-variant)', background: 'rgba(255,255,255,0.62)', color: 'var(--color-on-surface)' }}
+    >
+      {notes.length > 0 && (
+        <ul className="grid list-disc gap-1 pl-4" aria-label="Assistant notes">
+          {notes.map((note) => <li key={note}>{note}</li>)}
+        </ul>
       )}
-
-      {pendingChanges.length > 0 && (
-        <div className="grid gap-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <strong className="block text-xs" style={{ color: '#8a6400' }}>Confirm proposed changes</strong>
-              <span className="text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                These values have not been applied to the form.
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" className="outline-button text-[0.65rem]" onClick={onKeepAll}>Keep all existing</button>
-              <button type="button" className="gold-button text-[0.65rem]" onClick={onAcceptAll}>Accept all proposed</button>
-            </div>
-          </div>
-
-          {pendingChanges.map((change: ProductAutofillProposedChange) => (
-            <div
-              key={change.field}
-              data-testid={`ai-proposed-change-${change.field}`}
-              className="grid gap-2 rounded-lg border p-3 text-xs"
-              style={{ borderColor: '#e7c98a', background: '#fffaf0' }}
-            >
-              <div>
-                <strong className="block uppercase tracking-wide" style={{ color: '#8a6400', fontFamily: 'var(--font-label)' }}>
-                  {PRODUCT_AUTOFILL_FIELD_LABELS[change.field]}
-                </strong>
-                <p className="mt-1">{change.question}</p>
-              </div>
-              <div className="grid gap-1 sm:grid-cols-2">
-                <span><strong>Current:</strong> {formatAiFieldValue(change.field, change.current_value)}</span>
-                <span><strong>Proposed:</strong> {formatAiFieldValue(change.field, change.proposed_value)}</span>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {change.reasons.map((reason) => (
-                  <span
-                    key={reason}
-                    className="rounded-full border px-2 py-0.5 text-[0.65rem]"
-                    style={{ borderColor: '#d8c68c', color: '#735c12', background: '#fffdf6' }}
-                  >
-                    {AI_REVIEW_REASON_LABELS[reason]}
-                  </span>
-                ))}
-              </div>
-              <div className="flex flex-wrap justify-end gap-2">
-                <button type="button" className="outline-button text-[0.65rem]" onClick={() => onKeepChange(change.field)}>
-                  {change.current_value == null || change.current_value === '' ? 'Keep blank' : 'Keep existing'}
-                </button>
-                <button type="button" className="gold-button text-[0.65rem]" onClick={() => onAcceptChange(change.field)}>
-                  Accept proposed
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {(draft.warnings.length > 0 || draft.uncertainties.length > 0) && (
-        <div className="text-xs leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
-          {draft.warnings.length > 0 && <p><strong>Needs review:</strong> {draft.warnings.join(' ')}</p>}
-          {draft.uncertainties.length > 0 && <p><strong>Could not verify:</strong> {draft.uncertainties.join(' ')}</p>}
-        </div>
-      )}
-
       {canUndo && (
         <div className="flex justify-end">
           <button type="button" onClick={onUndo} className="outline-button text-xs">
-            Undo Last AI Update
+            Undo AI Fill
           </button>
         </div>
       )}
@@ -1603,17 +1409,13 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [showQuickFillPrompt, setShowQuickFillPrompt] = useState(false);
   const [aiTranscript, setAiTranscript] = useState('');
   const [aiInterimText, setAiInterimText] = useState('');
-  const [aiConversation, setAiConversation] = useState<AiConversationMessage[]>([]);
-  const [aiDraft, setAiDraft] = useState<ProductAutofillDraft | null>(null);
+  // What the admin typed/spoke on earlier passes for this item (oldest first).
+  const [aiPriorInputs, setAiPriorInputs] = useState<string[]>([]);
+  const [aiNotes, setAiNotes] = useState<string[]>([]);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiRecording, setAiRecording] = useState(false);
   const aiRecordingRef = useRef(false);
   const aiRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
-  const [aiSpeechState, setAiSpeechState] = useState<{ index: number; status: 'loading' | 'playing' } | null>(null);
-  const [aiAutoRead, setAiAutoRead] = useState(false);
-  const aiAudioRef = useRef<HTMLAudioElement | null>(null);
-  const aiAudioUrlRef = useRef<string | null>(null);
-  const aiSpeechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [aiNotice, setAiNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const [aiUndoSnapshot, setAiUndoSnapshot] = useState<{
     editing: ReturnType<typeof emptyProduct>;
@@ -1627,18 +1429,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   const [translatingSpanish, setTranslatingSpanish] = useState(false);
   const [spanishTranslationNotice, setSpanishTranslationNotice] = useState<{ text: string; ok: boolean } | null>(null);
   const spanishTranslationRequestRef = useRef(0);
-
-  useEffect(() => {
-    const preferenceTimer = window.setTimeout(() => {
-      setAiAutoRead(window.localStorage.getItem('admin-ai-auto-read') === 'true');
-    }, 0);
-    return () => {
-      window.clearTimeout(preferenceTimer);
-      aiAudioRef.current?.pause();
-      if (aiAudioUrlRef.current) URL.revokeObjectURL(aiAudioUrlRef.current);
-      window.speechSynthesis?.cancel();
-    };
-  }, []);
 
   function resetSpanishTranslation() {
     spanishTranslationRequestRef.current += 1;
@@ -2006,11 +1796,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     // Reset the Smart Listing Assistant so the next item starts completely fresh
     // (transcript, generated draft, notices, undo snapshot, and any active recording).
     stopAiRecording();
-    stopAiSpeech();
     setAiTranscript('');
     setAiInterimText('');
-    setAiConversation([]);
-    setAiDraft(null);
+    setAiPriorInputs([]);
+    setAiNotes([]);
     setAiUndoSnapshot(null);
     setAiNotice(null);
     setAiGenerating(false);
@@ -2058,11 +1847,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   function openEdit(p: Product) {
     resetSpanishTranslation();
     stopAiRecording();
-    stopAiSpeech();
     setAiTranscript('');
     setAiInterimText('');
-    setAiConversation([]);
-    setAiDraft(null);
+    setAiPriorInputs([]);
+    setAiNotes([]);
     setAiUndoSnapshot(null);
     setAiNotice(null);
     setAiGenerating(false);
@@ -2646,82 +2434,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     aiRecognitionRef.current?.stop();
   }
 
-  function stopAiSpeech() {
-    aiAudioRef.current?.pause();
-    aiAudioRef.current = null;
-    if (aiAudioUrlRef.current) {
-      URL.revokeObjectURL(aiAudioUrlRef.current);
-      aiAudioUrlRef.current = null;
-    }
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-    aiSpeechUtteranceRef.current = null;
-    setAiSpeechState(null);
-  }
-
-  function startDeviceVoice(index: number, text: string) {
-    if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
-      throw new Error('No read-aloud voice is available in this browser.');
-    }
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.95;
-    utterance.pitch = 1;
-    utterance.onend = () => {
-      aiSpeechUtteranceRef.current = null;
-      setAiSpeechState(null);
-    };
-    utterance.onerror = () => {
-      aiSpeechUtteranceRef.current = null;
-      setAiSpeechState(null);
-    };
-    aiSpeechUtteranceRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
-    setAiSpeechState({ index, status: 'playing' });
-  }
-
-  async function readAiMessage(index: number, text: string) {
-    stopAiSpeech();
-    setAiSpeechState({ index, status: 'loading' });
-    try {
-      const response = await fetch('/api/admin/ai-speech', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error ?? 'AI voice is unavailable.');
-      }
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      aiAudioUrlRef.current = audioUrl;
-      aiAudioRef.current = audio;
-      audio.onended = stopAiSpeech;
-      audio.onerror = () => {
-        stopAiSpeech();
-        showAiNotice('The generated voice could not be played.', false);
-      };
-      await audio.play();
-      setAiSpeechState({ index, status: 'playing' });
-    } catch (error) {
-      stopAiSpeech();
-      try {
-        startDeviceVoice(index, text);
-        showAiNotice('Using this device’s built-in voice because the AI voice was unavailable.');
-      } catch {
-        showAiNotice(error instanceof Error ? error.message : 'Read aloud is unavailable.', false);
-      }
-    }
-  }
-
-  function setAiAutoReadPreference(enabled: boolean) {
-    setAiAutoRead(enabled);
-    window.localStorage.setItem('admin-ai-auto-read', String(enabled));
-    if (!enabled) stopAiSpeech();
-  }
-
   async function generateAiDraft() {
     if (!editing) return;
     const latestUserInput = [aiTranscript, aiInterimText].filter(Boolean).join(' ').trim();
@@ -2729,14 +2441,12 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       showAiNotice('Add at least one photo to generate a listing.', false);
       return;
     }
-    if (aiConversation.length > 0 && !latestUserInput) {
-      showAiNotice('Add your answer or feedback before asking the assistant to update the listing.', false);
-      return;
-    }
 
-    stopAiSpeech();
     setAiGenerating(true);
     try {
+      // The form as it stands is the baseline: filled fields are kept, empty ones
+      // filled, and an explicit statement in the note wins (the three rules in
+      // ITERATIVE_LISTING_CONTRACT). Only the admin's own earlier inputs travel.
       const response = await fetch('/api/admin/ai-product-fill', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -2744,61 +2454,23 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
           transcript: latestUserInput,
           images: editing.images ?? [],
           mode: 'fast',
-          iteration: aiConversation.length > 0 ? 'refine' : 'initial',
           currentFields: getCurrentAiListingFields(editing, jewelryTypeInput, chainTypeInput, lengthInput),
-          conversation: aiConversation.map((message) => ({
-            role: message.role,
-            content: [
-              message.content,
-              message.questions?.length
-                ? `Questions asked:\n${message.questions.map((question) => `- ${question}`).join('\n')}`
-                : '',
-            ].filter(Boolean).join('\n\n'),
-          })),
+          priorInputs: aiPriorInputs,
         }),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(data?.error ?? 'AI listing generation failed.');
       const draft = data.draft as ProductAutofillDraft;
-      const autoApplyFields = draft.review?.auto_apply_fields ?? [];
-      const pendingChangeCount = draft.review?.pending_changes.length ?? 0;
-      const assistantMessage = draft.assistant_message
-        || (draft.follow_up_questions.length > 0
-          ? 'I updated the listing with the details I could support. I still need a few details from you.'
-          : 'I updated the listing with the details supported by the photos and your input.');
-      const assistantConversationMessage: AiConversationMessage = {
-        role: 'assistant',
-        content: assistantMessage,
-        questions: draft.follow_up_questions,
-      };
 
-      setAiDraft(draft);
-      if (autoApplyFields.length > 0) {
-        setAiUndoSnapshot({
-          editing: { ...editing },
-          jewelryTypeInput,
-          chainTypeInput,
-          lengthInput,
-        });
-        applyAiDraftToForm(draft, autoApplyFields);
-      } else if (pendingChangeCount > 0) {
-        setAiUndoSnapshot(null);
-        showAiNotice(`${pendingChangeCount} proposed ${pendingChangeCount === 1 ? 'change needs' : 'changes need'} your confirmation.`);
-      } else {
-        setAiUndoSnapshot(null);
-        showAiNotice('The assistant preserved the current form and returned its review.');
-      }
-      setAiConversation((current) => [
-        ...current,
-        {
-          role: 'user',
-          content: latestUserInput || 'Review the photos and create the most complete supported listing.',
-        },
-        assistantConversationMessage,
-      ]);
-      if (aiAutoRead) {
-        void readAiMessage(aiConversation.length + 1, getAiSpeechText(assistantConversationMessage));
-      }
+      setAiUndoSnapshot({
+        editing: { ...editing },
+        jewelryTypeInput,
+        chainTypeInput,
+        lengthInput,
+      });
+      applyAiDraftToForm(draft.fields, [...PRODUCT_AUTOFILL_FIELD_KEYS]);
+      setAiNotes(draft.notes ?? []);
+      if (latestUserInput) setAiPriorInputs((current) => [...current, latestUserInput]);
       setAiTranscript('');
       setAiInterimText('');
     } catch (error) {
@@ -2809,11 +2481,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   }
 
   function applyAiDraftToForm(
-    draft: ProductAutofillDraft,
+    fields: ProductAutofillFields,
     fieldsToApply: (keyof ProductAutofillFields)[],
   ) {
     if (!editing) return;
-    const fields = draft.fields;
     const selectedFields = new Set(fieldsToApply);
     const nextEditing = { ...editing };
     let nextJewelryType = jewelryTypeInput;
@@ -2891,7 +2562,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     });
 
     if (applied.length === 0) {
-      showAiNotice('No proposed values were available to apply.', false);
+      showAiNotice('The assistant returned nothing new for the form.', false);
       return;
     }
 
@@ -2899,55 +2570,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setJewelryTypeInput(nextJewelryType);
     setChainTypeInput(productSupportsLinkType(nextJewelryType) ? nextChainType : '');
     setLengthInput(productUsesLength(nextJewelryType) || productUsesSize(nextJewelryType) || productUsesHeight(nextJewelryType) ? nextLength : '');
-    showAiNotice(`Applied AI fields: ${applied.join(', ')}.`);
-  }
-
-  function updatePendingAiChanges(
-    fields: (keyof ProductAutofillFields)[],
-    accept: boolean,
-  ) {
-    if (!aiDraft?.review || fields.length === 0) return;
-    const pendingFields = new Set(fields);
-    const matchingChanges = aiDraft.review.pending_changes.filter((change) => pendingFields.has(change.field));
-    if (matchingChanges.length === 0) return;
-
-    if (accept) {
-      if (!aiUndoSnapshot && editing) {
-        setAiUndoSnapshot({
-          editing: { ...editing },
-          jewelryTypeInput,
-          chainTypeInput,
-          lengthInput,
-        });
-      }
-      applyAiDraftToForm(aiDraft, matchingChanges.map((change) => change.field));
-    } else {
-      showAiNotice(`Kept the existing ${matchingChanges.length === 1 ? 'value' : 'values'}.`);
-    }
-
-    setAiDraft((current) => current?.review ? {
-      ...current,
-      review: {
-        ...current.review,
-        pending_changes: current.review.pending_changes.filter((change) => !pendingFields.has(change.field)),
-      },
-    } : current);
-  }
-
-  function acceptAiChange(field: keyof ProductAutofillFields) {
-    updatePendingAiChanges([field], true);
-  }
-
-  function keepAiChange(field: keyof ProductAutofillFields) {
-    updatePendingAiChanges([field], false);
-  }
-
-  function acceptAllAiChanges() {
-    updatePendingAiChanges(aiDraft?.review?.pending_changes.map((change) => change.field) ?? [], true);
-  }
-
-  function keepAllAiChanges() {
-    updatePendingAiChanges(aiDraft?.review?.pending_changes.map((change) => change.field) ?? [], false);
+    showAiNotice(`Filled: ${applied.join(', ')}.`);
   }
 
   function undoAiFill() {
@@ -2958,9 +2581,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setChainTypeInput(aiUndoSnapshot.chainTypeInput);
     setLengthInput(aiUndoSnapshot.lengthInput);
     setAiUndoSnapshot(null);
-    setAiDraft(null);
-    setAiConversation((current) => current.slice(0, -2));
-    showAiNotice('Last AI update undone.');
+    setAiNotes([]);
+    setAiPriorInputs((current) => current.slice(0, -1));
+    showAiNotice('Last AI fill undone.');
   }
 
   function closeModal() {
@@ -2975,12 +2598,11 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
     setCropTarget(null);
     setQuickFillNotice(null);
     stopAiRecording();
-    stopAiSpeech();
     setAiTranscript('');
     setAiInterimText('');
-    setAiConversation([]);
+    setAiPriorInputs([]);
+    setAiNotes([]);
     setAiNotice(null);
-    setAiDraft(null);
     setAiUndoSnapshot(null);
   }
 
@@ -3054,26 +2676,30 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
   }
 
   const uploadImageBlob = useCallback(async (blob: Blob): Promise<string | null> => {
-    // ⛔ The extension and contentType come from the BLOB, never from what the
-    // encoder was asked to produce. Hardcoding `.webp` here is what put 46
-    // PNG files into the bucket under WebP names — see `lib/image-encode.ts`.
-    const contentType = blob.type || 'image/png';
-    const extension = extensionForImageType(contentType);
-    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
-    const path = `products/${filename}`;
-
-    const { error } = await supabase.storage
-      .from(PRODUCT_IMAGES_BUCKET)
-      .upload(path, blob, { contentType, cacheControl: '31536000', upsert: false });
-
-    if (error) {
-      flash(`Upload failed: ${error.message}`, false);
+    // Since 2026-09-09 every photo is encoded to WebP on the SERVER (sharp, in
+    // /api/admin/product-images): WebKit — every iPhone browser — cannot encode
+    // WebP in a canvas, so the browser only downsizes and hands over a
+    // high-quality intermediate (JPEG on iPhone, WebP on desktop Chrome). The
+    // stored object is WebP as a fact, not as a request — the old client path
+    // once put 46 PNGs into the bucket under `.webp` names.
+    let response: Response;
+    try {
+      response = await fetch('/api/admin/product-images', {
+        method: 'POST',
+        headers: { 'content-type': blob.type || 'application/octet-stream' },
+        body: blob,
+      });
+    } catch {
+      flash('Upload failed: the connection dropped before the photo reached the server.', false);
       return null;
     }
-
-    const { data } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path);
-    return data.publicUrl;
-  }, [supabase]);
+    const data = await response.json().catch(() => null) as { url?: string; error?: string } | null;
+    if (!response.ok || !data?.url) {
+      flash(`Upload failed: ${data?.error ?? response.statusText ?? 'unknown error'}`, false);
+      return null;
+    }
+    return data.url;
+  }, []);
 
   const deleteImagePaths = useCallback(async (paths: string[]) => {
     if (paths.length === 0) return true;
@@ -3138,15 +2764,9 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
       canvas.height = Math.round(bitmap.height * scale);
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-      const encoded = await encodeCanvasForUpload(canvas, 0.85);
-      if (!encoded.isPreferred) {
-        // Say so rather than silently shipping a heavier format. A PNG here is
-        // 1-3 MB against 20-60 KB for WebP, and it used to be invisible.
-        flash(
-          `This browser could not save WebP, so the photo was stored as ${encoded.extension.toUpperCase()} (larger file). Uploading from Chrome or Edge keeps photos small.`,
-          false,
-        );
-      }
+      // This is only the INTERMEDIATE the server re-encodes to WebP, so it is
+      // kept high quality; the browser's format no longer matters.
+      const encoded = await encodeCanvasForUpload(canvas, 0.92);
       return uploadImageBlob(encoded.blob);
     }
 
@@ -5558,7 +5178,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                     <div>
                       <h3 className="product-editor-section-title">Smart listing assistant</h3>
                       <p className={`product-editor-section-copy${openEditorSections.ai ? '' : ' hidden'}`}>
-                        Build the listing together. The assistant fills safe details, asks you to confirm uncertain changes, and accepts follow-up input until you are satisfied.
+                        Fills the form from the photos and your notes. Clear anything wrong, add the correction below, and run it again.
                       </p>
                     </div>
                   </div>
@@ -5579,35 +5199,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   >
                     Add at least one photo above to generate a listing.
                   </div>
-                ) : aiConversation.length === 0 && !aiTranscript.trim() ? (
-                  <div
-                    className="px-4 py-3 text-sm"
-                    style={{
-                      border: '1px solid #e7c98a',
-                      background: '#fffaf0',
-                      color: '#8a6d1a',
-                      borderRadius: '8px',
-                    }}
-                  >
-                    Photo-only results may be less accurate. Please review all fields carefully before saving.
-                  </div>
                 ) : null}
-
-                <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--color-on-surface-variant)' }}>
-                  <input
-                    type="checkbox"
-                    checked={aiAutoRead}
-                    onChange={(event) => setAiAutoReadPreference(event.target.checked)}
-                  />
-                  Automatically read AI responses aloud
-                </label>
-
-                <AiConversationThread
-                  messages={aiConversation}
-                  speechState={aiSpeechState}
-                  onReadAloud={(index, text) => { void readAiMessage(index, text); }}
-                  onStopReading={stopAiSpeech}
-                />
 
                 <button
                   type="button"
@@ -5615,13 +5207,13 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   className={aiRecording ? 'ai-talk-button ai-talk-button-recording' : 'ai-talk-button'}
                 >
                   <AppIcon name={aiRecording ? 'stop_circle' : 'mic'}  aria-hidden="true" />
-                  {aiRecording ? 'Listening... tap to stop' : aiConversation.length > 0 ? 'Tap to speak your next reply' : "Let's begin - tap here to talk"}
+                  {aiRecording ? 'Listening... tap to stop' : aiUndoSnapshot ? 'Tap to speak a correction' : "Let's begin - tap here to talk"}
                 </button>
 
                 <textarea
                   className="form-field w-full text-sm min-h-[96px]"
-                  placeholder={aiConversation.length > 0
-                    ? 'Answer the questions or request changes: the hallmark is 14K, shorten the title, add that the clasp has light wear...'
+                  placeholder={aiUndoSnapshot
+                    ? 'Corrections or new details: the weight is 4.2 grams, it is 18K not 14K, shorten the title...'
                     : 'Describe the item: marked 14K, 25.3 grams, Omega watch, light wear, box clasp, 7.5 inch bracelet...'}
                   value={[aiTranscript, aiInterimText].filter(Boolean).join(' ')}
                   onChange={(event) => { setAiTranscript(event.target.value); setAiInterimText(''); }}
@@ -5630,10 +5222,10 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 <button
                   type="button"
                   onClick={generateAiDraft}
-                  disabled={aiGenerating || editing.images.length === 0 || (aiConversation.length > 0 && ![aiTranscript, aiInterimText].some((value) => value.trim()))}
+                  disabled={aiGenerating || editing.images.length === 0}
                   className="gold-button text-xs disabled:opacity-50 w-full justify-center"
                 >
-                  {aiGenerating ? 'Updating Listing...' : aiConversation.length > 0 ? 'Send Feedback & Update Listing' : 'Generate Listing'}
+                  {aiGenerating ? 'Filling the form...' : aiUndoSnapshot ? 'Update Listing' : 'Generate Listing'}
                 </button>
 
                 {aiNotice && (
@@ -5651,17 +5243,7 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                   </div>
                 )}
 
-                {aiDraft && (
-                  <AiDraftReview
-                    draft={aiDraft}
-                    canUndo={Boolean(aiUndoSnapshot)}
-                    onUndo={undoAiFill}
-                    onAcceptChange={acceptAiChange}
-                    onKeepChange={keepAiChange}
-                    onAcceptAll={acceptAllAiChanges}
-                    onKeepAll={keepAllAiChanges}
-                  />
-                )}
+                <AiNotes notes={aiNotes} canUndo={Boolean(aiUndoSnapshot)} onUndo={undoAiFill} />
               </div>
 
               {/* Quick Fill — removed from UI. Flip SHOW_QUICK_FILL to restore. */}
@@ -5754,124 +5336,6 @@ export default function AdminShell({ initialProducts, userEmail, spotData, local
                 </p>
               </div>
               )}
-
-              {/* AI Listing Assistant */}
-              <div
-                className="hidden"
-                style={{
-                  background: '#fff1f7',
-                  borderColor: '#f5c5d6',
-                }}
-              >
-                {aiRecording && (
-                  <div className="ai-recording-pop" role="status">
-                    <span className="ai-recording-orb">
-                      <AppIcon name="mic"  aria-hidden="true" />
-                    </span>
-                    <span className="ai-recording-bars" aria-hidden="true">
-                      <span></span><span></span><span></span><span></span>
-                    </span>
-                    Recording
-                  </div>
-                )}
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div>
-                      <h3 className="product-editor-section-title">Smart listing assistant</h3>
-                      <p className={`product-editor-section-copy${openEditorSections.ai ? '' : ' hidden'}`}>
-                        Build the listing together. The assistant fills safe details, asks you to confirm uncertain changes, and accepts follow-up input until you are satisfied.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {editing.images.length === 0 ? (
-                  <div
-                    className="px-4 py-3 text-sm"
-                    style={{
-                      border: '1px solid #f4b7aa',
-                      background: '#fff8f5',
-                      color: '#b42318',
-                      borderRadius: '8px',
-                    }}
-                  >
-                    Add at least one photo above to generate a listing.
-                  </div>
-                ) : aiConversation.length === 0 && !aiTranscript.trim() ? (
-                  <div
-                    className="px-4 py-3 text-sm"
-                    style={{
-                      border: '1px solid #e7c98a',
-                      background: '#fffaf0',
-                      color: '#8a6d1a',
-                      borderRadius: '8px',
-                    }}
-                  >
-                    Photo-only results may be less accurate. Please review all fields carefully before saving.
-                  </div>
-                ) : null}
-
-                <AiConversationThread
-                  messages={aiConversation}
-                  speechState={aiSpeechState}
-                  onReadAloud={(index, text) => { void readAiMessage(index, text); }}
-                  onStopReading={stopAiSpeech}
-                />
-
-                <button
-                  type="button"
-                  onClick={() => { if (aiRecording) { stopAiRecording(); } else { setShowMicPrompt(true); } }}
-                  className={aiRecording ? 'ai-talk-button ai-talk-button-recording' : 'ai-talk-button'}
-                >
-                  <AppIcon name={aiRecording ? 'stop_circle' : 'mic'}  aria-hidden="true" />
-                  {aiRecording ? 'Listening... tap to stop' : aiConversation.length > 0 ? 'Tap to speak your next reply' : "Let's begin - tap here to talk"}
-                </button>
-
-                <textarea
-                  className="form-field w-full text-sm min-h-[96px]"
-                  placeholder={aiConversation.length > 0
-                    ? 'Answer the questions or request changes: the hallmark is 14K, shorten the title, add that the clasp has light wear...'
-                    : 'Describe the item: marked 14K, 25.3 grams, Omega watch, light wear, box clasp, 7.5 inch bracelet...'}
-                  value={[aiTranscript, aiInterimText].filter(Boolean).join(' ')}
-                  onChange={(event) => { setAiTranscript(event.target.value); setAiInterimText(''); }}
-                />
-
-                <button
-                  type="button"
-                  onClick={generateAiDraft}
-                  disabled={aiGenerating || editing.images.length === 0 || (aiConversation.length > 0 && ![aiTranscript, aiInterimText].some((value) => value.trim()))}
-                  className="gold-button text-xs disabled:opacity-50 w-full justify-center"
-                >
-                  {aiGenerating ? 'Updating Listing...' : aiConversation.length > 0 ? 'Send Feedback & Update Listing' : 'Generate Listing'}
-                </button>
-
-                {aiNotice && (
-                  <div
-                    className="px-3 py-2 text-xs font-medium"
-                    role="status"
-                    style={{
-                      background: aiNotice.ok ? 'color-mix(in srgb, #166534 10%, transparent)' : 'color-mix(in srgb, var(--color-error) 10%, transparent)',
-                      border: `1px solid ${aiNotice.ok ? 'color-mix(in srgb, #166534 30%, transparent)' : 'color-mix(in srgb, var(--color-error) 28%, transparent)'}`,
-                      color: aiNotice.ok ? '#166534' : 'var(--color-error)',
-                      fontFamily: 'var(--font-label)',
-                    }}
-                  >
-                    {aiNotice.text}
-                  </div>
-                )}
-
-                {aiDraft && (
-                  <AiDraftReview
-                    draft={aiDraft}
-                    canUndo={Boolean(aiUndoSnapshot)}
-                    onUndo={undoAiFill}
-                    onAcceptChange={acceptAiChange}
-                    onKeepChange={keepAiChange}
-                    onAcceptAll={acceptAllAiChanges}
-                    onKeepAll={keepAllAiChanges}
-                  />
-                )}
-              </div>
 
               {/* Listing details — modern card matching the panels above */}
               <div className="product-editor-panel product-editor-fields-panel" data-collapsed={openEditorSections.details ? 'false' : 'true'}>

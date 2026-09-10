@@ -1,24 +1,21 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import {
-  generateProductDraft,
-  type AiListingConversationMessage,
-} from '@/lib/ai-product-provider';
+import { generateProductDraft } from '@/lib/ai-product-provider';
 import { fetchStoredSystemPrompt } from '@/lib/ai-settings-store';
 import {
-  EMPTY_PRODUCT_AUTOFILL_FIELDS,
   PRODUCT_AUTOFILL_SCHEMA,
   coerceProductAutofill,
-  reviewProductAutofillDraft,
 } from '@/lib/ai-product-schema';
 
 const MAX_TRANSCRIPT_LENGTH = 8000;
-const MAX_CONVERSATION_TURNS = 12;
-const MAX_CONVERSATION_MESSAGE_LENGTH = 1800;
-const MAX_CONVERSATION_LENGTH = 12000;
+const MAX_PRIOR_INPUTS = 8;
+const MAX_PRIOR_INPUT_LENGTH = 1800;
+const MAX_PRIOR_INPUTS_TOTAL_LENGTH = 8000;
 const DEFAULT_MAX_IMAGES = 2;
-const HOURLY_LIMIT = Number(process.env.AI_RATE_LIMIT_HOURLY ?? 15);
-const DAILY_LIMIT = Number(process.env.AI_RATE_LIMIT_DAILY ?? 60);
+// Successful generations only — a failed or timed-out attempt must not eat a
+// slot, or retrying a broken run locks the admin out for an hour (2026-09-09).
+const HOURLY_LIMIT = Number(process.env.AI_RATE_LIMIT_HOURLY ?? 30);
+const DAILY_LIMIT = Number(process.env.AI_RATE_LIMIT_DAILY ?? 100);
 
 type UsageRecord = { timestamps: number[] };
 const usageByUser = new Map<string, UsageRecord>();
@@ -28,19 +25,20 @@ function pruneUsage(record: UsageRecord, now: number) {
   record.timestamps = record.timestamps.filter((timestamp) => timestamp > dayAgo);
 }
 
-function checkRateLimit(userId: string) {
+function isRateLimited(userId: string) {
   const now = Date.now();
   const record = usageByUser.get(userId) ?? { timestamps: [] };
   pruneUsage(record, now);
+  usageByUser.set(userId, record);
   const hourAgo = now - 60 * 60 * 1000;
   const hourlyCount = record.timestamps.filter((timestamp) => timestamp > hourAgo).length;
-  if (hourlyCount >= HOURLY_LIMIT || record.timestamps.length >= DAILY_LIMIT) {
-    usageByUser.set(userId, record);
-    return false;
-  }
-  record.timestamps.push(now);
+  return hourlyCount >= HOURLY_LIMIT || record.timestamps.length >= DAILY_LIMIT;
+}
+
+function recordUsage(userId: string) {
+  const record = usageByUser.get(userId) ?? { timestamps: [] };
+  record.timestamps.push(Date.now());
   usageByUser.set(userId, record);
-  return true;
 }
 
 function isAllowedImageSource(value: string) {
@@ -54,25 +52,19 @@ function isAllowedImageSource(value: string) {
   }
 }
 
-function sanitizeConversation(value: unknown): AiListingConversationMessage[] {
+/** The admin's earlier inputs for this item, oldest first; newest kept when over budget. */
+function sanitizePriorInputs(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
 
-  const messages = value
-    .slice(-MAX_CONVERSATION_TURNS)
-    .map((item): AiListingConversationMessage | null => {
-      if (!item || typeof item !== 'object') return null;
-      const role = (item as { role?: unknown }).role;
-      const rawContent = (item as { content?: unknown }).content;
-      if ((role !== 'user' && role !== 'assistant') || typeof rawContent !== 'string') return null;
-      const content = rawContent.replace(/\u0000/g, '').trim().slice(0, MAX_CONVERSATION_MESSAGE_LENGTH);
-      return content ? { role, content } : null;
-    })
-    .filter((item): item is AiListingConversationMessage => item !== null);
+  const inputs = value
+    .slice(-MAX_PRIOR_INPUTS)
+    .map((item) => (typeof item === 'string' ? item.replace(/\u0000/g, '').trim().slice(0, MAX_PRIOR_INPUT_LENGTH) : ''))
+    .filter(Boolean);
 
-  while (messages.reduce((total, item) => total + item.content.length, 0) > MAX_CONVERSATION_LENGTH) {
-    messages.shift();
+  while (inputs.reduce((total, item) => total + item.length, 0) > MAX_PRIOR_INPUTS_TOTAL_LENGTH) {
+    inputs.shift();
   }
-  return messages;
+  return inputs;
 }
 
 export async function POST(req: Request) {
@@ -88,7 +80,7 @@ export async function POST(req: Request) {
     .single();
 
   if (!profile?.is_admin) return NextResponse.json({ error: 'Admin access required.' }, { status: 403 });
-  if (!checkRateLimit(user.id)) {
+  if (isRateLimited(user.id)) {
     console.warn('[ai-product-fill] rate_limited', { userId: user.id });
     return NextResponse.json({ error: 'AI listing limit reached. Please try again later.' }, { status: 429 });
   }
@@ -110,8 +102,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Add at least one photo to generate a listing.' }, { status: 400 });
   }
   const mode = body?.mode === 'accurate' || body?.mode === 'premium' || body?.mode === 'fast' ? body.mode : undefined;
-  const iteration = body?.iteration === 'refine' ? 'refine' : 'initial';
-  const conversation = sanitizeConversation(body?.conversation);
+  const priorInputs = sanitizePriorInputs(body?.priorInputs);
   const currentFields = body?.currentFields && typeof body.currentFields === 'object' && !Array.isArray(body.currentFields)
     ? coerceProductAutofill({ fields: body.currentFields }).fields
     : undefined;
@@ -127,15 +118,12 @@ export async function POST(req: Request) {
       origin: new URL(req.url).origin,
       schema: PRODUCT_AUTOFILL_SCHEMA,
       mode,
-      iteration,
-      conversation,
+      priorInputs,
       currentFields,
       systemPrompt: storedSystemPrompt ?? undefined,
     });
-    const draft = reviewProductAutofillDraft(
-      coerceProductAutofill(result.draft),
-      currentFields ?? EMPTY_PRODUCT_AUTOFILL_FIELDS,
-    );
+    const draft = coerceProductAutofill(result.draft);
+    recordUsage(user.id);
     const populatedFields = Object.entries(draft.fields)
       .filter(([, value]) => value !== null && value !== '')
       .map(([key]) => key);
@@ -149,12 +137,9 @@ export async function POST(req: Request) {
       provider: result.meta.provider,
       model: result.meta.model,
       promptSource: storedSystemPrompt ? 'saved' : 'built-in',
-      iteration,
-      conversationTurns: conversation.length,
+      priorInputCount: priorInputs.length,
       populatedFields,
-      followUpQuestionCount: draft.follow_up_questions.length,
-      autoAppliedFieldCount: draft.review?.auto_apply_fields.length ?? 0,
-      pendingChangeCount: draft.review?.pending_changes.length ?? 0,
+      noteCount: draft.notes.length,
       rawTopLevelKeys,
       rawHadNestedFields,
       elapsedMs: Date.now() - startedAt,

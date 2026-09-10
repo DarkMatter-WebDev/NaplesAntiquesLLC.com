@@ -1,7 +1,172 @@
 
 # Changelog
 
-## 2026-09-08 (late night) — storefront photo on four "come see us" surfaces + homepage Visit Us re-laid out as a centred column with photo/map pair (STAGED, awaiting push)
+## 2026-09-09 (later) — product photos are encoded to WebP on the SERVER (sharp); the assistant's image payload is shrunk (BUILT + dev-verified + STAGED, rides with the batch above; no SQL, no env vars)
+
+Owner: "what can we do to get it to actually encode photos as webp? so far
+safari fails and now chrome" → "build option 1 … do the batch conversion too
+if it'll improve user experience."
+
+**Why the browser could never do it:** WebKit — Safari and Chrome on iPhone
+alike, Chrome being Safari underneath — has never implemented
+`canvas.toBlob('image/webp')`. `image-encode.ts` asked for WebP, checked
+honestly, and got JPEG: today's 42 phone uploads are 0.7–2 MB `.jpg` at
+2048px. Options weighed: (1) server-side sharp — already a dependency running
+on Netlify for the Etsy/Instagram pipelines, no CSP change; (2) a WebAssembly
+encoder in the browser — needs `'wasm-unsafe-eval'` in both CSPs, ~150 KB
+download, 1–3 s per photo on a phone, Turbopack/wasm rough edges; (3) just
+lower the JPEG quality. Built (1).
+
+**Built:**
+- `src/lib/product-image-encode.ts` — `encodeProductImageToWebp()` (sharp:
+  auto-orient, resize inside 2048, WebP q80; throws on non-image bytes) and
+  `shrinkImageForAi()` (leave ≤1600px/≤600 KB alone, else WebP at 1600 —
+  Anthropic downsamples past ~1568px anyway). Constants: max upload 5 MB
+  (Netlify's synchronous body cap is 6 MB).
+- `src/app/api/admin/product-images/route.ts` — POST raw image body → admin
+  auth → 413 over 5 MB → encode → service-role upload to
+  `products/<ts>-<rand>.webp` with `cacheControl: '31536000'` → `{ url, path,
+  bytes, width, height, sourceFormat }`; logs `[product-images] stored`.
+- `AdminShell.tsx` — `uploadImageBlob` posts the blob to the route instead of
+  writing Storage from the browser; the intermediate is encoded at q0.92
+  (WebP on desktop Chrome, JPEG on iPhone — it no longer matters); the "this
+  browser could not save WebP" flash is gone. Crop uses the same path.
+- `ai-product-provider.ts` — `prepareImages` runs `shrinkImageForAi` before
+  base64 (a 2 MB JPEG → ~150 KB WebP), falling back to the original bytes if
+  sharp cannot read them.
+- Tests: `product-image-encode.test.ts` (JPEG 3000×2000 → WebP 2048×1365
+  never upscaled, PNG stays 640×480, non-image rejected, upload cap under
+  6 MB, AI shrink leaves small alone / shrinks large).
+
+**Dev-verified in the owner's Chrome on `localhost:3007/admin`:** a
+canvas-made 460 KB JPEG posted to the route → 200 in **1.9 s** round trip
+(server 1.58 s), stored `products/1788999961574-ekovbu8343.webp` = 109 KB,
+2048×1365, `image/webp`; Storage object metadata read back
+`cacheControl: max-age=31536000`, `mimetype: image/webp`; test object deleted
+afterwards (0 orphans left).
+
+**Batch conversion of the existing 46 PNGs + 42 JPEGs: deliberately NOT
+done.** Shoppers already receive WebP/AVIF for every `next/image` through the
+Netlify Image CDN (`formats: ['image/avif','image/webp']`), so converting
+stored originals changes nothing a buyer sees. It would only save Storage
+space and the assistant payload — the latter now handled by
+`shrinkImageForAi` — while rewriting every product's `images`/`image_urls`,
+minting new URLs (cache keys, GC, marketplace/social references). Risk with
+no UX gain; parked in `TASKS.md` as optional if Storage cost ever matters.
+
+**Gate:** tsc 0 · lint 0 · **1274/1274 (130 files)** · build exit 0
+(86 routes = 40 EN + 40 ES + 6).
+
+## 2026-09-09 — Smart Listing Assistant: "AI generation failed" diagnosed (our own 30 s abort) and the assistant rebuilt to FILL THE FORM — no review layer, short notes, 50 s timeout (BUILT + dev-verified + STAGED, awaiting push; no SQL, no env vars)
+
+Owner: listing new items today, "the first item I listed went up fine, but
+then … most of the time it said AI generation failed", on iPhone Chrome and
+desktop alike; shortening the description seemed to help, then stopped
+helping; both API accounts funded.
+
+**Diagnosis (production evidence, Netlify function log, EDT):** 1:19:25 PM
+success at `elapsedMs: 30028`; 1:25:06 / 1:25:41 / 1:31:32 / 1:33:30 PM
+failures at 31–32 s, every one `message: 'This operation was aborted'` —
+Node's `AbortController` text, i.e. **our own `withTimeout(AI_TIMEOUT_MS ??
+30000)` in `ai-product-provider.ts` cancelling the Anthropic call.** Netlify
+had no `AI_TIMEOUT_MS` set. The function was still alive and logging at
+32.4 s, so the "26 s Netlify ceiling" theory was wrong: current Netlify docs
+put **synchronous functions at 60 s** (scheduled 30 s, background 15 min,
+none configurable). Reproduced from the workstation with the owner's real
+photos: 18.1 s photo-only (849 output tokens, 52 tok/s), 21.5 s with a
+444-char transcript (993 tokens) — the transcript adds ~3 s, not the cause.
+Production runs were slower (1097 tokens ≈ 39 tok/s ≈ 28–30 s) so they
+landed on either side of 30 s at random. The output had grown with the
+v15–v18 "confirmation" layer: every field + a confidence per field + a
+~700-char assistant message + follow-up questions (16 on the one success)
++ warnings + uncertainties. Secondary: failed attempts counted against the
+15/hour rate limit; today's phone uploads are 0.7–2 MB JPEGs (iOS Chrome
+cannot encode WebP — the truthful `.jpg` fallback ran).
+
+**Owner decision:** "get rid of the whole accept-edits buttons … and the
+huge long explanations; it should simply fill out the form for me, maybe
+give me a short note on anything it was not able to fill or not certain
+on … I'll clear any field that's not correct and re-input"; explicit
+statement overrides a filled field (yes); strip the auto-read checkbox and
+the photo-only banner — "only what's necessary".
+
+**Built:**
+- `ai-product-schema.ts` — contract is now `{ fields, notes }`
+  (`MAX_PRODUCT_AUTOFILL_NOTES = 5`). Deleted: `reviewProductAutofillDraft`,
+  `SENSITIVE_REVIEW_FIELDS`, the confidence/review/proposed-change types,
+  `addRequiredFollowUpQuestions`, `cleanAssistantMessage`, `cleanConfidence`.
+  Added `buildMissingPricingNote()` (the one deterministic note: purity/weight
+  on spot mode, a price on manual) and `cleanNotes` (Markdown stripped); legacy
+  `warnings`/`uncertainties` from older or custom saved prompts and any seller
+  claim stripped from buyer copy fold into `notes`.
+- `ai-product-provider.ts` — `PROMPT_VERSION` `product-listing-fill-v19`;
+  tool schema `fields` + `notes`; `ITERATIVE_LISTING_CONTRACT` rewritten as
+  the three FILL-THE-FORM rules (filled field = correct, fill every empty
+  field, an explicit statement wins over a filled field) + the notes shape
+  (≤4 lines, never a summary of what was filled); `priorInputs: string[]`
+  replaces the role-tagged conversation (only the admin's words travel);
+  `DEFAULT_TIMEOUT_MS` 30 000 → **50 000** (exported) and the abort now throws
+  `aiTimeoutMessage()` ("took longer than 50 seconds…") instead of the raw
+  abort text.
+- `api/admin/ai-product-fill/route.ts` — no review call; `priorInputs`
+  sanitizer (8 × 1800 chars, 8000 total); rate limit **counts successes
+  only** (`recordUsage` after coerce), defaults 15/60 → **30/hr · 100/day**;
+  log carries `priorInputCount` + `noteCount`.
+- `AdminShell.tsx` — deleted `AiDraftReview` (Accept proposed / Keep
+  existing / Accept all / Keep all, confidence + reason chips),
+  `AiConversationThread`, the hidden legacy duplicate panel, the auto-read
+  checkbox + `localStorage` preference, read-aloud (`readAiMessage`,
+  `startDeviceVoice`, `stopAiSpeech`, audio refs), the photo-only banner, the
+  accept/keep handlers. Added `AiNotes` (the ≤5 lines + **Undo AI Fill**).
+  `generateAiDraft` snapshots, applies EVERY field via
+  `applyAiDraftToForm(fields, PRODUCT_AUTOFILL_FIELD_KEYS)`, stores the notes,
+  appends the admin's input to `aiPriorInputs`. Panel = blurb, mic, textarea,
+  **Generate Listing** → **Update Listing** after the first run, notice
+  ("Filled: …"), notes + Undo. Update no longer requires typed input (a
+  cleared field alone is a valid correction). `/api/admin/ai-speech` is now
+  uncalled (left in place).
+- Tests: `ai-product-schema.test.ts` rewritten — guardrails, the three rules
+  (and the absence of confidence/follow-up/assistant_message), the fill turn
+  with `priorInputs`, the timeout window (40–55 s) + message, notes order /
+  legacy folding / cap, the missing-pricing note, width/length coercion.
+
+**Dev-verified in the owner's Chrome on `localhost:3007/admin`, product
+#135 (13 photos), NOT saved (DB `updated_at` unchanged afterwards):**
+run 1 (no note, fully filled listing) → **11.8 s, 453 output tokens**, 0
+notes, every field returned unchanged (rule 1), button flips to Update
+Listing + Undo AI Fill; run 2 (weight cleared, note "the weight is 3.46
+grams and it is 18K not 14K") → **12.9 s, 493 tokens** (prompt cache hit
+5224), weight re-filled 3.46 (rule 2), purity 14 → 18 and the title /
+description / public notes re-worded to 18K (rule 3), everything else
+preserved; Undo restored purity 14 and the cleared weight and flipped the
+button back. The one note the model wrote was a "what I changed" summary —
+the contract now forbids that explicitly (added after the run).
+
+**Gate:** tsc 0 · lint 0 · **1270/1270 (129 files)** · build exit 0
+(prerender manifest 86 routes = 40 EN + 40 ES + 6). Docs: this entry,
+`DECISIONS.md` (new *"The assistant fills the form"* entry; the 26 s rule
+corrected), `ARCHITECTURE.md`, `features/shop-listings.md`,
+`CURRENT_STATUS.md`, `TASKS.md`. After the push: list one real item on the
+phone; expect ~12–18 s and no "aborted"; the Netlify log line should read
+`noteCount` / `priorInputCount`.
+
+## 2026-09-08 (late night) — storefront photo + centred Visit Us DEPLOYED and production-verified; session closed
+
+Owner: "pushed and deployed, verify it live and then update docs and end
+session." Verified over HTTP minutes later: `/`, `/es`, `/card`,
+`/contact`, `/sell/naples`, `/es/sell/naples` → **200**, each carrying the
+`showroom-storefront.webp` references and the alt text (EN/ES);
+`/sell/fort-myers` → 200 with **0** references (no showroom, no photo);
+`/` and `/es` have exactly one `#visit-us` and two square tiles
+(`aspect-ratio:1 / 1` — the photo and the map); the asset itself → 200
+`image/webp` 359,840 B and the Next/Netlify optimized rendition (w=640)
+→ 200 `image/webp`; smoke `/shop`, `/reviews`, `/sitemap.xml` → 200,
+`/review` → 302. Docs flipped; staging re-synced. **Nothing is in flight.
+Owner-only items and the Search Console / Bing look-back dates are
+consolidated at the top of `TASKS.md`.** The block below is the pre-deploy
+record.
+
+## 2026-09-08 (late night) — storefront photo on four "come see us" surfaces + homepage Visit Us re-laid out as a centred column with photo/map pair (pre-deploy record)
 
 Owner: "add this storefront pic somewhere in the 'come see us today' areas
 … to help guide customers to the right unit"; then, from three mockups:

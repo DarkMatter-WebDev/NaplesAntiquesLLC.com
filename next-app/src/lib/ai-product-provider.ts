@@ -3,11 +3,7 @@ import {
   type ProductAutofillFields,
   type ProductAutofillProviderResult,
 } from '@/lib/ai-product-schema';
-
-export type AiListingConversationMessage = {
-  role: 'user' | 'assistant';
-  content: string;
-};
+import { shrinkImageForAi } from '@/lib/product-image-encode';
 
 export type GenerateProductDraftInput = {
   transcript: string;
@@ -15,8 +11,12 @@ export type GenerateProductDraftInput = {
   origin?: string;
   schema: typeof PRODUCT_AUTOFILL_SCHEMA;
   mode?: 'fast' | 'accurate' | 'premium';
-  iteration?: 'initial' | 'refine';
-  conversation?: AiListingConversationMessage[];
+  /**
+   * What the admin typed/spoke on earlier passes for this same item, oldest
+   * first. Only the admin's words travel — the assistant's earlier notes are
+   * not evidence and are never re-sent.
+   */
+  priorInputs?: string[];
   currentFields?: ProductAutofillFields;
   /**
    * The saved AI prompt (from the ai_settings table), when the admin has edited
@@ -56,8 +56,11 @@ export type GenerateStructuredTextJsonOutput<T extends Record<string, unknown>> 
   };
 };
 
-export const PROMPT_VERSION = 'product-listing-confirmation-v18';
-const DEFAULT_TIMEOUT_MS = 30000;
+export const PROMPT_VERSION = 'product-listing-fill-v19';
+// Netlify cuts a synchronous function at 60 s (docs, 2026-09; observed alive at
+// 32 s). The old 30 s default was aborting our own generations, which routinely
+// take 18–30 s — see CHANGELOG 2026-09-09. Keep headroom under the platform cap.
+export const DEFAULT_TIMEOUT_MS = 50000;
 
 // Anthropic has no `response_format` JSON mode and (for some models) rejects assistant
 // prefill. Forcing a single tool call is the supported way to guarantee structured JSON:
@@ -69,13 +72,9 @@ const ANTHROPIC_OUTPUT_TOOL = {
     type: 'object',
     properties: {
       fields: { type: 'object' },
-      warnings: { type: 'array', items: { type: 'string' } },
-      uncertainties: { type: 'array', items: { type: 'string' } },
-      confidence: { type: 'object' },
-      assistant_message: { type: 'string' },
-      follow_up_questions: { type: 'array', items: { type: 'string' } },
+      notes: { type: 'array', items: { type: 'string' } },
     },
-    required: ['fields', 'confidence', 'assistant_message', 'follow_up_questions'],
+    required: ['fields', 'notes'],
   },
 } as const;
 
@@ -86,14 +85,13 @@ export const CURRENT_PRODUCT_FIELD_CONTRACT = `CURRENT PRODUCT FIELD CONTRACT (N
 export const BUYER_FACING_COPY_GUARDRAILS = `BUYER-FACING COPY FIREWALL (NON-OVERRIDABLE):
 The fields title, description, and public_notes are shown directly to buyers. Never include, repeat, paraphrase, or attribute a seller suggestion, opinion, guess, requested wording, or unverified identification in any of those fields. This includes claims introduced with phrases such as "I think", "I believe", "probably", "possibly", "looks like", or "the seller says", as well as unsupported claims about brand, karat, gemstone identity, authenticity, age, provenance, or condition. Treat an uncertain seller statement as a suggestion, not as a fact. If a suggestion cannot be cleanly separated from an objective fact, omit the claim from buyer-facing fields and preserve it only as one concise warning or uncertainty for the admin to review. Objective seller-stated facts and clear visible markings may still be stated directly when they are appropriate for the field.`;
 
-export const ITERATIVE_LISTING_CONTRACT = `ITERATIVE LISTING CONVERSATION (NON-OVERRIDABLE):
-- You may receive currentListingFields, prior conversation turns, and latestUserInput. Treat currentListingFields as the listing baseline. Preserve supported existing values unless the latest user input explicitly asks to change them or stronger evidence proves they are wrong.
-- Treat every user turn as additional evidence or revision instructions. Assistant turns are context only and are never independent evidence for a product fact.
-- Return the COMPLETE revised fields object on every turn, including every schema field as a key. Do not return only the changed fields.
-- Return confidence for EVERY non-null field. Use high only for directly stated, clearly marked, or unmistakable visual facts; use medium or low whenever interpretation or uncertainty remains.
-- assistant_message must briefly explain what you updated, what you could not safely determine, and any important conflict that needs review. Speak directly to the admin in clear, helpful plain text. Do not use Markdown, headings, asterisks, or numbered/bulleted formatting.
-- follow_up_questions must contain concise, answerable questions for important applicable fields that remain unsupported, any conflicting evidence, or any instruction that is too ambiguous to apply. Ask only questions whose answers could improve this listing; do not ask about inapplicable fields. Return [] when nothing important remains.
-- Never claim the listing is complete when a required pricing fact is still missing.`;
+export const ITERATIVE_LISTING_CONTRACT = `FILL THE FORM (NON-OVERRIDABLE):
+You fill the admin's listing form directly; nothing you return is held for approval. You receive currentListingFields (the form as it is right now), priorInputs (what the admin said on earlier passes for this same item, oldest first) and latestUserInput (what they just said). Three rules:
+1. A field that is already filled in currentListingFields is correct — return it unchanged. The admin clears a field on purpose when it is wrong.
+2. Fill every EMPTY field you can support from the photos, the visible markings, priorInputs and latestUserInput. Leave a field null only when nothing supports it.
+3. An explicit statement or instruction in latestUserInput wins over a filled field: "the weight is 4.2 grams", "it is 18K not 14K", "shorten the title", "mention the clasp wear" — apply it even though that field is not empty. Never change a filled field on your own judgement alone.
+Return the COMPLETE fields object every time, with every schema field as a key.
+notes: at most 4 short plain-text lines for the admin, and only when there is something worth saying — what you could NOT fill and why ("Weight: not stated"), and what you filled but are unsure of ("Brand: no maker's mark seen, from style only"). One line per point, no Markdown, no questions. Never describe or summarize what you filled or changed — the form shows that; a note like "Purity updated to 18K per the correction" is wrong. Return [] when nothing needs saying. Never say the listing is complete when a pricing fact is still missing.`;
 
 export const PRODUCT_EXTRACTION_SYSTEM_PROMPT = `You are a careful estate-catalog assistant for Naples Estate Jewelry. You help an admin populate intake fields from item photos plus an optional spoken or typed description. The catalog covers fine jewelry, gold, and sterling silver — including sterling/estate tableware, flatware, and holloware (goblets, trays, salvers, platters, bowls, candlesticks, pitchers, teapots, forks, spoons, knives, ladles, salad servers, tomato servers, serving sets, etc.). You are interpretive but not imaginative: organize messy input, classify the item form from photos, and write useful titles and descriptions — but never invent unsupported facts. Think like a careful catalog assistant, not a salesperson, appraiser, or inventory manager.
 
@@ -137,8 +135,8 @@ WRITING (English only — Spanish translations are generated separately, never p
 Use transcript evidence for factual claims, visible evidence for classification, and null for everything unsupported.
 
 OUTPUT FORMAT — respond with a single raw JSON object (no markdown, no code fences), shaped EXACTLY like this:
-{"fields": { <every field name from schema.fields>: <value or null> }, "warnings": [<string>], "uncertainties": [<string>], "confidence": { <field name>: "low" | "medium" | "high" }}
-Put EVERY extracted value INSIDE the "fields" object — never at the top level. Include each schema field key in "fields", using null when unsupported. "warnings" and "uncertainties" are optional. "confidence" is required for every non-null field.`;
+{"fields": { <every field name from schema.fields>: <value or null> }, "notes": [<short string>]}
+Put EVERY extracted value INSIDE the "fields" object — never at the top level. Include each schema field key in "fields", using null when unsupported. "notes" holds at most 4 short lines (what you could not fill, what you are unsure of) or [].`;
 
 type PreparedImage = {
   dataUrl: string;
@@ -173,22 +171,16 @@ function resolveSystemPrompt(input: GenerateProductDraftInput): string {
 
 export function buildProductUserPrompt(input: GenerateProductDraftInput) {
   return JSON.stringify({
-    task: input.iteration === 'refine'
-      ? 'refine_product_listing_from_feedback'
-      : 'extract_product_listing_fields',
+    task: 'fill_product_listing_fields',
     promptVersion: PROMPT_VERSION,
     schema: input.schema,
     latestUserInput: input.transcript,
     currentListingFields: input.currentFields ?? null,
-    conversation: input.conversation ?? [],
+    priorInputs: input.priorInputs ?? [],
     imageCount: input.images.length,
     respondWith: {
       fields: 'object — include EVERY name from schema.fields as a key, with its value or null',
-      warnings: 'string[] (optional)',
-      uncertainties: 'string[] (optional)',
-      confidence: 'object — EVERY non-null field name -> "low" | "medium" | "high" (required)',
-      assistant_message: 'string — concise update for the admin',
-      follow_up_questions: 'string[] — important questions that would improve or complete the listing',
+      notes: 'string[] — at most 4 short lines: what could not be filled, what is unsure; [] when nothing needs saying',
     },
   });
 }
@@ -215,14 +207,21 @@ async function prepareImages(input: GenerateProductDraftInput): Promise<Prepared
     const mimeType = response.headers.get('content-type')?.split(';')[0]?.trim() || 'image/jpeg';
     if (!mimeType.startsWith('image/')) return null;
 
-    const bytes = Buffer.from(await response.arrayBuffer());
-    if (bytes.byteLength > maxBytes) return null;
+    const fetched = Buffer.from(await response.arrayBuffer());
+    if (fetched.byteLength > maxBytes) return null;
+
+    // A phone upload can be a 2 MB JPEG; the provider downsamples past ~1568px
+    // anyway, so shrink here and ship ~5× fewer base64 bytes per generation.
+    const { buffer: bytes, mimeType: actualMimeType } = await shrinkImageForAi(fetched, mimeType).catch(() => ({
+      buffer: fetched,
+      mimeType,
+    }));
 
     const base64 = bytes.toString('base64');
     return {
-      dataUrl: `data:${mimeType};base64,${base64}`,
+      dataUrl: `data:${actualMimeType};base64,${base64}`,
       base64,
-      mimeType,
+      mimeType: actualMimeType,
     };
   }));
 
@@ -264,8 +263,19 @@ function parseJsonObject(value: unknown): ProductAutofillProviderResult {
   throw new Error('AI response was not valid JSON.');
 }
 
+export function aiTimeoutMs() {
+  const configured = Number(process.env.AI_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_TIMEOUT_MS;
+}
+
+/** The message the admin sees when our own abort fires — not Node's "This operation was aborted". */
+export function aiTimeoutMessage(ms = aiTimeoutMs()) {
+  return `The assistant took longer than ${Math.round(ms / 1000)} seconds and was stopped. Try again — a shorter note or fewer photos helps.`;
+}
+
 async function postJson(url: string, headers: Record<string, string>, body: unknown) {
-  const timeout = withTimeout(Number(process.env.AI_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS));
+  const ms = aiTimeoutMs();
+  const timeout = withTimeout(ms);
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -279,6 +289,9 @@ async function postJson(url: string, headers: Record<string, string>, body: unkn
       throw new Error(message);
     }
     return data;
+  } catch (error) {
+    if (timeout.signal.aborted) throw new Error(aiTimeoutMessage(ms));
+    throw error;
   } finally {
     timeout.clear();
   }

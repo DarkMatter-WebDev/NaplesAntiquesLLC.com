@@ -64,37 +64,37 @@ Keep these fields especially consistent:
 
 ### Smart Listing Assistant
 
-The assistant is an iterative draft workflow:
+The assistant fills the form; it does not ask for approval (the accept/keep
+review layer was removed 2026-09-09 on the owner's word — "it should simply
+fill out the form for me"):
 
-1. Add at least one photo, then type or speak the initial item details.
-2. Generate the first draft. Only high-confidence descriptive values going
-   into blank fields are applied automatically. Sensitive facts, uncertain
-   values, and anything that would replace an existing value remain pending.
-3. Read the assistant's explanation, warnings, and targeted clarification
-   questions. Review each pending card with Accept Proposed or Keep Existing;
-   Accept All / Keep All are available for deliberate bulk review.
-4. Use Read Aloud on any assistant turn, or enable automatic read-aloud. The
-   server uses an OpenAI-generated voice when configured and the browser falls
-   back to its built-in device voice when that service is unavailable.
-5. Type or speak answers and requested changes, then choose Send Feedback &
-   Update Listing. Repeat until the listing is ready.
-6. Use Undo Last AI Update when needed, review the normal listing fields, and
-   save through the standard editor action.
+1. Add at least one photo, then type or speak the item details (optional).
+2. **Generate Listing.** Every field the model can support goes straight into
+   the form. A short **notes** box (≤ 5 lines) says what it could not fill and
+   what it was unsure of; the notice line lists the fields it filled. The one
+   deterministic note names the pricing facts a listing cannot be priced
+   without (purity/weight on spot mode, a price on manual).
+3. Correct it your way: **clear any field that is wrong**, type or speak the
+   correction or the missing fact, and press **Update Listing**. The three
+   rules the model runs under (`ITERATIVE_LISTING_CONTRACT`): a field still
+   filled in the form is correct and is returned unchanged; every empty field
+   is filled from the photos and everything said so far; an explicit
+   statement or instruction in the note ("the weight is 4.2 grams", "shorten
+   the title") wins over a filled field.
+4. **Undo AI Fill** restores the form as it was before the last run. Save
+   through the standard editor action; nothing is persisted until then.
 
-Each turn uses the current form as its baseline, so manual edits and supported
-earlier values are preserved unless the admin asks to change them or stronger
-evidence contradicts them. Conversation context is bounded and exists only
-while that product editor is open; opening another Add/Edit editor resets it.
-No conversation is stored in Supabase.
+Only the admin's own earlier inputs for the item are re-sent on later passes
+(`priorInputs`, bounded); the assistant's notes are not evidence and never
+travel. Context lives only while that editor is open; opening another Add/Edit
+editor resets it. Nothing is stored in Supabase.
 
-The same non-overridable safeguards apply on every turn. Buyer-facing copy
-cannot promote seller guesses as facts. Length accepts plain or inch-suffixed
-evidence but is normalized to one bare numeric value. Width is populated only
-for necklaces/bracelets and only from explicit reliable evidence. AI changes
-are never persisted until the admin saves the listing normally. The server,
-not the model prompt, determines which fields can auto-apply: any overwrite,
-low/medium/missing-confidence value, chain/measurement/purity/pricing fact, or
-other sensitive change requires explicit confirmation first.
+The non-overridable safeguards still apply on every run: buyer-facing copy
+cannot promote seller guesses as facts (a stripped claim becomes a note);
+length is normalized to one bare numeric value; width is populated only for
+necklaces/bracelets and only from explicit reliable evidence; status and
+location are never AI-controlled. There is no read-aloud in the panel any more
+(the `/api/admin/ai-speech` route remains, uncalled).
 
 ## Edit A Listing
 

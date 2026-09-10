@@ -816,11 +816,13 @@ Account routes live under `next-app/src/app/[locale]/account/`.
 
 The Product Admin Add/Edit drawer includes an integrated AI Listing Assistant
 that accepts typed text or browser speech-recognition transcript text, requests
-a structured product draft from the server, previews returned fields, and
-applies only server-approved safe fields into the current form state. Pending
-overwrites, sensitive facts, and uncertain values require explicit admin
-accept/keep decisions. It does not write directly to Supabase; the normal
-product Save flow remains the persistence step. The older
+a structured product draft from the server, and applies every returned field
+straight into the current form state, with a short notes list (what it could
+not fill / was unsure of) and one Undo. The admin corrects by clearing a field
+and re-running with the correction; there is no accept/keep review step
+(removed 2026-09-09, see `features/shop-listings.md`). It does not write
+directly to Supabase; the normal product Save flow remains the persistence
+step. The older
 manual Quick Fill workflow is currently disabled in the editor UI
 (`SHOW_QUICK_FILL = false` in `AdminShell.tsx`), but its parser and gated panel
 still live in `AdminShell.tsx` so it can be restored without carrying a stale
@@ -833,16 +835,19 @@ schema coercion, and form population code must stay provider-neutral.
 The trust boundary is:
 
 - `next-app/src/app/api/admin/ai-product-fill/route.ts` verifies the signed-in
-  Supabase user is an admin, validates transcript/images, rate-limits per admin
-  user, calls the provider-neutral draft function, coerces the result, compares
-  it with the current form, and returns structured JSON containing auto-apply
-  fields plus pending confirmation changes.
+  Supabase user is an admin, validates transcript/images/prior inputs,
+  rate-limits per admin user (successful generations only), calls the
+  provider-neutral draft function, coerces the result, and returns
+  `{ fields, notes }`. The provider call aborts at `AI_TIMEOUT_MS` (default
+  50 s — under Netlify's 60 s synchronous cap) with a readable message.
 - `next-app/src/app/api/admin/ai-speech/route.ts` verifies the same admin
   boundary, validates and rate-limits response text, and streams OpenAI speech
-  audio without exposing the API key to the browser.
+  audio without exposing the API key to the browser. Since 2026-09-09 nothing
+  in the editor calls it (read-aloud was removed with the review layer).
 - `next-app/src/lib/ai-product-schema.ts` owns the provider-neutral schema,
-  accepted field keys, enum coercion, warnings, confidence/uncertainty shape,
-  and the deterministic field-review classifier.
+  accepted field keys, enum coercion, and the notes list (model notes, the
+  deterministic missing-pricing note, legacy warnings/uncertainties, and any
+  seller claim stripped from buyer copy).
 - `next-app/src/lib/ai-speech.ts` owns provider-independent speech-text
   validation. Browser device speech is a client-side availability fallback.
 - `next-app/src/lib/ai-product-provider.ts` is the only file that may read AI

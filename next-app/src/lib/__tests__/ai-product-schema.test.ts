@@ -1,38 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import {
   EMPTY_PRODUCT_AUTOFILL_FIELDS,
+  MAX_PRODUCT_AUTOFILL_NOTES,
   PRODUCT_AUTOFILL_SCHEMA,
+  buildMissingPricingNote,
   coerceProductAutofill,
-  reviewProductAutofillDraft,
   sanitizeBuyerFacingText,
-  type ProductAutofillDraft,
-  type ProductAutofillFields,
 } from '@/lib/ai-product-schema';
 import {
   BUYER_FACING_COPY_GUARDRAILS,
   CURRENT_PRODUCT_FIELD_CONTRACT,
+  DEFAULT_TIMEOUT_MS,
   ITERATIVE_LISTING_CONTRACT,
+  aiTimeoutMessage,
   buildProductSystemPrompt,
   buildProductUserPrompt,
 } from '@/lib/ai-product-provider';
 
-function makeDraft(
-  fields: Partial<ProductAutofillFields>,
-  confidence: ProductAutofillDraft['confidence'] = {},
-  options: { warnings?: string[]; uncertainties?: string[] } = {},
-): ProductAutofillDraft {
-  return {
-    fields: { ...EMPTY_PRODUCT_AUTOFILL_FIELDS, ...fields },
-    warnings: options.warnings ?? [],
-    uncertainties: options.uncertainties ?? [],
-    confidence,
-    assistant_message: 'I reviewed the listing.',
-    follow_up_questions: [],
-  };
-}
-
 describe('AI buyer-facing copy guardrails', () => {
-  it('removes direct seller-attribution sentences and preserves them for review', () => {
+  it('removes direct seller-attribution sentences and keeps them as a note', () => {
     const result = coerceProductAutofill({
       fields: {
         ...EMPTY_PRODUCT_AUTOFILL_FIELDS,
@@ -45,10 +31,10 @@ describe('AI buyer-facing copy guardrails', () => {
     expect(result.fields.title).toBe('Vintage bracelet');
     expect(result.fields.description).toBe('A polished link bracelet');
     expect(result.fields.public_notes).toBeNull();
-    expect(result.uncertainties).toEqual(expect.arrayContaining([
-      'The seller suggests it is antique.',
-      'According to the seller, it is solid gold.',
-      'The seller says it is a family heirloom.',
+    expect(result.notes).toEqual(expect.arrayContaining([
+      expect.stringContaining('The seller suggests it is antique.'),
+      expect.stringContaining('According to the seller, it is solid gold.'),
+      expect.stringContaining('The seller says it is a family heirloom.'),
     ]));
   });
 
@@ -67,28 +53,23 @@ describe('AI buyer-facing copy guardrails', () => {
     expect(prompt.endsWith(BUYER_FACING_COPY_GUARDRAILS)).toBe(true);
   });
 
-  it('keeps assistant feedback and adds questions for required unsupported fields', () => {
-    const result = coerceProductAutofill({
-      fields: {
-        ...EMPTY_PRODUCT_AUTOFILL_FIELDS,
-        title: 'Yellow-Tone Link Bracelet',
-        product_type: 'Bracelet',
-        price_mode: 'spot-multiplier',
-        pricing_multiplier: 1.5,
-      },
-      assistant_message: '**Updated:** I identified the form and `updated` the title.',
-      follow_up_questions: ['Can you confirm the bracelet length?'],
-    });
+  it('keeps canonical length output rules in saved custom prompts', () => {
+    const prompt = buildProductSystemPrompt('Custom admin prompt.');
+    expect(prompt).toContain('24 in');
+    expect(prompt).toContain('bare canonical numeric string');
+  });
+});
 
-    expect(result.assistant_message).toBe('Updated: I identified the form and updated the title.');
-    expect(result.follow_up_questions).toEqual([
-      'Can you confirm the bracelet length?',
-      'What purity or hallmark does the item have?',
-      'What is the item’s weight in grams?',
-    ]);
+describe('AI fill-the-form contract', () => {
+  it('states the three rules and the short-notes shape, with no review step', () => {
+    expect(ITERATIVE_LISTING_CONTRACT).toContain('already filled in currentListingFields is correct');
+    expect(ITERATIVE_LISTING_CONTRACT).toContain('Fill every EMPTY field');
+    expect(ITERATIVE_LISTING_CONTRACT).toContain('wins over a filled field');
+    expect(ITERATIVE_LISTING_CONTRACT).toContain('at most 4 short plain-text lines');
+    expect(ITERATIVE_LISTING_CONTRACT).not.toMatch(/confidence|follow_up_questions|assistant_message/);
   });
 
-  it('builds a refinement turn with the current listing and prior conversation', () => {
+  it('builds a fill turn with the current listing and only the admin’s prior inputs', () => {
     const currentFields = {
       ...EMPTY_PRODUCT_AUTOFILL_FIELDS,
       title: 'Yellow-Tone Link Bracelet',
@@ -98,121 +79,82 @@ describe('AI buyer-facing copy guardrails', () => {
       transcript: 'The hallmark reads 14K and it weighs 18.2 grams.',
       images: ['/assets/example.webp'],
       schema: PRODUCT_AUTOFILL_SCHEMA,
-      iteration: 'refine',
       currentFields,
-      conversation: [
-        { role: 'user', content: 'Please create the listing.' },
-        { role: 'assistant', content: 'What purity and weight does it have?' },
-      ],
+      priorInputs: ['Please create the listing.'],
     }));
 
-    expect(prompt.task).toBe('refine_product_listing_from_feedback');
+    expect(prompt.task).toBe('fill_product_listing_fields');
     expect(prompt.latestUserInput).toContain('18.2 grams');
     expect(prompt.currentListingFields.title).toBe('Yellow-Tone Link Bracelet');
-    expect(prompt.conversation).toHaveLength(2);
-    expect(prompt.respondWith.follow_up_questions).toContain('important questions');
-  });
-
-  it('auto-applies only high-confidence descriptive values going into blank fields', () => {
-    const result = reviewProductAutofillDraft(
-      makeDraft({ title: 'Sterling Silver Brooch' }, { title: 'high' }),
-      EMPTY_PRODUCT_AUTOFILL_FIELDS,
-    );
-
-    expect(result.review?.auto_apply_fields).toEqual(['title']);
-    expect(result.review?.pending_changes).toEqual([]);
-  });
-
-  it('holds every uncertain value for confirmation and asks a deterministic question', () => {
-    const result = reviewProductAutofillDraft(
-      makeDraft(
-        { item_year: 1960, brand: 'Taxco' },
-        { item_year: 'low' },
-      ),
-      EMPTY_PRODUCT_AUTOFILL_FIELDS,
-    );
-
-    expect(result.review?.auto_apply_fields).toEqual([]);
-    expect(result.review?.pending_changes.map((change) => change.field)).toEqual(['brand', 'item_year']);
-    expect(result.review?.pending_changes[0].reasons).toContain('missing-confidence');
-    expect(result.review?.pending_changes[1].reasons).toContain('low-confidence');
-    expect(result.follow_up_questions).toEqual(expect.arrayContaining([
-      'Can you confirm Brand should be "Taxco"?',
-      'Can you confirm Date (Year Made) should be "1960"?',
-    ]));
-  });
-
-  it('never overwrites an existing value without confirmation, even at high confidence', () => {
-    const currentFields = {
-      ...EMPTY_PRODUCT_AUTOFILL_FIELDS,
-      product_type: 'Tray',
-    };
-    const result = reviewProductAutofillDraft(
-      makeDraft({ product_type: 'Salver' }, { product_type: 'high' }),
-      currentFields,
-    );
-
-    expect(result.review?.auto_apply_fields).toEqual([]);
-    expect(result.review?.pending_changes[0]).toMatchObject({
-      field: 'product_type',
-      current_value: 'Tray',
-      proposed_value: 'Salver',
-      reasons: ['changes-existing-value'],
+    expect(prompt.priorInputs).toEqual(['Please create the listing.']);
+    expect(prompt.respondWith).toEqual({
+      fields: expect.stringContaining('EVERY name'),
+      notes: expect.stringContaining('at most 4 short lines'),
     });
   });
 
-  it('holds sensitive facts for confirmation and ignores unchanged values', () => {
-    const currentFields = {
-      ...EMPTY_PRODUCT_AUTOFILL_FIELDS,
-      title: 'Existing Title',
-    };
-    const result = reviewProductAutofillDraft(
-      makeDraft(
-        { title: 'Existing Title', purity: 925 },
-        { title: 'high', purity: 'high' },
-      ),
-      currentFields,
-    );
+  it('leaves headroom under Netlify’s 60 s synchronous cap and names the seconds when it fires', () => {
+    expect(DEFAULT_TIMEOUT_MS).toBeGreaterThanOrEqual(40_000);
+    expect(DEFAULT_TIMEOUT_MS).toBeLessThanOrEqual(55_000);
+    expect(aiTimeoutMessage(50_000)).toContain('50 seconds');
+    expect(aiTimeoutMessage(50_000)).not.toContain('aborted');
+  });
+});
 
-    expect(result.review?.auto_apply_fields).toEqual([]);
-    expect(result.review?.pending_changes).toHaveLength(1);
-    expect(result.review?.pending_changes[0]).toMatchObject({
-      field: 'purity',
-      reasons: ['sensitive-field'],
+describe('AI notes', () => {
+  it('adds the missing-pricing note first, then the model’s notes, and strips Markdown', () => {
+    const result = coerceProductAutofill({
+      fields: {
+        ...EMPTY_PRODUCT_AUTOFILL_FIELDS,
+        title: 'Yellow-Tone Link Bracelet',
+        product_type: 'Bracelet',
+        price_mode: 'spot-multiplier',
+        pricing_multiplier: 1.5,
+      },
+      notes: ['**Brand**: no maker’s mark seen', '- Date: `estimated` from style'],
     });
+
+    expect(result.notes).toEqual([
+      'Not filled (needed for pricing): Purity, Weight (g).',
+      'Brand: no maker’s mark seen',
+      'Date: estimated from style',
+    ]);
   });
 
-  it('asks about an unchanged value whenever confidence is not high', () => {
-    const currentFields = {
-      ...EMPTY_PRODUCT_AUTOFILL_FIELDS,
-      item_year: 1960,
-    };
-    const result = reviewProductAutofillDraft(
-      makeDraft({ item_year: 1960 }, { item_year: 'low' }),
-      currentFields,
-    );
+  it('folds legacy warnings and uncertainties from older prompts into notes, without duplicates', () => {
+    const result = coerceProductAutofill({
+      fields: { ...EMPTY_PRODUCT_AUTOFILL_FIELDS, title: 'Sterling Brooch', purity: 925, weight_grams: 12 },
+      notes: ['Length: not stated'],
+      warnings: ['Length: not stated', 'The hallmark is partly worn.'],
+      uncertainties: ['Maker mark unreadable.'],
+    });
 
-    expect(result.review?.pending_changes).toEqual([]);
-    expect(result.follow_up_questions).toContain(
-      'Can you confirm the existing Date (Year Made) value "1960"? The assistant returned low confidence.',
-    );
+    expect(result.notes).toEqual([
+      'Length: not stated',
+      'The hallmark is partly worn.',
+      'Maker mark unreadable.',
+    ]);
   });
 
-  it('turns warnings and uncertainties into explicit clarification questions', () => {
-    const result = reviewProductAutofillDraft(
-      makeDraft({}, {}, {
-        warnings: ['The hallmark conflicts with the stated purity.'],
-        uncertainties: ['The maker mark is difficult to read.'],
-      }),
-      EMPTY_PRODUCT_AUTOFILL_FIELDS,
-    );
-
-    expect(result.follow_up_questions).toEqual(expect.arrayContaining([
-      expect.stringContaining('The hallmark conflicts with the stated purity.'),
-      expect.stringContaining('The maker mark is difficult to read.'),
-    ]));
+  it('caps the notes', () => {
+    const result = coerceProductAutofill({
+      fields: { ...EMPTY_PRODUCT_AUTOFILL_FIELDS, purity: 14, weight_grams: 5 },
+      notes: Array.from({ length: 12 }, (_, index) => `Note ${index + 1}`),
+    });
+    expect(result.notes).toHaveLength(MAX_PRODUCT_AUTOFILL_NOTES);
   });
 
+  it('names only the pricing facts a listing cannot be priced without', () => {
+    expect(buildMissingPricingNote({ ...EMPTY_PRODUCT_AUTOFILL_FIELDS, price_mode: 'spot-multiplier', purity: 14 }))
+      .toBe('Not filled (needed for pricing): Weight (g).');
+    expect(buildMissingPricingNote({ ...EMPTY_PRODUCT_AUTOFILL_FIELDS, price_mode: 'manual' }))
+      .toBe('Not filled (needed for pricing): Price Label.');
+    expect(buildMissingPricingNote({ ...EMPTY_PRODUCT_AUTOFILL_FIELDS, price_mode: 'manual', asking_price: 1200 })).toBeNull();
+    expect(buildMissingPricingNote({ ...EMPTY_PRODUCT_AUTOFILL_FIELDS, price_mode: 'spot-multiplier', purity: 925, weight_grams: 40 })).toBeNull();
+  });
+});
+
+describe('AI measurement coercion', () => {
   it('accepts explicit necklace and bracelet widths in millimeters', () => {
     const bracelet = coerceProductAutofill({
       fields: {
@@ -244,12 +186,6 @@ describe('AI buyer-facing copy guardrails', () => {
       });
       expect(result.fields.length).toBe('24');
     }
-  });
-
-  it('keeps canonical length output rules in saved custom prompts', () => {
-    const prompt = buildProductSystemPrompt('Custom admin prompt.');
-    expect(prompt).toContain('24 in');
-    expect(prompt).toContain('bare canonical numeric string');
   });
 
   it('drops width for non-applicable product types and invalid measurements', () => {

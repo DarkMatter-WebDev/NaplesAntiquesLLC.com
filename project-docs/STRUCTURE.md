@@ -82,7 +82,7 @@ let additional loose app assets accumulate at root.
 | Shared layout | `next-app/src/components/layout/` |
 | Product data | Supabase `products` |
 | Product TypeScript contract | `next-app/src/types/product.ts` |
-| Product uploads | Supabase Storage bucket `product-images` |
+| Product uploads | Supabase Storage bucket `product-images`, written ONLY by `src/app/api/admin/product-images/route.ts` since 2026-09-09: the browser downsizes to 2048px and posts a high-quality intermediate, the server encodes WebP with sharp (`src/lib/product-image-encode.ts`, also `shrinkImageForAi()` for the assistant payload) and uploads with `cacheControl: '31536000'`. ⛔ WebKit (every iPhone browser) cannot encode WebP in a canvas — never move the encode back to the client. Guarded by `lib/__tests__/product-image-encode.test.ts` |
 | Product video | Cloudflare Stream bytes; Supabase `product_videos` metadata; `src/lib/product-video*.ts` and `cloudflare-stream.ts` |
 | Product pricing | `next-app/src/lib/pricing.ts` and `spot-price.ts` |
 | Authoritative checkout totals | `next-app/src/lib/checkout-pricing.ts` |

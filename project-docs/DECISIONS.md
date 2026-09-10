@@ -361,6 +361,61 @@ editable. Rules that follow from that:
   through to. This is the ONLY page that opts out; do not spread the
   attribute without asking. Guarded by `card-page.test.ts`.
 
+## The Smart Listing Assistant fills the form (2026-09-09)
+
+### The assistant fills the form; the admin corrects by clearing and re-running — no review step
+
+Owner, 2026-09-09: "get rid of the whole accept-edits buttons … and the huge
+long explanations; it should simply fill out the form for me, maybe give me a
+short note on anything it was not able to fill or not certain on … I'll clear
+any field that's not correct and re-input." This supersedes the v15–v18
+"confirmation" design (auto-apply only high-confidence blanks, hold sensitive
+/ uncertain / overwriting values as pending cards with Accept / Keep).
+
+- **Contract = `{ fields, notes }`.** No per-field confidence, no
+  `assistant_message`, no `follow_up_questions`, no `review`. Notes are ≤ 5
+  plain lines (`MAX_PRODUCT_AUTOFILL_NOTES`): what could not be filled, what is
+  unsure. ⛔ Never a summary of what was filled — the form shows that.
+- **Three rules, in `ITERATIVE_LISTING_CONTRACT`:** (1) a field still filled
+  in `currentListingFields` is correct and comes back unchanged; (2) every
+  empty field is filled from the photos + everything the admin has said;
+  (3) an explicit statement or instruction in the latest input WINS over a
+  filled field ("the weight is 4.2 grams", "shorten the title"). The owner
+  chose (3) over "empty fields only" so a correction never has to be typed
+  twice. The rules are model-enforced; the server enforces only coercion.
+- **Every returned field is applied** (`applyAiDraftToForm(fields,
+  PRODUCT_AUTOFILL_FIELD_KEYS)`) behind one snapshot — **Undo AI Fill** is the
+  safety net, as it was in June 2026.
+- **Only the admin's words travel between passes** (`priorInputs`); the
+  assistant's own notes are not evidence and are never re-sent.
+- **The panel is only what is necessary:** mic, textarea, one button
+  (Generate → Update Listing), the notice line, notes + Undo. No auto-read
+  checkbox, no read-aloud, no photo-only banner, no chat thread. Do not
+  re-add any of it without the owner asking.
+- **Why it also fixed the failures:** the review layer had pushed output to
+  ~1100 tokens ≈ 30 s, straight into our own 30 s abort. Fill-the-form runs at
+  ~450–500 tokens ≈ 12–13 s (measured).
+
+### Our provider abort must sit under Netlify's real cap — which is 60 s for synchronous functions, not 26
+
+The 2026-09-09 "AI generation failed" run was **our** `withTimeout` at 30 s
+(`This operation was aborted`), while the Netlify function was alive and
+logging at 32.4 s. Current Netlify docs: **synchronous 60 s · scheduled 30 s ·
+background 15 min, none configurable.** `DEFAULT_TIMEOUT_MS` is 50 000 with
+headroom, exported and tested to stay within 40–55 s; the abort throws a
+sentence naming the seconds. ⛔ Never set a provider timeout at or above the
+platform cap, and never below the p95 of the call it guards. The "26 s"
+figure in the drip entry below came from a scheduled function and is retained
+there as history.
+
+### Rate limits count successes, never attempts
+
+A failed or timed-out generation must not consume a slot: the 15/hour budget
+was being burned by retries of a broken run, which would have turned a
+timeout into an hour-long lockout with a different error text.
+`ai-product-fill` records usage only after a coerced draft exists (defaults
+30/hr · 100/day).
+
 ## Thumbnail rails on wide displays (2026-09-02)
 
 ### The rail fit must save and restore `scrollLeft` around its width re-measure
@@ -5708,7 +5763,11 @@ never iterated. What consumed the 25s was never established (see `CHANGELOG.md`
 2026-08-20). The rule below stands on its own reasoning, not on that evidence —
 keep it, but do not cite that failure as proof of it.
 
-**Netlify cuts a SYNCHRONOUS function at 26 seconds.** The drip selected up to 25
+**Netlify cuts a SYNCHRONOUS function at 26 seconds.** ⚠️ *Corrected
+2026-09-09: that figure was observed on a SCHEDULED function; current Netlify
+docs say synchronous 60 s, scheduled 30 s, and an admin route was seen alive at
+32.4 s — see "Our provider abort must sit under Netlify's real cap" above. The
+budget rule below still stands.* The drip selected up to 25
 due rows and published them sequentially with no clock. A cap of 25 says nothing
 about how long 25 Meta publishes take, and the platform only enforces time.
 

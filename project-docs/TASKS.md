@@ -5,16 +5,90 @@
 
 ## ◻ OPEN — needs a human
 
-### 🟡 STAGED 2026-09-08 (late night) — storefront photo on four surfaces + centred homepage Visit Us with photo/map pair — awaiting push (no SQL, no env vars)
+### 🟡 2026-09-09 — Smart Listing Assistant rebuilt (fill-the-form, 50 s timeout) — BUILT + dev-verified + STAGED, awaiting push
 
-Owner's photo → `showroom-storefront.webp`; new `StorefrontPhoto`
-component; homepage Visit Us re-laid out (centred column, then photo +
-square map side by side — owner's V2); contact panel, `/sell/naples` band
-and `/card` thumbnail; no captions. Detail: `CHANGELOG.md` 2026-09-08
-(late night). Gate tsc 0 · lint 0 · **1271/1271 (129 files)** · build exit
-0. ◻ **Owner — push**, then "verify it live": `/` renders
-`showroom-storefront.webp` with one `#visit-us`; `/card`, `/contact`,
-`/sell/naples` render it; `/sell/fort-myers` does not.
+No SQL, no env vars. What changed and why: `CHANGELOG.md` 2026-09-09. Push
+when ready, then:
+- ◻ **Verify live:** list one real item from the phone. Expect the form to
+  fill in ~12–18 s with at most a few note lines and an **Undo AI Fill**
+  button; correct by clearing a field + typing the fact + **Update
+  Listing**. Netlify → Logs → Functions → Next.js Server Handler → switch
+  to **Last day** first, filter `ai-product-fill`: the success line now
+  carries `noteCount` / `priorInputCount` and `elapsedMs` well under 50 000;
+  no `This operation was aborted`.
+- ✅ **Phone photo size — FIXED for new uploads (09-09 later):** every photo
+  is now encoded to WebP on the server (`/api/admin/product-images`, sharp)
+  and the assistant shrinks its copies to 1600px WebP. ◻ After the push:
+  upload one photo from the iPhone and check the Netlify log for
+  `[product-images] stored` with `sourceFormat: 'jpeg'` and an
+  `outputBytes` in the ~100–300 KB range; the new object name ends `.webp`.
+- ◻ **Optional, only if Storage cost ever matters — convert the existing
+  46 PNG + ~42 JPEG originals to WebP.** Deliberately NOT done: shoppers
+  already get WebP/AVIF via the Netlify Image CDN, so it changes nothing
+  they see, and it would mint new URLs for every affected product
+  (`images`/`image_urls`, cache keys, GC reference set, marketplace/social
+  rows). If wanted: a dry-run-first script using `encodeProductImageToWebp`,
+  old objects left until the GC's reference scan clears them.
+- ◻ Optional cleanup later: `/api/admin/ai-speech` + `lib/ai-speech.ts` are
+  now uncalled (read-aloud removed). Left in place in case the owner wants
+  the voice back; delete only on request.
+
+**Staging (WebP encode batch):** ✅ synced 2026-09-09 (later) — dry run listed exactly the 9 touched files (product-images/route.ts NEW, product-image-encode.ts NEW, product-image-encode.test.ts NEW, AdminShell.tsx, ai-product-provider.ts + CHANGELOG, CURRENT_STATUS, STRUCTURE, TASKS), 0 Extras, 1074 total (= 1071 + the 3 new files); real run copied 9 / 0 FAILED; follow-up dry run 0/0/0; leak check 0 `.env*`; SHA256 MATCH on encode lib, route, AdminShell, provider, CHANGELOG. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+**Staging (assistant batch):** ✅ synced 2026-09-09 — dry run listed exactly the 11 touched files (route.ts, AdminShell.tsx, ai-product-provider.ts, ai-product-schema.ts, ai-product-schema.test.ts + ARCHITECTURE, CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS, features/shop-listings.md), 0 Extras, 1071 total (no new files, no strays); real run copied 11 / 0 FAILED (robocopy exit 1 = copied only); follow-up dry run 0/0/0; leak check 0 `.env*`; SHA256 MATCH on AdminShell, provider, schema, route, CHANGELOG. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### ◻ CONSOLIDATED at session end 2026-09-08 — everything outstanding, in one place (nothing is in flight; staging equals source)
+
+**Owner-only, from the gold/silver plan (do in this order):**
+1. ◻ Paste into the Google Business Profile **description**: "Calls and
+   appointments answered 9 AM to 6 PM, seven days a week." — no phone
+   number in that text; the main hours stay the showroom's (Option C).
+2. ◻ Ask every gold/silver seller for a Google review that **names what
+   they sold** (`naplesestatejewelry.com/review`; the card's gold button).
+3. ◻ Add gold-testing / flatware buying **photos** to the profile.
+4. ◻ For 30 days, **ask callers where they found us** (GBP hides low-volume
+   search terms — this is the only attribution).
+
+**Search Console / Bing — nothing is OWED right now.** `/reviews` was
+requested 09-08 ("Indexing requested"); `/es/reviews` was already indexed;
+IndexNow 200 for 212 URLs the same night. Dated look-backs:
+- ◻ **~2026-09-10 — Bing Webmaster Tools** recheck (index count; "Indexing
+  allowed: No" is *not selected yet*, never a code fix — memory
+  `bing-webmaster-tools`).
+- ◻ **mid-Sept — GSC Enhancements → Breadcrumbs** report (the 55 pages
+  with BreadcrumbList since 09-02) and **GSC Pages**: `/reviews` indexed
+  yet? `/silver-services` still ~pos 9 (the nearest lander to page 1)?
+  `/gold-services` (pos 24) moving after the FAQ + phone description?
+- ◻ **~2026-09-20 — GSC validations** started 09-06: "Page with redirect"
+  (the `/en/…` 307→308) and "Blocked by robots.txt" (`/account`).
+- ◻ **monthly — GBP Performance → Calls** (Aug = 71 interactions; the
+  diamond/gold balance is what to watch; read via the iframe method in
+  memory `diamond-calls-investigation-2026-09-08`).
+- ◻ **Optional, quota permitting (10/day):** the landers changed content
+  today without new URLs — a GSC "Request indexing" on `/gold-services`,
+  `/silver-services` (EN + ES) nudges the recrawl, and
+  `npm run indexnow -- --urls=/gold-services,/silver-services,/es/gold-services,/es/silver-services`
+  (run from **PowerShell**, not Git Bash — MSYS rewrites the leading `/`;
+  memory `session-tooling-gotchas`). Not required: the sitemap and normal
+  recrawl cover it.
+
+**Also parked (owner's timing):** pg_cron overlap cleanup + the admin "last
+sweep ran N min ago" line (see the 09-09 02:49Z CHANGELOG entry — the
+pushes were confirmed on the minute, so the overlap window is closed);
+inbound marketplace-sale detection proposal; the /free-evaluation bench
+photo; GBP "Google updates (1)" pending on the profile (review it — it may
+be a user-suggested edit, which is exactly what inaccurate hours attract).
+
+### ✅ DEPLOYED 2026-09-08 (late night) — storefront photo on four surfaces + centred homepage Visit Us with photo/map pair (production-verified)
+
+Owner: "pushed and deployed, verify it live." Verified: all six showroom
+surfaces (EN + ES) render `showroom-storefront.webp` with the alt text,
+`/sell/fort-myers` does not, `/` has one `#visit-us` and two square tiles,
+the asset and its optimized rendition serve as `image/webp`, smoke 200s,
+`/review` 302. Detail: `CHANGELOG.md` 2026-09-08 (late night, deployed).
+Gate tsc 0 · lint 0 · **1271/1271 (129 files)** · build exit 0.
+
+**Staging (session close):** ✅ synced 2026-09-08 (late night, post-deploy) — dry run listed exactly the 3 flipped docs (CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras; real run copied 3; follow-up dry run 0/0/0; leak check 0; CHANGELOG hash MATCH. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
 **Staging (storefront photo):** ✅ synced 2026-09-08 (late night) — dry run listed exactly the 13 touched files (showroom-storefront.webp NEW, StorefrontPhoto.tsx NEW, storefront-photo.test.ts NEW; (home)/page.tsx, card, sell/[city], VisitUsPanel.tsx, ShowroomMap.tsx (timestamp only — the 4:3 option was added and reverted) + CHANGELOG, CURRENT_STATUS, DECISIONS, STRUCTURE, TASKS), 0 Extras; real run copied 13 / 0 FAILED; follow-up dry run 0/0/0; leak check 0; SHA256 MATCH on the photo, StorefrontPhoto, home page, CHANGELOG. The CHANGELOG also carries a 2026-09-09 02:49Z pg_cron entry written by a parallel session — it travelled too. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 

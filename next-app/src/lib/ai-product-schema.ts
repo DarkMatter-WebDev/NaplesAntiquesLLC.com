@@ -13,8 +13,6 @@ import {
   type ProductMetalVariant,
 } from '@/types/product';
 
-export type ProductAutofillConfidence = 'low' | 'medium' | 'high';
-
 export type ProductAutofillFields = {
   title: string | null;
   product_type: string | null;
@@ -38,48 +36,27 @@ export type ProductAutofillFields = {
   public_notes: string | null;
 };
 
-export type ProductAutofillReviewReason =
-  | 'changes-existing-value'
-  | 'sensitive-field'
-  | 'low-confidence'
-  | 'medium-confidence'
-  | 'missing-confidence';
-
-export type ProductAutofillProposedChange = {
-  field: keyof ProductAutofillFields;
-  current_value: ProductAutofillFields[keyof ProductAutofillFields];
-  proposed_value: ProductAutofillFields[keyof ProductAutofillFields];
-  confidence: ProductAutofillConfidence | null;
-  reasons: ProductAutofillReviewReason[];
-  question: string;
-};
-
-export type ProductAutofillReview = {
-  auto_apply_fields: (keyof ProductAutofillFields)[];
-  pending_changes: ProductAutofillProposedChange[];
-};
-
+/**
+ * What the assistant hands back: the fields (applied straight to the form) and a
+ * few short notes — what it could not fill and what it was unsure about. There is
+ * no review/confirmation layer any more (removed 2026-09-09 on the owner's word:
+ * "it should simply fill out the form for me"); the admin clears a wrong field and
+ * re-runs with the correction.
+ */
 export type ProductAutofillDraft = {
   fields: ProductAutofillFields;
-  warnings: string[];
-  uncertainties: string[];
-  confidence: Partial<Record<keyof ProductAutofillFields, ProductAutofillConfidence>>;
-  assistant_message: string | null;
-  follow_up_questions: string[];
-  review?: ProductAutofillReview;
+  notes: string[];
 };
 
-export type ProductAutofillProviderResult = Omit<
-  Partial<ProductAutofillDraft>,
-  'fields' | 'warnings' | 'uncertainties' | 'confidence' | 'assistant_message' | 'follow_up_questions' | 'review'
-> & {
+export type ProductAutofillProviderResult = {
   fields?: Partial<Record<keyof ProductAutofillFields, unknown>>;
+  notes?: unknown;
+  /** Older/custom saved prompts may still emit these; they are folded into notes. */
   warnings?: unknown;
   uncertainties?: unknown;
-  confidence?: unknown;
-  assistant_message?: unknown;
-  follow_up_questions?: unknown;
 };
+
+export const MAX_PRODUCT_AUTOFILL_NOTES = 5;
 
 export const PRODUCT_AUTOFILL_FIELD_KEYS = [
   'title',
@@ -150,19 +127,6 @@ export const PRODUCT_AUTOFILL_FIELD_LABELS: Record<keyof ProductAutofillFields, 
   public_notes: 'Notes (English)',
 };
 
-const SENSITIVE_REVIEW_FIELDS = new Set<keyof ProductAutofillFields>([
-  'chain_type',
-  'length',
-  'width_mm',
-  'price_mode',
-  'purity',
-  'weight_grams',
-  'pricing_multiplier',
-  'asking_price',
-  'manual_price_label',
-  'show_spot_price',
-]);
-
 export const PRODUCT_AUTOFILL_SCHEMA = {
   name: 'product_listing_draft',
   description: 'Nullable catalog fields for a Naples Estate Jewelry product listing. Product type may be one of the common values or a concise new item form when the item does not fit the list. Do not return operational fields (status, location) — they are not AI-controlled.',
@@ -225,42 +189,39 @@ function cleanTitle(value: unknown): string | null {
   return out || null;
 }
 
-function cleanStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => cleanString(item, 260)).filter((item): item is string => Boolean(item));
-}
-
-function cleanAssistantMessage(value: unknown): string | null {
-  const cleaned = cleanString(value, 1200);
+// Notes are plain one-liners for the admin. Strip any Markdown the model slips in.
+function cleanNote(value: unknown): string | null {
+  const cleaned = cleanString(value, 220);
   if (!cleaned) return null;
   return cleaned
     .replace(/\*\*/g, '')
     .replace(/__+/g, '')
     .replace(/`([^`]+)`/g, '$1')
-    .replace(/\s+-\s+(?=[A-Z0-9])/g, '\n')
-    .trim();
+    .replace(/^[-*•]\s+/, '')
+    .trim() || null;
 }
 
-function addRequiredFollowUpQuestions(
-  fields: ProductAutofillFields,
-  questions: string[],
-): string[] {
-  const next = [...questions];
-  const add = (question: string) => {
-    if (!next.some((item) => item.toLowerCase() === question.toLowerCase())) next.push(question);
-  };
+function cleanNotes(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(cleanNote).filter((item): item is string => Boolean(item));
+}
 
-  if (!fields.title) add('What title or identifying details should be used for this item?');
-  if (!fields.product_type) add('What type of item is this?');
+/**
+ * The one deterministic note: the pricing facts a listing cannot be priced
+ * without. Everything else the model says for itself. Returns null when
+ * nothing pricing-critical is missing.
+ */
+export function buildMissingPricingNote(fields: ProductAutofillFields): string | null {
+  const missing: string[] = [];
   if (fields.price_mode === 'spot-multiplier') {
-    if (fields.purity == null) add('What purity or hallmark does the item have?');
-    if (fields.weight_grams == null) add('What is the item’s weight in grams?');
+    if (fields.purity == null) missing.push(PRODUCT_AUTOFILL_FIELD_LABELS.purity);
+    if (fields.weight_grams == null) missing.push(PRODUCT_AUTOFILL_FIELD_LABELS.weight_grams);
   }
   if (fields.price_mode === 'manual' && !fields.manual_price_label && fields.asking_price == null) {
-    add('What price should be shown for this item?');
+    missing.push(PRODUCT_AUTOFILL_FIELD_LABELS.manual_price_label);
   }
-
-  return next.slice(0, 12);
+  if (missing.length === 0) return null;
+  return `Not filled (needed for pricing): ${missing.join(', ')}.`;
 }
 
 const SELLER_ATTRIBUTION_PATTERNS: RegExp[] = [
@@ -382,16 +343,6 @@ function cleanQuantity(value: unknown): number | null {
   return numeric != null ? Math.round(numeric) : null;
 }
 
-function cleanConfidence(value: unknown): ProductAutofillDraft['confidence'] {
-  if (!value || typeof value !== 'object') return {};
-  const confidence: ProductAutofillDraft['confidence'] = {};
-  for (const key of PRODUCT_AUTOFILL_FIELD_KEYS) {
-    const raw = (value as Record<string, unknown>)[key];
-    if (raw === 'low' || raw === 'medium' || raw === 'high') confidence[key] = raw;
-  }
-  return confidence;
-}
-
 export function coerceProductAutofill(input: ProductAutofillProviderResult): ProductAutofillDraft {
   // Models sometimes return the fields flat at the top level instead of nested under `fields`.
   // Prefer a non-empty nested `fields` object; otherwise read from the top-level object.
@@ -462,127 +413,18 @@ export function coerceProductAutofill(input: ProductAutofillProviderResult): Pro
     fields.pricing_multiplier = 1.5;
   }
 
-  const followUpQuestions = addRequiredFollowUpQuestions(
-    fields,
-    cleanStringArray(input.follow_up_questions),
-  );
-
-  return {
-    fields,
-    warnings: cleanStringArray(input.warnings),
-    uncertainties: cleanStringArray([...cleanStringArray(input.uncertainties), ...sellerSuggestions]).slice(0, 10),
-    confidence: cleanConfidence(input.confidence),
-    assistant_message: cleanAssistantMessage(input.assistant_message),
-    follow_up_questions: followUpQuestions,
+  // Notes, in priority order: the pricing facts we cannot list without, the
+  // model's own "not filled / unsure" lines, then legacy warnings/uncertainties
+  // (older or custom saved prompts) and any seller claim stripped from buyer copy.
+  const notes: string[] = [];
+  const addNote = (note: string | null) => {
+    if (note && !notes.some((item) => item.toLowerCase() === note.toLowerCase())) notes.push(note);
   };
-}
+  addNote(buildMissingPricingNote(fields));
+  cleanNotes(input.notes).forEach(addNote);
+  cleanNotes(input.warnings).forEach(addNote);
+  cleanNotes(input.uncertainties).forEach(addNote);
+  sellerSuggestions.forEach((claim) => addNote(`Left out of buyer copy (unverified seller claim): ${claim}`));
 
-function hasReviewValue(value: ProductAutofillFields[keyof ProductAutofillFields]): boolean {
-  return value !== null && value !== '';
-}
-
-function formatReviewValue(value: ProductAutofillFields[keyof ProductAutofillFields]): string {
-  if (!hasReviewValue(value)) return 'blank';
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  const text = String(value);
-  return text.length > 90 ? `${text.slice(0, 87)}...` : text;
-}
-
-function addUniqueQuestion(questions: string[], question: string) {
-  if (!questions.some((item) => item.toLowerCase() === question.toLowerCase())) questions.push(question);
-}
-
-function buildReviewQuestion(
-  field: keyof ProductAutofillFields,
-  currentValue: ProductAutofillFields[keyof ProductAutofillFields],
-  proposedValue: ProductAutofillFields[keyof ProductAutofillFields],
-): string {
-  const label = PRODUCT_AUTOFILL_FIELD_LABELS[field];
-  if (hasReviewValue(currentValue)) {
-    return `Should I change ${label} from "${formatReviewValue(currentValue)}" to "${formatReviewValue(proposedValue)}"?`;
-  }
-  return `Can you confirm ${label} should be "${formatReviewValue(proposedValue)}"?`;
-}
-
-/**
- * Enforces the admin review boundary independently of model compliance.
- * Only high-confidence, non-sensitive values going into blank fields may be
- * applied automatically. Every overwrite, sensitive fact, or less-certain
- * value remains pending until the admin explicitly accepts it.
- */
-export function reviewProductAutofillDraft(
-  draft: ProductAutofillDraft,
-  currentFields: ProductAutofillFields,
-): ProductAutofillDraft {
-  const autoApplyFields: (keyof ProductAutofillFields)[] = [];
-  const pendingChanges: ProductAutofillProposedChange[] = [];
-  const followUpQuestions = [...draft.follow_up_questions];
-
-  for (const field of PRODUCT_AUTOFILL_FIELD_KEYS) {
-    const proposedValue = draft.fields[field];
-    if (!hasReviewValue(proposedValue)) continue;
-
-    const currentValue = currentFields[field];
-    const confidence = draft.confidence[field] ?? null;
-    if (Object.is(currentValue, proposedValue)) {
-      if (confidence !== 'high') {
-        const confidenceLabel = confidence ? `${confidence} confidence` : 'no confidence rating';
-        addUniqueQuestion(
-          followUpQuestions,
-          `Can you confirm the existing ${PRODUCT_AUTOFILL_FIELD_LABELS[field]} value "${formatReviewValue(currentValue)}"? The assistant returned ${confidenceLabel}.`,
-        );
-      }
-      continue;
-    }
-
-    const reasons: ProductAutofillReviewReason[] = [];
-    if (hasReviewValue(currentValue)) reasons.push('changes-existing-value');
-    if (SENSITIVE_REVIEW_FIELDS.has(field)) reasons.push('sensitive-field');
-    if (confidence === 'low') reasons.push('low-confidence');
-    if (confidence === 'medium') reasons.push('medium-confidence');
-    if (confidence === null) reasons.push('missing-confidence');
-
-    if (reasons.length === 0) {
-      autoApplyFields.push(field);
-      continue;
-    }
-
-    const question = buildReviewQuestion(field, currentValue, proposedValue);
-    pendingChanges.push({
-      field,
-      current_value: currentValue,
-      proposed_value: proposedValue,
-      confidence,
-      reasons,
-      question,
-    });
-    addUniqueQuestion(followUpQuestions, question);
-  }
-
-  for (const warning of draft.warnings) {
-    addUniqueQuestion(
-      followUpQuestions,
-      `The assistant flagged this possible conflict: ${warning} Can you confirm how it should be handled?`,
-    );
-  }
-  for (const uncertainty of draft.uncertainties) {
-    addUniqueQuestion(
-      followUpQuestions,
-      `The assistant could not verify this: ${uncertainty} Can you clarify it?`,
-    );
-  }
-
-  const reviewSummary = pendingChanges.length > 0
-    ? `I left ${pendingChanges.length} proposed ${pendingChanges.length === 1 ? 'change' : 'changes'} for you to confirm before updating the form.`
-    : null;
-
-  return {
-    ...draft,
-    assistant_message: [draft.assistant_message, reviewSummary].filter(Boolean).join(' ') || null,
-    follow_up_questions: followUpQuestions.slice(0, 24),
-    review: {
-      auto_apply_fields: autoApplyFields,
-      pending_changes: pendingChanges,
-    },
-  };
+  return { fields, notes: notes.slice(0, MAX_PRODUCT_AUTOFILL_NOTES) };
 }
