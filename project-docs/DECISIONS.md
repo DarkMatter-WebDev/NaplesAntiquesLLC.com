@@ -6,6 +6,62 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-09-08**.
 
+## The hero's "New Arrivals" is a text link under the trio, never a fourth button (2026-09-10)
+
+Mocked three placements for a homepage entry to the newest-first shop view:
+replace Buy, a four-button row (Buy · New Arrivals · Sell · Visit Us, a
+clean 2×2 on phones), and a small underlined line beneath the trio. **The
+owner chose the line** ("placement and style c, label it new arrivals").
+Rules:
+
+- **Buy · Sell · Visit Us stays exactly three.** The phone layout is a
+  two-column grid whose "one down" rule keys on `.hero-cta:last-child`, so
+  anything added INSIDE `.home-hero-actions` silently breaks the 2 + 1
+  shape. The link is a sibling after that div.
+- **It is a `<Link>`, not an `<a>`** — the opposite of the Visit Us anchor
+  rule (*"An in-page jump is an `<a>`…"*). This one is a real navigation
+  and should arm the route progress bar.
+- **Label "New Arrivals →" / "Novedades →"**, matching the shop's
+  "Newest arrivals" / "Novedades" sort option so the landing page reads as
+  the same thing. Arrow is `aria-hidden`. Do not promote it to a button, a
+  filled pill, or a badge without asking — the quiet weight was the choice.
+- **Colour is `var(--hero-btn-color)`** so it cross-fades with the hero's
+  light/dark theme exactly like the buttons; the underline is a 55%
+  `color-mix` of the same colour so it never reads as a foreign accent.
+- **Size is 0.85rem desktop / 0.78rem phone** (owner asked for "a tiny bit
+  bigger" than the 0.75 / 0.7 it launched at, minutes after seeing it). It
+  is still smaller than the 0.75rem-uppercase-tracked buttons read, which
+  is the point; bigger than this and it becomes a fourth call to action.
+- **The hero grew by one text line on phones** (bottom-anchored block, so
+  the growth is upward into the open space; measured 24px clearance at
+  375×812, 20px at 320×660). If the hero ever needs that height back, this
+  line is the first thing to reconsider, not the buttons.
+
+## "Newest arrivals" sorts by `created_at`, newest `sort_order` breaks ties (2026-09-10)
+
+The shop's default "Inventory order" puts new listings LAST (the admin
+assigns `sort_order = max + 1`), so a shopper could never see what just
+came in. The Sort select now offers **"Newest arrivals"** (ES "Novedades";
+`?sort=newest`) as its second option. Rules:
+
+- **The timestamp is `created_at`.** There is no published/listed column
+  on `products`, and listings go live minutes after creation in practice.
+  Do not add a `listed_at` column unless the owner starts drafting days
+  ahead of publishing; if that happens, add it with a status-change trigger
+  and switch the comparator, keep the option value `newest`.
+- **Ties fall to `sort_order` DESCENDING.** Bulk imports share a
+  `created_at` (19 rows at 2026-06-12 16:28Z, 36 on 2026-07-20). Inside a
+  tie the higher `sort_order` is the later listing, so the fallback must be
+  the reverse of every other sort's fallback.
+- **Available pieces still come first**, then the sort — same as every
+  other option (the purchasable-first split is unchanged).
+- **No "oldest first."** It is not a standard storefront control; add it
+  only on request.
+- Valid values live in ONE set (`VALID_SORTS`, `lib/shop-filter-state.ts`)
+  and the option list in ONE component (`ShopSortSelect.tsx`, used by the
+  gallery toolbar and the filter drawer). A sort added to one without the
+  other is silently dropped from the URL.
+
 ## The storefront photo says "which door"; the homepage Visit Us block is a centred column with the photo and the square map beneath it (2026-09-08)
 
 The owner supplied a photo of the storefront (orange two-story building,

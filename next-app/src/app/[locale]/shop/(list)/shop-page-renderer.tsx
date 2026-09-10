@@ -291,6 +291,7 @@ const SHOP_PRODUCT_COLUMNS = [
   'item_year',
   'quantity',
   'sort_order',
+  'created_at',
 ].join(', ');
 const SHOP_PRODUCT_COLUMNS_WITHOUT_ITEM_YEAR = SHOP_PRODUCT_COLUMNS
   .split(', ')
@@ -624,6 +625,20 @@ export async function renderShopPage({
     const aPurchasable = isProductPurchasable(a.status, a.quantity);
     const bPurchasable = isProductPurchasable(b.status, b.quantity);
     if (aPurchasable !== bPurchasable) return aPurchasable ? -1 : 1;
+    if (filters.sort === 'newest') {
+      // "Newest arrivals" = most recently created listing first. New listings
+      // are appended at the END of inventory order (sort_order = max + 1), so
+      // this is the only way a shopper sees what just came in. Rows that share
+      // a created_at (the bulk imports) fall through to sort_order, newest last
+      // there too, so the tie-break is reversed as well.
+      const byCreated = compareNullableNumbers(
+        Date.parse(a.created_at),
+        Date.parse(b.created_at),
+        'desc',
+      );
+      if (byCreated !== 0) return byCreated;
+      return (b.sort_order ?? 0) - (a.sort_order ?? 0);
+    }
     if (filters.sort === 'weight-asc' || filters.sort === 'weight-desc') {
       const byWeight = compareNullableNumbers(
         a.gram_weight ?? a.weight_grams,

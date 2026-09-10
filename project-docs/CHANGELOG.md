@@ -1,6 +1,116 @@
 
 # Changelog
 
+## 2026-09-10 (later still) — homepage hero gets a quiet "New Arrivals" link under the Buy · Sell · Visit Us trio (BUILT + dev-verified + STAGED, rides with the sort batch; no SQL, no env vars)
+
+Owner: "add a button to the homepage hero that brings users to the shop page
+sorted by newest arrivals … maybe under or next to the buy sell visit us trio,
+or maybe just replace buy … but lets mock it up first." Mocked first
+(artifact "Hero New Arrivals Button": today / A replace Buy / B four buttons /
+C text link, desktop + phone, real hero tokens). **Owner chose C — "go with
+placement and style c, and label it new arrivals."** A four-up row (my
+recommendation) and replacing Buy were both declined.
+
+**What changed (one file, `components/home/HomeHeroOverlay.tsx`):**
+- `newArrivalsHref = \`${storeHref}?sort=newest\`` beside `storeHref`.
+- A `<Link className="home-hero-newest">` rendered AFTER the
+  `.home-hero-actions` div (a sibling, never a fourth child — the phone
+  grid's "one down" rule keys on `.hero-cta:last-child`), text
+  "New Arrivals →" / "Novedades →" (arrow `aria-hidden`), colour
+  `var(--hero-btn-color)` so it cross-fades with the light/dark theme like
+  the buttons, `pointer-events: auto` because the overlay is
+  click-transparent. A Next `<Link>`, not `<a>`: this IS a route change and
+  should arm the progress bar (the Visit Us anchor rule is the opposite case).
+- CSS: 0.75rem / 600 / 0.06em tracking, underline with a 4px offset and a
+  55% `color-mix` underline colour (solid on hover), the hero's
+  `text-shadow` halo, `margin-top: -0.6rem` to pull it up against the
+  buttons (the column gap is sized for form → buttons); phone: 0.7rem and
+  `-0.25rem` because the gap there is 0.85rem.
+
+**Dev verification (localhost:3007, DOM reads in the Browser pane):**
+- SSR HTML (curl) carries the link on `/` (`href="/shop?sort=newest"`,
+  "New Arrivals →") and `/es` (`href="/es/shop?sort=newest"`, "Novedades →").
+- 935px: link 95×18, centred on the trio (0px offset), 14px below the
+  buttons, 12px, rgb(122,88,0), underlined.
+- 375×812: trio still 2 + 1 (Buy/Sell at y 672, Visit Us at 722, 144px
+  each), link at y 770, 10px below Visit Us, centred, 11.2px, single line;
+  link bottom sits 24px above the hero's bottom edge (the bottom-anchored
+  block grew upward by one line, as designed).
+- 320×660: same shape — 141px buttons, link 88px wide, single line, no
+  right overflow, 20px above the hero's bottom.
+- The pane screenshot at 375 was cropped mid-hero (the known hidden-pane
+  capture artifact); the DOM numbers above are the evidence.
+
+**Size bump, same session:** owner — "can we make new arrivals on the
+homepage a tiny bit bigger?" → 0.75rem → **0.85rem** desktop (12 → 13.6px,
+link 107×20, still 14px under the buttons, centred) and 0.7rem →
+**0.78rem** phone (11.2 → 12.48px; at 320×660 the link is 99px wide, single
+line, no overflow, 20px clearance to the hero's bottom edge). Re-gated:
+tsc 0 · lint 0 · 1276/1276 (130 files) · build exit 0 (86 routes = 40 EN + 40 ES + 6).
+
+**Gate:** tsc 0 · lint 0 · 1276/1276 (130 files) · build exit 0 (86 routes = 40 EN + 40 ES + 6).
+
+## 2026-09-10 (later) — shop gallery gains a "Newest arrivals" sort (BUILT + dev-verified + STAGED, awaiting push; no SQL, no env vars)
+
+Owner (from work, over Remote Control + TeamViewer): "add a sorting option
+to the shop gallery page that allows users to sort items by recently listed
+/ posted / arrivals (whatever standard terminology is on other ecommerce
+sites)."
+
+**Why it was missing:** new listings are appended to the END of inventory
+order (`sort_order = max + 1`, `AdminShell.tsx`), so the default gallery
+shows the oldest pieces first and a returning shopper has no way to see what
+just came in. Nothing on the site ever surfaced `created_at`.
+
+**What changed (four files):**
+- `components/shop/ShopSortSelect.tsx` — second option `newest`, label
+  **"Newest arrivals"** / **"Novedades"** (Amazon "Newest Arrivals", Etsy
+  "Most Recent", Shopify "Date, new to old" — "Newest arrivals" is the
+  shopper-facing phrase; "Novedades" is the standard Spanish e-commerce
+  label). Placed directly under "Inventory order", ahead of price.
+- `lib/shop-filter-state.ts` — `newest` added to `VALID_SORTS` (an unknown
+  `?sort=` is still dropped).
+- `app/[locale]/shop/(list)/shop-page-renderer.tsx` — `created_at` added to
+  `SHOP_PRODUCT_COLUMNS`; the comparator sorts `Date.parse(created_at)`
+  descending after the existing purchasable-first split, with the tie-break
+  REVERSED to `sort_order` descending (the 2026-06-12 import gave 19 legacy
+  rows the same second, and 2026-07-20 has 36 on one day — inside a tie, a
+  higher `sort_order` is the later listing). Shared with `/shop-modern`
+  through `renderShopPage`.
+- `lib/__tests__/shop-filter-state.test.ts` — every offered sort survives
+  normalisation; `oldest` / `created-desc` are dropped.
+
+**Timestamp choice:** `created_at` (row creation), because no
+published/listed timestamp exists on `products` (checked
+`supabase/products.sql` and the tree). A listing drafted long before it is
+made available would sort by its draft date; the catalog shows the 09-09/10
+listings going live minutes after creation, so this was accepted rather than
+adding a `listed_at` column + trigger. Revisit only if the owner starts
+staging drafts days ahead. No "oldest first" option — not a standard control.
+
+**Dev verification (localhost:3007, `/shop?sort=newest&perPage=96`):** the
+`<option value="newest">Newest arrivals</option>` renders; the page lists
+78 available pieces ("78 of 131 pieces"), and matching each card to the
+public REST `products` order (`created_at.desc,sort_order.desc`, anon key)
+the first 68 of 72 keyed cards are in exact order — inventory #137 (created
+2026-09-10 15:47Z) first, then #136 → #133 (09-09), #132 (09-02). The four
+"mismatches" and six "missing" are the checker's own slug keying (legacy
+slugs without an inventory suffix), not the page. Screenshot in the Browser
+pane: Sort = "Newest arrivals", the chair pendant (#137) leads the grid.
+
+**Gate:** tsc 0 · lint 0 · 1276/1276 (130 files) · build exit 0 (86 routes = 40 EN + 40 ES + 6).
+
+## 2026-09-10 — photo-upload hotfix DEPLOYED and owner-verified; session closed
+
+Owner: "fix was successful, deployed successfully and tested, simply update
+docs and end session, no live verification needed." Taken as stated — no
+production probe was run (memory: *no unrequested production checks*).
+Everything from 2026-09-09 is therefore live: the fill-the-form assistant
+(50 s abort, success-only rate limit), server-side WebP uploads via
+`/api/admin/product-images` (with the owned-buffer copy), and the shrunk AI
+image payload. Docs flipped; staging re-synced. **Nothing is in flight.**
+The block below is the pre-deploy record.
+
 ## 2026-09-09 (night) — HOTFIX: the deployed WebP upload route 502'd on every photo ("SharedArrayBuffer is not allowed") — owned-buffer copy before Storage upload (BUILT + STAGED, needs a re-push)
 
 Owner, after deploying the two batches below: photos picked on the iPhone

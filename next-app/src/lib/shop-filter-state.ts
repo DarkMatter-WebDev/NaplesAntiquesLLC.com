@@ -47,6 +47,7 @@ const SHOP_JEWELRY_ITEM_TYPES = new Set<string>(SHOP_JEWELRY_ITEM_TYPE_KEYS);
 const GOLD_METAL_COLORS = new Set<string>(PRODUCT_METAL_VARIANTS.Gold.map((variant) => variant.value));
 const SILVER_METAL_COLORS = new Set<string>(PRODUCT_METAL_VARIANTS.Silver.map((variant) => variant.value));
 const VALID_SORTS = new Set([
+  'newest',
   'price-asc',
   'price-desc',
   'weight-asc',

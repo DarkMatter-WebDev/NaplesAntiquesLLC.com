@@ -64,6 +64,10 @@ const DARK_THEME: CSSProperties = {
 export default function HomeHeroOverlay({ locale, dark }: Props) {
   const isEs = locale === 'es';
   const storeHref = isEs ? '/es/shop' : '/shop';
+  // The shop already sorted newest-first (`?sort=newest`, ShopSortSelect).
+  // New listings are appended to the END of inventory order, so without this
+  // a returning visitor never sees what just came in from the homepage.
+  const newArrivalsHref = `${storeHref}?sort=newest`;
 
   // Reveal after fonts settle (mirrors the slideshow's is-ready fade timing);
   // a short fallback guarantees the text can never stay hidden.
@@ -224,6 +228,18 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
             );
           })}
         </div>
+        {/* Option C (owner, 2026-09-10): the trio is untouched and "New Arrivals"
+            is a quiet underlined line beneath it — deliberately NOT a fourth
+            button (a four-up row was mocked and declined). A <Link>, because
+            this IS a route change and should arm the progress bar. */}
+        <Link
+          href={newArrivalsHref}
+          className="home-hero-newest"
+          style={{ color: 'var(--hero-btn-color)', fontFamily: 'var(--font-label)', pointerEvents: 'auto' }}
+        >
+          {isEs ? 'Novedades' : 'New Arrivals'}
+          <span aria-hidden="true"> →</span>
+        </Link>
       </div>
 
       <style>{`
@@ -361,6 +377,22 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
         }
         .hero-cta:hover { scale: 1.04; }
 
+        /* "New Arrivals" text link under the trio. Pulled up against the
+           buttons (the column gap is sized for form → buttons, not for a
+           caption), underlined so it reads as a link over any photo. */
+        .home-hero-newest {
+          margin-top: -0.6rem;
+          font-size: 0.85rem;
+          font-weight: 600;
+          letter-spacing: 0.06em;
+          text-decoration: underline;
+          text-underline-offset: 4px;
+          text-decoration-color: color-mix(in srgb, currentColor 55%, transparent);
+          text-shadow: 0 1px 12px rgba(var(--hero-fade), 0.9);
+          transition: color 0.8s ease, text-decoration-color 0.2s ease;
+        }
+        .home-hero-newest:hover { text-decoration-color: currentColor; }
+
         .home-hero-top > span {
           margin-bottom: 1.25rem;
         }
@@ -443,6 +475,11 @@ export default function HomeHeroOverlay({ locale, dark }: Props) {
             grid-column: 1 / -1;
             justify-self: center;
             width: calc(50% - 0.375rem);
+          }
+
+          .home-hero-newest {
+            margin-top: -0.25rem;
+            font-size: 0.78rem;
           }
         }
 

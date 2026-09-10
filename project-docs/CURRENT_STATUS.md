@@ -4,19 +4,45 @@
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
 > in `DECISIONS.md`. Last reconciled: **2026-09-08**.
 
-## Start Here (handoff, 2026-09-09 — SUPERSEDES the blocks below)
+## Start Here (handoff, end of the 2026-09-10 session — SUPERSEDES the blocks below)
 
 **Read this, then `TASKS.md`.**
 
-🔴 **09-09 (night) — the two batches below were PUSHED AND DEPLOYED, and the
+🟡 **09-10 (later) — shop gallery "Newest arrivals" sort + homepage hero
+"New Arrivals →" link BUILT + dev-verified + STAGED, awaiting push (no SQL,
+no env vars).** One new option in the existing Sort select (`?sort=newest`,
+EN "Newest arrivals" / ES "Novedades"), `created_at` descending with
+`sort_order` descending as the tie-break; `created_at` joins the gallery
+column list. On the homepage the Buy · Sell · Visit Us trio is untouched and a
+small underlined "New Arrivals →" / "Novedades →" line sits beneath it,
+opening that sorted view (owner picked this "Option C" from a mockup over a
+four-button row and over replacing Buy). Five files. Gate
+tsc 0 · lint 0 · 1276/1276 (130 files) · build exit 0 (86 routes = 40 EN + 40 ES + 6). Detail: `CHANGELOG.md` 2026-09-10 (later); rule in
+`DECISIONS.md` → *"Newest arrivals"*. The block below is the prior handoff.
+
+✅ **09-10 — everything from 09-09 is DEPLOYED and owner-verified
+("fix was successful, deployed successfully and tested"): the Smart
+Listing Assistant now FILLS THE FORM (no accept/keep review, `{fields,
+notes}`, three rules, one Undo; 50 s provider abort with a readable
+message; rate limit counts successes only), product photos are encoded to
+WebP on the SERVER (`/api/admin/product-images`, sharp, owned-buffer copy
+— the first deploy 502'd with "SharedArrayBuffer is not allowed" until
+`toOwnedBuffer()`), and the assistant's image payload is shrunk to 1600px
+WebP. Staging equals source; nothing is in flight.** Open items are all
+owner-timing or dated look-backs — top of `TASKS.md` (GBP items, GSC/Bing
+look-backs, pg_cron overlap cleanup, optional PNG/JPEG batch conversion,
+uncalled `ai-speech` route). Gate at close: tsc 0 · lint 0 · **1275/1275
+(130 files)** · build exit 0 (86 routes = 40 EN + 40 ES + 6). Detail:
+`CHANGELOG.md` 2026-09-09 (three entries) and 2026-09-10; rules in
+`DECISIONS.md` → *"The Smart Listing Assistant fills the form"*.
+
+🟡 (superseded) **09-09 (night) — the two batches below were PUSHED AND DEPLOYED, and the
 new photo upload route 502'd on every photo in production
 (`SharedArrayBuffer is not allowed` — sharp's output on Netlify is
 SAB-backed, supabase-js's Blob rejects it; local Node does not reproduce
-it). HOTFIX BUILT + STAGED (`toOwnedBuffer()` copy before upload), **needs a
-re-push**; until then photo uploads in the admin FAIL (the assistant
-rebuild is live and unaffected). No objects were written. Gate tsc 0 ·
-lint 0 · 1275/1275 (130 files) · build exit 0. Verify on production only:
-one phone photo → `[product-images] stored` + a new `.webp` in the bucket.
+it). HOTFIX BUILT + STAGED (`toOwnedBuffer()` copy before upload) — pushed
+and owner-verified 09-10. No objects were written by the failed attempts.
+Gate tsc 0 · lint 0 · 1275/1275 (130 files) · build exit 0.
 `CHANGELOG.md` 2026-09-09 (night).**
 
 🟡 **09-09 (later) — product photos are now encoded to WebP on the SERVER

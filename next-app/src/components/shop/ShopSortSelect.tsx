@@ -6,6 +6,7 @@ import { useShopNavigation } from '@/components/shop/ShopNavigationProgress';
 
 const SORT_OPTIONS = [
   { value: '', label: 'Inventory order', labelEs: 'Inventario' },
+  { value: 'newest', label: 'Newest arrivals', labelEs: 'Novedades' },
   { value: 'price-asc', label: 'Price: low to high', labelEs: 'Precio: menor a mayor' },
   { value: 'price-desc', label: 'Price: high to low', labelEs: 'Precio: mayor a menor' },
   { value: 'weight-asc', label: 'Weight: low to high', labelEs: 'Peso: menor a mayor' },

@@ -30,6 +30,14 @@ describe('shop filter state', () => {
     expect(normalizeShopFilterState({ q: 'yellow   gold' })).toEqual({ q: 'yellow gold' });
   });
 
+  it('keeps every sort the gallery offers and drops unknown values', () => {
+    for (const sort of ['newest', 'price-asc', 'price-desc', 'weight-asc', 'weight-desc', 'brand-asc', 'brand-desc']) {
+      expect(normalizeShopFilterState({ sort })).toEqual({ sort });
+    }
+    expect(normalizeShopFilterState({ sort: 'oldest' })).toEqual({});
+    expect(normalizeShopFilterState({ sort: 'created-desc' })).toEqual({});
+  });
+
   it('only keeps item type options represented in public inventory', () => {
     const options = [
       { value: 'ring', label: 'Rings' },

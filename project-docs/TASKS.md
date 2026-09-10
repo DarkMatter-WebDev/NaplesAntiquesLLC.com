@@ -5,37 +5,48 @@
 
 ## ◻ OPEN — needs a human
 
-### 🔴 2026-09-09 (night) — RE-PUSH NEEDED: photo-upload hotfix (production 502 "SharedArrayBuffer is not allowed") — BUILT + STAGED
+### 🟡 STAGED 2026-09-10 (later) — shop gallery "Newest arrivals" sort + homepage hero "New Arrivals →" link (no SQL, no env vars) — awaiting push
 
-The assistant rebuild + server-side WebP were deployed; the upload route
-failed on every photo in production (sharp's Netlify output is SAB-backed;
-supabase-js refuses it; does not reproduce locally). Fix =
-`toOwnedBuffer()` in `lib/product-image-encode.ts`. No objects were written.
-- ◻ Copy to the repo folder and push (staging is synced).
-- ◻ **Verify on production** (the only place it can be verified): upload one
-  photo from the iPhone → it appears in the editor; Netlify log shows
-  `[product-images] stored` with `sourceFormat: 'jpeg'`; the bucket gains a
-  `.webp` object. If it still fails, the flash message names the cause —
-  read it before retrying.
+Five files: `ShopSortSelect.tsx` (option), `shop-filter-state.ts`
+(`VALID_SORTS`), `shop-page-renderer.tsx` (`created_at` column + comparator),
+`shop-filter-state.test.ts`, and `components/home/HomeHeroOverlay.tsx` (the
+text link under the trio — Option C from the mockup; the trio itself is
+unchanged). Dev-verified: `/shop?sort=newest` order matches the DB's
+`created_at desc` (#137 first); the hero link is centred under Visit Us at
+935 / 375 / 320 px, single line (0.85rem desktop / 0.78rem phone after the
+owner's "tiny bit bigger"), and links `/shop?sort=newest` (EN) /
+`/es/shop?sort=newest` (ES). Gate tsc 0 · lint 0 · 1276/1276 (130 files) · build exit 0 (86 routes = 40 EN + 40 ES + 6). Bundle any follow-up into the
+same push (owner pays per deploy). After the push, a spot check is enough:
+open `naplesestatejewelry.com`, tap "New Arrivals →" under the hero buttons —
+the shop should open with Sort = "Newest arrivals" and the newest inventory
+number leading.
+
+**Staging:** ✅ synced 2026-09-10 (later) — dry run listed exactly the 8 touched files (shop-page-renderer.tsx, ShopSortSelect.tsx, shop-filter-state.ts, shop-filter-state.test.ts + CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS), 0 Extras, 1074 total; real run copied 8 / 0 FAILED; follow-up dry run 0/0/0; leak check 0 `.env*`; SHA256 MATCH on the renderer, the sort select, the filter-state lib and CHANGELOG. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+**Staging (hero link):** ✅ synced 2026-09-10 (later still) — dry run listed exactly the 5 touched files (HomeHeroOverlay.tsx + CHANGELOG, CURRENT_STATUS, DECISIONS, TASKS), 0 Extras, 1074 total; real run copied 5 / 0 FAILED; follow-up dry run 0/0/0; leak check 0 `.env*`; SHA256 MATCH on HomeHeroOverlay.tsx, CHANGELOG, DECISIONS. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+**Staging (size bump):** ✅ synced 2026-09-10 (later still, 2) — dry run listed exactly the 4 touched files (HomeHeroOverlay.tsx + CHANGELOG, DECISIONS, TASKS), 0 Extras, 1074 total; real run copied 4 / 0 FAILED; follow-up dry run 0/0/0; leak check 0 `.env*`; SHA256 MATCH on HomeHeroOverlay.tsx and CHANGELOG. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### ✅ DEPLOYED 2026-09-10 — photo-upload hotfix (production 502 "SharedArrayBuffer is not allowed") — owner-verified
+
+Owner: "fix was successful, deployed successfully and tested … no live
+verification needed." No probe run. Fix = `toOwnedBuffer()` in
+`lib/product-image-encode.ts` (sharp's Netlify output is SAB-backed;
+supabase-js refuses it; does not reproduce locally — production-only
+verification, done by the owner). **Staging equals source; nothing is in
+flight.**
+
+**Staging (session close 09-10):** ✅ synced 2026-09-10 — dry run listed exactly the 3 flipped docs (CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras, 1074 total; real run copied 3 / 0 FAILED; follow-up dry run 0/0/0; leak check 0 `.env*`; CHANGELOG hash MATCH. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
 **Staging (hotfix):** ✅ synced 2026-09-09 (night) — dry run listed exactly the 5 touched files (product-image-encode.ts, product-image-encode.test.ts + CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras, 1074 total; real run copied 5 / 0 FAILED; leak check 0 `.env*`; SHA256 MATCH on the encode lib, its test, CHANGELOG. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
 
-### ✅ DEPLOYED 2026-09-09 — Smart Listing Assistant rebuilt (fill-the-form, 50 s timeout) + server-side WebP uploads (upload part broken on production until the hotfix above is pushed)
+### ✅ DEPLOYED 2026-09-09/10 — Smart Listing Assistant rebuilt (fill-the-form, 50 s timeout) + server-side WebP uploads — owner-verified 09-10
 
-No SQL, no env vars. What changed and why: `CHANGELOG.md` 2026-09-09. Then:
-- ◻ **Verify live:** list one real item from the phone. Expect the form to
-  fill in ~12–18 s with at most a few note lines and an **Undo AI Fill**
-  button; correct by clearing a field + typing the fact + **Update
-  Listing**. Netlify → Logs → Functions → Next.js Server Handler → switch
-  to **Last day** first, filter `ai-product-fill`: the success line now
-  carries `noteCount` / `priorInputCount` and `elapsedMs` well under 50 000;
-  no `This operation was aborted`.
-- ✅ **Phone photo size — FIXED for new uploads (09-09 later):** every photo
-  is now encoded to WebP on the server (`/api/admin/product-images`, sharp)
-  and the assistant shrinks its copies to 1600px WebP. ◻ After the push:
-  upload one photo from the iPhone and check the Netlify log for
-  `[product-images] stored` with `sourceFormat: 'jpeg'` and an
-  `outputBytes` in the ~100–300 KB range; the new object name ends `.webp`.
+No SQL, no env vars. What changed and why: `CHANGELOG.md` 2026-09-09
+(three entries). Still open from this work, owner's timing:
+- ✅ Phone photo size — every photo is now encoded to WebP on the server
+  and the assistant shrinks its copies to 1600px WebP (owner-verified
+  09-10).
 - ◻ **Optional, only if Storage cost ever matters — convert the existing
   46 PNG + ~42 JPEG originals to WebP.** Deliberately NOT done: shoppers
   already get WebP/AVIF via the Netlify Image CDN, so it changes nothing
