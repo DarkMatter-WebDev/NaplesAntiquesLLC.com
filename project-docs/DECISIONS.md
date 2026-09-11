@@ -4,7 +4,34 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-09-10**.
+> compaction. Last reconciled: **2026-09-11**.
+
+## `/free-evaluation` is the call/visit-first "Free Estate Jewelry Appraisal" page; buttons say "Free Appraisal" (2026-09-11)
+
+- **Decision.** The page leads with the phone and the showroom. The form is
+  the optional route, placed just above the closing CTA ("Prefer to Write?").
+  A "Come to Us, or We Come to You" section offers the showroom (walk-ins
+  fine; call ahead for larger collections) and free home visits in the six
+  `SERVICE_AREAS` cities "and farther for larger collections". Never claim
+  "no minimum" (owner, 09-11: "yes, minimum").
+- **Wording.** Customer-facing labels say "appraisal" ("Free Appraisal" /
+  "Tasación Gratuita"), because searchers use that word. The title carries
+  the estate angle so it does not compete with `/jewelry-appraisal` ("Free
+  Jewelry Appraisal in Naples, FL"). The page says plainly that a written
+  insurance/probate appraisal is a different service.
+- **The URL stays `/free-evaluation`** (inbound links, the GBP booking link,
+  legacy `.html` 308s); the `freeEvaluation` message key stays too.
+- **Footer:** this page's link reads "Free Estate Appraisal" so it never
+  sits beside "Free Appraisals" (`/jewelry-appraisal`) as a near-duplicate.
+- **Why.** The 09-11 investigation found many lost calls were for the free
+  evaluation; plausible contributors include form-first CTAs and the
+  in-home → walk-in reframing. Owner: people wanting a free evaluation do not
+  want to deal with photos; they want a visit or to come in.
+- **How to apply.** New buttons pointing here say "Free Appraisal"; the phone
+  comes first wherever both appear; photos are never required; hours come
+  from `getStoreHours()` and cities from `SERVICE_AREAS`, never hardcoded.
+  Supersedes the 2026-08-09/10 "form in the second block" layout in
+  `features/lead-capture.md`.
 
 ## The Turbopack build cache stays off (2026-09-10)
 
@@ -814,6 +841,15 @@ stones to discuss them before travelling. Do not invent a refusal or minimum-val
 - **Public Q&A is retired on this listing** (only "Ask Maps" remains, checked
   on both Search and Maps 2026-08-30). Seed FAQs on the site instead.
 - GBP post images reject WebP — convert to JPG first.
+- ⛔ **No phone number anywhere in GBP post text** (Google: "we do not allow
+  your post content to include a phone number"; the 08-30 post was removed
+  and posting turned off for days). Use the **Call now** button. Also keep
+  addresses, emails and URLs out of the text; never hide a number in the image.
+- GBP's post preview is a wide box (~1.56:1). A portrait photo gets its
+  top or bottom cut off — place it uncropped on a wide JPG canvas with
+  blurred sides (done 2026-09-11) and check the composer preview.
+- The post composer in Business Profile Manager is an iframe the Chrome
+  tools cannot reach; open the frame's own URL as the page to attach files.
 - Profile edits publish through a "pending review, up to ~1 day" state;
   services/categories/date all went through same-day.
 - Google previously REJECTED the two wheelchair-accessibility attributes;

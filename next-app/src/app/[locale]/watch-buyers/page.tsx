@@ -149,7 +149,7 @@ export default async function WatchBuyersPage({ params }: Props) {
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link href={evalHref} className="gold-button">
-                  {isEs ? 'EVALUACIÓN GRATUITA DE RELOJES' : 'GET A FREE WATCH EVALUATION'}
+                  {isEs ? 'TASACIÓN GRATUITA DE RELOJES' : 'GET A FREE WATCH APPRAISAL'}
                 </Link>
                 <a
                   href="tel:2394048505"
@@ -242,14 +242,14 @@ export default async function WatchBuyersPage({ params }: Props) {
             </p>
             <div className="flex flex-col justify-center gap-6 md:flex-row">
               <Link href={evalHref} className="gold-button">
-                {isEs ? 'PROGRAMAR EVALUACIÓN' : 'SCHEDULE AN EVALUATION'}
+                {isEs ? 'PROGRAMAR TASACIÓN' : 'SCHEDULE AN APPRAISAL'}
               </Link>
               <a
                 href="tel:2394048505"
                 className="outline-button"
                 style={{ borderColor: 'rgba(255,255,255,0.32)', color: 'white', background: 'rgba(255,255,255,0.08)' }}
               >
-                CALL (239) 404-8505
+                {isEs ? 'LLAMAR (239) 404-8505' : 'CALL (239) 404-8505'}
               </a>
             </div>
           </div>

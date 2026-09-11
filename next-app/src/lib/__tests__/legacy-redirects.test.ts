@@ -22,6 +22,12 @@ describe('legacy redirect resolution', () => {
     expect(resolveLegacyRedirect('/es/account/saved')).toEqual({ destination: '/es/shop', permanent: false });
   });
 
+  it('sends the old process.html page to the free-evaluation page in both locales (English 404d before 2026-09-11)', () => {
+    expect(resolveLegacyRedirect('/process.html')).toEqual({ destination: '/free-evaluation', permanent: true });
+    expect(resolveLegacyRedirect('/en/process.html')).toEqual({ destination: '/free-evaluation', permanent: true });
+    expect(resolveLegacyRedirect('/es/process.html')).toEqual({ destination: '/es/free-evaluation', permanent: true });
+  });
+
   it('maps the locale root correctly for index.html (never /es/)', () => {
     expect(resolveLegacyRedirect('/index.html')).toEqual({ destination: '/', permanent: true });
     expect(resolveLegacyRedirect('/es/index.html')).toEqual({ destination: '/es', permanent: true });

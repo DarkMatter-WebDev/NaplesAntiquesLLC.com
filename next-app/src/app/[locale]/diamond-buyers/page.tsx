@@ -135,7 +135,7 @@ export default async function DiamondBuyersPage({ params }: Props) {
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link href={evalHref} className="gold-button">
-                  {isEs ? 'EVALUAR MIS JOYAS' : 'GET A JEWELRY EVALUATION'}
+                  {isEs ? 'TASACIÓN GRATUITA' : 'GET A FREE APPRAISAL'}
                 </Link>
                 <a
                   href="tel:2394048505"
@@ -228,7 +228,7 @@ export default async function DiamondBuyersPage({ params }: Props) {
             </p>
             <div className="flex flex-col justify-center gap-6 md:flex-row">
               <Link href={evalHref} className="gold-button">
-                {isEs ? 'PROGRAMAR EVALUACIÓN' : 'SCHEDULE AN EVALUATION'}
+                {isEs ? 'PROGRAMAR TASACIÓN' : 'SCHEDULE AN APPRAISAL'}
               </Link>
               <a
                 href="tel:2394048505"

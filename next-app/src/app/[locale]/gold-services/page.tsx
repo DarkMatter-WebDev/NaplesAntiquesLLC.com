@@ -152,7 +152,7 @@ export default async function GoldServicesPage({ params }: Props) {
                   href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
                   className="gold-button"
                 >
-                  {isEs ? 'EVALUACIÓN GRATIS' : 'FREE EVALUATION'}
+                  {isEs ? 'TASACIÓN GRATUITA' : 'FREE APPRAISAL'}
                 </Link>
                 {/* 2026-09-08 (mockup approved): this was a SECOND link to the
                     same form ("Free Evaluation" beside "Get an Estimate"). The
@@ -236,7 +236,7 @@ export default async function GoldServicesPage({ params }: Props) {
               className="outline-button inline-flex items-center gap-4 shrink-0"
               style={{ color: '#735c00' }}
             >
-              {isEs ? 'INICIAR EVALUACIÓN' : 'START EVALUATION'}
+              {isEs ? 'INICIAR TASACIÓN' : 'START YOUR APPRAISAL'}
               <AppIcon name="trending_flat"  />
             </Link>
           </div>
@@ -427,14 +427,14 @@ export default async function GoldServicesPage({ params }: Props) {
                 href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
                 className="gold-button"
               >
-                {isEs ? 'EVALUACIÓN GRATUITA' : 'FREE EVALUATION'}
+                {isEs ? 'TASACIÓN GRATUITA' : 'FREE APPRAISAL'}
               </Link>
               <a
                 href="tel:2394048505"
                 className="outline-button"
                 style={{ borderColor: 'rgba(255,255,255,0.32)', color: 'white', background: 'rgba(255,255,255,0.08)' }}
               >
-                CALL (239) 404-8505
+                {isEs ? 'LLAMAR (239) 404-8505' : 'CALL (239) 404-8505'}
               </a>
             </div>
           </div>

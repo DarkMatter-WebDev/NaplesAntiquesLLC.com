@@ -2,13 +2,37 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-09-10**.
+> in `DECISIONS.md`. Last reconciled: **2026-09-11**.
 
-## Start Here (2026-09-10 night — SUPERSEDES the blocks below)
+## Start Here (2026-09-11 night — SUPERSEDES the blocks below)
 
 **Read this, then `TASKS.md`.**
 
-🟡 **The Netlify "Exposed secrets" failure is FIXED and the fix is STAGED with
+🟡 **09-11 night — STAGED, awaiting the owner's push (no SQL, no env):**
+`/free-evaluation` rebuilt call/visit-first as "Free Estate Jewelry
+Appraisal — Home or Showroom" (URL unchanged), sitewide "Free Appraisal"
+button labels, `/process.html` 308, Spanish LLAMAR buttons, QR claim
+removed. Gate green (tsc 0 · lint 0 · 1278/1278 · build 0). Staging
+synced. After the deploy: IndexNow. Details: `TASKS.md` top, `CHANGELOG.md`.
+
+◻ **09-11 citation audit delivered** (report link in `TASKS.md` top): GBP
+opening date now Sept 1 (Maps shows hours again); Apple Maps hours wrong,
+Bing unpublished, BBB absent — owner sign-ins needed.
+
+✅ **Yelp moved to buyer-first the same night (owner-approved, all 10 items
+applied and re-read; `TASKS.md` top).** Two loose ends: the Estate
+Liquidation category is pending Yelp review (recheck ~09-12), and Yelp says
+established 2010 while GBP now says opened September 2026 — owner to pick one.
+
+✅ **DEPLOYED and owner-confirmed: the Turbopack build-cache fix plus the
+whole 09-10 SEO/seller batch** ("pushed and deployed successfully … no
+production verification needed" — no probe run). The Netlify secrets scan
+passes with `experimental.turbopackFileSystemCacheForBuild: false`.
+**Staging equals source; nothing is in flight.** IndexNow submitted after
+the deploy: **200 OK for 220 URLs** (live sitemap). Left: the gold-page and
+qualified-call look-backs in `TASKS.md`. The block below is the pre-deploy record.
+
+🟡 (superseded, pre-deploy record) **The Netlify "Exposed secrets" failure is FIXED and the fix is STAGED with
 the 09-10 SEO batch, awaiting the owner's push (no SQL, no env vars).** The
 staged files never held a secret. The prior agent's batch upgraded Next
 16.2.12 → 16.3.4, and Next 16.3 turns the Turbopack persistent BUILD cache on

@@ -57,7 +57,7 @@ export default function GoldMarksTeaser({ locale }: { locale: string }) {
           </p>
           <div className="mt-7">
             <Link href={evalHref} className="gold-button">
-              {isEs ? 'PROGRAMAR EVALUACIÓN' : 'Schedule Evaluation'}
+              {isEs ? 'PROGRAMAR TASACIÓN' : 'Schedule Appraisal'}
             </Link>
           </div>
         </div>

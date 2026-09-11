@@ -24,10 +24,15 @@ Reviews/recovery and legitimate local business mentions remain owner-deferred ta
 The page is built to be **texted to someone who does not know what they own**,
 so its structure is deliberate and should not be casually rearranged:
 
-- The **form is not in the hero.** It lives in a second `#request` block under
-  a plain lead-in, because the owner's read was that arriving straight into a
-  form "feels like it's shoved down their throat". The hero explains the
-  service first and ends in two CTAs (`#request` anchor and the phone number).
+- **2026-09-11 rebuild (supersedes the original order):** the page is
+  call/visit-first. The hero's buttons are Call and Visit the Showroom
+  (`#ways`), with a phone-hours line and a small "Prefer to write?" link.
+  The second block is `#ways` ("Come to Us, or We Come to You": showroom +
+  home-visit cards). The form (`#request`) sits just above the closing CTA
+  as "Prefer to Write? Send a Quick Note". Title: "Free Estate Jewelry
+  Appraisal — Home or Showroom". Rule: `DECISIONS.md` (2026-09-11).
+- The **form is never in the hero** — the owner's read was that arriving
+  straight into a form "feels like it's shoved down their throat".
 - **Photos are optional.** `EvalForm` accepts a submission with either photos
   **or** a one-line description — it only blocks when both are empty. Do not
   make photos required; the whole pitch is "you don't need to sort anything

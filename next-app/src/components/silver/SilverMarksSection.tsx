@@ -238,7 +238,7 @@ export default function SilverMarksSection({ locale }: { locale: string }) {
 
       <div className="mt-2 flex flex-wrap gap-3">
         <Link href={isEs ? '/es/free-evaluation' : '/free-evaluation'} className="gold-button">
-          {isEs ? 'Evaluación gratuita de plata' : 'Free silver evaluation'}
+          {isEs ? 'Tasación gratuita de plata' : 'Free silver appraisal'}
         </Link>
         <Link href={isEs ? '/es/jewelry-appraisal/hallmarks' : '/jewelry-appraisal/hallmarks'} className="outline-button">
           {isEs ? 'Guía completa de sellos →' : 'Full hallmarks guide →'}

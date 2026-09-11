@@ -1,11 +1,266 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-09-10**.
+> in `CHANGELOG.md`. Last reconciled: **2026-09-11**.
 
 ## ◻ OPEN — needs a human
 
-### 🟡 READY TO PUSH 2026-09-10 (night) — Netlify "Exposed secrets" FIXED (Turbopack build cache off) + the whole 09-10 SEO batch below (no SQL, no env vars)
+### 🟡 2026-09-11 — Free-evaluation calls: page rebuilt call/visit-first + small fixes STAGED (awaiting owner push)
+
+Findings in `SEO_LEAD_AUDIT.md` → "Free-evaluation follow-up". Built 09-11
+night (`CHANGELOG.md`): `/free-evaluation` is now the "Free Estate Jewelry
+Appraisal — Home or Showroom" page (call/visit first, home-visit section,
+form last), sitewide "Free Appraisal" labels, `/process.html` 308, Spanish
+LLAMAR buttons, QR claim removed. No SQL, no env vars.
+- ✅ Staging synced 09-11 night: 39 files (33 app + 6 docs), follow-up dry run
+  0, no `.env*` in staging, SHA256 spot-checks match.
+- ◻ **Owner: push + deploy** (staging synced). After the deploy the agent
+  runs `npm run indexnow` (titles changed); optional live check that
+  `/process.html` answers 308.
+- ◻ Owner: did walk-ins rise after 08-18? Were the free-evaluation calls
+  mostly about home visits? Early-morning callers?
+- ✅ GBP post published 09-11 night: free estate jewelry appraisals, showroom
+  or home, Call now button, Chris-at-the-counter photo (`CHANGELOG.md`).
+  ◻ **Recheck ~09-13** that it still says Published — the 08-30 post was
+  removed ~2 days after passing the instant check. Do not repost the same
+  text (repetitive-content rule).
+- ◻ GBP (owner, not code): restore "free in-home appraisal" wording in GBP
+  services/description; decide whether the GBP booking link stays on
+  `/free-evaluation` (now call-first, so most of the concern is gone).
+- ◻ Look-back ~10-09: appraisal / home-visit calls vs the 09-11 baseline;
+  GSC "free jewelry appraisal" queries landing on `/free-evaluation` vs
+  `/jewelry-appraisal` (cannibalization watch).
+- Dropped (owner 09-11: "ignore those if they dont affect seo, only focus on
+  anything that will get us calls"): the `/sell` EN/ES button wording
+  mismatch and the admin banner link-option label. Do not reopen.
+
+### ◻ 2026-09-11 — Citation (NAP) campaign: Steps 1–5 DELIVERED; owner actions open (Apple hours, Bing publish, BBB add, trade directories)
+
+Report (private artifact, owner's reference — master record, audit, checklists,
+two outreach emails, Moz Local vs Yext): https://claude.ai/code/artifact/441be9e1-19c3-4627-b4fe-fef5bc7a08ae
+
+**Step 1 ✅** owner confirmed the right-hand "citation standard" column below
+(09-11) and moved the GBP opening date to **Sept 1, 2026** → Maps now shows
+"Closed · Opens 11 AM" (verified), "Opens September" gone.
+
+**Step 2 audit (09-11, owner's Chrome, read-only except Yelp):**
+- Google ✅ baseline. Yelp ✅ NAP + hours match; categories Gold Buyers,
+  Jewelry, Diamond Buyers — owner: KEEP Diamond Buyers, gold first (it is).
+- ◻ **Apple Maps** (claimed, "From the Business"): NAP ✅ but hours WRONG
+  (Tue–Sat 12–3, Sun–Mon closed); About text retail-first; delivery/curbside
+  attributes. Owner fixes in businessconnect.apple.com (draft About in report).
+- ◻ **Bing**: NO listing on Bing Maps — the 09-01 import never published.
+  bingplaces.com offers "Continue as Chris" (Google SSO) — not clicked
+  without the owner's OK.
+- ◻ **BBB**: no profile (name, legal name, phone searched) → free
+  "Request a Business"; accreditation not needed.
+- ◻ **Yelp recheck ~09-14:** Estate Liquidation not visible; "Established"
+  stuck at 2010 (2026 saved 3× — shows, then reverts on reload); a Diamond
+  Buyers removal tried 09-11 did not register — if it vanishes later, re-add.
+
+**Step 3:** JA — not a member (10 retail members within 25 mi); JBT — free
+listing, status unknown (members-only lookup); GIA Retailer Lookup — not
+listed (Gulfcoast Coin & Jewelry, Yamron, Beckner are), register only if
+eligible. **Step 4:** Chamber + partner emails drafted (owner sends).
+**Step 5:** skip Yext; finish Apple/Bing/BBB by hand; optional Moz Local
+Lite monthly for the long tail.
+
+**DBA question (owner, 09-11):** Apple Business shows "Naples Antiques, LLC"
+because the ORGANIZATION record is the legal entity, verified against
+D-U-N-S 144420694; Apple labels it not shown to customers. The customer-facing
+brand and location are already "Naples Estate Jewelry". There is no DBA field
+in Apple Business, and the org name must stay the legal name. The DBA belongs
+on the public records:
+- ✅ **Florida fictitious name "Naples Estate Jewelry" is REGISTERED**
+  (owner confirmed 09-11). (Unrelated: a dissolved "NAPLES ESTATE JEWELRY,
+  INC.", doc P98000005757, also exists on Sunbiz.)
+- ✅ **Keep 4243 30th Ave SW** as the Sunbiz / D&B legal address (owner:
+  the showroom may move). Customer-facing listings keep the Shirley St
+  showroom; this split is deliberate.
+- ◻ **Dun & Bradstreet — owner sign-in needed.** D&B's free "View / Update
+  Company Information" search finds **NAPLES ANTIQUES LLC, 4243 30th Ave SW,
+  Naples FL 34116, Active, single location — no phone, no trade name
+  shown** (D-U-N-S 144420694 per Apple). The next step requires identity
+  verification + a D&B account (owner/officer only) — stopped there, tab
+  left on "Continue". In D-U-N-S Manager request: add trade name (DBA)
+  "Naples Estate Jewelry"; add phone (239) 404-8505; add website
+  https://naplesestatejewelry.com; keep the 4243 address. It's free — skip
+  every paid upsell (Credit Builder, CreditSignal upgrades, etc.). D&B may
+  phone the registered officer to validate.
+  **09-11:** "Continue" opens D&B's "Create an account" form (name, email,
+  terms, Register) — account creation is the owner's; stopped there. Once
+  the owner is registered + identity-verified, the edits above can be
+  entered for them.
+  **09-11 (later):** owner registered, logged in and passed D&B's identity
+  check. myD&B now shows the company linked: NAPLES ANTIQUES LLC, D-U-N-S
+  14-442-0694, LLC, 4243 30th Ave SW, **Phone: N/A**, "Year Started 2026".
+  D-U-N-S Profile Manager answers "Thank You for Accepting the Terms — your
+  request is being processed… check back after some time" (still so after
+  ~2 min). ◻ NEXT: open my.dnb.com → D-U-N-S Profile Manager; when it loads,
+  fill trade name / phone / website (address unchanged), owner submits.
+
+**09-11 (latest):**
+- ✅ **GIA Retailer Lookup APPROVED** (owner).
+- 🟡 **Apple Business updated, "In Review" (≤5 business days)** — owner
+  signed in (org "Naples Antiques, LLC" → Brands → Locations → Naples Estate
+  Jewelry, Verified). Hours → Mon–Fri 11–3 · Sat 11–4 · Sun closed; About →
+  the buyer-first text (same as GBP/Yelp); Good to Know → Appointments Only,
+  Delivery, Same-Day / No-Contact Delivery, Curbside Pickup set to NOT
+  offered (In-Store Pickup kept — checkout has Local Pickup). Address left as
+  stored "Suite 104" (displays "Ste 104"; editing risks re-verification).
+  Category stays "Gold Buyer". ◻ Owner's call: Apple suggests adding a
+  backup account to avoid lockout. ◻ Recheck the public place card ~09-18.
+
+**09-11 (later) — follow-through in the owner's Chrome:**
+- ✅ **GIA Retailer Lookup SUBMITTED** by the owner (form pre-filled by us:
+  "GIA Diamond Grading Reports" only — owner carries GIA-graded diamonds
+  occasionally; master record; showroom hours; contact = Chris Surette /
+  store phone / info@). "Submitted for review" — ◻ watch info@ for GIA's
+  approval, then search 34109 on the Retailer Lookup.
+- ✅ **BBB free profile SUBMITTED by the owner 09-11** (bbb.org "Thank you
+  for submitting" page seen). ◻ Owner confirms BBB's email to info@; recheck
+  bbb.org search for the profile ~09-18.
+- (was) ◻ **BBB free profile — form PRE-FILLED, owner clicks "Create Profile"**
+  (bbb.org/get-listed → I own a business). Categories Gold Buyers, Estate
+  Jewelry, Silver Buyers. Not clicked by us: it creates a BBB account and
+  accepts BBB's terms.
+- ◻ **Bing Places — NOT signed in.** The 09-01 listing (bizid f818777b…)
+  lives under the owner's **Microsoft account**, "Pending publish" with a
+  7–12 day ETA (→ ~09-13). The sign-in page's "Continue as Chris" is
+  info@surettesystems.com (Google) — would start a separate empty account;
+  never use it. Recheck Bing Maps after 09-13; if absent, owner signs in via
+  "Microsoft account" and reads the status.
+- Owner-only still: Apple Business Connect hours/About, JA (paid), JBT
+  (needs principals/references), Chamber + partner emails.
+
+(Step 1 baseline record, 09-10 night:)
+
+Owner asked for a 5-step citation project (baseline → audit Apple/Bing/BBB/
+Yelp → jewelry directories → Chamber outreach email → Moz Local vs Yext),
+source of truth = the website + GBP. Step 1 read-only: source
+`next-app/src/lib/business-location.ts`, live homepage HTML (HTTP 200,
+JewelryStore schema), public Maps listing + local pack in the owner's Chrome.
+
+| Field | Website (visible / schema) | GBP (public Maps) | Citation standard |
+|---|---|---|---|
+| Name | Naples Estate Jewelry | Naples Estate Jewelry | Naples Estate Jewelry |
+| Street | 6240 Shirley St, Ste 104 | 6240 Shirley St Ste 104 | 6240 Shirley St, Ste 104 (line 2 = Ste 104 where split) |
+| City/ZIP | Naples, FL 34109 | Naples, FL 34109 | Naples, FL 34109 |
+| Phone | (239) 404-8505 (151 uses); schema +12394048505 | (239) 404-8505 | (239) 404-8505 |
+| Website | https://naplesestatejewelry.com | naplesestatejewelry.com | https://naplesestatejewelry.com |
+
+The site and GBP match; the only difference is Google's display dropping the
+comma before "Ste" (not a discrepancy). Phone variants 239-404-8505 etc.
+exist only in `phone.test.ts`. Stale identities to hunt in Step 2: legal
+entity Naples Antiques LLC, old trading names (Naples Jewelry Buyers, Naples
+Gold & Silver Buyer), old domains (.co, naplesantiquesllc.com), pre-08-17
+"mobile / no storefront" copy.
+
+🔴 **Found in passing — GBP shows "Opens September"** on Maps and in the
+local pack (competitors show "Closed · Opens 9 AM"): the opening date set
+today is September 2026 with the day unset, so Google treats the business as
+pre-opening and hides its hours. Owner decision: set a past opening date
+(the true start, or a September day ≤ today). Also settles the Yelp
+"Established in 2010" question. No change made.
+
+### ✅ DONE 2026-09-10 (night) — Yelp moved to buyer-first (owner: "go ahead with all of it"); ◻ one category change unconfirmed
+
+Every save was re-read after a reload; the last three were also read on the
+public page. Budget $15/day and radius 15 miles unchanged (keeps the $135.39
+Bonus Ads credit).
+
+1. ✅ **Blocked** engagement rings, custom jewelry, handmade jewelry, gift
+   shops, buy gold bullion (12 blocked terms total).
+2. ✅ **Boosts:** removed Gold (still eligible) and Antique Jewelry (a custom
+   term, so it left the list entirely); added best place to sell gold, coin &
+   gold buyers, sell jewelry, sell estate jewelry, jewelry buyers, silver
+   buyers — Yelp accepted all four typed terms. 15 boosted terms total.
+3. ✅ **Post** edited in place (same photo, runs Aug 21 – Nov 19): "Selling
+   gold, silver or jewelry?" / "Bring single pieces, broken chains, sterling
+   flatware or a whole inherited collection to our Shirley Street showroom
+   for a free, no-obligation offer. Calls answered daily, 9 AM–6 PM."
+4. ✅ **Highlights** order: Free estimates, Walk-ins welcome (the two shown in
+   search), Available by appointment, Free consultations, Mobile services,
+   Locally owned & operated. "Committed to satisfaction" dropped.
+5. ✅ **CTA** "Sell gold & silver · 9 AM–6 PM" (exactly 30 chars) / Call for
+   details → (239) 404-8505.
+6. ✅ **Ad photo** smart selection OFF, pinned the gold-jewelry pile.
+   **Slideshow** pinned: gold pile, mixed lot box, coin tubes, chain in hand,
+   logo, brooches; chain display + jewelry trays left unpinned (auto-sorted
+   last).
+7. ◻ **Estate Liquidation category — submitted, NOT visible.** The post-save
+   screen showed Gold Buyers, Jewelry, Diamond Buyers (stale) with no Estate
+   Liquidation; after a reload and on the public page only Gold Buyers,
+   Jewelry. Yelp moderates categories and shows stale lists meanwhile. Not
+   resubmitted (a second request could collide). Recheck ~09-12: if Estate
+   Liquidation is still absent, add it once more; if Diamond Buyers ever
+   reappears publicly, remove it again.
+8. ✅ **History** "Established in 2010" + "Chris Surette has bought estate
+   jewelry, gold and sterling silver from Naples families since 2010. Sellers
+   get a free evaluation and a clear, no-obligation offer at our Shirley
+   Street showroom." ⚠️ Yelp REQUIRES the year; 2010 matches the approved
+   text, but GBP's opening date was changed to **September 2026** today —
+   owner to decide which is right and align the other (Yelp: Business
+   Information → History → Edit). **Meet the Business Owner** card: Chris S.,
+   Business Owner, bio "We buy gold jewelry, sterling silver and flatware,
+   coins and estate jewelry, one piece or a whole collection. Every
+   evaluation is free, and you're never obligated to sell." No photo.
+9. ✅ **Website** → `https://naplesestatejewelry.com/sell/naples` (Yelp
+   "reviews" basic-info edits; the public page already links the new URL).
+10. ✅ Budget/radius untouched.
+
+◻ **Owner:** buying photos (gold testing, scale, sterling flatware, a
+counter evaluation) to replace the retail-looking chain display and trays.
+◻ **Measure** ~09-24 on the same Yelp dashboard: impressions, clicks, CPC,
+leads, cost per lead, calls (baseline above: 6.6K / 55 / $4.82 / 15 /
+$16.06, 4 calls), plus whether callers are sellers.
+
+### (plan record) 2026-09-10 (night) — Yelp buyer-focus plan: AUDITED read-only, then approved and implemented above
+
+Owner: "audit my Yelp ads … move it towards mainly us buying jewelry, gold,
+and silver and move away from advertising that we sell it. plan then i will
+confirm before implement." Audit in the owner's Chrome; **nothing saved**
+(every dialog cancelled, category search typed and cancelled).
+
+**State found:** budget $15/day, 15 miles, goal Get more phone calls (call
+reporting off), audience "Limited". Last 30 days 6.6K ad impressions, 55
+clicks, $4.82 CPC, 15 ad leads, $16.06 per lead; Sept 1–10 spend $144.55;
+Yelp Bonus Ads $135.39 free through Feb 17 2027 (needs a minimum budget).
+Ad text + Specialties already seller-led. Categories now **Gold Buyers,
+Jewelry** — the Diamond Buyers removal DID go through. Retail leaks left:
+eligible keywords engagement rings / custom jewelry / handmade jewelry /
+gift shops / buy gold bullion; "Gold" and "Antique Jewelry" boosted; the
+public Update "We both buy and sell fine jewelry…"; the two highlights shown
+in search are "Locally owned & operated" + "Free consultations"; smart photo
+selection rotates 8 photos, none showing buying (hanging chains / trays read
+retail); History, Intro, Slideshow, Portfolio empty; website field = homepage.
+
+**Proposed changes (owner to confirm item by item):** block the five retail
+keywords; un-boost Gold + Antique Jewelry; boost best place to sell gold +
+coin & gold buyers (+ try sell jewelry / sell estate jewelry / jewelry
+buyers / silver buyers); replace the Update with a buy-only one; highlights
+top two = Free estimates + Walk-ins welcome; CTA text seller-led; ad photo
+pinned to a buying-lot photo + slideshow ordered buying-first; add category
+Estate Liquidation; write History + Intro; website → `/sell/naples`. Not
+proposed: Pawn Shops / Antiques / Appraisal categories, removing Jewelry
+(no Jewelry Buyers category exists), Yelp's "Let Yelp optimize" / smart ad
+text nags, budget or radius changes. Owner-only: new buying photos (testing,
+scale, sterling flatware, a counter evaluation).
+
+### ✅ DEPLOYED 2026-09-10 (night) — Turbopack build-cache fix + the whole 09-10 SEO/seller batch — owner-confirmed
+
+Owner: "pushed and deployed successfully, update docs, no production
+verification needed." No probe run. **Staging equals source; nothing is in
+flight.**
+
+✅ **IndexNow done 2026-09-10 (night):** `npm run indexnow` from `next-app/`
+in PowerShell → **200 OK for 220 URLs** from the live sitemap. The
+gold-page / estate-page / qualified-call look-backs in the item below now
+start from this deploy date.
+
+**Staging (session close):** ✅ synced 2026-09-10 (night, post-deploy) — dry run listed exactly the 3 flipped docs (CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras, 1075 total; real run copied 3 / 0 FAILED; follow-up dry run 0/0/0; leak check 0 (`.env*`, `.git`, `node_modules`, `.next`); SHA256 MATCH on all 3. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### (pre-deploy record) 🟡 READY TO PUSH 2026-09-10 (night) — Netlify "Exposed secrets" FIXED (Turbopack build cache off) + the whole 09-10 SEO batch below (no SQL, no env vars)
 
 The 22:45 ET failure is diagnosed and fixed — `CHANGELOG.md` 2026-09-10
 (night). One app file changed: `next-app/next.config.ts`
@@ -53,8 +308,8 @@ paths first — do not add `SECRETS_SCAN_OMIT_PATHS`.
 - Recheck all four revised GBP services: saved **Pending review**. Description
   accepted and number-free Update published. Jewelry buyer primary is unchanged;
   secondary Diamond buyer removal accepted.
-- Yelp Diamond Buyers category removal returned after reload: request submitted,
-  **unconfirmed**, with no displayed moderation status. Recheck before reporting removed.
+- ✅ Yelp Diamond Buyers category removal **confirmed 2026-09-10 (night)**: Business
+  Information, the ad preview and the public page all list only Gold Buyers, Jewelry.
 - Measure qualified calls after the changes. OpenAI seller contexts/ad copy
   and `/sell/naples` landing reloaded/verified, still Serving with 14 Naples ZIPs
   and $25/day. No conversion setup or measured lead-quality lift established.

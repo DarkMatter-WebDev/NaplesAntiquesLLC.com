@@ -603,3 +603,57 @@ the other 1,066 still match. The same script checked all 73 local file/line
 citations in this audit with zero missing, out-of-range or blank targets.
 Targeted `rg -n` readback confirmed the stopped/blocked status and handoff entries.
 No files were created, deleted, moved or copied by these read-only checks.
+
+## Free-evaluation follow-up — 2026-09-11
+
+Owner's new clue: many of the lost calls were people asking about the **free
+evaluation**. Question: did anything change with that offer or its pages
+around the 08-28/29 onset? Read-only; no settings changed.
+
+### Ruled out or unlikely
+
+| Candidate | Evidence | Verdict |
+|---|---|---|
+| The offer itself | Never withdrawn. `/free-evaluation` still says free, no-obligation, "Visit the showroom, or let us come to you" (`free-evaluation/page.tsx:85,497`). | Not a cause |
+| `/free-evaluation` as a search entry point | GSC, exact page, 08-01 → 09-09: **0 clicks, 172 impressions, position ~17.7**. All queries containing "free": **0 clicks, 35 impressions, position 61**. | Organic search never sent these callers |
+| The web form | `inquiries` since 2025: 16 rows, all `general`; 11 are the 08-22 bot burst. Satellite Netlify forms: gold `estimate-request` 6 (last 07-19), jewelry `jewelry-photo-estimate` 3 (last 07-18); both notify an AOL address. | Form was never the channel; no lost-lead sink |
+| Homepage banner | Replaced by "Closed on Wednesday, Aug. 26…" (no link) on 08-26; `shop_settings` last saved **08-28 23:56Z**; live homepage now serves "Summer Special · Schedule a free evaluation today" → `/free-evaluation` (verified 09-11). Two days only; negligible SEO effect. | Not a sustained cause |
+| Gold satellite (naplesgoldbuyers.com) | Netlify deploys 08-28 ("gsc updates", "redploy") and 08-29 ("update", "hero re-do"); GitHub compare 786581e…558c30e = one-page consolidation. The `sell-gold-*` / Spanish pages were created AND 301'd in the same batch (not in the 07-17 base), so nothing live was removed. Its GSC property shows 0 clicks / 34 impressions (08-27 → 08-30). | Timing matches, but it had no measurable search traffic to lose |
+| Jewelry satellite (naplesjewelrybuyers.com) | No deploys between 07-17 and 09-01. | Not the onset |
+| Deleted unverified "Naples Gold Buyers" Business Profile | Removed from the owner's Google account 08-29 (gold-satellite project memory). Google: "Only verified businesses can show their business info on Maps and Search." | Almost certainly never public; no effect |
+| Turnstile | Auth pages only (08-24). | Not a cause |
+
+### Plausible contributors (not proven — no call log)
+
+1. **Store-first reframing, 08-17 → 08-19.** The free evaluation went from
+   "private, mobile, we come to you" to "showroom, walk-ins, home visits on
+   request" (site live 08-18; GBP description rewritten 08-19). Callers who
+   used to phone to book an in-home evaluation can now simply walk in — calls
+   can fall while visits rise. Owner check: did walk-ins increase after 08-18?
+2. **GBP hours shrank on 08-19**: Mon–Sat 10–5 → Tue–Sat 11–3 (Wednesday
+   closed 08-26; Monday reopened 08-27; Sat 11–4 from 08-29). Morning
+   searchers see "Closed · Opens 11 AM" beside competitors opening 9–10 AM,
+   and the valuable calls came around 9 AM. Google often takes days to
+   propagate hours, which fits a late-August onset.
+3. **Calls-to-action lead to a form.** Nearly every "Free Evaluation" button
+   on the site is the primary button and opens `/free-evaluation`; the phone
+   is secondary almost everywhere (estate-jewelry is the exception). The
+   evaluation page's own hero leads with "Send a request". Homepage phone was
+   demoted to a button on 08-24.
+4. **GBP booking link → `/free-evaluation` (added 08-30).** Postdates the
+   onset, but it steers Maps users who want the free evaluation to a form
+   rather than a call, which would sustain a drop.
+
+### Small defects found in passing (not causes)
+
+- `/free-evaluation` step 1 says the business-card QR "lands right here"; the
+  QR lands on `/card`, which does not link to it.
+- `/process.html` (English) probably 404s on Netlify (only the Spanish twin is
+  reachable via the proxy); untested live.
+- `/free-evaluation` has no phone-hours line, address or hours; its meta
+  description has no phone number.
+- Some CALL labels stay English on Spanish pages (gold, silver, appraisal).
+
+**Status 2026-09-11 night:** all four defects fixed and staged, together
+with the call/visit-first rebuild of `/free-evaluation` and the sitewide
+"Free Appraisal" labels (`CHANGELOG.md`).

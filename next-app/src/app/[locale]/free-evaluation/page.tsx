@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo';
 import Image from 'next/image';
-import Link from 'next/link';
 import SiteHeader from '@/components/layout/SiteHeader';
 import BreadcrumbTrail from '@/components/BreadcrumbTrail';
 import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd';
@@ -9,15 +8,30 @@ import SiteFooter from '@/components/layout/SiteFooter';
 import EvalForm from '@/components/free-evaluation/EvalForm';
 import { AppIcon } from '@/components/AppIcon';
 import ClayMark, { type ClayMarkName } from '@/components/ClayMark';
+import ShowroomAddress from '@/components/ShowroomAddress';
+import { hoursSegmentsCompact, mapsUrl, phoneHoursLabel } from '@/lib/business-location';
+import { getStoreHours } from '@/lib/store-hours';
+import { SERVICE_AREAS } from '@/lib/service-areas';
 
+// 2026-09-11 (owner): this page leads with CALLING and VISITING, not with the
+// photo form. The free-evaluation calls were the valuable ones, people who
+// want one don't want to deal with photos, and they'd rather come in or have
+// Chris come out. The form stays, lower down, as the optional route.
+//
+// Title says "Appraisal" because that is what people search (GSC Aug 1–Sep 9:
+// 94 impressions on "apprais…" queries, 0 on "evaluat…"). It is the ESTATE /
+// collection angle on purpose: /jewelry-appraisal already owns "Free Jewelry
+// Appraisal in Naples, FL", and two pages with one title compete. The URL stays
+// /free-evaluation — the GBP booking link and every CTA on the site point here.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   const isEs = locale === 'es';
   return pageMetadata({
-    title: isEs ? 'Evaluación Gratuita de Joyas y Oro' : 'Free Jewelry & Gold Evaluation',
+    title: isEs ? 'Tasación Gratuita de Joyas de Herencia — Casa o Salón' : 'Free Estate Jewelry Appraisal — Home or Showroom',
+    // ≤ ~155 characters with the phone last (DECISIONS.md, 2026-09-08).
     description: isEs
-      ? 'Evaluación gratuita y sin compromiso de joyas, oro, plata, diamantes, relojes y monedas en Naples y el suroeste de Florida, con precios de mercado en vivo.'
-      : 'Free, no-obligation evaluation of your jewelry, gold, silver, diamonds, watches, and coins in Naples, Marco Island, Bonita Springs, and Fort Myers FL. Live gold pricing and same-day cash offers.',
+      ? 'Tasación gratuita y sin compromiso de piezas, colecciones completas y herencias — en nuestro salón de Naples o en su casa. Llame al (239) 404-8505.'
+      : 'Free, no-obligation appraisal of single pieces, whole collections and estates — at our Naples showroom or your home. Call (239) 404-8505.',
     path: '/free-evaluation',
     locale,
   });
@@ -33,6 +47,12 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
   const { submitted } = await searchParams;
   const isEs = locale === 'es';
   const isSubmitted = submitted === '1';
+  // Live showroom hours (admin-editable) — never hardcode days here.
+  const hourSegments = hoursSegmentsCompact(await getStoreHours(), isEs);
+  const serviceCities = SERVICE_AREAS.map((a) => a.city);
+  const cityList = isEs
+    ? `${serviceCities.slice(0, -1).join(', ')} y ${serviceCities[serviceCities.length - 1]}`
+    : `${serviceCities.slice(0, -1).join(', ')} and ${serviceCities[serviceCities.length - 1]}`;
 
   // `mark` names a clay illustration in /assets/images/icons, not an AppIcon.
   // These are decorative illustrated marks rather than functional UI icons —
@@ -59,13 +79,13 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
     ? [
         {
           num: '01',
-          title: 'Contáctenos',
-          body: 'Llámenos o envíenos un texto con una descripción rápida o algunas fotos de lo que tiene.',
+          title: 'Llame o Pase por el Salón',
+          body: 'Llámenos o envíenos un texto al (239) 404-8505, visite el salón en horario de atención o pida una visita a domicilio.',
         },
         {
           num: '02',
-          title: 'Lo Evaluamos',
-          body: 'Visítenos en el salón o déjenos ir a usted. Probamos, pesamos y explicamos cómo llegamos a cada número — usando precios de oro en vivo, nada oculto.',
+          title: 'Clasificamos y Probamos Todo',
+          body: 'En nuestro mostrador o en la mesa de su cocina. Probamos, pesamos y explicamos cómo llegamos a cada número — usando precios de oro en vivo, nada oculto.',
         },
         {
           num: '03',
@@ -76,13 +96,13 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
     : [
         {
           num: '01',
-          title: 'Reach Out',
-          body: "Call or text us a quick description or a few photos of what you have. Scan our card's QR code anytime to land right here.",
+          title: 'Call or Stop By',
+          body: 'Call or text (239) 404-8505, walk into the showroom during open hours, or ask for a home visit.',
         },
         {
           num: '02',
-          title: 'We Evaluate It',
-          body: "Visit the showroom, or let us come to you. We test, weigh, and explain how we arrive at each number — using live gold pricing, nothing hidden.",
+          title: 'We Sort & Test Everything',
+          body: "At our counter or your kitchen table. We test, weigh, and explain how we arrive at each number — using live gold pricing, nothing hidden.",
         },
         {
           num: '03',
@@ -92,7 +112,7 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
       ];
 
   // One crumbs array feeds both the JSON-LD and the visible trail.
-  const crumbs = [{ name: isEs ? 'Evaluación Gratuita' : 'Free Evaluation', path: '/free-evaluation' }];
+  const crumbs = [{ name: isEs ? 'Tasación Gratuita' : 'Free Appraisal', path: '/free-evaluation' }];
 
   return (
     <>
@@ -128,7 +148,7 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
                     fontFamily: 'var(--font-label)',
                   }}
                 >
-                  {isEs ? '100% Gratuito — Sin Obligación' : '100% Free — No Obligation'}
+                  {isEs ? 'Tasación Gratuita · Sin Obligación' : 'Free Appraisal · No Obligation'}
                 </span>
 
                 <h1
@@ -143,8 +163,13 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
                 <div className="text-base md:text-lg leading-relaxed" style={{ color: '#d8d1c2' }}>
                   <p className="fe-hero-lede">
                     {isEs
-                      ? 'Soy Chris. Llevo más de 15 años evaluando joyería de patrimonio en el suroeste de Florida, y estoy encantado de revisar lo que tenga — sin ninguna obligación de vender.'
-                      : "I'm Chris. I've spent 15+ years evaluating estate jewelry across Southwest Florida, and I'm happy to go through whatever you have — with no obligation to sell any of it."}
+                      ? 'Soy Chris. Llevo más de 15 años tasando joyería de patrimonio en el suroeste de Florida, y estoy encantado de revisar lo que tenga — sin ninguna obligación de vender.'
+                      : "I'm Chris. I've spent 15+ years appraising estate jewelry across Southwest Florida, and I'm happy to go through whatever you have — with no obligation to sell any of it."}
+                  </p>
+                  <p className="mt-4">
+                    {isEs
+                      ? 'Llámeme, pase por el salón o voy a su casa. Colecciones completas son bienvenidas — yo clasifico y pruebo todo por usted.'
+                      : "Call me, stop by the showroom, or I'll come to your home. Whole collections welcome — I sort and test everything for you."}
                   </p>
 
                   <h2 className="fe-hero-kicker mt-7">
@@ -199,14 +224,26 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
                     hover / active / focus-visible states with it. */}
                 {/* Centred below lg for the same reason as the trust chips
                     further down: the hero is one stacked column there. */}
+                {/* 2026-09-11: calling is primary, the showroom second; the
+                    form drops to a quiet text link (it moved down the page). */}
                 <div className="mt-8 flex flex-wrap justify-center lg:justify-start gap-3">
-                  <a href="#request" className="gold-button">
-                    {isEs ? 'Enviar una solicitud' : 'Send a request'}
-                  </a>
-                  <a href="tel:2394048505" className="outline-button outline-button-on-dark">
+                  <a href="tel:2394048505" className="gold-button" style={{ gap: '0.5rem' }}>
+                    <AppIcon name="call" className="text-[1rem]" />
                     {isEs ? 'Llamar (239) 404-8505' : 'Call (239) 404-8505'}
                   </a>
+                  <a href="#ways" className="outline-button outline-button-on-dark">
+                    {isEs ? 'Visitar el Salón' : 'Visit the Showroom'}
+                  </a>
                 </div>
+                <p className="mt-4 text-sm text-center lg:text-left" style={{ color: '#d7d0c3' }}>
+                  {phoneHoursLabel(isEs)}
+                </p>
+                <p className="mt-2 text-sm text-center lg:text-left" style={{ color: '#d7d0c3' }}>
+                  {isEs ? '¿Prefiere escribir? ' : 'Prefer to write? '}
+                  <a href="#request" className="underline underline-offset-4" style={{ color: '#f2ca50' }}>
+                    {isEs ? 'Envíe una nota rápida ↓' : 'Send a quick note instead ↓'}
+                  </a>
+                </p>
               </div>
 
               {/* PLACEHOLDER, to be replaced with a real photograph of Chris.
@@ -237,8 +274,8 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
                 with everything left-aligned, so the row follows. */}
             <ul className="flex flex-wrap justify-center lg:justify-start gap-2.5 md:gap-3 mt-10">
               {(isEs
-                ? ['Sin obligación', 'Oferta en efectivo el mismo día', 'Precios transparentes y en vivo', 'Privado y discreto']
-                : ['No obligation', 'Same-day cash offer', 'Live, transparent pricing', 'Private & discreet']
+                ? ['Sin obligación', 'Colecciones completas bienvenidas', 'En el salón o en su casa', 'Oferta en efectivo el mismo día']
+                : ['No obligation', 'Whole collections welcome', 'Showroom or your home', 'Same-day cash offer']
               ).map((chip) => (
                 <li
                   key={chip}
@@ -259,24 +296,121 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
           </div>
         </section>
 
-        {/* Request block — the form, now in the second position with a plain
-            lead-in rather than sitting in the hero. */}
-        <section id="request" className="scroll-mt-24 py-14 md:py-20" style={{ background: '#141616' }}>
-          <div className="container mx-auto px-6 md:px-8 max-w-3xl">
-            <div className="text-center mb-8">
-              <h2
-                className="text-2xl md:text-3xl font-bold mb-3 tracking-tight"
-                style={{ fontFamily: 'var(--font-headline)', color: '#f7f2e7' }}
+        {/* Two ways to get the appraisal (2026-09-11, owner-approved mockup).
+            Replaces the form in second position: people who want a free
+            appraisal would rather call, walk in, or have Chris come out. The
+            hours are the live admin schedule; the cities are SERVICE_AREAS. */}
+        <section id="ways" className="scroll-mt-24 py-16 md:py-24" style={{ background: 'var(--color-surface-container-low)' }}>
+          <div className="container mx-auto px-6 md:px-8 max-w-5xl">
+            <div className="text-center mb-10">
+              <span
+                className="text-xs font-bold uppercase tracking-[0.4em]"
+                style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
               >
-                {isEs ? 'Envíe una solicitud abajo' : 'Send a request below'}
+                {isEs ? 'Su Tasación Gratuita' : 'Your Free Appraisal'}
+              </span>
+              <h2
+                className="text-3xl md:text-4xl font-bold mt-3 mb-4 tracking-tight"
+                style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
+              >
+                {isEs ? 'Venga a Vernos, o Vamos a Usted' : 'Come to Us, or We Come to You'}
               </h2>
-              <p className="text-base leading-relaxed" style={{ color: '#c9c2b3' }}>
+              <p className="text-lg max-w-2xl mx-auto" style={{ color: 'var(--color-on-surface-variant)' }}>
                 {isEs
-                  ? 'Cuéntenos brevemente qué tiene y, si quiere, adjunte fotos de las piezas. No es obligatorio — una descripción de una línea es suficiente para empezar.'
-                  : 'Tell us briefly what you have and, if you like, attach photos of the items. Photos are optional — a one-line description is enough to get started.'}
+                  ? 'Sin fotos ni formularios. Traiga un solo anillo o una herencia completa — clasifico, pruebo y peso todo delante de usted y le explico cada número.'
+                  : 'No photos or forms needed. Bring a single ring or a whole estate — I sort, test and weigh everything in front of you and explain every number.'}
               </p>
             </div>
-            <EvalForm locale={locale} submitted={isSubmitted} />
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <article
+                className="flex flex-col gap-4 rounded-2xl p-7 shadow-[0_14px_38px_rgba(38,28,6,0.06)]"
+                style={{ background: 'var(--color-surface-container-lowest)' }}
+              >
+                <span
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl"
+                  style={{ background: 'rgba(115,92,0,0.08)', color: 'var(--color-primary)' }}
+                >
+                  <AppIcon name="store" className="text-[1.4rem]" aria-hidden="true" />
+                </span>
+                <h3 className="text-xl font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
+                  {isEs ? 'Visite el Salón' : 'Visit the Showroom'}
+                </h3>
+                <p className="leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  {isEs
+                    ? 'Pase durante el horario del salón — no necesita cita. Traiga la caja o el cajón entero; no tiene que ordenar nada primero. Para colecciones grandes que llevan más tiempo, le recomendamos llamar antes para reservar una cita.'
+                    : "Walk in during showroom hours — no appointment needed. Bring the whole box or drawer; you don't have to sort anything first. For larger collections that take more time, we recommend calling ahead to book an appointment."}
+                </p>
+                <div className="text-sm leading-relaxed" style={{ color: 'var(--color-on-surface)' }}>
+                  <ShowroomAddress locale={locale} />
+                  {hourSegments.length > 0 && (
+                    <p className="mt-2" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      {hourSegments.map((seg) => `${seg.days} ${seg.times}`).join(' · ')}
+                    </p>
+                  )}
+                </div>
+                <div className="mt-auto flex flex-wrap gap-3 pt-2">
+                  <a href={mapsUrl()} target="_blank" rel="noopener noreferrer" className="gold-button" style={{ gap: '0.5rem' }}>
+                    <AppIcon name="location_on" className="text-[1rem]" />
+                    {isEs ? 'Cómo Llegar' : 'Get Directions'}
+                  </a>
+                  <a href="tel:2394048505" className="outline-button">
+                    {isEs ? 'Llamar Antes' : 'Call Ahead'}
+                  </a>
+                </div>
+              </article>
+
+              <article
+                className="flex flex-col gap-4 rounded-2xl p-7 shadow-[0_14px_38px_rgba(38,28,6,0.06)]"
+                style={{ background: 'var(--color-surface-container-lowest)' }}
+              >
+                <span
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl"
+                  style={{ background: 'rgba(115,92,0,0.08)', color: 'var(--color-primary)' }}
+                >
+                  <AppIcon name="home" className="text-[1.4rem]" aria-hidden="true" />
+                </span>
+                <h3 className="text-xl font-bold" style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}>
+                  {isEs ? 'Vamos a Su Casa' : 'We Come to Your Home'}
+                </h3>
+                <p className="leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  {isEs
+                    ? 'Para colecciones completas, herencias o piezas que prefiere no trasladar — llevo el equipo de prueba y una báscula calibrada, y clasifico y pruebo todo en la mesa de su cocina.'
+                    : "For whole collections, estates, or pieces you'd rather not carry — I bring the testing kit and a calibrated scale and sort and test everything at your kitchen table."}
+                </p>
+                <ul className="space-y-1.5 text-sm leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
+                  <li>
+                    <strong style={{ color: 'var(--color-on-surface)' }}>
+                      {isEs ? `Visitas gratuitas en ${cityList}` : `Free home visits in ${cityList}`}
+                    </strong>
+                    {isEs ? ' — y más lejos para colecciones grandes.' : ' — and farther for larger collections.'}
+                  </li>
+                  <li>
+                    {isEs
+                      ? 'Ideal para albaceas, mudanzas y joyas y plata esterlina heredadas.'
+                      : 'Ideal for executors, downsizing, and inherited jewelry and sterling.'}
+                  </li>
+                  <li>
+                    {isEs
+                      ? 'La misma tasación gratuita y la misma oferta sin obligación.'
+                      : 'Same free appraisal, same no-obligation offer.'}
+                  </li>
+                </ul>
+                <div className="mt-auto flex flex-wrap gap-3 pt-2">
+                  <a href="tel:2394048505" className="gold-button" style={{ gap: '0.5rem' }}>
+                    <AppIcon name="call" className="text-[1rem]" />
+                    {isEs ? 'Llame para una Visita a Domicilio' : 'Call to Schedule a Home Visit'}
+                  </a>
+                </div>
+              </article>
+            </div>
+
+            {/* Mirrors /jewelry-appraisal: a buying appraisal is not paperwork. */}
+            <p className="mt-8 text-center text-sm leading-relaxed max-w-2xl mx-auto" style={{ color: 'var(--color-on-surface-variant)' }}>
+              {isEs
+                ? '¿Necesita una tasación escrita para su seguro o una sucesión? Es un servicio distinto — se lo diremos con honestidad y le indicaremos un tasador independiente certificado.'
+                : 'Need a written appraisal for insurance or probate? That is a different service — we will tell you so honestly and point you to a certified independent appraiser.'}
+            </p>
           </div>
         </section>
 
@@ -288,7 +422,7 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
                 className="text-xs font-bold uppercase tracking-[0.4em]"
                 style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
               >
-                {isEs ? 'Lo que Evaluamos' : 'What We Evaluate'}
+                {isEs ? 'Lo que Tasamos' : 'What We Appraise'}
               </span>
               <h2
                 className="text-3xl md:text-4xl font-bold mt-3 mb-4 tracking-tight"
@@ -300,8 +434,8 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
               </h2>
               <p className="text-lg max-w-2xl mx-auto" style={{ color: 'var(--color-on-surface-variant)' }}>
                 {isEs
-                  ? 'No es necesario ordenarla primero. Piezas individuales o colecciones enteras — evaluamos todo y le damos un número honesto.'
-                  : "No need to sort it first. Single pieces or whole unsorted collections — we'll evaluate everything and give you one honest number."}
+                  ? 'No es necesario ordenarla primero. Piezas individuales o colecciones enteras — tasamos todo y le damos un número honesto.'
+                  : "No need to sort it first. Single pieces or whole unsorted collections — we'll appraise everything and give you one honest number."}
               </p>
             </div>
 
@@ -335,7 +469,7 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
                 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight"
                 style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
               >
-                {isEs ? 'Cómo Funciona la Evaluación Gratuita' : 'How the Free Evaluation Works'}
+                {isEs ? 'Cómo Funciona la Tasación Gratuita' : 'How the Free Appraisal Works'}
               </h2>
               <p className="text-lg max-w-2xl mx-auto" style={{ color: 'var(--color-on-surface-variant)' }}>
                 {isEs
@@ -392,8 +526,8 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
               </h2>
               <p className="text-lg max-w-2xl mx-auto" style={{ color: 'var(--color-on-surface-variant)' }}>
                 {isEs
-                  ? 'Nada se junta en un solo montón. Esto es exactamente lo que hago, en orden, mientras usted observa.'
-                  : 'Nothing gets lumped into one pile. This is exactly what I do, in order, while you watch.'}
+                  ? 'Nada se junta en un solo montón. Esto es exactamente lo que hago, en orden, mientras usted observa — en nuestro mostrador o en la mesa de su cocina.'
+                  : 'Nothing gets lumped into one pile. This is exactly what I do, in order, while you watch — at our counter or your kitchen table.'}
               </p>
             </div>
 
@@ -487,12 +621,12 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
             <div className="grid md:grid-cols-3 gap-6 text-center">
               {(isEs
                 ? [
-                    { mark: 'nocost' as ClayMarkName, title: 'Sin Costo, Sin Trampa', body: 'La evaluación es genuinamente gratuita y no tiene ninguna obligación de vender.' },
+                    { mark: 'nocost' as ClayMarkName, title: 'Sin Costo, Sin Trampa', body: 'La tasación es genuinamente gratuita y no tiene ninguna obligación de vender.' },
                     { mark: 'pricing' as ClayMarkName, title: 'Precios de Mercado en Vivo', body: 'El oro y la plata se valoran según los precios spot en tiempo real, mostrados abiertamente.' },
                     { mark: 'private' as ClayMarkName, title: 'Privado y Discreto', body: 'En el salón o en su casa. Sus artículos e información permanecen confidenciales.' },
                   ]
                 : [
-                    { mark: 'nocost' as ClayMarkName, title: 'No Cost, No Catch', body: 'The evaluation is genuinely free and carries zero obligation to sell.' },
+                    { mark: 'nocost' as ClayMarkName, title: 'No Cost, No Catch', body: 'The appraisal is genuinely free and carries zero obligation to sell.' },
                     { mark: 'pricing' as ClayMarkName, title: 'Live Market Pricing', body: 'Gold and silver are valued against real-time spot prices, shown openly.' },
                     { mark: 'private' as ClayMarkName, title: 'Private & Discreet', body: 'At the showroom or in your home. Your items and information stay confidential.' },
                   ]
@@ -550,8 +684,8 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
                 </h2>
                 <p className="text-lg leading-relaxed mb-6" style={{ color: 'var(--color-on-surface-variant)' }}>
                   {isEs
-                    ? 'Sin centros de llamadas, sin intermediarios. Con más de 15 años evaluando joyería de patrimonio en todo el suroeste de Florida, Chris revisa personalmente cada pieza y explica exactamente cómo llega a cada número — para que pueda tomar una decisión informada sin ninguna presión.'
-                    : "No call centers, no middlemen. With 15+ years evaluating estate jewelry across Southwest Florida, Chris personally reviews every piece and explains exactly how he reaches each number — so you can make an informed decision with zero pressure."}
+                    ? 'Sin centros de llamadas, sin intermediarios. Con más de 15 años tasando joyería de patrimonio en todo el suroeste de Florida, Chris revisa personalmente cada pieza y explica exactamente cómo llega a cada número — para que pueda tomar una decisión informada sin ninguna presión.'
+                    : "No call centers, no middlemen. With 15+ years appraising estate jewelry across Southwest Florida, Chris personally reviews every piece and explains exactly how he reaches each number — so you can make an informed decision with zero pressure."}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start items-center">
                   <a href="tel:2394048505" className="gold-button">
@@ -560,6 +694,27 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* The form — the optional route since 2026-09-11 (it led the page
+            before). Photos stay optional; the fields are unchanged. */}
+        <section id="request" className="scroll-mt-24 py-14 md:py-20" style={{ background: '#141616' }}>
+          <div className="container mx-auto px-6 md:px-8 max-w-3xl">
+            <div className="text-center mb-8">
+              <h2
+                className="text-2xl md:text-3xl font-bold mb-3 tracking-tight"
+                style={{ fontFamily: 'var(--font-headline)', color: '#f7f2e7' }}
+              >
+                {isEs ? '¿Prefiere Escribir? Envíe una Nota Rápida' : 'Prefer to Write? Send a Quick Note'}
+              </h2>
+              <p className="text-base leading-relaxed" style={{ color: '#c9c2b3' }}>
+                {isEs
+                  ? 'Cuéntenos qué tiene y cuál es el mejor momento para llamarle — le devolvemos la llamada. Las fotos son opcionales.'
+                  : "Tell us what you have and the best time to reach you — we'll call you back. Photos are optional."}
+              </p>
+            </div>
+            <EvalForm locale={locale} submitted={isSubmitted} />
           </div>
         </section>
 
@@ -574,17 +729,22 @@ export default async function FreeEvaluationPage({ params, searchParams }: Props
             </h2>
             <p className="text-lg mb-10 max-w-2xl mx-auto" style={{ color: 'var(--color-on-surface-variant)' }}>
               {isEs
-                ? 'Solo toma un momento obtener una evaluación gratuita y honesta. Llame o envíenos un texto — nunca hay presión para vender.'
-                : "It only takes a moment to get a free, honest evaluation. Call or text us — there's never any pressure to sell."}
+                ? 'Solo toma una llamada — o pase por el salón. Nunca hay presión para vender.'
+                : "It only takes a phone call — or stop by the showroom. There's never any pressure to sell."}
             </p>
+            {/* 2026-09-11: "Request a Call" (another form, on /contact) became
+                directions — the page's routes are now call or visit. */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center flex-wrap">
               <a href="tel:2394048505" className="gold-button">
                 (239) 404-8505
               </a>
-              <Link href={isEs ? '/es/contact' : '/contact'} className="outline-button">
-                {isEs ? 'Solicitar una Llamada' : 'Request a Call'}
-              </Link>
+              <a href={mapsUrl()} target="_blank" rel="noopener noreferrer" className="outline-button">
+                {isEs ? 'Cómo Llegar' : 'Get Directions'}
+              </a>
             </div>
+            <p className="mt-5 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+              {phoneHoursLabel(isEs)}
+            </p>
           </div>
         </section>
 

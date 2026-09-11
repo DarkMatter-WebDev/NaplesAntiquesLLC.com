@@ -190,10 +190,10 @@ export default async function TradeInPage({ params }: Props) {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center flex-wrap">
               <Link href={p('/free-evaluation')} className="gold-button">
-                {isEs ? 'Evaluación Gratuita' : 'Free Evaluation'}
+                {isEs ? 'Tasación Gratuita' : 'Free Appraisal'}
               </Link>
               <a href="tel:2394048505" className="outline-button">
-                Call (239) 404-8505
+                {isEs ? 'Llamar (239) 404-8505' : 'Call (239) 404-8505'}
               </a>
               <Link href={p('/shop')} className="outline-button">
                 {isEs ? 'Ver la Tienda' : 'Browse the Shop'}

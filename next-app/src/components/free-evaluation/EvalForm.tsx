@@ -275,7 +275,7 @@ export default function EvalForm({ locale, submitted }: Props) {
           <button type="submit" className="gold-button w-full" disabled={sending}>
             {sending
               ? (isEs ? 'Enviando…' : 'Sending…')
-              : (isEs ? 'Enviar para Evaluación Gratuita' : 'Send for Free Evaluation')}
+              : (isEs ? 'Enviar para Tasación Gratuita' : 'Send for Free Appraisal')}
           </button>
         </>
       )}

@@ -94,7 +94,7 @@ export default async function SilverMarksGuidePage({ params }: Props) {
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link href={evalHref} className="gold-button">
-                  {isEs ? 'PROGRAMAR EVALUACIÓN' : 'SCHEDULE EVALUATION'}
+                  {isEs ? 'PROGRAMAR TASACIÓN' : 'SCHEDULE APPRAISAL'}
                 </Link>
                 <Link
                   href={p('/silver-services')}
@@ -166,7 +166,7 @@ export default async function SilverMarksGuidePage({ params }: Props) {
                 className="outline-button"
                 style={{ borderColor: 'rgba(255,255,255,0.32)', color: 'white', background: 'rgba(255,255,255,0.08)' }}
               >
-                CALL (239) 404-8505
+                {isEs ? 'LLAMAR (239) 404-8505' : 'CALL (239) 404-8505'}
               </a>
             </div>
           </div>

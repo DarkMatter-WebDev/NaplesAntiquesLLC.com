@@ -79,7 +79,7 @@ export default async function SellHubPage({ params }: Props) {
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link href={p('/free-evaluation')} className="gold-button">
-                  {isEs ? 'EVALUACIÓN GRATIS' : 'GET A FREE ESTIMATE'}
+                  {isEs ? 'TASACIÓN GRATUITA' : 'GET A FREE ESTIMATE'}
                 </Link>
                 <a
                   href="tel:2394048505"
@@ -241,9 +241,9 @@ export default async function SellHubPage({ params }: Props) {
 
             <p className="mx-auto mt-10 max-w-2xl text-center text-base leading-relaxed text-[#1a1c1c]">
               {isEs ? (
-                <>Nosotros hacemos la cuenta en voz alta — el peso en la báscula frente a usted, la pureza probada frente a usted y el spot del día en la pantalla. Traiga sus piezas al salón o <Link href={p('/free-evaluation')} className="font-semibold text-[#735c00] underline">agende una evaluación gratuita</Link>.</>
+                <>Nosotros hacemos la cuenta en voz alta — el peso en la báscula frente a usted, la pureza probada frente a usted y el spot del día en la pantalla. Traiga sus piezas al salón o <Link href={p('/free-evaluation')} className="font-semibold text-[#735c00] underline">agende una tasación gratuita</Link>.</>
               ) : (
-                <>We do the math out loud — weight on the scale in front of you, purity tested in front of you, and the day’s spot on the screen. Bring your pieces by the showroom, or <Link href={p('/free-evaluation')} className="font-semibold text-[#735c00] underline">book a free evaluation</Link>.</>
+                <>We do the math out loud — weight on the scale in front of you, purity tested in front of you, and the day’s spot on the screen. Bring your pieces by the showroom, or <Link href={p('/free-evaluation')} className="font-semibold text-[#735c00] underline">book a free appraisal</Link>.</>
               )}
             </p>
           </div>

@@ -239,7 +239,7 @@ export default async function BullionPage({ params }: Props) {
                 href="tel:2394048505"
                 className="outline-button"
               >
-                Call (239) 404-8505
+                {isEs ? 'Llamar (239) 404-8505' : 'Call (239) 404-8505'}
               </a>
             </div>
             <div className="mt-8">

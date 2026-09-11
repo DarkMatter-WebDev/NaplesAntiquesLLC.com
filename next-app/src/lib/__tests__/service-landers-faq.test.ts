@@ -29,7 +29,7 @@ describe('buy-side lander meta descriptions — phone last, short enough to surv
   // DECISIONS.md 2026-09-08: Google cuts descriptions at ~155–160 characters
   // on phones and the number is the LAST thing in the string. Extract the
   // EN and ES literals from each page's description ternary.
-  const LANDERS = ['gold-services', 'silver-services', 'diamond-buyers', 'watch-buyers', 'jewelry-appraisal'];
+  const LANDERS = ['gold-services', 'silver-services', 'diamond-buyers', 'watch-buyers', 'jewelry-appraisal', 'free-evaluation'];
   for (const lander of LANDERS) {
     it(`${lander}: both languages end with the phone and stay ≤ 160 characters`, () => {
       const src = read('src', 'app', '[locale]', lander, 'page.tsx');

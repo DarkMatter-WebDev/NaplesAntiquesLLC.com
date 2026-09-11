@@ -255,7 +255,7 @@ export default function GoldMarksSection({ locale }: { locale: string }) {
 
       <div className="mt-6 flex flex-wrap gap-3">
         <Link href={isEs ? '/es/free-evaluation' : '/free-evaluation'} className="gold-button">
-          {isEs ? 'Evaluación gratuita de oro' : 'Free gold evaluation'}
+          {isEs ? 'Tasación gratuita de oro' : 'Free gold appraisal'}
         </Link>
         <Link href={isEs ? '/es/gold-services/what-is-my-gold-worth' : '/gold-services/what-is-my-gold-worth'} className="outline-button">
           {isEs ? '¿Cuánto vale su oro? →' : 'What your gold is worth →'}

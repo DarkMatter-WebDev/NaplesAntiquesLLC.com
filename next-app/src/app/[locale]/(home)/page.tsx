@@ -287,7 +287,7 @@ export default async function HomePage({ params }: Props) {
                   </>
                 ),
                 href: evalHref,
-                cta: isEs ? 'Evaluación gratuita →' : 'Free evaluation →',
+                cta: isEs ? 'Tasación gratuita →' : 'Free appraisal →',
               },
               {
                 // Added 2026-09-05 (owner: "we mainly buy jewelry" — the strip

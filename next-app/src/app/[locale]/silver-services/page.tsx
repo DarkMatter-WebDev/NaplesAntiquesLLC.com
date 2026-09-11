@@ -160,7 +160,7 @@ export default async function SilverServicesPage({ params }: Props) {
                   href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
                   className="gold-button"
                 >
-                  {isEs ? 'EVALUACIÓN GRATUITA' : 'Free Evaluation'}
+                  {isEs ? 'TASACIÓN GRATUITA' : 'Free Appraisal'}
                 </Link>
                 {/* 2026-09-08 (mockup approved): "Current Silver Rates" → the
                     phone. Silver sellers call; the rates survive as the text
@@ -667,7 +667,7 @@ export default async function SilverServicesPage({ params }: Props) {
                 href="tel:2394048505"
                 className="outline-button"
               >
-                Call (239) 404-8505
+                {isEs ? 'Llamar (239) 404-8505' : 'Call (239) 404-8505'}
               </a>
             </div>
           </div>

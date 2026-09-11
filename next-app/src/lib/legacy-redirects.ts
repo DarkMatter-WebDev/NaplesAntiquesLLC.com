@@ -47,6 +47,11 @@ export const LEGACY_REDIRECTS: Record<string, LegacyRedirect> = {
   '/about.html': { to: '/about', permanent: true },
   '/contact.html': { to: '/contact', permanent: true },
   '/free-evaluation.html': { to: '/free-evaluation', permanent: true },
+  // The old static site's "process" page became the free-evaluation page.
+  // netlify.toml carried /process.html -> /free-evaluation for years, but the
+  // proxy rewrite (header comment above) meant only the /es/ twin ever
+  // reached it — the English URL 404'd in production (found 2026-09-11).
+  '/process.html': { to: '/free-evaluation', permanent: true },
   '/estate-jewelry.html': { to: '/estate-jewelry', permanent: true },
   '/gold-services.html': { to: '/gold-services', permanent: true },
   '/silver-services.html': { to: '/silver-services', permanent: true },

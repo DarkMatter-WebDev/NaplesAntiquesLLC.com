@@ -1,6 +1,151 @@
 
 # Changelog
 
+## 2026-09-11 (night) — GBP "free estate jewelry appraisal" post PUBLISHED (owner-requested)
+
+Owner: "use that one and do the post", with a WhatsApp photo of Chris at the
+counter (acid kit, scales, touchstone, calipers, estate tray). Checked first
+against Google's posts content policy: "we do not allow your post content to
+include a phone number" — the rule the 08-30 silver post broke (posting was
+turned off for a few days). Post: type Update, 686 characters, no phone,
+address, email, URL or digits, no caps/hashtags, every claim from the
+`/free-evaluation` page (free, no obligation, whole collections, walk-ins,
+home visits in the six cities and farther for larger collections, same-day
+cash offer); button **Call now** (profile number). The photo is portrait and
+Google's post preview is a wide box that cut the head off, so it went up
+uncropped on a 2500×1600 JPG with blurred, dimmed sides; the preview then
+showed head to tray. Business Profile Manager → Create post; the composer is
+an iframe the Chrome tools cannot target, so it was opened as its own page.
+Result: "Post submitted for review", then **Published** within seconds. The
+list also shows a buyer-first "Call now" post published ~16 h earlier (no
+phone number in its text) and the rejected 08-30 post. Recheck ~09-13: the
+08-30 post passed the instant check and was removed ~2 days later.
+
+## 2026-09-11 (night, STAGED) — /free-evaluation rebuilt call/visit-first as the "Free Estate Jewelry Appraisal" page; sitewide "Free Appraisal" labels; small defects fixed
+
+Owner approved the mockup and answered the open questions: free home visits
+in the six service cities "and farther for larger collections" (owner:
+"yes, minimum", so the page makes no "no minimum" claim); walk-ins fine, appointment recommended
+for larger collections; relabel "as you recommend".
+
+- **`/free-evaluation` (URL unchanged):** title "Free Estate Jewelry
+  Appraisal — Home or Showroom" / "Tasación Gratuita de Joyas de Herencia —
+  Casa o Salón"; both meta descriptions end with the phone (the page is now
+  in the lander meta test). Hero leads with Call + Visit the Showroom, a
+  phone-hours line and a "Prefer to write?" link. New `#ways` section "Come
+  to Us, or We Come to You": showroom card (address, admin hours,
+  directions, call-ahead advice) and home-visit card (six cities, farther
+  for larger collections, executors/downsizing), plus the honest
+  written-appraisal footnote. The form moved to just above the closing CTA as
+  "Prefer to Write? Send a Quick Note". Evaluation → appraisal wording on
+  the page; step 1's business-card QR claim removed; closing CTA gains Get
+  Directions and the phone-hours line.
+- **`/process.html` → `/free-evaluation` (308)** added to
+  `legacy-redirects.ts`; the English URL 404'd live. Test added.
+- **Spanish pages:** 13 bare "CALL (239) 404-8505" buttons now read
+  "LLAMAR (239) 404-8505" in Spanish.
+- **CTA labels "Free Evaluation" → "Free Appraisal" / "Tasación
+  Gratuita"** in the header Sell menu, footer, homepage gold card, 20
+  landers/components and the form's submit button. The footer link to
+  `/free-evaluation` reads "Free Estate Appraisal" / "Tasación de Herencias
+  Gratis" so it is not a near-duplicate of "Free Appraisals"
+  (`/jewelry-appraisal`) beside it; the `/services` card heading matches its
+  button. Left on purpose: prose headings, FAQs, other pages' meta, email
+  subjects, and the admin banner link-option label.
+- Sitemap `CONTENT_LAST_MODIFIED` → 2026-09-11.
+
+Gate (from `next-app/`): `npx tsc --noEmit` exit 0 · `npm run lint` exit 0 ·
+`npm test -- --maxWorkers=4` 1278/1278 (130 files) · `npm run build` exit 0
+(492 static pages). Dev checks: EN + ES SSR content and section order; at
+375 px no horizontal overflow and no clipped buttons in either language;
+relabeled pages (gold, watch, services, EN + ES) SSR-checked. No SQL, no env
+vars. After the deploy: IndexNow (titles changed).
+
+## 2026-09-11 (evening) — free-evaluation investigation (read-only)
+
+Owner recalled that many lost calls were about the free evaluation. Traced
+every change to the offer, its pages, forms, CTAs, the homepage banner, both
+satellite sites (Netlify deploy history + GitHub compare), satellite Netlify
+forms, and the deleted unverified "Naples Gold Buyers" profile. No single
+change is proven; the offer, its page, the form, the banner (restored by
+08-28, verified live) and the satellites are ruled out or unlikely. Plausible
+contributors: the 08-17/19 store-first reframing (in-home → walk-in), the
+08-19 GBP hours cut to 11–3, form-first CTAs, and the 08-30 GBP booking link
+to the form. Full table: `SEO_LEAD_AUDIT.md` → "Free-evaluation follow-up".
+No app, account or settings change.
+
+## 2026-09-11 (latest) — Apple Business listing corrected; GIA listing approved
+
+Owner reported the GIA Retailer Lookup listing approved and signed in to
+Apple Business. In it: hours set to Mon–Fri 11–3 / Sat 11–4 / Sun closed
+(were Tue–Sat 12–3), About replaced with the buyer-first description used on
+GBP and Yelp, and five untrue Good-to-Know attributes (Appointments Only and
+four delivery/curbside services) set to not offered. All three edits are "In
+Review" at Apple (up to 5 business days). Address and category unchanged.
+Report republished. No app code, SQL or env change.
+
+## 2026-09-11 (later) — citation follow-through: GIA submitted, BBB pre-filled, Bing left pending
+
+Owner confirmed GIA eligibility (carries GIA-graded diamonds occasionally)
+and asked to finish what could be done in Chrome, stopping at sign-ins. GIA
+Retailer Lookup form pre-filled; the owner submitted it (in review). BBB
+free-profile form pre-filled (Gold Buyers, Estate Jewelry, Silver Buyers);
+the final "Create Profile" creates a BBB account, so it is left to the
+owner. Bing: the Sept 1 listing sits under the owner's Microsoft account in
+"Pending publish" (ETA ~Sept 13); the Google one-tap offered
+info@surettesystems.com, which would open a separate account — not used.
+Report republished at the same URL. No app code, SQL or env change.
+
+## 2026-09-11 — Citation (NAP) audit + roadmap delivered; GBP opening date fixed by owner
+
+Owner's 5-step local-citation project. Step 1 baseline (site source +
+live HTML + GBP) confirmed by the owner. Owner set the GBP opening date to
+Sept 1, 2026 after we found Maps/local pack showing "Opens September" (hours
+hidden); verified "Closed · Opens 11 AM" afterwards. Step 2 in the owner's
+Chrome: Apple Maps hours wrong, Bing has no listing, BBB has no profile, Yelp
+matches (Estate Liquidation + "Established" year still pending — Yelp reverts
+the year edit on reload; a Diamond Buyers removal attempt did not register and
+the owner then chose to keep it). Steps 3–5 researched (JA, JBT, GIA; Moz
+Local vs Yext) and published with outreach emails as a private report:
+https://claude.ai/code/artifact/441be9e1-19c3-4627-b4fe-fef5bc7a08ae .
+No app code, SQL or env change. Open owner actions: `TASKS.md` top.
+
+## 2026-09-10 (night, Yelp implemented) — Yelp account moved to buyer-first; all 10 items applied, 1 pending Yelp review
+
+Owner approved the full plan ("go ahead with all of it"). Applied in the
+owner's Chrome and re-read after reload: 5 retail keywords blocked, Gold +
+Antique Jewelry un-boosted, 6 seller terms boosted; the public post rewritten
+buy-only; highlights reordered (Free estimates + Walk-ins welcome lead);
+CTA "Sell gold & silver · 9 AM–6 PM"; ad photo pinned (smart selection off)
+and slideshow ordered buying-first; History (year 2010, required by Yelp) and
+a Meet-the-Owner card added; website → `/sell/naples`. Estate Liquidation
+category submitted but not visible after reload — Yelp moderation, recheck
+~09-12. GBP now says opened September 2026 while Yelp says 2010 — owner to
+reconcile. Budget/radius unchanged. Detail: `TASKS.md` top. Session traps:
+Yelp's intermittent "This site can't be reached" clears on a direct reload;
+the ads settings page reflows while loading (click by fresh screenshot); typed
+text into Yelp textareas dropped letters, so fields were set with form_input.
+
+## 2026-09-10 (night, Yelp audit) — read-only Yelp ads audit for a buyer-first shift; plan awaiting owner
+
+Owner asked for a Yelp audit and a plan to lead with buying jewelry, gold and
+silver instead of selling. Read in the owner's Chrome, nothing saved. The
+Diamond Buyers category removal from earlier today is now confirmed (only
+Gold Buyers, Jewelry remain). The goal really is Get more phone calls with
+call reporting off; the settings summary row's "Let Yelp help optimize"
+wording is generic text, not the saved value. Findings and the proposed
+change list: `TASKS.md` top. "ASL proficient" on the public page is marked
+No, not claimed. No account, app or budget change.
+
+## 2026-09-10 (night, deployed) — Turbopack build-cache fix + 09-10 SEO/seller batch DEPLOYED
+
+Owner: "pushed and deployed successfully, update docs, no production
+verification needed." The redeploy passed Netlify's secrets scan with
+`experimental.turbopackFileSystemCacheForBuild: false`, confirming the
+diagnosis below. No production probe run, per the owner. IndexNow run
+afterward from `next-app/` (PowerShell): **200 OK for 220 URLs**. Docs
+flipped to deployed; staging re-synced.
+
 ## 2026-09-10 (night) — Netlify "Exposed secrets" deploy failure FIXED: Turbopack build cache disabled
 
 Owner: the 22:45 ET deploy failed with "Exposed secrets detected" after the

@@ -36,11 +36,11 @@ export default async function ServicesPage({ params }: Props) {
     {
       href: `${prefix}/free-evaluation`,
       eyebrow: isEs ? 'Gratis y sin obligación' : 'Free and no obligation',
-      title: isEs ? 'Evaluación Gratuita' : 'Free Evaluation',
+      title: isEs ? 'Tasación Gratuita' : 'Free Appraisal',
       body: isEs
         ? 'Para joyería, oro, plata, diamantes, relojes, monedas y piezas heredadas. Obtenga un número claro antes de decidir.'
         : 'For jewelry, gold, silver, diamonds, watches, coins, and inherited pieces. Get a clear number before you decide.',
-      button: isEs ? 'Ver Evaluación Gratuita' : 'View Free Evaluation',
+      button: isEs ? 'Ver Tasación Gratuita' : 'View Free Appraisal',
     },
     {
       href: `${prefix}/estate-services`,

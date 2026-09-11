@@ -91,7 +91,7 @@ export default async function EstateJewelryPage({ params }: Props) {
                   className="outline-button"
                   style={{ borderColor: 'rgba(255,255,255,0.4)', color: 'white' }}
                 >
-                  {isEs ? 'Evaluación Gratuita' : 'Free Evaluation'}
+                  {isEs ? 'Tasación Gratuita' : 'Free Appraisal'}
                 </Link>
               </div>
               <p className="mt-4 text-sm" style={{ color: '#d0c9bc' }}>{phoneHoursLabel(isEs)}</p>
@@ -273,7 +273,7 @@ export default async function EstateJewelryPage({ params }: Props) {
                 className="text-sm font-bold uppercase tracking-widest underline underline-offset-8 whitespace-nowrap"
                 style={{ color: 'var(--color-primary)', fontFamily: 'var(--font-label)' }}
               >
-                {isEs ? 'SOLICITAR EVALUACIÓN' : 'REQUEST EVALUATION'}
+                {isEs ? 'SOLICITAR TASACIÓN' : 'REQUEST AN APPRAISAL'}
               </Link>
             </div>
 

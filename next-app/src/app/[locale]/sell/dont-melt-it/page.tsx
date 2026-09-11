@@ -331,9 +331,9 @@ export default async function DontMeltItPage({ params }: Props) {
             </ol>
             <p className="mt-6 max-w-2xl text-sm leading-relaxed text-[#4d4635]">
               {isEs ? (
-                <>Tráigala al salón en 6240 Shirley St, Ste 104, Naples, o <Link href={evalHref} className="font-semibold text-[#735c00] underline underline-offset-2">programe una evaluación gratuita</Link>. Visitas a domicilio a pedido para patrimonios grandes.</>
+                <>Tráigala al salón en 6240 Shirley St, Ste 104, Naples, o <Link href={evalHref} className="font-semibold text-[#735c00] underline underline-offset-2">programe una tasación gratuita</Link>. Visitas a domicilio a pedido para patrimonios grandes.</>
               ) : (
-                <>Bring it to the showroom at 6240 Shirley St, Ste 104, Naples, or <Link href={evalHref} className="font-semibold text-[#735c00] underline underline-offset-2">book a free evaluation</Link>. Home visits on request for larger estates.</>
+                <>Bring it to the showroom at 6240 Shirley St, Ste 104, Naples, or <Link href={evalHref} className="font-semibold text-[#735c00] underline underline-offset-2">book a free appraisal</Link>. Home visits on request for larger estates.</>
               )}
             </p>
           </div>
@@ -377,14 +377,14 @@ export default async function DontMeltItPage({ params }: Props) {
             </p>
             <div className="flex flex-col justify-center gap-6 md:flex-row">
               <Link href={evalHref} className="gold-button">
-                {isEs ? 'PROGRAMAR EVALUACIÓN GRATUITA' : 'SCHEDULE A FREE EVALUATION'}
+                {isEs ? 'PROGRAMAR TASACIÓN GRATUITA' : 'SCHEDULE A FREE APPRAISAL'}
               </Link>
               <a
                 href="tel:2394048505"
                 className="outline-button"
                 style={{ borderColor: 'rgba(255,255,255,0.32)', color: 'white', background: 'rgba(255,255,255,0.08)' }}
               >
-                CALL (239) 404-8505
+                {isEs ? 'LLAMAR (239) 404-8505' : 'CALL (239) 404-8505'}
               </a>
             </div>
           </div>

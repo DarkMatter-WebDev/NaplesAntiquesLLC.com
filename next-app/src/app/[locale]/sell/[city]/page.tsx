@@ -252,7 +252,7 @@ export default async function SellCityPage({ params }: Props) {
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link href={evalHref} className="gold-button">
-                  {isEs ? 'EVALUACIÓN GRATIS' : 'GET A FREE ESTIMATE'}
+                  {isEs ? 'TASACIÓN GRATUITA' : 'GET A FREE ESTIMATE'}
                 </Link>
                 <a
                   href="tel:2394048505"

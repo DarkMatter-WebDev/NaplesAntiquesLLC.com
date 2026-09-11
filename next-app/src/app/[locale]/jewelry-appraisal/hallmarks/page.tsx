@@ -316,14 +316,14 @@ export default async function HallmarksGuidePage({ params }: Props) {
             </p>
             <div className="flex flex-col justify-center gap-6 md:flex-row">
               <Link href={evalHref} className="gold-button">
-                {isEs ? 'PROGRAMAR EVALUACIÓN' : 'SCHEDULE A FREE EVALUATION'}
+                {isEs ? 'PROGRAMAR TASACIÓN' : 'SCHEDULE A FREE APPRAISAL'}
               </Link>
               <a
                 href="tel:2394048505"
                 className="outline-button"
                 style={{ borderColor: 'rgba(255,255,255,0.32)', color: 'white', background: 'rgba(255,255,255,0.08)' }}
               >
-                CALL (239) 404-8505
+                {isEs ? 'LLAMAR (239) 404-8505' : 'CALL (239) 404-8505'}
               </a>
             </div>
           </div>

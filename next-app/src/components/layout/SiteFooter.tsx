@@ -36,7 +36,9 @@ export default function SiteFooter({ locale }: Props) {
     { label: isEs ? 'Vender Joyería' : 'Sell Estate Jewelry', href: p('/estate-jewelry') },
     { label: isEs ? 'Vender Relojes' : 'Sell Watches', href: p('/watch-buyers') },
     { label: isEs ? 'Programa de Intercambio' : 'Trade-In Program', href: p('/trade-in') },
-    { label: isEs ? 'Evaluación Gratuita' : 'Free Evaluation', href: p('/free-evaluation') },
+    // Estate angle keeps it distinct from the /jewelry-appraisal link below
+    // (2026-09-11 relabel; the page title is "Free Estate Jewelry Appraisal").
+    { label: isEs ? 'Tasación de Herencias Gratis' : 'Free Estate Appraisal', href: p('/free-evaluation') },
     { label: isEs ? 'Tasaciones Gratis' : 'Free Appraisals', href: p('/jewelry-appraisal') },
     { label: isEs ? 'Tienda' : 'Shop', href: p('/shop') },
   ];

@@ -28,7 +28,9 @@ const BASE = 'https://naplesestatejewelry.com';
 // footer of every page.
 // 2026-09-10: seller-first jewelry/gold/sterling copy, visible phone hours,
 // and reduced standalone diamond promotion across the buying pages.
-const CONTENT_LAST_MODIFIED = new Date('2026-09-10');
+// 2026-09-11: /free-evaluation rebuilt call/visit-first with appraisal
+// wording; sitewide "Free Appraisal" CTA labels; Spanish call labels.
+const CONTENT_LAST_MODIFIED = new Date('2026-09-11');
 
 // Both locale prefixes the app serves. EVERY public page exists in both, so each
 // language version gets its OWN <url> entry — Google's documented pattern —

@@ -174,7 +174,7 @@ export default async function InheritedJewelryGuidePage({ params }: Props) {
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link href={evalHref} className="gold-button">
-                  {isEs ? 'PROGRAMAR UNA EVALUACIÓN' : 'SCHEDULE AN EVALUATION'}
+                  {isEs ? 'PROGRAMAR UNA TASACIÓN' : 'SCHEDULE AN APPRAISAL'}
                 </Link>
                 <a
                   href="tel:2394048505"
