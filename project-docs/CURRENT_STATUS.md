@@ -4,16 +4,36 @@
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
 > in `DECISIONS.md`. Last reconciled: **2026-09-10**.
 
-## Start Here (handoff, end of the 2026-09-10 session — SUPERSEDES the blocks below)
+## Start Here (2026-09-10 night — SUPERSEDES the blocks below)
 
 **Read this, then `TASKS.md`.**
 
-**Pre-deployment follow-up verified; staging synced 09-10 at 22:43 ET for owner deployment.**
-The home gold card now links to the gold page, estate body/wayfinding welcomes
-ordinary pieces and actual showroom visits with accurate evaluation claims, and
-the inherited-jewelry guide links to the estate buyer page. Three existing files
-changed in EN/ES; no new estate FAQ/schema. The combined pending batch is now
-**14 unique app source files plus package manifests**; staging updated, no deployment or new SQL/env.
+🟡 **The Netlify "Exposed secrets" failure is FIXED and the fix is STAGED with
+the 09-10 SEO batch, awaiting the owner's push (no SQL, no env vars).** The
+staged files never held a secret. The prior agent's batch upgraded Next
+16.2.12 → 16.3.4, and Next 16.3 turns the Turbopack persistent BUILD cache on
+by default; that cache (`.next/cache/turbopack/*.sst`) stores every env value,
+and Netlify publishes + scans `.next` → 16 secrets flagged, all in that one
+cache file (Netlify log for deploy `6aa36b61…`, read in the owner's Chrome).
+Fix: `experimental.turbopackFileSystemCacheForBuild: false` in
+`next-app/next.config.ts`. Verified locally: cache deleted, build exit 0, no
+cache dir recreated, build-output grep for every `.env.local` value = 0
+secret hits. Gate: tsc 0 · lint 0 · 1276/1276 (130 files) · build exit 0.
+Nothing was served (Deploying skipped; the log prints names, not values), so
+rotation is not required — owner's call. Rule: `DECISIONS.md` → *"The
+Turbopack build cache stays off"*; check: `INTEGRITY.md`. After the push:
+IndexNow for the SEO batch (`TASKS.md` top).
+
+## (superseded) Start Here (handoff, end of the 2026-09-10 session)
+
+**Read this, then `TASKS.md`.**
+
+**STOPPED at owner request: Netlify reports exposed secrets; staging is NOT cleared for deployment.**
+The owner is assigning the repair to another agent. The 22:45 ET SEO deployment
+failed during building; Deploying was skipped. The exact flagged variable/file
+was not obtained before the stop. No repair, exclusion change, credential rotation
+or staging rewrite was performed during the interrupted investigation. Local
+**14 app source files plus package manifests** remain tested; that does not clear the Netlify failure.
 Final checks after the responsive fix: **1276 tests / 130 files pass (18.24s)**,
 TypeScript/lint/build pass; manifest **86 = 40 EN + 40 ES + 6**; production audit
 **0 vulnerabilities**. EN/ES responsive and new-link checks pass. The estate offer
@@ -21,7 +41,7 @@ card now grows with its text, resolving clipping/overlap found at 320px. The
 separate pre-existing homepage H1/newsletter overlap remains deferred.
 Reviews and legitimate local business mentions/links are deferred at the owner's
 request; no review requests or outreach now. Later tasks are in `TASKS.md`.
-Full follow-up and post-deployment ranking plan: `SEO_LEAD_AUDIT.md`, final section.
+Full handoff: `SEO_LEAD_AUDIT.md`, final incident section; outstanding repair/SEO tasks in `TASKS.md`. These closing docs are source-only and have NOT been copied to staging.
 
 **Gold-page follow-up — measure after deployment, ahead of cosmetic home fixes.**
 Aug 19–28 → Aug 29–Sep 7, exact `/gold-services`: 60→68 impressions,

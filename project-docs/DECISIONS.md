@@ -6,6 +6,21 @@
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
 > compaction. Last reconciled: **2026-09-10**.
 
+## The Turbopack build cache stays off (2026-09-10)
+
+`experimental.turbopackFileSystemCacheForBuild` is pinned to `false` in
+`next-app/next.config.ts`. Next 16.3 made it the default, and the cache it
+writes (`.next/cache/turbopack/*.sst`) contains a snapshot of every
+environment value — server-only secrets included. Netlify publishes `.next`
+and scans it, so the first 16.3.4 deploy failed with 16 flagged secrets, all
+in that one cache file, none in repo code. Faster incremental builds are not
+worth a build artifact that carries the PayPal secret and the service-role key;
+keep the flag off across future Next upgrades and re-run the build-output
+secret grep from `INTEGRITY.md` after each one. Do NOT "fix" this with
+`SECRETS_SCAN_OMIT_PATHS` — that hides the scanner from a real leak instead of
+removing it. The dev cache (`.next/dev/…`) also holds the values but never
+leaves the machine; it stays on.
+
 ## Seller acquisition emphasizes jewelry, gold and sterling; truthful phone availability (2026-09-10)
 
 After the audit/reassessment, the owner authorized seller-focused website and
@@ -7076,9 +7091,16 @@ such as “review it next,” which can be read as carousel order.
 
 ## Staging handoff is a file copy, separate from deployment (2026-09-10)
 
-The latest tested batch was copied to the established `C:\Users\rcman\NEJ-repo-staging`
-handoff directory after a dry run showed only 24 expected updates and no Extras.
-With no removals required, `/E` was sufficient; no destructive mirror was run.
-Retain the runbook exclusions, exclude `.git` files as well as directories, and
-verify the staged files against source. The owner handles the separate repo and
-deployment; no Git operation or publication belongs to this staging step.
+The established handoff directory is `C:\Users\rcman\NEJ-repo-staging`. The owner
+explicitly requires the existing structure and unaffected files to stay unchanged:
+update only the files that need updating, never replace the handoff with a new
+layout or perform an indiscriminate rebuild. Preserve the secret/build exclusions
+and required hidden configuration. Dry-run/review the named changes before copying.
+Source/staging hash equality and absence of `.env*` prove copy properties only;
+they do not prove the contents are secret-free or that Netlify will accept a deploy.
+Do not disable secret scanning to work around an unresolved alert.
+
+After the 2026-09-10 Netlify failure, the owner stopped this agent's repair and
+assigned it to another agent. This task may update closing docs only; no further
+staging, code, configuration, account or deployment action. The owner handles the
+separate repo workflow; no Git commands are permitted in this source folder.

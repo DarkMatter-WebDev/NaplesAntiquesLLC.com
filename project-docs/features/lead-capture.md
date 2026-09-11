@@ -4,7 +4,7 @@
 
 The September 10 audit and authorized seller-acquisition implementation are in
 `../SEO_LEAD_AUDIT.md`. Local seller copy/call presentation is built and verified,
-awaiting owner deployment; form submission and phone routing are unchanged.
+deployment blocked by Netlify's secrets alert; another agent owns repair. See audit handoff.
 Yelp seller ads/Specialties, phone-hours CTA and phone-call goal are saved with
 call reporting off. GBP category/description accepted and new Update published;
 four revised services remain Pending. OpenAI's verified seller ad leads to

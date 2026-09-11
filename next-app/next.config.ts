@@ -38,6 +38,17 @@ const SECURITY_HEADERS = [
 const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
+  experimental: {
+    // ⛔ Keep this OFF. Next 16.3 turned the Turbopack persistent BUILD cache
+    // on by default, and that cache (`.next/cache/turbopack/*.sst`) stores a
+    // snapshot of every process.env value — RESEND_API_KEY, the PayPal secret,
+    // every cron/enc key. Netlify publishes `.next`, so its secrets scanner
+    // read them and failed the 2026-09-10 deploy ("Secrets scanning found 16
+    // instance(s)", all in .netlify/.next/cache/turbopack/…/00000001.sst).
+    // Nothing was served, but the deploy cannot pass with the cache on. The
+    // dev cache (`.next/dev/…`) is unaffected and never leaves this machine.
+    turbopackFileSystemCacheForBuild: false,
+  },
   // The Instagram card renders its type with Satori, which needs the actual
   // font bytes at runtime. Nothing imports these files, so tracing cannot infer
   // them and the serverless bundle would ship without them — every card render

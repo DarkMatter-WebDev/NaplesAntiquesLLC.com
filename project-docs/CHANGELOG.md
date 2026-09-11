@@ -1,6 +1,43 @@
 
 # Changelog
 
+## 2026-09-10 (night) — Netlify "Exposed secrets" deploy failure FIXED: Turbopack build cache disabled
+
+Owner: the 22:45 ET deploy failed with "Exposed secrets detected" after the
+prior agent's batch; "all of them are exposed". Diagnosis, all cited: the
+staged tree is CLEAN — a value grep of every staged file against `.env.local`
+found only public values (Supabase URL, site URL, the PayPal client id,
+`EBAY_ENV`, `EMAIL_FROM`, the Facebook app id, the Turnstile site key). The
+Netlify log for deploy `6aa36b611af589000823ab7d` (read in the owner's Chrome)
+says: `Scanning complete. 11675 file(s) scanned. Secrets scanning found 16
+instance(s)` — 16 env vars (FACEBOOK/ETSY cron secrets, EBAY_CLIENT_SECRET,
+ETSY_REDIRECT_URI, PAYPAL_CLIENT_SECRET, ETSY_TOKEN_ENC_KEY, ETSY_API_KEY,
+RESEND_API_KEY, FACEBOOK_APP_SECRET, RESEND_WEBHOOK_SECRET,
+EBAY_VERIFICATION_TOKEN, ETSY_SHARED_SECRET, ANTHROPIC_API_KEY,
+PAYPAL_WEBHOOK_ID, FACEBOOK/INSTAGRAM_TOKEN_ENC_KEY), **27 hits, every one in
+`.netlify/.next/cache/turbopack/v16.3.4-299180d3/00000001.sst`**, nothing in
+repo code. Root cause: the batch upgraded Next 16.2.12 → 16.3.4, and 16.3
+defaults `experimental.turbopackFileSystemCacheForBuild: true`
+(`node_modules/next/dist/server/config-shared.js:283`); that persistent build
+cache stores a snapshot of every `process.env` value, and Netlify publishes
+`.next`. Reproduced locally: the 168 MB `.next/cache/turbopack/v16.3.4-…`
+directory held every `.env.local` secret.
+
+**Fix (one file):** `next-app/next.config.ts` sets
+`experimental.turbopackFileSystemCacheForBuild: false` with the reason in a
+comment. Verified: cache dir deleted → `npm run build` exit 0 → no
+`.next/cache/turbopack/` recreated → grep of the whole build output
+(excluding the dev-only `.next/dev`) for every `.env.local` value: **0 secret
+hits**, only the same public values as before. Gate: tsc 0 · lint 0 ·
+**1276/1276 (130 files, 14.5 s)** · build exit 0. `INTEGRITY.md` gains the
+rule + a checklist line; `DECISIONS.md` → *"The Turbopack build cache stays
+off"*.
+
+**Exposure assessment:** nothing was served — Deploying was skipped and the
+Netlify log prints names + line numbers, never values. The values existed only
+inside Netlify's private build container. Rotation is not required by this
+incident; it remains the owner's call. No SQL, no env vars.
+
 ## 2026-09-10 (pre-deploy completion) — gold and estate links, seller copy, responsive offer card
 
 Owner authorized the three proposed improvements and deferred reviews/business
@@ -18,7 +55,7 @@ reachable, no browser errors. Preview stopped and temporary tab/viewport cleaned
 Combined pending batch14 app sources plus package manifests; no SQL/env or deploy.
 Reviews, review recovery and legitimate local mentions are later Tasks; Google
 inspection/recrawl and ranking/call measurement follow owner deployment.
-Initial implementation did not stage; at 22:43 ET staging was synced: 24 expected files copied, no deletions/failures, clean follow-up dry run, all 1072 staged-file hashes match and excluded-file scan clean. Four memory docs re-synced for handoff. No deployment, new code edits or repeated tests in this staging step.
+At 22:43 ET staging copied 24 files, then four closing docs, without deletions; hash/file-exclusion checks passed. The owner's 22:45 ET SEO deploy subsequently FAILED with Netlify “Exposed secrets detected”; the prior readiness assurance is withdrawn. Read-only investigation did not obtain the exact finding before the owner stopped repair and assigned another agent. No repair/staging rewrite/rotation was performed. Closing docs only were updated and were NOT re-synced. Full incident evidence and limits: SEO_LEAD_AUDIT.md final section; outstanding work: TASKS.md.
 
 ## 2026-09-10 (gold-position follow-up) — exact-page ranking and query-mix investigation
 

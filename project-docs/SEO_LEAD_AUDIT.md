@@ -520,3 +520,86 @@ The **pre-existing homepage H1/newsletter overlap** remains separately deferred;
 Cleanup: temporary browser viewport reset and agent-created QA tab closed. Production preview stopped with Ctrl+C; `Get-NetTCPConnection -LocalPort 3010 -State Listen -ErrorAction SilentlyContinue` returned no listener. No scratch artifacts were retained; build/cache files remain covered by existing ignore rules. No Git or staging/copy operation.
 
 Final memory check: inline PowerShell `ReadAllLines`/regex validation found **73 local citations, zero missing/out-of-range/blank targets**, after the 19-line CHANGELOG insertion and updating current home/estate source locations. CURRENT_STATUS, TASKS, DECISIONS and lead-capture memory reflect the verified local implementation and owner-deferred reviews/mentions. Independent final source review found no introduced issue; it did not replace the runtime checks above.
+
+## Staging incident and stopped-repair handoff — 2026-09-10
+
+**The earlier staging/deploy-readiness assurance is withdrawn. The owner reported
+exposed secrets after this agent updated staging, then stopped this agent's repair
+and assigned another agent. This closing action changes documentation only.**
+The exact secret-scanning finding and root cause remain unresolved; no correction
+or credential rotation has been performed, and no successful replacement deploy
+has been observed. Preserve the owner's requirement: update only what needs
+updating, retaining the existing staging directory structure and unaffected files.
+
+### What was copied before the failure
+
+At 22:43 ET the source was copied to the existing `C:\Users\rcman\NEJ-repo-staging`
+directory. Both resolved paths were checked and were ordinary directories. The
+runbook's `robocopy /MIR /L` dry run, with `/XJ` and file-form `.git` excluded as
+well, listed **24 files, no Extras, mismatches or failures**. The real run used
+`/E`, without deletion or restructuring, and copied those 24 files (exit 1).
+
+- App source (14): `src/app/sitemap.ts`; the `[locale]` home, diamond-buyers,
+  estate-jewelry, estate-services/selling-inherited-jewelry, faq, gold-services,
+  jewelry-appraisal, sell, sell/[city], and silver-services pages; contact
+  `MessageUsForm.tsx` and `VisitUsPanel.tsx`; layout `SiteFooter.tsx`.
+- App manifests (2): `next-app/package.json` and `next-app/package-lock.json`.
+- Memory (8): CHANGELOG, CURRENT_STATUS, DECISIONS, README, SEO_LEAD_AUDIT
+  (new file), STRUCTURE, TASKS and features/lead-capture.
+
+The follow-up dry run reported zero differences. All **1,072 staged file hashes**
+matched source, and a filename/path check found no `.env*`, Git metadata,
+dependency/build folders or worktrees. Required hidden/config files were present.
+Robocopy's 1,075 total includes three excluded files. Four memory docs were then
+re-copied; final dry run and those four hashes matched at 22:45 ET. **These checks
+verified copying and exclusions, not secret-free contents or Netlify acceptance.**
+The earlier unqualified readiness statement went beyond that evidence.
+
+### What was observed after the owner reported the failure
+
+The owner's already-open Netlify project showed **Exposed secrets detected** for
+the SEO update. The [failed deployment details](https://app.netlify.com/projects/naplesantiques/deploys/6aa36b611af589000823ab7d)
+identified the owner's `seo update chatgpt` revision `2b2e5b8`, started at **10:45 PM
+September 10**. The Building stage failed with exit code 2; **Deploying, Cleanup
+and Post-processing were skipped**. The overview still identified the earlier
+New Arrivals release as published at 1:38 PM. A blocked deployment does not
+establish that nothing sensitive reached the separate repository.
+
+Read-only local investigation scanned all 1,072 staged files, including hidden
+and ignored paths. An exact-value check against 25 qualifying local environment
+values found matches only for public sender/application identifiers, not a
+confirmed private credential. A separate recognizable-token scan found no
+candidate. These are limited checks: local environment values are not necessarily
+Netlify's operating values, and pattern scans are not exhaustive. **They do not
+refute the Netlify alert or establish that it is a false positive.** Values were
+kept out of tool output and documentation.
+
+The deployment log rendered line numbers in the available browser text extraction,
+but the exact flagged variable and file were not obtained. The owner stopped the
+investigation before further log inspection. No environment settings, scanner
+settings, code, staging exclusions or staged files were changed during this
+investigation; no retry, deployment, rotation or Git operation was performed.
+The audit subagent was interrupted. The existing browser tab remains on the failed
+deployment details for the next agent.
+
+### Outstanding handoff
+
+The next agent needs the actual Netlify finding, the affected file/value type,
+the exposure scope and a bounded correction, followed by the owner's new deploy
+and successful scan/publication verification. Do not disable scanning or assume
+a public-value false positive without the finding. All SEO follow-ups, pending
+GBP/Yelp items, phone/lead-quality checks, deferred reviews/local mentions and
+the existing mobile issue remain open in TASKS. No ranking recovery or call
+improvement has been measured.
+
+Closing documentation: CURRENT_STATUS, TASKS, DECISIONS, CHANGELOG, lead-capture
+and this audit were updated in source only. **They were not copied to staging.**
+No app edits or build/test reruns were made during the stopped repair or this
+docs-only handoff; earlier app verification remains historical evidence.
+
+Docs-only verification: an inline `node -` script using `fs`/`crypto` compared
+all 1,072 staged files with source: only the six named closing docs differ;
+the other 1,066 still match. The same script checked all 73 local file/line
+citations in this audit with zero missing, out-of-range or blank targets.
+Targeted `rg -n` readback confirmed the stopped/blocked status and handoff entries.
+No files were created, deleted, moved or copied by these read-only checks.

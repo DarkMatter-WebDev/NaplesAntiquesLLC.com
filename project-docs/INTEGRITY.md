@@ -81,6 +81,15 @@ Keep `.env`, `.env.local`, provider keys, service-role keys, and webhook secrets
 out of project memory and source. Document only variable names and dashboard/
 password-manager locations. Netlify is the operating environment source.
 
+The BUILD OUTPUT counts too: Netlify publishes `.next` and its secrets scanner
+reads every file in it. `experimental.turbopackFileSystemCacheForBuild` in
+`next-app/next.config.ts` must stay `false` — Next 16.3 turned it on by default
+and its `.next/cache/turbopack/*.sst` files hold a snapshot of every env value
+(16 secrets flagged, deploy failed, 2026-09-10). After any Next upgrade, build
+locally, confirm `.next/cache/turbopack/` does not exist, and grep `.next`
+(excluding `.next/dev`) for the `.env.local` values — expect hits only for
+`NEXT_PUBLIC_*`, `PAYPAL_CLIENT_ID`, `EBAY_ENV`, `EMAIL_FROM`, `AI_PROVIDER`.
+
 ### Keep memory bounded
 
 Update present state in `CURRENT_STATUS.md`, open work in `TASKS.md`, durable
@@ -93,6 +102,8 @@ the same session report to all four files.
 - [ ] `npx tsc --noEmit` passes.
 - [ ] `npm run lint` passes.
 - [ ] `npm run build` exits 0.
+- [ ] After a Next upgrade: no `.next/cache/turbopack/` after the build, and the
+      build-output secret grep is clean (see *Never store secrets*).
 - [ ] If the batch changes page COPY, `CONTENT_LAST_MODIFIED` in `sitemap.ts`
       is bumped; if it adds, removes or retitles URLs, run `npm run indexnow`
       from `next-app/` AFTER the deploy is live (it refuses to run before).

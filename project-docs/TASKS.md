@@ -5,7 +5,26 @@
 
 ## ◻ OPEN — needs a human
 
-### ◻ 2026-09-10 — deploy tested acquisition changes; prioritize scoped gold-page follow-up
+### 🟡 READY TO PUSH 2026-09-10 (night) — Netlify "Exposed secrets" FIXED (Turbopack build cache off) + the whole 09-10 SEO batch below (no SQL, no env vars)
+
+The 22:45 ET failure is diagnosed and fixed — `CHANGELOG.md` 2026-09-10
+(night). One app file changed: `next-app/next.config.ts`
+(`experimental.turbopackFileSystemCacheForBuild: false`). The staged tree
+never contained a secret; the leak was Next 16.3.4's new persistent build
+cache inside the published `.next`. Gate: tsc 0 · lint 0 · 1276/1276 (130
+files) · build exit 0 · build-output secret grep 0 hits. **Not rotated:**
+nothing was served and the log prints names only — owner's call.
+
+◻ **Owner:** copy staging to the repo and push. Expect the Netlify log to
+show `Secrets scanning … found 0` and Deploying to run. After it is live:
+spot-check `/`, `/gold-services`, `/estate-jewelry`, then `npm run indexnow`
+from `next-app/` (PowerShell) because the SEO batch changed titles/content.
+If the scanner still fails, read the log's `found value at line … in …`
+paths first — do not add `SECRETS_SCAN_OMIT_PATHS`.
+
+**Staging:** ✅ synced 2026-09-10 (night) — dry run listed exactly the 8 touched files (next.config.ts + CHANGELOG, CURRENT_STATUS, DECISIONS, INTEGRITY, SEO_LEAD_AUDIT, TASKS, features/lead-capture — the last six include the closing docs the prior agent never re-synced), 0 Extras, 1075 total; real run copied 8 / 0 FAILED (exit 1 = copied only); follow-up dry run 0/0/0; leak check 0 (`.env*`, `.git`, `node_modules`, `.next`, `worktrees`, `*.tsbuildinfo`, `next-env.d.ts`); 1072 files on disk (= 1075 − the 3 `/XF`-excluded); SHA256 MATCH on all 8; staged next.config.ts carries `turbopackFileSystemCacheForBuild: false`. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### ✅ (resolved above) 2026-09-10 — STOPPED: other agent to resolve staging/Netlify secrets alert before deployment
 
 - **Pre-deploy follow-up implemented and verified locally:**
   home gold-card link to `/gold-services` retains evaluation; estate body and
@@ -14,9 +33,9 @@
   files, EN/ES parity, no new routes and no new estate FAQ/schema.
   All automated gates and focused responsive/link checks pass. Estate offer card
   grows with its text; the mobile clipping found during QA is fixed.
-- Owner deploys the combined **14 unique app source files plus package manifests**
+- After the repair is verified, owner deploys **14 unique app source files plus package manifests**
   including the newly changed inherited-guide file; verification is complete.
-  **Staging synced 09-10 at 22:43 ET; ready for owner deployment. No new SQL/env.**
+  **NOT cleared: the 22:45 ET deployment failed with “Exposed secrets detected.”**
   Submit IndexNow after deployment because titles/content changed.
 - **Gold-page follow-up before cosmetic home work:** Aug 19–28 → Aug 29–Sep 7,
   exact `/gold-services` was 60→68 impressions and position 12.2→20.4. Shared
@@ -6081,7 +6100,7 @@ Headlines only — full detail lives in `CHANGELOG.md` under each date.
   seven insured-shipping policies/profiles provisioned on both marketplaces;
   Facebook Page token validated.
 
-## 2026-09-10 22:43 ET — latest staging handoff verification
+## 2026-09-10 22:43 ET — staging copy verification (superseded by failed deploy below)
 
 `C:\Users\rcman\NEJ-repo-staging` now contains the complete tested seller-acquisition
 batch, the three-file gold/estate follow-up, dependency manifests and memory docs.
@@ -6094,4 +6113,44 @@ file scan found no `.env*`, Git metadata, dependencies, build output or worktree
 Robocopy's 1075 total includes three excluded generated/env files, as documented.
 Final memory handoff: the four updated docs were re-synced using the same exclusions;
 a final dry run returned zero differences and the four updated hashes matched.
-No app edits or tests rerun: the preceding verified source is unchanged. No deployment.
+No app edits or tests rerun during that copy. The owner's subsequent deployment failed; see below.
+
+## 2026-09-10 — staging incident: owner transferred repair to another agent
+
+**This agent stopped investigation/repair on the owner's instruction. Only closing
+memory docs were updated; do not resume repair or re-sync staging from this task.**
+The earlier ready-to-deploy assurance is withdrawn. No identified secret has been
+removed or rotated, and no corrected Netlify deploy has been verified.
+
+- **Next agent:** obtain the exact Netlify secret-scanning finding (variable/type
+  and flagged path/line, never the value) from the failed deploy linked in
+  `SEO_LEAD_AUDIT.md`. Determine whether a credential was exposed or a public/test
+  value was flagged; current checks establish neither conclusion.
+- Establish the actual source of the failure and the exposure scope, including
+  whether the flagged material exists in the owner's published repository/history
+  or built output. The deploy was blocked, which does not establish repository
+  safety. Handle any confirmed credential exposure through the relevant provider
+  and owner workflow; no credential or history repair has been performed here.
+- Correct only the files that require correction. **Keep the same staging path,
+  folder hierarchy and unaffected files; no wholesale rebuild or restructuring.**
+  The owner explicitly reinforced this constraint after reporting the failure.
+  Preserve hidden deployment/config files and existing secret/build exclusions.
+- Verify the bounded changed-file list and scan actual file contents, including
+  Netlify-relevant configured values and any flagged generated output. Matching
+  source hashes and excluding `.env*` alone did not establish deploy readiness.
+  Do not bypass or disable the scanner to clear the error.
+- After repair, the owner handles the separate repo/deployment. Verify the new
+  Netlify build/secret scan and successful publication before marking deployed.
+  The last observed published version was the earlier New Arrivals release.
+- These closing source docs are newer than staging. Have the next agent include
+  only the relevant updated docs in its verified handoff; this task did not copy
+  them or touch staging again after the stop.
+
+Other outstanding work remains in the opening task block: Google live/indexed
+gold/estate inspection and IndexNow after successful deployment; scoped two-/four-
+week ranking and qualified-call measurements; real early-call/forwarding checks;
+four GBP services Pending review; unconfirmed Yelp Diamond Buyers category removal;
+paid-lead quality/attribution; missing satellite source and appointment-copy issue;
+deferred 320px homepage overlap. Reviews, review recovery and legitimate local
+business mentions remain explicitly deferred by the owner. Existing unrelated
+owner-timed infrastructure/store tasks below are not superseded or marked done.
