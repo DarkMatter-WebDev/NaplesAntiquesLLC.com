@@ -11,23 +11,20 @@ interface Props {
   params: Promise<{ locale: string }>;
 }
 
-// Seller-intent lander for the diamond query cluster (GSC 2026-08: "sell
-// diamonds naples" 71.6, "diamond buyers naples fl" 61.7, "sell diamond ring
-// naples" 69.8, "naples engagement ring buyer" 68.2, "sell diamond eternity
-// bands naples" 59.7 — ~35 impressions with no page). The page's differentiator
-// is the honest resale-vs-insurance-appraisal framing; keep it. Lab-grown
-// stance (owner decision 2026-08-30): we DO buy them, priced honestly against
-// their much lower resale market.
+// Keep the established route for diamond jewelry evaluations. The owner's
+// 2026-09-10 acquisition focus is jewelry, gold and sterling collections;
+// this page no longer broadly solicits loose or lab-grown stones. That is a
+// marketing emphasis, not a new refusal policy. Keep the resale explanation.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   const isEs = locale === 'es';
   return pageMetadata({
-    title: isEs ? 'Vender Diamantes en Naples, FL' : 'Sell Diamonds in Naples, FL',
+    title: isEs ? 'Evaluación de Joyas con Diamantes en Naples, FL' : 'Diamond Jewelry Evaluations in Naples, FL',
     // ≤ ~155 characters with the phone LAST (2026-09-08 rule, DECISIONS.md):
     // Google truncates around 155–160 on phones and the number is the point.
     description: isEs
-      ? 'Venda diamantes en Naples, FL — anillos de compromiso, argollas, aretes y piedras sueltas, con o sin certificado. Pago inmediato. Llame al (239) 404-8505.'
-      : 'Sell diamonds in Naples, FL — engagement rings, eternity bands, studs, loose stones. Graded in front of you, paid on the spot. Call (239) 404-8505.',
+      ? 'Evaluamos joyas con diamantes en Naples, FL: oro, piedras y diseño en conjunto. Para piedras sueltas, llame primero al (239) 404-8505.'
+      : 'Diamond jewelry evaluations in Naples, FL — rings, bracelets and estate pieces valued as a whole. For loose stones, call first: (239) 404-8505.',
     path: '/diamond-buyers',
     locale,
   });
@@ -46,8 +43,8 @@ export default async function DiamondBuyersPage({ params }: Props) {
       kEs: 'La piedra',
       titleEn: 'The 4Cs, seen honestly',
       titleEs: 'Las 4C, vistas con honestidad',
-      descEn: 'Carat, cut, color, clarity — measured with loupe and gauge in front of you. GIA certificates help, and we coordinate GIA verification for significant stones, but an uncertified diamond is still very sellable.',
-      descEs: 'Quilates, corte, color y claridad — medidos con lupa y calibrador frente a usted. Los certificados GIA ayudan, y coordinamos la verificación con GIA para piedras importantes, pero un diamante sin certificado sigue siendo muy vendible.',
+      descEn: 'We assess carat, cut, color and clarity as part of the complete piece. Bring any existing grading reports; we coordinate GIA verification for significant stones when needed.',
+      descEs: 'Evaluamos los quilates, el corte, el color y la claridad como parte de la joya completa. Traiga los informes que tenga; coordinamos la verificación con GIA para piedras importantes cuando hace falta.',
     },
     {
       kEn: 'The market',
@@ -75,22 +72,16 @@ export default async function DiamondBuyersPage({ params }: Props) {
       aEs: 'Depende de los quilates, el corte, el color y la claridad de la piedra, del mercado actual de reventa para su forma y tamaño, y del oro de la montura. Por eso evaluamos en persona y explicamos cada factor — un número real vale más que una estimación en línea. La evaluación es gratuita.',
     },
     {
-      qEn: 'Do I need a GIA certificate to sell a diamond?',
-      qEs: '¿Necesito un certificado GIA para vender un diamante?',
-      aEn: 'No. A certificate helps confirm what a stone is, and we coordinate GIA verification for significant diamonds, but we regularly buy uncertified stones — we grade them in front of you.',
-      aEs: 'No. Un certificado ayuda a confirmar qué es la piedra, y coordinamos la verificación con GIA para diamantes importantes, pero compramos piedras sin certificado con regularidad — las clasificamos frente a usted.',
+      qEn: 'What should I bring for a jewelry evaluation?',
+      qEs: '¿Qué debo traer para evaluar mis joyas?',
+      aEn: 'Bring the jewelry and any grading reports, boxes or paperwork you already have. We can assess jewelry without papers. For loose stones, call first to discuss what you have and whether we can help before making a trip.',
+      aEs: 'Traiga las joyas y los informes, cajas o documentos que ya tenga. Podemos evaluar joyas sin documentación. Para piedras sueltas, llame primero para explicar qué tiene y confirmar si podemos ayudarle antes de venir.',
     },
     {
       qEn: 'Why is the offer less than my insurance appraisal says?',
       qEs: '¿Por qué la oferta es menor que lo que dice mi tasación del seguro?',
       aEn: 'An insurance appraisal states retail replacement value — what a jeweler would charge to sell you a new equivalent, at full margin. Resale is a different market, and any buyer’s honest offer will be below that paper number. We would rather explain the difference than surprise you with it.',
       aEs: 'Una tasación de seguro indica el valor de reposición al detalle — lo que un joyero cobraría por venderle un equivalente nuevo, con margen completo. La reventa es un mercado distinto, y la oferta honesta de cualquier comprador estará por debajo de ese número en papel. Preferimos explicar la diferencia antes que sorprenderlo con ella.',
-    },
-    {
-      qEn: 'Do you buy lab-grown diamonds?',
-      qEs: '¿Compran diamantes de laboratorio?',
-      aEn: 'Yes. Lab-grown resale values are a fraction of natural-diamond values — production keeps getting cheaper, and the resale market prices them accordingly. We will price yours honestly against that market and show you exactly how we got there.',
-      aEs: 'Sí. Los valores de reventa de los diamantes de laboratorio son una fracción de los naturales — producirlos es cada vez más barato, y el mercado de reventa los valora en consecuencia. Valoraremos el suyo con honestidad según ese mercado y le mostraremos exactamente cómo llegamos al número.',
     },
     {
       qEn: 'Where can I sell an engagement ring in Naples?',
@@ -105,7 +96,7 @@ export default async function DiamondBuyersPage({ params }: Props) {
     '@type': 'BreadcrumbList',
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: isEs ? 'Inicio' : 'Home', item: `https://naplesestatejewelry.com${isEs ? '/es' : ''}` },
-      { '@type': 'ListItem', position: 2, name: isEs ? 'Vender Diamantes' : 'Sell Diamonds', item: canonicalUrl },
+      { '@type': 'ListItem', position: 2, name: isEs ? 'Joyas con Diamantes' : 'Diamond Jewelry', item: canonicalUrl },
     ],
   };
 
@@ -135,16 +126,16 @@ export default async function DiamondBuyersPage({ params }: Props) {
                 {isEs ? 'Privado · Discreto · Pago en el Acto' : 'Private · Discreet · Paid on the Spot'}
               </span>
               <h1 className="mb-6 text-4xl font-bold leading-tight text-white md:text-5xl" style={{ fontFamily: 'var(--font-headline)' }}>
-                {isEs ? 'Venda Diamantes y Joyas con Diamantes en Naples' : 'Sell Diamonds & Diamond Jewelry in Naples'}
+                {isEs ? 'Evaluación de Joyas con Diamantes en Naples' : 'Diamond Jewelry Evaluations in Naples'}
               </h1>
               <p className="mb-8 max-w-xl text-lg leading-relaxed text-[#d7d0c3]">
                 {isEs
-                  ? 'Anillos de compromiso, argollas de eternidad, aretes, pulseras de tenis y piedras sueltas — con o sin certificado. Una evaluación privada con la matemática explicada abiertamente, y el pago en el momento en que acepta. Vender un diamante suele ser personal; lo mantenemos sin prisas y enteramente en sus términos.'
-                  : "Engagement rings, eternity bands, studs, tennis bracelets, and loose stones — certified or not. A private evaluation with the math explained openly, and payment the moment you accept. Selling a diamond is often personal; we keep it unhurried and entirely on your terms."}
+                  ? 'Evaluamos anillos, pulseras, aretes y joyas heredadas como piezas completas: el oro, las piedras, el fabricante y el estado cuentan. Traiga una pieza o su colección junto con las demás joyas que desea vender. Para piedras sueltas, llame primero para confirmar si podemos ayudarle.'
+                  : 'We evaluate rings, bracelets, earrings and inherited jewelry as complete pieces: the gold, stones, maker and condition all count. Bring one piece or your collection along with the other jewelry you want to sell. For loose stones, call first to discuss whether we can help.'}
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link href={evalHref} className="gold-button">
-                  {isEs ? 'EVALUACIÓN GRATUITA DE DIAMANTES' : 'GET A FREE DIAMOND EVALUATION'}
+                  {isEs ? 'EVALUAR MIS JOYAS' : 'GET A JEWELRY EVALUATION'}
                 </Link>
                 <a
                   href="tel:2394048505"
@@ -185,15 +176,15 @@ export default async function DiamondBuyersPage({ params }: Props) {
           </div>
         </section>
 
-        {/* Life's timeline */}
+        {/* Collection context */}
         <section className="mx-auto max-w-3xl px-4 py-16 text-center md:px-8">
           <h2 className="mb-4 text-3xl font-bold text-[#1a1c1c] md:text-4xl" style={{ fontFamily: 'var(--font-headline)' }}>
-            {isEs ? 'Se vende en los tiempos de la vida' : "Sold on life's timeline"}
+            {isEs ? 'Una joya o una colección heredada' : 'One piece or an inherited collection'}
           </h2>
           <p className="mx-auto max-w-2xl text-base leading-relaxed text-[#4d4635]">
             {isEs
-              ? 'Anillos de compromiso después de un divorcio, un solitario que llegó con una herencia, una mejora que dejó el original en un cajón. Sea lo que sea que lo traiga, la evaluación ocurre en privado, a su ritmo, sin juicios y sin presión — y usted se va con el pago en la mano o con su anillo en el dedo, nunca con un "tal vez".'
-              : 'Engagement rings after a divorce, a solitaire that came with an inheritance, an upgrade that left the original in a drawer. Whatever brings you in, the evaluation happens in private, at your pace, with no judgment and no pressure — and you leave with payment in hand or your ring still on your finger, never a maybe.'}
+              ? 'Un anillo heredado puede llegar junto con cadenas de oro, broches, cubiertos de plata esterlina y otras piezas de la familia. Podemos revisarlo todo en la misma visita, explicar el valor de cada pieza y dejar que usted decida qué desea vender. La evaluación es privada, gratuita y sin obligación.'
+              : 'An inherited ring may come with gold chains, brooches, sterling flatware and other family pieces. We can review them in the same visit, explain each piece’s value and let you decide what to sell. The evaluation is private, free and without obligation.'}
           </p>
         </section>
 
@@ -201,7 +192,7 @@ export default async function DiamondBuyersPage({ params }: Props) {
         <section className="border-t border-[#d0c5af] bg-[#f3f3f3] py-20">
           <div className="mx-auto max-w-3xl px-4 md:px-8">
             <h2 className="mb-10 text-center text-3xl font-bold text-[#1a1c1c] md:text-4xl" style={{ fontFamily: 'var(--font-headline)' }}>
-              {isEs ? 'Preguntas Sobre Vender Diamantes' : 'Selling Diamonds FAQ'}
+              {isEs ? 'Preguntas Sobre Joyas con Diamantes' : 'Diamond Jewelry FAQ'}
             </h2>
             <div className="flex flex-col gap-4">
               {faqs.map((f) => (
@@ -226,14 +217,14 @@ export default async function DiamondBuyersPage({ params }: Props) {
         {/* Final CTA */}
         <section className="bg-[#2f3131] py-24 text-center">
           <div className="mx-auto max-w-2xl px-4">
-            <ClayMark name="gemstone" size={96} onDark className="mx-auto mb-6 block" />
+            <ClayMark name="signet-ring" size={96} onDark className="mx-auto mb-6 block" />
             <h2 className="mb-6 text-3xl font-bold text-white md:text-4xl" style={{ fontFamily: 'var(--font-headline)' }}>
-              {isEs ? '¿Listo para un número honesto por su diamante?' : 'Ready for an honest number on your diamond?'}
+              {isEs ? '¿Qué joyas desea vender?' : 'What jewelry would you like to sell?'}
             </h2>
             <p className="mx-auto mb-10 max-w-lg text-base leading-relaxed text-[#d7d0c3]">
               {isEs
-                ? 'Evaluación gratuita, privada y sin obligación — en el salón o en su casa.'
-                : 'Free, private, no-obligation evaluation — at the showroom or in your home.'}
+                ? 'Cuéntenos sobre sus joyas, oro o plata esterlina. Evaluación gratuita en el salón o visita a domicilio con cita.'
+                : 'Tell us about your jewelry, gold or sterling silver. Free evaluation at the showroom, or a home visit by appointment.'}
             </p>
             <div className="flex flex-col justify-center gap-6 md:flex-row">
               <Link href={evalHref} className="gold-button">
@@ -244,7 +235,7 @@ export default async function DiamondBuyersPage({ params }: Props) {
                 className="outline-button"
                 style={{ borderColor: 'rgba(255,255,255,0.32)', color: 'white', background: 'rgba(255,255,255,0.08)' }}
               >
-                CALL (239) 404-8505
+                {isEs ? 'LLAMAR (239) 404-8505' : 'CALL (239) 404-8505'}
               </a>
             </div>
           </div>

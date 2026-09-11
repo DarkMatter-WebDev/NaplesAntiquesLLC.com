@@ -1,6 +1,7 @@
 import {
   cityLine,
   mapsUrl,
+  phoneHoursLabel,
   streetLine,
 } from '@/lib/business-location';
 import { AppIcon } from '@/components/AppIcon';
@@ -141,6 +142,7 @@ export default function VisitUsPanel({ locale = 'en' }: Props) {
                 (239) 404-8505
               </a>
             </div>
+            <p className="mt-3 text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>{phoneHoursLabel(isEs)}</p>
           </div>
 
           {/* RIGHT — orientation, then the map. */}

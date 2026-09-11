@@ -68,8 +68,8 @@ const FAQ_ITEMS = [
   {
     questionEn: 'What types of items do you purchase?',
     questionEs: '¿Qué tipos de artículos compran?',
-    answerEn: 'Fine and estate jewelry, signed designer pieces (Rolex, Cartier, Tiffany, Van Cleef, Bulgari, Patek Philippe, David Yurman, etc.), loose diamonds and gemstones, gold and silver bullion, rare and pre-1965 silver coins, sterling silver flatware and hollowware, fine art, antique furniture, and complete estate collections.',
-    answerEs: 'Joyería fina y de patrimonio, piezas de diseñador firmadas (Rolex, Cartier, Tiffany, Van Cleef, Bulgari, Patek Philippe, David Yurman, etc.), diamantes y piedras preciosas sueltas, lingotes de oro y plata, monedas de plata raras y anteriores a 1965, cubertería y vajilla de plata esterlina, arte fino, muebles antiguos y colecciones de patrimonio completas.',
+    answerEn: 'We buy jewelry, gold, sterling silver flatware and hollowware, from single everyday pieces to complete inherited collections. Jewelry is evaluated as a complete piece, including its metal, stones and maker. We also buy designer pieces, watches, bullion, rare and pre-1965 silver coins, fine art and antique furniture.',
+    answerEs: 'Compramos joyería, oro, cubertería y vajilla de plata esterlina, desde una sola pieza de uso diario hasta colecciones heredadas completas. Evaluamos cada joya como pieza completa, incluidos su metal, piedras y fabricante. También compramos piezas de diseñador, relojes, lingotes, monedas raras y de plata anteriores a 1965, arte fino y muebles antiguos.',
   },
   {
     questionEn: 'Is the process confidential?',

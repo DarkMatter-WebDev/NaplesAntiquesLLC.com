@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { SERVICE_AREAS } from '@/lib/service-areas';
-import { mapsUrl } from '@/lib/business-location';
+import { mapsUrl, phoneHoursLabel } from '@/lib/business-location';
 import ShowroomAddress from '@/components/ShowroomAddress';
 import ShowroomHours from '@/components/ShowroomHours';
 import CopyAddressButton from '@/components/CopyAddressButton';
@@ -34,7 +34,6 @@ export default function SiteFooter({ locale }: Props) {
     // Esterlina" and this is the one link to it on EVERY page.
     { label: isEs ? 'Vender Plata Esterlina' : 'Sell Sterling Silver', href: p('/silver-services') },
     { label: isEs ? 'Vender Joyería' : 'Sell Estate Jewelry', href: p('/estate-jewelry') },
-    { label: isEs ? 'Vender Diamantes' : 'Sell Diamonds', href: p('/diamond-buyers') },
     { label: isEs ? 'Vender Relojes' : 'Sell Watches', href: p('/watch-buyers') },
     { label: isEs ? 'Programa de Intercambio' : 'Trade-In Program', href: p('/trade-in') },
     { label: isEs ? 'Evaluación Gratuita' : 'Free Evaluation', href: p('/free-evaluation') },
@@ -76,8 +75,8 @@ export default function SiteFooter({ locale }: Props) {
             </p>
             <p className="max-w-[20rem] text-xs leading-snug md:text-sm md:leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
               {isEs
-                ? 'Compramos y vendemos joyería de patrimonio fina en nuestro salón de Naples, Florida. Evaluaciones gratuitas.'
-                : 'Buying and selling fine estate jewelry at our Naples, Florida showroom. Free, on-the-spot appraisals.'}
+                ? 'Compramos joyería de patrimonio, oro y plata esterlina en nuestro salón de Naples. Una pieza o una colección completa, con evaluación gratuita.'
+                : 'We buy estate jewelry, gold and sterling silver at our Naples showroom. One piece or a whole collection, with a free evaluation.'}
             </p>
             <a
               href="tel:2394048505"
@@ -90,12 +89,12 @@ export default function SiteFooter({ locale }: Props) {
             >
               (239) 404-8505
             </a>
-            {/* The explicit space is for text extractors, not layout: JSX drops
-                the newline between sibling elements, so the phone and email
-                anchors shipped as `</a><a` and Google's snippet for /shop read
-                "(239) 404-8505info@naplesestatejewelry.com" (owner, 2026-09-03).
-                A whitespace-only text node is not rendered inside a flex
-                container, so the stack is unchanged. */}
+            {/* Explicit spaces separate the phone, hours and email for text
+                extractors; whitespace-only nodes do not add flex items. */}
+            {' '}
+            <p className="text-xs leading-snug md:text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+              {phoneHoursLabel(isEs)}
+            </p>
             {' '}
             <a
               href="mailto:info@naplesestatejewelry.com"

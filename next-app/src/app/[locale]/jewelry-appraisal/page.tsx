@@ -85,12 +85,12 @@ export default async function JewelryAppraisalPage({ params }: Props) {
       descEs: 'Juegos de cubiertos, servicios de té, hollowware y joyería .925.',
     },
     {
-      mark: 'gemstone' as ClayMarkName,
-      href: p('/diamond-buyers'),
-      titleEn: 'Diamonds',
-      titleEs: 'Diamantes',
-      descEn: 'Engagement rings, studs, and tennis bracelets — certified or not.',
-      descEs: 'Anillos de compromiso, aretes y pulseras de tenis — con o sin certificado.',
+      mark: 'heirloom' as ClayMarkName,
+      href: p('/estate-jewelry'),
+      titleEn: 'Estate & designer jewelry',
+      titleEs: 'Joyería de patrimonio y de diseñador',
+      descEn: 'Rings, brooches, bracelets and inherited pieces, with the maker, stones and metal considered together.',
+      descEs: 'Anillos, broches, pulseras y piezas heredadas, con el fabricante, las piedras y el metal valorados en conjunto.',
     },
     {
       mark: 'watch' as ClayMarkName,
@@ -196,8 +196,8 @@ export default async function JewelryAppraisalPage({ params }: Props) {
               </h1>
               <p className="mb-8 max-w-xl text-lg leading-relaxed text-[#d7d0c3]">
                 {isEs
-                  ? 'Traiga sus joyas, plata, diamantes, relojes o monedas a nuestro salón de Shirley St y reciba una respuesta directa sobre su valor — probado y pesado frente a usted, con una oferta real en efectivo que puede rechazar sin compromiso.'
-                  : "Bring your jewelry, silver, diamonds, watches, or coins to our Shirley St showroom and get a straight answer on what they're worth — tested and weighed in front of you, with a real cash offer you're free to walk away from."}
+                  ? 'Traiga sus joyas, oro, plata esterlina, relojes o monedas a nuestro salón de Shirley St y reciba una respuesta directa sobre su valor — probado y pesado frente a usted, con una oferta real en efectivo que puede rechazar sin compromiso.'
+                  : "Bring your jewelry, gold, sterling silver, watches, or coins to our Shirley St showroom and get a straight answer on what they're worth — tested and weighed in front of you, with a real cash offer you're free to walk away from."}
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link href={evalHref} className="gold-button">

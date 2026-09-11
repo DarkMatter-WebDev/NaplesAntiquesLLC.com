@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { pageMetadata } from '@/lib/seo';
 import { jsonLdHtml } from '@/lib/json-ld';
 import { SERVICE_AREAS, getServiceArea } from '@/lib/service-areas';
-import { SAME_AS, mapsUrl } from '@/lib/business-location';
+import { SAME_AS, mapsUrl, phoneHoursLabel } from '@/lib/business-location';
 import { routing } from '@/i18n/routing';
 import SiteHeader from '@/components/layout/SiteHeader';
 import { BreadcrumbTrailFromLd } from '@/components/BreadcrumbTrail';
@@ -43,8 +43,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ? (area.metaTitleEs ?? `Vender Oro, Joyería y Plata en ${area.city}, FL`)
     : (area.metaTitleEn ?? `Sell Gold, Jewelry & Silver in ${area.city}, FL`);
   const description = isEs
-    ? (area.metaDescEs ?? `Compramos oro, joyería, plata, diamantes y relojes en ${area.city}, FL. Evaluación gratuita en nuestro salón de Naples o a domicilio.`)
-    : (area.metaDescEn ?? `Sell gold, jewelry, silver, diamonds & watches in ${area.city}, FL. Free appraisals at our Naples showroom or at your home. Call (239) 404-8505.`);
+    ? (area.metaDescEs ?? `Venda joyería, oro y plata esterlina en ${area.city}, FL. Compramos cubiertos y colecciones completas. Evaluación gratis. Llame al (239) 404-8505.`)
+    : (area.metaDescEn ?? `Sell jewelry, gold & sterling silver in ${area.city}, FL. Flatware and whole collections welcome. Free evaluation. Call (239) 404-8505.`);
   // Same blank-card defect as /sell, across every city page.
   return pageMetadata({ title, description, path: `/sell/${area.slug}`, locale });
 }
@@ -62,12 +62,8 @@ export default async function SellCityPage({ params }: Props) {
   const travel = isEs ? area.travelEs : area.travelEn;
   const canonicalUrl = `https://naplesestatejewelry.com${isEs ? '/es' : ''}/sell/${area.slug}`;
 
-  // Each card's heading front-loads a high-intent "<thing> buyers in <city>"
-  // phrase so the page can rank for every buy-side combination. `href` (added
-  // 2026-08-30, SEO internal-link pass) turns each heading into a contextual
-  // link to the matching service page — the anchors these pages were already
-  // ranking near. Watches got its page (/watch-buyers) on 2026-09-01, so all
-  // six cards now link.
+  // Lead with jewelry, gold and sterling. The collection card connects
+  // families to estate services without promoting standalone stone buying.
   const whatWeBuy = [
     {
       mark: 'gold-seal',
@@ -94,12 +90,12 @@ export default async function SellCityPage({ params }: Props) {
       descEs: `Compradores de plata esterlina en ${area.city} para cubiertos, juegos de té, bandejas, holloware y joyería .925. Aceptamos patrimonios completos y piezas sueltas.`,
     },
     {
-      mark: 'signet-ring',
-      href: p('/diamond-buyers'),
-      titleEn: `Sell Diamonds in ${area.city}`,
-      titleEs: `Vender Diamantes en ${area.city}`,
-      descEn: `Diamond buyers in ${area.city} for loose stones and mounted diamonds — engagement rings, tennis bracelets, and studs, certified or not.`,
-      descEs: `Compradores de diamantes en ${area.city} para piedras sueltas y montadas — anillos de compromiso, pulseras de tenis y aretes, con o sin certificado.`,
+      mark: 'heirloom',
+      href: p('/estate-services'),
+      titleEn: `Estate Collections in ${area.city}`,
+      titleEs: `Colecciones Heredadas en ${area.city}`,
+      descEn: `Help for families and executors in ${area.city} with inherited jewelry, gold, sterling flatware and mixed collections. We review each piece and explain the offer.`,
+      descEs: `Ayudamos a familias y albaceas en ${area.city} con joyas heredadas, oro, cubiertos de plata esterlina y colecciones variadas. Revisamos cada pieza y explicamos la oferta.`,
     },
     {
       mark: 'coins',
@@ -157,10 +153,10 @@ export default async function SellCityPage({ params }: Props) {
       aEs: `Nosotros. Compramos cubiertos de plata esterlina, juegos de té, bandejas, holloware y joyería .925 de vendedores en ${area.city} y el suroeste de Florida — patrimonios completos o una sola pieza.`,
     },
     {
-      qEn: `Do you buy estate jewelry, diamonds, and watches in ${area.city}?`,
-      qEs: `¿Compran joyería de patrimonio, diamantes y relojes en ${area.city}?`,
-      aEn: `Yes. Along with gold and silver, we buy estate and designer jewelry, loose and mounted diamonds, luxury watches, and coins throughout ${area.city}.`,
-      aEs: `Sí. Además de oro y plata, compramos joyería de patrimonio y de diseñador, diamantes sueltos y montados, relojes de lujo y monedas en todo ${area.city}.`,
+      qEn: `Can you evaluate an inherited collection in ${area.city}?`,
+      qEs: `¿Pueden evaluar una colección heredada en ${area.city}?`,
+      aEn: `Yes. We buy estate and designer jewelry, gold, sterling silver, luxury watches and coins throughout ${area.city}. Jewelry with diamonds or gemstones is evaluated as a complete piece, with its metal, stones, maker and condition considered together.`,
+      aEs: `Sí. Compramos joyería de patrimonio y de diseñador, oro, plata esterlina, relojes de lujo y monedas en todo ${area.city}. Las joyas con diamantes o gemas se evalúan como piezas completas, considerando el metal, las piedras, el fabricante y el estado.`,
     },
     {
       qEn: `Do I have to come to the showroom?`,
@@ -251,8 +247,8 @@ export default async function SellCityPage({ params }: Props) {
               </h1>
               <p className="mb-8 max-w-xl text-lg leading-relaxed text-[#d7d0c3]">
                 {isEs
-                  ? `El comprador de confianza y al mejor precio de ${area.city} para oro, joyería de patrimonio, plata, diamantes, monedas y relojes. Visítenos en Naples o pida una cita a domicilio.`
-                  : `${area.city}'s trusted, top-paying buyer for gold, estate jewelry, silver, diamonds, coins, and watches. Visit our Naples showroom, or ask us to come to you.`}
+                  ? `Compramos joyería, oro y plata esterlina de vendedores en ${area.city}: cadenas, anillos, cubiertos, juegos de té y colecciones completas. Visite nuestro salón de Naples o solicite una visita a domicilio.`
+                  : `We buy jewelry, gold and sterling silver from sellers in ${area.city}: chains, rings, flatware, tea services and whole collections. Visit our Naples showroom, or request a home visit.`}
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link href={evalHref} className="gold-button">
@@ -266,6 +262,7 @@ export default async function SellCityPage({ params }: Props) {
                   {isEs ? 'LLAMAR (239) 404-8505' : 'CALL (239) 404-8505'}
                 </a>
               </div>
+              <p className="mt-4 text-sm text-[#d7d0c3]">{phoneHoursLabel(isEs)}</p>
             </div>
           </div>
         </section>
@@ -324,6 +321,7 @@ export default async function SellCityPage({ params }: Props) {
                     {isEs ? 'LLAMAR O TEXTO (239) 404-8505' : 'CALL OR TEXT (239) 404-8505'}
                   </a>
                 </div>
+                <p className="mt-4 text-sm text-[#4d4635]">{phoneHoursLabel(isEs)}</p>
               </div>
               <div>
                 {/* The door, above "What to bring" (owner, 2026-09-08; no caption). */}
@@ -480,7 +478,7 @@ export default async function SellCityPage({ params }: Props) {
                 className="outline-button"
                 style={{ borderColor: 'rgba(255,255,255,0.32)', color: 'white', background: 'rgba(255,255,255,0.08)' }}
               >
-                CALL (239) 404-8505
+                {isEs ? 'LLAMAR (239) 404-8505' : 'CALL (239) 404-8505'}
               </a>
             </div>
             <p className="mt-8 text-sm text-[#a9a9a5]">

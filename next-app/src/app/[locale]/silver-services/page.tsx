@@ -13,6 +13,7 @@ import ClayMark, { type ClayMarkName } from '@/components/ClayMark';
 import { TESTIMONIALS } from '@/lib/testimonials';
 import SilverMarksTeaser from '@/components/silver/SilverMarksTeaser';
 import FaqSection, { type Faq } from '@/components/FaqSection';
+import { phoneHoursLabel } from '@/lib/business-location';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -142,24 +143,24 @@ export default async function SilverServicesPage({ params }: Props) {
             <div className="max-w-2xl">
               <BreadcrumbTrail locale={locale} crumbs={crumbs} tone="light" />
               <span className="text-[#735c00] text-xs font-bold uppercase tracking-[0.2em] mb-4 block">
-                {isEs ? 'Servicios de Plata Privados' : 'Private Silver Estate Services'}
+                {isEs ? 'Cubertería, Juegos de Té y Joyería' : 'Flatware, Tea Services & Jewelry'}
               </span>
               <h1 className="font-[family-name:var(--font-headline)] text-4xl md:text-5xl font-bold text-[#1a1c1c] mb-6 leading-tight">
                 {isEs
-                  ? 'Servicios y Evaluaciones de Plata en Naples'
-                  : "Naples' Premier Silver Estate Services & Evaluations"}
+                  ? 'Venda Plata Esterlina en Naples'
+                  : 'Sell Sterling Silver in Naples'}
               </h1>
               <p className="text-lg text-[#4d4635] mb-10 max-w-xl leading-relaxed">
                 {isEs
-                  ? 'Un legado de confianza en cada transacción. Ofrecemos evaluaciones privadas de alta precisión para colecciones de plata fina, cubertería de patrimonio y lingotes raros.'
-                  : 'A legacy of trust in every transaction. We provide private, high-accuracy evaluations for fine silver collections, estate flatware, and rare bullion.'}
+                  ? 'Compramos cubertería de plata esterlina, juegos de té, monedas y joyería — una pieza o toda una colección. Identificamos su plata y explicamos la oferta.'
+                  : 'We buy sterling flatware, tea services, coins, and jewelry — one piece or a full collection. We identify your silver and explain our offer.'}
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link
                   href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
                   className="gold-button"
                 >
-                  {isEs ? 'PROGRAMAR EVALUACIÓN' : 'Schedule Evaluation'}
+                  {isEs ? 'EVALUACIÓN GRATUITA' : 'Free Evaluation'}
                 </Link>
                 {/* 2026-09-08 (mockup approved): "Current Silver Rates" → the
                     phone. Silver sellers call; the rates survive as the text
@@ -170,6 +171,7 @@ export default async function SilverServicesPage({ params }: Props) {
                   {isEs ? 'LLAMAR (239) 404-8505' : 'CALL (239) 404-8505'}
                 </a>
               </div>
+              <p className="mt-4 text-sm text-[#4d4635]">{phoneHoursLabel(isEs)}</p>
               <Link
                 href={isEs ? '/es/spot-prices' : '/spot-prices'}
                 className="mt-4 inline-block text-sm font-semibold text-[#735c00] underline underline-offset-2"
@@ -636,9 +638,9 @@ export default async function SilverServicesPage({ params }: Props) {
           faqs={SILVER_FAQS}
           footer={
             isEs ? (
-              <>¿Vende más que plata? También compramos <Link href="/es/gold-services" className="font-semibold text-[#735c00] underline underline-offset-2">oro</Link>, <Link href="/es/diamond-buyers" className="font-semibold text-[#735c00] underline underline-offset-2">diamantes</Link> y <Link href="/es/estate-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">joyería de patrimonio</Link>.</>
+              <>¿Vende más que plata? También compramos <Link href="/es/gold-services" className="font-semibold text-[#735c00] underline underline-offset-2">oro</Link> y <Link href="/es/estate-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">joyería de patrimonio</Link>.</>
             ) : (
-              <>Selling more than silver? We also buy <Link href="/gold-services" className="font-semibold text-[#735c00] underline underline-offset-2">gold</Link>, <Link href="/diamond-buyers" className="font-semibold text-[#735c00] underline underline-offset-2">diamonds</Link>, and <Link href="/estate-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">estate jewelry</Link>.</>
+              <>Selling more than silver? We also buy <Link href="/gold-services" className="font-semibold text-[#735c00] underline underline-offset-2">gold</Link> and <Link href="/estate-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">estate jewelry</Link>.</>
             )
           }
         />

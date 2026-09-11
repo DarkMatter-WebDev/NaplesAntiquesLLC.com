@@ -7,6 +7,7 @@ import BreadcrumbTrail from '@/components/BreadcrumbTrail';
 import BreadcrumbJsonLd from '@/components/BreadcrumbJsonLd';
 import SiteFooter from '@/components/layout/SiteFooter';
 import { AppIcon } from '@/components/AppIcon';
+import { phoneHoursLabel, wayfindingSentence } from '@/lib/business-location';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -16,8 +17,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ? 'Comprador de Joyería de Patrimonio en Naples'
       : 'Estate Jewelry Buyer in Naples, FL',
     description: isEs
-      ? 'Evaluaciones privadas de joyería de patrimonio en Naples, FL. Pruebas ácidas en el sitio, análisis XRF y coordinación con GIA. Pago inmediato al llegar a un acuerdo.'
-      : 'Private estate jewelry evaluations in Naples, FL. Onsite acid testing, XRF analysis, and GIA coordination. Immediate payment upon agreement.',
+      ? 'Venda joyería heredada en Naples, FL — anillos, cadenas, pulseras y colecciones. Evaluación gratis, pago al aceptar. Llame al (239) 404-8505.'
+      : 'Sell estate jewelry in Naples, FL — gold rings, chains, bracelets and inherited collections. Free evaluation, paid on agreement. Call (239) 404-8505.',
     path: '/estate-jewelry',
     locale,
   });
@@ -63,28 +64,28 @@ export default async function EstateJewelryPage({ params }: Props) {
                 className="text-xs font-bold uppercase tracking-[0.2em] mb-4 block"
                 style={{ color: '#f2ca50', fontFamily: 'var(--font-label)' }}
               >
-                {isEs ? 'Evaluación de Joyería de Patrimonio' : 'Estate Jewelry Assessment'}
+                {isEs ? 'Joyería de Oro, Antigua y Heredada' : 'Gold, Vintage & Inherited Jewelry'}
               </span>
               <h1
                 className="text-4xl md:text-6xl text-white font-bold mb-6 leading-tight"
                 style={{ fontFamily: 'var(--font-headline)' }}
               >
                 {isEs
-                  ? 'Evaluando la Artesanía de la Joyería Fina'
-                  : 'Evaluating the Artistry of Fine Jewelry'}
+                  ? 'Venda Joyería de Patrimonio en Naples, FL'
+                  : 'Sell Estate Jewelry in Naples, FL'}
               </h1>
               <p className="text-lg leading-relaxed mb-10" style={{ color: '#d0c9bc' }}>
                 {isEs
-                  ? 'Más allá del simple peso del oro y los quilates de las piedras hay un mundo de procedencia, artesanía e historia. Realizamos evaluaciones cuidadosas con pruebas de ácido en el lugar de su cita.'
-                  : 'Beyond the mere weight of gold and carats of stone lies a world of provenance, craftsmanship, and history. We provide careful evaluations with onsite acid testing at your appointment, and coordinate trusted offsite XRF analysis and GIA certification when a piece calls for deeper documentation.'}
+                  ? 'Compramos anillos de oro, cadenas, pulseras y joyería heredada — una pieza o todo un joyero. Evaluamos el metal, el fabricante, las gemas y la época, explicamos la oferta y pagamos al aceptarla.'
+                  : 'Gold rings, chains, bracelets, and inherited jewelry — one piece or a whole jewelry box. We evaluate the metal, maker, gemstones, and era, explain our offer, and pay when you accept.'}
               </p>
               <div className="flex flex-wrap gap-4">
-                <Link
-                  href={isEs ? '/es/contact' : '/contact'}
+                <a
+                  href="tel:2394048505"
                   className="gold-button"
                 >
-                  {isEs ? 'Programar Consulta' : 'Schedule Consultation'}
-                </Link>
+                  {isEs ? 'LLAMAR (239) 404-8505' : 'CALL (239) 404-8505'}
+                </a>
                 <Link
                   href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
                   className="outline-button"
@@ -93,11 +94,12 @@ export default async function EstateJewelryPage({ params }: Props) {
                   {isEs ? 'Evaluación Gratuita' : 'Free Evaluation'}
                 </Link>
               </div>
+              <p className="mt-4 text-sm" style={{ color: '#d0c9bc' }}>{phoneHoursLabel(isEs)}</p>
             </div>
           </div>
         </section>
 
-        {/* Multidimensional Approach */}
+        {/* How pieces are valued */}
         <section className="py-20 md:py-28" style={{ background: 'var(--color-background)' }}>
           <div className="ultrawide-page container mx-auto px-6 md:px-12 max-w-6xl">
             <div className="mb-16 text-center max-w-3xl mx-auto">
@@ -105,12 +107,12 @@ export default async function EstateJewelryPage({ params }: Props) {
                 className="text-3xl md:text-4xl font-bold mb-6 tracking-tight"
                 style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
               >
-                {isEs ? 'Un Enfoque Multidimensional del Valor' : 'A Multidimensional Approach to Value'}
+                {isEs ? 'Cómo Valoramos Su Joyería' : 'How We Value Your Jewelry'}
               </h2>
               <p style={{ color: 'var(--color-on-surface-variant)' }}>
                 {isEs
-                  ? 'Miramos más allá del valor de chatarra. Nuestra evaluación privada considera los factores que hacen única su pieza en el mercado secundario global.'
-                  : 'We look past the scrap value. Our private evaluation considers the factors that make your piece unique in the global secondary market.'}
+                  ? 'Valoramos cada pieza como joyería y como metal. Pesamos los metales preciosos y comprobamos su pureza con pruebas de ácido en el sitio. También consideramos el fabricante, las gemas, la época y el estado de la pieza. Cuando hace falta, organizamos análisis de metal XRF fuera del sitio.'
+                  : 'We assess each piece as jewelry and as metal. We weigh precious metals and check their purity with onsite acid testing. We also consider the maker, gemstones, era, and condition. When needed, we arrange offsite XRF metal analysis.'}
               </p>
             </div>
 
@@ -131,14 +133,14 @@ export default async function EstateJewelryPage({ params }: Props) {
                   {
                     title: isEs ? 'Fabricante y Procedencia' : 'Maker & Provenance',
                     body: isEs
-                      ? 'Los artículos de casas como Cartier, Van Cleef & Arpels o Tiffany conllevan una prima significativa. Rastreamos registros de subastas y ventas privadas para garantizar que su pieza sea evaluada por su firma.'
-                      : 'Items from houses like Cartier, Van Cleef & Arpels, or Tiffany carry a significant premium. We track auction records and private sales to ensure your piece is evaluated for its signature.',
+                      ? 'Buscamos marcas del fabricante y revisamos cualquier documentación que conserve. Una firma de Cartier, Van Cleef & Arpels o Tiffany puede influir en el valor de reventa, junto con el diseño y el estado. No hace falta una firma para que evaluemos su joyería.'
+                      : 'We look for maker\'s marks and review any paperwork you have. A Cartier, Van Cleef & Arpels, or Tiffany signature can affect resale value alongside design and condition. Your jewelry does not need a designer signature for an evaluation.',
                   },
                   {
                     title: isEs ? 'Calidad de las Gemas' : 'Gemstone Quality',
                     body: isEs
-                      ? 'Para diamantes y piedras de color, combinamos inspección visual, investigación de mercado, documentación disponible, pruebas de ácido en el sitio y certificación XRF o GIA fuera del sitio cuando sea necesario.'
-                      : 'For diamonds and colored stones, we combine visual inspection, market research, available paperwork, onsite acid testing, and offsite XRF or GIA certification when needed to account for rarity, origin, and treatment.',
+                      ? 'Revisamos las piedras montadas mediante inspección visual, investigación de mercado y los informes gemológicos disponibles. Si hace falta un análisis especializado, organizamos la evaluación fuera del sitio. Esta revisión de las gemas es distinta de las pruebas de ácido del metal.'
+                      : 'We assess mounted stones through visual inspection, market research, and any available gemological reports. If specialist analysis is needed, we arrange an offsite assessment. This gemstone review is separate from acid testing the metal.',
                   },
                   {
                     title: isEs ? 'Era Histórica' : 'Historical Era',
@@ -167,7 +169,7 @@ export default async function EstateJewelryPage({ params }: Props) {
           </div>
         </section>
 
-        {/* Private Consultation */}
+        {/* Evaluation process and showroom visits */}
         <section className="py-20 md:py-28" style={{ background: '#1a1c1c', color: 'white' }}>
           <div className="ultrawide-page container mx-auto px-6 md:px-12 max-w-6xl">
             <div className="grid md:grid-cols-2 gap-12 items-center">
@@ -176,26 +178,26 @@ export default async function EstateJewelryPage({ params }: Props) {
                   className="text-xs font-bold uppercase tracking-widest mb-6 block"
                   style={{ color: '#f2ca50', fontFamily: 'var(--font-label)' }}
                 >
-                  {isEs ? 'Consulta Privada' : 'Private Consultation'}
+                  {isEs ? 'Evaluación Gratuita' : 'Free Evaluation'}
                 </span>
                 <h2
                   className="text-3xl md:text-4xl font-bold mb-8 leading-tight"
                   style={{ fontFamily: 'var(--font-headline)' }}
                 >
                   {isEs
-                    ? '¿No sabe el valor de su joyería? Le damos claridad.'
-                    : "Unsure of your jewelry's value? We provide clarity."}
+                    ? 'Qué Ocurre Durante Su Evaluación'
+                    : 'What Happens at Your Evaluation'}
                 </h2>
                 <p className="text-lg mb-8 leading-relaxed" style={{ color: '#d0c9bc' }}>
                   {isEs
-                    ? 'Muchas piezas valiosas se pasan por alto porque no parecen "modernas". Nuestras evaluaciones ofrecen valoraciones honestas, sin obligación, en un entorno seguro y profesional.'
-                    : 'Many valuable pieces are overlooked because they don\'t look "modern." Our estate jewelry assessments offer honest, no-obligation evaluations in a secure, professional setting.'}
+                    ? 'Traiga una pieza, joyería de uso diario o una colección heredada. Puede visitarnos sin cita durante el horario del salón o concertar una cita privada. Las visitas a domicilio están disponibles a solicitud para quienes prefieren no transportar sus piezas.'
+                    : 'Bring one piece, everyday jewelry, or an inherited collection. Walk into our showroom during open hours or arrange a private appointment. Home visits are available on request if you would rather not transport your pieces.'}
                 </p>
                 <ul className="space-y-4 mb-10">
                   {[
-                    isEs ? 'Pruebas de ácido en el lugar; XRF y certificación GIA fuera del sitio cuando sea necesario' : 'Onsite acid testing; offsite XRF, geological & GIA certification when needed',
-                    isEs ? 'Manejo privado y proceso de revisión seguro' : 'Private handling and secure review process',
-                    isEs ? 'Pago inmediato al llegar a un acuerdo' : 'Immediate payment upon agreement',
+                    isEs ? 'Revisamos el metal, las marcas y el estado de sus piezas' : 'We examine the metal, markings, and condition of your pieces',
+                    isEs ? 'Explicamos la oferta; usted decide si desea vender' : 'We explain our offer; you decide whether to sell',
+                    isEs ? 'Pago inmediato al aceptar la oferta' : 'Immediate payment when you accept the offer',
                   ].map((item, i) => (
                     <li key={i} className="flex items-start gap-4">
                       <AppIcon name="check_circle" className="text-sm" style={{ color: '#f2ca50', flexShrink: 0, marginTop: '0.1rem' }} />
@@ -208,20 +210,23 @@ export default async function EstateJewelryPage({ params }: Props) {
                     </li>
                   ))}
                 </ul>
+                <p className="text-sm mb-6 leading-relaxed" style={{ color: '#d0c9bc' }}>
+                  {wayfindingSentence(isEs)}
+                </p>
                 <Link
                   href={isEs ? '/es/contact' : '/contact'}
                   className="gold-button inline-flex"
                 >
-                  {isEs ? 'Reserve Su Cita Privada' : 'Book Your Private Appointment'}
+                  {isEs ? 'Horario y Cómo Llegar' : 'Showroom Hours & Directions'}
                 </Link>
               </div>
 
               <div
-                className="flex aspect-square items-center justify-center rounded-2xl p-8 shadow-[0_18px_54px_rgba(0,0,0,0.16)] md:p-12"
+                className="flex items-center justify-center rounded-2xl p-6 shadow-[0_18px_54px_rgba(0,0,0,0.16)] md:p-10"
                 style={{ background: 'var(--color-surface-container-highest)' }}
               >
                 <div
-                  className="flex h-full w-full flex-col justify-center rounded-xl p-8 text-center md:p-10"
+                  className="flex w-full flex-col justify-center rounded-xl p-6 text-center md:p-8"
                   style={{ border: '1px solid rgba(115, 92, 0, 0.18)' }}
                 >
                   <AppIcon name="verified"
@@ -233,12 +238,12 @@ export default async function EstateJewelryPage({ params }: Props) {
                     className="text-2xl font-bold mb-4"
                     style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
                   >
-                    {isEs ? 'Integridad Profesional' : 'Professional Integrity'}
+                    {isEs ? 'Una Oferta Clara' : 'An Offer You Can Understand'}
                   </h3>
                   <p className="text-sm leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
                     {isEs
-                      ? 'Nuestras evaluaciones utilizan inspección cuidadosa, herramientas de precisión, investigación de mercado y pruebas de ácido en el sitio para que los detalles importantes sean documentados y respetados.'
-                      : 'Our evaluations use careful inspection, precision tools, market research, and onsite acid testing so important details are documented and respected.'}
+                      ? 'Explicamos cómo el metal, el fabricante, las gemas y el estado de sus piezas influyen en la oferta según el mercado actual. La evaluación es gratuita y no tiene obligación de vender.'
+                      : 'We explain how the metal, maker, gemstones, and condition of your pieces contribute to an offer based on the current market. The evaluation is free, with no obligation to sell.'}
                   </p>
                 </div>
               </div>
@@ -255,12 +260,12 @@ export default async function EstateJewelryPage({ params }: Props) {
                   className="text-3xl md:text-4xl font-bold mb-4 tracking-tight"
                   style={{ fontFamily: 'var(--font-headline)', color: 'var(--color-on-surface)' }}
                 >
-                  {isEs ? 'Artículos Excepcionales Buscados' : 'Exceptional Items Sought'}
+                  {isEs ? 'Joyería Que Compramos' : 'Jewelry We Buy'}
                 </h2>
                 <p style={{ color: 'var(--color-on-surface-variant)' }}>
                   {isEs
-                    ? 'Nos enfocamos en la adquisición de piezas firmadas de alto valor, antigüedades heredadas y relojes de lujo.'
-                    : 'Our boutique focuses on the acquisition of high-value signed pieces, antique heirlooms, and luxury timepieces.'}
+                    ? 'Compramos anillos de oro, cadenas, pulseras, aretes y joyería heredada, incluidas piezas rotas o sin firma. También evaluamos joyería antigua y de diseñador y relojes de lujo, tanto piezas individuales como colecciones.'
+                    : 'We buy gold rings, chains, bracelets, earrings, and inherited jewelry, including broken or unsigned pieces. We also evaluate antique and designer jewelry and luxury watches, as individual pieces or collections.'}
                 </p>
               </div>
               <Link
@@ -358,9 +363,9 @@ export default async function EstateJewelryPage({ params }: Props) {
                 literal the newer pages use. */}
             <p className="mt-10 text-center text-sm leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
               {isEs ? (
-                <>¿Vende más que joyería? También compramos <Link href={p('/gold-services')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>chatarra de oro</Link>, <Link href={p('/silver-services')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>cubertería y vajilla de plata esterlina</Link> y <Link href={p('/diamond-buyers')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>diamantes sueltos</Link>.</>
+                <>¿Vende más que joyería? También compramos <Link href={p('/gold-services')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>chatarra de oro</Link> y <Link href={p('/silver-services')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>cubertería y vajilla de plata esterlina</Link>. Si su colección incluye piezas con piedras, consulte nuestras <Link href={p('/diamond-buyers')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>evaluaciones de joyería con diamantes</Link>.</>
               ) : (
-                <>Selling more than jewelry? We also buy <Link href={p('/gold-services')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>scrap gold</Link>, <Link href={p('/silver-services')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>sterling silver flatware and hollowware</Link>, and <Link href={p('/diamond-buyers')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>loose diamonds</Link>.</>
+                <>Selling more than jewelry? We also buy <Link href={p('/gold-services')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>scrap gold</Link> and <Link href={p('/silver-services')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>sterling silver flatware and hollowware</Link>. If your collection includes pieces with stones, see our <Link href={p('/diamond-buyers')} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>diamond jewelry evaluations</Link>.</>
               )}
             </p>
           </div>
@@ -377,10 +382,10 @@ export default async function EstateJewelryPage({ params }: Props) {
             </span>
             <div className="flex flex-wrap justify-center gap-12 md:gap-24">
               {[
-                { stat: isEs ? 'Pruebas en el Sitio' : 'Onsite Testing', label: isEs ? 'Pruebas de Ácido en su Cita' : 'Acid Tests at Your Appointment' },
+                { stat: isEs ? 'Pruebas en el Sitio' : 'Onsite Testing', label: isEs ? 'Pruebas de Metales Preciosos' : 'Precious Metal Checks' },
                 { stat: '15+', label: isEs ? 'Años de Experiencia' : 'Years Experience' },
                 { stat: isEs ? 'Raíces Locales' : 'Local Roots', label: isEs ? 'Nacido y criado en Naples' : 'Born & raised in Naples' },
-                { stat: isEs ? 'Mejor Mercado' : 'Top Market', label: isEs ? 'Garantía de Valor' : 'Value Guarantee' },
+                { stat: isEs ? 'Sin Obligación' : 'No Obligation', label: isEs ? 'Evaluación Gratuita' : 'Free Evaluation' },
               ].map((item) => (
                 <div key={item.stat} className="flex flex-col items-center">
                   <span

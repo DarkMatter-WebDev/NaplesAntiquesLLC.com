@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { pageMetadata } from '@/lib/seo';
 import { jsonLdHtml } from '@/lib/json-ld';
 import { SERVICE_AREAS } from '@/lib/service-areas';
+import { phoneHoursLabel } from '@/lib/business-location';
 import SiteHeader from '@/components/layout/SiteHeader';
 import { BreadcrumbTrailFromLd } from '@/components/BreadcrumbTrail';
 import SiteFooter from '@/components/layout/SiteFooter';
@@ -23,8 +24,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ? 'Vender Oro, Joyería y Plata en el Suroeste de Florida'
     : 'Sell Gold, Jewelry & Silver in Southwest Florida';
   const description = isEs
-    ? 'Compramos oro, joyería, plata, diamantes, monedas y relojes al mejor precio. Evaluación gratuita en nuestro salón de Naples o a domicilio.'
-    : 'Top-paying buyer of gold, jewelry, silver, diamonds, coins & watches. Free appraisals at our Naples showroom or at your home across Southwest Florida.';
+    ? 'Venda joyería, oro, plata esterlina y cubertería en Naples y el suroeste de Florida. Evaluación gratis en el salón o a domicilio: (239) 404-8505.'
+    : 'Sell jewelry, gold, sterling silver and flatware in Naples and Southwest Florida. Free showroom or home evaluations. Call (239) 404-8505.';
   // Was a hand-rolled openGraph block with no `images`, which meant this page —
   // one of the most shared on the site — posted a BLANK card. pageMetadata
   // restores the image, siteName, locale and the matching twitter tags.
@@ -68,13 +69,13 @@ export default async function SellHubPage({ params }: Props) {
               </span>
               <h1 className="mb-6 text-4xl font-bold leading-tight text-white md:text-5xl" style={{ fontFamily: 'var(--font-headline)' }}>
                 {isEs
-                  ? 'Venda Oro, Joyería y Plata Esterlina al Mejor Precio'
-                  : 'Sell Gold, Jewelry & Sterling Silver for Top Dollar'}
+                  ? 'Venda Oro, Joyería y Plata Esterlina'
+                  : 'Sell Gold, Jewelry & Sterling Silver'}
               </h1>
               <p className="mb-8 max-w-xl text-lg leading-relaxed text-[#d7d0c3]">
                 {isEs
-                  ? 'Comprador privado de oro, joyería de patrimonio, plata, diamantes, monedas y relojes. Evaluación gratuita, números honestos y pago inmediato — en nuestro salón de Naples o en su casa.'
-                  : 'Private buyer of gold, estate jewelry, silver, diamonds, coins, and watches. Free evaluation, honest numbers, and immediate payment — at our Naples showroom or at your home.'}
+                  ? 'Compramos joyería, oro, plata esterlina y cubertería, desde una sola pieza hasta una colección heredada. También compramos monedas y relojes. Evaluación gratuita y pago inmediato al llegar a un acuerdo — en nuestro salón de Naples o en su casa.'
+                  : 'We buy jewelry, gold, sterling silver and flatware, from a single piece to an inherited collection. We also buy coins and watches. Free evaluation and immediate payment upon agreement — at our Naples showroom or at your home.'}
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link href={p('/free-evaluation')} className="gold-button">
@@ -85,9 +86,10 @@ export default async function SellHubPage({ params }: Props) {
                   className="outline-button"
                   style={{ borderColor: 'rgba(255,255,255,0.48)', color: 'white', background: 'rgba(255,255,255,0.08)' }}
                 >
-                  CALL (239) 404-8505
+                  {isEs ? 'LLAMAR (239) 404-8505' : 'CALL (239) 404-8505'}
                 </a>
               </div>
+              <p className="mt-4 text-sm text-[#d7d0c3]">{phoneHoursLabel(isEs)}</p>
             </div>
           </div>
         </section>
@@ -299,7 +301,7 @@ export default async function SellHubPage({ params }: Props) {
                 className="outline-button"
                 style={{ borderColor: 'rgba(255,255,255,0.32)', color: 'white', background: 'rgba(255,255,255,0.08)' }}
               >
-                CALL (239) 404-8505
+                {isEs ? 'LLAMAR (239) 404-8505' : 'CALL (239) 404-8505'}
               </a>
             </div>
           </div>

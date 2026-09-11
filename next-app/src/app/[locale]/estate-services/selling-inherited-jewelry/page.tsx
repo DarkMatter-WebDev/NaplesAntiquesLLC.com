@@ -236,9 +236,9 @@ export default async function InheritedJewelryGuidePage({ params }: Props) {
           </div>
           <p className="mt-8 max-w-3xl text-sm leading-relaxed text-[#4d4635]">
             {isEs ? (
-              <>Para la matemática detrás de las ofertas de metal, vea <Link href={p('/gold-services/what-is-my-gold-worth')} className="font-semibold text-[#735c00] underline underline-offset-2">cuánto vale su oro</Link> y <Link href={p('/silver-services/flatware-value')} className="font-semibold text-[#735c00] underline underline-offset-2">cuánto vale la cubertería de plata</Link>.</>
+              <>Para la matemática detrás de las ofertas de metal, vea <Link href={p('/gold-services/what-is-my-gold-worth')} className="font-semibold text-[#735c00] underline underline-offset-2">cuánto vale su oro</Link> y <Link href={p('/silver-services/flatware-value')} className="font-semibold text-[#735c00] underline underline-offset-2">cuánto vale la cubertería de plata</Link>. Para una evaluación de las piezas, vea <Link href={p('/estate-jewelry')} className="font-semibold text-[#735c00] underline underline-offset-2">cómo vender joyería heredada en Naples</Link>.</>
             ) : (
-              <>For the math behind metal offers, see <Link href={p('/gold-services/what-is-my-gold-worth')} className="font-semibold text-[#735c00] underline underline-offset-2">what your gold is worth</Link> and <Link href={p('/silver-services/flatware-value')} className="font-semibold text-[#735c00] underline underline-offset-2">what sterling flatware is worth</Link>.</>
+              <>For the math behind metal offers, see <Link href={p('/gold-services/what-is-my-gold-worth')} className="font-semibold text-[#735c00] underline underline-offset-2">what your gold is worth</Link> and <Link href={p('/silver-services/flatware-value')} className="font-semibold text-[#735c00] underline underline-offset-2">what sterling flatware is worth</Link>. For a review of the pieces themselves, see <Link href={p('/estate-jewelry')} className="font-semibold text-[#735c00] underline underline-offset-2">how to sell inherited jewelry in Naples</Link>.</>
             )}
           </p>
         </section>

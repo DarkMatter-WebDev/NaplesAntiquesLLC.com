@@ -20,6 +20,7 @@ docs and evidence-backed verification.
 | `STRUCTURE.md` | Canonical repo map + structural **invariants** that keep the site consistent. |
 | `INTEGRITY.md` | Next.js integrity rules + pre-publish checklist. |
 | `COMPLIANCE_AUDIT.md` | 2026-06-19 website compliance audit and implementation report. |
+| `SEO_LEAD_AUDIT.md` | 2026-09-10 seller-call evidence and authorized implementation: Naples OpenAI targeting, saved/pending GBP/Yelp changes, seller copy/phone availability, verification and deployment limits. |
 | `DECISIONS.md` | Current durable technical/design/business decisions and rationale. |
 | `TASKS.md` | Open work plus a short recent-completions summary. |
 | `CHANGELOG.md` | The one full-history, dated log of meaningful changes. |

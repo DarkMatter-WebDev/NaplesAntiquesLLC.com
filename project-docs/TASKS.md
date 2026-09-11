@@ -1,11 +1,99 @@
 # Tasks
 
 > Actionable open work plus a short recent-completions summary. Full history is
-> in `CHANGELOG.md`. Last reconciled: **2026-09-08**.
+> in `CHANGELOG.md`. Last reconciled: **2026-09-10**.
 
 ## ◻ OPEN — needs a human
 
-### 🟡 STAGED 2026-09-10 (later) — shop gallery "Newest arrivals" sort + homepage hero "New Arrivals →" link (no SQL, no env vars) — awaiting push
+### ◻ 2026-09-10 — deploy tested acquisition changes; prioritize scoped gold-page follow-up
+
+- **Pre-deploy follow-up implemented and verified locally:**
+  home gold-card link to `/gold-services` retains evaluation; estate body and
+  wayfinding welcome ordinary pieces and showroom visits with accurate process
+  claims; inherited-jewelry guide links to `/estate-jewelry`. Three existing
+  files, EN/ES parity, no new routes and no new estate FAQ/schema.
+  All automated gates and focused responsive/link checks pass. Estate offer card
+  grows with its text; the mobile clipping found during QA is fixed.
+- Owner deploys the combined **14 unique app source files plus package manifests**
+  including the newly changed inherited-guide file; verification is complete.
+  **Staging synced 09-10 at 22:43 ET; ready for owner deployment. No new SQL/env.**
+  Submit IndexNow after deployment because titles/content changed.
+- **Gold-page follow-up before cosmetic home work:** Aug 19–28 → Aug 29–Sep 7,
+  exact `/gold-services` was 60→68 impressions and position 12.2→20.4. Shared
+  brand/antique queries were stable; `estate jewelry naples fl` worsened 10→22.1.
+  With exact page + U.S. + that query, desktop was 6→7 impressions, 9.3→22.1;
+  mobile 2→0, 12→missing, not rank 0. All clicks 0. New weak-position queries
+  worsen the exposed mix, but its 34→43 impressions do not reconcile 60→68.
+  Other-URL inspection found estate page 10→18.3 and no diamond page among 15
+  exposed rows. After deployment, repeat identical page/query/country/device
+  scopes; no observed diamond-page replacement. The limited three-file follow-up
+  above is implemented; its effect on rankings or qualified calls is unmeasured.
+  Inspect live/indexed gold and estate URLs, request Google recrawl once as needed,
+  and assess roughly two-/four-week windows plus qualified calls. These are
+  planning checkpoints; no automation or recovery deadline was set.
+- Recheck all four revised GBP services: saved **Pending review**. Description
+  accepted and number-free Update published. Jewelry buyer primary is unchanged;
+  secondary Diamond buyer removal accepted.
+- Yelp Diamond Buyers category removal returned after reload: request submitted,
+  **unconfirmed**, with no displayed moderation status. Recheck before reporting removed.
+- Measure qualified calls after the changes. OpenAI seller contexts/ad copy
+  and `/sell/naples` landing reloaded/verified, still Serving with 14 Naples ZIPs
+  and $25/day. No conversion setup or measured lead-quality lift established.
+- Satellite source is absent from this project. Gold-satellite appointment copy
+  remains unresolved until its actual source/workspace is available.
+- **Later, explicitly deferred by the owner — no outreach or review requests now:**
+  investigate/recover missing Google reviews using evidence and Google's support
+  process; invite honest reviews from genuine customers without incentives or
+  selective positive-review requests; pursue legitimate local business mentions
+  and relevant links. Reassess these after deployment, separate from this batch.
+- Reassess the pre-existing **320×660 homepage H1/newsletter overlap** afterward:
+  English 8.3px, Spanish 27.8px. HomeHeroOverlay was unchanged; no fix in this
+  batch. Follow-up seller/card/link checks pass; the homepage hero itself is unchanged.
+
+Latest checks after the three-file follow-up, from `next-app/`:
+`npm test -- --maxWorkers=4` — **1276/1276 tests, 130 files, 18.24s**;
+`npx tsc --noEmit`, `npm run lint`, `npm run build` — pass after the final
+estate-card responsive fix. `npm audit --omit=dev` — **0 vulnerabilities**;
+dependencies unchanged in this follow-up. Final manifest **86 = 40 EN + 40 ES + 6**.
+EN/ES at 320, 768, 1024 and 1920px checked; all four new localized links reach
+the correct destinations and estate phone buttons remain reachable. No calls made.
+
+✅ Yelp saved/rechecked: 11 boosted terms (including gold jewelry/silver/sterling/
+flatware; Sell Diamonds boost removed), seven irrelevant exclusions, seller-led
+ad and automatically mirrored Specialties, “Call daily, 9 AM–6 PM / Call for
+details” CTA, and Get more phone calls with Free call reporting **unchecked**.
+$15/day and 15-mile radius unchanged; no forwarding numbers activated. Screenshot
+confirmed correct CTA number; initial AX/DOM output omitted its value. Actual
+outbound dialing remains untested. Full record: `SEO_LEAD_AUDIT.md`, implementation.
+
+**Initial audit context (before the authorized targeting change):**
+
+Evidence and ordered next steps: `SEO_LEAD_AUDIT.md`. No proven single cause;
+main Google clicks rose 33→46 and GBP interactions stayed 41→41 in comparable
+ten-day periods. Reconstruct answered/missed calls, time/material/source and
+quality; check 9 AM phone screening/forwarding and local availability signals.
+OpenAI campaign was national and had no conversions; the initial Yelp keyword
+set lacked silver/sterling/flatware. Its apparent blank phone field was later
+resolved as an AX/DOM omission, not an empty destination. Gold satellite retains appointment-only
+copy; Google sterling post is rejected. Review these after the audit, without
+bundling speculative code/category/budget changes. Owner says today's opening
+date change is not the cause and the Google review loss followed the slowdown.
+Yelp review presence is longstanding; recommendation-status timing unknown.
+The 09-08 “root cause” assertion and interaction-as-call inference are withdrawn.
+Read-only Bing check completed: gold/silver indexed; no useful historical AI
+baseline. No indexing requests, test submissions, calls or settings saves made.
+Those statements describe the initial read-only phase. The implementation above
+now supersedes its pending proposals. Staging was subsequently synced; see record below.
+
+### ✅ DEPLOYED 2026-09-10 (evening) — shop gallery "Newest arrivals" sort + homepage hero "New Arrivals →" link — owner-verified
+
+Owner: "pushed and deployed successfully, update docs, no live verification
+needed." No probe run. **Staging equals source; nothing is in flight.**
+The block below is the pre-deploy record.
+
+**Staging (session close 09-10 evening):** ✅ synced 2026-09-10 (evening) — dry run listed exactly the 3 flipped docs (CHANGELOG, CURRENT_STATUS, TASKS), 0 Extras, 1074 total; real run copied 3 / 0 FAILED; follow-up dry run 0/0/0; leak check 0 `.env*`; CHANGELOG hash MATCH. Docs-only re-sync after this line: dry run 1 (TASKS.md) → copied → follow-up 0.
+
+### (pre-deploy record) 🟡 STAGED 2026-09-10 (later) — shop gallery "Newest arrivals" sort + homepage hero "New Arrivals →" link (no SQL, no env vars)
 
 Five files: `ShopSortSelect.tsx` (option), `shop-filter-state.ts`
 (`VALID_SORTS`), `shop-page-renderer.tsx` (`created_at` column + comparator),
@@ -77,18 +165,19 @@ No SQL, no env vars. What changed and why: `CHANGELOG.md` 2026-09-09
 **Search Console / Bing — nothing is OWED right now.** `/reviews` was
 requested 09-08 ("Indexing requested"); `/es/reviews` was already indexed;
 IndexNow 200 for 212 URLs the same night. Dated look-backs:
-- ◻ **~2026-09-10 — Bing Webmaster Tools** recheck (index count; "Indexing
-  allowed: No" is *not selected yet*, never a code fix — memory
-  `bing-webmaster-tools`).
+- ✅ **2026-09-10 — Bing Webmaster Tools rechecked read-only:** 31 indexed
+  in Site Explorer; gold/silver URL inspections both indexed successfully.
+  AI report exposes no pre-decline baseline. Details: `SEO_LEAD_AUDIT.md`.
 - ◻ **mid-Sept — GSC Enhancements → Breadcrumbs** report (the 55 pages
   with BreadcrumbList since 09-02) and **GSC Pages**: `/reviews` indexed
   yet? `/silver-services` still ~pos 9 (the nearest lander to page 1)?
   `/gold-services` (pos 24) moving after the FAQ + phone description?
 - ◻ **~2026-09-20 — GSC validations** started 09-06: "Page with redirect"
   (the `/en/…` 307→308) and "Blocked by robots.txt" (`/account`).
-- ◻ **monthly — GBP Performance → Calls** (Aug = 71 interactions; the
-  diamond/gold balance is what to watch; read via the iframe method in
-  memory `diamond-calls-investigation-2026-09-08`).
+- ◻ **monthly — GBP Performance → Calls plus actual phone log:** Sept 10
+  read shows August 2 call-button clicks, 78 interactions; September 1 call
+  click, 24 interactions. Neither measures completed calls or material mix.
+  Older August 71 was an earlier interaction snapshot, not 71 calls.
 - ◻ **Optional, quota permitting (10/day):** the landers changed content
   today without new URLs — a GSC "Request indexing" on `/gold-services`,
   `/silver-services` (EN + ES) nudges the recrawl, and
@@ -5991,3 +6080,18 @@ Headlines only — full detail lives in `CHANGELOG.md` under each date.
   cert, sitemap, Search Console, Change of Address all production-verified);
   seven insured-shipping policies/profiles provisioned on both marketplaces;
   Facebook Page token validated.
+
+## 2026-09-10 22:43 ET — latest staging handoff verification
+
+`C:\Users\rcman\NEJ-repo-staging` now contains the complete tested seller-acquisition
+batch, the three-file gold/estate follow-up, dependency manifests and memory docs.
+Resolved source/target paths were checked. Runbook `robocopy /MIR /L` with its
+exclusions plus `/XJ` and `/XF .git` listed exactly 24 updates, 0 Extras, 0 failures.
+The actual copy used `/E` (no deletion): 24 copied, 0 failed, exit 1 = success.
+Follow-up `/MIR /L` returned 0 to copy / 0 Extras / 0 mismatches, exit 0.
+SHA256 comparison of every one of the 1072 staged files matched source; excluded
+file scan found no `.env*`, Git metadata, dependencies, build output or worktrees.
+Robocopy's 1075 total includes three excluded generated/env files, as documented.
+Final memory handoff: the four updated docs were re-synced using the same exclusions;
+a final dry run returned zero differences and the four updated hashes matched.
+No app edits or tests rerun: the preceding verified source is unchanged. No deployment.

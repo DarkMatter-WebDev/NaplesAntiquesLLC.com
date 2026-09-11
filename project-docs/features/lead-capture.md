@@ -1,6 +1,23 @@
 # Feature: Lead Capture
 
-> Current lead and subscriber capture surfaces. Last updated: **2026-08-23**.
+> Current lead and subscriber capture surfaces. Last updated: **2026-09-10**.
+
+The September 10 audit and authorized seller-acquisition implementation are in
+`../SEO_LEAD_AUDIT.md`. Local seller copy/call presentation is built and verified,
+awaiting owner deployment; form submission and phone routing are unchanged.
+Yelp seller ads/Specialties, phone-hours CTA and phone-call goal are saved with
+call reporting off. GBP category/description accepted and new Update published;
+four revised services remain Pending. OpenAI's verified seller ad leads to
+`/sell/naples`. The audit distinguishes accepted, pending and unconfirmed edits.
+Do not treat GBP/Yelp actions or retained spam inquiry rows as qualified calls.
+Current form `source` identifies the form, not the marketing channel; no
+historical call-to-channel attribution is established by the app.
+
+The completed pre-deployment follow-up adds a home gold-card link and an inherited-
+jewelry guide link to their seller pages, retaining direct evaluation actions.
+Estate copy now welcomes ordinary pieces and walk-ins, explains the offer, and
+uses shared showroom wayfinding. The text-sized offer card passes mobile checks.
+Reviews/recovery and legitimate local business mentions remain owner-deferred tasks.
 
 ## `/free-evaluation` is the sendable lead surface (2026-08-09/10 rework)
 
@@ -168,8 +185,25 @@ add an admin notification; it is not the public PayPal checkout path.
 ## Click-To-Call And CTAs
 
 The primary phone/text CTA remains `(239) 404-8505` via `tel:` links throughout
-the app. The owner is mobile and appointment-only; there is no public storefront
-address to present as a walk-in destination.
+the app. The showroom is at 6240 Shirley St, Suite 104, Naples, FL 34109;
+walk-ins are welcome during its configured hours, with home visits by
+appointment. Phone availability is 9 AM–6 PM daily, separate from showroom
+hours. These hours describe availability; they do not operate the telephone
+or establish that an incoming call rang or was answered.
+
+The September 10 source batch uses `phoneHoursLabel()` beside gold, silver,
+estate-jewelry, Sell and city hero calls, the Naples city showroom call group,
+`SiteFooter`, the `MessageUsForm` introduction and the `VisitUsPanel` call action.
+Existing card/home/spot-prices labels
+and ContactPoint schema remain. Showroom hours continue to come from the live
+schedule. The estate-jewelry hero gains a direct `tel:` action; gold/silver
+already had one. Seller copy welcomes single everyday pieces and collections;
+the gold page's appointment-only closing contradiction is removed.
+
+The diamond route remains for complete-jewelry evaluations. Broad loose/lab-grown
+solicitation was removed from marketing at the owner's request; that does not
+reverse the historical lab-grown purchasing policy. No new tracking or form
+attribution was added. Local source is not yet a verified production deployment.
 
 ## Privacy / Compliance Notes
 

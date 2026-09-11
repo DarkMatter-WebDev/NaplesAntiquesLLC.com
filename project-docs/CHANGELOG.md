@@ -1,6 +1,151 @@
 
 # Changelog
 
+## 2026-09-10 (pre-deploy completion) — gold and estate links, seller copy, responsive offer card
+
+Owner authorized the three proposed improvements and deferred reviews/business
+mentions. Home gold card gains a contextual gold-page link while retaining Free
+evaluation. Inherited-jewelry guide links directly to the estate buyer page.
+Estate body welcomes ordinary/broken/unsigned pieces and collections, explains
+offers and walk-ins, uses shared wayfinding, separates metal/gem assessment,
+and replaces the undefined value guarantee with free/no-obligation wording.
+All three files have EN/ES parity. During mobile QA the square estate offer card
+clipped its longer text and overlapped directions; removed the square/full-height
+constraints and rechecked both languages at 320/768/1024/1920px.
+Final tests 1276/130 (18.24s), tsc/lint/build exit 0; manifest86=40EN+40ES+6.
+Production audit0; four new localized links navigated correctly, phone controls
+reachable, no browser errors. Preview stopped and temporary tab/viewport cleaned.
+Combined pending batch14 app sources plus package manifests; no SQL/env or deploy.
+Reviews, review recovery and legitimate local mentions are later Tasks; Google
+inspection/recrawl and ranking/call measurement follow owner deployment.
+Initial implementation did not stage; at 22:43 ET staging was synced: 24 expected files copied, no deletions/failures, clean follow-up dry run, all 1072 staged-file hashes match and excluded-file scan clean. Four memory docs re-synced for handoff. No deployment, new code edits or repeated tests in this staging step.
+
+## 2026-09-10 (gold-position follow-up) — exact-page ranking and query-mix investigation
+
+Read-only GSC drilldown after owner highlighted gold-page position: exact URL
+60→68 impressions, 12.2→20.4 position, zero clicks in both equal ten-day windows.
+Only three shared query rows: brand/antique stable; estate jewelry naples fl
+10→22.1. Exact query + US + desktop confirms 9.3→22.1 on 6→7 impressions.
+Twelve newly exposed queries add 14 low-ranked impressions; detailed rows cover
+34→43 of headline 60→68, so they cannot fully decompose the headline decline.
+For that estate query, homepage remains clicked and estate page also weakens;
+no diamond page in all 15 page rows. No demonstrated diamond replacement/call cause.
+Prioritize deploy/verify the existing gold seller copy and consistent query,
+country/device and qualified-call measurement above cosmetic homepage work.
+Full data, limitations and read-only verification: SEO_LEAD_AUDIT.md, final section.
+Only memory updated; no app/account edits, build/test rerun, deployment or Git.
+Subsequent pre-deploy review recommends three bounded, still-unimplemented edits:
+home gold-card context link; estate ordinary-piece/showroom/process and claims
+copy; inherited-guide link to estate buyer page. Existing titles/H1s are ready.
+Plan: verify/gate future edits, deploy, inspect Google's crawled copy, then assess
+consistent seller queries and qualified calls at two-/four-week review points.
+
+## 2026-09-10 (authorized implementation) — seller acquisition and phone availability; local batch awaits deployment
+
+After the audit and reassessment, the owner authorized implementation, including
+removing the Diamond buyer emphasis and following Google's phone-number policy.
+`SEO_LEAD_AUDIT.md` holds the exact account copy, verification and remaining limits.
+
+### Website and dependencies
+
+Gold hero changed from “Private Gold Estate Services” to “Sell Gold in Naples, FL”;
+silver from “Premier Silver Estate Services & Evaluations” to “Sell Sterling Silver
+in Naples.” Estate jewelry also leads with selling; EN/ES copy welcomes ordinary
+single pieces and inherited collections. Gold's appointment-only closing claim
+is removed; walk-ins use the real showroom hours. The central `phoneHoursLabel()`
+appears by gold/silver/estate/Sell/city hero calls, footer, contact-form intro and
+visit calls. Estate hero gains a direct call; Sell/city Spanish calls localized.
+Diamond's former broad lab-grown/uncertified invitation becomes whole-jewelry
+evaluation copy; loose stones should be discussed by phone first. The route
+remains, and the historical lab-grown purchase policy is unchanged. Footer
+diamond link removed; contextual links and appraisal/city wording adjusted.
+The final home/sell/FAQ and gold/silver cross-link pass removes remaining generic
+loose-diamond sales pitches while preserving direct gold/sterling/jewelry offers.
+Sitemap content date is September 10; submit IndexNow only after deployment.
+Next/eslint-config-next 16.2.12→16.3.4; Sharp 0.35.3→0.35.4;
+baseline-browser-mapping 2.10.37→2.11.22. Production audit: 0 vulnerabilities.
+
+### Accounts saved and verified by reopening
+
+Yelp: 11 boosted terms, Sell Diamonds boost removed; seven irrelevant exclusions
+retained; seller ad copy automatically mirrored into Business Information /
+Specialties. Live CTA “Call daily, 9 AM–6 PM / Call for details” has the correct
+number visibly confirmed in the reopened editor. Get more phone calls saved,
+Free call reporting OFF; no forwarding numbers. Budget $15/day, radius 15 miles.
+Diamond Buyers category removal submitted but returned after reload: unconfirmed.
+GBP: Jewelry buyer primary retained; secondary Diamond buyer removal accepted.
+Description accepted; new number-free Update published with native Call now.
+Four service copies/names saved and reloaded but the services banner says Pending
+review; do not call them publicly approved yet. Prior rejected post retained.
+OpenAI: local seller context text, phone-hours ad description and /sell/naples
+landing saved/reloaded; live destination HTTP 200. Still Serving, $25/day and
+the same 14 Naples ZIPs; no conversion tracking added or lead lift demonstrated.
+
+### Verification and remaining work
+
+Final complete-batch checkpoint from next-app: npm test -- --maxWorkers=4,
+npx tsc --noEmit, npm run lint, npm run build, npm audit --omit=dev — all exit 0.
+1276 tests/130 files, 17.08s; manifest 86 = 40 EN + 40 ES + 6; all 13 app files.
+Seller responsive checks pass; existing 320px EN/ES home H1/signup overlap deferred.
+No new SQL/env, production deployment, staging/copy, calls or Git. Owner handles
+the separate deployment workflow. Recheck GBP services and Yelp category request;
+satellite source is absent from this project, so its appointment copy remains.
+
+## 2026-09-10 (8:13 PM EDT follow-up) — OpenAI targeting narrowed to Naples; Yelp/GBP proposals prepared
+
+Owner requested Naples-only OpenAI targeting, deeper diamond visibility work,
+and phone-hours/Yelp options, then a stop for reassessment. Replaced United
+States with 14 Naples ZIPs; save toast, reopened editor and Change History
+verified. $25/day and Serving status retained; exact ZIP list in the follow-up
+section of `SEO_LEAD_AUDIT.md`. No other account change or code edit.
+Yelp editor accepted silver/sterling/flatware seller keyword drafts; previewed
+seller-first ad text and custom Call daily, 9 AM–6 PM / Call for details CTA.
+Drafts discarded, original live CTA/settings re-read. Get more phone calls
+exists but can introduce forwarding numbers; left for reassessment. GBP has
+no Phone hours field; researched Update/native call button and truthful hours.
+Same GSC query data: previously visible gold queries 29→16 impressions,
+silver/sterling/flatware 30→15, despite broader growth. Tiny/privacy-filtered
+samples and often better surviving ranks prevent a suppression conclusion.
+Diamond content/category additions were additive; broad lab-grown/uncertified
+buying copy and gold appointment ambiguity may affect lead mix. No root cause
+proved. Updated audit, status, tasks, decisions, README and lead-capture memory.
+Verification: account UI save/reopen/history; Yelp draft/discard/re-read; GBP
+hours read; official docs; retained GSC DOM-row analysis; rg/bounded source
+reads and agent public GET checks. No calls/messages/posts, DB writes, Git,
+build/lint/tests, deployment or staging/copy. Local citation check recorded
+in the audit. Stop before further account/code changes.
+
+## 2026-09-10 (seller-call audit) — read-only channel investigation; prior causal conclusion corrected
+
+Owner requested a deep audit of the jewelry/gold/sterling call slowdown around
+Aug 28–29, with no code changes. Durable report: `SEO_LEAD_AUDIT.md`.
+Inspected GSC/GBP/Yelp/OpenAI Ads/Bing/Netlify, public pages, project history,
+source and one aggregate-only read of inquiry dates/types. GSC equal windows
+33→46 clicks (U.S. 33→45, mobile 21→39); GBP interactions 41→41. OpenAI started
+Aug 30, national targeting, no conversions. No single cause established.
+Owner clarified: opening date changed today, Google review loss followed the
+slowdown, Yelp reviews were always present (filter-change timing unknown).
+Withdrew the September 8 “root cause is local-pack eligibility” claim and the
+interaction-as-call/spam-as-lead inferences; corrected lead-capture storefront
+documentation. Source, configs, database, profiles, ads and deployments unchanged.
+Verification: read-only browser report inspections; `rg`/`Get-Content` source
+reads; inline Node GET redirect checks (3 expected 301s); Supabase GET selecting
+only created_at/item_title/status (13 rows since Aug 1, aggregated). No test
+submissions, emails, calls, indexing requests or settings saves. No build/lint/
+unit tests: documentation-only work. Citation check: 26 valid, none blank. No Git/copy.
+
+## 2026-09-10 (evening) — "Newest arrivals" sort + hero "New Arrivals →" link DEPLOYED and owner-verified; session closed
+
+Owner: "pushed and deployed successfully, update docs, no live verification
+needed." Taken as stated — no production probe was run (memory: *no
+unrequested production checks*). Live now: the shop Sort option "Newest
+arrivals" / "Novedades" (`?sort=newest`, `created_at` desc, `sort_order`
+desc tie-break) and the homepage hero's underlined "New Arrivals →" /
+"Novedades →" line under the Buy · Sell · Visit Us trio (0.85rem desktop /
+0.78rem phone), opening that sorted view. Five files, no SQL, no env vars.
+Gate at push: tsc 0 · lint 0 · 1276/1276 (130 files) · build exit 0 (86 routes = 40 EN + 40 ES + 6). Docs flipped; staging re-synced. **Nothing is in
+flight.**
+
 ## 2026-09-10 (later still) — homepage hero gets a quiet "New Arrivals" link under the Buy · Sell · Visit Us trio (BUILT + dev-verified + STAGED, rides with the sort batch; no SQL, no env vars)
 
 Owner: "add a button to the homepage hero that brings users to the shop page

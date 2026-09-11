@@ -5,6 +5,7 @@ import FormPrivacyNotice from '@/components/legal/FormPrivacyNotice';
 import { LocationField, PreferredContactField } from '@/components/contact/InquiryPreferenceFields';
 import { parsePreferredContact, preferredContactEmailErrorMessage, preferredContactNeedsEmail } from '@/lib/inquiry-fields';
 import { isValidPhoneNumber, phoneErrorMessage } from '@/lib/phone';
+import { phoneHoursLabel } from '@/lib/business-location';
 import { FormGrid, PageContainer, Section } from '@/components/layout/ResponsiveLayout';
 
 interface Props {
@@ -79,11 +80,17 @@ export default function MessageUsForm({ locale }: Props) {
           >
             {isEs ? 'Envíenos un Mensaje Directamente' : 'Message Us Directly'}
           </h1>
-          <p className="responsive-copy max-w-xl mx-auto mb-8" style={{ color: 'var(--color-on-surface-variant)' }}>
+          <p className="responsive-copy max-w-xl mx-auto mb-4" style={{ color: 'var(--color-on-surface-variant)' }}>
             {isEs
               ? 'Envíenos un mensaje y adjunte fotos si lo desea. Le responderemos lo antes posible.'
               : 'Send us a note and attach photos if you like. We\'ll get back to you as soon as we can.'}
           </p>
+          <div className="mb-8 flex flex-col items-center gap-2">
+            <a href="tel:2394048505" className="outline-button">
+              {isEs ? 'Llamar (239) 404-8505' : 'Call (239) 404-8505'}
+            </a>
+            <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>{phoneHoursLabel(isEs)}</p>
+          </div>
         </div>
 
         {done ? (

@@ -44,9 +44,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ? 'Naples Estate Jewelry - Compramos Joyería, Oro y Plata en Naples, FL'
     : 'Naples Estate Jewelry - Sell Jewelry, Gold & Silver in Naples, FL';
 
+  const callHours = phoneHours(isEs, 'compact');
   const description = isEs
-    ? 'Compramos oro, joyería, plata, diamantes, monedas y relojes en Naples, FL. Visite nuestro salón o agende una cita — o vamos a usted. Llame al (239) 404-8505.'
-    : 'We buy gold, estate jewelry, silver, diamonds, coins, and watches in Naples, FL. Visit our showroom or book an appointment — or we come to you. Call (239) 404-8505.';
+    ? `Venda joyería, oro, plata esterlina y cubertería en Naples, FL. Evaluación gratis. ${callHours.before}${callHours.time}${callHours.after}: (239) 404-8505.`
+    : `Sell jewelry, gold, sterling silver and flatware in Naples, FL. Free evaluations. ${callHours.before}${callHours.time}${callHours.after}: (239) 404-8505.`;
 
   // `brandedTitle` because this title LEADS with the brand rather than trailing
   // it, so the suffix pageMetadata() adds to every other page's og:title would
@@ -73,6 +74,7 @@ export default async function HomePage({ params }: Props) {
   const storeHref = isEs ? '/es/shop' : '/shop';
   const evalHref = isEs ? '/es/free-evaluation' : '/free-evaluation';
   const contactHref = isEs ? '/es/contact' : '/contact';
+  const goldHref = isEs ? '/es/gold-services' : '/gold-services';
   const silverHref = isEs ? '/es/silver-services' : '/silver-services';
   const estateHref = isEs ? '/es/estate-jewelry' : '/estate-jewelry';
 
@@ -274,9 +276,16 @@ export default async function HomePage({ params }: Props) {
                 // one claim melt-only buyers cannot copy. Same owner-confirmed
                 // "both ways, whichever is higher" wording as the silver card and
                 // /sell/dont-melt-it — never "we always pay more than melt".
-                body: isEs
-                  ? 'Evaluaciones gratuitas en el acto. A diferencia de quienes solo funden, valoramos la joyería como metal y como joya, y pagamos el mayor.'
-                  : 'Free appraisals on gold jewelry, coins, and bullion. Unlike melt-only buyers, we price jewelry as metal and as jewelry and pay whichever is higher.',
+                body: (
+                  <>
+                    {isEs
+                      ? 'Evaluaciones gratuitas en el acto. A diferencia de quienes solo funden, valoramos la joyería como metal y como joya, y pagamos el mayor.'
+                      : 'Free appraisals on gold jewelry, coins, and bullion. Unlike melt-only buyers, we price jewelry as metal and as jewelry and pay whichever is higher.'}{' '}
+                    <Link href={goldHref} className="font-semibold underline underline-offset-2" style={{ color: 'var(--color-primary)' }}>
+                      {isEs ? 'Cómo vender oro en Naples' : 'How to sell gold in Naples'}
+                    </Link>.
+                  </>
+                ),
                 href: evalHref,
                 cta: isEs ? 'Evaluación gratuita →' : 'Free evaluation →',
               },
@@ -488,13 +497,13 @@ export default async function HomePage({ params }: Props) {
             <div className="flex flex-col">
               {(isEs
                 ? [
-                    { q: '¿Compran joyería además de venderla?', a: 'Sí — comprar es la mitad del negocio. Evaluaciones gratuitas y privadas para oro, plata, diamantes, relojes y patrimonios completos, en nuestro salón de Naples o en su casa en todo el suroeste de Florida.' },
+                    { q: '¿Compran joyería además de venderla?', a: 'Sí. Compramos joyería, oro, plata esterlina y cubertería, desde piezas de uso diario hasta colecciones heredadas completas. Evaluaciones gratuitas y privadas en nuestro salón de Naples o en su casa en todo el suroeste de Florida.' },
                     { q: '¿Cómo funciona el envío?', a: 'Cada pedido enviado viaja totalmente asegurado con confirmación de firma, y los pedidos de $5,000+ se envían por USPS Registered Mail. Las tarifas según el valor se muestran al pagar.' },
                     { q: '¿Puedo ver una pieza en persona?', a: 'Sí — visite nuestro salón en 6240 Shirley St, Ste 104, dentro de Sharon Lynch Collections, durante el horario del salón o con cita (el horario actual aparece arriba y en nuestra página de contacto). La recogida local es gratuita: elija Recogida local al pagar o llame para coordinar.' },
                     { q: '¿Cómo fijan sus precios?', a: 'La mayoría de las piezas se calculan directamente contra el mercado de metales en vivo, con el valor de rescate junto al precio; algunas tienen un precio fijo. En ambos casos, lo que ve es transparente — no un margen arbitrario.' },
                   ]
                 : [
-                    { q: 'Do you buy jewelry as well as sell it?', a: 'Yes — buying is half the business. Free, private appraisals for gold, silver, diamonds, watches, and full estates, at our Naples showroom or at your home across Southwest Florida.' },
+                    { q: 'Do you buy jewelry as well as sell it?', a: 'Yes. We buy jewelry, gold, sterling silver and flatware, from everyday pieces to complete inherited collections. Free, private evaluations at our Naples showroom or at your home across Southwest Florida.' },
                     { q: 'How does shipping work?', a: 'Every shipped order travels fully insured with signature confirmation, and orders of $5,000+ ship USPS Registered Mail. Value-based rates are shown at checkout.' },
                     { q: 'Can I see a piece in person?', a: 'Yes — visit our Naples showroom at 6240 Shirley St, Ste 104, inside Sharon Lynch Collections, during showroom hours or by appointment (current hours are listed just above and on our contact page). Local pickup is free: choose Local Pickup at checkout, or call to arrange a viewing.' },
                     { q: 'How are your prices set?', a: 'Most pieces are priced directly against the live metals market, with the scrap value shown right beside the price; some carry a set price instead. Either way, what you see is transparent — not an arbitrary markup.' },

@@ -4,7 +4,76 @@
 > reasoning remain in `CHANGELOG.md`. Older runbooks that cite a dated
 > `DECISIONS.md` "session" or "addendum" should follow the same date/label in
 > `CHANGELOG.md`; those historical entries moved there during the 2026-07-23
-> compaction. Last reconciled: **2026-09-08**.
+> compaction. Last reconciled: **2026-09-10**.
+
+## Seller acquisition emphasizes jewelry, gold and sterling; truthful phone availability (2026-09-10)
+
+After the audit/reassessment, the owner authorized seller-focused website and
+profile/ad changes. Gold, sterling and estate-jewelry copy welcomes ordinary
+single pieces and collections, with clear call actions and the central daily
+9 AM–6 PM phone-hours label. Showroom hours remain the actual visiting schedule.
+Diamond marketing emphasizes evaluations of complete jewelry; the established
+route remains, while the broad lab-grown/loose-stone invitation and footer link
+are removed. This is marketing emphasis, not a new refusal policy or proof that
+diamond discovery caused the earlier decline. The lab-grown buying decision
+below still stands.
+
+GBP keeps **Jewelry buyer** primary; secondary Diamond buyer removal was
+accepted. Google Update copy has no actual telephone number; native **Call now**
+uses the verified profile number. Check Pending versus Live before claiming
+publication. Custom service names exclude phone numbers and prices. A rejected
+post alone does not establish an account-wide ranking penalty. Yelp's phone-call
+goal is now selected with **Free call reporting OFF**; no forwarding numbers
+were activated. Keep the existing business number and verify visible saved
+values, because AX/DOM output can omit a populated input. Full account state,
+including the unconfirmed Yelp category removal, is in `SEO_LEAD_AUDIT.md`.
+
+OpenAI's 14 Naples ZIP areas replace United States; $25/day remains unchanged.
+Seller-only context hints and phone-hours ad copy lead to `/sell/naples`;
+the saved ad remains Serving. Contexts do not guarantee exclusion of every
+diamond search, and no conversion outcome was configured.
+This is postal-area coverage, not an exact municipal-boundary geofence. Do not
+infer organic assistant suppression or improved paid lead quality from these
+edits. Aggregate impressions can conceal reduced exposure for previously
+visible queries; retain the audit's sample/selection limits. Website deployment
+and post-deployment IndexNow are owner-timed; no new SQL or env setup is needed.
+
+## Diagnose seller calls with comparable, correctly defined evidence (2026-09-10)
+
+`SEO_LEAD_AUDIT.md` supersedes the September 8 causal conclusion. GBP
+interactions, call-button clicks, completed calls, qualified sellers and Yelp
+lead actions are distinct measures. GSC query rows omit private queries;
+material keyword groups are not complete source attribution. Exclude retained
+spam/test inquiries before treating database rows as customer conversions.
+Use equal date windows, preserve reporting cutoffs and separate observation
+from hypothesis. Do not change code, categories, ad budgets or tracking on the
+strength of the withdrawn “local-pack eligibility is the root cause” claim.
+Exact-page GSC results and property-wide keyword cohorts are different scopes;
+neither substitutes for the other. Preserve page, exact query, country and
+device filters when comparing positions. Separate new-query/weight changes
+from same-query changes, and report when detailed rows do not reconcile the
+headline. With zero impressions, position is missing, never rank 0. The gold
+page's specific U.S. desktop estate-query deterioration warrants follow-up
+after deploying the tested copy, ahead of cosmetic home work; it does not
+establish a broad gold-search loss, penalty or cause of fewer qualified calls.
+The owner subsequently authorized and the project locally implemented only the
+observed content/link gaps: a home gold-card context link, accurate and welcoming
+estate buying/visit copy, and an inherited-guide link to the estate buyer page.
+The follow-up changes three existing files in EN/ES, with no new estate FAQ/schema,
+URLs or routes. The combined pending batch is 14 unique app source files plus
+package manifests. Preserve direct conversion paths and truthful process claims;
+the edits do not establish a diagnosis or promise ranking recovery. The extension
+passes tests, TypeScript, lint, build and focused visual checks; dependency audit
+is clean. Estate offer cards must grow with their text: a square/fixed-height
+constraint clipped the expanded explanation at 320px and overlapped the visit CTA.
+Google inspection/recrawl and consistent page/query/country/device comparisons
+remain post-deployment work, with roughly two-/four-week measurement checkpoints.
+At the owner's explicit request, missing-review recovery, honest new customer
+reviews and legitimate local business mentions/links are later tasks. No outreach
+or review requests in this phase; do not imply these actions are completed.
+The owner requested the initial audit without code changes, then authorized
+the separate implementation recorded above. The owner confirms September 2026 opening date was set
+September 10 and Google review loss occurred after the original slowdown.
 
 ## The hero's "New Arrivals" is a text link under the trio, never a fourth button (2026-09-10)
 
@@ -102,26 +171,30 @@ draw Google's user-suggested edits. Rules:
 
 - **GBP main hours = showroom hours, always** (and they must keep matching
   the admin-editable schedule the site renders — NAP consistency).
-- **Phone availability is said in words:** one sentence in the GBP
-  description (owner-pasted; ⛔ no phone number inside GBP description
-  text), and on the site the line "Calls answered 9am–6pm, every day"
-  beside the showroom hours on `/card`, the homepage Visit Us block and
-  `/spot-prices`, plus `ContactPoint.hoursAvailable` in the JewelryStore
-  schema (distinct from `openingHoursSpecification`).
+- **Phone availability is said in words:** use factual availability in the
+  GBP description and a number-free Update with native Call now. Google's
+  explicit phone-number prohibition applies to post content; do not generalize
+  it into an unsupported ban on every profile field. On the site, use the
+  central label on `/card`, homepage Visit Us, `/spot-prices`, gold/silver/estate
+  hero calls, Sell/city hero calls, Naples city showroom call group, footer,
+  contact form introduction and visit-panel call area.
+  `ContactPoint.hoursAvailable` remains distinct from the JewelryStore's
+  showroom `openingHoursSpecification`.
 - **One constant** — `PHONE_HOURS` in `lib/business-location.ts` — feeds
   every surface through `phoneHours()` / `phoneHoursLabel()` /
   `phoneContactPointSchema()`. Not an admin field (owner's call): it
   changes rarely. Guarded by `lib/__tests__/phone-hours.test.ts`.
 - **Never a row in the hours table.** Each row there is a day; the phone
   line sits under "or by appointment", which already qualifies the table.
-- The "More hours" field is not the place: its types (Delivery, Brunch,
-  Senior hours…) have nothing for a phone.
+- The inspected More hours editor has no Phone hours type. Online service
+  hours is real but is not verified as a substitute for telephone availability
+  or as a way to override Closed. Preserve accurate showroom hours.
 
 ## Hero buttons on the buy-side landers include the phone (2026-09-08)
 
-The diamond-calls investigation found the calls come from the Business
-Profile while the gold and silver heroes steered every visitor to a form —
-gold even had TWO buttons to the same form. Rule: a buy-side lander's hero
+The September 8 review found the gold and silver heroes steered visitors
+to a form — gold even had TWO buttons to the same form. It did not establish
+the calls' source (corrected September 10). Rule: a buy-side lander's hero
 offers the form AND the phone (`tel:2394048505`, in the hero's own outline
 style, `AppIcon name="call"`); a secondary link that is not one of those
 two (the silver "rates" link) becomes a small text link under the buttons.
@@ -714,10 +787,12 @@ page's positioning, and the GBP holds the appraisal pack slot it supports.
 
 ### Lab-grown diamonds: we buy them, priced against their (much lower) resale market
 
-Owner decision 2026-08-30 ("a"). The /diamond-buyers FAQ states it with the
-reason (production keeps getting cheaper; resale prices follow). Keep the
-explanation — the honest "why" is what stops the number from feeling like a
-lowball.
+Owner decision 2026-08-30 ("a"): lab-grown stones can be bought at their much
+lower resale value. On 2026-09-10 the owner requested removal of the broad
+lab-grown marketing FAQ to emphasize estate jewelry, gold and sterling.
+That FAQ requirement is superseded; the buying policy is not reversed. Keep
+honest resale-versus-insurance-value explanations and invite callers with loose
+stones to discuss them before travelling. Do not invent a refusal or minimum-value policy.
 
 ### GBP operational facts worth not re-discovering
 
@@ -6998,3 +7073,12 @@ does not mark a photo that will appear later in the carousel. Owner-facing setup
 copy must say that Save & prepare creates the final card **as slide 1** and that
 this finished first slide is reviewed before publishing. Avoid relative wording
 such as “review it next,” which can be read as carousel order.
+
+## Staging handoff is a file copy, separate from deployment (2026-09-10)
+
+The latest tested batch was copied to the established `C:\Users\rcman\NEJ-repo-staging`
+handoff directory after a dry run showed only 24 expected updates and no Extras.
+With no removals required, `/E` was sufficient; no destructive mirror was run.
+Retain the runbook exclusions, exclude `.git` files as well as directories, and
+verify the staged files against source. The owner handles the separate repo and
+deployment; no Git operation or publication belongs to this staging step.

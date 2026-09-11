@@ -12,6 +12,7 @@ import FaqSection, { type Faq } from '@/components/FaqSection';
 import { fetchSpotData } from '@/lib/spot-price';
 import { AppIcon } from '@/components/AppIcon';
 import ClayMark from '@/components/ClayMark';
+import { phoneHoursLabel } from '@/lib/business-location';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -134,17 +135,17 @@ export default async function GoldServicesPage({ params }: Props) {
             <div className="max-w-2xl">
               <BreadcrumbTrail locale={locale} crumbs={crumbs} tone="dark" />
               <span className="text-[#e9c349] font-[family-name:var(--font-body)] text-xs font-bold tracking-[0.2em] uppercase block mb-4">
-                {isEs ? 'Adquisiciones de Oro Privadas' : 'Private Gold Acquisitions'}
+                {isEs ? 'Joyería de Oro, Monedas y Lingotes' : 'Gold Jewelry, Coins & Bullion'}
               </span>
               <h1 className="text-white font-[family-name:var(--font-headline)] text-4xl md:text-5xl font-bold mb-6 leading-tight">
                 {isEs
-                  ? 'Servicios de Oro con Evaluación Clara y Pago Inmediato.'
-                  : 'Private Gold Estate Services with Clear Evaluation & Immediate Payment.'}
+                  ? 'Venda Oro en Naples, FL'
+                  : 'Sell Gold in Naples, FL'}
               </h1>
               <p className="text-[#d7d0c3] text-lg mb-10 max-w-lg leading-relaxed">
                 {isEs
-                  ? 'Destino principal en Naples para transacciones de oro de alto valor. Evaluaciones privadas con pago inmediato para joyería fina, lingotes y monedas raras.'
-                  : "Naples' premier destination for high-value gold and estate transactions. We provide expert private evaluations with immediate payment for fine jewelry, bullion, and rare coins."}
+                  ? 'Compramos joyería de oro, cadenas rotas, monedas y lingotes — una pieza o toda una colección. Evaluación gratuita en nuestro salón de Naples y pago inmediato al aceptar nuestra oferta.'
+                  : 'We buy gold jewelry, broken chains, coins, and bullion — one piece or a whole collection. Free evaluation at our Naples showroom, with immediate payment when you accept our offer.'}
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link
@@ -168,6 +169,7 @@ export default async function GoldServicesPage({ params }: Props) {
                   {isEs ? 'LLAMAR (239) 404-8505' : 'CALL (239) 404-8505'}
                 </a>
               </div>
+              <p className="mt-4 text-sm text-[#d7d0c3]">{phoneHoursLabel(isEs)}</p>
             </div>
           </div>
         </section>
@@ -269,9 +271,9 @@ export default async function GoldServicesPage({ params }: Props) {
               /free-evaluation; a gold seller with a flatware chest had no path. */}
           <p className="mt-10 text-center text-sm leading-relaxed text-[#4d4635]">
             {isEs ? (
-              <>¿Vende más que oro? También compramos <Link href={p('/silver-services')} className="font-semibold text-[#735c00] underline underline-offset-2">plata esterlina</Link>, <Link href={p('/diamond-buyers')} className="font-semibold text-[#735c00] underline underline-offset-2">diamantes</Link> y <Link href={p('/estate-jewelry')} className="font-semibold text-[#735c00] underline underline-offset-2">joyería de patrimonio</Link>.</>
+              <>¿Vende más que oro? También compramos <Link href={p('/silver-services')} className="font-semibold text-[#735c00] underline underline-offset-2">plata esterlina</Link> y <Link href={p('/estate-jewelry')} className="font-semibold text-[#735c00] underline underline-offset-2">joyería de patrimonio</Link>.</>
             ) : (
-              <>Selling more than gold? We also buy <Link href={p('/silver-services')} className="font-semibold text-[#735c00] underline underline-offset-2">sterling silver</Link>, <Link href={p('/diamond-buyers')} className="font-semibold text-[#735c00] underline underline-offset-2">diamonds</Link>, and <Link href={p('/estate-jewelry')} className="font-semibold text-[#735c00] underline underline-offset-2">estate jewelry</Link>.</>
+              <>Selling more than gold? We also buy <Link href={p('/silver-services')} className="font-semibold text-[#735c00] underline underline-offset-2">sterling silver</Link> and <Link href={p('/estate-jewelry')} className="font-semibold text-[#735c00] underline underline-offset-2">estate jewelry</Link>.</>
             )}
           </p>
         </section>
@@ -400,9 +402,9 @@ export default async function GoldServicesPage({ params }: Props) {
           faqs={GOLD_FAQS}
           footer={
             isEs ? (
-              <>¿Vende más que oro? También compramos <Link href="/es/silver-services" className="font-semibold text-[#735c00] underline underline-offset-2">plata esterlina</Link>, <Link href="/es/diamond-buyers" className="font-semibold text-[#735c00] underline underline-offset-2">diamantes</Link> y <Link href="/es/estate-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">joyería de patrimonio</Link>.</>
+              <>¿Vende más que oro? También compramos <Link href="/es/silver-services" className="font-semibold text-[#735c00] underline underline-offset-2">plata esterlina</Link> y <Link href="/es/estate-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">joyería de patrimonio</Link>.</>
             ) : (
-              <>Selling more than gold? We also buy <Link href="/silver-services" className="font-semibold text-[#735c00] underline underline-offset-2">sterling silver</Link>, <Link href="/diamond-buyers" className="font-semibold text-[#735c00] underline underline-offset-2">diamonds</Link>, and <Link href="/estate-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">estate jewelry</Link>.</>
+              <>Selling more than gold? We also buy <Link href="/silver-services" className="font-semibold text-[#735c00] underline underline-offset-2">sterling silver</Link> and <Link href="/estate-jewelry" className="font-semibold text-[#735c00] underline underline-offset-2">estate jewelry</Link>.</>
             )
           }
         />
@@ -417,15 +419,15 @@ export default async function GoldServicesPage({ params }: Props) {
             </h2>
             <p className="text-[#d7d0c3] text-base mb-10 leading-relaxed max-w-lg mx-auto">
               {isEs
-                ? 'Naples Estate Jewelry ofrece servicios privados de oro por cita en todo el suroeste de Florida, con pruebas claras, números honestos y pago inmediato.'
-                : 'Naples Estate Jewelry provides private, appointment-based gold estate services throughout Southwest Florida, with clear testing, honest numbers, and prompt payment.'}
+                ? 'Visite nuestro salón de Naples durante el horario de atención o programe una visita privada a domicilio. Probamos y pesamos su oro, explicamos la oferta y pagamos al aceptarla.'
+                : 'Visit our Naples showroom during open hours or arrange a private home visit. We test and weigh your gold, explain the offer, and pay when you accept.'}
             </p>
             <div className="flex flex-col md:flex-row justify-center gap-6">
               <Link
                 href={isEs ? '/es/free-evaluation' : '/free-evaluation'}
                 className="gold-button"
               >
-                {isEs ? 'PROGRAMAR CITA' : 'SCHEDULE APPOINTMENT'}
+                {isEs ? 'EVALUACIÓN GRATUITA' : 'FREE EVALUATION'}
               </Link>
               <a
                 href="tel:2394048505"

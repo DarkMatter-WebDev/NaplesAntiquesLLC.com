@@ -2,13 +2,85 @@
 
 > Present-state snapshot for session startup. Historical implementation detail
 > lives in `CHANGELOG.md`; open work lives in `TASKS.md`; durable rationale lives
-> in `DECISIONS.md`. Last reconciled: **2026-09-08**.
+> in `DECISIONS.md`. Last reconciled: **2026-09-10**.
 
 ## Start Here (handoff, end of the 2026-09-10 session — SUPERSEDES the blocks below)
 
 **Read this, then `TASKS.md`.**
 
-🟡 **09-10 (later) — shop gallery "Newest arrivals" sort + homepage hero
+**Pre-deployment follow-up verified; staging synced 09-10 at 22:43 ET for owner deployment.**
+The home gold card now links to the gold page, estate body/wayfinding welcomes
+ordinary pieces and actual showroom visits with accurate evaluation claims, and
+the inherited-jewelry guide links to the estate buyer page. Three existing files
+changed in EN/ES; no new estate FAQ/schema. The combined pending batch is now
+**14 unique app source files plus package manifests**; staging updated, no deployment or new SQL/env.
+Final checks after the responsive fix: **1276 tests / 130 files pass (18.24s)**,
+TypeScript/lint/build pass; manifest **86 = 40 EN + 40 ES + 6**; production audit
+**0 vulnerabilities**. EN/ES responsive and new-link checks pass. The estate offer
+card now grows with its text, resolving clipping/overlap found at 320px. The
+separate pre-existing homepage H1/newsletter overlap remains deferred.
+Reviews and legitimate local business mentions/links are deferred at the owner's
+request; no review requests or outreach now. Later tasks are in `TASKS.md`.
+Full follow-up and post-deployment ranking plan: `SEO_LEAD_AUDIT.md`, final section.
+
+**Gold-page follow-up — measure after deployment, ahead of cosmetic home fixes.**
+Aug 19–28 → Aug 29–Sep 7, exact `/gold-services`: 60→68 impressions,
+position 12.2→20.4. Of three shared queries, brand/antique were stable; **estate
+jewelry naples fl** worsened 10→22.1. Exact page + U.S. + that query: desktop
+6→7 impressions, 9.3→22.1; mobile 2→0, 12→missing (never rank 0). All clicks 0.
+New low-ranking queries worsen the exposed mix, but its 34→43 impressions do
+not reconcile the page's 60→68 headline. This is a specific follow-up, not proof
+of a broad gold-search loss or the call decline's cause. Deploy the tested copy,
+then compare the same page/query/country/device; the limited follow-up above is
+implemented, without claiming it explains or guarantees recovery of rankings.
+For that U.S. query, estate page position also worsened 10→18.3; homepage
+clicks rose 1→2. No diamond page appeared among the 15 exposed URL rows.
+Full scoped evidence is in `SEO_LEAD_AUDIT.md`.
+
+**09-10 earlier seller-acquisition batch — verified before the three-file extension above.**
+Gold/sterling/estate-jewelry copy is seller-first in EN/ES; centralized daily
+9–6 phone hours appear by hero calls, footer and contact surfaces. Diamond
+marketing now emphasizes jewelry evaluations; its route and historical buying
+policy remain. That earlier batch changed **13 app source files plus package manifests**. Next/eslint
+16.3.4, Sharp 0.35.4; production audit 0 vulnerabilities. Post-update gates:
+TypeScript/lint/build pass; **1276/1276 tests (130 files)**; manifest **86 routes
+= 40 EN + 40 ES + 6**. These checks apply to the earlier batch, before the new
+three-file follow-up. Earlier seller-page responsive checks passed; the existing **320px EN/ES homepage
+H1/newsletter overlap** is deferred for reassessment. **No new SQL/env.
+Not deployed or copied in this session; IndexNow after deployment.**
+
+Yelp saved: 11 boosted seller terms, seven exclusions, seller ad/Specialties,
+9–6 phone CTA, Get more phone calls with call reporting OFF; $15/day and 15-mile
+radius unchanged. Correct CTA number visually verified; no forwarding enabled.
+Yelp Diamond Buyers removal was submitted but returned after reload: unconfirmed.
+GBP secondary Diamond buyer removal accepted; Jewelry buyer remains primary.
+GBP description accepted and number-free Update published. All four revised
+services are saved but **Pending review**. OpenAI seller contexts and ad copy
+reloaded/verified; landing now `/sell/naples` (live HTTP 200), still Serving,
+14 Naples ZIPs and $25/day. Exact state and evidence:
+`SEO_LEAD_AUDIT.md` → Authorized implementation. No lead-quality lift measured.
+
+**09-10 initial seller-call audit — read-only evidence, before the follow-up.**
+Read `SEO_LEAD_AUDIT.md` for the evidence. Equal ten-day GSC windows
+(Aug 19–28 vs Aug 29–Sep 7): clicks 33→46, U.S. clicks 33→45,
+mobile 21→39; GBP interactions 41→41. No single cause is established.
+The prior “local-pack eligibility is the root cause” statement is withdrawn:
+interactions are not calls and the old inquiry count included retained spam.
+Owner clarified: opening date changed TODAY (not the August cause); Google
+reviews dropped this past week, after calls slowed; Yelp reviews were always
+present (filter-change date unknown). Priorities: reconstruct real calls,
+check the 9 AM availability/phone path, measure paid lead quality, and resolve
+documented profile/satellite inconsistencies in a later change phase.
+The deployment records below are historical. The new local batch above is not
+yet deployed; its authorized account changes supersede the initial audit's
+read-only state.
+
+✅ **09-10 (evening) — the "Newest arrivals" sort + hero "New Arrivals →"
+link are DEPLOYED and owner-verified ("pushed and deployed successfully …
+no live verification needed" — no probe run). Staging equals source;
+nothing is in flight.** The paragraph below is the pre-deploy record.
+
+🟡 (superseded) **09-10 (later) — shop gallery "Newest arrivals" sort + homepage hero
 "New Arrivals →" link BUILT + dev-verified + STAGED, awaiting push (no SQL,
 no env vars).** One new option in the existing Sort select (`?sort=newest`,
 EN "Newest arrivals" / ES "Novedades"), `created_at` descending with
@@ -115,25 +187,13 @@ has none); items 2 (hours), reviews-that-name-the-metal, photos and the
 (128 files)** · build exit 0 (481 static pages). `TASKS.md` top;
 `CHANGELOG.md` 09-08 (night, FAQ).
 
-🔎 **09-08 (night) — "why are the calls about diamonds?" INVESTIGATED,
-then the plan item 3 above was built.** Organic search sends ~0 non-brand clicks for any
-material (3 months: diamond 0 / gold 0 / silver 1 click); the calls come
-from the Google Business Profile (71 interactions in August); the site
-publishes gold/silver numbers (`/spot-prices`, guides) so those sellers
-self-serve while a diamond seller can only call; gold/silver landers push
-the form, the diamond lander the phone, and only the diamond/watch/
-appraisal pages carry FAQ schema + the phone in the description.
-**Re-checked with live SERPs, the `.co` history, the leads table and
-GBP research (owner: "it must've been something we did recently" → the
-08-30 GBP rebuild): root cause is local-pack eligibility — we hold the
-"Jewelry buyer" packs (diamond / jewelry / silver-buyer queries) and are
-absent from the gold pack, which "Gold dealer"-primary coin shops own;
-silver has no pack and we are organic #2.** Refined, reordered PLAN at the
-top of `TASKS.md`: GBP owner actions first (verify Gold dealer + Coin
-dealer secondaries, real hours, reviews that name the metal, service
-copy + photos; ⛔ don't switch the primary, ⛔ no "gold" in the name), then
-FAQ-schema/phone parity on the gold + silver landers, CTA changes last.
-Detail: `CHANGELOG.md` 09-08 (night, research addendum + investigation).
+**09-08 call investigation — historical; causal conclusion superseded 09-10.**
+Phone/FAQ parity was implemented, but the investigation did not establish
+where calls originated or why their material mix changed. Its “3 months”
+was Aug 1–Sep 6; GBP interactions were not a call count; product inquiries
+included retained spam. August 30 added categories/services, not a documented
+profile recreation that day. See `SEO_LEAD_AUDIT.md` and the original
+September 8 `CHANGELOG.md` entries for evidence and limitations.
 
 ✅ **09-08 (late) — locale-switch fade fix + `/reviews` count removal
 DEPLOYED and production-verified** (0 `pending` stamps on three live

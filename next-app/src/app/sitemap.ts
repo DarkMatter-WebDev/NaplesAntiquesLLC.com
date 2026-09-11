@@ -26,7 +26,9 @@ const BASE = 'https://naplesestatejewelry.com';
 // plus a teaser on /gold-services and links from the hallmarks page.
 // 2026-09-08: /reviews added, with a link to it in the About menu and the
 // footer of every page.
-const CONTENT_LAST_MODIFIED = new Date('2026-09-08');
+// 2026-09-10: seller-first jewelry/gold/sterling copy, visible phone hours,
+// and reduced standalone diamond promotion across the buying pages.
+const CONTENT_LAST_MODIFIED = new Date('2026-09-10');
 
 // Both locale prefixes the app serves. EVERY public page exists in both, so each
 // language version gets its OWN <url> entry — Google's documented pattern —
